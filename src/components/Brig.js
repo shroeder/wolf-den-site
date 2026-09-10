@@ -390,7 +390,7 @@ export default function Brig() {
                 /* ⚠️ EACH MAN IS A COLUMN, AND HIS NAME HAS ITS OWN BAND. The first cut hung the name on
                    him absolutely and it came out clipped by the bars on all three - "C..mmodore Ash",
                    "ndertow Van". A label that has to fit between two iron bars is a label that will not. */
-                .brg-floor { position: absolute; inset: auto 0 32px 0; z-index: 2; height: 58%;
+                .brg-floor { position: absolute; inset: auto 0 46px 0; z-index: 2; height: 56%;
                     display: flex; align-items: flex-end; justify-content: center; gap: 1%; padding: 0 2%; }
                 .brg-man { position: relative; flex: 1 1 0; min-width: 0; height: 100%;
                     display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
@@ -402,19 +402,22 @@ export default function Brig() {
                 @keyframes brgBreathe { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
                 .brg-man img { display: block; width: auto; max-width: 100%; min-height: 0;
                     flex: 1 1 auto; object-fit: contain; object-position: bottom;
-                    filter: drop-shadow(0 8px 12px rgba(0,0,0,.75)) brightness(.86) contrast(1.06); }
+                    filter: drop-shadow(0 8px 12px rgba(0,0,0,.75)) brightness(.95) contrast(1.04); }
                 .brg-man.is-spent img { filter: drop-shadow(0 8px 12px rgba(0,0,0,.75)) brightness(.6) grayscale(.4); }
                 .brg-man:hover img { filter: drop-shadow(0 8px 16px rgba(0,0,0,.8)) brightness(1); }
                 .brg-plates-row { position: absolute; inset: auto 0 0 0; z-index: 6;
                     display: flex; align-items: stretch; justify-content: center; gap: 1%;
                     padding: 0 2% 5px; pointer-events: none; }
-                .brg-nameplate { flex: 1 1 0; min-width: 0;
+                /* The plate sizes its own text: four men make each column about eighty pixels wide, and a name like
+                   "Cartographer" cannot be set at a fixed size in eighty pixels without breaking mid-word. */
+                .brg-nameplate { container-type: inline-size;
+                    flex: 1 1 0; min-width: 0; min-height: 44px; justify-content: flex-end;
                     display: flex; flex-direction: column; align-items: center; gap: 3px;
                     padding: 5px 4px 6px; border-radius: 5px;
                     background: linear-gradient(180deg, rgba(14,10,7,.55), rgba(8,6,4,.94));
                     box-shadow: inset 0 1px 0 rgba(255,214,150,.10); }
-                .brg-nameplate b { max-width: 100%; font-size: 10.5px; line-height: 1.22; font-weight: 800;
-                    overflow-wrap: anywhere; hyphens: auto;
+                .brg-nameplate b { max-width: 100%; font-size: clamp(8.5px, 11cqw, 11px); line-height: 1.22; font-weight: 800;
+                    overflow-wrap: break-word;
                     color: #f0e2c8; text-align: center; overflow: hidden;
                     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
                     text-shadow: 0 1px 3px #000; }
@@ -593,6 +596,25 @@ export default function Brig() {
                 .brg-broke-name { margin: 4px 0 12px; text-align: center; font-size: 21px;
                     font-weight: 800; color: #f6ead2; }
                 .brg-note { margin: 0 0 14px; text-align: center; font-size: 13px; color: #9a8b74; }
+
+                /* ── ⚠️ A REAL PHONE IS NOT 900 PIXELS TALL ────────────────────────────────────────────
+                   Filmed at 375x440, which is a 667pt phone once the browser chrome is taken off it:
+                   the scene ate 46vh, the tell and the legend took the rest, and TWO OF THE FOUR
+                   TACTICS were below the fold. The tactics are the entire interaction — a player who
+                   has to scroll to find out that Confront exists will not find out that Confront
+                   exists. The room gives up the height, because the room is scenery and they are not. */
+                @media (max-height: 620px) {
+                    .brg-scene { height: 38vh; min-height: 150px; }
+                    .brg-below { padding: 10px 12px 16px; }
+                    .brg-tell { margin-bottom: 9px; padding: 8px 11px; font-size: 13px; }
+                    .brg-legend { gap: 2px 12px; margin-bottom: 9px; }
+                    .brg-legend span { font-size: 11px; }
+                    .brg-plate { padding: 9px 11px; }
+                    .brg-plate b { font-size: 14px; }
+                    .brg-plate i { font-size: 11px; }
+                    .brg-name b { font-size: 16px; }
+                    .brg-name i { font-size: 11px; }
+                }
 
                 @media (min-width: 700px) {
                     .brg-room { aspect-ratio: 16 / 9; }
