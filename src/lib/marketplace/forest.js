@@ -63,16 +63,35 @@ export const BASE_BITE = 1;
 // ⚠️ THE WINDOW WIDENS WITH THE HAFT TRACK RATHER THAN THE MULTIPLIER CLIMBING FASTER. Buying "more damage per
 // tap" twice is one upgrade wearing two names; buying "the rhythm is easier to hold" is a different thing to
 // want, and it is the one that helps a player on a phone with a slow screen.
-export const STREAK_MS = 420;
+//
+// ⚠️ THE BASE WINDOW WAS 420ms AND THAT MADE THE HAFT TRACK DECORATIVE. Anybody mashing a phone is tapping
+// six or seven times a second — 150ms apart — so a 420ms window was never missed by anyone, and "the rhythm is
+// easier to keep hold of" was an upgrade that solved a problem no player had. At 260ms you have to hold better
+// than four taps a second to keep the streak alive, which is a real ask on a small screen, and the eight Haft
+// levels walk it back out to half a second. The track now buys relief from something that actually happens.
+export const STREAK_MS = 260;
 export const STREAK_STEP = 0.08;
 export const STREAK_CAP = 2.0;
 
+//
+// ⚠️ THE THREE TRACKS ARE NOT WORTH THE SAME AND SO THEY MUST NOT COST THE SAME. They all charged a flat
+// 30 wood for the first level, at which price Edge bought +35% damage and Heft bought +3.5% — ten times the
+// value for the same purse. A shop with one right answer and two wrong ones is not a shop, it is a delay before
+// the obvious purchase. Each track now carries its own `base` and `pow`.
+//
+// The point of the curve is the CROSSOVER. Edge's marginal value falls as it climbs (the twelfth level adds
+// 0.35 to a bite of 4.85, which is +7%, where the first added 0.35 to a bite of 1) while Heft's stays flat, so
+// pricing Edge steeply and Heft cheaply makes Edge the obvious early buy and Heft the better one somewhere
+// around Edge 7. That is a decision the player gets to make twice rather than a column they read once.
 export const AXE_TRACKS = {
-    edge:  { id: "edge",  name: "Edge",  max: 12, per: 0.35, effect: "Damage a swing",
+    edge:  { id: "edge",  name: "Edge",  max: 12, per: 0.35, base: 38, pow: 1.8,
+        verb: "Sharpen", effect: "Damage a swing", unit: "a swing",
         blurb: "A sharper bite. Every swing takes more out of the trunk." },
-    haft:  { id: "haft",  name: "Haft",  max: 8,  per: 22,  effect: "Rhythm window",
+    haft:  { id: "haft",  name: "Haft",  max: 8,  per: 30,  base: 18, pow: 1.4,
+        verb: "Re-haft", effect: "Rhythm window", unit: "to keep the rhythm",
         blurb: "A longer handle and a better grip — the rhythm is easier to keep hold of." },
-    heft:  { id: "heft",  name: "Heft",  max: 8,  per: 0.035, effect: "Double-bite chance",
+    heft:  { id: "heft",  name: "Heft",  max: 8,  per: 0.045, base: 22, pow: 1.5,
+        verb: "Weight it", effect: "Double-bite chance", unit: "to bite twice",
         blurb: "Weight behind the head. Sometimes one swing takes two swings' worth." },
 };
 export const AXE_TRACK_IDS = Object.keys(AXE_TRACKS);
@@ -85,8 +104,29 @@ export const doubleChance = (heft = 0) => Math.max(0, Math.min(AXE_TRACKS.heft.m
 export const trackCost = (track, level) => {
     const t = AXE_TRACKS[track];
     if (!t || level >= t.max) return null;
-    return Math.round(30 * (level + 1) ** 1.65);
+    return Math.round(t.base * (level + 1) ** t.pow);
 };
+
+/**
+ * What a level of a track is actually WORTH, as the two numbers a player wants to compare.
+ *
+ * ⚠️ THE SHOP USED TO SHOW A LEVEL COUNTER, A ROW OF PIPS AND A SENTENCE OF FLAVOUR, AND NO NUMBER. "A
+ * sharper bite" next to "0 / 12" and a price does not tell you whether 38 wood is a good deal, so the only way
+ * to find out what an upgrade did was to buy it and go hit a tree. This returns the before and the after in the
+ * track's own units, and lives here rather than in the screen so the simulator prices the same numbers the
+ * player is shown.
+ */
+export function trackReadout(track, level = 0) {
+    const t = AXE_TRACKS[track];
+    if (!t) return null;
+    const at = (n) => {
+        if (track === "edge") return `${(BASE_BITE + n * t.per).toFixed(2)}`;
+        if (track === "haft") return `${Math.round(STREAK_MS + n * t.per)}ms`;
+        return `${Math.round(n * t.per * 100)}%`;
+    };
+    const lvl = Math.max(0, Math.min(t.max, Number(level) || 0));
+    return { now: at(lvl), next: lvl >= t.max ? null : at(lvl + 1), unit: t.unit };
+}
 
 // ── WHAT THE AXE LOOKS LIKE ──────────────────────────────────────────────────────────────────────────────────
 // "you can like upgrade your ax and make it look cool and stuff." The FORM is read off total levels rather than

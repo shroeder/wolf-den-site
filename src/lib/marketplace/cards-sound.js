@@ -262,6 +262,14 @@ export const SFX = {
         haptic([40, 60, 40, 90]);
     },
     forestWood: () => { run([392, 523, 659], { dur: 0.26, type: "triangle", gain: 0.1, step: 0.07 }); haptic([14, 24, 34]); },
+    // A rare trunk coming down. The ordinary payout is three rising notes; this is a bell over a held chord,
+    // so the good ones are audible from the next room without anybody having to read the banner.
+    forestRare: () => {
+        run([523, 659, 784, 1047, 1319], { dur: 0.55, type: "sine", gain: 0.12, step: 0.075 });
+        tone({ freq: 1568, to: 1568, dur: 1.5, type: "sine", gain: 0.09, delay: 0.34 });
+        tone({ freq: 196, to: 196, dur: 1.4, type: "triangle", gain: 0.07, delay: 0.3 });
+        haptic([18, 30, 18, 30, 18, 60, 140]);
+    },
     forestAxe: () => { noise({ dur: 0.3, gain: 0.14, freq: 3400, q: 1.6, sweepTo: 5600 }); run([523, 784, 1047], { dur: 0.34, type: "sine", gain: 0.11, step: 0.08, delay: 0.06 }); haptic([20, 34, 20, 60]); },
 };
 

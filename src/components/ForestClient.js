@@ -18,7 +18,7 @@ import { GiWoodAxe, GiLogging, GiChoppedSkull } from "react-icons/gi";
 import { playMusic, sfx, stopMusic, wake } from "@/lib/marketplace/cards-sound.js";
 import {
     AXE_TRACKS, AXE_TRACK_IDS, STREAK_CAP, STREAK_STEP,
-    axeForm, axeTotal, swing, trackCost, treeById,
+    axeForm, axeTotal, swing, trackCost, trackReadout, treeById,
 } from "@/lib/marketplace/forest.js";
 
 const TREE_ART = (id) => `/images/forest/trees/${id}.png`;
@@ -120,8 +120,9 @@ export default function ForestClient() {
                 setBusy(false);
                 if (!d?.ok) { setErr(errorText(d?.error)); return; }
                 setState(d.forest);
-                sfx("forestWood");
-                setFell({ tree: d.tree, name: d.name, wood: d.wood, swings: next.swings });
+                const rare = ["rare", "epic", "legendary"].includes(treeById(d.tree).rarity);
+                sfx(rare ? "forestRare" : "forestWood");
+                setFell({ tree: d.tree, name: d.name, wood: d.wood, swings: next.swings, rare });
             })();
         }
     }, [live, state, busy, openIdx]);
@@ -237,7 +238,13 @@ export default function ForestClient() {
                     </div>
 
                     {fell ? (
-                        <div className="fr-took" role="status">
+                        /* ⚠️ THE BANNER USED TO BE RARITY-BLIND. A Moonash — a tree that turns up roughly once in
+                           a hundred regrowths and takes seven hundred bites — printed the same grey line as a
+                           birch with a bigger number in it. The one moment this game exists to sell was the one
+                           moment it said nothing about. */
+                        <div className={`fr-took${fell.rare ? " is-rare" : ""}`} role="status"
+                            style={{ "--r": RARITY[treeById(fell.tree).rarity] || "#b9b2a4" }}>
+                            {fell.rare ? <span className="fr-rarity">{treeById(fell.tree).rarity} find</span> : null}
                             <GiChoppedSkull aria-hidden="true" />
                             <b>{fell.name} down</b>
                             <span>+{fell.wood} wood · {fell.swings} swings</span>
@@ -258,13 +265,15 @@ export default function ForestClient() {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={AXE_ART(form.id)} alt="" className="fr-shop-axe" draggable="false" />
                         <p className="fr-shop-name">{form.name}</p>
-                        <p className="fr-shop-sub">{state.wood.toLocaleString()} wood · a swing takes {state.bite}</p>
+                        <p className="fr-shop-sub">{state.wood.toLocaleString()} wood in the pile</p>
                         {AXE_TRACK_IDS.map((id) => {
                             const t = AXE_TRACKS[id];
                             const lvl = state.axe[id] || 0;
                             const cost = trackCost(id, lvl);
+                            const read = trackReadout(id, lvl);
+                            const short = cost != null && state.wood < cost;
                             return (
-                                <div key={id} className="fr-track">
+                                <div key={id} className={`fr-track${short ? " is-short" : ""}`}>
                                     <span className="fr-track-top">
                                         <b>{t.name}</b>
                                         <em>{lvl} / {t.max}</em>
@@ -272,10 +281,16 @@ export default function ForestClient() {
                                     <span className="fr-pips" aria-hidden="true">
                                         {Array.from({ length: t.max }, (_, k) => <i key={k} className={k < lvl ? "is-on" : ""} />)}
                                     </span>
+                                    {/* The two numbers that make the price mean something. */}
+                                    <span className="fr-track-num">
+                                        <b>{read.now}</b>
+                                        {read.next ? <><s aria-hidden="true">→</s><u>{read.next}</u></> : null}
+                                        <i>{read.unit}</i>
+                                    </span>
                                     <i className="fr-track-blurb">{t.blurb}</i>
-                                    <button type="button" className="fr-btn is-go" disabled={busy || cost == null || state.wood < cost}
+                                    <button type="button" className="fr-btn is-go" disabled={busy || cost == null || short}
                                         onClick={() => buy(id)}>
-                                        {cost == null ? "Maxed" : <>Sharpen <em>{cost} wood</em></>}
+                                        {cost == null ? "Maxed" : <>{t.verb} <em>{cost.toLocaleString()} wood</em></>}
                                     </button>
                                 </div>
                             );
@@ -429,6 +444,17 @@ export default function ForestClient() {
                 @keyframes frTook { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
                 .fr-took :global(svg) { width: 26px; height: 26px; color: #b6d06a; }
                 .fr-took b { font-size: 19px; font-weight: 800; color: #e8f0e4; }
+                .fr-took.is-rare :global(svg) { color: var(--r); }
+                .fr-took.is-rare b { color: var(--r); text-shadow: 0 0 18px color-mix(in srgb, var(--r) 55%, transparent); }
+                .fr-rarity { display: block; margin-bottom: 2px !important; padding: 2px 10px; border-radius: 999px;
+                    font-size: 10.5px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+                    color: var(--r) !important; border: 1px solid color-mix(in srgb, var(--r) 45%, transparent);
+                    background: color-mix(in srgb, var(--r) 12%, transparent);
+                    animation: frRare 2.4s ease-in-out infinite; }
+                @keyframes frRare {
+                    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--r) 40%, transparent); }
+                    50% { box-shadow: 0 0 16px 3px color-mix(in srgb, var(--r) 26%, transparent); }
+                }
                 .fr-took span { font-size: 13px; color: #ffcf87; margin-bottom: 8px; }
 
                 /* ── THE AXE ──────────────────────────────────────────────────────────────────────── */
@@ -448,6 +474,13 @@ export default function ForestClient() {
                 .fr-pips { display: flex; gap: 3px; margin: 6px 0 5px; }
                 .fr-pips i { flex: 1 1 0; height: 5px; border-radius: 999px; background: #2c352a; }
                 .fr-pips i.is-on { background: linear-gradient(90deg, #8fbf7a, #d8f0be); }
+                .fr-track-num { display: flex; align-items: baseline; gap: 6px; margin: 7px 0 5px; }
+                .fr-track-num b { font-size: 17px; font-weight: 800; color: #cfd8c8; font-variant-numeric: tabular-nums; }
+                .fr-track-num s { text-decoration: none; color: #6f7a68; font-size: 13px; }
+                .fr-track-num u { text-decoration: none; font-size: 17px; font-weight: 800; color: #9ede7a;
+                    font-variant-numeric: tabular-nums; }
+                .fr-track-num i { margin-left: 4px; font-style: normal; font-size: 11.5px; color: #7d876f; }
+                .fr-track.is-short .fr-track-num u { color: #6f7a68; }
                 .fr-track-blurb { display: block; margin-bottom: 9px; font-style: normal;
                     font-size: 12px; line-height: 1.4; color: #8a9384; }
                 .fr-track .fr-btn { width: 100%; }
