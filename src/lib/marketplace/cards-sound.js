@@ -235,6 +235,34 @@ export const SFX = {
     brigChart: () => { noise({ dur: 0.5, gain: 0.09, freq: 2200, q: 0.8, sweepTo: 900 }); run([233, 294, 349, 466], { dur: 0.7, type: "triangle", gain: 0.11, step: 0.11, delay: 0.08 }); haptic([20, 30, 20, 30, 90]); },
     // He buys himself back, and it is coins and a key.
     brigRansom: () => { run([392, 330], { dur: 0.2, type: "triangle", gain: 0.09, step: 0.07 }); noise({ dur: 0.26, gain: 0.1, freq: 1400, q: 2, sweepTo: 500, delay: 0.05 }); haptic([16, 26]); },
+
+    // ── THE FOREST ───────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ THE CHOP IS PLAYED TEN TIMES A SECOND, so it has to be SHORT and it has to VARY. A fixed sample at
+    // mashing speed becomes a buzz within a second — the pitch is jittered per swing so a run of them reads
+    // as chopping rather than as one tone stuttering. Everything here is wood, not metal: the axe is the
+    // quiet half of the sound and the trunk is the loud half.
+    forestChop: () => {
+        const j = 0.86 + Math.random() * 0.3;
+        noise({ dur: 0.055, gain: 0.13, freq: 900 * j, q: 1.5, sweepTo: 260 * j });
+        tone({ freq: 160 * j, to: 96 * j, dur: 0.07, type: "square", gain: 0.07 });
+        haptic(9);
+    },
+    // The same swing once the rhythm is up: deeper, with the ring of a well-struck haft behind it.
+    forestBite: () => {
+        const j = 0.9 + Math.random() * 0.22;
+        noise({ dur: 0.08, gain: 0.17, freq: 1500 * j, q: 1.1, sweepTo: 300 * j });
+        tone({ freq: 210 * j, to: 84 * j, dur: 0.11, type: "sawtooth", gain: 0.1 });
+        haptic(16);
+    },
+    // The trunk giving. One crack, then the long fall.
+    forestTimber: () => {
+        noise({ dur: 0.22, gain: 0.2, freq: 700, q: 0.8, sweepTo: 150 });
+        tone({ freq: 120, to: 44, dur: 0.9, type: "sawtooth", gain: 0.13, delay: 0.06 });
+        noise({ dur: 0.7, gain: 0.12, freq: 400, q: 0.7, sweepTo: 90, delay: 0.18 });
+        haptic([40, 60, 40, 90]);
+    },
+    forestWood: () => { run([392, 523, 659], { dur: 0.26, type: "triangle", gain: 0.1, step: 0.07 }); haptic([14, 24, 34]); },
+    forestAxe: () => { noise({ dur: 0.3, gain: 0.14, freq: 3400, q: 1.6, sweepTo: 5600 }); run([523, 784, 1047], { dur: 0.34, type: "sine", gain: 0.11, step: 0.08, delay: 0.06 }); haptic([20, 34, 20, 60]); },
 };
 
 /** Play by name, ignoring anything this palette has never heard of. */
@@ -253,6 +281,8 @@ const TRACKS = {
     boss: { root: 110.00, steps: [0, 1, 5, 6, 5, 1], beat: 0.44, type: "sawtooth", drone: true },
     shop: { root: 220.00, steps: [0, 4, 7, 11, 7, 4], beat: 0.44, type: "sine", drone: false },
     campfire: { root: 164.81, steps: [0, 7, 12, 7], beat: 0.78, type: "sine", drone: true },
+    // ── THE FOREST ── open, cold and slow, with a fifth that never resolves. It sits under a lot of tapping.
+    forest: { root: 146.83, steps: [0, 7, 5, 7, 0, 3], beat: 1.05, type: "sine", drone: true },
     event: { root: 155.56, steps: [0, 2, 3, 7, 3, 2], beat: 0.50, type: "sine", drone: true },
     // ── BELOW DECKS ──────────────────────────────────────────────────────────────────────────────────
     // The slowest thing in here on purpose. An interrogation is a room where nothing is happening fast
