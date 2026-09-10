@@ -86,7 +86,7 @@ export default function HoldAndSpin({ hold, onDone }) {
             <div className="hs-head">
                 <i>{hold?.label || "Hold and Spin"}</i>
                 <b key={onBoard}>{onBoard.toLocaleString()}</b>
-                <em>{done ? "chips" : "chips if it stops here"}</em>
+                <em>{done ? "tokens" : "tokens if it stops here"}</em>
             </div>
 
             {/* THE RESPINS LEFT ARE THE WHOLE GAME. Three lamps, and every coin that lands puts them all

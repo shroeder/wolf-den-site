@@ -249,7 +249,7 @@ export default function GemVault({ gems, bet, onDone }) {
                     <img className="gv-won-art" src={winner.art} alt="" draggable="false" />
                     <span className="gv-won-kick">{winner.name} set complete</span>
                     <b className="gv-won-n">{(winner.pay * (bet || 0)).toLocaleString()}</b>
-                    <span className="gv-won-sub">chips</span>
+                    <span className="gv-won-sub">tokens</span>
                 </div>
             ) : null}
         </div>

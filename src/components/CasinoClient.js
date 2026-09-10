@@ -1240,6 +1240,12 @@ export default function CasinoClient({ initial }) {
                 setSt((p) => ({
                     ...p, others: r.others, gold: r.gold, vip: r.vip ?? p?.vip,
                     chips: heldChips.current != null ? p?.chips : (r.chips ?? p?.chips),
+                    // The token purse rides the same hold as the chip purse: while a win is being
+                    // counted up on screen the number must not jump ahead of the animation. It was
+                    // simply absent here, so tokens moved only on a reload, which is how members
+                    // came to describe a win as "paying chips" -- the only figure that visibly moved
+                    // was the wrong one. See stakeNow, which merges the same two fields.
+                    tokens: heldChips.current != null ? p?.tokens : (r.tokens ?? p?.tokens),
                 }));
                 if (r.pot) setPot(r.pot.amount);
             }
@@ -2142,7 +2148,7 @@ export default function CasinoClient({ initial }) {
                                 drawn…". */}
                             <p className={`cas-result${keno?.won > 0 ? " is-win" : ""}${kenoPending ? " is-edge" : ""}`}>
                                 {keno && !busy
-                                    ? `${keno.hits.length} of 5${keno.goldMine ? ` · the golden ball doubled it` : ""} — ${keno.won > 0 ? `${money(keno.won)} chips` : "nothing"}`
+                                    ? `${keno.hits.length} of 5${keno.goldMine ? ` · the golden ball doubled it` : ""} — ${keno.won > 0 ? `${money(keno.won)} tokens` : "nothing"}`
                                     : kenoPending
                                         ? `${kenoPending.hits} of 5 · one more is ${money(kenoPending.chips)}`
                                         : keno ? `${kenoOut} of ${keno.drawn.length} drawn…`
@@ -2538,12 +2544,12 @@ export default function CasinoClient({ initial }) {
                                     moment — on the line announcing that you had won. Luke: "remove rake from
                                     this, we don't want to rake anything." Both are gone because the rake is
                                     gone; what stands in its place is the thing that IS true now, which is
-                                    that the table pays chips. */}
+                                    that the table pays TOKENS — chips are what it took to sit down. */}
                                 {!hand ? "Blackjack pays 3:2. Dealer stands on all 17."
                                     : hand.open ? (hand.hands?.[hand.active]?.canSplit ? "Hit, stand, double, or split." : "Hit, stand, or double.")
                                         : hand.outcome === "split" ? "Both hands played."
                                             : OUTCOME[hand.outcome] || "Hand over."}
-                                {hand && !hand.open && hand.won > 0 ? ` +${money(hand.won)} chips` : ""}
+                                {hand && !hand.open && hand.won > 0 ? ` +${money(hand.won)} tokens` : ""}
                             </p>
                         </div>
                     ) : null}
@@ -2606,7 +2612,7 @@ export default function CasinoClient({ initial }) {
                                                 : "The dragon passes — every square was already yours.")
                                             : busy ? `${called} of ${card.drawn.length} called…`
                                                 : card.label
-                                                    ? `${card.label} — ${card.won > 0 ? `${money(card.won)} chips` : "no pay"}`
+                                                    ? `${card.label} — ${card.won > 0 ? `${money(card.won)} tokens` : "no pay"}`
                                                     : "Not this time."}
                                 </p>
                             ) : null}

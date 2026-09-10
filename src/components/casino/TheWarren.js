@@ -345,7 +345,7 @@ export default function TheWarren({ warren, onDone, owner = false }) {
             <div className="wr-head">
                 <i>{inHoard ? "The Hoard" : cur?.name || "The Warren"}</i>
                 <b key={won}>{won.toLocaleString()}</b>
-                <em>chips</em>
+                <em>tokens</em>
                 <div className="wr-depth" aria-label={`Level ${depth} of ${stages.length + 1}`}>
                     {Array.from({ length: 6 }, (_, i) => (
                         <span key={i} className={i < depth ? "is-on" : ""} />
@@ -480,7 +480,7 @@ export default function TheWarren({ warren, onDone, owner = false }) {
                 <div className="wr-end" role="status">
                     <i>{reachedHoard ? "You cracked the Deep Warren open" : "The warren is closed"}</i>
                     <b>{won.toLocaleString()}</b>
-                    <em>chips</em>
+                    <em>tokens</em>
                     <ul className="wr-tally">
                         <li><span>{deepest}</span> {deepest === 1 ? "room" : "rooms"} deep</li>
                         <li><span>{opened}</span> {opened === 1 ? "egg" : "eggs"} opened</li>

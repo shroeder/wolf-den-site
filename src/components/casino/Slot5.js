@@ -1539,7 +1539,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                         draggable="false" />
                     <span className="s5-tally-kick">{round === "locked" ? "The locking round is done" : "The round is done"}</span>
                     <b className="s5-tally-n"><Tally n={freeWon} /></b>
-                    <span className="s5-tally-sub">chips</span>
+                    <span className="s5-tally-sub">tokens</span>
                     <div className="s5-tally-rows">
                         <span><i>Spins</i><b>{result[round].spins.length}</b></span>
                         {/* ── THE ROUND'S OWN NUMBERS, NOT THE OFFER'S ─────────────────────────────────
@@ -1589,7 +1589,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                 expression position is a parse error, and it is one this file has already made once. */}
             <div className="s5-say">
                 {phase === "spin" ? <span className="s5-dim">…</span>
-                    : lit ? <span><b>{lit.count}</b> {symbolName(lit.symbol, machineId)} — <b>{lit.chips.toLocaleString()}</b> chips</span>
+                    : lit ? <span><b>{lit.count}</b> {symbolName(lit.symbol, machineId)} — <b>{lit.chips.toLocaleString()}</b> tokens</span>
                     : result?.wonChips && phase === "done" && !isBigWin(result.multiple)
                         ? <WinTally key={`w${result.id || result.wonChips}`} chips={result.wonChips}
                             multiple={result.multiple || 0} tone={symbolTone(slot5(machineId).wild, machineId)}

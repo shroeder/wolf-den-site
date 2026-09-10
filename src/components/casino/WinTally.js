@@ -125,7 +125,7 @@ export default function WinTally({ chips = 0, multiple = 0, tone = "#ffd75e", ms
             {over ? <Burst key="land" kind={tier.burst} tone={tone} /> : null}
             <span className="wt-title">{tier.label}</span>
             <b className="wt-n">{at.toLocaleString()}</b>
-            <span className="wt-sub">chips</span>
+            <span className="wt-sub">tokens</span>
         </div>
     );
 }

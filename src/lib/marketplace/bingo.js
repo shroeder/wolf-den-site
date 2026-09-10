@@ -125,16 +125,22 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     // here, exactly as it does at every slot cabinet and now at the blackjack table.
     const wonGold = Math.round(stake * (score.mult + patternHit.mult));
     const won = wonGold > 0 ? chipsFor(wonGold, 1) : 0;
-    // `chips` already holds the balance after the stake — the win moves it again rather than shadowing it.
+    // `chips` already holds the balance after the stake, and the stake is the ONLY thing that moved it.
+    let tokens = null;
     if (won > 0) {
         // ⚠ The win is TOKENS; the stake was chips and is gone. See tokens.js.
-        const after = await moveTokens(buyerId, won, "casino_bingo_win", {
+        // -- THE WIN BALANCE IS TOKENS AND MUST NOT LAND IN `chips` --------------------------------
+        // It did, and members watched their chip purse GO UP on a win -- Sunflower Jinxx: "it was
+        // paying me in chips when I won, not tokens". moveTokens returns the TOKEN balance, and
+        // assigning it to `chips` handed the screen a chip figure that was really a token count,
+        // which is the one thing the split exists to make impossible. Two purses, two variables.
+        tokens = await moveTokens(buyerId, won, "casino_bingo_win", {
             meta: { bet: stake, tier: score.tier, lines: score.lines.length, dragon: burnt.length,
             pattern: patternHit.hit ? today.id : null, patternMult: patternHit.mult, wonGold, rate: CHIP_RATE },
         });
-        if (after != null) chips = after;
     }
     if (chips == null) chips = await chipBalance(buyerId);
+    if (tokens == null) tokens = await tokenBalance(buyerId);
     await trackActivity(buyerId, "casino_play", {
         game: "bingo", bet: stake, wonChips: won,
         multiple: Number((score.mult || 0).toFixed(3)),
@@ -181,7 +187,10 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
         won,
         wonGold,
         chips,
-        chips,
+        // ⚠️ THIS SAID `chips` TWICE. The second was meant to be the token purse and the slip meant
+        // bingo returned no token balance at all, so the header's tokens figure only ever moved on a
+        // reload -- Eric D: "if you refresh the casino page, it should show it as tokens won".
+        tokens,
         prize,
         onHouse,
     };

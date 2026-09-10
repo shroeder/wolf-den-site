@@ -133,19 +133,25 @@ async function settleAll(buyerId, row, dealerCards, hands) {
     const back = chipsFor(backGold, 1);
     const won = chipsFor(wonGold, 1);
 
+    // -- TWO PURSES, TWO VARIABLES ----------------------------------------------------------------
+    // `chips` used to hold whatever moveTokens returned, which is the TOKEN balance -- so a winning
+    // hand reported a chip figure that was really a token count, and no token figure at all. Same
+    // slip as bingo, same symptom members saw: the win looked like it paid chips.
     let chips = null;
+    let tokens = null;
     if (back > 0) {
         // ⚠️ TOKENS, and that includes the part of `back` that is the returned stake. On this floor a
         // stake does not come back — the chips were spent to sit down. A push therefore pays your
         // stake in tokens rather than refunding chips, which is the same arithmetic for the player
         // and keeps the one rule the whole split rests on: chips only ever go down. See tokens.js.
-        chips = await moveTokens(buyerId, back, "casino_blackjack_win", {
+        tokens = await moveTokens(buyerId, back, "casino_blackjack_win", {
             ref: String(row.id),
             meta: { bet: results.reduce((n, r) => n + r.bet, 0), outcomes: results.map((r) => r.outcome),
                 goldStaked: row.stake, backGold, wonGold, rate: CHIP_RATE, hands: hands.length },
         });
     }
     if (chips == null) chips = await chipBalance(buyerId);
+    if (tokens == null) tokens = await tokenBalance(buyerId);
     await trackActivity(buyerId, "casino_play", {
         game: "blackjack", bet: row.stake, wonChips: back,
         multiple: row.stake ? Number((backGold / row.stake).toFixed(3)) : 0,
@@ -185,7 +191,7 @@ async function settleAll(buyerId, row, dealerCards, hands) {
     // A natural twenty-one is this table's jackpot: it is the rarest good outcome and the one worth a prize.
     const prize = await rollCasinoPrize(buyerId, { jackpot: results.some((r) => r.outcome === "blackjack"), perks });
 
-    return { hand: publicView(shape, { reveal: true }), gold, chips, won, wonGold, outcome, prize };
+    return { hand: publicView(shape, { reveal: true }), gold, chips, tokens, won, wonGold, outcome, prize };
 }
 
 /**
@@ -204,7 +210,7 @@ async function advance(buyerId, row, hands, active) {
     const alive = hands.some((h) => !handValue(h.cards).bust);
     const dealer = alive ? playDealer(parse(row.dealer, []), shoe) : parse(row.dealer, []);
     const s = await settleAll(buyerId, row, dealer, hands);
-    return { ok: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: row.stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
+    return { ok: true, gold: s.gold, chips: s.chips, tokens: s.tokens, hand: s.hand, bet: row.stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
 }
 
 /**
@@ -252,7 +258,7 @@ export async function dealBlackjack(buyerId, { bet } = {}) {
     // A natural on either side ends it immediately — there is no turn to take.
     if (isBlackjack(player) || isBlackjack(dealer)) {
         const s = await settleAll(buyerId, row, dealer, hands);
-        return { ok: true, natural: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
+        return { ok: true, natural: true, gold: s.gold, chips: s.chips, tokens: s.tokens, hand: s.hand, bet: stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
     }
     // `paid` is the chip balance moveChips handed back — no gold moved anywhere in this file.
     return { ok: true, chips: paid, hand: publicView(row), bet: stake };
@@ -358,7 +364,7 @@ export async function splitBlackjack(buyerId) {
         const shoeNow = parse(saved.shoe, []);
         const dealer = playDealer(parse(saved.dealer, []), shoeNow);
         const s = await settleAll(buyerId, saved, dealer, split);
-        return { ok: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: row.stake * 2, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
+        return { ok: true, gold: s.gold, chips: s.chips, tokens: s.tokens, hand: s.hand, bet: row.stake * 2, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
     }
     return { ok: true, hand: publicView(saved) };
 }

@@ -633,7 +633,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
                         the screen is watching it arrive. */}
                     <span className="s5-tally-n"><WinTally chips={tally.total} multiple={0} ms={1700}
                         tone={symbolTone(m.wild, machineId)} /></span>
-                    <span className="s5-tally-sub">chips</span>
+                    <span className="s5-tally-sub">tokens</span>
                     <div className="s5-tally-rows">
                         <span><i>Spins</i><b>{tally.spins}</b></span>
                         <span><i>{m.scatter === "moon" ? "Moons" : "Scatters"}</i><b>{tally.scatters}</b></span>

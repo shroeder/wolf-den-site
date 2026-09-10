@@ -105,11 +105,14 @@ export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25
                     <b>What it pays</b>
                     <button type="button" className="pt-x" onClick={onClose} aria-label="Close">✕</button>
                 </div>
-                {/* THE UNIT IS NOT THE SAME ON EVERY CABINET. The five-reel machines pay chips; the ones
-                    that have not been rebuilt still pay the gold you staked. Saying "chips" on both was the
-                    kind of wrong that a member only finds out by being paid something else. */}
+                {/* THE UNIT IS THE SAME ON EVERY CABINET AGAIN, and it is neither of the two this line
+                    used to name. It read "chips" on the five-reels and "gold" on the three-reels, which
+                    was true of each in turn and is true of neither now: every machine on the floor takes
+                    CHIPS and pays TOKENS. The three-reel cabinet was the last one still paying what it
+                    took, and it was corrected with the rest — see casino.js casino_slot_win. Getting this
+                    line wrong is the kind of wrong a member only finds out by being paid something else. */}
                 <p className="pt-sub">
-                    In {kind === "five" ? "chips" : "gold"}, at a bet of <b>{bet.toLocaleString()}</b>
+                    In tokens, at a bet of <b>{bet.toLocaleString()}</b>
                     {kind === "five" ? <> across {LINES.length} lines</> : null}. Raise the bet and every number
                     here rises with it.
                 </p>
