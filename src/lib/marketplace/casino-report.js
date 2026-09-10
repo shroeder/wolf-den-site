@@ -28,7 +28,7 @@ import { primaryOwnerId } from "@/lib/marketplace/owner.js";
 // casino_play held nothing before 2026-08-26 — five of the first six days of the casino were simply absent
 // from the report, silently, with a plausible-looking number in every box.
 //
-// mkt_coin_event and mkt_chip_event are written by logCoin and moveChips inside the same call that moves the
+// mkt_coin_event and mkt_token_event are written by logCoin and moveChips inside the same call that moves the
 // balance. They cannot miss a play, they carry the machine and the win split in their meta, and they are the
 // rows an argument about somebody's balance would be settled from. Telemetry is a convenience; a ledger is the
 // record.
@@ -180,7 +180,7 @@ async function ledgers({ days, buyerId = null }) {
                     COUNT(*)::int AS n,
                     COALESCE(SUM(e.delta), 0)::bigint AS total,
                     COALESCE(MAX(e.delta), 0)::bigint AS best
-               FROM mkt_chip_event e
+               FROM mkt_token_event e
               WHERE e.created_at >= NOW() - $1::interval${who}
               GROUP BY 1, 2, 3, 4`, args).catch(() => []),
     ]);
@@ -220,7 +220,7 @@ async function winSources({ days, buyerId = null, byMachine = false }) {
             `SELECT ${mach} AS machine, s.key AS source,
                     COALESCE(SUM(s.value::numeric), 0)::bigint AS chips,
                     COUNT(*) FILTER (WHERE s.value::numeric > 0)::int AS n
-               FROM mkt_chip_event e, LATERAL jsonb_each_text(e.meta->'from') AS s
+               FROM mkt_token_event e, LATERAL jsonb_each_text(e.meta->'from') AS s
               WHERE e.reason = 'slot5' AND e.created_at >= NOW() - $1::interval${who}
                 AND e.meta ? 'from'
               GROUP BY 1, 2`, args).catch(() => []),
@@ -230,7 +230,7 @@ async function winSources({ days, buyerId = null, byMachine = false }) {
                     COUNT(*)::int AS n,
                     COUNT(*) FILTER (WHERE COALESCE((e.meta->>'free')::numeric, 0)
                                         + COALESCE((e.meta->>'locked')::numeric, 0) > 0)::int AS bonus_n
-               FROM mkt_chip_event e
+               FROM mkt_token_event e
               WHERE e.reason = 'slot5' AND e.created_at >= NOW() - $1::interval${who}
                 AND NOT (e.meta ? 'from') AND e.meta ? 'base'
               GROUP BY 1`, args).catch(() => []),
@@ -306,15 +306,20 @@ export async function getCasinoReport({ days = 7 } = {}) {
                     COALESCE(SUM(won), 0)::bigint AS chips_won,
                     COALESCE(SUM(plays), 0)::int AS plays
                FROM (
+                 -- ⚠️ CHIPS, NOT COIN. Every bet on this floor is a chip debit and has been since the
+                 -- cage moved to the front; this asked the GOLD ledger for rows matching '_bet$' and got
+                 -- nothing, so the staking line has been drawing flat zero. The gold that enters the floor
+                 -- is casino_chips_buy on mkt_coin_event, which is a different question from this one.
+                 -- (No backticks in here: this SQL lives in a JS template literal and one would end it.)
                  SELECT (created_at AT TIME ZONE '${TZ}')::date AS day,
                         SUM(-delta) AS spent, 0 AS won, COUNT(*) AS plays
-                   FROM mkt_coin_event
+                   FROM mkt_chip_event
                   WHERE reason ~ '_bet$' AND buyer_id <> $2 AND created_at >= NOW() - $1::interval
                   GROUP BY 1
                  UNION ALL
                  SELECT (created_at AT TIME ZONE '${TZ}')::date AS day,
                         0 AS spent, SUM(delta) AS won, 0 AS plays
-                   FROM mkt_chip_event
+                   FROM mkt_token_event
                   WHERE delta > 0 AND reason <> 'slot5_forced' AND buyer_id <> $2
                     AND created_at >= NOW() - $1::interval
                   GROUP BY 1
@@ -481,7 +486,7 @@ export async function getCasinoPlayerReport({ buyerId, days = 7 } = {}) {
                FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(
             `SELECT created_at AS at, reason, COALESCE(ref, '') AS ref, delta, meta
-               FROM mkt_chip_event
+               FROM mkt_token_event
               WHERE buyer_id = $1 AND created_at >= NOW() - $2::interval AND delta > 0
               ORDER BY created_at DESC LIMIT 40`, [buyerId, iv]).catch(() => []),
         // ── KENO, BY HOW MANY THEY HIT ───────────────────────────────────────────────────────────────
@@ -490,19 +495,19 @@ export async function getCasinoPlayerReport({ buyerId, days = 7 } = {}) {
         db.query(
             `SELECT COALESCE((meta->>'hits')::int, 0) AS hits, COUNT(*)::int AS n,
                     COALESCE(SUM(delta), 0)::bigint AS chips
-               FROM mkt_chip_event
+               FROM mkt_token_event
               WHERE buyer_id = $1 AND reason = 'casino_keno_win' AND created_at >= NOW() - $2::interval
               GROUP BY 1 ORDER BY 1 DESC`, [buyerId, iv]).catch(() => []),
         db.query(
             `SELECT o AS outcome, COUNT(*)::int AS n
-               FROM mkt_chip_event e, LATERAL jsonb_array_elements_text(COALESCE(e.meta->'outcomes', '[]'::jsonb)) AS o
+               FROM mkt_token_event e, LATERAL jsonb_array_elements_text(COALESCE(e.meta->'outcomes', '[]'::jsonb)) AS o
               WHERE e.buyer_id = $1 AND e.reason = 'casino_blackjack_win' AND e.created_at >= NOW() - $2::interval
               GROUP BY 1 ORDER BY n DESC`, [buyerId, iv]).catch(() => []),
         db.query(
             `SELECT COALESCE(meta->>'tier', 'card') AS tier, COUNT(*)::int AS n,
                     COALESCE(SUM(delta), 0)::bigint AS chips,
                     COUNT(*) FILTER (WHERE COALESCE((meta->>'dragon')::int, 0) > 0)::int AS dragon
-               FROM mkt_chip_event
+               FROM mkt_token_event
               WHERE buyer_id = $1 AND reason = 'casino_bingo_win' AND created_at >= NOW() - $2::interval
               GROUP BY 1 ORDER BY chips DESC`, [buyerId, iv]).catch(() => []),
         db.query(

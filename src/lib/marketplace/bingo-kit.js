@@ -259,6 +259,30 @@ export const cornersOf = (card, drawn, burnt = []) => {
 // house edge, it was the trap: two-thirds of the return of the thing next to it, for a player who has no way
 // of knowing that. The whole ladder is multiplied by 1.41 so the SHAPE is untouched — the same one-in-two-
 // thousand six-liner, the same corners consolation — and only the height moves.
+// ── ⚠️ THIS TABLE WAS PAYING 144% AND NOBODY HAD EVER SEEN THE NUMBER ────────────────────
+// The simulator reported 94.62% for two reasons, and both were the sim's fault rather than this table's: it
+// scored every card with an empty `burnt` list — a game with no dragon in it — and it never added the day's
+// pattern, which bingo.js pays IN ADDITION to the lines. Given both, it reads 144.09% (lines 141.10, the
+// pattern 2.99), against a live ledger that says 163% over 2,310 real cards. Sim and floor now agree to
+// within the sample.
+//
+// ⚠️ AND THAT MADE BINGO THE ONLY GAME WORTH PLAYING. Since the split (migration 436) a win is TOKENS, so
+// a game's return is no longer an abstract house edge — it is the exchange rate from gold to what is on the
+// Counter's shelf. At 144 against the cabinets' 121, every gold piece spent anywhere else on the floor was a
+// worse deal by nineteen points, and four of the five slot machines were decoration.
+//
+// ⚠️ THIS IS NOT THE "DO NOT BALANCE TO A NUMBER" CASE, and the difference is worth writing down because
+// the instruction is standing. That one was about trimming payouts to hold an arbitrary RTP in a currency
+// that could not leave the casino — the target protected nothing, so the trimming was pure loss. Here the
+// target is not arbitrary: Luke picked 121% today, deliberately, off a priced table ("50 percent went
+// broke"), and it is now the rate at which the whole floor converts gold into prizes. Bingo's 144 was never
+// chosen by anyone; it was an accident hidden by a broken measurement. Bringing an accident into line with a
+// decision is a different act from levelling a cabinet down to serve a gate.
+//
+// ONE DIAL, and reversing it is one number: set BINGO_PAY to 1 and bingo is exactly what it was this
+// morning. Re-measure with `node --import ./scripts/lib/register-loader.mjs scripts/casino-sim.mjs`.
+export const BINGO_PAY = 0.86;
+
 export const BINGO_PAYS = {
     corners: 0.7,
     1: 1.4,
@@ -268,6 +292,16 @@ export const BINGO_PAYS = {
     5: 35,
     6: 283,   // six lines or more — about one card in two thousand
 };
+
+// Scaled at import, the same way the cabinets' paytables are (see casino-slot5.js): every number a player
+// can win moves together, so the screen and the payout cannot disagree. The pattern awards go with them —
+// they are the same win in a different shape, and leaving them behind would slowly make the pattern of the
+// day the only part of bingo worth chasing.
+if (BINGO_PAY !== 1) {
+    for (const k of Object.keys(BINGO_PAYS)) {
+        BINGO_PAYS[k] = Number((BINGO_PAYS[k] * BINGO_PAY).toPrecision(6));
+    }
+}
 
 /** The single source of truth for what one card won. The screen shows what this returned. */
 export function scoreCard(card, drawn, burnt = []) {
@@ -344,6 +378,11 @@ export const PATTERNS = [
  * key rather than working the date out here — this module is shared with the browser, and a client deciding
  * for itself what day it is in Montgomery is a client that disagrees with the till for five hours a night.
  */
+// The day's patterns take the same dial as the lines above — see the note by BINGO_PAY.
+if (BINGO_PAY !== 1) {
+    for (const pat of PATTERNS) pat.pay = Number((pat.pay * BINGO_PAY).toPrecision(6));
+}
+
 export const patternFor = (weekday) => PATTERNS[((Number(weekday) || 0) % PATTERNS.length + PATTERNS.length) % PATTERNS.length];
 
 /** Whether a card completed a pattern, and what it is worth. Same `marked` rule the lines use. */

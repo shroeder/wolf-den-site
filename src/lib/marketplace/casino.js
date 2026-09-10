@@ -1,6 +1,7 @@
 import "server-only";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { CHIP_RATE, DAILY_CHIPS, chipBalance, chipsFor, moveChips } from "@/lib/marketplace/chips.js";
+import { moveTokens, tokenBalance } from "@/lib/marketplace/tokens.js";
 
 import { db } from "@/lib/db";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -636,10 +637,13 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
         // then counts a fact the slot asserted, instead of re-deriving "three wolves" from a multiplier it
         // would have to keep in step with the paytable forever. Each cabinet's jackpot is its own top symbol,
         // so the badge keeps working across three of them without knowing there are three.
-        const back = await moveChips(buyerId, won, "casino_slot_win", {
+        // ⚠️ TOKENS, and `bank` DOES NOT MOVE. The old cabinet was the last machine on the floor still
+        // paying the currency it took, which quietly broke the one rule the split rests on: chips only ever
+        // go down. Found by grepping every moveChips with a positive delta — three machines were still
+        // minting fuel out of play. See tokens.js and migration 436.
+        await moveTokens(buyerId, won, "casino_slot_win", {
             meta: { bet: stake, reels, mult, machine: m.id, jackpot: reels.every((r) => r === m.symbols[0].id) },
         });
-        if (back != null) bank = back;
     }
     // Three of a kind on the top symbol is this machine's rarest event, so it is the one that is certain.
     const prize = await rollCasinoPrize(buyerId, { jackpot: reels.every((r) => r === m.symbols[0].id), perks });
@@ -672,7 +676,10 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     await surpriseChest(buyerId, "casino", SURPRISE_WEIGHT.light).catch(() => {});
 
     return {
-        ok: true, machine: m.id, reels, mult, bet: stake, won, chips: bank, prize, onHouse,
+        // Both purses: `chips` is the fuel left after the stake (it cannot have gone up) and `tokens`
+        // is where the win landed. See tokens.js.
+        ok: true, machine: m.id, reels, mult, bet: stake, won,
+        chips: bank, tokens: await tokenBalance(buyerId), prize, onHouse,
         free, nudged, awarded, struck: struck > 1 ? struck : null, tipped: tipped > 0 ? tipped : null,
         fed: fx.fed?.length ? fx.fed : null, burst: fx.burst?.length ? fx.burst : null,
         potWon: potWon > 0 ? potWon : null, pot: await readPot(),
@@ -898,15 +905,17 @@ export async function gambleWin(buyerId, { machine } = {}) {
     const stake = Math.round(meter.pending || 0);
     if (stake <= 0) return { ok: false, error: "nothing_to_gamble" };
 
-    // The win is already in the player's CHIPS, so the gamble takes it back first and pays the result. Taking
-    // it back with moveChips' own `chips >= n` guard — the same one every other bet uses — means a gamble can
-    // never go through on a balance that has already been spent elsewhere.
-    let bank = await moveChips(buyerId, -stake, "casino_gamble_bet", { meta: { machine: m.id } });
+    // ⚠️ THE GAMBLE IS ENTIRELY IN TOKENS, both sides. The win it is risking was PAID in tokens, so
+    // taking it back out of chips would have let a player convert their winnings into fuel at even money —
+    // a door back through the split, and the one thing the whole design exists to prevent. Taken back with
+    // moveTokens' own `tokens >= n` guard, the same one the Counter uses, so a gamble cannot go through on
+    // a balance that has already been spent on a pet.
+    let bank = await moveTokens(buyerId, -stake, "casino_gamble_bet", { meta: { machine: m.id } });
     if (bank == null) return { ok: false, error: "no_chips" };
 
     const won = Math.random() < GAMBLE_WIN_CHANCE;
     if (won) {
-        const back = await moveChips(buyerId, stake * 2, "casino_gamble_win", { meta: { machine: m.id } });
+        const back = await moveTokens(buyerId, stake * 2, "casino_gamble_win", { meta: { machine: m.id } });
         if (back != null) bank = back;
     }
 
@@ -917,7 +926,11 @@ export async function gambleWin(buyerId, { machine } = {}) {
     await trackActivity(buyerId, "casino_gamble", {
         machine: m.id, staked: stake, won: Boolean(won), payout: won ? stake * 2 : 0,
     }).catch(() => {});
-    return { ok: true, machine: m.id, staked: stake, won, payout: won ? stake * 2 : 0, chips: bank };
+    // `bank` is the TOKEN balance here, not the chip one — this whole function moves tokens. The field
+    // keeps its name because the client reads it by that name; `tokens` carries the same number under the
+    // name that is now true, and the chip purse is sent so the header can redraw both.
+    return { ok: true, machine: m.id, staked: stake, won, payout: won ? stake * 2 : 0,
+        chips: await chipBalance(buyerId), tokens: bank };
 }
 
 // ── THE CROUPIER'S CAT ───────────────────────────────────────────────────────────────────────────────────────
@@ -990,7 +1003,21 @@ export const KENO_DRAWN = 10;
 // Two hits still returns your stake exactly. That tier is 27.8% of all tickets and it is the one people read
 // as "I got my money back"; taking the cut from there would have made the commonest outcome a small loss,
 // which is a worse game for the same number. The whole reduction comes off the three tiers above it.
-export const KENO_PAYS = { 0: 0, 1: 0, 2: 1, 3: 2.7, 4: 22, 5: 540 };
+// ── ⚠️ THE LOW ONE, BROUGHT UP ─────────────────────────────────────────────
+// Since the split (migration 436) a win is TOKENS, so a game's return is the exchange rate from gold to what
+// is on the Counter's shelf — and a floor where the rate differs by game is a floor where all but one game
+// is a worse deal. Keno sat at 94.77% against the cabinets' 121: the worst rate in the building, on the game
+// with the shortest round.
+//
+// Raised to the floor's own number rather than left as the cheap corner, which is the direction the standing
+// instruction points — bring the LOW one up, never level the others down. The dial multiplies the whole
+// ladder so the SHAPE is untouched: two hits still returns your stake, five hits is still the thing you are
+// there for, and the golden ball still doubles whatever landed. Exactly the same treatment the cabinets got.
+export const KENO_PAY = 1.277;
+export const KENO_PAYS = Object.fromEntries(
+    Object.entries({ 0: 0, 1: 0, 2: 1, 3: 2.7, 4: 22, 5: 540 })
+        .map(([k, v]) => [k, Number((v * KENO_PAY).toPrecision(6))]),
+);
 
 // ── THE GOLDEN BALL ──────────────────────────────────────────────────────────────────────────────────────────
 // Keno's problem was never its return, it was the shape of it. Worked out exactly rather than simulated — the
@@ -1125,11 +1152,13 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     // `chips` already holds the balance after the stake was taken — the win moves it again rather than
     // shadowing it. Two `let chips` in one scope is a build error, and the second one silently meaning
     // something different from the first would be worse than one.
+    // ⚠️ TOKENS, and `chips` DOES NOT MOVE — it is the fuel left after the stake. Same correction as
+    // the three-reel cabinet above: keno was still paying the currency it took.
+    let tokens = null;
     if (won > 0) {
-        const after = await moveChips(buyerId, won, "casino_keno_win", {
+        tokens = await moveTokens(buyerId, won, "casino_keno_win", {
             meta: { bet: stake, hits: hits.length, picks: clean, wonGold, rate: CHIP_RATE },
         });
-        if (after != null) chips = after;
     }
     await trackActivity(buyerId, "casino_play", {
         game: "keno", bet: stake, wonChips: won,
@@ -1165,6 +1194,7 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     // metric `casino_keno_win`, which no bounty and no quest has ever asked for.
     await tickCasinoQuests(buyerId, "keno", won);
     if (chips == null) chips = await chipBalance(buyerId);
+    if (tokens == null) tokens = await tokenBalance(buyerId);
 
     return {
         ok: true,
@@ -1182,6 +1212,7 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         won,
         wonGold,
         chips,
+        tokens,
         staked,
         onHouse,
         refund,

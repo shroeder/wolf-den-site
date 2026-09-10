@@ -146,22 +146,60 @@ const HANDS = arg("--hands", 300000);
 
 // ── BINGO ────────────────────────────────────────────────────────────────────────────────────────────────────
 const bi = await import("@/lib/marketplace/bingo-kit.js");
+// ── ⚠️ THIS MEASURED THE LINES AND NOTHING ELSE, AND IT WAS OUT BY SIXTY POINTS ─────────────────────────────
+// It reported 94.62% while the live ledger said 163% — 1,336,050 chips staked against 2,181,417 won, over
+// 2,310 real cards. That gap was not variance and it was not the paytable. It was two whole features this
+// sim could not see:
+//
+//   THE PATTERN OF THE DAY pays IN ADDITION to whatever lines the card made (see bingo.js: the win is
+//   `score.mult + patternHit.mult`). This asked scoreCard for the lines and stopped there, so every pattern
+//   award the game has ever paid was invisible to it.
+//
+//   THE DRAGON burns numbers off the card before it is scored. This passed `[]` for the burnt list, which
+//   is the state of a card the dragon never visited — so the sim was measuring a game that has no dragon in
+//   it at all.
+//
+// Same failure the five-reel gate had, in the same words its own note uses: "a gate that cannot see a
+// feature is a gate that lies about the machine." It composes the payout the way bingo.js composes it now,
+// which is the only version of this that can be trusted.
 {
     const CARDS = arg("--cards", 200000);
-    let staked = 0, back = 0;
+    let staked = 0, back = 0, lines = 0, patterns = 0, dragons = 0;
     const tally = {};
-    for (let i = 0; i < CARDS; i += 1) {
-        const card = bi.makeCard();
-        const pool = Array.from({ length: bi.BALLS }, (_, n) => n + 1);
-        for (let j = pool.length - 1; j > 0; j -= 1) { const k = Math.floor(Math.random() * (j + 1)); [pool[j], pool[k]] = [pool[k], pool[j]]; }
-        const drawn = pool.slice(0, bi.DRAWN);
-        const r = bi.scoreCard(card, drawn, []);
-        const mult = Number(r?.mult) || 0;   // scoreCard's own field — the one the screen reads
-        staked += 1; back += mult;
-        const key = r?.tier ?? (mult ? String(mult) : "nothing");
-        tally[key] = (tally[key] || 0) + 1;
+    // The pattern is the SHOP'S DAY, and every day of the week is a different one — so a single day's
+    // pattern is a single day's RTP, not the machine's. Swept across all seven and reported as a range,
+    // because "which day is it" turning out to be worth ten points is exactly the sort of thing a mean
+    // hides. The board rotates; the number a player meets depends on when they walk in.
+    const perDay = [];
+    for (let day = 0; day < 7; day += 1) {
+        const pattern = bi.patternFor(day);
+        let dStaked = 0, dBack = 0;
+        for (let i = 0; i < Math.round(CARDS / 7); i += 1) {
+            const card = bi.makeCard();
+            const pool = Array.from({ length: bi.BALLS }, (_, n) => n + 1);
+            for (let j = pool.length - 1; j > 0; j -= 1) { const k = Math.floor(Math.random() * (j + 1)); [pool[j], pool[k]] = [pool[k], pool[j]]; }
+            const drawn = pool.slice(0, bi.DRAWN);
+            // The dragon first, exactly as the game does it: it decides what is burnt, and the burnt list
+            // is what the card is then scored against.
+            const dragon = bi.dragonFor(card, drawn, Math.random, {});
+            const burnt = bi.burntOf(dragon);
+            if (burnt.length) dragons += 1;
+            const r = bi.scoreCard(card, drawn, burnt);
+            const hit = bi.patternAward(card, drawn, burnt, pattern);
+            const lineMult = Number(r?.mult) || 0;
+            const patMult = Number(hit?.mult) || 0;
+            const mult = lineMult + patMult;      // bingo.js: `score.mult + patternHit.mult`
+            staked += 1; back += mult; dStaked += 1; dBack += mult;
+            lines += lineMult; patterns += patMult;
+            const key = r?.tier ?? (lineMult ? String(lineMult) : "nothing");
+            tally[key] = (tally[key] || 0) + 1;
+        }
+        perDay.push({ day: pattern?.name || `day ${day}`, rtp: dBack / dStaked });
     }
     console.log(`\n── BINGO ──  ${CARDS.toLocaleString()} cards, ${bi.DRAWN} of ${bi.BALLS} drawn`);
-    console.log(`  RTP ${(100 * back / staked).toFixed(2)}%`);
-    console.log("  outcomes " + JSON.stringify(tally));
+    console.log(`  RTP ${(100 * back / staked).toFixed(2)}%   `
+        + `= lines ${(100 * lines / staked).toFixed(2)}% + the day's pattern ${(100 * patterns / staked).toFixed(2)}%`);
+    console.log(`  the dragon visited ${(100 * dragons / staked).toFixed(2)}% of cards`);
+    for (const d of perDay) console.log(`    ${String(d.day).padEnd(18)} ${(100 * d.rtp).toFixed(2)}%`);
+    console.log("  line outcomes " + JSON.stringify(tally));
 }
