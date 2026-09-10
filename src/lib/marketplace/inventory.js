@@ -8,6 +8,7 @@ import { getOwnedPieceIds, grantPiece } from "@/lib/marketplace/collection-owned
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { getElementOverrides, describeItemElements } from "@/lib/marketplace/item-element.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
+import { powerFor } from "@/lib/marketplace/ascension-powers.js";
 import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
 import { setBonusStats, activeSetBonuses, setForItem, getSetsOverview } from "@/lib/marketplace/sets.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -34,6 +35,30 @@ async function memberContext(buyerId) {
 }
 
 // Grant gate: drives WHEN level/milestone items are auto-gifted (syncLevelItems). Still uses reqLevel.
+// ── ⚠️ WHAT AN ITEM DOES, FROM WHICHEVER SYSTEM GAVE IT ONE ──────────────────────────
+// From the bug channel: "do all ascendant/higher items not have any special ability? Like all my
+// legendary/mythic items have one, none of the ascendant/higher I have seen do."
+//
+// They all have one. It was never being DRAWN. Two systems grant special abilities and only one of them
+// reached the card:
+//     ITEM_SIGNATURES (signatures.js)      legendary 54/55, mythic 47/47  — rendered
+//     ASCENSION_POWERS (ascension-powers)  ascendant 35/37, eternal 30/31,
+//                                          celestial 30/30, primordial 25/26  — rendered NOWHERE
+// His own Ascendant Cleaver carries The Long Reach; the card just never said so. So the best gear in the
+// game read as the only gear with nothing special about it, which is worse than a missing feature — a
+// player can see a hole where a line should be and reasonably conclude the tier is unfinished.
+//
+// ⚠️ THE PAYLOAD IS THE ONLY PLACE THIS MERGES, NOT signatureFor. Combat asks signatureFor directly for
+// its magnitudes (signatureHit, signatureStrikeBonus, rollCheerProcs) and an ascension power has none of
+// them — folding the two together at the source would hand the boss maths an effect it cannot price. This
+// is a view model; every renderer already knows how to draw `signature`, so it is the one field to fill.
+const abilityOf = (id) => {
+    const sig = signatureFor(id);
+    if (sig) return sig;
+    const pow = powerFor(id);
+    return pow ? { label: pow.name, desc: pow.desc, power: true } : null;
+};
+
 export function itemLockReason(item, ctx, metrics = null) {
     if (item.reqLevel && ctx.level < item.reqLevel) return `Reach Level ${item.reqLevel}`;
     if (item.reqBadge && !ctx.badges.has(item.reqBadge)) return `Requires the ${item.reqBadge} badge`;
@@ -238,7 +263,9 @@ function gearPhraseFromSlots(bySlot) {
         ? " Their finest pieces glow with golden power."
         : "";
     // Powers: signature / charged (elite) gear visibly crackles with magical energy, so the art reads "strong".
-    const powered = items.some((x) => signatureFor(x.def.id) || x.def.charged);
+    // The avatar's art crackles for a signature OR an ascension power — an ascendant piece is the
+    // strongest thing a member can be wearing and it was the one kind that did not read as strong.
+    const powered = items.some((x) => abilityOf(x.def.id) || x.def.charged);
     const powerClause = powered ? " Their most powerful pieces crackle with visible arcane energy — glowing runes, sparks, and magical light trailing off the gear." : "";
     return parts.length ? `The hero is ${parts.join(", ")} — draw every piece of equipment clearly as worn armor, a flowing cape, and held weapons, matching each item's rarity and power.${aura}${powerClause}` : "";
 }
@@ -397,7 +424,7 @@ export async function getInventory(buyerId) {
                 // The socket, and the gem in it — so every grid that draws this item can show it.
                 socket: Boolean((socketed[def.id] || []).length),
                 gem: (() => { const g = (socketed[def.id] || []).find((x) => x.gemId); return g ? gemById(g.gemId) : null; })(),
-                util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null,
+                util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: abilityOf(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null,
                 // Trophies are not items any more, so nothing in this bag can be one and the flag is always
                 // false. Kept on the payload so the client's existing branches stay valid until they are cleaned
                 // up; the collections panel reads mkt_user_collection directly.
@@ -449,7 +476,7 @@ export async function getInventory(buyerId) {
             const set = setForItem(i.id);
             return {
                 id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
-                stats: i.stats, statsText: describeStats(i.stats), sea: i.sea || null, depth: i.depth || null, signature: signatureFor(i.id),
+                stats: i.stats, statsText: describeStats(i.stats), sea: i.sea || null, depth: i.depth || null, signature: abilityOf(i.id),
                 // Base elements only, and correctly so: an override belongs to an OWNER, and nothing in the
                 // shop is owned yet. What you see on the shelf is what the piece arrives attuned to.
                 elements: describeItemElements(i.id, null),
