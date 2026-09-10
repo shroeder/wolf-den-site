@@ -90,6 +90,23 @@ export const VOYAGE_OPTIONS = [
     { id: "long", label: "Long expedition", mult: 6, frag: { gold: 83, mythic: 17 } },    // ~24h — gold or mythic
 ];
 
+// ── THE CHARTED ISLAND ───────────────────────────────────────────────────────────────────────────────────────
+// What three broken captains buy. Deliberately NOT a fourth entry in VOYAGE_OPTIONS: that list is the picker,
+// and a charted island is not a longer voyage you choose — it is a place you were TOLD about, and the only way
+// to reach it is to have made somebody say where it is.
+//
+// ⚠️ IT IS MEANT TO OUTGROW THE THREE ABOVE. Luke: "its a unique dig with unique rewards, eventually we replace
+// the voyage stuff with this." So it is built as the SUCCESSOR rather than the top rung — its own board, its
+// own payout, its own backdrop — and the three durations stay exactly as they are until it is ready to take
+// over. Nothing here changes an ordinary voyage by a single number.
+export const CHARTED_VOYAGE = {
+    id: "charted", label: "A charted island", mult: 4,
+    // Better than a long expedition can roll, and it can roll the top on its own.
+    frag: { gold: 55, mythic: 45 },
+};
+/** Everything a stored `voyage_quality` can be. The picker still only ever offers VOYAGE_OPTIONS. */
+export const ALL_VOYAGES = [...VOYAGE_OPTIONS, CHARTED_VOYAGE];
+
 // SAILING — dispatch your boat on a ONE-WAY voyage to a mysterious island; when it lands you play an
 // excavation dig minigame (ESO-style: a grid of dirt, a limited stamina budget, an Augur "hot/cold" locator)
 // trying to unearth a treasure-chest FRAGMENT before you run out. Win or fail, you return to port and can set
@@ -601,7 +618,9 @@ export const ISLAND_ART = "/images/sailing/island.png";
 const SKY_BGS = ["sunset", "sunrise", "night", "storm", "fog", "clearday", "goldenhour", "dusk", "overcast", "aurora"]
     .map((t) => `/images/sailing/sky-${t}.png`);
 // Dig-pit backdrop hints at the RARITY of the duration you chose (short→plain, standard→gold, long→mythic).
-const DIG_BGS = { short: "/images/sailing/dig-short.png", standard: "/images/sailing/dig-standard.png", long: "/images/sailing/dig-long.png" };
+const DIG_BGS = { short: "/images/sailing/dig-short.png", standard: "/images/sailing/dig-standard.png", long: "/images/sailing/dig-long.png",
+    // A charted island has to LOOK like somewhere else or the whole loop lands you on the same beach.
+    charted: "/images/sailing/dig-charted.png" };
 
 // --- pure curves ---------------------------------------------------------------------------------------
 // A new boat form every LEVELS_PER_FORM levels, capped at BOAT_TIERS distinct arts (level 80 → tier 9).
@@ -898,10 +917,20 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     const luckLevel = row?.find_level || 0;
     const level = boatLevelFromUpgrades(row?.speed_level || 0, fortuneLevel, row?.rarity_level || 0, luckLevel, row?.raid_level || 0);
     // The hunt scales with Excavation level (voyages): bigger board, more treasure, deeper dirt at higher tiers.
-    const tier = digTier(row?.voyages_completed || 0);
-    const size = digSize(tier);
+    // ── AND A CHARTED ISLAND IS NOT THE SAME DIG ─────────────────────────────────────────────────────
+    // Three captains told you where this is, so it is bigger ground, buried deeper, and it holds TWO of
+    // them rather than one. The grade — the three men's stars added up, 3 to 15 — is what decides how much
+    // of each, so a chart made of small men is a modest island and one made of admirals is not.
+    //
+    // ⚠️ THE STAMINA HAS TO MOVE WITH THE BOARD. A wider, deeper board on the same dig budget is not a
+    // better island, it is the same island you are allowed to see less of — which is how a reward turns
+    // into a tax. The extra digs are granted below, in the same block that grants Deep Ballast's.
+    const charted = Number(row?.chart_grade) || 0;
+    const chartStep = charted ? Math.max(1, Math.round(charted / 4)) : 0;   // 1 at grade 3 … 4 at grade 15
+    const tier = Math.min(6, digTier(row?.voyages_completed || 0) + chartStep);
+    const size = digSize(tier) + (charted ? 1 : 0);
     const rows = size, cols = size;
-    const maxDepth = digDepthMax(tier);
+    const maxDepth = digDepthMax(tier) + (charted ? 1 : 0);
     // Every tile is a stack of 1–maxDepth dirt layers you chip through. A literal CHEST (a 2×N rectangle) is
     // buried; a SCAN reads how close it is (hot→cold), and digging its cells uncovers the chest piece-by-piece.
     const depth = Array.from({ length: rows }, () => Array.from({ length: cols }, () => 1 + randInt(maxDepth)));
@@ -929,7 +958,10 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     // `> 0` and not `=== true`: a lure is a COUNT now, so a second one banks instead of overwriting the
     // first — see mig400 and the note in consumables.js. Reading it as a boolean here would have quietly
     // stopped charming anything the moment the column changed type.
-    const twinChest = (Number(row?.dig_lure) || 0) > 0 && Math.random() < luckyChance(LURE_TWIN_CHANCE, fortune);
+    // A charted island always holds two. That is the thing three confessions bought, and it must not be a
+    // roll — a reward you had to break three men for cannot sometimes not be there.
+    const twinChest = charted > 0
+        || ((Number(row?.dig_lure) || 0) > 0 && Math.random() < luckyChance(LURE_TWIN_CHANCE, fortune));
     // A flat cap on how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
     const cap = Math.min(fragMaxDepth(), maxDepth);
     // Beachhead: a third of sites arrive half dug, so the shallow layers over the chest are already gone.
@@ -965,6 +997,8 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     // is what "twice" means here.
     let stamina = digStamina(row?.dig_stamina_level || 0) + (tier - 1) * 2 + petStamina;
     if (boardPowers?.has?.("deep_ballast")) stamina += 4;
+    // See the note by `charted` above: the board grew, so the budget grows with it.
+    if (charted) stamina += 3 + chartStep * 2;
     if (boardPowers?.has?.("twice_landed")) stamina *= 2;
     const maxSenses = digSenseBudget(tier);
     // Bake the digging-upgrade proc chances + unlocked tools onto the board so every dig can apply them.
@@ -978,7 +1012,9 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     // Unlocked tools (by chest-points) baked onto the board with each one's PROC chance, so every dig can roll them.
     const toolLevels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
     const tools = unlockedTools(digUpgradeLevels(row)).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, cols: t.cols, rows: t.rows, layers: t.layers, proc: toolProcChance(Number(toolLevels[t.id]) || 0) }));
-    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, chestTier: artifactTier, shape, artifactTier, chestBox, twinChest, items, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
+    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, chestTier: artifactTier, shape, artifactTier, chestBox, twinChest, items, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0,
+        // Carried on the board so the dig screen can say where it is standing and finishDig can pay it.
+        charted: charted || 0 };
 }
 
 // Resolve the board's status after a mutation. Finding the chest NO LONGER ends the dig on its own — you keep
@@ -1113,7 +1149,7 @@ function boardView(board) {
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
 // `baits` is handed in for the same reason gunDeck and the recipe shelf are: it is a pantry query and this
 // function is synchronous on purpose.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = [], baitCookable = [], deepFish = false) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = [], baitCookable = [], deepFish = false, charts = 0) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1155,6 +1191,11 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // Every chest tier's real art, so the dig board can draw the one that is actually buried.
         chestArtMap: chestArt,
         // Embark duration choices — trip time + which shards each favours — for the "set sail" picker.
+        // ── AND A CHART, IF THREE MEN GAVE ONE UP ────────────────────────────────────────────────
+        // A COUNT, not the charts themselves: the embark row only needs to know whether the option
+        // exists and what the best one is worth. The brig is where a chart is actually looked at.
+        // Owner-gated with the rest of the feature — see captains.js CAPTAINS_PUBLIC.
+        chartsReady: charts,
         voyageOptions: VOYAGE_OPTIONS.map((o) => ({
             id: o.id, label: o.label,
             ms: Math.round(voyageDurationMs(speedLevel, level) * o.mult),
@@ -1764,8 +1805,18 @@ export async function getSailingState(buyerId, skyKey = null) {
     const heroRow = await db.queryOne(
         `SELECT avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [buyerId]
     ).catch(() => null);
+    // ── HOW MANY CHARTS ARE WAITING ──────────────────────────────────────────────────────────────────────
+    // ⚠️ ONE COUNT, AND ONLY FOR THE OWNER. This is on the sailing state, which every member loads on every
+    // visit to the harbour — so an ungated query here would be a round trip the whole Den pays for a feature
+    // only one person can see. See the note on CPU in CLAUDE.md: the lever that matters is queries per
+    // request, and the cheapest query is the one that is not made.
+    const chartsHeld = captainsOpenTo(isOwner(buyerId))
+        ? Number((await db.queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL`, [buyerId]
+        ).catch(() => null))?.n || 0)
+        : 0;
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
-        recipeShop, baits, baitCookable, deepFish), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        recipeShop, baits, baitCookable, deepFish, chartsHeld), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
         // ── THE PURSE, WHERE YOU CAN SEE IT ──────────────────────────────────────────────────────────
         // Sunflower Jinxx: "it gives boat stat lvl 22, then has dabloons and gold but the dabloons is always
         // 0. I can't see how many I have unless I look in the quartermaster." Always 0 is exactly right: the
@@ -1785,7 +1836,23 @@ export async function startVoyage(buyerId, optionId = "standard") {
     const row = await readRow(buyerId);
     const state = decorate(row);
     if (state.status !== "idle") return { ok: false, error: "busy", ...(await getSailingState(buyerId)) };
-    const opt = VOYAGE_OPTIONS.find((o) => o.id === optionId) || VOYAGE_OPTIONS[1];
+    // ── SPENDING A CHART ─────────────────────────────────────────────────────────────────────────────
+    // Marked sailed BEFORE the voyage row is written, and conditionally, so a double-tap cannot put one
+    // chart on two voyages — there is no transaction on this driver to lean on (see postgres-landmines).
+    // If the voyage insert below then failed the player would lose a chart, which is why nothing between
+    // here and it is allowed to throw: the only statements in between are arithmetic.
+    let chart = null;
+    if (optionId === "charted") {
+        const [c] = await db.query(
+            `UPDATE mkt_ship_chart SET sailed_at = NOW()
+              WHERE id = (SELECT id FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL
+                           ORDER BY grade DESC, made_at LIMIT 1)
+              RETURNING id, grade, band`, [buyerId]
+        ).catch(() => []);
+        if (!c) return { ok: false, error: "no_chart" };
+        chart = c;
+    }
+    const opt = optionId === "charted" ? CHARTED_VOYAGE : (VOYAGE_OPTIONS.find((o) => o.id === optionId) || VOYAGE_OPTIONS[1]);
     let voyageSpeed = seaEffects(await equippedSeaAffinity(buyerId)).voyageSpeed; // Tailwind shortens the trip
     // Following Sea: a companion shortens it further, capped at 25% so a 4h voyage lands at 3h. Added to
     // Tailwind rather than multiplied — MIN_VOYAGE_MS below is the real floor either way.
@@ -1820,12 +1887,14 @@ export async function startVoyage(buyerId, optionId = "standard") {
         `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, voyage_quality, voyage_ms, encounter_at, encounter_result, wind_recharges, updated_at)
          VALUES ($1, NOW(), NOW() + ($2 || ' milliseconds')::interval, NULL, $3, $4,
                  CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END, NULL, 0, NOW())
+         -- $6, $7 and $8 are read by the DO UPDATE below; a first-ever voyage has no chart to carry.
          ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval,
                  dig_state = NULL, voyage_quality = $3, voyage_ms = $4,
                  encounter_at = CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END,
                  encounter_result = NULL, merchant_json = NULL, wind_recharges = 0, force_encounter = FALSE, arrival_notified = FALSE, idle_notified_at = NULL,
-                 encounter_marks = $6::jsonb, encounter_paused_at = NULL, encounter_active = NULL, updated_at = NOW()`,
-        [buyerId, String(ms), opt.id, ms, encMs, JSON.stringify(marks)]
+                 encounter_marks = $6::jsonb, encounter_paused_at = NULL, encounter_active = NULL,
+                 chart_id = $7, chart_grade = $8, updated_at = NOW()`,
+        [buyerId, String(ms), opt.id, ms, encMs, JSON.stringify(marks), chart?.id || null, chart?.grade || null]
     ).catch(() => {});
     await bumpQuestProgress(buyerId, "voyage_start", 1).catch(() => {}); // "Set sail" daily quest
     await trackActivity(buyerId, "sail_voyage", { option: opt.id, hours: Math.round(ms / 3600000) }).catch(() => {});
@@ -3910,7 +3979,9 @@ function nextTierCapped(tier) {
 // Roll one dug shard's tier from the voyage's duration weights, with a small Rarity chance to bump it up a
 // tier (never past the cap).
 function rollFragmentTier(qualityId, rarityLevel = 0, level = 1) {
-    const opt = VOYAGE_OPTIONS.find((o) => o.id === qualityId) || VOYAGE_OPTIONS[1];
+    // ALL_VOYAGES, not VOYAGE_OPTIONS — a charted island is a quality the picker never offers, and looking it
+    // up in the picker's list would silently fall through to `standard` and pay a charted dig in plain iron.
+    const opt = ALL_VOYAGES.find((o) => o.id === qualityId) || VOYAGE_OPTIONS[1];
     const weights = opt.frag;
     const total = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
     let r = Math.random() * total;
@@ -3927,7 +3998,18 @@ async function finishDig(buyerId, board) {
     // voyage, because a dig is the part you actually play; a voyage is a timer you come back to.
     const { rollStone } = await import("@/lib/marketplace/pet-ascension.js");
     const { STONE_SOURCES } = await import("@/lib/marketplace/pet-stones.js");
-    const digStone = await rollStone(buyerId, STONE_SOURCES.sail_dig.chance, "sail_dig").catch(() => null);
+    // ── WHAT A CHARTED ISLAND HOLDS THAT NO VOYAGE DOES ──────────────────────────────────────────────
+    // The stone is the difference. On an ordinary dig it is a small chance, which is right — a stone
+    // should be a morning that went unusually well. Three broken captains is not luck, it is a bill
+    // somebody paid, so a charted island hands one over: chance 1 rather than STONE_SOURCES.sail_dig.
+    //
+    // ⚠️ THE STONE IS THE UNIQUE PART, NOT THE MULTIPLIER. The temptation was to make this dig pay the
+    // same things faster, which is how an ordinary voyage becomes pointless and the whole loop collapses
+    // into "only ever sail charted". It pays a DIFFERENT thing instead, and the ordinary voyage keeps its
+    // own job. Same reasoning as the note on CHARTED_VOYAGE.
+    const chartGradeHere = Number(board?.charted) || 0;
+    const stoneSrc = chartGradeHere ? "sail_charted" : "sail_dig";
+    const digStone = await rollStone(buyerId, STONE_SOURCES[stoneSrc].chance, stoneSrc).catch(() => null);
     // ── AND THE FOUR RAREST CHESTS ── on the DIG, for the same reason the stone is: a dig is the part you
     // actually play. Sailing was one of the systems named by name, and it pays in loot rather than in coin,
     // so there is no ledger line for the sweep to have sat beside — it had to be placed here by hand.
@@ -3992,6 +4074,9 @@ async function finishDig(buyerId, board) {
     await db.query(
         `UPDATE mkt_sailing
             SET dig_state = NULL, departed_at = NULL, returns_at = NULL, voyage_quality = NULL,
+                -- The chart is spent the moment the island is dug, not the moment it is sailed to, so a
+                -- voyage that never got dug does not quietly eat one.
+                chart_id = NULL, chart_grade = NULL,
                 -- ONE charge, not all of them. This cleared the flag outright, which was correct while it
                 -- was a boolean and is the whole bug now that a member can hold five.
                 dig_lure = GREATEST(0, dig_lure - 1),

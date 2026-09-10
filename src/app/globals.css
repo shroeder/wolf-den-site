@@ -12509,6 +12509,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-embark-title { font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .sail-embark-title .muted { font-weight: 600; }
 .sail-embark-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* The charted island sits in the same row as the three durations and must not read as a fourth one:
+   colder, bordered rather than filled, and it says what it spends. See the note at its JSX. */
+.sail-embark-opt.is-charted { border-color: #4d6f8e; background: linear-gradient(180deg, #14202b, #0f1720);
+    box-shadow: inset 0 0 0 1px rgba(120,180,230,.18); }
+.sail-embark-opt.is-charted .sail-embark-opt-name { color: #a8d4ff; }
+.sail-embark-opt.is-charted .sail-embark-opt-loot { color: #7f97ad; }
 .sail-embark-opt { display: grid; gap: 3px; justify-items: center; padding: 10px 6px; border-radius: 12px; cursor: pointer;
     background: linear-gradient(180deg, rgba(90,170,255,0.16), rgba(40,90,160,0.16)); border: 1px solid rgba(120,190,255,0.4);
     color: #eaf6ff; transition: transform 0.12s ease, box-shadow 0.12s ease; }

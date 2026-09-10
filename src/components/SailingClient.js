@@ -1030,6 +1030,23 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                     </span>
                                 </button>
                             ))}
+                            {/* ── AND THE ONE YOU WERE TOLD ABOUT ──────────────────────────────────────
+                                Not one of the three durations and drawn so it cannot be mistaken for one:
+                                a charted island is not a longer trip you choose, it is a place three
+                                captains were made to name. Only ever rendered when one is actually in
+                                hand, so for everybody else this row is exactly what it was.
+                                Owner-gated upstream — chartsReady is 0 for anyone the feature is shut to,
+                                so there is no second gate to forget here. */}
+                            {(state.chartsReady || 0) > 0 ? (
+                                <button className="sail-embark-opt is-charted" disabled={busy}
+                                    onClick={() => act("start", { duration: "charted" })}>
+                                    <span className="sail-embark-opt-name">A charted island</span>
+                                    <span className="sail-embark-opt-time">🧭 {fmtLeft(4 * 60 * 60 * 1000)}</span>
+                                    <span className="sail-embark-opt-loot">
+                                        {state.chartsReady > 1 ? `${state.chartsReady} charts` : "1 chart"} · the best one is spent
+                                    </span>
+                                </button>
+                            ) : null}
                         </div>
                         {/* SHIP BATTLES, public since 2026-08-09. Still keyed off `combat.fleet` rather than a
                             bare truthy check: a state that came back without it (an error shape, a stale cache)

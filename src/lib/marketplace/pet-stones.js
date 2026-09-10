@@ -79,6 +79,13 @@ export const STONE_SOURCES = {
     mine_seam: { label: "a deep seam", chance: 0.0015 },
     // Sailing: what the dredge turns up on a dig.
     sail_dig: { label: "a dig", chance: 0.00125 },
+    // ── AND A CHARTED ISLAND, WHICH IS THE ONLY CERTAIN ONE ──────────────────────────────────────────────
+    // chance 1 is not a typo and not a farm. Reaching a charted island costs three captains BROKEN — each
+    // one bought off a won fleet battle, held in one of four berths, and talked out of the only thing he
+    // knows — and the whole loop yields a single island. This is what that is for. It is declared here
+    // rather than passed as a bare 1 from sailing.js so this table stays what its header claims: the one
+    // place the stone supply can be read off.
+    sail_charted: { label: "a charted island", chance: 1 },
     // The boss: only on a KILL, which is a whole-server event a few times a week.
     boss_kill: { label: "a boss kill", chance: 0.02 },
     // The Depths' dungeons: the floor-ten boss, one run per dungeon per day.
