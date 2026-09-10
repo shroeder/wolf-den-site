@@ -22,9 +22,19 @@ const TACTICS = [
     { id: "wait", name: "Wait", blurb: "Say nothing. Leave him with the dark." },
 ];
 
+// ⚠️ IT CARRIES ITS OWN STYLE BLOCK, AND IT HAS TO. styled-jsx scopes a <style jsx> block to the markup of
+// the component that DECLARES it — so the rules living in Brig below never reached these dots, because Brig
+// does not render them, Stars does. They came out as unstyled inline <i> elements with no width and no
+// height, which is to say invisible: the star rating, which is the one number this whole feature turns on,
+// drew nothing at all and the bug is silent by construction. See [[styled-jsx-landmines]].
 const Stars = ({ n }) => (
     <span className="bg-stars" aria-label={`${n} of 5`}>
         {[1, 2, 3, 4, 5].map((i) => <i key={i} className={i <= n ? "is-on" : ""} />)}
+        <style jsx>{`
+            .bg-stars { display: inline-flex; gap: 2px; align-items: center; }
+            .bg-stars i { display: block; width: 7px; height: 7px; border-radius: 50%; background: #333b48; }
+            .bg-stars i.is-on { background: #e8b64c; box-shadow: 0 0 5px rgba(232,182,76,.5); }
+        `}</style>
     </span>
 );
 
@@ -96,7 +106,9 @@ export default function Brig() {
                             <img src={art(o.art)} alt="" className="bg-face" draggable="false" />
                             <span className="bg-who">
                                 <b>{o.name}</b>
-                                <i>{o.ship}</i>
+                                {/* Several captains ARE their ship -- Commodore Ash commands Commodore Ash --
+                                    and printing both put the same words twice in a two-line row. */}
+                                {o.ship && o.ship !== o.name ? <i>{o.ship}</i> : null}
                                 <Stars n={o.stars} />
                             </span>
                             <button type="button" className="bg-btn is-go" disabled={busy || brig.room <= 0}
@@ -120,7 +132,7 @@ export default function Brig() {
                             <img src={art(c.art)} alt="" className="bg-face" draggable="false" />
                             <span className="bg-who">
                                 <b>{c.name}</b>
-                                <i>{c.ship}</i>
+                                {c.ship && c.ship !== c.name ? <i>{c.ship}</i> : null}
                                 <Stars n={c.stars} />
                             </span>
                             <span className="bg-gauge">
@@ -181,7 +193,7 @@ export default function Brig() {
                         <img src={art(broke.art)} alt="" className="bg-sheet-face" draggable="false" />
                         <p className="bg-broke-kick">He talks</p>
                         <p className="bg-sheet-name">{broke.name}</p>
-                        <p className="bg-sheet-ship">{broke.ship} · <Stars n={broke.stars} /></p>
+                        <p className="bg-sheet-ship">{broke.ship !== broke.name ? <>{broke.ship} · </> : null}<Stars n={broke.stars} /></p>
                         <p className="bg-said is-crack">{broke.said}<em>{broke.text}</em></p>
                         <p className="bg-broke-note">
                             His confession is in your hold. Three of them make a chart.
@@ -199,7 +211,7 @@ export default function Brig() {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={art(open.art)} alt="" className="bg-sheet-face" draggable="false" />
                         <p className="bg-sheet-name">{open.name}</p>
-                        <p className="bg-sheet-ship">{open.ship} · <Stars n={open.stars} /></p>
+                        <p className="bg-sheet-ship">{open.ship !== open.name ? <>{open.ship} · </> : null}<Stars n={open.stars} /></p>
 
                         {/* THE TELL. The one thing that lets a player who reads people skip the probing. */}
                         <p className="bg-tell">{open.tell}</p>
@@ -276,10 +288,6 @@ export default function Brig() {
                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 .bg-who i { font-size: 11.5px; font-style: normal; color: #8d97a6;
                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-                .bg-stars { display: inline-flex; gap: 2px; }
-                .bg-stars i { width: 7px; height: 7px; border-radius: 50%; background: #333b48; }
-                .bg-stars i.is-on { background: #e8b64c; box-shadow: 0 0 5px rgba(232,182,76,.5); }
 
                 .bg-offer { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 6px;
                     border: 1px solid #55452a; border-radius: 10px; background: #241f16; }
