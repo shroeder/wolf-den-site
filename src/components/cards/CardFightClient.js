@@ -2630,18 +2630,35 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-drop.is-spilled { color: #f0c98a; border-color: rgba(240, 201, 138, .45); }
                 .cf-drop-art { width: 20px; height: 20px; object-fit: contain; display: block; }
 
-                .cf-offers { display: flex; gap: 10px; justify-content: center; flex-wrap: nowrap; }
+                /* ── ⚠️ THERE ARE NOT ALWAYS THREE ─────────────────────────────────────────────────────
+                   cardOffers deals three PLUS the offerPlus perk sum, so a run carrying that perk is
+                   offered four or more — and this row was nowrap at a fixed 1.26 scale, which is 121px a
+                   card. Three fit a 393px phone with ten pixels to spare and FOUR RAN OFF THE EDGE: the
+                   fourth card was cut in half by the screen and the reward you were being asked to choose
+                   between was partly invisible. Luke, on a four-card screen: "cant see all rewards."
+                   Every card shares its width now, so any count fits — see below. */
+                .cf-offers { display: flex; gap: 8px; justify-content: center; flex-wrap: nowrap;
+                    width: 100%; padding: 0 4px; }
                 /* ── BIGGER, NOT DIFFERENT ────────────────────────────────────────────────────────────
                    The card inside is the hand's card at the hand's exact geometry — 96x138, every rule shared
                    — and the only thing this wrapper does is scale it. A reward is read where it stands rather
                    than picked up, so it wants to be larger; changing any number INSIDE the card to achieve
                    that is how the two renders drift apart again. */
-                .cf-offer { position: relative; width: calc(96px * var(--cf-offer-s));
-                    height: calc(138px * var(--cf-offer-s)); padding: 0; background: none;
-                    border: 0; cursor: pointer; display: grid; place-items: center; --cf-offer-s: 1.26; }
-                .cf-offer .cf-card { transform: scale(var(--cf-offer-s)); transition: transform 140ms ease-out; }
-                .cf-offer:hover:not(:disabled) .cf-card, .cf-offer:focus-visible .cf-card {
-                    transform: scale(calc(var(--cf-offer-s) + 0.08)) translateY(-4px); }
+                /* ── SHARED WIDTH, NOT A FIXED SCALE ──────────────────────────────────────────────────
+                   It used to be a transform scale on a fixed 96px card, which cannot know how many
+                   siblings it has. Each offer is a flex child that takes an equal share of the row and
+                   caps at the size a three-card screen used to give it, and the card inside is driven by
+                   the SAME --cf-w contract the deck grid uses — so four cards shrink to fit rather than
+                   the fourth one leaving the screen. A container query supplies the width; if one is not
+                   supported the min() is invalid, --cf-w is never set, and .cf-card falls back to its own
+                   96px default, which is the layout this had before. */
+                .cf-offer { position: relative; flex: 1 1 0; min-width: 0; max-width: 121px;
+                    container-type: inline-size; padding: 0; background: none;
+                    border: 0; cursor: pointer; display: grid; place-items: center;
+                    transition: transform 140ms ease-out; }
+                .cf-offer .cf-card { --cf-w: min(121px, 100cqw); --cf-h: calc(var(--cf-w) * 1.4375); }
+                .cf-offer:hover:not(:disabled), .cf-offer:focus-visible {
+                    transform: scale(1.06) translateY(-4px); }
                 .cf-offer:disabled { opacity: 0.5; cursor: default; }
                 /* The peek modal is the one place left that still wants a body around its content — it is a
                    LIST, not a choice, and a list on a bare dim has no edge to stop at. Flat and quiet: a dark

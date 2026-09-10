@@ -24,6 +24,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { readdirSync } from "node:fs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FILES = [path.join(HERE, "..", "src", "app", "globals.css")];
@@ -92,6 +93,50 @@ for (const file of FILES) {
 
     console.log(`  ${rel}  ${lines.length.toLocaleString()} lines, ${(src.length / 1024).toFixed(0)}kb`);
 }
+
+// ── ⚠️ AND A BACKTICK INSIDE A styled-jsx CSS COMMENT, WHICH ENDS THE TEMPLATE LITERAL ───────────────
+// This gate already exists to catch a rule the browser never sees. Its sibling is a comment the PARSER
+// never survives: a <style jsx> block IS a template literal, so one backtick in a CSS comment closes it
+// early and the build dies with "Expected '</', got ..." pointing at a line of prose.
+//
+// It is the most-repeated self-inflicted break in this codebase — five times in one session previously and
+// three more in the session that added this check, every time from quoting an identifier the natural way
+// inside a comment. It is invisible on review because the character is a quote mark doing its job
+// everywhere else in the file, and no linter reads inside a template literal.
+//
+// Bolted onto this gate rather than made a new one: same class of fault, and the Den does not need a fifth.
+const TICK = String.fromCharCode(96);
+// A regex LITERAL, not one built from a string: in a string "\s" is just an s and the
+// first version of this silently matched nothing. A backtick is unremarkable in a .mjs file.
+const STYLE_OPEN = /<style\s+jsx[^>]*>\{`/g;
+
+function scanStyledJsx(file) {
+    const src = readFileSync(file, "utf8");
+    const rel = path.relative(path.join(HERE, ".."), file).split(path.sep).join("/");
+    for (const open of src.matchAll(STYLE_OPEN)) {
+        const from = open.index + open[0].length;
+        const close = src.indexOf(TICK + "}</style>", from);
+        const body = src.slice(from, close < 0 ? src.length : close);
+        for (const c of body.matchAll(/\/\*[\s\S]*?\*\//g)) {
+            if (!c[0].includes(TICK)) continue;
+            const line = src.slice(0, from + c.index).split(String.fromCharCode(10)).length;
+            problems.push(rel + ": a backtick inside a CSS comment at line " + line
+                + " — it ENDS the styled-jsx template and the build will not parse. Name it without quoting it.");
+        }
+    }
+}
+
+// Every component that carries a styled-jsx block, which is where this fault lives — globals.css cannot
+// have it, and the components were never scanned by this gate at all.
+const COMPONENT_DIR = path.join(HERE, "..", "src", "components");
+function walk(dir) {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        else if (e.name.endsWith(".js")) scanStyledJsx(full);
+    }
+}
+walk(COMPONENT_DIR);
 
 console.log("");
 if (problems.length) {
