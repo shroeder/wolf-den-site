@@ -3,6 +3,7 @@
 // gives a stronger themed active buff. Crisp vector game-icons (react-icons/gi, CC BY 3.0). Keep ids STABLE.
 // (Export names stay `collectible*` for back-compat with existing importers — conceptually these are pets.)
 import { SEASON_HIDDEN } from "@/lib/marketplace/arena-season.js";
+import { CARDS_HIDDEN } from "@/lib/marketplace/cards-gate.js";
 import { STAT_META } from "@/lib/marketplace/items.js";
 import {
     GiRabbit, GiFrog, GiChicken, GiCat, GiFox, GiWolfHead, GiOwl, GiBearFace, GiRaven, GiSnake, GiDeer,
@@ -83,6 +84,8 @@ export const PET_PASSIVE_STAT = {
     mammoth: "tenacity", wyvern: "pierce", sea_serpent: "seafaring", fairy: "xp_gain", kraken: "seafaring",
     // Elite
     molten_phoenix: "crit_power", eternal_wolf: "ferocity", bounty_hound: "gold_find",
+    // The card game's four. Ordinary stats on purpose — the character is in the CARD each one brings.
+    chalk_hare: "fortune", cellar_jay: "gold_find", pit_marten: "crit_chance", ivory_adder: "crit_power",
     // Merchant (sailing-exclusive)
     elephant_spear: "gold_find",
     // Farm/pastoral pets — every one carries a FARM passive (seedLuck / growSpeed / petXp), so it helps the
@@ -408,6 +411,31 @@ export const COLLECTIBLES = [
     { id: "gate_moth", name: "The Doorward's Moth", Icon: GiButterfly, color: "#8fd0ff", rarity: "eternal", source: "road", season: 1, rung: 200,
       ownerOnly: SEASON_HIDDEN, activeStat: "fortune", hint: "It was on the other side. Now it is on this one.",
       spritePrompt: "an enormous pale moth with dusty blue-white wings marked like a keyhole, faintly luminous, wings held open and perfectly still" },
+
+    // ── THE CARD GAME'S OWN FOUR ─────────────────────────────────────────────────────────────────────
+    // Luke: "perhaps a new pet unlocks at levels 3 5 10 and 15."
+    //
+    // `source: "cards"` matches NO existing drop pool — every pet source in pet-drops.js filters
+    // explicitly, so these can never fall out of a chest, a boss or the wheel. The card game hands them
+    // over at a rank and that is the only door, which is the same shape the Road's two exclusives use.
+    //
+    // ⚠️ AND EACH ONE IS ALSO A CARD. Every collectible in the game has one, and the card POOL is gated on
+    // owning the pet — so these four are four new cards as well, reachable only by the people who earned
+    // the animal. That is the loop closing: the game pays you in the thing that makes the game bigger.
+    //
+    // Hidden until the game opens, on the same one switch as everything else in it. See CARDS_HIDDEN.
+    { id: "chalk_hare", name: "Chalk Hare", Icon: GiRabbit, color: "#e6dcc6", rarity: "rare", source: "cards", cardLevel: 3,
+      ownerOnly: CARDS_HIDDEN, activeStat: "fortune", hint: "It keeps the tally on the wall, and it has never once been wrong.",
+      spritePrompt: "a lean alert hare the colour of chalk dust, upright on its hind legs, one ear notched, a smudge of white chalk across its flank" },
+    { id: "cellar_jay", name: "Cellar Jay", Icon: GiRaven, color: "#6fa8e6", rarity: "epic", source: "cards", cardLevel: 5,
+      ownerOnly: CARDS_HIDDEN, activeStat: "gold_find", hint: "Takes the brightest thing on the table and is gone before the hand is finished.",
+      spritePrompt: "a sleek blue-and-slate jay with a bold black eye-stripe, one bright gold coin held in its beak, wings half-open as if about to bolt" },
+    { id: "pit_marten", name: "The Pit Marten", Icon: GiFox, color: "#c8873f", rarity: "legendary", source: "cards", cardLevel: 10,
+      ownerOnly: CARDS_HIDDEN, activeStat: "crit_chance", hint: "Lives under the card room floor and knows every hand played above it.",
+      spritePrompt: "a long low chestnut-brown marten with a cream throat patch and a dark bushy tail, body stretched forward and low, amber eyes fixed" },
+    { id: "ivory_adder", name: "The Ivory Adder", Icon: GiSnake, color: "#f2e8d5", rarity: "mythic", source: "cards", cardLevel: 15,
+      ownerOnly: CARDS_HIDDEN, activeStat: "crit_power", hint: "The house keeps one. Nobody has ever seen it moved.",
+      spritePrompt: "a pale ivory-white adder coiled on itself with its head raised, faint gold banding along its back, pale eyes, utterly still" },
 ];
 
 const BY_ID = Object.fromEntries(COLLECTIBLES.map((c) => [c.id, c]));

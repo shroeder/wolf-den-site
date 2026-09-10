@@ -6,11 +6,11 @@ import { buildFinalMap, buildMap, reachable, resolveUnknown } from "@/lib/market
 import { isOwner, isStaff } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
-    ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
+    ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL, openPerkIds,
     HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
     ASC_MAX, FINAL_ACT, POTION_DROP_BASE, ascPotionScale, ascRule, beltSize, buildShop, canUpgrade,
     cardById, drawOffer, encounterById, levelSharpens, openingRun,
-    levelWeight, nextRand, perkSum, pickEncounter, rankFor, runScore, stopAt, unlockTrack, unlockedCards,
+    levelWeight, levelsCrossed, nextRand, perkSum, pickEncounter, rankFor, runScore, stopAt, unlockTrack, unlockedCards,
     upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -18,6 +18,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { ownedPetIdSet } from "@/lib/marketplace/pets.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE CARD GAME'S DOOR, AND THE ONE THING THE SERVER DOES FOR IT ───────────────────────────────────────────
 // The rules live in cards-kit.js and run in the browser (see the note at the top of that file: the fight pays
@@ -250,6 +251,12 @@ export async function loadRun(buyerId, { create = true } = {}) {
  */
 export async function startRun(buyerId, asc = 0) {
     const run = newRun(Math.floor(Math.random() * 900000) + 1000, Math.max(0, Math.min(ASC_MAX, Number(asc) || 0)));
+    // ── THE RANK IS STAMPED ON THE RUN, ONCE ─────────────────────────────────────────────────────────
+    // The perk pool is gated by level now (see PERK_LEVELS), and every place that draws a trinket is deep
+    // inside the pure engine where there is no buyer and no database. Reading it once here and carrying it
+    // means a run cannot change its own pool halfway through by levelling mid-fight — which is the same
+    // reason the map and the seed are stamped rather than recomputed.
+    run.lvl = rankFor(await cardXp(buyerId)).level;
     await saveRun(buyerId, run);
     // A RUN STARTED IS A RUN COUNTED. It is the one counter nothing else can infer: a member who opens the
     // game, walks two rooms and dies has played, and the ladder in UNLOCKS should be able to say so.
@@ -285,6 +292,28 @@ export async function recordRun(buyerId, run, outcome) {
         ]
     ).catch(() => {});
     run.recorded = true;
+
+    // ── AND WHAT THE RUN JUST EARNED ─────────────────────────────────────────────────────────────────
+    // XP is lifetime score and score is dominated by DISTANCE — five a room, sixty an act cleared, and
+    // 250 for finishing — so "how far did you get" is already what the ladder counts. Luke asked for that
+    // explicitly and it did not need changing; what it needed was for crossing a rung to DO something.
+    //
+    // Read after the insert, so the run that just ended is in the total. Anything crossed is handed over
+    // here and handed back to the screen, which is the only place a player is ever told.
+    const before = rankFor(Math.max(0, (await cardXp(buyerId)) - runScore(ended))).level;
+    const after = rankFor(await cardXp(buyerId)).level;
+    run.levelled = after > before ? levelsCrossed(before, after) : [];
+    for (const step of run.levelled) {
+        if (!step.pet) continue;
+        // ⚠️ ONE ROW, ON CONFLICT DO NOTHING. Levelling past a rung you have already passed cannot happen
+        // — score never goes down — but a double-posted ending could, and a pet granted twice is a bug
+        // somebody would have to unpick by hand.
+        await db.query(
+            `INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2)
+             ON CONFLICT DO NOTHING`, [buyerId, step.pet]
+        ).catch(() => {});
+        await trackActivity(buyerId, "cards_pet", { pet: step.pet, level: step.level }).catch(() => {});
+    }
     return run;
 }
 
@@ -750,7 +779,7 @@ export async function shopStock(buyerId, run, seed) {
     // Nothing already carried: a shop offering a perk you hold or a potion slot you cannot fill is a slot
     // that wastes the visit.
     const held = new Set(run.perks || []);
-    return buildShop(seed, { cardIds, perkIds: PERK_IDS.filter((id) => !held.has(id)), asc: run.asc || 0 });
+    return buildShop(seed, { cardIds, perkIds: openPerkIds(run.lvl).filter((id) => !held.has(id)), asc: run.asc || 0 });
 }
 
 /**

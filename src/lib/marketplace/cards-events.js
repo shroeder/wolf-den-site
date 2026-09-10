@@ -14,7 +14,7 @@
 // PURE, like the rules and the map: an event is data plus a seed. The server owns what a choice DOES (it
 // needs the perk table and the deck), the screen owns how it reads, and this file owns what exists.
 import {
-    ALL_CARDS, CURSE_IDS, PERKS, PERK_IDS, POOL, POTIONS, POTION_IDS, STARTER_DECK, STATUS_IDS, takePerk,
+    ALL_CARDS, CURSE_IDS, PERKS, PERK_IDS, POOL, openPerkIds, POTIONS, POTION_IDS, STARTER_DECK, STATUS_IDS, takePerk,
     beltSize, canUpgrade, cardById, nextRand, upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -759,7 +759,8 @@ export function applyEventChoice(run, ev, index, card = null) {
     const wantsPerk = eff.perk || (eff.maybePerk && next() < eff.maybePerk);
     if (wantsPerk) {
         const held = new Set(run.perks || []);
-        const open = PERK_IDS.filter((id) => !held.has(id));
+        // openPerkIds, not PERK_IDS: nineteen trinkets are gated behind a rank now. See PERK_LEVELS.
+        const open = openPerkIds(run.lvl).filter((id) => !held.has(id));
         if (open.length) {
             const got = open[Math.floor(next() * open.length)];
             // ⚠️ ASKED, NOT REPEATED. These three lines used to be written out here and applied `maxHp` and
@@ -825,7 +826,8 @@ export function applyEventChoice(run, ev, index, card = null) {
         if (hit.card) { run.deck = [...(run.deck || []), hit.card]; said.push(`${cardById(hit.card)?.name || "Something"} is in your deck now.`); }
         if (hit.perk) {
             const held = new Set(run.perks || []);
-            const open = PERK_IDS.filter((id) => !held.has(id));
+            // openPerkIds, not PERK_IDS: nineteen trinkets are gated behind a rank now. See PERK_LEVELS.
+        const open = openPerkIds(run.lvl).filter((id) => !held.has(id));
             if (open.length) {
                 const got = open[Math.floor(next() * open.length)];
                 run.perks = [...(run.perks || []), got];

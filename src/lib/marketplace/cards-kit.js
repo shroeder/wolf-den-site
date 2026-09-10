@@ -181,6 +181,27 @@ export const POOL = {
     quill: { id: "quill", pet: "hedgehog", name: "Quills", cost: 1, kind: "skill", target: "self", tier: 1,
         block: 5, strength: 1, text: "Gain {block} Block and 1 Strength.",
         upgrade: { block: 8 } },
+    // ── THE FOUR THE GAME GIVES YOU ITSELF ───────────────────────────────────────────────────────────
+    // One per exclusive pet (see LEVEL_PETS). They sit in the ordinary pool and are reached the ordinary
+    // way — by owning the animal — so nothing here needs a second gate: the RANK is the gate, because the
+    // rank is how the animal is got.
+    //
+    // ⚠️ FOUR DIFFERENT THINGS TO DO, not four numbers. A card whose effect another card already has is a
+    // wasted pet, which is the note left on Flock when its first draft was Swarm with a new animal on it.
+    // Dexterity in particular was chosen deliberately: the file already records that three of the four
+    // cards re-spec'd onto it are unreachable, so the stat had no cheap on-ramp at all.
+    chalk_tally: { id: "chalk_tally", pet: "chalk_hare", name: "Chalk Tally", cost: 0, kind: "skill", target: "self", tier: 1,
+        dexterity: 1, text: "Gain {dexterity} Dexterity.",
+        upgrade: { dexterity: 2 } },
+    jays_cut: { id: "jays_cut", pet: "cellar_jay", name: "The Jay's Cut", cost: 0, kind: "skill", target: "self", tier: 2,
+        energy: 1, draw: 1, exhaust: true, text: "Gain {energy} energy. Draw {draw} card. Exhaust.",
+        upgrade: { draw: 2 } },
+    under_floor: { id: "under_floor", pet: "pit_marten", name: "Under the Floor", cost: 1, kind: "attack", target: "foe", tier: 3,
+        damage: 9, vulnerable: 2, text: "Deal {damage} damage. Apply {vulnerable} Vulnerable.",
+        upgrade: { damage: 12 } },
+    ivory_bite: { id: "ivory_bite", pet: "ivory_adder", name: "The Ivory Bite", cost: 2, kind: "attack", target: "foe", tier: 3,
+        damage: 7, poison: 8, text: "Deal {damage} damage. Apply {poison} Poison.",
+        upgrade: { poison: 12 } },
     peck: { id: "peck", pet: "raven", name: "Peck", cost: 0, kind: "attack", target: "foe", tier: 1,
         damage: 3, text: "Deal {damage} damage.",
         upgrade: { damage: 5 } },
@@ -822,6 +843,20 @@ export const RANKS = [
     { level: 10, xp: 8500, name: "The House" },
     { level: 11, xp: 11500, name: "Ivory" },
     { level: 12, xp: 15000, name: "Kingmaker" },
+    // ── PAST TWELVE ──────────────────────────────────────────────────────────────────────────────────
+    // The ladder stopped at twelve, and Luke's four exclusive pets land at 3, 5, 10 and 15 — so the last
+    // one sat three rungs above the top of the game. Eight more, and the spacing widens rather than
+    // steepens: the gap between rungs is roughly a run and a half all the way up, so a level always feels
+    // like a handful of evenings and never like a wall. A full three-act win scores about 825 and a death
+    // 80-220, which puts 15 at roughly forty wins and 20 at a season.
+    { level: 13, xp: 18500, name: "Faro" },
+    { level: 14, xp: 22500, name: "The Cold Deck" },
+    { level: 15, xp: 27000, name: "Blackleg" },
+    { level: 16, xp: 32000, name: "The Quiet Room" },
+    { level: 17, xp: 37500, name: "Paper Man" },
+    { level: 18, xp: 44000, name: "The Long Count" },
+    { level: 19, xp: 51500, name: "Ghost Hand" },
+    { level: 20, xp: 60000, name: "The Last Word" },
 ];
 export const RANK_MAX = RANKS[RANKS.length - 1].level;
 
@@ -845,6 +880,78 @@ export function rankFor(xp = 0) {
         part: next ? Math.max(0, Math.min(1, (total - at.xp) / span)) : 1,
     };
 }
+
+// ── ⚠️ WHAT A LEVEL ACTUALLY HANDS OVER ──────────────────────────────────────────────────────────────────
+// Luke: "each level unlocks new cards, new perks, maybe new encounters? and perhaps a new pet unlocks at
+// levels 3 5 10 and 15."
+//
+// Three tables, read by one function, because a level-up screen has to be able to say what it just gave you
+// and there is no way to do that if every kind of unlock is discovered by a different filter somewhere else.
+// Cards were already here (UNLOCKS, levels 2-9). These are the other two.
+
+// ── THE PERKS A LEVEL OPENS ──────────────────────────────────────────────────────────────────────────────
+// ⚠️ NOT ONE OF THE 162 PERKS WAS GATED BY ANYTHING. Every trinket in the game was reachable on run one,
+// which is a lot of content spent all at once and nothing left for a ladder to be made of. These nineteen
+// are the ones that most CHANGE a run rather than nudge it — an extra card to choose from, a death save,
+// energy on a kill — so opening one is a different game rather than a bigger number.
+//
+// The other 143 stay in the pool from the first run, deliberately: a new player must never sit down to a
+// thin table. This takes the ceiling off, it does not lower the floor.
+export const PERK_LEVELS = {
+    question_card: 2,     // one extra card to choose from after every fight
+    travel_pack: 3,       // draw two extra on the first turn
+    paper_frog: 4,        // Vulnerable hits for 75% instead of 50%
+    magic_flower: 5,      // everything that heals you heals half again
+    three_marks: 6,       // every enemy opens Weak AND Frail
+    war_claw: 7,          // three Strength, every fight
+    wide_belt: 8,         // two more potion slots
+    molten_egg: 9,        // attacks arrive already sharpened
+    lizard_tail: 10,      // the first killing blow leaves you standing
+    gremlin_horn: 11,     // a kill pays an energy and a card
+    ash_hourglass: 12,    // 3 to everything, every turn
+    slow_burn: 13,        // a Strength every turn, and open on Block
+    tower_shield: 14,     // eighteen Block, every fight
+    long_wind_up: 15,     // the first attack hits for sixteen more
+    cornered_beast: 16,   // seven Strength when you are nearly dead
+    slow_poison: 17,      // 5 to everything, every turn
+    deep_reserve: 18,     // +22 health and Strength when you are hurt
+    iron_burr: 19,        // eight back to anything that touches you
+    elk_heart: 20,        // +26 health, and a heal when you win hurt
+};
+
+/** The perk pool at a given rank: everything ungated, plus whatever this level has opened. */
+export const openPerkIds = (level = 0) =>
+    PERK_IDS.filter((id) => !PERK_LEVELS[id] || Number(level) >= PERK_LEVELS[id]);
+
+// ── AND THE FOUR PETS ────────────────────────────────────────────────────────────────────────────────────
+// Exclusive to this game and reachable nowhere else, which is the whole point of them: the deck is built out
+// of pets you own, so a pet the card game gives you is content the card game unlocks for itself. Each one
+// brings its own card with it (every collectible has one), so these are four cards as well as four pets.
+export const LEVEL_PETS = { 3: "chalk_hare", 5: "cellar_jay", 10: "pit_marten", 15: "ivory_adder" };
+
+/**
+ * Everything a level opens, as one object a screen can draw.
+ *
+ * The level-up moment is the only place a player is ever told any of this, so it has to be complete: a card
+ * they can now be offered, a trinket that can now turn up, and the animal that just walked in.
+ */
+export function levelRewards(level) {
+    const lv = Number(level) || 0;
+    return {
+        level: lv,
+        name: RANKS.find((r) => r.level === lv)?.name || null,
+        cards: UNLOCK_IDS.filter((id) => UNLOCKS[id].level === lv),
+        perks: Object.keys(PERK_LEVELS).filter((id) => PERK_LEVELS[id] === lv),
+        pet: LEVEL_PETS[lv] || null,
+    };
+}
+
+/** Every level between two ranks that handed something over — what a run just crossed. */
+export const levelsCrossed = (from, to) => {
+    const out = [];
+    for (let lv = Math.max(1, Number(from) || 0) + 1; lv <= (Number(to) || 0); lv += 1) out.push(levelRewards(lv));
+    return out;
+};
 
 export const unlockedCards = (progress, level = 0) => new Set(
     UNLOCK_IDS.filter((id) => meetsNeed(progress, UNLOCKS[id].need)
