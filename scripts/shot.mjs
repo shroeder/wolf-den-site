@@ -90,6 +90,16 @@ await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceSc
 //   SHOT_COOKIE=<token> node scripts/shot.mjs http://localhost:3000/marketplace/market out.png
 if (process.env.SHOT_COOKIE) {
     await send("Network.enable");
+    // ── ⚠️ AND THE DISK CACHE IS OFF, BECAUSE IT SERVED A STALE PICTURE ──────────────────────────────
+    // Chrome is launched against a REUSED profile (--user-data-dir above), so its disk cache survives
+    // between runs — and static art under /public is served with max-age=86400. Redrawing a sprite and
+    // re-shooting therefore photographed the OLD one, for a day, with no way to tell from the picture.
+    //
+    // Caught on the forest: three trunks came back redrawn and three came back as the previous art, and
+    // the only thing separating them was which had happened to be on screen during an earlier shot. That
+    // is precisely the "wrong picture that looks right" this file exists to prevent — so the cache is
+    // disabled for every shot. A screenshot rig has no business remembering anything.
+    await send("Network.setCacheDisabled", { cacheDisabled: true });
     await send("Network.setCookie", {
         name: "wolfden-mkt-buyer-session", value: process.env.SHOT_COOKIE,
         domain: new URL(url).hostname, path: "/",
