@@ -535,7 +535,14 @@ export async function getFarm(ownerId, viewerId) {
         mine ? decoState(viewerId).catch(() => null) : Promise.resolve(null), // your inventory — manage on your own farm only
         // Only on your OWN farm: the "who haven't I visited today" strip. On someone else's you are already
         // doing the visiting, and a list of other people to go and see is the last thing that screen needs.
-        mine ? farmNeighbours(viewerId, { limit: 8 }).catch(() => []) : Promise.resolve([]),
+        // ⚠️ 24, NOT 8, AND THE STRIP IS WHY. `came_by` is only computed for the rows this query
+        // returns — everybody else in the directory comes back as a plain "say hi" — and the ORDER BY
+        // deliberately leads with "not yet rated today", so somebody who came by AND has already been paid
+        // back sorts low and fell straight off the end of an eight-row list. The card now leads with a
+        // strip of who has been round lately, and a strip that silently drops half of them is worse than
+        // no strip. Twenty-four is the function's own ceiling and covers any realistic day: the busiest
+        // farm in the Den has three.
+        mine ? farmNeighbours(viewerId, { limit: 24 }).catch(() => []) : Promise.resolve([]),
         // The farm COLLECTIONS (Harvester / Forager) — shown permanently on the farm screen, because that is
         // where their bonuses land and where somebody chasing them is standing.
         mine ? farmCollections(viewerId).catch(() => []) : Promise.resolve([]),

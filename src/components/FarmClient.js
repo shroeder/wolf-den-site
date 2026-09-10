@@ -3577,6 +3577,13 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
     // Who came to YOU and has not been paid back yet. This is the line worth leading with when it applies —
     // "someone was here" is a far better reason to tap than "here are some farms".
     const owed = neighbours.filter((n) => n.cameBy && !n.ratedToday);
+    // ⚠️ EVERYONE WHO CAME BY, not only the ones still owed. Somebody you have already paid back this
+    // morning is still somebody who was here, and dropping them off the strip the moment you rate them
+    // makes the row shrink under your thumb as you work down it — which reads as people disappearing.
+    // They stay, marked as paid, and the unpaid ones sort to the front.
+    const visitors = neighbours
+        .filter((n) => n.cameBy)
+        .sort((a, b) => Number(Boolean(a.ratedToday)) - Number(Boolean(b.ratedToday)));
     return (
         <section className="card farm-neigh">
             <div className="farm-neigh-head">
@@ -3603,14 +3610,49 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
             <label className="farm-find">
                 <SearchIcon />
                 <input type="search" value={q} onChange={(e) => setQ(e.target.value)}
-                    placeholder={all ? `Filter ${roster.length} farms` : "Loading farms…"}
+                    placeholder={all ? `Search ${roster.length} farms by name` : "Loading farms…"}
                     aria-label="Filter farms" />
             </label>
 
-            {/* ── EVERY FARM, AS A CARD ────────────────────────────────────────────────────────────────────
+            {/* ── WHO HAS BEEN ROUND LATELY, ACROSS THE TOP ───────────────────────────────
+                Luke: "bring back the horizontal list of people that have been by lately."
+                ⚠️ AND THE NOTE UNDER IT SAYING NOT TO IS STILL RIGHT — about the other list. A strip
+                "shows four and hides the rest behind a sideways scroll nobody performs", which is exactly
+                what it did to a DIRECTORY of a hundred and twenty people, and why that became a grid. This
+                is not that list. The people who came by are a handful, they are the one thing on this card
+                worth acting on, and a strip is the right shape for a short list of faces precisely because
+                it costs one line instead of four. The two lists wanted opposite answers and were being
+                given one.
+                It hides while you are searching: a term means you are looking for a person by name, and the
+                grid below already searches all hundred and twenty. Two lists answering one query is how you
+                end up tapping the wrong copy of somebody. */}
+            {!term && visitors.length ? (
+                <div className="farm-neigh-strip" aria-label="Came by lately">
+                    {visitors.map((n) => {
+                        const avatar = n.spriteUrl || n.avatarUrl;
+                        return (
+                            <a key={`by-${n.id}`}
+                                className={`farm-neigh-chip is-strip${n.ratedToday ? " is-done" : " is-owed"}`}
+                                href={`/marketplace/farm?u=${encodeURIComponent(n.alias)}`}
+                                title={n.ratedToday ? `${n.name} — you have paid this one back` : `${n.name} came by — pay it back`}>
+                                <span className="farm-neigh-face">
+                                    {avatar ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={avatar} alt="" style={{ transform: n.spriteFlip ? "scaleX(-1)" : "none" }} />
+                                    ) : <span aria-hidden="true" className="farm-neigh-noface" />}
+                                </span>
+                                <b>{n.name}</b>
+                                <em>{n.ratedToday ? "paid back" : "came by"}</em>
+                            </a>
+                        );
+                    })}
+                </div>
+            ) : null}
+
+            {/* ── AND EVERY FARM, AS A CARD ────────────────────────────────────────────────────────────────
                 A wrapping grid, not a horizontal strip: a strip shows four and hides the rest behind a
                 sideways scroll nobody performs, which is how a directory of ninety-five people read as a
-                directory of four. The ones who came by keep their gold mark and stay at the front. */}
+                directory of four. Still true, which is why the strip above is only ever the short list. */}
             {shown.length ? (
                 <div className="farm-neigh-grid">
                     {shown.map((n) => {

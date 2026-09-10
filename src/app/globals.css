@@ -23654,3 +23654,18 @@ body.cas-seated .social-fab { display: none; }
     white-space: nowrap; font-weight: 700; color: #cfe6d6; }
 .social-pic-chip button { flex: none; border: 0; background: none; cursor: pointer; font: inherit;
     font-size: 11.5px; color: #8a8f98; text-decoration: underline; }
+
+/* ── WHO CAME BY, ACROSS THE TOP ─────────────────────────────────────────────────────────────────────────
+   Luke: "bring back the horizontal list of people that have been by lately." A strip is the wrong shape for
+   a directory of 120 — that is why the list under this is a grid — and the right shape for a handful of
+   faces you are meant to act on, because it costs one line instead of four. Scrolls sideways with snap
+   points so a half-cut face never sits at the edge pretending to be the end of the list. */
+.farm-neigh-strip { display: flex; gap: 8px; overflow-x: auto; margin: 0 0 10px; padding: 2px 2px 8px;
+    scroll-snap-type: x proximity; scrollbar-width: thin; }
+.farm-neigh-strip::-webkit-scrollbar { height: 4px; }
+.farm-neigh-strip::-webkit-scrollbar-thumb { background: rgba(255,215,94,0.35); border-radius: 4px; }
+.farm-neigh-chip.is-strip { flex: 0 0 auto; width: 96px; scroll-snap-align: start; }
+/* Paid back reads as done rather than as gone — see the note by `visitors`. */
+.farm-neigh-chip.is-strip.is-done { opacity: 0.55; }
+.farm-neigh-noface { display: block; width: 100%; height: 100%; border-radius: inherit;
+    background: rgba(255,255,255,0.06); }
