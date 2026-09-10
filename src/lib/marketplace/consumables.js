@@ -6,7 +6,7 @@ import { itemById } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { addPetXp, levelUpPet } from "@/lib/marketplace/pet-level.js";
 import { getPetLevelSprite } from "@/lib/marketplace/pet-sprite.js";
-import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
+import { previewShopPrice, consumeShopCoupon, getShopCoupon, couponedPrice, shelfPrice, petHaggle, haggleCut } from "@/lib/marketplace/shop-coupon.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { applyGrowthTonic, grantSeedBundle, grantFarmFertilizer, grantHarvestLuckCharges, grantExtraPettings, grantExtraRatings } from "@/lib/marketplace/farm-consumables.js";
@@ -405,10 +405,12 @@ export async function listConsumables(buyerId) {
         getShopCoupon(buyerId).catch(() => null),
     ]);
     const gold = goldRow?.gold || 0;
+    // The companion's haggle, folded into every shelf price for the same reason the coupon is.
+    const hagCut = haggleCut(await petHaggle(buyerId));
     const shop = SHOP_ORDER.filter((id) => CONSUMABLES[id]?.price != null).map((id) => {
         const c = CONSUMABLES[id];
         // effectivePrice folds in an active coupon so the shown price + affordability match the actual charge.
-        const effectivePrice = couponedPrice(coupon, c.price);
+        const effectivePrice = shelfPrice(coupon, hagCut, c.price);
         return { id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc, price: c.price, effectivePrice, discounted: effectivePrice < c.price, canAfford: gold >= effectivePrice };
     });
     const stash = ownRows.map((r) => {
@@ -452,7 +454,7 @@ export async function grantConsumable(buyerId, id, n = 1) {
 export async function buyConsumable(buyerId, id) {
     const c = CONSUMABLES[id];
     if (!buyerId || !c || c.price == null) return { ok: false, error: "not_for_sale" };
-    const cp = await previewShopCoupon(buyerId, c.price); // apply a login coupon if one's active
+    const cp = await previewShopPrice(buyerId, c.price); // apply a login coupon if one's active
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cp.price]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
     await logCoin(buyerId, -cp.price, "buy_consumable", { meta: { name: c.name }, balanceAfter: row.gold }).catch(() => {});
@@ -463,8 +465,8 @@ export async function buyConsumable(buyerId, id) {
     const { powerRoll } = await import("@/lib/marketplace/ascension-powers.js");
     const paired = await powerRoll(buyerId, "bulk_buyer", 3).catch(() => false);
     await grantConsumable(buyerId, id, paired ? 2 : 1);
-    await trackActivity(buyerId, "buy_consumable", { id, name: c.name, couponPct: cp.pct || 0, paired });
-    return { ok: true, gold: row.gold, couponPct: cp.pct || 0, paired };
+    await trackActivity(buyerId, "buy_consumable", { id, name: c.name, couponPct: cp.couponPct || 0, paired });
+    return { ok: true, gold: row.gold, couponPct: cp.couponPct || 0, paired };
 }
 
 // Use one from the stash. Targeted relics (recharge / reset) take a charged item id; validated BEFORE the

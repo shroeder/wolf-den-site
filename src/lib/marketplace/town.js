@@ -601,12 +601,11 @@ export async function buyMerchantChest(buyerId, tier) {
     if (!ware) return { ok: false, error: "not_for_sale" };
     if (ware.remaining <= 0) return { ok: false, error: "daily_limit" };
     // A haggling companion knocks its stated percentage off the asking price.
-    let haggle = 0;
-    try {
-        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
-        haggle = await getPetSystemPerk(buyerId, "town_haggle");
-    } catch { /* no companion, no discount */ }
-    const price = Math.max(1, Math.round(ware.price * (1 - Math.min(0.4, haggle / 100))));
+    // ⚠️ THE RULE LIVES IN shop-coupon.js NOW AND THIS CALLS IT. It used to be written out here and ONLY
+    // here, which is exactly why the gold shop half of the same ability never worked: there was nothing
+    // for the shop to call. Two copies of a discount is two chances for one of them to be missing.
+    const { petHaggle, haggleCut } = await import("@/lib/marketplace/shop-coupon.js");
+    const price = Math.max(1, Math.round(ware.price * (1 - haggleCut(await petHaggle(buyerId)))));
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, price]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold" };
     await logCoin(buyerId, -price, "merchant_chest", { balanceAfter: paid.gold, meta: { tier } }).catch(() => {});

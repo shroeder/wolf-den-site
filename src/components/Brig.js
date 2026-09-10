@@ -130,7 +130,6 @@ export default function Brig() {
                             <img src={face(c.art)} alt="" draggable="false" />
                         </button>
                     ))}
-                    {!held.length ? <p className="brg-none">Nobody in the irons. Board a ship and take her captain.</p> : null}
                 </div>
 
                 {/* ── AND THE IRON, IN FRONT OF ALL OF IT ── */}
@@ -144,6 +143,10 @@ export default function Brig() {
                     the parent context, and every name came out with an iron bar drawn through the
                     middle of it. Out here it is simply above them. Same family as the note on
                     absolutely-positioned children in a grid. */}
+                {/* Out here with the nameplates and for the same reason: .brg-floor opens a stacking
+                    context, so anything inside it is under the iron no matter what z-index it claims. */}
+                {!held.length ? <p className="brg-none">Nobody in the irons. Board a ship and take her captain.</p> : null}
+
                 {held.length ? (
                     <div className="brg-plates-row" aria-hidden="true">
                         {held.map((c) => (
@@ -387,9 +390,9 @@ export default function Brig() {
                 /* ⚠️ EACH MAN IS A COLUMN, AND HIS NAME HAS ITS OWN BAND. The first cut hung the name on
                    him absolutely and it came out clipped by the bars on all three - "C..mmodore Ash",
                    "ndertow Van". A label that has to fit between two iron bars is a label that will not. */
-                .brg-floor { position: absolute; inset: auto 0 34px 0; z-index: 2; height: 56%;
-                    display: flex; align-items: flex-end; justify-content: center; gap: 1.5%; padding: 0 4%; }
-                .brg-man { position: relative; flex: 1 1 0; min-width: 0; max-width: 32%; height: 100%;
+                .brg-floor { position: absolute; inset: auto 0 32px 0; z-index: 2; height: 58%;
+                    display: flex; align-items: flex-end; justify-content: center; gap: 1%; padding: 0 2%; }
+                .brg-man { position: relative; flex: 1 1 0; min-width: 0; height: 100%;
                     display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
                     border: 0; background: none; padding: 0; cursor: pointer;
                     animation: brgBreathe 5.4s ease-in-out infinite; }
@@ -403,19 +406,21 @@ export default function Brig() {
                 .brg-man.is-spent img { filter: drop-shadow(0 8px 12px rgba(0,0,0,.75)) brightness(.6) grayscale(.4); }
                 .brg-man:hover img { filter: drop-shadow(0 8px 16px rgba(0,0,0,.8)) brightness(1); }
                 .brg-plates-row { position: absolute; inset: auto 0 0 0; z-index: 6;
-                    display: flex; align-items: stretch; justify-content: center; gap: 1.5%;
-                    padding: 0 4% 6px; pointer-events: none; }
-                .brg-nameplate { flex: 1 1 0; min-width: 0; max-width: 32%;
+                    display: flex; align-items: stretch; justify-content: center; gap: 1%;
+                    padding: 0 2% 5px; pointer-events: none; }
+                .brg-nameplate { flex: 1 1 0; min-width: 0;
                     display: flex; flex-direction: column; align-items: center; gap: 3px;
                     padding: 5px 4px 6px; border-radius: 5px;
                     background: linear-gradient(180deg, rgba(14,10,7,.55), rgba(8,6,4,.94));
                     box-shadow: inset 0 1px 0 rgba(255,214,150,.10); }
-                .brg-nameplate b { max-width: 100%; font-size: 10.5px; line-height: 1.25; font-weight: 800;
+                .brg-nameplate b { max-width: 100%; font-size: 10.5px; line-height: 1.22; font-weight: 800;
+                    overflow-wrap: anywhere; hyphens: auto;
                     color: #f0e2c8; text-align: center; overflow: hidden;
                     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
                     text-shadow: 0 1px 3px #000; }
-                .brg-none { margin: 0 auto 8%; max-width: 74%; text-align: center; font-size: 13px;
-                    line-height: 1.5; color: #9a8b74; text-shadow: 0 1px 3px #000; }
+                .brg-none { position: absolute; left: 50%; top: 62%; z-index: 6; width: 76%;
+                    transform: translate(-50%,-50%); margin: 0; padding: 10px 12px; border-radius: 9px;
+                    text-align: center; font-size: 13px; line-height: 1.5; color: #b6a892; background: rgba(8,6,4,.82); }
 
                 /* Drawn rather than painted: full-bleed at any width, crisp at any density, and it can
                    never come back from a generator as something other than bars. */

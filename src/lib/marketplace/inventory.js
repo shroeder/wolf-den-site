@@ -9,7 +9,7 @@ import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { getElementOverrides, describeItemElements } from "@/lib/marketplace/item-element.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { powerFor } from "@/lib/marketplace/ascension-powers.js";
-import { previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice } from "@/lib/marketplace/shop-coupon.js";
+import { previewShopPrice, previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice, shelfPrice, petHaggle, haggleCut } from "@/lib/marketplace/shop-coupon.js";
 import { setBonusStats, activeSetBonuses, setForItem, getSetsOverview } from "@/lib/marketplace/sets.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { voidPendingTradesForItem } from "@/lib/marketplace/trade.js";
@@ -434,6 +434,8 @@ export async function getInventory(buyerId) {
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
     const gold = goldRow?.gold || 0;
     const coupon = await getShopCoupon(buyerId).catch(() => null);
+    // The companion's haggle, folded into every shelf price below for the same reason the coupon is.
+    const hagCut = haggleCut(await petHaggle(buyerId));
     // The gold shop: xp_shop items you don't own yet. effectiveCost folds in an active coupon so the price
     // shown + affordability match what the buy actually charges (canAfford on FULL price was a bug — an item
     // you could afford at half price still read "need more").
@@ -458,7 +460,7 @@ export async function getInventory(buyerId) {
     const shopPieces = COLLECTION_PIECES.filter((p) => p.source === "xp_shop" && !ownedPieceIds.has(p.id))
         .map((p) => {
             const cost = Math.max(0, p.xpCost || 0);
-            const effectiveCost = couponedPrice(coupon, cost);
+            const effectiveCost = shelfPrice(coupon, hagCut, cost);
             const set = setForItem(p.id);
             return {
                 id: p.id, name: p.name, slot: null, rarity: p.rarity, icon: p.icon, reqLevel: null,
@@ -472,7 +474,7 @@ export async function getInventory(buyerId) {
     const shop = ITEMS.filter((i) => i.source === "xp_shop" && !ownedIds.has(i.id))
         .map((i) => {
             const cost = Math.max(0, i.xpCost || 0);
-            const effectiveCost = couponedPrice(coupon, cost);
+            const effectiveCost = shelfPrice(coupon, hagCut, cost);
             const set = setForItem(i.id);
             return {
                 id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
@@ -530,15 +532,15 @@ export async function buyItem(buyerId, itemId) {
     const base = Math.max(0, item.xpCost || 0);
     const owned = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     if (owned) return { ok: false, error: "already_owned" };
-    const cp = await previewShopCoupon(buyerId, base); // apply a login coupon if one's active
+    const cp = await previewShopPrice(buyerId, base); // apply a login coupon if one's active
     const cost = cp.price;
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
     await logCoin(buyerId, -cost, "buy_gear", { meta: { name: item.name }, balanceAfter: row.gold }).catch(() => {});
     if (cp.pct > 0) await consumeShopCoupon(buyerId);
     await grantItem(buyerId, itemId, "xp_shop");
-    await trackActivity(buyerId, "buy_gear", { itemId, name: item.name, cost, couponPct: cp.pct || 0 });
-    return { ok: true, gold: row.gold, couponPct: cp.pct || 0 };
+    await trackActivity(buyerId, "buy_gear", { itemId, name: item.name, cost, couponPct: cp.couponPct || 0, hagglePct: cp.hagglePct || 0 });
+    return { ok: true, gold: row.gold, couponPct: cp.couponPct || 0, hagglePct: cp.hagglePct || 0 };
 }
 
 // Buying a COLLECTION piece. Deliberately a sibling of buyItem rather than a branch inside it: the two share a
@@ -548,15 +550,15 @@ async function buyPiece(buyerId, piece) {
     if (piece.source !== "xp_shop") return { ok: false, error: "not_for_sale" };
     const already = await getOwnedPieceIds(buyerId).catch(() => []);
     if (already.includes(piece.id)) return { ok: false, error: "already_owned" };
-    const cp = await previewShopCoupon(buyerId, Math.max(0, piece.xpCost || 0));
+    const cp = await previewShopPrice(buyerId, Math.max(0, piece.xpCost || 0));
     const cost = cp.price;
     const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!row) return { ok: false, error: "not_enough_gold" };
     await logCoin(buyerId, -cost, "buy_gear", { meta: { name: piece.name }, balanceAfter: row.gold }).catch(() => {});
     if (cp.pct > 0) await consumeShopCoupon(buyerId);
     await grantPiece(buyerId, piece.id, "xp_shop");
-    await trackActivity(buyerId, "buy_gear", { itemId: piece.id, name: piece.name, cost, couponPct: cp.pct || 0 });
-    return { ok: true, gold: row.gold, couponPct: cp.pct || 0 };
+    await trackActivity(buyerId, "buy_gear", { itemId: piece.id, name: piece.name, cost, couponPct: cp.couponPct || 0, hagglePct: cp.hagglePct || 0 });
+    return { ok: true, gold: row.gold, couponPct: cp.couponPct || 0, hagglePct: cp.hagglePct || 0 };
 }
 
 // Sell an owned item back for gold. Unequips it first if worn, credits the rarity sell value, and records
