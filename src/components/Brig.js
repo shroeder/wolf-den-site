@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
     GiCardRandom, GiTwoCoins, GiPrisoner, GiSandsOfTime,
-    GiScrollUnfurled, GiCompass, GiBrokenSkull, GiCoinflip, GiOpenGate,
+    GiScrollUnfurled, GiCompass, GiCoinflip, GiOpenGate,
 } from "react-icons/gi";
 
 const TACTIC_ICON = { bluff: GiCardRandom, offer: GiTwoCoins, confront: GiPrisoner, wait: GiSandsOfTime };
@@ -35,6 +35,10 @@ export default function Brig() {
     const [openId, setOpenId] = useState(null);
     const [busy, setBusy] = useState(false);
     const [say, setSay] = useState(null);        // the last thing he did, shown over the sheet
+    // ⚠️ THE MOMENT HE BREAKS HAS TO SURVIVE HIM. A broken captain leaves the brig the instant he talks —
+    // his berth frees and his row ends — so the sheet showing him is unmounted by the same response that
+    // says he cracked, and the player never reads the thing the whole loop was for. Held separately.
+    const [broke, setBroke] = useState(null);
     const [err, setErr] = useState("");
 
     const load = useCallback(async () => {
@@ -59,9 +63,13 @@ export default function Brig() {
     const ask = useCallback(async (captive, tactic) => {
         const d = await act({ action: "ask", id: captive.id, tactic });
         if (!d) return;
-        setSay({ outcome: d.outcome, said: d.said, broke: d.broke, spent: d.spent, name: captive.name, broke_text: d.captive?.broke });
-        // A man who is finished is no longer a man you have open.
-        if (d.broke || d.spent) setOpenId(d.broke ? null : captive.id);
+        if (d.broke) {
+            setOpenId(null);
+            setBroke({ name: captive.name, ship: captive.ship, art: captive.art, stars: captive.stars,
+                said: d.said, text: d.captive?.broke, confession: d.confession });
+            return;
+        }
+        setSay({ outcome: d.outcome, said: d.said, spent: d.spent, name: captive.name });
     }, [act]);
 
     if (!brig) return <p className="bg-wait">Opening the brig…</p>;
@@ -164,6 +172,25 @@ export default function Brig() {
                 </div>
             ) : null}
 
+            {/* ── HE TALKED ── the payoff, and the one screen in here that is allowed to be loud. */}
+            {broke ? (
+                <div className="bg-sheet-over" role="presentation" onClick={() => setBroke(null)}>
+                    <div className="bg-sheet is-broke" role="dialog" aria-label={`${broke.name} talked`}
+                        onClick={(e) => e.stopPropagation()}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={art(broke.art)} alt="" className="bg-sheet-face" draggable="false" />
+                        <p className="bg-broke-kick">He talks</p>
+                        <p className="bg-sheet-name">{broke.name}</p>
+                        <p className="bg-sheet-ship">{broke.ship} · <Stars n={broke.stars} /></p>
+                        <p className="bg-said is-crack">{broke.said}<em>{broke.text}</em></p>
+                        <p className="bg-broke-note">
+                            His confession is in your hold. Three of them make a chart.
+                        </p>
+                        <button type="button" className="bg-btn is-go bg-wide" onClick={() => setBroke(null)}>Good</button>
+                    </div>
+                </div>
+            ) : null}
+
             {/* ── THE INTERROGATION ── a sheet, not a dialog: on a phone this IS the screen. */}
             {open ? (
                 <div className="bg-sheet-over" role="presentation" onClick={() => setOpenId(null)}>
@@ -185,7 +212,6 @@ export default function Brig() {
                         {say ? (
                             <p className={`bg-said is-${say.outcome}`} role="status">
                                 {say.said}
-                                {say.broke ? <em>He breaks. {say.broke_text}</em> : null}
                                 {say.spent ? <em>You have nothing left to try on him.</em> : null}
                             </p>
                         ) : null}
@@ -339,6 +365,12 @@ export default function Brig() {
                 .bg-tactic b { font-size: 14px; font-weight: 800; }
                 .bg-tactic i { font-size: 11.5px; font-style: normal; line-height: 1.35; color: #8d97a6; }
 
+                .bg-sheet.is-broke { text-align: center; animation: bgBreak .3s ease both; }
+                @keyframes bgBreak { from { transform: scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+                .bg-broke-kick { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .16em;
+                    text-transform: uppercase; color: #e8b64c; }
+                .bg-broke-note { margin: 12px 0 14px; font-size: 13px; color: #8d97a6; }
+                .bg-wide { width: 100%; justify-content: center; }
                 .bg-done p { margin: 0 0 10px; font-size: 13.5px; line-height: 1.5; color: #cfd6e0; }
                 .bg-done .bg-btn { width: 100%; justify-content: center; margin-bottom: 6px; }
 
