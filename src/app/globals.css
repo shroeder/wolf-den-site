@@ -6957,6 +6957,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .social-list-top { display: flex; justify-content: flex-end; }
 .social-list-full { font-size: 0.82rem; }
 .social-empty { padding: 18px 6px; text-align: center; }
+/* The way out of an empty friend-filter. A button rather than a sentence naming another tab, because
+   being told where to go and then retyping the name reads as a search that did nothing -- see the note
+   in SocialHub's FriendsTab. `color` is stated because the global link rules reach buttons in here. */
+.social-empty-go { display: inline; padding: 0; border: 0; background: none; font: inherit;
+    color: #9fd0ff; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.social-empty-go:hover { color: #cfe6ff; }
 /* Global (town/plaza) chat tab — a first-class feed with hero sprites + pretty timestamps and a pinned composer. */
 .social-global { display: flex; flex-direction: column; min-height: 100%; gap: 8px; }
 /* Room under the last message for the sticky composer to sit over. Without it the newest line was always the

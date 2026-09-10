@@ -624,6 +624,7 @@ export default function SocialHub() {
                                         busyId={busyId}
                                         onMessage={openDm}
                                         onRespond={respondRequest}
+                                        onDiscover={(text) => { setDiscoverQ(text); setTab("discover"); }}
                                     />
                                 ) : (
                                     <DiscoverTab
@@ -692,7 +693,7 @@ function MsgRow({ it }) {
 //
 // This filters the list you already have, in the browser. No request, no endpoint: the friends list is
 // on screen, and the only thing missing was a way to narrow it. Matches display name or @handle.
-function FriendsTab({ data, busyId, onMessage, onRespond }) {
+function FriendsTab({ data, busyId, onMessage, onRespond, onDiscover }) {
     const [q, setQ] = useState("");
     if (data === null) return <p className="muted social-empty">Loading…</p>;
     const { friends = [], incoming = [] } = data;
@@ -735,7 +736,20 @@ function FriendsTab({ data, busyId, onMessage, onRespond }) {
             {friends.length === 0 ? (
                 <p className="muted social-empty">No friends yet — head to Discover and add some.</p>
             ) : shownFriends.length === 0 ? (
-                <p className="muted social-empty">No friend matches &ldquo;{q.trim()}&rdquo;. To add somebody new, try Discover.</p>
+                // -- A DEAD END THAT TOLD YOU WHERE TO GO AND MADE YOU WALK ------------------------
+                // This box filters the friends you already have; finding somebody you do NOT know is
+                // Discover's job. The line already said so and that was still not enough:
+                // ValkyrieSylve, weeks after the box was added, "searching for players names doesn't
+                // appear to be working still... within the friends tab". The search is not broken --
+                // it was checked against every member and it finds them -- but being told the name of
+                // another tab and having to retype the name into it reads exactly like a search that
+                // does nothing. It carries the name over now, which is what the sentence meant.
+                <p className="muted social-empty">
+                    No friend matches &ldquo;{q.trim()}&rdquo;.{" "}
+                    <button type="button" className="social-empty-go" onClick={() => onDiscover?.(q.trim())}>
+                        Look for them in Discover
+                    </button>
+                </p>
             ) : (
                 shownFriends.map((m) => (
                     <MemberHeroCard
