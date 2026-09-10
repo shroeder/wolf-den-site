@@ -17,52 +17,152 @@
 
 export const FLEET = [
     { rank: 1, name: "Gull's Folly", cls: "Fishing cutter", art: "fleet_cutter", ammo: "round",
-        hp: 78, guns: 2, accuracy: 0.52, rake: 0.05,
+        hits: 6, hp: 78, guns: 2, accuracy: 0.52, rake: 0.05,
         flavor: "A fishing boat with two stolen guns lashed to the deck. It should not be out here." },
     { rank: 2, name: "Wet Powder", cls: "Smuggler's sloop", art: "fleet_sloop", ammo: "round",
-        hp: 112, guns: 3, accuracy: 0.55, rake: 0.06,
+        hits: 7, hp: 112, guns: 3, accuracy: 0.55, rake: 0.06,
         flavor: "Fast, low, and carrying more brandy than shot." },
     { rank: 3, name: "The Cormorant", cls: "Coastal lugger", art: "fleet_lugger", ammo: "grape",
-        hp: 155, guns: 3, accuracy: 0.57, rake: 0.07,
+        hits: 8, hp: 155, guns: 3, accuracy: 0.57, rake: 0.07,
         flavor: "Loads grape and sweeps decks. Stay behind your bulwarks." },
     { rank: 4, name: "Iron Nettle", cls: "Gun brig", art: "fleet_brig", ammo: "round",
-        hp: 230, guns: 5, accuracy: 0.59, rake: 0.08,
+        hits: 9, hp: 230, guns: 5, accuracy: 0.59, rake: 0.08,
         flavor: "Plated at the waterline with whatever the last wreck was carrying." },
     { rank: 5, name: "Salt Meg's Revenge", cls: "Brigantine", art: "fleet_boss_revenge", ammo: "chain", boss: true,
-        hp: 280, guns: 6, accuracy: 0.62, rake: 0.11,
+        hits: 10, hp: 280, guns: 6, accuracy: 0.62, rake: 0.11,
         flavor: "Meg takes your rigging first and your cargo at her leisure. Nobody has out-run her twice." },
 
     { rank: 6, name: "The Hollow Tide", cls: "Schooner", art: "fleet_schooner", ammo: "round",
-        hp: 315, guns: 6, accuracy: 0.61, rake: 0.1,
+        hits: 11, hp: 315, guns: 6, accuracy: 0.61, rake: 0.1,
         flavor: "Crewed thin and sailed hard. It will trade with you all afternoon." },
     { rank: 7, name: "Bitterhold", cls: "Corvette", art: "fleet_corvette", ammo: "explosive",
-        hp: 355, guns: 7, accuracy: 0.63, rake: 0.12,
+        hits: 12, hp: 355, guns: 7, accuracy: 0.63, rake: 0.12,
         flavor: "Fires shells. Half go wide; the half that don't set your deck alight." },
     { rank: 8, name: "Widow's Wage", cls: "Privateer frigate", art: "fleet_frigate", ammo: "grape",
-        hp: 400, guns: 7, accuracy: 0.65, rake: 0.13,
+        hits: 13, hp: 400, guns: 7, accuracy: 0.65, rake: 0.13,
         flavor: "A letter of marque from a country that no longer exists, and no intention of checking." },
     { rank: 9, name: "The Grinding Reef", cls: "Heavy frigate", art: "fleet_heavy", ammo: "round",
-        hp: 440, guns: 8, accuracy: 0.67, rake: 0.13,
+        hits: 14, hp: 440, guns: 8, accuracy: 0.67, rake: 0.13,
         flavor: "Slow, heavy, and entirely willing to sit there and out-last you." },
     { rank: 10, name: "The Black Tithe", cls: "Ship of the line", art: "fleet_boss_tithe", ammo: "explosive", boss: true,
-        hp: 490, guns: 8, accuracy: 0.69, rake: 0.16,
+        hits: 15, hp: 490, guns: 8, accuracy: 0.69, rake: 0.16,
         flavor: "It takes a tenth of everything that passes. The tenth is not negotiable and neither is the price." },
 
     { rank: 11, name: "Kraken's Dowry", cls: "Razee", art: "fleet_razee", ammo: "chain",
-        hp: 560, guns: 8, accuracy: 0.71, rake: 0.15,
+        hits: 16, hp: 560, guns: 8, accuracy: 0.71, rake: 0.15,
         flavor: "Cut down a deck for speed and still heavier than anything you have met." },
     { rank: 12, name: "Pale Lantern", cls: "Ghost brig", art: "fleet_ghost", ammo: "grape",
-        hp: 620, guns: 8, accuracy: 0.72, rake: 0.16,
+        hits: 17, hp: 620, guns: 8, accuracy: 0.72, rake: 0.16,
         flavor: "No crew answers the hail. The guns run out anyway." },
     { rank: 13, name: "Cannonade", cls: "Bomb vessel", art: "fleet_bomb", ammo: "explosive",
-        hp: 690, guns: 8, accuracy: 0.7, rake: 0.18,
+        hits: 18, hp: 690, guns: 8, accuracy: 0.7, rake: 0.18,
         flavor: "Built around a mortar and a complete disregard for its own timbers." },
     { rank: 14, name: "The Long Arrears", cls: "Man-o'-war", art: "fleet_manowar", ammo: "round",
-        hp: 740, guns: 9, accuracy: 0.77, rake: 0.2,
+        hits: 19, hp: 740, guns: 9, accuracy: 0.77, rake: 0.2,
         flavor: "Three decks of guns and a purser who writes down every ball he spends on you." },
     { rank: 15, name: "Admiral Vane's Sovereign", cls: "Flagship", art: "fleet_boss_sovereign", ammo: "explosive", boss: true,
-        hp: 820, guns: 9, accuracy: 0.75, rake: 0.22,
+        hits: 20, hp: 820, guns: 9, accuracy: 0.75, rake: 0.22,
         flavor: "The reason the fleet has a name. Vane has never had to fire a second broadside." },
+
+    // ── ⚠️ PAST THE FLAGSHIP, BECAUSE SEVEN CAPTAINS HAD FINISHED THE LADDER ────────────────
+    // Luke: "I havent lost a sea raid in weeks. looking for an actual challenge."
+    // Measured before writing a line of this. The Den has fought 828 fleet battles and won 768 of them —
+    // 93%. Seven captains sit at depth 15 with nothing above them, and two of them have never lost at all:
+    // Kaishiern 51-0, Luke 44-0. It is not a tuning problem and it is not luck. The ladder is finished.
+    //
+    // ⚠️ AND IT COULD NOT HAVE BEEN EXTENDED WITHOUT THIS: foePlanks reads `foe.hits` and falls back to
+    // clamp(5 + rank, 5, 22). Not one ship in the fleet had a `hits`, so every hull was that fallback — and
+    // it CAPS AT 22. Ranks 16, 17 and 18 would each have had a 22-plank hull and rank 40 would have had the
+    // same 22 as rank 17. Twenty-five new ships, twenty-three of them identical where it counts. The `hp`
+    // field in this table is decorative and has always been (see the note by foePlanks); `hits` is the hull
+    // the fight actually counts. Every rank now says its own, including the original fifteen — which are
+    // written at exactly the number the fallback was already giving them, so nothing changes for anybody
+    // who is mid-ladder.
+    //
+    // The captain's own ceiling is fixed and low: 7 guns, 22 planks, 96% accuracy, all of them maxed by the
+    // people asking for this. So the climb past 15 is carried by HULL and GUNS rather than by accuracy,
+    // which is nearly capped by rank 20 and has nowhere to go.
+    //
+    // ⚠️ THESE NUMBERS ARE A FIRST CUT AND MUST BE MEASURED AGAINST REAL BOUTS. matchupOdds already says
+    // rank 15 is a 44% fight and the Den wins it every time — the model does not see aiming, ammo or the
+    // loadout, so it cannot be trusted to price a rung. Watch the win rate at 16-20 for a week and steepen
+    // or flatten from what actually happens, not from the model.
+
+    { rank: 16, name: "Revenue Cutter Thorn", cls: "Revenue cutter", art: "fleet_thorn", ammo: "round",
+        hits: 22, hp: 924, guns: 10, accuracy: 0.76, rake: 0.23,
+        flavor: "Flies a flag you recognise. That is worse, not better." },
+    { rank: 17, name: "The Assize", cls: "Patrol sloop", art: "fleet_assize", ammo: "grape",
+        hits: 24, hp: 1008, guns: 10, accuracy: 0.77, rake: 0.24,
+        flavor: "Carries a magistrate and a rope, and has never needed the magistrate." },
+    { rank: 18, name: "Hammerfall", cls: "Bomb ketch", art: "fleet_hammerfall", ammo: "explosive",
+        hits: 26, hp: 1092, guns: 11, accuracy: 0.77, rake: 0.26,
+        flavor: "It does not chase. It ranges you, and then it is simply over." },
+    { rank: 19, name: "Cold Assurance", cls: "Escort frigate", art: "fleet_assurance", ammo: "chain",
+        hits: 28, hp: 1176, guns: 11, accuracy: 0.78, rake: 0.26,
+        flavor: "Insures the convoy behind it. It settles claims with the guns." },
+    { rank: 20, name: "Commodore Ash", cls: "Squadron flagship", art: "fleet_boss_ash", ammo: "explosive", boss: true,
+        hits: 31, hp: 1302, guns: 12, accuracy: 0.8, rake: 0.3,
+        flavor: "He was given a fleet to end piracy and has decided to end sailors instead." },
+    { rank: 21, name: "The Long Blockade", cls: "Line frigate", art: "fleet_blockade", ammo: "round",
+        hits: 33, hp: 1386, guns: 12, accuracy: 0.8, rake: 0.28,
+        flavor: "It has sat off this coast for nine years. It is not in a hurry now." },
+    { rank: 22, name: "Sixty-Four", cls: "Third rate", art: "fleet_sixtyfour", ammo: "round",
+        hits: 35, hp: 1470, guns: 13, accuracy: 0.81, rake: 0.29,
+        flavor: "Sixty-four guns and a name nobody bothered to improve on." },
+    { rank: 23, name: "The Iron Verdict", cls: "Ironclad ram", art: "fleet_verdict", ammo: "chain",
+        hits: 38, hp: 1596, guns: 13, accuracy: 0.81, rake: 0.31,
+        flavor: "Plated stem to stern. Shot comes off it like rain off a roof." },
+    { rank: 24, name: "Gallowglass", cls: "Mercenary razee", art: "fleet_gallowglass", ammo: "grape",
+        hits: 40, hp: 1680, guns: 14, accuracy: 0.82, rake: 0.32,
+        flavor: "Fights for whoever paid last. Today that was not you." },
+    { rank: 25, name: "Admiral Vane's Reprisal", cls: "Rebuilt flagship", art: "fleet_boss_reprisal", ammo: "explosive", boss: true,
+        hits: 44, hp: 1848, guns: 15, accuracy: 0.84, rake: 0.35,
+        flavor: "You sank the Sovereign. He has had a year and a grudge and a shipyard." },
+    { rank: 26, name: "The Salt Choir", cls: "Drowned brig", art: "fleet_choir", ammo: "chain",
+        hits: 46, hp: 1932, guns: 15, accuracy: 0.83, rake: 0.32,
+        flavor: "You can hear the crew. You should not be able to hear the crew." },
+    { rank: 27, name: "Wreck of the Marigold", cls: "Risen wreck", art: "fleet_marigold", ammo: "round",
+        hits: 48, hp: 2016, guns: 15, accuracy: 0.83, rake: 0.33,
+        flavor: "It went down with all hands eighty years ago and has not stopped sailing." },
+    { rank: 28, name: "Barnacle Court", cls: "Coral hulk", art: "fleet_court", ammo: "grape",
+        hits: 51, hp: 2142, guns: 16, accuracy: 0.84, rake: 0.34,
+        flavor: "More reef than ship now, and the reef has opinions." },
+    { rank: 29, name: "The Lamprey", cls: "Boarding hulk", art: "fleet_lamprey", ammo: "chain",
+        hits: 53, hp: 2226, guns: 16, accuracy: 0.84, rake: 0.35,
+        flavor: "It does not want to sink you. It wants to be alongside." },
+    { rank: 30, name: "The Tide Marshal", cls: "Leviathan-drawn barge", art: "fleet_boss_marshal", ammo: "explosive", boss: true,
+        hits: 57, hp: 2394, guns: 17, accuracy: 0.86, rake: 0.38,
+        flavor: "Something under the water is pulling it, and it is pulling it toward you." },
+    { rank: 31, name: "Gravemouth", cls: "Whaler, converted", art: "fleet_gravemouth", ammo: "explosive",
+        hits: 59, hp: 2478, guns: 17, accuracy: 0.85, rake: 0.36,
+        flavor: "Built to kill something bigger than a ship. It has kept the habit." },
+    { rank: 32, name: "The Nine Widows", cls: "Ghost squadron", art: "fleet_widows", ammo: "grape",
+        hits: 62, hp: 2604, guns: 17, accuracy: 0.85, rake: 0.37,
+        flavor: "Nine sets of running lights. There is only ever one hull." },
+    { rank: 33, name: "Pressgang", cls: "Slaver hulk", art: "fleet_pressgang", ammo: "chain",
+        hits: 64, hp: 2688, guns: 18, accuracy: 0.86, rake: 0.38,
+        flavor: "It is short of crew. It has been short of crew for a very long time." },
+    { rank: 34, name: "The Undertow", cls: "Storm cutter", art: "fleet_undertow", ammo: "round",
+        hits: 67, hp: 2814, guns: 18, accuracy: 0.86, rake: 0.38,
+        flavor: "It brings its own weather and it does not sail in anybody else's." },
+    { rank: 35, name: "Mother Fathom", cls: "Abyssal dreadnought", art: "fleet_boss_fathom", ammo: "explosive", boss: true,
+        hits: 72, hp: 3024, guns: 19, accuracy: 0.88, rake: 0.42,
+        flavor: "She has been down there since before anybody thought to name the sea." },
+    { rank: 36, name: "The Long Reckoning", cls: "Hulk of the fleet", art: "fleet_reckoning", ammo: "round",
+        hits: 75, hp: 3150, guns: 19, accuracy: 0.87, rake: 0.4,
+        flavor: "Every ship you have sunk, welded into one and still floating." },
+    { rank: 37, name: "Cartographer's Regret", cls: "Charting vessel", art: "fleet_regret", ammo: "grape",
+        hits: 78, hp: 3276, guns: 20, accuracy: 0.88, rake: 0.41,
+        flavor: "It maps the water you are standing on. You are on the chart already." },
+    { rank: 38, name: "The Unbroken Line", cls: "Battle line, entire", art: "fleet_line", ammo: "chain",
+        hits: 82, hp: 3444, guns: 20, accuracy: 0.88, rake: 0.42,
+        flavor: "Not a ship. Eleven of them, and they have done this before." },
+    { rank: 39, name: "Hull Seventeen", cls: "Nameless prototype", art: "fleet_seventeen", ammo: "explosive",
+        hits: 86, hp: 3612, guns: 21, accuracy: 0.89, rake: 0.44,
+        flavor: "No flag, no name, no crew on deck. The yard that built it burned down after." },
+    { rank: 40, name: "The Last Harbour", cls: "The thing at the bottom", art: "fleet_boss_harbour", ammo: "explosive", boss: true,
+        hits: 95, hp: 3990, guns: 22, accuracy: 0.9, rake: 0.48,
+        flavor: "Everything that ever sank is moored here. It is not a place. It is waiting." },
 ];
 
 import { fleetDeck } from "@/lib/marketplace/deck-lines.js";
@@ -112,7 +212,16 @@ export const fleetShip = (rank) => FLEET.find((f) => f.rank === Number(rank)) ||
 export function fleetReward(rank, { first = false } = {}) {
     const ship = fleetShip(rank);
     if (!ship) return null;
-    const r = ship.rank;
+    // ── ⚠️ THE PAYOUT DOES NOT CLIMB AS FAST AS THE LADDER DOES ───────────────────────
+    // Everything below is linear in the rank, which was fine while the ladder stopped at 15. Run straight
+    // out to 40 it triples the gold a top captain takes off the sea: a rank-40 re-fight would pay 230 where
+    // rank 15 pays 76, five sorties a day, on the seven people who already have everything.
+    //
+    // So the rank the REWARD is worked out from grows at about a third of the rate past 15. Rank 40 pays
+    // like rank 24 — a real lift over the old top rung, and nothing like a tripling. The reason to climb
+    // past the flagship is the climb; the fight is the reward and the ladder says so.
+    // Nothing at or below 15 moves by a single coin: `payRank` is exactly `r` there.
+    const r = Math.min(ship.rank, 15 + (ship.rank - 15) * 0.35);
     const boss = Boolean(ship.boss);
     const mult = first ? 1 : 0.4; // re-fights pay 40% — worth doing, never the best way up
     const round = (n) => Math.max(1, Math.round(n * mult));
