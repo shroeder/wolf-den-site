@@ -229,7 +229,7 @@ export default function ForestClient() {
                         <div className={`fr-hud${fell ? " is-gone" : ""}`}>
                             <span className="fr-name" style={{ "--r": RARITY[tree.rarity] || "#b9b2a4" }}>{tree.name}</span>
                             <span className="fr-hp"><i style={{ width: `${pct}%` }} /></span>
-                            <span className="fr-streak">
+                            <span className={`fr-streak${live.streak > 0 ? "" : " is-cold"}`}>
                                 <i style={{ width: `${streakPct}%` }} />
                                 {/* ⚠️ CLAMPED THE SAME WAY THE ENGINE CLAMPS IT. This read the raw streak and printed ×2.04
                                     while swing() was paying ×2.00 — a meter promising more than the axe delivers is the
@@ -449,7 +449,7 @@ export default function ForestClient() {
                     to { opacity: 1; transform: translateX(-50%); }
                 }
                 .fr-hud { position: absolute; left: 0; right: 0; top: 0; z-index: 5;
-                    display: flex; flex-direction: column; gap: 5px; padding: 12px 58px 12px 14px;
+                    display: flex; flex-direction: column; gap: 6px; padding: 16px 62px 18px 14px;
                     background: linear-gradient(180deg, rgba(4,8,10,.85), transparent); pointer-events: none; }
                 .fr-name { font-size: 15px; font-weight: 800; color: var(--r); text-shadow: 0 1px 4px #000; }
                 .fr-hp { display: block; height: 9px; border-radius: 999px; overflow: hidden;
@@ -460,9 +460,18 @@ export default function ForestClient() {
                     background: rgba(6,10,12,.7); box-shadow: inset 0 0 0 1px rgba(255,180,90,.18); }
                 .fr-streak i { display: block; height: 100%; border-radius: 999px;
                     background: linear-gradient(90deg, #c8873f, #ffcf87); transition: width 90ms linear; }
+                /* ⚠️ TWO COLOURS, BECAUSE THE BAR BEHIND THE LABEL IS NOT ALWAYS THERE. The multiplier is dark
+                   ink so it reads against the filled orange, which is right the moment a streak exists — and
+                   invisible before one does, when the bar is empty and the ink is black on black. "Swing
+                   faster" was the first thing a new chopper was meant to read and the one thing they could not
+                   see. The cold state gets light text and its own faint pulse instead. */
                 .fr-streak em { position: absolute; inset: 0; display: grid; place-items: center;
                     font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .06em;
                     color: #1a140c; text-shadow: 0 1px 0 rgba(255,255,255,.25); }
+                .fr-streak.is-cold em { color: #ffcf87; text-shadow: 0 1px 3px rgba(0,0,0,.9);
+                    animation: frCold 1.6s ease-in-out infinite; }
+                @keyframes frCold { 0%,100% { opacity: .58; } 50% { opacity: 1; } }
+                .fr-streak.is-cold { box-shadow: inset 0 0 0 1px rgba(255,180,90,.32); }
 
                 .fr-tap { flex: 0 0 auto; margin: 0; padding: 13px; text-align: center;
                     font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
