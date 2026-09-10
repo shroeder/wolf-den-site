@@ -97,7 +97,9 @@ export default function ForestClient() {
         const id = chipId.current++;
         setChips((c) => [
             ...c.slice(-14),
-            { id, hit: res.hit, mult: res.mult, doubled: res.doubled, x: 32 + Math.random() * 36, y: 40 + Math.random() * 22 },
+            // AT THE CUT, NOT OVER THE CROWN. The numbers were scattering across the canopy, which is the
+            // one part of the tree the axe is nowhere near — they belong where the blade goes in.
+            { id, hit: res.hit, mult: res.mult, doubled: res.doubled, x: 40 + Math.random() * 20, y: 66 + Math.random() * 10 },
         ]);
         setTimeout(() => setChips((c) => c.filter((x) => x.id !== id)), 620);
         setShake(Math.min(6, 2 + res.streak * 0.22));
@@ -213,7 +215,12 @@ export default function ForestClient() {
                             <span className="fr-hp"><i style={{ width: `${pct}%` }} /></span>
                             <span className="fr-streak">
                                 <i style={{ width: `${streakPct}%` }} />
-                                <em>{live.streak > 0 ? `×${(1 + live.streak * STREAK_STEP).toFixed(2)}` : "swing faster"}</em>
+                                {/* ⚠️ CLAMPED THE SAME WAY THE ENGINE CLAMPS IT. This read the raw streak and printed ×2.04
+                                    while swing() was paying ×2.00 — a meter promising more than the axe delivers is the
+                                    shop-price bug in a different costume. */}
+                                <em>{live.streak > 0
+                                    ? `×${(1 + Math.min(STREAK_CAP - 1, live.streak * STREAK_STEP)).toFixed(2)}`
+                                    : "swing faster"}</em>
                             </span>
                         </div>
                     </div>
@@ -341,14 +348,17 @@ export default function ForestClient() {
 
                 /* The axe rides in from the right on every swing. It is drawn upright, so the swing is a
                    rotation about its own head — see the note on orientation in gen-forest.mjs. */
-                .fr-axe { position: absolute; right: 6%; bottom: 16%; width: 34%; max-width: 190px;
-                    transform-origin: 60% 20%; transform: rotate(38deg);
+                /* ⚠️ IT HAS TO REACH THE TRUNK. At right:6% the axe sat off in the undergrowth swinging at
+                   nothing while the tree shook on its own — the two halves of one action, happening in
+                   different places. Brought in over the cut, and the swing arcs into it. */
+                .fr-axe { position: absolute; left: 52%; bottom: 12%; width: 30%; max-width: 165px;
+                    transform-origin: 50% 15%; transform: rotate(46deg);
                     filter: drop-shadow(0 6px 12px rgba(0,0,0,.75)); pointer-events: none; }
                 .fr-axe.is-swing { animation: frSwing .11s ease-out; }
                 @keyframes frSwing {
-                    0% { transform: rotate(38deg) translate(0, 0); }
-                    55% { transform: rotate(-32deg) translate(-16%, 6%); }
-                    100% { transform: rotate(38deg) translate(0, 0); }
+                    0% { transform: rotate(46deg) translate(0, 0); }
+                    55% { transform: rotate(-26deg) translate(-26%, 4%); }
+                    100% { transform: rotate(46deg) translate(0, 0); }
                 }
                 .fr-axe.is-hot { filter: drop-shadow(0 6px 12px rgba(0,0,0,.75)) drop-shadow(0 0 14px rgba(255,170,60,.85)); }
 

@@ -66,7 +66,10 @@ const PIECES = {
     grove: { subject: "A dark pine forest at night seen straight on: dense black trunks receding into fog, a "
         + "faint cold blue mist between them, the ground a bed of dark needles and scattered fallen leaves, a "
         + "sliver of moonlight coming down from the upper left. Deep, quiet and empty -- no people, no animals, "
-        + "no buildings, no path. The MIDDLE of the frame is open ground with nothing standing in it",
+        + "no buildings, no path. The MIDDLE of the frame is open ground with nothing standing in it. "
+        + "⚠️ ONE CONTINUOUS PAINTING edge to edge: no panel, no inset rectangle, no frame, no border, no "
+        + "seam, no straight-edged patch of lighter sky. The first draft came back with a rectangular "
+        + "lighter box around the moon, which reads as a rendering fault rather than as a forest",
         sprite: false, size: "1536x1024" },
 };
 
