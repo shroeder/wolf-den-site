@@ -146,9 +146,29 @@ const SAFE_DEPTH_CAP = 6;
 // Undone. The dead tenth level comes back with it and is the better problem to have: a track whose last rung
 // is flat is a tuning complaint, and a push-your-luck game whose first four steps cannot fail is not a
 // push-your-luck game. If level 10 should pay, it should pay in something that is not safe depth.
+// ── ⚠️ SEVEN OF THE TEN LEVELS BOUGHT NOTHING, AND ONE OF THEM COULD NEVER BUY ANYTHING ──────────────────────
+// This floored the level before dividing, so only 3, 6 and 9 moved the roof at all — 1, 2, 4, 5, 7, 8 and 10
+// changed no number in the game. The card said so ("still 5 safe") and the track's own description says "every
+// THIRD level", so the CADENCE was disclosed and is not the complaint. Level 10 is the complaint: it is the
+// last rung, there is no eleventh for it to be a step toward, and it is therefore a purchase that is
+// structurally incapable of ever doing anything. Four members hold it. ValkyrieSylve, who is one of them:
+// "If level.10.shoring still does nothing, can I please have my gold back then? 5k for no effect isn't fair."
+//
+// The note left here previously said that if level 10 should pay, it should pay in something that is not safe
+// depth. The smaller answer is that safe depth was never required to be a whole number: collapseChanceAt
+// multiplies `depth - safeDepth` by a per-step rate, and that arithmetic has always been happy with a third of
+// a step. Dropping the floor() makes every level move the roof by a third of a step, which leaves 3, 6 and 9
+// landing on exactly the whole steps the description promises and gives the seven dead rungs something real.
+//
+// Measured: at Shoring 1 a depth-3 step goes 7.5% -> 5.0%, and at Shoring 10 a depth-8 step goes 22.5% -> 20%.
+// The per-step climb and the hard ceiling are both untouched, so the mine still gets away from you.
+//
+// ⚠️ SAFE_DEPTH_CAP STILL BINDS FOR A LAMP AT SHORING 9+. With a lamp the ceiling of six is reached at level
+// nine, so the tenth is still flat for that loadout — which is the ceiling doing its job rather than the track
+// failing, and the card prints "still 6 safe" when it happens.
 export const safeDepthFor = (shoringLevel = 0, lamp = false) => Math.min(
     SAFE_DEPTH_CAP,
-    COLLAPSE_FREE_DEPTH + Math.floor(Math.max(0, shoringLevel) / 3) + (lamp ? LAMP_SAFE_DEPTH : 0));
+    COLLAPSE_FREE_DEPTH + Math.max(0, shoringLevel) / 3 + (lamp ? LAMP_SAFE_DEPTH : 0));
 const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs, this much per step...
 const COLLAPSE_SLOW_PER = 0.05;     // ...less 5% of that per Buttress level...
 const COLLAPSE_SLOW_CAP = 0.50;     // ...to a floor of half the base rate.
@@ -866,7 +886,7 @@ export const SURVEY_TRACKS = {
     // thing you are buying and states the rate, and the projection below says plainly when a level adds
     // nothing rather than printing the same number twice and letting it read as a fault.
     shoring: { max: 10, per: 1 / 3, cap: 10 / 3, kind: "count", name: "Shoring", icon: "/images/mining/track-shoring.png", col: "assay_level",
-        desc: "Timbered walls, and slow to set. Every THIRD level pushes the roof one step further before the risk starts climbing — three steps in all, and the mine is meant to get away from you after that.", effect: "Safe depth" },
+        desc: "Timbered walls, and slow to set. Every level pushes the roof a third of a step further before the risk starts climbing, so every THIRD level is a whole step — three of them in all, and the mine is meant to get away from you after that.", effect: "Safe depth" },
     buttress: { max: 10, per: COLLAPSE_SLOW_PER, cap: COLLAPSE_SLOW_CAP, kind: "pct", name: "Buttress", icon: "/images/mining/track-buttress.png", col: "brace_level",
         desc: "Arched stone set as you go. The risk still starts where Shoring says — it just climbs far more slowly from there.", effect: "Risk climb" },
     pack: { max: 10, per: 0.08, cap: 0.80, kind: "pct", name: "Pack", icon: "/images/mining/track-pack.png", col: "face_level",
@@ -1155,8 +1175,13 @@ export async function getMiningState(buyerId) {
             // "still N safe" on a level that buys nothing. Printing "5 safe" against "5 safe" is how somebody
             // comes to ask whether the upgrade is broken — see the note on the track itself.
             if (key === "shoring") {
+                // Safe depth is fractional now (see safeDepthFor), so this rounds for the eye while the
+                // engine keeps the real number. "still N safe" survives for the one case that is still
+                // genuinely flat: a lamp at the ceiling.
                 const here = safeDepthFor(lvl, lamp);
-                return here === safeDepthFor(lvl - 1, lamp) && lvl > 0 ? `still ${here} safe` : `${here} safe`;
+                const prev = safeDepthFor(lvl - 1, lamp);
+                const show = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+                return here === prev && lvl > 0 ? `still ${show(here)} safe` : `${show(here)} safe`;
             }
             // Buttress reads as the actual per-step risk rather than a percentage OF a percentage — "7.5% a
             // step" going to "7.1% a step" is a number you can feel; "+5% risk climb" is a riddle.
