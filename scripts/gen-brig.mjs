@@ -18,29 +18,31 @@ const PIECES = {
     // BEHIND him. Deliberately empty in the middle third — that is where a man is going to be standing.
     room: {
         size: "1024x1024", transparent: false,
-        subject: "The inside of a ship's brig below decks, seen straight on: a back wall of heavy dark "
-            + "timber planks with iron bolts, damp streaks and old scratches, a low curved deck beam "
-            + "overhead, scattered straw on the floor, a tin cup and a rumpled blanket pushed into the "
-            + "left corner, a heavy iron ring bolted low on the right wall with a slack chain. Lit warm "
-            + "and dim from the upper left as if by a single lantern just out of frame, everything else "
-            + "falling into deep shadow. The MIDDLE of the wall is bare and unobstructed. No people, no "
-            + "figures, no bars",
+        // ⚠️ "EVERY SURFACE IS TIMBER" IS LOAD-BEARING. The first draft came back with a band of brick
+        // across the top of the wall, which reads as a cellar rather than as somewhere below a waterline.
+        subject: "The inside of a wooden ship's brig below decks, seen straight on: a back wall built "
+            + "entirely of heavy dark horizontal timber planks with iron bolts, damp streaks and old "
+            + "scratches, curved wooden deck beams overhead, a plank floor with scattered straw, a tin "
+            + "cup and a rumpled blanket pushed into the left corner, a heavy iron ring bolted low on "
+            + "the right wall with a slack chain. EVERY surface is ship timber — there is no brick, no "
+            + "stone, no masonry and no plaster anywhere in the image. Lit warm and dim from the upper "
+            + "left as if by a single lantern just out of frame, everything else falling into deep "
+            + "shadow. The MIDDLE of the wall is bare and unobstructed. No people, no figures, no bars",
     },
-    // IN FRONT of him. Vertical iron, mostly empty so the man reads through it.
-    bars: {
-        size: "1024x1024", transparent: true,
-        subject: "A row of seven thick vertical iron prison bars running from the top of the frame to the "
-            + "bottom, evenly spaced with wide gaps between them, pitted rusted black iron with warm "
-            + "highlights down their left edges, one horizontal iron cross-brace low across them. Only "
-            + "the bars themselves — the gaps between them are EMPTY and fully transparent. No wall, no "
-            + "floor, no background, no door, no lock, no figures",
-    },
+    // ⚠️ THERE IS NO `bars` PIECE AND THERE MUST NOT BE ONE. The iron is drawn in CSS (see Brig.js) so
+    // it is full-bleed at any width and crisp at any density. It was attempted here once and gpt-image-1
+    // returned a horned ogre, because DIE_CUT asks for a single centred subject touching no edge and a
+    // prison bar is the exact opposite of that. Re-adding it would also mean --force quietly recreating a
+    // 2MB file nothing loads.
     // The light source, drawn as its own object so it can flicker and gutter down.
     lantern: {
         size: "1024x1024", transparent: true,
-        subject: "An old ship's lantern hanging from a short iron hook: dented brass frame, four smoked "
-            + "glass panes, a warm flame burning inside, a small ring at the top. Seen from the side, "
-            + "isolated on transparency",
+        // The room is lit BY this thing, so it has to look like the source of that light: warm metal and a
+        // real flame. A reroll came back pale pewter and instantly read as a stone lamp in a wooden room.
+        subject: "An old ship's lantern hanging from a short iron hook: a dented POLISHED BRASS frame in "
+            + "deep warm gold, four smoked glass panes lit from within by a strong orange flame, the "
+            + "brass catching that firelight along every edge, a small ring at the top. Warm, glowing and "
+            + "unmistakably the source of a room's light. Seen from the side, isolated on transparency",
     },
 };
 

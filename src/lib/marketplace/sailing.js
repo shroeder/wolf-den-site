@@ -18,7 +18,7 @@ import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { captainsOpenTo } from "@/lib/marketplace/captains.js";
+import { captainsOpenTo, OFFER_MINUTES } from "@/lib/marketplace/captains.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, foePlanks, BATTLE_STATE_V,
@@ -1149,7 +1149,7 @@ function boardView(board) {
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
 // `baits` is handed in for the same reason gunDeck and the recipe shelf are: it is a pantry query and this
 // function is synchronous on purpose.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = [], baitCookable = [], deepFish = false, charts = 0) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = [], baitCookable = [], deepFish = false, charts = 0, waiting = 0) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1196,6 +1196,8 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // exists and what the best one is worth. The brig is where a chart is actually looked at.
         // Owner-gated with the rest of the feature — see captains.js CAPTAINS_PUBLIC.
         chartsReady: charts,
+        // How many men are standing on the deck unpaid, so the station can say so before the clock runs out.
+        captainsWaiting: waiting,
         voyageOptions: VOYAGE_OPTIONS.map((o) => ({
             id: o.id, label: o.label,
             ms: Math.round(voyageDurationMs(speedLevel, level) * o.mult),
@@ -1810,13 +1812,29 @@ export async function getSailingState(buyerId, skyKey = null) {
     // visit to the harbour — so an ungated query here would be a round trip the whole Den pays for a feature
     // only one person can see. See the note on CPU in CLAUDE.md: the lever that matters is queries per
     // request, and the cheapest query is the one that is not made.
-    const chartsHeld = captainsOpenTo(isOwner(buyerId))
-        ? Number((await db.queryOne(
-            `SELECT COUNT(*)::int AS n FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL`, [buyerId]
-        ).catch(() => null))?.n || 0)
-        : 0;
+    // ── AND WHETHER THE BRIG WANTS YOU ───────────────────────────────────────────────────────────────
+    // ⚠️ ONE QUERY FOR BOTH, AND ONLY FOR THE OWNER. A captain waits on deck for thirty minutes and then
+    // he is gone; a chart sits until it is sailed. Neither had any way of saying so outside the brig
+    // itself, which is a feature that can only tell you something while you are already looking at it.
+    //
+    // It is folded into the query that was already here rather than given its own, and it is NOT a nav
+    // badge: a badge in site chrome that reads a feature endpoint bills that feature on every page for
+    // every member forever (see check:chrome and CLAUDE.md). This is one extra column on a query this
+    // page already runs, for one person.
+    const brigRow = captainsOpenTo(isOwner(buyerId))
+        ? await db.queryOne(
+            `SELECT
+                (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS charts,
+                (SELECT COUNT(*)::int FROM mkt_ship_captive
+                  WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'offered'
+                    AND taken_at > NOW() - ($2 || ' minutes')::interval) AS waiting`,
+            [buyerId, String(OFFER_MINUTES)]
+        ).catch(() => null)
+        : null;
+    const chartsHeld = Number(brigRow?.charts) || 0;
+    const captainsWaiting = Number(brigRow?.waiting) || 0;
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
-        recipeShop, baits, baitCookable, deepFish, chartsHeld), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        recipeShop, baits, baitCookable, deepFish, chartsHeld, captainsWaiting), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
         // ── THE PURSE, WHERE YOU CAN SEE IT ──────────────────────────────────────────────────────────
         // Sunflower Jinxx: "it gives boat stat lvl 22, then has dabloons and gold but the dabloons is always
         // 0. I can't see how many I have unless I look in the quartermaster." Always 0 is exactly right: the

@@ -1208,6 +1208,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="sail-station-art" src={`/images/sailing/tracks/${art}.png`} alt="" draggable="false" />
                         <em>{label}</em>
+                        {/* ── THE BRIG ASKS FOR YOU ────────────────────────────────────────────────
+                            A captured captain waits on deck for thirty minutes and is then gone for
+                            good, and the only thing that knew was the brig itself — a feature that can
+                            only tell you something while you are already looking at it. The count is
+                            owner-gated upstream and rides the query the page already runs, so for
+                            everybody else this is exactly the row it was. */}
+                        {k === "guns" && (state.captainsWaiting > 0 || state.chartsReady > 0) ? (
+                            <i className="sail-station-dot" aria-label={state.captainsWaiting > 0
+                                ? `${state.captainsWaiting} in irons on deck` : "A chart is ready"} />
+                        ) : null}
                     </button>
                 ))}
             </div>

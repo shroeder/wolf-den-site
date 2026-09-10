@@ -12044,6 +12044,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    and only the selected tab had any background, so the other three read as loose text rather than controls.
    Fixed by shape, not by squeezing: one-word labels stacked under a glyph, so every tab has the same footprint
    whatever the word is and nothing can wrap. Four fit at 360px with room to spare. */
+/* The brig's one call for attention: a captain on deck has a clock on him, and the only thing that
+   knew was the brig. Positioned on the station rather than in site chrome on purpose — a nav badge
+   that reads a feature endpoint bills that feature on every page for every member. */
+.sail-station-dot { position: absolute; top: 5px; right: 7px; width: 9px; height: 9px; border-radius: 50%;
+    background: #ffbe57; box-shadow: 0 0 0 2px rgba(10,8,6,.85), 0 0 9px rgba(255,190,87,.9);
+    animation: sailStationDot 1.9s ease-in-out infinite; }
+@keyframes sailStationDot { 0%,100% { opacity: 1; transform: scale(1); } 55% { opacity: .55; transform: scale(.82); } }
+.sail-stations button { position: relative; }
 .sail-stations { display: flex; gap: 6px; padding: 5px; margin: 12px 0 10px; border-radius: 14px;
     background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); }
 .sail-stations button { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center;
