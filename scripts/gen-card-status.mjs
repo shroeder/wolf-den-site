@@ -97,6 +97,12 @@ const ART = {
     // dark board it read as a missing image rather than as an emblem. Given something to be.
     status: "a tattered parchment card curling at its corners, BRIGHT CREAM-WHITE paper lit from the front "
         + "with scorched amber edges, and a heavy black X scrawled across its face",
+    // Told apart from `strength` by being the SAME OBJECT COMING APART: a fist that is losing its plates
+    // rather than a fist being thrown. Ashen where strength is gold, so the two never read as each other
+    // in a pill row at 22 pixels.
+    strengthDown: "a clenched armoured gauntlet fist cracking apart, its plates breaking off and drifting "
+        + "away from the knuckles, BRIGHT ASHEN SILVER-GREY plate lit hard from the front with cold violet "
+        + "light bleeding out of the seams where the gold has gone",
     summon: "a curved war-horn raised and blowing, BRIGHT POLISHED BRASS with strong white highlights "
         + "along its bell, with three pale sound rings coming off it",
 };

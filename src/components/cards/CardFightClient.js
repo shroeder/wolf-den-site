@@ -1191,7 +1191,17 @@ export default function CardFightClient({ fixture, run = null }) {
                                             Driven off the beat's own fields now, so a move that grows a new
                                             one gets a mark by adding a picture rather than a branch. */}
                                         <span className="cf-intent-marks">
-                                            {["damage", "block", "strength", "heal", "weak", "vulnerable",
+                                            {/* ⚠️ AND TWO MORE WORDS THE VOCABULARY WAS MISSING. Same
+                                                fault as the two above, found the same way: Siphon Soul
+                                                takes a Strength and lays Frail, and the pill drew only
+                                                the Frail — so the Strength appeared to be Frail's doing.
+                                                GrayKitsune: "Frail doesn't say anything about lowering
+                                                my strength by 1 which is what I am assuming happened
+                                                here?" And a creature about to turn Intangible drew an
+                                                empty pill, which is the worst turn to spend your biggest
+                                                attack on. See intentSay, which was silent on both. */}
+                                            {["damage", "block", "intangible", "strength", "strengthDown",
+                                                "heal", "weak", "vulnerable",
                                                 "frail", "poison", "status", "summon"]
                                                 .filter((k) => beat[k])
                                                 .map((k) => {

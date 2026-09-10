@@ -103,6 +103,35 @@ export async function syncPetAchievements(buyerId) {
 //
 // Mirrors petsState's own rule, including its ownerOnly guard: unlaunched pets count only for whoever actually
 // holds one.
+// -- THE SAME QUESTION, FOR EVERY PET AT ONCE ---------------------------------------------------------
+// ownsPet answers for one pet and is the rule; this answers for all of them, because three callers wanted
+// the whole set and each had written its own version of the rule to get it. Two of those three were right.
+// The third was the CARD GAME, which gates its whole pool on pet ownership and asked the raw table:
+//
+//     SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'
+//
+// which is precisely the check the note above says is not ownership. GrayKitsune, who has 59 granted pets
+// and twelve more that are his by LEVEL: "There seems to be a few others I own that its asking me to
+// obtain, like Fawn." His twelve were bunny, frog, chick, kitten, fox_kit and wolf_pup -- the exact six
+// that note names -- plus eagle, owl, bear_cub, raven, bat and the fawn. Every card belonging to them was
+// locked to him while their portraits drew at the right level, because the ART reads mkt_pet_level and the
+// GATE read mkt_cosmetic_unlock, and those two tables do not agree about what a pet is.
+//
+// One rule, one place, and it keeps ownsPet's ownerOnly guard: an unlaunched pet counts only for whoever
+// actually holds one. See [[owneronly-content-landmine]].
+export async function ownedPetIdSet(buyerId) {
+    if (!buyerId) return new Set();
+    const [buyer, rows] = await Promise.all([
+        db.queryOne(`SELECT COALESCE(xp,0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
+    ]);
+    const granted = new Set((rows || []).map((r) => r.ref));
+    const level = levelForXp(buyer?.xp || 0).level;
+    return new Set(COLLECTIBLES
+        .filter((p) => (!p.ownerOnly || granted.has(p.id)) && isCollectibleUnlocked(p, level, { owned: granted }))
+        .map((p) => p.id));
+}
+
 export async function ownsPet(buyerId, petId) {
     const def = collectibleById(petId);
     if (!buyerId || !def) return false;

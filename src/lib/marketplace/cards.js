@@ -17,6 +17,7 @@ import {
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
+import { ownedPetIdSet } from "@/lib/marketplace/pets.js";
 
 // ── THE CARD GAME'S DOOR, AND THE ONE THING THE SERVER DOES FOR IT ───────────────────────────────────────────
 // The rules live in cards-kit.js and run in the browser (see the note at the top of that file: the fight pays
@@ -362,10 +363,11 @@ export async function saveRun(buyerId, run) {
  * you own the day the rule changes.
  */
 export async function ownedPetIds(buyerId) {
-    const owned = await db
-        .query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId])
-        .catch(() => []);
-    return new Set((owned || []).map((r) => r.ref));
+    // ⚠️ THIS USED TO READ mkt_cosmetic_unlock DIRECTLY, and that table is not ownership -- it holds the
+    // pets you were GRANTED. The ones you unlock by account level have no row in it at all, so the pool
+    // silently refused twelve of GrayKitsune's pets while drawing their portraits at the right level.
+    // pets.js owns this rule and documents why; see ownedPetIdSet and ownsPet above it.
+    return ownedPetIdSet(buyerId);
 }
 
 /**
@@ -440,22 +442,30 @@ export async function bumpCardProgress(buyerId, field, { bestStop = 0 } = {}) {
  * That exact trap already cost this feature its whole level-art feature once.
  */
 export async function ownedPetLevels(buyerId) {
-    const rows = await db.query(
-        `SELECT u.ref AS pet_id, COALESCE(l.xp, 0) AS xp, e.stone
-           FROM mkt_cosmetic_unlock u
-           LEFT JOIN mkt_pet_level l
-                  ON l.buyer_id::text = u.buyer_id::text AND l.pet_id = u.ref
-           LEFT JOIN mkt_pet_enshrined e
-                  ON e.buyer_id::text = u.buyer_id::text AND e.pet_id = u.ref
-          WHERE u.buyer_id = $1 AND u.category = 'pet'`,
-        [buyerId]
-    ).catch(() => []);
+    // ⚠️ WHICH PETS, AND HOW GROWN, ARE TWO SEPARATE QUESTIONS AND ONLY ONE OF THEM LIVES HERE.
+    // This query used to be anchored on mkt_cosmetic_unlock, which made the ownership rule a join
+    // condition -- and the wrong rule, at that: a level-unlocked pet has no row there. The set comes from
+    // pets.js now, which is where that rule is written down, and this query answers only the second half.
+    // A pet you own but have never fed has no mkt_pet_level row either, and is level 1 rather than absent.
+    const [owned, rows] = await Promise.all([
+        ownedPetIdSet(buyerId),
+        db.query(
+            `SELECT l.pet_id, COALESCE(l.xp, 0) AS xp, e.stone
+               FROM mkt_pet_level l
+               LEFT JOIN mkt_pet_enshrined e
+                      ON e.buyer_id::text = l.buyer_id::text AND e.pet_id = l.pet_id
+              WHERE l.buyer_id::text = $1`,
+            [buyerId]
+        ).catch(() => []),
+    ]);
+    const grown = new Map((rows || []).map((r) => [r.pet_id, r]));
     const out = new Map();
-    for (const r of rows || []) {
-        const rarity = collectibleById(r.pet_id)?.rarity || "common";
-        out.set(r.pet_id, {
-            level: petLevelForXp(r.xp, rarity),
-            enshrined: Boolean(r.stone),
+    for (const petId of owned) {
+        const r = grown.get(petId);
+        const rarity = collectibleById(petId)?.rarity || "common";
+        out.set(petId, {
+            level: petLevelForXp(r?.xp || 0, rarity),
+            enshrined: Boolean(r?.stone),
         });
     }
     return out;

@@ -3797,7 +3797,25 @@ export function intentSay(state, i = 0) {
     if (beat.vulnerable) bits.push(`Put ${beat.vulnerable} Vulnerable on you`);
     if (beat.frail) bits.push(`Put ${beat.frail} Frail on you`);
     if (beat.poison) bits.push(`Put ${beat.poison} Poison on you`);
-    if (beat.cards?.length || beat.card) bits.push("Shuffle something into your deck");
+    // -- THREE MOVES THIS SENTENCE COULD NOT DESCRIBE --------------------------------------------------
+    // ⚠️ AND ONE OF THEM IS THE "TURN 1 THE BOSS DOES NOTHING" BUG, STILL HERE. That was fixed in the
+    // intent PILL by driving its marks off the beat's own fields; this sentence was left testing
+    // `beat.cards` and `beat.card`, and NO foe move in the game has either field -- they all carry
+    // `status: { id, n }`. So every junk move fell through to "Wait, and watch you", which is the same
+    // lie in longer form. The Bolt has no damage at all, so that WAS its whole description.
+    //
+    // The other two are what GrayKitsune met: "Frail doesn't say anything about lowering my strength by
+    // 1 which is what I am assuming happened here?" Frail does not, and Frail's own text says so -- but
+    // Siphon Soul takes a Strength AND lays 2 Frail, and this sentence named only the Frail. He was
+    // reading the only explanation he had been given. `strengthDown` is permanent where Weak wears off,
+    // which makes being told about it more important than either, not less.
+    if (beat.strengthDown) bits.push(`Take ${beat.strengthDown} Strength off you for the rest of the fight`);
+    if (beat.intangible) bits.push(`Turn Intangible for ${beat.intangible} — every hit you land cut to 1`);
+    if (beat.status) {
+        const junk = cardById(beat.status.id);
+        const n = Math.max(1, Number(beat.status.n) || 1);
+        bits.push(`Shuffle ${n} ${junk?.name || "something"} into your ${beat.status.where === "draw" ? "draw pile" : "deck"}`);
+    }
     if (beat.summon?.length) bits.push("Call in something else");
     return bits.length ? bits.join(". ") + "." : "Wait, and watch you.";
 }

@@ -22,6 +22,10 @@ export const STATUS_ART = {
     // ⚠️ THE LAST TWO EXIST BECAUSE THE INTENT PILL COULD NOT DRAW THEM, and three creatures open a fight
     // with one. The act-one boss's first move shuffles junk into your deck and the pill had no mark for it,
     // so its opening turn rendered EMPTY and Luke read it as "turn 1 the boss does nothing".
+    // The Strength it TAKES, which is not the Strength it gains and must not wear the same picture -- a
+    // gold fist on a move that empties yours would be exactly backwards. `word` is null because there is
+    // no keyword to open: it is a permanent stat change, not a mark you carry, and intentSay says so.
+    strengthDown: { src: "/images/cards/status/strengthDown.png", label: "Takes your Strength", word: null },
     status: { src: "/images/cards/status/status.png", label: "Junk into your deck", word: null },
     summon: { src: "/images/cards/status/summon.png", label: "Calls in more", word: null },
 };

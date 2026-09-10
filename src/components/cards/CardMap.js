@@ -70,7 +70,20 @@ const ROW_H = 26;
 const PAD_TOP = 26 + 26;
 const BOSS_ROW_UP = 26;   // ROW_H — declared below, so the number rather than the name
 const PAD_BOTTOM = 18;
-const H = PAD_TOP + (RUN_LENGTH - 1) * ROW_H + PAD_BOTTOM;
+// -- THE SHEET IS AS TALL AS THE ACT IS, NOT AS TALL AS AN ACT USUALLY IS ------------------------
+// These three were computed from RUN_LENGTH, which is fifteen rows -- correct for every act except the
+// one that ends the run. The last act is a four-room CORRIDOR (see buildFinalMap), so its three rooms
+// were drawn bunched at the foot of a fifteen-row parchment with its boss pinned to the top, twelve
+// empty rows above the player, off the screen and off the end of the scroll's opening position.
+//
+// GrayKitsune, having taken all three keys and walked the corridor: "I'm stuck, theres nothing left
+// for me to do and it didn't end the run." There was something left to do and it was above his head.
+//
+// So the height is a function of how many rows the map says it has. A fifteen-row act comes out at
+// exactly the numbers these constants used to hold, so nothing about a normal act moves.
+const hFor = (rows) => PAD_TOP + (rows - 1) * ROW_H + PAD_BOTTOM;
+const yIn = (rows, row) => hFor(rows) - PAD_BOTTOM - row * ROW_H;
+const bossYIn = (rows) => yIn(rows, rows - 1) - BOSS_ROW_UP;
 
 // ⚠️ SEVEN LANES EXIST; A GIVEN MAP DOES NOT USE ALL SEVEN. This spread lane 0..6 across the full width
 // unconditionally, so a sheet whose paths happened to occupy the left five lanes was DRAWN in the left five
@@ -83,9 +96,7 @@ const H = PAD_TOP + (RUN_LENGTH - 1) * ROW_H + PAD_BOTTOM;
 // pinned at 50% (see its marker and the curves that reach it), which is exactly where the middle of a
 // centred cluster now is.
 const xAt = (lane, shift = 0) => 10 + ((lane + shift) / (MAP_LANES - 1)) * (W - 20);
-const yOf = (row) => H - PAD_BOTTOM - row * ROW_H;
-// One clear row above the last room, which is where the trail from every top-row node now ends.
-const BOSS_Y = yOf(RUN_LENGTH - 1) - BOSS_ROW_UP;
+
 
 const Ink = ({ kind, className }) => (MARK[kind]
     // eslint-disable-next-line @next/next/no-img-element
@@ -117,6 +128,15 @@ export default function CardMap({ run, art = {} }) {
     const sheet = useRef(null);
 
     const map = run.map;
+    // The act's own height, and the three measurements that come off it. `rows` is written on every map
+    // the generator makes -- fifteen for a normal act, three for the final corridor.
+    const rows = map?.rows ?? RUN_LENGTH;
+    const H = hFor(rows);
+    const yOf = useCallback((row) => yIn(rows, row), [rows]);
+    const BOSS_Y = bossYIn(rows);
+    // The boss sits one row above the last walkable one. Read off the map rather than assumed, because
+    // the two kinds of act do not agree on which row that is.
+    const bossRow = map?.boss?.row ?? rows;
     const trail = useMemo(() => run.trail || [], [run.trail]);
     // How far the whole sheet has to slide to sit in the middle of its own parchment — see xAt.
     const laneShift = useMemo(() => {
@@ -139,7 +159,7 @@ export default function CardMap({ run, art = {} }) {
         if (!el) return;
         const rowY = last ? (yOf(last.row) / H) * el.scrollHeight : el.scrollHeight;
         el.scrollTop = Math.max(0, rowY - el.clientHeight * 0.62);
-    }, [last]);
+    }, [last, yOf, H]);
 
     // The map's own hum, and a footfall on the room you chose.
     const sound = useCardSound("map");
@@ -280,6 +300,15 @@ export default function CardMap({ run, art = {} }) {
                 <div className="cm-inner">
                     <svg className="cm-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
                         {map.nodes.map((n) => n.next.map((lane) => {
+                            // -- THE BOSS'S OWN EDGE IS DRAWN BELOW, AND ONLY THERE --------------------
+                            // A last-row node's `next` points at the boss like any other edge, so this
+                            // pass drew one line to xOf(bossLane) while the pass below drew a second to
+                            // the middle of the parchment, where the boss disc actually sits. On a sheet
+                            // the lane-shift has slid those are two different places -- so the room before
+                            // the boss appeared to offer two ways out, one of them leading nowhere.
+                            // GrayKitsune: "the area before suggested not facing the boss but then forced
+                            // it anyway to continue." There was only ever one way out.
+                            if (n.row + 1 >= bossRow) return null;
                             const x1 = xOf(n.lane);
                             const y1 = yOf(n.row);
                             const x2 = xOf(lane);
@@ -297,7 +326,7 @@ export default function CardMap({ run, art = {} }) {
                                 />
                             );
                         }))}
-                        {map.nodes.filter((n) => n.row === RUN_LENGTH - 1).map((n) => (
+                        {map.nodes.filter((n) => n.row === bossRow - 1).map((n) => (
                             <path
                                 key={`boss-${n.lane}`}
                                 className={`cm-edge${here === `${n.row}:${n.lane}` && bossOpen ? " is-live" : ""}`}
