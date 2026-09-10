@@ -12,6 +12,39 @@
 
 export const CHANGELOG = [
     {
+        key: "chips-and-tokens",
+        date: "2026-09-09",
+        tag: "new",
+        title: "The floor takes chips and pays tokens",
+        blurb: "The casino has two currencies now, and the reason is the machines. Chips are what you feed them — you buy those with gold at the cage, and you still get a thousand free every day. Tokens are what you WIN, and tokens are the only thing the Counter takes. Nothing you had has gone anywhere: whatever chips you were holding have been handed to you a second time as tokens, so if you were saving for something on the shelf you are exactly as close to it as you were yesterday. What the split buys is a floor that can afford to be generous. While one currency did both jobs, every point the machines paid out was a point off the price of everything on the shelf, so the machines had to be tight. They do not any more. Every cabinet, the keno board and the bingo hall now return around a fifth more than they take, which is not a typo — the fuel is meant to last. Sit down with five thousand chips meaning to walk out with a pet and it used to end badly nine times in ten; it is closer to one in two now. Keno in particular was the worst rate in the building and is now the same as everywhere else. The prices on the Counter have not moved, which quietly makes everything on it about a sixth cheaper in gold than it was this morning.",
+        href: "/marketplace/casino",
+    },
+    {
+        key: "ascendant-abilities-shown",
+        date: "2026-09-09",
+        tag: "improved",
+        title: "Your best gear has had a special ability all along",
+        blurb: "If you have ever looked at an Ascendant, Eternal, Celestial or Primordial piece and wondered why the legendaries in your bag have a starred line and the best thing you own does not — you were reading a bug, not a tier. Every one of those items has a named power. There are a hundred and twenty of them, they have been working the whole time, and not one of them was ever printed on the card. An Ascendant Cleaver carries The Long Leash: your pet's ability keeps working while you are on somebody else's farm. It has done that since the day it was made and the card has never once mentioned it. All four top tiers show their ability now, on the card, in the same starred line the legendaries use — thirty-seven of thirty-seven ascendant items, thirty of thirty-one eternal, every celestial, and all but one primordial. Your avatar's art crackles for them too, which it did for a signature and a charge and never for the strongest thing a member can be wearing. Worth going through your bag: some of you have been sitting on effects you did not know you had.",
+        href: "/marketplace/inventory",
+    },
+    {
+        key: "fleet-past-the-flagship",
+        date: "2026-09-09",
+        tag: "new",
+        title: "Twenty-five more ships, past the flagship",
+        blurb: "Seven captains had sunk Admiral Vane's Sovereign and found nothing behind it. Across the whole Den the fleet was going down in ninety-three of every hundred battles, and two of you have never lost at sea at all. That is not a hard ladder with good sailors on it — that is a ladder that ended. It goes to forty now. Sixteen through twenty-five are NAVIES: revenue cutters, a patrol sloop with a gallows rigged on the afterdeck, an ironclad ram, a squadron flagship in full livery — the people who came out here to hunt the people who hunt shipping. It finishes with Vane again, because you sank his flagship and he has had a year, a grudge and a shipyard. Twenty-six through thirty-five are what the sea keeps: a drowned brig you can hear the crew of, a hulk that is more coral than ship, a barge with no sails being dragged by chains that run forward into the water toward something nobody has seen. The last five are neither, and the ladder stops at a thing that is not a ship. Your own hull, guns and gunnery are already at their ceiling, so the climb is carried by theirs — the flagship you have been beating has twenty planks and the thing at the bottom has ninety-five. The payouts go up too, though deliberately not as fast as the difficulty: the reason to keep going is the climb.",
+        href: "/marketplace/sailing",
+        askedBy: ["GrayKitsune"],
+    },
+    {
+        key: "farm-came-by",
+        date: "2026-09-09",
+        tag: "improved",
+        title: "Who came by, back across the top of the farm",
+        blurb: "The people who have been round to your farm lately have their own row again, above the directory. They were being mixed into a wall of a hundred and twenty faces where the one thing worth acting on — somebody visited you and has not been paid back — was indistinguishable from a stranger you have never met. They stay on the row after you have rated them, marked as paid, so the list does not shrink under your thumb as you work along it. The search underneath still reaches every farm in the Den by name.",
+        href: "/marketplace/farm",
+    },
+    {
         key: "the-roof-bites",
         date: "2026-09-01",
         tag: "improved",
