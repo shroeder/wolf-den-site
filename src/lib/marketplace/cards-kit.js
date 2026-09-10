@@ -398,7 +398,18 @@ export const POOL = {
         upgrade: { cost: 2 } },
     limitbreak: { id: "limitbreak", pet: "molten_salamander", name: "Limit Break", cost: 1, kind: "skill", target: "self", tier: 3,
         strengthDouble: true, exhaust: true, text: "Double your Strength. Exhaust.",
-        upgrade: { exhaust: false } },
+        // ⚠️ THE UPGRADE TAKES THE SENTENCE WITH IT. From the testing room, with a screenshot of the
+        // campfire's before/after and the words "What's the difference": both faces read "Double your
+        // Strength. Exhaust." and both cost 1, so sharpening this card looked like it did nothing. It does
+        // the biggest thing an upgrade can do here — the card stops being one-use — and the face was still
+        // promising the opposite.
+        // The other four cards whose + changes something no placeholder can show all change COST, and the
+        // cost diamond says that on the face. This was the only one whose change was both invisible AND
+        // misstated. Swept the other 133 to be sure.
+        // ⚠️ "Exhaust." IS PROSE IN THESE STRINGS, NOT A FIELD THE TEMPLATE READS — see the ~20 cards
+        // above that write it out longhand. So any future upgrade that flips `exhaust` must hand over its
+        // own text the way this one now does, or it will lie in exactly the same way.
+        upgrade: { exhaust: false, text: "Double your Strength." } },
     offering: { id: "offering", pet: "imp", name: "Offering", cost: 0, kind: "skill", target: "self", tier: 3,
         selfHp: 6, energy: 2, draw: 3, exhaust: true,
         text: "Lose {selfHp} health. Gain {energy} energy and draw {draw} card{s:draw}. Exhaust.",
