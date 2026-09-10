@@ -192,13 +192,24 @@ export default function ForestClient() {
                             target you can miss — a 90px trunk asks for accuracy in a game whose entire ask is
                             speed. Everything under the header takes the tap. */}
                         <button type="button" className="fr-hit" onPointerDown={chop} aria-label="Swing">
+                            {/* ⚠️ THE TREE AND THE STUMP ARE TWO ELEMENTS, AND THEY HAVE TO BE. Swapping one
+                                element's src to the stump on the way down meant the STUMP played the falling
+                                animation and faded to nothing — so a felled tree left an empty clearing with
+                                an axe lying in it. What is supposed to remain is the thing that remains. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={fell ? STUMP : TREE_ART(live.tree)} alt=""
-                                className={`fr-tree${fell ? " is-down" : ""}${shake ? " is-struck" : ""}`}
-                                key={fell ? "stump" : live.tree} draggable="false" />
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={AXE_ART(form.id)} alt="" draggable="false"
-                                className={`fr-axe${shake ? " is-swing" : ""}${live.streak >= 8 ? " is-hot" : ""}`} />
+                            <img src={TREE_ART(live.tree)} alt="" key={live.tree} draggable="false"
+                                className={`fr-tree${fell ? " is-down" : ""}${shake ? " is-struck" : ""}`} />
+                            {fell ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={STUMP} alt="" className="fr-stump" draggable="false" />
+                            ) : null}
+                            {/* The axe goes with the tree. A hatchet hanging in mid-air over a stump is a
+                                swing waiting for a trunk that is not there any more. */}
+                            {!fell ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={AXE_ART(form.id)} alt="" draggable="false"
+                                    className={`fr-axe${shake ? " is-swing" : ""}${live.streak >= 8 ? " is-hot" : ""}`} />
+                            ) : null}
 
                             <span className="fr-chips" aria-hidden="true">
                                 {chips.map((c) => (
@@ -210,7 +221,7 @@ export default function ForestClient() {
                             </span>
                         </button>
 
-                        <div className="fr-hud">
+                        <div className={`fr-hud${fell ? " is-gone" : ""}`}>
                             <span className="fr-name" style={{ "--r": RARITY[tree.rarity] || "#b9b2a4" }}>{tree.name}</span>
                             <span className="fr-hp"><i style={{ width: `${pct}%` }} /></span>
                             <span className="fr-streak">
@@ -384,6 +395,16 @@ export default function ForestClient() {
                     100% { opacity: 0; transform: translate(26px,-46px) scale(.9); }
                 }
 
+                .fr-hud.is-gone { opacity: 0; transition: opacity .35s ease; }
+                /* What is left standing. Comes up out of the ground as the trunk goes over. */
+                .fr-stump { position: absolute; left: 50%; bottom: 0; width: 56%; max-width: 300px;
+                    transform: translateX(-50%); z-index: 1;
+                    filter: drop-shadow(0 8px 14px rgba(0,0,0,.8));
+                    animation: frStump .5s ease .35s both; }
+                @keyframes frStump {
+                    from { opacity: 0; transform: translateX(-50%) translateY(14px) scale(.94); }
+                    to { opacity: 1; transform: translateX(-50%); }
+                }
                 .fr-hud { position: absolute; left: 0; right: 0; top: 0; z-index: 5;
                     display: flex; flex-direction: column; gap: 5px; padding: 12px 58px 12px 14px;
                     background: linear-gradient(180deg, rgba(4,8,10,.85), transparent); pointer-events: none; }
