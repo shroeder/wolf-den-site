@@ -50,3 +50,5 @@ scripts/tmp/
 
 # the brig screenshot fixture, never committed
 src/app/brigshot-tmp/
+scratch-*.png
+crew-sheet.png
