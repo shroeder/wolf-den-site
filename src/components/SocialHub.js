@@ -954,7 +954,15 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
                     {roster.length ? <><b>{here.length}</b> here</> : "Who is in this room"}
                 </button>
             ) : null}
-            {roster.length && railOpen ? (
+            {/* ⚠️ AND IT RENDERS WHENEVER IT IS OPEN, EMPTY OR NOT. This was `roster.length && railOpen`,
+                which has a third state nobody drew: open, with nothing in it. That renders NOTHING — no
+                list and no restore bar either, because the bar is keyed off the fold being shut — so the
+                control vanished with no way back, which is the same complaint as before wearing different
+                clothes. Luke: "dismissing whos here makes the list unavailable to come back."
+                An empty room now says so and keeps its header, so there is always something to press. The
+                two-column `has-rail` above stays keyed to roster.length, because a column reserved for an
+                empty list is the other half of the original bug. */}
+            {railOpen ? (
                 <aside className="social-rail" aria-label="Who is in this room">
                     {/* The whole heading is the fold. It was already a full-width row carrying two words, so
                         making it the control costs nothing and gives it a 26px target instead of an 18px one. */}
@@ -963,6 +971,7 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
                         <b>{here.length}</b> here <i aria-hidden="true">›</i>
                     </button>
                     <ul className="social-rail-list">
+                        {!roster.length ? <li className="social-rail-split"><span>Nobody yet</span></li> : null}
                         {here.map((m) => <RailMember key={m.id} m={m} />)}
                         {away.length ? (
                             <li className="social-rail-split" aria-hidden="true">

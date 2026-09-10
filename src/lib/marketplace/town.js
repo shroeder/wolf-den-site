@@ -874,7 +874,27 @@ export async function channelRoster(buyerId, channel = "global") {
             ORDER BY (o.seen IS NOT NULL) DESC, o.seen DESC NULLS LAST, s.said DESC NULLS LAST
             LIMIT 80`;
 
-    const rows = await db.query(sql, [chan, ONLINE_WINDOW]).catch(() => []);
+    // ── ⚠️ $3 WAS NEVER BOUND, AND EVERY PRIVATE ROOM'S RAIL HAS BEEN EMPTY EVER SINCE ────────
+    // The gated query reads `WHERE b.id = ANY($3::uuid[])` and this passed TWO parameters. Postgres refuses
+    // the statement, the .catch below turns the refusal into an empty array, and the screen draws a room
+    // with nobody in it. Measured before the fix — and it was not one room:
+    //     testing   6 members  ->  roster 0
+    //     staff     2 members  ->  roster 0
+    //     vip       6 members  ->  roster 0
+    //     global    (open)     ->  roster 16   ← the ungated branch takes two parameters and always worked
+    // So the VIP rail has never once shown anybody, including on the day it was built to answer exactly
+    // that — "the list should also show everyone in that group not online". Luke, on the testing room:
+    // "the list should show the members who have access to the channel. I dont know what logic it uses
+    // today but it isnt in line with what I want." The logic was right; it never ran.
+    //
+    // ⚠️ AND THE CATCH IS WHY IT LIVED. A best-effort catch on a read is correct — a rail is a courtesy
+    // and must never break a room — but swallowing the reason meant a fatal, permanent, every-request
+    // failure looked exactly like a quiet room. It still returns [], and now it says why first.
+    const args = gated ? [chan, ONLINE_WINDOW, members] : [chan, ONLINE_WINDOW];
+    const rows = await db.query(sql, args).catch((err) => {
+        console.warn(`channelRoster(${chan}) failed:`, err?.message || err);
+        return [];
+    });
     return rows.map((r) => ({
         id: r.id,
         name: r.display_name || r.alias || "A member",
