@@ -69,6 +69,7 @@ const errorText = (e) => ({
 export default function ForestClient() {
     const [st, setSt] = useState(null);
     const [viewW, setViewW] = useState(360);
+    const [viewH, setViewH] = useState(640);
     const [heroX, setHeroX] = useState(0);
     const [facing, setFacing] = useState(1);
     const [walking, setWalking] = useState(false);
@@ -113,9 +114,10 @@ export default function ForestClient() {
     useEffect(() => {
         const el = wrapRef.current;
         if (!el) return undefined;
-        const ro = new ResizeObserver(() => setViewW(el.clientWidth || 360));
+        const read = () => { setViewW(el.clientWidth || 360); setViewH(el.clientHeight || 640); };
+        const ro = new ResizeObserver(read);
         ro.observe(el);
-        setViewW(el.clientWidth || 360);
+        read();
         return () => ro.disconnect();
     }, [st]);
 
@@ -295,6 +297,9 @@ export default function ForestClient() {
     // wood has a start but the CAMERA does not need one — letting it run negative just shows empty backdrop
     // to the left of the first tree, which is what the edge of a forest looks like.
     const camX = heroX - viewW / 2;
+    // Trees are drawn against the height of the world, so a tall phone shows a taller wood rather than the
+    // same small one with more empty air above it.
+    const treeScale = Math.max(0.85, Math.min(1.9, viewH / 420));
 
     // ── WHAT IS ON SCREEN ────────────────────────────────────────────────────────────────────────────
     // Only the nodes the camera can see, plus a couple either side so nothing pops in at the edge. This is
@@ -326,6 +331,7 @@ export default function ForestClient() {
                 <b>The Forest</b>
                 <span className="twd-depth">node {atNode.toLocaleString()}</span>
                 <span className="twd-wood">{st.wood.toLocaleString()}<i>wood</i></span>
+                <a className="twd-out" href="/marketplace" aria-label="Leave the forest">✕</a>
                 <button type="button" className="twd-bag" onClick={() => { sfx("open"); setBag(true); }} aria-label="Your pouch">
                     <GiSwapBag aria-hidden="true" />
                     {st.materials?.length ? <em>{st.materials.length}</em> : null}
@@ -339,7 +345,7 @@ export default function ForestClient() {
                 both of them — and everything inside is positioned against it by percentage, so the trees,
                 the floor and the hero all landed outside the box that was actually drawn. An inline height
                 is the one value nothing can disagree about: no cascade, no stale chunk, no scoping. */}
-            <div className="twd-world" ref={wrapRef} style={{ height: WORLD_H }}
+            <div className="twd-world" ref={wrapRef}
                 onPointerDown={(e) => {
                     if (e.target.closest("[data-node]")) return;   // a tree handles its own tap
                     const rect = e.currentTarget.getBoundingClientRect();
@@ -355,6 +361,7 @@ export default function ForestClient() {
                 <span className="twd-haze" aria-hidden="true" />
                 <span className="twd-floor" aria-hidden="true"
                     style={{ backgroundImage: `url(${FLOOR})`, backgroundPositionX: `${-camX}px` }} />
+                <span className="twd-ground" aria-hidden="true" />
 
                 <div className="twd-stage" style={{ transform: shake ? `translate3d(${(Math.random() - 0.5) * shake}px, ${(Math.random() - 0.5) * shake * 0.6}px, 0)` : undefined }}>
                     {nodes.map((n) => {
@@ -365,7 +372,7 @@ export default function ForestClient() {
                         // ⚠️ SMALL. The first pass drew these at 170px in a 360px-wide wood — 56% of the screen for one
                         // tree, which is the same "takes up the whole screen" in a new costume. A tree you walk past
                         // should be a thing in the scene, not the scene.
-                        const scale = 0.62 + (1 - back) * 0.42;
+                        const scale = (0.62 + (1 - back) * 0.42) * treeScale;
                         const bottom = 7 + back * 12;
                         const z = Math.round(100 - back * 40);
                         if (n.kind === "shroom") {
@@ -507,13 +514,18 @@ export default function ForestClient() {
             <style jsx>{`
                 .twd { display: block; }
                 .twd-wait { padding: 26px; text-align: center; color: #8a9384; }
-                .twd-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+                .twd-top { position: fixed; top: 0; left: 0; right: 0; z-index: 70; display: flex;
+                    align-items: center; gap: 8px; padding: 10px 12px;
+                    background: linear-gradient(180deg, rgba(4,8,10,.88), rgba(4,8,10,0)); }
                 .twd-top :global(svg) { width: 22px; height: 22px; color: #8fbf5f; }
                 .twd-top b { font-size: 17px; font-weight: 800; color: #e8f0e4; }
                 .twd-depth { font-size: 11px; color: #6f7a68; letter-spacing: .06em; }
                 .twd-wood { margin-left: auto; font-size: 17px; font-weight: 800; color: #ffcf87; }
                 .twd-wood i { margin-left: 5px; font-style: normal; font-size: 10.5px; letter-spacing: .1em;
                     text-transform: uppercase; color: #8a9384; }
+                .twd-out { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px;
+                    font-size: 15px; text-decoration: none; color: #cfd8c8; background: rgba(6,11,13,.6);
+                    border: 1px solid rgba(180,200,170,.2); }
                 .twd-bag { position: relative; width: 38px; height: 38px; display: grid; place-items: center;
                     border-radius: 11px; background: #18221a; border: 1px solid #34402f; cursor: pointer; }
                 .twd-bag :global(svg) { width: 20px; height: 20px; color: #b6d06a; }
@@ -530,14 +542,35 @@ export default function ForestClient() {
                    floor strip at 22%) landed wherever the disagreement put it. A world whose height depends on
                    which tool is looking at it cannot be judged from a picture, which is the only way this
                    screen can be judged at all. Fixed px here, and the media query below steps it up. */
-                .twd-world { position: relative; width: 100%; height: 400px; overflow: hidden;
-                    border-radius: 14px; background: #070d10; touch-action: manipulation; cursor: pointer;
-                    box-shadow: inset 0 0 80px rgba(0,0,0,.8); }
+                /* ── ⚠️ IT FILLS THE DEVICE. ─────────────────────────────────────────────────────
+                   Luke: "I asked you to do immersive with my character, and you did, like, a tiny little
+                   mini animation tab completely zoomed in ... Do you know what immersive means?"
+                   He is right and it was not close. This was a 400px card sitting in the page flow between
+                   the nav bar and the footer, with the camera pressed so near the backdrop that a wall of
+                   trunks filled it and nothing else fit. A forest you are meant to walk through cannot be a
+                   panel on a page -- it has to BE the screen. Fixed to the viewport, edge to edge, with the
+                   HUD floating on top of it and a way out in the corner. */
+                .twd-world { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: 60;
+                    overflow: hidden; background: #070d10; touch-action: manipulation; cursor: pointer; }
                 /* The two backdrop walls. repeat-x with a moving background-position is how a flat picture
                    becomes an endless one: no elements are created, nothing is measured, and the wood can run
                    to node forty thousand for the price of a number changing. */
-                .twd-far, .twd-near { position: absolute; left: 0; right: 0; top: 0; bottom: 0;
-                    background-repeat: repeat-x; background-size: auto 100%; pointer-events: none; }
+                /* ⚠️ THE WALL SITS IN THE TOP HALF AND IS SIZED IN PIXELS, NOT PERCENT. Stretched to the
+                   full height of the box (auto 100%) the picture scales UP with the screen, so the bigger the
+                   world got the bigger the trunks got — which is how a backdrop meant to read as distance
+                   ended up as six close-ups. A fixed 300px band keeps them small and far no matter how tall
+                   the device is, and the floor takes the rest. */
+                /* The wall of distant trunks fills everything above the floor line — no bare band at the top,
+                   and it scales with that area rather than with the whole screen. */
+                /* ⚠️ AND IT FADES INTO THE GROUND. Cut off square the wall of trunks met the litter along a
+                   dead straight line across the middle of the screen, which reads as two pictures stacked
+                   rather than as a place. The bottom eighth dissolves so the far trees go into the haze the
+                   way they would if you were standing in it. */
+                .twd-far, .twd-near { position: absolute; left: 0; right: 0; top: 0; bottom: 34%;
+                    background-repeat: repeat-x; background-size: auto 100%; background-position: bottom;
+                    pointer-events: none;
+                    -webkit-mask-image: linear-gradient(180deg, #000 0, #000 80%, transparent 100%);
+                    mask-image: linear-gradient(180deg, #000 0, #000 80%, transparent 100%); }
                 .twd-far { filter: brightness(.34) blur(2px) saturate(.7); }
                 .twd-near { filter: brightness(.52) blur(1px); opacity: .8;
                     -webkit-mask-image: linear-gradient(180deg, #000 0, #000 64%, transparent 92%);
@@ -549,9 +582,19 @@ export default function ForestClient() {
                                 linear-gradient(180deg, transparent 52%, rgba(3,7,9,.6)); }
                 /* The floor is its own repeating strip at 1:1 with the camera, so what you walk on moves at
                    exactly your speed and the parallax above it reads as distance rather than as drift. */
-                .twd-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
-                    background-repeat: repeat-x; background-size: auto 100%; pointer-events: none;
-                    box-shadow: inset 0 14px 22px -10px rgba(0,0,0,.85); }
+                /* ⚠️ THE LITTER IS TILED SMALL, NOT STRETCHED. Sized to the band height it drew leaves
+                   bigger than the player — a picture of a forest floor blown up until one leaf is a metre
+                   across. A fixed tile width repeated both ways keeps a leaf leaf-sized whatever the screen. */
+                .twd-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 46%;
+                    background-repeat: repeat; background-size: 150px auto; pointer-events: none;
+                    filter: brightness(.62) saturate(.85); }
+                /* ⚠️ AND IT IS DARKENED INTO GROUND. The litter art is drawn top-down; laid flat in a
+                   side-on scene at full strength it reads as wallpaper with metre-wide leaves on it rather
+                   than as something underfoot. Small tile, dimmed, and a gradient that goes darker toward the
+                   camera so the horizon is a horizon instead of a hard seam across the middle of the screen. */
+                .twd-ground { position: absolute; left: 0; right: 0; bottom: 0; height: 52%; pointer-events: none;
+                    background: linear-gradient(180deg, rgba(4,8,10,0) 0%, rgba(4,8,10,.08) 35%,
+                        rgba(3,6,8,.42) 78%, rgba(3,6,8,.66) 100%); }
                 .twd-stage { position: absolute; inset: 0; will-change: transform; }
 
                 /* ── WHAT STANDS IN IT ───────────────────────────────────────────────────────────── */
@@ -594,9 +637,9 @@ export default function ForestClient() {
                     background: linear-gradient(90deg, #6f9440, #b6d06a); transition: width 70ms linear; }
 
                 /* ── YOU ──────────────────────────────────────────────────────────────────────────── */
-                .twd-hero { position: absolute; bottom: 9%; width: 72px; height: 92px; z-index: 120;
+                .twd-hero { position: absolute; bottom: 11%; width: 96px; height: 124px; z-index: 120;
                     display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
-                .twd-me { position: absolute; bottom: 0; left: 50%; margin-left: -36px; width: 72px;
+                .twd-me { position: absolute; bottom: 0; left: 50%; margin-left: -48px; width: 96px;
                     filter: drop-shadow(0 5px 9px rgba(0,0,0,.8)); }
                 .twd-hero.is-walking { animation: fwBob 420ms ease-in-out infinite; }
                 @keyframes fwBob {
@@ -630,7 +673,7 @@ export default function ForestClient() {
                 .twd-p.is-num.is-hot { color: #ffcf87; font-size: 18px; }
 
                 /* ── THE HUD ─────────────────────────────────────────────────────────────────────── */
-                .twd-streak { position: absolute; left: 12px; right: 12px; bottom: 10px; height: 17px; z-index: 140;
+                .twd-streak { position: absolute; left: 12px; right: 12px; bottom: 74px; height: 17px; z-index: 140;
                     display: block; border-radius: 999px; background: rgba(6,10,12,.74);
                     box-shadow: inset 0 0 0 1px rgba(255,180,90,.18); pointer-events: none; }
                 .twd-streak i { display: block; height: 100%; border-radius: 999px;
@@ -639,9 +682,9 @@ export default function ForestClient() {
                     font-style: normal; font-size: 10.5px; font-weight: 800; letter-spacing: .06em;
                     color: #1a140c; text-shadow: 0 1px 0 rgba(255,255,255,.25); }
                 .twd-streak.is-cold em { color: #ffe3b4; text-shadow: 0 1px 4px rgba(0,0,0,.95); }
-                .twd-hint { position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; z-index: 140;
+                .twd-hint { position: absolute; left: 0; right: 0; bottom: 78px; text-align: center; z-index: 140;
                     font-size: 11px; letter-spacing: .04em; color: rgba(223,233,214,.55); pointer-events: none; }
-                .twd-got { position: absolute; right: 10px; top: 10px; z-index: 150; display: flex;
+                .twd-got { position: absolute; right: 12px; top: 58px; z-index: 150; display: flex;
                     flex-direction: column; align-items: flex-end; gap: 4px; pointer-events: none; }
                 .twd-got em { font-style: normal; font-size: 12.5px; font-weight: 800; color: var(--r);
                     text-shadow: 0 2px 6px rgba(0,0,0,.95); animation: fwGot 1.8s ease-out forwards; }
@@ -673,7 +716,8 @@ export default function ForestClient() {
                 .twd-btn em { font-style: normal; font-weight: 700; color: #ffcf87; }
                 .twd-btn.is-go { background: linear-gradient(180deg, #26351f, #1b2617); border-color: #4c6b3c; }
                 .twd-btn:disabled { opacity: .45; cursor: default; }
-                .twd-wide { width: 100%; margin-top: 10px; }
+                /* The axe sits on the floor of the screen, thumb-high, not below the fold. */
+                .twd-wide { position: fixed; left: 12px; right: 12px; bottom: 14px; z-index: 70; width: auto; }
                 .twd-x { position: absolute; top: 10px; right: 12px; z-index: 9; width: 34px; height: 34px;
                     border-radius: 999px; font-size: 16px; color: #cfd8c8; background: rgba(6,11,13,.66);
                     border: 1px solid rgba(180,200,170,.2); cursor: pointer; }
