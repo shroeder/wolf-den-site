@@ -70,6 +70,7 @@ export default function ForestClient() {
     const [st, setSt] = useState(null);
     const [viewW, setViewW] = useState(360);
     const [viewH, setViewH] = useState(640);
+    const [cam, setCam] = useState(0);
     const [heroX, setHeroX] = useState(0);
     const [facing, setFacing] = useState(1);
     const [walking, setWalking] = useState(false);
@@ -86,6 +87,7 @@ export default function ForestClient() {
     const wrapRef = useRef(null);
     const targetRef = useRef(null);
     const heroRef = useRef(0);
+    const camRef = useRef(0);
     const rafRef = useRef(0);
     const lastTick = useRef(0);
     const armed = useRef(false);
@@ -107,6 +109,8 @@ export default function ForestClient() {
             const x = (Number(d.atNode) || 0) * NODE_GAP;
             heroRef.current = x;
             setHeroX(x);
+            camRef.current = x - (wrapRef.current?.clientWidth || 360) / 2;
+            setCam(camRef.current);
         }
     }, []);
     useEffect(() => { load(); }, [load]);
@@ -173,6 +177,21 @@ export default function ForestClient() {
             heroRef.current = Math.max(0, x);
             setHeroX(heroRef.current);
         }
+        // ── THE CAMERA ───────────────────────────────────────────────────────────────────────────
+        // Dead zone first: the target only changes once the hero is past the edge of the middle band. Then
+        // ease toward it — framerate-independent, so a slow phone pans at the same speed as a fast one.
+        {
+            const half = viewW / 2;
+            const dz = viewW * 0.17;
+            const centre = camRef.current + half;
+            let want = camRef.current;
+            if (heroRef.current > centre + dz) want = heroRef.current - half - dz;
+            else if (heroRef.current < centre - dz) want = heroRef.current - half + dz;
+            const k = 1 - Math.pow(0.0016, dt);   // ~ease with a 0.16s time constant
+            camRef.current += (want - camRef.current) * k;
+            setCam(camRef.current);
+        }
+
         // ── AND WHAT YOU WALKED PAST ─────────────────────────────────────────────────────────────
         // Checked every frame rather than on arrival, because the mushrooms you pass are the ones BETWEEN
         // here and where you tapped — picking up only what is under your feet when you stop would mean
@@ -296,7 +315,12 @@ export default function ForestClient() {
     // on the very left edge with half your body off the screen and the first tree pinned to the corner. The
     // wood has a start but the CAMERA does not need one — letting it run negative just shows empty backdrop
     // to the left of the first tree, which is what the edge of a forest looks like.
-    const camX = heroX - viewW / 2;
+    // ⚠️ NOT `heroX - viewW / 2`. Locked straight to the player the camera moved on every single frame the
+    // hero did, so the entire wood slid under a walking character and nothing on screen ever held still —
+    // which reads as the camera chasing you rather than following you. It eases toward a target now, and only
+    // acquires one once you leave the middle third of the frame (the dead zone), so short walks move the
+    // player across a still scene and long ones pull the world along behind them.
+    const camX = cam;
     // Trees are drawn against the height of the world, so a tall phone shows a taller wood rather than the
     // same small one with more empty air above it.
     const treeScale = Math.max(0.85, Math.min(1.9, viewH / 420));
@@ -388,8 +412,13 @@ export default function ForestClient() {
                                 style={{ left, bottom: `${bottom}%`, zIndex: z }}
                                 onPointerDown={(e) => { e.stopPropagation(); if (!down) hitTree(n); }}
                                 aria-label={down ? "A cut stump" : `${treeById(n.id).name} — chop`}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={STUMP} alt="" draggable="false" className="twd-stump" style={{ width: `${40 * scale}px` }} />
+                                {/* ⚠️ ONLY WHEN IT IS DOWN. This drew the cut stump under EVERY tree, standing
+                                    ones included — so each trunk had a pale sheared-off disc jammed into its
+                                    roots and every tree in the wood looked chopped. */}
+                                {down ? (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                    <img src={STUMP} alt="" draggable="false" className="twd-stump" style={{ width: `${40 * scale}px` }} />
+                                ) : null}
                                 {!down ? (
                                     /* eslint-disable-next-line @next/next/no-img-element */
                                     <img src={TREE_ART(n.id)} alt="" draggable="false"
