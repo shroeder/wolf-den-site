@@ -1313,13 +1313,26 @@ export async function checkFishingBadges(buyerId) {
     ).catch(() => null);
     const n = num(row?.n);
     const log = (row?.fish_log && typeof row.fish_log === "object") ? row.fish_log : {};
-    const known = Object.keys(log).length;
+    // ── ⚠️ COUNT SPECIES, NOT KEYS ───────────────────────────────────────────────────────────────────
+    // This was `Object.keys(log).length`, and a fish_log keeps the id of everything you have ever landed —
+    // including species that have since been renamed or removed. Five members carry dead ids. ValkyrieSylve
+    // carried three (fish_gulper, fish_bonecrab, fish_lightless), so her log held 34 keys against 34 living
+    // species and the completionist badge fired while she was still missing the Kraken, the Starfish and the
+    // Tidewyrm. She reported it herself: "I have not caught every species however, and it doesn't seem fair
+    // for me to have it."
+    //
+    // The tell was that memberFishLog already filters `FISH.filter(f => log[f.id])` — so her own screen said
+    // 31 of 34 while the badge said finished. Two counts of one thing, and the one that paid out was wrong.
+    const known = FISH.filter((f) => log[f.id]).length;
 
     if (n >= 1) await grantEventBadge(buyerId, "fish_first").catch(() => {});
     if (n >= 50) await grantEventBadge(buyerId, "fish_angler").catch(() => {});
     if (n >= 250) await grantEventBadge(buyerId, "fish_master").catch(() => {});
     if (known >= 10) await grantEventBadge(buyerId, "fish_naturalist").catch(() => {});
-    if (known >= FISH_COUNT) await grantEventBadge(buyerId, "fish_complete").catch(() => {});
+    // ⚠️ EVERY SPECIES, ASKED AS A SET. `known >= FISH_COUNT` is the same statement only while the count is
+    // honest, and the whole defect above was the count going dishonest. `every` cannot drift: it is the
+    // sentence the badge prints.
+    if (FISH.every((f) => log[f.id])) await grantEventBadge(buyerId, "fish_complete").catch(() => {});
     // Landed one of the four mythics.
     const mythics = FISH.filter((f) => f.rarity === "mythic").map((f) => f.id);
     if (mythics.some((id) => log[id])) await grantEventBadge(buyerId, "fish_deepwater").catch(() => {});
