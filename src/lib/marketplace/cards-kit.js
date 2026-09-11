@@ -2474,20 +2474,35 @@ export const FOE_SCRIPTS = {
     heart: {
         // Theirs opens with a debuff that lands before you have drawn a hand worth protecting, then cycles
         // enormous multi-hits against single huge ones so that neither pure block nor pure damage covers it.
+        //
+        // ⚠️ BROUGHT BACK IN LINE WITH THEIRS. Luke: "the card game's balance should just be slay the spire's
+        // exact fight mechanics." This fight had drifted furthest of anything in the file, and all of the
+        // drift was upward:
+        //
+        //   Flail was 15 damage x4 = SIXTY a turn. Theirs is Blood Shot, 2 x12 = twenty-four.
+        //   Echo was 45. Theirs is 40 at base; 45 is their Ascension 4 value.
+        //   Drain and Wither are not their moves at all — the Heart has four, and the fourth is Buffer.
+        //
+        // GrayKitsune, in the testing room: "750 health with an attack that does 45 damage is harsh." He was
+        // fighting an ascension Heart on a rung-zero run, and the multi-hit was more than twice theirs.
+        //
+        // ⚠️ `guard` STANDS IN FOR BUFFER, WHICH THIS ENGINE CANNOT EXPRESS. Their Buffer negates the next two
+        // times the Heart would lose HP; we have no such field, and inventing one for a single fight is how
+        // engines rot. Block is the honest substitute — it costs the player the same thing, a turn of damage
+        // that does not land — and it keeps the three-beat rhythm that is the actual point of the fight.
+        // If Buffer is ever implemented, this is the move to replace.
         open: "blight",
         moves: {
             blight: { key: "blight", label: "Blight", weak: 2, frail: 2, vulnerable: 2 },
-            flail: { key: "flail", label: "Flail", damage: 15, hits: 4 },
-            echo: { key: "echo", label: "Echo", damage: 45 },
-            drain: { key: "drain", label: "Drain", damage: 22, heal: 30 },
-            wither: { key: "wither", label: "Wither", damage: 12, status: { id: "decay", n: 2 } },
+            flail: { key: "flail", label: "Flail", damage: 2, hits: 12 },
+            echo: { key: "echo", label: "Echo", damage: 40 },
+            guard: { key: "guard", label: "Gather", block: 40 },
         },
         after: {
-            blight: [["flail", 55], ["echo", 45]],
-            flail: [["drain", 40], ["echo", 35], ["wither", 25]],
-            echo: [["flail", 45], ["wither", 30], ["drain", 25]],
-            drain: [["blight", 35], ["flail", 65]],
-            wither: [["echo", 60], ["flail", 40]],
+            blight: [["flail", 50], ["echo", 50]],
+            flail: [["echo", 50], ["guard", 50]],
+            echo: [["guard", 50], ["flail", 50]],
+            guard: [["flail", 50], ["echo", 50]],
         },
     },
     warlord: {
@@ -2972,14 +2987,20 @@ export const FOES = {
     // The pair on the door, theirs: one that only blocks and one that only hits, so the fight is a question
     // about whether your deck can do both things at once rather than either of them very well.
     gate_shield: { id: "gate_shield", name: "The Shield", hp: [110, 110], script: "gate_shield", plate: 3 },
-    gate_spear:  { id: "gate_spear",  name: "The Spear",  hp: [110, 110], script: "gate_spear" },
+    // ⚠️ 160, NOT 110. Theirs is Spire Shield 110 and Spire SPEAR 160 — the pair is deliberately lopsided, and
+    // copying the Shield's number onto both made the door easier than theirs while the thing behind it was
+    // harder. Kill order is the whole fight, and it is not a decision when both sides die at the same rate.
+    gate_spear:  { id: "gate_spear",  name: "The Spear",  hp: [160, 160], script: "gate_spear" },
     // ⚠️ AND THE THING BEHIND IT. 750, which is three times the biggest number in this file, and the health
     // is the least of it — see `pulse` and `invincible` on the engine side. Theirs is the Corrupt Heart and
     // the reason it is the ending is that it beats decks rather than players: an engine that wins by playing
     // twelve cards a turn is punished for every one of them, and a deck that wins by one enormous swing
     // finds the swing capped. There is no build it does not have an answer to, only builds that survive it.
+    // ⚠️ invincible 300, NOT 200. Their Heart caps a turn at 300 damage; 200 is the Ascension 19 value, and
+    // it does not scale with our `asc` — so a rung-zero run was being damage-capped as hard as their hardest
+    // difficulty while the rest of the run was pitched at rung zero. pulse 1 is their Beat of Death at base.
     heart: { id: "heart", name: "The Heart", hp: [750, 750], script: "heart",
-        pulse: 1, invincible: 200 },
+        pulse: 1, invincible: 300 },
 
     // ══ ACT TWO — THE DEEP (their City) ══════════════════════════════════════════════════════════════════
     drowned:    { id: "drowned",    name: "Drowned",    hp: [25, 31],   script: "drowned" },             // Byrd 25-31
@@ -3080,7 +3101,15 @@ export const ENCOUNTERS = [
     { id: "the_champion", name: "The Gremlin Nob", pool: "elite", weight: 3, foes: ["champion"] },
     { id: "the_headsman", name: "The Sleeper", pool: "elite", weight: 3, foes: ["headsman"] },
     { id: "twin_sentinels", name: "Three Sentries", pool: "elite", weight: 3, foes: ["sentinel", "sentinel", "sentinel"] },
-    { id: "bloodgorged", name: "The Gorged", pool: "elite", weight: 1, foes: ["gorger", "hexer"] },
+    // ⚠️ RETIRED, NOT DELETED. Their act one has exactly three elites — the Nob, Lagavulin and the Sentries —
+    // and this fourth one is ours: a Jaw Worm and a Fungi Beast, both ORDINARY enemies, standing in an elite
+    // room and paying an elite's reward. It is off the rota.
+    //
+    // It is not removed, because a live run stores encounter IDS in its own row: deleting this hands anybody
+    // currently walking toward it a room that cannot be looked up. Same rule as the note on ACT_NAMES — what a
+    // place is CALLED is copy, what it is KEYED by is a record. The flag is read by pickEncounter, and
+    // `weight: 0` would NOT have done it: the picker reads `e.weight || 1`, so zero becomes one.
+    { id: "bloodgorged", name: "The Gorged", pool: "elite", weight: 1, retired: true, foes: ["gorger", "hexer"] },
 
     // ── ACT ONE BOSSES ── theirs, all three.
     { id: "warlord", name: "The Guardian", pool: "boss", weight: 1, foes: ["warlord"] },
@@ -3213,7 +3242,8 @@ export function poolFor(n, kind = "fight", act = 1) {
  */
 export function pickEncounter(seed, n, kind = "fight", recent = [], act = 1) {
     const pool = poolFor(n, kind, act);
-    const all = ENCOUNTERS.filter((e) => e.pool === pool);
+    // `retired` rooms are still looked-up-able for runs already holding them, and are never dealt again.
+    const all = ENCOUNTERS.filter((e) => e.pool === pool && !e.retired);
     const fresh = all.filter((e) => !recent.includes(e.id));
     const list = fresh.length ? fresh : all;
     const total = list.reduce((sum, e) => sum + (e.weight || 1), 0);
