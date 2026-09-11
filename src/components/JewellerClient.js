@@ -124,6 +124,14 @@ export default function JewellerClient({ initial }) {
                                 {g.count > 1 ? <i className="jw-gem-n">×{g.count}</i> : null}
                             </button>
                             {/* ── FUSING ── three of a kind make one of the tier above, which is what stops the
+                                ⚠️ AND THE BUTTON NAMES WHAT IT SPENDS. It read "Fuse x3 -> Flawed Amethyst",
+                                so the only gem NAME on the control was the one it PRODUCES, while the control
+                                itself sat under the gem it consumes. ValkyrieSylve, in the bug room: "I just
+                                fused 3 Flawed Amethyst to get another Polished Amethyst, but it didn't add a
+                                second to my stack." Her rows say she fused three CHIPPED and was correctly
+                                paid one Flawed — nothing was lost and nothing was broken. She had read the
+                                button's only noun as the thing going in. It now reads "Fuse 3 Chipped ->
+                                Flawed", which is shorter AND cannot be read the other way round.
                                 bottom tiers being litter: a Chipped Ruby is not worth setting into anything by
                                 the time you have real gear, but nine of them are a Polished one. Only offered
                                 when you are actually holding three — a greyed-out button you can never press
@@ -138,10 +146,10 @@ export default function JewellerClient({ initial }) {
                                         setWorking(null);
                                         if (r?.ok) { Sfx.gemSet(g.tier + 1); Haptic.gemSet(g.tier + 1); }
                                     }}>
-                                    Fuse ×{g.fuseCount}<i>→ {g.fuseInto?.name}</i>
+                                    Fuse {g.fuseCount} {g.tierName || "of these"}<i>→ {g.fuseInto?.tierName || g.fuseInto?.name}</i>
                                 </button>
                             ) : g.fuseInto ? (
-                                <span className="jw-fuse-hint">{g.fuseCount} make a {g.fuseInto.name}</span>
+                                <span className="jw-fuse-hint">{g.fuseCount} {g.tierName || "of these"} make a {g.fuseInto.tierName || g.fuseInto.name}</span>
                             ) : null}
                             </div>
                         ))}

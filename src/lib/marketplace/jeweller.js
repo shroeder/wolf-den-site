@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { FUSE_COUNT, FUSE_MAX_TIER, GEMS, GEM_TIERS, MAX_SOCKETS, fuseCountFor, gemById, gemId, socketCost, sumGemStats } from "@/lib/marketplace/gems.js";
+import { FUSE_MAX_TIER, GEMS, GEM_TIERS, MAX_SOCKETS, fuseCountFor, gemById, gemId, socketCost, sumGemStats, tierByN } from "@/lib/marketplace/gems.js";
 import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 import { describeStats, itemById } from "@/lib/marketplace/items.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -17,11 +17,19 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // a gate that always says yes still reads like a gate.
 
 // ── THE BAG ──────────────────────────────────────────────────────────────────────────────────────────────────
-export async function getGems(buyerId) {
+export async function getGems(buyerId, powers = null) {
     if (!buyerId) return [];
-    const rows = await db.query(
-        `SELECT gem_id, count FROM mkt_gem WHERE buyer_id = $1 AND count > 0`, [buyerId]
-    ).catch(() => []);
+    const [rows, pw] = await Promise.all([
+        db.query(`SELECT gem_id, count FROM mkt_gem WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
+        // ⚠️ THE REAL FUSE COUNT, NOT THE CONSTANT. This published `fuseCount: FUSE_COUNT` with the comment
+        // "display only; fuseCountFor() decides what is actually spent" — which is a screen admitting it does
+        // not know what the button does. The Steady Bench drops a fuse to two, so its holder would have read
+        // "Fuse x3", been charged two, and — worse — seen NO button at all while holding exactly two, because
+        // `canFuse` was gated on the same wrong number. Nobody owns that item yet; the first person to earn
+        // it would have found a bench that refused to fuse gems it could afford to fuse.
+        powers ? Promise.resolve(powers) : equippedPowers(buyerId).catch(() => new Set()),
+    ]);
+    const need = fuseCountFor(pw);
     const held = new Map(rows.map((r) => [r.gem_id, Number(r.count) || 0]));
     // Everything you hold, in catalog order, so the bag reads as a set you are filling rather than a list of
     // whatever happened to drop.
@@ -33,9 +41,11 @@ export async function getGems(buyerId) {
             ...g,
             count: held.get(g.id),
             // What three of them would make, and whether you are holding three.
-            fuseInto: next ? { id: next.id, name: next.name, stats: next.stats } : null,
-            canFuse: Boolean(next) && held.get(g.id) >= FUSE_COUNT,
-            fuseCount: FUSE_COUNT,   // display only; fuseCountFor() decides what is actually spent
+            // The TIER WORD on both sides, so the button can say what it spends as well as what it makes.
+            tierName: tierByN(g.tier)?.name || null,
+            fuseInto: next ? { id: next.id, name: next.name, stats: next.stats, tierName: tierByN(next.tier)?.name || null } : null,
+            canFuse: Boolean(next) && held.get(g.id) >= need,
+            fuseCount: need,
         };
     });
 }

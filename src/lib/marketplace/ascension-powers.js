@@ -88,7 +88,11 @@ export const ASCENSION_POWERS = {
     head_chef: { item: "eternal_timeless_cleaver", name: "The Head Chef", tier: "eternal", cls: "B", desc: "A cook never pays the bottom rung. The consolation is off your ladder." },
     cellar_key: { item: "eternal_timeless_orb", name: "The Cellar Key", tier: "eternal", cls: "B", desc: "One harvest or landing in three puts a second copy in your pantry." },
     jeweller_s_patience: { item: "eternal_timeless_hood", name: "Jeweller's Patience", tier: "eternal", cls: "B", desc: "One gem in three survives being pulled from its socket." },
-    steady_bench: { item: "eternal_timeless_scale", name: "The Steady Bench", tier: "eternal", cls: "B", desc: "A failed fuse returns all three gems." },
+    // ⚠️ THE DESCRIPTION DESCRIBED AN OUTCOME THAT CANNOT HAPPEN. A fuse is a deterministic spend-three-get-one
+    // and has no failure case, so "a failed fuse returns all three gems" promised a refund on an event that
+    // does not exist — the power was reimplemented as "costs two instead of three" (see fuseCountFor) and the
+    // printed line was never brought along. An eternal-tier power whose own text is about nothing.
+    steady_bench: { item: "eternal_timeless_scale", name: "The Steady Bench", tier: "eternal", cls: "B", desc: "Fusing gems costs two of them instead of three." },
     patron_of_works: { item: "eternal_timeless_waistguard", name: "Patron of Works", tier: "eternal", cls: "A", desc: "Gold you give to a town project counts double toward it." },
     free_company: { item: "eternal_timeless_tracks", name: "The Free Company", tier: "eternal", cls: "A", desc: "Your spoils ceiling on a town raid is doubled." },
     free_spin: { item: "eternal_timeless_cloak", name: "The Free Spin", tier: "eternal", cls: "A", desc: "Your first three spins each day cost nothing." },
