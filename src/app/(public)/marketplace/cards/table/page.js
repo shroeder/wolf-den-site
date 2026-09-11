@@ -20,7 +20,7 @@ export const metadata = {
 export default async function CardTablePage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/cards/table");
-    // Owner-gated while it is a prototype, on the same terms and with the same bounce as the game itself.
+    // Signed in, on the same terms and with the same bounce as the game itself.
     if (!await CARDS_UNLOCKED(buyer.id)) redirect("/marketplace/town");
 
     // Both in one go: neither waits on the other, and the table is a screen people open often.

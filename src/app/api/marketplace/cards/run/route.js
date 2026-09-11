@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
     CARDS_UNLOCKED, bossOffers, bumpCardProgress, cardOffers, grantForRoom, loadRun, nextAct, potionDrop,
-    recordRun, saveRun, shopStock, startRun, takePerk,
+    recordRun, saveRun, shopStock, startRun, takePerk, verifyWin,
 } from "@/lib/marketplace/cards.js";
 import { applyEventChoice, eventById, pickEvent } from "@/lib/marketplace/cards-events.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
@@ -21,13 +21,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // ── WHERE A RUN MOVES FORWARD ────────────────────────────────────────────────────────────────────────────────
-// The rules still run in the browser and this route does not check them, because the run pays NOTHING — there
-// is no gold, no XP and no row anywhere else to protect. What it is for is memory: the health you finished a
-// fight on and the card you picked have to outlive a locked phone.
+// The rules run in the browser and this route CHECKS THEM. That is the change the old note here promised —
+// "the day this pays a single coin, this is the file that changes" — and the day came with the pet XP and the
+// four ladder pets. The fight did not have to move: cards-kit was written pure, seeded and clockless exactly
+// so the server could run the same fight again, which is what `won` now does with the player's own move log.
 //
-// ⚠️ THE DAY THIS PAYS A SINGLE COIN, THIS IS THE FILE THAT CHANGES. The fight would move behind this route
-// (cards-kit is written to survive that move unchanged — pure, seeded, no clock) and `hp` would stop being
-// something the client is trusted to report. Until then, trusting it costs nobody anything.
+// Everything else here was already the server's and always has been: which room is reachable, which party
+// stands in it, every card offered, the shop's stock and its prices, the deck, the trinkets, the potions
+// spent. A client could never invent a card or a room. It could only ever claim a win, and now it cannot.
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/marketplace/cards/run", async ({ internalError }) => {
         try {
@@ -84,7 +85,11 @@ export async function POST(request) {
                 // draw against a memory that already holds this encounter.
                 const encSeed = (run.seed >>> 0) + (want.row * 31 + want.lane) * 104729;
                 const enc = pickEncounter(encSeed, want.row + 1, kind, run.recent || [], run.act || 1);
-                run.at = { row: want.row, lane: want.lane, kind, enc: enc?.id || null };
+                // ⚠️ AND THE HEALTH AT THE DOOR IS STAMPED HERE. The replay that checks the win has to start
+                // the fight from the health the fight STARTED on, and run.hp stops being that the moment a
+                // potion is drunk mid-room (the `drink` action moves it). One number, written once, by the
+                // only party that knows it before the fight exists. See verifyWin.
+                run.at = { row: want.row, lane: want.lane, kind, enc: enc?.id || null, hp: run.hp };
                 run.stop = want.row + 1;
                 run.trail = [...(run.trail || []), { row: want.row, lane: want.lane }];
                 // Two deep, which is the reference's own window: what you just fought, and what you fought
@@ -360,8 +365,24 @@ export async function POST(request) {
             }
 
             if (action === "won") {
-                // The fight is over and won. Bank the health it was won on, then put three cards on the table.
-                run.hp = Math.max(1, Math.min(run.hpMax, Math.round(Number(body.hp) || run.hp)));
+                // ── THE FIGHT IS REPLAYED BEFORE IT IS BELIEVED ─────────────────────────────────────
+                // The header of this file said it: the day the run pays a single coin, this is what changes.
+                // It pays pet XP now, and four pets. verifyWin rebuilds the exact fixture the page handed the
+                // browser and runs the player's own moves through the engine again; the health banked is the
+                // health THAT ended on, never the number in the body.
+                //
+                // ⚠️ SHADOW FIRST. A verifier that rejects honest players is worse than no verifier, and this
+                // one has to agree with an animation loop that steps a foe turn by hand. So for now a failure
+                // is COUNTED and the room is allowed: `run.unverified` rides to the end of the run and is
+                // written on the result row, which makes one query answer "did anybody's fights not replay,
+                // and whose". When that column is quiet, swap the count for a 400 -- one line, right here.
+                const claimed = Math.max(1, Math.min(run.hpMax, Math.round(Number(body.hp) || run.hp)));
+                const seen = await verifyWin(buyer.id, run, body?.log).catch(() => ({ ok: false, why: "threw" }));
+                if (!seen.ok || seen.hp !== claimed) {
+                    run.unverified = (Number(run.unverified) || 0) + 1;
+                    run.lastUnverified = seen.ok ? `hp ${claimed} vs ${seen.hp}` : seen.why;
+                }
+                run.hp = seen.ok ? seen.hp : claimed;
                 run.fight = null;           // won: there is no fight to come back to, only a reward
                 // Iron Ration pays here — after a win, before the reward, so the number on the card is the
                 // number you keep.

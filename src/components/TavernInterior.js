@@ -54,9 +54,15 @@ const NPCS = [
     { key: "bar", art: "barkeep", emoji: "🧔", label: "Barkeep", x: 16 },
     { key: "dice", art: "gambler", emoji: "🎲", label: "Gambler", x: 84 },
 ];
-// The card sharp at the back table — the way into the card run. OWNER-ONLY while the run is a prototype, and
-// he is appended to the room rather than written into NPCS so a member never renders a table they cannot sit
-// at. The page behind him has its own gate (CARDS_UNLOCKED); this is the door, that is the room.
+// The card sharp at the back table — the way into the card run. He is appended to the room rather than
+// written into NPCS because for a year he was owner-only, and a member must never render a table they cannot
+// sit at. LAUNCHED 2026-09-11: he is there for everybody, and the append is left alone rather than folded
+// into NPCS so the note above him stays attached to the thing it explains.
+//
+// ⚠️ THE DOOR AND THE ROOM WERE ON DIFFERENT GATES, which is the exact pair-of-gates trap. The page behind
+// him asks CARDS_UNLOCKED; he asked the town state's `owner` flag. So while the game was open to testers,
+// every tester could reach /marketplace/cards by URL and none of them could find the man who takes you
+// there. Both are open now, but if either ever closes again they close together.
 // x=41 is a MEASURED spot, not a guess: the room art puts fireplaces at ~16% and ~69% and round tables at
 // ~28/41/51/57/85%. At 58% his 168px sprite hung over the right-hand fire and read as a man sitting in it.
 // 41% covers the second table with his own — which is what "he is AT that table" looks like — and keeps him
@@ -105,7 +111,7 @@ function TavAvatar({ a, you = false, onTap }) {
     );
 }
 
-export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, owner = false, onLeave }) {
+export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, onLeave }) {
     const [st, setSt] = useState(null);
     const [viewportW, setViewportW] = useState(360);
     const [pos, setPos] = useState({ x: 50, y: FLOOR_Y, facing: 1, moving: false });
@@ -334,7 +340,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, ow
                     <div className="tv-fire" aria-hidden="true" />
                     <div className="tv-vignette" aria-hidden="true" />
                     {/* NPC characters */}
-                    {(owner ? [...NPCS, SHARP] : NPCS).map((n, i) => {
+                    {[...NPCS, SHARP].map((n, i) => {
                         const url = n.art ? npcArt?.[n.art] : null;
                         const isBar = n.key === "bar";
                         const isSharp = n.key === "cards";

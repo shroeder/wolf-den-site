@@ -163,7 +163,10 @@ export default function CardFightClient({ fixture, run = null }) {
         reported.current = fight.over;
         // The one guarded place a fight can end, so the fanfare cannot double-fire either.
         sfx(fight.over === "win" ? "win" : "lose");
-        post(fight.over === "win" ? "won" : "dead", { hp: fight.hero.hp });
+        // `hp` is still sent, and the server no longer believes it: it replays `log` and banks the health
+        // the replay ended on. It is kept because a mismatch between the two is the signal that somebody is
+        // either cheating or that the replay has drifted from the screen, and it is worth knowing which.
+        post(fight.over === "win" ? "won" : "dead", { hp: fight.hero.hp, log: fight.log || [] });
     }, [run, fight.over, fight.hero.hp, post]);
     // ── THE HAND IS ALWAYS INSPECTING SOMETHING ─────────────────────────────────────────────────────
     // Luke: "I dont know that tap and hold is gonna be ideal. Oftentimes when you're playing Slay the Spire on
@@ -209,6 +212,15 @@ export default function CardFightClient({ fixture, run = null }) {
     const fightRef = useRef(fight);
     const actingRef = useRef(false);
     const land = useCallback((next) => { fightRef.current = next; setFight(next); }, []);
+    // ── WHAT THE PLAYER ACTUALLY DID, KEPT ON THE FIGHT ITSELF ──────────────────────────────────────
+    // The server replays this to check the win (see replayFight). It rides the state object rather than a
+    // ref for two reasons: `run.fight` is already saved and restored at the end of every turn, so a reload
+    // mid-fight keeps the log for free, and `startFight` returns an object without one, so a new fight
+    // cannot inherit the last fight's moves.
+    //
+    // Appended AFTER the engine call and against the state that call was made on, so the order is the order
+    // the rules saw. Nothing in it is a claim -- a step is a move, and an illegal move fails the replay.
+    const logged = useCallback((prev, next, step) => ({ ...next, log: [...(prev?.log || []), step] }), []);
     // WHICH foe is mid-beat, and whether it is swinging or guarding. One at a time, by construction.
     const [actor, setActor] = useState(null);
     const [played, setPlayed] = useState(null);
@@ -368,7 +380,10 @@ export default function CardFightClient({ fixture, run = null }) {
         // The card's own kind picks the noise: a blade, a ward, a thing that stays on the table.
         const kind = cardById(entry?.id)?.kind;
         sfx(kind === "attack" ? "attack" : kind === "power" ? "power" : "skill");
-        const { state, events } = playCard(fight, uid, target === "self" ? 0 : target);
+        const tgt = target === "self" ? 0 : target;
+        const res = playCard(fight, uid, tgt);
+        const events = res.events;
+        const state = logged(fight, res.state, ["p", uid, tgt]);
         // Booked NOW, whatever the picture does next. The next tap and End turn both read this.
         fightRef.current = state;
         const willStrike = Boolean(
@@ -483,7 +498,7 @@ export default function CardFightClient({ fixture, run = null }) {
         // dead control that looks alive is the worst version of any bug.
         try {
             sfx("potion");
-            const next = drinkPotion(fightRef.current, id);
+            const next = logged(fightRef.current, drinkPotion(fightRef.current, id), ["d", id]);
             land(next);
             await post("drink", { slot, hp: next.hero.hp });
             return next;
@@ -569,8 +584,12 @@ export default function CardFightClient({ fixture, run = null }) {
             timers.push(setTimeout(() => setActor(null), step.at + 300));
         }
         timers.push(setTimeout(() => {
+            // The whole foe turn is ONE step in the log -- there is nothing in it the player chose, and the
+            // engine's own endTurn() walks the identical sequence the plan above walked, which is what the
+            // server replays. Stamped on the state the turn ENDED on, carrying everything played before it.
             const done = finishFoeTurn(live);
-            land(done.state);
+            const ended = logged(fight, done.state, ["e"]);
+            land(ended);
             pushFloats(done.events);
             setActor(null);
             setActing(false); actingRef.current = false;
@@ -579,7 +598,7 @@ export default function CardFightClient({ fixture, run = null }) {
             // covers ten taps. Not for a fight that just ended — `won`/`dead` are posted by the effect
             // above and they clear the held fight themselves — and not for a bare ?seed= fight, which has
             // no run to hold anything.
-            if (run && !done.state.over) post("save", { fight: done.state });
+            if (run && !ended.over) post("save", { fight: ended });
         }, at + 220));
         turnTimers.current = timers;
     }, [fight, acting, pushFloats]);

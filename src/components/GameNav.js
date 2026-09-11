@@ -350,7 +350,7 @@ export default function GameNav() {
             ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons", sub: "Ten floors down" }] : []),
             ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "The Arena", sub: "Fight with your gear" }] : []),
             ...(casino ? [{ href: "/marketplace/casino", label: "The Casino", sub: "Nine machines" }] : []),
-            ...(cards ? [{ href: "/marketplace/cards", Icon: GiCardPlay, label: "Cards", sub: "A deck and a road", owner: true }] : []),
+            ...(cards ? [{ href: "/marketplace/cards", Icon: GiCardPlay, label: "Cards", sub: "A deck and a road" }] : []),
             ...(signedIn ? [{ href: "/marketplace/market", emoji: "🏪", label: "The Market", sub: "Trade crops & fish" }] : []),
         ] },
         { title: "Gear & Pets", items: [

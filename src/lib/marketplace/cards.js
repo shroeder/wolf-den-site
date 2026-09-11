@@ -11,7 +11,7 @@ import {
     ASC_MAX, FINAL_ACT, POTION_DROP_BASE, ascPotionScale, ascRule, beltSize, buildShop, canUpgrade,
     cardById, drawOffer, encounterById, levelSharpens, openingRun,
     levelWeight, levelsCrossed, nextRand, perkSum, pickEncounter, rankFor, runScore, stopAt, unlockTrack, unlockedCards,
-    upgradedId,
+    upgradedId, livingFoes, replayFight, startFight,
 } from "@/lib/marketplace/cards-kit.js";
 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -30,32 +30,23 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 // answers "does this person run the shop" and would let three people into a prototype. On launch day this
 // becomes `Boolean(buyerId)` and that is the whole flip.
 // ── WHO CAN OPEN THE CARD GAME ───────────────────────────────────────────────
-// Luke: "lets open the card game up to testers."
+// LAUNCHED 2026-09-11. Everybody signed in. It ran as an owner prototype, then opened to the house and
+// anybody holding the Tester role -- 54 runs across 7 players, three acts walked, best score 1,285 -- and
+// this is the flip that note always described: "on launch day CARDS_UNLOCKED becomes Boolean(buyerId) in one
+// place, and a second copy of the rule in the menu would keep the door shut for everyone after the page had
+// opened."
 //
-// The house and anybody holding the Tester role — five rewarded bug reports, the bug_hunter rung, see
-// ROLES.tester. Staff come too: Eric is in the testing room and inviting somebody to test a thing they
-// cannot open is not an invitation.
+// ⚠️ KEPT AS A FUNCTION RATHER THAN DELETED, unlike ARENA_UNLOCKED and jewelsEnabled, which were removed
+// outright at their launches because a predicate that always answers yes still reads like a gate. This one
+// does not always answer yes: it answers "is anybody signed in", which the nav, the HUD, three pages and the
+// run API each need and none of them should re-derive. It is the door and the play path, still moving
+// together.
 //
-// ⚠️ IT IS ASYNC NOW, AND EVERY CALLER HAD TO LEARN THAT. A role lives in the database, so this stopped
-// being a pure function the moment it stopped being a hardcoded list. The note in hud/route.js already
-// says why the rule lives HERE and is imported rather than copied: "on launch day CARDS_UNLOCKED becomes
-// Boolean(buyerId) in one place, and a second copy of the rule in the menu would keep the door shut for
-// everyone after the page had opened." That is the door and the play path — they are separate gates and
-// they must move together.
-//
-// ⚠️ AND IT IS ON THE HUD, WHICH BILLS ON EVERY NAVIGATION BY EVERY MEMBER. The owner check short-
-// circuits first and costs nothing; everybody else pays ONE indexed existence check against
-// mkt_user_badge, which is the narrowest question that answers this. Do not widen it into standingFor
-// here — that is four reads for a boolean, on the one component the chrome-fanout rule exists to protect.
-// See npm run check:chrome.
+// The badge query it used to run is gone with it. That matters more than it looks: this is read by
+// /api/marketplace/hud, which bills on every navigation by every member, and it was one indexed read there
+// for a question that is now free. See npm run check:chrome.
 export async function CARDS_UNLOCKED(buyerId) {
-    if (!buyerId) return false;
-    if (isOwner(buyerId) || isStaff(buyerId)) return true;
-    const row = await db.queryOne(
-        `SELECT 1 AS ok FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug IN ('bug_hunter', 'staff', 'owner') LIMIT 1`,
-        [buyerId],
-    ).catch(() => null);
-    return Boolean(row);
+    return Boolean(buyerId);
 }
 
 // ── EVERY FACE IN THIS FIGHT IS ART WE ALREADY PAID FOR ──────────────────────────────────────────────────
@@ -278,17 +269,25 @@ export async function recordRun(buyerId, run, outcome) {
     const ended = { ...run, done: outcome };
     await db.query(
         `INSERT INTO mkt_cards_result
-             (buyer_id, outcome, act, stop, score, hp, hp_max, deck_size, seed, deck, perks, asc_level)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12)`,
+             (buyer_id, outcome, act, stop, score, hp, hp_max, deck_size, seed, deck, perks, asc_level,
+              unverified, unverified_why)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13, $14)`,
         [
             buyerId, outcome,
-            Math.max(1, Math.min(ACTS, Number(run.act) || 1)),
+            // FINAL_ACT, not ACTS -- the same clamp that made scoreParts record an act-four death as an
+            // act-three one. ACTS is 3 because three is how many you must CLEAR; the Hollow is a fourth act
+            // you bring keys to, and a run that reached it was being written to history as act three.
+            Math.max(1, Math.min(FINAL_ACT, Number(run.act) || 1)),
             Math.max(0, Number(run.stop) || 0),
             runScore(ended),
             Math.max(0, Number(run.hp) || 0), Math.max(1, Number(run.hpMax) || 1),
             (run.deck || []).length, Number(run.seed) || 0,
             JSON.stringify(run.deck || []), JSON.stringify(run.perks || []),
             Math.max(0, Math.min(ASC_MAX, Number(run.asc) || 0)),
+            // How many of this run's rooms did not replay to the health they claimed, and what the replay
+            // said about the last one. Zero for every honest run; see verifyWin and migration 443.
+            Math.max(0, Math.min(32767, Number(run.unverified) || 0)),
+            run.unverified ? String(run.lastUnverified || "").slice(0, 120) : null,
         ]
     ).catch(() => {});
     run.recorded = true;
@@ -722,6 +721,48 @@ export async function cardOffers(buyerId, run) {
  * The ladder still supplies the CURVE — how hard a fight is this far up — but the map now supplies the
  * position, so `stop` is the row you are standing on rather than a step in a straight line.
  */
+// ── DID THIS FIGHT ACTUALLY HAPPEN ───────────────────────────────────────────────────────────────────────────
+// The run route's own header said it: "the day this pays a single coin, this is the file that changes." It
+// pays now -- pet XP to every animal whose cards were in the deck, and a ladder that hands over four pets
+// nothing else in the game can give you -- so the fight stopped being something the client gets to report.
+//
+// Nothing about the engine moved. It is pure and seeded, which is what makes this cheap: the server already
+// builds the identical fixture the page handed the browser (runFixture, the same call the page makes), so
+// handing back the ordered list of what the player DID is enough to run the whole fight again here and look
+// at the end of it. No physics, no clock, no randomness that is not the seed's.
+//
+// ⚠️ THE HEALTH COMES FROM THE REPLAY, NOT FROM THE CLIENT. That is the point of the whole exercise. It also
+// closes a smaller hole beside it: `drink` lets the client post an hp mid-fight, so the number on the run row
+// during a room is not trustworthy either -- but the room ENDS here, and what it ends on is computed.
+//
+// ⚠️ AND THE FIGHT STARTS FROM THE HEALTH STAMPED AT THE DOOR, not run.hp. Same reason: a potion drunk in the
+// third turn has already moved run.hp, and replaying from a moved number would fail every honest fight that
+// had a potion in it. `enter` writes run.at.hp; anything older falls back and is reported unverifiable rather
+// than wrong.
+export async function verifyWin(buyerId, run, log) {
+    if (!run?.at) return { ok: false, why: "no_room" };
+    const entry = Number(run.at.hp);
+    if (!Number.isFinite(entry) || entry <= 0) return { ok: false, why: "no_entry_hp" };
+    const fixture = await runFixture(buyerId, run);
+    const start = startFight({
+        seed: fixture.seed,
+        asc: fixture.asc || 0,
+        kind: fixture.kind || "fight",
+        // The identical four arguments CardFightClient hands it, with the door's health in place of the
+        // page's -- which at page-render time WAS the door's health. Same fight, same shuffle, same hand.
+        hero: { ...fixture.hero, hp: entry, hpMax: run.hpMax },
+        foes: fixture.foes,
+        deck: run.deck || null,
+        perks: run.perks || [],
+    });
+    const out = replayFight(start, log);
+    if (!out.ok) return { ok: false, why: out.why };
+    if (livingFoes(out.state).length > 0) return { ok: false, why: "foes_alive" };
+    const hp = Math.round(Number(out.state?.hero?.hp) || 0);
+    if (hp <= 0) return { ok: false, why: "hero_dead" };
+    return { ok: true, hp: Math.min(run.hpMax, hp) };
+}
+
 export async function runFixture(buyerId, run) {
     // The room being stood in decides the fight: its row sets the curve, its kind sets the shape. A run
     // with no room selected is not in a fight at all — the page shows the map instead.

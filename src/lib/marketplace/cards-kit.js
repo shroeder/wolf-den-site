@@ -4718,6 +4718,60 @@ export function heroEndTurn(state) {
     };
 }
 
+// ── REPLAYING A FIGHT SOMEBODY ELSE CLAIMS TO HAVE WON ───────────────────────────────────────────────────────
+// The engine runs in the BROWSER. That was the right call for a prototype -- it is what let the rules be
+// retuned in a minute, and it is why there is a simulator at all -- but it means the server's only knowledge
+// of a fight was the client saying "I won, at 34 health". Everything AROUND the fight was already the
+// server's: the map and whether a room is reachable, the seed, which party stands in it, every card offer,
+// the shop's stock and prices, the deck, the trinkets. The fight itself was the one hole, and the run now
+// pays pet XP and hands over four pets nobody can get another way, so the hole had to close.
+//
+// It closes without moving the engine, because the engine is PURE and SEEDED: same inputs, same fight, every
+// time, on any machine. The server already holds every input (runFixture builds the identical fixture the
+// page handed the client), so all it was missing is what the PLAYER did. That is this log -- the ordered list
+// of plays, drinks and end-turns, and nothing else. Hand it back and the whole fight can be run again on the
+// server and checked.
+//
+// A log is deliberately tiny and dumb: ["p", uid, target], ["d", potionId], ["e"]. No state, no numbers, no
+// claims -- nothing in it can assert an outcome, only an action, and an action that was not legal at that
+// moment fails the replay. The health banked afterwards is the health the REPLAY ended on, never the number
+// the client sent.
+//
+// ⚠️ CAPPED. This runs on request CPU, which is the bill (see CLAUDE.md), and an unbounded array from a
+// client is an unbounded loop. A real fight is tens of steps; a thousand is already absurd.
+export const REPLAY_MAX = 2000;
+
+export function replayFight(start, log) {
+    if (!start) return { ok: false, why: "no_fight" };
+    const steps = Array.isArray(log) ? log : [];
+    if (steps.length > REPLAY_MAX) return { ok: false, why: "too_long" };
+    let state = start;
+    for (const step of steps) {
+        // A move after the fight is over is not a fight anybody had.
+        if (!state || state.over) return { ok: false, why: "move_after_over" };
+        const kind = Array.isArray(step) ? step[0] : null;
+        if (kind === "p") {
+            const uid = step[1];
+            const target = Math.max(0, Math.min((state.foes || []).length - 1, Number(step[2]) || 0));
+            // canPlay owns affordability, playability and whether that card is even in the hand -- the same
+            // check the screen makes before it lets a finger land on one.
+            if (!canPlay(state, uid)) return { ok: false, why: "illegal_play" };
+            state = playCard(state, uid, target).state;
+        } else if (kind === "d") {
+            // Whether the belt HELD that potion is the run's business, not the fight's -- the route spends it
+            // from run.potions on its own action and would have rejected one that was not there.
+            const next = drinkPotion(state, step[1]);
+            if (next === state) return { ok: false, why: "illegal_drink" };
+            state = next;
+        } else if (kind === "e") {
+            state = endTurn(state).state;
+        } else {
+            return { ok: false, why: "bad_step" };
+        }
+    }
+    return { ok: true, state };
+}
+
 export function endTurn(state) {
     if (!state || state.over) return { state, events: [] };
     const opened = heroEndTurn(state);

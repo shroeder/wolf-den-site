@@ -24,8 +24,11 @@ export const metadata = {
 // problem you take with you, and the deck only grows, so every pick is a bet about the fights you have not
 // seen yet.
 //
-// STILL PAYS NOTHING. No gold, no XP, no item, no row outside its own — and still owner-gated. That is what
-// keeps the rules in the browser where they can be changed in a minute (see cards-kit.js).
+// WHAT IT PAYS, AS OF LAUNCH. Still no gold and no item — the run cannot mint currency and does not touch
+// the shop. What it does pay is its own ladder (score is lifetime XP, and crossing a rung opens cards,
+// trinkets and four pets nothing else in the game can hand over) and PET XP to the animals whose cards were
+// in the deck, capped at 300 a pet a run. That second one is the only thing a run puts back into the wider
+// Den, because a pet's level is read by the arena and the road. See recordRun.
 //
 // ?seed=N STILL WORKS and still means what it always did: one standalone fight, the starter deck, full
 // health, no run touched. That is the replay link you hand somebody to argue about a specific turn, and a run
@@ -33,8 +36,8 @@ export const metadata = {
 export default async function CardsPage({ searchParams }) {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/cards");
-    // Owner-gated while it is a prototype. A member who wanders in goes back to the town rather than meeting a
-    // half-built game — the same bounce the mine and the kitchen used before they opened.
+    // Signed in is the whole gate now (CARDS_UNLOCKED). The bounce stays: a signed-out visitor is sent to
+    // login above, and this catches anything else rather than rendering a game with no player attached.
     if (!await CARDS_UNLOCKED(buyer.id)) redirect("/marketplace/town");
 
     const q = await searchParams;

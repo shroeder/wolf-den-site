@@ -4,7 +4,7 @@
 // engine — every card, perk, potion and foe script — into the farm, the arena and the shop.
 //
 // The Road's two exclusives use exactly this shape (SEASON_HIDDEN off SEASON_PUBLIC) and for exactly this
-// reason. When the card game launches, flip CARDS_PUBLIC and the four pets appear in the collection with
-// everything else.
-export const CARDS_PUBLIC = false;
+// reason. LAUNCHED 2026-09-11: the four pets are in the collection with everything else, earned at card
+// ranks 3, 5, 10 and 15 and reachable no other way -- `source: "cards"` matches no drop pool.
+export const CARDS_PUBLIC = true;
 export const CARDS_HIDDEN = !CARDS_PUBLIC;
