@@ -24,6 +24,12 @@ const SOURCES = [
     { id: "boss", label: "Boss" },
     { id: "raid", label: "Raid" },
     { id: "elite", label: "Elite" },
+    // ⚠️ A SOURCE WITH NO CHIP IS A SOURCE NOBODY CAN FIND. The five patronage pets are the only ones bought
+    // with real money at the counter, and without a filter they existed only inside "All" — 130 cards deep.
+    // (`farm` and `road` are still missing chips for the same reason nobody noticed this one. Road is
+    // deliberate while the season is hidden: the pets are dropped from the public list, so its chip would
+    // filter to nothing.)
+    { id: "counter", label: "In-store" },
 ];
 
 const RARITY_ORDER = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
