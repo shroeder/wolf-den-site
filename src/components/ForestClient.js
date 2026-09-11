@@ -468,9 +468,12 @@ export default function ForestClient() {
                 .fr-streak em { position: absolute; inset: 0; display: grid; place-items: center;
                     font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .06em;
                     color: #1a140c; text-shadow: 0 1px 0 rgba(255,255,255,.25); }
-                .fr-streak.is-cold em { color: #ffcf87; text-shadow: 0 1px 3px rgba(0,0,0,.9);
-                    animation: frCold 1.6s ease-in-out infinite; }
-                @keyframes frCold { 0%,100% { opacity: .58; } 50% { opacity: 1; } }
+                /* The pulse breathes between BRIGHT and BRIGHTER. Bottoming out at .58 meant the prompt spent
+                   half its cycle dimmer than the bar it sits on, which is the same legibility bug the dark ink
+                   was, just slower. */
+                .fr-streak.is-cold em { color: #ffe3b4; text-shadow: 0 1px 4px rgba(0,0,0,.95), 0 0 10px rgba(0,0,0,.7);
+                    animation: frCold 1.7s ease-in-out infinite; }
+                @keyframes frCold { 0%,100% { opacity: .82; } 50% { opacity: 1; } }
                 .fr-streak.is-cold { box-shadow: inset 0 0 0 1px rgba(255,180,90,.32); }
 
                 .fr-tap { flex: 0 0 auto; margin: 0; padding: 13px; text-align: center;
