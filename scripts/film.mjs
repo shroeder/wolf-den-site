@@ -116,6 +116,14 @@ await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceSc
 // behind a session, so a film rig that cannot hold one can only film the fixtures.
 if (process.env.SHOT_COOKIE) {
     await send("Network.enable");
+    // ⚠️ AND THE DISK CACHE IS OFF, FOR THE REASON shot.mjs TURNED IT OFF. Chrome runs against a REUSED
+    // profile (--user-data-dir above), so its disk cache survives between runs — and static art under
+    // /public is served with max-age=86400. Redraw a sprite, re-film, and you photograph the OLD one.
+    //
+    // This cost a full debugging round on the Forest: the new whole-tree art was live and byte-correct at the
+    // edge, and the film kept showing the redwood trunk-crops it replaced. Every conclusion drawn from those
+    // frames was about art that had not existed for an hour. shot.mjs learned this and film.mjs was not told.
+    await send("Network.setCacheDisabled", { cacheDisabled: true });
     await send("Network.setCookie", {
         name: "wolfden-mkt-buyer-session", value: process.env.SHOT_COOKIE,
         domain: new URL(url).hostname, path: "/",

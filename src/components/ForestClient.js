@@ -500,7 +500,13 @@ export default function ForestClient() {
                     color: #ffb9a8; background: rgba(120,40,30,.28); border: 1px solid rgba(220,110,90,.3); }
 
                 /* ── THE WOOD ────────────────────────────────────────────────────────────────────── */
-                .fw-world { position: relative; width: 100%; height: min(58vh, 460px); overflow: hidden;
+                /* ⚠️ A FIXED HEIGHT, NOT vh. Sized as 58vh this box measured 440px when the DOM was asked and
+                   rendered 178px when the frame was actually captured — the same rule, the same rig, two
+                   answers — and everything positioned against it by percentage (the trees at bottom 7%, the
+                   floor strip at 22%) landed wherever the disagreement put it. A world whose height depends on
+                   which tool is looking at it cannot be judged from a picture, which is the only way this
+                   screen can be judged at all. Fixed px here, and the media query below steps it up. */
+                .fw-world { position: relative; width: 100%; height: 400px; overflow: hidden;
                     border-radius: 14px; background: #070d10; touch-action: manipulation; cursor: pointer;
                     box-shadow: inset 0 0 80px rgba(0,0,0,.8); }
                 /* The two backdrop walls. repeat-x with a moving background-position is how a flat picture
@@ -681,7 +687,7 @@ export default function ForestClient() {
                 .fw-track .fw-btn { width: 100%; }
 
                 @media (min-width: 700px) {
-                    .fw-world { height: min(64vh, 540px); }
+                    .fw-world { height: 520px; }
                     .fw-sheet { align-self: center; border-radius: 16px; border: 1px solid #34402f; }
                     .fw-over { align-items: center; }
                 }
