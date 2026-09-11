@@ -277,7 +277,11 @@ export default function ForestClient() {
     }, []);
 
     const form = useMemo(() => axeForm(st?.total || 0), [st?.total]);
-    const camX = Math.max(0, heroX - viewW / 2);
+    // ⚠️ NOT CLAMPED AT ZERO. Clamping it meant that at node 0 the camera could not centre you, so you stood
+    // on the very left edge with half your body off the screen and the first tree pinned to the corner. The
+    // wood has a start but the CAMERA does not need one — letting it run negative just shows empty backdrop
+    // to the left of the first tree, which is what the edge of a forest looks like.
+    const camX = heroX - viewW / 2;
 
     // ── WHAT IS ON SCREEN ────────────────────────────────────────────────────────────────────────────
     // Only the nodes the camera can see, plus a couple either side so nothing pops in at the edge. This is
@@ -340,13 +344,16 @@ export default function ForestClient() {
                         // The LANE it stands in. Further back is smaller, dimmer and sits higher up the
                         // frame — which is what stops a side-on wood reading as a single row of cut-outs.
                         const back = n.lane;
-                        const scale = 0.72 + (1 - back) * 0.5;
+                        // ⚠️ SMALL. The first pass drew these at 170px in a 360px-wide wood — 56% of the screen for one
+                        // tree, which is the same "takes up the whole screen" in a new costume. A tree you walk past
+                        // should be a thing in the scene, not the scene.
+                        const scale = 0.62 + (1 - back) * 0.42;
                         const bottom = 7 + back * 12;
                         const z = Math.round(100 - back * 40);
                         if (n.kind === "shroom") {
                             /* eslint-disable-next-line @next/next/no-img-element */
                             return <img key={n.i} src={SHROOM_ART(n.id)} alt="" draggable="false" data-node={n.i}
-                                className="fw-shroom" style={{ left, bottom: `${bottom}%`, width: `${44 * scale}px`, zIndex: z }} />;
+                                className="fw-shroom" style={{ left, bottom: `${bottom}%`, width: `${34 * scale}px`, zIndex: z }} />;
                         }
                         const down = Number(st.cut?.[String(n.i)]) > 0;
                         const isChop = chop && chop.node === n.i;
@@ -357,12 +364,12 @@ export default function ForestClient() {
                                 onPointerDown={(e) => { e.stopPropagation(); if (!down) hitTree(n); }}
                                 aria-label={down ? "A cut stump" : `${treeById(n.id).name} — chop`}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={STUMP} alt="" draggable="false" className="fw-stump" style={{ width: `${58 * scale}px` }} />
+                                <img src={STUMP} alt="" draggable="false" className="fw-stump" style={{ width: `${40 * scale}px` }} />
                                 {!down ? (
                                     /* eslint-disable-next-line @next/next/no-img-element */
                                     <img src={TREE_ART(n.id)} alt="" draggable="false"
                                         className={`fw-tree${isChop && shake ? " is-struck" : ""}${going ? " is-down" : ""}`}
-                                        style={{ width: `${170 * scale}px`, filter: `brightness(${(0.6 + (1 - back) * 0.45).toFixed(2)})` }} />
+                                        style={{ width: `${112 * scale}px`, filter: `brightness(${(0.6 + (1 - back) * 0.45).toFixed(2)})` }} />
                                 ) : null}
                                 {isChop && !down ? (
                                     <span className="fw-hp" style={{ "--r": RARITY[treeById(n.id).rarity] }}>

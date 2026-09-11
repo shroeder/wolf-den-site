@@ -20,9 +20,10 @@
 import { MUSHROOMS, MUSHROOM_IDS, TREES, TREE_IDS, treeById, weighted } from "@/lib/marketplace/forest.js";
 
 // ── HOW BIG THE WOOD IS ──────────────────────────────────────────────────────────────────────────────────────
-// Node spacing in world pixels. Wide enough that two trees are never touching at the sizes they are drawn, and
-// close enough that there is always something in shot — an empty screen is a walk, not a forest.
-export const NODE_GAP = 190;
+// Node spacing in world pixels. Wide enough that two trees are never touching at the sizes they are drawn,
+// and close enough that there is always something in shot — an empty screen is a walk, not a forest. Dropped
+// from 190 when the trees came down in size: spacing that suited a 170px tree leaves gaps around a 112px one.
+export const NODE_GAP = 150;
 // How many nodes a segment holds. Segments exist only so the client can build the wood in chunks as it walks
 // rather than generating ten thousand nodes at once.
 export const SEGMENT = 24;
