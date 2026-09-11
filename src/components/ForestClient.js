@@ -43,6 +43,7 @@ const WALK_PX = 300;      // world pixels a second
 const CHOP_REACH = 110;   // how close you must be for a tree to be choppable
 const PICK_REACH = 80;    // and for a mushroom to be picked up as you pass
 const PAD = 2;            // nodes generated beyond each edge of the screen
+const WORLD_H = 400;      // how tall the wood is drawn, in real pixels — see the note where it is applied
 
 const errorText = (e) => ({
     too_fast: "That tree did not come down that fast.",
@@ -321,7 +322,12 @@ export default function ForestClient() {
 
             {err ? <p className="fw-err" role="alert">{err}</p> : null}
 
-            <div className="fw-world" ref={wrapRef}
+            {/* ⚠️ THE HEIGHT IS INLINE, NOT IN THE STYLE BLOCK. Through the stylesheet this box reported a
+                computed height of 400px to two different rigs and PAINTED at 189px in the screenshots from
+                both of them — and everything inside is positioned against it by percentage, so the trees,
+                the floor and the hero all landed outside the box that was actually drawn. An inline height
+                is the one value nothing can disagree about: no cascade, no stale chunk, no scoping. */}
+            <div className="fw-world" ref={wrapRef} style={{ height: WORLD_H }}
                 onPointerDown={(e) => {
                     if (e.target.closest("[data-node]")) return;   // a tree handles its own tap
                     const rect = e.currentTarget.getBoundingClientRect();
