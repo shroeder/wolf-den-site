@@ -755,9 +755,23 @@ export async function verifyWin(buyerId, run, log) {
         deck: run.deck || null,
         perks: run.perks || [],
     });
+    // ⚠️ "NO LOG AT ALL" IS NOT "THE LOG DID NOT FINISH THE FIGHT", and telling them apart is the whole
+    // difference between a deploy and a cheat. A player whose tab was open when this shipped is still running
+    // the OLD javascript: it posts a win with no log, the replay walks nothing, the foes are all still
+    // standing, and it reports `foes_alive` -- indistinguishable from somebody skipping the fight entirely.
+    // That happened within twenty minutes of launch, to a member four rooms into act three.
+    //
+    // It heals itself on their next reload and it must never be counted as cheating, so it says so.
+    if (!Array.isArray(log) || log.length === 0) return { ok: false, why: "no_log" };
     const out = replayFight(start, log);
     if (!out.ok) return { ok: false, why: out.why };
-    if (livingFoes(out.state).length > 0) return { ok: false, why: "foes_alive" };
+    // The detail is the diagnosis: a log that ran out with one foe on 3hp is a replay that drifted, and a
+    // log of forty steps that leaves everything at full is somebody feeding it nonsense. Reading "foes_alive"
+    // on its own tells you neither.
+    const left = livingFoes(out.state);
+    if (left.length > 0) {
+        return { ok: false, why: `foes_alive ${left.length}/${(out.state.foes || []).length} (${left.map((f) => f.hp).join(",")}) after ${log.length} steps` };
+    }
     const hp = Math.round(Number(out.state?.hero?.hp) || 0);
     if (hp <= 0) return { ok: false, why: "hero_dead" };
     return { ok: true, hp: Math.min(run.hpMax, hp) };
