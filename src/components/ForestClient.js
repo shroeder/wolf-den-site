@@ -41,12 +41,22 @@ import {
 } from "@/lib/marketplace/forest.js";
 import { NODE_GAP, nodeAt } from "@/lib/marketplace/forest-world.js";
 
-const TREE_ART = (id) => `/images/forest/trees/${id}.webp`;
-const SHROOM_ART = (id) => `/images/forest/shrooms/${id}.webp`;
-const AXE_ART = (id) => `/images/forest/axes/${id}.webp`;
-const GROVE = "/images/forest/grove.webp";
-const FLOOR = "/images/forest/floor.webp";
-const STUMP = "/images/forest/stump.webp";
+// ── ⚠️ THE ART IS VERSIONED, AND IT HAS TO BE ────────────────────────────────────────────────────────────────
+// Every one of these files was REDRAWN in place: the trees went from bottom-half redwood crops to whole trees,
+// the grove went from orange redwoods to a flat blue wall. Same paths, new bytes. Static art under /public is
+// served with max-age=86400, so anybody who had opened the Forest kept the old pictures for up to a day —
+// Luke's phone was still drawing the cropped trunks, sheared off at the top, hours after they were replaced,
+// and the screen looked exactly like the thing he had asked me to fix.
+//
+// A cache is not wrong to do that; asking for the same URL and expecting different bytes is. Bump ART_V on any
+// redraw and every device gets the new picture on the next load.
+const ART_V = "2";
+const TREE_ART = (id) => `/images/forest/trees/${id}.webp?v=${ART_V}`;
+const SHROOM_ART = (id) => `/images/forest/shrooms/${id}.webp?v=${ART_V}`;
+const AXE_ART = (id) => `/images/forest/axes/${id}.webp?v=${ART_V}`;
+const GROVE = `/images/forest/grove.webp?v=${ART_V}`;
+const FLOOR = `/images/forest/floor.webp?v=${ART_V}`;
+const STUMP = `/images/forest/stump.webp?v=${ART_V}`;
 
 const RARITY = { common: "#b9b2a4", uncommon: "#7fc98a", rare: "#7fb0ff", epic: "#d98ae8", legendary: "#ffc861" };
 
