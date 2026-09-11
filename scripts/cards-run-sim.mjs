@@ -58,6 +58,35 @@ const blockOf = (c) => m.cardById(c.id)?.block || 0;
 // Not optimal and not stupid: covers a swing that would cost more than a Defend is worth, then spends the rest
 // of the bar on the thing closest to dying. A bot that plays perfectly measures the ceiling; this measures the
 // floor a real hand plays on, which is the number a health total should be set against.
+// ── ⚠️ TURNS WHERE THE HAND CAN DO NOTHING ───────────────────────────────────────────────────────────────────
+// SunflowerJinxx, testing room, with two screenshots: "I had 4 rounds in a row that I couldn't do anything and
+// lost the run... I understand them blocking some, but 4 rounds of no or 1 card seems a little broken."
+//
+// That is a question about the STATUS cards the creatures push into your hand — Dazed, Wound and Burn are
+// unplayable by definition and Slimed costs energy to throw away — and it cannot be answered by reading the
+// card table, because what matters is how often they ARRIVE together. So the sim counts it: a turn is DEAD if
+// the hand is non-empty at the top of the turn and not one card in it can be played with a full energy bar.
+//
+// A dead turn is not automatically a fault. One in a long fight is the creature's attack landing; four in a
+// row is the fight playing itself. The streak histogram is the part worth reading.
+// ⚠️ AND THE MEASURE IS "AT MOST ONE", NOT "NONE". The first cut of this counted only turns where NOTHING
+// could be played, found six in eight thousand, and would have let me tell her she was wrong. She did not say
+// nothing: "4 rounds of no OR 1 card seems a little broken". A turn where the only legal move is one card is
+// a turn you watched rather than played, and four of those in a row is the complaint. Both are counted.
+const DEAD = { turns: 0, dead: 0, thin: 0, streaks: new Map(), worst: 0, hist: new Map() };
+const noteTurn = (st) => {
+    if (st.over || !st.hand || !st.hand.length) return;
+    DEAD.turns += 1;
+    const n = st.hand.filter((c) => m.canPlay(st, c.uid)).length;
+    DEAD.hist.set(n, (DEAD.hist.get(n) || 0) + 1);
+    if (!n) DEAD.dead += 1;
+    if (n > 1) { DEAD.run = 0; return; }
+    DEAD.thin += 1;
+    DEAD.run = (DEAD.run || 0) + 1;
+    DEAD.worst = Math.max(DEAD.worst, DEAD.run);
+    DEAD.streaks.set(DEAD.run, (DEAD.streaks.get(DEAD.run) || 0) + 1);
+};
+
 function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null, kind = "fight") {
     let st = m.startFight({
         seed,
@@ -69,6 +98,8 @@ function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null, 
         foes: party.map((p) => ({ ...p, script: scriptOf(p.script) })),
     });
     let guard = 0;
+    DEAD.run = 0;
+    noteTurn(st);
     while (!st.over && guard < 600) {
         guard += 1;
         // ── AND A PLAYER DRINKS ──────────────────────────────────────────────────────────────────────────
@@ -163,6 +194,7 @@ function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null, 
         const other = st.hand.find((c) => m.canPlay(st, c.uid));
         if (other) { st = m.playCard(st, other.uid).state; continue; }
         st = m.endTurn(st).state;
+        noteTurn(st);
     }
     return st;
 }
@@ -559,3 +591,15 @@ for (let a = 1; a <= m.ACTS; a += 1) {
             + `   potions ${avg(came, (x) => x.potions).toFixed(1)}`);
     }
 }
+
+// ── AND WHAT THE HAND COULD NOT DO ───────────────────────────────────────────────────────────────────────────
+console.log("");
+console.log("-- DEAD TURNS (nothing in hand playable at the top of the turn) --");
+console.log(`  nothing playable : ${DEAD.dead} of ${DEAD.turns} turns (${(DEAD.dead / Math.max(1, DEAD.turns) * 100).toFixed(2)}%)`);
+console.log(`  at most ONE      : ${DEAD.thin} of ${DEAD.turns} turns (${(DEAD.thin / Math.max(1, DEAD.turns) * 100).toFixed(2)}%)`);
+console.log(`  longest run of "at most one" in a row: ${DEAD.worst}`);
+const hk = [...DEAD.hist.keys()].sort((a, b) => a - b);
+console.log("  playable cards at the top of a turn:");
+for (const k of hk) console.log(`    ${String(k).padStart(2)} playable: ${String(DEAD.hist.get(k)).padStart(5)}  (${(DEAD.hist.get(k) / DEAD.turns * 100).toFixed(1)}%)`);
+const streakKeys = [...DEAD.streaks.keys()].sort((a, b) => a - b);
+for (const k of streakKeys) console.log(`    reached ${String(k).padStart(2)} in a row: ${DEAD.streaks.get(k)} times`);
