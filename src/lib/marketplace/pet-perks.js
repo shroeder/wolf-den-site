@@ -299,6 +299,20 @@ export const PET_PERKS = {
     elephant_spear: { name: "Merchant's Nose", key: "gold_find", note: "Unique: while equipped, boosts your chance to find the Gold Merchant at sea (+1% per pet level, up to +5%)." },
     // Farm/pastoral pets — a farm passive (in collectibles PET_PASSIVE_STAT) PLUS a combat active so they still
     // fight. Actives are ordinary combat keys (nothing farm-specific here).
+    // ── THE CARD ROOM'S FOUR ───────────────────────────────────────────────────────────────────────────────
+    // ⚠️ ADDED WITH SIGNATURES THIS TIME — AND I STILL SHIPPED THEM WITHOUT. These four went in with the card
+    // levels and fell straight into petPerk()'s "Companion" fallback, which is the fifth time this table has
+    // been extended and the fifth time the new pets arrived nameless. SoullessShiitake found the downstream
+    // half: with no authored ability there is nothing for a stone to be ABOUT, so both of a pet's stones came
+    // out of the same dull default and one was strictly weaker. "The Chalk Hare lightstone ability is exactly
+    // the same as its darkstone ability, just weaker (+17.5 fortune vs +26.3 fortune)."
+    //
+    // Every key checked against the real resolver for a numeric twin at that pet's rarity; all four were free.
+    chalk_hare: { name: "Keeps the Tally", key: "fortune" },
+    cellar_jay: { name: "Takes the Shine", key: "housefavour" },
+    pit_marten: { name: "Knows Every Way In", key: "ferocity" },
+    ivory_adder: { name: "Never Seen It Move", key: "crit_chance" },
+
     // ── PATRONAGE · THE FIVE BOUGHT AT THE COUNTER ────────────────────────────────────────────────────────
     // Added WITH their signatures rather than after somebody notices, which is the fourth time this table has
     // been extended and the first time it was not a rescue: the kitchen five, the fishing four, the mine's

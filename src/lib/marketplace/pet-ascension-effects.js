@@ -175,6 +175,26 @@ export const ASCENSION_EFFECTS = {
         light: { name: "The Second Paw", kind: "graft", key: "chain_strike", scale: 0.8, note: "One is a warning." },
         dark: { name: "Learned the Kill", kind: "graft", key: "crit_power", scale: 0.9, note: "The pounce was always there. Now it lands somewhere that matters." },
     },
+    // ── THE CARD ROOM'S FOUR ───────────────────────────────────────────────────────────────────────────
+    // With no entry here these fell to the default, so Light was Dark with a smaller number on it — which is
+    // exactly the "two options is not the same thing as a decision" this whole file was written to end, and
+    // it shipped again anyway. Light grafts a second trade; Dark doubles down on what the pet already is.
+    chalk_hare: {
+        light: { name: "Counts What It Sees", kind: "graft", key: "xp_gain", scale: 0.9 },
+        dark: { name: "Never Wrong Twice", kind: "amplify", mult: 2.2, note: "It has kept that tally a long time." },
+    },
+    cellar_jay: {
+        light: { name: "Magpie's Habit", kind: "graft", key: "chest_luck", scale: 0.85 },
+        dark: { name: "Brightest on the Table", kind: "amplify", mult: 2.2 },
+    },
+    pit_marten: {
+        light: { name: "Every Way Out", kind: "graft", key: "second_wind", scale: 1 },
+        dark: { name: "Under the Floor", kind: "amplify", mult: 2.1 },
+    },
+    ivory_adder: {
+        light: { name: "Strikes First", kind: "graft", key: "first_blood", scale: 1 },
+        dark: { name: "Nobody Sees It", kind: "amplify", mult: 2.2 },
+    },
     seahorse: {
         light: { name: "Combs the Shallows", kind: "graft", key: "sea_dredge", scale: 0.8 },
         dark: { name: "Knows Every Reef", kind: "amplify", mult: 2.2, note: "It has not left this stretch of water in its life." },

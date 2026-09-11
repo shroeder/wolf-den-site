@@ -26,6 +26,7 @@ import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { STATUS_ART, marksOn } from "@/components/cards/status-art.js";
 import CardKeyNote from "@/components/cards/CardKeyNote";
 import CardTally from "@/components/cards/CardTally";
+import CardLevelUp from "@/components/cards/CardLevelUp";
 import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
 import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
 import { KEY_OFFER_CSS, KEY_TINT, keyArt } from "@/components/cards/key-offer.js";
@@ -1596,6 +1597,11 @@ export default function CardFightClient({ fixture, run = null }) {
                                 just the win: dying on act two with a big deck is a real result and the
                                 player should be able to see it was better than the last one. */}
                             {runState?.done ? <CardTally run={runState} /> : null}
+                            {/* And what the score just bought. Under the tally, because the rung is EARNED by
+                                the total that has just finished rolling above it. */}
+                            {runState?.done && runState?.levelled?.length ? (
+                                <CardLevelUp levelled={runState.levelled} petArt={fixture.petArt} />
+                            ) : null}
                             <div className="cf-result-btns">
                                 {/* Leaves to the table, not to the town — same as the map's ribbon. A run that
                                     just ended is exactly when you want the sharp in front of you asking for

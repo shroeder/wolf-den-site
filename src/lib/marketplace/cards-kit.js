@@ -1856,8 +1856,12 @@ export const KEYS = {
         says: "Let the fire go out. It gives you nothing tonight." },
     sapphire: { id: "sapphire", name: "The Blue Key", from: "treasure",
         says: "Leave what is in the chest. Take the key under it." },
+    // ⚠️ IT NAMES THE TRINKET. EricD, testing room: "It says 'take the red key instead', but still allows you
+    // to grab a card as well. Is that by design?" It is — the key costs that ROOM'S prize, and an elite's
+    // prize is the trinket it drops; the card is what winning any fight pays, elite or not. But "what the
+    // elite was carrying" reads as everything it had, so the answer to a fair question was buried in a noun.
     ruby: { id: "ruby", name: "The Red Key", from: "elite",
-        says: "Walk away from what the elite was carrying." },
+        says: "Leave the trinket the elite dropped. You still take a card." },
 };
 export const KEY_IDS = Object.keys(KEYS);
 

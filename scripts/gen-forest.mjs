@@ -48,12 +48,18 @@ const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 // size you can draw it at that reads as a tree rather than as a wall. A whole tree has a silhouette, and a
 // silhouette can be small. This one is drawn complete — roots to crown, inside the frame — so a walkable
 // forest can stand six of them at different depths and none of them is the screen.
+// ⚠️ PAINTED TO MATCH THE PLATE, NOT DRAWN AS A STICKER. The first set were house-style die-cut sprites:
+// hard black outlines, flat bright fills, vivid spring-green leaves. Dropped onto a soft painted forest lit
+// cool blue they read as two different games in one frame. Luke: "bg and fg no mesh at all."
 const TRUNK_FRAMING =
     "A COMPLETE tree, whole and entire: roots at the bottom, trunk, branches and the full crown of foliage, "
     + "ALL of it inside the frame with clear space above the crown. Seen straight on at eye level, standing "
-    + "upright and centred, noticeably taller than it is wide. A tree you could walk up to — not a giant, not "
-    + "seen from below, not cropped on any edge. Nothing else in the picture. Isolated on a FULLY TRANSPARENT "
-    + "background: no ground, no grass, no undergrowth, no other trees, no cast shadow, no background.";
+    + "upright and centred, noticeably taller than it is wide. "
+    + "PAINTED, not inked: soft brushed edges and NO black outline anywhere. Lit by a pale cool light from "
+    + "high above with deep blue-green shadow through the lower half, as if standing inside a dim blue-lit "
+    + "forest. Foliage muted and desaturated toward the cool blues and deep greens of deep woodland -- never "
+    + "bright, never vivid. Nothing else in the picture. Isolated on a FULLY TRANSPARENT background: no "
+    + "ground, no grass, no undergrowth, no other trees, no cast shadow, no background.";
 const trunkPrompt = (subject) => [subject, TRUNK_FRAMING, HOUSE_STYLE, NEGATIVE_STYLE].join(" ");
 
 const TREES = {
@@ -97,6 +103,19 @@ const AXES = {
     heart: "a legendary greataxe with a crimson-cored blade that glows from within like split heartwood, gold filigree and a dark heavy haft",
 };
 
+// The scene every plate is painted from. Only the middle clause changes, so three different woods still share
+// one palette, one light direction and one ground height -- which is what lets them sit side by side.
+const GROVE_SCENE = (feature) =>
+    "A side-on view of deep forest at eye level, painted as one continuous scene and lit from above. Dark "
+    + "leafy canopy and overhanging branches across the TOP of the frame. Below that, ranks of tree trunks "
+    + "receding into cool blue-grey haze -- further trunks paler and softer, never converging. In the middle "
+    + "distance, " + feature + ". Across the BOTTOM third, a forest floor of dark earth, moss, fallen leaves "
+    + "and twigs running flat left to right, its top edge at the SAME height as in any other forest scene. "
+    + "Soft shafts of pale light falling between the trunks onto the ground. NO path, NO clearing, NO focal "
+    + "point, NO vanishing point, NO sky, NO horizon line. Evenly composed end to end so the left and right "
+    + "edges tile seamlessly against another copy. Nothing in the immediate foreground. "
+    + HOUSE_STYLE + " " + NEGATIVE_STYLE;
+
 const PIECES = {
     ...Object.fromEntries(Object.entries(TREES).map(([id, p]) => [`trees/${id}`, { raw: trunkPrompt(p), sprite: true, size: "1024x1536", tall: true }])),
     ...Object.fromEntries(Object.entries(MUSHROOMS).map(([id, p]) => [`shrooms/${id}`, { subject: p, extra: MUSH_EXTRA, sprite: true }])),
@@ -119,15 +138,15 @@ const PIECES = {
     // rather than nothing, trunks receding into haze, and the floor coming toward the viewer — painted
     // together so the light and the ground line are consistent. It still must TILE, so: no focal point, no
     // path, no vanishing point, and the two side edges have to meet.
-    grove: { raw: "A side-on view of deep forest at eye level, painted as one continuous scene and lit from "
-        + "above. Dark leafy canopy and overhanging branches across the TOP of the frame. Below that, ranks "
-        + "of tree trunks receding into cool blue-grey haze — further trunks are paler and softer, never "
-        + "converging. Across the BOTTOM third, a forest floor of dark earth, moss, fallen leaves and twigs "
-        + "running flat left to right. Soft shafts of pale light falling between the trunks onto the ground. "
-        + "NO path, NO clearing, NO focal point, NO vanishing point, NO sky, NO horizon line — the ground "
-        + "meets the trunks in shadow and undergrowth. Evenly composed end to end so the left and right "
-        + "edges tile seamlessly against another copy. Nothing in the immediate foreground. "
-        + HOUSE_STYLE + " " + NEGATIVE_STYLE, size: "1536x1024" },
+    grove:  { raw: GROVE_SCENE("an even rank of straight trunks, low scrub along the floor"), size: "1536x1024" },
+    // ⚠️ THREE PLATES, BECAUSE ONE REPEATS AND YOU CAN SEE IT. A single tile is about 1,250px on a phone, so
+    // the same distinctive trunk came round every few seconds and the wood read as looping wallpaper. Luke:
+    // "repeat bg sucks." Three scenes dealt in sequence push the period out past noticing. They only have to
+    // agree on palette, light direction and ground height -- which is what GROVE_SCENE fixes.
+    grove2: { raw: GROVE_SCENE("two great trunks close together on the left with pale mist between them, "
+        + "low mossy boulders across the floor"), size: "1536x1024" },
+    grove3: { raw: GROVE_SCENE("a leaning half-fallen trunk crossing the upper right, dense fern undergrowth "
+        + "along the ground"), size: "1536x1024" },
 };
 
 let spent = 0;
