@@ -2505,8 +2505,17 @@ export default function CardFightClient({ fixture, run = null }) {
                    Spire darkens the room and leaves it there — you can still faintly make out the arena
                    behind the cards, which is what keeps the reward feeling like part of the fight instead of
                    a dialog that has interrupted it. */
-                .cf-over { position: fixed; inset: 0; z-index: 5200; display: grid; place-items: center;
-                    padding: 16px; background: rgba(4,5,8,0.88); }
+                /* ⚠️ IT SCROLLS, AND place-items: center IS WHY IT DID NOT. A centred grid item taller
+                   than the viewport overflows in BOTH directions and gets clipped at the top and bottom with
+                   no way to reach either — which is fine while the end screen is a banner and a number, and
+                   breaks the moment it grows a tally, a pet feed and a rank card. Luke, on the run-end
+                   screen: "its not scrollable".
+                   Flex with margin: auto on the child is the fix that does both: the margins centre it
+                   while there is room and collapse when there is not, so tall content scrolls instead of
+                   being cut. Shared by all four overlays on this screen, and right for every one of them. */
+                .cf-over { position: fixed; inset: 0; z-index: 5200; display: flex; overflow-y: auto;
+                    padding: 16px; background: rgba(4,5,8,0.88); -webkit-overflow-scrolling: touch; }
+                .cf-over > * { margin: auto; }
                 /* ── ARE YOU SURE ── quiet, and the safe answer is the one wearing the primary colour.
                    The destructive one is a plain pill, because a red button next to a red-lit fight screen
                    is the most eye-catching thing on it, and the thing you want somebody to press here is

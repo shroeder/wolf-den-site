@@ -8,7 +8,7 @@
 // Sorted biggest first, so the pet the deck was actually about is the top line rather than something buried
 // under four one-card also-rans.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { GiPawPrint } from "react-icons/gi";
 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -16,7 +16,12 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 const ROW = 260;
 
 export default function CardPetGains({ gains, petArt = {} }) {
-    const list = Array.isArray(gains) ? gains.slice(0, 6) : [];
+    // ⚠️ MEMOISED, OR THE REVEAL NEVER FINISHES. This was `gains.slice(0, 6)` computed in the render body,
+    // which is a NEW ARRAY every render — so the effect below saw a changed dependency on every render,
+    // cleared its timers and started the reveal again from zero. The first row survived because its timer is
+    // short; the second and third appeared and vanished on a loop. Luke: "the 2nd pet the sloth keeps popping
+    // up and going away."
+    const list = useMemo(() => (Array.isArray(gains) ? gains.slice(0, 6) : []), [gains]);
     const [shown, setShown] = useState(0);
 
     useEffect(() => {
