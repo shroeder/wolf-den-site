@@ -1769,11 +1769,19 @@ export const SCORE = {
  * exposes its working, and runScore adds the same rows up.
  */
 export function scoreParts(run = {}) {
-    const act = Math.max(1, Math.min(ACTS, Number(run.act) || 1));
+    // ⚠️ CLAMPED TO FINAL_ACT, NOT ACTS — THE FOURTH ACT WAS BEING SCORED AS THE THIRD. ACTS is 3 because
+    // three is how many you must clear to win; the Hollow is a fourth act you bring keys to. Clamping the
+    // act to ACTS meant a player standing in act four was recorded as standing in act three, so `cleared`
+    // came out 3 - 1 = 2 and the death screen told them they had cleared two acts after they had walked
+    // three and died to the fourth boss. GrayKitsune, in the testing room: "the reward screen when I died to
+    // act 4 boss says I only cleared 2 acts not 3." Every room walked in act four was uncounted too.
+    const act = Math.max(1, Math.min(FINAL_ACT, Number(run.act) || 1));
     const stop = Math.max(0, Number(run.stop) || 0);
     const won = run.done === "won";
     const rooms = (act - 1) * RUN_LENGTH + Math.min(RUN_LENGTH + 1, stop);
-    const cleared = won ? ACTS : act - 1;
+    // Winning in act three is three cleared; carrying the keys and winning in the Hollow is four. `won` alone
+    // could not tell those apart, and the harder of the two was paying the smaller number.
+    const cleared = won ? Math.max(ACTS, act) : act - 1;
     const asc = Math.max(0, Math.min(ASC_MAX, Number(run.asc) || 0));
     const rows = [
         { key: "rooms", say: "Rooms walked", at: rooms, each: SCORE.room },
@@ -1793,24 +1801,16 @@ export function scoreParts(run = {}) {
     };
 }
 
+/**
+ * The run's score.
+ *
+ * ⚠️ IT IS scoreParts' TOTAL, NOT A SECOND SUM. This function used to re-add every term itself, beside a
+ * scoreParts that added the same terms for the screen — which is exactly the "screen says 176, scoreboard
+ * records 180" the comment above scoreParts warns about, and it came true the moment the act clamp was wrong
+ * in both copies. One arithmetic, in one place.
+ */
 export function runScore(run = {}) {
-    const act = Math.max(1, Math.min(ACTS, Number(run.act) || 1));
-    const stop = Math.max(0, Number(run.stop) || 0);
-    const won = run.done === "won";
-    // Rooms across every act: the acts behind you were fifteen apiece, plus how far into this one you got.
-    const rooms = (act - 1) * RUN_LENGTH + Math.min(RUN_LENGTH + 1, stop);
-    const cleared = won ? ACTS : act - 1;
-    const raw = rooms * SCORE.room
-        + cleared * SCORE.actCleared
-        + (won ? SCORE.finished : 0)
-        + (run.perks || []).length * SCORE.perk
-        + (run.deck || []).length * SCORE.card
-        + (won ? Math.max(0, Number(run.hp) || 0) * SCORE.aliveHp : 0);
-    // ⚠️ THE RUNG MULTIPLIES, IT DOES NOT ADD. A flat bonus per rung would make the ladder a tax you pay for
-    // points; a multiplier makes the same climb WORTH more the harder it was, which is the only way a score
-    // and a difficulty ladder can share a scoreboard honestly.
-    const asc = Math.max(0, Math.min(ASC_MAX, Number(run.asc) || 0));
-    return Math.round(raw * (1 + asc * SCORE.rung));
+    return scoreParts(run).total;
 }
 
 // ── THE RUN IS THREE ACTS, NOT ONE ───────────────────────────────────────────────────────────────────────
@@ -3727,6 +3727,16 @@ function beginTurn(state) {
         if (regen > 0 && h.hp > 0) {
             h = { ...h, hp: Math.min(h.hpMax, h.hp + Math.round(regen * (h.healMult || 1))), regen: Math.max(0, (h.regen || 0) - 1) };
         }
+        // ⚠️ INTANGIBLE IS A DURATION AND NOTHING WAS SPENDING IT. The creatures' tick drops theirs by one at
+        // the top of their turn; the hero's side ticked poison and Regeneration and simply never touched this
+        // — so Ghostly Armour, a one-energy tier-2 card, cut EVERY hit of the rest of the fight to 1 damage.
+        // Permanently. It trivialised every boss in the game, the act 4 boss the testing room is currently
+        // calling too hard included. EricD found it by reading the card rather than by losing to it: "I've yet
+        // to see it disappear during a fight, and it drops all battle damage to 1."
+        //
+        // Dropping it here rather than at end of turn is what makes the card do what it says: you play it,
+        // the creature's whole attack phase is cut to 1, and it is gone when your next turn opens.
+        if ((h.intangible || 0) > 0) h = { ...h, intangible: Math.max(0, h.intangible - 1) };
         ready = { ...ready, hero: stillStanding(h, state.perks) };
         if (ready.hero.hp <= 0) ready = { ...ready, over: "lose" };
     }

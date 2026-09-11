@@ -755,6 +755,12 @@ export default function CardFightClient({ fixture, run = null }) {
     // Whether the card in the middle can be afforded at all — the bodies stop inviting a tap they would
     // refuse, and the raised card says so on its face.
     const activeAffordable = activeEntry ? canPlay(fight, activeEntry.uid) : false;
+    // Nothing in hand can be played — every card is unaffordable or unplayable — so ending the turn is the
+    // only move the player has. Computed off the same canPlay the cards themselves are dimmed by, rather
+    // than off energy alone: a hand of zero-cost cards you cannot target is just as stuck as an empty purse.
+    const nothingLeft = !fight.over && !acting
+        && (fight.hand || []).length > 0
+        && !(fight.hand || []).some((e) => canPlay(fight, e.uid));
     const onHeroTap = () => {
         if (!activeEntry) return;
         if (cardById(activeEntry.id)?.target === "self") commit(activeEntry.uid, "self");
@@ -1098,7 +1104,14 @@ export default function CardFightClient({ fixture, run = null }) {
                         <button type="button" className="cf-forfeit" onClick={() => setAskForfeit(true)} disabled={Boolean(fight.over)} title="Forfeit" aria-label="Forfeit">
                             <GiExitDoor aria-hidden="true" />
                         </button>
-                        <button type="button" className="cf-end" onClick={onEndTurn} disabled={Boolean(fight.over) || acting}>
+                        {/* ⚠️ IT PULSES WHEN IT IS THE ONLY MOVE LEFT. SoullessShiitake, first run, testing
+                            room: "it would be nice to have the end turn button highlighted in some way when
+                            you run out of energy. If you skip reading the rules on accident, it isnt very
+                            obvious when you dont have anything left to do on your turn." A player sitting on
+                            a hand of cards they cannot afford has no signal at all that the turn is over —
+                            the cards dim, which reads as "these are wrong" rather than "you are done". */}
+                        <button type="button" className={`cf-end${nothingLeft ? " is-only-move" : ""}`}
+                            onClick={onEndTurn} disabled={Boolean(fight.over) || acting}>
                             <Sprite src="/images/cards/chrome/button-plate.png" className="cf-end-art" />
                             <span className="cf-end-label">{acting ? "…" : "End turn"}</span>
                         </button>
@@ -2390,6 +2403,14 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-end:disabled .cf-end-art { filter: brightness(0.66) saturate(0.75)
                     drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
                 .cf-end:disabled .cf-end-label { color: #4a505c; text-shadow: 0 1px 0 rgba(255,255,255,0.18); }
+                /* The only-move state. A slow breath rather than a flash: the button is being pointed at, not
+                   alarmed about, and this fires on most turns late in a fight. */
+                .cf-end.is-only-move .cf-end-art { animation: cfOnlyMove 1.5s ease-in-out infinite; }
+                @keyframes cfOnlyMove {
+                    0%, 100% { filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
+                    50% { filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55))
+                            drop-shadow(0 0 9px rgba(255,214,124,0.95)) brightness(1.12); }
+                }
 
                 /* ── THE AIM ── over everything, hit-testing nothing. */
                 .cf-aim { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: 4900;

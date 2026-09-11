@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import ConsumableArt from "@/components/ConsumableArt";
 
@@ -77,7 +77,32 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
         }
     }, [load, onUsed]);
 
+    // When the set of rows changes, the shelf has re-laid-out under whatever finger is on it.
+    const lastUsed = useRef(null);
+    const reflowAt = useRef(0);
+    // Read off `data` rather than the destructured `stash`, which is not declared until after the
+    // callbacks — using it here is a temporal dead zone ReferenceError that neither the build nor
+    // lint:undef catches, and it would have crashed the shelf on every render.
+    const shape = (data?.stash || []).map((c) => c.id).join(",");
+    useEffect(() => { reflowAt.current = Date.now(); }, [shape]);
+
     const use = useCallback(async (id) => {
+        // ── ⚠️ THE ROW YOU WERE TAPPING CAN VANISH BETWEEN TAPS ──────────────────────────────────────────
+        // Spend your last Harvest Charm and that row leaves the shelf, so everything under it slides up and
+        // the NEXT item's Use button lands exactly where your thumb already is. ValkyrieSylve: "I was
+        // clicking all my harvest charms to stack them up and then it automatically changed the button to
+        // growth tonic as I was clicking, so I burned a tonic without meaning to."
+        //
+        // Consumables are bought with gold and some of them are rare, so the cost of this is real and it is
+        // not recoverable. The guard is deliberately narrow: a tap on a DIFFERENT item within 500ms of the
+        // shelf changing shape is refused, once, with a line saying why. Tapping the same item as fast as you
+        // like still works, which is the thing people actually do.
+        if (id !== lastUsed.current && Date.now() - reflowAt.current < 500) {
+            reflowAt.current = 0;
+            setMsg({ ok: false, text: "That row had just moved — tap again if you meant it." });
+            return;
+        }
+        lastUsed.current = id;
         setBusy(id);
         setMsg(null);
         const r = await fetch("/api/marketplace/consumables", {

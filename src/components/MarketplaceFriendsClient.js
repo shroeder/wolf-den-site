@@ -134,6 +134,32 @@ export default function MarketplaceFriendsClient() {
         return <button className="button primary" disabled={busyId === u.id} onClick={() => addFriend(u.id)}>Add friend</button>;
     }
 
+    // ⚠️ THE BOX SAYS "FILTER MEMBERS" AND IT NEVER FILTERED THE ONE LIST A MEMBER ACTUALLY HAS. It only
+    // narrowed the directory below; your own friends stayed in full, in their own section, in the way. Both
+    // lists answer the same question now.
+    const searching = query.trim().length > 0;
+    const needle = query.trim().toLowerCase();
+    const shownFriends = searching
+        ? friends.filter((u) => `${u.displayLabel || ""} ${u.alias || ""}`.toLowerCase().includes(needle))
+        : friends;
+
+    const directory = (
+        <section className="card">
+            <h2 className="mkt-social-h2">{searching ? "Search results" : "Discover members"}</h2>
+            {members === null ? (
+                <p className="muted">Loading members…</p>
+            ) : members.length === 0 ? (
+                <p className="muted">{searching ? "No members match that." : "No members yet."}</p>
+            ) : (
+                <div className="mkt-member-grid">
+                    {members.map((u) => (
+                        <MemberTile key={u.id} user={u}>{relationAction(u)}</MemberTile>
+                    ))}
+                </div>
+            )}
+        </section>
+    );
+
     return (
         <div className="stack reveal">
             <section className="card mkt-social-hero">
@@ -164,13 +190,23 @@ export default function MarketplaceFriendsClient() {
                 </section>
             ) : null}
 
+            {/* ⚠️ WHILE SEARCHING, THE RESULTS COME FIRST. They used to be the THIRD section on the page,
+                under the friend requests and under every friend you have — so typing a name and then having
+                to scroll past your whole friend list to reach the answer made the box look broken.
+                ValkyrieSylve: "Searching for players names doesn't appear to be working still" and, an hour
+                later, "Search results are appearing at the bottom of my entire list of friends. Kinda defeats
+                the purpose of searching... Explains why I thought it was broken." */}
+            {searching ? directory : null}
+
             <section className="card">
-                <h2 className="mkt-social-h2">Your friends <span className="mkt-count-pill">{friends.length}</span></h2>
+                <h2 className="mkt-social-h2">Your friends <span className="mkt-count-pill">{shownFriends.length}{searching && friends.length !== shownFriends.length ? ` / ${friends.length}` : ""}</span></h2>
                 {friends.length === 0 ? (
                     <p className="muted">No friends yet — add people from the directory below.</p>
+                ) : shownFriends.length === 0 ? (
+                    <p className="muted">None of your friends match that.</p>
                 ) : (
                     <div className="mkt-member-grid">
-                        {friends.map((u) => (
+                        {shownFriends.map((u) => (
                             <MemberTile key={u.id} user={u}>
                                 <button className="btn-gold" disabled={busyId === u.id} onClick={() => message(u.id)}>Message</button>
                                 <button className="button" disabled={busyId === u.id} onClick={() => removeFriend(u.id)}>Remove</button>
@@ -180,20 +216,7 @@ export default function MarketplaceFriendsClient() {
                 )}
             </section>
 
-            <section className="card">
-                <h2 className="mkt-social-h2">{query.trim() ? "Search results" : "Discover members"}</h2>
-                {members === null ? (
-                    <p className="muted">Loading members…</p>
-                ) : members.length === 0 ? (
-                    <p className="muted">{query.trim() ? "No members match that." : "No members yet."}</p>
-                ) : (
-                    <div className="mkt-member-grid">
-                        {members.map((u) => (
-                            <MemberTile key={u.id} user={u}>{relationAction(u)}</MemberTile>
-                        ))}
-                    </div>
-                )}
-            </section>
+            {searching ? null : directory}
 
             {outgoing.length > 0 ? (
                 <section className="card">
