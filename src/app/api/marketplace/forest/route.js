@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
-import { forestOpenTo } from "@/lib/marketplace/forest.js";
+import { forestOpenTo } from "@/lib/marketplace/forest-gate.js";
 import { fellTree, forestState, noteStreak, upgradeAxe } from "@/lib/marketplace/forest-store.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -18,7 +17,7 @@ const noStore = (body, init = {}) =>
 async function gate() {
     const buyer = await getAuthenticatedBuyer();
     if (!buyer) return { error: noStore({ error: "unauthorized" }, { status: 401 }) };
-    if (!forestOpenTo(isOwner(buyer.id))) return { error: noStore({ error: "not_found" }, { status: 404 }) };
+    if (!forestOpenTo(buyer.id)) return { error: noStore({ error: "not_found" }, { status: 404 }) };
     return { buyer };
 }
 

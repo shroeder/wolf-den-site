@@ -10,6 +10,34 @@ const OWNER_BUYER_IDS = new Set([
 // able to fire a raid at everyone, so the raid controls check THIS, not the broader owner allow-list.
 const PRIMARY_OWNER_ID = "6857d67e-3dd0-46b6-aad7-b91699155ff6"; // The Wolf Den (Luke)
 
+// ── PREVIEW GUESTS, PER FEATURE ──────────────────────────────────────────────────────────────────────────────
+// Luke: "make it visible for me and little wolf in the game menu."
+//
+// ⚠️ NOT BY ADDING THEM TO OWNER_BUYER_IDS, WHICH IS WHAT THE COMMENT AT THE TOP OF THIS FILE INVITES. That
+// list was written when it only gated dev previews, and it has since spread: isOwner is checked in 44 files
+// and now decides casino controls, credit checkout, changelog authoring, the role system, market offers,
+// creation tokens, custom decorations and pet drops. Inviting somebody to try one unreleased minigame must not
+// hand them the shop's controls, and "they are trustworthy" is not the point — the invite should carry exactly
+// what it says it carries, so that revoking it is equally exact.
+//
+// Keyed by feature, so a guest for the Forest is not automatically a guest for whatever is half-built next.
+// Owners pass everything without being listed here.
+const PREVIEW_GUESTS = {
+    forest: new Set([
+        "27da67c2-8548-453f-bda4-4349c0e4ef06", // Littlewolf
+    ]),
+};
+
+/**
+ * May this buyer see an unreleased feature? Owners always may; everybody else only the features they were
+ * named for. Pass the same key the feature's own gate uses.
+ */
+export function canPreview(feature, buyerId) {
+    if (isOwner(buyerId)) return true;
+    if (!buyerId) return false;
+    return Boolean(PREVIEW_GUESTS[feature]?.has(String(buyerId)));
+}
+
 export function isOwner(buyerId) {
     return Boolean(buyerId) && OWNER_BUYER_IDS.has(String(buyerId));
 }

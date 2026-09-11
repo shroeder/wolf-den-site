@@ -2,7 +2,7 @@
 // A tap-as-fast-as-you-can game is only a game if going fast is measurably better. This drives real tap
 // cadences through the real swing() and reports seconds-to-fell and wood-per-minute.
 //   node scripts/forest-sim.mjs
-import { TREES, TREE_IDS, plant, swing, woodFor, biteFor, axeForm, axeTotal, AXE_TRACKS, regrow, PATCHES }
+import { TREES, TREE_IDS, plant, swing, woodFor, biteFor, axeForm, axeTotal, AXE_TRACKS, trackCost, regrow, PATCHES }
     from "@/lib/marketplace/forest.js";
 
 // Real thumb speeds, measured in ms between taps.
@@ -41,5 +41,10 @@ let seed = 7; const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7ffffff
 let wood = 0, bare = 0;
 for (let i = 0; i < PATCHES; i += 1) { const id = regrow(rnd(), 1); wood += woodFor(id); bare += TREES[id].regrow; }
 console.log(`a full stand of ${PATCHES}: ~${wood} wood, average regrow ${(bare / PATCHES).toFixed(0)} min`);
-const lvl1 = Object.keys(AXE_TRACKS).map((k) => `${k} ${30}`).join("  ");
+// ⚠️ ASKS trackCost RATHER THAN PRINTING 30. This line said "edge 30 haft 30 heft 30" for a while after the
+// tracks were priced apart, which is the worst thing a simulator can do: report a number the game does not
+// charge. See [[reuse-the-rule-never-restate-it]].
+const lvl1 = Object.keys(AXE_TRACKS).map((k) => `${k} ${trackCost(k, 0)}`).join("  ");
 console.log(`first upgrade of each track costs: ${lvl1} wood`);
+console.log(`maxing every track costs: ${Object.keys(AXE_TRACKS).reduce((n, k) =>
+    n + Array.from({ length: AXE_TRACKS[k].max }, (_, l) => trackCost(k, l)).reduce((a, b) => a + b, 0), 0)} wood`);

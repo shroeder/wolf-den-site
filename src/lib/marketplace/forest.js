@@ -16,6 +16,12 @@
 //
 // PURE — no database, no imports with side effects — like ship-battle.js and captains.js, so the chop maths
 // can be run in a simulator rather than argued about. forest-store.js is the half that persists it.
+//
+// ⚠️ AND IT HAS TO STAY THAT WAY, BECAUSE ForestClient IMPORTS IT. Anything this file pulls in is pulled into
+// the browser bundle with it. The gate briefly lived here and imported owner.js, which looks like a file of
+// constants until line 138, where hasOwnerStanding does `await import("@/lib/db")` — Turbopack traces that
+// into the client graph and the build stops with "you are importing a module that depends on server-only".
+// The gate now lives in forest-gate.js, which is server-only on purpose.
 
 // ── WHAT GROWS HERE ──────────────────────────────────────────────────────────────────────────────────────────
 // `bites` is how many clean swings at bite 1 it takes to fell — the tree's health in axe-blows. `wood` is what
@@ -190,11 +196,18 @@ export const readyAt = (treeId, felledAt) => Number(felledAt || 0) + treeById(tr
 export const isReady = (treeId, felledAt, now = Date.now()) => now >= readyAt(treeId, felledAt);
 
 // ── ⚠️ OWNER-GATED, AND THE GATE COMES IN A PAIR ─────────────────────────────────────────────────────────────
-// Luke: "it's owner gated." Two doors, both here so neither can be forgotten: the PAGE has to be invisible and
-// the API has to refuse. A feature gated only at the door still has an open play path, and one gated only at
-// the play path still advertises itself in the nav. See [[feature-gates-come-in-pairs]].
+// Luke: "it's owner gated." Three checks, all asking forest-gate.js the same question so none can drift: the
+// PAGE has to be invisible, the API has to refuse, and the MENU has to leave the entry off. A feature gated
+// only at the door still has an open play path; one gated only at the play path still advertises itself in the
+// nav; and one gated only at those two shows a menu entry that 404s. See [[feature-gates-come-in-pairs]].
+//
+// Luke, later: "make it visible for me and little wolf in the game menu." Invited guests are named per feature
+// in owner.js (PREVIEW_GUESTS) — NOT by adding them to the owner allow-list, which now decides far more than
+// dev previews.
 //
 // ⚠️ AND IT GOES ON THE MASTER LIST. When this launches, flip this one constant and delete the entry from
 // [[sailing-test-overrides]]. Nothing else in the feature reads a flag.
 export const FOREST_PUBLIC = false;
-export const forestOpenTo = (isOwner) => FOREST_PUBLIC || Boolean(isOwner);
+
+// The question "may this person walk in?" is asked in three places and lives in ONE — forest-gate.js, which
+// can import the owner allow-list without dragging the database into ForestClient's bundle.

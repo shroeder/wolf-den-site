@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 import ForestClient from "@/components/ForestClient";
 import MarketplaceLoginClient from "@/components/MarketplaceLoginClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
-import { forestOpenTo } from "@/lib/marketplace/forest.js";
+import { forestOpenTo } from "@/lib/marketplace/forest-gate.js";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +18,7 @@ export const metadata = {
 export default async function ForestPage() {
     const buyer = await getAuthenticatedBuyer();
     if (!buyer) return <MarketplaceLoginClient />;
-    if (!forestOpenTo(isOwner(buyer.id))) notFound();
+    if (!forestOpenTo(buyer.id)) notFound();
     return (
         <main className="wrap" style={{ paddingTop: 14, paddingBottom: 28 }}>
             <ForestClient />

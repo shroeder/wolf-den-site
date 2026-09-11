@@ -16,8 +16,7 @@ import { getFeatureClaimCounts } from "@/lib/marketplace/feature-dailies.js";
 import { getTownTodo } from "@/lib/marketplace/town.js";
 import { farmNav } from "@/lib/marketplace/farm.js";
 import { dailyChipsReady } from "@/lib/marketplace/chips.js";
-import { forestOpenTo } from "@/lib/marketplace/forest.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
+import { forestOpenTo } from "@/lib/marketplace/forest-gate.js";
 
 // ── THE WHOLE NAV BAR, IN ONE REQUEST ────────────────────────────────────────────────────────────────────────
 // GameNav is mounted on every page under /marketplace, and it used to ask FOURTEEN separate endpoints what to
@@ -98,14 +97,15 @@ export async function GET(request) {
             // in the menu would keep the door shut for everyone after the page had opened.
             cards: await CARDS_UNLOCKED(id),
             arena: { unlocked: Boolean(arena?.unlocked), fightsLeft: Number(arena?.fightsLeft) || 0 },
-            // The Forest, owner-only while it is built. The gate is IMPORTED for the same reason the cards
-            // gate above is: on launch day FOREST_PUBLIC flips in one file, and a second copy of the rule
-            // written out here as isOwner(id) would keep the door shut after the page had opened.
+            // The Forest, owner-and-invited-guests while it is built. The gate is IMPORTED, and it is handed
+            // the BUYER rather than a boolean, for the same reason the cards gate above is: on launch day
+            // FOREST_PUBLIC flips in one file, and a second copy of the rule written out here as isOwner(id)
+            // would keep the menu shut for a guest the page had already let in.
             //
             // ⚠️ A FIELD ON THIS REQUEST, NOT A REQUEST OF ITS OWN. The menu is deliberately one call for the
             // whole thing (see the note above), and a nav entry that fetches its own feature bills that
             // feature on every page for every member — which is what check:chrome exists to catch.
-            forest: forestOpenTo(isOwner(id)),
+            forest: forestOpenTo(id),
             mine: {
                 unlocked: Boolean(mining?.unlocked),
                 trips: Number(mining?.trips) || 0,
