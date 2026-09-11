@@ -186,7 +186,9 @@ export async function addPetXpById(buyerId, petId, amount) {
         .catch(() => null);
     const xp = row?.xp ?? Math.min(maxXp, (before?.xp || 0) + add);
     const level = petLevelForXp(xp, rarity);
-    return { ok: true, petId, xp, level, leveled: level > prevLevel };
+    // prevXp comes back so a screen can draw the bar MOVING rather than sitting at its new value: the
+    // caller knows where the pet was and where it ended, which is the whole of the feeling.
+    return { ok: true, petId, xp, level, leveled: level > prevLevel, prevXp: before?.xp || 0, prevLevel };
 }
 
 // Instantly bump the equipped pet to the start of its next level (for a rare "instant level" consumable).

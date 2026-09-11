@@ -322,12 +322,23 @@ export async function recordRun(buyerId, run, outcome) {
     const totalCards = [...byPet.values()].reduce((n, v) => n + v, 0);
     run.petXp = [];
     if (totalCards > 0 && petPool > 0) {
-        const { addPetXpById } = await import("@/lib/marketplace/pet-level.js");
+        const { addPetXpById, petLevelInfo } = await import("@/lib/marketplace/pet-level.js");
         for (const [petId, n] of byPet) {
             const amount = Math.min(300, Math.round((petPool * n) / totalCards));
             if (amount <= 0) continue;
             const res = await addPetXpById(buyerId, petId, amount).catch(() => null);
-            run.petXp.push({ pet: petId, n: amount, cards: n, level: res?.level ?? null, leveled: Boolean(res?.leveled) });
+            // WHERE THE BAR STARTED AND WHERE IT ENDED, worked out here because petLevelInfo sits beside a db
+            // import and a client component reaching for it drags server-only into the browser graph. Same
+            // rule, one caller -- the screen draws these numbers, it does not own them.
+            const petRarity = collectibleById(petId)?.rarity || "common";
+            const from = petLevelInfo(res?.prevXp ?? 0, petRarity);
+            const to = petLevelInfo(res?.xp ?? 0, petRarity);
+            run.petXp.push({
+                pet: petId, n: amount, cards: n,
+                level: res?.level ?? null, leveled: Boolean(res?.leveled),
+                from: { level: from.level, into: from.into, span: from.span, maxed: from.maxed },
+                to: { level: to.level, into: to.into, span: to.span, maxed: to.maxed },
+            });
         }
         run.petXp.sort((a, b) => b.n - a.n);
     }
