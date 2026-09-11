@@ -11,17 +11,27 @@
 
 import { useEffect, useState } from "react";
 import {
-    GiTwoCoins, GiCoins, GiGears, GiChest, GiPlantSeed, GiWheat, GiCrossedSwords, GiPawPrint,
+    GiTwoCoins, GiCoins, GiGears, GiPlantSeed, GiWheat, GiCrossedSwords, GiPawPrint,
 } from "react-icons/gi";
 
+import ChestIcon from "@/components/ChestIcon";
+
 const RARITY = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legendary: "#f59e0b", mythic: "#ff5cc8" };
+const CHEST_TONE = { wooden: "#b07a43", iron: "#c7d0d8", gold: "#ffd75e", mythic: "#33e0a1", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
+
+// "a iron chest". Three of the six chest tiers start with a vowel — iron, ascendant, eternal — so the article
+// has to be worked out rather than typed.
+const an = (word) => ("aeiou".includes(String(word || "")[0]) ? "an" : "a");
 
 // One row of the hand. Icons rather than emoji, per the house rule — see [[no-emoji-in-ui]].
 function line(sp) {
     if (sp.kind === "gold") return { Icon: GiTwoCoins, col: "#ffd75e", text: `${sp.n.toLocaleString()} gold` };
     if (sp.kind === "doubloons") return { Icon: GiCoins, col: "#e8c07a", text: `${sp.n.toLocaleString()} doubloons` };
     if (sp.kind === "parts") return { Icon: GiGears, col: "#c8d6bd", text: `${sp.n} forge part${sp.n === 1 ? "" : "s"} · tier ${sp.tier}` };
-    if (sp.kind === "chest") return { Icon: GiChest, col: "#ffcf87", text: `a ${sp.tier} chest` };
+    // ⚠️ THE CHEST IS THE THING PEOPLE REMEMBER FROM A SCAN, and it was a flat grey glyph like everything
+    // else in the list. ChestIcon is drawn per tier and already exists -- a wooden chest and a mythic one look
+    // like different objects, which is the whole point of there being tiers. See [[check-existing-sprites-first]].
+    if (sp.kind === "chest") return { chest: sp.tier, col: CHEST_TONE[sp.tier] || "#ffcf87", text: `${an(sp.tier)} ${sp.tier} chest` };
     if (sp.kind === "seed") return { Icon: GiPlantSeed, col: RARITY[sp.rarity] || "#9ede7a", text: `${sp.n}x ${sp.name || "seed"}` };
     if (sp.kind === "crop") return { Icon: GiWheat, col: RARITY[sp.rarity] || "#d9c07a", text: `${sp.n}x ${sp.name || "crop"}` };
     if (sp.kind === "gear") return { Icon: GiCrossedSwords, col: RARITY[sp.rarity] || "#cdd9c6", text: sp.name + (sp.isNew ? "" : " (dupe)") };
@@ -54,8 +64,8 @@ export default function PatronageReward({ patronage }) {
                             const l = line(sp);
                             if (!l) return null;
                             return (
-                                <li key={i} className="pat-row" style={{ "--c": l.col }}>
-                                    <l.Icon aria-hidden="true" />
+                                <li key={i} className={`pat-row${l.chest ? " is-chest" : ""}`} style={{ "--c": l.col }}>
+                                    {l.chest ? <ChestIcon tier={l.chest} size={26} /> : <l.Icon aria-hidden="true" />}
                                     <span>{l.text}</span>
                                 </li>
                             );
@@ -70,8 +80,15 @@ export default function PatronageReward({ patronage }) {
                 <div className="pat-pets">
                     {pets.map((p) => (
                         <div key={p.id} className="pat-pet" style={{ "--c": RARITY[p.rarity] || "#cdd9c6" }}>
-                            <GiPawPrint aria-hidden="true" />
+                            {/* The ANIMAL. Raw img rather than a wrapper, because styled-jsx only stamps its
+                                scope class onto DOM elements — see [[styled-jsx-landmines]]. */}
+                            {p.art?.url ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={p.art.url} alt="" className="pat-pet-art" draggable="false"
+                                    style={p.art.flip ? { transform: "scaleX(-1)" } : undefined} />
+                            ) : <GiPawPrint aria-hidden="true" />}
                             <b>{p.name}</b>
+                            {p.hint ? <em>{p.hint}</em> : null}
                             <i>unlocked at ${Number(p.spend || 0).toLocaleString()} lifetime spend</i>
                         </div>
                     ))}
@@ -80,9 +97,20 @@ export default function PatronageReward({ patronage }) {
 
             {/* Where the next one is. A ladder whose next rung nobody can see is not a ladder. */}
             {allIn && patronage.next ? (
-                <p className="pat-next">
-                    <b>${Number(patronage.next.need).toLocaleString()}</b> more lifetime spend unlocks <b>{patronage.next.name}</b>
-                </p>
+                <div className="pat-next">
+                    {/* ⚠️ THE NEXT RUNG IS DRAWN, NOT DESCRIBED. It was one grey sentence, which is the least
+                        persuasive form the best argument in this whole system could take: a member is thirty
+                        dollars from an animal nobody else has and could not see it. Shown dimmed and
+                        desaturated — the silhouette of a thing you do not own yet. */}
+                    {patronage.next.art?.url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={patronage.next.art.url} alt="" className="pat-next-art" draggable="false" />
+                    ) : null}
+                    <p>
+                        <b>${Number(patronage.next.need).toLocaleString()}</b> more lifetime spend unlocks{" "}
+                        <b style={{ color: RARITY[patronage.next.rarity] || "#cdd9c6" }}>{patronage.next.name}</b>
+                    </p>
+                </div>
             ) : null}
 
             <style jsx>{`
@@ -95,6 +123,9 @@ export default function PatronageReward({ patronage }) {
                     font-size: 14px; font-weight: 700; color: var(--c);
                     animation: patIn .34s cubic-bezier(.2,1.3,.35,1) both; }
                 .pat-row :global(svg) { width: 20px; height: 20px; flex-shrink: 0; }
+                /* The chest draws itself at 26 and brings its own colours, so it is neither tinted nor shrunk. */
+                .pat-row.is-chest :global(svg) { width: 26px; height: 26px; }
+                .pat-row.is-chest { background: rgba(255, 207, 135, .09); border-color: rgba(255, 207, 135, .28); }
                 @keyframes patIn {
                     0% { opacity: 0; transform: translateX(-14px) scale(.94); }
                     100% { opacity: 1; transform: translateX(0) scale(1); }
@@ -113,8 +144,17 @@ export default function PatronageReward({ patronage }) {
                     60% { transform: scale(1.06); }
                     100% { opacity: 1; transform: scale(1); }
                 }
-                .pat-next { margin: 11px 0 0; text-align: center; font-size: 12.5px; color: #8a9384; }
+                .pat-pet-art { width: 92px; height: 92px; object-fit: contain; margin-bottom: 2px;
+                    filter: drop-shadow(0 8px 11px rgba(0, 0, 0, .55));
+                    animation: patBob 3.4s ease-in-out infinite; }
+                @keyframes patBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+                .pat-pet em { font-style: normal; font-size: 11.5px; line-height: 1.3; color: #a99c88; }
+
+                .pat-next { margin: 12px 0 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+                .pat-next p { margin: 0; text-align: center; font-size: 12.5px; color: #8a9384; }
                 .pat-next b { color: #cdd9c6; }
+                .pat-next-art { width: 54px; height: 54px; object-fit: contain; opacity: .38;
+                    filter: grayscale(.75) brightness(.85); }
             `}</style>
         </div>
     );

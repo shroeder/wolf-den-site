@@ -112,6 +112,25 @@ export async function payHaul(buyerId, hand, band) {
  * this receipt and `before` is it minus what was just spent — which is what makes "you just unlocked the
  * Ledger Lynx" true rather than approximately true.
  */
+// ── THE ANIMAL, NOT A PAW PRINT ──────────────────────────────────────────────────────────────────────────────
+// The five ladder pets are the whole reason to keep scanning after the novelty wears off, and the screen drew
+// every one of them as the same grey react-icons paw -- including the NEXT rung, which is the thing that is
+// supposed to make somebody come back. A pet you cannot see is not a reward, it is a receipt line.
+//
+// One query, and only when a rung was actually crossed or a next rung exists -- which is at most six ids and
+// happens five times in a member's life. The sprites are the ones every other shelf in the Den draws.
+async function petArt(ids) {
+    const want = [...new Set((ids || []).filter(Boolean))];
+    if (!want.length) return {};
+    const rows = await db.query(
+        `SELECT pet_id, url, flip FROM mkt_pet_sprite WHERE pet_id = ANY($1) AND url IS NOT NULL`,
+        [want]
+    ).catch(() => []);
+    const out = {};
+    for (const r of rows || []) out[r.pet_id] = { url: r.url, flip: r.flip === true };
+    return out;
+}
+
 export async function patronageForScan(buyerId, amountCents) {
     const dollars = Math.max(0, Math.round((Number(amountCents) || 0) / 100));
     const after = await lifetimeSpendDollars(buyerId);
@@ -121,6 +140,8 @@ export async function patronageForScan(buyerId, amountCents) {
     // backfill already handed them the Copper Stag is not told they just won it again.
     const newPets = await grantPatronPets(buyerId, after).catch(() => []);
     const hand = dollars > 0 ? await payHaul(buyerId, rolled.hand, rolled.band).catch(() => []) : [];
+    const ahead = nextPatronRung(after);
+    const art = await petArt([...newPets.map((p) => p.id), ahead?.pet?.id]).catch(() => ({}));
     return {
         dollars,
         lifetime: after,
@@ -129,15 +150,16 @@ export async function patronageForScan(buyerId, amountCents) {
         hand,
         // What THIS scan crossed, intersected with what was actually new — the announcement.
         pets: newPets.filter((p) => unlocked.some((u) => u.id === p.id) || before === 0)
-            .map((p) => ({ id: p.id, name: p.name, rarity: p.rarity, hint: p.hint, spend: p.spend })),
+            .map((p) => ({ id: p.id, name: p.name, rarity: p.rarity, hint: p.hint, spend: p.spend, art: art[p.id] || null })),
         // Everything the backfill or this scan handed over that the member had not seen, so nothing is silent.
         alsoGranted: newPets.filter((p) => !unlocked.some((u) => u.id === p.id))
-            .map((p) => ({ id: p.id, name: p.name, rarity: p.rarity, spend: p.spend })),
+            .map((p) => ({ id: p.id, name: p.name, rarity: p.rarity, spend: p.spend, art: art[p.id] || null })),
         // The rung ahead, so the receipt can say how far off it is. A ladder whose next rung nobody can see
         // is not a ladder — it is a series of surprises, and a surprise is not a reason to come back.
         next: (() => {
-            const n = nextPatronRung(after);
-            return n ? { id: n.pet.id, name: n.pet.name, rarity: n.pet.rarity, spend: n.pet.spend, need: n.need } : null;
+            const n = ahead;
+            return n ? { id: n.pet.id, name: n.pet.name, rarity: n.pet.rarity, spend: n.pet.spend, need: n.need,
+                art: art[n.pet.id] || null } : null;
         })(),
     };
 }

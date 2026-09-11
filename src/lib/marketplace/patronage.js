@@ -56,7 +56,16 @@ export function nextPatronRung(dollars) {
 // enormous case break from being worth more than a year of ordinary visits.
 export const HAUL_PER_DOLLAR = 20;
 export const HAUL_MAX = 14;
-export const rollsFor = (dollars) => Math.max(1, Math.min(HAUL_MAX, 1 + Math.floor((Number(dollars) || 0) / HAUL_PER_DOLLAR)));
+// ⚠️ THE FLOOR IS TWO, AND THE FLOOR IS THE MODE. Measured over all 217 redeemed receipts: the median is $30,
+// 61% of scans fall in the plain band and 38% of them drew exactly ONE roll. So the thing most customers
+// experience most of the time was a single pull, and a quarter of those were plain coin -- which the purchase
+// XP had already paid. 17% of all scans handed over nothing but currency.
+//
+// Luke, on a real $11 scan: "rewards were lame for her." He is right, and the fault was never the scaling --
+// it was that the bottom of the curve was one pull deep. Two is the difference between "here is a thing" and
+// "here is what the counter threw in", and it costs the big receipts nothing: they were already past it.
+export const HAUL_FLOOR = 2;
+export const rollsFor = (dollars) => Math.max(HAUL_FLOOR, Math.min(HAUL_MAX, 1 + Math.floor((Number(dollars) || 0) / HAUL_PER_DOLLAR)));
 
 // And how good a pull can be. Four bands rather than a smooth curve so the step up is legible: a member who
 // spends $100 instead of $90 can see what it bought them.
@@ -81,11 +90,20 @@ export const bandFor = (dollars) => {
 // pays — so the "wide pool" was, in practice, a gold faucet with some seeds in it, which is the exact thing
 // the comment above says it must not be. Gold's weight and its size both came down; everything else came up.
 // It now lands around a third on top, and what a member actually REMEMBERS from a scan is the chest.
+// ⚠️ AND GOLD CAME DOWN AGAIN, HARDEST AT THE BOTTOM. Gold was the single likeliest plain-band pull at 24%,
+// which made the commonest outcome of the commonest scan "some coin" -- on top of the coin the purchase XP
+// mints 1:1 anyway. Paying the same reward twice and calling it variety is exactly what the note above says
+// this table must not do, and at the plain band it was doing it worst.
+//
+// Simulated over the same 217 receipts, against the floor of two: scans handing over nothing but currency
+// fall from 17.1% to 4.7%, chests per hundred scans go 40 -> 59, gear 23 -> 28 -- and total haul gold DROPS
+// 27% (23,894 -> 17,417 against the ~77,000 the purchase XP already mints). Better to receive and less of a
+// faucet, which is the only kind of buff worth shipping. See [[economy-nerf-measure-daily-total]].
 export const POOL = {
-    plain:  { gold: 24, seed: 23, crop: 19, parts: 16, doubloons: 12, chest: 4,  gear: 2 },
-    good:   { gold: 19, seed: 20, crop: 14, parts: 19, doubloons: 14, chest: 9,  gear: 5 },
-    rich:   { gold: 14, seed: 15, crop: 10, parts: 20, doubloons: 16, chest: 16, gear: 9 },
-    lavish: { gold: 10, seed: 10, crop: 7,  parts: 21, doubloons: 16, chest: 22, gear: 14 },
+    plain:  { gold: 13, seed: 22, crop: 18, parts: 18, doubloons: 14, chest: 11, gear: 4 },
+    good:   { gold: 12, seed: 20, crop: 14, parts: 20, doubloons: 14, chest: 14, gear: 6 },
+    rich:   { gold: 10, seed: 15, crop: 10, parts: 20, doubloons: 16, chest: 19, gear: 10 },
+    lavish: { gold: 8,  seed: 10, crop: 7,  parts: 21, doubloons: 16, chest: 24, gear: 14 },
 };
 
 // What one pull of each kind is worth, per band. `stack` is how many of a seed or crop come at once.

@@ -161,7 +161,6 @@ export async function redeemLoyaltyClaim(token, buyerId) {
         return { ok: false, error: "expired" };
     }
 
-    const before = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     await awardPurchaseXp({ buyerId, amountCents: won[0].amount_cents, orderId: won[0].award_order_id });
     const after = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
 
@@ -189,7 +188,27 @@ export async function redeemLoyaltyClaim(token, buyerId) {
     // fail because the Forge module threw while handing them two iron ingots.
     const patronage = await patronageForScan(buyerId, won[0].amount_cents).catch(() => null);
 
-    const points = Math.max(0, (after?.xp || 0) - (before?.xp || 0));
+    // ── WHAT THIS PURCHASE EARNED, NOT WHAT THIS REQUEST HAPPENED TO ADD ────────────────────────────
+    // ⚠️ THIS WAS A BEFORE/AFTER DIFF ACROSS awardPurchaseXp, AND IT READ ZERO FOR A GROWING SHARE OF
+    // MEMBERS. Every one of those grants is deduped by order id, so if the Square webhook already matched
+    // the payment to an account — which it does the moment a customer's Square profile is linked — the XP
+    // was banked seconds before the QR was ever scanned. Awarding again is correctly a no-op, the delta is
+    // zero, and the screen drops "+89 XP" for the word "banked". The single most motivating number on the
+    // one screen the shop has a member's full attention for, silently absent.
+    //
+    // Measured on the last forty scans: four of them, teegs and phillip among them, both in the last hour.
+    // It is not an edge case that is going away either — it grows with every customer whose Square profile
+    // gets linked.
+    //
+    // So the number comes from the ORDER, which is the thing that actually earned it. Every event
+    // awardPurchaseXp writes stamps meta.orderId, so this is exact whichever path banked it and it survives
+    // a re-scan, a webhook retry and the backfill.
+    const earned = await db.queryOne(
+        `SELECT COALESCE(SUM(points), 0)::int AS points
+           FROM mkt_xp_event WHERE buyer_id = $1 AND meta->>'orderId' = $2`,
+        [buyerId, String(won[0].award_order_id || "")]
+    ).catch(() => null);
+    const points = Math.max(0, Number(earned?.points) || 0);
     return { ok: true, points, level: levelForXp(after?.xp || 0), patronage };
 }
 
