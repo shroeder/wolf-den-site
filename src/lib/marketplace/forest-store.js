@@ -56,7 +56,12 @@ function prune(seed, cut, taken, atNode, now) {
 
 /** Read the member's wood, minting a seed on the first walk into it. */
 export async function forestState(buyerId) {
-    let row = await db.queryOne(`SELECT ${COLS} FROM mkt_forest WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    // The hero sprite comes along on the SAME read. Luke: "we want our character to be able to walk through
+    // the forest like in town" — and in Town you are your own avatar, not a floating tool.
+    let row = await db.queryOne(
+        `SELECT f.*, b.avatar_sprite_url, b.avatar_sprite_flip
+           FROM mkt_forest f JOIN mkt_buyer b ON b.id = f.buyer_id WHERE f.buyer_id = $1`, [buyerId]
+    ).catch(() => null);
     if (!row || row.seed == null) {
         // ⚠️ THE SEED IS MINTED ONCE AND NEVER CHANGES. It IS the member's forest — every tree they will ever
         // walk past is already decided by it. Re-rolling one would silently replace somebody's wood.
@@ -69,6 +74,11 @@ export async function forestState(buyerId) {
         ).catch(() => null);
         if (!row) return null;
     }
+    // A freshly-inserted row came back without the join, so ask once more for the two avatar fields.
+    if (row.avatar_sprite_url === undefined) {
+        const b = await db.queryOne(`SELECT avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        row = { ...row, avatar_sprite_url: b?.avatar_sprite_url || null, avatar_sprite_flip: b?.avatar_sprite_flip };
+    }
     const mats = await db.query(
         `SELECT material_id, count FROM mkt_forest_material WHERE buyer_id = $1 AND count > 0`, [buyerId]
     ).catch(() => []);
@@ -79,6 +89,8 @@ function view(row, mats = []) {
     const axe = axeOf(row);
     return {
         seed: Number(row.seed) || 1,
+        hero: row.avatar_sprite_url || null,
+        heroFlip: row.avatar_sprite_flip === true,
         atNode: Number(row.at_node) || 0,
         deepest: Number(row.deepest_node) || 0,
         wood: Number(row.wood) || 0,
