@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { forestOpenTo } from "@/lib/marketplace/forest-gate.js";
-import { fellTree, forestState, noteStreak, upgradeAxe } from "@/lib/marketplace/forest-store.js";
+import { fellNode, forestState, gatherNodes, noteStreak, upgradeAxe, walkTo } from "@/lib/marketplace/forest-store.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -41,11 +41,26 @@ export async function POST(request) {
             const body = await request.json().catch(() => ({}));
             switch (String(body?.action || "")) {
                 case "fell": {
-                    // ONE REQUEST A TREE, NOT ONE A TAP. See the note on fellTree: the browser runs the swing
-                    // loop and posts only when something comes down.
-                    const res = await fellTree(g.buyer.id, body.patch, body.swings);
+                    // ONE REQUEST A TREE, NOT ONE A TAP. See the note on fellNode: the browser runs the swing
+                    // loop against its own copy of the wood and posts only when something comes down. `node`
+                    // is a world index — the server regenerates it to see whether the claim is possible.
+                    const res = await fellNode(g.buyer.id, body.node, body.swings, body.leaves);
                     if (body.streak) await noteStreak(g.buyer.id, body.streak).catch(() => {});
+                    if (Number.isFinite(Number(body.at))) await walkTo(g.buyer.id, body.at).catch(() => {});
                     return res?.ok ? noStore(res) : noStore(res || { error: "failed" }, { status: 400 });
+                }
+                case "gather": {
+                    // A batch of mushroom nodes. See gatherNodes — every one is still checked on its own.
+                    const res = await gatherNodes(g.buyer.id, Array.isArray(body.nodes) ? body.nodes : []);
+                    if (Number.isFinite(Number(body.at))) await walkTo(g.buyer.id, body.at).catch(() => {});
+                    return res?.ok ? noStore(res) : noStore(res || { error: "failed" }, { status: 400 });
+                }
+                case "walk": {
+                    // ⚠️ DEBOUNCED BY THE CLIENT, AND IT HAS TO BE. This is the one call that could be made on
+                    // every footstep, which is exactly the round-trip-per-tap shape the whole feature is built
+                    // to avoid. The browser sends it after the walk settles, the way Town does.
+                    await walkTo(g.buyer.id, body.node);
+                    return noStore({ ok: true });
                 }
                 case "axe": {
                     const res = await upgradeAxe(g.buyer.id, String(body.track || ""));
