@@ -24,6 +24,9 @@ export async function POST(request) {
                 kind,
                 token: String(body?.token || "").trim(),
                 email: String(body?.email || "").trim(),
+                // The second pass, after the address has been read back to them. It can only ever send the
+                // points to the account that owns that address — it never grants a session. See counter-claim.
+                confirm: body?.confirm === true,
             });
 
             // A refusal is a 200 with a reason, not a 4xx. Every one of these is a thing the person standing

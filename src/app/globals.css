@@ -23313,6 +23313,10 @@ body.cas-seated .social-fab { display: none; }
 .cclaim-known b { font-size: .92rem; color: #9fd8ff; }
 .cclaim-known span { font-size: .78rem; color: #b6c2ce; line-height: 1.4; }
 .cclaim-known .btn-gold { margin-top: 4px; text-align: center; }
+.cclaim-known u { text-decoration: none; font-weight: 800; color: #e8f3ff; word-break: break-all; }
+/* The way out, for somebody who would rather sign in than bank it blind — quiet, because the button above is
+   the answer for nearly everybody standing at a till. */
+.cclaim-thin { text-align: center; font-size: .74rem; color: #8fa3b5; text-decoration: underline; }
 .cclaim-err { margin: 0; font-size: .8rem; font-weight: 700; color: #ff9aa6; }
 .cclaim-alt { margin: 0; text-align: center; font-size: .78rem; color: #7c8490; }
 .cclaim-alt a { color: #ffd75e; }
