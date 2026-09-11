@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 
 import { db } from "@/lib/db";
 import { awardPurchaseXp, levelForXp } from "@/lib/marketplace/xp.js";
+import { patronageForScan } from "@/lib/marketplace/patronage-store.js";
 
 // Scan-to-earn loyalty claims. A claim ties a specific Square payment (amount + dedupe id) to a QR that
 // a customer scans to bank the XP on their own account. Single-use, one per payment. TTL is generous
@@ -174,8 +175,22 @@ export async function redeemLoyaltyClaim(token, buyerId) {
     // this simply asks the question at the point in time where the answer exists.
     await creditMysteryBagsForPayment(won[0].square_payment_id, buyerId).catch(() => {});
 
+    // ── AND WHAT THE COUNTER PAYS ON TOP ─────────────────────────────────────────────────────────────
+    // Luke: "if someone blows 209 bucks at the store, they should feel like a baller in game when they scan
+    // the qr." Before this, a $12 impulse buy and a $209 box break produced the same screen with different
+    // numbers on it — XP and the gold that rides on it, and nothing else.
+    //
+    // AFTER awardPurchaseXp, deliberately: patronageForScan reads lifetime spend to place the member on the
+    // ladder, and it has to read it with this receipt already counted, or the scan that carries somebody past
+    // $250 would not be the scan that tells them so.
+    //
+    // Best-effort, and that is load-bearing. The XP and the gold are banked by the time this runs and the
+    // claim is already spent; a member standing at the counter with their phone out must not see the scan
+    // fail because the Forge module threw while handing them two iron ingots.
+    const patronage = await patronageForScan(buyerId, won[0].amount_cents).catch(() => null);
+
     const points = Math.max(0, (after?.xp || 0) - (before?.xp || 0));
-    return { ok: true, points, level: levelForXp(after?.xp || 0) };
+    return { ok: true, points, level: levelForXp(after?.xp || 0), patronage };
 }
 
 /**

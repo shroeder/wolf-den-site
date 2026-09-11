@@ -308,6 +308,49 @@ export async function resolveBuyerId({ squareCustomerId = null, email = null, ph
     return null;
 }
 
+// ── LIFETIME IN-STORE SPEND, IN ONE PLACE ────────────────────────────────────────────────────────────────────
+/**
+ * What a member has spent in the shop, ever, in CENTS.
+ *
+ * ⚠️ THIS RULE WAS WRITTEN OUT TWICE BEFORE THIS FUNCTION EXISTED — once in roles.js for the standing that
+ * grants a role, once in badges.js for the big-spender badge — with the same COALESCE and the same fallback in
+ * both, differing only in whether they divided by 100. The patronage ladder wanted a third copy, and three
+ * copies is the version where they drift and two screens tell one member two different numbers about their
+ * own money. It lives here because this is where the purchase is written.
+ * See [[reuse-the-rule-never-restate-it]].
+ *
+ * THE FALLBACK IS LOAD-BEARING AND IS NOT A GUESS. The QR handshake writes a `purchase_spend` event, and since
+ * 23 July it stamps the real merchandise amount into the meta. The 48 events before that carry only the order
+ * id and the XP — and XP is `dollars x SPEND_XP_PER_DOLLAR`, so the amount divides straight back out. Counting
+ * those as zero, which the first version of the roles check did, quietly understated everybody who was buying
+ * in the shop's first week.
+ */
+export async function lifetimeSpendCents(buyerId) {
+    if (!buyerId) return 0;
+    const row = await db.queryOne(
+        `SELECT COALESCE(SUM(COALESCE((meta->>'amountCents')::numeric, points * 100.0 / ${SPEND_XP_PER_DOLLAR})), 0)::bigint AS c
+           FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`,
+        [buyerId]
+    ).catch(() => null);
+    return Math.max(0, Number(row?.c) || 0);
+}
+
+/**
+ * The same figure in whole dollars, which is what the patronage rungs and the big-spender badge are cut in.
+ *
+ * ⚠️ ROUNDS, AND DOES NOT FLOOR, BECAUSE THE QUERY THIS REPLACED ROUNDED. badges.js cast the sum with `::int`,
+ * which rounds half up, and flooring instead moved 19 of the 64 members with in-store spend down by a dollar
+ * — including one sitting at exactly $99.50, who rounds to $100 and floors to $99. That member holds a badge
+ * cut at a hundred dollars. A refactor whose whole claim is "the same rule in one place" must not quietly
+ * take a badge off somebody on its way past, so the behaviour is preserved exactly. Verified by running the
+ * old SQL and this function against all 64 members with in-store spend: 0 differences, in cents and dollars.
+ *
+ * It is also the forgiving direction for the patronage ladder, which is where a reward should err.
+ */
+export async function lifetimeSpendDollars(buyerId) {
+    return Math.round((await lifetimeSpendCents(buyerId)) / 100);
+}
+
 export async function awardPurchaseXp({ email = null, phone = null, buyerId = null, amountCents = 0, orderId, squareCustomerId = null } = {}) {
     let id = buyerId || (await resolveBuyerId({ squareCustomerId, email, phone }));
     if (!id) {

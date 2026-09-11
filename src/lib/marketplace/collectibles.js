@@ -25,6 +25,8 @@ import {
     // Mine pets
     GiEarthWorm, GiBeetleShell, GiGolemHead, GiCrystalGrowth, GiScarabBeetle,
     GiStarSwirl, GiAmmonite,
+    // The patronage ladder — see PATRON pets below.
+    GiStagHead, GiLynxHead, GiRamProfile, GiSaberToothedCatHead, GiWolfHowl,
 } from "react-icons/gi";
 
 // Passive bonus each OWNED pet contributes to your account (all owned pets stack), by rarity.
@@ -51,6 +53,9 @@ export const FORGE_PASSIVE_STATS = new Set([...FORGE_ODDS_KEYS, "forgemaster"]);
 export const COOK_ODDS_KEYS = ["hot_hands", "generous", "thrifty", "prep_cook"];
 export const COOK_PASSIVE_STATS = new Set([...COOK_ODDS_KEYS, "kitchen_master"]);
 export const PET_PASSIVE_STAT = {
+    // Patronage — see the COUNTER block below.
+    copper_stag: "xp_gain", ledger_lynx: "gold_find", silver_ram: "tenacity",
+    vault_sabrecat: "crit_power", den_warden: "ferocity",
     // FISHING passives — the four pets you EARN from fishing carried no passive override at all, so the pets
     // you get for fishing did nothing for fishing. `angling` already runs pet -> equippedSeaAffinity ->
     // anglingEffects; `reelStrength` is its partner on the landing side.
@@ -394,6 +399,37 @@ export const COLLECTIBLES = [
     { id: "spice_moth", name: "Spice Moth", Icon: GiButterfly, color: "#c9a2ff", rarity: "legendary", source: "achievement", activeStat: "generous", achievement: "Cook a dish of every tier", spritePrompt: "a large velvety moth with wings patterned like ground spices in saffron, paprika and violet, trailing a fine shimmer of powder" },
     { id: "gourmand_dragon", name: "Gourmand Dragon", Icon: GiDragonHead, color: "#ffd75e", rarity: "mythic", source: "achievement", activeStat: "kitchen_master", achievement: "Cook 500 dishes AND a flawless timing run", spritePrompt: "a small round gold dragon with an enormous well-fed belly, a napkin tucked under its chin, holding a tiny silver fork, extremely pleased with itself" },
 
+    // ── PATRONAGE · WHAT THE COUNTER REMEMBERS ────────────────────────────────────────────────────────
+    // Luke: "when someone buys stuff at the store and uses the qr code we need to make it way more rewarding
+    // with 5 exclusive pets unlocked at 50 100 250 500 and 1000 backfilled, dollars."
+    //
+    // These are the only pets in the game bought with real money at a real counter, and they are LIFETIME —
+    // you cross a rung once and it is yours, so a member who has already spent $300 over four months owns the
+    // first three the moment this ships. See backfillPatronPets.
+    //
+    // `source: "counter"` matches NO existing drop pool, the same trick the Long Road pets use: every pool in
+    // pet-drops.js filters explicitly on its own source string, so a new one is exclusive by construction
+    // rather than by a flag six different pools each have to be taught. The wish power can only steer a pool
+    // it already draws from, so it cannot reach these either.
+    //
+    // `spend` is read by petUnlockText, so the locked card names the rung in dollars rather than saying
+    // "special unlock" — a ladder whose rungs nobody can see is not a ladder.
+    { id: "copper_stag", name: "Copper Stag", Icon: GiStagHead, color: "#c9793d", rarity: "rare", source: "counter", spend: 50,
+      activeStat: "xp_gain", hint: "The first one the counter learns to recognise.",
+      spritePrompt: "a young stag cast in warm hammered copper, patina green in the hollows, antlers like beaten wire, standing alert and proud" },
+    { id: "ledger_lynx", name: "Ledger Lynx", Icon: GiLynxHead, color: "#d8c48a", rarity: "epic", source: "counter", spend: 100,
+      activeStat: "gold_find", hint: "Keeps a tally of everything you have ever carried out of the shop.",
+      spritePrompt: "a lean tufted-ear lynx with parchment-coloured fur marked in faint ink ruling like a ledger page, amber eyes, sitting upright and watchful" },
+    { id: "silver_ram", name: "Silver Ram", Icon: GiRamProfile, color: "#c6d0dc", rarity: "epic", source: "counter", spend: 250,
+      activeStat: "might", hint: "Horns like a closed account.",
+      spritePrompt: "a heavy-set ram with a fleece of brushed silver wool and great spiralled horns chased with fine engraving, head lowered, breath steaming" },
+    { id: "vault_sabrecat", name: "Vault Sabrecat", Icon: GiSaberToothedCatHead, color: "#ffcf5e", rarity: "legendary", source: "counter", spend: 500,
+      activeStat: "crit_power", hint: "Sleeps across the strongbox and does not move for anybody.",
+      spritePrompt: "a massive sabre-toothed cat with dark gold fur and ivory tusks, lying across an iron-bound strongbox, eyes half open, utterly unbothered" },
+    { id: "den_warden", name: "The Den Warden", Icon: GiWolfHowl, color: "#8fd0ff", rarity: "mythic", source: "counter", spend: 1000,
+      activeStat: "ferocity", hint: "The house wolf. There is exactly one way to be introduced.",
+      spritePrompt: "an enormous silver-black wolf with a frost-pale ruff, head thrown back mid-howl, breath and snow streaming off it, moonlight down its spine" },
+
     // ── SEASON EXCLUSIVES · THE LONG ROAD ─────────────────────────────────────────────────────────────
     // `source: "road"` matches NO existing drop pool. Every pet source in pet-drops.js filters explicitly —
     // `p.source === "chest"`, `=== "boss"`, `=== "raid"` and so on — so a new source is exclusive by
@@ -558,6 +594,7 @@ export function petPrice(pet) {
 export function petUnlockText(pet) {
     switch (pet.source) {
         case "road": return pet.rung ? `Walk to rung ${pet.rung} of the Long Road` : "Won on the Long Road";
+        case "counter": return pet.spend ? `Spend $${pet.spend.toLocaleString()} in the shop (lifetime)` : "Earned at the counter";
         case "level": return `Reach Level ${pet.level}`;
         case "shop": return `Buy for ${petPrice(pet).toLocaleString()} gold`;
         case "chest": return `Found in ${CHEST_LABEL[pet.chestTier] || "rare"}+ chests`;

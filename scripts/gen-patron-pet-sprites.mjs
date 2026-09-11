@@ -1,14 +1,14 @@
-// Battle sprites for the five SEA-FIGHT pets (won off an encounter, never out of a chest) — the BASE sprite plus all four evolved forms (Lv2-5),
-// because a pet that levels has to visibly evolve or the levelling means nothing.
+// Battle sprites for the five PATRONAGE pets -- the ones unlocked by lifetime in-store spend at
+// $50/$100/$250/$500/$1000 -- plus all four evolved forms each, because a pet that levels has to visibly
+// evolve or the levelling means nothing.
 //
-// Unlike the fish and nav icons, pet sprites are NOT static files: the app reads them from mkt_pet_sprite /
-// mkt_pet_sprite_level, with the image itself on Vercel Blob. So this writes to both, exactly as the in-app
-// generator does — but calls OpenAI directly rather than driving the site's own admin endpoints.
+// Pet sprites are NOT static files: the app reads them from mkt_pet_sprite / mkt_pet_sprite_level, with the
+// image itself on Vercel Blob. So this writes to both, exactly as the in-app generator does.
 //
-// The pose and evolution wording are copied from src/lib/marketplace/pet-sprite.js so these 20 match the 89
+// The pose and evolution wording are copied from src/lib/marketplace/pet-sprite.js so these 25 match the
 // sprites already in the table. If that file's wording changes, change it here too.
 //
-// Usage:  node scripts/gen-seafight-pet-sprites.mjs [petId ...]
+// Usage:  node scripts/gen-patron-pet-sprites.mjs [petId ...]
 import fs from "node:fs";
 
 import { put } from "@vercel/blob";
@@ -37,13 +37,14 @@ const LEVEL_EVOLUTION = {
     5: "It has reached its ULTIMATE LEGENDARY form — a blazing powerful aura, crackling energy, maximum intensity, awe-inspiring and majestic.",
 };
 
-// Kept in step with the sea-fight pets in collectibles.js (each carries SEA affinity).
+// Kept in step with the `source: "counter"` entries in collectibles.js -- these strings ARE the
+// spritePrompt fields there, so the locked card's art and the battle sprite describe the same creature.
 const PETS = {
-    powder_monkey: "a small nimble ship's monkey in a scruffy red waistcoat, clutching a paper powder cartridge, soot smudged on its face",
-    ironback: "a stout sea turtle whose barnacled shell is plated in riveted iron scutes, weathered and unbothered",
-    stormcrow: "a glossy black storm crow with a silver coin held in its beak, wind-ruffled feathers and storm light on its wings",
-    chain_shrike: "a fierce grey-and-white shrike with a hooked beak, a short length of iron chain gripped in its talons, wings swept back mid-dive",
-    bosun_shade: "a translucent golden ghost of an old bosun in a tattered coat and tricorn hat, a spectral silver call-whistle at his chest",
+    copper_stag: "a young stag cast in warm hammered copper, patina green in the hollows, antlers like beaten wire, standing alert and proud",
+    ledger_lynx: "a lean tufted-ear lynx with parchment-coloured fur marked in faint ink ruling like a ledger page, amber eyes, sitting upright and watchful",
+    silver_ram: "a heavy-set ram with a fleece of brushed silver wool and great spiralled horns chased with fine engraving, head lowered, breath steaming",
+    vault_sabrecat: "a massive sabre-toothed cat with dark gold fur and ivory tusks, lying across an iron-bound strongbox, eyes half open, utterly unbothered",
+    den_warden: "an enormous silver-black wolf with a frost-pale ruff, head thrown back mid-howl, breath and snow streaming off it, moonlight down its spine",
 };
 
 const basePrompt = (p) => housePrompt(`${p} — a loyal battle companion.`, { extra: POSE });
@@ -79,18 +80,12 @@ async function upload(buf) {
     return blob.url;
 }
 
-// Args are pet ids, optionally pinned to one level: `bosun_shade:5` redraws only the Lv5 sprite. A high
-// evolution can drift off the creature — the Lv5 wording asks for a blazing aura and sometimes gets a blazing
-// aura with something else inside it — and redrawing all five to fix one is four wasted images.
-const want = process.argv.slice(2).map((a) => { const [id, lv] = a.split(":"); return { id, lv: lv ? Number(lv) : null }; });
-const ids = Object.keys(PETS).filter((id) => (want.length ? want.some((w) => w.id === id) : true));
+const want = process.argv.slice(2);
+const ids = Object.keys(PETS).filter((id) => (want.length ? want.includes(id) : true));
 
 // One job per (pet, level). level 0 = the base sprite.
 const jobs = [];
-for (const id of ids) {
-    const pinned = want.filter((w) => w.id === id && w.lv != null).map((w) => w.lv);
-    for (const lv of (pinned.length ? pinned : [0, 2, 3, 4, 5])) jobs.push({ id, lv });
-}
+for (const id of ids) for (const lv of [0, 2, 3, 4, 5]) jobs.push({ id, lv });
 console.log(`${jobs.length} sprites to generate (${ids.length} pets x base+Lv2-5)`);
 
 const queue = [...jobs];

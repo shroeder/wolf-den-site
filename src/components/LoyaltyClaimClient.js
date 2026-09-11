@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import UserLevel from "@/components/UserLevel";
+import PatronageReward from "@/components/PatronageReward";
 
 const ERROR_COPY = {
     already_yours: "You've already claimed these points. 🎉",
@@ -37,7 +38,7 @@ export default function LoyaltyClaimClient({ token, claim }) {
                     body: JSON.stringify({ token }),
                 });
                 const data = await res.json().catch(() => ({}));
-                if (res.ok && data.ok) return setState({ status: "success", points: data.points, level: data.level });
+                if (res.ok && data.ok) return setState({ status: "success", points: data.points, level: data.level, patronage: data.patronage });
                 setState({ status: "error", error: data.error || "invalid" });
             } catch {
                 setState({ status: "error", error: "invalid" });
@@ -61,6 +62,7 @@ export default function LoyaltyClaimClient({ token, claim }) {
                 <h2 style={{ margin: 0 }}>{state.points > 0 ? `+${state.points} XP` : "Points banked!"}</h2>
                 <p className="muted" style={{ margin: 0 }}>Nice — that&apos;s on your Wolf Den account.</p>
                 {state.level ? <UserLevel level={state.level} /> : null}
+                <PatronageReward patronage={state.patronage} />
                 <a className="btn" href="/marketplace/profile">
                     View your profile
                 </a>

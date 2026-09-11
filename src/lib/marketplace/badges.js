@@ -6,7 +6,7 @@ import { COLLECTIBLES, collectibleById, isCollectibleUnlocked } from "@/lib/mark
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
-import { awardXp, getRewardsProgress, levelForXp, SPEND_XP_PER_DOLLAR } from "@/lib/marketplace/xp.js";
+import { awardXp, getRewardsProgress, levelForXp, lifetimeSpendDollars } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { allowsNotify } from "@/lib/marketplace/notify-prefs.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
@@ -97,11 +97,9 @@ export async function getMemberMetrics(buyerId) {
         //
         // `amountCents` is what the order was really worth and is stored on every event since July; older
         // ones fall back to points / SPEND_XP_PER_DOLLAR, which is the same reconstruction awardXp documents.
-        db.queryOne(
-            `SELECT COALESCE(SUM(COALESCE((meta->>'amountCents')::numeric / 100.0, points / ${SPEND_XP_PER_DOLLAR}.0)), 0)::int AS n
-               FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`,
-            [buyerId]
-        ).catch(() => null),
+        // In-store spend in whole dollars. The rule lives in xp.js beside the purchase that writes it —
+        // this was one of the two places it had been copied out to. See lifetimeSpendCents.
+        lifetimeSpendDollars(buyerId).then((n) => ({ n })),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'event_checkin'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'daily_active'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM card_watchlist_items i JOIN card_watchers w ON w.id = i.watcher_id WHERE w.buyer_id = $1`, [buyerId]).catch(() => null),

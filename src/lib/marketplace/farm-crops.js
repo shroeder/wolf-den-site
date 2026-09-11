@@ -139,6 +139,18 @@ export const SEED_BANDS = {
     // ascendant and eternal reach this now — the two chests above them stopped paying seeds entirely —
     // and it is weighted at the top of the ladder: mostly Golden Apple and Star Fruit, no commons at all.
     chest_high: { rare: 12, epic: 40, legendary: 36, mythic: 12 },
+    // ── THE COUNTER, BY WHAT WAS SPENT ──────────────────────────────────────────────────────────────────
+    // A seed pulled out of the QR haul (see patronage.js). Declared HERE, as its own row per band, because
+    // grantSeedFromBand looks its band up in this table and an undeclared band is not an error — it is a
+    // silent nothing. `ship_battle` shipped that way once: every won battle that promised a seed handed over
+    // exactly nothing, for as long as the band was missing from this object.
+    //
+    // The plain band sits under a cast, because a $10 purchase is not an afternoon's fishing; the lavish one
+    // reaches past a gold chest, because a $250 receipt should out-pay anything a member can farm for free.
+    patron_plain: { common: 44, rare: 42, epic: 14 },
+    patron_good: { common: 26, rare: 46, epic: 25, legendary: 3 },
+    patron_rich: { common: 10, rare: 40, epic: 41, legendary: 8, mythic: 1 },
+    patron_lavish: { rare: 20, epic: 44, legendary: 30, mythic: 6 },
     // The Armoury crate. Bought with laurels off won bouts, so it sits with the ship rather than the farm.
     arena_win: { rare: 42, epic: 44, legendary: 12, mythic: 2 },
     // A dug-up chest, by board depth. The sea's own supply line into the farm.

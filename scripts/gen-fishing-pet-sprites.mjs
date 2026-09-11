@@ -103,9 +103,16 @@ await Promise.all(Array.from({ length: 3 }, async () => {
                     [id, url],
                 );
             } else {
+                    // ⚠️ THE CONFLICT TARGET IS ALL THREE PRIMARY-KEY COLUMNS. It read `(pet_id, level)` in
+                    // every one of these generators, and the primary key is `(pet_id, level, variant)` —
+                    // Postgres cannot match a two-column target against a three-column index, so EVERY level
+                    // sprite this script generated failed to save with "there is no unique or exclusion
+                    // constraint matching the ON CONFLICT specification". The image was made and uploaded to
+                    // Blob first, so the money was spent and the row never landed. variant defaults to '' and
+                    // is not in the column list, which is why naming it here is enough.
                 await sql.query(
                     `INSERT INTO mkt_pet_sprite_level (pet_id, level, url, updated_at) VALUES ($1, $2, $3, NOW())
-                     ON CONFLICT (pet_id, level) DO UPDATE SET url = $3, updated_at = NOW(), flip = FALSE, facing_checked_at = NULL`,
+                     ON CONFLICT (pet_id, level, variant) DO UPDATE SET url = $3, updated_at = NOW(), flip = FALSE, facing_checked_at = NULL`,
                     [id, lv, url],
                 );
             }

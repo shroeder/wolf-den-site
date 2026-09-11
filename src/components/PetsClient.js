@@ -47,6 +47,7 @@ const STAT_EFFECT = {
 const SOURCE_LABEL = {
     level: "🎮 Leveling reward", shop: "🛒 Shop", achievement: "🏅 Achievement",
     chest: "🎁 Chest drop", boss: "⚔️ Boss drop", raid: "🏘️ Raid-exclusive", elite: "🌟 Elite",
+    counter: "🧾 In-store spend", road: "🛣️ The Long Road",
 };
 
 // A scannable, self-explaining group for the menagerie summary: a labeled header + one row per bonus, each

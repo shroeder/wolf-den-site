@@ -1,7 +1,7 @@
 import { db } from "@/lib/db.js";
 import { isOwner, isStaff } from "@/lib/marketplace/owner.js";
 import { levelForXp } from "@/lib/marketplace/xp-curve.js";
-import { SPEND_XP_PER_DOLLAR } from "@/lib/marketplace/xp.js";
+import { SPEND_XP_PER_DOLLAR, lifetimeSpendCents } from "@/lib/marketplace/xp.js";
 import { RANKS, rankForLevel } from "@/lib/marketplace/ranks.js";
 
 // ── ROLES ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -79,18 +79,10 @@ export async function standingFor(buyerId) {
         // deploy. Falls back to the column that has always existed.
         db.queryOne(`SELECT xp, role FROM mkt_buyer WHERE id = $1`, [buyerId])
             .catch(() => db.queryOne(`SELECT xp, NULL AS role FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)),
-        // ── IN-STORE SPEND, INCLUDING THE EVENTS THAT PREDATE THE STAMP ──────────────────────────────
-        // The QR handshake at the counter writes a purchase_spend event; since 23 July it stamps the real
-        // merchandise amount into the meta. The 48 events before that carry only the Square order id and the
-        // XP — and XP is `dollars x SPEND_XP_PER_DOLLAR`, so the amount is recoverable by dividing it back
-        // out. That is not a guess: awardXp documents the relationship and badges.js already falls back to
-        // exactly this for the same rows. Counting them as zero, which is what this did first, quietly
-        // understated everybody who was buying in the shop's first week.
-        db.queryOne(
-            `SELECT COALESCE(SUM(COALESCE((meta->>'amountCents')::numeric, points * 100.0 / ${SPEND_XP_PER_DOLLAR})), 0)::bigint AS c
-               FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`,
-            [buyerId],
-        ).catch(() => null),
+        // IN-STORE SPEND, in cents. The rule (and the reconstruction for the 48 events that predate the
+        // amount stamp) lives in xp.js beside the purchase that writes it — it was copied out here and again
+        // in badges.js, and the patronage ladder wanted a third copy.
+        lifetimeSpendCents(buyerId).then((c) => ({ c })),
         db.queryOne(
             `SELECT COALESCE(SUM(amount_cents), 0) AS c
                FROM mkt_credit_purchase WHERE buyer_id = $1 AND status = 'paid'`,
