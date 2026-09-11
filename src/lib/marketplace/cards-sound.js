@@ -262,6 +262,23 @@ export const SFX = {
         haptic([40, 60, 40, 90]);
     },
     forestWood: () => { run([392, 523, 659], { dur: 0.26, type: "triangle", gain: 0.1, step: 0.07 }); haptic([14, 24, 34]); },
+    // ⚠️ THE TRUNK HITTING THE GROUND, WHICH IS A DIFFERENT EVENT FROM THE TREE GIVING WAY. forestTimber is
+    // the crack and the lean — it fires the instant the last swing lands. This is the impact three quarters of
+    // a second later, when the trunk actually reaches the floor and bursts: a low body you feel more than
+    // hear, a wide crack of splintering over the top, and a tail of debris still rattling down after it.
+    forestCrash: () => {
+        tone({ freq: 78, to: 30, dur: 0.62, type: "sine", gain: 0.28 });
+        tone({ freq: 132, to: 44, dur: 0.42, type: "triangle", gain: 0.16 });
+        noise({ dur: 0.3, gain: 0.26, freq: 1100, q: 0.6, sweepTo: 180 });
+        noise({ dur: 0.5, gain: 0.1, freq: 2600, q: 2.2, sweepTo: 700, delay: 0.12 });
+        noise({ dur: 0.4, gain: 0.06, freq: 3400, q: 3, sweepTo: 1200, delay: 0.3 });
+        haptic([40, 30, 70, 40, 30, 24, 18]);
+    },
+    // One footfall of the walk between trees. Deliberately small — it happens a lot.
+    forestStep: () => {
+        noise({ dur: 0.09, gain: 0.08, freq: 520, q: 1.2, sweepTo: 170 });
+        haptic(12);
+    },
     // A rare trunk coming down. The ordinary payout is three rising notes; this is a bell over a held chord,
     // so the good ones are audible from the next room without anybody having to read the banner.
     forestRare: () => {
