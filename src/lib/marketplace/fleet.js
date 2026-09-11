@@ -209,7 +209,13 @@ export const fleetShip = (rank) => FLEET.find((f) => f.rank === Number(rank)) ||
 //
 // Every rank pays doubloons and fragments. Bosses add a chest and a bigger purse. The FIRST time you sink a
 // rank pays a clear bonus over re-fighting it, so climbing beats farming rank 1 forever.
-export function fleetReward(rank, { first = false } = {}) {
+// ⚠️ `boss` MAY BE OVERRIDDEN, BECAUSE A MEMBER'S BOAT IS NOT A MAN-O'-WAR. A member raid matches the rival's
+// hull to the nearest fleet rank by HP (fleetRankForShip), and ranks 5, 10 and 15 are BOSSES — so a member
+// whose boat happened to sit near a boss hull paid out the boss bonus: +18 doubloons, +110 gold, +80 XP for
+// beating somebody's sloop. It is visible as a sawtooth in the payout curve, where rank 5 pays more than
+// rank 8 and rank 10 more than rank 13. Member-vs-member passes `boss: false` on BOTH sides — the raider's
+// win and the defender's repel — because the same hull cannot be a boss for one of them and not the other.
+export function fleetReward(rank, { first = false, boss: bossOverride = null } = {}) {
     const ship = fleetShip(rank);
     if (!ship) return null;
     // ── ⚠️ THE PAYOUT DOES NOT CLIMB AS FAST AS THE LADDER DOES ───────────────────────
@@ -222,7 +228,7 @@ export function fleetReward(rank, { first = false } = {}) {
     // past the flagship is the climb; the fight is the reward and the ladder says so.
     // Nothing at or below 15 moves by a single coin: `payRank` is exactly `r` there.
     const r = Math.min(ship.rank, 15 + (ship.rank - 15) * 0.35);
-    const boss = Boolean(ship.boss);
+    const boss = bossOverride === null ? Boolean(ship.boss) : Boolean(bossOverride);
     const mult = first ? 1 : 0.4; // re-fights pay 40% — worth doing, never the best way up
     const round = (n) => Math.max(1, Math.round(n * mult));
     return {
@@ -250,6 +256,44 @@ export function fleetReward(rank, { first = false } = {}) {
         loot: { chance: Math.min(0.34, 0.06 + r * 0.018) * (first ? 1 : 0.5), maxRank: r, boss },
         first,
         boss,
+    };
+}
+
+// ── WHAT DRIVING SOMEBODY OFF PAYS ───────────────────────────────────────────────────────────────────────────
+// Repelling a raid used to pay a flat 12 doubloons, and the screen that announced it rendered the row's `gold`
+// column — which the insert hardcodes to 0. So the one reward in the game you never chose to take was reported
+// to the member as "You repelled 1 raid! +0" with "+0g" beside the raider's name. It was not nothing; it was
+// twelve doubloons described as nothing, which is worse than nothing.
+//
+// It pays out of the SAME TABLE as sinking a ship now, at a defender's share, because the thing that happened
+// is the same thing: you beat a hull of that rank. One reward design for ship battles was the point of
+// finishToRaidBattle's rewrite, and a second bespoke payout for the defence half would undo it.
+//
+// ⚠️ GENEROUS ON PURPOSE, AND THE FREQUENCY IS WHY. Measured before choosing the number: the whole Den
+// produces one to three repels a DAY, and nobody has been raided more than once in any three-day window.
+// 220 repels all time. A reward nobody can farm, cannot choose to take, and sees about once a week is the
+// wrong place to be careful — see [[economy-nerf-measure-daily-total]], which is about the daily total, and
+// the daily total here is two.
+//
+// Still a SHARE rather than the whole hand: raiding costs a daily raid and defending costs nothing, so
+// attacking has to remain the better way to earn or the ladder stops meaning anything.
+export const DEFENCE_SHARE = 0.6;
+
+export function defenceReward(rank) {
+    const r = fleetReward(rank, { first: true, boss: false });
+    if (!r) return null;
+    const cut = (n) => (n ? Math.max(1, Math.round(n * DEFENCE_SHARE)) : n);
+    return {
+        ...r,
+        doubloons: cut(r.doubloons),
+        gold: cut(r.gold),
+        xp: cut(r.xp),
+        fragments: cut(r.fragments),
+        parts: r.parts ? { ...r.parts, n: cut(r.parts.n) } : null,
+        // No seed. It is the first-sinking flavour on the fleet ladder and a repel is not a rung you climbed.
+        seed: false,
+        loot: r.loot ? { ...r.loot, chance: r.loot.chance * DEFENCE_SHARE } : null,
+        first: false,
     };
 }
 

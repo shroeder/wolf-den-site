@@ -28,7 +28,7 @@ import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { hasPower, equippedPowers, claimPowerUse, powerUsesLeft, powerRoll, oneIn } from "@/lib/marketplace/ascension-powers.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
-import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
+import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, defenceReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { getSavedPorts, getSavedHulls, portsWithSaved, facing } from "@/lib/marketplace/gun-ports-store.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
@@ -2313,7 +2313,10 @@ async function finishRaidBattle(buyerId, meta, res) {
     const spoils = [];
     if (res.win) {
         const rank = fleetRankForShip({ guns: meta.foe?.guns, hp: meta.foe?.hp });
-        const reward = fleetReward(rank, { first: true });
+        // `boss: false` — see fleetReward. A rival's boat is matched to the nearest fleet rank BY HULL, and
+        // ranks 5, 10 and 15 are bosses, so a member whose boat sat near one of those hulls was paying out the
+        // Man-o'-War bonus to whoever raided them.
+        const reward = fleetReward(rank, { first: true, boss: false });
         // Plunder (sea affinity, chiefly the Dread Corsair set) fattens the purse off a beaten crew.
         const sea = await equippedSeaAffinity(buyerId).catch(() => ({}));
         const bonus = 1 + seaEffects(sea).plunderBonus;
@@ -2336,18 +2339,24 @@ async function finishRaidBattle(buyerId, meta, res) {
         // one thing in ship battles you do not choose to do was the one thing that paid nothing. Doubloons
         // rather than coin, because they are the only currency the gun deck takes, and this is the only way
         // to earn them without spending a daily raid of your own.
+        // ── AND IT PAYS WHAT BEATING THAT HULL IS WORTH ──────────────────────────────────────────
+        // The rank is the ATTACKER'S ship, not the defender's: what the defender did was beat the boat that
+        // came at them, so that boat is what it is worth. meta.me carries the raider's guns and hull.
+        //
+        // The comment that used to sit here said "the defender gets a roll too … leaving it out would have
+        // made the one system where you can be on the receiving end the one system that never pays a
+        // windfall" — and then no roll followed it. Only a counter was incremented. The intent was written
+        // down and never built; this is it, built. See [[declared-but-never-read]].
+        const defRank = fleetRankForShip({ guns: meta.me?.guns, hp: meta.me?.hp });
+        const defReward = defenceReward(defRank);
+        const defSpoils = defReward ? await payFleetReward(meta.targetId, defReward).catch(() => []) : [];
+        const defDoubloons = defSpoils.find((x) => x.kind === "doubloons")?.n || 0;
+        const defGold = defSpoils.find((x) => x.kind === "gold")?.n || 0;
         await db.query(
-            `INSERT INTO mkt_raid_defense (defender_id, attacker_id, gold, doubloons, gear_item_id) VALUES ($1, $2, 0, $3, NULL)`,
-            [meta.targetId, buyerId, DEFENCE_DOUBLOONS]
+            `INSERT INTO mkt_raid_defense (defender_id, attacker_id, gold, doubloons, gear_item_id, spoils)
+             VALUES ($1, $2, $3, $4, NULL, $5::jsonb)`,
+            [meta.targetId, buyerId, defGold, defDoubloons, JSON.stringify(defSpoils)]
         ).catch(() => {});
-        await db.query(
-            `INSERT INTO mkt_sailing (buyer_id, doubloons) VALUES ($1, $2)
-             ON CONFLICT (buyer_id) DO UPDATE SET doubloons = COALESCE(mkt_sailing.doubloons,0) + $2, updated_at = NOW()`,
-            [meta.targetId, DEFENCE_DOUBLOONS]
-        ).catch(() => {});
-        // The defender gets a roll too. It is the only reward in the game you never chose to take —
-        // somebody else's raid happening to you — and leaving it out would have made the one system where
-        // you can be on the receiving end the one system that never pays a windfall.
         const defRow = await db.queryOne(
             `INSERT INTO mkt_sailing (buyer_id, raids_defended) VALUES ($1, 1)
              ON CONFLICT (buyer_id) DO UPDATE SET raids_defended = COALESCE(mkt_sailing.raids_defended, 0) + 1 RETURNING raids_defended`,
@@ -2365,13 +2374,47 @@ async function finishRaidBattle(buyerId, meta, res) {
 // The "you got raided (and won)" welcome-back report: every raid you repelled since you last saw it, grouped
 // by attacker, with their hero card, how many times you beat them, gold earned, and any gear you took. Reading
 // it marks the entries seen so it only pops once.
+/**
+ * Fold a pile of spoils arrays into one hand.
+ *
+ * ⚠️ COUNTED LINES ADD; NAMED ONES LIST. Two repels paying 14 and 19 doubloons is one line reading 33, because
+ * that is what arrived in the purse — but two repels each coughing up a different cutlass is two cutlasses,
+ * and summing them into "2 loot" would throw away the only part of the reward with a name on it. The parts
+ * line keeps the BEST tier it saw rather than the last, so a report holding a tier-2 and a tier-5 does not
+ * describe itself by the smaller one.
+ */
+function mergeSpoils(rows) {
+    const counted = new Map();   // kind -> { kind, n, tier }
+    const named = [];
+    for (const arr of rows.flat()) {
+        for (const sp of (Array.isArray(arr) ? arr : [arr])) {
+            if (!sp || !sp.kind) continue;
+            if (sp.kind === "loot" || sp.kind === "seed" || sp.kind === "chest") { named.push(sp); continue; }
+            const at = counted.get(sp.kind);
+            if (at) {
+                at.n += Number(sp.n) || 0;
+                if (sp.tier != null) at.tier = Math.max(at.tier ?? 0, Number(sp.tier) || 0);
+            } else {
+                counted.set(sp.kind, { kind: sp.kind, n: Number(sp.n) || 0, ...(sp.tier != null ? { tier: Number(sp.tier) || 0 } : {}) });
+            }
+        }
+    }
+    const order = ["doubloons", "gold", "xp", "parts"];
+    return [
+        ...order.map((k) => counted.get(k)).filter((x) => x && x.n > 0),
+        ...[...counted.values()].filter((x) => !order.includes(x.kind) && x.n > 0),
+        ...named,
+    ];
+}
+
 export async function getUnseenRaidDefenses(buyerId) {
     if (!buyerId) return { defenses: [], totalGold: 0, totalDoubloons: 0, totalWins: 0 };
     const rows = await db
         .query(
             `SELECT attacker_id, COUNT(*)::int AS n, COALESCE(SUM(gold), 0)::int AS gold,
                     COALESCE(SUM(doubloons), 0)::int AS doubloons,
-                    array_remove(array_agg(gear_item_id), NULL) AS gears
+                    array_remove(array_agg(gear_item_id), NULL) AS gears,
+                    COALESCE(jsonb_agg(spoils) FILTER (WHERE spoils IS NOT NULL), '[]'::jsonb) AS spoils
                FROM mkt_raid_defense WHERE defender_id = $1 AND seen_at IS NULL
               GROUP BY attacker_id ORDER BY n DESC, doubloons DESC`,
             [buyerId]
@@ -2401,6 +2444,11 @@ export async function getUnseenRaidDefenses(buyerId) {
             gold: r.gold,
             doubloons: r.doubloons,
             gear,
+            // Pre-441 repels have no spoils column. They banked doubloons all the same, so they are described
+            // by the one line they actually paid rather than shown as an empty hand.
+            spoils: (Array.isArray(r.spoils) && r.spoils.length)
+                ? mergeSpoils([r.spoils])
+                : (r.doubloons ? [{ kind: "doubloons", n: r.doubloons }] : []),
         };
     });
     await db.query(`UPDATE mkt_raid_defense SET seen_at = NOW() WHERE defender_id = $1 AND seen_at IS NULL`, [buyerId]).catch(() => {});
@@ -2409,6 +2457,10 @@ export async function getUnseenRaidDefenses(buyerId) {
         totalGold: rows.reduce((s, r) => s + r.gold, 0),
         totalDoubloons: rows.reduce((s, r) => s + r.doubloons, 0),
         totalWins: rows.reduce((s, r) => s + r.n, 0),
+        // The whole take across every raider, which is the headline the report leads with. Built from the
+        // per-attacker hands that were just computed, so a pre-441 repel's doubloons-only fallback is counted
+        // here too rather than dropping out of the total because its row had no spoils column.
+        total: mergeSpoils(defenses.map((d) => d.spoils)),
     };
 }
 
@@ -3409,9 +3461,10 @@ export const LOCKER_LIST = Object.values(LOCKER);
 // thousand doubloons. Anything added to LOCKER that touches `charged`, `charges` or a cooldown belongs here.
 export const MANIFEST_EXCLUDED = new Set(["elixir_renewal", "sands_of_time"]);
 
-// What repelling one raid is worth. Deliberately modest: it is income you did not spend a raid to earn, and
-// the cheapest gun-deck level costs 18.
-export const DEFENCE_DOUBLOONS = 12;
+// What repelling one raid is worth now lives in fleet.js as defenceReward(), beside the table it takes its
+// share of. The flat DEFENCE_DOUBLOONS = 12 that used to sit here is gone: a single number could not scale
+// with who attacked you, and the screen was rendering the row's `gold` column anyway, so what the member
+// actually read was "+0".
 
 // -- COLLECTION PIECES, FOR DOUBLOONS -------------------------------------------------------------------------
 // The non-combat sets pay for being OWNED, and most of their pieces only come out of chests — so a set you are

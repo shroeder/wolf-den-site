@@ -1,0 +1,15 @@
+-- ── REPELLING A RAID PAYS A HAND, NOT A NUMBER ──────────────────────────────────────────────────────
+-- The defence row carried `gold` and `doubloons` and nothing else, and the insert hardcoded gold to 0 --
+-- which is the column the welcome-back report rendered. So a member who drove somebody off was told
+-- "You repelled 1 raid! +0" with "+0g" beside the raider's name, while twelve doubloons went quietly
+-- into their purse. Reporting a real reward as nothing is worse than paying nothing.
+--
+-- Repelling now pays out of the same table sinking a ship pays (see defenceReward in fleet.js), which is
+-- a HAND: doubloons, gold, XP, treasure fragments, forge parts and occasionally something off the deck.
+-- Rather than a column per line -- five more columns on a table that is read once and shown once -- the
+-- spoils array payFleetReward already returns is stored whole. Nobody will ever query "every repel that
+-- paid tier-3 parts"; the report just needs to draw what was paid.
+--
+-- Old rows keep working: spoils IS NULL means a pre-441 repel, and the report falls back to the
+-- doubloons column for those.
+ALTER TABLE mkt_raid_defense ADD COLUMN IF NOT EXISTS spoils jsonb;
