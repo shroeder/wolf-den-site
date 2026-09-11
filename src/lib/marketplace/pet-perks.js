@@ -299,6 +299,21 @@ export const PET_PERKS = {
     elephant_spear: { name: "Merchant's Nose", key: "gold_find", note: "Unique: while equipped, boosts your chance to find the Gold Merchant at sea (+1% per pet level, up to +5%)." },
     // Farm/pastoral pets — a farm passive (in collectibles PET_PASSIVE_STAT) PLUS a combat active so they still
     // fight. Actives are ordinary combat keys (nothing farm-specific here).
+    // ── PATRONAGE · THE FIVE BOUGHT AT THE COUNTER ────────────────────────────────────────────────────────
+    // Added WITH their signatures rather than after somebody notices, which is the fourth time this table has
+    // been extended and the first time it was not a rescue: the kitchen five, the fishing four, the mine's
+    // five and the ship's five all shipped with petPerk()'s "Companion" fallback first. A legendary sabrecat
+    // whose signature ability is called "Companion" is the same bug every time.
+    //
+    // Every key below was checked against the REAL resolver for a numeric twin at that pet's rarity — the
+    // lesson written down above Sable's three — and each one was free. town_haggle on the Copper Stag is the
+    // point of the whole ladder in one ability: the first rung is the counter starting to recognise you, and
+    // what that is worth is a better price.
+    copper_stag: { name: "Knows Your Face", key: "town_haggle" },
+    ledger_lynx: { name: "Kept Accounts", key: "xp_gain" },
+    silver_ram: { name: "Lowered Horns", key: "ferocity" },
+    vault_sabrecat: { name: "Sleeps On It", key: "hoarder" },
+    den_warden: { name: "The House Wolf", key: "ferocity" },
     honeybee: { name: "Following Wind", key: "following_sea" }, barn_cat: { name: "Night Prowler", key: "night_angler" },
     piglet: { name: "Truffle Snout", key: "truffle_hog" }, hen: { name: "Broody Hen", key: "green_thumb" },
     spring_lamb: { name: "Spring Lamb", key: "pack_visit" }, scarecrow_crow: { name: "Storm Caller", key: "storm_sense" },
