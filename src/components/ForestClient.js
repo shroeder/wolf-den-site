@@ -50,7 +50,7 @@ import { NODE_GAP, nodeAt } from "@/lib/marketplace/forest-world.js";
 //
 // A cache is not wrong to do that; asking for the same URL and expecting different bytes is. Bump ART_V on any
 // redraw and every device gets the new picture on the next load.
-const ART_V = "2";
+const ART_V = "3";
 const TREE_ART = (id) => `/images/forest/trees/${id}.webp?v=${ART_V}`;
 const SHROOM_ART = (id) => `/images/forest/shrooms/${id}.webp?v=${ART_V}`;
 const AXE_ART = (id) => `/images/forest/axes/${id}.webp?v=${ART_V}`;
@@ -388,14 +388,14 @@ export default function ForestClient() {
                 {/* Parallax. Two copies of one FLAT backdrop at different rates — the far wall barely moves,
                     the near one sweeps, and that difference is the whole feeling of walking. Flat is why it
                     can tile forever: a vanishing point would be right from one spot and wrong from the rest. */}
-                <span className="twd-far" aria-hidden="true"
-                    style={{ backgroundImage: `url(${GROVE})`, backgroundPositionX: `${-camX * 0.18}px` }} />
-                <span className="twd-near" aria-hidden="true"
-                    style={{ backgroundImage: `url(${GROVE})`, backgroundPositionX: `${-camX * 0.45}px` }} />
-                <span className="twd-haze" aria-hidden="true" />
-                <span className="twd-floor" aria-hidden="true"
-                    style={{ backgroundImage: `url(${FLOOR})`, backgroundPositionX: `${-camX}px` }} />
-                <span className="twd-ground" aria-hidden="true" />
+                {/* ⚠️ ONE PLATE, NOT THREE BANDS. This was a flat wall of trunks with a top-down litter
+                    texture tiled under it and a gradient trying to hide the join — two unrelated pictures
+                    butted together at a hard seam, with a dead empty half above them. Luke: "straight dog
+                    dookie." It is one painted scene now: canopy overhead, trunks into haze, ground coming
+                    toward you, all lit the same way and tiled end to end. */}
+                <span className="twd-plate" aria-hidden="true"
+                    style={{ backgroundImage: `url(${GROVE})`, backgroundPositionX: `${-camX * 0.42}px` }} />
+                <span className="twd-vig" aria-hidden="true" />
 
                 <div className="twd-stage" style={{ transform: shake ? `translate3d(${(Math.random() - 0.5) * shake}px, ${(Math.random() - 0.5) * shake * 0.6}px, 0)` : undefined }}>
                     {nodes.map((n) => {
@@ -407,7 +407,7 @@ export default function ForestClient() {
                         // tree, which is the same "takes up the whole screen" in a new costume. A tree you walk past
                         // should be a thing in the scene, not the scene.
                         const scale = (0.62 + (1 - back) * 0.42) * treeScale;
-                        const bottom = 7 + back * 12;
+                        const bottom = 13 + back * 8;
                         const z = Math.round(100 - back * 40);
                         if (n.kind === "shroom") {
                             /* eslint-disable-next-line @next/next/no-img-element */
@@ -594,46 +594,14 @@ export default function ForestClient() {
                 /* The two backdrop walls. repeat-x with a moving background-position is how a flat picture
                    becomes an endless one: no elements are created, nothing is measured, and the wood can run
                    to node forty thousand for the price of a number changing. */
-                /* ⚠️ THE WALL SITS IN THE TOP HALF AND IS SIZED IN PIXELS, NOT PERCENT. Stretched to the
-                   full height of the box (auto 100%) the picture scales UP with the screen, so the bigger the
-                   world got the bigger the trunks got — which is how a backdrop meant to read as distance
-                   ended up as six close-ups. A fixed 300px band keeps them small and far no matter how tall
-                   the device is, and the floor takes the rest. */
-                /* The wall of distant trunks fills everything above the floor line — no bare band at the top,
-                   and it scales with that area rather than with the whole screen. */
-                /* ⚠️ AND IT FADES INTO THE GROUND. Cut off square the wall of trunks met the litter along a
-                   dead straight line across the middle of the screen, which reads as two pictures stacked
-                   rather than as a place. The bottom eighth dissolves so the far trees go into the haze the
-                   way they would if you were standing in it. */
-                .twd-far, .twd-near { position: absolute; left: 0; right: 0; top: 0; bottom: 34%;
-                    background-repeat: repeat-x; background-size: auto 100%; background-position: bottom;
-                    pointer-events: none;
-                    -webkit-mask-image: linear-gradient(180deg, #000 0, #000 80%, transparent 100%);
-                    mask-image: linear-gradient(180deg, #000 0, #000 80%, transparent 100%); }
-                .twd-far { filter: brightness(.34) blur(2px) saturate(.7); }
-                .twd-near { filter: brightness(.52) blur(1px); opacity: .8;
-                    -webkit-mask-image: linear-gradient(180deg, #000 0, #000 64%, transparent 92%);
-                    mask-image: linear-gradient(180deg, #000 0, #000 64%, transparent 92%); }
-                .twd-haze { position: absolute; inset: 0; pointer-events: none;
-                    background: linear-gradient(101deg, transparent 14%, rgba(168,214,236,.09) 19%, transparent 25%),
-                                linear-gradient(97deg, transparent 56%, rgba(168,214,236,.07) 61%, transparent 67%),
-                                radial-gradient(120% 62% at 50% 0%, rgba(150,200,230,.11), transparent 64%),
-                                linear-gradient(180deg, transparent 52%, rgba(3,7,9,.6)); }
-                /* The floor is its own repeating strip at 1:1 with the camera, so what you walk on moves at
-                   exactly your speed and the parallax above it reads as distance rather than as drift. */
-                /* ⚠️ THE LITTER IS TILED SMALL, NOT STRETCHED. Sized to the band height it drew leaves
-                   bigger than the player — a picture of a forest floor blown up until one leaf is a metre
-                   across. A fixed tile width repeated both ways keeps a leaf leaf-sized whatever the screen. */
-                .twd-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 46%;
-                    background-repeat: repeat; background-size: 150px auto; pointer-events: none;
-                    filter: brightness(.62) saturate(.85); }
-                /* ⚠️ AND IT IS DARKENED INTO GROUND. The litter art is drawn top-down; laid flat in a
-                   side-on scene at full strength it reads as wallpaper with metre-wide leaves on it rather
-                   than as something underfoot. Small tile, dimmed, and a gradient that goes darker toward the
-                   camera so the horizon is a horizon instead of a hard seam across the middle of the screen. */
-                .twd-ground { position: absolute; left: 0; right: 0; bottom: 0; height: 52%; pointer-events: none;
-                    background: linear-gradient(180deg, rgba(4,8,10,0) 0%, rgba(4,8,10,.08) 35%,
-                        rgba(3,6,8,.42) 78%, rgba(3,6,8,.66) 100%); }
+                /* The scene itself. repeat-x with a moving background-position is how one painted plate
+                   becomes an endless wood: no elements made, nothing measured, and node forty thousand costs
+                   exactly what node four costs. It scrolls SLOWER than you walk, so the far trees lag behind
+                   the ones you can touch. */
+                .twd-plate { position: absolute; inset: 0; background-repeat: repeat-x;
+                    background-size: auto 100%; background-position-y: bottom; pointer-events: none; }
+                .twd-vig { position: absolute; inset: 0; pointer-events: none;
+                    background: radial-gradient(120% 78% at 50% 42%, transparent 40%, rgba(2,6,8,.55) 100%); }
                 .twd-stage { position: absolute; inset: 0; will-change: transform; }
 
                 /* ── WHAT STANDS IN IT ───────────────────────────────────────────────────────────── */
@@ -642,6 +610,13 @@ export default function ForestClient() {
                     display: flex; flex-direction: column; align-items: center; }
                 .twd-tree { display: block; transform-origin: 50% 100%;
                     filter: drop-shadow(0 8px 14px rgba(0,0,0,.65)); }
+                /* ⚠️ A CONTACT SHADOW, OR IT IS A STICKER. Without a dark patch where a thing meets the
+                   ground it floats above the picture no matter how well it is drawn — the one cue that says
+                   "this is standing here" rather than "this was pasted on". */
+                .twd-node::after, .twd-hero::after { content: ""; position: absolute; bottom: -4px; left: 50%;
+                    width: 76%; height: 14px; transform: translateX(-50%); border-radius: 50%;
+                    background: radial-gradient(ellipse, rgba(2,5,7,.66), transparent 70%); pointer-events: none; }
+                .twd-hero::after { width: 58px; height: 13px; bottom: -2px; }
                 .twd-stump { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
                     filter: drop-shadow(0 5px 10px rgba(0,0,0,.7)); }
                 .twd-shroom { position: absolute; transform: translateX(-50%); pointer-events: none;
@@ -676,7 +651,7 @@ export default function ForestClient() {
                     background: linear-gradient(90deg, #6f9440, #b6d06a); transition: width 70ms linear; }
 
                 /* ── YOU ──────────────────────────────────────────────────────────────────────────── */
-                .twd-hero { position: absolute; bottom: 11%; width: 96px; height: 124px; z-index: 120;
+                .twd-hero { position: absolute; bottom: 15%; width: 96px; height: 124px; z-index: 120;
                     display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
                 .twd-me { position: absolute; bottom: 0; left: 50%; margin-left: -48px; width: 96px;
                     filter: drop-shadow(0 5px 9px rgba(0,0,0,.8)); }

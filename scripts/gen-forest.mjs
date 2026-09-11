@@ -109,16 +109,24 @@ const PIECES = {
     // and the whole wood appears to swivel. See [[scrolling-room-needs-flat-backdrop]]. So: no perspective,
     // no converging lines, no path running away from the viewer. A flat wall of distant trunks, straight on,
     // that can be tiled end to end forever without a seam or a centre.
-    grove: { raw: "A dense forest seen dead straight on, like a flat painted theatre backdrop: a wall of "
-        + "distant tree trunks in cool blue-grey haze, receding only by getting paler and softer, NEVER by "
-        + "converging. NO perspective, NO vanishing point, NO path, NO ground plane, NO sky. The left and "
-        + "right edges are plain forest that could tile seamlessly against another copy of itself. Soft "
-        + "shafts of pale light falling vertically between the trunks. Nothing in sharp focus, nothing in "
-        + "the foreground. " + HOUSE_STYLE + " " + NEGATIVE_STYLE, size: "1536x1024" },
-    // The floor the player walks on, as a strip: a band of forest litter with no perspective in it either.
-    floor: { raw: "A horizontal strip of forest floor seen from slightly above: dark earth, fallen needles, "
-        + "scattered dry leaves, moss patches, a few small stones and twigs. Evenly covered end to end with "
-        + "no path, no perspective lines and no focal point, so it can tile side by side forever. "
+    // ── ⚠️ ONE PAINTED SCENE, NOT TWO TEXTURES STACKED ──────────────────────────────────────────────────
+    // The first cut was a flat wall of trunks with a separate top-down litter texture tiled underneath it.
+    // Luke: "straight dog dookie." He was right: two unrelated pictures butted together at a hard seam, a
+    // dead empty half at the top, and trees standing on what read as patterned lino. Nothing in it agreed
+    // about where the light came from or where the ground was.
+    //
+    // This is ONE plate with the whole scene in it — canopy overhead so the top of the screen is forest
+    // rather than nothing, trunks receding into haze, and the floor coming toward the viewer — painted
+    // together so the light and the ground line are consistent. It still must TILE, so: no focal point, no
+    // path, no vanishing point, and the two side edges have to meet.
+    grove: { raw: "A side-on view of deep forest at eye level, painted as one continuous scene and lit from "
+        + "above. Dark leafy canopy and overhanging branches across the TOP of the frame. Below that, ranks "
+        + "of tree trunks receding into cool blue-grey haze — further trunks are paler and softer, never "
+        + "converging. Across the BOTTOM third, a forest floor of dark earth, moss, fallen leaves and twigs "
+        + "running flat left to right. Soft shafts of pale light falling between the trunks onto the ground. "
+        + "NO path, NO clearing, NO focal point, NO vanishing point, NO sky, NO horizon line — the ground "
+        + "meets the trunks in shadow and undergrowth. Evenly composed end to end so the left and right "
+        + "edges tile seamlessly against another copy. Nothing in the immediate foreground. "
         + HOUSE_STYLE + " " + NEGATIVE_STYLE, size: "1536x1024" },
 };
 
