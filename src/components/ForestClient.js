@@ -86,6 +86,8 @@ export default function ForestClient() {
     const last = useRef(0);
     const fxId = useRef(0);
     const timers = useRef([]);
+    const worldRef = useRef(null);
+    const centred = useRef(false);
 
     // Every setTimeout this component starts is parked here and cleared on unmount. One fell schedules four of
     // them and a member can walk off the page mid-fall; a setState after that is a React warning, and for the
@@ -103,6 +105,18 @@ export default function ForestClient() {
         if (d && !d.error) setState(d);
     }, []);
     useEffect(() => { load(); }, [load]);
+
+    // ⚠️ THE BOTTOM OF THE WORLD WAS BELOW THE FOLD, AND THE BOTTOM IS WHERE THE GAME IS. Filmed at 393x760 —
+    // a real phone — the site header, the gold/XP bar and the menu row come to about 475px before this feature
+    // gets a single pixel, so the rhythm meter, the patch dots and the foot of the trunk all sat under the
+    // edge of the screen. A tap-as-fast-as-you-can game whose meter you have to scroll to find is not the
+    // game. One scroll on first load puts the whole strip on screen, and only ever once: re-centring on every
+    // state change would yank the page out from under a thumb mid-swing.
+    useEffect(() => {
+        if (!state || centred.current || !worldRef.current) return;
+        centred.current = true;
+        worldRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, [state]);
 
     const arm = useCallback(() => {
         if (armed.current) return;
@@ -280,7 +294,7 @@ export default function ForestClient() {
             {err ? <p className="fr-err" role="alert">{err}</p> : null}
 
             {/* ── THE WOOD ── one strip of forest, and you are standing in it. */}
-            <div className="fr-world">
+            <div className="fr-world" ref={worldRef}>
                 {/* Parallax. Two copies of the same backdrop moving at different rates is what turns a sideways
                     slide into walking — the far trees lag, the near ones sweep past. */}
                 <span className="fr-far" aria-hidden="true"
@@ -444,7 +458,7 @@ export default function ForestClient() {
                 /* ── THE WORLD ─────────────────────────────────────────────────────────────────────
                    A window onto a strip of forest six screens wide. Tall on purpose: a redwood you can see the
                    top of is not a redwood, and the whole art direction is trunks running out of frame. */
-                .fr-world { position: relative; width: 100%; height: min(66vh, 560px); overflow: hidden;
+                .fr-world { position: relative; width: 100%; height: min(62vh, 520px); overflow: hidden;
                     border-radius: 14px; background: #070d10; touch-action: manipulation;
                     box-shadow: inset 0 0 90px rgba(0,0,0,.85); }
                 .fr-far, .fr-near { position: absolute; inset: -4% -30% -4% -30%; background-size: cover;
