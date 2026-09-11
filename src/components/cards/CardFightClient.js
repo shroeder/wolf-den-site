@@ -143,6 +143,10 @@ export default function CardFightClient({ fixture, run = null }) {
         }).catch(() => null);
         const d = await r?.json().catch(() => null);
         setBusy(false);
+        // The server saying "you are running code I removed". Costs nothing to honour and it is the whole fix
+        // -- the run is server-side, so a reload lands back in the same room. Here for the NEXT deploy that
+        // changes this contract, not for the one that added it.
+        if (d?.reload) { window.location.reload(); return null; }
         if (d?.run) setRunState(d.run);
         return d?.run || null;
     }, []);
@@ -155,19 +159,6 @@ export default function CardFightClient({ fixture, run = null }) {
         reported.current = "win";
     }
 
-    // ── TELLING THE SERVER HOW IT ENDED, EXACTLY ONCE ────────────────────────────────────────────────
-    // `reported` guards the double-fire: the effect re-runs on every state change after the fight is over,
-    // and posting a win twice would put three fresh cards on a table that already had a pick made against it.
-    useEffect(() => {
-        if (!run || !fight.over || reported.current === fight.over) return;
-        reported.current = fight.over;
-        // The one guarded place a fight can end, so the fanfare cannot double-fire either.
-        sfx(fight.over === "win" ? "win" : "lose");
-        // `hp` is still sent, and the server no longer believes it: it replays `log` and banks the health
-        // the replay ended on. It is kept because a mismatch between the two is the signal that somebody is
-        // either cheating or that the replay has drifted from the screen, and it is worth knowing which.
-        post(fight.over === "win" ? "won" : "dead", { hp: fight.hero.hp, log: fight.log || [] });
-    }, [run, fight.over, fight.hero.hp, post]);
     // ── THE HAND IS ALWAYS INSPECTING SOMETHING ─────────────────────────────────────────────────────
     // Luke: "I dont know that tap and hold is gonna be ideal. Oftentimes when you're playing Slay the Spire on
     // the computer you quickly hover over a bunch of different cards... it should already be in inspection
@@ -212,15 +203,59 @@ export default function CardFightClient({ fixture, run = null }) {
     const fightRef = useRef(fight);
     const actingRef = useRef(false);
     const land = useCallback((next) => { fightRef.current = next; setFight(next); }, []);
-    // ── WHAT THE PLAYER ACTUALLY DID, KEPT ON THE FIGHT ITSELF ──────────────────────────────────────
-    // The server replays this to check the win (see replayFight). It rides the state object rather than a
-    // ref for two reasons: `run.fight` is already saved and restored at the end of every turn, so a reload
-    // mid-fight keeps the log for free, and `startFight` returns an object without one, so a new fight
-    // cannot inherit the last fight's moves.
-    //
-    // Appended AFTER the engine call and against the state that call was made on, so the order is the order
-    // the rules saw. Nothing in it is a claim -- a step is a move, and an illegal move fails the replay.
-    const logged = useCallback((prev, next, step) => ({ ...next, log: [...(prev?.log || []), step] }), []);
+    // ── WHAT THE PLAYER DID, WAITING TO BE SENT ─────────────────────────────────────────────────────
+    // The server owns the fight. This is the queue of moves it has not been told about yet -- the turn in
+    // progress -- and it is flushed at the end of a turn, when a bottle is opened, and the instant the fight
+    // is over. Everything the screen does between flushes is a PREDICTION: the same engine, the same seed, so
+    // it lands on the same state the server will, and the server's answer replaces it either way.
+    const pending = useRef([]);
+    const queue = useCallback((move) => { pending.current = [...pending.current, move]; }, []);
+
+    // ⚠️ THE SERVER'S FIGHT WINS. Whatever the screen predicted, the run that comes back carries the real
+    // fight and the screen takes it -- with the art re-attached, because the held state carries numbers and
+    // the pictures belong to the fixture.
+    const accept = useCallback((next) => {
+        // A room that ENDED comes back with no fight on it and the reward already dealt. The screen keeps the
+        // state it predicted -- that is the one the death or the victory is animating out of -- and the run
+        // beside it carries what was won.
+        if (!next?.fight?.hand || next.fight.foes?.length !== fixture.foes.length) return;
+        land({
+            ...next.fight,
+            hero: { ...next.fight.hero, art: fixture.hero.art, flip: fixture.hero.flip, name: fixture.hero.name },
+            foes: next.fight.foes.map((f, i) => ({
+                ...f, art: fixture.foes[i]?.art ?? f.art, flip: fixture.foes[i]?.flip ?? f.flip,
+            })),
+        });
+    }, [land, fixture]);
+
+    // ── SENDING THE TURN ────────────────────────────────────────────────────────────────────────────
+    // One request per turn, which is what the old per-turn save already cost. The queue is emptied BEFORE the
+    // request goes, so a second flush racing this one cannot send the same move twice -- a double-played card
+    // is the one mistake this design could make and it would be invisible until somebody's health was wrong.
+    const flush = useCallback(async () => {
+        if (!run || !pending.current.length) return null;
+        const moves = pending.current;
+        pending.current = [];
+        const next = await post("act", { moves });
+        if (next) accept(next);
+        return next;
+    }, [run, post, accept]);
+
+    // ── TELLING THE SERVER HOW IT ENDED, EXACTLY ONCE ────────────────────────────────────────────────
+    // `reported` guards the double-fire: the effect re-runs on every state change after the fight is over,
+    // and posting a win twice would put three fresh cards on a table that already had a pick made against it.
+    useEffect(() => {
+        if (!run || !fight.over || reported.current === fight.over) return;
+        reported.current = fight.over;
+        // The one guarded place a fight can end, so the fanfare cannot double-fire either.
+        sfx(fight.over === "win" ? "win" : "lose");
+        // ⚠️ THIS NO LONGER REPORTS AN OUTCOME. It used to post "won" with the health the browser said it
+        // finished on, which is the whole thing that was wrong: an ending was a claim. It sends the last of
+        // the moves, and the server decides what they came to. Killing the last creature mid-turn is the case
+        // that lands here -- there is no end-turn to carry it, so the queue has to go now.
+        flush();
+    }, [run, fight.over, flush]);
+
     // WHICH foe is mid-beat, and whether it is swinging or guarding. One at a time, by construction.
     const [actor, setActor] = useState(null);
     const [played, setPlayed] = useState(null);
@@ -383,7 +418,9 @@ export default function CardFightClient({ fixture, run = null }) {
         const tgt = target === "self" ? 0 : target;
         const res = playCard(fight, uid, tgt);
         const events = res.events;
-        const state = logged(fight, res.state, ["p", uid, tgt]);
+        const state = res.state;
+        // Predicted on screen, queued for the server. It arrives with the rest of the turn.
+        queue(["p", uid, tgt]);
         // Booked NOW, whatever the picture does next. The next tap and End turn both read this.
         fightRef.current = state;
         const willStrike = Boolean(
@@ -498,9 +535,13 @@ export default function CardFightClient({ fixture, run = null }) {
         // dead control that looks alive is the worst version of any bug.
         try {
             sfx("potion");
-            const next = logged(fightRef.current, drinkPotion(fightRef.current, id), ["d", id]);
+            const next = drinkPotion(fightRef.current, id);
             land(next);
-            await post("drink", { slot, hp: next.hero.hp });
+            // Sent straight away rather than with the rest of the turn: the belt is the RUN's, so the bottle
+            // is not actually gone until the server has spent it, and a belt on screen that still shows a
+            // potion somebody drank is the kind of thing a second thumb spends twice.
+            queue(["d", slot]);
+            await flush();
             return next;
         } finally {
             setDrinking(null);
@@ -518,8 +559,12 @@ export default function CardFightClient({ fixture, run = null }) {
     const onForfeit = useCallback(() => {
         if (fight.over) return;
         setAskForfeit(false);
+        // Shown at once, told to the server on its own action. Giving up is the ONE ending a player is allowed
+        // to declare, because the only thing it can ever do is cost them the run.
+        pending.current = [];
         land(forfeit(fight));
-    }, [fight]);
+        if (run) post("forfeit");
+    }, [fight, run, post, land]);
 
     /**
      * ── THE PARTY TAKES ITS TURN, ONE AT A TIME ─────────────────────────────────────────────────────────
@@ -584,11 +629,10 @@ export default function CardFightClient({ fixture, run = null }) {
             timers.push(setTimeout(() => setActor(null), step.at + 300));
         }
         timers.push(setTimeout(() => {
-            // The whole foe turn is ONE step in the log -- there is nothing in it the player chose, and the
-            // engine's own endTurn() walks the identical sequence the plan above walked, which is what the
-            // server replays. Stamped on the state the turn ENDED on, carrying everything played before it.
+            // The whole foe turn is ONE move -- there is nothing in it the player chose, and the engine's own
+            // endTurn() walks the identical sequence the plan above walked, which is what the server runs.
             const done = finishFoeTurn(live);
-            const ended = logged(fight, done.state, ["e"]);
+            const ended = done.state;
             land(ended);
             pushFloats(done.events);
             setActor(null);
@@ -598,7 +642,12 @@ export default function CardFightClient({ fixture, run = null }) {
             // covers ten taps. Not for a fight that just ended — `won`/`dead` are posted by the effect
             // above and they clear the held fight themselves — and not for a bare ?seed= fight, which has
             // no run to hold anything.
-            if (run && !ended.over) post("save", { fight: ended });
+            // ── AND THE TURN GOES TO THE SERVER ──────────────────────────────────────────────────
+            // Queued last, after every card that was thrown during it, so the order the server applies is the
+            // order the player played. Sent whether or not the fight ended: a room that ended IS the request
+            // that ends it, and the run that comes back carries the reward.
+            queue(["e"]);
+            if (run) flush();
         }, at + 220));
         turnTimers.current = timers;
     }, [fight, acting, pushFloats]);

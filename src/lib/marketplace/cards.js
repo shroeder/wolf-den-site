@@ -11,7 +11,7 @@ import {
     ASC_MAX, FINAL_ACT, POTION_DROP_BASE, ascPotionScale, ascRule, beltSize, buildShop, canUpgrade,
     cardById, drawOffer, encounterById, levelSharpens, openingRun,
     levelWeight, levelsCrossed, nextRand, perkSum, pickEncounter, rankFor, runScore, stopAt, unlockTrack, unlockedCards,
-    upgradedId, livingFoes, replayFight, startFight,
+    upgradedId, livingFoes, applyMoves, startFight,
 } from "@/lib/marketplace/cards-kit.js";
 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -270,7 +270,7 @@ export async function recordRun(buyerId, run, outcome) {
     await db.query(
         `INSERT INTO mkt_cards_result
              (buyer_id, outcome, act, stop, score, hp, hp_max, deck_size, seed, deck, perks, asc_level,
-              unverified, unverified_why)
+              refused, refused_why)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13, $14)`,
         [
             buyerId, outcome,
@@ -284,10 +284,11 @@ export async function recordRun(buyerId, run, outcome) {
             (run.deck || []).length, Number(run.seed) || 0,
             JSON.stringify(run.deck || []), JSON.stringify(run.perks || []),
             Math.max(0, Math.min(ASC_MAX, Number(run.asc) || 0)),
-            // How many of this run's rooms did not replay to the health they claimed, and what the replay
-            // said about the last one. Zero for every honest run; see verifyWin and migration 443.
-            Math.max(0, Math.min(32767, Number(run.unverified) || 0)),
-            run.unverified ? String(run.lastUnverified || "").slice(0, 120) : null,
+            // How many moves the server REFUSED during this run, and what it said about the last one. Zero
+            // for every honest run: the screen runs the same engine and cannot offer an illegal move. See
+            // the note in the run route's `act`, and migration 443 for what this column used to mean.
+            Math.max(0, Math.min(32767, Number(run.refused) || 0)),
+            run.refused ? String(run.lastRefused || "").slice(0, 120) : null,
         ]
     ).catch(() => {});
     run.recorded = true;
@@ -721,60 +722,80 @@ export async function cardOffers(buyerId, run) {
  * The ladder still supplies the CURVE — how hard a fight is this far up — but the map now supplies the
  * position, so `stop` is the row you are standing on rather than a step in a straight line.
  */
-// ── DID THIS FIGHT ACTUALLY HAPPEN ───────────────────────────────────────────────────────────────────────────
-// The run route's own header said it: "the day this pays a single coin, this is the file that changes." It
-// pays now -- pet XP to every animal whose cards were in the deck, and a ladder that hands over four pets
-// nothing else in the game can give you -- so the fight stopped being something the client gets to report.
+// ── THE FIGHT IS THE SERVER'S ─────────────────────────────────────────────────────────────────────────────────
+// This replaced a verifier, and the verifier was the wrong shape. It let the browser play the fight and then
+// re-ran it here to see whether the answer was allowed -- which means the rules lived in two places, the
+// server's copy only ever ran in judgement, and a disagreement between them was a support problem rather than
+// an impossibility. The browser could still SAY "I won this room at 34", and everything after that was the
+// server arguing with it.
 //
-// Nothing about the engine moved. It is pure and seeded, which is what makes this cheap: the server already
-// builds the identical fixture the page handed the browser (runFixture, the same call the page makes), so
-// handing back the ordered list of what the player DID is enough to run the whole fight again here and look
-// at the end of it. No physics, no clock, no randomness that is not the seed's.
+// So the browser does not say that any more. There is no "I won" to send. The server builds the fight when the
+// room is entered, holds it, and is the only thing that ever applies a move to it. What a browser sends is what
+// the player DID -- a list of plays, drinks and end-turns -- and what it gets back is the fight, as it now is.
+// An outcome is something the server NOTICES, never something it is told.
 //
-// ⚠️ THE HEALTH COMES FROM THE REPLAY, NOT FROM THE CLIENT. That is the point of the whole exercise. It also
-// closes a smaller hole beside it: `drink` lets the client post an hp mid-fight, so the number on the run row
-// during a room is not trustworthy either -- but the room ENDS here, and what it ends on is computed.
+// This is affordable because the engine is pure and seeded and the unit is a TURN, not a tap: one request per
+// end-turn, which is exactly the cadence the old per-turn save already cost. See CLAUDE.md on round trips --
+// a move-per-request design would have been the honest-looking answer and a ruinous one.
 //
-// ⚠️ AND THE FIGHT STARTS FROM THE HEALTH STAMPED AT THE DOOR, not run.hp. Same reason: a potion drunk in the
-// third turn has already moved run.hp, and replaying from a moved number would fail every honest fight that
-// had a potion in it. `enter` writes run.at.hp; anything older falls back and is reported unverifiable rather
-// than wrong.
-export async function verifyWin(buyerId, run, log) {
+// The client still runs the same engine, for the picture. It plays the turn locally so a card moves the moment
+// it is thrown, sends the moves, and takes the server's fight as the truth when it answers. Same rules, same
+// seed, so they agree; when they do not, the server wins and the screen corrects itself.
+export async function advanceFight(buyerId, run, moves) {
     if (!run?.at) return { ok: false, why: "no_room" };
-    const entry = Number(run.at.hp);
-    if (!Number.isFinite(entry) || entry <= 0) return { ok: false, why: "no_entry_hp" };
+    if (run.done) return { ok: false, why: "run_over" };
+    if (!FIGHT_ROOMS.has(run.at.kind || "fight")) return { ok: false, why: "not_a_fight" };
+    // ⚠️ A ROOM IS WON ONCE. `run.fight` is cleared the moment the creatures are dead, and `run.at` stays put
+    // until the reward is taken -- so without this, moves posted into a room that is ALREADY over would find
+    // no fight, deal a fresh one from the seed, kill it again and pay the room a second time. That is the same
+    // shape of hole the old "won" action had, rebuilt by accident, and it is the reason the flag is on the
+    // ROOM rather than on the fight: the fight is gone by then, which is precisely the problem.
+    if (run.at.won) return { ok: false, why: "room_already_won" };
+    // ⚠️ BUILT HERE IF IT DOES NOT EXIST, which is what makes the room un-skippable: a fight the server has
+    // never dealt cannot be reported as won, because there is nothing to win. Older runs mid-room when this
+    // shipped land here on their next move and get the same fight they were already looking at -- the fixture
+    // is a pure function of the seed and the room, so it rebuilds identically.
+    if (!run.fight) run.fight = await dealFight(buyerId, run);
+    const out = applyMoves(run.fight, moves, {
+        // The belt belongs to the run, so spending from it happens here and only here -- a potion the run does
+        // not hold is not a move, and a slot cannot be drunk twice because it is gone by the next move.
+        potionAt: (slot) => {
+            const id = (run.potions || [])[slot];
+            if (!id) return null;
+            run.potions = (run.potions || []).filter((_, i) => i !== slot);
+            return id;
+        },
+    });
+    if (!out.ok) return out;
+    run.fight = out.state;
+    return { ok: true, state: out.state };
+}
+
+/** The fight this room is, dealt from the room and the seed alone. */
+export async function dealFight(buyerId, run) {
     const fixture = await runFixture(buyerId, run);
-    const start = startFight({
+    return startFight({
         seed: fixture.seed,
         asc: fixture.asc || 0,
         kind: fixture.kind || "fight",
-        // The identical four arguments CardFightClient hands it, with the door's health in place of the
-        // page's -- which at page-render time WAS the door's health. Same fight, same shuffle, same hand.
-        hero: { ...fixture.hero, hp: entry, hpMax: run.hpMax },
+        // The health at the door. run.hp moves while the room is open -- a potion is drunk, a creature lands a
+        // blow -- and the fight has to begin on the number the player walked in carrying.
+        hero: { ...fixture.hero, hp: Number(run.at?.hp) || run.hp, hpMax: run.hpMax },
         foes: fixture.foes,
         deck: run.deck || null,
         perks: run.perks || [],
     });
-    // ⚠️ "NO LOG AT ALL" IS NOT "THE LOG DID NOT FINISH THE FIGHT", and telling them apart is the whole
-    // difference between a deploy and a cheat. A player whose tab was open when this shipped is still running
-    // the OLD javascript: it posts a win with no log, the replay walks nothing, the foes are all still
-    // standing, and it reports `foes_alive` -- indistinguishable from somebody skipping the fight entirely.
-    // That happened within twenty minutes of launch, to a member four rooms into act three.
-    //
-    // It heals itself on their next reload and it must never be counted as cheating, so it says so.
-    if (!Array.isArray(log) || log.length === 0) return { ok: false, why: "no_log" };
-    const out = replayFight(start, log);
-    if (!out.ok) return { ok: false, why: out.why };
-    // The detail is the diagnosis: a log that ran out with one foe on 3hp is a replay that drifted, and a
-    // log of forty steps that leaves everything at full is somebody feeding it nonsense. Reading "foes_alive"
-    // on its own tells you neither.
-    const left = livingFoes(out.state);
-    if (left.length > 0) {
-        return { ok: false, why: `foes_alive ${left.length}/${(out.state.foes || []).length} (${left.map((f) => f.hp).join(",")}) after ${log.length} steps` };
-    }
-    const hp = Math.round(Number(out.state?.hero?.hp) || 0);
-    if (hp <= 0) return { ok: false, why: "hero_dead" };
-    return { ok: true, hp: Math.min(run.hpMax, hp) };
+}
+
+/** Which rooms are a fight at all. A rest is not something you can send moves to. */
+export const FIGHT_ROOMS = new Set(["fight", "elite", "boss"]);
+
+/** What the server's own fight says has happened, which is the only opinion there is. */
+export function fightOutcome(fight) {
+    if (!fight) return null;
+    if (livingFoes(fight).length === 0) return "won";
+    if ((Number(fight.hero?.hp) || 0) <= 0) return "dead";
+    return null;
 }
 
 export async function runFixture(buyerId, run) {

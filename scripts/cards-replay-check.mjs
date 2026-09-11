@@ -19,7 +19,7 @@
 //   node scripts/cards-replay-check.mjs 600
 import {
     buildParty, canPlay, endTurn, finishFoeTurn, foeAct, heroEndTurn, livingFoes, pickEncounter, playCard,
-    replayFight, startFight, startFoeTurn, STARTER_DECK, PERK_IDS, POTION_IDS, drinkPotion, CARDS,
+    applyMoves, startFight, startFoeTurn, STARTER_DECK, PERK_IDS, POTION_IDS, drinkPotion, CARDS,
 } from "../src/lib/marketplace/cards-kit.js";
 
 const ROUNDS = Number(process.argv[2] || 400);
@@ -70,6 +70,7 @@ for (let r = 0; r < ROUNDS; r += 1) {
     const seed = (r * 7919 + 13) >>> 0;
     let state = fresh(seed);
     const log = [];
+    const belt = [];
     let guard = 0;
     while (!state.over && guard++ < 200) {
         const playable = (state.hand || []).filter((c) => canPlay(state, c.uid));
@@ -84,7 +85,7 @@ for (let r = 0; r < ROUNDS; r += 1) {
             // A potion, which is the one move that changes the fight without costing a card.
             const id = POTION_IDS[rand(POTION_IDS.length)];
             const next = drinkPotion(state, id);
-            if (next !== state) { state = next; log.push(["d", id]); drank += 1; }
+            if (next !== state) { state = next; log.push(["d", 0]); belt.push(id); drank += 1; }
         } else {
             // 1. PARITY — the screen's stepping against the engine's own endTurn, on the same state.
             const byScreen = screenEndTurn(state);
@@ -104,8 +105,11 @@ for (let r = 0; r < ROUNDS; r += 1) {
     if (state.over === "win") wins += 1;
 
     // 2. FIDELITY — the log, replayed from scratch by the server.
-    const out = replayFight(fresh(seed), log);
-    if (!out.ok) { replayBad += 1; if (replayBad === 1) console.log("REPLAY REFUSED on seed", seed, out.why); continue; }
+    // The server resolves a slot against the run's belt; here the belt is just the bottles in the order they
+    // were drunk, which is the same question answered by the same call.
+    let sip = 0;
+    const out = applyMoves(fresh(seed), log, { potionAt: () => belt[sip++] || null });
+    if (!out.ok) { replayBad += 1; if (replayBad === 1) console.log("MOVES REFUSED on seed", seed, out.why); continue; }
     if (shape(out.state) !== shape(state)) {
         replayBad += 1;
         if (replayBad <= 1) {

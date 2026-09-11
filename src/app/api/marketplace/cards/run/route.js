@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
     CARDS_UNLOCKED, bossOffers, bumpCardProgress, cardOffers, grantForRoom, loadRun, nextAct, potionDrop,
-    recordRun, saveRun, shopStock, startRun, takePerk, verifyWin,
+    recordRun, saveRun, shopStock, startRun, takePerk, advanceFight, fightOutcome, FIGHT_ROOMS, dealFight,
 } from "@/lib/marketplace/cards.js";
 import { applyEventChoice, eventById, pickEvent } from "@/lib/marketplace/cards-events.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
@@ -17,18 +17,143 @@ import {
 const DECK_FLOOR = 5;
 import { withRequestLogging } from "@/lib/server-logger";
 
+// ── WHAT A WON ROOM PAYS ─────────────────────────────────────────────────────────────────────────────────────
+// Lifted out of the old client-callable "won" action unchanged. It is called now by the server itself, the
+// moment its OWN fight has no creature left standing in it -- see `act`. Nothing reaches this because a
+// browser said so.
+//
+// It reads run.hp, which by then is the health the server's fight ended on.
+async function roomWon(buyerId, run) {
+                run.fight = null;           // won: there is no fight to come back to, only a reward
+                // Stamped on the ROOM, because the fight is what gets cleared and the room is what stays. It
+                // is what stops a second set of moves being posted into a room that is already paid for --
+                // see the guard in advanceFight.
+                run.at = { ...run.at, won: true };
+                // Iron Ration pays here — after a win, before the reward, so the number on the card is the
+                // number you keep.
+                // Warm Blood pays after every win; Bone Broth pays only when the win nearly cost you the
+                // run — read against the health the FIGHT ended on, before the ration heals it, or a hero on
+                // 20 would be judged as a hero on 32 and the trinket would never fire.
+                const spent = run.hp < run.hpMax / 2;
+                const ration = (run.perks || []).reduce((n, id) => n
+                    + (perkById(id)?.healAfter || 0)
+                    + (spent ? (perkById(id)?.healAfterLow || 0) : 0), 0);
+                if (ration) run.hp = Math.min(run.hpMax, run.hp + ration);
+                // ── AND WHAT A WIN IS WORTH IN COIN ──────────────────────────────────────────────
+                // Their Ceramic Fish family: a trinket that pays a little every time, which over sixteen
+                // rooms is a card off the shelf you could not otherwise have bought. Paid here beside the
+                // ration because "the fight is won" is one moment and should have one place.
+                const purse = perkSum(run.perks, "emberPerWin");
+                if (purse) run.embers = (run.embers || 0) + purse;
+                const wonKind = run.at?.kind || "fight";
+                // An elite hands over a perk for the health it just cost you.
+                if (run.at?.kind === "elite") {
+                    // Their Mango-on-a-kill idea: an elite is the only fight worth growing for, and a
+                    // trinket that pays only there is a reason to take the room you would rather walk past.
+                    const grew = perkSum(run.perks, "maxHpPerElite");
+                    if (grew) { run.hpMax += grew; run.hp = Math.min(run.hpMax, run.hp + grew); }
+                    const got = grantForRoom(run, run.at.row, run.at.lane, "elite");
+                    // takePerk owns the health bump too — see the note on it. Two copies of that is Ember
+                    // Heart paying its +8 from an elite and not from the shop.
+                    if (got.perk) takePerk(run, got.perk);
+                    if (got.embers) run.embers = (run.embers || 0) + got.embers;
+                    // ── AND THE SCREEN IS TOLD WHICH ONE ─────────────────────────────────────────
+                    // It used to appear in the strip along the top and nowhere else — a strip nobody is
+                    // looking at, because the same request also deals three cards to choose between. A
+                    // trinket is carried for the rest of the run and has to be READ once; see CardGot.
+                    // Cleared when the reward is taken, like `dropped`.
+                    if (got.perk) run.gotPerk = got.perk;
+                }
+                // ── AND THE BOTTLE THE FIGHT PAID ────────────────────────────────────────────────
+                // See potionDrop: two combats in five, theirs, and the reserve a hero needs to arrive at an
+                // elite with. Keyed to the room so a re-posted win cannot pay twice, and a full belt is said
+                // out loud rather than swallowed — the chest already works this way.
+                const dropKey = `${run.at?.row ?? 0}:${run.at?.lane ?? 0}`;
+                if (run.dropped?.key !== dropKey) {
+                    // ── ⚠️ AND THE MONEY, WHICH A WON FIGHT HAS NEVER PAID ───────────────────────
+                    // Found by playing it: five fights won and the purse never moved off sixty. Embers came
+                    // from chests, from skipping a card and from an elite that had nothing left to give —
+                    // and from nothing else. Every combat in their game pays gold, and it is what makes the
+                    // merchant a room you can use rather than scenery: card removal is the strongest
+                    // purchase in Spire and ours was priced at 55 against an income of almost zero.
+                    //
+                    // Worse, the SIMULATOR has been paying 15 a win all along, so every number it has
+                    // printed about shops, burns and the Bonesetter was for a player with money the browser
+                    // never gave them. Paid inside the same once-per-room guard the bottle uses, so a
+                    // re-posted win cannot pay twice.
+                    run.embers = (run.embers || 0) + (wonKind === "boss" ? 30 : wonKind === "elite" ? 30 : 15);
+                    const bottle = potionDrop(run, run.at?.row ?? 0, run.at?.lane ?? 0);
+                    const room = (run.potions || []).length < beltSize(run.perks, run.asc);
+                    if (bottle && room) run.potions = [...(run.potions || []), bottle];
+                    run.dropped = bottle ? { key: dropKey, potion: bottle, spilled: !room } : { key: dropKey };
+                }
+                const wasBoss = run.at?.kind === "boss" || run.stop > RUN_LENGTH;
+                // WON IS WON, and an elite or a boss is also its own line in the ledger — those are the two
+                // counts the harder unlocks are keyed to, and they are the two a player remembers doing.
+                await bumpCardProgress(buyerId, "fights", { bestStop: run.stop });
+                if (run.at?.kind === "elite") await bumpCardProgress(buyerId, "elites");
+                // ── RUNG SIXTEEN: AN ELITE LEAVES SOMETHING BEHIND ──────────────────────────────────
+                // The relic an elite pays is the reason to fight one, and past rung fifteen that trade needs
+                // a second side to it. Rolled off the run's own seed and the stop, so the same climb dealt
+                // twice hands out the same curse — a run that reloads must not be able to reroll its price.
+                if (run.at?.kind === "elite" && ascRule(run.asc || 0, 16)) {
+                    const pick = CURSE_POOL[((run.seed >>> 0) + run.stop * 7717) % CURSE_POOL.length];
+                    run.deck = [...(run.deck || []), pick];
+                }
+                if (wasBoss) await bumpCardProgress(buyerId, "bosses");
+                if (wasBoss) {
+                    // ── THE BOSS IS A GATE ───────────────────────────────────────────────────────────
+                    // Luke, having just killed one: "the run isn't supposed to end when you beat the boss...
+                    // you get a really powerful enhancement that you get to choose from, and then you keep
+                    // going." Which is Spire exactly: the relic is the payment for the act, and the next act
+                    // opens harder. Ending here finished every good run at the moment the deck got
+                    // interesting.
+                    //
+                    // The LAST act still ends — a game with no end is not a run — and that is the only place
+                    // `done: "won"` is set now.
+                    run.offers = null;
+                    // ── AND THE THIRD BOSS IS A DOOR, IF YOU BROUGHT THE KEYS ────────────────────
+                    // Three acts still finishes the game and still counts as a win — see the note on ACTS.
+                    // What all three keys buy is the right to keep going instead, into a corridor that ends
+                    // at the only fight in this game that was built to beat a finished deck.
+                    const opensDoor = (run.act || 1) === ACTS && hasAllKeys(run);
+                    if ((run.act || 1) >= FINAL_ACT || ((run.act || 1) >= ACTS && !opensDoor)) {
+                        run.done = "won";
+                        run.bossOffers = null;
+                        // ── AND IT GOES IN THE LEDGER ────────────────────────────────────────
+                        // The one moment a climb is finished. See recordRun: written once, here, and the
+                        // stamp it leaves means a reloaded result screen cannot write a second row.
+                        await recordRun(buyerId, run, "won");
+                    } else {
+                        run.bossOffers = bossOffers(run);
+                    }
+                } else {
+                    run.offers = await cardOffers(buyerId, run);
+                }
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ── WHERE A RUN MOVES FORWARD ────────────────────────────────────────────────────────────────────────────────
-// The rules run in the browser and this route CHECKS THEM. That is the change the old note here promised —
-// "the day this pays a single coin, this is the file that changes" — and the day came with the pet XP and the
-// four ladder pets. The fight did not have to move: cards-kit was written pure, seeded and clockless exactly
-// so the server could run the same fight again, which is what `won` now does with the player's own move log.
+// ── WHERE A RUN MOVES FORWARD, AND WHERE THE FIGHT IS PLAYED ─────────────────────────────────────────────────
+// The old note here said "the day this pays a single coin, this is the file that changes". It went on to pay
+// pet XP and four pets, and the first attempt at the change was the wrong shape: the browser still played the
+// fight and still SAID "I won this room at 34 health", and the server re-ran the moves afterwards to decide
+// whether to believe it. That is a verifier, and a verifier means the rules live in two places, the server's
+// copy only ever runs in judgement, and a disagreement is a support ticket rather than an impossibility.
+//
+// There is no "won" action here now, and no "dead" one either. The server deals the fight when the room is
+// entered (`enter`), holds it on the run, and is the only thing that ever applies a move to it (`act`). What a
+// browser sends is what the PLAYER DID — a list of plays, drinks and end-turns — and what it gets back is the
+// fight as it now is. An outcome is something this file NOTICES, never something it is told. The one ending a
+// player still declares is `forfeit`, because the only thing that can ever do is cost them the run.
+//
+// A TURN is the unit, not a tap. That is one request per end-turn, which is exactly what the old per-turn save
+// already cost — a move-per-request design would have been the honest-looking answer and a ruinous one. See
+// CLAUDE.md on round trips being the bill.
 //
 // Everything else here was already the server's and always has been: which room is reachable, which party
-// stands in it, every card offered, the shop's stock and its prices, the deck, the trinkets, the potions
-// spent. A client could never invent a card or a room. It could only ever claim a win, and now it cannot.
+// stands in it, every card offered, the shop's stock and its prices, the deck, the trinkets, the bottles.
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/marketplace/cards/run", async ({ internalError }) => {
         try {
@@ -125,6 +250,13 @@ export async function POST(request) {
                 if (kind === "merchant") {
                     run.shop = { stock: await shopStock(buyer.id, run, encSeed), bought: [], removed: false };
                 }
+
+                // ── AND IF IT IS A FIGHT, THE SERVER DEALS IT ───────────────────────────────────
+                // Here, on the way in, rather than on the first move. The hand, the shuffle and the creatures
+                // are decided by the room and the seed, so this is the same fight either way -- but dealing it
+                // at the door means the fight EXISTS before anybody can send a move to it, and a room the
+                // server never dealt can never come back reported as won.
+                if (FIGHT_ROOMS.has(kind)) run.fight = await dealFight(buyer.id, run);
 
                 await bumpCardProgress(buyer.id, "rooms", { bestStop: run.stop });
                 await saveRun(buyer.id, run);
@@ -364,135 +496,65 @@ export async function POST(request) {
                 return NextResponse.json({ run });
             }
 
-            if (action === "won") {
-                // ── THE FIGHT IS REPLAYED BEFORE IT IS BELIEVED ─────────────────────────────────────
-                // The header of this file said it: the day the run pays a single coin, this is what changes.
-                // It pays pet XP now, and four pets. verifyWin rebuilds the exact fixture the page handed the
-                // browser and runs the player's own moves through the engine again; the health banked is the
-                // health THAT ended on, never the number in the body.
-                //
-                // ⚠️ SHADOW FIRST. A verifier that rejects honest players is worse than no verifier, and this
-                // one has to agree with an animation loop that steps a foe turn by hand. So for now a failure
-                // is COUNTED and the room is allowed: `run.unverified` rides to the end of the run and is
-                // written on the result row, which makes one query answer "did anybody's fights not replay,
-                // and whose". When that column is quiet, swap the count for a 400 -- one line, right here.
-                const claimed = Math.max(1, Math.min(run.hpMax, Math.round(Number(body.hp) || run.hp)));
-                const seen = await verifyWin(buyer.id, run, body?.log).catch(() => ({ ok: false, why: "threw" }));
-                if (!seen.ok || seen.hp !== claimed) {
-                    run.unverified = (Number(run.unverified) || 0) + 1;
-                    run.lastUnverified = seen.ok ? `hp ${claimed} vs ${seen.hp}` : seen.why;
-                }
-                run.hp = seen.ok ? seen.hp : claimed;
-                run.fight = null;           // won: there is no fight to come back to, only a reward
-                // Iron Ration pays here — after a win, before the reward, so the number on the card is the
-                // number you keep.
-                // Warm Blood pays after every win; Bone Broth pays only when the win nearly cost you the
-                // run — read against the health the FIGHT ended on, before the ration heals it, or a hero on
-                // 20 would be judged as a hero on 32 and the trinket would never fire.
-                const spent = run.hp < run.hpMax / 2;
-                const ration = (run.perks || []).reduce((n, id) => n
-                    + (perkById(id)?.healAfter || 0)
-                    + (spent ? (perkById(id)?.healAfterLow || 0) : 0), 0);
-                if (ration) run.hp = Math.min(run.hpMax, run.hp + ration);
-                // ── AND WHAT A WIN IS WORTH IN COIN ──────────────────────────────────────────────
-                // Their Ceramic Fish family: a trinket that pays a little every time, which over sixteen
-                // rooms is a card off the shelf you could not otherwise have bought. Paid here beside the
-                // ration because "the fight is won" is one moment and should have one place.
-                const purse = perkSum(run.perks, "emberPerWin");
-                if (purse) run.embers = (run.embers || 0) + purse;
-                const wonKind = run.at?.kind || "fight";
-                // An elite hands over a perk for the health it just cost you.
-                if (run.at?.kind === "elite") {
-                    // Their Mango-on-a-kill idea: an elite is the only fight worth growing for, and a
-                    // trinket that pays only there is a reason to take the room you would rather walk past.
-                    const grew = perkSum(run.perks, "maxHpPerElite");
-                    if (grew) { run.hpMax += grew; run.hp = Math.min(run.hpMax, run.hp + grew); }
-                    const got = grantForRoom(run, run.at.row, run.at.lane, "elite");
-                    // takePerk owns the health bump too — see the note on it. Two copies of that is Ember
-                    // Heart paying its +8 from an elite and not from the shop.
-                    if (got.perk) takePerk(run, got.perk);
-                    if (got.embers) run.embers = (run.embers || 0) + got.embers;
-                    // ── AND THE SCREEN IS TOLD WHICH ONE ─────────────────────────────────────────
-                    // It used to appear in the strip along the top and nowhere else — a strip nobody is
-                    // looking at, because the same request also deals three cards to choose between. A
-                    // trinket is carried for the rest of the run and has to be READ once; see CardGot.
-                    // Cleared when the reward is taken, like `dropped`.
-                    if (got.perk) run.gotPerk = got.perk;
-                }
-                // ── AND THE BOTTLE THE FIGHT PAID ────────────────────────────────────────────────
-                // See potionDrop: two combats in five, theirs, and the reserve a hero needs to arrive at an
-                // elite with. Keyed to the room so a re-posted win cannot pay twice, and a full belt is said
-                // out loud rather than swallowed — the chest already works this way.
-                const dropKey = `${run.at?.row ?? 0}:${run.at?.lane ?? 0}`;
-                if (run.dropped?.key !== dropKey) {
-                    // ── ⚠️ AND THE MONEY, WHICH A WON FIGHT HAS NEVER PAID ───────────────────────
-                    // Found by playing it: five fights won and the purse never moved off sixty. Embers came
-                    // from chests, from skipping a card and from an elite that had nothing left to give —
-                    // and from nothing else. Every combat in their game pays gold, and it is what makes the
-                    // merchant a room you can use rather than scenery: card removal is the strongest
-                    // purchase in Spire and ours was priced at 55 against an income of almost zero.
+            // ── THE ONLY WAY A FIGHT MOVES ──────────────────────────────────────────────────────────
+            // What the player DID, in order, for one turn: [["p", uid, target], ["d", slot], ["e"]]. The
+            // server applies it to ITS OWN held fight and then looks at the result. There is no "won" action
+            // and no "dead" action any more, because an outcome is not a thing a browser is allowed to have an
+            // opinion about -- the room is over when the server's own creatures are dead, and not before.
+            //
+            // A turn is the unit for the same reason the old save was: it is what somebody would mind
+            // replaying, and it is one request for ten taps. See CLAUDE.md on round trips.
+            if (action === "act") {
+                const out = await advanceFight(buyer.id, run, body?.moves);
+                if (!out.ok) {
+                    // The fight is untouched -- applyMoves builds forward and only assigns on success -- so an
+                    // illegal move leaves the room exactly as it was and the screen re-reads it.
                     //
-                    // Worse, the SIMULATOR has been paying 15 a win all along, so every number it has
-                    // printed about shops, burns and the Bonesetter was for a player with money the browser
-                    // never gave them. Paid inside the same once-per-room guard the bottle uses, so a
-                    // re-posted win cannot pay twice.
-                    run.embers = (run.embers || 0) + (wonKind === "boss" ? 30 : wonKind === "elite" ? 30 : 15);
-                    const bottle = potionDrop(run, run.at?.row ?? 0, run.at?.lane ?? 0);
-                    const room = (run.potions || []).length < beltSize(run.perks, run.asc);
-                    if (bottle && room) run.potions = [...(run.potions || []), bottle];
-                    run.dropped = bottle ? { key: dropKey, potion: bottle, spilled: !room } : { key: dropKey };
+                    // ⚠️ AND IT IS WRITTEN DOWN. This column was a shadow verifier's disagreement count; the
+                    // verifier is gone because the server plays the fight now, and what is worth counting
+                    // instead is a move the server REFUSED. For an honest player that is zero for ever -- the
+                    // screen runs the same engine and would not offer an illegal move. Anything else is a bug
+                    // of mine or somebody at the API by hand, and one query says which and whose.
+                    run.refused = (Number(run.refused) || 0) + 1;
+                    run.lastRefused = String(out.why || "").slice(0, 120);
+                    await saveRun(buyer.id, run);
+                    return NextResponse.json({ error: out.why, run }, { status: 400 });
                 }
-                const wasBoss = run.at?.kind === "boss" || run.stop > RUN_LENGTH;
-                // WON IS WON, and an elite or a boss is also its own line in the ledger — those are the two
-                // counts the harder unlocks are keyed to, and they are the two a player remembers doing.
-                await bumpCardProgress(buyer.id, "fights", { bestStop: run.stop });
-                if (run.at?.kind === "elite") await bumpCardProgress(buyer.id, "elites");
-                // ── RUNG SIXTEEN: AN ELITE LEAVES SOMETHING BEHIND ──────────────────────────────────
-                // The relic an elite pays is the reason to fight one, and past rung fifteen that trade needs
-                // a second side to it. Rolled off the run's own seed and the stop, so the same climb dealt
-                // twice hands out the same curse — a run that reloads must not be able to reroll its price.
-                if (run.at?.kind === "elite" && ascRule(run.asc || 0, 16)) {
-                    const pick = CURSE_POOL[((run.seed >>> 0) + run.stop * 7717) % CURSE_POOL.length];
-                    run.deck = [...(run.deck || []), pick];
+                const ended = fightOutcome(out.state);
+                if (ended === "won") {
+                    // The health the SERVER's fight ended on. This is the number the whole rewrite is about.
+                    run.hp = Math.max(1, Math.min(run.hpMax, Math.round(Number(out.state.hero?.hp) || 1)));
+                    await roomWon(buyer.id, run);
+                    await saveRun(buyer.id, run);
+                    return NextResponse.json({ run });
                 }
-                if (wasBoss) await bumpCardProgress(buyer.id, "bosses");
-                if (wasBoss) {
-                    // ── THE BOSS IS A GATE ───────────────────────────────────────────────────────────
-                    // Luke, having just killed one: "the run isn't supposed to end when you beat the boss...
-                    // you get a really powerful enhancement that you get to choose from, and then you keep
-                    // going." Which is Spire exactly: the relic is the payment for the act, and the next act
-                    // opens harder. Ending here finished every good run at the moment the deck got
-                    // interesting.
-                    //
-                    // The LAST act still ends — a game with no end is not a run — and that is the only place
-                    // `done: "won"` is set now.
-                    run.offers = null;
-                    // ── AND THE THIRD BOSS IS A DOOR, IF YOU BROUGHT THE KEYS ────────────────────
-                    // Three acts still finishes the game and still counts as a win — see the note on ACTS.
-                    // What all three keys buy is the right to keep going instead, into a corridor that ends
-                    // at the only fight in this game that was built to beat a finished deck.
-                    const opensDoor = (run.act || 1) === ACTS && hasAllKeys(run);
-                    if ((run.act || 1) >= FINAL_ACT || ((run.act || 1) >= ACTS && !opensDoor)) {
-                        run.done = "won";
-                        run.bossOffers = null;
-                        // ── AND IT GOES IN THE LEDGER ────────────────────────────────────────
-                        // The one moment a climb is finished. See recordRun: written once, here, and the
-                        // stamp it leaves means a reloaded result screen cannot write a second row.
-                        await recordRun(buyer.id, run, "won");
-                    } else {
-                        run.bossOffers = bossOffers(run);
-                    }
-                } else {
-                    run.offers = await cardOffers(buyer.id, run);
+                if (ended === "dead") {
+                    run.hp = 0;
+                    run.done = "dead";
+                    run.fight = null;
+                    await recordRun(buyer.id, run, "dead");
+                    await saveRun(buyer.id, run);
+                    return NextResponse.json({ run });
                 }
+                // Still standing. run.hp tracks the fight so the map, the strip and a reload all read one
+                // number -- and it is the server's number, not a reported one.
+                run.hp = Math.max(0, Math.round(Number(out.state.hero?.hp) || 0));
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }
 
-            // ── TAKE THE BOSS TRINKET, AND WALK INTO THE NEXT ACT ───────────────────────────────────
-            // One request, because they are one decision: there is no state worth having between "I choose
-            // the crown" and "act two is dealt". Legal only against the three actually on the table, which is
-            // also what makes a replayed request harmless — once they are cleared there is nothing to take.
+            // ── GIVING UP IS THE ONE ENDING A PLAYER DECLARES ───────────────────────────────────────
+            // And it is safe to let them, because it can only ever cost them the run. Spire has no in-combat
+            // forfeit; ours is a door out of a fight that has become unwinnable, and it ends the climb.
+            if (action === "forfeit") {
+                run.done = "dead";
+                run.fight = null;
+                run.gaveUp = true;
+                await recordRun(buyer.id, run, "dead");
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
             if (action === "bosspick") {
                 run.dropped = null;
                 const id = String(body?.id || "");
@@ -547,39 +609,6 @@ export async function POST(request) {
             // The engine state IS the fight (pure, seeded, serialisable — see the note at the top of
             // cards-kit), so holding it is holding the room. Written at the END of a turn, not per card: a
             // turn is the unit somebody would be annoyed to replay, and it is one write for ten taps.
-            if (action === "save") {
-                const snap = body?.fight;
-                // Shape-checked rather than trusted. It is the owner's own prototype and the engine runs in
-                // the browser anyway, but a malformed blob here is a run that cannot be loaded at all.
-                if (!snap || typeof snap !== "object" || !Array.isArray(snap.hand) || !Array.isArray(snap.foes)) {
-                    return NextResponse.json({ error: "bad_fight" }, { status: 400 });
-                }
-                run.fight = snap;
-                await saveRun(buyer.id, run);
-                return NextResponse.json({ run });
-            }
-
-            if (action === "drink") {
-                const idx = Number(body?.slot);
-                if (!Number.isInteger(idx) || !(run.potions || [])[idx]) {
-                    return NextResponse.json({ error: "no_such_potion" }, { status: 400 });
-                }
-                run.potions = run.potions.filter((_, i) => i !== idx);
-                if (Number.isFinite(Number(body?.hp))) {
-                    run.hp = Math.max(1, Math.min(run.hpMax, Math.round(Number(body.hp))));
-                }
-                await saveRun(buyer.id, run);
-                return NextResponse.json({ run });
-            }
-
-            if (action === "dead") {
-                run.done = "dead";
-                run.fight = null;              // the room is over; nothing to come back to
-                await recordRun(buyer.id, run, "dead");
-                await saveRun(buyer.id, run);
-                return NextResponse.json({ run });
-            }
-
             if (action === "restart") {
                 // Explicit, because loading no longer deals one — see startRun. A run given up is still a
                 // run that happened, and it goes in the history saying how far it actually got.
@@ -590,6 +619,14 @@ export async function POST(request) {
                 return NextResponse.json({ run: await startRun(buyer.id, Number(body?.asc ?? run.asc ?? 0)) });
             }
 
+            // ── A TAB THAT HAS NOT RELOADED SINCE THIS SHIPPED ──────────────────────────────────────
+            // "won", "dead", "save" and "drink" were how the old client drove a fight, and all four are gone
+            // on purpose -- three of them let the browser assert something. A browser still holding that code
+            // is not doing anything wrong, it is just old, and the only thing it needs is to fetch itself
+            // again. The run underneath it is untouched and it comes back to the room it was standing in.
+            if (["won", "dead", "save", "drink"].includes(action)) {
+                return NextResponse.json({ error: "stale_client", reload: true, run }, { status: 409 });
+            }
             return NextResponse.json({ error: "bad_action" }, { status: 400 });
         } catch (error) {
             return internalError(error, { event: "cards.run.failure" });

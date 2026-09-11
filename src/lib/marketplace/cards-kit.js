@@ -4718,55 +4718,50 @@ export function heroEndTurn(state) {
     };
 }
 
-// ── REPLAYING A FIGHT SOMEBODY ELSE CLAIMS TO HAVE WON ───────────────────────────────────────────────────────
-// The engine runs in the BROWSER. That was the right call for a prototype -- it is what let the rules be
-// retuned in a minute, and it is why there is a simulator at all -- but it means the server's only knowledge
-// of a fight was the client saying "I won, at 34 health". Everything AROUND the fight was already the
-// server's: the map and whether a room is reachable, the seed, which party stands in it, every card offer,
-// the shop's stock and prices, the deck, the trinkets. The fight itself was the one hole, and the run now
-// pays pet XP and hands over four pets nobody can get another way, so the hole had to close.
+// ── THE ONLY PLACE A MOVE IS APPLIED TO A FIGHT ──────────────────────────────────────────────────────────────
+// The engine is pure, seeded and clockless, so a fight is entirely decided by its inputs and the ORDER OF WHAT
+// THE PLAYER DID. That list is the only thing the server needs from a browser, and it is deliberately dumb:
+// ["p", uid, target], ["d", slot], ["e"]. Nothing in it can assert an outcome -- only an action, which is
+// either legal at that moment or is not. There is no "I won" to send.
 //
-// It closes without moving the engine, because the engine is PURE and SEEDED: same inputs, same fight, every
-// time, on any machine. The server already holds every input (runFixture builds the identical fixture the
-// page handed the client), so all it was missing is what the PLAYER did. That is this log -- the ordered list
-// of plays, drinks and end-turns, and nothing else. Hand it back and the whole fight can be run again on the
-// server and checked.
+// ⚠️ ONE IMPLEMENTATION, TWO CALLERS. The server walks this to ADVANCE its own held fight (advanceFight) and
+// the test walks it to prove a whole fight replays byte-identical (scripts/cards-replay-check.mjs). Two copies
+// of "what a move does" is two games, and the one nobody is looking at is the one that drifts.
 //
-// A log is deliberately tiny and dumb: ["p", uid, target], ["d", potionId], ["e"]. No state, no numbers, no
-// claims -- nothing in it can assert an outcome, only an action, and an action that was not legal at that
-// moment fails the replay. The health banked afterwards is the health the REPLAY ended on, never the number
-// the client sent.
+// A potion is a SLOT, not an id, because the belt is the run's and the run is the server's: `potionAt` is how
+// the caller turns a slot into a bottle and spends it. A caller with no belt (the test) can answer with
+// anything it likes.
 //
-// ⚠️ CAPPED. This runs on request CPU, which is the bill (see CLAUDE.md), and an unbounded array from a
-// client is an unbounded loop. A real fight is tens of steps; a thousand is already absurd.
-export const REPLAY_MAX = 2000;
+// ⚠️ CAPPED. This runs on request CPU, which is the bill (see CLAUDE.md), and an unbounded array from a client
+// is an unbounded loop. A real turn is a handful of moves; a thousand is already absurd.
+export const MOVES_MAX = 2000;
 
-export function replayFight(start, log) {
+export function applyMoves(start, moves, { potionAt = () => null } = {}) {
     if (!start) return { ok: false, why: "no_fight" };
-    const steps = Array.isArray(log) ? log : [];
-    if (steps.length > REPLAY_MAX) return { ok: false, why: "too_long" };
+    const list = Array.isArray(moves) ? moves : [];
+    if (list.length > MOVES_MAX) return { ok: false, why: "too_long" };
     let state = start;
-    for (const step of steps) {
+    for (const move of list) {
         // A move after the fight is over is not a fight anybody had.
         if (!state || state.over) return { ok: false, why: "move_after_over" };
-        const kind = Array.isArray(step) ? step[0] : null;
+        const kind = Array.isArray(move) ? move[0] : null;
         if (kind === "p") {
-            const uid = step[1];
-            const target = Math.max(0, Math.min((state.foes || []).length - 1, Number(step[2]) || 0));
+            const uid = move[1];
+            const target = Math.max(0, Math.min((state.foes || []).length - 1, Number(move[2]) || 0));
             // canPlay owns affordability, playability and whether that card is even in the hand -- the same
-            // check the screen makes before it lets a finger land on one.
+            // question the screen asks before it lets a finger land on one.
             if (!canPlay(state, uid)) return { ok: false, why: "illegal_play" };
             state = playCard(state, uid, target).state;
         } else if (kind === "d") {
-            // Whether the belt HELD that potion is the run's business, not the fight's -- the route spends it
-            // from run.potions on its own action and would have rejected one that was not there.
-            const next = drinkPotion(state, step[1]);
+            const id = potionAt(Number(move[1]));
+            if (!id) return { ok: false, why: "no_such_potion" };
+            const next = drinkPotion(state, id);
             if (next === state) return { ok: false, why: "illegal_drink" };
             state = next;
         } else if (kind === "e") {
             state = endTurn(state).state;
         } else {
-            return { ok: false, why: "bad_step" };
+            return { ok: false, why: "bad_move" };
         }
     }
     return { ok: true, state };
