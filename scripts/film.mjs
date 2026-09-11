@@ -20,7 +20,7 @@
 //     but it means two runs are never identical. Judge the SHAPE across frames, not one frame.
 import { spawn } from "node:child_process";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 
 import { QUIET_HIDE, QUIET_SEEN, quiet } from "./lib/shot-quiet.mjs";
 
@@ -273,7 +273,12 @@ writeFileSync(sheetPath, sheet);
 // Shoot the sheet itself, tall enough to hold every row.
 const rows = Math.ceil(frames.length / cols);
 await send("Emulation.setDeviceMetricsOverride", { width: 1500, height: Math.max(400, rows * 300 + 40), deviceScaleFactor: 1, mobile: false });
-await send("Page.navigate", { url: `file:///${sheetPath.replace(/\\/g, "/")}` });
+// ⚠️ RESOLVED TO AN ABSOLUTE PATH, BECAUSE A RELATIVE outBase SILENTLY PHOTOGRAPHED A CHROME ERROR PAGE.
+// "out/x-sheet.html" became "file:///out/x-sheet.html", a path at the root of the drive that does not
+// exist — so the rig reported "44 frames over 2857ms" and handed back a picture of ERR_FILE_NOT_FOUND.
+// That is precisely the wrong-picture-that-looks-right this file was written to prevent, committed by
+// the file itself.
+await send("Page.navigate", { url: `file:///${resolve(sheetPath).replace(/\\/g, "/")}` });
 await sleep(1500);
 const sheetShot = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
 writeFileSync(`${outBase}-sheet.png`, Buffer.from(sheetShot.data, "base64"));

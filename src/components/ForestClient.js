@@ -48,9 +48,18 @@ const backIn = (ms) => {
 // is the frame the trunk reaches the floor, which is where the crash, the hardest shake in the feature and the
 // debris burst all fire together. They have to be ONE moment — a shake that lands before the wood does reads as
 // a bug, and a burst that lands after it reads as lag.
+// ⚠️ AND NOT ONE OF THESE MAY BE INTERPOLATED INTO THE styled-jsx BLOCK. It was written that way first —
+// `animation: frFall ${FALL_MS}ms` and a `${FALL_PCT}%` keyframe stop — and styled-jsx silently dropped BOTH.
+// The deployed rule read `animation: auto ... frFall` and the compiled keyframes came back as 0%, 14%, 100%
+// with the two middle stops simply gone. An animation-duration of `auto` is zero, so the trunk jumped straight
+// to the 100% frame, which is opacity 0: the tree vanished on the swing that felled it instead of going over,
+// and nothing warned about it. The CSS below carries literals; the duration is set as an inline style on the
+// element, where a JS value is a JS value, so FALL_MS stays the one place the timing lives.
 const FALL_MS = 820;
-const IMPACT_MS = 660;
-const FALL_PCT = Math.round((IMPACT_MS / FALL_MS) * 100);
+// Where in the fall the trunk reaches the floor. MUST match the 80% stop in the frFall keyframes below — the
+// crash, the shake and the debris are all scheduled off it.
+const IMPACT_AT = 0.8;
+const IMPACT_MS = Math.round(FALL_MS * IMPACT_AT);
 
 const errorText = (e) => ({
     too_fast: "That tree did not come down that fast.",
@@ -313,7 +322,8 @@ export default function ForestClient() {
                                         /* eslint-disable-next-line @next/next/no-img-element */
                                         <img src={TREE_ART(down ? falling.tree : p.tree)} alt=""
                                             key={down ? `f${p.tree}` : p.tree} draggable="false"
-                                            className={`fr-trunk${down ? " is-down" : ""}${isHere && shake && !down ? " is-struck" : ""}`} />
+                                            className={`fr-trunk${down ? " is-down" : ""}${isHere && shake && !down ? " is-struck" : ""}`}
+                                            style={down ? { animationDuration: `${FALL_MS}ms` } : undefined} />
                                     ) : null}
                                     {isHere && !p.felled && !down ? (
                                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -483,13 +493,14 @@ export default function ForestClient() {
                 /* THE FALL. Slow to give, then all at once — a trunk that topples linearly looks like a door
                    swinging shut. It overshoots a couple of degrees past the landing and settles back, which is
                    the visual half of the crash the speakers are doing on the same frame. */
-                .fr-trunk.is-down { animation: frFall ${FALL_MS}ms cubic-bezier(.55,.02,.72,.35) forwards; }
+                .fr-trunk.is-down { animation: frFall 820ms cubic-bezier(.55,.02,.72,.35) forwards; }
                 @keyframes frFall {
-                    0% { transform: translateX(-50%) rotate(0deg); }
-                    14% { transform: translateX(-50%) rotate(-3deg); }
-                    ${FALL_PCT}% { transform: translateX(-50%) rotate(86deg); opacity: 1; }
-                    ${FALL_PCT + 6}% { transform: translateX(-50%) rotate(82deg); }
-                    100% { transform: translateX(-50%) rotate(84deg); opacity: 0; }
+                    0% { transform: translateX(-50%) rotate(0deg); opacity: 1; }
+                    14% { transform: translateX(-50%) rotate(-4deg); opacity: 1; }
+                    80% { transform: translateX(-50%) rotate(80deg); opacity: 1; }
+                    86% { transform: translateX(-50%) rotate(75deg); opacity: 1; }
+                    92% { transform: translateX(-50%) rotate(78deg); opacity: .85; }
+                    100% { transform: translateX(-50%) rotate(78deg); opacity: 0; }
                 }
 
                 .fr-axe { position: absolute; left: 60%; bottom: 20%; width: 27%; max-width: 118px;
