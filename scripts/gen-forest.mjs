@@ -38,23 +38,51 @@ const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 // ⚠️ AND EACH SPECIES IS DESCRIBED BY ITS BARK. The crown used to be how you told a birch from an oak, and
 // the crown is now above the top of the frame — so the leaves are gone from every prompt and the trunk does
 // all the work: colour, texture, the shape of the roots.
+// ⚠️ WHOLE TREES. The first cut of these asked for "an ENORMOUS ancient tree seen from close to its base ...
+// the trunk runs straight off the TOP edge, the crown far overhead and completely out of shot", and that is
+// exactly what it produced. Luke, looking at it: "the trees are janky, you can't see the top of them, and
+// they're, like, so big they take up the whole screen ... the trees aren't, like, massive redwoods, so forget
+// about that. We want just trees, different kinds of trees that you come across."
+//
+// A trunk crop can only ever be photographed from one distance, which is why it ate the screen: there is no
+// size you can draw it at that reads as a tree rather than as a wall. A whole tree has a silhouette, and a
+// silhouette can be small. This one is drawn complete — roots to crown, inside the frame — so a walkable
+// forest can stand six of them at different depths and none of them is the screen.
 const TRUNK_FRAMING =
-    "An ENORMOUS ancient tree seen from close to its base, the viewer looking slightly upward. The trunk is "
-    + "so vast it fills most of the width of the frame and runs straight off the TOP edge — the crown is far "
-    + "overhead and completely out of shot. Only the lower trunk and the spreading roots are visible, with a "
-    + "little clear space beneath the roots at the bottom. Nothing else in the picture. Isolated on a FULLY "
-    + "TRANSPARENT background: no ground, no undergrowth, no other trees, no cast shadow, no background.";
+    "A COMPLETE tree, whole and entire: roots at the bottom, trunk, branches and the full crown of foliage, "
+    + "ALL of it inside the frame with clear space above the crown. Seen straight on at eye level, standing "
+    + "upright and centred, noticeably taller than it is wide. A tree you could walk up to — not a giant, not "
+    + "seen from below, not cropped on any edge. Nothing else in the picture. Isolated on a FULLY TRANSPARENT "
+    + "background: no ground, no grass, no undergrowth, no other trees, no cast shadow, no background.";
 const trunkPrompt = (subject) => [subject, TRUNK_FRAMING, HOUSE_STYLE, NEGATIVE_STYLE].join(" ");
 
 const TREES = {
-    birch: "a colossal birch: chalk-white bark peeling in fine papery curls, ringed with black scars and dark knot-eyes, slender pale roots",
-    pine: "a colossal pine: thick red-brown bark broken into deep jigsaw plates, amber resin bleeding from the seams, a broad flaring base",
-    oak: "a colossal ancient oak: heavily furrowed grey-brown bark in deep vertical ridges, a massive knotted burl low on the trunk, huge buttressed roots",
-    ash: "a colossal ash: smooth pale silver-grey bark with fine dark fissures near the base, clean and upright, roots gripping tight",
-    blackthorn: "a colossal blackthorn: near-black bark, long iron-hard thorns bristling straight out of the trunk itself, twisted and sinewy",
-    ironwood: "a colossal ironwood: blue-grey bark that looks like riveted iron plate, hard angular facets and seams of rust, unnaturally straight",
-    heartwood: "a colossal heartwood: deep red-brown bark split open in a long vertical wound down the trunk, a molten crimson glow pouring out of the crack, embers in the grain",
-    moonash: "a colossal moonash: luminous silver-white bark glowing softly with cold blue light, pale veins running up the trunk, faint motes drifting off it",
+    birch: "a birch tree: slender chalk-white trunk peeling in fine papery curls, ringed with black scars and dark knot-eyes, a light airy crown of small bright green leaves",
+    pine: "a pine tree: straight red-brown trunk in deep jigsaw bark plates, amber resin at the seams, tiers of dark blue-green needled branches",
+    oak: "an oak tree: sturdy grey-brown trunk in deep furrowed ridges with a knotted burl low down, broad spreading limbs and a heavy round crown of lobed leaves",
+    ash: "an ash tree: smooth pale silver-grey trunk with fine dark fissures, upswept branches and a narrow crown of slim paired leaves",
+    blackthorn: "a blackthorn tree: near-black sinewy twisted trunk bristling with long iron-hard thorns, a sparse dark crown with a scatter of tiny white blossom",
+    ironwood: "an ironwood tree: blue-grey trunk that looks like riveted iron plate with angular facets and seams of rust, stiff angular branches and hard grey-green foliage",
+    heartwood: "a heartwood tree: deep red-brown trunk split by a long vertical wound with a molten crimson glow pouring out of the crack, embers in the grain, a dark red crown",
+    moonash: "a moonash tree: luminous silver-white trunk glowing with cold blue light, pale veins running up it, a shimmering crown of pale blue leaves shedding faint drifting motes",
+};
+
+// ── MUSHROOMS ── small, on the floor, picked up rather than chopped. Drawn from slightly above, the way you
+// would see one you were about to crouch for.
+const MUSH_EXTRA =
+    "A small clump of mushrooms growing from a little patch of moss and leaf litter, seen from slightly above "
+    + "at a three-quarter angle, complete and inside the frame. Isolated on a FULLY TRANSPARENT background: "
+    + "no ground plane, no scenery, no cast shadow.";
+const MUSHROOMS = {
+    button_cap: "three small pale cream button mushrooms with plump rounded caps",
+    inkcap: "a cluster of tall slender grey inkcaps, their bell caps splitting and dripping black at the rims",
+    chanterelle: "a group of golden-orange chanterelles with wavy funnel caps and deep ridged gills",
+    bloodgill: "a pair of dark red mushrooms with vivid blood-red gills showing under thick caps",
+    fairy_ring: "a small ring of tiny pale yellow-green toadstools on delicate stems, faintly glowing",
+    lantern_cap: "a cluster of warm amber mushrooms whose translucent caps glow from within like little lanterns",
+    corpse_veil: "a tall ghost-white mushroom with a torn lacy veil hanging from its cap, faint violet bruising",
+    dreamcap: "a smooth domed mushroom in deep dreamy blue with soft pale spots, wisps of pale vapour curling off it",
+    mooncrown: "a rare silver-white mushroom with a crown-shaped fluted cap, glowing cold blue, motes drifting from its gills",
 };
 
 const AXE_EXTRA = "Held VERTICALLY, head at the top and haft running straight down to the bottom of the frame, "
@@ -71,18 +99,27 @@ const AXES = {
 
 const PIECES = {
     ...Object.fromEntries(Object.entries(TREES).map(([id, p]) => [`trees/${id}`, { raw: trunkPrompt(p), sprite: true, size: "1024x1536", tall: true }])),
+    ...Object.fromEntries(Object.entries(MUSHROOMS).map(([id, p]) => [`shrooms/${id}`, { subject: p, extra: MUSH_EXTRA, sprite: true }])),
     ...Object.fromEntries(Object.entries(AXES).map(([id, p]) => [`axes/${id}`, { subject: p, extra: AXE_EXTRA, sprite: true }])),
     stump: { subject: "a freshly cut tree stump, pale raw wood across the cut face with the rings showing, "
         + "bark dark around the rim, a few chips and splinters at its foot", sprite: true },
-    // The place itself. Deliberately empty in the middle band, because six trees are about to stand there.
-    grove: { subject: "A redwood forest at dusk seen straight on: immense reddish-brown trunks rising out "
-        + "of frame on both sides and receding into a soft blue-grey haze, a bed of dark needles and fallen "
-        + "leaves underfoot, low drifting mist, and pale shafts of light slanting down between the trunks "
-        + "from high above. SEMI-DARK rather than black — the far trunks and the mist stay clearly visible "
-        + "and the ground reads. Quiet and enormous; no people, no animals, no buildings, no path. The "
-        + "MIDDLE of the frame is open ground with nothing standing in it. One continuous painting edge to "
-        + "edge: no panel, no inset rectangle, no frame, no border, no seam",
-        sprite: false, size: "1536x1024" },
+    // ── ⚠️ THE BACKDROP IS FLAT, AND THAT IS NOT A STYLE CHOICE ──────────────────────────────────────────
+    // A scrolling world slides one picture sideways past a camera that never moves in depth. Any vanishing
+    // point drawn into it is correct from exactly ONE spot on the strip and wrong everywhere else — walk on
+    // and the whole wood appears to swivel. See [[scrolling-room-needs-flat-backdrop]]. So: no perspective,
+    // no converging lines, no path running away from the viewer. A flat wall of distant trunks, straight on,
+    // that can be tiled end to end forever without a seam or a centre.
+    grove: { raw: "A dense forest seen dead straight on, like a flat painted theatre backdrop: a wall of "
+        + "distant tree trunks in cool blue-grey haze, receding only by getting paler and softer, NEVER by "
+        + "converging. NO perspective, NO vanishing point, NO path, NO ground plane, NO sky. The left and "
+        + "right edges are plain forest that could tile seamlessly against another copy of itself. Soft "
+        + "shafts of pale light falling vertically between the trunks. Nothing in sharp focus, nothing in "
+        + "the foreground. " + HOUSE_STYLE + " " + NEGATIVE_STYLE, size: "1536x1024" },
+    // The floor the player walks on, as a strip: a band of forest litter with no perspective in it either.
+    floor: { raw: "A horizontal strip of forest floor seen from slightly above: dark earth, fallen needles, "
+        + "scattered dry leaves, moss patches, a few small stones and twigs. Evenly covered end to end with "
+        + "no path, no perspective lines and no focal point, so it can tile side by side forever. "
+        + HOUSE_STYLE + " " + NEGATIVE_STYLE, size: "1536x1024" },
 };
 
 let spent = 0;

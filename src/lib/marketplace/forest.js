@@ -211,3 +211,103 @@ export const FOREST_PUBLIC = false;
 
 // The question "may this person walk in?" is asked in three places and lives in ONE — forest-gate.js, which
 // can import the owner allow-list without dragging the database into ForestClient's bundle.
+
+// ── WHAT THE FOREST IS MADE OF, BESIDES WOOD ─────────────────────────────────────────────────────────────────
+// Luke: "there's mushrooms you can pick up, and there's leaves that fall off the trees when you hit them that
+// go into your inventory ... they're not gear, they're gonna be used for alchemy, which we're gonna add later.
+// And there's rare stuff that drops from trees, like resin and other, like, fifteen other rare things you can
+// get from trees. And there's a bunch of different kinds of mushrooms, a bunch of different rarities of them
+// and different rarities of leaves."
+//
+// ⚠️ THESE ARE MATERIALS, NOT ITEMS. They never enter mkt_user_item, they have no slot, no stats and no
+// rarity-coloured border in the armoury — they go in a pouch of their own. Putting them in the gear table
+// would have been the fast way and it is the one that cannot be undone: every screen that lists what you own,
+// every trade, every drop pool and every "you have 412 items" count would have swallowed a thousand leaves.
+// Alchemy is not built yet; the pouch is, so that the day it arrives there is a year of gathering behind it.
+export const RARITIES = ["common", "uncommon", "rare", "epic", "legendary"];
+export const RARITY_RANK = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+
+// ── LEAVES ── knocked loose by the axe. Every tree drops ITS OWN leaf, so what you are carrying is a record of
+// where you have been rather than a single generic "leaf" counter. The rarity is the TREE's rarity: a Moonash
+// leaf is legendary because a Moonash is, and that is one less table to keep in step.
+export const LEAVES = {
+    birch_leaf:      { id: "birch_leaf",      name: "Birch Leaf",      from: "birch",      rarity: "common" },
+    pine_needle:     { id: "pine_needle",     name: "Pine Needles",    from: "pine",       rarity: "common" },
+    oak_leaf:        { id: "oak_leaf",        name: "Oak Leaf",        from: "oak",        rarity: "uncommon" },
+    ash_leaf:        { id: "ash_leaf",        name: "Ash Leaf",        from: "ash",        rarity: "uncommon" },
+    blackthorn_leaf: { id: "blackthorn_leaf", name: "Blackthorn Leaf", from: "blackthorn", rarity: "rare" },
+    ironwood_leaf:   { id: "ironwood_leaf",   name: "Ironwood Leaf",   from: "ironwood",   rarity: "rare" },
+    heartwood_leaf:  { id: "heartwood_leaf",  name: "Heartwood Leaf",  from: "heartwood",  rarity: "epic" },
+    moonash_leaf:    { id: "moonash_leaf",    name: "Moonash Leaf",    from: "moonash",    rarity: "legendary" },
+};
+export const LEAF_IDS = Object.keys(LEAVES);
+export const leafOf = (treeId) => LEAF_IDS.find((id) => LEAVES[id].from === treeId) || null;
+
+// A swing knocks leaves down. Not every swing — a shower on every tap is confetti, and confetti stops being a
+// reward on the second tree. Roughly one swing in five, so a common tree hands over five or six leaves on the
+// way down and a Moonash buries you.
+export const LEAF_CHANCE = 0.2;
+
+// ── MUSHROOMS ── not chopped. They are ON THE FLOOR, and you walk over and pick them up, which is the other
+// half of what makes the forest a place rather than a row of buttons: something to look at between the trees,
+// and a reason to go and stand somewhere for its own sake.
+export const MUSHROOMS = {
+    button_cap:   { id: "button_cap",   name: "Button Cap",     rarity: "common",    weight: 30, tint: "#cbb99a" },
+    inkcap:       { id: "inkcap",       name: "Inkcap",         rarity: "common",    weight: 26, tint: "#6b6472" },
+    chanterelle:  { id: "chanterelle",  name: "Chanterelle",    rarity: "uncommon",  weight: 18, tint: "#e8a33d" },
+    bloodgill:    { id: "bloodgill",    name: "Bloodgill",      rarity: "uncommon",  weight: 14, tint: "#a33b3b" },
+    fairy_ring:   { id: "fairy_ring",   name: "Fairy Ring",     rarity: "rare",      weight: 7,  tint: "#9ede7a" },
+    lantern_cap:  { id: "lantern_cap",  name: "Lantern Cap",    rarity: "rare",      weight: 5,  tint: "#ffcf87" },
+    corpse_veil:  { id: "corpse_veil",  name: "Corpse Veil",    rarity: "epic",      weight: 2.4, tint: "#c9a2ff" },
+    dreamcap:     { id: "dreamcap",     name: "Dreamcap",       rarity: "epic",      weight: 1.6, tint: "#7fb0ff" },
+    mooncrown:    { id: "mooncrown",    name: "Mooncrown",      rarity: "legendary", weight: 0.5, tint: "#a9d8ff" },
+};
+export const MUSHROOM_IDS = Object.keys(MUSHROOMS);
+
+// ── WHAT A TREE GIVES UP BESIDES WOOD ── Luke: "resin and other, like, fifteen other rare things you can get
+// from trees." Sixteen, rolled when a tree comes DOWN rather than per swing, so it is the felling that pays
+// and a half-chopped trunk owes you nothing.
+//
+// ⚠️ BANDED BY THE TREE, NOT ROLLED FLAT. A Birch cannot cough up Heartwood Amber. `minRank` is the rarity
+// rung a tree must reach for a drop to be in its pool at all, so the rare things stay attached to the rare
+// trees — which is the only reason walking further into the wood is worth anything.
+export const TREE_DROPS = {
+    resin:         { id: "resin",         name: "Resin",           rarity: "common",    minRank: 0, weight: 30 },
+    sap_amber:     { id: "sap_amber",     name: "Sap Amber",       rarity: "common",    minRank: 0, weight: 22 },
+    soft_bark:     { id: "soft_bark",     name: "Soft Bark",       rarity: "common",    minRank: 0, weight: 20 },
+    knotwood:      { id: "knotwood",      name: "Knotwood",        rarity: "uncommon",  minRank: 1, weight: 18 },
+    heart_pitch:   { id: "heart_pitch",   name: "Heart Pitch",     rarity: "uncommon",  minRank: 1, weight: 15 },
+    burl:          { id: "burl",          name: "Burl",            rarity: "uncommon",  minRank: 1, weight: 12 },
+    witch_knot:    { id: "witch_knot",    name: "Witch Knot",      rarity: "rare",      minRank: 2, weight: 9 },
+    ironbark:      { id: "ironbark",      name: "Ironbark Plate",   rarity: "rare",     minRank: 2, weight: 8 },
+    green_tallow:  { id: "green_tallow",  name: "Green Tallow",    rarity: "rare",      minRank: 2, weight: 7 },
+    quicklimb:     { id: "quicklimb",     name: "Quicklimb Shoot",  rarity: "rare",     minRank: 2, weight: 6 },
+    hollow_core:   { id: "hollow_core",   name: "Hollow Core",     rarity: "epic",      minRank: 3, weight: 4 },
+    weeping_gum:   { id: "weeping_gum",   name: "Weeping Gum",     rarity: "epic",      minRank: 3, weight: 3.5 },
+    ghost_ring:    { id: "ghost_ring",    name: "Ghost Ring",      rarity: "epic",      minRank: 3, weight: 3 },
+    starwood:      { id: "starwood",      name: "Starwood Splinter", rarity: "legendary", minRank: 4, weight: 1.6 },
+    moon_sap:      { id: "moon_sap",      name: "Moon Sap",        rarity: "legendary", minRank: 4, weight: 1.2 },
+    worldroot:     { id: "worldroot",     name: "Worldroot Thread", rarity: "legendary", minRank: 4, weight: 0.6 },
+};
+export const TREE_DROP_IDS = Object.keys(TREE_DROPS);
+
+/** Everything a tree of this rarity could give up. */
+export const dropsFor = (treeId) => {
+    const rank = RARITY_RANK[treeById(treeId).rarity] ?? 0;
+    return TREE_DROP_IDS.filter((id) => TREE_DROPS[id].minRank <= rank);
+};
+
+// How often a felled tree pays one at all. Climbs with the tree, so the walk deeper is the whole reward curve.
+export const dropChanceFor = (treeId) => 0.18 + (RARITY_RANK[treeById(treeId).rarity] ?? 0) * 0.13;
+
+/** One pull from a weighted table. `roll` passed in so the whole forest can be simulated. */
+export function weighted(ids, table, roll = Math.random()) {
+    const total = ids.reduce((n, id) => n + (table[id].weight || 1), 0);
+    let r = roll * total;
+    for (const id of ids) { r -= table[id].weight || 1; if (r <= 0) return id; }
+    return ids[ids.length - 1];
+}
+
+// Every material the pouch can hold, in one map, so the store never has to know which table a thing came from.
+export const MATERIALS = { ...LEAVES, ...MUSHROOMS, ...TREE_DROPS };
+export const materialById = (id) => MATERIALS[String(id || "")] || null;
