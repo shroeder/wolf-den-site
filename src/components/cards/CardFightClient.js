@@ -27,6 +27,7 @@ import { STATUS_ART, marksOn } from "@/components/cards/status-art.js";
 import CardKeyNote from "@/components/cards/CardKeyNote";
 import CardTally from "@/components/cards/CardTally";
 import CardLevelUp from "@/components/cards/CardLevelUp";
+import CardPetGains from "@/components/cards/CardPetGains";
 import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
 import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
 import { KEY_OFFER_CSS, KEY_TINT, keyArt } from "@/components/cards/key-offer.js";
@@ -1599,6 +1600,9 @@ export default function CardFightClient({ fixture, run = null }) {
                             {runState?.done ? <CardTally run={runState} /> : null}
                             {/* And what the score just bought. Under the tally, because the rung is EARNED by
                                 the total that has just finished rolling above it. */}
+                            {runState?.done && runState?.petXp?.length ? (
+                                <CardPetGains gains={runState.petXp} petArt={fixture.petArt} />
+                            ) : null}
                             {runState?.done && runState?.levelled?.length ? (
                                 <CardLevelUp levelled={runState.levelled} petArt={fixture.petArt} />
                             ) : null}

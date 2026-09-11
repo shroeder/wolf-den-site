@@ -300,6 +300,38 @@ export async function recordRun(buyerId, run, outcome) {
     //
     // Read after the insert, so the run that just ended is in the total. Anything crossed is handed over
     // here and handed back to the screen, which is the only place a player is ever told.
+    // ── ── AND THE PETS WHOSE CARDS YOU PLAYED ───────────────────────────────────────────────────────
+    // The card pool is PET-GATED: you are only ever offered a card if you own the pet behind it (see
+    // cardsFor). That gate is the whole shape of the game's progression and it only ran one way — owning
+    // pets got you cards, and playing cards got the pets nothing. So a run fed the ladder and the menagerie
+    // sat still.
+    //
+    // A run now feeds the pets it was BUILT FROM, split by how much of the deck each one wrote. Take eight
+    // Wolf Pup cards and the Wolf Pup grows; take one of everything and the whole shelf inches along. It is
+    // the same choice the deck already makes, paid twice.
+    //
+    // ⚠️ CAPPED PER PET PER RUN, because the split is by card count and nothing stops a deck being twenty
+    // copies of one pet's card. Without the cap the fastest way to max a pet would be to build the worst
+    // possible deck on purpose, which is a strategy the game should not have.
+    const petPool = Math.round(runScore(ended) * 1.2);
+    const byPet = new Map();
+    for (const id of (ended.deck || [])) {
+        const pet = ALL_CARDS[id]?.pet;
+        if (pet) byPet.set(pet, (byPet.get(pet) || 0) + 1);
+    }
+    const totalCards = [...byPet.values()].reduce((n, v) => n + v, 0);
+    run.petXp = [];
+    if (totalCards > 0 && petPool > 0) {
+        const { addPetXpById } = await import("@/lib/marketplace/pet-level.js");
+        for (const [petId, n] of byPet) {
+            const amount = Math.min(300, Math.round((petPool * n) / totalCards));
+            if (amount <= 0) continue;
+            const res = await addPetXpById(buyerId, petId, amount).catch(() => null);
+            run.petXp.push({ pet: petId, n: amount, cards: n, level: res?.level ?? null, leveled: Boolean(res?.leveled) });
+        }
+        run.petXp.sort((a, b) => b.n - a.n);
+    }
+
     const before = rankFor(Math.max(0, (await cardXp(buyerId)) - runScore(ended))).level;
     const after = rankFor(await cardXp(buyerId)).level;
     run.levelled = after > before ? levelsCrossed(before, after) : [];
