@@ -261,7 +261,12 @@ export async function activeBoosts(buyerId) {
     if (strikeTotal > 0) {
         const kept = Math.min(MAX_POTION_STRIKES, strikeTotal);
         out.push({ kind: "strikes", magnitude: kept, expiresAt: strikeExpiry,
-            label: `+${kept} attacks today${strikeTotal > kept ? ` (${strikeTotal - kept} over the daily limit)` : ""}` });
+            // ⚠️ THE CEILING IS NAMED. Luke: "every cap should be shown ... ideally you show the cap whenever
+            // you show a stat." "2 over the daily limit" does not tell you what the limit IS, so a member who
+            // has just lost two strikes still cannot work out whether a third vial is worth drinking.
+            label: `+${kept} attacks today${strikeTotal > kept
+                ? ` — ${strikeTotal - kept} over the cap of ${MAX_POTION_STRIKES}`
+                : ` · cap ${MAX_POTION_STRIKES}`}` });
     }
     for (const [m, info] of damage) {
         const isTop = m === applied;
@@ -740,8 +745,11 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
     // Same rule the pet treats above already keep, in the same words: validate BEFORE spending so it is
     // never wasted. Refused only when it would do NOTHING — a vial that can still land one of its two is
     // allowed through, because part of a potion is a choice the member can reasonably make.
+    // Read once and kept, because the confirmation line below needs the SAME number the guard used: asking
+    // twice would straddle the insert and report the potion's own strikes as though they were already held.
+    let held = 0;
     if (e.type === "strikes") {
-        const held = await memberBonusStrikes(buyerId).catch(() => 0);
+        held = await memberBonusStrikes(buyerId).catch(() => 0);
         if (held >= MAX_POTION_STRIKES) return { ok: false, error: "strikes_capped" };
     }
     // Same rule, same reason: a Second Descent used on a day you have not been down is a rare item destroyed
@@ -801,7 +809,22 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
              VALUES ($1, 'strikes', $2, (date_trunc('day', NOW() AT TIME ZONE 'America/Chicago') + interval '1 day') AT TIME ZONE 'America/Chicago')`,
             [buyerId, e.amount]
         ).catch(() => {});
-        applied = `+${e.amount} manual daily strikes today`;
+        // ── AND IT SAYS HOW MANY ACTUALLY LANDED ─────────────────────────────────────────────────────
+        // SunflowerJinxx: "I just used 2 second winds (+5 daily strikes) it told me I then had 2 over the
+        // limit so did I just waste a Second wind???? It took it but only gave me 3 hits."
+        //
+        // She did not waste one — the second vial landed three of its five against the cap of eight, which
+        // is the rule this file states on purpose two hundred lines up: refuse a potion only when it would
+        // do NOTHING, because part of a potion is a choice a member can reasonably make. It is a choice
+        // nobody could make, though, because the confirmation said "+5 manual daily strikes today" whether
+        // five landed or one did. The number in the sentence was the number on the LABEL, not the number in
+        // the game. Same fault as the boost badge it sits beside, which the comment there calls out for
+        // telling you after the vial is gone.
+        const before = Math.min(MAX_POTION_STRIKES, Math.max(0, held));
+        const landed = Math.max(0, Math.min(MAX_POTION_STRIKES, before + e.amount) - before);
+        const lost = Math.max(0, e.amount - landed);
+        applied = `+${landed} manual daily strike${landed === 1 ? "" : "s"} today`
+            + (lost ? ` — ${lost} of the ${e.amount} was over today's limit of ${MAX_POTION_STRIKES}` : "");
     } else if (e.type === "damage") {
         // ── A SECOND BOTTLE BUYS TIME, NOT A BIGGER NUMBER ───────────────────────────────────────────────
         // Every use used to INSERT its own row, and memberDamageMult takes the STRONGEST of them — so a

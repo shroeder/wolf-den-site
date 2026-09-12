@@ -888,23 +888,35 @@ export default function CasinoClient({ initial }) {
     // win is HELD until the reveal is over. `staked` is the server's own balance the instant the bet left,
     // not `balance - bet`: the on-the-house perk hands a stake straight back and only the server knows.
     const heldChips = useRef(null);
+    // ── AND THE WIN IS TOKENS NOW, SO THE HOLD HAS TO HOLD TOKENS ────────────────────────────────────────
+    // SoullessShiitake: "in bingo, the tokens are updating with how much you win before the numbers get
+    // called ... its like its instantly trading chips for tokens on button press, before running the
+    // animation." That is exactly what it was doing. This whole hold was built when a win was paid in CHIPS;
+    // migration 436 moved wins to TOKENS and the hold was never told, so the one purse that could go up was
+    // the one purse nothing was holding back. Every reveal in the room printed its own ending — the reels,
+    // the wheel, the table and the card — because the number at the top had already moved.
+    const heldTokens = useRef(null);
     const settleChips = useCallback(() => {
         const n = heldChips.current;
-        if (n == null) return;
+        const t = heldTokens.current;
+        if (n == null && t == null) return;
         heldChips.current = null;
-        setSt((p) => (p ? { ...p, chips: n } : p));
+        heldTokens.current = null;
+        setSt((p) => (p ? { ...p, ...(n != null ? { chips: n } : {}), ...(t != null ? { tokens: t } : {}) } : p));
     }, []);
     // Take the stake, hold the outcome. A response with no `staked` (a machine that has not been converted,
     // or an error path) falls through to showing the final figure at once, which is the old behaviour rather
     // than a blank purse.
     const stakeNow = useCallback((r) => {
-        heldChips.current = r?.staked != null ? (r?.chips ?? null) : null;
+        const holding = r?.staked != null;
+        heldChips.current = holding ? (r?.chips ?? null) : null;
+        // The win landed in TOKENS, and it waits with the rest of the outcome. `chips` below is the fuel left
+        // after the stake and cannot have gone up — see the note on the response in casino-slot5-play.js.
+        heldTokens.current = holding ? (r?.tokens ?? null) : null;
         setSt((p) => (p ? {
             ...p,
             chips: r?.staked ?? r?.chips ?? p.chips,
-            // The win landed in TOKENS. `chips` above is the fuel left after the stake and cannot have
-            // gone up — see the note on the response in casino-slot5-play.js.
-            tokens: r?.tokens ?? p.tokens,
+            tokens: holding ? p.tokens : (r?.tokens ?? p.tokens),
             ...(r?.gold != null ? { gold: r.gold } : {}),
         } : p));
     }, []);
@@ -1240,12 +1252,15 @@ export default function CasinoClient({ initial }) {
                 setSt((p) => ({
                     ...p, others: r.others, gold: r.gold, vip: r.vip ?? p?.vip,
                     chips: heldChips.current != null ? p?.chips : (r.chips ?? p?.chips),
+                    // ⚠️ ITS OWN REF, not heldChips. A response can hold a token win without a chip figure
+                    // beside it, and reading the chip hold to decide whether to publish the TOKEN balance
+                    // let the poll print the ending six seconds into a reveal that was still running.
                     // The token purse rides the same hold as the chip purse: while a win is being
                     // counted up on screen the number must not jump ahead of the animation. It was
                     // simply absent here, so tokens moved only on a reload, which is how members
                     // came to describe a win as "paying chips" -- the only figure that visibly moved
                     // was the wrong one. See stakeNow, which merges the same two fields.
-                    tokens: heldChips.current != null ? p?.tokens : (r.tokens ?? p?.tokens),
+                    tokens: heldTokens.current != null ? p?.tokens : (r.tokens ?? p?.tokens),
                 }));
                 if (r.pot) setPot(r.pot.amount);
             }

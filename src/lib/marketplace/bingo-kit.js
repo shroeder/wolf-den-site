@@ -284,7 +284,16 @@ export const cornersOf = (card, drawn, burnt = []) => {
 export const BINGO_PAY = 0.86;
 
 export const BINGO_PAYS = {
-    corners: 0.7,
+    // ⚠️ A WIN MUST NOT COST YOU MONEY. SunflowerJinxx: "A 100 chip bingo bet is paying less than the bet."
+    // Two lines pays 181 on a 100 stake and one line pays 120, so on the lines she was wrong — but four
+    // corners paid 0.7 x 0.86 = 0.602, which is sixty chips back from a hundred, announced with a name and a
+    // flourish. 1.74% of cards end that way: the game stopped, told you that you had won a thing, and took
+    // forty per cent of your stake. A celebration you lose money on is worse than no celebration.
+    //
+    // 1.25 lands at 1.075 after the dial below — a small win rather than a small loss, which is what the
+    // easiest pattern on the card should be. It moves the game's return by under a point; measured with
+    // `node --import ./scripts/lib/register-loader.mjs scripts/casino-sim.mjs`.
+    corners: 1.25,
     1: 1.4,
     2: 2.1,
     3: 7,

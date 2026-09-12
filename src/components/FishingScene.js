@@ -51,6 +51,10 @@ const DART_EVERY_MS = 900;       // the fish makes a run for it this often
 // Gaff's value runs 0..0.25. Trimmed from 0.56 so a maxed Gaff lands at 0.48 of the tank rather than half
 // of it — the upgrade should widen the bar, not remove the game.
 const BAND_PER_GAFF = 0.48;
+// How far up and down the rail the fish can go. The bar's centre is held to the SAME range, so every place
+// the fish can be is a place the middle of your bar can be — see the note in the frame loop.
+const FISH_LOW = 0.05;
+const FISH_HIGH = 0.95;
 const bandFor = (gaff = 0) => BAND_H + Math.max(0, Math.min(0.25, Number(gaff) || 0)) * BAND_PER_GAFF;
 
 // ── THE PERFECT CORE ─────────────────────────────────────────────────────────────────────────────────────────
@@ -330,17 +334,35 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
             velRef.current += Math.sin(t * 0.9 + 0.7) * 0.5 * dt * F.dart * HOLD;
             velRef.current *= Math.pow(phase === "tired" ? TIRE_DAMPING : FISH_DAMPING, dt * 60);
             posRef.current += velRef.current * dt;
-            if (posRef.current <= 0.05) { posRef.current = 0.05; velRef.current = Math.abs(velRef.current) * 0.5; }
-            if (posRef.current >= 0.95) { posRef.current = 0.95; velRef.current = -Math.abs(velRef.current) * 0.5; }
+            if (posRef.current <= FISH_LOW) { posRef.current = FISH_LOW; velRef.current = Math.abs(velRef.current) * 0.5; }
+            if (posRef.current >= FISH_HIGH) { posRef.current = FISH_HIGH; velRef.current = -Math.abs(velRef.current) * 0.5; }
 
             // YOUR BAR: hold to raise, release and it falls. The only thing your thumb touches.
             barVelRef.current += (holdRef.current ? BAR_PULL : 0) * dt;
             barVelRef.current -= BAR_GRAVITY * dt;
             barVelRef.current *= Math.pow(BAR_DAMPING, dt * 60);
             bandRef.current += barVelRef.current * dt;
-            const half = BAND / 2;
-            if (bandRef.current <= half) { bandRef.current = half; barVelRef.current = 0; }
-            if (bandRef.current >= 1 - half) { bandRef.current = 1 - half; barVelRef.current = 0; }
+            // ── AND IT REACHES THE ENDS OF THE RAIL ──────────────────────────────────────────────────
+            // ⚠️ THE BAR'S CENTRE WAS PENNED IN BY ITS OWN HEIGHT — clamped to [BAND/2, 1-BAND/2] so the
+            // whole bar stayed on screen. The fish swims to 0.05 and 0.95. At a base Gaff that put the
+            // closest your CENTRE could get to a fish at the top at 0.13, against a core that needs 0.054
+            // and an inner ring that needs 0.112 — so a fish at either end of the rail could be held in the
+            // band and NEVER in the gold, no matter how well it was played.
+            //
+            // SoullessShiitake: "if the fish is at the very top or very bottom of the rail, there is no way
+            // to get the fish in the gold area no matter what you try." Kaishiern: "The target bar should be
+            // able to reach both ends."
+            //
+            // ⚠️ AND THE GAFF MADE IT WORSE, which is the part that makes this a bug rather than a hard
+            // corner. A wider bar has a bigger half-height, so every level of the upgrade that is sold as
+            // "easier to hold it" pushed the centre further from the ends: at a maxed Gaff the gap at the
+            // top was 0.19 against a core of 0.072. The one thing you can buy to improve this made the two
+            // worst positions on the rail strictly harder.
+            //
+            // The centre is clamped to the FISH's range now, so the core can always cover it and the bar
+            // simply hangs off the end of the rod — which .fwreel-rod already clips, being overflow:hidden.
+            if (bandRef.current <= FISH_LOW) { bandRef.current = FISH_LOW; barVelRef.current = 0; }
+            if (bandRef.current >= FISH_HIGH) { bandRef.current = FISH_HIGH; barVelRef.current = 0; }
 
             // ── CREDIT, BANKED PER FRAME ──────────────────────────────────────────────────────────────
             // Inside the bar pays; inside the CORE pays nearly double. The warm-up still applies: the score

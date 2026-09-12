@@ -739,9 +739,32 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
         if (!key || !battle) return [];
         const mirror = Boolean(foe?.mirror);
         const evasion = evasionOf(foeSys?.sails ?? caps?.sails ?? 4);
-        const att = { accuracy: battle.myAccuracy ?? 0.7, dmgMult: battle.stats?.me?.dmgMult ?? 1 };
+        // ── THE MARKER HAS TO KNOW WHICH BARRELS ARE FIRING ──────────────────────────────────────────
+        // ⚠️ gunStats WAS NOT ON THIS OBJECT, so hitChance could never find a barrel's Lay however it was
+        // called, and every marker in the fight quoted the battery's BASE accuracy. A captain who had spent
+        // four levels on Lay was shown the odds of a gun deck they no longer had — up to ten points under
+        // what the server was about to roll. hitChance's own comment says why that is not allowed: "the
+        // number you are shown is not the number you are rolling."
+        //
+        // ValkyrieSylve: "Feels like I'm missing way more shots in ship raids than I should be for maxing
+        // out all my guns." The misses were honest — see evasionOf, a ship under full canvas is a 51% shot
+        // at her gun deck and a 70% shot at her rigging, which is the whole reason to cut canvas first. But
+        // the number she was reading while she aimed was not the one the dice used either way.
+        const att = {
+            accuracy: battle.myAccuracy ?? 0.7,
+            dmgMult: battle.stats?.me?.dmgMult ?? 1,
+            gunStats: battle.me?.gunStats || null,
+        };
+        // One number per zone, because a broadside is aimed by zone — so it is the MEAN across the barrels
+        // that are still mounted rather than one gun's odds pretending to speak for the deck.
+        const upGuns = (battle?.sys?.me?.guns || []).map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
         const def = battle.stats?.foe || { dmgTaken: 1 };
         const shot = ammoById(ammo);
+        const chanceOn = (zone) => {
+            if (!att.gunStats || !upGuns.length) return hitChance(att, zone, shot, evasion);
+            const sum = upGuns.reduce((n, i) => n + hitChance(att, zone, shot, evasion, i), 0);
+            return sum / upGuns.length;
+        };
         const out = [];
         // THE RIGGING IS NOT THE SAILS. zoneBox returns the extent of every lit pixel in the zone, and a topmast
         // pennant or a bowsprit line stretches that far past the ship — so the canvas region came out as a
@@ -769,7 +792,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                 key: id, kind: "zone", zone: id, target: null, dead,
                 name: ZONES[id].name, icon: ZONES[id].icon, tint: ZONES[id].tint, effect: ZONES[id].effect,
                 x: box.cx, y: box.cy, box, hpPct,
-                chance: hitChance(att, ZONES[id], shot, evasion),
+                chance: chanceOn(ZONES[id]),
                 dmg: expectedDamage(att, def, ZONES[id], shot),
             });
         }
@@ -792,7 +815,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                 // end is worse than a barrel on the wrong end, because you tap it.
                 x: (mirror ? 1 - p.x : p.x) * 100, y: p.y * 100, box: null,
                 hpPct: clampPct(hp, caps?.gun || 4), hp, hpMax: caps?.gun || 4,
-                chance: hitChance(att, ZONES.guns, shot, evasion),
+                chance: chanceOn(ZONES.guns),
                 dmg: expectedDamage(att, def, ZONES.guns, shot),
             });
         });
