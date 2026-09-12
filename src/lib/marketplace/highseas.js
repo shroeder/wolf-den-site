@@ -62,6 +62,20 @@ const HULLS = {
     naval: ["boat-tier5-galleon", "boat-tier6-manowar"],
 };
 
+// ⚠️ EVERY HULL HAS A DIFFERENT AMOUNT OF NOTHING UNDER IT. These are square sprites, and the transparent
+// margin below the painted keel runs from 4.4% on the schooner to 12.3% on the cutter. Anchor the SPRITE to
+// the waterline and the little boats hover; the shadow lands in open water and the eye reads a ship in the
+// air, which is exactly what Luke saw. Measured off the alpha channel, one number per hull, and the waterline
+// is put at the KEEL instead.
+const KEEL = {
+    "boat-tier1-wood": 0.100,
+    "boat-tier2-cutter": 0.123,
+    "boat-tier3-brig": 0.079,
+    "boat-tier4-schooner": 0.044,
+    "boat-tier5-galleon": 0.074,
+    "boat-tier6-manowar": 0.067,
+};
+
 // ⚠️ THE FAR-RANGE READ HAS TO BE TRUE. It was the fixed string "three masts, square rigged" over whatever
 // hull had been drawn, so the glass could tell you three masts while showing you a one-masted boat. The
 // silhouette is the FIRST real information the telescope gives, and the whole point of the screen is that
@@ -103,6 +117,7 @@ export function spot(seed, index = 0) {
         hull,
         art: `/images/sailing/${hull}.png`,
         silhouette: SILHOUETTE[hull] || "a sail, hull down",
+        keel: KEEL[hull] ?? 0.08,
         name: `The ${pick(FIRST, n >>> 13)} ${pick(SECOND, n >>> 17)}`,
         captain: `${pick(RANKS, infamy)} ${pick(SURNAMES, n >>> 19)}`,
         infamy,
@@ -127,6 +142,19 @@ export function spot(seed, index = 0) {
 //
 // So the glass shows her, all of her, at once. What it is FOR is the moment — you were sailing, somebody
 // called out, and now you are looking at a ship and deciding. The decision that matters is the next one.
+
+// ── WHERE THE SEA STARTS ─────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ THE HORIZON IS NOT IN THE SAME PLACE IN EVERY SKY, and assuming it was is what put a ship in the clouds.
+// The four backdrops are one image each, scaled to the height of the frame, and their painted horizons sit
+// anywhere from 43% to 67% down: a hull pinned at a fixed "bottom: 34%" floats over a dusk sky and sits
+// correctly over a clear one. Measured off the art itself rather than eyeballed, and everything that has to
+// touch water — her, the island, the sun's glare — is placed as a fraction of the WATER, not of the frame.
+export const SKIES = [
+    { id: "sky-goldenhour", horizon: 0.544 },
+    { id: "sky-clearday", horizon: 0.433 },
+    { id: "sky-dusk", horizon: 0.669 },
+    { id: "sky-sunrise", horizon: 0.588 },
+];
 
 /** What her waterline tells you before anything else does — laden or riding high. */
 export const waterline = (ship) => (ship.hold >= 4 ? "heavy in the water" : ship.hold >= 3 ? "riding low" : "riding high");
