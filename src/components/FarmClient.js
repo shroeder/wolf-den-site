@@ -3606,32 +3606,38 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft, hideAlias = null }) {
         return hideAlias ? both.filter((m) => m.alias !== hideAlias) : both;
     }, [all, neighbours, hideAlias]);
     const term = q.trim().toLowerCase().replace(/^@/, "");
-    // ⚠️ THE GRID DROPS WHOEVER IS IN THE STRIP. They sort to the top of the roster for the same reason they
-    // are in the strip, so both lists opened with the identical six faces — the strip's own note already
-    // warned that "two lists answering one query is how you end up tapping the wrong copy of somebody", and
-    // widening the window to a week is what finally made it happen. The strip is who came by; the grid is
-    // everybody else. While SEARCHING the grid carries everyone again, because the strip hides then and a
-    // name you typed must never be missing from the one list still on screen.
-    const inStrip = useMemo(
-        () => new Set(term ? [] : (neighbours || []).filter((n) => n.cameBy).map((n) => n.id)),
-        [neighbours, term]
-    );
+    // ── ONE LIST, AND THE ORDER IS THE WHOLE FEATURE ────────────────────────────────────────────────────
+    // Luke: "I only want the horizontal scrolling list with people who visited and liked your farm first."
+    //
+    // There used to be two — a strip of who came by, and a wrapping GRID of all hundred and twenty-two farms
+    // underneath it. The grid was thirty-nine rows of tiles nobody scrolled to the bottom of, and the day the
+    // strip started working the two of them opened with the same six faces.
+    //
+    // ⚠️ NOT DELETED, MERGED — and the difference matters. Dropping the grid outright leaves a member with no
+    // visitors looking at an empty card, and leaves the search box with nowhere to put its results, since the
+    // grid WAS where they rendered. So the strip carries everybody: the people who came to your farm first,
+    // then the rest of the Den behind the same sideways flick, and the search filters this one list.
+    //
+    // The old note arguing a directory must not be a strip — "it shows four and hides the rest behind a
+    // sideways scroll nobody performs" — was right about a strip with no ORDER to it. Nobody was ever going to
+    // browse ninety-five people alphabetically in either shape. What makes this one work is that the four it
+    // shows are the four worth tapping, and anybody else is one search away.
+    const ranked = useMemo(() => {
+        const rank = (m) => (m.cameBy && !m.ratedToday ? 0 : m.cameBy ? 1 : 2);
+        return [...roster].sort((a, b) => rank(a) - rank(b));
+    }, [roster]);
     const shown = term
-        ? roster.filter((m) => `${m.name || ""} ${m.alias || ""}`.toLowerCase().includes(term))
-        : roster.filter((m) => !inStrip.has(m.id));
+        ? ranked.filter((m) => `${m.name || ""} ${m.alias || ""}`.toLowerCase().includes(term))
+        : ranked;
     if (!neighbours?.length) return null;
     const togo = neighbours.filter((n) => !n.ratedToday);
     const spent = ratesLeft <= 0 && petsLeft <= 0;
     // Who came to YOU and has not been paid back yet. This is the line worth leading with when it applies —
     // "someone was here" is a far better reason to tap than "here are some farms".
     const owed = neighbours.filter((n) => n.cameBy && !n.ratedToday);
-    // ⚠️ EVERYONE WHO CAME BY, not only the ones still owed. Somebody you have already paid back this
-    // morning is still somebody who was here, and dropping them off the strip the moment you rate them
-    // makes the row shrink under your thumb as you work down it — which reads as people disappearing.
-    // They stay, marked as paid, and the unpaid ones sort to the front.
-    const visitors = neighbours
-        .filter((n) => n.cameBy)
-        .sort((a, b) => Number(Boolean(a.ratedToday)) - Number(Boolean(b.ratedToday)));
+    // ⚠️ SOMEBODY PAID BACK IS STILL SOMEBODY WHO WAS HERE. They keep their place in the list, marked as
+    // rated, rather than vanishing the moment you tap them — a row that shrinks under your thumb as you work
+    // down it reads as people disappearing. `ranked` sorts the unpaid ahead of them; neither is dropped.
     return (
         <section className="card farm-neigh">
             <div className="farm-neigh-head">
@@ -3662,59 +3668,24 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft, hideAlias = null }) {
                     aria-label="Filter farms" />
             </label>
 
-            {/* ── WHO HAS BEEN ROUND LATELY, ACROSS THE TOP ───────────────────────────────
-                Luke: "bring back the horizontal list of people that have been by lately."
-                ⚠️ AND THE NOTE UNDER IT SAYING NOT TO IS STILL RIGHT — about the other list. A strip
-                "shows four and hides the rest behind a sideways scroll nobody performs", which is exactly
-                what it did to a DIRECTORY of a hundred and twenty people, and why that became a grid. This
-                is not that list. The people who came by are a handful, they are the one thing on this card
-                worth acting on, and a strip is the right shape for a short list of faces precisely because
-                it costs one line instead of four. The two lists wanted opposite answers and were being
-                given one.
-                It hides while you are searching: a term means you are looking for a person by name, and the
-                grid below already searches all hundred and twenty. Two lists answering one query is how you
-                end up tapping the wrong copy of somebody. */}
-            {!term && visitors.length ? (
-                <div className="farm-neigh-strip" aria-label="Came by lately">
-                    {visitors.map((n) => {
+            {/* ── EVERY FARM, ACROSS THE TOP, IN THE ORDER THAT MATTERS ───────────────────────────────
+                One horizontal list, scroll-snapped. Whoever came to your farm this week leads it — unpaid
+                first, then the ones you have already paid back, then the rest of the Den. See `ranked`. */}
+            {shown.length ? (
+                <div className="farm-neigh-strip" aria-label="Farms to visit">
+                    {shown.map((n) => {
                         const avatar = n.spriteUrl || n.avatarUrl;
+                        const came = n.cameBy && !term;
                         return (
-                            <a key={`by-${n.id}`}
-                                className={`farm-neigh-chip is-strip${n.ratedToday ? " is-done" : " is-owed"}`}
+                            <a key={n.id}
+                                className={`farm-neigh-chip is-strip${n.ratedToday ? " is-done" : ""}${came && !n.ratedToday ? " is-owed" : ""}`}
                                 href={`/marketplace/farm?u=${encodeURIComponent(n.alias)}`}
-                                title={n.ratedToday ? `${n.name} — you have paid this one back` : `${n.name} came by — pay it back`}>
+                                title={n.ratedToday ? `${n.name} — rated today` : n.cameBy ? `${n.name} came by — pay it back` : `Visit ${n.name}'s farm`}>
                                 <span className="farm-neigh-face">
                                     {avatar ? (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img src={avatar} alt="" style={{ transform: n.spriteFlip ? "scaleX(-1)" : "none" }} />
                                     ) : <span aria-hidden="true" className="farm-neigh-noface" />}
-                                </span>
-                                <b>{n.name}</b>
-                                <em>{n.ratedToday ? "paid back" : "came by"}</em>
-                            </a>
-                        );
-                    })}
-                </div>
-            ) : null}
-
-            {/* ── AND EVERY FARM, AS A CARD ────────────────────────────────────────────────────────────────
-                A wrapping grid, not a horizontal strip: a strip shows four and hides the rest behind a
-                sideways scroll nobody performs, which is how a directory of ninety-five people read as a
-                directory of four. Still true, which is why the strip above is only ever the short list. */}
-            {shown.length ? (
-                <div className="farm-neigh-grid">
-                    {shown.map((n) => {
-                        const avatar = n.spriteUrl || n.avatarUrl;
-                        return (
-                            <a key={n.id}
-                                className={`farm-neigh-chip${n.ratedToday ? " is-done" : ""}${n.cameBy && !n.ratedToday ? " is-owed" : ""}`}
-                                href={`/marketplace/farm?u=${encodeURIComponent(n.alias)}`}
-                                title={n.ratedToday ? `${n.name} — rated today` : n.cameBy ? `${n.name} visited you recently` : `Visit ${n.name}'s farm`}>
-                                <span className="farm-neigh-face">
-                                    {avatar ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={avatar} alt="" style={{ transform: n.spriteFlip ? "scaleX(-1)" : "none" }} />
-                                    ) : <span aria-hidden="true">🐾</span>}
                                 </span>
                                 <b>{n.name}</b>
                                 <em>{n.ratedToday ? "rated today" : n.cameBy ? "came by" : n.decoCount ? `${n.decoCount} placed` : "say hi"}</em>
@@ -3727,6 +3698,7 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft, hideAlias = null }) {
                     {all === null ? "Loading farms…" : term ? "Nobody by that name." : "No farms to visit yet."}
                 </p>
             )}
+
         </section>
     );
 }
