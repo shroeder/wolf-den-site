@@ -472,6 +472,29 @@ export function hitChance(att, zone, ammo, evasion, gunIndex = null) {
 const gunsReady = (s) => s.guns.reduce((n, hp) => n + (hp > 0 ? 1 : 0), 0);
 const hpPair = (st) => ({ me: st.me.hp, foe: st.foe.hp });
 
+// ── SHE STRIKES HER COLOURS ──────────────────────────────────────────────────────────────────────────────────
+// A fight used to have exactly one ending: somebody's hull reached zero. So a ship you had carefully dismasted
+// and dis-gunned — helpless, floating, unable to answer — still had to be chewed down plank by plank, and the
+// only thing aiming at her rigging ever bought you was a quieter victim.
+//
+// It ends now when she cannot fight and cannot run: canvas gone, every gun off its carriage, hull intact, and
+// you still have iron bearing on her. That is a prize rather than a wreck, and it is what makes "strip her
+// sails and silence her deck" a real route through a fight instead of flavour on the way to sinking her.
+//
+// ⚠️ `sys` IS THE GUARD AND IT ALREADY EXISTED. A kraken, a swarm, a serpent are built with `sys: false` —
+// "a living thing has no parts", nothing can be shot off it — and every side keeps a `sails` value internally
+// whether or not it has rigging, because evasionOf reads it. Without this check a monster, which can never
+// have its (notional) sails shot away, would still have had to be tested for it; WITH it, only something that
+// genuinely has rigging and gun ports can ever strike. Animals still have to be killed.
+//
+// ⚠️ AND IT COUNTS AS A WIN, so nothing downstream had to change. finishFleetBattle, finishRaidBattle and
+// finishEncounterBattle all pay on `res.win` rather than on `res.sunk`, so a struck ship pays exactly what a
+// sunk one pays. Old content keeps working and keeps paying the same; this only adds a second way to get there.
+const struckColours = (st) => Boolean(
+    st.foe.sys && st.foe.hp > 0 && st.foe.sails <= 0 && gunsReady(st.foe) === 0 && gunsReady(st.me) > 0
+);
+
+
 // The opening state of a fight. Kept JSON-safe: it is stored on the sailing row between rounds.
 export function initBattleState(me, foe) {
     const fresh = (p) => {
@@ -588,8 +611,12 @@ export function resolveReckoning(me, foe, state, { rng = Math.random } = {}) {
     for (const ev of reckoningBroadside(me, st, "me", rng)) events.push(ev);
 
     const sunk = st.foe.hp <= 0 ? "foe" : null;
-    const over = Boolean(sunk);
-    return { ok: true, events, state: st, over, win: over, sunk, stalemate: false, mine: [], theirs: [] };
+    // The free volley can be the one that takes her last gun, so it has to be able to end the fight the same
+    // way an ordinary one does — otherwise a Reckoning that dismounted her final cannon would leave a helpless
+    // ship on the water and the player waiting for a round that resolves nothing.
+    const struck = !sunk && struckColours(st);
+    const over = Boolean(sunk) || struck;
+    return { ok: true, events, state: st, over, win: over, sunk, struck, stalemate: false, mine: [], theirs: [] };
 }
 
 // ── WHAT THE CLIENT IS ALLOWED TO HAVE ASKED FOR ─────────────────────────────────────────────────────────────
@@ -850,9 +877,10 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
     // clock — nobody can die, which is the only case the rule has to cover.
     const sunk = st.foe.hp <= 0 ? "foe" : st.me.hp <= 0 ? "me" : null;
     const gunless = gunsReady(st.me) === 0 && gunsReady(st.foe) === 0;
-    const over = Boolean(sunk) || gunless;
-    const win = sunk === "foe" || (!sunk && gunless && st.me.hp / st.me.max >= st.foe.hp / st.foe.max);
-    return { events, state: st, over, win, sunk, stalemate: !sunk && gunless, mine, theirs };
+    const struck = !sunk && struckColours(st);
+    const over = Boolean(sunk) || gunless || struck;
+    const win = sunk === "foe" || struck || (!sunk && gunless && st.me.hp / st.me.max >= st.foe.hp / st.foe.max);
+    return { events, state: st, over, win, sunk, struck, stalemate: !sunk && gunless, mine, theirs };
 }
 
 // Kept only so a screen can say how long a fight has run; nothing ends on it any more.

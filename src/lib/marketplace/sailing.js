@@ -2952,7 +2952,7 @@ export async function shipBattleVolley(buyerId, aim) {
         ok: true,
         battle: {
             ...(await battleView(res.state, meta, { row: await readRow(buyerId) })), events: res.events, over: true,
-            win: res.win, sunk: res.sunk, reward,
+            win: res.win, sunk: res.sunk, struck: Boolean(res.struck), reward,
             yourAim: res.mine, theirAim: res.theirs,
         },
         ...(await getSailingState(buyerId)),
@@ -2995,7 +2995,7 @@ export async function shipBattleReckoning(buyerId) {
         ok: true,
         battle: {
             ...(await battleView(res.state, meta, { row: await readRow(buyerId) })), events: res.events, over: true,
-            win: res.win, sunk: res.sunk, reward, reckoning: true,
+            win: res.win, sunk: res.sunk, struck: Boolean(res.struck), reward, reckoning: true,
         },
         ...(await getSailingState(buyerId)),
     };
@@ -3296,7 +3296,7 @@ async function finishFleetBattle(buyerId, meta, res) {
           WHERE buyer_id = $1`,
         [buyerId, res.win && first ? want : depth, res.win ? 1 : 0, res.win ? 0 : 1]
     ).catch(() => {});
-    await trackActivity(buyerId, "ship_battle_end", { rank: want, win: res.win, sunk: res.sunk, rounds: res.state.round }).catch(() => {});
+    await trackActivity(buyerId, "ship_battle_end", { rank: want, win: res.win, sunk: res.sunk, struck: Boolean(res.struck), rounds: res.state.round }).catch(() => {});
     // ── AND HER CAPTAIN IS STANDING ON YOUR DECK ─────────────────────────────────────────────────────
     // Written AFTER the reward is paid and never in front of it: this only ever ADDS an offer, so a
     // failure here costs a capture and cannot cost a win. See the note in captains.js on why the choice

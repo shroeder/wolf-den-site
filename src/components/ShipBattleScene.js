@@ -1066,6 +1066,8 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
         onReckoning?.();
     }, [reckReady, busy, phase, onReckoning]);
 
+    // A struck ship never goes down, so the sinking cinematic has nothing to play — battle.sunk is null in
+    // that case anyway, and this stays keyed to it rather than to "the fight ended".
     const sinkingSide = phase === "sinking" || phase === "result" ? battle?.sunk : null;
     const win = Boolean(battle?.win);
     // A new exchange raises the recap; four and a half seconds later it lowers itself. Keyed on the round so
@@ -1377,15 +1379,23 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
             {phase === "result" ? (
                 <div className="sbt-result">
                     <div className={`card sbt-result-card ${win ? "is-win" : "is-lose"}`}>
+                        {/* ⚠️ A TAKEN SHIP IS NOT A SUNK ONE. A fight can now end with her dismasted, her guns
+                            off their carriages and her hull whole — see struckColours in ship-battle.js — and
+                            calling that "Sunk!" over a ship still floating is the screen contradicting the
+                            thing the player just spent six rounds doing on purpose. */}
                         <div className={`sbt-result-banner ${win ? "is-win" : "is-lose"}`}>
-                            {win ? (battle?.sunk === "foe" ? "Sunk!" : "Victory") : (battle?.sunk === "me" ? "Sent to the bottom" : "Driven off")}
+                            {win
+                                ? (battle?.struck ? "She strikes!" : battle?.sunk === "foe" ? "Sunk!" : "Victory")
+                                : (battle?.sunk === "me" ? "Sent to the bottom" : "Driven off")}
                         </div>
                         <p className="sbt-result-line">
-                            {battle?.sunk
-                                ? (win
-                                    ? <>{foe.name} went down by the bow after {battle?.round} round{battle?.round === 1 ? "" : "s"}.</>
-                                    : <>{foe.name} put you under after {battle?.round} round{battle?.round === 1 ? "" : "s"}.</>)
-                                : <>Not a gun left standing on either deck after {battle?.round} round{battle?.round === 1 ? "" : "s"} — {win ? "you were the healthier ship" : `${foe.name} was the healthier ship`}.</>}
+                            {battle?.struck
+                                ? <>{foe.name} is dismasted and silenced after {battle?.round} round{battle?.round === 1 ? "" : "s"} — she strikes her colours, hull whole.</>
+                                : battle?.sunk
+                                    ? (win
+                                        ? <>{foe.name} went down by the bow after {battle?.round} round{battle?.round === 1 ? "" : "s"}.</>
+                                        : <>{foe.name} put you under after {battle?.round} round{battle?.round === 1 ? "" : "s"}.</>)
+                                    : <>Not a gun left standing on either deck after {battle?.round} round{battle?.round === 1 ? "" : "s"} — {win ? "you were the healthier ship" : `${foe.name} was the healthier ship`}.</>}
                         </p>
                         {battle?.reward?.length ? (
                             <div className="sbt-rewards">
