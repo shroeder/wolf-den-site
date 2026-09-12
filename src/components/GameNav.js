@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { isGamePath } from "@/lib/marketplace/game-paths.js";
 import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
-import { GiCardPlay, GiSpyglass } from "react-icons/gi";
+import { GiCardPlay } from "react-icons/gi";
 
 import FishingLaunch from "@/components/FishingLaunch";
 import MiningLaunch from "@/components/MiningLaunch";
@@ -162,7 +162,6 @@ export default function GameNav() {
     // The Forest is owner-gated while it is built — same contract as the Kitchen and the Mine: ask the
     // server, never guess, and a non-owner simply has no Forest in the menu with nothing to see.
     const forest = Boolean(hud?.forest);
-    const highSeas = Boolean(hud?.highSeas);
     const mineTrips = Number(hud?.mine?.trips) || 0;
     const minePartsReady = Number(hud?.mine?.partsReady) || 0;
     const arena = Boolean(hud?.arena?.unlocked);
@@ -340,7 +339,6 @@ export default function GameNav() {
             { href: "/marketplace/sailing", emoji: "⛵", label: "Sailing", sub: "Voyage & dig" },
             // The High Seas prototype, owner-only while it is being felt out. Sits beside Sailing because it
             // is the same water — see highseas-gate.js for the one switch that opens it.
-            ...(highSeas ? [{ href: "/marketplace/sailing/lab", Icon: GiSpyglass, label: "High Seas", sub: "The new sailing", owner: true }] : []),
             { href: "/marketplace/farm", emoji: "🏡", label: "Farm", sub: "Grow & harvest" },
             { href: "/marketplace/spin", Icon: FaDharmachakra, label: "Daily Spin", sub: "Spin the wheel" },
             { href: "/marketplace/quests", emoji: "📜", label: "Quests", sub: "Daily bounties" },
