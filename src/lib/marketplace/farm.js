@@ -533,8 +533,17 @@ export async function getFarm(ownerId, viewerId) {
         farmRatingBits(ownerId, viewerId).catch(() => ({ rating: null })),
         getPlacements(ownerId).catch(() => []), // the OWNER's placed decorations — rendered on any farm
         mine ? decoState(viewerId).catch(() => null) : Promise.resolve(null), // your inventory — manage on your own farm only
-        // Only on your OWN farm: the "who haven't I visited today" strip. On someone else's you are already
-        // doing the visiting, and a list of other people to go and see is the last thing that screen needs.
+        // ⚠️ ON SOMEBODY ELSE'S FARM TOO, WHICH REVERSES THE NOTE THAT USED TO BE HERE. It read: "on someone
+        // else's you are already doing the visiting, and a list of other people to go and see is the last
+        // thing that screen needs." That is wrong about what visiting actually looks like — you go and see
+        // one farm, and then you want the next one, and the only route to it was BACK to your own farm and
+        // into the Standing tab. Luke: "it would be nice if we could show you the same controls that you see
+        // to visit people's farms when you're on your own farm on someone else's farm so that you don't have
+        // to go back to your farm to visit someone else's farm."
+        //
+        // Keyed on the VIEWER either way — it is your list of who you have not been to see, so it means the
+        // same thing standing anywhere. Two extra reads on a page nobody loads in a loop; the visiting screen
+        // is a deliberate navigation, not a poller. See CLAUDE.md on which calls are worth narrowing.
         // ⚠️ 24, NOT 8, AND THE STRIP IS WHY. `came_by` is only computed for the rows this query
         // returns — everybody else in the directory comes back as a plain "say hi" — and the ORDER BY
         // deliberately leads with "not yet rated today", so somebody who came by AND has already been paid
@@ -542,12 +551,14 @@ export async function getFarm(ownerId, viewerId) {
         // strip of who has been round lately, and a strip that silently drops half of them is worse than
         // no strip. Twenty-four is the function's own ceiling and covers any realistic day: the busiest
         // farm in the Den has three.
-        mine ? farmNeighbours(viewerId, { limit: 24 }).catch(() => []) : Promise.resolve([]),
+        viewerId ? farmNeighbours(viewerId, { limit: 24 }).catch(() => []) : Promise.resolve([]),
         // The farm COLLECTIONS (Harvester / Forager) — shown permanently on the farm screen, because that is
         // where their bonuses land and where somebody chasing them is standing.
         mine ? farmCollections(viewerId).catch(() => []) : Promise.resolve([]),
-        // The most-loved board. Only on your own farm — Standing is the tab that asks "how do I compare?", and
-        // a position with nobody else's name next to it is not an answer.
+        // The most-loved board stays OWN-FARM ONLY. It answers "how do I compare?", which is a Standing-tab
+        // question — and the visiting screen gets the neighbour strip instead, which already carries a
+        // browsable directory AND its own search. Two search boxes on one screen is worse than none, and this
+        // is a query per visit that buys nothing. See CLAUDE.md: narrow the call, do not widen it.
         mine ? farmLoveBoard(viewerId).catch(() => ({ top: [], mine: null })) : Promise.resolve({ top: [], mine: null }),
     ]);
     return {
@@ -588,7 +599,7 @@ export async function getFarm(ownerId, viewerId) {
             stones: await (await import("@/lib/marketplace/pet-ascension.js")).getStones(ownerId).catch(() => ({})),
         } : null,
         decorations, // your owned-decoration inventory + buffs (own farm only; null when visiting)
-        neighbours, // own farm only: who you have not visited yet today (see farmNeighbours)
+        neighbours, // who the VIEWER has not visited yet today (see farmNeighbours) — on any farm
         collections, // own farm only: the Harvester / Forager chases, always visible
         loveBoard, // own farm only: { top, mine } — the most-loved farms, for the Standing tab
         ...extras,

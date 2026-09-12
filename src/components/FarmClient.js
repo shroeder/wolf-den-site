@@ -220,6 +220,66 @@ const VIEW_BG = {
     garden: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-views/garden-beds-flat-1785108098669.png",
 };
 
+
+// ── THE WAY TO SOMEBODY ELSE'S FARM ──────────────────────────────────────────────────────────────────────────
+// Lifted out of the Standing tab so the VISITING screen can show the same thing. It used to exist once, inline,
+// on your own farm only — so the way to the second farm of the day was: leave, go home, open Standing, search.
+// Luke asked for it to be on the farm you are already standing in.
+//
+// A sibling function, which is only safe because every class in here (.farm-loveboard, .farm-findfarm, the
+// Leaderboard's own) lives in globals.css. styled-jsx scopes to the component that OWNS the style block, so
+// markup moved into a helper loses any rule declared in FarmClient's — see [[styled-jsx-landmines]].
+function FindAFarm({ board, rating, query, setQuery, hits, seeking }) {
+    if (!board?.top?.length) return null;
+    return (
+        <div className="farm-loveboard">
+                    <div className="farm-loveboard-head">
+                        <b>Most-loved farms</b>
+                        <span>tier-weighted · like 1 · love 2 · admire 3</span>
+                    </div>
+                    {/* Tap any farm to go and see it. With enough players a top ten stops being a
+                        way to find anyone in particular, so this searches the WHOLE board and each
+                        result keeps its real standing rather than its position in the results. */}
+                    <input className="farm-findfarm" value={query} autoComplete="off"
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Find a farm to visit…" aria-label="Search farms" />
+                    {hits ? (
+                        hits.length ? (
+                            <Leaderboard
+                                rows={hits.map((r) => ({
+                                    place: r.place ?? "–", who: r.who, avatar: r.avatar, you: r.you,
+                                    value: r.place == null ? "—" : r.score.toLocaleString(),
+                                    unit: r.place == null ? "not rated yet" : `love · ${r.votes} vote${r.votes === 1 ? "" : "s"}`,
+                                    href: r.you || !r.alias ? null : `/marketplace/farm?u=${encodeURIComponent(r.alias)}`,
+                                }))}
+                                unitPlural="farms"
+                            />
+                        ) : <p className="lb-empty">{seeking ? "Searching…" : "No farm by that name."}</p>
+                    ) : (
+                    <Leaderboard
+                        rows={board.top.map((r) => ({
+                            place: r.place, who: r.who, avatar: r.avatar, you: r.you,
+                            value: r.score.toLocaleString(),
+                            unit: `love · ${r.votes} vote${r.votes === 1 ? "" : "s"}`,
+                            href: r.you || !r.alias ? null : `/marketplace/farm?u=${encodeURIComponent(r.alias)}`,
+                        }))}
+                        mine={board.mine ? {
+                            place: board.mine.place, who: board.mine.who,
+                            avatar: board.mine.avatar, you: true,
+                            value: board.mine.score.toLocaleString(),
+                            unit: `love · ${board.mine.votes} vote${board.mine.votes === 1 ? "" : "s"}`,
+                            toNext: rating?.standings?.toNext
+                                ? `${rating.standings.toNext} more love to catch ${ordinal(board.mine.place - 1)}`
+                                : null,
+                        } : null}
+                        total={rating?.standings?.ranked || null}
+                        unitPlural="farms"
+                    />
+                    )}
+        </div>
+    );
+}
+
 export default function FarmClient({ initial, viewingAlias }) {
     const router = useRouter();
     const [farm, setFarm] = useState(initial);
@@ -1553,6 +1613,26 @@ export default function FarmClient({ initial, viewingAlias }) {
                     <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
                 ) : null}
 
+                {/* ── AND ON TO THE NEXT FARM ──────────────────────────────────────────────────────
+                    Luke: "so that you don't have to go back to your farm to visit someone else's farm." You
+                    pet their animals, you rate the place, and then the only route onward was: leave, load your
+                    own farm, open Standing, search. These are the same two controls that live on your own farm
+                    — the strip of who you have not been to see, and the searchable board — rendered from the
+                    same components rather than a second copy of them. Below the pets and the rating, because
+                    the farm you are standing in is what you came for. */}
+                {!farm.mine ? (
+                    <>
+                        {farm.neighbours?.length ? (
+                            <NeighbourStrip
+                                neighbours={farm.neighbours}
+                                ratesLeft={farm.rating?.charge?.left ?? 0}
+                                petsLeft={farm.petting?.others?.left ?? 0}
+                                hideAlias={farm.owner?.alias || null}
+                            />
+                        ) : null}
+                    </>
+                ) : null}
+
                 {/* GARDEN tab also carries the farm CHASES — the Harvester and Forager collections belong on
                     the screen their bonuses land on, not three taps away on the equipment page. */}
                 {farm.mine && panel === "garden" && farm.collections?.length ? (
@@ -1569,53 +1649,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
                         {/* HOW YOU COMPARE. A place with no other farms next to it is a fact, not a standing —
                             you cannot tell whether 1st is comfortable or one vote from being taken. */}
-                        {farm.loveBoard?.top?.length ? (
-                            <div className="farm-loveboard">
-                                <div className="farm-loveboard-head">
-                                    <b>Most-loved farms</b>
-                                    <span>tier-weighted · like 1 · love 2 · admire 3</span>
-                                </div>
-                                {/* Tap any farm to go and see it. With enough players a top ten stops being a
-                                    way to find anyone in particular, so this searches the WHOLE board and each
-                                    result keeps its real standing rather than its position in the results. */}
-                                <input className="farm-findfarm" value={farmQuery} autoComplete="off"
-                                    onChange={(e) => setFarmQuery(e.target.value)}
-                                    placeholder="Find a farm to visit…" aria-label="Search farms" />
-                                {farmHits ? (
-                                    farmHits.length ? (
-                                        <Leaderboard
-                                            rows={farmHits.map((r) => ({
-                                                place: r.place ?? "–", who: r.who, avatar: r.avatar, you: r.you,
-                                                value: r.place == null ? "—" : r.score.toLocaleString(),
-                                                unit: r.place == null ? "not rated yet" : `love · ${r.votes} vote${r.votes === 1 ? "" : "s"}`,
-                                                href: r.you || !r.alias ? null : `/marketplace/farm?u=${encodeURIComponent(r.alias)}`,
-                                            }))}
-                                            unitPlural="farms"
-                                        />
-                                    ) : <p className="lb-empty">{farmSeeking ? "Searching…" : "No farm by that name."}</p>
-                                ) : (
-                                <Leaderboard
-                                    rows={farm.loveBoard.top.map((r) => ({
-                                        place: r.place, who: r.who, avatar: r.avatar, you: r.you,
-                                        value: r.score.toLocaleString(),
-                                        unit: `love · ${r.votes} vote${r.votes === 1 ? "" : "s"}`,
-                                        href: r.you || !r.alias ? null : `/marketplace/farm?u=${encodeURIComponent(r.alias)}`,
-                                    }))}
-                                    mine={farm.loveBoard.mine ? {
-                                        place: farm.loveBoard.mine.place, who: farm.loveBoard.mine.who,
-                                        avatar: farm.loveBoard.mine.avatar, you: true,
-                                        value: farm.loveBoard.mine.score.toLocaleString(),
-                                        unit: `love · ${farm.loveBoard.mine.votes} vote${farm.loveBoard.mine.votes === 1 ? "" : "s"}`,
-                                        toNext: farm.rating?.standings?.toNext
-                                            ? `${farm.rating.standings.toNext} more love to catch ${ordinal(farm.loveBoard.mine.place - 1)}`
-                                            : null,
-                                    } : null}
-                                    total={farm.rating?.standings?.ranked || null}
-                                    unitPlural="farms"
-                                />
-                                )}
-                            </div>
-                        ) : null}
+                        <FindAFarm board={farm.loveBoard} rating={farm.rating} query={farmQuery}
+                            setQuery={setFarmQuery} hits={farmHits} seeking={farmSeeking} />
                         {/* The old "Visit a farm" directory lived here, collapsed inside a second collapsed
                             block and labelled "owner-only" — a label that was not even true, since the list
                             endpoint has always been open to any signed-in member. Between the two lids and the
@@ -3537,7 +3572,7 @@ const SearchIcon = () => (
 // This is the fix, and it is the first thing under the pasture: what you have left today, and WHO to spend it
 // on — un-rated farms first, with a tick on the ones already done. The whole point is that it answers "who
 // haven't I visited yet" without a search box, a tap, or knowing anyone's @name.
-function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
+function NeighbourStrip({ neighbours, ratesLeft, petsLeft, hideAlias = null }) {
     // ── AND ANYONE ELSE ── the eight faces answer "who owes me a visit", which is the right question most
     // days and the wrong one the day you want to go and look at a particular person's farm. There WAS a way:
     // a search box, inside the collapsed rating summary, under the standings. Nobody found it. It is here now,
@@ -3562,11 +3597,14 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
     }, []);
     // The neighbours strip stays FIRST and keeps its "came by" marks — those are the visits that pay you back,
     // and burying them in an alphabetical wall would lose the one thing worth acting on.
+    // ⚠️ NOT THE FARM YOU ARE STANDING IN. This card is rendered on somebody else's farm now, and a
+    // directory offering to take you to the place you are already looking at is a dead row at the top of it.
     const roster = useMemo(() => {
         const owedIds = new Set((neighbours || []).map((n) => n.id));
         const rest = (all || []).filter((m) => !owedIds.has(m.id));
-        return [...(neighbours || []), ...rest];
-    }, [all, neighbours]);
+        const both = [...(neighbours || []), ...rest];
+        return hideAlias ? both.filter((m) => m.alias !== hideAlias) : both;
+    }, [all, neighbours, hideAlias]);
     const term = q.trim().toLowerCase().replace(/^@/, "");
     const shown = term
         ? roster.filter((m) => `${m.name || ""} ${m.alias || ""}`.toLowerCase().includes(term))
