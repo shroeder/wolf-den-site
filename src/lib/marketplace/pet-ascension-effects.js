@@ -31,6 +31,13 @@
 //            number in the game. Nine shipped like that, two of them ascendant. The header above says this
 //            file was written because "on five ability keys Dark did nothing whatsoever"; it is the same
 //            fault and it grew back, because nothing was checking. scripts/pet-stone-check.mjs checks.
+//            ⚠️ AND A GRAFT IS NEVER WORTH LESS THAN THE AMPLIFY IT IS OFFERED AGAINST. The two stones are
+//            the same decision at the same price, so the GAIN has to be comparable: an amplify of x2 adds one
+//            whole helping of the pet's own ability, and a graft therefore has to add one whole helping of
+//            the other one. It was 0.6-1.0 against amplifies of 1.8-2.3 — a third less, on a third of the
+//            roster — which is the arithmetic behind Luke's "feels like the light evolution is way worse".
+//            A light graft now sits at (dark.mult - 1) or better. Dark was not touched: every one of these
+//            moved UP, so nobody who has already spent a stone lost anything.
 //   GRAFT    a SECOND ability, `key`, at `scale` of its natural value for that pet's rarity. This is where the
 //            character comes from: a fox that learns to raid chests, an owl that keeps watch after closing, a
 //            crocodile that learns to finish. Grafted abilities are rarity-scaled and capped exactly like a
@@ -55,7 +62,7 @@ export const ASCENSION_EFFECTS = {
     vaultwyrm: {
         // A dragon that reads rock, taught to swing at it. forge_salvage is the nearest thing in the game to
         // "more out of the same stone", and it is the trade a miner picks up next.
-        light: { name: "Breaks Its Own Ore", kind: "graft", key: "forge_salvage", scale: 0.9,
+        light: { name: "Breaks Its Own Ore", kind: "graft", key: "gold_find", scale: 1.0,
             note: "It got bored waiting for somebody else to bring the pile in." },
         // Its floor at the rock face, higher. 12 -> 36 at Lv5 and this carries it to the 38 ceiling.
         dark: { name: "Takes The Better Half", kind: "graft", key: "chest_luck", scale: 1, note: "A dragon knows which box is the one." },
@@ -89,11 +96,11 @@ export const ASCENSION_EFFECTS = {
 
     // Bought at the Counter. Each already makes the FLOOR kinder; the stones are about everything else.
     copper_paw: {
-        light: { name: "Pays Its Own Way", kind: "graft", key: "fortune", scale: 0.8, note: "It has been sleeping on the change tray for years. Some of it stuck." },
+        light: { name: "Pays Its Own Way", kind: "graft", key: "fortune", scale: 1, note: "It has been sleeping on the change tray for years. Some of it stuck." },
         dark: { name: "Heavier Than It Looks", kind: "amplify", mult: 2 },
     },
     tallyman: {
-        light: { name: "Knows What You Are Owed", kind: "graft", key: "town_haggle", scale: 0.9, note: "Nobody argues with the man holding the book." },
+        light: { name: "Knows What You Are Owed", kind: "graft", key: "town_haggle", scale: 1, note: "Nobody argues with the man holding the book." },
         dark: { name: "Counts Twice", kind: "amplify", mult: 2 },
     },
     gilded_magpie: {
@@ -106,36 +113,38 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "The House Cat Always Wins", kind: "amplify", mult: 1.8 },
     },
     night_auditor: {
-        light: { name: "Reconciled", kind: "graft", key: "xp_gain", scale: 0.9, note: "It works the hours nobody watches, and it learns in them." },
+        light: { name: "Reconciled", kind: "graft", key: "xp_gain", scale: 1, note: "It works the hours nobody watches, and it learns in them." },
         dark: { name: "The Books Are Never Wrong", kind: "amplify", mult: 2 },
     },
 
     // Sable's three, behind the rope. No casinoPerk — what a stone does to these is the whole of what they do.
     house_ferret: {
         // Same cap as the Magpie, same answer: two grafts, so the choice is a real one.
-        light: { name: "Under Every Floorboard", kind: "graft", key: "truffle_hog", scale: 0.8, note: "Whatever rolled under there, it knows." },
+        light: { name: "Under Every Floorboard", kind: "graft", key: "fortune", scale: 0.9,
+            note: "Whatever rolled under there, it knows." },
         dark: { name: "The Whole Room", kind: "graft", key: "gold_find", scale: 0.9, note: "Chest luck is capped where it stands, so the Darkstone widens the hunt rather than deepening it." },
     },
     velvet_lynx: {
-        light: { name: "Everyone Knows the Lynx", kind: "graft", key: "fortune", scale: 0.9, note: "It has never once been asked to leave, and it has never once paid." },
+        light: { name: "Everyone Knows the Lynx", kind: "graft", key: "fortune", scale: 1, note: "It has never once been asked to leave, and it has never once paid." },
         dark: { name: "Never Asked to Leave", kind: "amplify", mult: 2 },
     },
     midnight_crane: {
-        light: { name: "Misses Nothing At All", kind: "graft", key: "crit_chance", scale: 0.8, note: "It stands at the end of the bar and it is always facing the room." },
+        light: { name: "Misses Nothing At All", kind: "graft", key: "crit_chance", scale: 1.2, note: "It stands at the end of the bar and it is always facing the room." },
         dark: { name: "The Long Watch", kind: "amplify", mult: 2.2 },
     },
 
     // ── THE LEVELLING PETS ───────────────────────────────────────────────────────────────────────────────────
     bunny: {
-        light: { name: "Warren Cache", kind: "graft", key: "farm_seed", scale: 0.9, note: "Everything a rabbit digs, it digs twice." },
+        light: { name: "Warren Cache", kind: "graft", key: "farm_seed", scale: 1, note: "Everything a rabbit digs, it digs twice." },
         dark: { name: "Bottomless Burrow", kind: "amplify", mult: 2, note: "There is more down there than anyone put in." },
     },
     frog: {
-        light: { name: "Fly Catcher", kind: "graft", key: "angler_bite", scale: 0.8, note: "It has been watching the water this whole time." },
+        light: { name: "Fly Catcher", kind: "graft", key: "chain_strike", scale: 1.2,
+            note: "It has been watching the water this whole time." },
         dark: { name: "Tongue Like a Whip", kind: "amplify", mult: 2.2 },
     },
     chick: {
-        light: { name: "Scratched Earth", kind: "graft", key: "farm_speed", scale: 0.8, note: "Turned soil warms faster." },
+        light: { name: "Scratched Earth", kind: "graft", key: "farm_speed", scale: 1.2, note: "Turned soil warms faster." },
         dark: { name: "Every Grain", kind: "amplify", mult: 2.2 },
     },
     kitten: {
@@ -143,39 +152,41 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Claws Out", kind: "amplify", mult: 2 },
     },
     fox_kit: {
-        light: { name: "Raided the Henhouse", kind: "graft", key: "chest_luck", scale: 0.9, note: "It was never only about the hens." },
+        light: { name: "Raided the Henhouse", kind: "graft", key: "chest_luck", scale: 1, note: "It was never only about the hens." },
         dark: { name: "Throat Bite", kind: "amplify", mult: 2 },
     },
     wolf_pup: {
-        light: { name: "The Pack Runs Together", kind: "graft", key: "town_rally", scale: 0.8 },
+        light: { name: "The Pack Runs Together", kind: "graft", key: "chain_strike", scale: 1.0 },
         dark: { name: "Full Grown", kind: "amplify", mult: 2, note: "It is not a pup any more." },
     },
     owl: {
-        light: { name: "Night Watch", kind: "graft", key: "night_angler", scale: 1, note: "It keeps the shop's hours in reverse." },
+        light: { name: "Night Watch", kind: "graft", key: "crit_chance", scale: 1.2,
+            note: "It keeps the shop's hours in reverse." },
         dark: { name: "Every Lesson", kind: "amplify", mult: 2.2 },
     },
     bear_cub: {
-        light: { name: "Turned the Log", kind: "graft", key: "truffle_hog", scale: 0.7, note: "Whatever was under it is yours." },
+        light: { name: "Turned the Log", kind: "graft", key: "gold_find", scale: 1.0,
+            note: "Whatever was under it is yours." },
         dark: { name: "Full Weight", kind: "amplify", mult: 2 },
     },
     raven: {
-        light: { name: "Shiny Things", kind: "graft", key: "gold_find", scale: 1 },
+        light: { name: "Shiny Things", kind: "graft", key: "gold_find", scale: 1.2 },
         dark: { name: "The Hoard Grows", kind: "amplify", mult: 2.2, note: "It has been counting." },
     },
     serpent: {
-        light: { name: "Venom Takes", kind: "graft", key: "erupt", scale: 0.8, note: "Slow at first, and then all at once." },
+        light: { name: "Venom Takes", kind: "graft", key: "erupt", scale: 1, note: "Slow at first, and then all at once." },
         dark: { name: "Deeper Fangs", kind: "amplify", mult: 2 },
     },
     fawn: {
-        light: { name: "Gentle Tread", kind: "graft", key: "green_thumb", scale: 0.9, note: "It walks other people's fields without breaking a stem." },
+        light: { name: "Gentle Tread", kind: "graft", key: "green_thumb", scale: 1, note: "It walks other people's fields without breaking a stem." },
         dark: { name: "Grown Overnight", kind: "amplify", mult: 2 },
     },
     bat: {
-        light: { name: "Reads the Dark", kind: "graft", key: "night_angler", scale: 0.9 },
+        light: { name: "Reads the Dark", kind: "graft", key: "pierce", scale: 1.0 },
         dark: { name: "Perfect Return", kind: "amplify", mult: 2, note: "The sound comes back and it already knows." },
     },
     scorpion: {
-        light: { name: "Struck First", kind: "graft", key: "first_blood", scale: 0.9 },
+        light: { name: "Struck First", kind: "graft", key: "first_blood", scale: 1 },
         dark: { name: "Barbed", kind: "amplify", mult: 2 },
     },
     tiger_cub: {
@@ -187,7 +198,7 @@ export const ASCENSION_EFFECTS = {
     // exactly the "two options is not the same thing as a decision" this whole file was written to end, and
     // it shipped again anyway. Light grafts a second trade; Dark doubles down on what the pet already is.
     chalk_hare: {
-        light: { name: "Counts What It Sees", kind: "graft", key: "xp_gain", scale: 0.9 },
+        light: { name: "Counts What It Sees", kind: "graft", key: "xp_gain", scale: 1.2 },
         dark: { name: "Never Wrong Twice", kind: "amplify", mult: 2.2, note: "It has kept that tally a long time." },
     },
     cellar_jay: {
@@ -195,11 +206,11 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Brightest on the Table", kind: "graft", key: "town_haggle", scale: 0.9 },
     },
     pit_marten: {
-        light: { name: "Every Way Out", kind: "graft", key: "second_wind", scale: 1 },
+        light: { name: "Every Way Out", kind: "graft", key: "tenacity", scale: 1.1 },
         dark: { name: "Under the Floor", kind: "amplify", mult: 2.1 },
     },
     ivory_adder: {
-        light: { name: "Strikes First", kind: "graft", key: "first_blood", scale: 1 },
+        light: { name: "Strikes First", kind: "graft", key: "first_blood", scale: 1.2 },
         dark: { name: "Nobody Sees It", kind: "amplify", mult: 2.2 },
     },
     seahorse: {
@@ -207,11 +218,12 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Knows Every Reef", kind: "graft", key: "following_sea", scale: 0.9, note: "It has not left this stretch of water in its life. It knows which way it is going." },
     },
     eagle: {
-        light: { name: "Talons Down", kind: "graft", key: "angler_size", scale: 0.9, note: "It fishes, and it does not miss." },
+        light: { name: "Talons Down", kind: "graft", key: "execute", scale: 1.0,
+            note: "It fishes, and it does not miss." },
         dark: { name: "Nothing Hides", kind: "amplify", mult: 2 },
     },
     lion_cub: {
-        light: { name: "The Pride Follows", kind: "graft", key: "town_rally", scale: 0.9 },
+        light: { name: "The Pride Follows", kind: "graft", key: "ferocity", scale: 0.9 },
         dark: { name: "Holds the Rock", kind: "graft", key: "might", scale: 0.9, note: "It stopped being the smallest thing on it." },
     },
     gorilla: {
@@ -231,15 +243,17 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Above the Field", kind: "graft", key: "first_blood", scale: 0.85, note: "It sees the fight start before anyone in it does." },
     },
     unicorn: {
-        light: { name: "Wishes Twice", kind: "graft", key: "chest_luck", scale: 0.9 },
+        light: { name: "Wishes Twice", kind: "graft", key: "chest_luck", scale: 1.2 },
         dark: { name: "Granted", kind: "amplify", mult: 2.2, note: "You did not have to ask again." },
     },
     dragon_whelp: {
-        light: { name: "Ember in the Forge", kind: "graft", key: "forge_spark", scale: 0.9, note: "The smiths keep it in a bucket by the anvil." },
+        light: { name: "First Ember", kind: "graft", key: "first_blood", scale: 1.0,
+            note: "The smiths keep it in a bucket by the anvil." },
         dark: { name: "Full Breath", kind: "amplify", mult: 2 },
     },
     pegasus: {
-        light: { name: "Tailwind", kind: "graft", key: "following_sea", scale: 1, note: "Everything you send out comes home early." },
+        light: { name: "Tailwind", kind: "graft", key: "ferocity", scale: 1.2,
+            note: "Everything you send out comes home early." },
         dark: { name: "Never Lands", kind: "amplify", mult: 2.2 },
     },
     baby_rex: {
@@ -261,11 +275,11 @@ export const ASCENSION_EFFECTS = {
 
     // ── THE SHOP PETS ────────────────────────────────────────────────────────────────────────────────────────
     penguin: {
-        light: { name: "Under the Ice", kind: "graft", key: "angler_bite", scale: 0.9 },
+        light: { name: "Under the Ice", kind: "graft", key: "angler_bite", scale: 1.2 },
         dark: { name: "Colder Than That", kind: "amplify", mult: 2.2 },
     },
     hedgehog: {
-        light: { name: "Kept the Change", kind: "graft", key: "gold_find", scale: 0.9 },
+        light: { name: "Kept the Change", kind: "graft", key: "gold_find", scale: 1 },
         dark: { name: "A Sharper Bargain", kind: "amplify", mult: 2, note: "Nobody enjoys haggling with it twice." },
     },
     sheep: {
@@ -273,11 +287,11 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Shorn Twice", kind: "amplify", mult: 2 },
     },
     crab: {
-        light: { name: "Sideways Search", kind: "graft", key: "beachcomber", scale: 1, note: "It covers ground nobody thinks to walk." },
+        light: { name: "Sideways Search", kind: "graft", key: "beachcomber", scale: 1.2, note: "It covers ground nobody thinks to walk." },
         dark: { name: "Sifts It All", kind: "amplify", mult: 2.2 },
     },
     turtle: {
-        light: { name: "Never Tires", kind: "graft", key: "second_wind", scale: 1 },
+        light: { name: "Never Tires", kind: "graft", key: "second_wind", scale: 1.2 },
         dark: { name: "Hauls Deeper", kind: "amplify", mult: 2.2 },
     },
     parrot: {
@@ -285,7 +299,7 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Word for Word", kind: "amplify", mult: 1.9, note: "It has heard the recipe once. That was enough." },
     },
     dolphin: {
-        light: { name: "Rides the Bow", kind: "graft", key: "following_sea", scale: 0.9 },
+        light: { name: "Rides the Bow", kind: "graft", key: "following_sea", scale: 1.2 },
         dark: { name: "The Pod Knows", kind: "amplify", mult: 2.2 },
     },
     monkey: {
@@ -293,7 +307,7 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Fire Handled", kind: "graft", key: "kitchen_portion", scale: 0.9, note: "It has worked out that the pan comes off the heat too early." },
     },
     panda: {
-        light: { name: "Eats and Grows", kind: "graft", key: "farm_speed", scale: 0.9 },
+        light: { name: "Eats and Grows", kind: "graft", key: "farm_speed", scale: 1 },
         dark: { name: "Glut", kind: "amplify", mult: 2 },
     },
     kangaroo: {
@@ -303,19 +317,19 @@ export const ASCENSION_EFFECTS = {
 
     // ── THE ACHIEVEMENT PETS ─────────────────────────────────────────────────────────────────────────────────
     ladybug: {
-        light: { name: "Clean Leaves", kind: "graft", key: "farm_yield", scale: 0.8, note: "Nothing else got to eat first." },
+        light: { name: "Clean Leaves", kind: "graft", key: "farm_yield", scale: 1, note: "Nothing else got to eat first." },
         dark: { name: "Patrolled", kind: "amplify", mult: 2 },
     },
     bee: {
-        light: { name: "The Second Flowering", kind: "graft", key: "green_thumb", scale: 0.85, note: "It went back over everything the first pass missed." },
+        light: { name: "The Second Flowering", kind: "graft", key: "green_thumb", scale: 1, note: "It went back over everything the first pass missed." },
         dark: { name: "The Whole Meadow", kind: "amplify", mult: 2 },
     },
     sloth: {
-        light: { name: "Slow Hands", kind: "graft", key: "green_thumb", scale: 0.9, note: "It gets there. It always gets there." },
+        light: { name: "Slow Hands", kind: "graft", key: "green_thumb", scale: 1.2, note: "It gets there. It always gets there." },
         dark: { name: "Ripened Whole", kind: "amplify", mult: 2.2 },
     },
     beaver: {
-        light: { name: "Flooded the Field", kind: "graft", key: "farm_yield", scale: 0.9 },
+        light: { name: "Flooded the Field", kind: "graft", key: "farm_yield", scale: 1 },
         dark: { name: "Dammed the Creek", kind: "amplify", mult: 2 },
     },
     raccoon: {
@@ -323,19 +337,19 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Went Back for Seconds", kind: "graft", key: "kitchen_portion", scale: 0.9, note: "It has worked out where the bins are kept." },
     },
     flamingo: {
-        light: { name: "Stands in the Shallows", kind: "graft", key: "angler_bite", scale: 0.9, note: "One leg, all day, and it never misses." },
+        light: { name: "Stands in the Shallows", kind: "graft", key: "angler_bite", scale: 1, note: "One leg, all day, and it never misses." },
         dark: { name: "Struts Harder", kind: "amplify", mult: 2 },
     },
     toucan: {
-        light: { name: "Sweet Tooth", kind: "graft", key: "kitchen_portion", scale: 0.8 },
+        light: { name: "Sweet Tooth", kind: "graft", key: "kitchen_portion", scale: 0.9 },
         dark: { name: "Smells It Coming", kind: "amplify", mult: 1.9 },
     },
     spirit_fox: {
-        light: { name: "The Favour Spreads", kind: "graft", key: "xp_gain", scale: 1 },
+        light: { name: "The Favour Spreads", kind: "graft", key: "xp_gain", scale: 1.2 },
         dark: { name: "The Fox's Due", kind: "amplify", mult: 2.2 },
     },
     runebound_drake: {
-        light: { name: "Runes on the Scrap", kind: "graft", key: "forge_salvage", scale: 0.9 },
+        light: { name: "Runes Cut Deeper", kind: "graft", key: "pierce", scale: 0.9 },
         dark: { name: "The Runes Take", kind: "graft", key: "crit_power", scale: 0.9, note: "The bindings are not decoration. They are load-bearing." },
     },
     radiant_phoenix: {
@@ -345,15 +359,15 @@ export const ASCENSION_EFFECTS = {
 
     // ── THE FORGE PETS ───────────────────────────────────────────────────────────────────────────────────────
     ember_whelp: {
-        light: { name: "The Ember Catches", kind: "graft", key: "erupt", scale: 0.8 },
+        light: { name: "The Ember Catches", kind: "graft", key: "erupt", scale: 1.4 },
         dark: { name: "Bellows", kind: "amplify", mult: 2.4, note: "A spark is only a spark until somebody feeds it air." },
     },
     cinder_hound: {
-        light: { name: "A Nose for Scrap", kind: "graft", key: "chest_luck", scale: 0.8 },
+        light: { name: "A Nose for Scrap", kind: "graft", key: "chest_luck", scale: 1 },
         dark: { name: "Strips It Bare", kind: "amplify", mult: 2 },
     },
     anvil_golem: {
-        light: { name: "Takes the Blow", kind: "graft", key: "forge_spark", scale: 0.9, note: "Everything that misses the work hits the golem instead." },
+        light: { name: "Takes the Blow", kind: "graft", key: "forge_spark", scale: 1.3, note: "Everything that misses the work hits the golem instead." },
         dark: { name: "Takes the Blow", kind: "amplify", mult: 2.3, note: "Everything that misses the work hits the golem instead." },
     },
     molten_salamander: {
@@ -367,23 +381,24 @@ export const ASCENSION_EFFECTS = {
 
     // ── THE CHEST PETS ───────────────────────────────────────────────────────────────────────────────────────
     tropical_fish: {
-        light: { name: "Knows the Reef", kind: "graft", key: "angler_size", scale: 0.85, note: "Small, and entirely aware of where the big ones sleep." },
+        light: { name: "Knows the Reef", kind: "graft", key: "angler_size", scale: 1.2, note: "Small, and entirely aware of where the big ones sleep." },
         dark: { name: "Calls Them All In", kind: "amplify", mult: 2.2 },
     },
     axolotl: {
-        light: { name: "Grows It Back", kind: "graft", key: "second_wind", scale: 1, note: "It has lost more than most things have had." },
+        light: { name: "Grows It Back", kind: "graft", key: "second_wind", scale: 1.5, note: "It has lost more than most things have had." },
         dark: { name: "Grows It Back Twice", kind: "amplify", mult: 2.5, note: "Whatever you take off it, it has already started replacing." },
     },
     butterfly: {
-        light: { name: "Somewhere Warmer", kind: "graft", key: "farm_speed", scale: 0.9, note: "It has been to the end of the season and back." },
+        light: { name: "Somewhere Warmer", kind: "graft", key: "fortune", scale: 1.3,
+            note: "It has been to the end of the season and back." },
         dark: { name: "Second Season", kind: "amplify", mult: 2.3, note: "It came back, which is not what anybody expected." },
     },
     squid: {
-        light: { name: "Ink and Away", kind: "graft", key: "first_hit", scale: 0.9 },
+        light: { name: "Ink and Away", kind: "graft", key: "first_hit", scale: 1 },
         dark: { name: "The Ambush Holds", kind: "amplify", mult: 2 },
     },
     jellyfish: {
-        light: { name: "The Bloom", kind: "graft", key: "chain_strike", scale: 0.8, note: "There is never only one." },
+        light: { name: "The Bloom", kind: "graft", key: "chain_strike", scale: 1, note: "There is never only one." },
         dark: { name: "Sting Surge", kind: "amplify", mult: 2 },
     },
     octopus: {
@@ -409,7 +424,7 @@ export const ASCENSION_EFFECTS = {
 
     // ── THE BOSS PETS ────────────────────────────────────────────────────────────────────────────────────────
     vulture: {
-        light: { name: "Waits It Out", kind: "graft", key: "execute", scale: 0.9, note: "It was always going to be there at the end." },
+        light: { name: "Waits It Out", kind: "graft", key: "execute", scale: 1, note: "It was always going to be there at the end." },
         dark: { name: "Circling Death", kind: "amplify", mult: 2 },
     },
     minotaur: {
@@ -421,15 +436,15 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "The Second Volley", kind: "graft", key: "execute", scale: 0.85, note: "It nocks the next one before the first has landed." },
     },
     imp: {
-        light: { name: "Sets the Kitchen Alight", kind: "graft", key: "kitchen_heat", scale: 0.9, note: "Nobody asked it to." },
+        light: { name: "Sets It Alight", kind: "graft", key: "first_blood", scale: 1.0, note: "Nobody asked it to." },
         dark: { name: "Hellfire", kind: "amplify", mult: 2 },
     },
     polar_bear: {
-        light: { name: "Through the Ice", kind: "graft", key: "angler_size", scale: 0.9 },
+        light: { name: "Through the Ice", kind: "graft", key: "pierce", scale: 0.9 },
         dark: { name: "Under the Ice", kind: "graft", key: "first_blood", scale: 0.85, note: "You do not hear it coming across snow." },
     },
     mammoth: {
-        light: { name: "The Herd Moves", kind: "graft", key: "town_rally", scale: 0.9 },
+        light: { name: "The Herd Moves", kind: "graft", key: "ferocity", scale: 0.9 },
         dark: { name: "The Whole Herd", kind: "graft", key: "might", scale: 1, note: "Ten tonnes, and it has decided." },
     },
     wyvern: {
@@ -437,15 +452,15 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Out of the Sun", kind: "graft", key: "execute", scale: 0.85, note: "It only ever dives once." },
     },
     sea_serpent: {
-        light: { name: "The Tide Comes In", kind: "graft", key: "sea_plunder", scale: 0.9 },
+        light: { name: "The Tide Comes In", kind: "graft", key: "tenacity", scale: 0.9 },
         dark: { name: "Coil and Coil", kind: "graft", key: "onslaught", scale: 0.85, note: "It is longer than the ship." },
     },
     fairy: {
-        light: { name: "A Blessing on the Field", kind: "graft", key: "green_thumb", scale: 1 },
+        light: { name: "A Blessing on All of It", kind: "graft", key: "fortune", scale: 0.9 },
         dark: { name: "Never Where You Looked", kind: "graft", key: "crit_chance", scale: 0.85, note: "Small, quick, and unreasonably pleased about it." },
     },
     kraken: {
-        light: { name: "Takes the Ship Down With It", kind: "graft", key: "sea_plunder", scale: 1 },
+        light: { name: "Takes the Ship Down With It", kind: "graft", key: "might", scale: 1.0 },
         dark: { name: "Down With It", kind: "graft", key: "execute", scale: 0.9, note: "Nothing it has taken hold of has come back up." },
     },
 
@@ -473,7 +488,7 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "The Whole Hive", kind: "graft", key: "farm_yield", scale: 0.85, note: "It does not work alone and it never did." },
     },
     barn_cat: {
-        light: { name: "Keeps the Barn", kind: "graft", key: "kitchen_larder", scale: 0.9, note: "Nothing gets into the stores while it is awake." },
+        light: { name: "Keeps the Barn", kind: "graft", key: "kitchen_larder", scale: 1, note: "Nothing gets into the stores while it is awake." },
         dark: { name: "Night Prowler", kind: "amplify", mult: 2 },
     },
     piglet: {
@@ -481,7 +496,7 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Truffle Snout", kind: "amplify", mult: 1.6, note: "It already comes back most days. Now it comes back." },
     },
     hen: {
-        light: { name: "Scratches It Up", kind: "graft", key: "farm_seed", scale: 0.9, note: "Whatever was buried there is on the surface now." },
+        light: { name: "Scratches It Up", kind: "graft", key: "farm_seed", scale: 1.4, note: "Whatever was buried there is on the surface now." },
         dark: { name: "Broody", kind: "amplify", mult: 2.4, note: "It has been sitting on that patch for a week and it is not moving." },
     },
     spring_lamb: {
@@ -501,7 +516,7 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Walks the Whole Beach", kind: "graft", key: "sea_dredge", scale: 1, note: "Beachcomber is capped where it stands, so the Darkstone widens the search instead of deepening it." },
     },
     elephant_spear: {
-        light: { name: "Knows Every Trader", kind: "graft", key: "town_haggle", scale: 1 },
+        light: { name: "Knows Which Crate", kind: "graft", key: "chest_luck", scale: 1.0 },
         dark: { name: "The Merchant's Nose", kind: "amplify", mult: 2 },
     },
 
@@ -519,13 +534,13 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "First Through the Gate", kind: "graft", key: "chest_luck", scale: 0.85, note: "It picks the room before anyone else is in it." },
     },
     golem_heart: {
-        light: { name: "The Heart Still Beats", kind: "graft", key: "forge_spark", scale: 1 },
+        light: { name: "The Heart Still Beats", kind: "graft", key: "tenacity", scale: 1.0 },
         dark: { name: "Struck From the Same Vein", kind: "graft", key: "might", scale: 1, note: "It remembers being ore, and being struck." },
     },
 
     // ── THE FISHING PETS ─────────────────────────────────────────────────────────────────────────────────────
     reef_seahorse: {
-        light: { name: "Holds the Current", kind: "graft", key: "angler_size", scale: 0.9, note: "It weighs nothing and it does not move." },
+        light: { name: "Holds the Current", kind: "graft", key: "angler_size", scale: 1.2, note: "It weighs nothing and it does not move." },
         dark: { name: "Reef Sense", kind: "amplify", mult: 2.2 },
     },
     lantern_jelly: {
@@ -547,7 +562,7 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "A Second Pantry", kind: "graft", key: "kitchen_heat", scale: 0.85, note: "Nobody has ever found the first one." },
     },
     copper_kettle: {
-        light: { name: "Always On the Boil", kind: "graft", key: "kitchen_heat", scale: 0.9, note: "It has not been cold in years." },
+        light: { name: "Always On the Boil", kind: "graft", key: "kitchen_heat", scale: 1.3, note: "It has not been cold in years." },
         dark: { name: "Never Off the Heat", kind: "amplify", mult: 2.3, note: "It has not been cold in years." },
     },
     hearth_cat: {
@@ -576,22 +591,26 @@ export const ASCENSION_EFFECTS = {
     // (pet-perks.js) and the guard walks everything that can actually be enshrined.
     // ── THE MINE ─────────────────────────────────────────────────────────────────────────────────────────────
     tunnel_worm: {
-        light: { name: "Straight Through", kind: "graft", key: "forge_salvage", scale: 0.85, note: "It does not go around anything." },
+        light: { name: "Straight Through", kind: "graft", key: "pierce", scale: 1.0,
+            note: "It does not go around anything." },
         dark: { name: "Deeper Still", kind: "amplify", mult: 2, note: "There is always more seam." },
     },
     pit_beetle: {
         // `second_wind` pays a free recharge — so the card is named for getting another go, not for the shell.
         // A name that describes armour over a mechanic that hands back a use is the small dishonesty this
         // whole table exists to avoid.
-        light: { name: "Digs Itself Out", kind: "graft", key: "second_wind", scale: 0.8, note: "Bred where the roof comes down, and it has been under one before." },
+        light: { name: "Digs Itself Out", kind: "graft", key: "tenacity", scale: 1.2,
+            note: "Bred where the roof comes down, and it has been under one before." },
         dark: { name: "Pit-Fury", kind: "amplify", mult: 2.2 },
     },
     cinder_scarab: {
-        light: { name: "Rolls the Coals", kind: "graft", key: "kitchen_heat", scale: 0.85, note: "It has been pushing embers around since before the forge was lit." },
+        light: { name: "Rolls the Coals", kind: "graft", key: "erupt", scale: 1.0,
+            note: "It has been pushing embers around since before the forge was lit." },
         dark: { name: "Burns Hotter", kind: "amplify", mult: 2 },
     },
     geode_sprite: {
-        light: { name: "Splits the Stone", kind: "graft", key: "forge_spark", scale: 0.9, note: "It knows exactly where the seam is." },
+        light: { name: "Splits the Stone", kind: "graft", key: "crit_power", scale: 0.9,
+            note: "It knows exactly where the seam is." },
         dark: { name: "Split Clean", kind: "graft", key: "chest_luck", scale: 0.9, note: "It knows which stones are worth opening." },
     },
     deep_golem: {
@@ -600,15 +619,18 @@ export const ASCENSION_EFFECTS = {
     },
     // ── THE SHIP ─────────────────────────────────────────────────────────────────────────────────────────────
     powder_monkey: {
-        light: { name: "Runs the Powder", kind: "graft", key: "sea_plunder", scale: 0.8, note: "Up the ladder, down the ladder, arms full both ways." },
+        light: { name: "Runs the Powder", kind: "graft", key: "first_hit", scale: 1.2,
+            note: "Up the ladder, down the ladder, arms full both ways." },
         dark: { name: "Quicker Hands", kind: "amplify", mult: 2.2 },
     },
     ironback: {
-        light: { name: "Shrugs It Off", kind: "graft", key: "second_wind", scale: 0.9, note: "It rides the waterline so the planks do not have to — and the first one off the shell never counted." },
+        light: { name: "Shrugs It Off", kind: "graft", key: "tenacity", scale: 1.0,
+            note: "It rides the waterline so the planks do not have to — and the first one off the shell never counted." },
         dark: { name: "Riveted Deeper", kind: "amplify", mult: 2, note: "More plate, more shell, same unbothered turtle." },
     },
     stormcrow: {
-        light: { name: "Reads the Weather", kind: "graft", key: "following_sea", scale: 0.9, note: "It leaves before the sky says why." },
+        light: { name: "Reads the Weather", kind: "graft", key: "crit_chance", scale: 1.0,
+            note: "It leaves before the sky says why." },
         dark: { name: "Picks the Wreck Clean", kind: "amplify", mult: 2 },
     },
     chain_shrike: {
@@ -616,7 +638,8 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Both Barrels", kind: "amplify", mult: 1.9 },
     },
     bosun_shade: {
-        light: { name: "All Hands", kind: "graft", key: "town_rally", scale: 0.9, note: "The whistle still carries, whoever is left to hear it." },
+        light: { name: "All Hands", kind: "graft", key: "chain_strike", scale: 1.0,
+            note: "The whistle still carries, whoever is left to hear it." },
         dark: { name: "The Bosun's Due", kind: "amplify", mult: 1.8, note: "Ascendant, and it collects." },
     },
 
@@ -633,19 +656,19 @@ export const ASCENSION_EFFECTS = {
     // scripts/pet-stone-check.mjs so the next pet added cannot ship with a stone that does nothing.
     copper_stag: {
         // Recognised at the counter, and the recognition is worth something at every other till too.
-        light: { name: "Known At The Till", kind: "graft", key: "gold_find", scale: 0.9,
+        light: { name: "Known At The Till", kind: "graft", key: "gold_find", scale: 1.2,
             note: "Nobody decided to start rounding in your favour. It simply happens now." },
         dark: { name: "Knows Your Face By Now", kind: "amplify", mult: 2.2 },
     },
     ledger_lynx: {
         // It keeps a tally of everything carried out of the shop, so it knows what is in the boxes.
-        light: { name: "Reads The Manifest", kind: "graft", key: "chest_luck", scale: 0.9,
+        light: { name: "Reads The Manifest", kind: "graft", key: "chest_luck", scale: 1,
             note: "It has seen what was in the last four hundred of these." },
         dark: { name: "The Whole Tally", kind: "amplify", mult: 2 },
     },
     silver_ram: {
         // A ram is an opener. onslaught pays while the thing in front of you is still fresh.
-        light: { name: "Lowers Them Early", kind: "graft", key: "onslaught", scale: 0.9 },
+        light: { name: "Lowers Them Early", kind: "graft", key: "onslaught", scale: 1 },
         dark: { name: "Straight Through The Gate", kind: "amplify", mult: 2,
             note: "Horns like a closed account, and accounts get settled." },
     },
@@ -660,7 +683,7 @@ export const ASCENSION_EFFECTS = {
     den_warden: {
         // The ram opens and the wolf closes — the two ferocity pets on the ladder, pointed at opposite ends of
         // the same fight so owning both is worth something.
-        light: { name: "Sees It Out", kind: "graft", key: "execute", scale: 0.9 },
+        light: { name: "Sees It Out", kind: "graft", key: "execute", scale: 1.2 },
         dark: { name: "The House Answers", kind: "amplify", mult: 2.2,
             note: "There is exactly one way to be introduced, and you have been." },
     },
