@@ -20,6 +20,11 @@
 // The ship it spots carries her fighting shape in the SHIPPED ENGINE'S UNITS — planks off hullHitsFor, canvas
 // off SAILS_MAX, a gun deck of GUN_HP barrels — so she can be handed straight to that battle when the two
 // halves are joined, rather than being translated across a seam.
+// ⚠️ THE ONE SWITCH, kept HERE in the pure file and read by highseas-gate.js, which is the half that knows
+// about owners. Same shape as FOREST_PUBLIC and CARDS_PUBLIC: on the day this opens, one constant moves and
+// the page, the menu and anything added later all follow, because none of them re-write the rule.
+export const HIGHSEAS_PUBLIC = false;
+
 import { SAILS_MAX, GUN_HP, hullHitsFor } from "@/lib/marketplace/ship-battle.js";
 
 // ── A SEEDED SEA ─────────────────────────────────────────────────────────────────────────────────────────────

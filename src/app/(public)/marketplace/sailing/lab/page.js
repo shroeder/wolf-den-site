@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import HighSeasLab from "@/components/HighSeasLab";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { hasOwnerStanding } from "@/lib/marketplace/owner.js";
+import { highSeasOpenTo } from "@/lib/marketplace/highseas-gate.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -15,16 +15,18 @@ export const metadata = {
 // gated, because I'd kinda like to see some of this in action before we go too far."
 //
 // So it is its own route and it touches nothing. No API, no database, no migration, no doubloons — the whole
-// run lives in the browser, which is why there is no `*-gate.js` beside this file: the page IS the only door,
-// because there is nothing else to knock on. Nothing here can reach a member's save.
+// run lives in the browser. There is no API to guard, so the only two doors are this page and the menu entry
+// that points at it — and both read the same gate, because a door and a menu on two different rules is how a
+// member ends up with an entry that 404s. Nothing here can reach anybody's save.
 //
 // notFound() rather than a redirect or a "you can't see this": the route simply does not exist for anybody
 // else, which is the same shape the Forest and the Brig use while they are being built.
 export default async function HighSeasLabPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) notFound();
-    const owns = await hasOwnerStanding(buyer.id).catch(() => false);
-    if (!owns) notFound();
+    // The SAME gate the menu entry reads — see highseas-gate.js. A door and a menu on two different rules is
+    // how a member ends up with an entry that 404s, or a page nothing leads to.
+    if (!highSeasOpenTo(buyer.id)) notFound();
 
     return (
         <div className="stack reveal">

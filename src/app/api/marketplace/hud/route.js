@@ -17,6 +17,7 @@ import { getTownTodo } from "@/lib/marketplace/town.js";
 import { farmNav } from "@/lib/marketplace/farm.js";
 import { dailyChipsReady } from "@/lib/marketplace/chips.js";
 import { forestOpenTo } from "@/lib/marketplace/forest-gate.js";
+import { highSeasOpenTo } from "@/lib/marketplace/highseas-gate.js";
 
 // ── THE WHOLE NAV BAR, IN ONE REQUEST ────────────────────────────────────────────────────────────────────────
 // GameNav is mounted on every page under /marketplace, and it used to ask FOURTEEN separate endpoints what to
@@ -53,7 +54,7 @@ export async function GET(request) {
         };
         if (!id) {
             return noStore({
-                signedIn: false, arena: { unlocked: false }, mine: { unlocked: false }, delves: { unlocked: false }, forest: false,
+                signedIn: false, arena: { unlocked: false }, mine: { unlocked: false }, delves: { unlocked: false }, forest: false, highSeas: false,
                 jeweller: false, casino: false, kitchen: false, cards: false, chests: 0, spins: 0, bossStrikes: 0, questsReady: 0,
                 sailing: { attention: false, casts: 0, forgeable: 0, fishing: false }, featureClaims: {},
                 townTodo: null, farm: { cropsReady: 0, petNudge: 0 },
@@ -106,6 +107,10 @@ export async function GET(request) {
             // whole thing (see the note above), and a nav entry that fetches its own feature bills that
             // feature on every page for every member — which is what check:chrome exists to catch.
             forest: forestOpenTo(id),
+            // The High Seas prototype. A field on THIS request, never a call of its own — the menu is one
+            // request for the whole thing, and a nav entry that fetches its own feature bills that feature on
+            // every page for every member. The gate is a synchronous allow-list, so this costs nothing.
+            highSeas: highSeasOpenTo(id),
             mine: {
                 unlocked: Boolean(mining?.unlocked),
                 trips: Number(mining?.trips) || 0,
