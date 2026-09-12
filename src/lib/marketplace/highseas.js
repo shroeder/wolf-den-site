@@ -1,27 +1,25 @@
-// ── THE HIGH SEAS · A LAB, NOT A FEATURE ─────────────────────────────────────────────────────────────────────
-// Luke wants to see the NEW sailing loop before any of it is committed to:
+// ── THE HIGH SEAS · THE APPROACH ─────────────────────────────────────────────────────────────────────────────
+// The narrow question this answers: what does it feel like to set sail ACTIVELY rather than setting a timer
+// and walking away? So this module is the minute BEFORE a fight and nothing else —
 //
-//     always at sea  ->  a lookout spots a sail  ->  the telescope  ->  take her or let her pass
-//     shoot her CANVAS and her GUNS and leave her hull whole  ->  board her  ->  her captain
-//     hole her instead  ->  she goes down  ->  you salvage what floats
+//     underway  ->  a sail comes up on the horizon  ->  the masthead calls it  ->  you take the glass
+//     what you can see depends on how close you dare get  ->  run her down, or hold your course
 //
-// The point of the design is that sink-or-board stops being a button after the battle and becomes something
-// you express by WHERE YOU AIM. A captain is taken by choosing the slow, dangerous way in and surviving it —
-// she is shooting back the whole time you are being careful.
+// ⚠️ THERE IS NO COMBAT IN HERE, AND THERE WAS. The first cut had its own resolver — zones, broadsides, a
+// boarding check — which is a second engine answering a question ship-battle.js already answers, in numbers
+// that would drift from the shipped ones the moment either was touched. Luke: "I also wanted to use the ship
+// battle system that we already have." It is deleted, not disabled.
 //
-// ⚠️ THERE IS NO AMMUNITION HERE, DELIBERATELY. The first cut had you load round, chain or grape, which is
-// historically lovely and, as Luke put it, "just unneeded complexity" — a second control that only ever
-// restated the first. Aiming decides everything, and it removes the failure state with it: you cannot hole
-// her by accident, because holing her is something you have to point at on purpose. One decision a round.
+// ⚠️ AND NO AMMUNITION EITHER. Round, chain and grape were briefly a control here; Luke: "just unneeded
+// complexity." Where you aim is enough, and it takes the accidental-sinking failure state with it — you
+// cannot hole her by mistake when holing her is something you point at on purpose.
 //
-// ⚠️ THIS IS A LAB. It exists to be played and argued with, and it is owner-gated. It does NOT touch the
-// database, the real voyage, the fleet or anybody's doubloons: a run lives in the browser and dies with it.
-// That is deliberate — the fastest way to answer "does this feel good" is to make it free to change.
+// ⚠️ IT IS A LAB. Owner-gated, and it touches no database, no voyage, no doubloons: a run lives in the
+// browser and dies with the tab, which is what makes it free to argue with.
 //
-// ⚠️ AND IT BORROWS THE REAL NUMBERS RATHER THAN INVENTING ITS OWN. AMMO, SAILS_MAX, GUN_HP and hullHitsFor
-// come from ship-battle.js, which is the shipped engine. A lab that quietly re-tunes the thing it is meant to
-// be testing tells you how a game you do not have feels. What is genuinely NEW here is the telescope and the
-// boarding outcome; everything else is the existing fight with a different question asked of it.
+// The ship it spots carries her fighting shape in the SHIPPED ENGINE'S UNITS — planks off hullHitsFor, canvas
+// off SAILS_MAX, a gun deck of GUN_HP barrels — so she can be handed straight to that battle when the two
+// halves are joined, rather than being translated across a seam.
 import { SAILS_MAX, GUN_HP, hullHitsFor } from "@/lib/marketplace/ship-battle.js";
 
 // ── A SEEDED SEA ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -41,17 +39,22 @@ const between = (n, lo, hi) => lo + (n % (hi - lo + 1));
 // nobody. A king's ship is the reverse — she will hurt you and there is nothing in the hold, but the man on her
 // quarterdeck is worth the beating. The privateer sits between them so the choice is not always obvious.
 //
-// Art is the fleet's, which already has forty hulls drawn. Nothing new was generated for this.
+// Art is the boat tiers, already drawn. Nothing new was generated for this.
 export const KINDS = {
     trader:    { id: "trader",    label: "Merchantman", hold: [3, 5], infamy: [1, 2], guns: [2, 3], tone: "#8fd0a0" },
     privateer: { id: "privateer", label: "Privateer",   hold: [2, 4], infamy: [2, 4], guns: [4, 5], tone: "#e8c07a" },
     naval:     { id: "naval",     label: "King's ship", hold: [1, 2], infamy: [4, 5], guns: [5, 7], tone: "#9fd8ff" },
 };
 
+// ⚠️ THE BOAT ART, NOT THE FLEET ART. The fleet's forty hulls are Long Road ships — coral, flowers, arcane
+// rigging — and dropped into a painted sunset beside the player's plain schooner they read as something from a
+// different game. These are the same hulls the player's own boat is drawn from, so a sail on the horizon looks
+// like a SHIP: the world stays one world, and her class is legible from her silhouette at distance, which is
+// exactly what the telescope is asking you to read.
 const HULLS = {
-    trader: ["fleet_marigold", "fleet_lugger", "fleet_court"],
-    privateer: ["fleet_cutter", "fleet_brig", "fleet_razee"],
-    naval: ["fleet_frigate", "fleet_manowar", "fleet_line"],
+    trader: ["boat-tier1-wood", "boat-tier2-cutter"],
+    privateer: ["boat-tier3-brig", "boat-tier4-schooner"],
+    naval: ["boat-tier5-galleon", "boat-tier6-manowar"],
 };
 
 const FIRST = ["Marigold", "Bittern", "Quiet", "Saint", "Black", "Fair", "Widow's", "Iron", "Sparrow", "Long"];
@@ -77,7 +80,7 @@ export function spot(seed, index = 0) {
         kind: kindId,
         label: kind.label,
         tone: kind.tone,
-        art: `/images/fleet/${pick(HULLS[kindId], n >>> 5)}.png`,
+        art: `/images/sailing/${pick(HULLS[kindId], n >>> 5)}.png`,
         name: `The ${pick(FIRST, n >>> 13)} ${pick(SECOND, n >>> 17)}`,
         captain: `${pick(RANKS, infamy)} ${pick(SURNAMES, n >>> 19)}`,
         infamy,
@@ -109,98 +112,15 @@ export const sees = (i, what) => rangeAt(i).shows.includes(what);
 /** What her waterline tells you before anything else does — laden or riding high. */
 export const waterline = (ship) => (ship.hold >= 4 ? "heavy in the water" : ship.hold >= 3 ? "riding low" : "riding high");
 
-// ── THE FIGHT, AS THIS LOOP ASKS IT ──────────────────────────────────────────────────────────────────────────
-// One broadside a round, at ONE part of her. That is the entire control surface.
-export const ZONES = [
-    { id: "hull", label: "Hull", blurb: "Sinks her. Fast, and the captain goes down with it." },
-    { id: "sails", label: "Rigging", blurb: "Stops her running." },
-    { id: "guns", label: "Gun deck", blurb: "Stops her shooting back." },
-];
-
-export function openFight(ship, { planks = 12, guns = 5 } = {}) {
-    return {
-        round: 1,
-        foe: { planks: ship.planks, sails: ship.sails, guns: [...ship.guns] },
-        me: { planks, guns },
-        log: [],
-        over: null,           // sunk | boarded | lost | fled
-    };
-}
-
-const alive = (guns) => guns.filter((g) => g > 0).length;
-
-/** Is she helpless — canvas gone, every gun dismounted, and still floating? That is a prize, not a wreck. */
-export const boardable = (f) => f.foe.planks > 0 && f.foe.sails <= 0 && alive(f.foe.guns) === 0;
-
-/**
- * One round: your volley, then hers. Pure — takes state and a roll, returns new state.
- * `roll` is passed in so the lab can be replayed and a test can pin it.
- */
-export function volley(fight, { zone, roll = Math.random }) {
-    if (fight.over) return fight;
-    const f = {
-        ...fight,
-        foe: { ...fight.foe, guns: [...fight.foe.guns] },
-        me: { ...fight.me },
-        log: [...fight.log],
-    };
-
-    // ── YOUR BROADSIDE ─────────────────────────────────────────────────────────────────────────────
-    // ⚠️ A BROADSIDE IS EVERY GUN YOU HAVE, AND GETTING THAT WRONG INVERTED THE WHOLE DESIGN. The first cut
-    // resolved a volley as a single shot, so holing a hull took eleven rounds while stripping canvas took two.
-    // Simulated over 400 ships, the careful line boarded 332 times in 5.6 rounds while the fast line sank only
-    // 88 and was driven off 312 times — sinking, the route that is meant to be quick and safe and pay less,
-    // was the hard one. Iron into planks is the whole broadside: one plank per gun.
-    if (zone === "hull") {
-        const planks = Math.max(1, f.me.guns);
-        f.foe.planks = Math.max(0, f.foe.planks - planks);
-        f.log.push({ side: "me", text: `A full broadside into her hull — ${planks} planks gone.` });
-    } else if (zone === "sails") {
-        const took = 3;
-        f.foe.sails = Math.max(0, f.foe.sails - took);
-        f.log.push({ side: "me", text: f.foe.sails <= 0 ? "Her canvas comes down. She is going nowhere." : "Shot through her rigging — another suit down." });
-    } else {
-        // Concentrated on one barrel at a time: a gun you have started on is the one you finish.
-        const idx = f.foe.guns.findIndex((g) => g > 0);
-        if (idx >= 0) {
-            f.foe.guns[idx] = Math.max(0, f.foe.guns[idx] - GUN_HP);
-            const left = alive(f.foe.guns);
-            f.log.push({ side: "me", text: left ? `You sweep her deck — ${left} gun${left === 1 ? "" : "s"} still bearing.` : "Her last gun is off its carriage." });
-        }
-    }
-
-    if (f.foe.planks <= 0) { f.over = "sunk"; return f; }
-    if (boardable(f)) { f.over = "boardable"; return f; }
-
-    // ── AND SHE ANSWERS ────────────────────────────────────────────────────────────────────────────
-    // Only with the guns she still has. This is the cost of the careful route: every round you spend on her
-    // canvas is a round she spends on your planks.
-    const firing = alive(f.foe.guns);
-    if (firing > 0) {
-        const landed = Math.max(0, Math.round(firing * 0.5 * (0.6 + roll() * 0.8)));
-        f.me.planks = Math.max(0, f.me.planks - landed);
-        f.log.push({ side: "foe", text: landed ? `She fires — ${landed} plank${landed === 1 ? "" : "s"} off your hull.` : "Her broadside goes wide." });
-    } else {
-        f.log.push({ side: "foe", text: "Nothing answers from her deck." });
-    }
-    if (f.me.planks <= 0) { f.over = "lost"; return f; }
-
-    f.round += 1;
-    return f;
-}
-
-/** What the two endings pay. Sinking is a real choice, not a consolation — it is simply paid in cargo. */
-export function spoils(ship, outcome) {
-    if (outcome === "sunk") {
-        return {
-            headline: "She goes down",
-            blurb: "Your boats pull through the wreckage for whatever floats.",
-            lines: [`${Math.max(1, ship.hold - 1)} crates of ${ship.cargo}`, "salvage from the wreck"],
-        };
-    }
-    return {
-        headline: `${ship.captain} is taken`,
-        blurb: "Her colours come down and your people go over the side.",
-        lines: [`${ship.hold} crates of ${ship.cargo}`, `${ship.captain} — infamy ${ship.infamy}`, "her crew, and what they know"],
-    };
-}
+// ── AND HERE THE EXISTING GAME TAKES OVER ────────────────────────────────────────────────────────────────────
+// There was a whole combat resolver below this line — zones, broadsides, a boarding check — and it is gone.
+// Luke: "I also wanted to use the ship battle system that we already have." He is right, and a second engine
+// would have been the worst kind of prototype: one that answers a question already answered, in numbers that
+// drift from the shipped ones the moment either is touched.
+//
+// ship-battle.js already models the two things this design needs — her RIGGING and her GUN DECK as separate
+// systems you can shoot at, with a hull that only takes planks when something aimed at it. "Strip her canvas,
+// silence her guns, leave her floating" is expressible there today. What was missing was never the fight. It
+// was the minute in front of it: being underway, being called to, and choosing whether to look.
+//
+// So this module stops at the approach, which is the only part that is genuinely new.
