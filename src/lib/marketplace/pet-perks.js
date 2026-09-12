@@ -57,6 +57,29 @@ const ERUPT_BY_RARITY = {
     legendary: { chance: 0.15, mult: 2.0 }, mythic: { chance: 0.18, mult: 2.3 }, ascendant: { chance: 0.2, mult: 2.6 }, eternal: { chance: 0.25, mult: 3.0 },
 };
 // Cool mechanics (not stat sticks): chance to strike twice; big damage on a low-HP boss; bonus for hitting early.
+// ── BLEED, AND WHAT IT IS WORTH ──────────────────────────────────────────────────────────────────────────────
+// `bleed` is the chance a landed blow opens a wound; the wound then ticks for a share of the blow that made
+// it. `bleed_leech` is how much of that ticking comes back to you as health — AND it carries a smaller bleed
+// chance of its own, which is not decoration:
+//
+// ⚠️ A LEECH WITH NO BLEED IS A DEAD STONE, and the two stones are mutually exclusive. Spend the Lightstone
+// for "your bleeds heal you" and, unless your class tree has already bought Rend, you own a share of nothing.
+// That is exactly the fault the sweep in scripts/pet-stone-check.mjs was written to catch. So the Light one
+// draws blood too — less of it — and the choice is pressure against sustain rather than a thing against
+// nothing.
+//
+// Quoted at the BASE. applyPerk multiplies by the pet's level (x3.5 at the enshrined level), so a common's
+// 0.04 is 14% in the ring and an eternal's 0.115 reaches the ceiling.
+// How much bleed the LEECH ability brings on its own, as a share of the dedicated one. Half: enough that the
+// Lightstone works with nothing else bought, little enough that the Darkstone is still the bleeding one.
+export const BLEED_LEECH_OWN = 0.5;
+
+const BLEED_BY_RARITY = {
+    common: 0.04, rare: 0.05, epic: 0.065, legendary: 0.08, mythic: 0.095, ascendant: 0.105, eternal: 0.115,
+};
+const BLEED_LEECH_BY_RARITY = {
+    common: 0.07, rare: 0.085, epic: 0.1, legendary: 0.115, mythic: 0.13, ascendant: 0.145, eternal: 0.16,
+};
 const CHAIN_BY_RARITY = { common: 0.08, rare: 0.1, epic: 0.15, legendary: 0.2, mythic: 0.28, ascendant: 0.35, eternal: 0.45 };
 const EXECUTE_BY_RARITY = { common: 0.15, rare: 0.2, epic: 0.3, legendary: 0.45, mythic: 0.65, ascendant: 0.85, eternal: 1.1 };
 const FIRSTBLOOD_BY_RARITY = { common: 0.15, rare: 0.2, epic: 0.35, legendary: 0.5, mythic: 0.7, ascendant: 0.9, eternal: 1.2 };
@@ -80,6 +103,17 @@ export const PERK_META = {
     execute: { icon: "☠️", kind: "proc" },
     onslaught: { icon: "🌅", kind: "proc" },
     first_blood: { icon: "🩸", kind: "proc" },
+    // ── THE WOLF'S TWO ───────────────────────────────────────────────────────────────────────────────────
+    // Luke, on the Wolf Pup: "whats a wolf all about, seems like bleeding chance for dark and bleed leach as
+    // light." The arena has carried a full bleed track for a while — a stack is a share of the blow that lit
+    // it, ticking for BLEED_TURNS — and nothing outside the skill tree could ever set it. These are the first
+    // two abilities that can.
+    //
+    // ⚠️ BLEED IS AN ARENA MECHANIC. The boss fight has no damage over time at all, so a pet built on this
+    // pays in the ring and not against the weekly boss. That is a real narrowing against "+21% damage", and
+    // it is deliberate here because the wolf IS the ring; it is not a shape to copy onto a farm pet.
+    bleed: { icon: "🩸", kind: "proc" },
+    bleed_leech: { icon: "🩸", kind: "proc" },
     xp_gain: { icon: "✨", kind: "econ" },
     gold_find: { icon: "💰", kind: "econ" },
     // ── SYSTEM PERKS ─────────────────────────────────────────────────────────────────────────────────────
@@ -420,6 +454,10 @@ export const PROC_CAP = {
     // freely, and the strongest pet in the Den had reached x4.60 on the day’s opening strike. Every other
     // proc has had a ceiling since the day it was written; this is that ceiling.
     first_hit: 2.5,      // the multiplier itself, not an increment
+    // The chance a blow opens a wound, and how much of the wound comes back as health. Both are shares, and
+    // both are ceilinged well under the engine's own clamp so a pet can never be the whole of either.
+    bleed: 0.4,
+    bleed_leech: 0.6,
 };
 
 export function petPerkValue(rarity, key) {
@@ -430,6 +468,8 @@ export function petPerkValue(rarity, key) {
     if (key === "housefavour") return HOUSEFAVOUR_BY_RARITY[rarity] || 5;
     if (key === "neverturns") return NEVERTURNS_BY_RARITY[rarity] || 25;
     if (key === "erupt") return ERUPT_BY_RARITY[rarity] || ERUPT_BY_RARITY.epic;
+    if (key === "bleed") return BLEED_BY_RARITY[rarity] || BLEED_BY_RARITY.epic;
+    if (key === "bleed_leech") return BLEED_LEECH_BY_RARITY[rarity] || BLEED_LEECH_BY_RARITY.epic;
     if (key === "chain_strike") return CHAIN_BY_RARITY[rarity] || 0.1;
     if (key === "execute") return EXECUTE_BY_RARITY[rarity] || 0.3;
     if (key === "onslaught") return ONSLAUGHT_BY_RARITY[rarity] || 0.3;
@@ -508,6 +548,8 @@ function perkDescRaw(key, v, level = 1) {
         case "extra_strike": { const c = Math.min(100, 20 + 20 * (Math.max(1, level) - 1)); return `${c}% chance for an extra daily strike${c < 100 ? " — rises to 100% by Lv 5" : " (maxed — every day!)"}`; }
         case "first_hit": return `Your first MANUAL strike each day (your daily boss tap) deals ×${v} damage — passive auto-damage isn't affected`;
         case "erupt": return `${Math.round(v.chance * 100)}% chance your strike erupts for ×${v.mult}`;
+        case "bleed": return `${Math.round(v * 100)}% chance your blow opens a wound that keeps bleeding — in the arena`;
+        case "bleed_leech": return `Their bleeding feeds you: ${Math.round(v * 100)}% of every bleed tick comes back as health, and your blows draw blood ${Math.round(v * BLEED_LEECH_OWN * 100)}% of the time — in the arena`;
         case "chain_strike": return `${Math.round(v * 100)}% chance your strike lands TWICE`;
         case "execute": return `+${Math.round(v * 100)}% damage when the boss is below 30% HP`;
         case "onslaught": return `+${Math.round(v * 100)}% damage while the boss is above 75% HP`;
@@ -652,6 +694,11 @@ export function ascensionEffectView(pet, stone) {
     // proc through PROC_CAP; anything left is an uncapped stat. Rounded to a tenth because an amplify of 2.2 on
     // a whole number produces things like "+6.6000000000000005/hr", which is a number nobody wrote.
     const round1 = (x) => Math.round(x * 10) / 10;
+    // ⚠️ AND A SHARE IS NOT ROUNDED TO A TENTH. round1 exists because an amplify of 2.2 on a whole number
+    // produces "+6.6000000000000005/hr"; applied to a PROC it rounds 0.14 to 0.1, which is ten percentage
+    // points thrown away on a card whose whole job is the number. Every proc chance was being quoted in
+    // multiples of ten per cent — the Jellyfish's 42% read as 40, the Wolf Pup's 14% as 10.
+    const share = (x) => Math.round(x * 1000) / 1000;
     const procCap = PROC_CAP[key];
     // ──── AND THE LEVEL MULTIPLIER, WHICH THIS CARD HAS NEVER APPLIED ──────────────────
     // ⚠️ 203 OF 211 STONE CARDS UNDERSTATED WHAT THE ENGINE PAYS, nearly all of them by exactly 3.5x.
@@ -671,12 +718,15 @@ export function ascensionEffectView(pet, stone) {
     const lvl = petActiveLevelMult(PET_ENSHRINED_LEVEL);
     const gain = factor * lvl;
     const scaled = raw && typeof raw === "object"
-        ? { ...raw, chance: round1(Math.min(procCap ?? 1, raw.chance * gain) * 100) / 100 }
+        ? { ...raw, chance: share(Math.min(procCap ?? 1, raw.chance * gain)) }
         : key === "first_hit"
             ? round1(Math.min(PROC_CAP.first_hit, 1 + (raw - 1) * gain))
             : key === "extra_strike"
                 ? round1(Math.min(1, (0.2 + 0.2 * (PET_ENSHRINED_LEVEL - 1)) * factor))
-                : round1(procCap != null ? Math.min(procCap, raw * gain) : capSystemPerk(key, raw * gain));
+                // A proc ceiling of 1 or less means the value is a SHARE, so it keeps its thousandths.
+                : (procCap != null && procCap <= 1)
+                    ? share(Math.min(procCap, raw * gain))
+                    : round1(procCap != null ? Math.min(procCap, raw * gain) : capSystemPerk(key, raw * gain));
     const meta = PERK_META[key] || { icon: "🐾" };
     return {
         stone,
@@ -847,6 +897,12 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
         const best = (k, x) => { proc[k] = Math.max(proc[k] || 0, x); };
         if (def.key === "first_hit") best("firstHitMult", cap(1 + (v - 1) * aMult, PROC_CAP.first_hit));
         else if (def.key === "erupt") { best("eruptChance", cap(v.chance * aMult, PROC_CAP.erupt)); proc.eruptMult = Math.max(proc.eruptMult || 0, v.mult); }
+        else if (def.key === "bleed") best("bleedChance", cap(v * aMult, PROC_CAP.bleed));
+        else if (def.key === "bleed_leech") {
+            best("bleedLeech", cap(v * aMult, PROC_CAP.bleed_leech));
+            // ⚠️ AND ITS OWN TEETH. See the note on BLEED_LEECH_OWN — a share of nothing is a dead stone.
+            best("bleedChance", cap(v * BLEED_LEECH_OWN * aMult, PROC_CAP.bleed));
+        }
         else if (def.key === "chain_strike") best("chainChance", cap(v * aMult, PROC_CAP.chain_strike));
         else if (def.key === "execute") best("executePct", cap(v * aMult, PROC_CAP.execute));
         else if (def.key === "onslaught") best("onslaughtPct", cap(v * aMult, PROC_CAP.onslaught));

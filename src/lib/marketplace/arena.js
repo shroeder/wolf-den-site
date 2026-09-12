@@ -333,8 +333,26 @@ export async function combatStats(buyerId, gearStats, ids) {
         const total = gear + pet + badge + bought;
         if (total) out[k] = total;
     }
+    // ── AND THE TWO THAT ARE SHARES, NOT POINTS ──────────────────────────────────────────────────────────
+    // The loop above adds POINTS. Bleed chance and bleed leech are fractions, and the file has a scar from
+    // mixing the two — see the note on Lifedrink a couple of hundred lines down, where one key was written as
+    // points in one place and a share in another and paid a hundredth of what its card said. So these ride
+    // alongside rather than through it, named exactly as the kit and the engine name them.
+    //
+    // They come off the PET proc bag, which combatStats was throwing away: getPetCombatBonus returns
+    // { stats, economy, proc } and only `stats` was ever read, so every proc a pet has ever granted was
+    // invisible to the ring. Bleed is the first one the arena can actually use. Beastbond multiplies the
+    // pet's share here for the same reason it does above.
+    const pp = petBonus?.proc || {};
+    if (pp.bleedChance) out.bleedChance = Math.min(0.9, (Number(pp.bleedChance) || 0) * bb);
+    if (pp.bleedLeech) out.bleedLeech = Math.min(0.9, (Number(pp.bleedLeech) || 0) * bb);
     return out;
 }
+
+// The two keys in the stat pool that are SHARES. Anything summing the pool as a power figure has to skip
+// them, or a 24% leech reads as 0.24 of a damage point and the exclusion is silently wrong in the other
+// direction the day somebody raises it.
+export const SHARE_STATS = new Set(["bleedChance", "bleedLeech"]);
 
 // The power figure the LADDER sorts on and the profile prints. Same source as the fight itself — a member
 // shown as weaker than they fight is a matchmaker aiming at the wrong number.
@@ -356,7 +374,9 @@ export async function arenaPower(buyerId) {
     // fighter swinging for 25, which is precisely the "shown as weaker than they fight" this comment warns of.
     const ids = Object.values(bySlot || {}).filter(Boolean);
     const stats = await combatStats(buyerId, await getEquippedStats(buyerId).catch(() => ({})), ids);
-    const gearPower = Object.values(stats).reduce((n, v) => n + (Number(v) || 0), 0);
+    const gearPower = Object.entries(stats)
+        .filter(([k]) => !SHARE_STATS.has(k))
+        .reduce((n, [, v]) => n + (Number(v) || 0), 0);
     return {
         level, gearPower, ...fighterFrom(stats, {}, null), power: arenaRating(fighterFrom(stats, {}, null)),
         sprite: me?.avatar_sprite_url || null,
@@ -439,9 +459,12 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // Gear pays in POINTS and the tree pays in SHARES, and the engine adds them. Keeping the two apart is
         // what lets a node say "+3% counter" and mean it, without anyone having to know that a gear point is
         // worth a quarter of one.
-        bleedChance: Math.max(0, Math.min(1, perks.bleedChance || 0)),
+        // ⚠️ THE TREE'S SHARE PLUS EVERYTHING ELSE'S. These were tree-only, which is why a pet could never
+        // touch them however the card was worded. A source added to the pool is carried here for free now,
+        // which is the same promise the loop in combatStats makes about points.
+        bleedChance: Math.max(0, Math.min(1, (perks.bleedChance || 0) + (Number(stats.bleedChance) || 0))),
         bleedDamage: perks.bleedDamage || 0,
-        bleedLeech: perks.bleedLeech || 0,
+        bleedLeech: Math.max(0, Math.min(1, (perks.bleedLeech || 0) + (Number(stats.bleedLeech) || 0))),
         wildProc: perks.wildProc || 0,
         // The Warden's four. `guardSize` is the base share of your health a guard is worth, raised by
         // Unbreakable — so the node that makes shields BIGGER is separate from the one that makes them

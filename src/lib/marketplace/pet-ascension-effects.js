@@ -156,13 +156,19 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Throat Bite", kind: "amplify", mult: 2 },
     },
     wolf_pup: {
-        // ⚠️ NOT A STRIKE PROC. This was a chance to land twice, which read well against the name and which
-        // Luke did not want here: "Not a fan of strikes, make it something else." Tenacity is the other axis
-        // entirely — the Darkstone makes the wolf hit harder, the Lightstone makes the pack harder to hurt —
-        // and a pack that runs together is the one that all gets home. Neither stone is the other one smaller.
-        light: { name: "The Pack Runs Together", kind: "graft", key: "tenacity", scale: 1,
-            note: "None of them is out there on its own." },
-        dark: { name: "Full Grown", kind: "amplify", mult: 2, note: "It is not a pup any more." },
+        // ── WHAT A WOLF IS ACTUALLY ABOUT ────────────────────────────────────────────────────────────────
+        // Luke: "whats a wolf all about, seems like bleeding chance for dark and bleed leach as light."
+        // A wolf does not kill with the bite. It opens something and then follows it, and the pack eats what
+        // the chase brings down — so the Darkstone is the wound and the Lightstone is the feeding.
+        //
+        // ⚠️ BOTH OF THESE PAY IN THE ARENA AND NOT AGAINST THE BOSS, because bleed is an arena mechanic and
+        // the boss fight has no damage over time at all. That is narrower than the "+21% damage" this
+        // replaced, and it is the trade being made on purpose: the wolf is a ring animal now. See the note
+        // on bleed in pet-perks.js before copying this shape onto anything that is not.
+        light: { name: "The Pack Feeds", kind: "graft", key: "bleed_leech", scale: 1,
+            note: "Nothing it opens goes to waste." },
+        dark: { name: "The Long Chase", kind: "graft", key: "bleed", scale: 1,
+            note: "It was never going to be the first bite that did it." },
     },
     owl: {
         light: { name: "Night Watch", kind: "graft", key: "crit_chance", scale: 1.2,
