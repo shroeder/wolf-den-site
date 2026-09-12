@@ -49,7 +49,7 @@ export async function POST(request) {
             // FREE (no token needed), so there's no reason to mint tokens to yourself here.
 
             // ── PAYING WITH THE BALANCE THEY ALREADY HAVE ───────────────────────────────────────────
-            // Luke: "you can use Star Credit as a valid method of payment to buy generation tokens."
+            // Luke: "use store credit as a valid method of payment to buy generation tokens."
             //
             // ⚠️ AND IT GRANTS NO COINS, WHICH IS THE WHOLE REASON THIS NEEDS A COMMENT. Every dollar of store
             // credit in this system minted coins the moment it was BOUGHT — 200 a dollar, see COINS_PER_CENT —

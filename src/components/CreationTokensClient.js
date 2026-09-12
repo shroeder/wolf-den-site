@@ -53,8 +53,8 @@ export default function CreationTokensClient({
 }) {
     const [tokenBalance, setTokenBalance] = useState(initialTokenBalance);
     // ── PAYING WITH THE BALANCE YOU ALREADY HAVE ────────────────────────────────────────────────────
-    // Luke: "you can use Star Credit as a valid method of payment to buy generation tokens." It is the same
-    // store-credit balance the rest of the site spends, and unlike the card it works while payments are dark.
+    // Luke: "use store credit as a valid method of payment to buy generation tokens." The same balance the rest
+    // of the site spends, and unlike the card it works while payments are dark.
     const [creditCents, setCreditCents] = useState(initialCreditCents);
     // ⚠️ DEFAULTS TO WHICHEVER ONE CAN ACTUALLY PAY. Card payments are dark most of the time (PAYMENTS_ENABLED),
     // and defaulting to a method that cannot charge put "Online purchases are currently unavailable" under a
