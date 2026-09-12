@@ -6,6 +6,7 @@ import { createSquareCardPayment, createSquareOrder, getCreationTokensVariationI
 import { sendAdminPush } from "@/lib/push/send.js";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { getStoreCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
 import { getCreationTier } from "@/lib/marketplace/creation-tokens.js";
 import {
     createPendingCreationPurchase,
@@ -46,6 +47,62 @@ export async function POST(request) {
             // Granting creation tokens is ADMIN-APP ONLY now (POST /api/admin/creations, marketplace.manage +
             // full audit ledger). The old website owner self-grant path was removed — owners instead create for
             // FREE (no token needed), so there's no reason to mint tokens to yourself here.
+
+            // ── PAYING WITH THE BALANCE THEY ALREADY HAVE ───────────────────────────────────────────
+            // Luke: "you can use Star Credit as a valid method of payment to buy generation tokens."
+            //
+            // ⚠️ AND IT GRANTS NO COINS, WHICH IS THE WHOLE REASON THIS NEEDS A COMMENT. Every dollar of store
+            // credit in this system minted coins the moment it was BOUGHT — 200 a dollar, see COINS_PER_CENT —
+            // so paying with it and then also paying the tier's coins would mint the same dollar twice. On the
+            // $25 tier that is 5,000 coins at top-up plus 6,000 again here: store credit would become a coin
+            // doubler and the one lever on the mint rate would be a customer's choice of payment method. See
+            // [[gold-mint-rate-lever]] and [[awardxp-gold-tracks-xp-landmine]], which is the same shape of bug.
+            //
+            // So a credit purchase buys the TOKENS. The pending row is written with coins: 0, which is what
+            // finalizeCreationPurchase grants from — the row is the record of what was promised, so there is no
+            // second place that has to remember this rule.
+            //
+            // Not behind PAYMENTS_ENABLED: that flag guards taking a CARD. No card is touched here, and the
+            // money entered the system when the credit was bought.
+            if (String(body?.pay || "") === "credit") {
+                const balance = await getStoreCredit(buyer.id);
+                if (balance < tier.priceCents) {
+                    return noStore({ error: "Not enough store credit.", code: "insufficient_credit", balanceCents: balance }, { status: 402 });
+                }
+                const purchaseId = await createPendingCreationPurchase({
+                    buyerId: buyer.id,
+                    tierId: tier.id,
+                    amountCents: tier.priceCents,
+                    tokens: tier.tokens,
+                    coins: 0,
+                    idempotencyKey: randomUUID(),
+                });
+                // Race-safe by construction: the spend is a conditional UPDATE that only succeeds while the
+                // balance still covers it, so two taps cannot both go through. The purchase id is the ledger
+                // ref, which is what makes a stuck pending row reconcilable afterwards.
+                const spent = await spendCredit(buyer.id, tier.priceCents, "creation_tokens", purchaseId, { tierId: tier.id, tokens: tier.tokens });
+                if (!spent.ok) {
+                    await failCreationPurchase(purchaseId);
+                    return noStore({ error: "Not enough store credit.", code: "insufficient_credit" }, { status: 402 });
+                }
+                const paid = await finalizeCreationPurchase(purchaseId);
+                if (paid.granted) {
+                    sendAdminPush({
+                        title: "🎨 Creation tokens bought with credit",
+                        body: `${buyer.alias ? `@${buyer.alias}` : "A member"} spent $${(tier.priceCents / 100).toFixed(2)} of store credit on ${tier.tokens} creation tokens.`,
+                        data: { type: "creation_purchase", buyerId: buyer.id, tierId: tier.id, paidWith: "credit" },
+                    }).catch(() => {});
+                }
+                return noStore({
+                    ok: true,
+                    paidWith: "credit",
+                    tokens: paid.tokens,
+                    coins: 0,
+                    amountCents: tier.priceCents,
+                    tokenBalance: paid.tokenBalance,
+                    creditCents: spent.balanceCents,
+                });
+            }
 
             // ── Real charge (dark until PAYMENTS_ENABLED, exactly like store credit). ──
             if (!isPaymentsEnabled()) return noStore({ error: "Payments are currently disabled." }, { status: 403 });

@@ -48,9 +48,22 @@ export default function CreationTokensClient({
     squareLocationId,
     tiers = [],
     initialTokenBalance = 0,
+    initialCreditCents = 0,
     isOwner = false,
 }) {
     const [tokenBalance, setTokenBalance] = useState(initialTokenBalance);
+    // ── PAYING WITH THE BALANCE YOU ALREADY HAVE ────────────────────────────────────────────────────
+    // Luke: "you can use Star Credit as a valid method of payment to buy generation tokens." It is the same
+    // store-credit balance the rest of the site spends, and unlike the card it works while payments are dark.
+    const [creditCents, setCreditCents] = useState(initialCreditCents);
+    // ⚠️ DEFAULTS TO WHICHEVER ONE CAN ACTUALLY PAY. Card payments are dark most of the time (PAYMENTS_ENABLED),
+    // and defaulting to a method that cannot charge put "Online purchases are currently unavailable" under a
+    // summary nobody could act on — with the balance that WOULD have worked sitting greyed beside it, opt-in.
+    // The same logic derived below as `canCharge`, and it has to be computed here because it decides the
+    // opening state rather than a render.
+    const [method, setMethod] = useState(
+        paymentsEnabled && squareApplicationId && squareLocationId ? "card" : "credit"
+    );   // card | credit
     const [selectedId, setSelectedId] = useState(tiers.find((t) => t.popular)?.id || tiers[0]?.id || null);
     const [cardState, setCardState] = useState("idle"); // idle | loading | ready | error
     const [busy, setBusy] = useState(false);
@@ -102,6 +115,30 @@ export default function CreationTokensClient({
         })();
         return () => { disposed = true; if (mounted?.destroy) mounted.destroy().catch(() => {}); cardRef.current = null; };
     }, [canCharge, squareApplicationId, squareLocationId]);
+
+    // Spend the balance instead of a card. No Square, no tokenize, no PAYMENTS_ENABLED — the money entered
+    // the system when the credit was bought, and so did its coins, which is why none come with this.
+    async function buyWithCredit() {
+        setErr(""); setDone(null);
+        if (!selected) { setErr("Pick a creation bundle."); return; }
+        setBusy(true);
+        try {
+            const res = await fetch("/api/marketplace/creations/checkout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tierId: selected.id, pay: "credit" }),
+            });
+            const d = await res.json().catch(() => null);
+            if (!res.ok || !d?.ok) throw new Error(d?.error || "Purchase failed.");
+            if (typeof d.tokenBalance === "number") setTokenBalance(d.tokenBalance);
+            if (typeof d.creditCents === "number") setCreditCents(d.creditCents);
+            setDone({ tokens: d.tokens, coins: 0, owner: false, paidWith: "credit" });
+        } catch (e) {
+            setErr(e instanceof Error ? e.message : "Purchase failed.");
+        } finally {
+            setBusy(false);
+        }
+    }
 
     async function buy() {
         setErr(""); setDone(null);
@@ -175,7 +212,14 @@ export default function CreationTokensClient({
                 <section className="card" style={{ textAlign: "center", border: "1px solid rgba(201,162,255,0.45)" }}>
                     <div style={{ fontSize: "2rem" }}>🎉</div>
                     <h2 style={{ margin: "4px 0", color: PURPLE }}>{done.owner ? "Granted" : "Purchased"} {done.tokens} creation{done.tokens === 1 ? "" : "s"}!</h2>
-                    <p className="muted" style={{ marginTop: 0 }}>+{done.coins.toLocaleString()} <Coin /> coins dropped into your wallet. You now have <strong style={{ color: PURPLE }}>🎨 {tokenBalance.toLocaleString()}</strong> creations.</p>
+                    {/* ⚠️ A CREDIT BUY MINTS NO COINS, so it must not announce "+0 coins dropped into your
+                        wallet" — which is what this said, and it reads as something having gone wrong rather
+                        than as the rule working. The coins for those dollars were paid at top-up. */}
+                    <p className="muted" style={{ marginTop: 0 }}>
+                        {done.paidWith === "credit"
+                            ? <>Paid from your store credit{creditCents >= 0 ? <> — <strong style={{ color: PURPLE }}>{usd(creditCents)}</strong> left</> : null}. You now have <strong style={{ color: PURPLE }}>🎨 {tokenBalance.toLocaleString()}</strong> creations.</>
+                            : <>+{done.coins.toLocaleString()} <Coin /> coins dropped into your wallet. You now have <strong style={{ color: PURPLE }}>🎨 {tokenBalance.toLocaleString()}</strong> creations.</>}
+                    </p>
                     <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
                         <button className="pill" onClick={() => setDone(null)}>Buy more</button>
                         <a className="pill" href="/marketplace/farm" style={{ textDecoration: "none" }}>Go make one →</a>
@@ -216,15 +260,77 @@ export default function CreationTokensClient({
                         })}
                     </div>
 
+                    {/* ── HOW YOU ARE PAYING ──────────────────────────────────────────────────────────
+                        Two methods, and they do not hand over the same thing — so the choice is made BEFORE
+                        the summary rather than under it, and the summary re-reads itself when you switch. */}
+                    <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+                        {[
+                            { id: "card", label: "Card", sub: canCharge ? "Visa · Mastercard" : "unavailable", ok: canCharge },
+                            { id: "credit", label: "Store credit", sub: usd(creditCents) + " available", ok: creditCents > 0 },
+                        ].map((m) => (
+                            <button
+                                key={m.id} type="button" onClick={() => { setMethod(m.id); setErr(""); }} disabled={!m.ok}
+                                style={{
+                                    flex: 1, padding: "10px 8px", borderRadius: 12, cursor: m.ok ? "pointer" : "default",
+                                    textAlign: "left", WebkitTapHighlightColor: "transparent",
+                                    border: `2px solid ${method === m.id ? PURPLE : "rgba(201,162,255,0.28)"}`,
+                                    background: method === m.id ? "linear-gradient(180deg, rgba(201,162,255,0.22), rgba(224,85,154,0.14))" : "rgba(255,255,255,0.03)",
+                                    opacity: m.ok ? 1 : 0.45,
+                                }}
+                            >
+                                <div style={{ fontWeight: 900, fontSize: 13.5, color: method === m.id ? PURPLE : "#f6efff" }}>{m.label}</div>
+                                <div className="muted" style={{ fontSize: 11 }}>{m.sub}</div>
+                            </button>
+                        ))}
+                    </div>
+
                     {selected ? (
-                        <div style={{ marginTop: 16, padding: 14, borderRadius: 12, background: "rgba(201,162,255,0.08)", border: "1px solid rgba(201,162,255,0.25)" }}>
+                        <div style={{ marginTop: 12, padding: 14, borderRadius: 12, background: "rgba(201,162,255,0.08)", border: "1px solid rgba(201,162,255,0.25)" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}><span className="muted">Creations</span><strong style={{ color: PURPLE }}>🎨 {selected.tokens}</strong></div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}><span className="muted">Coins</span><strong style={{ color: PINK }}><Coin /> {selected.coins.toLocaleString()}</strong></div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(201,162,255,0.2)" }}><span style={{ fontWeight: 800, color: "#f6efff" }}>You pay</span><strong style={{ color: "#ffffff" }}>{usd(selected.priceCents)}</strong></div>
+                            {/* ⚠️ CREDIT BUYS THE CREATIONS, NOT THE COINS. Every dollar of store credit minted
+                                coins the moment it was bought (200 a dollar), so paying the tier's coins again
+                                would mint the same dollar twice — see the note in the checkout route. Said here
+                                rather than discovered afterwards. */}
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}>
+                                <span className="muted">Coins</span>
+                                {method === "credit"
+                                    ? <span className="muted" style={{ fontSize: 12, textAlign: "right", maxWidth: 190 }}>already paid when you bought the credit</span>
+                                    : <strong style={{ color: PINK }}><Coin /> {selected.coins.toLocaleString()}</strong>}
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(201,162,255,0.2)" }}>
+                                <span style={{ fontWeight: 800, color: "#f6efff" }}>You pay</span>
+                                <strong style={{ color: "#ffffff" }}>{usd(selected.priceCents)}{method === "credit" ? " in credit" : ""}</strong>
+                            </div>
+                            {method === "credit" ? (
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginTop: 4 }}>
+                                    <span className="muted">Credit left after</span>
+                                    <span className="muted">{usd(Math.max(0, creditCents - selected.priceCents))}</span>
+                                </div>
+                            ) : null}
                         </div>
                     ) : null}
 
-                    {!paymentsEnabled ? (
+                    {method === "credit" ? (
+                        <>
+                            <button
+                                onClick={buyWithCredit}
+                                disabled={busy || !selected || creditCents < (selected?.priceCents || 0)}
+                                style={{ marginTop: 12, width: "100%", padding: 13, fontWeight: 900, border: "none", borderRadius: 12, cursor: busy ? "default" : "pointer", color: "#2a0f45", background: `linear-gradient(180deg, ${PURPLE}, ${PURPLE_DEEP})`, boxShadow: "0 3px 0 #7d47c0", opacity: busy || !selected || creditCents < (selected?.priceCents || 0) ? 0.6 : 1 }}
+                            >
+                                {busy ? "Processing…"
+                                    : !selected ? "Pick a bundle"
+                                        : creditCents < selected.priceCents ? `Need ${usd(selected.priceCents - creditCents)} more credit`
+                                            : `Pay ${usd(selected.priceCents)} with credit`}
+                            </button>
+                            {selected && creditCents < selected.priceCents ? (
+                                <p className="muted" style={{ fontSize: "0.75rem", marginTop: 6 }}>
+                                    <a href="/marketplace/credit" style={{ color: PURPLE, fontWeight: 800 }}>Top up your credit →</a>
+                                </p>
+                            ) : (
+                                <p className="muted" style={{ fontSize: "0.75rem", marginTop: 6 }}>Spent from the balance on your account. No card needed.</p>
+                            )}
+                        </>
+                    ) : !paymentsEnabled ? (
                         <p className="muted" style={{ marginTop: 14 }}>Online purchases are currently unavailable. Check back soon to stock up on creations.</p>
                     ) : missingSquareConfig ? (
                         <p className="muted" style={{ marginTop: 14 }}>Card payments aren&apos;t configured yet.</p>

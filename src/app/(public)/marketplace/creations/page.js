@@ -5,6 +5,7 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { hasOwnerStanding } from "@/lib/marketplace/owner.js";
 import { CREATION_TOKEN_TIERS } from "@/lib/marketplace/creation-tokens.js";
 import { getTokenBalance } from "@/lib/marketplace/creation-tokens-server.js";
+import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -30,6 +31,9 @@ export default async function CreationTokensPage() {
 
     const paymentsEnabled = process.env.PAYMENTS_ENABLED === "true" && process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
     const tokenBalance = await getTokenBalance(buyer.id).catch(() => 0);
+    // The dollar balance already on the account — a second way to pay, and the only one that works when card
+    // payments are dark. See the note on `pay: "credit"` in the checkout route for why it grants no coins.
+    const creditCents = await getStoreCredit(buyer.id).catch(() => 0);
     // The badge, not the one-account allow-list — the same question custom-deco's `free` asks.
     const owns = await hasOwnerStanding(buyer.id).catch(() => false);
 
@@ -42,6 +46,7 @@ export default async function CreationTokensPage() {
                 squareLocationId={process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || ""}
                 tiers={CREATION_TOKEN_TIERS}
                 initialTokenBalance={tokenBalance}
+                initialCreditCents={creditCents}
                 isOwner={owns}
             />
         </div>
