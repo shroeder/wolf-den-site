@@ -4,50 +4,48 @@
 // The haul and the ladder, drawn on the one screen where the shop has a member's full attention: standing at
 // the counter, phone out, holding the thing they just bought.
 //
-// ⚠️ THE LINES ARRIVE ONE AT A TIME. Eleven rewards rendered in a single frame is a list, and a list is
+// ⚠️ EVERY REWARD IS AN ITEM CARD WITH ITS OWN ARTWORK, and it was a list of react-icons glyphs. Luke, looking
+// at a real $180 receipt: "Show actual sprites ... And it should always use full sprites and item cards."
+// A Legendary ring and five Tempered Steel and a Gold Chest all arrived as the same grey 20px svg beside a
+// string, while the painted sprite for every one of them was already generated and already on the shelf
+// somewhere else in the Den. A reward you cannot recognise is a receipt line.
+//
+// The art is resolved SERVER-SIDE, in one pass, by dressHaul in patronage-store.js — this component does not
+// fetch anything. See the note there for why, and [[check-existing-sprites-first]] for where the sprites live.
+//
+// ⚠️ THE CARDS ARRIVE ONE AT A TIME. Eleven rewards rendered in a single frame is a list, and a list is
 // something you skim; the same eleven landing a beat apart is an opening, and an opening is something you
 // watch. The stagger is the entire difference between "you got some stuff" and Luke's "feel like a baller",
-// and it costs one CSS delay per row.
+// and it costs one interval.
 
 import { useEffect, useState } from "react";
-import {
-    GiTwoCoins, GiCoins, GiGears, GiPlantSeed, GiWheat, GiCrossedSwords, GiPawPrint,
-} from "react-icons/gi";
+import { GiPawPrint } from "react-icons/gi";
 
 import ChestIcon from "@/components/ChestIcon";
 
-const RARITY = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legendary: "#f59e0b", mythic: "#ff5cc8" };
-const CHEST_TONE = { wooden: "#b07a43", iron: "#c7d0d8", gold: "#ffd75e", mythic: "#33e0a1", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
+// The shared ladder from globals.css, plus one tone the rarity scale does not have a word for: currency.
+// Kept local rather than reading the `.rar-*` classes so a card can be tinted by its OWN colour — a Forge
+// part is Tempered Steel blue and a Wooden Chest is brown, neither of which is a rarity.
+const RARITY = {
+    common: "#9aa7b5", rare: "#4a90d9", epic: "#a855f7", legendary: "#f5a623",
+    mythic: "#5affaf", ascendant: "#ff7a3c", eternal: "#ff5cc8", coin: "#ffd75e",
+};
+const toneOf = (c) => c.tone || RARITY[c.rarity] || RARITY.common;
 
-// "a iron chest". Three of the six chest tiers start with a vowel — iron, ascendant, eternal — so the article
-// has to be worked out rather than typed.
-const an = (word) => ("aeiou".includes(String(word || "")[0]) ? "an" : "a");
-
-// One row of the hand. Icons rather than emoji, per the house rule — see [[no-emoji-in-ui]].
-function line(sp) {
-    if (sp.kind === "gold") return { Icon: GiTwoCoins, col: "#ffd75e", text: `${sp.n.toLocaleString()} gold` };
-    if (sp.kind === "doubloons") return { Icon: GiCoins, col: "#e8c07a", text: `${sp.n.toLocaleString()} doubloons` };
-    if (sp.kind === "parts") return { Icon: GiGears, col: "#c8d6bd", text: `${sp.n} forge part${sp.n === 1 ? "" : "s"} · tier ${sp.tier}` };
-    // ⚠️ THE CHEST IS THE THING PEOPLE REMEMBER FROM A SCAN, and it was a flat grey glyph like everything
-    // else in the list. ChestIcon is drawn per tier and already exists -- a wooden chest and a mythic one look
-    // like different objects, which is the whole point of there being tiers. See [[check-existing-sprites-first]].
-    if (sp.kind === "chest") return { chest: sp.tier, col: CHEST_TONE[sp.tier] || "#ffcf87", text: `${an(sp.tier)} ${sp.tier} chest` };
-    if (sp.kind === "seed") return { Icon: GiPlantSeed, col: RARITY[sp.rarity] || "#9ede7a", text: `${sp.n}x ${sp.name || "seed"}` };
-    if (sp.kind === "crop") return { Icon: GiWheat, col: RARITY[sp.rarity] || "#d9c07a", text: `${sp.n}x ${sp.name || "crop"}` };
-    if (sp.kind === "gear") return { Icon: GiCrossedSwords, col: RARITY[sp.rarity] || "#cdd9c6", text: sp.name + (sp.isNew ? "" : " (dupe)") };
-    return null;
-}
+// Rarities worth shouting about. A card at these tiers gets the glow the gear screen gives them, because
+// pulling a Legendary out of a card purchase should not look like pulling a turnip.
+const LOUD = new Set(["legendary", "mythic", "ascendant", "eternal"]);
 
 export default function PatronageReward({ patronage }) {
     const [shown, setShown] = useState(0);
     const hand = patronage?.hand || [];
     const pets = [...(patronage?.pets || []), ...(patronage?.alsoGranted || [])];
 
-    // Reveal a line at a time. An interval rather than per-row CSS delays because the pets land AFTER the
+    // Reveal a card at a time. An interval rather than per-card CSS delays because the pets land AFTER the
     // hand and need to know when it has finished.
     useEffect(() => {
         if (!hand.length) { setShown(0); return undefined; }
-        const t = setInterval(() => setShown((n) => (n >= hand.length ? n : n + 1)), 260);
+        const t = setInterval(() => setShown((n) => (n >= hand.length ? n : n + 1)), 240);
         return () => clearInterval(t);
     }, [hand.length]);
 
@@ -59,18 +57,28 @@ export default function PatronageReward({ patronage }) {
             {hand.length ? (
                 <>
                     <p className="pat-head">The counter threw in{patronage.rolls > 1 ? ` ${patronage.rolls} things` : " something"}</p>
-                    <ul className="pat-list">
-                        {hand.slice(0, shown).map((sp, i) => {
-                            const l = line(sp);
-                            if (!l) return null;
-                            return (
-                                <li key={i} className={`pat-row${l.chest ? " is-chest" : ""}`} style={{ "--c": l.col }}>
-                                    {l.chest ? <ChestIcon tier={l.chest} size={26} /> : <l.Icon aria-hidden="true" />}
-                                    <span>{l.text}</span>
-                                </li>
-                            );
-                        })}
-                    </ul>
+                    <div className="pat-grid">
+                        {hand.slice(0, shown).map((c, i) => (
+                            <div key={`${c.kind}-${c.id || c.tier || i}`}
+                                className={`pat-card${LOUD.has(c.rarity) ? " is-loud" : ""}`}
+                                style={{ "--rar": toneOf(c) }}>
+                                <span className="pat-art">
+                                    {/* A chest whose painted art the cron has not made yet still gets a chest:
+                                        ChestIcon draws one per tier. Every other kind has a generic sprite
+                                        behind it, so `fallback` is never a broken image. */}
+                                    {c.kind === "chest" && !c.sprite
+                                        ? <ChestIcon tier={c.tier} size={44} />
+                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                        : <img src={c.sprite || c.fallback} alt="" draggable="false" />}
+                                </span>
+                                {/* A pile of coin is a NUMBER; three chests are a multiplier. "×574 gold" reads
+                                    as 574 separate golds. */}
+                                {c.n > 1 ? <b className="pat-n">{c.rarity === "coin" && c.kind !== "parts" ? c.n.toLocaleString() : `×${c.n}`}</b> : null}
+                                <b className="pat-name">{c.name}</b>
+                                {c.sub ? <em className="pat-sub">{c.sub}</em> : null}
+                            </div>
+                        ))}
+                    </div>
                 </>
             ) : null}
 
@@ -114,22 +122,50 @@ export default function PatronageReward({ patronage }) {
             ) : null}
 
             <style jsx>{`
-                .pat { width: 100%; max-width: 340px; margin: 4px auto 0; text-align: left; }
-                .pat-head { margin: 0 0 7px; text-align: center; font-size: 12px; font-weight: 800;
+                .pat { width: 100%; max-width: 360px; margin: 4px auto 0; text-align: left; }
+                .pat-head { margin: 0 0 9px; text-align: center; font-size: 12px; font-weight: 800;
                     letter-spacing: .1em; text-transform: uppercase; color: #8a9384; }
-                .pat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
-                .pat-row { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 10px;
-                    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
-                    font-size: 14px; font-weight: 700; color: var(--c);
-                    animation: patIn .34s cubic-bezier(.2,1.3,.35,1) both; }
-                .pat-row :global(svg) { width: 20px; height: 20px; flex-shrink: 0; }
-                /* The chest draws itself at 26 and brings its own colours, so it is neither tinted nor shrunk. */
-                .pat-row.is-chest :global(svg) { width: 26px; height: 26px; }
-                .pat-row.is-chest { background: rgba(255, 207, 135, .09); border-color: rgba(255, 207, 135, .28); }
+
+                /* ── THE LOOT CARD ────────────────────────────────────────────────────────────────────
+                   Same shape the bag and the chest reveal use: a rarity-tinted plate, the art on a
+                   backplate of its own colour, the name under it. Two across on a phone, because a
+                   full-width row wastes the frame the art needs to read at all. */
+                .pat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
+                .pat-card { position: relative; display: flex; flex-direction: column; align-items: center;
+                    gap: 3px; text-align: center; padding: 10px 7px 9px; border-radius: 13px;
+                    background: linear-gradient(180deg, color-mix(in srgb, var(--rar) 16%, transparent), rgba(0,0,0,.3));
+                    border: 1.5px solid color-mix(in srgb, var(--rar) 55%, transparent);
+                    box-shadow: 0 0 12px -5px var(--rar), inset 0 0 18px -13px var(--rar);
+                    animation: patIn .4s cubic-bezier(.2,1.35,.35,1) both; }
+                .pat-card.is-loud { box-shadow: 0 0 18px -3px var(--rar), inset 0 0 20px -10px var(--rar);
+                    animation: patIn .4s cubic-bezier(.2,1.35,.35,1) both, patGlow 2.4s ease-in-out .4s infinite; }
                 @keyframes patIn {
-                    0% { opacity: 0; transform: translateX(-14px) scale(.94); }
-                    100% { opacity: 1; transform: translateX(0) scale(1); }
+                    0% { opacity: 0; transform: translateY(10px) scale(.86); }
+                    100% { opacity: 1; transform: none; }
                 }
+                @keyframes patGlow {
+                    0%, 100% { box-shadow: 0 0 18px -3px var(--rar), inset 0 0 20px -10px var(--rar); }
+                    50% { box-shadow: 0 0 26px 0 var(--rar), inset 0 0 22px -8px var(--rar); }
+                }
+
+                /* The backplate. It is what makes a die-cut sprite read as an ITEM rather than a picture
+                   floating on the page — same trick .equip-card-glyph plays in globals.css. */
+                .pat-art { width: 54px; height: 54px; border-radius: 13px; display: grid; place-items: center;
+                    flex: none;
+                    background: radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--rar) 38%, transparent), rgba(0,0,0,.22));
+                    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rar) 50%, transparent), 0 2px 6px rgba(0,0,0,.4); }
+                .pat-art img { width: 44px; height: 44px; object-fit: contain; display: block;
+                    filter: drop-shadow(0 1px 4px rgba(0,0,0,.55)); }
+                .pat-art :global(svg) { width: 44px; height: 44px; }
+
+                /* How many. A corner badge rather than a prefix, so "Tempered Steel" stays readable at 12px
+                   and the number is the thing the eye finds first. */
+                .pat-n { position: absolute; top: -6px; right: -4px; min-width: 24px; padding: 2px 6px;
+                    border-radius: 999px; font-size: 11.5px; font-weight: 900; color: #14100a;
+                    background: linear-gradient(180deg, #ffe488, #f3b23a); box-shadow: 0 2px 5px rgba(0,0,0,.5); }
+                .pat-name { font-size: 12.5px; line-height: 1.2; font-weight: 800; color: #f2ead9; }
+                .pat-sub { font-style: normal; font-size: 10.5px; line-height: 1.25; color: #8a9384; }
+
                 .pat-pets { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
                 .pat-pet { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 13px 12px;
                     border-radius: 13px; text-align: center;

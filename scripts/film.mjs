@@ -63,6 +63,16 @@ const DELAY = Number(arg("--delay", 0));
 //   node scripts/film.mjs "<lab url>" out/reel --click ".pill" --eval "window.__bot(130)" --frames 16
 // (shot.mjs learned the same lesson and grew SHOT_EVAL.)
 const EVAL = arg("--eval", null);
+// -- AND SOME THINGS CANNOT BE FILMED AFTER THE PAGE HAS LOADED ------------------------------------------------
+// --eval runs once the page has settled, which is too late for anything that happens ON MOUNT. The receipt
+// screen POSTs its claim the instant it renders and then draws whatever came back, so there is no moment
+// after load at which a stub could be installed -- the request is already gone. Filming that screen against a
+// $180 haul would otherwise mean redeeming a real claim on a real account and then unpicking a chest, a page,
+// a piece of gear and three Creations by hand.
+//
+// --pre runs at DOCUMENT START, before any of the page's own script, which is where a fetch stub belongs:
+//   node scripts/film.mjs "<url>" out/x --pre "window.fetch = async () => new Response(...)"
+const PRE = arg("--pre", null);
 
 if (!url) throw new Error("usage: node scripts/film.mjs <url> <outBase> [--click sel] [--await sel] [--tap sel] [--frames n] [--every ms]");
 if (!existsSync(dirname(outBase)) && dirname(outBase) !== ".") mkdirSync(dirname(outBase), { recursive: true });
@@ -182,6 +192,8 @@ if (process.env.SHOT_HIDE) {
         })();`,
     });
 }
+if (PRE) await send("Page.addScriptToEvaluateOnNewDocument", { source: PRE });
+
 await send("Page.navigate", { url });
 await sleep(SETTLE);
 

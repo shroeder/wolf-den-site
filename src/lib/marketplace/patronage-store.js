@@ -43,6 +43,10 @@ export async function grantPatronPets(buyerId, dollars) {
  * this runs, and a haul that pays six of seven lines is a far better outcome than a red error on the one
  * screen where the shop has their full attention.
  */
+// What a recipe roll pays when the member has already read every page in their band. One tier below the
+// band's own chest, so a full book is still worth something and never worth MORE than the roll it replaced.
+const FALLBACK_CHEST = { plain: "wooden", good: "wooden", rich: "iron", lavish: "gold" };
+
 export async function payHaul(buyerId, hand, band) {
     const out = [];
     for (const x of hand) {
@@ -66,8 +70,39 @@ export async function payHaul(buyerId, hand, band) {
                 out.push({ kind: "parts", n: x.n, tier: x.tier });
             } else if (x.kind === "chest") {
                 const { addChests } = await import("@/lib/marketplace/chests.js");
-                await addChests(buyerId, { [x.tier]: 1 }, { source: "patronage" });
-                out.push({ kind: "chest", tier: x.tier });
+                // n, not 1 — chests of one tier merge into a single intent, so a rich hand that rolled three
+                // gold chests is one line saying x3 rather than three identical rows.
+                const n = Math.max(1, Number(x.n) || 1);
+                await addChests(buyerId, { [x.tier]: n }, { source: "patronage" });
+                out.push({ kind: "chest", tier: x.tier, n });
+            } else if (x.kind === "token") {
+                // ── A CREATION, THROWN IN AT THE COUNTER ─────────────────────────────────────────────
+                // Luke: "a 190 dollar purchase should give ... a few generation tokens." Worth being explicit
+                // that this is a DELIBERATE reversal: creation-tokens-server.js says a Creation is minted at
+                // checkout, by an admin grant, "or not at all", because token grants had been scattered across
+                // reward paths and a SKU that is also loot is a SKU nobody buys. The line still holds for
+                // every free earner in the game — this is the one exception, and it is the one that cannot be
+                // farmed, because the only way to roll on this table is to spend real money at the counter.
+                const { grantCustomCredit } = await import("@/lib/marketplace/custom-deco.js");
+                const n = Math.max(1, Number(x.n) || 1);
+                await grantCustomCredit(buyerId, n, {
+                    source: "patronage", actorId: buyerId, actorLabel: "counter haul", meta: { band },
+                });
+                out.push({ kind: "token", n });
+            } else if (x.kind === "recipe") {
+                const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
+                // Returns null when they already know every page in the band. A dud line reads as the screen
+                // being broken, so the roll falls through to the band's chest instead of paying nothing —
+                // same fallback shape grantRecipeReward's own doc comment recommends.
+                const rec = await grantRecipeReward(buyerId, x.band);
+                if (rec) {
+                    out.push({ kind: "recipe", id: rec.id, name: rec.name, tier: rec.tier || 1 });
+                } else {
+                    const { addChests } = await import("@/lib/marketplace/chests.js");
+                    const tier = FALLBACK_CHEST[band] || "wooden";
+                    await addChests(buyerId, { [tier]: 1 }, { source: "patronage" });
+                    out.push({ kind: "chest", tier, n: 1 });
+                }
             } else if (x.kind === "seed") {
                 const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
                 // The band name is `patron_<band>` and every one of the four is declared in SEED_BANDS. An
@@ -97,12 +132,116 @@ export async function payHaul(buyerId, hand, band) {
                 const pickItem = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
                 if (pickItem) {
                     const g = await grantItem(buyerId, pickItem.id, "patronage");
-                    out.push({ kind: "gear", id: pickItem.id, name: pickItem.name, rarity: pickItem.rarity, slot: pickItem.slot || null, isNew: Boolean(g?.granted) });
+                    out.push({ kind: "gear", id: pickItem.id, name: pickItem.name, rarity: pickItem.rarity,
+                        slot: pickItem.slot || null, icon: pickItem.icon || null, isNew: Boolean(g?.granted) });
                 }
             }
         } catch { /* one line of a haul is never worth failing the scan over */ }
     }
     return out;
+}
+
+// ── AND EVERY LINE GETS ITS REAL ARTWORK ─────────────────────────────────────────────────────────────────────
+// Luke: "Show actual sprites ... And it should always use full sprites and item cards."
+//
+// The screen drew nine different kinds of reward as the same handful of react-icons glyphs — a pair of crossed
+// swords for a Legendary ring, a cog for Tempered Steel — while the painted sprite for every one of them was
+// already generated, already paid for and already on the shelf somewhere else in the Den. A reward you cannot
+// recognise is a receipt line.
+//
+// ⚠️ RESOLVED HERE, ON THE SERVER, IN ONE PASS — not per card in the browser. Four reads at most, each an
+// ANY($1) over the ids this hand actually contains, and itemSpriteMap is already a five-minute cache. The
+// alternative is every card fetching its own art on the one screen a member opens holding their phone at the
+// counter. See CLAUDE.md on convenience calls, and road-prizes.js for the same shape.
+//
+// Nothing here can fail the scan: every read falls back to the kind's generic sprite, and ChestIcon draws a
+// chest for a tier whose art the cron has not made yet.
+const KIND_ART = {
+    gold: "/images/ui/coin.png",
+    doubloons: "/images/sailing/doubloon.png",
+    parts: "/images/ui/parts.png",
+    chest: "/images/ui/chest.png",
+    seed: "/images/ui/seed.png",
+    crop: "/images/nav/farm.png",
+    recipe: "/images/cooking/dish.png",
+    // The Creations palette the nav already uses. It was the ONE kind in the haul with no artwork anywhere —
+    // CreationTokensClient draws a paintbrush emoji in seven places — and this file is on disk, in the house
+    // style, referenced by nothing. See [[check-existing-sprites-first]] and [[no-emoji-in-ui]].
+    token: "/images/nav/creations.png",
+};
+
+// What rarity frame a thing that has no rarity of its own wears. A chest is the tier it is; a page is its tier.
+const CHEST_RARITY = { wooden: "common", iron: "rare", gold: "epic", mythic: "legendary", ascendant: "ascendant", eternal: "eternal" };
+const TIER_RARITY = ["common", "common", "rare", "epic", "legendary", "mythic", "mythic"];
+
+export async function dressHaul(hand) {
+    const gearIds = hand.filter((x) => x.kind === "gear" && x.id).map((x) => x.id);
+    const pageIds = hand.filter((x) => x.kind === "recipe" && x.id).map((x) => x.id);
+    const cropIds = hand.filter((x) => (x.kind === "seed" || x.kind === "crop") && x.id).map((x) => x.id);
+    const anyChest = hand.some((x) => x.kind === "chest");
+
+    const [{ itemSpriteMap }, { getChestArt }, { partColor, partName, partSprite }, { CHEST_TIERS }, { SEEDS }] = await Promise.all([
+        import("@/lib/marketplace/item-sprites.js"),
+        import("@/lib/marketplace/chest-art.js"),
+        import("@/lib/marketplace/forge-parts.js"),
+        import("@/lib/marketplace/chests.js"),
+        import("@/lib/marketplace/farm-crops.js"),
+    ]);
+
+    const [items, chestArt, pages, crops] = await Promise.all([
+        gearIds.length ? itemSpriteMap().catch(() => ({})) : {},
+        anyChest ? getChestArt().catch(() => ({})) : {},
+        pageIds.length
+            ? db.query(`SELECT ref, url FROM mkt_cooking_sprite WHERE ref = ANY($1)`, [pageIds]).catch(() => [])
+            : [],
+        cropIds.length
+            // The RIPE stage, because that is what the thing looks like — a sprout is what a seed looks like
+            // after you have already planted it, which is not what is being handed over.
+            ? db.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key = ANY($1)`,
+                [cropIds.map((id) => `crop_${id}_ripe`)]).catch(() => [])
+            : [],
+    ]);
+    const pageArt = Object.fromEntries((pages || []).map((r) => [r.ref, r.url]));
+    const cropArt = Object.fromEntries((crops || []).map((r) => [r.art_key, r.url]));
+
+    return hand.map((x) => {
+        const base = { ...x, fallback: KIND_ART[x.kind] || null };
+        if (x.kind === "gold") return { ...base, name: "Gold", n: x.n, rarity: "coin", sprite: KIND_ART.gold };
+        if (x.kind === "doubloons") return { ...base, name: "Doubloons", n: x.n, rarity: "coin", sprite: KIND_ART.doubloons };
+        if (x.kind === "parts") {
+            return { ...base, name: partName(x.tier), sub: `Forge · tier ${x.tier}`, n: x.n,
+                rarity: "coin", tone: partColor(x.tier), sprite: partSprite(x.tier) || KIND_ART.parts };
+        }
+        if (x.kind === "chest") {
+            const t = CHEST_TIERS[x.tier] || {};
+            return { ...base, name: t.label || `${x.tier} chest`, n: x.n || 1,
+                rarity: CHEST_RARITY[x.tier] || "common", tone: t.color || null, sprite: chestArt[x.tier] || null };
+        }
+        if (x.kind === "token") {
+            return { ...base, name: x.n === 1 ? "Creation" : "Creations", sub: "Make your own art", n: x.n,
+                rarity: "epic", sprite: KIND_ART.token };
+        }
+        if (x.kind === "recipe") {
+            return { ...base, name: x.name, sub: `Recipe · tier ${x.tier}`, n: 1,
+                rarity: TIER_RARITY[x.tier] || "rare", sprite: pageArt[x.id] || null };
+        }
+        if (x.kind === "seed") {
+            // The crop's own name, not "Grapes seeds" — SEEDS names are already plural where the plant is
+            // ("Strawberries", "Grapes"), so appending the word made a mess of half of them. The sub says
+            // which of the two things this is.
+            return { ...base, name: SEEDS[x.id]?.name || x.name || "Seed", sub: "Seeds for the farm", n: x.n,
+                rarity: x.rarity || "common", sprite: cropArt[`crop_${x.id}_ripe`] || null };
+        }
+        if (x.kind === "crop") {
+            return { ...base, name: SEEDS[x.id]?.name || x.name || "Crop", sub: "Into the pantry", n: x.n,
+                rarity: x.rarity || "common", sprite: cropArt[`crop_${x.id}_ripe`] || null };
+        }
+        if (x.kind === "gear") {
+            return { ...base, name: x.name, sub: x.isNew ? (x.slot || "Gear") : "Already owned — salvage it",
+                n: 1, rarity: x.rarity || "common", sprite: items[x.id] || null, icon: x.icon || null };
+        }
+        return base;
+    });
 }
 
 /**
@@ -139,7 +278,8 @@ export async function patronageForScan(buyerId, amountCents) {
     // Grants the whole earned ladder; `newPets` is only what had not been granted before, so a member whose
     // backfill already handed them the Copper Stag is not told they just won it again.
     const newPets = await grantPatronPets(buyerId, after).catch(() => []);
-    const hand = dollars > 0 ? await payHaul(buyerId, rolled.hand, rolled.band).catch(() => []) : [];
+    const paid = dollars > 0 ? await payHaul(buyerId, rolled.hand, rolled.band).catch(() => []) : [];
+    const hand = paid.length ? await dressHaul(paid).catch(() => paid) : paid;
     const ahead = nextPatronRung(after);
     const art = await petArt([...newPets.map((p) => p.id), ahead?.pet?.id]).catch(() => ({}));
     return {

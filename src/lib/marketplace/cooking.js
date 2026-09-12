@@ -502,6 +502,15 @@ export const RECIPE_BANDS = {
     dig_deep:     { min: 3, max: 4 },
     fish:         { min: 1, max: 3 },   // a sealed bottle
     spin:         { min: 1, max: 3 },
+    // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────
+    // A page thrown in with a card purchase, scaled by the receipt the same way the rest of the haul is.
+    // It tops out at 4: the Master tier and the Legendary pages stay where they were — bosses, raids and deep
+    // seams — because a shop receipt is the ON-RAMP to the book, not a way to buy the end of it. Same
+    // reasoning as the `shop` band directly below.
+    patron_plain:  { min: 1, max: 2 },
+    patron_good:   { min: 1, max: 3 },
+    patron_rich:   { min: 2, max: 4 },
+    patron_lavish: { min: 3, max: 4 },
     // ── NO `cook` BAND ───────────────────────────────────────────────────────────────────────────────────
     // Cooking used to teach recipes: a rung on the Hearty and Fine ladders, band 1-3, on the reasoning that
     // "cooking teaches you the next thing to cook". Luke's call to remove it. A dish now pays what a dish

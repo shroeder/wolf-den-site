@@ -54,8 +54,15 @@ export function nextPatronRung(dollars) {
 // ── THE HAUL ─────────────────────────────────────────────────────────────────────────────────────────────────
 // How many pulls a receipt is worth. Linear in dollars and capped, because the cap is what stops a single
 // enormous case break from being worth more than a year of ordinary visits.
-export const HAUL_PER_DOLLAR = 20;
-export const HAUL_MAX = 14;
+// ⚠️ AND THE RATE WENT FROM ONE-PER-$20 TO ONE-PER-$12. Luke, on a real $180 scan that paid gold, forge
+// parts, doubloons and a single chest: "a 190 dollar purchase should give multiple chests, a few generation
+// tokens, a recipe, a couple pieces of gear, etc. Thats my expectation ... make it random but what im
+// describing should be the average." Ten pulls could not carry that list — nine kinds over ten rolls leaves
+// roughly one of each and a coin-flip on whether the good ones showed up at all, which is exactly the receipt
+// he was looking at. Sixteen can. Measured, not guessed: scripts/haul-odds.mjs prints the average hand for
+// every receipt size, and the numbers in the POOL comment below are its output.
+export const HAUL_PER_DOLLAR = 12;
+export const HAUL_MAX = 24;
 // ⚠️ THE FLOOR IS TWO, AND THE FLOOR IS THE MODE. Measured over all 217 redeemed receipts: the median is $30,
 // 61% of scans fall in the plain band and 38% of them drew exactly ONE roll. So the thing most customers
 // experience most of the time was a single pull, and a quarter of those were plain coin -- which the purchase
@@ -76,42 +83,84 @@ export const bandFor = (dollars) => {
 };
 
 // ── THE POOL ─────────────────────────────────────────────────────────────────────────────────────────────────
-// Luke: "it should pull from a WIDE pool." Seven kinds, and the point of seven is that they land in seven
-// different parts of the game — the purse, the farm, the pantry, the Forge, the sea, the chest pile and your
-// own gear. A member who only plays the farm still gets something they wanted out of a card purchase.
+// Luke: "it should pull from a WIDE pool." NINE kinds, and the point of nine is that they land in nine
+// different parts of the game — the purse, the farm, the pantry, the Forge, the sea, the chest pile, the
+// recipe book, the art studio and your own gear. A member who only plays the farm still gets something they
+// wanted out of a card purchase.
 //
-// ⚠️ GOLD IS DELIBERATELY THE THING THAT SHRINKS AS THE BAND CLIMBS. A scan ALREADY pays gold — awardPurchaseXp
-// gives `dollars x SPEND_XP_PER_DOLLAR` in XP and awardXp mints gold 1:1 with points — so a $209 receipt is
-// already handing over roughly a thousand coins before this table is touched. Making the big spenders' extra
-// rolls ALSO mostly gold would be paying the same reward twice and calling it variety. The rich bands trade
-// coin for chests, Forge parts and gear: things you cannot simply buy with the coin.
-// ⚠️ THE FIRST CUT OF THIS TABLE PAID 89% AS MUCH GOLD AGAIN AS THE XP ALREADY MINTS. Run over all 213 real
-// receipts in the Den's history, the haul came to 48,823 coins against the 55,030 the purchase XP already
-// pays — so the "wide pool" was, in practice, a gold faucet with some seeds in it, which is the exact thing
-// the comment above says it must not be. Gold's weight and its size both came down; everything else came up.
-// It now lands around a third on top, and what a member actually REMEMBERS from a scan is the chest.
-// ⚠️ AND GOLD CAME DOWN AGAIN, HARDEST AT THE BOTTOM. Gold was the single likeliest plain-band pull at 24%,
-// which made the commonest outcome of the commonest scan "some coin" -- on top of the coin the purchase XP
-// mints 1:1 anyway. Paying the same reward twice and calling it variety is exactly what the note above says
-// this table must not do, and at the plain band it was doing it worst.
+// ⚠️ GOLD IS DELIBERATELY THE THING THAT SHRINKS AS THE BAND CLIMBS, AND AT LAVISH IT IS GONE. A scan ALREADY
+// pays gold — awardPurchaseXp gives `dollars x SPEND_XP_PER_DOLLAR` in XP and awardXp mints gold 1:1 with
+// points — so a $209 receipt is already handing over roughly a thousand coins before this table is touched.
+// Making the big spenders' extra rolls ALSO mostly gold would be paying the same reward twice and calling it
+// variety. The rich bands trade coin for chests, gear, pages and Creations: things you cannot simply buy with
+// the coin. Two earlier tunings walked gold down from 24% of a plain pull; this one finishes the argument by
+// taking it off the lavish table entirely.
 //
-// Simulated over the same 217 receipts, against the floor of two: scans handing over nothing but currency
-// fall from 17.1% to 4.7%, chests per hundred scans go 40 -> 59, gear 23 -> 28 -- and total haul gold DROPS
-// 27% (23,894 -> 17,417 against the ~77,000 the purchase XP already mints). Better to receive and less of a
-// faucet, which is the only kind of buff worth shipping. See [[economy-nerf-measure-daily-total]].
+// ⚠️ THE GOLD RANGES ARE PRE-MINT. "patronage" is now in MINT_REASONS, so roughly 40% of these numbers is what
+// a member actually receives — they were raised by the reciprocal, which is why they look enormous beside the
+// pile the screen shows. See [[gold-mint-rate-lever]].
+//
+// ── WHAT THIS PAYS, MEASURED ─────────────────────────────────────────────────────────────────────────────────
+// 20,000 simulated scans per size, from `node --experimental-loader ./scripts/lib/app-loader.mjs
+// scripts/haul-odds.mjs`. Averages per scan; gold is post-mint:
+//
+//     $     band    rolls  chests  gear  creations  recipes  seeds  crops  parts  doubloons  gold   coin-only
+//     11    plain     2      0.3    0.1     0.1       0.1     0.4    0.3    0.5       1       22      12.9%
+//     30    plain     3      0.4    0.2     0.1       0.1     0.6    0.4    0.7       2       32       4.7%
+//     60    good      6      1.0    0.6     0.4       0.3     0.9    0.6    1.9       8      104       0.3%
+//    100    rich      9      1.9    1.2     1.4       0.6     0.9    0.6    4.0      20      131       0.0%
+//    180    rich     16      3.4    2.1     2.4       1.1     1.6    1.1    7.2      36      227       0.0%
+//    250  lavish     21      4.8    3.6     5.0       1.7     1.5    1.1   13.3      74        0       0.0%
+//    400  lavish     24      5.5    4.1     5.8       1.9     1.7    1.2   15.0      84        0       0.0%
+//
+// The $180 row IS the ask: "multiple chests, a few generation tokens, a recipe, a couple pieces of gear."
+// Against the table this replaced, the same receipt paid 1.9 chests, 1.0 gear, no Creations and no recipe.
+//
+// ⚠️ THE NUMBER TO WATCH WHEN THESE MOVE IS THE LAST COLUMN, not the averages. The failure this table has
+// shipped twice is not "too little on average" — it is a scan whose entire hand was currency, which reads as
+// nothing at all because the purchase XP already paid gold. It was 17.1% of all scans two tunings ago and is
+// 12.9% at the very bottom of the curve now. See [[economy-nerf-measure-daily-total]].
 export const POOL = {
-    plain:  { gold: 13, seed: 22, crop: 18, parts: 18, doubloons: 14, chest: 11, gear: 4 },
-    good:   { gold: 12, seed: 20, crop: 14, parts: 20, doubloons: 14, chest: 14, gear: 6 },
-    rich:   { gold: 10, seed: 15, crop: 10, parts: 20, doubloons: 16, chest: 19, gear: 10 },
-    lavish: { gold: 8,  seed: 10, crop: 7,  parts: 21, doubloons: 16, chest: 24, gear: 14 },
+    plain:  { gold: 10, seed: 21, crop: 15, parts: 15, doubloons: 11, chest: 14, gear:  7, recipe: 3, token:  4 },
+    good:   { gold:  7, seed: 15, crop: 10, parts: 16, doubloons: 14, chest: 17, gear: 10, recipe: 5, token:  6 },
+    rich:   { gold:  3, seed: 10, crop:  7, parts: 15, doubloons: 14, chest: 21, gear: 13, recipe: 7, token: 10 },
+    lavish: { gold:  0, seed:  7, crop:  5, parts: 14, doubloons: 14, chest: 23, gear: 17, recipe: 8, token: 12 },
 };
 
-// What one pull of each kind is worth, per band. `stack` is how many of a seed or crop come at once.
+// ── WHAT ONE PULL IS WORTH ───────────────────────────────────────────────────────────────────────────────────
+// `stack` is how many of a seed or crop come at once. `chest` and `gear` are WEIGHTED TABLES rather than one
+// fixed tier, so a rich receipt is usually a gold chest and occasionally a mythic one — the spike is most of
+// what makes a random table worth watching, and a band that always pays exactly its own tier is a schedule.
+//
+// ⚠️ THE CHEST SPIKE STOPS AT MYTHIC, ON PURPOSE. Ascendant and above are the ELITE chests: they draw from
+// ELITE_POOL, which is the charged Ascendant/Eternal gear. A QR scan at the counter must not be a door into
+// that, however large the receipt. See [[rewards-must-be-scoped]].
+//
+// ⚠️ AND GOLD IS QUOTED BEFORE THE MINT RATE. "patronage" is now in MINT_REASONS (it always claimed to be in
+// the comment beside the grant, and was not), so these numbers are multiplied by GOLD_MINT_RATE on the way
+// out and a member sees roughly 40% of them. They were raised to match, so the pile a scan pays is about what
+// it paid before — the change is that the one lever can finally see it. See [[gold-mint-rate-lever]].
 export const SIZE = {
-    plain:  { gold: [40, 120],  parts: [1, 2], partTier: 1, doubloons: [3, 8],   chest: "wooden", gear: "common", stack: [1, 3] },
-    good:   { gold: [90, 240],  parts: [1, 3], partTier: 2, doubloons: [6, 14],  chest: "iron",   gear: "rare",   stack: [2, 4] },
-    rich:   { gold: [170, 420], parts: [2, 4], partTier: 3, doubloons: [10, 22], chest: "gold",   gear: "rare",   stack: [3, 6] },
-    lavish: { gold: [280, 600], parts: [3, 6], partTier: 4, doubloons: [16, 34], chest: "mythic", gear: "epic",   stack: [4, 8] },
+    plain: {
+        gold: [150, 400], parts: [1, 2], partTier: 1, doubloons: [3, 8], stack: [1, 3], tokens: [1, 1],
+        chest: { wooden: 86, iron: 14 },
+        gear: { common: 78, rare: 22 },
+    },
+    good: {
+        gold: [350, 900], parts: [1, 3], partTier: 2, doubloons: [6, 14], stack: [2, 4], tokens: [1, 1],
+        chest: { wooden: 26, iron: 66, gold: 8 },
+        gear: { common: 40, rare: 52, epic: 8 },
+    },
+    rich: {
+        gold: [700, 1700], parts: [2, 4], partTier: 3, doubloons: [10, 22], stack: [3, 6], tokens: [1, 2],
+        chest: { iron: 22, gold: 70, mythic: 8 },
+        gear: { common: 12, rare: 58, epic: 27, legendary: 3 },
+    },
+    lavish: {
+        gold: [0, 0], parts: [3, 6], partTier: 4, doubloons: [16, 34], stack: [4, 8], tokens: [1, 3],
+        chest: { gold: 26, mythic: 74 },
+        gear: { rare: 30, epic: 46, legendary: 21, mythic: 3 },
+    },
 };
 
 const pick = (weights, roll) => {
@@ -139,18 +188,25 @@ export function rollHaul(dollars, rng = Math.random) {
         if (kind === "gold") out.push({ kind, n: between(sz.gold, rng()) });
         else if (kind === "doubloons") out.push({ kind, n: between(sz.doubloons, rng()) });
         else if (kind === "parts") out.push({ kind, n: between(sz.parts, rng()), tier: sz.partTier });
-        else if (kind === "chest") out.push({ kind, tier: sz.chest });
-        else if (kind === "gear") out.push({ kind, rarity: sz.gear });
+        else if (kind === "chest") out.push({ kind, tier: pick(sz.chest, rng()), n: 1 });
+        else if (kind === "gear") out.push({ kind, rarity: pick(sz.gear, rng()) });
+        else if (kind === "token") out.push({ kind, n: between(sz.tokens, rng()) });
+        else if (kind === "recipe") out.push({ kind, band: `patron_${band}` });
         else out.push({ kind, n: between(sz.stack, rng()) });   // seed | crop
     }
     // ⚠️ MERGED, BECAUSE ELEVEN ROLLS IS ELEVEN LINES AND NOBODY READS ELEVEN LINES. Coin and doubloons add
     // into one line each — they are one pile in the purse either way — while every named thing (a chest, a
     // seed, a piece of gear) stays its own line, because the name IS the reward. Same rule the raid-defence
     // report follows.
+    // ⚠️ CHESTS OF THE SAME TIER MERGE TOO, and that is new. "Multiple chests" as three identical rows reads
+    // as a bug; one card saying x3 reads as a haul. Creations merge for the same reason — they are a count of
+    // one fungible thing. A recipe and a piece of gear never merge: the NAME is the reward.
     const merged = [];
     for (const x of out) {
         const at = merged.find((m) => m.kind === x.kind && (x.kind === "gold" || x.kind === "doubloons"
-            || (x.kind === "parts" && m.tier === x.tier)));
+            || x.kind === "token"
+            || (x.kind === "parts" && m.tier === x.tier)
+            || (x.kind === "chest" && m.tier === x.tier)));
         if (at) at.n += x.n; else merged.push({ ...x });
     }
     return { band, rolls: n, hand: merged };

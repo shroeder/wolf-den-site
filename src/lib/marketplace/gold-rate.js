@@ -64,6 +64,12 @@ const MINT_REASONS = new Set([
     "ship_battle", "raid_complete", "town_duel", "boss_reward",
     // -- collection and progression --
     "badge_reward", "badge_milestone", "loot_pig", "chest_reward", "pet_income",
+    // ⚠️ "patronage" IS THE COUNTER'S HAUL, AND IT WAS MISSING. patronage-store.js has always carried the
+    // comment "THROUGH mint(), like every other faucet" beside the grant — and because the reason was not in
+    // this set, mint() handed the number straight back and the haul paid full rate. A faucet the one lever
+    // cannot see is exactly what this file exists to prevent. The haul's gold ranges were raised to match, so
+    // what a member receives is roughly unchanged; what changed is that it now moves when the rate does.
+    "patronage",
     // -- guided play --
     "guide_step", "guide_chapter", "onboarding", "merchant_minigame",
 ]);
