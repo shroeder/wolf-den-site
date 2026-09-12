@@ -1093,6 +1093,11 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
     // that case anyway, and this stays keyed to it rather than to "the fight ended".
     const sinkingSide = phase === "sinking" || phase === "result" ? battle?.sunk : null;
     const win = Boolean(battle?.win);
+    // The captain is a spoil with a clock and an errand, so he comes out of the list and gets his own card.
+    // Pulled apart HERE rather than filtered twice in the markup: drawn in both places is the other half of
+    // the bug this fixes, and it is the easy one to reintroduce.
+    const captain = (battle?.reward || []).find((r) => r?.kind === "captain")?.offer || null;
+    const spoils = (battle?.reward || []).filter((r) => r?.kind !== "captain");
     // A new exchange raises the recap; four and a half seconds later it lowers itself. Keyed on the round so
     // re-rendering for any other reason cannot restart the timer, and so the Recap button's manual open is
     // not yanked shut underneath the player.
@@ -1406,6 +1411,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                             off their carriages and her hull whole — see struckColours in ship-battle.js — and
                             calling that "Sunk!" over a ship still floating is the screen contradicting the
                             thing the player just spent six rounds doing on purpose. */}
+                        {/* The captain is lifted OUT of the spoils list so it cannot be drawn twice. */}
                         <div className={`sbt-result-banner ${win ? "is-win" : "is-lose"}`}>
                             {win
                                 ? (battle?.struck ? "She strikes!" : battle?.sunk === "foe" ? "Sunk!" : "Victory")
@@ -1420,9 +1426,33 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                                         : <>{foe.name} put you under after {battle?.round} round{battle?.round === 1 ? "" : "s"}.</>)
                                     : <>Not a gun left standing on either deck after {battle?.round} round{battle?.round === 1 ? "" : "s"} — {win ? "you were the healthier ship" : `${foe.name} was the healthier ship`}.</>}
                         </p>
-                        {battle?.reward?.length ? (
+                        {/* ── HER CAPTAIN, AND WHAT TO DO ABOUT HIM ───────────────────────────────────
+                            ⚠️ THIS WAS A ROW IN THE SPOILS LIST READING "Captain". finishFleetBattle has
+                            always pushed { kind: "captain", offer } into the payout, and nothing here had a
+                            case for it — so it fell through rewardName's default, which prints the KIND, and
+                            came out as one unlabelled word with an empty art box and no number beside it.
+                            Luke: "I defeated the ship and didn't get the interrogation." He did get it. The
+                            row was written, he was standing on the deck, and the screen never said so.
+                            It is a card and not a chip because it is the only spoil with a CLOCK on it —
+                            thirty minutes and he is gone — and the only one that asks you to go somewhere. */}
+                        {captain ? (
+                            <div className="sbt-captain">
+                                {captain.art ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img className="sbt-captain-art" src={captain.art} alt="" draggable="false" />
+                                ) : null}
+                                <div className="sbt-captain-body">
+                                    <b>{captain.name} is on your deck</b>
+                                    <span className="sbt-captain-stars">{"★".repeat(Math.max(1, captain.stars || 1))}</span>
+                                    <em>Master of {captain.ship}. He knows where something is, and he will not say.</em>
+                                    <i>Take him below within 30 minutes — {Number(captain.cost || 0).toLocaleString()} doubloons — or he goes over the side.</i>
+                                </div>
+                                <a className="sail-cta sbt-captain-go" href="/marketplace/sailing?station=guns">To the brig</a>
+                            </div>
+                        ) : null}
+                        {spoils.length ? (
                             <div className="sbt-rewards">
-                                {battle.reward.map((r, i) => {
+                                {spoils.map((r, i) => {
                                     const art = rewardArt(r);
                                     const amount = rewardAmount(r);
                                     return (
