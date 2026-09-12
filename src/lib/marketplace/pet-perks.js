@@ -603,11 +603,27 @@ export function petPerkAt(pet, level) {
     if (!pet) return null;
     const perk = petPerk(pet);
     const mult = petActiveLevelMult(level);
-    const raw = (Number(perk.value) || 0) * mult;
-    const capped = PROC_CAP[perk.key] != null
-        ? Math.min(PROC_CAP[perk.key], raw)
-        : capSystemPerk(perk.key, raw);
     const at = Math.max(1, Number(level) || 1);
+    const hi = PROC_CAP[perk.key];
+    // ⚠️ NOT EVERY PERK VALUE IS A NUMBER, AND THIS ASSUMED THEY ALL WERE. `erupt` is authored as
+    // { chance, mult } — the chance grows with the pet's level and the multiplier does not — so multiplying
+    // the whole object by a level factor produced Number({...}) = NaN, the `|| 0` quietly turned that into 0,
+    // and perkDesc then read .chance and .mult off the number zero. Every pet carrying it printed
+    // "NaN% chance your strike erupts for ×undefined" on its card, on its owner's public profile and in the
+    // level-up banner. GrayKitsune, on the Jellyfish.
+    //
+    // ascensionEffectView twenty lines below already knew this — "Erupt is the one perk whose value is an
+    // object" — and scaled the CHANCE alone. This is the same rule, in the other place that needed it.
+    // `scaled` stays a NUMBER because two callers do arithmetic on it; for a proc that number is the chance.
+    if (perk.value && typeof perk.value === "object") {
+        const chance = Math.min(hi ?? Infinity, (Number(perk.value.chance) || 0) * mult);
+        return {
+            ...perk, level: at, scaled: Math.round(chance * 1000) / 1000,
+            desc: perkDesc(perk.key, { ...perk.value, chance }, at),
+        };
+    }
+    const raw = (Number(perk.value) || 0) * mult;
+    const capped = hi != null ? Math.min(hi, raw) : capSystemPerk(perk.key, raw);
     // ⚠️ AND THE SENTENCE HAS TO MOVE WITH THE NUMBER. `perk.desc` is built by petPerk() at the pet's BASE
     // value, so a card showing it at Lv5 printed the Lv1 wording — beside a label that reads "grows as it
     // levels". Harmless-looking on a percentage and outright wrong on an ability counted in whole units: the

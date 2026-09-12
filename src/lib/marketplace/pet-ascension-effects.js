@@ -24,6 +24,13 @@
 //
 //   AMPLIFY  the pet's own ability, at `mult`. What Dark used to be, except the number is chosen per pet
 //            against that ability's own ceiling rather than being 1.5 across the board.
+//
+//            ⚠️ AND AN AMPLIFY ONLY WORKS IF THE ABILITY HAS HEADROOM AT THE ENSHRINED LEVEL. An enshrined
+//            pet is applied at PET_ENSHRINED_LEVEL, which multiplies by 3.5 before the cap — so an ability
+//            that already reaches its ceiling at x1 pays exactly the same at x2, and the stone changes no
+//            number in the game. Nine shipped like that, two of them ascendant. The header above says this
+//            file was written because "on five ability keys Dark did nothing whatsoever"; it is the same
+//            fault and it grew back, because nothing was checking. scripts/pet-stone-check.mjs checks.
 //   GRAFT    a SECOND ability, `key`, at `scale` of its natural value for that pet's rarity. This is where the
 //            character comes from: a fox that learns to raid chests, an owl that keeps watch after closing, a
 //            crocodile that learns to finish. Grafted abilities are rarity-scaled and capped exactly like a
@@ -51,13 +58,13 @@ export const ASCENSION_EFFECTS = {
         light: { name: "Breaks Its Own Ore", kind: "graft", key: "forge_salvage", scale: 0.9,
             note: "It got bored waiting for somebody else to bring the pile in." },
         // Its floor at the rock face, higher. 12 -> 36 at Lv5 and this carries it to the 38 ceiling.
-        dark: { name: "Takes The Better Half", kind: "amplify", mult: 1.6 },
+        dark: { name: "Takes The Better Half", kind: "graft", key: "chest_luck", scale: 1, note: "A dragon knows which box is the one." },
     },
     lodestar: {
         // A moth at the brightest room in the Den, taught to haggle everywhere else in it too.
         light: { name: "Owed Everywhere", kind: "graft", key: "town_haggle", scale: 0.9,
             note: "It turns out the favour was never only good on the floor." },
-        dark: { name: "The House Insists", kind: "amplify", mult: 2 },
+        dark: { name: "The House Insists", kind: "graft", key: "town_rally", scale: 1 },
     },
     ammonite: {
         // ⚠️ NO AMPLIFY HERE, AND NOT FOR BALANCE. `neverturns` is counted in whole raids (/25 at the
@@ -185,7 +192,7 @@ export const ASCENSION_EFFECTS = {
     },
     cellar_jay: {
         light: { name: "Magpie's Habit", kind: "graft", key: "chest_luck", scale: 0.85 },
-        dark: { name: "Brightest on the Table", kind: "amplify", mult: 2.2 },
+        dark: { name: "Brightest on the Table", kind: "graft", key: "town_haggle", scale: 0.9 },
     },
     pit_marten: {
         light: { name: "Every Way Out", kind: "graft", key: "second_wind", scale: 1 },
@@ -197,7 +204,7 @@ export const ASCENSION_EFFECTS = {
     },
     seahorse: {
         light: { name: "Combs the Shallows", kind: "graft", key: "sea_dredge", scale: 0.8 },
-        dark: { name: "Knows Every Reef", kind: "amplify", mult: 2.2, note: "It has not left this stretch of water in its life." },
+        dark: { name: "Knows Every Reef", kind: "graft", key: "following_sea", scale: 0.9, note: "It has not left this stretch of water in its life. It knows which way it is going." },
     },
     eagle: {
         light: { name: "Talons Down", kind: "graft", key: "angler_size", scale: 0.9, note: "It fishes, and it does not miss." },
@@ -283,7 +290,7 @@ export const ASCENSION_EFFECTS = {
     },
     monkey: {
         light: { name: "Quick Hands", kind: "graft", key: "kitchen_prep", scale: 1 },
-        dark: { name: "Fire Handled", kind: "amplify", mult: 2 },
+        dark: { name: "Fire Handled", kind: "graft", key: "kitchen_portion", scale: 0.9, note: "It has worked out that the pan comes off the heat too early." },
     },
     panda: {
         light: { name: "Eats and Grows", kind: "graft", key: "farm_speed", scale: 0.9 },
@@ -393,7 +400,7 @@ export const ASCENSION_EFFECTS = {
     },
     anglerfish: {
         light: { name: "The Light Draws Deeper", kind: "graft", key: "sea_dredge", scale: 0.9 },
-        dark: { name: "Luring Light", kind: "amplify", mult: 2.2 },
+        dark: { name: "Luring Light", kind: "graft", key: "angler_size", scale: 0.9, note: "Whatever came for the light was bigger than the light." },
     },
     sea_wyrm: {
         light: { name: "The Trench Gives Up Its Gold", kind: "graft", key: "sea_plunder", scale: 0.9 },
@@ -407,7 +414,7 @@ export const ASCENSION_EFFECTS = {
     },
     minotaur: {
         light: { name: "Through the Wall", kind: "graft", key: "might", scale: 1 },
-        dark: { name: "The Charge", kind: "amplify", mult: 2 },
+        dark: { name: "The Charge", kind: "graft", key: "first_hit", scale: 0.85, note: "There is only one of these in it, and it is the first one." },
     },
     centaur: {
         light: { name: "Nocks a Second", kind: "graft", key: "chain_strike", scale: 0.8 },
@@ -452,8 +459,12 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "The Pack Remembers", kind: "graft", key: "might", scale: 1, note: "It has been running this ground longer than the ground has had a name." },
     },
     bounty_hound: {
+        // ⚠️ BOTH STONES USED TO GRAFT gold_find, AT 1.0 AND 0.9 — so the Darkstone on a legendary pet was a
+        // strictly weaker copy of the Lightstone and there was no decision to make. Same class of fault Eric D
+        // raised about the counter pets; found by sweeping every pet for a pair whose two stones move the same
+        // number. The hound still gets paid; it now also finishes the job.
         light: { name: "Runs the Scent Down", kind: "graft", key: "gold_find", scale: 1 },
-        dark: { name: "Paid on Delivery", kind: "graft", key: "gold_find", scale: 0.9, note: "It has never once lost a scent, or a fee." },
+        dark: { name: "Paid on Delivery", kind: "graft", key: "execute", scale: 0.9, note: "It has never once lost a scent, or a fee." },
     },
 
     // ── THE PASTORAL PETS ────────────────────────────────────────────────────────────────────────────────────
@@ -541,7 +552,7 @@ export const ASCENSION_EFFECTS = {
     },
     hearth_cat: {
         light: { name: "Sleeps on the Stores", kind: "graft", key: "kitchen_larder", scale: 1 },
-        dark: { name: "Banked Embers", kind: "amplify", mult: 2.2 },
+        dark: { name: "Banked Embers", kind: "graft", key: "forge_spark", scale: 0.9, note: "It keeps a hearth alive overnight. A forge is only a bigger hearth." },
     },
     spice_moth: {
         light: { name: "Found the Recipe", kind: "graft", key: "recipe_nose", scale: 1, note: "Portion is capped where it stands — the Darkstone takes a different road." },
@@ -607,6 +618,67 @@ export const ASCENSION_EFFECTS = {
     bosun_shade: {
         light: { name: "All Hands", kind: "graft", key: "town_rally", scale: 0.9, note: "The whistle still carries, whoever is left to hear it." },
         dark: { name: "The Bosun's Due", kind: "amplify", mult: 1.8, note: "Ascendant, and it collects." },
+    },
+
+    // ── THE COUNTER LADDER AND THE ROAD ──────────────────────────────────────────────────────────────────────
+    // ⚠️ THESE SEVEN HAD NOTHING AUTHORED AND FELL THROUGH TO FALLBACK_EFFECT, which is light: amplify x1 and
+    // dark: amplify x1.5 — a Lightstone that does LITERALLY NOTHING and a Darkstone that is the same ability
+    // slightly bigger. On the Doorward's Moth the two stones printed the identical sentence, because chest_luck
+    // is already at its ceiling before either stone is spent: an eternal pet whose irreversible choice was
+    // between a no-op and a no-op.
+    //
+    // Eric D found it from the outside: "the new pets that have come out in the last few weeks ... the
+    // abilities are the exact same with the darkstone usually being the more powerful." He is describing the
+    // fallback exactly. Authored now, on the same rules as the other 123 — and there is a sweep in
+    // scripts/pet-stone-check.mjs so the next pet added cannot ship with a stone that does nothing.
+    copper_stag: {
+        // Recognised at the counter, and the recognition is worth something at every other till too.
+        light: { name: "Known At The Till", kind: "graft", key: "gold_find", scale: 0.9,
+            note: "Nobody decided to start rounding in your favour. It simply happens now." },
+        dark: { name: "Knows Your Face By Now", kind: "amplify", mult: 2.2 },
+    },
+    ledger_lynx: {
+        // It keeps a tally of everything carried out of the shop, so it knows what is in the boxes.
+        light: { name: "Reads The Manifest", kind: "graft", key: "chest_luck", scale: 0.9,
+            note: "It has seen what was in the last four hundred of these." },
+        dark: { name: "The Whole Tally", kind: "amplify", mult: 2 },
+    },
+    silver_ram: {
+        // A ram is an opener. onslaught pays while the thing in front of you is still fresh.
+        light: { name: "Lowers Them Early", kind: "graft", key: "onslaught", scale: 0.9 },
+        dark: { name: "Straight Through The Gate", kind: "amplify", mult: 2,
+            note: "Horns like a closed account, and accounts get settled." },
+    },
+    vault_sabrecat: {
+        // ⚠️ A SMALL AMPLIFY, AND DELIBERATELY. hoarder caps at 38 and a legendary is already at 28 before a
+        // stone is spent, so anything above x1.4 lands on the ceiling and is shaved off silently — the exact
+        // failure the header of this file describes. x1.4 takes the mine floor to the cap and no further.
+        light: { name: "Nothing Leaves The Room", kind: "graft", key: "gold_find", scale: 1 },
+        dark: { name: "Sleeps Heavier", kind: "amplify", mult: 1.4,
+            note: "It has not moved off the strongbox in nine years. It is not going to start." },
+    },
+    den_warden: {
+        // The ram opens and the wolf closes — the two ferocity pets on the ladder, pointed at opposite ends of
+        // the same fight so owning both is worth something.
+        light: { name: "Sees It Out", kind: "graft", key: "execute", scale: 0.9 },
+        dark: { name: "The House Answers", kind: "amplify", mult: 2.2,
+            note: "There is exactly one way to be introduced, and you have been." },
+    },
+    road_cur: {
+        light: { name: "Brings Things Back", kind: "graft", key: "gold_find", scale: 1,
+            note: "You did not ask for any of it and it is on the step anyway." },
+        // onslaught caps at 1.2 and a mythic sits at 0.65, so x1.8 lands just under the ceiling.
+        dark: { name: "Nine Rungs And Counting", kind: "graft", key: "chain_strike", scale: 0.9, note: "It has not stopped and it is not going to." },
+    },
+    gate_moth: {
+        // ⚠️ TWO GRAFTS, NO AMPLIFY — the Ammonite's rule, for the same reason. chest_luck caps at 20 and an
+        // eternal pet is AT that cap with no stone at all, so every amplify from x1 upward is the same number
+        // and the Darkstone was provably worthless. A moth at a door has been in every room behind it, and a
+        // moth goes to the flame.
+        light: { name: "Been In Every Room", kind: "graft", key: "recipe_nose", scale: 1,
+            note: "Including the ones with the books in." },
+        dark: { name: "Straight To The Flame", kind: "graft", key: "forge_spark", scale: 1,
+            note: "It was on the other side. It knows what the light is for." },
     },
 };
 

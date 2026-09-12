@@ -166,6 +166,15 @@ async function editTo(srcBuf, form, species = "") {
         + `IF THIS ANIMAL HAS NO HORNS, CLAWS, FANGS, BEAK, MANE, LEGS OR FEET, simply SKIP those parts of the `
         + `instruction — apply the effect to the body parts it actually has (tentacles, fins, shell, wings, `
         + `petals) and DO NOT invent limbs, claws or a predatory stance it never had. `
+        // ⚠️ AND SAID AGAIN AS A FLAT PROHIBITION, BECAUSE THE CONDITIONAL ABOVE WAS NOT ENOUGH. GrayKitsune:
+        // "Anglerfish lightstone has feet for some reason." It did — two clawed feet, standing on them — and
+        // so did the Deep Angler, from the same prompt. A sentence beginning "IF THIS ANIMAL HAS NO..." is an
+        // instruction the model gets to decide does not apply; a sentence beginning "NEVER" is not. Same fault
+        // ValkyrieSylve found on the Dolphin's Lightstone a week earlier, which was patched one sprite at a
+        // time rather than in the prompt that draws all 260.
+        + `NEVER add legs, feet, paws, hooves, toes or claws to an animal that does not have them in the `
+        + `reference image, and NEVER stand a swimming animal upright on the ground. A fish keeps its fins and `
+        + `stays a fish. `
         + `${KEEP_PALETTE} ${IDENTITY} ${NO_AURA} `
         + `Keep the same right-facing three-quarter full-body pose as the reference. ${HOUSE}`;
     const body = new FormData();
