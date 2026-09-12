@@ -1544,7 +1544,19 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         //
         // `startedHere` is set when THIS client presses Challenge and spent on the bout that follows, so the
         // answer no longer depends on render order.
-        const openAtEnd = !startedHere.current && logAll.length > 0;
+        // ⚠️ AND A FIGHT ON ITS FIRST ROUND WAS NEVER LEFT. `startedHere` is set when THIS client presses
+        // Challenge — which is the right signal for the arena and the only signal there was. Every other
+        // door into a fight sets nothing: a marine encounter off the water is spawned by the fishing screen,
+        // so its very first payload arrives with an opening line, no `startedHere`, and the screen announces
+        // "Picking up the fight you left — round 1, and your health is where you left it" over a creature
+        // that surfaced two seconds ago.
+        //
+        // SunflowerJinxx: "Marine encounters (glass eel cluster/crab) are giving me the message as if I've
+        // left and come back to the fight turn 1." Guarded on the round instead of only on who opened the
+        // door, because the round is the thing that is actually being claimed — a bout that has not resolved
+        // a round has nothing behind it to pick up, whichever screen started it.
+        const beatNow = Number(bout?.beat) || 1;
+        const openAtEnd = !startedHere.current && logAll.length > 0 && beatNow > 1;
         startedHere.current = false;
         setShown(openAtEnd ? logAll.length : 0);
         // ── AND SAY SO, BECAUSE OTHERWISE IT READS AS A BROKEN FIGHT ─────────────────────────────────

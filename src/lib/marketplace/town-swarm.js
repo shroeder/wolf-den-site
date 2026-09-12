@@ -487,19 +487,31 @@ export async function engageEnemy(buyerId, enemyId) {
     // redirected so the screen can pan to the foe it actually got. Same wave, because a wave has to be
     // cleared before the next arrives.
     const cur = await db.queryOne(
-        `SELECT event_id, wave, died_at IS NOT NULL AS dead FROM mkt_town_enemy WHERE id = $1`,
+        `SELECT event_id, wave, slot, died_at IS NOT NULL AS dead FROM mkt_town_enemy WHERE id = $1`,
         [Number(enemyId)],
     ).catch(() => null);
     if (cur) {
+        // ── AND IT HANDS YOU THE NEAREST ONE, NOT THE FIRST ONE ──────────────────────────────────────────
+        // ⚠️ THIS WAS `ORDER BY slot LIMIT 1` — the lowest slot in the whole wave, which is a fixed corner of
+        // the plaza and almost never anywhere near the foe you tapped. The diagnosis was already written down
+        // in town-events.js when the damage half of this was fixed, quoting the report: "It's still giving me
+        // a different mob than what I click on multiple times a raid. I killed 83 this time and I'd say about
+        // 15 times it was not what I clicked on, nor was it one near by." The ORDER BY was never changed, so
+        // the blow started landing on the right body and the body was still across the square.
+        //
+        // SunflowerJinxx screen-recorded it: "I finally remembered to screen record the raid in town to show
+        // it changing mobs during." Nearest free slot now, so a redirect is the bandit beside the one you
+        // meant — which reads as a crowd rather than as the game picking somebody else's fight for you.
         const other = await db.queryOne(
             `UPDATE mkt_town_enemy SET engaged_by = $3, engaged_at = NOW()
               WHERE id = (
                 SELECT id FROM mkt_town_enemy
                  WHERE event_id = $1 AND wave = $2 AND died_at IS NULL AND engaged_by IS NULL
-                 ORDER BY slot LIMIT 1
+                 ORDER BY ABS(COALESCE(slot, 0) - $4), slot
+                 LIMIT 1
                  FOR UPDATE SKIP LOCKED
               ) RETURNING id, kind, hp, hp_max`,
-            [cur.event_id, cur.wave, buyerId],
+            [cur.event_id, cur.wave, buyerId, Number(cur.slot) || 0],
         ).catch(() => null);
         if (other) {
             return { ok: true, redirected: true, enemyId: Number(other.id), kind: other.kind,

@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { GOLD_MINT_RATE } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { addChests, surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
@@ -121,6 +122,22 @@ const shuffled = (a) => { const c = [...a]; for (let i = c.length - 1; i > 0; i 
 // VARIANTS, not one offer per kind — otherwise one run teaches you every floor of this type forever.
 function buildOffer(run, d, ev) {
     const g = (mult) => Math.round(((d.goldPer[0] + d.goldPer[1]) / 2) * mult);
+    // ── AND A PRICE IS NOT PAID IN THE SAME COIN A PRIZE IS ──────────────────────────────────────────────
+    // ⚠️ EVERY PRICED OFFER DOWN HERE WAS A LOSS. A merchant's cost comes straight out of the member's real
+    // balance at face value (see the UPDATE in resolveOption), while every gold a floor pays goes into the
+    // run's purse and through mint(gold, "delve") on the way out — so the payout is worth GOLD_MINT_RATE of
+    // its printed number and the price is worth all of its own. The cloth costs g(4) and its gold branch
+    // pays g(5), which is 4 units out and 2 units back.
+    //
+    // GrayKitsune: "theres sometimes a 'buy whatever is under the cloth' costing like 270 gold and gives you
+    // 320 in return according to the screen, but you dont even get that for the whole run because of the gold
+    // reduction in rewards. So you are paying gold to get less gold in return now with that specific dungeon
+    // room." He is right, and it was not that room — it was all eleven of them.
+    //
+    // Quoted AND charged in the same units the prize is paid in, so the ratios the offers were designed
+    // around survive the mint rate wherever it is set. One helper, because the number on the button and the
+    // number taken out of the purse are the same number. See [[gold-mint-rate-lever]].
+    const price = (n) => Math.max(1, Math.round(n * GOLD_MINT_RATE));
     const x = (mult) => Math.round(((d.xpPer[0] + d.xpPer[1]) / 2) * mult);
     const big = d.minLevel >= 30 ? "gold" : "iron";
     const small = d.minLevel >= 30 ? "iron" : "wooden";
@@ -130,12 +147,12 @@ function buildOffer(run, d, ev) {
         [KIND.merchant]: [
             {
                 options: [
-                    { key: "flask", label: "Buy the flask he swears by", cost: g(2), roll: [
+                    { key: "flask", label: "Buy the flask he swears by", cost: price(g(2)), roll: [
                         O(58, { potion: 1 }, "It is what he said it was."),
                         O(22, { potion: 2 }, "He throws in a second one. He is in a mood."),
                         O(20, { xp: x(1) }, "Coloured water. You learn something about him, at least."),
                     ] },
-                    { key: "cloth", label: "Buy whatever is under the cloth", cost: g(4), roll: [
+                    { key: "cloth", label: "Buy whatever is under the cloth", cost: price(g(4)), roll: [
                         O(40, { chest: big, xp: x(2) }, "He would not look at you while he took the money. Now you know why."),
                         O(32, { gold: g(5) }, "Someone else's takings, and he was glad to be rid of them."),
                         O(28, { xp: x(2) }, "A dead man's journal. Interesting. Not valuable."),
@@ -148,12 +165,12 @@ function buildOffer(run, d, ev) {
             },
             {
                 options: [
-                    { key: "two", label: "Take both flasks — cheaper together", cost: g(3.4), roll: [
+                    { key: "two", label: "Take both flasks — cheaper together", cost: price(g(3.4)), roll: [
                         O(70, { potion: 2 }, "Two, as agreed."),
                         O(18, { potion: 3 }, "He miscounts in your favour and does not correct it."),
                         O(12, { potion: 1, gold: g(1) }, "One is cracked. He gives some of it back."),
                     ] },
-                    { key: "map", label: "Buy the torn map page", cost: g(2), roll: [
+                    { key: "map", label: "Buy the torn map page", cost: price(g(2)), roll: [
                         O(45, { gold: g(5) }, "It marks a cache two floors back. It was still there."),
                         O(33, { xp: x(3) }, "Half a map is still half a map."),
                         O(22, {}, "It is a map of somewhere else entirely."),
@@ -168,7 +185,7 @@ function buildOffer(run, d, ev) {
                         O(28, { chest: small, potion: 1 }, "He decides you have earned more than you asked for."),
                         O(22, { potion: 1 }, "He takes rather more than he gives."),
                     ] },
-                    { key: "gold", label: "Insist on paying in coin", cost: g(5), roll: [
+                    { key: "gold", label: "Insist on paying in coin", cost: price(g(5)), roll: [
                         O(75, { potion: 2, xp: x(1) }, "He is disappointed, but he trades."),
                         O(25, { potion: 2, gold: g(1) }, "He haggles himself down out of habit."),
                     ] },
@@ -177,12 +194,12 @@ function buildOffer(run, d, ev) {
             },
             {
                 options: [
-                    { key: "box", label: "Buy the sealed box", cost: g(3), roll: [
+                    { key: "box", label: "Buy the sealed box", cost: price(g(3)), roll: [
                         O(30, { chest: big, xp: x(2) }, "Whatever is in here, he did not know."),
                         O(28, { gold: g(4) }, "Coin, in a box, sold to you for less than the coin."),
                         O(42, { xp: x(1) }, "Sand and a note that says SORRY."),
                     ] },
-                    { key: "flask", label: "Buy a flask instead", cost: g(2), roll: [
+                    { key: "flask", label: "Buy a flask instead", cost: price(g(2)), roll: [
                         O(80, { potion: 1 }, "Straightforward, for once."),
                         O(20, { potion: 2 }, "He is trying to make up for the box."),
                     ] },
@@ -194,7 +211,7 @@ function buildOffer(run, d, ev) {
         [KIND.well]: [
             {
                 options: [
-                    { key: "toss", label: "Toss a coin in and listen", cost: g(1), roll: [
+                    { key: "toss", label: "Toss a coin in and listen", cost: price(g(1)), roll: [
                         O(45, { gold: g(4), xp: x(1) }, "Something down there throws four back."),
                         O(25, { xp: x(2) }, "No splash. You think about that for a while."),
                         O(30, {}, "A splash. That is all."),
@@ -227,7 +244,7 @@ function buildOffer(run, d, ev) {
             },
             {
                 options: [
-                    { key: "wish", label: "Make a wish and pay for it", cost: g(2), roll: [
+                    { key: "wish", label: "Make a wish and pay for it", cost: price(g(2)), roll: [
                         O(40, { potion: 2 }, "Two full flasks come up on the rope. Nobody put them there."),
                         O(28, { heal: 0.3 }, "Nothing comes up. You feel better anyway."),
                         O(32, { damage: 0.1 }, "Something answers, and you wish it had not."),
@@ -264,7 +281,7 @@ function buildOffer(run, d, ev) {
                         O(34, { gold: g(3), xp: x(3) }, "It takes what you offered and settles up fairly."),
                         O(22, { potion: 2 }, "Two flasks are sitting in the basin when you look up."),
                     ] },
-                    { key: "coin", label: "Leave a coin on the step instead", cost: g(2), roll: [
+                    { key: "coin", label: "Leave a coin on the step instead", cost: price(g(2)), roll: [
                         O(62, { heal: 0.25 }, "Accepted, apparently."),
                         O(38, { xp: x(2) }, "The coin is gone. Nothing else is different."),
                     ] },
@@ -355,7 +372,7 @@ function buildOffer(run, d, ev) {
                         O(28, { potion: 1, gold: g(4) }, "One flask and a great deal of coin."),
                         O(27, { xp: x(2) }, "It keeps the flask. You keep the lesson."),
                     ] },
-                    { key: "buy", label: "Pay it in coin instead", cost: g(2), roll: [
+                    { key: "buy", label: "Pay it in coin instead", cost: price(g(2)), roll: [
                         O(72, { potion: 1 }, "A flask drops into the tray."),
                         O(28, { potion: 1, xp: x(1) }, "A flask, and the mechanism shows you how it works."),
                     ] },

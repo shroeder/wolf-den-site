@@ -179,14 +179,28 @@ export { DRAGON_PATHS };
 export function dragonFor(card, drawn, rng = Math.random, { force = false } = {}) {
     if (!force && rng() >= DRAGON_CHANCE) return null;
     const hits = new Set(drawn);
-    const path = DRAGON_PATHS[Math.floor(rng() * DRAGON_PATHS.length)];
-    const burnt = path.cells.filter((at) => {
+    // Never the free centre (it is already yours) and never a ball that already came out — a dragon that
+    // lands on a square you had has given you nothing.
+    const burnable = (path) => path.cells.filter((at) => {
         const n = card[Math.floor(at / 5)][at % 5];
-        // Never the free centre (it is already yours) and never a ball that already came out — a dragon that
-        // lands on a square you had has given you nothing, and it would do that half the time.
         return n !== 0 && !hits.has(n);
     });
-    return { kind: path.kind, i: path.i, cells: path.cells, burnt };
+    // ── AND IT FLIES DOWN A LINE IT CAN ACTUALLY SET ALIGHT ──────────────────────────────────────────────
+    // ⚠️ THE CELLS WERE FILTERED AND THE PATH WAS NOT. The line above has excluded already-daubed squares
+    // since the day it was written, and the comment beside it says why — but the path itself was picked
+    // blind, so a dragon could pick a line that was already complete, fly the whole animation and burn
+    // nothing at all. From the seat it is indistinguishable from the feature being broken.
+    //
+    // SunflowerJinxx: "I've had multiple times now where the dragon burn is triggered on bingo, but it only
+    // goes over an already filled line ... The dragon hasn't given a single new square in 2 days now for me,
+    // just traces a completed line." She was half-talked out of it in the channel and she was right.
+    //
+    // It chooses among the paths that have something left on them, and only falls back to a blind pick when
+    // the card is so full that no path does — at which point there is nothing to award anyway.
+    const live = DRAGON_PATHS.filter((p) => burnable(p).length > 0);
+    const pool = live.length ? live : DRAGON_PATHS;
+    const path = pool[Math.floor(rng() * pool.length)];
+    return { kind: path.kind, i: path.i, cells: path.cells, burnt: burnable(path) };
 }
 
 /** The cell indices a pass actually set alight. Null-safe, so callers can pass a dragon that never came. */
@@ -281,7 +295,12 @@ export const cornersOf = (card, drawn, burnt = []) => {
 //
 // ONE DIAL, and reversing it is one number: set BINGO_PAY to 1 and bingo is exactly what it was this
 // morning. Re-measure with `node --import ./scripts/lib/register-loader.mjs scripts/casino-sim.mjs`.
-export const BINGO_PAY = 0.86;
+// ⚠️ 0.86 -> 0.82, AND IT IS THE DRAGON'S FAULT RATHER THAN THE TABLE'S. Fixing the dragon so it always
+// flies down a line it can actually burn (see dragonFor) moved the game from 124.8% to 131.0% on the same
+// 200,000 cards — six points, because a feature that did nothing to roughly half the cards it visited now
+// does something to all of them. That was never a payout anybody chose; it was the size of the bug. The dial
+// comes down to hold the game where it already sat, which is what the paragraph above says this dial is for.
+export const BINGO_PAY = 0.82;
 
 export const BINGO_PAYS = {
     // ⚠️ A WIN MUST NOT COST YOU MONEY. SunflowerJinxx: "A 100 chip bingo bet is paying less than the bet."
