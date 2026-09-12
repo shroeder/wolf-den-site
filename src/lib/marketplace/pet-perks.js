@@ -23,6 +23,23 @@ const FIRST_HIT_BY_RARITY = { common: 1.3, rare: 1.5, epic: 1.8, legendary: 2.2,
 //
 // These are new keys, so they get a base sized against their OWN ceiling rather than a generic one: low
 // enough that x3 at Lv5 lands just under the cap, so every single rung is worth something.
+// ── HAGGLING, ON ITS OWN CURVE AND A LOW ONE ─────────────────────────────────────────────────────────────────
+// ⚠️ THE CAP WAS A FLOOR, NOT A CEILING. town_haggle fell through PET_ACTIVE_BY_RARITY, and at the enshrined
+// level multiplier (x3.5) that curve produced 69.3 for the Lodestar, 56 for the Bandit King's Shade, 50.4 for
+// the Radiant Phoenix and 42 for the Merchant's Guard — against a cap of 30. Four of the five haggle stones in
+// the game blew through the ceiling on their own, so enshrining any of them landed on exactly the same number
+// and an ASCENDANT pet worth 69 raw paid precisely what a LEGENDARY worth 42 paid. That is the stone caps
+// erasing rarity, in the one place a member has already made an irreversible choice.
+//
+// Luke: "everything should give a lot less ... and thirty percent cap." The cap stays 30 and the curve comes
+// down under it, so 30 is something one combination approaches rather than the number everybody gets:
+//   enshrined (x3.5) at scale 0.9 → epic 11.0 · legendary 15.8 · mythic 22.1 · ascendant 28.4 · eternal 34.6
+// Only an eternal, and an ascendant at full scale, touch the ceiling at all. Every rung below it is now worth
+// a different amount, which is what the rarity was supposed to be buying.
+//
+// Its own curve rather than a scale tweak on the five stones, because the stones are authored per pet and a
+// sixth added tomorrow would arrive back at the old numbers. See SYSTEM_PERK_CAP.town_haggle.
+const HAGGLE_BY_RARITY = { common: 1.5, rare: 2.5, epic: 3.5, legendary: 5, mythic: 7, ascendant: 9, eternal: 11 };
 const HOARDER_BY_RARITY = { legendary: 8, mythic: 10, ascendant: 12, eternal: 14 };
 // ⚠️ SIZED AGAINST THE DISCOUNT THAT ALREADY EXISTS. The Counter has paid a trophy discount since the
 // casino pets shipped — 1.5% a pet, 0.5% a badge, hard-capped at 15% for the whole floor — and that file
@@ -408,6 +425,7 @@ export const PROC_CAP = {
 export function petPerkValue(rarity, key) {
     if (key === "extra_strike") return 1; // a pet grants EXACTLY one extra daily strike — never rarity/level-scaled
     if (key === "first_hit") return FIRST_HIT_BY_RARITY[rarity] || 1.5;
+    if (key === "town_haggle") return HAGGLE_BY_RARITY[rarity] || 3.5;
     if (key === "hoarder") return HOARDER_BY_RARITY[rarity] || 8;
     if (key === "housefavour") return HOUSEFAVOUR_BY_RARITY[rarity] || 5;
     if (key === "neverturns") return NEVERTURNS_BY_RARITY[rarity] || 25;
@@ -441,12 +459,41 @@ export function capSystemPerk(key, value) {
 // generated from one switch that is also used for ordinary equipped pets, where "while equipped" is correct.
 //
 // Rewritten at the end rather than case by case, so a clause added to a new perk tomorrow is covered too.
+// ── AND WHAT THE CEILING IS ──────────────────────────────────────────────────────────────────────────────────
+// Luke: "every cap should be shown ... ideally you show the cap whenever you show a stat."
+//
+// ⚠️ A CAPPED NUMBER WITH NO CEILING NEXT TO IT IS A LIE OF OMISSION, and this game has just proved it twice
+// over. Four of the five haggle stones paid 42-69 into a cap of 30, so the card said one thing and the engine
+// paid another, and nobody could see it — a member comparing an ascendant stone against a legendary one was
+// choosing between two numbers that were secretly identical. The same shape as the 203 stone cards that
+// understated the engine by 3.5x. Showing the cap is what makes a ladder legible: you can see the rung you
+// are on AND the top of it.
+//
+// Done HERE because every pet card, every owned-bonus line and the enshrining panel all come out of this one
+// function — a cap appended at a call site would be a cap on one screen.
+const CAP_SUFFIX = (key, v) => {
+    const cap = SYSTEM_PERK_CAP[key] ?? PROC_CAP[key];
+    if (cap == null) return "";
+    // ⚠️ THE UNITS ARE NOT ALL THE SAME AND first_hit IS THE ODD ONE. PROC_CAP holds chances (erupt 0.6,
+    // chain 0.6) and damage fractions (execute 1.2) which read as percentages, but first_hit is the
+    // MULTIPLIER itself — 2.5 means x2.5, and rendering it the same way would have printed "cap 250" under a
+    // line that says "deals x1.3 damage". A ceiling shown in the wrong unit is worse than no ceiling.
+    if (key === "first_hit") {
+        const at = Number(v) >= cap - 0.01;
+        return at ? ` · at the ×${cap} cap` : ` · cap ×${cap}`;
+    }
+    const shown = PROC_CAP[key] != null && SYSTEM_PERK_CAP[key] == null ? Math.round(cap * 100) : cap;
+    const at = Number(v) >= Number(shown) - 0.05;
+    return at ? ` · at the ${shown} cap` : ` · cap ${shown}`;
+};
+
 function perkDesc(key, v, level = 1, { enshrined = false } = {}) {
-    const line = perkDescRaw(key, v, level);
-    if (!enshrined || typeof line !== "string") return line;
-    return line
-        .replace(/while equipped/g, "whether it is out or not")
-        .replace(/at the equipped rate/g, "at the enshrined rate");
+    const raw = perkDescRaw(key, v, level);
+    if (typeof raw !== "string") return raw;
+    const line = enshrined
+        ? raw.replace(/while equipped/g, "whether it is out or not").replace(/at the equipped rate/g, "at the enshrined rate")
+        : raw;
+    return line + CAP_SUFFIX(key, v);
 }
 
 function perkDescRaw(key, v, level = 1) {
