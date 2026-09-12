@@ -57,6 +57,20 @@ const HULLS = {
     naval: ["boat-tier5-galleon", "boat-tier6-manowar"],
 };
 
+// ⚠️ THE FAR-RANGE READ HAS TO BE TRUE. It was the fixed string "three masts, square rigged" over whatever
+// hull had been drawn, so the glass could tell you three masts while showing you a one-masted boat. The
+// silhouette is the FIRST real information the telescope gives, and the whole point of the screen is that
+// what you can see is honest and merely incomplete — one line that contradicts the picture costs the other
+// four their credibility.
+const SILHOUETTE = {
+    "boat-tier1-wood": "a small open boat, one mast",
+    "boat-tier2-cutter": "a cutter, single mast",
+    "boat-tier3-brig": "two masts, square rigged",
+    "boat-tier4-schooner": "two masts, fore and aft",
+    "boat-tier5-galleon": "three masts, square rigged",
+    "boat-tier6-manowar": "three masts, and a row of gunports",
+};
+
 const FIRST = ["Marigold", "Bittern", "Quiet", "Saint", "Black", "Fair", "Widow's", "Iron", "Sparrow", "Long"];
 const SECOND = ["Wager", "Anne", "Errand", "Compass", "Lantern", "Tide", "Promise", "Reckoning", "Harrow", "Bell"];
 const RANKS = ["Cpt.", "Cpt.", "Cdr.", "Adm."];
@@ -75,12 +89,15 @@ export function spot(seed, index = 0) {
     const kind = KINDS[kindId];
     const infamy = between(n >>> 7, kind.infamy[0], kind.infamy[1]);
     const guns = between(n >>> 11, kind.guns[0], kind.guns[1]);
+    const hull = pick(HULLS[kindId], n >>> 5);
     return {
         id: `${seed}:${index}`,
         kind: kindId,
         label: kind.label,
         tone: kind.tone,
-        art: `/images/sailing/${pick(HULLS[kindId], n >>> 5)}.png`,
+        hull,
+        art: `/images/sailing/${hull}.png`,
+        silhouette: SILHOUETTE[hull] || "a sail, hull down",
         name: `The ${pick(FIRST, n >>> 13)} ${pick(SECOND, n >>> 17)}`,
         captain: `${pick(RANKS, infamy)} ${pick(SURNAMES, n >>> 19)}`,
         infamy,

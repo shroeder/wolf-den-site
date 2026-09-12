@@ -53,17 +53,16 @@ export default function HighSeasLab() {
         setLeg((n) => n + 1); setPhase("open"); setRange(0); setNote("");
     }, []);
 
+    // ⚠️ FUNCTIONAL UPDATE, OR A DOUBLE TAP IS ONE STEP. Reading `range` out of the closure meant two quick
+    // presses both computed from the same stale value and both landed on the same range — which on a phone,
+    // where "tap it twice to get a proper look" is the obvious thing to do, reads as the button being broken.
     const closer = useCallback(() => {
-        const at = Math.min(RANGES.length - 1, range + 1);
-        setRange(at);
-        if (Math.random() < rangeAt(at).flee * 0.5) setNote("She has seen you — she is making sail.");
-    }, [range]);
-
-    // ⚠️ SHE CLOSES DURING `open`, NOT AFTER THE CALL. Gated on "called" she was invisible for the entire
-    // approach and then simply existed — which is a popup with extra steps. She grows from a speck the moment
-    // you are underway, and the masthead calls at 2.6s, while she is still closing. The shout lands because
-    // you can already see something, which is the whole difference between an encounter and a dialog.
-    const closing = phase === "open" || phase === "called";
+        setRange((was) => {
+            const at = Math.min(RANGES.length - 1, was + 1);
+            if (Math.random() < rangeAt(at).flee * 0.5) setNote("She has seen you — she is making sail.");
+            return at;
+        });
+    }, []);
 
     return (
         <div className="seax">
@@ -93,20 +92,11 @@ export default function HighSeasLab() {
                     <svg className="sail-gull g2" viewBox="0 0 40 14"><path d="M2 12 Q11 2 20 11 Q29 2 38 12" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </div>
 
-                {/* ── HER SAIL ─────────────────────────────────────────────────────────────────────
-                    The ambient-boat drift, but she closes instead of passing: `seax-closing` holds her on
-                    the horizon and walks her toward you. She is the only thing in the scene that is not
-                    already part of an ordinary voyage. */}
-                {phase !== "passed" ? (
-                    <span className={`seax-sail${closing ? " is-closing" : ""}${phase === "glass" ? " is-held" : ""}`} aria-hidden="true">
-                        {/* ⚠️ NOT WRAPPED IN .sail-ambient-boat, WHICH IS A DRIFT CONTAINER 488px WIDE. Reusing
-                            it meant every transform here was scaling a full-width box rather than a ship, so
-                            she was invisible at one end and enormous at the other. The ambient boats' LOOK is
-                            an image; their positioning is a lane across the horizon, and this needs its own. */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={ship.art} alt="" />
-                    </span>
-                ) : null}
+                {/* ⚠️ SHE IS NOT ON THE WATER, AND THAT IS THE POINT. She used to close on you visibly, which
+                    spoiled the only thing the telescope is for: seeing her. Luke: "maybe you don't come up on
+                    the ship, but as you're sailing you see a message on your boat that says you've encountered
+                    something off in the distance." So the sea stays empty, the crew tell you there is
+                    SOMETHING out there, and the glass is the first look anybody gets. */}
 
                 {/* Your own boat, rocking at its cruise — the same element, the same animation. */}
                 <div className="sail-boat is-underway">
@@ -122,14 +112,15 @@ export default function HighSeasLab() {
                     It is the only thing that interrupts you, and it interrupts you with a choice. */}
                 {phase === "called" ? (
                     <div className="seax-hail">
+                        <span className="seax-hail-tail" aria-hidden="true" />
                         <span className="seax-hail-who">Masthead</span>
-                        <b>&ldquo;Sail ho — three points off the starboard bow!&rdquo;</b>
+                        <b>&ldquo;Something off the starboard bow, a long way out!&rdquo;</b>
                         <div className="seax-hail-acts">
                             <button type="button" className="seax-go" onClick={() => setPhase("glass")}>
-                                <GiSpyglass aria-hidden="true" /> Take the glass
+                                <GiSpyglass aria-hidden="true" /> Open the telescope
                             </button>
                             <button type="button" className="seax-pass" onClick={() => { setPhase("passed"); setTimeout(again, 900); }}>
-                                Hold your course
+                                Leave them alone
                             </button>
                         </div>
                     </div>
@@ -155,7 +146,7 @@ export default function HighSeasLab() {
             {phase === "glass" ? (
                 <>
                     <dl className="seax-read">
-                        <Row label="Shape" value={sees(range, "kind") ? ship.label : "three masts, square rigged"} />
+                        <Row label="Shape" value={sees(range, "kind") ? `${ship.label} — ${ship.silhouette}` : ship.silhouette} />
                         <Row label="Waterline" value={waterline(ship)} />
                         <Row label="Colours" value={sees(range, "name") ? ship.name : "—"} dim={!sees(range, "name")} />
                         <Row label="Her hold" value={sees(range, "hold") ? `${ship.hold} crates · ${ship.cargo}` : "—"} dim={!sees(range, "hold")} good />
@@ -212,30 +203,19 @@ function Style() {
                subject. Scoped under .seax so the real sailing screen is untouched. */
             .seax .sail-sea { min-height: 340px; }
 
-            /* ── HER SAIL, CLOSING ────────────────────────────────────────────────────────────────
-               A speck on the horizon that grows and settles lower in frame, which is what a ship closing
-               actually does. Sized in pixels on the IMAGE, so nothing inherits a drift lane's width. */
-            .seax-sail { position: absolute; right: 4%; top: 26%; z-index: 2; opacity: 0; }
-            .seax-sail img { display: block; width: 34px; height: auto; object-fit: contain;
-                filter: drop-shadow(0 4px 7px rgba(0,0,0,.45)); }
-            .seax-sail.is-closing { animation: seaxClose 2.8s cubic-bezier(.3,.7,.4,1) forwards; }
-            .seax-sail.is-held { opacity: 1; right: 13%; top: 34%; }
-            .seax-sail.is-held img { width: 104px; }
-            @keyframes seaxClose {
-                0%   { right: 4%;  top: 26%; opacity: 0; }
-                18%  { opacity: .85; }
-                100% { right: 13%; top: 34%; opacity: 1; }
-            }
-            .seax-sail.is-closing img { animation: seaxGrow 2.8s cubic-bezier(.3,.7,.4,1) forwards; }
-            @keyframes seaxGrow { from { width: 34px; } to { width: 104px; } }
-
-            /* ── THE MASTHEAD ─────────────────────────────────────────────────────────────────────
-               Sits IN the scene, low, over the water — a voice from above rather than a dialog. */
-            .seax-hail { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 6;
-                display: flex; flex-direction: column; gap: 5px; padding: 9px 11px; border-radius: 12px;
-                background: linear-gradient(180deg, rgba(10,18,26,.82), rgba(6,12,18,.92));
-                border: 1px solid rgba(255,215,94,.35); backdrop-filter: blur(3px);
+            /* ── A VOICE FROM YOUR OWN DECK ───────────────────────────────────────────────────────
+               Anchored over the boat with a tail pointing down at it, so it reads as somebody aboard
+               speaking rather than as a bar that appeared at the bottom of the screen. */
+            .seax-hail { position: absolute; left: 10px; right: 10px; bottom: 38%; z-index: 6;
+                display: flex; flex-direction: column; gap: 5px; padding: 10px 12px; border-radius: 13px;
+                background: linear-gradient(180deg, rgba(10,18,26,.9), rgba(6,12,18,.95));
+                border: 1px solid rgba(255,215,94,.4); backdrop-filter: blur(3px);
+                box-shadow: 0 8px 20px rgba(0,0,0,.5);
                 animation: seaxHail .45s cubic-bezier(.2,1.3,.35,1) both; }
+            .seax-hail-tail { position: absolute; left: 50%; bottom: -7px; width: 14px; height: 14px;
+                margin-left: -7px; transform: rotate(45deg);
+                background: rgba(6,12,18,.95); border-right: 1px solid rgba(255,215,94,.4);
+                border-bottom: 1px solid rgba(255,215,94,.4); }
             @keyframes seaxHail { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
             .seax-hail-who { font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: #ffd75e; }
             .seax-hail b { font-size: 13.5px; line-height: 1.35; color: #f6efdf; }
