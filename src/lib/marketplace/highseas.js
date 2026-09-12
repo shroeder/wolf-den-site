@@ -116,20 +116,17 @@ export function spot(seed, index = 0) {
 }
 
 // ── THE TELESCOPE ────────────────────────────────────────────────────────────────────────────────────────────
-// ⚠️ THE READ IS THE PROGRESSION, WHICH IS THE WHOLE REASON THIS SCREEN EXISTS. At distance you get a shape and
-// a waterline; closer, her name and her colours; closer still, the man on her quarterdeck. So a better glass —
-// or a lookout worth his salt — buys you a sharper DECISION rather than a bigger number, which is the one kind
-// of upgrade the old loop never sold.
+// ⚠️ IT IS A BEAT, NOT A MINIGAME, AND IT USED TO BE THE OTHER THING. There were three ranges — hull down,
+// within the glass, hailing distance — each revealing another line, with a "closer look" that risked her
+// seeing you and making sail. Luke: "the whole discovery mini game ... I don't think it needs to be a
+// minigame. It's just a fun way for you to go from beat to beat."
 //
-// Closing costs you the element of surprise: she gets a look at you too. In the lab that is a flat risk she
-// runs; in the real thing it would be her speed against yours.
-export const RANGES = [
-    { id: "far", label: "Hull down", shows: ["shape", "waterline"], flee: 0 },
-    { id: "mid", label: "Within the glass", shows: ["shape", "waterline", "name", "kind"], flee: 0.12 },
-    { id: "near", label: "Hailing distance", shows: ["shape", "waterline", "name", "kind", "hold", "captain"], flee: 0.3 },
-];
-export const rangeAt = (i) => RANGES[Math.max(0, Math.min(RANGES.length - 1, i))];
-export const sees = (i, what) => rangeAt(i).shows.includes(what);
+// He is right, and the mechanic was a fake decision besides: the information was worth far more than the small
+// chance she ran, so closing was always correct and the button was a tax on knowing that. A choice only one
+// answer survives is a loading screen with a button on it.
+//
+// So the glass shows her, all of her, at once. What it is FOR is the moment — you were sailing, somebody
+// called out, and now you are looking at a ship and deciding. The decision that matters is the next one.
 
 /** What her waterline tells you before anything else does — laden or riding high. */
 export const waterline = (ship) => (ship.hold >= 4 ? "heavy in the water" : ship.hold >= 3 ? "riding low" : "riding high");

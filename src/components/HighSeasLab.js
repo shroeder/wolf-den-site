@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GiSpyglass } from "react-icons/gi";
 
-import { RANGES, rangeAt, sees, spot, waterline } from "@/lib/marketplace/highseas.js";
+import { spot, waterline } from "@/lib/marketplace/highseas.js";
 
 const SKIES = ["sky-clearday", "sky-goldenhour", "sky-dusk", "sky-overcast", "sky-sunrise"];
 
@@ -30,8 +30,6 @@ export default function HighSeasLab() {
     const [seed, setSeed] = useState(41);
     const [leg, setLeg] = useState(0);
     const [phase, setPhase] = useState("open");   // open | called | glass | handoff | passed
-    const [range, setRange] = useState(0);
-    const [note, setNote] = useState("");
     const timers = useRef([]);
 
     const ship = useMemo(() => spot(seed, leg), [seed, leg]);
@@ -50,27 +48,19 @@ export default function HighSeasLab() {
     }, [phase, leg]);
 
     const again = useCallback(() => {
-        setLeg((n) => n + 1); setPhase("open"); setRange(0); setNote("");
+        setLeg((n) => n + 1); setPhase("open");
     }, []);
 
     // ⚠️ FUNCTIONAL UPDATE, OR A DOUBLE TAP IS ONE STEP. Reading `range` out of the closure meant two quick
     // presses both computed from the same stale value and both landed on the same range — which on a phone,
     // where "tap it twice to get a proper look" is the obvious thing to do, reads as the button being broken.
-    const closer = useCallback(() => {
-        setRange((was) => {
-            const at = Math.min(RANGES.length - 1, was + 1);
-            if (Math.random() < rangeAt(at).flee * 0.5) setNote("She has seen you — she is making sail.");
-            return at;
-        });
-    }, []);
-
     return (
         <div className="seax">
             <div className="seax-top">
                 <b>The High Seas</b>
                 <span className="seax-lab">lab · the approach only</span>
                 <label className="seax-seed">seed
-                    <input type="number" value={seed} onChange={(e) => { setSeed(Number(e.target.value) || 0); setPhase("open"); setRange(0); }} />
+                    <input type="number" value={seed} onChange={(e) => { setSeed(Number(e.target.value) || 0); setPhase("open"); }} />
                 </label>
             </div>
 
@@ -136,7 +126,6 @@ export default function HighSeasLab() {
                             <img src={ship.art} alt="" className="seax-lens-ship" draggable="false" />
                             <span className="seax-lens-vig" aria-hidden="true" />
                             <span className="seax-cross" aria-hidden="true" />
-                            <span className="seax-lens-range">{rangeAt(range).label}</span>
                         </div>
                     </div>
                 ) : null}
@@ -146,17 +135,17 @@ export default function HighSeasLab() {
             {phase === "glass" ? (
                 <>
                     <dl className="seax-read">
-                        <Row label="Shape" value={sees(range, "kind") ? `${ship.label} — ${ship.silhouette}` : ship.silhouette} />
+                        <Row label="Shape" value={`${ship.label} — ${ship.silhouette}`} />
                         <Row label="Waterline" value={waterline(ship)} />
-                        <Row label="Colours" value={sees(range, "name") ? ship.name : "—"} dim={!sees(range, "name")} />
-                        <Row label="Her hold" value={sees(range, "hold") ? `${ship.hold} crates · ${ship.cargo}` : "—"} dim={!sees(range, "hold")} good />
-                        <Row label="Quarterdeck" value={sees(range, "captain") ? `${ship.captain} · infamy ${ship.infamy}` : "—"} dim={!sees(range, "captain")} good />
+                        <Row label="Colours" value={ship.name} />
+                        {/* The two the whole decision weighs against each other: what is in her, and who is
+                            on her. Side by side, both plain, before you have spent anything. */}
+                        <Row label="Her hold" value={`${ship.hold} crates · ${ship.cargo}`} good />
+                        <Row label="Quarterdeck" value={`${ship.captain} · infamy ${ship.infamy}`} good />
                     </dl>
-                    {note ? <p className="seax-note">{note}</p> : null}
                     <div className="seax-acts">
-                        {range < RANGES.length - 1 ? <button type="button" className="seax-btn" onClick={closer}>Closer look</button> : null}
                         <button type="button" className="seax-btn seax-ghost" onClick={() => { setPhase("passed"); setTimeout(again, 900); }}>Let her pass</button>
-                        <button type="button" className="seax-btn seax-go" onClick={() => setPhase("handoff")}>Beat to quarters</button>
+                        <button type="button" className="seax-btn seax-go" onClick={() => setPhase("handoff")}>Run her down</button>
                     </div>
                 </>
             ) : null}
@@ -231,7 +220,10 @@ function Style() {
             @keyframes seaxScope { from { opacity: 0; } to { opacity: 1; } }
             .seax-lens { position: relative; width: 62%; aspect-ratio: 1; max-width: 250px; border-radius: 50%;
                 overflow: hidden; display: grid; place-items: center;
-                background: radial-gradient(circle at 50% 38%, rgba(58,102,140,.5), rgba(6,14,22,.75) 74%);
+                /* ⚠️ OPAQUE. It was translucent, so the scene BEHIND the tube showed through the circle —
+                   and the biggest thing behind the tube is your own hull. You raised a telescope and looked
+                   at your own ship through it. Whatever is in the glass has to be the only thing in it. */
+                background: radial-gradient(circle at 50% 38%, #3a668c, #0b1722 74%);
                 border: 3px solid #6b5836; box-shadow: 0 0 0 6px rgba(20,14,8,.9), 0 10px 26px rgba(0,0,0,.6); }
             .seax-lens-ship { width: 62%; height: 62%; object-fit: contain;
                 filter: drop-shadow(0 6px 10px rgba(0,0,0,.6)); animation: seaxBob 4.2s ease-in-out infinite; }
@@ -242,8 +234,6 @@ function Style() {
                 background: rgba(255,255,255,.16); }
             .seax-cross::after { content: ""; position: absolute; left: 50%; top: -52px; width: 1px; height: 104px;
                 background: rgba(255,255,255,.16); }
-            .seax-lens-range { position: absolute; bottom: 9%; font-size: 9.5px; letter-spacing: .18em;
-                text-transform: uppercase; color: #9fd8ff; }
 
             .seax-read { margin: 10px 0 0; display: flex; flex-direction: column; gap: 4px; }
             .seax-drow { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px;
@@ -253,7 +243,6 @@ function Style() {
             .seax-drow.is-good { background: rgba(255,215,94,.08); border: 1px solid rgba(255,215,94,.22); }
             .seax-drow.is-good dd { color: #ffd75e; font-weight: 700; }
             .seax-drow.is-dim dd { color: #5f6a72; }
-            .seax-note { margin: 8px 0 0; font-size: 12.5px; color: #ffb1c4; text-align: center; }
 
             .seax-acts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
             .seax-btn { flex: 1 1 auto; padding: 11px 12px; border-radius: 11px; font-weight: 800; font-size: 14px;
