@@ -139,8 +139,8 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Bottomless Burrow", kind: "amplify", mult: 2, note: "There is more down there than anyone put in." },
     },
     frog: {
-        light: { name: "Fly Catcher", kind: "graft", key: "chain_strike", scale: 1.2,
-            note: "It has been watching the water this whole time." },
+        light: { name: "Fly Catcher", kind: "graft", key: "crit_chance", scale: 1.2,
+            note: "It does not miss the ones that come close." },
         dark: { name: "Tongue Like a Whip", kind: "amplify", mult: 2.2 },
     },
     chick: {
@@ -630,7 +630,7 @@ export const ASCENSION_EFFECTS = {
     },
     // ── THE SHIP ─────────────────────────────────────────────────────────────────────────────────────────────
     powder_monkey: {
-        light: { name: "Runs the Powder", kind: "graft", key: "first_hit", scale: 1.2,
+        light: { name: "Runs the Powder", kind: "graft", key: "crit_power", scale: 1.2,
             note: "Up the ladder, down the ladder, arms full both ways." },
         dark: { name: "Quicker Hands", kind: "amplify", mult: 2.2 },
     },
@@ -649,7 +649,7 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Both Barrels", kind: "amplify", mult: 1.9 },
     },
     bosun_shade: {
-        light: { name: "All Hands", kind: "graft", key: "chain_strike", scale: 1.0,
+        light: { name: "All Hands", kind: "graft", key: "might", scale: 1.0,
             note: "The whistle still carries, whoever is left to hear it." },
         dark: { name: "The Bosun's Due", kind: "amplify", mult: 1.8, note: "Ascendant, and it collects." },
     },

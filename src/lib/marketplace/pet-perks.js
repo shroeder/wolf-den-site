@@ -74,11 +74,16 @@ const ERUPT_BY_RARITY = {
 // Lightstone works with nothing else bought, little enough that the Darkstone is still the bleeding one.
 export const BLEED_LEECH_OWN = 0.5;
 
+// ⚠️ TWO PER CENT IS LUKE'S NUMBER AND IT IS THE NUMBER. The first cut of this priced the wound against the
+// "+21% damage" it replaced and came out at 14%, on the reasoning that the stone should not be worth less
+// than it used to be. That reasoning was mine and it was not asked for: he had the card in front of him and
+// said "2 percent bleed chance, 2 percent bleed leach". A base is what the CARD shows divided by the
+// enshrined level multiplier of 3.5, so a common's 0.0057 prints as 2%, and the ladder climbs from there.
 const BLEED_BY_RARITY = {
-    common: 0.04, rare: 0.05, epic: 0.065, legendary: 0.08, mythic: 0.095, ascendant: 0.105, eternal: 0.115,
+    common: 0.0057, rare: 0.0071, epic: 0.0086, legendary: 0.01, mythic: 0.0114, ascendant: 0.0129, eternal: 0.0143,
 };
 const BLEED_LEECH_BY_RARITY = {
-    common: 0.07, rare: 0.085, epic: 0.1, legendary: 0.115, mythic: 0.13, ascendant: 0.145, eternal: 0.16,
+    common: 0.0057, rare: 0.0071, epic: 0.0086, legendary: 0.01, mythic: 0.0114, ascendant: 0.0129, eternal: 0.0143,
 };
 const CHAIN_BY_RARITY = { common: 0.08, rare: 0.1, epic: 0.15, legendary: 0.2, mythic: 0.28, ascendant: 0.35, eternal: 0.45 };
 const EXECUTE_BY_RARITY = { common: 0.15, rare: 0.2, epic: 0.3, legendary: 0.45, mythic: 0.65, ascendant: 0.85, eternal: 1.1 };
@@ -456,8 +461,10 @@ export const PROC_CAP = {
     first_hit: 2.5,      // the multiplier itself, not an increment
     // The chance a blow opens a wound, and how much of the wound comes back as health. Both are shares, and
     // both are ceilinged well under the engine's own clamp so a pet can never be the whole of either.
-    bleed: 0.4,
-    bleed_leech: 0.6,
+    // Proportionate to the ladder rather than to the engine's own clamp: the top rung prints 5%, so a ceiling
+    // of 40 sat twenty times above anything reachable and read as nonsense beside the number it capped.
+    bleed: 0.08,
+    bleed_leech: 0.08,
 };
 
 export function petPerkValue(rarity, key) {
