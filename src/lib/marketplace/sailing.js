@@ -1688,6 +1688,13 @@ async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } =
     if (ENCOUNTERS.every((e) => beaten.includes(e.id))) await grantEventBadge(buyerId, "full_bestiary").catch(() => {});
 
     await trackActivity(buyerId, "sail_encounter", { type: meta.encId, outcome: res.win ? "win" : "lose", tier: enc?.tier || 0 }).catch(() => {});
+    // Her captain, if she had one. Encounters have a TIER rather than a fleet rank, so it is mapped to the
+    // middle of that tier's star band — starsForRank is ceil(rank/8), so tier 1 reads one star and tier 5
+    // reads five, which is the same ladder the fleet uses.
+    if (res.win && enc && enc.kind !== "monster") {
+        const off = await maybeOfferCaptain(buyerId, Math.max(1, (Number(enc.tier) || 1) * 8 - 4));
+        if (off) spoils.push({ kind: "captain", offer: off });
+    }
     return spoils;
 }
 
@@ -2309,6 +2316,29 @@ export async function doRaid(buyerId, targetId = null) {
 // Losing costs the battle and nothing else, exactly as it does against the fleet. No gold penalty means there
 // is nothing to pay a defender a share OF, so the defender's bounty goes with it — they still get the report
 // and the badges for driving somebody off.
+// ── HER CAPTAIN, AFTER ANY WIN AGAINST A SHIP ────────────────────────────────────────────────────────────────
+// Luke: "I wanna be able to interrogate no matter what happens. Like, if I win, then I get to interrogate. If
+// I lose, then I don't. even if I sink the ship with the hull, I still get to interrogate."
+//
+// Sinking her has never blocked it — the rule was already "win, and he is offered" — but it only ran on the
+// FLEET ladder. A sea encounter and a raid on a rival's boat are both ship fights that end in a win, and
+// neither offered anybody. Three finishers now call one function, which is also where the owner gate and the
+// room check live: a gate written three times is a gate that will be true in two places one day.
+//
+// ⚠️ SHIPS ONLY. A kraken has no captain, and the encounter table says which is which — `kind: "monster"`.
+// Offering to interrogate a swarm of eels is worse than offering nothing.
+//
+// Best-effort and always AFTER the purse is paid: this only ever ADDS an offer, so a failure in here costs a
+// capture and can never cost a win.
+async function maybeOfferCaptain(buyerId, rank) {
+    if (!captainsOpenTo(isOwner(buyerId))) return null;
+    try {
+        const { offerCaptain, brigHasRoom } = await import("@/lib/marketplace/captains-store.js");
+        if (!(await brigHasRoom(buyerId))) return null;
+        return await offerCaptain(buyerId, Math.max(1, Number(rank) || 1));
+    } catch { return null; /* the brig is optional — a battle never fails for it */ }
+}
+
 async function finishRaidBattle(buyerId, meta, res) {
     const spoils = [];
     if (res.win) {
@@ -2368,6 +2398,11 @@ async function finishRaidBattle(buyerId, meta, res) {
     }
     if (meta.dodged) spoils.push({ kind: "free", n: 1 });
     await trackActivity(buyerId, "sail_raid", { outcome: res.win ? "win" : "lose", foe: meta.targetName, rank: res.win ? fleetRankForShip({ guns: meta.foe?.guns, hp: meta.foe?.hp }) : null }).catch(() => {});
+    // A rival's boat is a ship with a master on it too — the rank is already matched by hull above.
+    if (res.win) {
+        const off = await maybeOfferCaptain(buyerId, fleetRankForShip({ guns: meta.foe?.guns, hp: meta.foe?.hp }));
+        if (off) spoils.push({ kind: "captain", offer: off });
+    }
     return spoils;
 }
 
@@ -3304,13 +3339,7 @@ async function finishFleetBattle(buyerId, meta, res) {
     // ⚠️ OWNER-GATED, AND THE GATE COMES IN A PAIR — this half stops the offer being made, and the brig
     // route stops it being acted on. Removing only one of them is how a member ends up buying something
     // they cannot open. See captainsOpenTo.
-    let captainOffer = null;
-    if (res.win && captainsOpenTo(isOwner(buyerId))) {
-        try {
-            const { offerCaptain, brigHasRoom } = await import("@/lib/marketplace/captains-store.js");
-            if (await brigHasRoom(buyerId)) captainOffer = await offerCaptain(buyerId, want);
-        } catch { /* the brig is optional — a battle never fails for it */ }
-    }
+    const captainOffer = res.win ? await maybeOfferCaptain(buyerId, want) : null;
     if (res.win) {
         const depthNow = Math.max(depth, first ? want : depth);
         if (depthNow >= 1) await grantEventBadge(buyerId, "fleet_first_blood").catch(() => {});

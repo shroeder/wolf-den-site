@@ -100,7 +100,14 @@ export async function brigView(buyerId) {
 /** Is there room to take another one? Asked before the offer is shown, never after it is accepted. */
 export async function brigHasRoom(buyerId) {
     const [r] = await db.query(
-        `SELECT COUNT(*)::int AS n FROM mkt_ship_captive WHERE buyer_id = $1 AND ended_at IS NULL`, [buyerId]
+        // ⚠️ `status <> 'offered'` — A MAN ON THE DECK IS NOT IN A BERTH. This counted every unended row,
+        // which includes offers nobody accepted: they cost nothing, they expire in silence after thirty
+        // minutes and they are never swept, so four ignored offers filled the brig permanently and every win
+        // after that made no offer at all. No error, no log, nothing to find — the win simply paid its purse
+        // and said nothing, which is exactly the shape of "I defeated the ship and didn't get the
+        // interrogation". captiveRows twenty lines up already draws this distinction; this did not.
+        `SELECT COUNT(*)::int AS n FROM mkt_ship_captive
+          WHERE buyer_id = $1 AND ended_at IS NULL AND status <> 'offered'`, [buyerId]
     ).catch(() => [{ n: 0 }]);
     return (r?.n ?? 0) < BRIG_BERTHS;
 }
