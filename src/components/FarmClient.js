@@ -3606,9 +3606,19 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft, hideAlias = null }) {
         return hideAlias ? both.filter((m) => m.alias !== hideAlias) : both;
     }, [all, neighbours, hideAlias]);
     const term = q.trim().toLowerCase().replace(/^@/, "");
+    // ⚠️ THE GRID DROPS WHOEVER IS IN THE STRIP. They sort to the top of the roster for the same reason they
+    // are in the strip, so both lists opened with the identical six faces — the strip's own note already
+    // warned that "two lists answering one query is how you end up tapping the wrong copy of somebody", and
+    // widening the window to a week is what finally made it happen. The strip is who came by; the grid is
+    // everybody else. While SEARCHING the grid carries everyone again, because the strip hides then and a
+    // name you typed must never be missing from the one list still on screen.
+    const inStrip = useMemo(
+        () => new Set(term ? [] : (neighbours || []).filter((n) => n.cameBy).map((n) => n.id)),
+        [neighbours, term]
+    );
     const shown = term
         ? roster.filter((m) => `${m.name || ""} ${m.alias || ""}`.toLowerCase().includes(term))
-        : roster;
+        : roster.filter((m) => !inStrip.has(m.id));
     if (!neighbours?.length) return null;
     const togo = neighbours.filter((n) => !n.ratedToday);
     const spent = ratesLeft <= 0 && petsLeft <= 0;
@@ -3641,7 +3651,7 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft, hideAlias = null }) {
                 {!togo.length
                     ? "You have been round everyone today. They re-arm at midnight."
                     : owed.length
-                        ? <><b style={{ color: "#ffd75e" }}>{owed.length === 1 ? `${owed[0].name} came by` : `${owed.length} of these came by`}</b> in the last few days — pay it back.</>
+                        ? <><b style={{ color: "#ffd75e" }}>{owed.length === 1 ? `${owed[0].name} came by` : `${owed.length} of these came by`}</b> this week — pay it back.</>
                         : "Their pets gain the XP and their farm gains the vote — and both pay you back."}
             </p>
             {/* FILTERS what is already here rather than fetching what you typed. */}

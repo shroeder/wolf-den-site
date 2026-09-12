@@ -169,18 +169,35 @@ export async function farmNeighbours(viewerId, { limit = 8 } = {}) {
                -- petter_id it is ONE scan, and returns byte-identical rows (checked against the lateral for
                -- every owner with visits in the window).
                LEFT JOIN (
+                   -- ⚠️ A WEEK, NOT THREE DAYS. The strip only exists when somebody has been round, and at a
+                   -- three-day window that was true for 35 of the Den's ~121 members at any moment — so the
+                   -- card's best feature was missing two times in three and read as having been removed. A
+                   -- week covers 64 of them and still answers "lately" honestly. Measured, not guessed:
+                   -- 3d → 35, 7d → 64, 14d → 100.
                    SELECT petter_id, MAX(created_at) AS at FROM mkt_pet_visit
-                    WHERE owner_id = $1 AND created_at > NOW() - INTERVAL '3 days'
+                    WHERE owner_id = $1 AND created_at > NOW() - INTERVAL '7 days'
                     GROUP BY petter_id
                ) pv ON pv.petter_id = b.id
                LEFT JOIN mkt_farm_rating rin ON rin.owner_id = $1 AND rin.rater_id = b.id
-                    AND rin.updated_at > NOW() - INTERVAL '3 days'
+                    AND rin.updated_at > NOW() - INTERVAL '7 days'
                LEFT JOIN mkt_friendship fx ON fx.status = 'accepted'
                     AND ((fx.requester_id = $1 AND fx.addressee_id = b.id) OR (fx.addressee_id = $1 AND fx.requester_id = b.id))
               WHERE b.alias IS NOT NULL AND b.id <> $1
               -- The order IS the feature. Eight faces picked by "whoever logged in last" is a directory with
               -- the search box removed; this is a list of who you owe a visit to.
-              ORDER BY (fr.last_rated_day = ${DAY}) NULLS FIRST,                        -- not yet rated today
+              --
+              -- ⚠️ COALESCED, AND WITHOUT IT THE WHOLE CARD LOSES ITS POINT. The rated-today expression is
+              -- NULL for somebody you have NEVER rated and FALSE for somebody you rated on an earlier day —
+              -- which are the same answer to "have I rated them today?", both being no. Sorted with NULLS
+              -- FIRST they are not: every one of the ~100 members you have never rated outranked the handful
+              -- you have, so a neighbour who petted your pets yesterday sorted below the entire directory and
+              -- fell off the end of the LIMIT.
+              --
+              -- The effect was that cameBy came back false for everybody, the "who came by lately" strip
+              -- above the grid never had anything to render, and the one signal this card exists to surface
+              -- was invisible. Measured on the owner's own farm: rfeciskonin petted his pets AND rated his
+              -- farm, and was not in the 24 rows.
+              ORDER BY COALESCE(fr.last_rated_day = ${DAY}, false),                      -- not yet rated today
                        (pv.at IS NOT NULL OR rin.rater_id IS NOT NULL) DESC,            -- they came to you
                        (fx.requester_id IS NOT NULL) DESC,                              -- then friends
                        b.last_seen_at DESC NULLS LAST                                   -- then whoever is around
