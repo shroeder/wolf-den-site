@@ -156,7 +156,12 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Throat Bite", kind: "amplify", mult: 2 },
     },
     wolf_pup: {
-        light: { name: "The Pack Runs Together", kind: "graft", key: "chain_strike", scale: 1.0 },
+        // ⚠️ NOT A STRIKE PROC. This was a chance to land twice, which read well against the name and which
+        // Luke did not want here: "Not a fan of strikes, make it something else." Tenacity is the other axis
+        // entirely — the Darkstone makes the wolf hit harder, the Lightstone makes the pack harder to hurt —
+        // and a pack that runs together is the one that all gets home. Neither stone is the other one smaller.
+        light: { name: "The Pack Runs Together", kind: "graft", key: "tenacity", scale: 1,
+            note: "None of them is out there on its own." },
         dark: { name: "Full Grown", kind: "amplify", mult: 2, note: "It is not a pup any more." },
     },
     owl: {
