@@ -202,7 +202,9 @@ export default function CreationTokensClient({
                     <strong style={{ fontSize: "1.35rem", color: PURPLE }}>🎨 {tokenBalance.toLocaleString()}</strong>
                 </div>
                 <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 8, fontSize: 12.5 }}>
-                    <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(201,162,255,0.16)", color: "#e7d4ff", fontWeight: 700 }}>🎨 Creations + <Coin /> coins in one buy</span>
+                    <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(201,162,255,0.16)", color: "#e7d4ff", fontWeight: 700 }}>
+                        {method === "credit" ? <>🎨 Spend your store credit on creations</> : <>🎨 Creations + <Coin /> coins in one buy</>}
+                    </span>
                     <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(255,158,194,0.16)", color: "#ffd6e7", fontWeight: 700 }}>♾️ Yours forever</span>
                     <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(201,162,255,0.16)", color: "#e7d4ff", fontWeight: 700 }}>🔒 Personal & non-tradeable</span>
                 </div>
@@ -228,7 +230,11 @@ export default function CreationTokensClient({
             ) : (
                 <section className="card">
                     <h2 style={{ marginTop: 0 }}>Pick a bundle</h2>
-                    <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>Bigger bundles are a better deal — more creations and more coins per dollar.</p>
+                    <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
+                        {method === "credit"
+                            ? "Bigger bundles are a better deal — more creations per dollar."
+                            : "Bigger bundles are a better deal — more creations and more coins per dollar."}
+                    </p>
                     <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
                         {tiers.map((t) => {
                             const active = t.id === selectedId;
@@ -250,11 +256,24 @@ export default function CreationTokensClient({
                                         WebkitTapHighlightColor: "transparent",
                                     }}
                                 >
-                                    {t.bestValue ? <span style={badgeStyle(PINK_DEEP, PINK)}>★ Best value</span> : t.popular ? <span style={badgeStyle(PURPLE_DEEP, PURPLE)}>★ Popular</span> : bonus > 0 ? <span style={badgeStyle(PURPLE_DEEP, PURPLE)}>+{bonus}% coins</span> : null}
+                                    {/* ⚠️ THE BADGE IS A COIN CLAIM. "+30% coins" on a tile you are about to buy
+                                        with credit is an advertisement for something that will not arrive —
+                                        which is the shape of thing a member reads as being cheated, whatever
+                                        the small print underneath says. The rank badges stay; the coin ones go. */}
+                                    {t.bestValue ? <span style={badgeStyle(PINK_DEEP, PINK)}>★ Best value</span> : t.popular ? <span style={badgeStyle(PURPLE_DEEP, PURPLE)}>★ Popular</span> : bonus > 0 && method !== "credit" ? <span style={badgeStyle(PURPLE_DEEP, PURPLE)}>+{bonus}% coins</span> : null}
                                     <div style={{ fontSize: "1.3rem", fontWeight: 900, color: active ? PURPLE : "#f6efff" }}>{usd(t.priceCents)}</div>
                                     <div style={{ marginTop: 6, fontWeight: 800, color: "#efe3ff" }}>🎨 {t.tokens} creations</div>
-                                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "#ffd6e7" }}><Coin /> +{t.coins.toLocaleString()} coins</div>
-                                    {bonus > 0 && !t.bestValue && !t.popular ? null : bonus > 0 ? <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>+{bonus}% coins vs. base</div> : <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Base bundle</div>}
+                                    {/* Struck through rather than hidden: a member who came here knowing the
+                                        bundles pay coins needs to see WHY this one is not, not find the line
+                                        quietly missing. */}
+                                    {method === "credit" ? (
+                                        <div style={{ fontSize: 12.5, fontWeight: 700, color: "#8f86a0", textDecoration: "line-through" }}><Coin /> +{t.coins.toLocaleString()} coins</div>
+                                    ) : (
+                                        <div style={{ fontSize: 12.5, fontWeight: 700, color: "#ffd6e7" }}><Coin /> +{t.coins.toLocaleString()} coins</div>
+                                    )}
+                                    {method === "credit"
+                                        ? <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>card only</div>
+                                        : bonus > 0 && !t.bestValue && !t.popular ? null : bonus > 0 ? <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>+{bonus}% coins vs. base</div> : <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Base bundle</div>}
                                 </button>
                             );
                         })}
@@ -284,6 +303,22 @@ export default function CreationTokensClient({
                         ))}
                     </div>
 
+                    {/* ── SAID OUT LOUD, BEFORE THE TAP ──────────────────────────────────────────────
+                        Luke: "do we advertise giving coins? If so, when you [use] store credit, you should call
+                        out that we don't give coins. Otherwise people are gonna feel cheated." The page
+                        advertises coins in five places — the hero chip, the bundle blurb, a +N% badge and a
+                        coin line on every tile, and the summary — so ONE quiet line in the summary saying they
+                        were already paid is not disclosure, it is a footnote under an advertisement.
+                        Every one of those now reads for the method chosen, and this says why. */}
+                    {method === "credit" ? (
+                        <p style={{ marginTop: 10, marginBottom: 0, padding: "10px 12px", borderRadius: 10, fontSize: 12.5, lineHeight: 1.5,
+                            background: "rgba(255,214,110,0.09)", border: "1px solid rgba(255,214,110,0.3)", color: "#f0e2c2" }}>
+                            <strong style={{ color: "#ffd75e" }}>No coins with store credit.</strong> Your credit already paid
+                            you <Coin /> coins when you bought it — 200 a dollar — so bundles bought with credit are the
+                            creations only. Pay by card and the coins come with it.
+                        </p>
+                    ) : null}
+
                     {selected ? (
                         <div style={{ marginTop: 12, padding: 14, borderRadius: 12, background: "rgba(201,162,255,0.08)", border: "1px solid rgba(201,162,255,0.25)" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}><span className="muted">Creations</span><strong style={{ color: PURPLE }}>🎨 {selected.tokens}</strong></div>
@@ -301,10 +336,19 @@ export default function CreationTokensClient({
                                 <span style={{ fontWeight: 800, color: "#f6efff" }}>You pay</span>
                                 <strong style={{ color: "#ffffff" }}>{usd(selected.priceCents)}{method === "credit" ? " in credit" : ""}</strong>
                             </div>
-                            {method === "credit" ? (
+                            {/* ⚠️ ONLY WHEN IT ACTUALLY COVERS IT. Clamped at zero, this told somebody with $9
+                                looking at the $25 bundle that they would have "$0.00 left" — which reads as
+                                a purchase that empties the account rather than one that cannot happen. The
+                                shortfall is the honest line, and the button below already carries it. */}
+                            {method === "credit" && creditCents >= selected.priceCents ? (
                                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginTop: 4 }}>
                                     <span className="muted">Credit left after</span>
-                                    <span className="muted">{usd(Math.max(0, creditCents - selected.priceCents))}</span>
+                                    <span className="muted">{usd(creditCents - selected.priceCents)}</span>
+                                </div>
+                            ) : method === "credit" ? (
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginTop: 4 }}>
+                                    <span className="muted">You have</span>
+                                    <span style={{ color: "#ffb1c4", fontWeight: 700 }}>{usd(creditCents)} — {usd(selected.priceCents - creditCents)} short</span>
                                 </div>
                             ) : null}
                         </div>
