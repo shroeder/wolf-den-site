@@ -2322,8 +2322,10 @@ export async function doRaid(buyerId, targetId = null) {
 //
 // Sinking her has never blocked it — the rule was already "win, and he is offered" — but it only ran on the
 // FLEET ladder. A sea encounter and a raid on a rival's boat are both ship fights that end in a win, and
-// neither offered anybody. Three finishers now call one function, which is also where the owner gate and the
-// room check live: a gate written three times is a gate that will be true in two places one day.
+// neither offered anybody. The two NPC finishers now call one function, which is also where the owner gate
+// and the room check live: a gate written three times is a gate that will be true in two places one day.
+//
+// ⚠️ AND NOT A RAID ON A MEMBER — see the note in finishRaidBattle. NPC ships only.
 //
 // ⚠️ SHIPS ONLY. A kraken has no captain, and the encounter table says which is which — `kind: "monster"`.
 // Offering to interrogate a swarm of eels is worse than offering nothing.
@@ -2398,11 +2400,10 @@ async function finishRaidBattle(buyerId, meta, res) {
     }
     if (meta.dodged) spoils.push({ kind: "free", n: 1 });
     await trackActivity(buyerId, "sail_raid", { outcome: res.win ? "win" : "lose", foe: meta.targetName, rank: res.win ? fleetRankForShip({ guns: meta.foe?.guns, hp: meta.foe?.hp }) : null }).catch(() => {});
-    // A rival's boat is a ship with a master on it too — the rank is already matched by hull above.
-    if (res.win) {
-        const off = await maybeOfferCaptain(buyerId, fleetRankForShip({ guns: meta.foe?.guns, hp: meta.foe?.hp }));
-        if (off) spoils.push({ kind: "captain", offer: off });
-    }
+    // ⚠️ NO CAPTAIN FROM A RAID ON ANOTHER MEMBER. Luke: "Probably only when its an npc." A rival's boat is
+    // somebody's boat — putting a person you can message in irons below your deck is a different game from
+    // taking a King's officer off a fleet ship, and the brig's whole loop is built on a man who is nobody.
+    // The fleet ladder and the sea encounters are the two NPC paths and they are the two that offer.
     return spoils;
 }
 
