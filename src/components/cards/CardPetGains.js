@@ -25,7 +25,13 @@ export default function CardPetGains({ gains, petArt = {} }) {
     // Memoising the list fixed that instance, but the SHAPE is the bug: anything re-rendering on an interval
     // inside a results panel fights the panel's own scroll, and this panel is scrolled. So every row renders at
     // once and the cascade is pure CSS animation-delay. Nothing here can appear and then leave.
-    const list = useMemo(() => (Array.isArray(gains) ? gains.slice(0, 6) : []), [gains]);
+    // ⚠️ ALL OF THEM, NOT THE TOP SIX. The server feeds EVERY pet whose cards were in the deck — the list
+    // arrives sorted by how much each got — and this drew the first six, so a wide deck silently fed pets the
+    // player was never told about. Luke, looking at the screen: "Is the experience being fed to all the
+    // different pets, or is it only being fed to those six?" It was all of them, and the screen was the half
+    // that was lying. It is a short list by construction now that fully grown pets are left out of the split
+    // upstream, so there is nothing to trim.
+    const list = useMemo(() => (Array.isArray(gains) ? gains : []), [gains]);
 
     if (!list.length) return null;
 

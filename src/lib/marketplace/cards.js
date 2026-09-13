@@ -319,10 +319,27 @@ export async function recordRun(buyerId, run, outcome) {
         const pet = ALL_CARDS[id]?.pet;
         if (pet) byPet.set(pet, (byPet.get(pet) || 0) + 1);
     }
+    // ── ⚠️ A FULLY GROWN PET IS NOT FED, AND ITS SHARE IS NOT WASTED ─────────────────────────────────
+    // Luke: "sometimes the experience goes to a pet that's fully grown at level six and enshrined ... can we
+    // change it to where level six pets do not get fed?"
+    //
+    // It was worse than a wasted grant. addPetXpById clamps at petMaxXp, so the XP landing on a maxed pet
+    // evaporated — but the SHARE was still computed from its card count first, so eight cards belonging to
+    // a level-six pet took eight cards' worth of the pool off the pets that could still use it. The player
+    // was not just failing to grow that pet; they were paying for it out of the others.
+    //
+    // So maxed pets come out BEFORE the split, not after: the same pool, divided among the pets that can
+    // actually grow. A deck built entirely from finished pets feeds nobody, which is correct — there is
+    // nothing left in it to feed.
+    const { addPetXpById, petLevelInfo, getPetXpMap, petMaxXp } = await import("@/lib/marketplace/pet-level.js");
+    const heldXp = await getPetXpMap(buyerId).catch(() => ({}));
+    for (const petId of [...byPet.keys()]) {
+        const rar = collectibleById(petId)?.rarity || "common";
+        if ((heldXp[petId] || 0) >= petMaxXp(rar)) byPet.delete(petId);
+    }
     const totalCards = [...byPet.values()].reduce((n, v) => n + v, 0);
     run.petXp = [];
     if (totalCards > 0 && petPool > 0) {
-        const { addPetXpById, petLevelInfo } = await import("@/lib/marketplace/pet-level.js");
         for (const [petId, n] of byPet) {
             const amount = Math.min(300, Math.round((petPool * n) / totalCards));
             if (amount <= 0) continue;
