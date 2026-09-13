@@ -238,6 +238,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // (fishing upgrades AND the cast recharge) lives in here as a tab, which means the Fishing page had no way
     // to point at it: it could only say "go to Sailing" and hope.
     const [station, setStation] = useState("helm"); // the boat-forms gallery is collapsed by default
+    // ── AND THE BLOCKING STEP OPENS ITSELF ───────────────────────────────────────────────────────────────
+    // Luke: "Unable to get to the interrogate. It should pop up when I click raid." He is right, and it is
+    // the difference between a gate and a step. Refusing the raid and naming the man is honest and useless —
+    // if the only thing you may do is ask him, then the button that used to raid takes you to him. A nonce
+    // rather than a boolean: pressing Raid a second time after closing the panel has to open it again, and a
+    // flag that is already true does nothing.
+    const [askCaptain, setAskCaptain] = useState(0);
     // Where the stations live on the page, so something that SENDS you to a station can actually take you
     // there — see onUpgradeShip below.
     const stationsRef = useRef(null);
@@ -535,6 +542,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             // tap that the server declined was indistinguishable from a dead button — which is exactly how it
             // looked when an abandoned fight left `battle_in_progress` on the row. The server resumes that case
             // now; everything else at least gets a reason.
+            if (BATTLE_ACTIONS.has(action) && d?.error === "captain_waiting") {
+                setStation("guns");
+                setAskCaptain((n) => n + 1);
+            }
             if (BATTLE_ACTIONS.has(action)) {
                 setBattleMsg(!d ? "The sea didn't answer — try that again."
                     // ⚠️ THE BLOCKING STEP HAS TO NAME ITSELF. The interrogation sits in the middle of the
@@ -542,7 +553,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     // below. A refusal with no reason on it is a dead button, which is what the note above
                     // this one was written about.
                     : d.error === "captain_waiting"
-                        ? `${d.captain?.name || "Her captain"} is below decks and will not be left there. Go and ask him.`
+                        ? `${d.captain?.name || "Her captain"} is below decks. Nothing leaves this harbour until he talks.`
                     : d.error === "no_battles" || d.error === "no_raid" ? "No battles left today — they come back at midnight."
                     : d.error === "no_target" ? "Nobody worth taking on out there right now."
                     : d.error === "locked" ? "Sink the ship ahead of it first."
@@ -550,9 +561,12 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     : null);
             }
             if (d?.error === "captain_waiting") {
+                // Straight to the brig and straight into the panel — see the note on askCaptain.
+                setStation("guns");
+                setAskCaptain((n) => n + 1);
                 // Setting sail is not in BATTLE_ACTIONS, and it is blocked by the same man. Sent to the same
                 // line rather than a second one, so the sentence cannot drift between the two doors.
-                setBattleMsg(`${d.captain?.name || "Her captain"} is below decks and will not be left there. Go and ask him.`);
+                setBattleMsg(`${d.captain?.name || "Her captain"} is below decks. Nothing leaves this harbour until he talks.`);
             }
             if (d && !d.error) {
                 // A `partial` response carries only what changed (mid-dig taps send just the board), so merge it
@@ -655,6 +669,21 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         // is refused by the server. If a battle is open, Raid means "back on deck".
         const open = stateRef.current?.combat?.openBattle;
         if (open) { setShipBattle(open); return; }
+        // ── AND A CAPTAIN BELOW DECKS OWNS IT TOO ────────────────────────────────────────────────────
+        // Luke: "Unable to get to the interrogate. It should pop up when I click raid."
+        //
+        // The server refuses every fight while a captain is waiting — but this button never asked the
+        // server. It opened the yard, and the yard is a list of opponents every one of which is about to be
+        // refused. So the block was real and completely invisible from the one button anybody presses.
+        //
+        // Same argument as the unfinished fight directly above: if there is exactly one thing you may do,
+        // this button is how you do it. The count is already on the state for the station dot, so asking
+        // costs nothing.
+        if ((stateRef.current?.captainsWaiting || 0) > 0) {
+            setStation("guns");
+            setAskCaptain((n) => n + 1);
+            return;
+        }
         setBattleTab("battles");
         setYardOpen(true);
     }, []);
@@ -1292,7 +1321,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 See captains.js CAPTAINS_PUBLIC — flipping that one constant opens all three. */}
             {station === "guns" && state.owner === true ? (
                 <section className="card">
-                    <Brig />
+                    <Brig openNow={askCaptain} />
                 </section>
             ) : null}
 

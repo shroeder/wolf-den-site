@@ -39,7 +39,7 @@ const TACTICS = [
 // One animation per outcome: the word for what happened, said by his body before the text arrives.
 const POSE = { crack: "is-flinch", harden: "is-set", read: "is-turn" };
 
-export default function Brig() {
+export default function Brig({ openNow = 0 }) {
     const [brig, setBrig] = useState(null);
     const [openId, setOpenId] = useState(null);
     const [busy, setBusy] = useState(false);
@@ -65,6 +65,17 @@ export default function Brig() {
         wake();
         playMusic("brig");
     }, []);
+
+    // ── THE RAID BUTTON OPENS HIM ────────────────────────────────────────────────────────────────────────
+    // The sea is shut while a captain is below, and the door that is shut is the one you were reaching for —
+    // so pressing it should put you in front of him rather than telling you where he is. SailingClient bumps
+    // `openNow` when a raid, a battle or a sail is refused for him. Guarded on 0 so it does nothing on mount:
+    // walking into the brig on your own should show you the room first.
+    useEffect(() => {
+        if (!openNow) return;
+        const man = brig?.captain;
+        if (man) { arm(); setBeat(null); setOpenId(man.id); }
+    }, [openNow, brig, arm]);
     useEffect(() => () => stopMusic(), []);
 
     const act = useCallback(async (body) => {
