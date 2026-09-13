@@ -25,6 +25,14 @@
 //   AMPLIFY  the pet's own ability, at `mult`. What Dark used to be, except the number is chosen per pet
 //            against that ability's own ceiling rather than being 1.5 across the board.
 //
+//            ⚠️ AND ONE ABILITY MUST NOT BE A SUBSET OF THE OTHER. Ferocity and Might read as two stats and
+//            are not two choices against a boss: Might is passive damage AND your daily strike, Ferocity is
+//            the passive half alone. So a pet offering Ferocity against Might offers "all of it" against
+//            "some of it" at the same price. GrayKitsune found it on the Lion Cub — "the same as its
+//            darkstone except doesnt effect daily strike damage" — and a sweep found four more, three of
+//            them mine from the pass above. Two stats overlapping is not something a key comparison can see;
+//            it needs naming, and it is named in scripts/pet-stone-check.mjs.
+//
 //            ⚠️ AND AN AMPLIFY ONLY WORKS IF THE ABILITY HAS HEADROOM AT THE ENSHRINED LEVEL. An enshrined
 //            pet is applied at PET_ENSHRINED_LEVEL, which multiplies by 3.5 before the cap — so an ability
 //            that already reaches its ceiling at x1 pays exactly the same at x2, and the stone changes no
@@ -234,7 +242,8 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Nothing Hides", kind: "amplify", mult: 2 },
     },
     lion_cub: {
-        light: { name: "The Pride Follows", kind: "graft", key: "ferocity", scale: 0.9 },
+        light: { name: "The Pride Follows", kind: "graft", key: "first_blood", scale: 0.9,
+            note: "They arrive when you do." },
         dark: { name: "Holds the Rock", kind: "graft", key: "might", scale: 0.9, note: "It stopped being the smallest thing on it." },
     },
     gorilla: {
@@ -269,7 +278,7 @@ export const ASCENSION_EFFECTS = {
     },
     baby_rex: {
         light: { name: "Grown Teeth", kind: "graft", key: "might", scale: 1 },
-        dark: { name: "Grown Into It", kind: "graft", key: "ferocity", scale: 1, note: "There is no longer anything baby about it." },
+        dark: { name: "Grown Into It", kind: "graft", key: "crit_power", scale: 1, note: "There is no longer anything baby about it." },
     },
     sky_whale: {
         light: { name: "Sounds the Deep", kind: "graft", key: "sea_dredge", scale: 0.9, note: "It goes down further than the dredge does." },
@@ -455,7 +464,8 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Under the Ice", kind: "graft", key: "first_blood", scale: 0.85, note: "You do not hear it coming across snow." },
     },
     mammoth: {
-        light: { name: "The Herd Moves", kind: "graft", key: "ferocity", scale: 0.9 },
+        light: { name: "The Herd Moves", kind: "graft", key: "onslaught", scale: 0.9,
+            note: "By the time it is moving, it is too late to be in the way." },
         dark: { name: "The Whole Herd", kind: "graft", key: "might", scale: 1, note: "Ten tonnes, and it has decided." },
     },
     wyvern: {
@@ -481,7 +491,7 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Burns On the Way Down", kind: "graft", key: "first_hit", scale: 0.85, note: "It does not need to survive the dive." },
     },
     eternal_wolf: {
-        light: { name: "The Pack Endures", kind: "graft", key: "ferocity", scale: 1 },
+        light: { name: "The Pack Endures", kind: "graft", key: "tenacity", scale: 1 },
         dark: { name: "The Pack Remembers", kind: "graft", key: "might", scale: 1, note: "It has been running this ground longer than the ground has had a name." },
     },
     bounty_hound: {
@@ -649,8 +659,8 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Both Barrels", kind: "amplify", mult: 1.9 },
     },
     bosun_shade: {
-        light: { name: "All Hands", kind: "graft", key: "might", scale: 1.0,
-            note: "The whistle still carries, whoever is left to hear it." },
+        light: { name: "All Hands", kind: "graft", key: "tenacity", scale: 1,
+            note: "Every back on the ship, holding it together." },
         dark: { name: "The Bosun's Due", kind: "amplify", mult: 1.8, note: "Ascendant, and it collects." },
     },
 

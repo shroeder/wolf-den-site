@@ -314,8 +314,23 @@ export async function recordRun(buyerId, run, outcome) {
     // copies of one pet's card. Without the cap the fastest way to max a pet would be to build the worst
     // possible deck on purpose, which is a strategy the game should not have.
     const petPool = Math.round(runScore(ended) * 1.2);
+    // ── ⚠️ THE TEN CARDS YOU WERE GIVEN DO NOT COUNT ─────────────────────────────────────────────────
+    // GrayKitsune: "the cards that are in the starter deck I dont think should be giving pet exp at all."
+    // He is right, and it was not a small lean — the starter deck is five Bites, four Hops and a Pounce,
+    // which belong to the Wolf Pup, the Frog and the Fox Kit. Measured across real finished runs: those
+    // three took the top three shares of EVERY run in the sample, on decks of 16 to 25 cards. Kaishiern's
+    // last run paid the Wolf Pup its 300 cap and the Frog 282 while everything he had actually chosen took
+    // 141 each.
+    //
+    // The whole point of this pool is that a run feeds the pets it was BUILT from. Ten cards the game handed
+    // you are not a build, so the starter's own composition is subtracted before the split — by COUNT, not
+    // by id, so a sixth Bite you went and earned still feeds the Wolf Pup while the five you started with
+    // do not.
     const byPet = new Map();
+    const free = new Map();
+    for (const id of STARTER_DECK) free.set(id, (free.get(id) || 0) + 1);
     for (const id of (ended.deck || [])) {
+        if ((free.get(id) || 0) > 0) { free.set(id, free.get(id) - 1); continue; }
         const pet = ALL_CARDS[id]?.pet;
         if (pet) byPet.set(pet, (byPet.get(pet) || 0) + 1);
     }

@@ -21,6 +21,7 @@
 //   BROKEN LINE    the generated sentence contains NaN or undefined (see the erupt object in petPerkAt)
 //   NARROW LIGHT   the Lightstone pays in ONE feature while the Darkstone pays everywhere
 //   THIN LIGHT     the Lightstone's graft gains less than the Darkstone's amplify does
+//   SUBSET         one stone's ability is contained in the other's — see DOMINATED
 //
 // The last two are Luke's, off the Wolf Pup's card: "Feels like the light evolution is way worse." It was, on
 // a third of the roster and in two separate ways — a narrower ability AND a smaller helping of it. Both are
@@ -30,6 +31,12 @@ import { ASCENSION_EFFECTS } from "@/lib/marketplace/pet-ascension-effects.js";
 import { PET_PERKS, ascensionEffectView } from "@/lib/marketplace/pet-perks.js";
 
 // An ability that pays in most of what you do, against one that pays inside a single feature.
+// ⚠️ TWO STATS CAN OVERLAP WITHOUT SHARING A KEY. Ferocity against a boss is PASSIVE damage; Might is the
+// passive damage AND the daily strike. They are different keys and the same choice — "some of it" against
+// "all of it" at one price. GrayKitsune found it on the Lion Cub. Named here because no comparison of keys or
+// numbers can see it: it is a fact about what the two abilities DO.
+const DOMINATED = { ferocity: "might" };
+
 const BROAD = new Set([
     "might", "crit_chance", "crit_power", "ferocity", "tenacity", "pierce", "fortune", "extra_strike",
     "first_hit", "erupt", "chain_strike", "execute", "onslaught", "first_blood", "xp_gain", "gold_find",
@@ -73,6 +80,12 @@ for (const pet of COLLECTIBLES) {
         const lk = authored.light.kind === "graft" ? authored.light.key : own;
         const dk = authored.dark.kind === "graft" ? authored.dark.key : own;
         if (!BROAD.has(lk) && BROAD.has(dk)) bad.push(`NARROW LIGHT — ${lk} is one feature, ${dk} is everywhere`);
+        // ⚠️ NO NUMERIC GET-OUT. The first cut of this rule let a containment pass if the narrower ability
+        // carried a bigger figure — but `scaled` is in the KEY'S OWN units, so comparing a Ferocity total
+        // against a Might percentage is comparing two different things and calling the larger one better.
+        // Two abilities where one contains the other simply should not be the two sides of one choice.
+        if (DOMINATED[lk] === dk) bad.push(`SUBSET — ${lk} is contained in ${dk}; that is not two choices`);
+        if (DOMINATED[dk] === lk) bad.push(`SUBSET — ${dk} is contained in ${lk}; that is not two choices`);
         // An amplify of x2 adds one whole helping of the pet's own ability, so a graft offered against it has
         // to add one whole helping of the other one. Anything less is the same decision at a discount.
         if (authored.light.kind === "graft" && authored.dark.kind === "amplify") {
