@@ -19,7 +19,7 @@
 //   · CSS animations run on the compositor; a frame grabbed mid-transition is exactly what we want to see,
 //     but it means two runs are never identical. Judge the SHAPE across frames, not one frame.
 import { spawn } from "node:child_process";
-import { writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import { QUIET_HIDE, QUIET_SEEN, quiet } from "./lib/shot-quiet.mjs";
@@ -73,6 +73,33 @@ const EVAL = arg("--eval", null);
 // --pre runs at DOCUMENT START, before any of the page's own script, which is where a fetch stub belongs:
 //   node scripts/film.mjs "<url>" out/x --pre "window.fetch = async () => new Response(...)"
 const PRE = arg("--pre", null);
+
+// ── --mock: DRIVE THE PAGE INTO A STATE WITHOUT TOUCHING THE DATABASE ────────────────────────────────────────
+// Writing a state into Neon to look at a screen means mutating a real member's account — so it gets done once,
+// carefully, on a live account, and every OTHER state goes unlooked-at. That is how a banner shipped two screens
+// below the fold: only one state was ever put in front of a camera, and it was not this one.
+//
+// Everything these client screens draw arrives over /api/..., so the state can be served at the browser instead:
+//   node scripts/film.mjs "<url>" out/x --mock scripts/fixtures/sailing.captain.json
+//
+// The file is { "<url substring>": <json body> } or { "<substring>": {"status": 500, "json": {...}} }. Anything
+// that does not match falls through to the real fetch, so one canned answer can sit inside a live page.
+// ⚠️ IT REPORTS WHAT IT SERVED. A fixture whose key never matched is a rig that filmed the real state while
+// telling you it filmed yours — the miss list is printed at the end for exactly that reason.
+const MOCK = arg("--mock", null);
+
+// ── --fold: IS THE THING ACTUALLY ON THE SCREEN ──────────────────────────────────────────────────────────────
+// querySelector finding it and innerText reading right is NOT the same question as a player seeing it. Checked
+// with an --eval that read the text, a blocking banner passed while sitting at y=2140 on an 820px screen.
+//   node scripts/film.mjs "<url>" out/x --fold ".sail-capblock,.sail-cta"
+// Measured at the filmed viewport, before the contact sheet resizes it.
+const FOLD = arg("--fold", null);
+
+// ── --fixture: THE SERVER-SIDE HALF OF --mock ────────────────────────────────────────────────────────────────
+// These pages render their state on the SERVER and hand it over as a prop, so there is no request for --mock to
+// answer. This sets the cookie src/lib/dev-fixture.js reads, which swaps the database for a canned state for
+// that one request, in dev only. `--fixture captain` serves scripts/fixtures/.live/<page>.captain.json.
+const FIXTURE = arg("--fixture", null);
 
 if (!url) throw new Error("usage: node scripts/film.mjs <url> <outBase> [--click sel] [--await sel] [--tap sel] [--frames n] [--every ms]");
 if (!existsSync(dirname(outBase)) && dirname(outBase) !== ".") mkdirSync(dirname(outBase), { recursive: true });
@@ -134,6 +161,9 @@ if (process.env.SHOT_COOKIE) {
     // edge, and the film kept showing the redwood trunk-crops it replaced. Every conclusion drawn from those
     // frames was about art that had not existed for an hour. shot.mjs learned this and film.mjs was not told.
     await send("Network.setCacheDisabled", { cacheDisabled: true });
+    if (FIXTURE) await send("Network.setCookie", {
+        name: "wolfden-fixture", value: FIXTURE, domain: new URL(url).hostname, path: "/",
+    });
     await send("Network.setCookie", {
         name: "wolfden-mkt-buyer-session", value: process.env.SHOT_COOKIE,
         domain: new URL(url).hostname, path: "/",
@@ -189,6 +219,30 @@ if (process.env.SHOT_HIDE) {
             // A modal that mounts after hydration outlives a style added at document-start if the app
             // replaces the head, so re-apply on an interval for the first few seconds too.
             let n = 0; const iv = setInterval(() => { put(); if (++n > 20) clearInterval(iv); }, 200);
+        })();`,
+    });
+}
+if (MOCK) {
+    const table = JSON.parse(readFileSync(MOCK, "utf8"));
+    await send("Page.addScriptToEvaluateOnNewDocument", {
+        source: `(() => {
+            const table = ${JSON.stringify(table)};
+            const served = []; const missed = [];
+            window.__mockLog = () => ({ served, missed });
+            const real = window.fetch.bind(window);
+            window.fetch = async (input, init) => {
+                const url = String(typeof input === "string" ? input : (input && input.url) || "");
+                for (const key of Object.keys(table)) {
+                    if (!url.includes(key)) continue;
+                    const v = table[key];
+                    const body = v && typeof v === "object" && "json" in v ? v.json : v;
+                    const status = (v && v.status) || 200;
+                    served.push(key);
+                    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+                }
+                if (url.includes("/api/")) missed.push(url);
+                return real(input, init);
+            };
         })();`,
     });
 }
@@ -274,6 +328,27 @@ for (const f of all) {
 if (!frames.length) { chrome.kill(); throw new Error("the screencast produced no frames"); }
 console.log(`captured ${all.length} painted frames, sampled ${frames.length}`);
 
+// ── ON SCREEN, OR MERELY IN THE DOCUMENT ─────────────────────────────────────────────────────────────────────
+// The last measurement before the viewport is resized for the sheet. A element that exists, reads right and
+// sits below the fold is reported as OFF SCREEN rather than as a pass.
+if (FOLD) {
+    const rows = await evaluate(`(() => ${JSON.stringify(FOLD)}.split(",").map((sel) => {
+        const el = document.querySelector(sel.trim());
+        if (!el) return { sel: sel.trim(), found: false };
+        const r = el.getBoundingClientRect();
+        const st = getComputedStyle(el);
+        return { sel: sel.trim(), found: true, top: Math.round(r.top + window.scrollY), h: Math.round(r.height),
+            onScreen: r.top < window.innerHeight && r.bottom > 0 && r.width > 0 && r.height > 0,
+            hidden: st.display === "none" || st.visibility === "hidden" || Number(st.opacity) === 0 };
+    }))()`);
+    for (const r of rows || []) {
+        if (!r.found) console.log(`  fold  ${r.sel.padEnd(24)} NOT IN THE DOCUMENT`);
+        else if (r.hidden) console.log(`  fold  ${r.sel.padEnd(24)} in the document but HIDDEN by css`);
+        else if (!r.onScreen) console.log(`  fold  ${r.sel.padEnd(24)} OFF SCREEN — y=${r.top} on a ${H}px viewport`);
+        else console.log(`  fold  ${r.sel.padEnd(24)} on screen at y=${r.top} (${r.h}px tall)`);
+    }
+}
+
 // ── THE CONTACT SHEET ────────────────────────────────────────────────────────────────────────────────────────
 // Frames as data URIs in a grid, each stamped with the millisecond it was taken, shot as one image. One look
 // instead of thirty, and the stamps are what make it readable as time rather than as a set of pictures.
@@ -302,6 +377,17 @@ await send("Page.navigate", { url: `file:///${resolve(sheetPath).replace(/\\/g, 
 await sleep(1500);
 const sheetShot = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
 writeFileSync(`${outBase}-sheet.png`, Buffer.from(sheetShot.data, "base64"));
+
+if (MOCK) {
+    const log = await evaluate("window.__mockLog ? JSON.stringify(window.__mockLog()) : null");
+    const l = log ? JSON.parse(log) : null;
+    if (l) {
+        const keys = [...new Set(l.served)];
+        console.log(`  mock  served ${l.served.length} request(s) from ${keys.length} key(s): ${keys.join(", ") || "NONE — the fixture never matched"}`);
+        const miss = [...new Set(l.missed)];
+        if (miss.length) console.log(`  mock  fell through to the real server: ${miss.slice(0, 6).join(", ")}`);
+    }
+}
 
 sock.close();
 chrome.kill();

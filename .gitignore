@@ -54,3 +54,6 @@ scratch-*.png
 crew-sheet.png
 /forest-*.png
 /patron-pets.png
+
+# Derived fixture states written by the state rigs (scripts/sail-states.mjs) — never committed.
+scripts/fixtures/.live/

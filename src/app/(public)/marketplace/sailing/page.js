@@ -10,6 +10,7 @@ import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { getSailingState } from "@/lib/marketplace/sailing.js";
+import { devFixture } from "@/lib/dev-fixture.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -22,8 +23,13 @@ export default async function SailingPage() {
     // Cold ad traffic lands here logged-out — show a hook + signup that returns them to sailing, not a 404.
     if (!buyer) return <SailingLanding />;
 
+    // A canned state instead of the database, in dev only, when the rig asks for one — see dev-fixture.js.
+    // It is a no-op in production before it reads anything, and it is how every state of this screen gets
+    // looked at without writing that state onto somebody's real account first.
+    const fixture = devFixture("sailing", (await cookies()).get("wolfden-fixture")?.value);
+
     const [state, me, petBase, petLevels] = await Promise.all([
-        getSailingState(buyer.id),
+        fixture ? Promise.resolve(fixture) : getSailingState(buyer.id),
         db.queryOne(
             `SELECT display_name, alias, avatar_url, avatar_config, avatar_cosmetics, avatar_sprite_url, avatar_sprite_flip, featured_collectible
                FROM mkt_buyer WHERE id = $1`,
