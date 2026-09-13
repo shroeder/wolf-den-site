@@ -1669,7 +1669,7 @@ export default function CardFightClient({ fixture, run = null }) {
                             {/* And what the score just bought. Under the tally, because the rung is EARNED by
                                 the total that has just finished rolling above it. */}
                             {runState?.done && runState?.petXp?.length ? (
-                                <CardPetGains gains={runState.petXp} petArt={fixture.petArt} />
+                                <CardPetGains gains={runState.petXp} full={runState.petFull} petArt={fixture.petArt} />
                             ) : null}
                             {runState?.done && runState?.levelled?.length ? (
                                 <CardLevelUp levelled={runState.levelled} petArt={fixture.petArt} />

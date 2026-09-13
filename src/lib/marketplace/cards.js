@@ -333,9 +333,17 @@ export async function recordRun(buyerId, run, outcome) {
     // nothing left in it to feed.
     const { addPetXpById, petLevelInfo, getPetXpMap, petMaxXp } = await import("@/lib/marketplace/pet-level.js");
     const heldXp = await getPetXpMap(buyerId).catch(() => ({}));
+    // ── AND THE SCREEN HAS TO SAY SO ─────────────────────────────────────────────────────────────────
+    // A pet quietly dropping off the list looks like a bug, and "why didn't my Wolf Pup get any?" is a
+    // question nobody should have to ask twice. The ones left out travel with the run, by name, so the
+    // reason can be printed where the numbers are instead of living only in this comment.
+    run.petFull = [];
     for (const petId of [...byPet.keys()]) {
         const rar = collectibleById(petId)?.rarity || "common";
-        if ((heldXp[petId] || 0) >= petMaxXp(rar)) byPet.delete(petId);
+        if ((heldXp[petId] || 0) >= petMaxXp(rar)) {
+            run.petFull.push({ pet: petId, name: collectibleById(petId)?.name || petId, cards: byPet.get(petId) });
+            byPet.delete(petId);
+        }
     }
     const totalCards = [...byPet.values()].reduce((n, v) => n + v, 0);
     run.petXp = [];

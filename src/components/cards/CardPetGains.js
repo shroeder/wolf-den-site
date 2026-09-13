@@ -16,7 +16,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 const ROW = 200;   // ms between one row arriving and the next
 const LEAD = 240;  // ms before the first
 
-export default function CardPetGains({ gains, petArt = {} }) {
+export default function CardPetGains({ gains, full = [], petArt = {} }) {
     // ⚠️ NO TIMERS AND NO STATE. This used to reveal rows on setTimeout off a `gains.slice(0, 6)` computed in
     // the render body -- a NEW ARRAY every render, so the effect saw a changed dependency every time, cleared
     // its timers and restarted from zero. The first row survived because its timer is short; the rest appeared
@@ -33,7 +33,11 @@ export default function CardPetGains({ gains, petArt = {} }) {
     // upstream, so there is nothing to trim.
     const list = useMemo(() => (Array.isArray(gains) ? gains : []), [gains]);
 
-    if (!list.length) return null;
+    // ⚠️ EVERY PET IN THE DECK IS ACCOUNTED FOR, INCLUDING THE ONES THAT GOT NOTHING. A pet quietly missing
+    // from this list looks like a bug — "why didn't my Wolf Pup get any?" — and the honest answer is that it
+    // is finished and its share went to the others, which is a good thing said badly by silence.
+    const grown = Array.isArray(full) ? full : [];
+    if (!list.length && !grown.length) return null;
 
     return (
         <div className="cpg">
@@ -87,6 +91,14 @@ export default function CardPetGains({ gains, petArt = {} }) {
                     );
                 })}
             </ul>
+            {grown.length ? (
+                <p className="cpg-full">
+                    {grown.length === 1
+                        ? <><b>{grown[0].name}</b> is fully grown</>
+                        : <><b>{grown.map((g) => g.name).join(", ")}</b> are fully grown</>}
+                    {" — "}{grown.length === 1 ? "its" : "their"} share went to the rest.
+                </p>
+            ) : null}
 
             <style jsx>{`
                 .cpg { margin: 12px auto 0; max-width: 360px; padding: 13px 14px 12px; border-radius: 14px;
@@ -95,6 +107,8 @@ export default function CardPetGains({ gains, petArt = {} }) {
                     font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
                     color: #8a8496; }
                 .cpg-h :global(svg) { width: 16px; height: 16px; color: #b6d06a; }
+                .cpg-full { margin: 8px 2px 0; font-size: 12px; line-height: 1.4; color: #8a9384; }
+                .cpg-full b { color: #cdd9c6; font-weight: 700; }
                 .cpg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
                 .cpg-row { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px;
                     background: rgba(255,255,255,.04);
