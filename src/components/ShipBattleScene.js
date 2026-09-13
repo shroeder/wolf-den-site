@@ -1093,10 +1093,10 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
     // that case anyway, and this stays keyed to it rather than to "the fight ended".
     const sinkingSide = phase === "sinking" || phase === "result" ? battle?.sunk : null;
     const win = Boolean(battle?.win);
-    // The captain is a spoil with a clock and an errand, so he comes out of the list and gets his own card.
-    // Pulled apart HERE rather than filtered twice in the markup: drawn in both places is the other half of
-    // the bug this fixes, and it is the easy one to reintroduce.
-    const captain = (battle?.reward || []).find((r) => r?.kind === "captain")?.offer || null;
+    // The captain is not a drop — he is a person handing you the only thing this feature is for — so he
+    // comes out of the spoils list and gets his own card. Pulled apart HERE rather than filtered twice in
+    // the markup: drawn in both places is the easy half of this to reintroduce.
+    const captain = (battle?.reward || []).find((r) => r?.kind === "captain")?.captain || null;
     const spoils = (battle?.reward || []).filter((r) => r?.kind !== "captain");
     // A new exchange raises the recap; four and a half seconds later it lowers itself. Keyed on the round so
     // re-rendering for any other reason cannot restart the timer, and so the Recap button's manual open is
@@ -1426,28 +1426,27 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                                         : <>{foe.name} put you under after {battle?.round} round{battle?.round === 1 ? "" : "s"}.</>)
                                     : <>Not a gun left standing on either deck after {battle?.round} round{battle?.round === 1 ? "" : "s"} — {win ? "you were the healthier ship" : `${foe.name} was the healthier ship`}.</>}
                         </p>
-                        {/* ── HER CAPTAIN, AND WHAT TO DO ABOUT HIM ───────────────────────────────────
-                            ⚠️ THIS WAS A ROW IN THE SPOILS LIST READING "Captain". finishFleetBattle has
-                            always pushed { kind: "captain", offer } into the payout, and nothing here had a
-                            case for it — so it fell through rewardName's default, which prints the KIND, and
-                            came out as one unlabelled word with an empty art box and no number beside it.
-                            Luke: "I defeated the ship and didn't get the interrogation." He did get it. The
-                            row was written, he was standing on the deck, and the screen never said so.
-                            It is a card and not a chip because it is the only spoil with a CLOCK on it —
-                            thirty minutes and he is gone — and the only one that asks you to go somewhere. */}
+                        {/* ── HER CAPTAIN, AND WHAT HE KNOWS ─────────────────────────────────────────
+                            ⚠️ THERE WAS A MINIGAME BEHIND THIS CARD. Four tactics, a disposition to read, a
+                            nerve lantern that burned down, and a chart only if you broke him — and it sat
+                            between beating a ship and sailing to the island that ship bought you. Luke:
+                            "Remove the whole interrogated mini game. It should just be a... you capture the
+                            captain, and he gives you the treasure map."
+                            So this is the whole of it now: he is taken, he talks, the chart is already in
+                            your hold. A card and not a chip in the spoils row because it is the only spoil
+                            that is a PERSON, and because the chart it carries is a voyage, not a number. */}
                         {captain ? (
                             <div className="sbt-captain">
                                 {captain.art ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img className="sbt-captain-art" src={captain.art} alt="" draggable="false" />
+                                    <img className="sbt-captain-art" src={`/images/fleet/crew/${captain.art}.png`} alt="" draggable="false" />
                                 ) : null}
                                 <div className="sbt-captain-body">
-                                    <b>{captain.name} is on your deck</b>
+                                    <b>{captain.name} gives up the anchorage</b>
                                     <span className="sbt-captain-stars">{"★".repeat(Math.max(1, captain.stars || 1))}</span>
-                                    <em>Master of {captain.ship}. He knows where something is, and he will not say.</em>
-                                    <i>He waits below until you ask him — and nothing else leaves this harbour until he has talked.</i>
+                                    <em>{captain.said}</em>
+                                    <i>{captain.chart?.bandName || "A chart"} — {captain.chart?.blurb || "somewhere worth the sail."} Set sail for a charted island from the helm.</i>
                                 </div>
-                                <a className="sail-cta sbt-captain-go" href="/marketplace/sailing?station=guns">Interrogate him</a>
                             </div>
                         ) : null}
                         {spoils.length ? (

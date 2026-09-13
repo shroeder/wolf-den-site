@@ -1149,7 +1149,7 @@ function boardView(board) {
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
 // `baits` is handed in for the same reason gunDeck and the recipe shelf are: it is a pantry query and this
 // function is synchronous on purpose.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = [], baitCookable = [], deepFish = false, charts = 0, waiting = 0) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = [], baitCookable = [], deepFish = false, charts = 0) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1191,13 +1191,10 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // Every chest tier's real art, so the dig board can draw the one that is actually buried.
         chestArtMap: chestArt,
         // Embark duration choices — trip time + which shards each favours — for the "set sail" picker.
-        // ── AND A CHART, IF THREE MEN GAVE ONE UP ────────────────────────────────────────────────
+        // ── AND A CHART, IF A CAPTAIN GAVE ONE UP ────────────────────────────────────────────────
         // A COUNT, not the charts themselves: the embark row only needs to know whether the option
-        // exists and what the best one is worth. The brig is where a chart is actually looked at.
-        // Owner-gated with the rest of the feature — see captains.js CAPTAINS_PUBLIC.
+        // exists and how many are in hand. Owner-gated with the rest — see captains.js CAPTAINS_PUBLIC.
         chartsReady: charts,
-        // How many men are standing on the deck unpaid, so the station can say so before the clock runs out.
-        captainsWaiting: waiting,
         voyageOptions: VOYAGE_OPTIONS.map((o) => ({
             id: o.id, label: o.label,
             ms: Math.round(voyageDurationMs(speedLevel, level) * o.mult),
@@ -1692,8 +1689,8 @@ async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } =
     // middle of that tier's star band — starsForRank is ceil(rank/8), so tier 1 reads one star and tier 5
     // reads five, which is the same ladder the fleet uses.
     if (res.win && enc && enc.kind !== "monster") {
-        const off = await maybeOfferCaptain(buyerId, Math.max(1, (Number(enc.tier) || 1) * 8 - 4));
-        if (off) spoils.push({ kind: "captain", offer: off });
+        const took = await maybeCaptureCaptain(buyerId, Math.max(1, (Number(enc.tier) || 1) * 8 - 4));
+        if (took) spoils.push({ kind: "captain", captain: took });
     }
     return spoils;
 }
@@ -1820,37 +1817,22 @@ export async function getSailingState(buyerId, skyKey = null) {
     // only one person can see. See the note on CPU in CLAUDE.md: the lever that matters is queries per
     // request, and the cheapest query is the one that is not made.
     // ── AND WHETHER THE BRIG WANTS YOU ───────────────────────────────────────────────────────────────
-    // ⚠️ ONE QUERY FOR BOTH, AND ONLY FOR THE OWNER. A captain waits on deck for thirty minutes and then
-    // he is gone; a chart sits until it is sailed. Neither had any way of saying so outside the brig
-    // itself, which is a feature that can only tell you something while you are already looking at it.
+    // ⚠️ CHARTS ONLY, AND ONLY FOR THE OWNER. This used to count the man below decks as well, and name him,
+    // so a banner could tell you the page was blocked until you had interrogated him. There is no such step
+    // any more — he hands the chart over as you take him — so what is left is the one number the helm needs.
     //
-    // It is folded into the query that was already here rather than given its own, and it is NOT a nav
-    // badge: a badge in site chrome that reads a feature endpoint bills that feature on every page for
-    // every member forever (see check:chrome and CLAUDE.md). This is one extra column on a query this
-    // page already runs, for one person.
+    // It rides the query that was already here rather than getting its own, and it is NOT a nav badge: a
+    // badge in site chrome that reads a feature endpoint bills that feature on every page for every member
+    // forever (see check:chrome and CLAUDE.md).
     const brigRow = captainsOpenTo(isOwner(buyerId))
         ? await db.queryOne(
-            `SELECT
-                (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS charts,
-                (SELECT COUNT(*)::int FROM mkt_ship_captive
-                  WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'held') AS waiting,
-                -- ⚠️ AND WHO HE IS, because the banner that unblocks the page has to name him. A count can
-                -- draw a dot on a tab; it cannot say "The Widow Wage is below decks", and a blocking step
-                -- that will not tell you WHAT is blocking it is the whole of the complaint this answers.
-                (SELECT name FROM mkt_ship_captive
-                  WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'held' ORDER BY taken_at LIMIT 1) AS waiting_name,
-                (SELECT art FROM mkt_ship_captive
-                  WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'held' ORDER BY taken_at LIMIT 1) AS waiting_art`,
+            `SELECT (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS charts`,
             [buyerId]
         ).catch(() => null)
         : null;
     const chartsHeld = Number(brigRow?.charts) || 0;
-    const captainsWaiting = Number(brigRow?.waiting) || 0;
-    const captainWaiting = captainsWaiting > 0
-        ? { name: brigRow?.waiting_name || "Her captain", art: brigRow?.waiting_art || null }
-        : null;
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
-        recipeShop, baits, baitCookable, deepFish, chartsHeld, captainsWaiting), captainWaiting, gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        recipeShop, baits, baitCookable, deepFish, chartsHeld), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
         // ── THE PURSE, WHERE YOU CAN SEE IT ──────────────────────────────────────────────────────────
         // Sunflower Jinxx: "it gives boat stat lvl 22, then has dabloons and gold but the dabloons is always
         // 0. I can't see how many I have unless I look in the quartermaster." Always 0 is exactly right: the
@@ -1870,8 +1852,6 @@ export async function startVoyage(buyerId, optionId = "standard") {
     const row = await readRow(buyerId);
     const state = decorate(row);
     if (state.status !== "idle") return { ok: false, error: "busy", ...(await getSailingState(buyerId)) };
-    const heldBy = await captainBlocking(buyerId);
-    if (heldBy) return { ok: false, error: "captain_waiting", captain: heldBy, ...(await getSailingState(buyerId)) };
     // ── SPENDING A CHART ─────────────────────────────────────────────────────────────────────────────
     // Marked sailed BEFORE the voyage row is written, and conditionally, so a double-tap cannot put one
     // chart on two voyages — there is no transaction on this driver to lean on (see postgres-landmines).
@@ -2230,10 +2210,6 @@ export async function doRaid(buyerId, targetId = null) {
             battle: { ...(await battleView(openNow.state, openNow.meta, { row })), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
-    // The interrogation comes before the next fight — see captainBlocking. Checked AFTER the resume above,
-    // so a fight you are already standing in is never taken away from you by the man below decks.
-    const waitingCaptain = await captainBlocking(buyerId);
-    if (waitingCaptain) return { ok: false, error: "captain_waiting", captain: waitingCaptain, ...(await getSailingState(buyerId)) };
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const raidExtras = await equippedRaidExtras(buyerId); // Dread Corsair: +1 raid/day, double win gold
     if (raidsUsedToday(row) >= raidsPerDay(myLevel, raidExtras.bonusRaids)) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
@@ -2352,29 +2328,21 @@ export async function doRaid(buyerId, targetId = null) {
 // can't move on from sailing until you interrogate them. If you click sailing or if you leave and you come
 // back to sailing, you're still stuck on the interrogation until you finish."
 //
-// So the interrogation is a STEP IN THE LOOP, not an errand beside it. Every door back out to sea asks this
-// first: setting sail, a battle, a raid, the fleet. One function rather than four copies — a gate written in
-// four places is a gate that is open in one of them. See [[feature-gates-come-in-pairs]].
+// ── TAKING HER CAPTAIN ───────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ THIS USED TO BE TWO FUNCTIONS AND A GATE IN FOUR PLACES. `captainBlocking` shut the sea, both raids and
+// the fleet until the man below decks had been interrogated, and `maybeOfferCaptain` refused to take a second
+// captain while the first was still waiting. Both are gone with the minigame: there is nothing to wait for, so
+// there is nothing to block and no queue to manage. Luke: "you capture the captain, and he gives you the
+// treasure map."
 //
-// It returns the man himself so the refusal can name him, because "you cannot sail" with no reason attached
-// is the same as a broken button.
-async function captainBlocking(buyerId) {
+// It only ever ADDS to a payout that has already been paid, and it swallows its own failures, so a chart that
+// does not write costs a chart and can never cost a win.
+async function maybeCaptureCaptain(buyerId, rank) {
     if (!captainsOpenTo(isOwner(buyerId))) return null;
     try {
-        const { brigView } = await import("@/lib/marketplace/captains-store.js");
-        return (await brigView(buyerId))?.captain || null;
-    } catch { return null; }
-}
-
-async function maybeOfferCaptain(buyerId, rank) {
-    if (!captainsOpenTo(isOwner(buyerId))) return null;
-    try {
-        const { offerCaptain, brigHasRoom } = await import("@/lib/marketplace/captains-store.js");
-        // One at a time. A second win while somebody is still standing on the deck does not queue him — the
-        // interrogation is the moment after THIS battle, and two of them waiting is a collection.
-        if (!(await brigHasRoom(buyerId))) return null;
-        return await offerCaptain(buyerId, Math.max(1, Number(rank) || 1));
-    } catch { return null; /* the brig is optional — a battle never fails for it */ }
+        const { captureCaptain } = await import("@/lib/marketplace/captains-store.js");
+        return await captureCaptain(buyerId, Math.max(1, Number(rank) || 1));
+    } catch { return null; /* the chart is a bonus — a battle never fails for it */ }
 }
 
 async function finishRaidBattle(buyerId, meta, res) {
@@ -3256,10 +3224,6 @@ export async function doBattle(buyerId) {
             battle: { ...(await battleView(openNow.state, openNow.meta, { row })), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
-    // The interrogation comes before the next fight — see captainBlocking. Checked AFTER the resume above,
-    // so a fight you are already standing in is never taken away from you by the man below decks.
-    const waitingCaptain = await captainBlocking(buyerId);
-    if (waitingCaptain) return { ok: false, error: "captain_waiting", captain: waitingCaptain, ...(await getSailingState(buyerId)) };
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const extras = await equippedRaidExtras(buyerId);
     if (raidsUsedToday(row) >= raidsPerDay(myLevel, extras.bonusRaids)) return { ok: false, error: "no_battles", ...(await getSailingState(buyerId)) };
@@ -3285,10 +3249,6 @@ export async function doFleetBattle(buyerId, rank = null) {
             battle: { ...(await battleView(openNow.state, openNow.meta, { row })), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
-    // The interrogation comes before the next fight — see captainBlocking. Checked AFTER the resume above,
-    // so a fight you are already standing in is never taken away from you by the man below decks.
-    const waitingCaptain = await captainBlocking(buyerId);
-    if (waitingCaptain) return { ok: false, error: "captain_waiting", captain: waitingCaptain, ...(await getSailingState(buyerId)) };
     const myBattleLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const extras = await equippedRaidExtras(buyerId);
     if (raidsUsedToday(row) >= raidsPerDay(myBattleLevel, extras.bonusRaids)) return { ok: false, error: "no_battles", ...(await getSailingState(buyerId)) };
@@ -3377,14 +3337,12 @@ async function finishFleetBattle(buyerId, meta, res) {
         [buyerId, res.win && first ? want : depth, res.win ? 1 : 0, res.win ? 0 : 1]
     ).catch(() => {});
     await trackActivity(buyerId, "ship_battle_end", { rank: want, win: res.win, sunk: res.sunk, struck: Boolean(res.struck), rounds: res.state.round }).catch(() => {});
-    // ── AND HER CAPTAIN IS STANDING ON YOUR DECK ─────────────────────────────────────────────────────
-    // Written AFTER the reward is paid and never in front of it: this only ever ADDS an offer, so a
-    // failure here costs a capture and cannot cost a win. See the note in captains.js on why the choice
-    // is a priced offer rather than a fork that holds the payout.
-    // ⚠️ OWNER-GATED, AND THE GATE COMES IN A PAIR — this half stops the offer being made, and the brig
-    // route stops it being acted on. Removing only one of them is how a member ends up buying something
-    // they cannot open. See captainsOpenTo.
-    const captainOffer = res.win ? await maybeOfferCaptain(buyerId, want) : null;
+    // ── AND YOU HAVE HER CAPTAIN, AND HE TELLS YOU WHERE SOMETHING IS ────────────────────────────────
+    // Written AFTER the reward is paid and never in front of it: this only ever ADDS, so a failure here
+    // costs a chart and cannot cost a win.
+    // ⚠️ OWNER-GATED, AND THE GATE COMES IN A PAIR — this half stops the capture, and chartsReady on the
+    // helm stops the charted voyage it would buy. See captainsOpenTo.
+    const captainTaken = res.win ? await maybeCaptureCaptain(buyerId, want) : null;
     if (res.win) {
         const depthNow = Math.max(depth, first ? want : depth);
         if (depthNow >= 1) await grantEventBadge(buyerId, "fleet_first_blood").catch(() => {});
@@ -3393,8 +3351,8 @@ async function finishFleetBattle(buyerId, meta, res) {
         if (depthNow >= MAX_FLEET_RANK) await grantEventBadge(buyerId, "fleet_admiral").catch(() => {});
         if (res.state.myHp >= res.state.myMax) await grantEventBadge(buyerId, "fleet_unscathed").catch(() => {});
     }
-    // The victory screen reads `captainOffer` to draw the choice; everything else about `paid` is unchanged.
-    if (captainOffer) paid.push({ kind: "captain", offer: captainOffer });
+    // The victory screen reads `captain` to draw him handing it over; everything else about `paid` is unchanged.
+    if (captainTaken) paid.push({ kind: "captain", captain: captainTaken });
     return paid;
 }
 

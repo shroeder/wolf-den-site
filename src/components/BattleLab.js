@@ -68,10 +68,11 @@ export default function BattleLab() {
         { kind: "parts", n: 4, tier: 2 },
         { kind: "seed", id: "potato", name: "Potato", rarity: "common" },
         { kind: "loot", name: "Tidebreaker Cutlass", rarity: "epic" },
-        // Her captain, in the shape finishFleetBattle pushes him — the one spoil that is a card rather than a
-        // chip, and the one the victory screen used to render as the bare word "Captain".
-        { kind: "captain", offer: { id: 1, rank: 18, stars: 3, name: "Cdr. Ashcroft", ship: "The Quiet Reckoning",
-            art: "/images/fleet/crew/fleet_court.png", cost: 1800 } },
+        // Her captain, in the shape finishFleetBattle pushes him — the one spoil that is a card rather than
+        // a chip, because he is a person and because the chart he hands over is a voyage rather than a number.
+        { kind: "captain", captain: { rank: 18, stars: 3, name: "Cdr. Ashcroft", ship: "The Quiet Reckoning",
+            art: "fleet_court", said: "He is a long time deciding. What he finally says, he says only once.",
+            chart: { id: 1, grade: 3, band: "bearing", bandName: "A Bearing", blurb: "Enough to steer by, if the sea is kind." } } },
     ];
 
     const fight = (rank) => {

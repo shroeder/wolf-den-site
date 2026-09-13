@@ -24,22 +24,25 @@ const base = JSON.parse(readFileSync("scripts/fixtures/sailing.base.json", "utf8
 const clone = () => JSON.parse(JSON.stringify(base));
 
 const STATES = {
-    // The captain below decks. The sea, raids and fleet battles all refuse while he is there, so the way to
-    // him has to be the first thing on the page — not a button you only find by pressing one that fails.
-    captain: {
-        why: "a captain is waiting: nothing else on this page works",
-        watch: [".sail-capblock", ".sail-capblock-go"],
-        make: () => { const s = clone(); s.captainWaiting = { name: "Reef Kallow", art: "fleet_heavy" }; s.captainsWaiting = 1; return s; },
-    },
-    // And the same page with nobody below: the banner must be GONE, not merely quiet.
-    clear: {
-        why: "nobody below decks: the banner must not be there at all",
-        watch: [],
-        // Reported, not failed. The station switcher living under the boat is the design — the boat is the
-        // hero of this screen — so it is here to be LOOKED AT each run rather than to be asserted about.
-        soft: [".sail-stations"],
+    // A chart in hand. This is what a captain is FOR: beat her, he gives up the anchorage, and the helm grows a
+    // fourth voyage option that is not one of the three durations. ⚠️ There used to be an interrogation between
+    // those two things and a banner blocking the page until you had done it — both are gone (see captains.js),
+    // so what is left to check is that the chart shows up and the sea is not shut.
+    charted: {
+        why: "a chart in hand: the helm offers a charted island and nothing is blocked",
+        // PRESENT, not `watch`: the embark picker sits under the boat by design, so "below the fold" is not a
+        // fault here — "not there at all" is. Three strengths, and picking the wrong one is how a check starts
+        // failing for a thing that is working.
+        present: [".sail-embark-opt.is-charted"],
         absent: [".sail-capblock"],
-        make: () => { const s = clone(); s.captainWaiting = null; s.captainsWaiting = 0; return s; },
+        make: () => { const s = clone(); s.chartsReady = 2; s.status = "idle"; return s; },
+    },
+    clear: {
+        why: "no chart: the charted option must not be there at all",
+        watch: [],
+        soft: [".sail-stations"],
+        absent: [".sail-embark-opt.is-charted", ".sail-capblock"],
+        make: () => { const s = clone(); s.chartsReady = 0; s.status = "idle"; return s; },
     },
     // Mid-voyage, which is what most members see most of the time.
     sailing: {
@@ -47,7 +50,7 @@ const STATES = {
         watch: [],
         soft: [".sail-stations"],
         make: () => {
-            const s = clone(); s.captainWaiting = null; s.captainsWaiting = 0; s.status = "sailing";
+            const s = clone(); s.chartsReady = 0; s.status = "sailing";
             s.departedAt = new Date(Date.now() - 60_000).toISOString();
             s.arrivesAt = new Date(Date.now() + 20 * 60_000).toISOString();
             return s;
@@ -84,7 +87,7 @@ for (const name of names) {
         const out = `${OUT}/${name}-${z.name}`;
         const r = spawnSync(process.execPath, [
             "scripts/film.mjs", "http://localhost:3000/marketplace/sailing", out,
-            "--fixture", name, "--pre", RETURNING, "--fold", [...(st.watch || []), ...(st.soft || []), ...(st.absent || [])].join(","),
+            "--fixture", name, "--pre", RETURNING, "--fold", [...(st.watch || []), ...(st.present || []), ...(st.soft || []), ...(st.absent || [])].join(","),
             "--settle", "9000", "--frames", "1", "--every", "200",
             "--w", String(z.w), "--h", String(z.h), "--dpr", String(z.dpr),
         ], { encoding: "utf8", env: { ...process.env, SHOT_QUIET: "1" } });
@@ -98,6 +101,13 @@ for (const name of names) {
                 const gone = /NOT IN THE DOCUMENT/.test(l);
                 console.log(`     ${gone ? "ok  " : "⚠️  "} ${l.trim().replace(/^fold\s+/, "")}${gone ? "  (correct — it should not be here)" : "  ← SHOULD NOT BE HERE"}`);
                 if (!gone) bad += 1;
+                continue;
+            }
+            const isPresent = (st.present || []).some((sel) => l.includes(sel));
+            if (isPresent) {
+                const there = !/NOT IN THE DOCUMENT|HIDDEN by css/.test(l);
+                if (!there) bad += 1;
+                console.log(`     ${there ? "ok  " : "⚠️  "} ${l.trim().replace(/^fold\s+/, "")}${there ? "" : "  ← MUST BE HERE"}`);
                 continue;
             }
             const isSoft = (st.soft || []).some((sel) => l.includes(sel));

@@ -20,7 +20,6 @@ import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
 import ConsumableShelf from "@/components/ConsumableShelf";
 import Coin from "@/components/Coin";
-import Brig from "@/components/Brig";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
 // passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
@@ -244,7 +243,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // if the only thing you may do is ask him, then the button that used to raid takes you to him. A nonce
     // rather than a boolean: pressing Raid a second time after closing the panel has to open it again, and a
     // flag that is already true does nothing.
-    const [askCaptain, setAskCaptain] = useState(0);
     // Where the stations live on the page, so something that SENDS you to a station can actually take you
     // there — see onUpgradeShip below.
     const stationsRef = useRef(null);
@@ -542,31 +540,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             // tap that the server declined was indistinguishable from a dead button — which is exactly how it
             // looked when an abandoned fight left `battle_in_progress` on the row. The server resumes that case
             // now; everything else at least gets a reason.
-            if (BATTLE_ACTIONS.has(action) && d?.error === "captain_waiting") {
-                setStation("guns");
-                setAskCaptain((n) => n + 1);
-            }
             if (BATTLE_ACTIONS.has(action)) {
                 setBattleMsg(!d ? "The sea didn't answer — try that again."
-                    // ⚠️ THE BLOCKING STEP HAS TO NAME ITSELF. The interrogation sits in the middle of the
-                    // loop — sail, fight, ask him, go again — so every door out to sea refuses while he is
-                    // below. A refusal with no reason on it is a dead button, which is what the note above
-                    // this one was written about.
-                    : d.error === "captain_waiting"
-                        ? `${d.captain?.name || "Her captain"} is below decks. Nothing leaves this harbour until he talks.`
                     : d.error === "no_battles" || d.error === "no_raid" ? "No battles left today — they come back at midnight."
                     : d.error === "no_target" ? "Nobody worth taking on out there right now."
                     : d.error === "locked" ? "Sink the ship ahead of it first."
                     : d.error ? "That fight couldn't start — try again."
                     : null);
-            }
-            if (d?.error === "captain_waiting") {
-                // Straight to the brig and straight into the panel — see the note on askCaptain.
-                setStation("guns");
-                setAskCaptain((n) => n + 1);
-                // Setting sail is not in BATTLE_ACTIONS, and it is blocked by the same man. Sent to the same
-                // line rather than a second one, so the sentence cannot drift between the two doors.
-                setBattleMsg(`${d.captain?.name || "Her captain"} is below decks. Nothing leaves this harbour until he talks.`);
             }
             if (d && !d.error) {
                 // A `partial` response carries only what changed (mid-dig taps send just the board), so merge it
@@ -669,21 +649,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         // is refused by the server. If a battle is open, Raid means "back on deck".
         const open = stateRef.current?.combat?.openBattle;
         if (open) { setShipBattle(open); return; }
-        // ── AND A CAPTAIN BELOW DECKS OWNS IT TOO ────────────────────────────────────────────────────
-        // Luke: "Unable to get to the interrogate. It should pop up when I click raid."
-        //
-        // The server refuses every fight while a captain is waiting — but this button never asked the
-        // server. It opened the yard, and the yard is a list of opponents every one of which is about to be
-        // refused. So the block was real and completely invisible from the one button anybody presses.
-        //
-        // Same argument as the unfinished fight directly above: if there is exactly one thing you may do,
-        // this button is how you do it. The count is already on the state for the station dot, so asking
-        // costs nothing.
-        if ((stateRef.current?.captainsWaiting || 0) > 0) {
-            setStation("guns");
-            setAskCaptain((n) => n + 1);
-            return;
-        }
         setBattleTab("battles");
         setYardOpen(true);
     }, []);
@@ -764,37 +729,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
     return (
         <div className="stack reveal sailing">
-            {/* ── THE MAN WHO IS STOPPING YOU ─────────────────────────────────────────────────────────────
-                Luke: "I cant sail and I cant interrogate at all fix the fucking ui so I can clearly
-                interrogate this mf."
-                ⚠️ FIRST THING ON THE PAGE, ABOVE THE TITLE. It went above the STATIONS first, which is two
-                screens down past the how-to-play card, the weather prompt and the boat — so a banner whose
-                whole job is "you cannot do anything else" was below the fold on the screen it was blocking.
-                ⚠️ A BLOCKING STEP HAS TO BLOCK THE PAGE, NOT A BUTTON. Everything before this was a dot on a
-                tab and a refusal message on whichever door you happened to push — which means the state of
-                the whole feature was being communicated by things you had to go and find. He is the only
-                thing you can do, so he is the first thing on the screen, on every station, with his face on
-                it and one button. Nothing subtle survives contact with somebody who just wants to play.
-                `owner` is checked here as well as at the API and at the brig itself — three places, same
-                reason the rest of this feature has three. */}
-            {state.owner === true && state.captainWaiting ? (
-                <section className="card sail-capblock">
-                    {state.captainWaiting.art ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img className="sail-capblock-face" src={`/images/fleet/crew/${state.captainWaiting.art}.png`}
-                            alt="" draggable="false" />
-                    ) : null}
-                    <div className="sail-capblock-body">
-                        <b>{state.captainWaiting.name} is below decks</b>
-                        <em>Nothing leaves this harbour until he talks.</em>
-                    </div>
-                    <button type="button" className="sail-cta sail-capblock-go"
-                        onClick={() => { setStation("guns"); setAskCaptain((n) => n + 1); }}>
-                        Interrogate him
-                    </button>
-                </section>
-            ) : null}
-
             <section className="card" style={{ overflow: "hidden" }}>
                 <div className="sail-head">
                     <h1 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
@@ -1279,15 +1213,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="sail-station-art" src={`/images/sailing/tracks/${art}.png`} alt="" draggable="false" />
                         <em>{label}</em>
-                        {/* ── THE BRIG ASKS FOR YOU ────────────────────────────────────────────────
-                            A captured captain waits on deck for thirty minutes and is then gone for
-                            good, and the only thing that knew was the brig itself — a feature that can
-                            only tell you something while you are already looking at it. The count is
-                            owner-gated upstream and rides the query the page already runs, so for
+                        {/* A chart in hand is a voyage you can take and nothing on this row would say so.
+                            Owner-gated upstream and riding the query the page already runs, so for
                             everybody else this is exactly the row it was. */}
-                        {k === "guns" && (state.captainsWaiting > 0 || state.chartsReady > 0) ? (
-                            <i className="sail-station-dot" aria-label={state.captainsWaiting > 0
-                                ? `${state.captainsWaiting} in irons on deck` : "A chart is ready"} />
+                        {k === "helm" && state.chartsReady > 0 ? (
+                            <i className="sail-station-dot" aria-label="A chart is ready" />
                         ) : null}
                     </button>
                 ))}
@@ -1343,18 +1273,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             </section>
 
             </> : null}
-
-            {/* ── THE BRIG ────────────────────────────────────────────────────────────────────────────
-                Under the gun deck because that is where the fight ends and where a prisoner comes from.
-                ⚠️ OWNER-GATED, AND THE GATE IS IN THREE PLACES BY DESIGN: here (the door), the API route
-                (the play path), and finishFleetBattle (whether an offer is ever made at all). A feature
-                gated only at the door still lets somebody buy a captain they cannot go and look at.
-                See captains.js CAPTAINS_PUBLIC — flipping that one constant opens all three. */}
-            {station === "guns" && state.owner === true ? (
-                <section className="card">
-                    <Brig openNow={askCaptain} />
-                </section>
-            ) : null}
 
             {station === "guns" && state.combat ? <>
                 <section className="card">
