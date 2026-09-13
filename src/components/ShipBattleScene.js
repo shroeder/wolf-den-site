@@ -1445,7 +1445,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                                     <b>{captain.name} is on your deck</b>
                                     <span className="sbt-captain-stars">{"★".repeat(Math.max(1, captain.stars || 1))}</span>
                                     <em>Master of {captain.ship}. He knows where something is, and he will not say.</em>
-                                    <i>Ask him within 30 minutes, or he goes over the side. He costs nothing; he is the way to the island.</i>
+                                    <i>He waits below until you ask him — and nothing else leaves this harbour until he has talked.</i>
                                 </div>
                                 <a className="sail-cta sbt-captain-go" href="/marketplace/sailing?station=guns">Interrogate him</a>
                             </div>

@@ -38,11 +38,10 @@ import { FLEET, MAX_FLEET_RANK } from "@/lib/marketplace/fleet.js";
 // It is priced at what he would pay to be let go — see ransomFor. So the arithmetic in front of the player is
 // clean: keeping him costs precisely what releasing him would return, and every doubloon of that is bet on
 // getting a confession out of him instead.
-// ⚠️ HE WAITS, BUT HE IS NOT KEPT. Thirty minutes is how long a captain stands on the deck before he goes
-// over the side — not so the brig can hold a collection, but so closing a tab between the battle and the
-// interrogation does not silently lose the only thing the fight was for. One at a time; the next win cannot
-// arrive while he is still standing there.
-export const OFFER_MINUTES = 30;
+// ⚠️ THERE IS NO WINDOW AND NO WAY TO LOSE HIM. He used to stand on the deck for thirty minutes and then go
+// over the side, and OFFER_MINUTES is gone with that. Luke: "There's no risk to be on two because you can only
+// ever be on one. It's blocking ... You can't move on from sailing until you interrogate them." A timer on a
+// blocking step is a trap rather than tension — the only thing it can do is punish somebody for closing a tab.
 
 // ⚠️ HE COSTS NOTHING. Taking him used to cost exactly what releasing him would have paid, which was the
 // right shape for a thing you KEEP — a berth is a decision and a decision needs a price. He is a step on the

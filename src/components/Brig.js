@@ -164,7 +164,7 @@ export default function Brig() {
                 ) : null}
             </div>
 
-            {held.length ? <p className="brg-count">He is here for {brig.minutes} minutes. Ask him.</p> : null}
+            {held.length ? <p className="brg-count">You are not going back out until he talks.</p> : null}
             {err ? <p className="brg-err" role="alert">{err}</p> : null}
 
             {(brig.charts || []).length ? (

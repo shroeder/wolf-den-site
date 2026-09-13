@@ -18,7 +18,7 @@ import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { captainsOpenTo, OFFER_MINUTES } from "@/lib/marketplace/captains.js";
+import { captainsOpenTo } from "@/lib/marketplace/captains.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, foePlanks, BATTLE_STATE_V,
@@ -1833,9 +1833,8 @@ export async function getSailingState(buyerId, skyKey = null) {
             `SELECT
                 (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS charts,
                 (SELECT COUNT(*)::int FROM mkt_ship_captive
-                  WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'offered'
-                    AND taken_at > NOW() - ($2 || ' minutes')::interval) AS waiting`,
-            [buyerId, String(OFFER_MINUTES)]
+                  WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'held') AS waiting`,
+            [buyerId]
         ).catch(() => null)
         : null;
     const chartsHeld = Number(brigRow?.charts) || 0;
@@ -1861,6 +1860,8 @@ export async function startVoyage(buyerId, optionId = "standard") {
     const row = await readRow(buyerId);
     const state = decorate(row);
     if (state.status !== "idle") return { ok: false, error: "busy", ...(await getSailingState(buyerId)) };
+    const heldBy = await captainBlocking(buyerId);
+    if (heldBy) return { ok: false, error: "captain_waiting", captain: heldBy, ...(await getSailingState(buyerId)) };
     // ── SPENDING A CHART ─────────────────────────────────────────────────────────────────────────────
     // Marked sailed BEFORE the voyage row is written, and conditionally, so a double-tap cannot put one
     // chart on two voyages — there is no transaction on this driver to lean on (see postgres-landmines).
@@ -2219,6 +2220,10 @@ export async function doRaid(buyerId, targetId = null) {
             battle: { ...(await battleView(openNow.state, openNow.meta, { row })), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
+    // The interrogation comes before the next fight — see captainBlocking. Checked AFTER the resume above,
+    // so a fight you are already standing in is never taken away from you by the man below decks.
+    const waitingCaptain = await captainBlocking(buyerId);
+    if (waitingCaptain) return { ok: false, error: "captain_waiting", captain: waitingCaptain, ...(await getSailingState(buyerId)) };
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const raidExtras = await equippedRaidExtras(buyerId); // Dread Corsair: +1 raid/day, double win gold
     if (raidsUsedToday(row) >= raidsPerDay(myLevel, raidExtras.bonusRaids)) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
@@ -2332,6 +2337,25 @@ export async function doRaid(buyerId, targetId = null) {
 //
 // Best-effort and always AFTER the purse is paid: this only ever ADDS an offer, so a failure in here costs a
 // capture and can never cost a win.
+// ── AND THE SEA IS SHUT UNTIL HE HAS TALKED ──────────────────────────────────────────────────────────────────
+// Luke: "Sailing is literally... you sail, you fight, you interrogate, and then you get to go again ... You
+// can't move on from sailing until you interrogate them. If you click sailing or if you leave and you come
+// back to sailing, you're still stuck on the interrogation until you finish."
+//
+// So the interrogation is a STEP IN THE LOOP, not an errand beside it. Every door back out to sea asks this
+// first: setting sail, a battle, a raid, the fleet. One function rather than four copies — a gate written in
+// four places is a gate that is open in one of them. See [[feature-gates-come-in-pairs]].
+//
+// It returns the man himself so the refusal can name him, because "you cannot sail" with no reason attached
+// is the same as a broken button.
+async function captainBlocking(buyerId) {
+    if (!captainsOpenTo(isOwner(buyerId))) return null;
+    try {
+        const { brigView } = await import("@/lib/marketplace/captains-store.js");
+        return (await brigView(buyerId))?.captain || null;
+    } catch { return null; }
+}
+
 async function maybeOfferCaptain(buyerId, rank) {
     if (!captainsOpenTo(isOwner(buyerId))) return null;
     try {
@@ -3222,6 +3246,10 @@ export async function doBattle(buyerId) {
             battle: { ...(await battleView(openNow.state, openNow.meta, { row })), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
+    // The interrogation comes before the next fight — see captainBlocking. Checked AFTER the resume above,
+    // so a fight you are already standing in is never taken away from you by the man below decks.
+    const waitingCaptain = await captainBlocking(buyerId);
+    if (waitingCaptain) return { ok: false, error: "captain_waiting", captain: waitingCaptain, ...(await getSailingState(buyerId)) };
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const extras = await equippedRaidExtras(buyerId);
     if (raidsUsedToday(row) >= raidsPerDay(myLevel, extras.bonusRaids)) return { ok: false, error: "no_battles", ...(await getSailingState(buyerId)) };
@@ -3247,6 +3275,10 @@ export async function doFleetBattle(buyerId, rank = null) {
             battle: { ...(await battleView(openNow.state, openNow.meta, { row })), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
+    // The interrogation comes before the next fight — see captainBlocking. Checked AFTER the resume above,
+    // so a fight you are already standing in is never taken away from you by the man below decks.
+    const waitingCaptain = await captainBlocking(buyerId);
+    if (waitingCaptain) return { ok: false, error: "captain_waiting", captain: waitingCaptain, ...(await getSailingState(buyerId)) };
     const myBattleLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const extras = await equippedRaidExtras(buyerId);
     if (raidsUsedToday(row) >= raidsPerDay(myBattleLevel, extras.bonusRaids)) return { ok: false, error: "no_battles", ...(await getSailingState(buyerId)) };

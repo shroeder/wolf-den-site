@@ -537,11 +537,22 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             // now; everything else at least gets a reason.
             if (BATTLE_ACTIONS.has(action)) {
                 setBattleMsg(!d ? "The sea didn't answer — try that again."
+                    // ⚠️ THE BLOCKING STEP HAS TO NAME ITSELF. The interrogation sits in the middle of the
+                    // loop — sail, fight, ask him, go again — so every door out to sea refuses while he is
+                    // below. A refusal with no reason on it is a dead button, which is what the note above
+                    // this one was written about.
+                    : d.error === "captain_waiting"
+                        ? `${d.captain?.name || "Her captain"} is below decks and will not be left there. Go and ask him.`
                     : d.error === "no_battles" || d.error === "no_raid" ? "No battles left today — they come back at midnight."
                     : d.error === "no_target" ? "Nobody worth taking on out there right now."
                     : d.error === "locked" ? "Sink the ship ahead of it first."
                     : d.error ? "That fight couldn't start — try again."
                     : null);
+            }
+            if (d?.error === "captain_waiting") {
+                // Setting sail is not in BATTLE_ACTIONS, and it is blocked by the same man. Sent to the same
+                // line rather than a second one, so the sentence cannot drift between the two doors.
+                setBattleMsg(`${d.captain?.name || "Her captain"} is below decks and will not be left there. Go and ask him.`);
             }
             if (d && !d.error) {
                 // A `partial` response carries only what changed (mid-dig taps send just the board), so merge it

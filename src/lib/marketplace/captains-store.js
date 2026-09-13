@@ -11,24 +11,28 @@ import "server-only";
 import { db } from "@/lib/db";
 import {
     BRIG_BERTHS, DISPOSITION_IDS, DISPOSITIONS, TACTICS,
-    OFFER_MINUTES, captainFor, chartBand, chartGrade, interrogate, newCaptive, tellFor,
+    captainFor, chartBand, chartGrade, interrogate, newCaptive, tellFor,
 } from "@/lib/marketplace/captains.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 /**
- * The man on your deck. Raw row — internal only, disposition included.
+ * The man below decks. Raw row — internal only, disposition included.
  *
- * ⚠️ HE IS ON A CLOCK, AND THAT CLOCK IS WHAT STOPS THIS BEING A COLLECTION. There are no berths: a captain
- * stands there for OFFER_MINUTES and is then over the side. Without the window he would simply sit in the
- * table forever, which is a berth with the word filed off.
+ * ⚠️ NO CLOCK, AND THAT IS THE POINT. He stood on the deck for thirty minutes and then went over the side,
+ * which made him a thing you could LOSE — and a thing you can lose is a thing you have to remember to go and
+ * collect. Luke: "There's no risk to be on two because you can only ever be on one. It's blocking ... You
+ * can't move on from sailing until you interrogate them. If you click sailing or if you leave and you come
+ * back to sailing, you're still stuck on the interrogation until you finish."
+ *
+ * So he waits as long as it takes, and the sea is shut until he has talked. See captainBlocking in
+ * sailing.js, which is the half that shuts it.
  */
 async function heldRows(buyerId) {
     return db.query(
         `SELECT * FROM mkt_ship_captive
           WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'held'
-            AND taken_at > NOW() - ($2 || ' minutes')::interval
           ORDER BY taken_at DESC`,
-        [buyerId, String(OFFER_MINUTES)]
+        [buyerId]
     ).catch(() => []);
 }
 
@@ -69,7 +73,6 @@ export async function brigView(buyerId) {
     // captain standing in front of you, or there is not, and there are the charts he has already given up.
     return {
         captain: rows.map(rowToCaptive).map(publicCaptive)[0] || null,
-        minutes: OFFER_MINUTES,
         charts: charts.map((r) => ({ id: Number(r.id), grade: r.grade, band: r.band })),
     };
 }
