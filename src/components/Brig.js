@@ -21,7 +21,7 @@
 // breaks. Nothing here knows anything it should not.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GiCoinflip, GiOpenGate, GiScrollUnfurled } from "react-icons/gi";
+import { createPortal } from "react-dom";
 import { playMusic, sfx, stopMusic, wake } from "@/lib/marketplace/cards-sound.js";
 
 const ROOM = "/images/sailing/brig/room.png";
@@ -31,7 +31,8 @@ const face = (id) => `/images/fleet/crew/${id}.png`;
 const TACTICS = [
     { id: "bluff", name: "Bluff", line: "You already have it. His own crew is why." },
     { id: "offer", name: "Offer", line: "Name a number and let him argue." },
-    { id: "confront", name: "Confront", line: "Bring another of them in.", needsOther: true },
+    // No second prisoner to bring in any more — it is his own crew, who you took with the ship.
+    { id: "confront", name: "Confront", line: "Walk one of his own crew past the door." },
     { id: "wait", name: "Wait", line: "Say nothing. Leave him with the dark." },
 ];
 
@@ -87,7 +88,7 @@ export default function Brig() {
             setOpenId(null);
             // ⚠️ HELD SEPARATELY BECAUSE HE LEAVES. A broken captain's row ends in the same response that
             // says he cracked, so the cell showing him unmounts before the payoff can be read.
-            setBroke({ ...captive, said: d.said, text: d.captive?.broke, confession: d.confession });
+            setBroke({ ...captive, said: d.said, text: d.captive?.broke, chart: d.chart });
             return;
         }
         sfx(d.outcome === "crack" ? "brigCrack" : d.outcome === "harden" ? "brigHarden" : "brigRead");
@@ -98,8 +99,12 @@ export default function Brig() {
 
     if (!brig) return <p className="brg-wait">Going below…</p>;
 
-    const open = (brig.captives || []).find((c) => c.id === openId) || null;
-    const held = brig.captives || [];
+    // ⚠️ ONE MAN, NOT A ROOM OF THEM. Luke: "I dont think we need to collect enemy captains. We just use them
+    // as a way to get the location of treasure. Its transient, a stepping stone, not collected." So the berth
+    // list, the deck offers, the confession pile and the "lay them side by side" button are all gone — what is
+    // left is the room, whoever is standing in it, and the charts he has already given up.
+    const held = brig.captain ? [brig.captain] : [];
+    const open = held.find((c) => c.id === openId) || null;
 
     return (
         <section className={`brg${shake ? " is-shook" : ""}`} onPointerDown={arm}>
@@ -145,7 +150,7 @@ export default function Brig() {
                     absolutely-positioned children in a grid. */}
                 {/* Out here with the nameplates and for the same reason: .brg-floor opens a stacking
                     context, so anything inside it is under the iron no matter what z-index it claims. */}
-                {!held.length ? <p className="brg-none">Nobody in the irons. Board a ship and take her captain.</p> : null}
+                {!held.length ? <p className="brg-none">Nobody down here. Beat a ship and her captain comes below with you.</p> : null}
 
                 {held.length ? (
                     <div className="brg-plates-row" aria-hidden="true">
@@ -159,47 +164,8 @@ export default function Brig() {
                 ) : null}
             </div>
 
-            <p className="brg-count">{held.length} of {brig.berths} irons full</p>
+            {held.length ? <p className="brg-count">He is here for {brig.minutes} minutes. Ask him.</p> : null}
             {err ? <p className="brg-err" role="alert">{err}</p> : null}
-
-            {/* ── STILL ON DECK ── */}
-            {(brig.offers || []).map((o) => (
-                <div key={o.id} className="brg-deck">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={face(o.art)} alt="" className="brg-deck-face" draggable="false" />
-                    <span className="brg-deck-who">
-                        <i>On your deck</i>
-                        <b>{o.name}</b>
-                        <Stars n={o.stars} />
-                    </span>
-                    <button type="button" className="brg-btn is-go" disabled={busy || brig.room <= 0}
-                        onClick={() => { sfx("brigTake"); act({ action: "take", id: o.id }); }}>
-                        {brig.room <= 0 ? "No iron free" : <>Keep him <em>{o.cost.toLocaleString()}</em></>}
-                    </button>
-                </div>
-            ))}
-
-            {/* ── WHAT THEY HAVE GIVEN UP ── */}
-            <div className="brg-conf">
-                <p className="brg-head"><GiScrollUnfurled aria-hidden="true" /> Confessions</p>
-                <div className="brg-papers">
-                    {Array.from({ length: brig.piecesNeeded }, (_, i) => {
-                        const c = brig.confessions[i];
-                        return (
-                            <span key={i} className={`brg-paper${c ? " is-had" : ""}`}>
-                                {c ? <><b>{c.name}</b><Stars n={c.stars} /></> : <i>—</i>}
-                            </span>
-                        );
-                    })}
-                </div>
-                <button type="button" className="brg-btn is-go brg-wide"
-                    disabled={busy || brig.confessions.length < brig.piecesNeeded}
-                    onClick={() => { sfx("brigChart"); act({ action: "chart" }); }}>
-                    {brig.confessions.length < brig.piecesNeeded
-                        ? `${brig.piecesNeeded - brig.confessions.length} more before they agree on a place`
-                        : "Lay them side by side"}
-                </button>
-            </div>
 
             {(brig.charts || []).length ? (
                 <div className="brg-charts">
@@ -212,8 +178,17 @@ export default function Brig() {
                 </div>
             ) : null}
 
+            {/* ── BOTH OVERLAYS GO TO document.body ────────────────────────────────────────────────────
+                ⚠️ position: fixed WAS NOT FIXED TO THE VIEWPORT. The brig is rendered inside a `.card` on the
+                sailing page, and that card carries `animation: fade-in-up ... both` — `both` keeps the
+                animation's final transform on the element forever, and ANY transform other than `none` makes
+                that element the containing block for fixed descendants. So the interrogation panel anchored
+                to the card and opened at 1745px down a 1000px screen: you tapped the man and nothing
+                appeared. Measured, not guessed — getBoundingClientRect on the open dialog.
+                Portalled, which is what five other overlays in this repo already do. The styled-jsx classes
+                travel with the markup, so nothing about the look changes. */}
             {/* ── THE INTERROGATION ── the same room, one man, and everything else gone. */}
-            {open ? (
+            {open && typeof document !== "undefined" ? createPortal((
                 <div className="brg-over" role="dialog" aria-label={open.name}>
                     <div className="brg-scene" style={{ backgroundImage: `url(${ROOM})` }}>
                         <span className="brg-dark" aria-hidden="true" />
@@ -282,36 +257,31 @@ export default function Brig() {
 
                         {open.status === "spent" ? (
                             <div className="brg-done">
-                                <p>The lantern is out. He will buy himself back, or you can put him off at the next port.</p>
-                                <button type="button" className="brg-btn is-go brg-wide" disabled={busy}
-                                    onClick={() => { sfx("brigRansom"); act({ action: "ransom", id: open.id }); setOpenId(null); }}>
-                                    <GiCoinflip aria-hidden="true" /> Ransom him <em>{open.ransom.toLocaleString()}</em>
-                                </button>
+                                {/* Ransom and release are gone with the berths — there is nothing left to do
+                                    with a man you cannot break, and nothing to keep him in. */}
+                                <p>The lantern is out and he has said all he is going to. He goes over the side.</p>
                                 <button type="button" className="brg-btn brg-wide" disabled={busy}
-                                    onClick={() => { sfx("close"); act({ action: "release", id: open.id }); setOpenId(null); }}>
-                                    <GiOpenGate aria-hidden="true" /> Let him go
-                                </button>
+                                    onClick={() => { sfx("close"); setOpenId(null); load(); }}>Leave him</button>
                             </div>
                         ) : (
                             <div className="brg-plates">
-                                {TACTICS.map((t) => {
-                                    const locked = t.needsOther && !brig.canConfront;
-                                    return (
-                                        <button key={t.id} type="button" className="brg-plate" disabled={busy || locked}
-                                            onClick={() => ask(open, t.id)}>
-                                            <b>{t.name}</b>
-                                            <i>{locked ? "Nobody else in the irons." : t.line}</i>
-                                        </button>
-                                    );
-                                })}
+                                {/* No tactic is locked any more: Confront reaches for his own crew rather than
+                                    a second prisoner, and there is never a second prisoner. */}
+                                {TACTICS.map((t) => (
+                                    <button key={t.id} type="button" className="brg-plate" disabled={busy}
+                                        onClick={() => ask(open, t.id)}>
+                                        <b>{t.name}</b>
+                                        <i>{t.line}</i>
+                                    </button>
+                                ))}
                             </div>
                         )}
                     </div>
                 </div>
-            ) : null}
+            ), document.body) : null}
 
             {/* ── HE TALKS ── the one loud moment down here. */}
-            {broke ? (
+            {broke && typeof document !== "undefined" ? createPortal((
                 <div className="brg-over is-broke" role="dialog" aria-label={`${broke.name} talked`}
                     onClick={() => { sfx("tap"); setBroke(null); }}>
                     <div className="brg-scene is-lit" style={{ backgroundImage: `url(${ROOM})` }}>
@@ -324,11 +294,13 @@ export default function Brig() {
                         <p className="brg-kick">He talks</p>
                         <p className="brg-broke-name">{broke.name}</p>
                         <p className="brg-said is-crack">{broke.said}<em>{broke.text}</em></p>
-                        <p className="brg-note">His confession is in your hold. Three of them name a place.</p>
+                        <p className="brg-note">{broke.chart
+                            ? <>He names the water. <b>{broke.chart.name}</b> — {broke.chart.blurb}</>
+                            : <>He names the water, and the chart is in your hold.</>}</p>
                         <button type="button" className="brg-btn is-go brg-wide" onClick={() => setBroke(null)}>Good</button>
                     </div>
                 </div>
-            ) : null}
+            ), document.body) : null}
 
             <style jsx>{`
                 .brg { display: block; }
@@ -449,32 +421,10 @@ export default function Brig() {
                 .brg-err { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px;
                     background: #3a1c20; color: #ffc9cf; font-size: 13px; }
 
-                .brg-deck { display: flex; align-items: center; gap: 11px; margin-top: 12px; padding: 10px 12px;
-                    border: 1px solid #6a5432; border-radius: 12px;
-                    background: linear-gradient(180deg, #241d12, #171208);
-                    box-shadow: inset 0 1px 0 rgba(255,210,140,.08); }
-                .brg-deck-face { width: 52px; height: 52px; object-fit: contain; flex: 0 0 auto;
-                    filter: drop-shadow(0 4px 7px rgba(0,0,0,.6)); }
-                .brg-deck-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-                .brg-deck-who i { font-size: 10.5px; font-style: normal; letter-spacing: .09em;
-                    text-transform: uppercase; color: #b39355; }
-                .brg-deck-who b { font-size: 15px; font-weight: 800; color: #f2e6cd;
-                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .brg-deck .brg-btn { margin-left: auto; flex: 0 0 auto; }
 
                 .brg-head { display: flex; align-items: center; gap: 6px; margin: 18px 0 8px;
                     font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #8a7f6d; }
                 .brg-head :global(svg) { width: 15px; height: 15px; color: #b39355; }
-                .brg-papers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 9px; }
-                .brg-paper { display: flex; flex-direction: column; align-items: center; justify-content: center;
-                    gap: 4px; min-height: 58px; padding: 7px 5px; border-radius: 4px;
-                    border: 1px dashed #3b342a; background: #14110c; }
-                .brg-paper.is-had { border: 0; background: linear-gradient(178deg, #e8dcbe, #cdbe99);
-                    box-shadow: 0 2px 5px rgba(0,0,0,.6); transform: rotate(-.7deg); }
-                .brg-paper.is-had:nth-child(2) { transform: rotate(.9deg); }
-                .brg-paper.is-had b { color: #2b2317; font-size: 11.5px; font-weight: 800; text-align: center;
-                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-                .brg-paper i { color: #443c30; font-style: normal; }
 
                 .brg-chart { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; margin-top: 8px;
                     padding: 11px 13px; border: 1px solid #4a6274; border-radius: 10px;
@@ -652,7 +602,6 @@ function errorText(code) {
         case "needs_other": return "You are holding nobody else to walk in.";
         case "no_offer": case "gone": return "He is gone — that one waited as long as he was going to.";
         case "spent": return "The lantern is out. There is nothing left to try on him.";
-        case "not_enough": return "Not enough confessions yet.";
         default: return "That did not go through.";
     }
 }

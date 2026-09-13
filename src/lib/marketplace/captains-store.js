@@ -10,32 +10,22 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import {
-    BRIG_BERTHS, CHART_PIECES, DISPOSITION_IDS, DISPOSITIONS, TACTICS,
-    OFFER_MINUTES, boardingCost, captainFor, chartBand, chartGrade, interrogate, newCaptive, ransomFor, tellFor,
+    BRIG_BERTHS, DISPOSITION_IDS, DISPOSITIONS, TACTICS,
+    OFFER_MINUTES, captainFor, chartBand, chartGrade, interrogate, newCaptive, tellFor,
 } from "@/lib/marketplace/captains.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
-/** Everyone still aboard. Raw rows — internal only, disposition included. */
+/**
+ * The man on your deck. Raw row — internal only, disposition included.
+ *
+ * ⚠️ HE IS ON A CLOCK, AND THAT CLOCK IS WHAT STOPS THIS BEING A COLLECTION. There are no berths: a captain
+ * stands there for OFFER_MINUTES and is then over the side. Without the window he would simply sit in the
+ * table forever, which is a berth with the word filed off.
+ */
 async function heldRows(buyerId) {
     return db.query(
         `SELECT * FROM mkt_ship_captive
-          WHERE buyer_id = $1 AND ended_at IS NULL AND status <> 'offered' ORDER BY taken_at`,
-        [buyerId]
-    ).catch(() => []);
-}
-
-/**
- * Men standing on your deck who have not been paid for yet.
- *
- * ⚠️ THE OFFER IS A ROW AND NOT A MOMENT ON THE VICTORY SCREEN. If taking him only existed while the client
- * still held the result, then closing the tab, a dropped connection or a stray back-button would lose a
- * five-star captain — and it would be unreportable, because nothing would have gone wrong anywhere a log
- * could see it. He waits on deck instead, for OFFER_MINUTES, and the brig can show him.
- */
-async function offerRows(buyerId) {
-    return db.query(
-        `SELECT * FROM mkt_ship_captive
-          WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'offered'
+          WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'held'
             AND taken_at > NOW() - ($2 || ' minutes')::interval
           ORDER BY taken_at DESC`,
         [buyerId, String(OFFER_MINUTES)]
@@ -62,7 +52,6 @@ function publicCaptive(c) {
     return {
         id: c.id, rank: c.rank, stars: c.stars, art: c.art, name: c.name, ship: c.ship,
         tell: c.tell, will: c.will, nerve: c.nerve, tried: c.tried, status: c.status,
-        ransom: ransomFor(c.stars),
         // Only once there is nothing left to work out.
         disposition: broken ? c.disposition : null,
         broke: broken ? DISPOSITIONS[c.disposition]?.broke || null : null,
@@ -70,46 +59,28 @@ function publicCaptive(c) {
 }
 
 export async function brigView(buyerId) {
-    const [rows, offers, confessions, charts] = await Promise.all([
+    const [rows, charts] = await Promise.all([
         heldRows(buyerId),
-        offerRows(buyerId),
-        db.query(`SELECT id, stars, name, ship, art FROM mkt_ship_confession
-                   WHERE buyer_id = $1 AND spent_on IS NULL ORDER BY made_at`, [buyerId]).catch(() => []),
         db.query(`SELECT id, grade, band, made_at FROM mkt_ship_chart
                    WHERE buyer_id = $1 AND sailed_at IS NULL ORDER BY made_at`, [buyerId]).catch(() => []),
     ]);
-    const held = rows.map(rowToCaptive);
+    // ⚠️ ONE MAN, AND CONFESSIONS ARE GONE. This returned a berth list, an offer list, a confession pile and a
+    // "pieces needed" counter — the furniture of a collection. He is a step to the treasure now: there is the
+    // captain standing in front of you, or there is not, and there are the charts he has already given up.
     return {
-        berths: BRIG_BERTHS,
-        captives: held.map(publicCaptive),
-        offers: offers.map((r) => {
-            const c = rowToCaptive(r);
-            return { id: c.id, rank: c.rank, stars: c.stars, art: c.art, name: c.name, ship: c.ship, cost: boardingCost(c.stars) };
-        }),
-        room: BRIG_BERTHS - held.length,
-        confessions: confessions.map((r) => ({ id: Number(r.id), stars: r.stars, name: r.name, ship: r.ship, art: r.art })),
+        captain: rows.map(rowToCaptive).map(publicCaptive)[0] || null,
+        minutes: OFFER_MINUTES,
         charts: charts.map((r) => ({ id: Number(r.id), grade: r.grade, band: r.band })),
-        piecesNeeded: CHART_PIECES,
-        // Confront is unplayable on the only man you are holding, and the screen has to be able to say so
-        // BEFORE the tap rather than answering an error afterwards. Any body aboard counts, spent or not —
-        // see the note in interrogateCaptive.
-        canConfront: held.length > 1,
     };
 }
 
 /** Is there room to take another one? Asked before the offer is shown, never after it is accepted. */
 export async function brigHasRoom(buyerId) {
-    const [r] = await db.query(
-        // ⚠️ `status <> 'offered'` — A MAN ON THE DECK IS NOT IN A BERTH. This counted every unended row,
-        // which includes offers nobody accepted: they cost nothing, they expire in silence after thirty
-        // minutes and they are never swept, so four ignored offers filled the brig permanently and every win
-        // after that made no offer at all. No error, no log, nothing to find — the win simply paid its purse
-        // and said nothing, which is exactly the shape of "I defeated the ship and didn't get the
-        // interrogation". captiveRows twenty lines up already draws this distinction; this did not.
-        `SELECT COUNT(*)::int AS n FROM mkt_ship_captive
-          WHERE buyer_id = $1 AND ended_at IS NULL AND status <> 'offered'`, [buyerId]
-    ).catch(() => [{ n: 0 }]);
-    return (r?.n ?? 0) < BRIG_BERTHS;
+    // ⚠️ ONE MAN, AND THE SAME WINDOW heldRows USES. This counted every unended row, which included offers
+    // nobody accepted — they cost nothing, expire in silence and are never swept, so a handful of ignored
+    // ones locked the brig and every win afterwards made no offer at all, with nothing in any log. There are
+    // no offers now and no berths; the only question is whether somebody is already standing there.
+    return (await heldRows(buyerId)).length < BRIG_BERTHS;
 }
 
 /**
@@ -128,55 +99,25 @@ export async function offerCaptain(buyerId, rank) {
     });
     const [row] = await db.query(
         `INSERT INTO mkt_ship_captive (buyer_id, rank, stars, art, name, ship, disposition, tell, will, nerve, tried, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'[]'::jsonb,'offered') RETURNING id`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'[]'::jsonb,'held') RETURNING id`,
         [buyerId, who.rank, who.stars, who.art, who.name, who.ship, disposition, c.tell, c.will, c.nerve]
     ).catch(() => []);
     if (!row) return null;
-    return { id: Number(row.id), rank: who.rank, stars: who.stars, art: who.art, name: who.name, ship: who.ship, cost: boardingCost(who.stars) };
+    // No `cost` any more: he is free and he is already on the deck. There is nothing to accept.
+    return { id: Number(row.id), rank: who.rank, stars: who.stars, art: who.art, name: who.name, ship: who.ship };
 }
 
-/** Pay for him and put him in a berth. The only thing in this feature that takes money off the player. */
-export async function acceptOffer(buyerId, offerId) {
-    const [offer] = (await offerRows(buyerId)).filter((r) => Number(r.id) === Number(offerId));
-    if (!offer) return { ok: false, error: "no_offer" };
-    if (!(await brigHasRoom(buyerId))) return { ok: false, error: "brig_full" };
-    const cost = boardingCost(offer.stars);
-    // ⚠️ THE DEBIT CARRIES ITS OWN CONDITION. No transaction exists on this driver, so "can he afford it" and
-    // "take it" have to be the same statement or a double-tap buys two captains with one purse.
-    const [purse] = await db.query(
-        `UPDATE mkt_sailing SET doubloons = doubloons - $2
-          WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2 RETURNING doubloons`,
-        [buyerId, cost]
-    ).catch(() => []);
-    if (!purse) return { ok: false, error: "not_enough_doubloons", cost };
-    const [row] = await db.query(
-        `UPDATE mkt_ship_captive SET status = 'held', taken_at = NOW()
-          WHERE id = $1 AND buyer_id = $2 AND status = 'offered' AND ended_at IS NULL RETURNING *`,
-        [offer.id, buyerId]
-    ).catch(() => []);
-    if (!row) {
-        // Give the money back rather than swallow it — the offer expiring between two statements is rare and
-        // is still our problem, not the player's.
-        await db.query(`UPDATE mkt_sailing SET doubloons = doubloons + $2 WHERE buyer_id = $1`, [buyerId, cost]).catch(() => {});
-        return { ok: false, error: "gone" };
-    }
-    await trackActivity(buyerId, "captain_taken", { rank: row.rank, stars: row.stars, doubloons: cost }).catch(() => {});
-    return { ok: true, captive: publicCaptive(rowToCaptive(row)), doubloons: purse.doubloons, cost };
-}
+// ⚠️ acceptOffer IS GONE. He used to stand on the deck until you paid his boarding cost, which is the shape a
+// thing you KEEP has — you decide, and the decision has a price. He is a step to the treasure now, so he
+// arrives already held and costs nothing; the only thing you do with a captain is ask him.
 
-/** One move. Everything that decides the outcome happens in captains.js; this only persists the result. */
 export async function interrogateCaptive(buyerId, captiveId, tactic) {
     const rows = await heldRows(buyerId);
     const row = rows.find((r) => Number(r.id) === Number(captiveId));
     if (!row) return { ok: false, error: "no_captive" };
-    // -- A SPENT MAN IS STILL A BODY IN A CELL -----------------------------------------------------
-    // Confront needs somebody to walk in, not somebody who is still talking. Counting only `held` here
-    // would make a captain whose nerve you exhausted pure dead weight in a berth, when he is in fact the
-    // cheapest possible Confront partner: he has nothing left to give you himself and can still be the
-    // face in the doorway. It also softens a failed interrogation into something rather than nothing,
-    // which matters because failure is already paid for by a ransom that is worth less than a confession.
-    const others = rows.filter((r) => Number(r.id) !== Number(captiveId)).length;
-    const res = interrogate(rowToCaptive(row), tactic, others);
+    // Confront reaches for his own CREW now rather than another prisoner — see the note on it in
+    // captains.js — so there is no second body to count and the argument is always satisfied.
+    const res = interrogate(rowToCaptive(row), tactic, 1);
     if (res.error) return { ok: false, error: res.error };
 
     const c = res.captive;
@@ -184,88 +125,43 @@ export async function interrogateCaptive(buyerId, captiveId, tactic) {
     // the only thing that must move atomically and it moves in one statement; the confession below is a
     // separate insert whose absence would cost a confession, not corrupt a captive. Ordered so the worse
     // failure cannot happen: he is only marked broken after the row that records why.
-    let confession = null;
+    // ⚠️ THE CHART IS MINTED HERE, ON THE BREAK. It used to write a CONFESSION and wait for two more. One
+    // man is one answer now, so the thing he gives up is the chart itself, graded on his own stars — see
+    // chartGrade. Written BEFORE he is marked broken, so the worse of the two failures cannot happen: a man
+    // who breaks and hands over nothing is unreportable, a chart with no matching captive row is visible.
+    let chart = null;
     if (res.broke) {
-        const [conf] = await db.query(
-            `INSERT INTO mkt_ship_confession (buyer_id, stars, name, ship, art)
-             VALUES ($1,$2,$3,$4,$5) RETURNING id, stars, name, ship, art`,
-            [buyerId, c.stars, c.name, c.ship, c.art]
+        const grade = chartGrade(c.stars);
+        const band = chartBand(grade);
+        const [made] = await db.query(
+            `INSERT INTO mkt_ship_chart (buyer_id, grade, band) VALUES ($1,$2,$3) RETURNING id, grade, band`,
+            [buyerId, grade, band.id]
         ).catch(() => []);
-        confession = conf ? { id: Number(conf.id), stars: conf.stars, name: conf.name, ship: conf.ship, art: conf.art } : null;
+        chart = made ? { id: Number(made.id), grade, band: band.id, name: band.name, blurb: band.blurb } : null;
     }
+    // ⚠️ AND HE IS OFF THE DECK EITHER WAY. `spent` used to leave him sitting in a berth as a Confront
+    // partner and a ransom you could still collect. There is nothing left to do with him, so an
+    // interrogation that ends, ends him — which is the whole of "transient, a stepping stone, not collected".
+    const over = res.broke || c.status === "spent";
     await db.query(
         `UPDATE mkt_ship_captive
             SET will = $2, nerve = $3, tried = $4::jsonb, status = $5,
-                ended_at = CASE WHEN $5 = 'broken' THEN NOW() ELSE ended_at END
+                ended_at = CASE WHEN $6 THEN NOW() ELSE ended_at END
           WHERE id = $1`,
-        [row.id, c.will, c.nerve, JSON.stringify(c.tried), c.status]
+        [row.id, c.will, c.nerve, JSON.stringify(c.tried), c.status, over]
     ).catch(() => {});
-    if (res.broke) await trackActivity(buyerId, "captain_broken", { rank: c.rank, stars: c.stars }).catch(() => {});
+    if (res.broke) await trackActivity(buyerId, "captain_broken", { rank: c.rank, stars: c.stars, grade: chart?.grade || null }).catch(() => {});
 
     return {
         ok: true, outcome: res.outcome, said: res.said, broke: res.broke, spent: res.spent,
-        captive: publicCaptive(c), confession,
+        captive: publicCaptive(c), chart,
     };
 }
 
-/** He buys himself back. The only thing left to do with a man whose nerve outlasted yours. */
-export async function ransomCaptive(buyerId, captiveId) {
-    const rows = await heldRows(buyerId);
-    const row = rows.find((r) => Number(r.id) === Number(captiveId));
-    if (!row) return { ok: false, error: "no_captive" };
-    if (row.status === "broken") return { ok: false, error: "already_broken" };
-    const paid = ransomFor(row.stars);
-    // ⚠️ ONE ROW, ONCE. The conditional in the WHERE is what stops a double-tap paying twice — there is no
-    // transaction to lean on here, so the guard has to be in the statement that does the work.
-    const [done] = await db.query(
-        `UPDATE mkt_ship_captive SET status = 'ransomed', ended_at = NOW()
-          WHERE id = $1 AND ended_at IS NULL RETURNING id`, [row.id]
-    ).catch(() => []);
-    if (!done) return { ok: false, error: "already_gone" };
-    // ⚠️ IMPORTED HERE AND NOT AT THE TOP. sailing.js imports THIS file for the capture hook at the end of a
-    // battle, so a top-level import back into it is a cycle — and the same deferred-import shape is what
-    // sailing.js already uses to reach the Forge and the farm from inside a payout.
-    const { grantDoubloons } = await import("@/lib/marketplace/sailing.js");
-    await grantDoubloons(buyerId, paid).catch(() => {});
-    await trackActivity(buyerId, "captain_ransomed", { stars: row.stars, doubloons: paid }).catch(() => {});
-    return { ok: true, doubloons: paid };
-}
-
-/** Put him off at the next port for nothing. There is no reward and there is not meant to be. */
-export async function releaseCaptive(buyerId, captiveId) {
-    const [done] = await db.query(
-        `UPDATE mkt_ship_captive SET status = 'released', ended_at = NOW()
-          WHERE id = $1 AND buyer_id = $2 AND ended_at IS NULL RETURNING id`, [captiveId, buyerId]
-    ).catch(() => []);
-    return done ? { ok: true } : { ok: false, error: "no_captive" };
-}
-
-/**
- * Three confessions into a chart. The oldest three, so the player never has to choose which men to spend —
- * and the grade is their stars added up, which is Luke's "the star rating of the captain helps determine the
- * quality of the island".
- */
-export async function makeChart(buyerId) {
-    const rows = await db.query(
-        `SELECT id, stars FROM mkt_ship_confession WHERE buyer_id = $1 AND spent_on IS NULL
-          ORDER BY made_at LIMIT $2`, [buyerId, CHART_PIECES]
-    ).catch(() => []);
-    if (rows.length < CHART_PIECES) return { ok: false, error: "not_enough", have: rows.length, need: CHART_PIECES };
-    const grade = chartGrade(rows.map((r) => r.stars));
-    const band = chartBand(grade);
-    const [chart] = await db.query(
-        `INSERT INTO mkt_ship_chart (buyer_id, grade, band) VALUES ($1,$2,$3) RETURNING id, grade, band`,
-        [buyerId, grade, band.id]
-    ).catch(() => []);
-    if (!chart) return { ok: false, error: "failed" };
-    // Spent only after the chart exists, so a failure here costs a chart nobody paid for rather than three
-    // confessions that bought nothing.
-    await db.query(
-        `UPDATE mkt_ship_confession SET spent_on = $1 WHERE id = ANY($2::bigint[])`,
-        [chart.id, rows.map((r) => Number(r.id))]
-    ).catch(() => {});
-    await trackActivity(buyerId, "chart_made", { grade, band: band.id }).catch(() => {});
-    return { ok: true, chart: { id: Number(chart.id), grade, band: band.id, name: band.name, blurb: band.blurb } };
-}
+// ⚠️ RANSOM, RELEASE AND makeChart ARE GONE, AND SO IS THE CHOICE THEY EXISTED FOR. They were the three ways
+// a man left a berth — he bought himself out, you let him go, or you spent his confession with two others.
+// Nothing keeps him now: breaking him ends him with a chart in your hand, running out of nerve ends him with
+// nothing, and either way he is off the deck by the time the panel redraws. A captain you can still do
+// something with tomorrow is a captain you are collecting.
 
 export { TACTICS };

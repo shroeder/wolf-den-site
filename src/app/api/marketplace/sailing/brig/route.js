@@ -3,9 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { captainsOpenTo } from "@/lib/marketplace/captains.js";
-import {
-    acceptOffer, brigView, interrogateCaptive, makeChart, ransomCaptive, releaseCaptive,
-} from "@/lib/marketplace/captains-store.js";
+import { brigView, interrogateCaptive } from "@/lib/marketplace/captains-store.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -45,12 +43,11 @@ export async function POST(request) {
             const body = await request.json().catch(() => ({}));
             const id = Number(body?.id) || 0;
             let res;
+            // ⚠️ ONE ACTION. take / ransom / release / chart were the four verbs of a collection — buy him,
+            // sell him back, let him go, spend three of him. There is one thing you do with a captain now and
+            // this is it. See the note at the top of captains.js.
             switch (String(body?.action || "")) {
-                case "take": res = await acceptOffer(g.buyer.id, id); break;
                 case "ask": res = await interrogateCaptive(g.buyer.id, id, String(body?.tactic || "")); break;
-                case "ransom": res = await ransomCaptive(g.buyer.id, id); break;
-                case "release": res = await releaseCaptive(g.buyer.id, id); break;
-                case "chart": res = await makeChart(g.buyer.id); break;
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
             if (!res?.ok) return noStore(res || { error: "failed" }, { status: 400 });

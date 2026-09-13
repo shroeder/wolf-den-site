@@ -2336,6 +2336,8 @@ async function maybeOfferCaptain(buyerId, rank) {
     if (!captainsOpenTo(isOwner(buyerId))) return null;
     try {
         const { offerCaptain, brigHasRoom } = await import("@/lib/marketplace/captains-store.js");
+        // One at a time. A second win while somebody is still standing on the deck does not queue him — the
+        // interrogation is the moment after THIS battle, and two of them waiting is a collection.
         if (!(await brigHasRoom(buyerId))) return null;
         return await offerCaptain(buyerId, Math.max(1, Number(rank) || 1));
     } catch { return null; /* the brig is optional — a battle never fails for it */ }

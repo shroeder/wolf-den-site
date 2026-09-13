@@ -6,8 +6,15 @@
 // Sinking a ship ended a fight and paid a purse. Taking her CAPTAIN starts something: he goes in a berth, he
 // knows where something is, and he will not say. The loop is
 //
-//     win a fleet battle  ->  her hold OR her captain  ->  interrogate  ->  a confession
-//     three confessions   ->  a chart                  ->  a charted island nobody else can sail to
+//     beat an NPC ship  ->  her captain is on your deck  ->  interrogate him  ->  he says where it is
+//
+// ⚠️ HE IS NOT COLLECTED, AND HE USED TO BE. Luke: "I dont think we need to collect enemy captains. We just
+// use them as a way to get the location of treasure. Its transient, a stepping stone, not collected."
+//
+// So the berths are gone, and with them everything a collection needs: buying him off his own deck, four
+// cells to keep him in, a ransom to send him home, a release to let him go, and three confessions saved up
+// to make one chart. He arrives free, you interrogate him on the spot, and he leaves either way — with a
+// chart if he broke and with nothing if he did not. One man, one interrogation, one answer.
 //
 // PURE ON PURPOSE, like ship-battle.js and gun-ports.js next door: no database, no imports with side effects.
 // The interrogation is a rules puzzle and a rules puzzle you cannot run in a test is a rules puzzle nobody can
@@ -31,10 +38,15 @@ import { FLEET, MAX_FLEET_RANK } from "@/lib/marketplace/fleet.js";
 // It is priced at what he would pay to be let go — see ransomFor. So the arithmetic in front of the player is
 // clean: keeping him costs precisely what releasing him would return, and every doubloon of that is bet on
 // getting a confession out of him instead.
+// ⚠️ HE WAITS, BUT HE IS NOT KEPT. Thirty minutes is how long a captain stands on the deck before he goes
+// over the side — not so the brig can hold a collection, but so closing a tab between the battle and the
+// interrogation does not silently lose the only thing the fight was for. One at a time; the next win cannot
+// arrive while he is still standing there.
 export const OFFER_MINUTES = 30;
 
-/** What it costs to take him off his own deck. Symmetrical with his ransom, deliberately. */
-export const boardingCost = (stars) => ransomFor(stars);
+// ⚠️ HE COSTS NOTHING. Taking him used to cost exactly what releasing him would have paid, which was the
+// right shape for a thing you KEEP — a berth is a decision and a decision needs a price. He is a step on the
+// way to the treasure now, so charging for the step is charging twice for the same island.
 
 // ── HOW MUCH A CAPTAIN IS WORTH ──────────────────────────────────────────────────────────────────────────────
 // Stars come off the rung he was commanding, in five bands of eight. They are the only number the player sees
@@ -44,7 +56,9 @@ export const MAX_STARS = 5;
 export const starsForRank = (rank) => Math.max(1, Math.min(MAX_STARS, Math.ceil(Math.max(1, Number(rank) || 1) / 8)));
 
 /** The four berths. Scarcity is the whole reason a capture is a decision rather than a habit. */
-export const BRIG_BERTHS = 4;
+// ONE AT A TIME. Not a capacity — a queue of one, because the interrogation is the moment after the battle
+// and there is no version of this where two of them are standing on your deck at once.
+export const BRIG_BERTHS = 1;
 
 // ── WHAT HE IS ───────────────────────────────────────────────────────────────────────────────────────────────
 // Rolled at capture, not authored per ship — a captain you have taken before must not be a captain you already
@@ -81,11 +95,11 @@ export const TACTICS = {
     },
     confront: {
         id: "confront", name: "Confront", icon: "GiPrisoner",
-        blurb: "Walk another of your captives in and let him hear what has already been said.",
-        // ⚠️ THE REASON THE BRIG HAS FOUR BERTHS. Luke asked for confessions "after you get a few of them",
-        // and this is where a few of them is the mechanic rather than the flavour: Confront is the only
-        // tactic that reaches a LOYAL man, and it cannot be played on the only captain you are holding.
-        needsOther: true,
+        // ⚠️ IT USED TO NEED A SECOND PRISONER, and it was the reason the brig had four berths. With no
+        // collection there is never a second prisoner, so the one tactic that reaches a LOYAL man would have
+        // been unplayable forever — the puzzle would have lost a column and one disposition would have become
+        // a dead end. It is his own CREW now, which you have by definition: you just took their ship.
+        blurb: "Walk one of his own crew past the door and let him hear what they have already said.",
     },
     wait: {
         id: "wait", name: "Wait", icon: "GiSandsOfTime",
@@ -280,16 +294,21 @@ export const ransomFor = (stars) => 40 * Math.max(1, Math.min(MAX_STARS, stars))
 // A broken captain gives up one confession. Three of them make a chart, and the chart's GRADE is the stars of
 // the three men who gave it up — three to fifteen. That is Luke's "depending on the star rating of the captain
 // helps determine the quality of the island".
-export const CHART_PIECES = 3;
-export const chartGrade = (starList) => (starList || []).slice(0, CHART_PIECES).reduce((a, b) => a + (Number(b) || 0), 0);
+// ⚠️ ONE MAN, ONE CHART. It was three confessions saved up, graded three-to-fifteen on the stars of the three
+// men who gave them — which is a collection mechanic wearing a treasure map. A captain is the step and the
+// chart is the answer, so breaking him hands one over on the spot and its grade is HIS stars. That is still
+// Luke's "depending on the star rating of the captain helps determine the quality of the island", said in one
+// step instead of three.
+export const CHART_PIECES = 1;
+export const chartGrade = (stars) => Math.max(1, Math.min(MAX_STARS, Number(Array.isArray(stars) ? stars[0] : stars) || 1));
 
-// Four bands rather than thirteen numbers: a grade is a thing the player should be able to feel, and "a
-// Sounding" versus "a Reckoning" is legible where 11-of-15 is not.
+// Four bands rather than five numbers: a grade is a thing the player should be able to feel, and "a Sounding"
+// versus "a Reckoning" is legible where 4-of-5 is not.
 export const CHART_BANDS = [
-    { id: "sounding", name: "A Sounding", min: 3, blurb: "Three small men agreeing about a small place." },
-    { id: "bearing", name: "A Bearing", min: 7, blurb: "Enough to steer by, if the sea is kind." },
-    { id: "reckoning", name: "A Reckoning", min: 11, blurb: "Three men who commanded something, all naming the same water." },
-    { id: "certainty", name: "A Certainty", min: 14, blurb: "Nobody left alive disputes where this is." },
+    { id: "sounding", name: "A Sounding", min: 1, blurb: "A small man agreeing about a small place." },
+    { id: "bearing", name: "A Bearing", min: 2, blurb: "Enough to steer by, if the sea is kind." },
+    { id: "reckoning", name: "A Reckoning", min: 4, blurb: "A man who commanded something, naming the water he lost it in." },
+    { id: "certainty", name: "A Certainty", min: 5, blurb: "Nobody left alive disputes where this is." },
 ];
 export const chartBand = (grade) => [...CHART_BANDS].reverse().find((b) => grade >= b.min) || CHART_BANDS[0];
 

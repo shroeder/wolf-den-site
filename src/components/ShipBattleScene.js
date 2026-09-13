@@ -1445,9 +1445,9 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                                     <b>{captain.name} is on your deck</b>
                                     <span className="sbt-captain-stars">{"★".repeat(Math.max(1, captain.stars || 1))}</span>
                                     <em>Master of {captain.ship}. He knows where something is, and he will not say.</em>
-                                    <i>Take him below within 30 minutes — {Number(captain.cost || 0).toLocaleString()} doubloons — or he goes over the side.</i>
+                                    <i>Ask him within 30 minutes, or he goes over the side. He costs nothing; he is the way to the island.</i>
                                 </div>
-                                <a className="sail-cta sbt-captain-go" href="/marketplace/sailing?station=guns">To the brig</a>
+                                <a className="sail-cta sbt-captain-go" href="/marketplace/sailing?station=guns">Interrogate him</a>
                             </div>
                         ) : null}
                         {spoils.length ? (
