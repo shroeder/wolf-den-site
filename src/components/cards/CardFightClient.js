@@ -1653,7 +1653,16 @@ export default function CardFightClient({ fixture, run = null }) {
                                     // WARNING: A RUN IS THREE ACTS. This said "All 15 stops", which is one
                                     // act's worth and was written when the game was one act long — the line
                                     // that pays off the whole climb was understating it by two thirds.
-                                    ? `All three acts, ${ACTS * RUN_LENGTH} stops, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
+                                    // ⚠️ AND A RUN THAT ENDED IN THE HOLLOW IS FOUR. GrayKitsune: "The top text
+                                    // is only mentioning 3 acts even though I beat act 4." Three is what you
+                                    // must clear to win and the Hollow is a fourth you have to bring keys to,
+                                    // so the line is right for most runs and wrong for the best one anybody
+                                    // has. The START page still says three on purpose — the Hollow is meant to
+                                    // be found, not advertised — but a man standing in the wreckage of it
+                                    // should be told what he just did.
+                                    ? (Number(runState?.act) > ACTS
+                                        ? `All four acts — the Hollow as well — and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
+                                        : `All three acts, ${ACTS * RUN_LENGTH} stops, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`)
                                     : runState?.done === "dead"
                                         ? `You made it to ${stopLabel(runState.stop, { capital: false, act: runState.act })}.`
                                         : fight.over === "win"

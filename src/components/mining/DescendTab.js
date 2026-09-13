@@ -15,7 +15,13 @@ function TunnelCard({ card }) {
     return (
         <div className="mine-card" key={card.k}>
             <span className="mine-card-lab">{card.label}</span>
-            {card.kind === "encounter" ? (
+            {/* The one card that is not a find. Shored Timbers eats the collapse the tunnel just rolled, and
+                it has to LOOK like a save or it is indistinguishable from a step that turned up nothing —
+                which is exactly how an eternal power came to be reported as broken. */}
+            {card.kind === "shored" ? (
+                <><b style={{ color: "#ffcf87" }}>The roof shifts, and holds</b>
+                    <em>Shored Timbers took that one. It will not take the next.</em></>
+            ) : card.kind === "encounter" ? (
                 <><b style={{ color: "#ff9a8a" }}>{card.title}</b><em>{card.body}</em></>
             ) : card.kind === "nothing" ? (
                 <><b className="muted">Nothing</b><em>Just rock.</em></>

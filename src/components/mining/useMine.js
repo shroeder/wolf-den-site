@@ -88,6 +88,17 @@ export function useMine(initial) {
             setWrap({ collapsed: true, depth: r.depth, lost: r.lost, seam: r.seam, lostTier: r.lostTier || null, secondWind: Boolean(r.secondWind), paid: r.secondWind ? (r.paid || []) : [] });
             clink(0.2);
             try { navigator.vibrate?.([40, 60, 40, 60, 120]); } catch { /* no haptics */ }
+        } else if (r.shored) {
+            // ── ⚠️ THE ROOF CAME IN AND THE POWER ATE IT, AND NOTHING SAID SO ────────────────────────
+            // Shored Timbers is an ETERNAL power whose whole promise is "the first collapse of each trip
+            // does nothing at all" — and the server answered with { shored: true } and no `found`, so this
+            // spread undefined into a card and the step passed in silence. An eternal-tier save that looks
+            // exactly like an ordinary empty step is a power nobody can tell is working, which is how
+            // ValkyrieSylve came to report the opposite: "i have a helmet that says the first collapse of
+            // each trip does nothing at all yet when i got to my collapse, I lost everything."
+            setCard({ kind: "shored", label: "The timbers hold", depth: r.depth, k: Date.now() });
+            clink(1);
+            try { navigator.vibrate?.([30, 40, 90]); } catch { /* no haptics */ }
         } else {
             setCard({ ...r.found, label: r.card?.label, depth: r.depth, k: Date.now() });
             clink(r.found?.kind === "gear" || r.found?.kind === "chest" ? 1 : r.found?.kind === "nothing" ? 0.2 : 0.6);
