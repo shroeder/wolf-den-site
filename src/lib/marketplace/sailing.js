@@ -1833,14 +1833,24 @@ export async function getSailingState(buyerId, skyKey = null) {
             `SELECT
                 (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS charts,
                 (SELECT COUNT(*)::int FROM mkt_ship_captive
-                  WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'held') AS waiting`,
+                  WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'held') AS waiting,
+                -- ⚠️ AND WHO HE IS, because the banner that unblocks the page has to name him. A count can
+                -- draw a dot on a tab; it cannot say "The Widow Wage is below decks", and a blocking step
+                -- that will not tell you WHAT is blocking it is the whole of the complaint this answers.
+                (SELECT name FROM mkt_ship_captive
+                  WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'held' ORDER BY taken_at LIMIT 1) AS waiting_name,
+                (SELECT art FROM mkt_ship_captive
+                  WHERE buyer_id = $1 AND ended_at IS NULL AND status = 'held' ORDER BY taken_at LIMIT 1) AS waiting_art`,
             [buyerId]
         ).catch(() => null)
         : null;
     const chartsHeld = Number(brigRow?.charts) || 0;
     const captainsWaiting = Number(brigRow?.waiting) || 0;
+    const captainWaiting = captainsWaiting > 0
+        ? { name: brigRow?.waiting_name || "Her captain", art: brigRow?.waiting_art || null }
+        : null;
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
-        recipeShop, baits, baitCookable, deepFish, chartsHeld, captainsWaiting), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        recipeShop, baits, baitCookable, deepFish, chartsHeld, captainsWaiting), captainWaiting, gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
         // ── THE PURSE, WHERE YOU CAN SEE IT ──────────────────────────────────────────────────────────
         // Sunflower Jinxx: "it gives boat stat lvl 22, then has dabloons and gold but the dabloons is always
         // 0. I can't see how many I have unless I look in the quartermaster." Always 0 is exactly right: the

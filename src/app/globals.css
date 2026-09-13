@@ -12052,6 +12052,25 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     animation: sailStationDot 1.9s ease-in-out infinite; }
 @keyframes sailStationDot { 0%,100% { opacity: 1; transform: scale(1); } 55% { opacity: .55; transform: scale(.82); } }
 .sail-stations button { position: relative; }
+/* ── THE CAPTAIN BLOCKING THE SEA ─────────────────────────────────────────────────────────────────────────
+   Loud on purpose. It is the only thing a member may do on this page, so it sits above the stations and does
+   not look like one of them. */
+.sail-capblock { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center;
+    margin-bottom: 10px; border: 1px solid rgba(255, 150, 60, 0.55);
+    background: linear-gradient(180deg, rgba(255, 150, 60, 0.15), rgba(12, 8, 4, 0.55));
+    box-shadow: 0 0 26px -10px rgba(255, 150, 60, 0.85); animation: capblockPulse 2.6s ease-in-out infinite; }
+@keyframes capblockPulse {
+    0%, 100% { box-shadow: 0 0 26px -10px rgba(255, 150, 60, 0.85); }
+    50% { box-shadow: 0 0 34px -6px rgba(255, 150, 60, 0.95); }
+}
+.sail-capblock-face { width: 64px; height: 64px; object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.65)); }
+.sail-capblock-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sail-capblock-body b { font-size: 1rem; color: #ffd0a0; }
+.sail-capblock-body em { font-style: normal; font-size: 0.8rem; color: #c9bda8; }
+/* Full width under both columns — it is the only action on the page and it should be thumb-sized. */
+.sail-capblock-go { grid-column: 1 / -1; }
+
 .sail-stations { display: flex; gap: 6px; padding: 5px; margin: 12px 0 10px; border-radius: 14px;
     background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); }
 .sail-stations button { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center;

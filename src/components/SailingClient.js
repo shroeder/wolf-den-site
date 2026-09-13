@@ -764,6 +764,37 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
     return (
         <div className="stack reveal sailing">
+            {/* ── THE MAN WHO IS STOPPING YOU ─────────────────────────────────────────────────────────────
+                Luke: "I cant sail and I cant interrogate at all fix the fucking ui so I can clearly
+                interrogate this mf."
+                ⚠️ FIRST THING ON THE PAGE, ABOVE THE TITLE. It went above the STATIONS first, which is two
+                screens down past the how-to-play card, the weather prompt and the boat — so a banner whose
+                whole job is "you cannot do anything else" was below the fold on the screen it was blocking.
+                ⚠️ A BLOCKING STEP HAS TO BLOCK THE PAGE, NOT A BUTTON. Everything before this was a dot on a
+                tab and a refusal message on whichever door you happened to push — which means the state of
+                the whole feature was being communicated by things you had to go and find. He is the only
+                thing you can do, so he is the first thing on the screen, on every station, with his face on
+                it and one button. Nothing subtle survives contact with somebody who just wants to play.
+                `owner` is checked here as well as at the API and at the brig itself — three places, same
+                reason the rest of this feature has three. */}
+            {state.owner === true && state.captainWaiting ? (
+                <section className="card sail-capblock">
+                    {state.captainWaiting.art ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img className="sail-capblock-face" src={`/images/fleet/crew/${state.captainWaiting.art}.png`}
+                            alt="" draggable="false" />
+                    ) : null}
+                    <div className="sail-capblock-body">
+                        <b>{state.captainWaiting.name} is below decks</b>
+                        <em>Nothing leaves this harbour until he talks.</em>
+                    </div>
+                    <button type="button" className="sail-cta sail-capblock-go"
+                        onClick={() => { setStation("guns"); setAskCaptain((n) => n + 1); }}>
+                        Interrogate him
+                    </button>
+                </section>
+            ) : null}
+
             <section className="card" style={{ overflow: "hidden" }}>
                 <div className="sail-head">
                     <h1 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
