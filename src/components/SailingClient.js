@@ -1007,6 +1007,29 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </>
                 )}
 
+                {/* ── ⚠️ A CHART IS NOT A VOYAGE, SO IT MUST NOT LIVE INSIDE THE VOYAGE PICKER ─────────────
+                    This row used to sit among the three durations, inside the `liveStatus === "idle"` block —
+                    a leftover from when a chart really WAS a fourth duration that started a sixteen-hour trip.
+                    It is an expedition now: you open it, plot it, sail thirty seconds and walk an island, all
+                    in one sitting, and none of it touches the boat's voyage.
+
+                    Leaving it in the picker meant an unrelated twelve-hour trip HID IT COMPLETELY. Luke, with
+                    two charts in hand and his boat at sea: "So I am waiting on my expedition? My vision for
+                    the new expeditions was they were no waiting." He was not waiting on the expedition. He
+                    could not see the door, because an ordinary voyage was standing in front of it.
+
+                    So it sits above the picker and renders on its own terms, whatever the boat is doing.
+                    Still owner-gated upstream — chartsReady is 0 for anyone the feature is shut to. */}
+                {(state.chartsReady || 0) > 0 ? (
+                    <a className="sail-chart-cta" href="/marketplace/expedition">
+                        <span className="sail-chart-cta-main">
+                            <b>A charted island</b>
+                            <em>{state.chartsReady > 1 ? `${state.chartsReady} charts in hand` : "1 chart in hand"} · the best one is opened</em>
+                        </span>
+                        <span className="sail-chart-cta-go">Open the chart</span>
+                    </a>
+                ) : null}
+
                 {/* Embark: pick how long to be out — longer voyages roll better chest tiers. */}
                 {liveStatus === "idle" && (
                     <div className="sail-embark">
@@ -1035,30 +1058,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                     </span>
                                 </button>
                             ))}
-                            {/* ── AND THE ONE YOU WERE TOLD ABOUT ──────────────────────────────────────
-                                Not one of the three durations and drawn so it cannot be mistaken for one:
-                                a charted island is not a longer trip you choose, it is a place three
-                                captains were made to name. Only ever rendered when one is actually in
-                                hand, so for everybody else this row is exactly what it was.
-                                Owner-gated upstream — chartsReady is 0 for anyone the feature is shut to,
-                                so there is no second gate to forget here. */}
-                            {(state.chartsReady || 0) > 0 ? (
-                                /* ── ⚠️ IT IS NO LONGER A VOYAGE, SO IT NO LONGER STARTS ONE ──────────────
-                                   This used to post {duration:"charted"} and begin a SIXTEEN-HOUR trip that
-                                   landed on the ordinary dig board with a different backdrop. A chart is an
-                                   EXPEDITION now — open it, plot the fix, thirty seconds of sailing with two
-                                   named things in the way, then beach the boat and walk the island — and all
-                                   of that lives on its own page because it is a full-screen scene, not a
-                                   picker row. Luke: "it would only take 30 seconds to get there."
-                                   The three durations beside it are untouched, on purpose. */
-                                <a className="sail-embark-opt is-charted" href="/marketplace/expedition">
-                                    <span className="sail-embark-opt-name">A charted island</span>
-                                    <span className="sail-embark-opt-time">🧭 30 seconds out</span>
-                                    <span className="sail-embark-opt-loot">
-                                        {state.chartsReady > 1 ? `${state.chartsReady} charts` : "1 chart"} · the best one is opened
-                                    </span>
-                                </a>
-                            ) : null}
                         </div>
                         {/* SHIP BATTLES, public since 2026-08-09. Still keyed off `combat.fleet` rather than a
                             bare truthy check: a state that came back without it (an error shape, a stale cache)
