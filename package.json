@@ -29,7 +29,10 @@
     "check:polls": "node scripts/check-polls.mjs",
     "check:chrome": "node scripts/check-chrome-fanout.mjs",
     "gen:season-art": "node --import ./scripts/lib/register-loader.mjs scripts/gen-season-art.mjs",
-    "mine:report": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/mine-report.mjs"
+    "mine:report": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/mine-report.mjs",
+    "sim:islands": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/island-sim.mjs",
+    "gen:islands": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/gen-islands.mjs",
+    "sheet:islands": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/island-sheet.mjs"
   },
   "keywords": [],
   "author": "",

@@ -32,11 +32,12 @@ export const SEGMENT = 24;
 // One integer in, one in [0,1) out, stable across machines. Not Math.random: the whole point is that the server
 // can reproduce it. xorshift-ish mix — cheap, well-spread, and it does not need to be cryptographic because
 // the thing it protects is "which mushroom", not anybody's money.
-export function hash(a, b = 0) {
-    let h = (Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x165667b1, 0xc2b2ae35)) >>> 0;
-    h ^= h >>> 15; h = Math.imul(h, 0x2545f491) >>> 0; h ^= h >>> 13;
-    return (h >>> 0) / 4294967296;
-}
+//
+// ⚠️ IT MOVED, BYTE FOR BYTE, TO world-hash.js when the islands wanted the same guarantee — the mix is
+// untouched, so every tree in the wood still stands exactly where it stood. Re-exported here because this is
+// where the wood's own callers have always looked for it.
+export { hash } from "@/lib/marketplace/world-hash.js";
+import { hash } from "@/lib/marketplace/world-hash.js";
 
 // ── WHAT GROWS WHERE ─────────────────────────────────────────────────────────────────────────────────────────
 // ⚠️ THE WOOD GETS RARER AS YOU GO, AND THAT IS THE ONLY REASON TO WALK. A forest with the same odds at node

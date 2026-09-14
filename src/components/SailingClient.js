@@ -1043,14 +1043,21 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 Owner-gated upstream — chartsReady is 0 for anyone the feature is shut to,
                                 so there is no second gate to forget here. */}
                             {(state.chartsReady || 0) > 0 ? (
-                                <button className="sail-embark-opt is-charted" disabled={busy}
-                                    onClick={() => act("start", { duration: "charted" })}>
+                                /* ── ⚠️ IT IS NO LONGER A VOYAGE, SO IT NO LONGER STARTS ONE ──────────────
+                                   This used to post {duration:"charted"} and begin a SIXTEEN-HOUR trip that
+                                   landed on the ordinary dig board with a different backdrop. A chart is an
+                                   EXPEDITION now — open it, plot the fix, thirty seconds of sailing with two
+                                   named things in the way, then beach the boat and walk the island — and all
+                                   of that lives on its own page because it is a full-screen scene, not a
+                                   picker row. Luke: "it would only take 30 seconds to get there."
+                                   The three durations beside it are untouched, on purpose. */
+                                <a className="sail-embark-opt is-charted" href="/marketplace/expedition">
                                     <span className="sail-embark-opt-name">A charted island</span>
-                                    <span className="sail-embark-opt-time">🧭 {fmtLeft(4 * 60 * 60 * 1000)}</span>
+                                    <span className="sail-embark-opt-time">🧭 30 seconds out</span>
                                     <span className="sail-embark-opt-loot">
-                                        {state.chartsReady > 1 ? `${state.chartsReady} charts` : "1 chart"} · the best one is spent
+                                        {state.chartsReady > 1 ? `${state.chartsReady} charts` : "1 chart"} · the best one is opened
                                     </span>
-                                </button>
+                                </a>
                             ) : null}
                         </div>
                         {/* SHIP BATTLES, public since 2026-08-09. Still keyed off `combat.fleet` rather than a

@@ -1487,16 +1487,24 @@ async function resolveDueEncounter(buyerId) {
     }).catch(() => {});
 }
 
-/** Build the battle state for an encounter and save it under meta.kind = "encounter". */
-async function openEncounterBattle(buyerId, enc, row) {
+/**
+ * Build the battle state for an encounter and save it under meta.kind.
+ *
+ * ⚠️ `kind` AND `extra` EXIST SO THE ISLANDS DO NOT NEED A SECOND COMBAT SYSTEM. An island warden is an
+ * ENCOUNTERS-shaped object (see island-wardens.js) so everything below — the profiles, the limb points, the
+ * zone map, the gun stages — works on it with nothing changed. What differs is only where the art lives and
+ * who gets told when it ends, which is what these two arguments carry.
+ */
+export async function openEncounterBattle(buyerId, enc, row, { kind = "encounter", extra = {}, art = null } = {}) {
     const me = await db.queryOne(
         `SELECT alias, display_name, avatar_sprite_url, avatar_sprite_flip, featured_collectible FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     ).catch(() => null);
     const fired = openingLoadout(row);
     const mine = await myShipProfile(buyerId, { ...row, loadout: fired }, me?.display_name || me?.alias || "Your ship");
+    const foeArt = art || enc.art || encounterArt(enc.id);
     const foe = foeProfile({
-        name: enc.name, art: encounterArt(enc.id), flavor: enc.blurb,
+        name: enc.name, art: foeArt, flavor: enc.blurb,
         rank: enc.tier * 3, guns: enc.guns, hits: enc.hits, accuracy: enc.accuracy, rake: enc.rake, ammo: enc.ammo,
     });
 
@@ -1504,11 +1512,11 @@ async function openEncounterBattle(buyerId, enc, row) {
     const savedPorts = await getSavedPorts().catch(() => ({}));
     const myTier = boatTier(mine.boatLevel);
     const meta = {
-        kind: "encounter", encId: enc.id, encKind: enc.kind, tier: enc.tier,
+        kind, encId: enc.id, encKind: enc.kind, tier: enc.tier, ...extra,
         meProfile: { openingCrit: mine.openingCrit, stun: mine.stun, name: mine.name, boatLevel: mine.boatLevel, gunLevel: row?.gun_level || 0,
             gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art,
             sea: await equippedSeaAffinity(buyerId).catch(() => ({})), gunStats: mine.gunStats || null },
-        foeProfile: { ...enc, fleet: true, hits: enc.hits, art: encounterArt(enc.id) },
+        foeProfile: { ...enc, fleet: true, hits: enc.hits, art: foeArt },
         // ── THE GUNS' OWN DATA, ON THE SIDE THAT DRAWS THEM ──────────────────────────────────────────
         // decorate() reads gunStats/gunLevel off THIS object to pick each barrel's stage sprite, and
         // they only ever existed on meProfile — so `stats` was null and gunStageFromLevel(undefined)
@@ -1530,7 +1538,7 @@ async function openEncounterBattle(buyerId, enc, row) {
         // wherever the artist put them on thirty-odd different sprites, and a hand-placed table would rot the
         // first time one was redrawn.
         foe: { gunLevel: Math.max(0, (enc.tier || 1) * 3 - 2),   // no gun rows on an encounter — its tier implies the mark
-            name: enc.name, cls: enc.cls, art: encounterArt(enc.id), guns: enc.guns, hp: enc.hits,
+            name: enc.name, cls: enc.cls, art: foeArt, guns: enc.guns, hp: enc.hits,
             ammo: enc.ammo, boss: enc.tier >= 5, flavor: enc.blurb, mirror: false,
             deck: 42, rider: null, riderFlip: false, pet: null,
             ports: enc.kind === "monster" ? limbPoints(enc.guns) : [],
@@ -1545,6 +1553,23 @@ async function openEncounterBattle(buyerId, enc, row) {
     if (setOpeningReckoning(await getOwnedPieceIds(buyerId).catch(() => []))) state.me.reck = RECKONING_AT;
     state.theirNext = planFoeRound(state, mine, foe);
     await saveBattle(buyerId, state, meta);
+}
+
+// ── AN ISLAND WARDEN IS BEATEN ───────────────────────────────────────────────────────────────────────────────
+// The run in carries two of these and expedition.js owns what they mean, so this hands straight over to it.
+// A DYNAMIC import on purpose: expedition.js imports this module for the opener and the payer, and a static
+// import both ways is a cycle. The same trick the pet perks use a few hundred lines up.
+//
+// ⚠️ IT NEVER THROWS. A warden that cannot be recorded must still have been BEATEN — the fight was won, the
+// spoils are the fight's, and an expedition row that failed to update is a bookkeeping problem and not the
+// player's. Same rule as the chart being written before the captive; see [[captains-brig]].
+async function finishWardenBattle(buyerId, meta, res) {
+    try {
+        const { wardenBeaten } = await import("@/lib/marketplace/expedition.js");
+        return await wardenBeaten(buyerId, meta, res);
+    } catch {
+        return [];
+    }
 }
 
 /** Pay out an encounter and let the voyage go again. `reckoning` is true if the last shot was the free volley. */
@@ -2675,7 +2700,10 @@ const openingLoadout = (row) => {
 
 // Pay out a fleet win. Deliberately a HAND of things, most of which spend somewhere else in the game — the
 // fleet should move whatever else you are working on, not just its own counter.
-async function payFleetReward(buyerId, reward) {
+// ⚠️ EXPORTED because the islands pay through it too. A charted expedition hands out the same hand of things
+// a fleet win does — coin, parts, a chest, experience — and a second granting function beside this one would
+// be a second place to forget `gold: 0` on awardXp (see [[awardxp-gold-tracks-xp-landmine]]). One payer.
+export async function payFleetReward(buyerId, reward) {
     const out = [];
     if (reward.doubloons) {
         await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, reward.doubloons]).catch(() => {});
@@ -2984,7 +3012,8 @@ export async function shipBattleVolley(buyerId, aim) {
     await saveBattle(buyerId, null, null);
     const meta = open.meta;
     let reward = [];
-    if (meta.kind === "encounter") reward = await finishEncounterBattle(buyerId, meta, res);
+    if (meta.kind === "warden") reward = await finishWardenBattle(buyerId, meta, res);
+    else if (meta.kind === "encounter") reward = await finishEncounterBattle(buyerId, meta, res);
     else if (meta.kind === "fleet") reward = await finishFleetBattle(buyerId, meta, res);
     else reward = await finishRaidBattle(buyerId, meta, res);
 
@@ -3026,7 +3055,9 @@ export async function shipBattleReckoning(buyerId) {
 
     await saveBattle(buyerId, null, null);
     const meta = open.meta;
-    const reward = meta.kind === "encounter"
+    const reward = meta.kind === "warden"
+        ? await finishWardenBattle(buyerId, meta, res)
+        : meta.kind === "encounter"
         ? await finishEncounterBattle(buyerId, meta, res, { reckoning: true })
         : meta.kind === "fleet"
             ? await finishFleetBattle(buyerId, meta, res)

@@ -31,9 +31,20 @@ export async function captureCaptain(buyerId, rank) {
     const grade = chartGrade(who.stars);
     const band = chartBand(grade);
 
+    // ── THE CHART'S FACE IS DECIDED HERE, WHEN HE NAMES THE PLACE ────────────────────────────────────────
+    // The seed fixes WHICH island this chart points to and where the three rings fall on the paper (see
+    // chart-plot.js). Stamped at capture rather than when the chart is opened, because a destination rolled
+    // at open time would be a chart whose island depends on when you got round to looking at it — and because
+    // re-opening the same chart after a reload has to be the same puzzle, not a new one.
+    //
+    // Math.random rather than the id, because the id is guessable: a member who can work out their next chart
+    // id could read off the island before spending it. A migration backfills the OLD rows off their ids,
+    // which is fine for charts that already exist and would not be fine for the ones minted from now on.
+    const seed = Math.floor(Math.random() * 2147483647);
+
     const [made] = await db.query(
-        `INSERT INTO mkt_ship_chart (buyer_id, grade, band) VALUES ($1,$2,$3) RETURNING id`,
-        [buyerId, grade, band.id]
+        `INSERT INTO mkt_ship_chart (buyer_id, grade, band, seed) VALUES ($1,$2,$3,$4) RETURNING id`,
+        [buyerId, grade, band.id, seed]
     ).catch(() => []);
     if (!made) return null;
 
@@ -48,6 +59,6 @@ export async function captureCaptain(buyerId, rank) {
     return {
         name: who.name, ship: who.ship, art: who.art, stars: who.stars,
         said: handoverFor(who.stars),
-        chart: { id: Number(made.id), grade, band: band.id, bandName: band.name, blurb: band.blurb },
+        chart: { id: Number(made.id), grade, band: band.id, bandName: band.name, blurb: band.blurb, seed },
     };
 }
