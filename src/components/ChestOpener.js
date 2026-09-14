@@ -93,6 +93,35 @@ export default function ChestOpener({ onLoot, bare = false, openTier = null }) {
     // The server caps how many it will open in a request, so `more` is what is left and the card offers
     // another round rather than silently stopping — see BULK_OPEN_CAP.
     const [bulk, setBulk] = useState(null);   // { opens, opened, more, tier }
+
+    // ── ⚠️ OPENING A HOARD IS IRREVERSIBLE AND IT WAS ONE TAP ────────────────────────────────────────────
+    // Kaishiern: "I was on my equipment screen actively changing my equipment and when I clicked on the back
+    // piece I wanted to switch to it instead opened all of my chests in my inventory. I was saving those for
+    // later."
+    //
+    // He is describing the geometry of this page exactly. The gear picker is a full-screen sheet that
+    // UNMOUNTS on the tap that equips something — and measured at 390x844, its item rows sit at y=380, 413
+    // and 460, which is precisely where `.chest-tile-one`, `.chest-tile-one` and `.chest-tile-all` are on the
+    // page underneath. `.chest-openall` is at 690, under the lower rows. So the instant the sheet goes, every
+    // chest button in the game is under the player's finger, and a second tap — or a click the browser
+    // synthesises after the sheet has already gone — opens the lot.
+    //
+    // The page-side half of this is a tap shield in EquipmentClient. This half is the one that matters: a
+    // thing you cannot undo must be asked twice. Armed for four seconds, then it forgets — so the confirm is
+    // a deliberate second tap rather than a state you can wander back into.
+    const [armed, setArmed] = useState(null);   // the tier awaiting confirmation, or "__all"
+    useEffect(() => {
+        if (!armed) return undefined;
+        const t = setTimeout(() => setArmed(null), 4000);
+        return () => clearTimeout(t);
+    }, [armed]);
+    function askOpenAll(tier = null) {
+        const key = tier || "__all";
+        if (armed !== key) { setArmed(key); Sfx.chestRattle(0.6); return; }
+        setArmed(null);
+        openAll(tier);
+    }
+
     async function openAll(tier = null) {
         if (busy) return;
         setBusy(true); setModalTier(tier || "__all"); setPhase("shaking"); setReveal(null); setBulk(null);
@@ -226,8 +255,9 @@ export default function ChestOpener({ onLoot, bare = false, openTier = null }) {
                                 {/* Only worth offering when there is a stack. On a single chest "open all"
                                     and "open" are the same tap with two names. */}
                                 {c.count > 1 ? (
-                                    <button type="button" className="chest-tile-all" onClick={() => openAll(c.tier)} disabled={busy}>
-                                        Open all {c.count}
+                                    <button type="button" className={`chest-tile-all${armed === c.tier ? " is-armed" : ""}`}
+                                        onClick={() => askOpenAll(c.tier)} disabled={busy}>
+                                        {armed === c.tier ? `Open ${c.count}? Tap again` : `Open all ${c.count}`}
                                     </button>
                                 ) : null}
                             </div>
@@ -236,8 +266,9 @@ export default function ChestOpener({ onLoot, bare = false, openTier = null }) {
                     {/* The whole pile, richest first. Only when there is more than one tier to sweep — with a
                         single tier on the shelf its own "open all" already is this button. */}
                     {chests.length > 1 ? (
-                        <button type="button" className="chest-openall" onClick={() => openAll(null)} disabled={busy}>
-                            Open all {total} chests
+                        <button type="button" className={`chest-openall${armed === "__all" ? " is-armed" : ""}`}
+                            onClick={() => askOpenAll(null)} disabled={busy}>
+                            {armed === "__all" ? `Open all ${total}? Tap again to confirm` : `Open all ${total} chests`}
                         </button>
                     ) : null}
                 </>

@@ -248,6 +248,22 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     // while you are standing in the picker deciding.
     const [priorities, setPriorities] = useState(() => new Set());
     const [pickerOpen, setPickerOpen] = useState(false);
+    // ── ⚠️ THE SHEET GOES, AND YOUR FINGER IS STILL THERE ────────────────────────────────────────────────
+    // This picker is a full-screen portal that unmounts on the tap that equips something, and what is on the
+    // page directly beneath its item rows — measured at 390x844 — is the chest card: `.chest-tile-one` at
+    // y=380 and 413, `.chest-tile-all` at 460, `.chest-openall` at 690. So the moment it closes, every chest
+    // button in the game is under the point you just tapped. Kaishiern opened every chest he had been saving
+    // that way, while changing his off hand.
+    //
+    // A brief shield over the page after the sheet closes: 350ms, invisible, swallows one stray tap and then
+    // removes itself. The other half of this is the confirmation on the bulk opens in ChestOpener — this
+    // stops the tap, that stops the loss if one ever gets through.
+    const [shield, setShield] = useState(false);
+    const closePicker = useCallback(() => {
+        setSlot(null); setPickerOpen(false);
+        setShield(true);
+        setTimeout(() => setShield(false), 350);
+    }, []);
     useEffect(() => {
         try {
             const raw = window.localStorage.getItem(PRIORITY_KEY);
@@ -579,8 +595,13 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 Now: what you are wearing sits at the top as the thing to beat, the candidates are RANKED, and
                 every row states WHAT CHANGES rather than what it is. The scoring is a sort order and says so
                 — see item-value.js. */}
+            {shield && typeof document !== "undefined" ? createPortal((
+                <div aria-hidden="true" style={{ position: "fixed", inset: 0, zIndex: 1400, background: "transparent" }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} />
+            ), document.body) : null}
+
             {slot && typeof document !== "undefined" ? createPortal((
-                <div className="gearpick-scrim" role="dialog" aria-modal="true" onClick={() => { setSlot(null); setPickerOpen(false); }}>
+                <div className="gearpick-scrim" role="dialog" aria-modal="true" onClick={closePicker}>
                     <div className="gearpick" onClick={(e) => e.stopPropagation()}>
                         {(() => {
                             const slotLabel = EQUIP_SLOTS.find((x) => x.slot === slot)?.label || slot;
@@ -605,7 +626,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 <>
                                     <div className="gearpick-head">
                                         <b>{slotLabel}</b>
-                                        <button type="button" className="gearpick-x" onClick={() => { setSlot(null); setPickerOpen(false); }}>Close</button>
+                                        <button type="button" className="gearpick-x" onClick={closePicker}>Close</button>
                                     </div>
 
                                     {worn ? (
@@ -617,7 +638,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                                     <b>{worn.name}{worn.enhanceLevel > 0 ? <em className="gearpick-forge">+{worn.enhanceLevel}</em> : null}</b>
                                                     <span>{describeStats(wornStats)}</span>
                                                 </div>
-                                                <button type="button" className="gearpick-off" onClick={() => { unequip(slot); setSlot(null); }} disabled={busy}>Take off</button>
+                                                <button type="button" className="gearpick-off" onClick={() => { unequip(slot); closePicker(); }} disabled={busy}>Take off</button>
                                             </div>
                                         </div>
                                     ) : <p className="gearpick-empty">Nothing in this slot.</p>}
@@ -648,7 +669,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                             const up = i.score - wornScore;
                                             return (
                                                 <button type="button" key={i.id} className={`gearpick-row rar-${i.rarity}${n === 0 && up > 0 ? " is-best" : ""}`}
-                                                    onClick={() => { equip(slot, i.id); setSlot(null); }} disabled={busy}>
+                                                    onClick={() => { equip(slot, i.id); closePicker(); }} disabled={busy}>
                                                     <ItemGlyph id={i.id} className="gearpick-glyph" elements={i.elements} gem={i.gem} socket={i.socket} />
                                                     <div className="gearpick-row-body">
                                                         <b>{i.name}{i.enhanceLevel > 0 ? <em className="gearpick-forge">+{i.enhanceLevel}</em> : null}{n === 0 && up > 0 ? <em className="gearpick-best">best pick</em> : null}</b>

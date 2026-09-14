@@ -22,7 +22,7 @@ import { spawn } from "node:child_process";
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import { QUIET_HIDE, QUIET_SEEN, quiet } from "./lib/shot-quiet.mjs";
+import { QUIET_HIDE, QUIET_SEEN, installQuiet, quiet } from "./lib/shot-quiet.mjs";
 
 // ── SHOT_QUIET=1 ── seed every known "already seen this" marker and hide every known scrim, so a shot is of
 // the page rather than of whichever launch card this profile has not dismissed yet. See lib/shot-quiet.mjs.
@@ -101,6 +101,20 @@ const FOLD = arg("--fold", null);
 // that one request, in dev only. `--fixture captain` serves scripts/fixtures/.live/<page>.captain.json.
 const FIXTURE = arg("--fixture", null);
 
+// ── --touch: TAP LIKE A FINGER, NOT LIKE A SCRIPT ────────────────────────────────────────────────────────────
+// `el.click()` and even a full synthetic pointer sequence are DOM events the page dispatches to itself. A real
+// touch is different in the one way that matters for a whole class of bug: after `touchend` the BROWSER
+// synthesises a click, and it hit-tests that click at dispatch time — so if the handler for the touch removed
+// the thing under the finger (closing a sheet, unmounting a portal), the synthesised click lands on whatever
+// is now underneath. That is "click-through", and no synthetic event can reproduce it.
+//
+//   --touch ".equip-slot.slot-off_hand;.gearpick-more;.gearpick-item"
+//
+// Semicolon-separated selectors, tapped in order via Input.dispatchTouchEvent at each element's centre, with
+// --touch-wait ms between them. Requires touch emulation, which is turned on whenever this flag is used.
+const TOUCH = arg("--touch", null);
+const TOUCH_WAIT = Number(arg("--touch-wait", 900));
+
 if (!url) throw new Error("usage: node scripts/film.mjs <url> <outBase> [--click sel] [--await sel] [--tap sel] [--frames n] [--every ms]");
 if (!existsSync(dirname(outBase)) && dirname(outBase) !== ".") mkdirSync(dirname(outBase), { recursive: true });
 
@@ -160,6 +174,7 @@ if (process.env.SHOT_COOKIE) {
     // This cost a full debugging round on the Forest: the new whole-tree art was live and byte-correct at the
     // edge, and the film kept showing the redwood trunk-crops it replaced. Every conclusion drawn from those
     // frames was about art that had not existed for an hour. shot.mjs learned this and film.mjs was not told.
+    if (TOUCH) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
     await send("Network.setCacheDisabled", { cacheDisabled: true });
     if (FIXTURE) await send("Network.setCookie", {
         name: "wolfden-fixture", value: FIXTURE, domain: new URL(url).hostname, path: "/",
@@ -183,45 +198,13 @@ if (process.env.SHOT_COOKIE) {
 // against Date.now(), so seeding it with "1" reads as "dismissed in 1970" and the banner appears anyway —
 // which it did, over the reels, from frame 11 of a film of a reel animation. The two rigs having different
 // seeding was the whole bug: the fix went into one of them.
-if (process.env.SHOT_SEEN) {
-    const setters = process.env.SHOT_SEEN.split(";").map((x) => x.trim()).filter(Boolean).map((entry) => {
-        const eq = entry.indexOf("=");
-        const key = eq === -1 ? entry : entry.slice(0, eq);
-        const raw = eq === -1 ? "1" : entry.slice(eq + 1);
-        // `now` is a timestamp (the web-push snooze compares against Date.now()); `now-day` is the
-        // store-local DATE, which is what the daily check-in remembers. Neither is a flag.
-        const value = raw === "now" ? "String(Date.now())"
-            : raw === "now-day" ? 'new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date())'
-                : JSON.stringify(raw);
-        return `localStorage.setItem(${JSON.stringify(key)}, ${value});`;
-    });
-    await send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `try { ${setters.join(" ")} } catch (e) {}`,
-    });
-}
-// And the ones a localStorage marker cannot pre-empt, because the server decides they are due. The poll took
-// the whole screen one frame after the click on 2026-08-21 and the rig filmed twenty frames of it while
-// reporting success — the click landed on the modal, not the button underneath it.
-if (process.env.SHOT_HIDE) {
-    const sel = process.env.SHOT_HIDE.split(",").map((x) => x.trim()).filter(Boolean).join(", ");
-    const css = `${sel} { display: none !important; }`;
-    await send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `(() => {
-            // At document-start there may be no head AND no documentElement yet, and .appendChild on null
-            // throws — which killed the whole hook before the retry below was ever registered, so
-            // SHOT_HIDE silently hid nothing. Same bug as shot.mjs had.
-            const put = () => { const root = document.head || document.documentElement;
-                if (!root) return;
-                const s = document.createElement("style");
-                s.textContent = ${JSON.stringify(css)};
-                root.appendChild(s); };
-            document.addEventListener("DOMContentLoaded", put); put();
-            // A modal that mounts after hydration outlives a style added at document-start if the app
-            // replaces the head, so re-apply on an interval for the first few seconds too.
-            let n = 0; const iv = setInterval(() => { put(); if (++n > 20) clearInterval(iv); }, 200);
-        })();`,
-    });
-}
+// ⚠️ ONE IMPLEMENTATION, NOT TWO. Both of these hooks used to be COPIED here from shot.mjs, and the note
+// directly above says why that is a bug — "the two rigs having different seeding was the whole bug: the fix
+// went into one of them". It happened again, in this file, today: the modal-hiding CSS was fixed in
+// shot-quiet.mjs to release the scroll lock an announcement modal leaves on `body`, and film.mjs went on
+// using its own copy, so the page still could not scroll and a touch tap aimed below the fold hit nothing.
+// See [[reuse-the-rule-never-restate-it]]. installQuiet does the seeding AND the hiding for both rigs.
+await installQuiet(send, { hide: process.env.SHOT_HIDE, seen: process.env.SHOT_SEEN });
 if (MOCK) {
     const table = JSON.parse(readFileSync(MOCK, "utf8"));
     await send("Page.addScriptToEvaluateOnNewDocument", {
@@ -271,6 +254,49 @@ if (CLICK) {
         if (!fired) await sleep(250);
     }
     if (!fired) { chrome.kill(); throw new Error(`nothing clickable matched ${CLICK} — nothing was filmed`); }
+}
+
+// THE FINGER. Real touch points, one selector at a time, each tap reported with what was under it — because a
+// tap that found nothing is a tap that proves nothing, and this flag exists to prove things.
+if (TOUCH) {
+    for (const sel of TOUCH.split(";").map((x) => x.trim()).filter(Boolean)) {
+        let at = null;
+        for (let i = 0; i < 20 && !at; i += 1) {
+            // ⚠️ SCROLLED INTO VIEW FIRST, AND MEASURED AFTER THE SCROLL HAS LANDED. A touch point below the
+            // fold is dispatched at a coordinate the viewport does not contain, so it silently hits nothing —
+            // the first run of this tapped an equipment slot at y=869 on an 844px screen and reported success.
+            // Measuring in the same tick as the scrollIntoView reads the OLD position, which is the same bug
+            // one frame earlier.
+            await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(sel)});
+                if (el) el.scrollIntoView({ block: "center", behavior: "instant" }); })()`);
+            await sleep(250);
+            at = await evaluate(`(() => {
+                const el = document.querySelector(${JSON.stringify(sel)});
+                if (!el) return null;
+                const r = el.getBoundingClientRect();
+                if (!r.width || !r.height) return null;
+                const y = Math.round(r.top + r.height / 2);
+                if (y < 0 || y > window.innerHeight) return null;
+                return JSON.stringify({ x: Math.round(r.left + r.width / 2), y,
+                    what: String(el.className || el.tagName).slice(0, 40) });
+            })()`);
+            if (!at) await sleep(200);
+        }
+        if (!at) { chrome.kill(); throw new Error(`nothing tappable matched ${sel} — nothing was filmed`); }
+        const { x, y, what } = JSON.parse(at);
+        // ⚠️ synthesizeTapGesture, NOT dispatchTouchEvent. Raw touchStart/touchEnd pairs DO reach the page —
+        // and Chrome synthesises no click from them, so a tap on a plain <button> does nothing at all. The
+        // first cut of this flag reported "touch .gearpick-x at 326,151" and the sheet it was closing stayed
+        // open; nothing in that output says "no click was ever produced". synthesizeTapGesture drives the
+        // real gesture pipeline, which is the half that turns a tap into a click.
+        const mouse = { x, y, button: "left", clickCount: 1, buttons: 1 };
+        await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...mouse, buttons: 0 });
+        await send("Input.dispatchMouseEvent", { type: "mousePressed", ...mouse });
+        await sleep(70);
+        await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...mouse, buttons: 0 });
+        console.log(`  touch ${sel} at ${x},${y} (${what})`);
+        await sleep(TOUCH_WAIT);
+    }
 }
 
 // The scripted player, if there is one. Its return value is printed: a bot that failed to find what it drives

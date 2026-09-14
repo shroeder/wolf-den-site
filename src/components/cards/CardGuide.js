@@ -50,8 +50,9 @@ export default function CardGuide({ open, onClose }) {
                 <p className="cg-head">How this works</p>
 
                 <p className="cg-lead">
-                    A run is three acts of fifteen rooms. You pick the route, one room at a time, and every
-                    card you take stays in the deck for the whole climb.
+                    A run is three acts of fifteen rooms — and a fourth beneath them, if you find the keys.
+                    You pick the route, one room at a time, and every card you take stays in the deck for the
+                    whole climb.
                 </p>
 
                 <p className="cg-sub">What you can carry</p>

@@ -11047,6 +11047,17 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     font-size: 0.9rem; font-weight: 900; color: #2a1a00;
     background: linear-gradient(180deg, #ffe08a, #f0b73c); border: 1px solid rgba(255,240,190,0.5);
 }
+
+/* ── ARMED: A HOARD IS NOT OPENED BY ONE TAP ──────────────────────────────────────────────────────────────
+   The confirm state for both bulk opens. Loud and red-orange, because the only reason it is on the screen is
+   that the next tap destroys something the player was saving — see the note in ChestOpener.js. */
+.chest-openall.is-armed, .chest-tile-all.is-armed {
+    background: linear-gradient(180deg, #ff8a3c, #d8541a) !important;
+    border-color: rgba(255, 190, 120, 0.9) !important;
+    color: #1a0d04 !important;
+    animation: chestArm 0.9s ease-in-out infinite;
+}
+@keyframes chestArm { 0%, 100% { box-shadow: 0 0 0 rgba(255, 140, 60, 0); } 50% { box-shadow: 0 0 16px rgba(255, 140, 60, 0.85); } }
 .chest-openall:disabled { opacity: 0.5; cursor: default; }
 
 /* ── THE SUMMARY, FOR A PILE ─────────────────────────────────────────────────────────────────────────────────

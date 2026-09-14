@@ -92,7 +92,18 @@ export function quiet(env, extra, sep) {
 export async function installQuiet(send, { hide = "", seen = "" } = {}) {
     const sel = String(hide).split(",").map((x) => x.trim()).filter(Boolean).join(", ");
     if (sel) {
-        const css = `${sel} { display: none !important; }`;
+        // ── ⚠️ AND THE SCROLL LOCK THE MODAL LEFT BEHIND ────────────────────────────────────────────────
+        // Hiding a modal with CSS does not UNMOUNT it. AnnouncementModal sets `document.body.style.overflow
+        // = "hidden"` in an effect and restores it on unmount — so a modal hidden by this hook is still
+        // mounted, still holding the lock, and the page underneath cannot scroll at all. `body` ends up with
+        // a 6,081px scrollHeight inside an 844px window that will not move.
+        //
+        // It cost a full round on the equipment screen: every element below the fold was unreachable, a
+        // scrollIntoView did nothing, and a touch tap aimed at y=869 on an 844px viewport landed on nothing
+        // while the rig reported a successful tap. Nothing about that says "a modal you cannot see".
+        // The inline style wins over a stylesheet rule, so this has to be !important.
+        const css = `${sel} { display: none !important; }
+            body { overflow: auto !important; }`;
         await send("Page.addScriptToEvaluateOnNewDocument", {
             source: `(() => {
                 const put = () => {

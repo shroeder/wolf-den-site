@@ -7,7 +7,7 @@ import { isOwner, isStaff } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL, openPerkIds,
-    HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
+    HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, baseIdOf, buildParty,
     ASC_MAX, FINAL_ACT, POTION_DROP_BASE, ascPotionScale, ascRule, beltSize, buildShop, canUpgrade,
     cardById, drawOffer, encounterById, levelSharpens, openingRun,
     levelWeight, levelsCrossed, nextRand, perkSum, pickEncounter, rankFor, runScore, stopAt, unlockTrack, unlockedCards,
@@ -326,12 +326,30 @@ export async function recordRun(buyerId, run, outcome) {
     // you are not a build, so the starter's own composition is subtracted before the split — by COUNT, not
     // by id, so a sixth Bite you went and earned still feeds the Wolf Pup while the five you started with
     // do not.
+    //
+    // ── ⚠️ AND AN UPGRADED CARD IS STILL THAT PET'S CARD ─────────────────────────────────────────────
+    // Sunflower Jinxx: "I use the swarm card pretty often in the card game, but my bee never gets XP. It's
+    // never on the list no matter how many I have in my deck." Kaishiern, on his Forge Heart Dragon: "I got
+    // to use the card but it didn't reward it any exp at the end."
+    //
+    // An upgraded card's id carries a "+" and there is no `swarm+` in ALL_CARDS — upgrades are derived from
+    // the base entry at read time (see cardById/baseIdOf). So the lookup below returned undefined and the
+    // card fed NOTHING. Not less. Nothing.
+    //
+    // Measured across all 116 finished runs with a saved deck: 730 of 2,564 cards played were upgraded
+    // (28.5%), 104 runs — ninety per cent of them — lost shares to this, 632 card-shares fed nothing at all,
+    // and on 386 occasions a pet was left off the end-of-run list ENTIRELY that belonged on it. Upgrading
+    // your best card is the thing this game most wants you to do, and doing it disowned the pet it came from.
+    //
+    // The starter subtraction goes through the same door: the ten cards you were handed are the ten you were
+    // handed whether or not you have since upgraded one, so it counts by BASE id too.
     const byPet = new Map();
     const free = new Map();
-    for (const id of STARTER_DECK) free.set(id, (free.get(id) || 0) + 1);
+    for (const id of STARTER_DECK) free.set(baseIdOf(id), (free.get(baseIdOf(id)) || 0) + 1);
     for (const id of (ended.deck || [])) {
-        if ((free.get(id) || 0) > 0) { free.set(id, free.get(id) - 1); continue; }
-        const pet = ALL_CARDS[id]?.pet;
+        const base = baseIdOf(id);
+        if ((free.get(base) || 0) > 0) { free.set(base, free.get(base) - 1); continue; }
+        const pet = ALL_CARDS[base]?.pet;
         if (pet) byPet.set(pet, (byPet.get(pet) || 0) + 1);
     }
     // ── ⚠️ A FULLY GROWN PET IS NOT FED, AND ITS SHARE IS NOT WASTED ─────────────────────────────────

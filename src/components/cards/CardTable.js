@@ -7,7 +7,7 @@ import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
-import { ACTS, ASC_MAX, RUN_LENGTH, actName, ascRules, stopLabel } from "@/lib/marketplace/cards-kit.js";
+import { ACTS, ASC_MAX, FINAL_ACT, RUN_LENGTH, actName, ascRules, stopLabel } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE TABLE YOU SIT DOWN AT ────────────────────────────────────────────────────────────────────────────
 // The card game had no front room. Every other feature in the Den has one — the mine has a shaft head, the
@@ -99,7 +99,12 @@ export default function CardTable({ run, history = null }) {
                             ? "You walked out of the last one. Sit down and we'll go again."
                             : run?.done === "dead"
                                 ? "That one went badly. Cut the deck, start over."
-                                : `One run, three acts, ${ACTS * RUN_LENGTH} rooms. You in?`}
+                                // ⚠️ AND THE FOURTH ACT EXISTS. GrayKitsune: "the start page also only
+                                // mentions 3 acts not 4." ACTS is 3 because three is what you must CLEAR —
+                                // the fourth is a door you have to bring keys to — but a front room that
+                                // never mentions it is a front room that hides a quarter of the game from
+                                // the person deciding whether to sit down.
+                                : `One run, three acts, ${ACTS * RUN_LENGTH} rooms — and a fourth, if you find the keys. You in?`}
                 </p>
 
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -211,8 +216,12 @@ export default function CardTable({ run, history = null }) {
                             {history.recent.slice(0, 3).map((r, i) => (
                                 <li key={i} className={r.outcome === "won" ? "is-won" : ""}>
                                     <span>{r.outcome === "won" ? "Won" : "Died"}</span>
+                                    {/* ⚠️ EIGHTEEN WINS HAD ALREADY GONE THROUGH THE FOURTH ACT and every
+                                        one of them was listed here as "all three acts". A result line that
+                                        cannot tell your best run from your ordinary one is worse than no
+                                        result line. */}
                                     <i>{r.outcome === "won"
-                                        ? "all three acts"
+                                        ? (Number(r.act) >= FINAL_ACT ? "all four acts" : "all three acts")
                                         : `${actName(r.act)}, stop ${r.stop}`}</i>
                                     <b>{Number(r.score).toLocaleString()}</b>
                                 </li>
