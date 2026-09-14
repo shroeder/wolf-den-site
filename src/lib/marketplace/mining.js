@@ -1160,6 +1160,24 @@ export async function getMiningState(buyerId) {
             haul: run.haul || [],
             last: run.last || null,
             risk: Math.round(collapseChanceAt((Number(run.depth) || 0) + 1, row?.assay_level, row?.brace_level, lamp, depthCut) * 100),
+            // ── ⚠️ AND THE RISK COMPOUNDS, WHICH THE ONE NUMBER CANNOT SAY ───────────────────────────
+            // Brecken22: "Is the step 6-7 mine collapse common? I can't get further then 8-9 lucky if that
+            // happens." Kaishiern, trying to explain it: "It's almost as if the mine's collapse risk % is
+            // showing the % that it won't collapse versus the risk of collapsing."
+            //
+            // The number is right — it is the chance THIS step brings the roof in. What it cannot tell you
+            // is what three more steps costs, and the answer is most of your trip. With no upgrades the
+            // steps read 8%, 15%, 22%, 30% and every one of them is honest, while the chance of standing
+            // at depth 6 at all is 43%, and at depth 8 it is 15%. Brecken22 is not unlucky. He is reading a
+            // per-step number and living a compounded one.
+            //
+            // So the screen gets both: the step, and the odds of clearing the next THREE steps from here.
+            // Three because that is the decision in front of you — one more step is not the gamble, "can I
+            // get to the good seam" is.
+            ahead: Math.round(
+                [1, 2, 3].reduce((p, n) => p * (1 - collapseChanceAt((Number(run.depth) || 0) + n,
+                    row?.assay_level, row?.brace_level, lamp, depthCut)), 1) * 100
+            ),
         } : null,
         // How the last descent ended, so the client can show the wrap-up once.
         lastRun: row?.run_json?.over ? { collapsed: Boolean(row.run_json.collapsed), depth: Number(row.run_json.depth) || 0 } : null,

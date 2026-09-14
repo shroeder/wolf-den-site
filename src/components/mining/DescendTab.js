@@ -103,6 +103,16 @@ export default function DescendTab({ s, msg, busy, card, startTrip, buyTrip, goD
                             carrying <b>{run.haul.length}</b> · next step{" "}
                             <b style={{ color: run.risk >= 35 ? "#ff8f9a" : run.risk >= 18 ? "#ffcf6a" : "#8fe39a" }}>{run.risk}%</b> collapse
                         </div>
+                        {/* ── AND WHAT THREE MORE STEPS COSTS ────────────────────────────────────────
+                            One step's risk is an honest number that describes none of the decision. Every
+                            step is a fresh roll against a worse figure, so a run that reads "22%" is a run
+                            with a 43% chance of seeing depth 6 — see `ahead` in mining.js and the two
+                            reports it came from. Only once there is something to lose. */}
+                        {run.haul.length && typeof run.ahead === "number" ? (
+                            <div className="mine-hud is-ahead">
+                                three more steps: <b>{run.ahead}%</b> you keep walking
+                            </div>
+                        ) : null}
                     </>
                 ) : (
                     <div className="mine-face-cta">

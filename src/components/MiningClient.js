@@ -303,6 +303,11 @@ export default function MiningClient({ initial }) {
                 .mine-hud { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-size: 12px;
                     color: #e7dcc8; text-shadow: 0 2px 6px #000; }
                 .mine-hud b { color: #ffe28a; }
+                /* ⚠️ .mine-hud IS ABSOLUTE AT bottom: 8px, so a second one lands exactly on top of the
+                   first. The compounded-odds line sits above it and reads quieter — the step risk is the
+                   number you act on, this is the one that explains why the trip ended where it did. */
+                .mine-hud.is-ahead { bottom: 26px; font-size: 11px; color: #b9ae99; }
+                .mine-hud.is-ahead b { color: #ffc46a; }
                 .mine-readout { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 12px;
                     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
                 .mine-readout-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
