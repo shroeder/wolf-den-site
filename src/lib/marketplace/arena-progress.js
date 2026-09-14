@@ -282,7 +282,25 @@ export async function buyArmoury(buyerId, id) {
 
     // Hand it over. Anything that throws here has already been paid for, so each grant is best-effort and the
     // log below is the record — a member charged and given nothing is the one outcome worth avoiding above all.
-    let got = { kind: won.kind, label: won.label, art: null };
+    // ── ⚠️ SAY WHERE IT WENT, NOT JUST WHAT IT WAS ──────────────────────────────────────────────────────
+    // GrayKitsune, 2026-09-03: "needs to say its given doubloons." ValkyrieSylve, 2026-09-13, after twelve
+    // thousand laurels: "it didnt tell me what I got and I cant find what is new in my inventory."
+    //
+    // The card DID name the prize. What it never said is that the prize is not in the arena. A jewel lands in
+    // the Jeweller, doubloons on the boat, forge parts in the Forge, a chest in the chest hold — four screens,
+    // none of them this one, and the member is left hunting an inventory that was never going to hold it.
+    // Valkyrie won a Polished Jewel and spent the next hour looking for it in the wrong place.
+    const WHERE = {
+        gold: "Added to your gold.",
+        doubloons: "Added to your doubloons — on the boat, not in a bag.",
+        chest: "In your chest hold, waiting to be opened.",
+        parts: "In the Forge, with your other parts.",
+        gem: "With the Jeweller, under your uncut stones.",
+        consumable: "On your consumable shelf.",
+        seed: "In the farm's seed tin.",
+        fights: "Spent already — it is today's challenges, not an item.",
+    };
+    let got = { kind: won.kind, label: won.label, art: null, where: WHERE[won.kind] || null };
     try {
         if (won.kind === "gold") {
             // NOT written back onto `won` - it is a row of the shared crate.table built once by G(n), so

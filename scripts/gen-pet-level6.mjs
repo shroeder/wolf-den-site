@@ -161,7 +161,22 @@ function catalogue() {
 // and a prompt describing this pet.
 async function editTo(srcBuf, form, species = "") {
     const prompt = `Transform THIS EXACT creature into its final level-6 form. `
-        + (species ? `The creature is: ${species}. It MUST still be that exact animal when you are done. ` : "")
+        + (species ? `The creature is: ${species}. It MUST still be that exact subject when you are done. ` : "")
+        // ── ⚠️ NOT EVERY PET IS AN ANIMAL, AND THE OBJECT ONES GET EATEN ────────────────────────────────
+        // GrayKitsune, 2026-09-14: "Copper Kettle's darkstone looks like some demon wolf thing, not a kettle
+        // at all." Eric D said it first on 2026-08-28, naming the Lantern Jelly alongside it.
+        //
+        // The dark line is written for fur: "its coat", "horns, claws, fangs, beak or mane", "posture lower
+        // and more predatory", worked examples that are all animals. Hand that to a living KETTLE and the
+        // only way to satisfy the sentence is to draw something that has a coat and claws — so it did, and
+        // the Kettle's final form came back a horned cat with no spout, no lid and no handle.
+        //
+        // Same shape of failure as the Lantern Jelly and the Anglerfish's feet directly below, and the fix is
+        // the same: name the thing it must remain, as a flat prohibition rather than a hint.
+        + `IF THE SUBJECT IS AN OBJECT OR A THING RATHER THAN AN ANIMAL — a kettle, a lantern, a lodestone, a `
+        + `banner, an anvil — it REMAINS that object. Keep its defining parts exactly: a kettle keeps its `
+        + `spout, its lid and its handle and is still recognisably a kettle. DO NOT replace it with an animal, `
+        + `a cat, a wolf or any beast, and do not give it fur. `
         + `${FORMS[form].line} `
         + `IF THIS ANIMAL HAS NO HORNS, CLAWS, FANGS, BEAK, MANE, LEGS OR FEET, simply SKIP those parts of the `
         + `instruction — apply the effect to the body parts it actually has (tentacles, fins, shell, wings, `

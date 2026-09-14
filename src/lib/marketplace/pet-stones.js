@@ -86,6 +86,12 @@ export const STONE_SOURCES = {
     // rather than passed as a bare 1 from sailing.js so this table stays what its header claims: the one
     // place the stone supply can be read off.
     sail_charted: { label: "a charted island", chance: 1 },
+    // ── AND THE SHRINES ON THE WAY TO IT ──────────────────────────────────────────────────────────────────
+    // An island carries two or three of these and you only reach the ones your tide stretches to, so this is
+    // the rare tail on a thing that already had its certain head above. Declared rather than passed as a bare
+    // number from expedition.js for the same reason sail_charted is: this table is the one place the supply
+    // can be read off. ⚠️ It shares a run with sail_charted — re-run scripts/check-stones.mjs after moving it.
+    island_shrine: { label: "an island shrine", chance: 0.06 },
     // The boss: only on a KILL, which is a whole-server event a few times a week.
     boss_kill: { label: "a boss kill", chance: 0.02 },
     // The Depths' dungeons: the floor-ten boss, one run per dungeon per day.

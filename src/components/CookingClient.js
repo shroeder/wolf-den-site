@@ -694,7 +694,21 @@ export default function CookingClient({ initial }) {
                                                 <i key={i} className={i < result.made.reward.rung ? "is-on" : ""} style={{ "--i": `${i * 0.05}s` }} />
                                             ))}
                                         </span>
+                                        {/* ── ⚠️ NAME THE LADDER, BECAUSE THE BUMP CHANGES IT ──────────────
+                                            Sunflower Jinxx, 2026-09-14: "Rung 7 says enshrinement stone. But
+                                            also says rung 7 out of 7, but the chest is rung 8?"
+
+                                            She had studied the pool before cooking — the LEGENDARY ladder,
+                                            eight rungs, a stone at 7 and a chest at 8. The heat caught her
+                                            recipe and bumped it a tier, so the reward actually rolled on the
+                                            MASTER ladder, which is seven rungs long and holds neither. The
+                                            card told her she had been bumped and then printed "Rung 7 of 7"
+                                            with no clue which ladder that was seven of, so the only reading
+                                            available was the one she had in front of her.
+
+                                            A rung number is meaningless without the ladder it belongs to. */}
                                         Rung {result.made.reward.rung} of {result.made.reward.rungs}
+                                        {result.made.tierName ? <> · {result.made.tierName} ladder</> : null}
                                         {topRung ? <b> · TOP OF THE LADDER</b> : null}
                                     </div>
                                 ) : null}

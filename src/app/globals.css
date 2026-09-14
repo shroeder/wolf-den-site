@@ -13473,6 +13473,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .eqtrait > span:first-child { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .eqtrait b { font-weight: 800; color: #f2ead9; }
 .eqtrait em { display: block; font-style: normal; margin-top: 2px; font-size: 0.75rem; line-height: 1.35; color: #8a9099; }
+/* An ascension power sitting in the bag. The promise on the card is true only while the piece is worn, and
+   saying nothing was read as saying it already applied. See abilityOf in inventory.js. */
+.eqtrait-note { display: block; font-style: normal; margin-top: 3px; font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.01em; color: #e8b060; }
+.eqtrait.is-dormant b { color: #cdbb98; }
+.eqtrait.is-dormant > span:first-child { opacity: 0.5; }
 .eqtrait.is-link { cursor: pointer; }
 .eqtrait.t-forge { border-color: rgba(255,183,77,0.3); background: rgba(255,183,77,0.07); }
 .eqtrait.t-forge b { color: #ffc966; }

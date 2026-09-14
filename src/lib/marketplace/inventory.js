@@ -52,11 +52,31 @@ async function memberContext(buyerId) {
 // its magnitudes (signatureHit, signatureStrikeBonus, rollCheerProcs) and an ascension power has none of
 // them — folding the two together at the source would hand the boss maths an effect it cannot price. This
 // is a view model; every renderer already knows how to draw `signature`, so it is the one field to fill.
-const abilityOf = (id) => {
+// ── ⚠️ AN ASCENSION POWER IS ONLY REAL WHILE THE PIECE IS WORN, AND THE CARD NEVER SAID SO ──────────────────
+// ValkyrieSylve, twice: "I have a helmet that says the first collapse of each trip does nothing at all, yet
+// when I got to my collapse I lost everything" — and then, a day later, "I'm confused as to what Ascension
+// Powers are and why the perk doesn't work without the gear being ascended."
+//
+// The rule was right the whole time; the CARD was lying by omission. It printed "The first collapse of each
+// trip does nothing at all" as a flat statement of fact on a piece sitting in her bag, unequipped, doing
+// nothing. A signature works the same way, but a signature reads as a property of the object; a power reads
+// as a promise about your run. So the payload now carries whether it is LIVE, and the word "while worn" goes
+// on the card whenever it is not.
+//
+// This was already owed: the Arbiter's own post on 2026-09-13 said "a card that states a rule it is not
+// currently applying is a card lying by omission, and I have not fixed that half yet." This is that half.
+const abilityOf = (id, worn = null) => {
     const sig = signatureFor(id);
     if (sig) return sig;
     const pow = powerFor(id);
-    return pow ? { label: pow.name, desc: pow.desc, power: true } : null;
+    if (!pow) return null;
+    return {
+        label: pow.name, desc: pow.desc, power: true,
+        // `null` means "nobody is asking about a specific member" (the shop shelf), where nothing is worn yet
+        // and the honest line is the same one.
+        live: worn === true,
+        note: worn === true ? null : "Only while this piece is equipped.",
+    };
 };
 
 export function itemLockReason(item, ctx, metrics = null) {
@@ -424,7 +444,7 @@ export async function getInventory(buyerId) {
                 // The socket, and the gem in it — so every grid that draws this item can show it.
                 socket: Boolean((socketed[def.id] || []).length),
                 gem: (() => { const g = (socketed[def.id] || []).find((x) => x.gemId); return g ? gemById(g.gemId) : null; })(),
-                util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: abilityOf(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null,
+                util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: abilityOf(def.id, equippedIds.has(def.id)), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null,
                 // Trophies are not items any more, so nothing in this bag can be one and the flag is always
                 // false. Kept on the payload so the client's existing branches stay valid until they are cleaned
                 // up; the collections panel reads mkt_user_collection directly.
@@ -478,7 +498,7 @@ export async function getInventory(buyerId) {
             const set = setForItem(i.id);
             return {
                 id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
-                stats: i.stats, statsText: describeStats(i.stats), sea: i.sea || null, depth: i.depth || null, signature: abilityOf(i.id),
+                stats: i.stats, statsText: describeStats(i.stats), sea: i.sea || null, depth: i.depth || null, signature: abilityOf(i.id, false),
                 // Base elements only, and correctly so: an override belongs to an OWNER, and nothing in the
                 // shop is owned yet. What you see on the shelf is what the piece arrives attuned to.
                 elements: describeItemElements(i.id, null),

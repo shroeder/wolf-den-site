@@ -3430,6 +3430,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img className="ar-open-art" src={opened.art || opened.crate?.art} alt="" draggable="false" />
                             <b className="ar-open-name">{opened.label}</b>
+                            {/* Where it landed. Half of what a crate pays lives on a different screen, and
+                                "I cant find what is new in my inventory" is what that costs. */}
+                            {opened.where ? <span className="ar-open-where">{opened.where}</span> : null}
                             <button type="button" className="ar-btn ar-open-go" onClick={() => setOpened(null)}>Take it</button>
                         </div>
                     ) : (
@@ -5961,6 +5964,7 @@ function Styles() {
                 animation: arOpenFloat 2.8s ease-in-out infinite; }
             @keyframes arOpenFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
             .ar-open-name { display: block; font-family: var(--font-display); font-size: 1.2rem; color: #f7efe0; }
+            .ar-open-where { display: block; margin-top: 4px; font-size: 0.82rem; color: #b9a986; line-height: 1.35; }
             .ar-open-go { width: 100%; margin-top: 14px; }
             .ar-arm-head { display: flex; align-items: baseline; gap: 8px; }
             .ar-arm-head b { font-family: var(--font-display); font-size: 1.05rem; color: #e8dcc6; }

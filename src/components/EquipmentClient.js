@@ -1036,7 +1036,17 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     <div className="eqtrait t-att"><span aria-hidden="true">🔮</span><span><b>+{it.util.value}{it.util.unit} {it.util.label}{it.util.level > 1 ? ` Lv${it.util.level}` : ""}</b><em>attunement — a bonus rolled at the Forge</em></span></div>
                                 ) : null}
                                 {it.signature ? (
-                                    <div className="eqtrait t-sig"><span aria-hidden="true">★</span><span><b>{it.signature.label}</b><em>{it.signature.desc}</em></span></div>
+                                    <div className={`eqtrait t-sig${it.signature.power && !it.signature.live ? " is-dormant" : ""}`}>
+                                        <span aria-hidden="true">★</span>
+                                        <span>
+                                            <b>{it.signature.label}</b>
+                                            <em>{it.signature.desc}</em>
+                                            {/* An ascension power does nothing in the bag. Saying so here is the
+                                                whole of ValkyrieSylve's report — the rule was right, the card
+                                                was stating it as though it were already in force. */}
+                                            {it.signature.note ? <i className="eqtrait-note">{it.signature.note}</i> : null}
+                                        </span>
+                                    </div>
                                 ) : null}
                                 {it.sea ? <div className="eqtrait t-sea"><span aria-hidden="true">⚓</span><span><b>{describeSea(it.sea)}</b><em>at sea — raids · digging · voyages</em></span></div> : null}
                                 {it.depth ? <div className="eqtrait t-depth"><span aria-hidden="true">⛏️</span><span><b>{describeDepth(it.depth)}</b><em>underground — delving · mining · smelting</em></span></div> : null}

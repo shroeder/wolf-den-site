@@ -32,7 +32,7 @@ import {
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { rankForLevel } from "@/lib/marketplace/ranks.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
-import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { COLLECTIBLES, collectibleById, isCollectibleUnlocked } from "@/lib/marketplace/collectibles.js";
 
 // ── SHELF HELPERS ────────────────────────────────────────────────────────────────────────────────────────────
 // `tool` = a thing you have UPGRADED. `rec` = a thing you have DONE. Both are declarative so the loader can
@@ -621,7 +621,7 @@ export const curationBonusFor = (pct) =>
 // Farm and Den read off counts spread across a dozen tables. Both build a Map<buyerId, rowLikeObject> so the
 // main loop can treat them exactly like mkt_arena.
 async function farmAggregates() {
-    const [harvests, petRows, decos, love, upg] = await Promise.all([
+    const [harvests, petRows, decos, love, upg, buyerXp, petUnlocks] = await Promise.all([
         // There is no lifetime harvest counter — mkt_farm_plot holds only what is in the ground right now.
         // The activity log is the record: one `harvest` row per crop pulled, 5,647 of them and counting.
         db.query(`SELECT buyer_id, count(*)::int v FROM mkt_xp_event WHERE action = 'harvest' GROUP BY buyer_id`).catch(() => []),
@@ -636,6 +636,17 @@ async function farmAggregates() {
                          SUM(votes)::int votes
                     FROM mkt_farm_rating GROUP BY owner_id`).catch(() => []),
         db.query(`SELECT id AS buyer_id, farm_upgrades FROM mkt_buyer WHERE farm_upgrades IS NOT NULL`).catch(() => []),
+        // ── ⚠️ "PETS KEPT" IS OWNERSHIP, AND OWNERSHIP IS NOT A TABLE ────────────────────────────────────
+        // GrayKitsune, 2026-09-14: "Trophy room - Pets Kept stat is wrong unless its tracking something
+        // thats not pets owned?" It was. It counted rows in mkt_pet_level, which is the table of pets that
+        // have EARNED EXPERIENCE — so a pet you own and have never fielded did not exist, and 97 of 123
+        // members were shown a number that was not how many pets they have. Gray was shown 56 against 80.
+        //
+        // A pet is yours if it was GRANTED or your LEVEL unlocks it (see ownedPetIdSet in pets.js) — there is
+        // no owned-pets table to count and there never was. This is that same rule in bulk: two more queries
+        // for the whole board rather than one per member, because this builds every member at once.
+        db.query(`SELECT id AS buyer_id, COALESCE(xp,0) AS xp FROM mkt_buyer WHERE COALESCE(xp,0) > 0`).catch(() => []),
+        db.query(`SELECT buyer_id, ref FROM mkt_cosmetic_unlock WHERE category = 'pet'`).catch(() => []),
     ]);
     const rows = new Map();
     const at = (id) => {
@@ -647,11 +658,28 @@ async function farmAggregates() {
     for (const r of decos) if (r.buyer_id) { const c = at(r.buyer_id); c.decos = Number(r.kinds) || 0; c.deco_total = Number(r.total) || 0; }
     for (const r of love) if (r.buyer_id) { const c = at(r.buyer_id); c.love = Number(r.score) || 0; c.votes = Number(r.votes) || 0; }
     for (const r of upg) if (r.buyer_id) at(r.buyer_id).farm_upgrades = r.farm_upgrades;
+    // Pet LEVELS earned still comes off the XP rows, which is correct — a level is a thing you earned, and a
+    // pet with no row has earned none. Only the COUNT was wrong.
     for (const r of petRows) {
         if (!r.buyer_id) continue;
         const c = at(r.buyer_id);
-        c.pets = (c.pets || 0) + 1;
         c.pet_levels = (c.pet_levels || 0) + petLevelForXp(Number(r.xp) || 0, collectibleById(r.pet_id)?.rarity);
+    }
+
+    // ⚠️ THE CAST IS LOAD-BEARING. mkt_cosmetic_unlock.buyer_id is TEXT and mkt_buyer.id is UUID; comparing
+    // them raw is "operator does not exist: text = uuid". See [[postgres-landmines]].
+    const grantedPets = new Map();
+    for (const u of petUnlocks || []) {
+        const k = String(u.buyer_id);
+        if (!grantedPets.has(k)) grantedPets.set(k, new Set());
+        grantedPets.get(k).add(u.ref);
+    }
+    for (const b of buyerXp || []) {
+        if (!b.buyer_id) continue;
+        const granted = grantedPets.get(String(b.buyer_id)) || new Set();
+        const level = levelForXp(Number(b.xp) || 0).level;
+        at(b.buyer_id).pets = COLLECTIBLES.filter((p) =>
+            (!p.ownerOnly || granted.has(p.id)) && isCollectibleUnlocked(p, level, { owned: granted })).length;
     }
     return { rows };
 }
