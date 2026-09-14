@@ -1877,23 +1877,25 @@ export async function startVoyage(buyerId, optionId = "standard") {
     const row = await readRow(buyerId);
     const state = decorate(row);
     if (state.status !== "idle") return { ok: false, error: "busy", ...(await getSailingState(buyerId)) };
-    // ── SPENDING A CHART ─────────────────────────────────────────────────────────────────────────────
-    // Marked sailed BEFORE the voyage row is written, and conditionally, so a double-tap cannot put one
-    // chart on two voyages — there is no transaction on this driver to lean on (see postgres-landmines).
-    // If the voyage insert below then failed the player would lose a chart, which is why nothing between
-    // here and it is allowed to throw: the only statements in between are arithmetic.
-    let chart = null;
+    // ── ⚠️ THE OLD CHARTED VOYAGE IS CLOSED, AND IT HAS TO BE REFUSED HERE ──────────────────────────────
+    // A chart buys an EXPEDITION now (see expedition.js): open it, plot it, thirty seconds of sailing, then
+    // walk the island. The sixteen-hour trip to the ordinary dig board is gone from the helm.
+    //
+    // Gone from the HELM is not gone. Luke tapped the charted option sixteen minutes after the expedition
+    // deployed — from a tab that had been open since before it — and a page carrying the old bundle posted
+    // the old action quite happily. It spent his grade-5 Certainty, his best chart, on a ten-hour timer to a
+    // dig board. A client is never the place a door is closed; this is.
+    //
+    // ⚠️ CHARTED_VOYAGE ITSELF STAYS in ALL_VOYAGES. Voyages started under the old path are still in flight
+    // and still have to resolve when they land — deleting the quality would pay a charted dig in plain iron.
+    // What is refused is STARTING a new one.
     if (optionId === "charted") {
-        const [c] = await db.query(
-            `UPDATE mkt_ship_chart SET sailed_at = NOW()
-              WHERE id = (SELECT id FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL
-                           ORDER BY grade DESC, made_at LIMIT 1)
-              RETURNING id, grade, band`, [buyerId]
-        ).catch(() => []);
-        if (!c) return { ok: false, error: "no_chart" };
-        chart = c;
+        return { ok: false, error: "use_expedition", ...(await getSailingState(buyerId)) };
     }
-    const opt = optionId === "charted" ? CHARTED_VOYAGE : (VOYAGE_OPTIONS.find((o) => o.id === optionId) || VOYAGE_OPTIONS[1]);
+
+    // Nothing here spends a chart any more — expedition.js is the only thing that does.
+    const chart = null;
+    const opt = VOYAGE_OPTIONS.find((o) => o.id === optionId) || VOYAGE_OPTIONS[1];
     let voyageSpeed = seaEffects(await equippedSeaAffinity(buyerId)).voyageSpeed; // Tailwind shortens the trip
     // Following Sea: a companion shortens it further, capped at 25% so a 4h voyage lands at 3h. Added to
     // Tailwind rather than multiplied — MIN_VOYAGE_MS below is the real floor either way.
