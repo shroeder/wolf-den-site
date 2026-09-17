@@ -391,7 +391,7 @@ const STATUS_KINDS = {
     // "Ragged Cut" told you that you were on fire. Its own track, its own colour, and it says the one thing
     // that makes it different from a burn.
     bleed:   { Icon: GiDroplets,      label: "Bleeding",       tone: "blood",
-               what: () => `Takes ${pct(BLEED_SHARE)} of the blow that opened it at the start of each of their turns, STRAIGHT to health — a guard does not stop it. Stacks: a new one extends it and keeps the deeper tick.` },
+               what: () => `Takes ${pct(BLEED_SHARE)} of the blow that opened it PER STACK, STRAIGHT to health — neither armour nor a guard stops it. A tick pays every stack at once and then half of them close, so a wound hits hardest the moment it lands and fades fast. A new one adds a stack and keeps the deeper tick.` },
     frozen:  { Icon: GiIciclesAura,       label: "Frozen",         tone: "ice",
                what: () => "Solid. The next turn is lost — the beat passes without an action." },
     noguard: { Icon: GiCrackedShield, label: "Guard shattered", tone: "ice",

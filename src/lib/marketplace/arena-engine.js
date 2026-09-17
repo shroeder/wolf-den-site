@@ -71,6 +71,11 @@ export const DEFAULT_SPEED = 10;
 // BLEEDING fighter's own swings, which is what "three turns" means when there are no turns: three more times
 // they step up to swing, they lose blood first.
 export const BLEED_SHARE = 0.20;
+// WHAT ONE STACK OF A WOUND IS WORTH, and the only place that arithmetic lives. A reporting script had
+// its own copy (`BLEED_SHARE + bleedDamage`) and went on printing the old numbers after the rule changed
+// — a second copy of a balance rule is a second, wrong game. See [[reuse-the-rule-never-restate-it]].
+// `bleedDamage` SCALES the share: +36% means 36% deeper, not +36 points of the blow.
+export const bleedShareFor = (bleedDamage = 0) => BLEED_SHARE * (1 + Math.max(0, Number(bleedDamage) || 0));
 // A burn is a bleed in a different colour: same three ticks, same fifth of the blow, same contempt for armour.
 // Tracked separately so a fighter can be burning AND bleeding, and so the two read differently on screen.
 // ── STACKING ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -467,7 +472,18 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         if (dealt > 0 && att.bleedChance > 0 && def.hp > 0 && rng() < att.bleedChance) {
             // Same rule as the burn above: a second wound deepens the first rather than replacing it.
             def.bleedLeft = (def.bleedLeft || 0) + (att.bleedStacks || 1);
-            def.bleedPer = Math.max(Number(def.bleedPer) || 0, dealt * (BLEED_SHARE + att.bleedDamage));
+            // ── bleedDamage DEEPENS THE WOUND; IT DOES NOT ADD A SECOND ONE ──────────────────────────────
+            // This was `BLEED_SHARE + att.bleedDamage`, so the tree's percentage points landed on a 20% base
+            // as flat additions: Rupture's Hemorrhage branch (+0.10 +0.08 +0.18) made a stack worth 56% of
+            // the blow instead of 20%, and because a tick pays EVERY stack at once, its five stacks came to
+            // 2.8x the blow on the first tick — through armour and through shield. Measured on real kits:
+            // Nicholas's swings averaged 16.8% of JT's health and his first tick 37% of it, peaking at 143%.
+            //
+            // Luke's own model of the mechanic was "10 percent of damage dealt, 3 stacks, thats 30 percent on
+            // the first tick". Multiplying instead of adding is what makes the tree read that way: +36% is
+            // 36% DEEPER (27% of the blow), not +36 points of it. The front-loaded shape, the halving and the
+            // armour-piercing are all untouched — this is the magnitude and nothing else.
+            def.bleedPer = Math.max(Number(def.bleedPer) || 0, dealt * bleedShareFor(att.bleedDamage));
             bled = true;
         }
         log.push({ t, who, dmg: dealt + soul, crit: anyCrit, hits, blocked, turned, soaked, stunned, hasted, bled, wild,

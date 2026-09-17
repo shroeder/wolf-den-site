@@ -273,7 +273,7 @@ export const TREES = {
 
         // TIER 2 — make it hurt.
         N({ id: "rv_deep", tier: 1, name: "Deep Cuts", ranks: 5, stat: "bleedDamage", per: 0.04, needs: 3,
-            desc: "+4% of the blow to every bleed tick, on top of the base fifth.",
+            desc: "Every bleed tick bites 4% deeper. It scales the fifth a wound already takes, and it stacks with Rend.",
             sprite: "/images/arena/node/rv_rend.webp" }),
         N({ id: "rv_letting", tier: 1, name: "Bloodletting", ranks: 5, stat: "lifestealBonus", per: 0.05, needs: 3,
             desc: "+5% of what you land, healed back.", sprite: "/images/arena/node/rv_drain.webp" }),

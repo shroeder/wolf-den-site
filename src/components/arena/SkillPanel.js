@@ -49,7 +49,9 @@ function statsOf(s) {
     // The over-time numbers matter MORE than the ones above once a branch is invested in — Hemorrhage's whole
     // payoff is here, and leaving them off meant the strip said "Power 1.60x" for a build whose damage does not
     // come from the blow at all.
-    if (s.bleedDamage > 0) out.push(["Wound tick", `+${p(s.bleedDamage)}`]);
+    // "Wound tick +36%" read as 36 POINTS of the blow, which is what the engine used to do. It scales the
+    // share now, so the honest word is deeper.
+    if (s.bleedDamage > 0) out.push(["Wound depth", `+${p(s.bleedDamage)} deeper`]);
     if (s.bleedLeech > 0) out.push(["Wound leech", p(s.bleedLeech)]);
     if (s.burnDamage > 0) out.push(["Burn tick", `+${p(s.burnDamage)}`]);
     if (s.burnLeech > 0) out.push(["Burn leech", p(s.burnLeech)]);
