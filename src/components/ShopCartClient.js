@@ -216,6 +216,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const [applyCredit, setApplyCredit] = useState(false);
     const [fulfillmentMode, setFulfillmentMode] = useState("");
     const [pickupName, setPickupName] = useState("");
+    // Pickup has no shipping block, so this is the only address we get for a guest — and it is what the
+    // confirmation / "ready for pickup" / "picked up" emails are sent to.
+    const [pickupEmail, setPickupEmail] = useState("");
     const [saveCustomerProfile, setSaveCustomerProfile] = useState(false);
     const [profileLookupBusy, setProfileLookupBusy] = useState(false);
     const [profileLookupMessage, setProfileLookupMessage] = useState("");
@@ -277,8 +280,14 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         return out;
     }, [fulfillmentMode, normalizedShipping]);
     const isShippingAddressReady = fulfillmentMode === "shipping" && missingAddressFields.length === 0;
-    // Pickup needs a name so the owner can match the person to their order at the counter.
-    const isPickupReady = fulfillmentMode === "pickup" && pickupName.trim().length >= 2;
+    // Pickup needs a name so the owner can match the person to their order at the counter, and an email
+    // so we can send the confirmation number and the "it's ready" notice. The field is SEEDED from a
+    // signed-in buyer's account email (see the effect below) rather than falling back to it here, so
+    // that backspacing the last character doesn't snap the address back and make the box uneditable.
+    const pickupEmailValue = pickupEmail.trim();
+    const isPickupEmailValid = /^\S+@\S+\.\S+$/.test(pickupEmailValue);
+    const isPickupReady =
+        fulfillmentMode === "pickup" && pickupName.trim().length >= 2 && isPickupEmailValid;
     const isFulfillmentReady = isPickupReady || isShippingReady;
 
     // When EasyPost returns live rates, the buyer must pick one and the totals use that rate.
@@ -515,6 +524,14 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         return () => window.clearTimeout(timeoutId);
     }, [refreshAuthSession]);
 
+    // A signed-in buyer shouldn't have to type an address we already hold, so prefill the pickup email
+    // when the session resolves — but only into an empty box, never over something they typed.
+    useEffect(() => {
+        if (authCustomer?.email) {
+            setPickupEmail((current) => (current.trim() ? current : authCustomer.email));
+        }
+    }, [authCustomer]);
+
     useEffect(() => {
         if (canShowCart && cartData.items.length) {
             return;
@@ -634,6 +651,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
         if (fulfillmentMode === "pickup") {
             checkoutPayload.pickupName = pickupName.trim();
+            checkoutPayload.pickupEmail = pickupEmailValue;
         }
 
         if (fulfillmentMode === "shipping") {
@@ -990,7 +1008,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                             Local pickup at The Wolf Den in Montgomery. Give the name your order is under —
                                             just come in and say it to pick up.
                                         </p>
-                                        <label className="cart-field-full">
+                                        {/* cart-field is what stacks the label over the input (globals.css) — without it the
+                                            label and the box sit side by side and the helper text lands beside the field. */}
+                                        <label className="cart-field cart-field-full">
                                             <span>Name for pickup</span>
                                             <input
                                                 type="text"
@@ -1000,7 +1020,38 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                                 autoComplete="name"
                                             />
                                         </label>
+                                        <label className="cart-field cart-field-full">
+                                            <span>Email for your confirmation</span>
+                                            <input
+                                                type="email"
+                                                value={pickupEmail}
+                                                onChange={(event) => setPickupEmail(event.target.value)}
+                                                placeholder="you@example.com"
+                                                autoComplete="email"
+                                                aria-invalid={pickupEmail && !isPickupEmailValid ? "true" : "false"}
+                                            />
+                                            <small className="secondary">
+                                                We&rsquo;ll send your confirmation number here, and email you again the
+                                                moment your order is ready to collect.
+                                            </small>
+                                            {fieldErrors.pickupEmail ? (
+                                                <small className="shop-payment-error">{fieldErrors.pickupEmail}</small>
+                                            ) : null}
+                                        </label>
                                     </div>
+                                ) : null}
+
+                                {fulfillmentMode === "pickup" && !isPickupReady ? (
+                                    <p className="secondary">
+                                        Still needed:{" "}
+                                        {[
+                                            pickupName.trim().length >= 2 ? null : "name for pickup",
+                                            isPickupEmailValid ? null : "a valid email",
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" and ")}
+                                        .
+                                    </p>
                                 ) : null}
 
                                 {fulfillmentMode === "shipping" && !isShippingAddressReady ? (

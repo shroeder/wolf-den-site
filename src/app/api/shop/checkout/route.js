@@ -89,10 +89,25 @@ function validateFulfillment(body) {
     }
 
     if (mode === "pickup") {
+        // A pickup order carries no shipping block, so the email typed here is the ONLY address we get
+        // for a guest — and it is what every order email (confirmation, ready, picked up, cancelled)
+        // writes to. Signed-in buyers have their account email as a fallback, guests do not.
+        const pickupEmail = String(body?.pickupEmail || "").trim();
+        if (pickupEmail && !/^\S+@\S+\.\S+$/.test(pickupEmail)) {
+            // Must carry `error` — the caller branches on fulfillment.error, and a bare fieldErrors
+            // object would fall straight through with fulfillmentMode undefined.
+            return {
+                error: "Enter a valid email address for your confirmation.",
+                fieldErrors: {
+                    pickupEmail: "Enter a valid email address so we can send your confirmation.",
+                },
+            };
+        }
         return {
             fulfillmentMode: mode,
             shipping: null,
             shippingValidationStatus: "not_required",
+            pickupEmail: pickupEmail || null,
             fieldErrors: null,
         };
     }
@@ -352,7 +367,8 @@ export async function POST(request) {
                 shippingCarrier,
                 shippingService,
                 customerId: authenticatedCustomer?.id || null,
-                customerEmail: authenticatedCustomer?.email || fulfillment.shipping?.email || null,
+                customerEmail:
+                    authenticatedCustomer?.email || fulfillment.pickupEmail || fulfillment.shipping?.email || null,
                 customerName:
                     (fulfillment.fulfillmentMode === "pickup"
                         ? String(body?.pickupName || "").trim()

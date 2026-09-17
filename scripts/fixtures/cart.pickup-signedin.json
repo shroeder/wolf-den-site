@@ -1,0 +1,41 @@
+{
+  "/api/shop/cart": {
+    "json": {
+      "cartId": "rig-cart",
+      "items": [
+        {
+          "catalogObjectId": "RIGVAR1",
+          "name": "Alolan Ninetales 145/236 Holo Rare NM",
+          "categoryName": "Singles",
+          "imageUrl": null,
+          "quantity": 1,
+          "maxQuantity": 3,
+          "priceCents": 1299,
+          "lineTotalCents": 1299
+        }
+      ],
+      "itemCount": 1,
+      "subtotalCents": 1299,
+      "onlineFeeCents": 60,
+      "taxCents": 94,
+      "shippingCents": 0,
+      "totalCents": 1453,
+      "hasUnavailableItems": false
+    }
+  },
+  "/api/shop/auth": {
+    "json": {
+      "authenticated": true,
+      "customer": {
+        "id": "rig-cust",
+        "email": "luke@wolfdengamingmn.com",
+        "name": "Luke S"
+      }
+    }
+  },
+  "/api/shop/store-credit": {
+    "json": {
+      "balanceCents": 0
+    }
+  }
+}

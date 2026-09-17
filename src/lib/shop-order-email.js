@@ -2,8 +2,11 @@ import "server-only";
 
 import { Resend } from "resend";
 
-// Order emails for the online shop — customer confirmation + a new-order alert to the owner. Reuses
-// the same Resend setup as the auth emails. Takes a raw shop_orders row (snake_case).
+import { STORE_ADDRESS, STORE_NAME } from "@/lib/site";
+
+// Order emails for the online shop — customer confirmation, fulfillment-status updates, and a
+// new-order alert to the owner. Reuses the same Resend setup as the auth emails. Takes a raw
+// shop_orders row (snake_case).
 
 const FROM = "The Wolf Den <portal@wolfdengamingmn.com>";
 
@@ -34,6 +37,47 @@ function money(cents) {
 
 function shortId(id) {
     return String(id || "").slice(0, 8).toUpperCase();
+}
+
+// Who to write to. A PICKUP order has no shipping block at all, so shipping_email is NULL and only
+// customer_email (from the signed-in account, or the email typed into the pickup form) exists. Reading
+// shipping_email alone is why pickup buyers — 7 of the first 8 orders ever placed — were never emailed.
+function recipientEmail(order) {
+    const email = String(order?.customer_email || order?.shipping_email || "").trim();
+    return email || null;
+}
+
+function buyerName(order) {
+    return String(order?.customer_name || order?.shipping_name || "").trim() || null;
+}
+
+// The confirmation number the buyer quotes at the counter. Same value everywhere it is shown — email
+// subject, email body, the owner's alert and the order page — so the two sides of the counter match.
+function confirmationNumber(order) {
+    return shortId(order?.id);
+}
+
+// Where to come and get it. From the shared constant, because this email is the reason someone drives
+// somewhere, and the hand-typed copy this replaced had the building number wrong.
+const PICKUP_LOCATION = `${STORE_NAME}, ${STORE_ADDRESS}`;
+
+function pickupNameLine(order) {
+    const name = buyerName(order);
+    return name ? `under the name <strong>${escapeHtml(name)}</strong>` : "under your confirmation number";
+}
+
+function trackingHtml(order) {
+    const tracking = String(order?.tracking_number || "").trim();
+    if (!tracking) return "";
+    const carrier = String(order?.shipping_carrier || "").trim();
+    return (
+        `<p><strong>Tracking${carrier ? ` (${escapeHtml(carrier)})` : ""}:</strong> ` +
+        `${escapeHtml(tracking)}</p>`
+    );
+}
+
+function footerHtml() {
+    return `<p style="color:#777;font-size:13px;">Questions? Just reply to this email.</p>`;
 }
 
 function itemsHtml(itemsJson) {
@@ -74,39 +118,109 @@ function shipToHtml(order) {
     );
 }
 
-/** Customer order confirmation. Skips silently if there's no email on the order (e.g. guest pickup). */
+/**
+ * Customer order confirmation — sent for BOTH pickup and shipping. Leads with the confirmation number
+ * so a pickup buyer has something to say at the counter. Skips silently only when we genuinely have no
+ * address to write to (a guest who gave none).
+ */
 export async function sendOrderConfirmationEmail(order) {
     const resend = getResendClient();
-    if (!resend || !order?.shipping_email) {
+    const to = recipientEmail(order);
+    if (!resend || !to) {
         return false;
     }
     const isPickup = order.fulfillment_mode === "pickup";
+    const number = confirmationNumber(order);
     const html = `
         <h1>Thanks for your order!</h1>
-        <p>Order <strong>#${shortId(order.id)}</strong> is confirmed.</p>
+        <p>Your order is confirmed. Your confirmation number is:</p>
+        <p style="font-size:24px;font-weight:bold;letter-spacing:2px;margin:12px 0;">#${number}</p>
         <ul>${itemsHtml(order.items_json)}</ul>
         <p>${totalsHtml(order)}</p>
         <p>${
             isPickup
-                ? "Ready for <strong>pickup</strong> at The Wolf Den in Montgomery — we&rsquo;ll let you know when it&rsquo;s ready."
-                : `Shipping to:<br/>${shipToHtml(order)}`
+                ? `<strong>Pickup in store.</strong> We&rsquo;re packing it now and will email you the moment it&rsquo;s ready. ` +
+                  `Come to ${escapeHtml(PICKUP_LOCATION)} and ask for it ${pickupNameLine(order)}.`
+                : `<strong>Shipping to:</strong><br/>${shipToHtml(order)}<br/><br/>We&rsquo;ll email you a tracking number as soon as it ships.`
         }</p>
-        ${order.receipt_url ? `<p><a href="${escapeHtml(order.receipt_url)}">View your payment receipt →</a></p>` : ""}
-        <p style="color:#777;font-size:13px;">Questions? Just reply to this email.</p>
+        ${order.receipt_url ? `<p><a href="${escapeHtml(order.receipt_url)}">View your payment receipt &rarr;</a></p>` : ""}
+        ${footerHtml()}
     `;
     const result = await resend.emails.send({
         from: FROM,
-        to: order.shipping_email,
-        subject: `Your Wolf Den order #${shortId(order.id)}`,
+        to,
+        subject: `Your Wolf Den order #${number} is confirmed`,
         html,
     });
     return !result?.error;
 }
 
-/** Customer cancellation + refund notice with the owner's reason. Skips if no email on the order. */
+/**
+ * Fulfillment-status update — what the buyer gets when the owner moves an order along in the admin app.
+ * One email per status a customer actually cares about:
+ *   ready     → their pickup order is on the shelf with their name on it
+ *   shipped   → it left the store, with tracking when we have it
+ *   picked_up → a receipt that they walked out with it, so a wrong tap is visible to them too
+ * `unfulfilled` is a correction, not news, so it sends nothing. Cancellations keep their own email
+ * (sendOrderCancelledEmail) because they carry a refund and a reason.
+ */
+export async function sendOrderStatusEmail(order, status) {
+    const resend = getResendClient();
+    const to = recipientEmail(order);
+    if (!resend || !to) {
+        return false;
+    }
+
+    const number = confirmationNumber(order);
+    let subject = null;
+    let body = null;
+
+    if (status === "ready") {
+        subject = `Order #${number} is ready for pickup`;
+        body = `
+            <h1>Your order is ready!</h1>
+            <p>Order <strong>#${number}</strong> is packed and waiting for you at ${escapeHtml(PICKUP_LOCATION)}.</p>
+            <p>Just come in and ask for it ${pickupNameLine(order)} &mdash; or show this email.</p>
+            <ul>${itemsHtml(order.items_json)}</ul>
+        `;
+    } else if (status === "shipped") {
+        subject = `Order #${number} has shipped`;
+        body = `
+            <h1>Your order is on its way</h1>
+            <p>Order <strong>#${number}</strong> shipped today.</p>
+            ${trackingHtml(order)}
+            ${order.shipping_name ? `<p><strong>Shipping to:</strong><br/>${shipToHtml(order)}</p>` : ""}
+            <ul>${itemsHtml(order.items_json)}</ul>
+        `;
+    } else if (status === "picked_up") {
+        subject = `Order #${number} was picked up`;
+        body = `
+            <h1>Thanks for coming in!</h1>
+            <p>Order <strong>#${number}</strong> is marked picked up. Enjoy it.</p>
+            <ul>${itemsHtml(order.items_json)}</ul>
+            <p>If you did NOT pick this up, reply to this email and we&rsquo;ll sort it out straight away.</p>
+        `;
+    } else {
+        return false;
+    }
+
+    const result = await resend.emails.send({
+        from: FROM,
+        to,
+        subject,
+        html: `${body}${footerHtml()}`,
+    });
+    return !result?.error;
+}
+
+/**
+ * Customer cancellation + refund notice with the owner's reason. Skips only if we have no address.
+ * Reads the same recipient as every other order email, so a PICKUP cancellation reaches the buyer too.
+ */
 export async function sendOrderCancelledEmail(order, { reason, refundAmountCents } = {}) {
     const resend = getResendClient();
-    if (!resend || !order?.shipping_email) {
+    const to = recipientEmail(order);
+    if (!resend || !to) {
         return false;
     }
     const refunded = Number(refundAmountCents || 0) > 0;
@@ -124,7 +238,7 @@ export async function sendOrderCancelledEmail(order, { reason, refundAmountCents
     `;
     const result = await resend.emails.send({
         from: FROM,
-        to: order.shipping_email,
+        to,
         subject: `Your Wolf Den order #${shortId(order.id)} was cancelled`,
         html,
     });

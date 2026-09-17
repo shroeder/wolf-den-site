@@ -37,7 +37,7 @@ export default function ShopOrdersAdminClient({ orders: initial }) {
             body: JSON.stringify(patch),
         });
         if (res.ok) {
-            const { order } = await res.json();
+            const { order, customerNotified } = await res.json();
             setOrders((os) =>
                 os.map((o) =>
                     o.id === id
@@ -45,7 +45,11 @@ export default function ShopOrdersAdminClient({ orders: initial }) {
                         : o
                 )
             );
+            // Hand back whether the customer was emailed, so the card can say so. The owner has no other
+            // way to know a status tap left the building — and a silent send is the same as none.
+            return { ok: true, customerNotified: Boolean(customerNotified) };
         }
+        return { ok: false, customerNotified: false };
     }
 
     return (
@@ -84,11 +88,16 @@ function OrderCard({ order: o, onUpdate }) {
     const [labelUrl, setLabelUrl] = useState(o.shippingLabelUrl || "");
     const [labelBusy, setLabelBusy] = useState(false);
     const [labelError, setLabelError] = useState("");
+    // What we last emailed the customer about, so a status tap visibly reaches them.
+    const [notified, setNotified] = useState("");
     const isPickup = o.fulfillmentMode === "pickup";
 
     async function act(patch) {
         setBusy(true);
-        await onUpdate(o.id, patch);
+        const result = await onUpdate(o.id, patch);
+        if (result?.customerNotified) {
+            setNotified(patch.fulfillmentStatus.replace("_", " "));
+        }
         setBusy(false);
     }
 
@@ -107,8 +116,12 @@ function OrderCard({ order: o, onUpdate }) {
             if (data.trackingCode) {
                 setTracking(data.trackingCode);
             }
-            // The label endpoint already marked the order shipped server-side; sync the list row.
+            // The label endpoint already marked the order shipped server-side — and emailed the tracking
+            // number from there — so this PATCH is only syncing the list row and reports no new notice.
             await onUpdate(o.id, { fulfillmentStatus: "shipped", trackingNumber: newTracking });
+            if (!data.alreadyBought) {
+                setNotified("shipped");
+            }
         } catch {
             setLabelError("Could not buy label.");
         } finally {
@@ -211,6 +224,7 @@ function OrderCard({ order: o, onUpdate }) {
                     Cancel
                 </button>
             </div>
+            {notified ? <p className="muted">Emailed the customer: {notified}.</p> : null}
         </section>
     );
 }

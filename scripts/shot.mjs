@@ -26,9 +26,10 @@
 // cannot be produced that way — Emulation.setDeviceMetricsOverride is the only thing that actually gives you
 // the viewport you asked for. Node 22 has WebSocket built in, so no dependency is needed.
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 import { QUIET_HIDE, QUIET_SEEN, installQuiet, quiet } from "./lib/shot-quiet.mjs";
+import { installMock, reportMock } from "./lib/shot-mock.mjs";
 
 // ── SHOT_QUIET=1 ── seed every known "already seen this" marker and hide every known scrim, so a shot is of
 // the page rather than of whichever launch card this profile has not dismissed yet. See lib/shot-quiet.mjs.
@@ -125,6 +126,19 @@ if (process.env.SHOT_COOKIE) {
 // SHOT_HIDE is a comma-separated selector list, SHOT_SEEN a semicolon-separated set of localStorage markers,
 // and SHOT_QUIET=1 merges the standing list into both (see the top of this file).
 await installQuiet(send, { hide: process.env.SHOT_HIDE, seen: process.env.SHOT_SEEN });
+
+// ── SHOT_MOCK=<fixture.json> ── A STATE THAT ARRIVES OVER FETCH ──────────────────────────────────────────────
+// A cart with items in it, a signed-in account, a balance: there is no row on a clean machine that makes any of
+// it true, so the page can only be photographed empty. This serves the fixture to the page's own fetches (the
+// same table format as film.mjs --mock, the same implementation — lib/shot-mock.mjs).
+//
+//   SHOT_MOCK=scripts/fixtures/cart.pickup.json node scripts/shot.mjs http://localhost:3000/cart out.png
+//
+// ⚠️ THIS IS THE RIG FOR A PAGE THAT IS NOT MOVING. film.mjs only gets frames when the page PAINTS, so a
+// static screen hands it one stale frame from before the click and reports a pass — which is how a pickup form
+// that was on the screen got filmed as the empty state it replaced.
+const MOCK = process.env.SHOT_MOCK || null;
+if (MOCK) await installMock(send, JSON.parse(readFileSync(MOCK, "utf8")));
 
 await send("Page.navigate", { url });
 // Let the sprites actually arrive — a blank shot proves nothing. 2600ms was not enough on a cold dev server:
@@ -252,6 +266,8 @@ if (process.env.SHOT_SCROLL) {
     }
     await sleep(250);
 }
+
+if (MOCK) await reportMock(evaluate);
 
 const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
 writeFileSync(out, Buffer.from(data, "base64"));

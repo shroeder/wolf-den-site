@@ -23,6 +23,7 @@ import { writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import { QUIET_HIDE, QUIET_SEEN, installQuiet, quiet } from "./lib/shot-quiet.mjs";
+import { installMock, reportMock } from "./lib/shot-mock.mjs";
 
 // ── SHOT_QUIET=1 ── seed every known "already seen this" marker and hide every known scrim, so a shot is of
 // the page rather than of whichever launch card this profile has not dismissed yet. See lib/shot-quiet.mjs.
@@ -205,30 +206,7 @@ if (process.env.SHOT_COOKIE) {
 // using its own copy, so the page still could not scroll and a touch tap aimed below the fold hit nothing.
 // See [[reuse-the-rule-never-restate-it]]. installQuiet does the seeding AND the hiding for both rigs.
 await installQuiet(send, { hide: process.env.SHOT_HIDE, seen: process.env.SHOT_SEEN });
-if (MOCK) {
-    const table = JSON.parse(readFileSync(MOCK, "utf8"));
-    await send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `(() => {
-            const table = ${JSON.stringify(table)};
-            const served = []; const missed = [];
-            window.__mockLog = () => ({ served, missed });
-            const real = window.fetch.bind(window);
-            window.fetch = async (input, init) => {
-                const url = String(typeof input === "string" ? input : (input && input.url) || "");
-                for (const key of Object.keys(table)) {
-                    if (!url.includes(key)) continue;
-                    const v = table[key];
-                    const body = v && typeof v === "object" && "json" in v ? v.json : v;
-                    const status = (v && v.status) || 200;
-                    served.push(key);
-                    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-                }
-                if (url.includes("/api/")) missed.push(url);
-                return real(input, init);
-            };
-        })();`,
-    });
-}
+if (MOCK) await installMock(send, JSON.parse(readFileSync(MOCK, "utf8")));
 if (PRE) await send("Page.addScriptToEvaluateOnNewDocument", { source: PRE });
 
 await send("Page.navigate", { url });
@@ -375,6 +353,9 @@ if (FOLD) {
     }
 }
 
+// What the fixture actually answered — read HERE, while the filmed page is still the one loaded.
+if (MOCK) await reportMock(evaluate);
+
 // ── THE CONTACT SHEET ────────────────────────────────────────────────────────────────────────────────────────
 // Frames as data URIs in a grid, each stamped with the millisecond it was taken, shot as one image. One look
 // instead of thirty, and the stamps are what make it readable as time rather than as a set of pictures.
@@ -403,17 +384,6 @@ await send("Page.navigate", { url: `file:///${resolve(sheetPath).replace(/\\/g, 
 await sleep(1500);
 const sheetShot = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
 writeFileSync(`${outBase}-sheet.png`, Buffer.from(sheetShot.data, "base64"));
-
-if (MOCK) {
-    const log = await evaluate("window.__mockLog ? JSON.stringify(window.__mockLog()) : null");
-    const l = log ? JSON.parse(log) : null;
-    if (l) {
-        const keys = [...new Set(l.served)];
-        console.log(`  mock  served ${l.served.length} request(s) from ${keys.length} key(s): ${keys.join(", ") || "NONE — the fixture never matched"}`);
-        const miss = [...new Set(l.missed)];
-        if (miss.length) console.log(`  mock  fell through to the real server: ${miss.slice(0, 6).join(", ")}`);
-    }
-}
 
 sock.close();
 chrome.kill();

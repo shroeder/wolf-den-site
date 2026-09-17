@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { getShopOrderById, setShopOrderShippingLabel } from "@/lib/shop-orders";
+import { sendOrderStatusEmail } from "@/lib/shop-order-email.js";
 import { buyShippingLabel, isEasyPostEnabled } from "@/lib/shipping/easypost";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -50,6 +51,22 @@ export async function POST(request, { params }) {
                 carrier: label.carrier,
                 service: label.service,
             });
+
+            // Buying a label is the SECOND way an order becomes "shipped" (the status dropdown is the
+            // other), and it's the one that has the tracking number, so the customer hears it from here.
+            // Guarded by the already-bought early return above, so one label = one email.
+            if (order.fulfillment_status !== "shipped") {
+                after(async () => {
+                    try {
+                        await sendOrderStatusEmail(updated, "shipped");
+                    } catch (emailError) {
+                        logger.warn("admin.shop.order.label.ship_email_failed", {
+                            orderId: id,
+                            errorMessage: emailError instanceof Error ? emailError.message : "unknown_error",
+                        });
+                    }
+                });
+            }
 
             return NextResponse.json({ order: updated, labelUrl: label.labelUrl, trackingCode: label.trackingCode });
         } catch (error) {
