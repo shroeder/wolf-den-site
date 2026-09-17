@@ -27,7 +27,19 @@ export function isChunkError(err) {
         || /Loading chunk \S+ failed/i.test(msg)
         || /Failed to load chunk/i.test(msg)
         || /Loading CSS chunk/i.test(msg)
-        || /error loading dynamically imported module/i.test(msg);
+        || /error loading dynamically imported module/i.test(msg)
+        // ── CHROME RENAMED IT, AND THE LIST ABOVE STOPPED MATCHING ───────────────────────────────────────
+        // A dynamic import that will not download used to throw "error loading dynamically imported module".
+        // Chrome 152 throws `TypeError: network error` — three words, no mention of a module or a chunk — so
+        // none of the tests above fire and a deploy landing under somebody's tab arrives as a hard crash
+        // that buzzes the phone. Three of those came in tonight from one member across two deployments,
+        // each paired to the second with a stale-build row saying exactly what it was.
+        //
+        // Matched as the NAME AND THE WHOLE MESSAGE, not as a substring: "network error" anywhere in a
+        // sentence is how half of a real outage would read, and this must not become the rule that hides
+        // one. A bare three-word TypeError is the import failure and nothing else.
+        || (name === "TypeError" && /^network error$/i.test(msg.trim()))
+        || /Importing a module script failed/i.test(msg);
 }
 
 // Exported so the crash boundary can take the same decision without duplicating the rules.

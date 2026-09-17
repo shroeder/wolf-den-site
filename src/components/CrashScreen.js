@@ -32,28 +32,44 @@ export default function CrashScreen({ error, reset, where = "page" }) {
         // bury the one report that matters under a thousand copies of itself.
         if (reported.current) return;
         reported.current = true;
-        // A CHUNK failure is not this page being broken — it is a deploy landing while the member had the tab
-        // open, so the build their HTML names no longer exists. Reloading fetches the current one and puts
-        // them on the page they asked for. Showing them a crash screen for that is a bug in us, not the page.
-        if (recoverFromChunkError(error, where)) return;
-        // The chunks may all still exist and the CODE still be old — a tab open since this morning crashing on
-        // a bug fixed at lunchtime. Ask which deployment is current; if this bundle is not it, reload instead of
-        // showing a crash screen for something already repaired. Async, so the report below still goes out if
-        // the build turns out to be current.
-        recoverFromStaleBuild(error, where).catch(() => {});
-        fetch("/api/client-error", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-                message: error?.message || null,
-                name: error?.name || null,
-                digest,
-                stack: error?.stack ? String(error.stack).slice(0, 4000) : null,
-                path: typeof window !== "undefined" ? window.location.pathname + window.location.search : null,
-                ua: typeof navigator !== "undefined" ? navigator.userAgent : null,
-                where,
-            }),
-        }).then(() => setSent(true)).catch(() => { /* the screen still works without us */ });
+        // An async IIFE rather than an async effect: React treats an effect's return value as its cleanup
+        // function, and handing it a promise means no cleanup ever runs.
+        (async () => {
+            // A CHUNK failure is not this page being broken — it is a deploy landing while the member had the tab
+            // open, so the build their HTML names no longer exists. Reloading fetches the current one and puts
+            // them on the page they asked for. Showing them a crash screen for that is a bug in us, not the page.
+            if (recoverFromChunkError(error, where)) return;
+            // The chunks may all still exist and the CODE still be old — a tab open since this morning crashing on
+            // a bug fixed at lunchtime. Ask which deployment is current; if this bundle is not it, reload instead of
+            // showing a crash screen for something already repaired.
+            //
+            // ── AND WAIT FOR THE ANSWER BEFORE CALLING IT A CRASH ────────────────────────────────────────────
+            // This used to fire and forget, deliberately, so a real crash on the CURRENT build could not be lost
+            // while we waited on a fetch. The cost of that was a second report: recoverFromStaleBuild writes its
+            // own "held X, current Y" line and reloads, so every deploy that landed under somebody's feet
+            // produced BOTH a quiet row and a hard one — and the hard one pushes Luke's phone. Tonight that was
+            // three false alarms from one member in eleven minutes, each one paired to the second with the row
+            // that already explained it.
+            //
+            // Awaiting it loses nothing: it resolves false — and falls through to the report — whenever the build
+            // is current, the check is offline, no id is baked in, or the one-reload-a-minute guard has already
+            // fired. A crash that is still there after the reload is a crash on the current build, and it is
+            // reported then, which is the one that was ever worth waking somebody for.
+            if (await recoverFromStaleBuild(error, where).catch(() => false)) return;
+            fetch("/api/client-error", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    message: error?.message || null,
+                    name: error?.name || null,
+                    digest,
+                    stack: error?.stack ? String(error.stack).slice(0, 4000) : null,
+                    path: typeof window !== "undefined" ? window.location.pathname + window.location.search : null,
+                    ua: typeof navigator !== "undefined" ? navigator.userAgent : null,
+                    where,
+                }),
+            }).then(() => setSent(true)).catch(() => { /* the screen still works without us */ });
+        })();
     }, [error, digest, where]);
 
     const copy = async () => {
