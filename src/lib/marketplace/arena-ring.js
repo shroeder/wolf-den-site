@@ -491,6 +491,14 @@ function castSkill(ring, skill, att, def) {
         bleedChance: A.bleedChance, burnChance: A.burnChance, pierce: A.pierce, soulfire: A.soulfire,
         bleedDamage: A.bleedDamage, burnDamage: A.burnDamage, burnLeech: A.burnLeech,
         lifesteal: A.lifesteal, grudge: A.grudge, banked: A.banked,
+        // ── AND THE STACK COUNTS, WHICH WERE SET BUT NEVER HANDED BACK ────────────────────────────────────
+        // The two lines below set bleedStacks/burnStacks from the skill, and `was` did not name either — so
+        // uncast restored the CHANCE and left the COUNT on the fighter for the rest of the bout. After one
+        // Rupture, every ordinary Rend proc laid FIVE stacks instead of one, and bleed pays every stack at
+        // once: an 18% proc off a routine swing came out five times the wound it is priced as. Measured on
+        // Nicholas's real kit — A.bleedStacks read 5 on every beat after his first cast, to the end of the
+        // fight. `bleedDamage` was restored all along, which is why nothing looked wrong on the card.
+        bleedStacks: A.bleedStacks, burnStacks: A.burnStacks,
     };
     // A skill's `bleed`/`burn` is a COUNT, and both halves of it matter: it guarantees the proc AND says how
     // many stacks that proc lays down. Only the guarantee was being read, so Immolate's `burn: 1` and a
