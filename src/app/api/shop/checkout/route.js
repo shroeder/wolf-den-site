@@ -460,6 +460,11 @@ export async function POST(request) {
                         body: `${orderItemCount} item${orderItemCount === 1 ? "" : "s"} · $${((updatedOrder.total_cents || 0) / 100).toFixed(2)}${updatedOrder.fulfillment_mode === "pickup" ? " · Pickup" : ""}`,
                         route: "shopOrders",
                         data: { orderId: updatedOrder.id },
+                        // An online order is picked and packed by whoever is on shift, not only the owner, so it
+                        // goes to the employee channel too. sendAdminPush defaults to ["full"] (owner devices),
+                        // which is why staff phones stayed silent; the employee build already carries the
+                        // Shop Orders screen the "shopOrders" route lands on.
+                        channels: ["full", "employee"],
                     }),
                 ]);
 
