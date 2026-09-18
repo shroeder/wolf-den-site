@@ -1,6 +1,6 @@
 import { swingFrom, healthFrom, critChanceFrom, critMultFrom, procFrom,
     COUNTER_PER_POINT, HASTE_PER_POINT, LIFESTEAL_PER_POINT, PIERCE_PER_POINT, STUN_PER_POINT } from "@/lib/marketplace/arena-kit.js";
-import { ITEMS, sumItemStats, FORGE, forgeWeaponRate, forgeArmourRate } from "@/lib/marketplace/items.js";
+import { ITEMS, sumItemStats, FORGE, forgeWeaponRate, forgeArmourRate, isForgedItem } from "@/lib/marketplace/items.js";
 import { ARENA_MAX_LEVEL, CLASSES, treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
 // npcClassForArchetype, so a rung's TREE and its DECK cannot name two different classes.
 import { npcClassForArchetype } from "@/lib/marketplace/arena-skills.js";
@@ -488,7 +488,9 @@ function slotPool(slot, rarity) {
     if (!_bySlot) {
         _bySlot = {};
         for (const it of ITEMS) {
-            if (!it.slot || !it.stats) continue;
+            // An Ascended twin is something a member MADE. Dressing a ladder NPC in one both inflates the
+            // ascendant pool they draw from and puts a player's achievement on a bot.
+            if (!it.slot || !it.stats || isForgedItem(it)) continue;
             (_bySlot[it.slot] ||= []).push(it);
         }
     }

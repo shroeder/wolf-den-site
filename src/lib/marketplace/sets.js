@@ -1,6 +1,6 @@
 import "server-only";
 
-import { itemById, describeStats, describeStat, describeSea, describeFarm, describeDepth, SEA_META, DEPTH_META } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeStat, describeSea, describeFarm, describeDepth, SEA_META, DEPTH_META, ascendedIdOf, baseIdOf } from "@/lib/marketplace/items.js";
 import { pieceById } from "@/lib/marketplace/collection-pieces.js";
 
 // A set's members are gear OR trophies, and after the collection migration the two live in different tables.
@@ -256,7 +256,13 @@ const SET_BY_ID = Object.fromEntries(ITEM_SETS.map((s) => [s.id, s]));
 // They are their own table now (collection-pieces.js), so a piece id simply does not resolve as an item and
 // the category error is impossible rather than merely forbidden.
 const SET_BY_ITEM = {};
-for (const set of ITEM_SETS) for (const id of set.items) SET_BY_ITEM[id] = set;
+// ── A RAISED PIECE IS STILL THE PIECE ────────────────────────────────────────────────────────────────────────
+// The Ascended twin of a set piece is a separate item id, so without this line a Prismatic Stone spent on your
+// chest piece would silently BREAK your set — the bonus you were wearing it for would just stop. Registering
+// the twin against the same set is the whole fix: equippedCounts and collectedCounts both look a piece up
+// here, so both start counting it again, and `set.items` is untouched so a "full set" is still the same
+// number of pieces rather than twice as many.
+for (const set of ITEM_SETS) for (const id of set.items) { SET_BY_ITEM[id] = set; SET_BY_ITEM[ascendedIdOf(id)] = set; }
 
 // Sets belonging to a feature that hasn't launched carry `ownerOnly: true`. Same contract as pets and items:
 // invisible in the browser, but fully functional for whoever actually holds the pieces (the bonus maths below
@@ -283,7 +289,8 @@ export function collectionsForFeature(feature, ownedIds) {
  */
 export function setOfItem(itemId) {
     if (!itemId) return null;
-    return ITEM_SETS.find((s) => (s.items || []).includes(itemId)) || null;
+    const base = baseIdOf(itemId);
+    return ITEM_SETS.find((s) => (s.items || []).includes(base)) || null;
 }
 
 export function itemsOfSet(setId) {
@@ -312,7 +319,13 @@ function equippedCounts(equippedIds, powers = null) {
     const list = Array.isArray(equippedIds) ? equippedIds : Object.values(equippedIds || {});
     const each = powers?.has?.("completionist_s_ledger") ? 2 : 1;
     const counts = new Map();
+    // Two ring slots mean a member can wear a ring AND the Ascended twin of that same ring. That is one set
+    // piece worn twice, not two pieces of the set, so the base id is what de-duplicates here.
+    const seen = new Set();
     for (const id of list) {
+        const key = baseIdOf(id);
+        if (seen.has(key)) continue;
+        seen.add(key);
         const set = SET_BY_ITEM[id];
         if (set) counts.set(set.id, (counts.get(set.id) || 0) + each);
     }
@@ -330,8 +343,10 @@ export function collectedCounts(ownedIds) {
     const seen = new Set();
     const counts = new Map();
     for (const id of list) {
-        if (seen.has(id)) continue;
-        seen.add(id);
+        // Keyed on the BASE id: a piece and the Ascended version of that same piece are one piece, not two.
+        const key = baseIdOf(id);
+        if (seen.has(key)) continue;
+        seen.add(key);
         const set = SET_BY_ITEM[id];
         if (set?.collection) counts.set(set.id, (counts.get(set.id) || 0) + 1);
     }
@@ -517,8 +532,10 @@ export function setCombatMult(equippedIds, ctx = {}) {
 
 // Full overview for the Sets browser: every set with per-piece owned/equipped status + bonuses + capstone.
 export function getSetsOverview(equippedIds, ownedIds) {
-    const eq = new Set(equippedIds || []);
-    const own = new Set(ownedIds || []);
+    // Normalised to base ids so a piece you have RAISED still shows as owned/worn in the set browser rather
+    // than reading as a hole in a set you actually completed.
+    const eq = new Set((equippedIds || []).map(baseIdOf));
+    const own = new Set((ownedIds || []).map(baseIdOf));
     // The browser shows PUBLIC sets, plus any unlaunched one you already hold a piece of — so an owner testing
     // a feature still sees their set, and nobody else sees a set they have no way to explain.
     const visible = ITEM_SETS.filter((s) => !s.ownerOnly || s.items.some((id) => own.has(id) || eq.has(id)));

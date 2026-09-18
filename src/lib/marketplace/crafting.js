@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
-import { itemById, STAT_META, describeStats, mergeStats, AFFIX_POOL, affixCeiling, isIntrinsicStat, pickWeightedAffix, FORGE } from "@/lib/marketplace/items.js";
+import { itemById, STAT_META, describeStats, mergeStats, statValue, AFFIX_POOL, affixCeiling, isIntrinsicStat, pickWeightedAffix, FORGE, ascendedIdOf, canAscendItem, isAscendedId } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
@@ -24,7 +24,9 @@ import { equippedPowers, oneIn, claimPowerUse } from "@/lib/marketplace/ascensio
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
-// mini-game. Phase 1 core loop. All actions are owner-gated at the API layer.
+// mini-game. The Forge is LIVE FOR EVERY SIGNED-IN MEMBER — this line used to say the actions were
+// owner-gated, which was true of the phase-1 build and has not been true for a long time. The route
+// (api/marketplace/crafting) checks a session and nothing more.
 
 // The AI-painted blacksmith-hearth backdrop for the whole experience (generated once, hardcoded like FARM_BG).
 export const HEARTH_BG = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/forge/hearth-1785047633350.png";
@@ -890,8 +892,131 @@ export async function getForgeState(buyerId) {
         return { id, name: it.name, slot: it.slot, rarity: it.rarity, icon: it.icon, sprite: spriteMap[id] || null, elements: describeItemElements(id, elemOver[id]), cost: reforgeCost(it.rarity), equipped: equippedIds.has(id) };
     }).filter(Boolean).sort((a, b) => rarityTier(b.rarity) - rarityTier(a.rarity) || a.name.localeCompare(b.name));
     // Forge scrolls held (Power = free enhance, Enchant = add an affinity).
-    const scrollRows = await db.query(`SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND consumable_id IN ('forge_power_scroll','forge_enchant_scroll') AND count > 0`, [buyerId]).catch(() => []);
+    const scrollRows = await db.query(`SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND consumable_id IN ('forge_power_scroll','forge_enchant_scroll','prismatic_stone') AND count > 0`, [buyerId]).catch(() => []);
     const scrollCount = (cid) => Number(scrollRows.find((r) => r.consumable_id === cid)?.count || 0);
     const reforge = { items: reforgeItems, elements: Object.values(ELEMENTS).map((e) => ({ key: e.key, label: e.label, emoji: e.emoji, color: e.color })), dualChance: Math.round(DUAL_ELEMENT_CHANCE * 100), enchantScrolls: scrollCount("forge_enchant_scroll") };
-    return { parts: partList, salvage, enhance, reforge, upgrades, dailies, regalia, salvageOdds, steadyHandChance: chance(upg, "steady_hand", bf), gold: goldRow?.gold || 0, powerScrolls: scrollCount("forge_power_scroll"), enchantScrolls: scrollCount("forge_enchant_scroll"), combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
+    // ── Ascend (the Prismatic Stone) — every OWNED piece that can still be raised, and exactly what raising it
+    // would do to each of its numbers. The before/after is computed HERE rather than in the client because the
+    // raised piece is a real catalogue item: the answer is known exactly, so showing an estimate would be a
+    // worse version of something we can simply read off. A member spending the rarest drop in the game gets to
+    // see the actual result before they spend it.
+    const ascendItems = (ownedRows || []).map((r) => r.item_id).map((id) => {
+        const it = itemById(id);
+        if (!it || !canAscendItem(it)) return null;
+        const raised = itemById(ascendedIdOf(id));
+        if (!raised) return null;
+        const keys = [...new Set([...Object.keys(it.stats || {}), ...Object.keys(raised.stats || {})])];
+        const gains = keys.map((k) => {
+            const from = Number(it.stats?.[k]) || 0;
+            const to = Number(raised.stats?.[k]) || 0;
+            if (!to || to === from) return null;
+            // Formatted with statValue, the same helper every other stat readout in the game goes through.
+            // Sent raw, block_chance reached the confirm dialog as "0.4 -> 0.413" — a number a member has no
+            // way to read, on the one screen where they are deciding whether to spend the rarest item in the
+            // game. It is a percentage everywhere else and it is a percentage here.
+            const suffix = STAT_META[k]?.suffix && !["block_chance"].includes(k) ? STAT_META[k].suffix : "";
+            return {
+                key: k, label: STAT_META[k]?.label || k, icon: STAT_META[k]?.icon || null,
+                from, to, isNew: !from,
+                fromText: from ? `${statValue(k, from)}${suffix}` : null,
+                toText: `${statValue(k, to)}${suffix}`,
+            };
+        }).filter(Boolean);
+        return {
+            id, name: it.name, slot: it.slot, rarity: it.rarity, icon: it.icon,
+            sprite: spriteMap[id] || null, equipped: equippedIds.has(id),
+            to: { id: raised.id, name: raised.name, rarity: raised.rarity },
+            gains,
+        };
+    }).filter(Boolean).sort((a, b) => rarityTier(b.rarity) - rarityTier(a.rarity) || a.name.localeCompare(b.name));
+    const ascend = { items: ascendItems, stones: scrollCount("prismatic_stone") };
+
+    return { parts: partList, salvage, enhance, reforge, ascend, upgrades, dailies, regalia, salvageOdds, steadyHandChance: chance(upg, "steady_hand", bf), gold: goldRow?.gold || 0, powerScrolls: scrollCount("forge_power_scroll"), enchantScrolls: scrollCount("forge_enchant_scroll"), prismaticStones: scrollCount("prismatic_stone"), combineCost: COMBINE_COST, maxTier: MAX_TIER, hearthBg: HEARTH_BG };
+}
+
+// ── THE PRISMATIC STONE: RAISE A PIECE TO ASCENDANT ──────────────────────────────────────────────────────────
+// Luke: "an item that lets you upgrade the rarity of a piece of gear when you're in the forge area, but only
+// to whatever the orange rarity is, ascended."
+//
+// The catalogue has no family ladders — there is no mythic version of the Iron Helm to promote a piece INTO —
+// so the upgraded piece is a real catalogue entry built for exactly this: the Ascended twin, derived from the
+// parent by the same passes that derive everything else (see items.js). Because it is a real item with a real
+// id, every screen, trade, auction, set bonus and combat path in the codebase already understands it, and
+// none of them needed a per-instance rarity threaded through them.
+//
+// WHICH MEANS RAISING A PIECE IS A RENAME. Ownership, forge enhancement, elemental affinity, sockets and the
+// slot it is worn in are all keyed (buyer_id, item_id) — so moving the id moves all of it, and the piece
+// stays enhanced, stays attuned, stays socketed and stays ON. That is the difference between an upgrade and
+// handing somebody a different item.
+//
+// ⚠️ ONE STATEMENT, because this driver has no transactions (neon over HTTP). A CTE chain is atomic at the
+// statement level, so a piece can never end up half-moved: enhanced as the new id while still owned as the
+// old one. And the stone is consumed FIRST but REFUNDED if the move does not land — losing the rarest drop in
+// the game to a failed write is the one outcome worth writing extra code to prevent.
+export async function ascendItem(buyerId, itemId) {
+    if (!buyerId || !itemId) return { ok: false, error: "not_signed_in" };
+    const item = itemById(itemId);
+    if (!item) return { ok: false, error: "bad_item" };
+    if (isAscendedId(itemId)) return { ok: false, error: "already_ascended" };
+    // The cap is the feature. Anything at ascendant or above, anything charged, and anything carrying a
+    // real-world perk has no twin and is refused here rather than failing obscurely below.
+    if (!canAscendItem(item)) return { ok: false, error: "cannot_ascend" };
+    const newId = ascendedIdOf(itemId);
+    const raised = itemById(newId);
+    if (!raised) return { ok: false, error: "cannot_ascend" };
+
+    const owns = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
+    if (!owns) return { ok: false, error: "not_owned" };
+    // mkt_user_item is UNIQUE (buyer_id, item_id). Someone who raised this piece before and has since found
+    // another copy of the base would collide on the rename, so it is caught here with a sentence that says
+    // what happened instead of a constraint violation.
+    const dupe = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, newId]).catch(() => null);
+    if (dupe) return { ok: false, error: "already_own_ascended" };
+
+    const stone = await db.queryOne(
+        `UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = 'prismatic_stone' AND count > 0 RETURNING count`,
+        [buyerId]
+    ).catch(() => null);
+    if (!stone) return { ok: false, error: "no_stone" };
+
+    const moved = await db.queryOne(
+        `WITH owned AS (
+             UPDATE mkt_user_item SET item_id = $3 WHERE buyer_id = $1 AND item_id = $2 RETURNING 1
+         ), enh AS (
+             UPDATE mkt_item_enhance SET item_id = $3 WHERE buyer_id = $1 AND item_id = $2 RETURNING 1
+         ), elem AS (
+             UPDATE mkt_item_element SET item_id = $3 WHERE buyer_id = $1 AND item_id = $2 RETURNING 1
+         ), sock AS (
+             UPDATE mkt_item_socket SET item_id = $3 WHERE buyer_id = $1 AND item_id = $2 RETURNING 1
+         ), worn AS (
+             UPDATE mkt_user_equipment SET item_id = $3 WHERE buyer_id = $1 AND item_id = $2 RETURNING 1
+         )
+         SELECT (SELECT COUNT(*) FROM owned)::int AS owned,
+                (SELECT COUNT(*) FROM enh)::int   AS enhanced,
+                (SELECT COUNT(*) FROM worn)::int  AS worn,
+                (SELECT COUNT(*) FROM sock)::int  AS sockets`,
+        [buyerId, itemId, newId]
+    ).catch(() => null);
+
+    if (!Number(moved?.owned)) {
+        // Put the stone back. Nothing moved, so nothing is half-done — the member simply still holds it.
+        await db.query(
+            `UPDATE mkt_user_consumable SET count = count + 1 WHERE buyer_id = $1 AND consumable_id = 'prismatic_stone'`,
+            [buyerId]
+        ).catch(() => {});
+        return { ok: false, error: "ascend_failed" };
+    }
+
+    await trackActivity(buyerId, "ascend_item", { from: itemId, to: newId, rarity: item.rarity }).catch(() => {});
+    grantEventBadge(buyerId, "forge_ascendant");
+
+    return {
+        ok: true,
+        from: { id: itemId, name: item.name, rarity: item.rarity, stats: item.stats || {} },
+        to: { id: newId, name: raised.name, rarity: raised.rarity, stats: raised.stats || {} },
+        keptEnhancement: Number(moved.enhanced) > 0,
+        stillWorn: Number(moved.worn) > 0,
+        sockets: Number(moved.sockets) || 0,
+        stonesLeft: Number(stone.count) || 0,
+    };
 }

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { ITEMS, isOwnerOnlyItem, itemSourceLabel } from "@/lib/marketplace/items.js";
+import { ITEMS, isOwnerOnlyItem, itemSourceLabel, isForgedItem } from "@/lib/marketplace/items.js";
 
 // ── THE COMPENDIUM ───────────────────────────────────────────────────────────────────────────────────────────
 // Every piece of gear in the game, and whether you have ever held it.
@@ -87,7 +87,10 @@ export async function compendiumStats(buyerId) {
  */
 export async function getCompendium(buyerId) {
     const have = await collectedIds(buyerId);
-    const pool = ITEMS.filter((i) => !isOwnerOnlyItem(i));
+    // Ascended twins are excluded on the same principle stated above: they are a STATE a piece can be put
+    // into with a Prismatic Stone, not 260 more items to go and find. Counting them would double the
+    // denominator with entries no amount of playing can collect.
+    const pool = ITEMS.filter((i) => !isOwnerOnlyItem(i) && !isForgedItem(i));
     const items = pool.map((i) => ({
         id: i.id, name: i.name, slot: i.slot || null, rarity: i.rarity, icon: i.icon || null,
         flavor: i.flavor || null, stats: i.stats || null, reqLevel: i.reqLevel || null,

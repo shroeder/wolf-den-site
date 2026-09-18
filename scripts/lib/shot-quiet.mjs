@@ -25,6 +25,20 @@ export const QUIET_SEEN = [
     "wolfden-mining-announce-v2",
     "wolfden-hh-seen",
     "wolfden-arena-reopen-v1",
+    // ── THE HOW-TO CARDS ─────────────────────────────────────────────────────────────────────────────────
+    // HowToPlay keys on "wolfden-howto-<id>" and renders a full-bleed teaching card over the feature until
+    // it is dismissed. Shooting the Forge without these gives you a perfectly sharp photograph of the
+    // tutorial — which is the exact failure this file exists to prevent, just wearing a different hat.
+    "wolfden-howto-forge",
+    "wolfden-howto-farm",
+    "wolfden-howto-arena",
+    "wolfden-howto-mining",
+    "wolfden-howto-fishing",
+    "wolfden-howto-delve",
+    "wolfden-howto-sailing",
+    "wolfden-howto-casino",
+    "wolfden-howto-cooking",
+    "wolfden-howto-town",
 ];
 
 // Overlays with no marker to seed — they are server-driven, so the only way to be rid of them is a stylesheet.

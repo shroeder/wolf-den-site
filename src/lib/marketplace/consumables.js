@@ -58,6 +58,17 @@ export const CONSUMABLES = {
     // salvaged parts). The rarer Enchantment Scroll permanently adds an elemental affinity you pick (can exceed two).
     forge_power_scroll: { name: "Power Scroll", emoji: "📜", kind: "scroll", price: null, target: "forge", desc: "A free enhancement at the Forge — enhance a piece WITHOUT spending salvaged parts.", effect: { type: "forge_enhance" } },
     forge_enchant_scroll: { name: "Enchantment Scroll", emoji: "🪄", kind: "scroll", price: null, target: "forge", desc: "Permanently add an elemental affinity of your choice to a piece of gear (can extend it past two).", effect: { type: "forge_enchant" } },
+    // ── THE PRISMATIC STONE ──────────────────────────────────────────────────────────────────────────────
+    // The rarest thing in the game: a drop from ANY activity, tuned so the whole Den turns up about one every
+    // five days between them (see prismatic.js for the rate and why it is capped per member rather than per
+    // action). No price, in any currency — it cannot be bought, only found.
+    //
+    // It RAISES a piece you already own to Ascendant, keeping every affix it had and every point of forge
+    // enhancement on it. The cap is Luke's and it is the point: "only to whatever the orange rarity is,
+    // ascended." Eternal, Celestial and Primordial stay where they are, earned the way they always were.
+    prismatic_stone: { name: "Prismatic Stone", emoji: "💎", kind: "stone", price: null, target: "forge", soulbound: true,
+        desc: "Raise one piece of gear you own to ASCENDANT. It keeps its affixes and its enhancement — every number goes up. Cannot go past Ascendant.",
+        effect: { type: "forge_ascend" } },
     // PET TREATS — feed your EQUIPPED pet to level it up. Six buyable tiers + four drop-only.
     treat_bone: { name: "Pet Treat", emoji: "🦴", kind: "treat", desc: "Feed your equipped pet +25 pet XP.", price: 400, effect: { type: "pet_xp", amount: 25 } },
     treat_snack: { name: "Hearty Snack", emoji: "🍖", kind: "treat", desc: "Feed your equipped pet +75 pet XP.", price: 1000, effect: { type: "pet_xp", amount: 75 } },
@@ -291,7 +302,7 @@ export async function activeBoosts(buyerId) {
 const FEATURE_BY_EFFECT = {
     strikes: "boss", damage: "boss",
     recharge: "gear", reset_cooldown: "gear",
-    forge_enhance: "forge", forge_enchant: "forge",
+    forge_enhance: "forge", forge_enchant: "forge", forge_ascend: "forge",
     pet_xp: "pets", pet_level: "pets",
     spin_token: "spin", spin_reset: "spin",
     delve_reset: "delve",
@@ -308,7 +319,7 @@ const FEATURE_BY_EFFECT = {
 //
 // The bench comes from the effect the scroll HAS, for the same reason the screen does, and it lives here so
 // the two callers ask rather than each remember.
-const BENCH_BY_EFFECT = { forge_enhance: "enhance", forge_enchant: "attune" };
+const BENCH_BY_EFFECT = { forge_enhance: "enhance", forge_enchant: "attune", forge_ascend: "ascend" };
 
 /** Where using this consumable should land you: a path, or null if it is used from the stash itself. */
 export function consumableHref(id) {
@@ -572,7 +583,7 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
     const e = c.effect;
 
     // Forge scrolls are consumed at the Forge (they need the enhance flow / an item+element picker), not here.
-    if (e.type === "forge_enhance" || e.type === "forge_enchant") return { ok: false, error: "use_at_forge" };
+    if (e.type === "forge_enhance" || e.type === "forge_enchant" || e.type === "forge_ascend") return { ok: false, error: "use_at_forge" };
 
     if (e.type === "recharge" || e.type === "reset_cooldown") {
         const def = itemById(targetItemId);

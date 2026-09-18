@@ -14,6 +14,8 @@ import {
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { textIcon } from "@/lib/coin-icon.js";
 import { FORTUNE_DESC } from "@/lib/marketplace/fortune.js";
+// The ladder itself, so the ascend cap below is expressed in the same order every other screen sorts by.
+import { rarityRank } from "@/lib/marketplace/rarity.js";
 
 // The nine equip slots (rings occupy ring1/ring2). `accepts` = which item.slot fits.
 export const EQUIP_SLOTS = [
@@ -59,9 +61,25 @@ export const isOwnerOnlyItem = (i) => Boolean(i?.ownerOnly);
 // fishing rod hands out. See the note above isRealMoneyItem — the rule existed, it just was not shared.
 export const isSeasonItem = (i) => i?.source === "season";
 
+// ── AN ITEM THAT ONLY THE FORGE CAN MAKE ─────────────────────────────────────────────────────────────────────
+// The Ascended twins (built just below the catalogue) are real entries in ITEMS — that is the whole point of
+// them, because item identity travels this codebase as a bare id through thirty-odd files and a "virtual"
+// upgrade would have to be threaded through every one. Being real costs one thing: every random reward path
+// filters ITEMS, so without a flag the fishing rod would hand out the one item in the game you are meant to
+// spend a Prismatic Stone on. Same lesson as isSeasonItem and isOwnerOnlyItem directly above — the rule
+// existed each time, it just was not shared.
+export const isForgedItem = (i) => i?.source === "forge";
+
+// Twin ids are the base id plus a suffix, so anything keyed by item id (sets, elements, sprites) can find its
+// way back to the piece it came from with baseIdOf() instead of keeping a second table.
+export const ASCEND_SUFFIX = "__ascended";
+export const baseIdOf = (id) => String(id || "").replace(/__ascended$/, "");
+export const ascendedIdOf = (id) => `${baseIdOf(id)}${ASCEND_SUFFIX}`;
+export const isAscendedId = (id) => String(id || "").endsWith(ASCEND_SUFFIX);
+
 /** Every item a RANDOM reward is allowed to hand out. Use this instead of filtering ITEMS directly. */
 export const randomDropPool = (predicate) =>
-    ITEMS.filter((i) => !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && !isSeasonItem(i) && (typeof predicate === "function" ? predicate(i) : true));
+    ITEMS.filter((i) => !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && !isSeasonItem(i) && !isForgedItem(i) && (typeof predicate === "function" ? predicate(i) : true));
 
 /**
  * A feature's OWN unlaunched gear, for that feature's own reward code — and nothing else.
@@ -800,6 +818,53 @@ export const ITEMS = [
     { id: "s1_hinge_iron_greaves", name: "Hinge-Iron Greaves", slot: "boots", rarity: "primordial", icon: "GiGreaves", flavor: "Cut from the pin the door turned on.", stats: { ferocity: 74, might: 56 }, reqLevel: null, source: "season", season: 1, rung: 175, charged: true, charges: 1, cooldownDays: 365, chargeReward: "store_credit_20", chargeRewardLabel: REWARDS.store_credit_20, sort: 1201 },
 ];
 
+// ── THE ASCENDED TWIN: THE SAME PIECE, RAISED ────────────────────────────────────────────────────────────────
+// Luke: "an item that lets you upgrade the rarity of a piece of gear when you're in the forge area, but only
+// to ascended."
+//
+// There is no such thing as a mythic Iron Helm to promote an item INTO — the catalogue has 387 hand-authored
+// pieces and no family ladders, so "raise this one" has to mean something the data can express. It can, and
+// the shape of this file is why: everything that makes a piece good is a pure function of (id, rarity).
+// Intrinsics come off RARITY_INTRINSICS by tier, affix COUNT off AFFIX_COUNT by rarity, affix VALUES off
+// AFFIX_TIER by rarity — while WHICH affixes a piece draws, and the variance texture on every number, are
+// seeded from the item's id and do not move. So re-deriving a piece at ascendant gives you the same item with
+// the same affixes in the same order, more of them, each one bigger, on better armour and damage. That is a
+// promotion rather than a re-roll, which is what "upgrade YOUR gear" has to feel like.
+//
+// WHY THEY ARE APPENDED HERE, above the passes rather than below them: every derivation in this file walks
+// ITEMS once. Pushing the twins in before the first pass means they are stat-deduped, vitality-split, given
+// intrinsics and given affixes by the SAME code as everything else — there is no second derivation to keep in
+// step, and no way for a twin to drift from the rules the catalogue plays by.
+//
+// `hashId` is the one thing they do not inherit by copying: it points the id-seeded hashes back at the base
+// piece, so the twin keeps its parent's texture instead of rolling a stranger's.
+const ASCEND_TO = "ascendant";
+
+/** Can this piece be raised by a Prismatic Stone? The cap is Luke's: ascendant and no further. */
+export const canAscendItem = (i) => Boolean(i?.slot) && !i?.charged && !isForgedItem(i)
+    && !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && !isSeasonItem(i)
+    && rarityRank(i?.rarity) > -1 && rarityRank(i?.rarity) < rarityRank(ASCEND_TO);
+
+for (const base of ITEMS.filter(canAscendItem)) {
+    ITEMS.push({
+        ...base,
+        id: ascendedIdOf(base.id),
+        // Seeds every id-hash in the passes below — see `hid` in each. NOT the twin's own id, or the piece
+        // would come back carrying a different set of affixes and stop being the item you upgraded.
+        hashId: base.id,
+        ascendedFrom: base.id,
+        name: `Ascended ${base.name}`,
+        rarity: ASCEND_TO,
+        // Excluded from every random pool by isForgedItem. The Forge is the only thing that can mint one.
+        source: "forge",
+        // Not for sale anywhere, at any price, in any currency — it is not a shop item that happens to be dear.
+        xpCost: null, price: null, priceUsd: null,
+        // Sorts immediately after its parent wherever the catalogue is listed in authored order.
+        sort: (Number(base.sort) || 0) + 0.5,
+        stats: { ...(base.stats || {}) },
+    });
+}
+
 // ── De-clone stat blocks ──────────────────────────────────────────────────────────────────────────────────
 // The flat per-rarity stat budgets left dozens of items with byte-identical stat blocks (e.g. nine different
 // epics all "might 22"). This one-time pass makes every same-rarity stat block UNIQUE by deterministically
@@ -1006,6 +1071,9 @@ const BLOCK_CHANCE_MIN = 0.35;
 
 (() => {
     for (const it of ITEMS) {
+        // An Ascended twin hashes as the piece it was RAISED FROM, so it keeps that piece's texture:
+        // the same haste/pierce selection, the same variance nudges. Its own id would make it a stranger.
+        const hid = it.hashId || it.id;
         const stats = { ...(it.stats || {}) };
         // Precision bought accuracy and accuracy no longer exists, so the affix is stripped rather than
         // left on 24 items as a number that does nothing.
@@ -1015,8 +1083,8 @@ const BLOCK_CHANCE_MIN = 0.35;
         // kept; what changed is who decides. It used to be "mythic through eternal", which is rarity picking
         // the winners — it is the item's own hash now, so the same handful of pieces carry it and none of
         // them carry it because of what tier they are.
-        if ((vary(it.id, "haste") > 1.205 && vary(it.id, "hasteroll") > 1.10) || stats.haste != null) {
-            stats.haste = Math.max(1, Math.round(rar(it, "haste") * nudge(it.id, "hasteval")));
+        if ((vary(hid, "haste") > 1.205 && vary(hid, "hasteroll") > 1.10) || stats.haste != null) {
+            stats.haste = Math.max(1, Math.round(rar(it, "haste") * nudge(hid, "hasteval")));
         }
         // ── NO STAT IS SECRETLY ANOTHER STAT ─────────────────────────────────────────────────────────
         // 45% of every item's authored Might used to be moved into Vitality here, and 40% of an armour
@@ -1034,17 +1102,17 @@ const BLOCK_CHANCE_MIN = 0.35;
         // Any item that carries pierce takes its tier's value: a main hand always, a minority of other pieces
         // by the item's own hash, and anything that already had one typed on it (five charms and passes did,
         // as low as 1 on an epic, which is exactly the inversion check:rarity now refuses).
-        if (it.slot === "main_hand" || vary(it.id, "prcroll") > 1.175 || stats.pierce != null) {
-            stats.pierce = Math.max(1, Math.round(rar(it, "pierce") * nudge(it.id, "prc")));
+        if (it.slot === "main_hand" || vary(hid, "prcroll") > 1.175 || stats.pierce != null) {
+            stats.pierce = Math.max(1, Math.round(rar(it, "pierce") * nudge(hid, "prc")));
         }
         if (it.slot === "main_hand") {
-            stats.base_damage = Math.max(1, Math.round(rar(it, "base_damage") * nudge(it.id, "dmg")));
+            stats.base_damage = Math.max(1, Math.round(rar(it, "base_damage") * nudge(hid, "dmg")));
             stats.speed = rar(it, "speed");
         }
         if (ARMOR_SLOT_WEIGHT[it.slot]) {
             // Slot weight is COVERAGE, not rarity — a breastplate covers more of you than a belt, and that
             // is true of a common one and a primordial one alike. It stays.
-            stats.armor = Math.max(1, Math.round(rar(it, "armor") * ARMOR_SLOT_WEIGHT[it.slot] * nudge(it.id, "arm")));
+            stats.armor = Math.max(1, Math.round(rar(it, "armor") * ARMOR_SLOT_WEIGHT[it.slot] * nudge(hid, "arm")));
             // ── EVERY OFF-HAND BLOCKS, AND NONE OF THEM BLOCKS LESS THAN THE FLOOR ───────────────────
             // Luke, looking at a Mythic off-hand: "every shield should have at least .35 block chance, this
             // one has 0?"
@@ -1401,6 +1469,9 @@ const AUTHORED_STATS = new Map(ITEMS.map((it) => [it.id, new Set(Object.keys(it.
 
 for (const it of ITEMS) {
     if (!it.stats) continue;
+    // Seeded from the parent for an Ascended twin — same draw ORDER, so the piece gains affixes rather
+    // than swapping them. See the note on hashId where the twins are built.
+    const hid = it.hashId || it.id;
     const counted = () => Object.keys(it.stats).filter((k) => k !== "extra_strike").length;
     const authored = Object.keys(it.stats).filter((k) => k !== "extra_strike");
     const want = AFFIX_COUNT[it.rarity] || 2;
@@ -1411,11 +1482,11 @@ for (const it of ITEMS) {
     // is the opposite of what makes an affix worth finding. WEIGHT pushes a stat down the draw order — the
     // higher the weight the further it sinks, so it only surfaces on pieces rich enough to reach that deep.
     // Nothing is barred from any slot; the scarce ones are simply scarce.
-    const seed = affixSeed(it.id);
+    const seed = affixSeed(hid);
     // AFFIX_DRAW_ORDER, not AFFIX_POOL — see the note on it. The draw is unchanged by a retirement; only the
     // name the points land under is.
     const order = AFFIX_DRAW_ORDER
-        .map((k) => ({ k, w: (affixSeed(`${it.id}:${k}`) ^ (seed + AFFIX_INDEX[k])) / (AFFIX_RARITY[k] || 1) }))
+        .map((k) => ({ k, w: (affixSeed(`${hid}:${k}`) ^ (seed + AFFIX_INDEX[k])) / (AFFIX_RARITY[k] || 1) }))
         .sort((a, b) => b.w - a.w)
         .map((x) => x.k)
         // ⚠️ NOT ALSO FILTERED ON WHAT A RETIRED AFFIX CONVERTS TO. Doing that dropped the retired draw
@@ -1435,7 +1506,7 @@ for (const it of ITEMS) {
         if (filled >= want) break;
         // Varies per item as well as per rarity, so two pieces that drew the same affix rarely carry the
         // same amount of it.
-        const jitter = (affixSeed(`${it.id}#${k}`) % 3) - 1;
+        const jitter = (affixSeed(`${hid}#${k}`) % 3) - 1;
         const value = BIG_STATS.has(k) ? Math.max(2, tier * 2 + jitter * 2) : Math.max(1, Math.round(tier * 0.8) + jitter);
         const grant = RETIRED_AFFIX[k] || k;
         it.stats[grant] = (it.stats[grant] || 0) + value;
@@ -1536,6 +1607,70 @@ const PROC_PER_SLOT = 3;
             const bound = Math.max(1, Math.round(base * 0.2));
             it.stats[k] = Math.max(1, base + Math.max(-bound, Math.min(bound, step)));
         }
+    }
+}
+
+// ── A RAISED PIECE IS NEVER A WORSE PIECE ────────────────────────────────────────────────────────────────────
+// The twins are derived by the same passes as everything else, which makes them genuine ascendant items — and
+// on its own that is NOT enough to make them an upgrade of the piece you spent the stone on. Measured before
+// this pass existed, on the twins as the passes left them:
+//
+//   · 46 twins LOST an affix their parent carried. Berserker's Hide went in with Riposte — the joint-rarest
+//     affix in the game — and came out with Might and Crit instead. The draw order is seeded off the parent
+//     so it should have been a superset, but the dedupe and vitality passes run FIRST and move an item's
+//     stats around, so parent and twin reach the draw holding different hands and take different lines.
+//   · An ascended RING OR AMULET was byte-identical to its parent. Those slots carry no armour, no damage,
+//     no block — every intrinsic the rarity table knows how to raise — so re-deriving them at ascendant
+//     changed a label and nothing else. The rarest consumable in the game, spent on a new word.
+//
+// Both are the same mistake: deriving the twin ALONGSIDE the parent rather than FROM it. So this pass walks
+// each twin against its finished parent and enforces the promise the Prismatic Stone actually makes — every
+// line the parent had, and no number smaller:
+//
+//   · an affix-style stat scales by the AFFIX_TIER ratio, which is the same ladder a native ascendant's
+//     affixes are written on, so a raised legendary lands where an ascendant sits rather than above it
+//   · an intrinsic keeps whatever the rarity table already gave it — that IS the upgrade, and it is bigger
+//     than this ratio would be
+//   · anything the twin drew on its own is kept, so a raise can ADD a line but can never take one away
+//
+// max() rather than assignment throughout: this pass is a floor, not an overwrite, and it must never pull a
+// number DOWN to what it thinks the answer should be.
+const ASCEND_INTRINSICS = new Set(["armor", "base_damage", "pierce", "haste", "speed", "block_chance"]);
+
+// ── AND IT IS STILL ONLY AN ASCENDANT ────────────────────────────────────────────────────────────────────────
+// The tier ratio alone overshot, because authored values do not sit on the AFFIX_TIER ladder that ratio comes
+// from. Fortune Pendant is a RARE amulet carrying an authored 13 Fortune — already triple what the draw gives
+// a rare line — so tripling it again for ascendant produced 39, and the best raised ring came out at 90 affix
+// points against a best native ascendant of 67. A stone would have minted the strongest ring in the game
+// while still calling it ascendant, which is the rarity ladder telling a lie.
+//
+// So every raised line is capped at the most that stat reaches on a piece that was BORN ascendant in that
+// slot. The stone takes your piece to the top of its new tier and not one point past it — the tiers above
+// (eternal, celestial, primordial) stay where they are, which is what "only to ascended" has to mean.
+const ASCEND_CAP_BY_SLOT = (() => {
+    const cap = {};
+    for (const i of ITEMS) {
+        if (i.rarity !== ASCEND_TO || isForgedItem(i) || !i.slot || !i.stats) continue;
+        const m = (cap[i.slot] = cap[i.slot] || {});
+        for (const [k, v] of Object.entries(i.stats)) if (typeof v === "number") m[k] = Math.max(m[k] || 0, v);
+    }
+    return cap;
+})();
+
+for (const twin of ITEMS) {
+    if (!isForgedItem(twin) || !twin.ascendedFrom) continue;
+    const parent = ITEMS.find((i) => i.id === twin.ascendedFrom);
+    if (!parent?.stats) continue;
+    const ratio = (AFFIX_TIER[ASCEND_TO] || 6) / (AFFIX_TIER[parent.rarity] || 1);
+    const caps = ASCEND_CAP_BY_SLOT[parent.slot] || {};
+    for (const [k, v] of Object.entries(parent.stats)) {
+        // extra_strike and friends are flags, not amounts — carried across untouched if the twin lacks one.
+        if (typeof v !== "number") { if (twin.stats[k] == null) twin.stats[k] = v; continue; }
+        // An intrinsic is already raised by the rarity table, which is the real upgrade on those lines.
+        // Math.max(v, cap) so a parent that ALREADY exceeds the ascendant band keeps what it had — the cap
+        // is here to stop a raise from inventing power, never to take a piece backwards.
+        const want = ASCEND_INTRINSICS.has(k) ? v : Math.min(Math.round(v * ratio), Math.max(v, caps[k] || 0));
+        twin.stats[k] = Math.max(Number(twin.stats[k]) || 0, want);
     }
 }
 

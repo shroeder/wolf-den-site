@@ -16,7 +16,7 @@ import { barredFromPrizes, isHouse, isOwner } from "@/lib/marketplace/owner.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIdsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
-import { itemById, ITEMS, isOwnerOnlyItem } from "@/lib/marketplace/items.js";
+import { itemById, ITEMS, isOwnerOnlyItem, isForgedItem } from "@/lib/marketplace/items.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
 import { memberDamageMult, memberBonusStrikes, activeBoosts } from "@/lib/marketplace/consumables.js";
@@ -1202,7 +1202,10 @@ function pickRewardItems(n = 3, capRarity = "epic", floorRarity = "rare") {
     // which meant boss rewards could hand a non-owner a Delver's Kit piece for a feature they cannot open.
     const inBand = (f) => ITEMS.filter((i) => {
         const r = REWARD_RARITY_RANK[i.rarity] ?? 9;
-        return i.stats && i.source !== "admin" && !isOwnerOnlyItem(i) && r <= cap && r >= f;
+        // !isForgedItem for the same reason !isOwnerOnlyItem is here — this filters ITEMS directly rather
+        // than going through randomDropPool, so it has to restate every exclusion that pool applies.
+        // An Ascended twin is the thing a Prismatic Stone MAKES; a boss must never simply hand one over.
+        return i.stats && i.source !== "admin" && !isOwnerOnlyItem(i) && !isForgedItem(i) && r <= cap && r >= f;
     });
     let pool = inBand(floor);
     // Widen downward only if the band can't fill the slots — better a mixed set than a short one.

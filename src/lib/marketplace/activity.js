@@ -87,6 +87,18 @@ export async function trackActivity(buyerId, event, meta = null, { path = null, 
             .catch(() => {});
     }
 
+    // ── THE PRISMATIC STONE ──────────────────────────────────────────────────────────────────────────────
+    // Hung off trackActivity rather than off each feature, so "a rare drop from ANY activity" is literally
+    // true and stays true for features that do not exist yet. Deferred import for the same reason the bounty
+    // tick above is — this module is imported by nearly everything, and a static edge out of it is the shape
+    // of cycle that has taken features down here before. Fire-and-forget: finding a stone must never be able
+    // to fail the thing that found it.
+    if (buyerId) {
+        import("@/lib/marketplace/prismatic.js")
+            .then((m) => m.rollPrismaticStone(buyerId, String(event)))
+            .catch(() => {});
+    }
+
     if (buyerId) await chronicle(buyerId, String(event)).catch(() => {});
 }
 

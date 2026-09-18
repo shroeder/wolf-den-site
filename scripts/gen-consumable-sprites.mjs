@@ -51,10 +51,22 @@ const SUBJECTS = {
     sail_tailwind_charm: "A carved pale-wood wind CHARM shaped like a curling gust, hung with three small silver bells and a white feather, wisps of air curling around it",
     sail_prospectors_charm: "A weathered brass PROSPECTOR'S CHARM — a tiny crossed pick and pan on a leather thong, with a small raw gold nugget wired to it",
     sail_raiding_horn: "A curved ox HORN banded with dark iron and bound in leather cord, a war-worn drinking-and-signalling horn",
+    // Luke: "it should look sweet. It'll be like a stone, like a prismatic stone." Described as a rough-cut
+    // crystal rather than a cut jewel so it does not read as a shop gem at 40px — the silhouette has to say
+    // "raw thing you FOUND", because that is the only way anybody gets one.
+    prismatic_stone: "A single rough-cut PRISMATIC STONE the size of a fist — a raw angular crystal, its broad facets splitting light into bands of orange, magenta, cyan and gold like the inside of an opal, a molten orange core burning deep inside it, crisp bright specular highlights along the sharpest edges, three or four tiny chips of the same crystal floating just off its surface. Uncut and natural, not a jeweller's gemstone, no setting, no metal, no ring. Rendered as a GLOSSY THREE-DIMENSIONAL object with soft depth, rich internal reflections and refraction through the crystal, only a thin dark contour where it needs one — not flat vector art and not a thick cartoon outline",
     delve_second_descent: "A heavy antique BRASS KEY, warm golden metal with dark tarnish in the crevices, its bow a circle of four interlocking rings and its bit cut with four distinct wards, bright cyan light burning in the cuts and along the shaft, strong highlights down one edge, older than any lock still standing",
 };
 
-const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const argv = process.argv.slice(2);
+// Drops flag VALUES as well as flags. Without the second clause "--quality medium" left "medium" behind as an
+// id to generate, and the run politely reported "skip medium — no subject written" rather than the flag
+// silently eating the real argument, which is the version of this bug that wastes a generation.
+const only = argv.filter((a, i) => !a.startsWith("--") && !(i > 0 && argv[i - 1] === "--quality"));
+// Every consumable so far was drawn at "low" and they hold up at 256px, so that stays the default — passing
+// --quality medium is for the handful of pieces where the extra facet detail is the point.
+const qAt = argv.indexOf("--quality");
+const QUALITY = qAt > -1 ? String(argv[qAt + 1] || "low") : "low";
 const rows = await sql`SELECT consumable_id FROM mkt_consumable_sprite`;
 const have = new Set(rows.map((r) => r.consumable_id));
 const todo = (only.length ? only : Object.keys(SUBJECTS)).filter((id) => only.length || !have.has(id));
@@ -69,7 +81,7 @@ for (const id of todo) {
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt: `${subject}. ${BASE}`, size: "1024x1024", background: "transparent", output_format: "png", quality: "low", n: 1 }),
+        body: JSON.stringify({ model: "gpt-image-1", prompt: `${subject}. ${BASE}`, size: "1024x1024", background: "transparent", output_format: "png", quality: QUALITY, n: 1 }),
     });
     if (!resp.ok) { console.log(`  FAILED ${id}: ${resp.status} ${(await resp.text()).slice(0, 140)}`); continue; }
     const b64 = (await resp.json())?.data?.[0]?.b64_json;

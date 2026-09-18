@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GiAnvilImpact, GiCrackedShield, GiUpgrade } from "react-icons/gi";
+import { GiAnvilImpact, GiCrackedShield, GiUpgrade, GiCrystalCluster } from "react-icons/gi";
 
 import HowToPlay from "@/components/HowToPlay";
 import ItemArt from "@/components/ItemArt";
@@ -71,6 +71,17 @@ const STRIKES = 6;
 const RARITY_ORDER = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal"];
 const EMPTY_FORGE = { parts: [], salvage: [], enhance: [], upgrades: [], dailies: [], regalia: null, hearthBg: null };
 
+// Every refusal ascendItem can return, in words that say what happened. A raw error key on the rarest action
+// in the game is the one place a shrug is least affordable.
+const ASCEND_ERR = {
+    no_stone: "You have no Prismatic Stone.",
+    not_owned: "You do not own that piece.",
+    already_ascended: "That piece is already Ascendant.",
+    cannot_ascend: "Ascendant is the ceiling — this piece is already at it or above it.",
+    already_own_ascended: "You already own the Ascendant version of that piece.",
+    ascend_failed: "The forge could not take it. Your stone was not spent.",
+};
+
 export default function BlacksmithClient({ initial }) {
     // Always keep forge a valid object (never null) so render-time reads like dep arrays don't crash while loading.
     const [forge, setForge] = useState(initial || EMPTY_FORGE);
@@ -81,7 +92,7 @@ export default function BlacksmithClient({ initial }) {
     // the scroll's whole interface (every piece you own, pick one, pick an element) already lives on that tab.
     const [tab, setTab] = useState(() => {
         const want = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
-        return ["enhance", "salvage", "attune", "upgrades"].includes(want) ? want : "enhance";
+        return ["enhance", "salvage", "attune", "ascend", "upgrades"].includes(want) ? want : "enhance";
     });
     const [enhancing, setEnhancing] = useState(null); // the equipped item being enhanced (opens the mini-game)
     const [rerolling, setRerolling] = useState(null);  // the item whose forged spread is being redistributed
@@ -94,6 +105,8 @@ export default function BlacksmithClient({ initial }) {
     const [reforgeFor, setReforgeFor] = useState(null); // the item whose element you're reforging (opens the picker)
     const [reforgeFx, setReforgeFx] = useState(null);   // the post-reforge reveal { item, elements, dual }
     const [showFounder, setShowFounder] = useState(false); // the Alstier1 credit medallion
+    const [ascendFor, setAscendFor] = useState(null);   // the piece awaiting a "spend the stone" confirm
+    const [ascendFx, setAscendFx] = useState(null);     // the post-ascension reveal
 
     const post = useCallback(async (body, key) => {
         setBusy(key || body.action);
@@ -110,6 +123,25 @@ export default function BlacksmithClient({ initial }) {
     const doSalvage = useCallback(async (item) => {
         const r = await post({ action: "salvage", itemId: item.id }, `sv-${item.id}`);
         if (!r?.ok && r?.error) setToast(salvageErr(r.error));
+        return r;
+    }, [post]);
+
+    // ── SPENDING THE STONE ───────────────────────────────────────────────────────────────────────────────
+    // Never one tap: it is the rarest thing in the game and it is irreversible, so it goes through a confirm
+    // that shows the exact before/after first. The server hands back the whole forge state, so the piece's id
+    // changing underneath the grid takes care of itself.
+    const doAscend = useCallback(async (item) => {
+        const r = await post({ action: "ascend", itemId: item.id }, `asc-${item.id}`);
+        if (r?.ok) {
+            SFX.win();
+            navigator.vibrate?.([0, 22, 40, 22, 40, 70]);
+            setAscendFor(null);
+            // The icon rides along from the card that was tapped — the server answers with the raised item, and
+            // the reveal should show the same art the member was just looking at rather than a fallback glyph.
+            setAscendFx({ ...r, icon: item.icon });
+        } else {
+            setToast({ kind: "err", text: ASCEND_ERR[r?.error] || "That piece could not be raised." });
+        }
         return r;
     }, [post]);
 
@@ -210,6 +242,7 @@ export default function BlacksmithClient({ initial }) {
     ).filter(([, n]) => n > 1).sort((a, z) => (RARITY_ORDER.indexOf(a[0]) - RARITY_ORDER.indexOf(z[0])));
     const enhance = forge.enhance || [];
     const reforge = forge.reforge || { items: [], elements: [], dualChance: 12 };
+    const ascend = forge.ascend || { items: [], stones: 0 };
     const powerScrolls = forge.powerScrolls || 0;
     const enchantScrolls = forge.enchantScrolls || 0;
     const bg = forge.hearthBg && !forge.hearthBg.startsWith("__") ? forge.hearthBg : null;
@@ -384,6 +417,10 @@ export default function BlacksmithClient({ initial }) {
                         <span aria-hidden="true" style={{ fontSize: 18, lineHeight: 1 }}>💠</span>
                         <span className="forge-tab-lbl">Attune</span>
                     </button>
+                    <button type="button" className={`${tab === "ascend" ? "on" : ""}${ascend.stones ? " has-stone" : ""}`} onClick={() => setTab("ascend")}>
+                        <GiCrystalCluster aria-hidden="true" />
+                        <span className="forge-tab-lbl">Ascend{ascend.stones ? <em className="forge-tab-ct is-stone">{ascend.stones}</em> : null}</span>
+                    </button>
                     <button type="button" className={tab === "upgrades" ? "on" : ""} onClick={() => setTab("upgrades")}>
                         <GiUpgrade aria-hidden="true" />
                         <span className="forge-tab-lbl">Perks</span>
@@ -540,6 +577,43 @@ export default function BlacksmithClient({ initial }) {
                                     <span className="forge-card-cost"><Coin /> {it.cost.toLocaleString()} to reforge</span>
                                 </button>
                             )) : <div className="forge-empty">No gear to attune yet — win or buy some pieces first.</div>}
+                        </div>
+                    </>
+                ) : tab === "ascend" ? (
+                    <>
+                        <p className="forge-panel-sub">
+                            A <b>Prismatic Stone</b> raises one piece you own to <b className="forge-asc-word">Ascendant</b>. It keeps its
+                            affixes, its enhancement, its affinity and its sockets — <b>every number goes up</b>, and it stays
+                            on if you are wearing it. Ascendant is the ceiling; a stone cannot take a piece past it.
+                        </p>
+                        {ascend.stones ? (
+                            <div className="forge-stones">
+                                <GiCrystalCluster aria-hidden="true" />
+                                <span>{ascend.stones} Prismatic Stone{ascend.stones === 1 ? "" : "s"} in hand</span>
+                            </div>
+                        ) : (
+                            <div className="forge-stones is-empty">
+                                <GiCrystalCluster aria-hidden="true" />
+                                {/* The stone is in no shop and no drop table a member can read, so this line is the
+                                    only place anybody can find out how one is obtained. */}
+                                <span>No stones yet. They turn up rarely from <b>anything you do</b> in the Den — there is no way to buy one.</span>
+                            </div>
+                        )}
+                        <div className="forge-grid">
+                            {ascend.items.length ? ascend.items.map((it) => (
+                                <button key={it.id} type="button" className="forge-card is-ascend" style={{ "--rc": rc(it.rarity) }}
+                                    disabled={Boolean(busy) || !ascend.stones}
+                                    onClick={() => { ac(); SFX.good(); setAscendFor(it); }}>
+                                    <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
+                                    <span className="forge-card-name">{it.name}</span>
+                                    <span className="forge-asc-arrow">
+                                        <b style={{ color: rc(it.rarity) }}>{it.rarity}</b>
+                                        <span aria-hidden="true">&rarr;</span>
+                                        <b style={{ color: rc("ascendant") }}>ascendant</b>
+                                    </span>
+                                    <span className="forge-asc-gains">{it.gains.length} stat{it.gains.length === 1 ? "" : "s"} rise</span>
+                                </button>
+                            )) : <div className="forge-empty">Nothing here can be raised — every piece you own is already Ascendant or above.</div>}
                         </div>
                     </>
                 ) : (
@@ -717,6 +791,69 @@ export default function BlacksmithClient({ initial }) {
             {/* SWAPPING IS A DICE ROLL, and the list row could not say so — it reads "Swap +3 Might", which
                 sounds like a choice of destination. This is the step that tells you it is random, and the one
                 place to say the thing people actually want to know: the VALUE comes with it. */}
+            {ascendFor ? (
+                <div className="forge-swapscrim" role="dialog" aria-modal="true" onClick={() => setAscendFor(null)}>
+                    <div className="forge-asc-card" onClick={(e) => e.stopPropagation()}>
+                        <p className="forge-founder-kicker">Spend a Prismatic Stone</p>
+                        <div className="forge-asc-head">
+                            <ItemArt id={ascendFor.id} icon={ascendFor.icon} className="forge-asc-art" alt={ascendFor.name} />
+                            <div>
+                                <div className="forge-asc-name">{ascendFor.name}</div>
+                                <div className="forge-asc-arrow">
+                                    <b style={{ color: rc(ascendFor.rarity) }}>{ascendFor.rarity}</b>
+                                    <span aria-hidden="true">&rarr;</span>
+                                    <b style={{ color: rc("ascendant") }}>ascendant</b>
+                                </div>
+                            </div>
+                        </div>
+                        {/* The exact numbers, not an estimate. The raised piece is a real catalogue entry, so the
+                            result is knowable before the stone is spent — and there is no excuse for asking
+                            somebody to gamble the rarest drop in the game on a description of what might happen. */}
+                        <div className="forge-asc-table">
+                            {(ascendFor.gains || []).map((g) => (
+                                <div className="forge-asc-row" key={g.key}>
+                                    <span className="forge-asc-stat">{g.icon ? <Glyph value={g.icon} /> : null} {g.label}</span>
+                                    <span className="forge-asc-nums">
+                                        {g.isNew
+                                            ? <b className="forge-asc-new">NEW {g.toText ?? "+" + g.to}</b>
+                                            : <>{g.fromText ?? g.from}<span aria-hidden="true">&nbsp;&rarr;&nbsp;</span><b>{g.toText ?? g.to}</b></>}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="forge-founder-blurb">
+                            This cannot be undone, and the stone is spent either way.{" "}
+                            {ascendFor.equipped ? <b>You are wearing this piece — it stays on.</b> : null}
+                        </p>
+                        <div className="forge-asc-actions">
+                            <button type="button" className="btn forge-asc-cancel" onClick={() => setAscendFor(null)}>Not yet</button>
+                            <button type="button" className="btn primary" disabled={Boolean(busy)} onClick={() => doAscend(ascendFor)}>
+                                {busy === "asc-" + ascendFor.id ? "Raising…" : "Raise it"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {ascendFx ? (
+                <div className="forge-swapscrim" role="dialog" aria-modal="true" onClick={() => setAscendFx(null)}>
+                    <div className="forge-asc-card is-reveal" onClick={(e) => e.stopPropagation()}>
+                        <div className="forge-asc-burst" aria-hidden="true" />
+                        <p className="forge-asc-kicker">ASCENDANT</p>
+                        <div className="forge-asc-revealname">{ascendFx.to?.name}</div>
+                        <ItemArt id={ascendFx.to?.id} icon={ascendFx.icon} className="forge-asc-art is-big" alt={ascendFx.to?.name || "The raised piece"} />
+                        <p className="forge-founder-blurb">
+                            {ascendFx.keptEnhancement ? "It kept every star you forged into it. " : ""}
+                            {ascendFx.stillWorn ? "It is still equipped. " : ""}
+                            {ascendFx.stonesLeft ? ascendFx.stonesLeft + " stone" + (ascendFx.stonesLeft === 1 ? "" : "s") + " left." : "That was your last stone."}
+                        </p>
+                        <div className="forge-asc-actions">
+                            <button type="button" className="btn primary" onClick={() => setAscendFx(null)}>Good</button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
             {swapConfirm ? (
                 /* ── THIS CARD WAS INVISIBLE ─────────────────────────────────────────────────────────────
                    Two mistakes stacked. `forge-modal` has NO CSS rule anywhere in the codebase, so the
@@ -1566,7 +1703,10 @@ export const FORGE_CSS = `
 .forge-art { width: 76px; height: 76px; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)) drop-shadow(0 0 14px color-mix(in srgb, var(--rc) 55%, transparent)); }
 /* ItemArt sizes its inner <img> in em (1.55em) by default, so the box alone doesn't enlarge it — make the image
    FILL its box in the forge card + the result reveal so the item actually reads big. */
-.forge-art .item-art-img, .forge-er-art .item-art-img { width: 100% !important; height: 100% !important; }
+/* ItemArt renders a SPAN that wraps the img, so sizing the span does nothing on its own — the image keeps
+   its intrinsic size and the box collapses around it. The ascend art was added without this line and
+   rendered at a fraction of the 124px it was asked for, leaving a hole in the middle of the reveal. */
+.forge-art .item-art-img, .forge-er-art .item-art-img, .forge-asc-art .item-art-img { width: 100% !important; height: 100% !important; object-fit: contain; }
 .forge-card-name { font-size: 14px; font-weight: 900; line-height: 1.15; color: #fff4e2; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 /* Inherent stats the item was BORN with — quiet, so the forged bonus can pop against them. */
 /* ── ONE ROW PER STAT ────────────────────────────────────────────────────────────────────────────────
@@ -1586,6 +1726,92 @@ export const FORGE_CSS = `
    been worked on still says so, and says WHERE, without a second copy of the whole stat list. */
 .forge-stat.is-forged b { color: #ffd08a; }
 .forge-stat u { text-decoration: none; margin-left: 4px; font-size: 9.5px; font-weight: 900; color: #8fe39a; }
+/* ── THE ASCEND BENCH ────────────────────────────────────────────────────────────────────────────────────
+   Prismatic, so it reads as its own thing next to the forge's orange and the attune bench's violet. The
+   colour is the ascendant rarity colour (ff7a3c) shot through a spectrum, because that is the tier the
+   stone takes you to and the screen should say so before you read a word of it. */
+.forge-tabs button.has-stone { position: relative; }
+.forge-tabs button.has-stone::after {
+    content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(115deg, rgba(255,122,60,0) 20%, rgba(255,210,120,0.35) 45%, rgba(150,220,255,0.3) 60%, rgba(255,122,60,0) 80%);
+    background-size: 260% 100%; animation: ascShimmer 2.6s linear infinite;
+}
+@keyframes ascShimmer { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+.forge-tab-ct.is-stone { background: rgba(255,122,60,0.9); color: #1b0f06; }
+
+.forge-stones {
+    display: flex; align-items: center; gap: 9px; margin: 2px 0 12px; padding: 9px 13px; border-radius: 12px;
+    font-size: 12px; font-weight: 900; color: #ffd9b8;
+    background: radial-gradient(120% 140% at 12% 0%, rgba(255,122,60,0.22), rgba(60,30,12,0.3));
+    border: 1px solid rgba(255,150,90,0.5); box-shadow: 0 0 20px rgba(255,122,60,0.22);
+}
+.forge-stones svg { font-size: 19px; color: #ffb27a; flex: none; }
+.forge-stones.is-empty { color: #cbbcae; background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); box-shadow: none; font-weight: 700; }
+.forge-stones.is-empty svg { color: #8e8279; }
+.forge-stones span { line-height: 1.35; }
+
+.forge-asc-word { color: #ff7a3c; }
+.forge-card.is-ascend:not(:disabled):hover { border-color: rgba(255,150,90,0.75); box-shadow: 0 0 20px rgba(255,122,60,0.3); }
+/* Wraps, because LEGENDARY and ASCENDANT together are wider than a card is at 375px and the word was
+   being cut off mid-letter. Two centred lines on a narrow card is the correct answer here. */
+.forge-asc-arrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px 5px; font-size: 10px; font-weight: 900; letter-spacing: 0.01em; text-transform: uppercase; line-height: 1.25; max-width: 100%; }
+.forge-asc-arrow span { color: #9aa0a6; }
+.forge-asc-gains { font-size: 10.5px; font-weight: 800; color: #ffb27a; }
+
+.forge-asc-card {
+    width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto;
+    padding: 18px 18px 16px; border-radius: 18px; text-align: left; position: relative;
+    background: radial-gradient(130% 110% at 50% 0%, rgba(70,38,18,0.96), rgba(22,16,12,0.98));
+    border: 1px solid rgba(255,150,90,0.5); box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 34px rgba(255,122,60,0.2);
+}
+.forge-asc-head { display: flex; align-items: center; gap: 13px; margin: 8px 0 14px; }
+.forge-asc-head .forge-asc-arrow { justify-content: flex-start; margin-top: 3px; }
+.forge-asc-art { width: 62px; height: 62px; flex: none; object-fit: contain; }
+.forge-asc-art.is-big { width: 124px; height: 124px; margin: 6px auto 10px; display: block; animation: ascRise 0.7s cubic-bezier(.2,.9,.25,1) both; }
+.forge-asc-name { font-size: 15px; font-weight: 900; color: #fff; line-height: 1.25; }
+
+.forge-asc-table { display: flex; flex-direction: column; gap: 1px; border-radius: 12px; overflow: hidden; background: rgba(0,0,0,0.3); }
+.forge-asc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; background: rgba(255,255,255,0.045); }
+.forge-asc-stat { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: #e7dcd2; min-width: 0; }
+.forge-asc-nums { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 800; color: #b5a99e; flex: none; font-variant-numeric: tabular-nums; }
+.forge-asc-nums b { color: #ffd9b8; font-size: 14.5px; }
+.forge-asc-new { color: #8fe38f !important; font-size: 12px !important; letter-spacing: 0.03em; }
+
+.forge-asc-actions { display: flex; gap: 9px; margin-top: 14px; }
+/* The cancel was rendering in the same gold as the confirm, so the two buttons under an IRREVERSIBLE action
+   read as equally weighted — and the one on the left was the one that does nothing. Ghosted, so the eye lands
+   on the real action and the safe out is still plainly there. */
+.forge-asc-actions .btn { flex: 1; }
+.forge-asc-actions .btn.forge-asc-cancel {
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18); color: #d9cec4;
+    box-shadow: none; text-shadow: none; background-image: none;
+}
+.forge-asc-actions .btn.forge-asc-cancel:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+/* The reveal. One burst, one rise, then it holds still so the numbers can be read. */
+.forge-asc-card.is-reveal { text-align: center; overflow: hidden; }
+.forge-asc-burst {
+    position: absolute; inset: -40% -10% auto; height: 300px; pointer-events: none;
+    background: conic-gradient(from 0deg, rgba(255,122,60,0), rgba(255,200,120,0.5), rgba(140,220,255,0.45), rgba(255,122,60,0));
+    filter: blur(26px); animation: ascBurst 1.1s ease-out both;
+}
+.forge-asc-kicker {
+    position: relative; margin: 2px 0 2px; font-size: 12px; font-weight: 900; letter-spacing: 0.22em; color: #ff9a5c;
+    text-shadow: 0 0 16px rgba(255,122,60,0.8); animation: ascPop 0.5s ease both;
+}
+.forge-asc-revealname { position: relative; font-size: 18px; font-weight: 900; color: #fff; line-height: 1.25; text-shadow: 0 0 20px rgba(255,150,90,0.55); }
+@keyframes ascBurst { from { opacity: 0; transform: scale(0.6) rotate(0deg); } 40% { opacity: 1; } to { opacity: 0.35; transform: scale(1.25) rotate(120deg); } }
+@keyframes ascPop { from { opacity: 0; transform: translateY(8px) scale(0.9); } to { opacity: 1; transform: none; } }
+@keyframes ascRise { from { opacity: 0; transform: translateY(26px) scale(0.8); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 420px) {
+    .forge-asc-card { padding: 15px 14px 13px; }
+    .forge-asc-art { width: 54px; height: 54px; }
+    .forge-asc-art.is-big { width: 104px; height: 104px; }
+    .forge-asc-row { padding: 7px 10px; }
+    .forge-asc-stat { font-size: 11.5px; }
+}
+
 .forge-card-attune { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #e0c8ff; font-weight: 900; line-height: 1.2; background: rgba(150,90,255,0.16); border: 1px solid rgba(184,120,255,0.5); border-radius: 10px; padding: 3px 9px; margin-top: 3px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
 .forge-setchip { display: block; margin: 2px 0 0; font-size: 10px; font-weight: 800; line-height: 1.3; color: #ffd75e; }
 /* A collection piece pays for being OWNED, so melting one costs a bonus you already hold — called out

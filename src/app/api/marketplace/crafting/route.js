@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getForgeState, salvageItem, combineParts, salvageAllOfRarity, combineAllAtTier, enhanceItem, rerollStat, buyForgeUpgrade, claimForgeDaily } from "@/lib/marketplace/crafting.js";
+import { getForgeState, salvageItem, combineParts, salvageAllOfRarity, combineAllAtTier, enhanceItem, rerollStat, buyForgeUpgrade, claimForgeDaily, ascendItem } from "@/lib/marketplace/crafting.js";
 import { reforgeItemElement, enchantItemElement } from "@/lib/marketplace/item-element.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -40,6 +40,9 @@ export async function POST(request) {
             else if (b?.action === "enhance") res = await enhanceItem(buyer.id, String(b?.itemId || ""), { quality: Number(b?.quality) || 0, grade: String(b?.grade || "good"), combo: Number(b?.combo) || 0, useScroll: Boolean(b?.useScroll) });
             else if (b?.action === "enchant_element") { res = await enchantItemElement(buyer.id, String(b?.itemId || ""), String(b?.element || "")); if (res?.ok) res = { ...res, ...(await getForgeState(buyer.id)) }; }
             else if (b?.action === "reforge_element") { res = await reforgeItemElement(buyer.id, String(b?.itemId || ""), String(b?.element || ""), b?.replace ? String(b.replace) : null); if (res?.ok) res = { ...res, ...(await getForgeState(buyer.id)) }; }
+            // Ships the refreshed state back like the element actions do — raising a piece changes its id,
+            // so a client holding the old one would be pointing at an item the member no longer owns.
+            else if (b?.action === "ascend") { res = await ascendItem(buyer.id, String(b?.itemId || "")); if (res?.ok) res = { ...res, ...(await getForgeState(buyer.id)) }; }
             else if (b?.action === "upgrade") res = await buyForgeUpgrade(buyer.id, String(b?.key || ""));
             else if (b?.action === "claim_daily") res = await claimForgeDaily(buyer.id, String(b?.key || ""));
             else return NextResponse.json({ error: "bad_action" }, { status: 400 });
