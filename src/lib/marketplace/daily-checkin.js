@@ -11,7 +11,7 @@ import { getSpinState } from "@/lib/marketplace/spin.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { rollLoginProcs, COUPON_PCT, COUPON_MAX } from "@/lib/marketplace/signatures.js";
-import { PUBLIC_COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
+import { PUBLIC_COLLECTIBLES, isGiftPet } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantMissingBadge } from "@/lib/marketplace/badges.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -159,7 +159,16 @@ async function resolveLoginProcs(buyerId) {
             const ownedRows = await db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []);
             const owned = new Set(ownedRows.map((r) => r.ref));
             // PUBLIC_ so a mystery pet can never hand out content from an unlaunched feature.
-            const pool = PUBLIC_COLLECTIBLES.filter((pt) => pt.source !== "level" && !owned.has(pt.id));
+            //
+            // ⚠️ AND NOT A GIFT. This pool filters by EXCLUSION — everything that is not a level pet — so
+            // every new source is opted IN by default and silently. A pet made for one member by name would
+            // have been handed to strangers by a mystery box on the second day it existed.
+            //
+            // ⚠️ WORTH KNOWING: the same shape means this pool can ALREADY hand out `counter` (the $50-$1000
+            // patronage ladder), `road` and `vip` pets — none of which is supposed to be winnable. That is
+            // older than this change and is Luke's call to make, so it is named here rather than quietly
+            // altered underneath a live feature.
+            const pool = PUBLIC_COLLECTIBLES.filter((pt) => pt.source !== "level" && !isGiftPet(pt) && !owned.has(pt.id));
             if (!pool.length) continue; // nothing to win → don't destroy the item
             const won = pool[Math.floor(Math.random() * pool.length)];
             await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, won.id]).catch(() => {});

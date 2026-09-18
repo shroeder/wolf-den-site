@@ -73,10 +73,24 @@ const IDENTITY = "CRITICAL: it must remain unmistakably the same individual crea
     // The sticker edge comes back at the evolved rungs specifically, because those are the ones that mention
     // an aura — and "hugging the outline" reads to the model as a line drawn along it. Named as a defect
     // here rather than left to the house string, which says "no sticker edge" and was not enough.
-    + "Do NOT draw an outline, halo, rim-light or coloured line tracing the creature's silhouette.";
+    + "Do NOT draw an outline, halo, rim-light or coloured line tracing the creature's silhouette. "
+    // ── AND THE BODY PLAN, WHICH IS THE THIRD TIME THIS CLASS OF DRIFT HAS BEEN PAID FOR ─────────────────
+    // The Lantern Jelly turned into a wolf. The Anglerfish grew feet. The Copper Kettle came back a horned
+    // cat. Each was patched for its own case — limbs an animal lacks, then pets that are objects — and the
+    // Frost Caterpillar found the gap all three left: it is a LONG MANY-LEGGED creature, and by rung 3 it was
+    // a stocky quadruped braced on four paws, with rungs 4 and 5 building on that. Nothing here was wrong
+    // about it. The words were: "bigger and more muscular, stance widened and braced" is a description of a
+    // four-legged animal, and handed a creature that is not one, the model fixes the mismatch by changing the
+    // creature. So the frame is now stated as something that cannot change, in the one string every rung
+    // shares. See [[generate-sprites-direct-to-ai]].
+    + "Its BODY PLAN is fixed and must not change: the same number of legs in the same arrangement, the same "
+    + "body length and segmentation, the same way it carries itself. A long, many-legged, legless, coiled, "
+    + "winged or floating creature stays exactly that — do NOT redraw it as a four-legged animal standing on "
+    + "four paws. 'Bigger and sturdier' means MORE OF WHAT IT ALREADY IS, never a different frame.";
 const EVO = {
     2: "It has visibly matured: slightly larger and sturdier, fur/scales/feathers fuller and better groomed, posture squared and alert, eyes sharper and more determined. No magical effects yet — this rung is about the creature itself looking healthier and stronger, and it must NOT look softer or younger than the base form.",
-    3: "It is battle-hardened: noticeably bigger and more muscular, a few honest marks of experience (a nicked ear, a scar, weathered plating), stance widened and braced. A faint warm glow at the eyes only.",
+    // "Stance widened and braced" was quadruped language, and it was the rung the caterpillar grew paws at.
+    3: "It is battle-hardened: noticeably bigger and more powerfully built, a few honest marks of experience (a nicked ear, a scar, weathered plating), and braced in whatever way ITS OWN BODY braces — a four-legged creature widens its stance, a long-bodied one coils and sets, a floating one holds itself steady. A faint warm glow at the eyes only.",
     // ── RUNG 4 USED TO HAND THE MODEL A MENU AND IT ORDERED THE LOT ─────────────────────────────────────
     // This said "ONE dramatic new physical feature that suits this species (heavier horns, a longer mane,
     // spreading wings, armoured plates)". Given a sea turtle, the model took horns AND a mane AND wings and
@@ -91,8 +105,27 @@ const EVO = {
     5: "It has reached its ULTIMATE LEGENDARY form: the largest and most majestic version of itself, its signature feature fully realised, bearing regal and awe-inspiring. Any glow or energy must CLING TIGHTLY to the creature's own silhouette — absolutely no background, no scenery, no filled backdrop, no glowing plate behind it. The background stays fully transparent.",
 };
 
+// ── SOME PETS ARE NOT MEANT TO GET SCARIER ───────────────────────────────────────────────────────────────────
+// The ladder above is written for a wolf: battle-hardened, scarred, widened stance, imposing, awe-inspiring.
+// It is the right ladder for most of this catalogue and it is the wrong one for a Snom.
+//
+// Luke, looking at the Frost Caterpillar's rungs: "needs to be cute the whole way through." He is right, and
+// nothing in the shared ladder could deliver that — "a few honest marks of experience (a nicked ear, a scar)"
+// has exactly one outcome. So a pet may declare `cute: true` in collectibles.js and get this ladder instead:
+// it still escalates, it still reads as five distinct rungs, and every rung is round, soft and friendly.
+// Power here is expressed as MAGIC and FINERY rather than as muscle and scars.
+const CUTE_EVO = {
+    2: "It has grown a little: slightly bigger and rounder, its coat or surface fuller and softer, sitting up a touch more brightly, eyes wide and cheerful. Still unmistakably a baby-faced creature. No scars, no muscle, nothing fierce — it just looks healthier, fluffier and very pleased with itself.",
+    3: "It is a little bigger again and clearly thriving: plumper, softer, its markings prettier and more defined, with a gentle sparkle beginning to show. Add something ENDEARING rather than something fearsome — a slight tilt of the head, brighter happy eyes. Absolutely NO scars, no chips, no wear, no fangs, no snarl, no aggression of any kind.",
+    4: "It has grown into a magnificent, magical version of itself: bigger and more splendid, the ONE feature it already has grown lovely and elaborate — longer, softer, more ornate, prettier. Delicate glowing details and a soft magical shimmer. It is impressive the way a beautiful thing is impressive, never the way a predator is. Keep the face round, sweet and smiling. Do NOT graft on body parts the reference does not show, and do NOT make it look dangerous, angry, armoured or battle-worn.",
+    5: "It has reached its ULTIMATE form and it is enchanting: the largest, softest, most beautiful version of itself, its signature feature fully realised in glowing, ornate, storybook splendour, haloed in gentle light. Regal and adorable at once — a creature you would want to hug, not one you would back away from. The face stays round, kind and smiling. Any glow CLINGS TIGHTLY to its own silhouette — no background, no scenery, no filled backdrop. The background stays fully transparent.",
+};
+
 async function genBase(pet) {
-    const prompt = `${pet.spritePrompt} — a loyal battle companion. ${POSE} ${HOUSE}`;
+    const flavour = pet.cute
+        ? "— a sweet little companion. Adorable, soft, round and friendly, with a gentle happy expression."
+        : "— a loyal battle companion.";
+    const prompt = `${pet.spritePrompt} ${flavour} ${POSE} ${HOUSE}`;
     const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -103,8 +136,8 @@ async function genBase(pet) {
     return Buffer.from((await r.json()).data[0].b64_json, "base64");
 }
 
-async function genLevel(baseBuf, level) {
-    const prompt = `Evolve THIS EXACT creature to power level ${level} of 5. ${EVO[level]} ${IDENTITY} `
+async function genLevel(baseBuf, level, cute = false) {
+    const prompt = `Evolve THIS EXACT creature to power level ${level} of 5. ${(cute ? CUTE_EVO : EVO)[level]} ${IDENTITY} `
         + `Keep the same art style, the same transparent background, and the same right-facing three-quarter full-body pose as the reference image.`;
     const form = new FormData();
     form.append("model", "gpt-image-1");
@@ -144,9 +177,12 @@ for (const id of ids) {
     const entry = at === -1 ? "" : src.slice(at, next === -1 ? src.length : next);
     const m = entry.match(/spritePrompt: "([^"]+)"/);
     if (!m) { console.log(`SKIP ${id} — no spritePrompt found`); continue; }
-    const pet = { id, spritePrompt: m[1] };
+    // `cute: true` on the entry picks the gentle ladder — see CUTE_EVO. Scraped the same way the prompt
+    // is, because this script runs outside Next and reads collectibles.js as text.
+    const pet = { id, spritePrompt: m[1], cute: /\bcute:\s*true\b/.test(entry) };
     console.log(`\n${id}: ${pet.spritePrompt.slice(0, 70)}…`);
 
+    if (pet.cute) console.log("  [CUTE ladder — soft rungs, no scars]");
     const levels = {};
     if (FROM) {
         for (const lv of [1, 2, 3, 4, 5]) {
@@ -162,7 +198,7 @@ for (const id of ids) {
         levels[1] = base;
         for (const lv of [2, 3, 4, 5]) {
             try {
-                const buf = await genLevel(base, lv);
+                const buf = await genLevel(base, lv, pet.cute);
                 levels[lv] = buf;
                 fs.writeFileSync(path.join(OUT, `${id}-lv${lv}.png`), buf);
                 console.log(`  Lv${lv} ${(buf.length / 1024).toFixed(0)}KB`);

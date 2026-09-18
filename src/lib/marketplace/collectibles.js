@@ -13,7 +13,7 @@ import {
     // Expanded roster
     GiPenguin, GiHedgehog, GiTurtle, GiTurtleShell, GiParrotHead, GiMonkey, GiPanda, GiDolphin, GiCrab, GiSheep, GiKangaroo,
     GiFalconMoon,
-    GiFlamingo, GiBee, GiSloth, GiRaccoonHead, GiBeaver, GiToucan, GiLadybug, GiButterfly, GiJellyfish,
+    GiFlamingo, GiBee, GiSloth, GiRaccoonHead, GiBeaver, GiToucan, GiLadybug, GiButterfly, GiCaterpillar, GiJellyfish,
     GiOctopus, GiSquid, GiAxolotl, GiTropicalFish, GiSeaSerpent, GiKrakenTentacle, GiWyvern, GiMinotaur,
     GiCentaur, GiMammoth, GiPolarBear, GiVulture, GiFairy, GiImp, GiElephant,
     GiAnglerFish, GiSeaDragon, GiFishMonster,
@@ -67,6 +67,8 @@ export const PET_PASSIVE_STAT = {
     eagle: "vitality", lion_cub: "ferocity", gorilla: "crit_power", croc: "tenacity", hydra: "crit_power",
     griffin: "crit_chance", unicorn: "xp_gain", dragon_whelp: "vitality", pegasus: "pierce", baby_rex: "vitality",
     sky_whale: "xp_gain", chameleon: "pierce", elder_dragon: "crit_power",
+    // Gifts — see the GIFTS block at the foot of the catalogue.
+    frost_caterpillar: "growSpeed",
     // Shop
     penguin: "angling", hedgehog: "gold_find", sheep: "xp_gain", crab: "tenacity", turtle: "growSpeed",
     parrot: "pierce", dolphin: "growSpeed", monkey: "gold_find", panda: "growSpeed", kangaroo: "crit_power",
@@ -472,6 +474,34 @@ export const COLLECTIBLES = [
     { id: "ivory_adder", name: "The Ivory Adder", Icon: GiSnake, color: "#f2e8d5", rarity: "mythic", source: "cards", cardLevel: 15,
       ownerOnly: CARDS_HIDDEN, activeStat: "crit_power", hint: "The house keeps one. Nobody has ever seen it moved.",
       spritePrompt: "a pale ivory-white adder coiled on itself with its head raised, faint gold banding along its back, pale eyes, utterly still" },
+
+    // ── GIFTS · MADE FOR SOMEBODY ─────────────────────────────────────────────────────────────────────
+    // Pets that exist because a member asked for one and Luke said yes. Handed over by name; there is no
+    // way to earn one.
+    //
+    // ⚠️ `source: "gift"` MATCHES NO DROP POOL, AND THAT IS THE WHOLE MECHANISM. Every pool in pet-drops.js
+    // filters explicitly on its own source string, so a source nobody filters on is exclusive BY
+    // CONSTRUCTION — the same trick the counter pets and the Long Road pets already use. The alternative
+    // was `ownerOnly: true`, and that flag is honoured by exactly two helpers out of the twenty-three
+    // places that filter this catalogue directly: it would have leaked into chests, bosses, fishing and the
+    // store while ALSO hiding the pet from the member who owns it. See [[owneronly-content-landmine]].
+    //
+    // The wish power cannot reach these either — it can only steer a pool it already draws from.
+    // ⚠️ `cute: true` AND A ONE-LINE PROMPT, BOTH FOR THE SAME REASON: the art scripts read this file as TEXT.
+    //
+    // regen-pet-levels.mjs and gen-pet-level6.mjs scrape `spritePrompt: "([^"]+)"` with a regex, so a prompt
+    // built by CONCATENATION is silently truncated at the first closing quote — this one lost its icicle
+    // spines, its legs, its eyes and its mist, and the ladder was drawn from half a sentence. Several older
+    // pets are written the same way and have the same silent problem.
+    //
+    // `cute` picks the gentle evolution ladder in both scripts. Without it every rung is "battle-hardened",
+    // "scarred", "imposing" — which is right for a wolf and turns a Snom into a monster by rung three.
+    { id: "frost_caterpillar", name: "Frost Caterpillar", Icon: GiCaterpillar, color: "#9fe3ff", rarity: "epic",
+      source: "gift", activeStat: "growSpeed", cute: true,
+      hint: "Eats the frost off the leaves and leaves the leaf alone.",
+      // Asked for by Cameron (YoshiHwan) — "like an icy caterpillar". Luke: "needs to be cute the whole way
+      // through", with a picture of Snom.
+      spritePrompt: "an adorable chubby little caterpillar with a soft round snow-white body in a few plump segments, a row of pale blue translucent ice crystals growing along its back like a tiny frozen mane, two small curled antennae, a very small friendly face with simple round black dot eyes and a tiny content smile, no visible mouth teeth, stubby soft little nubs for legs, a faint sparkle of frost in the air around it, sweet and huggable" },
 ];
 
 const BY_ID = Object.fromEntries(COLLECTIBLES.map((c) => [c.id, c]));
@@ -494,6 +524,17 @@ export function collectibleById(id) {
 // OWN, and the owner testing the feature should get the pet's real effect. Visibility is the thing being
 // gated here, not function.
 export const isOwnerOnlyPet = (p) => Boolean(p?.ownerOnly);
+
+/**
+ * A pet that only exists because it was handed to somebody by name. Never rolled, never sold, never won.
+ *
+ * ⚠️ THIS IS A PREDICATE, NOT A FLAG ON A ROW, BECAUSE A FLAG IS A THING SIX POOLS HAVE TO BE TAUGHT. It reads
+ * the source, so adding another gift pet teaches every caller at once. Pools that filter by INCLUSION
+ * (`source === "chest"`) already cannot reach a gift; this is for the ones that filter by EXCLUSION, where a
+ * new source is opted IN by default and nobody notices. See [[owneronly-content-landmine]] for the same
+ * lesson learned the expensive way.
+ */
+export const isGiftPet = (p) => p?.source === "gift";
 /** Every pet a member may SEE or be randomly granted. Use this instead of COLLECTIBLES for anything player-facing. */
 export const PUBLIC_COLLECTIBLES = COLLECTIBLES.filter((p) => !isOwnerOnlyPet(p));
 
@@ -603,6 +644,8 @@ export function petUnlockText(pet) {
         case "farm": return pet.farmSource === "loot_pig" ? "Rare drop from the Wild Loot Pig" : "Earned at a farm harvest milestone";
         case "achievement": return pet.achievement || "Earn via an achievement";
         case "elite": return pet.unlockText || (pet.unlockRarity ? `Own any ${pet.unlockRarity}-tier item` : (pet.hint || "Special unlock"));
+        // A gift is not a rung, and saying nothing here leaves the card reading as a lock with no key.
+        case "gift": return "A gift from The Wolf Den";
         default: return pet.hint || "";
     }
 }

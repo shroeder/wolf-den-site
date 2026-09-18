@@ -43,6 +43,17 @@ const ARGV = process.argv.slice(2);
 const APPLY = ARGV.includes("--apply");
 const ALL = ARGV.includes("--all");
 const RESUME = ARGV.includes("--resume");
+// ── PUBLISH THE ART YOU ACTUALLY LOOKED AT ───────────────────────────────────────────────────────────────────
+// Without this, --apply GENERATES A FRESH PAIR and uploads that — so the contact sheet you approved is not the
+// art that ships, and the preview the money guard exists to force proves nothing about what members see.
+// regen-pet-levels.mjs grew this flag after exactly that cost a second run and shipped a winged lion where a
+// sea turtle had been approved; this script is its twin and never got it.
+//
+//   node scripts/gen-pet-level6.mjs frost_caterpillar --from <dir> --apply
+//
+// Reads <dir>/<id>-lv6-<form>.png, uploads those exact bytes, and calls no image API at all.
+const FROM_AT = ARGV.indexOf("--from");
+const FROM = FROM_AT > -1 ? ARGV[FROM_AT + 1] : null;
 const LIST = ARGV.includes("--list");
 const only = ARGV.filter((a) => !a.startsWith("--"));
 // --form=light | --form=dark, so a prompt fix on one stone does not cost a rerun of the other.
@@ -92,6 +103,21 @@ const KEEP_PALETTE = "ABSOLUTELY DO NOT RECOLOUR THE CREATURE. Its fur, scales, 
     + "grey. You are ADDING an effect on top of the animal, not repainting it. If the finished creature is "
     + "mostly one flat colour, or if two different species would end up looking like each other, that is WRONG.";
 
+// ── A PET THAT IS MEANT TO BE CUTE STAYS CUTE, EVEN ENSHRINED ────────────────────────────────────────────────
+// Both level-6 lines are written for a creature with a predator's parts — the Darkstone one asks for claws and
+// fangs "grown longer and sharper" and a "lower, more predatory" posture. On a Snom that produces exactly what
+// it sounds like: the first Frost Caterpillar Darkstone came back snarling with an open fanged mouth.
+//
+// Luke: "needs to be cute the whole way through." So a pet carrying `cute: true` gets this appended, and the
+// transfiguration is expressed as ENCHANTMENT rather than as menace. The stones still read as opposites — one
+// warm and gilded, one cold and starlit — which is the whole job of the pair.
+const CUTE_GUARD = "THIS PET IS A CUTE PET AND MUST STAY CUTE. Keep the face round, soft and friendly with "
+    + "simple kind eyes and a gentle closed smile. NEVER give it a snarl, an open fanged mouth, bared teeth, "
+    + "an angry brow, claws, spikes turned into weapons, a predatory crouch or a menacing expression. Express "
+    + "the transformation as BEAUTY AND ENCHANTMENT — glowing patterns, ornate crystal, drifting light, "
+    + "storybook splendour — never as ferocity. It should look magical and adorable, like something you would "
+    + "want to hug. ";
+
 const FORMS = {
     light: {
         label: "Lightstone",
@@ -138,8 +164,10 @@ const FORMS = {
 function catalogue() {
     const src = fs.readFileSync("src/lib/marketplace/collectibles.js", "utf8");
     const out = [];
-    for (const m of src.matchAll(/\{ id: "([a-z0-9_]+)",[\s\S]{0,900}?spritePrompt: "([^"]+)"/g)) {
-        out.push({ id: m[1], prompt: m[2] });
+    for (const m of src.matchAll(/\{ id: "([a-z0-9_]+)",[\s\S]{0,1400}?spritePrompt: "([^"]+)"/g)) {
+        // `cute: true` rides along so the enshrined forms can be kept sweet — see CUTE_GUARD. Matched inside
+        // the same window the prompt came from, which is why the window has to reach past spritePrompt.
+        out.push({ id: m[1], prompt: m[2], cute: /\bcute:\s*true\b/.test(m[0]) });
     }
     return out;
 }
@@ -159,8 +187,9 @@ function catalogue() {
 // So the species is stated, in its own words, and the extremity clause is explicitly excused for animals that
 // lack those parts. This costs nothing per image and it is the difference between a prompt describing a wolf
 // and a prompt describing this pet.
-async function editTo(srcBuf, form, species = "") {
+async function editTo(srcBuf, form, species = "", cute = false) {
     const prompt = `Transform THIS EXACT creature into its final level-6 form. `
+        + (cute ? CUTE_GUARD : "")
         + (species ? `The creature is: ${species}. It MUST still be that exact subject when you are done. ` : "")
         // ── ⚠️ NOT EVERY PET IS AN ANIMAL, AND THE OBJECT ONES GET EATEN ────────────────────────────────
         // GrayKitsune, 2026-09-14: "Copper Kettle's darkstone looks like some demon wolf thing, not a kettle
@@ -279,9 +308,16 @@ async function worker(n) {
         const job = jobs[i];
         const label = `${job.id} ${job.form}`;
         try {
-            const srcBuf = Buffer.from(await (await fetch(topUrl.get(job.id))).arrayBuffer());
-            const buf = await withRetry(() => editTo(srcBuf, job.form, job.prompt), label);
-            fs.writeFileSync(path.join(OUT, `${job.id}-lv6-${job.form}.png`), buf);
+            let buf;
+            if (FROM) {
+                const f = path.join(FROM, `${job.id}-lv6-${job.form}.png`);
+                if (!fs.existsSync(f)) throw new Error(`missing preview at ${f}`);
+                buf = fs.readFileSync(f);
+            } else {
+                const srcBuf = Buffer.from(await (await fetch(topUrl.get(job.id))).arrayBuffer());
+                buf = await withRetry(() => editTo(srcBuf, job.form, job.prompt, job.cute), label);
+                fs.writeFileSync(path.join(OUT, `${job.id}-lv6-${job.form}.png`), buf);
+            }
 
             if (APPLY) {
                 const sharp = (await import("sharp")).default;
