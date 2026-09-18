@@ -7,7 +7,7 @@ import "server-only";
 // The loop, end to end:
 //
 //   openChart   spend the best chart in hand, resolve WHICH island it names, draw the face   → phase "plot"
-//   commitPlot  score the pin, fix the landfall, roll the two fights                         → phase "run"
+//   commitBearings  mark the three bearings, fix the landfall, roll the two fights          → phase "course"
 //   reachMark   the client reaches a mark in the thirty seconds; a warden comes alongside    (battle_state)
 //   goAshore    the boat beaches                                                             → phase "ashore"
 //   takeNode    walk somewhere and take what is standing there                               (repeats)
@@ -29,9 +29,10 @@ import { captainsOpenTo } from "@/lib/marketplace/captains.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { boatArt, boatLevelFromUpgrades, boatName, boatTier, openEncounterBattle, payFleetReward } from "@/lib/marketplace/sailing.js";
 import { ISLANDS, islandById, islandCard, prizeFor } from "@/lib/marketplace/islands.js";
-import { chartFace, landfall, plotAccuracy, plotBand } from "@/lib/marketplace/chart-plot.js";
+import { bearingAccuracy, bearingFace, bearingScore, chartFace, landfall, plotBand } from "@/lib/marketplace/chart-plot.js";
+import { HUNT_MS, SAILINGS_PER_DAY, huntCaptain, huntFoe, huntRankFor } from "@/lib/marketplace/hunt.js";
 import { TAKEABLE, nodeAt, nodeValue, reachable } from "@/lib/marketplace/island-world.js";
-import { RUN_MS, viewOf } from "@/lib/marketplace/expedition-view.js";
+import { RUN_MS, phaseAfter, viewOf } from "@/lib/marketplace/expedition-view.js";
 import { RUN_MARKS, escortFor, wardenArt, wardenFor } from "@/lib/marketplace/island-wardens.js";
 
 // The client animates the run and asks for a mark when it reaches one; the server checks the wall clock has
@@ -55,6 +56,196 @@ async function readExpedition(buyerId) {
     ).catch(() => null);
 }
 
+const asObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : (() => { try { return JSON.parse(v || "{}") || {}; } catch { return {}; } })());
+
+// ── ⚠️ WHEN THE DAY TURNS OVER, AND WHY THIS IS NOT `::date` ─────────────────────────────────────────────────
+// `opened_at >= (NOW() AT TIME ZONE 'America/Chicago')::date` looks right and is wrong. The left side is a
+// timestamptz and the right side is a bare DATE, so Postgres promotes the date using the SESSION time zone —
+// and src/lib/db.js never sets one, so on Neon that is UTC. The cutoff lands at UTC midnight of the Chicago
+// date, which is 7pm Chicago THE EVENING BEFORE.
+//
+// What that does to a player: sail three times at 8pm on Monday and on Tuesday morning you still have none,
+// because Tuesday's allowance does not begin until 7pm Tuesday. Every evening sailing is charged to two days.
+//
+// The round trip is the fix, and it is the idiom the rest of the codebase already uses (chests.js does it
+// this way). Declared once because it is now asked in two places and a predicate copied into two SQL strings
+// is two predicates the moment one of them is edited.
+const SINCE_MIDNIGHT = "date_trunc('day', NOW() AT TIME ZONE 'America/Chicago') AT TIME ZONE 'America/Chicago'";
+
+// ── 0 · SET SAIL ─────────────────────────────────────────────────────────────────────────────────────────────
+// The journey begins here now, before a chart exists. Luke: *"you get a certain amount of sailing attempts per
+// day and there's no longer a sailing duration."*
+//
+// ⚠️ EVERYTHING IS DECIDED AT THE PUSH-OFF, AND NOTHING IS REVEALED. The quarry, her captain, his stars, the
+// seed and therefore the island are all resolved in this one write. That is not the same as telling anybody:
+// `viewOf` withholds the lot until the fight is won, the way it has always withheld the fix during the plot.
+// Resolving late would mean a destination that depends on when you got round to looking, which is the thing
+// openChart's comment has warned about since the feature was built.
+export async function sailingsLeft(buyerId) {
+    const r = await db.queryOne(
+        `SELECT COUNT(*)::int AS n FROM mkt_ship_expedition
+          WHERE buyer_id = $1 AND opened_at >= ${SINCE_MIDNIGHT}`, [buyerId]
+    ).catch(() => null);
+    return leftOf(r?.n);
+}
+
+/** The allowance arithmetic, once, so the inline read on the state and this cannot drift apart. */
+const leftOf = (usedToday) => Math.max(0, SAILINGS_PER_DAY - (Number(usedToday) || 0));
+
+export async function setSail(buyerId) {
+    if (!expeditionsOpenTo(buyerId)) return { ok: false, error: "gated" };
+    const already = await readExpedition(buyerId);
+    if (already) return { ok: true, ...(await getExpeditionState(buyerId)) };
+    if ((await sailingsLeft(buyerId)) <= 0) return { ok: false, error: "no_sailings", ...(await getExpeditionState(buyerId)) };
+
+    // The seed is the chart's face AND the island's layout AND the quarry's wobble — one number, as it has
+    // always been, so the whole journey is reproducible from the row.
+    const seed = Math.floor(Math.random() * 2147483647);
+    const sail = await db.queryOne(
+        `SELECT COALESCE(speed_level,0) AS s, COALESCE(luck_level,0) AS f, COALESCE(rarity_level,0) AS r,
+                COALESCE(find_level,0) AS l, COALESCE(raid_level,0) AS rd
+           FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]
+    ).catch(() => null);
+    const level = boatLevelFromUpgrades(sail?.s || 0, sail?.f || 0, sail?.r || 0, sail?.l || 0, sail?.rd || 0);
+    const rank = huntRankFor(level, seed);
+    const foe = huntFoe(rank);
+    const captain = huntCaptain(rank);
+    const grade = Math.max(1, Math.min(5, Number(captain.stars) || 1));
+    const isle = islandForChartSafe(seed, grade);
+
+    const ins = await db.queryOne(
+        `INSERT INTO mkt_ship_expedition (buyer_id, seed, grade, island, phase, journey, ran_at)
+         VALUES ($1, $2, $3, $4, 'hunt', $5::jsonb, NOW())
+         ON CONFLICT DO NOTHING RETURNING id`,
+        [buyerId, seed, grade, isle.id, jsonb({ rank, foe, captain, huntMs: HUNT_MS })]
+    ).catch(() => null);
+    if (!ins) return { ok: true, ...(await getExpeditionState(buyerId)) };
+    await trackActivity(buyerId, "expedition_set_sail", { rank, grade, island: isle.id }).catch(() => {});
+    return { ok: true, ...(await getExpeditionState(buyerId)) };
+}
+
+// islandForChart lives in chart-plot and can only return a real island, but a bad grade would throw here
+// rather than at the screen, and this write is the one that cannot fail.
+function islandForChartSafe(seed, grade) {
+    try {
+        const face = chartFace(seed, grade);
+        return islandById(face.island) || ISLANDS[0];
+    } catch { return ISLANDS[0]; }
+}
+
+// ── 0b · SHE IS ALONGSIDE ────────────────────────────────────────────────────────────────────────────────────
+// The client sails the hunt on its own clock and asks for the fight when the sail it has been watching grow is
+// finally on top of it. The server checks the wall clock the same way the run's marks are checked, so the
+// approach cannot be skipped by a fast tap.
+export async function engage(buyerId) {
+    if (!expeditionsOpenTo(buyerId)) return { ok: false, error: "gated" };
+    const row = await readExpedition(buyerId);
+    if (!row || row.phase !== "hunt") return { ok: false, error: "not_hunting" };
+    const j = asObj(row.journey);
+    const since = row.ran_at ? Date.now() - new Date(row.ran_at).getTime() : 0;
+    if (since + RUN_GRACE_MS < (Number(j.huntMs) || HUNT_MS)) return { ok: false, error: "not_yet" };
+
+    const busy = await db.queryOne(`SELECT battle_state FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    if (busy?.battle_state) return { ok: true, ...(await getExpeditionState(buyerId)) };
+
+    const foe = j.foe || huntFoe(Number(j.rank) || 1);
+    const sailing = await db.queryOne(`SELECT * FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    await openEncounterBattle(buyerId, foe, sailing || {}, {
+        kind: "hunt", art: foe.art, extra: { expeditionId: Number(row.id) },
+    });
+    return { ok: true, fight: true, ...(await getExpeditionState(buyerId)) };
+}
+
+// ── 0c · SHE IS TAKEN ────────────────────────────────────────────────────────────────────────────────────────
+// Called by the battle finisher in sailing.js. A WIN takes her captain and moves to the beat that says so; a
+// LOSS ends the journey and the sailing is spent — which is the whole tension of an allowance.
+export async function huntFinished(buyerId, meta, res) {
+    const row = await readExpedition(buyerId);
+    if (!row || row.phase !== "hunt") return null;
+    if (!res?.win) {
+        await db.query(`UPDATE mkt_ship_expedition SET phase = 'lost', ended_at = NOW() WHERE id = $1`, [row.id]).catch(() => {});
+        await trackActivity(buyerId, "expedition_lost", { rank: asObj(row.journey).rank || 0 }).catch(() => {});
+        return { lost: true };
+    }
+    await db.query(`UPDATE mkt_ship_expedition SET phase = 'spoils' WHERE id = $1`, [row.id]).catch(() => {});
+    await trackActivity(buyerId, "captain_taken", { rank: asObj(row.journey).rank || 0, grade: Number(row.grade) || 1 }).catch(() => {});
+    return { captain: asObj(row.journey).captain || null };
+}
+
+// ── 0d · THE GLASS GOES UP ───────────────────────────────────────────────────────────────────────────────────
+// The spoils beat has been read. Nothing is decided here; it is the door between a beat you look at and a beat
+// you play, and it exists as a server phase rather than a client flag so a reload lands you back on the right
+// screen rather than on the one before it.
+export async function readSpoils(buyerId) {
+    if (!expeditionsOpenTo(buyerId)) return { ok: false, error: "gated" };
+    const row = await readExpedition(buyerId);
+    if (!row) return { ok: true, ...(await getExpeditionState(buyerId)) };
+    if (row.phase === "spoils") {
+        await db.query(`UPDATE mkt_ship_expedition SET phase = $2 WHERE id = $1`, [row.id, phaseAfter("spoils")]).catch(() => {});
+    }
+    return { ok: true, ...(await getExpeditionState(buyerId)) };
+}
+
+// ── 0e · THREE BEARINGS ──────────────────────────────────────────────────────────────────────────────────────
+// The rebuilt minigame's one write. The browser owns the sweep — sixty frames a second of a glass moving is
+// nothing that belongs on a wire — and posts three numbers. The server regenerates the same face off the same
+// seed and marks them, so a client that posts three perfect bearings has posted three numbers it was always
+// going to be marked on.
+//
+// ⚠️ IT STILL PRODUCES AN `accuracy` AND HANDS IT TO THE SAME `landfall()`. That is what keeps the promise the
+// whole feature rests on: the tide is measured off the real walk plus a floor, so a bad reading lands you
+// further out and never nowhere. See [[charted-expedition]] and section 1 of scripts/island-sim.mjs.
+//
+// ⚠️ AND IT CANNOT REFUSE. Missing, wild or malformed bearings score zero and sail anyway. A minigame that can
+// ERROR is a minigame that can cost somebody the captain they just beat — which is the interrogation all over
+// again, and that one was deleted for it.
+export async function commitBearings(buyerId, taken) {
+    if (!expeditionsOpenTo(buyerId)) return { ok: false, error: "gated" };
+    const row = await readExpedition(buyerId);
+    if (!row) return { ok: false, error: "no_expedition" };
+    if (row.phase !== "bearings") return { ok: true, ...(await getExpeditionState(buyerId)) };
+
+    const isle = islandById(row.island) || ISLANDS[0];
+    const face = bearingFace(Number(row.seed), Number(row.grade));
+    const list = (Array.isArray(taken) ? taken : []).slice(0, face.marks.length).map((n) => Number(n));
+    const accuracy = bearingAccuracy(face, list);
+    const lf = landfall(chartFace(Number(row.seed), Number(row.grade)), accuracy, isle.span);
+
+    // The two encounters on the way in, decided here so the run has a schedule the server can check against.
+    const escort = escortFor(isle.id, Number(row.seed));
+    const warden = wardenFor(isle.id);
+    const marks = [escort, warden].filter(Boolean).map((foe, i) => ({
+        at: RUN_MARKS[i] ?? 0.5, foe: foe.id, name: foe.name, art: foe.art,
+        anchorage: Boolean(foe.anchorage), done: false,
+    }));
+
+    const j = asObj(row.journey);
+    await db.query(
+        `UPDATE mkt_ship_expedition
+            SET phase = 'course', accuracy = $2, span = $3, entry = $4, fix_index = $5, tide = $6,
+                marks = $7::jsonb, journey = $8::jsonb
+          WHERE id = $1`,
+        [row.id, accuracy, lf.span, lf.entry, lf.fixIndex, lf.tide, jsonb(marks),
+            jsonb({ ...j, bearings: list, scores: face.marks.map((m, i) => bearingScore(m, list[i])) })]
+    ).catch(() => {});
+    await trackActivity(buyerId, "chart_solved", { island: isle.id, accuracy: Math.round(accuracy * 100) }).catch(() => {});
+    return { ok: true, ...(await getExpeditionState(buyerId)) };
+}
+
+// ── 0f · THE COURSE IS SET ───────────────────────────────────────────────────────────────────────────────────
+// The second beat has been read and the boat pushes off for the island. `ran_at` is re-stamped HERE rather
+// than at the bearings, so the run's clock starts when the run starts — reading a beat for a minute must not
+// spend a minute of the sail.
+export async function setCourse(buyerId) {
+    if (!expeditionsOpenTo(buyerId)) return { ok: false, error: "gated" };
+    const row = await readExpedition(buyerId);
+    if (!row) return { ok: true, ...(await getExpeditionState(buyerId)) };
+    if (row.phase === "course") {
+        await db.query(`UPDATE mkt_ship_expedition SET phase = $2, ran_at = NOW() WHERE id = $1`, [row.id, phaseAfter("course")]).catch(() => {});
+    }
+    return { ok: true, ...(await getExpeditionState(buyerId)) };
+}
+
 // ── WHAT THE SCREEN SEES ─────────────────────────────────────────────────────────────────────────────────────
 export async function getExpeditionState(buyerId) {
     if (!buyerId) return { ok: false, error: "no_session" };
@@ -73,6 +264,12 @@ export async function getExpeditionState(buyerId) {
     // an INNER JOIN there would drop the avatar and the chart count with it.
     const held = await db.queryOne(
         `SELECT (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS n,
+                -- ⚠️ THE DAY'S SAILINGS COME ALONG ON THIS ROW, NOT ON A SECOND QUERY. They were a separate
+                -- queryOne for one integer, on a read that runs on mount and after EVERY action of the
+                -- journey — which is the exact shape CLAUDE.md calls the bill, since neon() is the HTTP
+                -- driver and every query is its own TLS handshake. A scalar subquery costs nothing here.
+                (SELECT COUNT(*)::int FROM mkt_ship_expedition
+                  WHERE buyer_id = $1 AND opened_at >= ${SINCE_MIDNIGHT}) AS today,
                 b.avatar_sprite_url AS art, b.avatar_sprite_flip AS flip,
                 COALESCE(s.speed_level, 0) AS speed_level, COALESCE(s.luck_level, 0) AS luck_level,
                 COALESCE(s.rarity_level, 0) AS rarity_level, COALESCE(s.find_level, 0) AS find_level,
@@ -84,8 +281,9 @@ export async function getExpeditionState(buyerId) {
     const boat = shipOf(held);
     const charts = Number(held?.n) || 0;
 
-    if (!row) return { ok: true, open: false, charts, hero, boat };
-    return { ok: true, open: true, charts, hero, boat, expedition: viewOf(row) };
+    const sailings = leftOf(held?.today);
+    if (!row) return { ok: true, open: false, charts, hero, boat, sailings, perDay: SAILINGS_PER_DAY };
+    return { ok: true, open: true, charts, hero, boat, sailings, perDay: SAILINGS_PER_DAY, expedition: viewOf(row) };
 }
 
 // The hull to draw, off the five upgrade tracks — the SAME sum the helm and the profile take, called rather
@@ -104,6 +302,13 @@ function shipOf(row) {
 // island there and then. Marked sailed BEFORE the expedition row is written, conditionally, so a double tap
 // cannot put one chart on two expeditions; there is no transaction on this driver to lean on (see
 // [[postgres-landmines]]), so nothing between the UPDATE and the INSERT is allowed to throw.
+// ⚠️ IT OPENS AT `bearings`, NOT AT `plot`, AND THAT IS A STUCK-STATE FIX.
+// The seamless journey takes its chart off a captain at the front of the run, so nothing NEW ever arrives
+// here. But members who beat a fleet ship under the old rules are still holding rows in mkt_ship_chart, and
+// this is the only door those rows have. It used to open them at phase 'plot' — a phase the rebuilt client
+// renders NOTHING for, because the ring-and-pin screen it belonged to is gone. That is an expedition a member
+// cannot leave, on a table with a one-open-row unique index, which means they could never sail again either.
+// Old charts land in the glass with everyone else.
 export async function openChart(buyerId) {
     if (!expeditionsOpenTo(buyerId)) return { ok: false, error: "gated" };
     const already = await readExpedition(buyerId);
@@ -125,7 +330,7 @@ export async function openChart(buyerId) {
 
     const made = await db.queryOne(
         `INSERT INTO mkt_ship_expedition (buyer_id, chart_id, seed, grade, island, phase)
-         VALUES ($1,$2,$3,$4,$5,'plot') RETURNING *`,
+         VALUES ($1,$2,$3,$4,$5,'bearings') RETURNING *`,
         [buyerId, Number(chart.id), seed, grade, face.island]
     ).catch(() => null);
     // The unique partial index is the real guard against two tabs. If it raised, somebody else already opened
@@ -136,45 +341,13 @@ export async function openChart(buyerId) {
     return { ok: true, ...(await getExpeditionState(buyerId)) };
 }
 
-// ── 2 · COMMIT THE PLOT ──────────────────────────────────────────────────────────────────────────────────────
-// The pin goes down and everything downstream is decided at once: how well it was read, where the boat
-// beaches, how long the tide gives you, and which two things are in the water on the way in.
-//
-// ⚠️ IT CANNOT REFUSE. Any pin on the paper is a legal plot, including a terrible one, and a pin off the paper
-// is clamped rather than rejected. There is no input here that produces "no, try again".
-export async function commitPlot(buyerId, at) {
-    if (!expeditionsOpenTo(buyerId)) return { ok: false, error: "gated" };
-    const row = await readExpedition(buyerId);
-    if (!row) return { ok: false, error: "no_expedition" };
-    if (row.phase !== "plot") return { ok: true, ...(await getExpeditionState(buyerId)) };
-
-    const isle = islandById(row.island) || ISLANDS[0];
-    const pin = {
-        x: Math.max(0, Math.min(1, Number(at?.x))) || 0,
-        y: Math.max(0, Math.min(1, Number(at?.y))) || 0,
-    };
-    const face = chartFace(Number(row.seed), Number(row.grade));
-    const accuracy = plotAccuracy(face, pin);
-    const lf = landfall(face, accuracy, isle.span);
-
-    // The two fights on the way in — the biome's escort, then the island's own warden at the anchorage.
-    const escort = escortFor(isle.id, Number(row.seed));
-    const warden = wardenFor(isle.id);
-    const marks = [escort, warden].filter(Boolean).map((foe, i) => ({
-        at: RUN_MARKS[i] ?? 0.5, foe: foe.id, name: foe.name, art: foe.art, anchorage: Boolean(foe.anchorage), done: false,
-    }));
-
-    await db.query(
-        `UPDATE mkt_ship_expedition
-            SET phase = 'run', plot_x = $2, plot_y = $3, accuracy = $4,
-                span = $5, entry = $6, fix_index = $7, tide = $8, marks = $9::jsonb, ran_at = NOW()
-          WHERE id = $1`,
-        [row.id, pin.x, pin.y, accuracy, lf.span, lf.entry, lf.fixIndex, lf.tide, jsonb(marks)]
-    ).catch(() => {});
-
-    await trackActivity(buyerId, "chart_plotted", { island: isle.id, accuracy: Math.round(accuracy * 100) }).catch(() => {});
-    return { ok: true, ...(await getExpeditionState(buyerId)) };
-}
+// ── 2 · THE PIN IS GONE ──────────────────────────────────────────────────────────────────────────────────────
+// `commitPlot` used to live here: it scored a pin dropped on three distance rings, fixed the landfall and
+// pushed off. The rings screen was replaced by the glass (see commitBearings above, and the note at the
+// bottom of chart-plot.js on why). Nothing writes phase 'plot' any more, nothing renders it, and the route
+// no longer carries the action — so the scorer went with it rather than staying as a function that looks
+// live and can never run. `plotAccuracy` stays in chart-plot.js: it is pure, it is tested, and it is the
+// worked example of how an accuracy is meant to be shaped.
 
 // ── 3 · SOMETHING COMES ALONGSIDE ────────────────────────────────────────────────────────────────────────────
 // The client reaches a mark and says so. The server checks the wall clock actually got there — the run cannot
@@ -199,7 +372,16 @@ export async function reachMark(buyerId, k) {
 
     const isle = islandById(row.island) || ISLANDS[0];
     const foe = mark.anchorage ? wardenFor(isle.id) : escortFor(isle.id, Number(row.seed));
-    if (!foe) return { ok: false, error: "no_foe" };
+    // ⚠️ A MARK WITH NO FOE IS SKIPPED, NOT REFUSED. This cannot fire today — WARDENS has one row per island
+    // and ESCORTS covers all five biomes — but if it ever did, refusing here pinned the expedition in `run`
+    // forever: both comeAlongside and goAshore delegate to this for any pending mark, so the row could never
+    // advance, the client would retry it every second, and the one-open-row index would bar that member from
+    // ever sailing again. A fight that cannot be staged is a fight that did not happen; the journey goes on.
+    if (!foe) {
+        const skipped = marks.map((m, n) => (n === i ? { ...m, done: true, skipped: true } : m));
+        await db.query(`UPDATE mkt_ship_expedition SET marks = $2::jsonb WHERE id = $1`, [row.id, jsonb(skipped)]).catch(() => {});
+        return { ok: true, ...(await getExpeditionState(buyerId)) };
+    }
 
     const sailing = await db.queryOne(`SELECT * FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
     await openEncounterBattle(buyerId, foe, sailing || {}, {
@@ -207,6 +389,15 @@ export async function reachMark(buyerId, k) {
         art: wardenArt(foe.id),
         extra: { expeditionId: Number(row.id), markIndex: i, island: isle.id },
     });
+    // ⚠️ THE RUN'S CLOCK STOPS FOR THE FIGHT. `ran_at` is the only thing the journey's pacing is measured
+    // off, and a battle takes minutes where the whole run is thirty seconds — so without this you come back
+    // from the first fight to find the second mark AND the landfall both already due, and they fire
+    // back-to-back with no sailing between them. The seam is the one thing this rebuild exists to remove.
+    // Stamped here, spent in wardenBeaten.
+    await db.query(
+        `UPDATE mkt_ship_expedition SET journey = journey || jsonb_build_object('pausedAt', $2::text) WHERE id = $1`,
+        [row.id, new Date().toISOString()]
+    ).catch(() => {});
     return { ok: true, fight: true, ...(await getExpeditionState(buyerId)) };
 }
 
@@ -240,21 +431,49 @@ export async function wardenBeaten(buyerId, meta, res) {
     }
 
     const coin = paid.filter((p) => p.kind === "doubloons").reduce((a, p) => a + (p.n || 0), 0);
+    // Give back exactly the time the fight took, by pushing the run's start stamp forward by the same
+    // amount. Clamped to an hour so a member who walked away mid-battle for a day does not come back to a
+    // run that still has twenty-nine seconds left on it three days running.
+    const j = asObj(row.journey);
+    const pausedMs = j.pausedAt ? Math.max(0, Math.min(3_600_000, Date.now() - new Date(j.pausedAt).getTime())) : 0;
     await db.query(
-        `UPDATE mkt_ship_expedition SET marks = $2::jsonb, purse = purse + $3 WHERE id = $1`,
-        [row.id, jsonb(marks), coin]
+        `UPDATE mkt_ship_expedition
+            SET marks = $2::jsonb, purse = purse + $3,
+                ran_at = ran_at + ($4 || ' milliseconds')::interval,
+                journey = journey - 'pausedAt'
+          WHERE id = $1`,
+        [row.id, jsonb(marks), coin, String(Math.round(pausedMs))]
     ).catch(() => {});
     return paid;
 }
 
 // ── 4 · THE BOAT BEACHES ─────────────────────────────────────────────────────────────────────────────────────
 // Only once the thirty seconds are genuinely up and both marks are behind you.
+// ── 3b · COMING ALONGSIDE ────────────────────────────────────────────────────────────────────────────────────
+// The run's clock is up and the island fills the screen. This is its own phase rather than a client-side
+// flourish because the landing is where the boat docks and the member steps off — a reload in the middle of
+// that must come back to the dock, not to the middle of the sea it already crossed.
+export async function comeAlongside(buyerId) {
+    if (!expeditionsOpenTo(buyerId)) return { ok: false, error: "gated" };
+    const row = await readExpedition(buyerId);
+    if (!row || row.phase !== "run") return { ok: true, ...(await getExpeditionState(buyerId)) };
+    const marks = asArr(row.marks);
+    const pending = marks.findIndex((m) => !m.done);
+    if (pending >= 0) return reachMark(buyerId, pending);
+    const since = row.ran_at ? Date.now() - new Date(row.ran_at).getTime() : 0;
+    if (since + RUN_GRACE_MS < RUN_MS) return { ok: false, error: "not_yet" };
+    await db.query(`UPDATE mkt_ship_expedition SET phase = 'landing' WHERE id = $1`, [row.id]).catch(() => {});
+    return { ok: true, ...(await getExpeditionState(buyerId)) };
+}
+
 export async function goAshore(buyerId) {
     if (!expeditionsOpenTo(buyerId)) return { ok: false, error: "gated" };
     const row = await readExpedition(buyerId);
     if (!row) return { ok: false, error: "no_expedition" };
     if (row.phase === "ashore") return { ok: true, ...(await getExpeditionState(buyerId)) };
-    if (row.phase !== "run") return { ok: false, error: "not_running" };
+    // `landing` is the boat coming alongside; stepping off is this call. `run` is still accepted because a
+    // client that reloaded through the landing cinematic must be able to reach the beach from either.
+    if (row.phase !== "run" && row.phase !== "landing") return { ok: false, error: "not_running" };
 
     const since = row.ran_at ? Date.now() - new Date(row.ran_at).getTime() : 0;
     if (since + RUN_GRACE_MS < RUN_MS) return { ok: false, error: "still_sailing" };
@@ -301,6 +520,22 @@ export async function takeNode(buyerId, { to, spent } = {}) {
             [row.id, at, used]).catch(() => {});
         return { ok: true, took: null, ...(await getExpeditionState(buyerId)) };
     }
+
+    // ⚠️ THE NODE IS MARKED TAKEN BEFORE A PENNY IS PAID, AND THAT ORDER IS THE ANTI-DOUBLE-CLAIM.
+    // It used to pay first and record second, with the record swallowed by a bare catch — so one transient
+    // Neon failure on that UPDATE meant the member had been paid (possibly the chart's own prize chest or an
+    // ascension stone), the node was still un-taken on the row and in the view, and walking back one node
+    // paid it again. Nothing errored and nothing logged. Claiming the node first means the worst case is a
+    // node marked taken that paid nothing — a loss the member can see and complain about, rather than a
+    // silent mint. Same rule as the chart being written before the captive: see [[captains-brig]].
+    const claimed = await db.queryOne(
+        `UPDATE mkt_ship_expedition
+            SET at_node = $2, spent = GREATEST(spent, $3), taken = taken || $4::jsonb
+          WHERE id = $1 AND NOT (taken @> $4::jsonb)
+        RETURNING id`,
+        [row.id, at, used, jsonb([at])]
+    ).catch(() => null);
+    if (!claimed) return { ok: false, error: "already_taken", ...(await getExpeditionState(buyerId)) };
 
     const value = nodeValue(node, isle.rung);
     const reward = {};
@@ -365,11 +600,12 @@ export async function takeNode(buyerId, { to, spent } = {}) {
     paid = [...paid, ...extras];
     const coin = paid.filter((p) => p.kind === "doubloons").reduce((a, p) => a + (p.n || 0), 0);
 
+    // The node itself was claimed above, before anything was paid. All that is left is the purse — and it is
+    // ONLY the purse: rewriting `taken` wholesale here would clobber a claim made by a request that landed in
+    // between, which is the race the conditional claim above exists to win.
     await db.query(
-        `UPDATE mkt_ship_expedition
-            SET at_node = $2, spent = GREATEST(spent, $3), taken = $4::jsonb, purse = purse + $5
-          WHERE id = $1`,
-        [row.id, at, used, jsonb([...taken, at]), coin]
+        `UPDATE mkt_ship_expedition SET purse = purse + $2 WHERE id = $1`,
+        [row.id, coin]
     ).catch(() => {});
 
     return { ok: true, took: { i: at, kind: node.kind, reward: paid }, ...(await getExpeditionState(buyerId)) };

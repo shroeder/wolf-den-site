@@ -1574,6 +1574,23 @@ async function finishWardenBattle(buyerId, meta, res) {
     }
 }
 
+// ── THE HUNT AT THE FRONT OF AN EXPEDITION ───────────────────────────────────────────────────────────────────
+// The ship you went looking for. A win takes her captain and the journey moves to the beat that says so; a
+// loss ends the journey and spends the sailing. Dynamic import for the same reason the warden's is — sailing.js
+// and expedition.js import each other, and the cycle has to be broken on one side.
+//
+// ⚠️ THE SPOILS ARE THE CAPTAIN, NOT A LOOT ROW. Nothing is paid here. What was won is a chart, and the chart
+// is the whole rest of the journey — see the `spoils` phase in expedition.js.
+async function finishHuntBattle(buyerId, meta, res) {
+    try {
+        const { huntFinished } = await import("@/lib/marketplace/expedition.js");
+        const out = await huntFinished(buyerId, meta, res);
+        return out?.captain ? [{ kind: "captain", captain: out.captain }] : [];
+    } catch {
+        return [];
+    }
+}
+
 /** Pay out an encounter and let the voyage go again. `reckoning` is true if the last shot was the free volley. */
 async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } = {}) {
     const enc = encounterById(meta.encId);
@@ -3017,6 +3034,7 @@ export async function shipBattleVolley(buyerId, aim) {
     const meta = open.meta;
     let reward = [];
     if (meta.kind === "warden") reward = await finishWardenBattle(buyerId, meta, res);
+    else if (meta.kind === "hunt") reward = await finishHuntBattle(buyerId, meta, res);
     else if (meta.kind === "encounter") reward = await finishEncounterBattle(buyerId, meta, res);
     else if (meta.kind === "fleet") reward = await finishFleetBattle(buyerId, meta, res);
     else reward = await finishRaidBattle(buyerId, meta, res);
@@ -3061,6 +3079,8 @@ export async function shipBattleReckoning(buyerId) {
     const meta = open.meta;
     const reward = meta.kind === "warden"
         ? await finishWardenBattle(buyerId, meta, res)
+        : meta.kind === "hunt"
+        ? await finishHuntBattle(buyerId, meta, res)
         : meta.kind === "encounter"
         ? await finishEncounterBattle(buyerId, meta, res, { reckoning: true })
         : meta.kind === "fleet"

@@ -156,11 +156,15 @@ export const plotAccuracy = (face, at) =>
 // What to call it on screen once it is plotted. Words, not a percentage — "you were 0.31 out" is a mark out of
 // ten for a thing that should feel like seamanship.
 export const PLOT_BANDS = [
-    { min: 0.92, id: "dead", name: "Dead on the mark", say: "The three rings cross under your pin." },
+    // ⚠️ THIS LINE USED TO SAY "the three rings cross under your pin". There are no rings and there is no
+    // pin — that screen was replaced by the glass — so the one sentence summing up a whole expedition was
+    // describing a puzzle the player had never seen. Caught by shooting the ending. Copy written against a
+    // mechanic that no longer exists is the quietest kind of rot: nothing errors, it just stops making sense.
+    { min: 0.92, id: "dead", name: "Dead on the mark", say: "All three bearings agreed. She is exactly where you said." },
     { min: 0.74, id: "close", name: "A good cut", say: "Close enough that the lookout will see it before dark." },
-    { min: 0.48, id: "fair", name: "A fair reckoning", say: "You will find it. You will do some coasting first." },
+    { min: 0.48, id: "fair", name: "A fair reckoning", say: "Two good marks and a rough one. You will find it, after some coasting." },
     { min: 0.22, id: "loose", name: "Loose", say: "Somewhere along that shore. You will know it when you see it." },
-    { min: 0, id: "wild", name: "A wild guess", say: "You will make landfall. It will be the wrong end of it." },
+    { min: 0, id: "wild", name: "A wild guess", say: "The glass told you nothing you kept. You will make landfall at the wrong end of it." },
 ];
 export const plotBand = (acc) => PLOT_BANDS.find((b) => acc >= b.min) || PLOT_BANDS[PLOT_BANDS.length - 1];
 
@@ -200,4 +204,132 @@ export function solveChart({ seed, grade, at }) {
     const island = ISLANDS.find((i) => i.id === face.island) || ISLANDS[0];
     const accuracy = plotAccuracy(face, at || face.fix);
     return { face, island: island.id, accuracy, band: plotBand(accuracy), ...landfall(face, accuracy, island.span) };
+}
+
+// ── TAKING THE BEARINGS YOURSELF ─────────────────────────────────────────────────────────────────────────────
+// Luke, on the ring-and-pin plot: *"right now, that makes no sense at all. So that needs a complete rework. It
+// needs to make sense, and it has to be fun for the user."*
+//
+// He was right and the reason is worth writing down, because the old puzzle was not badly BUILT. It was
+// trilateration on a unit square: three bands, find the darkest patch, drop a pin. Everything about it worked.
+// What it never did was tell you what you were doing. Nothing on that screen said "these are distances", so a
+// player who did not already know what a sounding is saw three smudges and a pin and guessed — and a puzzle
+// you can only guess at is not a puzzle, it is a dice roll wearing one.
+//
+// So the skill moved from READING an abstraction to DOING the thing the abstraction stood for. You stand at
+// the rail with a glass. The captain named three landmarks. You sweep the horizon, centre each one, and take
+// its bearing. Three bearings is a fix. That is how it is actually done, it needs no explaining, and it is a
+// hand-eye act rather than a reading comprehension test.
+//
+// ⚠️ IT STILL EMITS ONE SCALAR, AND THAT IS DELIBERATE. `landfall()` below is the promise this whole feature
+// rests on — the step budget is MEASURED off the real walk plus a floor, so a bad plot lands you further out
+// and never nowhere. Everything downstream (the tide, the sim's 250,000-plot guarantee, the bands) is written
+// against an `accuracy` in 0..1. A new minigame that produced its own currency would have thrown that away for
+// nothing. This produces the same number by a better route.
+//
+// ⚠️ AND IT IS SCORED HERE, NOT IN THE BROWSER. The browser owns the sweep, because a sweep is sixty frames a
+// second and nothing about it belongs on a wire. It sends three numbers. The server regenerates the same face
+// from the same seed and marks them. A client that posts three perfect bearings has posted three numbers the
+// server was always going to check.
+
+// How far round the horizon the glass can sweep, in face units (0..1 maps to the full sweep). A landmark's
+// `at` is where it sits in that sweep.
+export const SWEEP = 1;
+
+// ── THE GLASS'S OWN NUMBERS ──────────────────────────────────────────────────────────────────────────────────
+// ⚠️ THEY LIVE HERE, NOT IN THE COMPONENT, BECAUSE TWO THINGS READ THEM. Bearings.js draws with them and
+// scripts/island-sim.mjs has to model a hand holding the same glass — and while they were module-private in a
+// "use client" file, the sim carried a hand-copied mirror of all three with a comment apologising for it.
+// A copied constant is a second, wrong game the moment one of them moves. See [[balance-constants-never-copied]].
+//
+// ⚠️ AND FOV IS 0.42, NOT 0.26. At 0.26 the widest windows did not fit the view: a four-star window drew at
+// 96% of the glass and a five-star at 123%, both clamped to the same 92% — so the ONE element on that screen
+// whose whole job is to make the captain's stars legible drew a Reckoning and a Certainty identically. Found
+// by measuring the band at every grade rather than by looking at it. At 0.42 the whole range lands inside the
+// view (26% at one star, 76% at five) and nothing has to be clamped at all.
+export const GLASS_FOV = 0.42;
+// How far the swell pushes the wire off true, and how long a cycle takes. This is the skill: a mark you can
+// plainly see still has to be CALLED as the wire crosses it.
+export const GLASS_SWELL = 0.026;
+export const GLASS_SWELL_MS = 2600;
+// The widest a landmark may be from the edge of the sweep, so nothing sits where it cannot be centred.
+const SWEEP_INSET = 0.08;
+
+// ── HOW FORGIVING HIS DESCRIPTION IS ─────────────────────────────────────────────────────────────────────────
+// The grade buys you a WINDOW, not an answer. A five-star man says "the Widow's Light, the third stack from
+// the left, with the broken lantern" and you know it the moment it enters the glass; a one-star man says "a
+// rock, I think" and you are guessing which rock. So his stars widen the band inside which a bearing counts
+// as taken — and that is the same shape the old chart had (grade = legibility, not reward), which is the one
+// thing about it that was right.
+//
+// ⚠️ IT RUNS THE OTHER WAY ROUND, AND THE FIRST CUT HAD IT BACKWARDS. I wrote the table narrowing as the
+// stars went UP — 0.150 at one star down to 0.042 at five — which reads fine as "a better chart is more
+// precise" and is exactly wrong twice over. It made a five-star captain HARDER to take a bearing off than a
+// drunk with a rowboat, and because accuracy buys tide slack it handed the most slack to the worst
+// informant. Caught by playing it: at five stars the scoring window was barely wider than the swell, so
+// three perfectly-aimed calls all came back "BARELY".
+//
+// A man who describes a headland exactly is a man you can take a bearing off in one pass. His stars WIDEN it.
+export const BEARING_WINDOW = { 1: 0.055, 2: 0.075, 3: 0.098, 4: 0.125, 5: 0.160 };
+export const windowFor = (grade) => BEARING_WINDOW[Math.max(1, Math.min(MAX_STARS, Number(grade) || 1))] || BEARING_WINDOW[1];
+
+/**
+ * The three landmarks as they sit on the horizon for this chart, plus what he said about each.
+ *
+ * Derived from the SAME seed and grade as `chartFace`, and it reuses that face's landmark names and its
+ * hedged/exact distances — so the bearings screen and the chart that knits itself out of it are describing one
+ * place, not two. Restating them would be two sources for one fact.
+ */
+export function bearingFace(seed, grade) {
+    const face = chartFace(seed, grade);
+    const win = windowFor(grade);
+    // Spread across the sweep in thirds with a per-mark wobble, so the three are never mechanically even and
+    // never overlap: a landmark hiding inside another's window would be two right answers for one bearing.
+    const marks = face.soundings.map((s, i) => {
+        const third = (i + 0.5) / 3;
+        const wob = (hash(Math.floor(Number(seed) || 0) ^ 0x2b7f, i) - 0.5) * 0.16;
+        const at = Math.max(SWEEP_INSET, Math.min(SWEEP - SWEEP_INSET, third + wob));
+        return { k: s.k, mark: s.mark, says: s.says, exact: s.exact, at, window: win };
+    });
+    return { seed: Number(seed) || 0, grade: Number(grade) || 1, island: face.island, fix: face.fix, marks, window: win };
+}
+
+/**
+ * Mark three taken bearings. `taken` is an array of three numbers in 0..1 — where the glass was pointed when
+ * the player called it — in the same order as `bearingFace().marks`. A missing or wild entry scores zero for
+ * that mark rather than throwing: a minigame that can ERROR is a minigame that can cost somebody a chart.
+ *
+ * Each mark scores 1 at dead centre, falling to 0 at twice its window. Twice, not once, so a near miss is
+ * worth something — a cliff at the window edge would make three good-but-not-perfect bearings score the same
+ * as three wild ones, and the whole point of a skill surface is that the middle of it is reachable.
+ */
+export function bearingAccuracy(face, taken) {
+    const list = Array.isArray(taken) ? taken : [];
+    const marks = face?.marks || [];
+    if (!marks.length) return 0;
+    let total = 0;
+    for (let i = 0; i < marks.length; i += 1) {
+        const got = Number(list[i]);
+        if (!Number.isFinite(got)) continue;
+        const err = Math.abs(Math.max(0, Math.min(1, got)) - marks[i].at);
+        total += Math.max(0, 1 - err / (marks[i].window * 2));
+    }
+    return Math.max(0, Math.min(1, total / marks.length));
+}
+
+/** Per-bearing score, for the screen that has to show which of the three you fluffed. Same curve as above. */
+export function bearingScore(mark, got) {
+    const g = Number(got);
+    if (!mark || !Number.isFinite(g)) return 0;
+    const err = Math.abs(Math.max(0, Math.min(1, g)) - mark.at);
+    return Math.max(0, Math.min(1, 1 - err / (mark.window * 2)));
+}
+
+/** What to call a single bearing on screen. Words, because a percentage is not something a navigator says. */
+export function bearingBand(score) {
+    if (score >= 0.92) return { id: "true", say: "Dead on" };
+    if (score >= 0.7) return { id: "good", say: "A good mark" };
+    if (score >= 0.4) return { id: "rough", say: "Rough, but it will serve" };
+    if (score > 0) return { id: "poor", say: "Barely a bearing" };
+    return { id: "lost", say: "Lost it" };
 }

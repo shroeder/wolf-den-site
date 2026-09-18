@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
 import {
-    commitPlot, expeditionsOpenTo, getExpeditionState, goAshore, leaveIsland, openChart, reachMark, takeNode,
+    comeAlongside, commitBearings, engage, expeditionsOpenTo, getExpeditionState, goAshore,
+    leaveIsland, openChart, readSpoils, reachMark, setCourse, setSail, takeNode,
 } from "@/lib/marketplace/expedition.js";
 
 export const runtime = "nodejs";
@@ -43,10 +44,29 @@ export async function POST(request) {
             if (g.error) return g.error;
             const body = await request.json().catch(() => ({}));
             switch (String(body?.action || "")) {
-                // Spend the best chart in hand and resolve which island it names.
+                // ── THE SEAMLESS JOURNEY, IN ORDER ───────────────────────────────────────────────────
+                // Luke's shape: one unbroken track from the harbour to the beach with no waiting in it. Each
+                // action below is one beat of it, and the server holds the phase so a reload lands on the
+                // screen you were on rather than the one before it.
+                //
+                // Push off on one of the day's sailings. Everything — quarry, captain, grade, island — is
+                // resolved here and revealed one beat at a time.
+                case "set_sail": return noStore(await setSail(g.buyer.id));
+                // The sail you have been watching grow is alongside.
+                case "engage": return noStore(await engage(g.buyer.id));
+                // The beat naming what her captain gave up has been read.
+                case "read_spoils": return noStore(await readSpoils(g.buyer.id));
+                // Three bearings through the glass. Scored server-side against a face it regenerates.
+                case "bearings": return noStore(await commitBearings(g.buyer.id, body.taken));
+                // The beat naming where you are going has been read; the boat pushes off.
+                case "course": return noStore(await setCourse(g.buyer.id));
+                // The run's clock is up and the island fills the screen.
+                case "alongside": return noStore(await comeAlongside(g.buyer.id));
+
+                // Spend the best chart in hand and resolve which island it names. ⚠️ KEPT: a member who was
+                // handed a chart by the OLD fleet-ladder capture still has a row in mkt_ship_chart, and the
+                // seamless journey does not spend those. Removing this would strand every chart already won.
                 case "open": return noStore(await openChart(g.buyer.id));
-                // The pin goes down. Any point on the paper is legal — see commitPlot, it cannot refuse.
-                case "plot": return noStore(await commitPlot(g.buyer.id, { x: body.x, y: body.y }));
                 // The run reached one of its two marks and something is coming alongside.
                 case "mark": return noStore(await reachMark(g.buyer.id, body.k));
                 // Thirty seconds are up and both marks are behind us.

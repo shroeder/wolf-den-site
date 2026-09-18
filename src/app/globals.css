@@ -11574,6 +11574,39 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     width: 24%; max-width: 30px; height: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
 .sail-ambient-name { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); white-space: nowrap;
     font-size: 0.6rem; font-weight: 700; color: #eaf2ff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); opacity: 0.9; }
+/* ── SOMETHING COMING ────────────────────────────────────────────────────────────────────────────────────
+   The approach layer (SailingSea's `approach` prop). Until this existed, every encounter in the game arrived
+   as a modal over a scene that did not react — there was no approach anywhere in the codebase, so a sail was
+   something you were TOLD about rather than something you saw. Position, scale, blur and opacity are all
+   driven inline off one 0..1 number, so a caller can time it off any clock.
+   transform-origin is the BOTTOM of the sprite: a ship closing on you grows out of the waterline, and
+   scaling about the centre instead makes it rise off the sea as it approaches. */
+.sail-approach { position: absolute; z-index: 2; pointer-events: none; will-change: transform; }
+.sail-approach img { display: block; width: clamp(150px, 46vw, 340px); height: auto; transform-origin: 50% 100%;
+    filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
+/* ⚠️ AN ISLAND IS LAND, NOT A CARD. The first cut drew the island's backdrop plate at a few hundred pixels
+   with a 6px radius, which on screen is a rectangular photograph floating on the water with four hard edges —
+   the exact "pasted on" read the whole scene exists to avoid, and obvious the moment the landing was shot.
+   It is big enough to be a coast now, anchored at the waterline by the shared transform-origin, and masked so
+   it has no edges at all: it fades out at both sides and dissolves into the sea along the bottom. */
+.sail-approach.is-island { left: auto; }
+/* ⚠️ ONE MASK, NOT TWO COMPOSITED. The first attempt used a horizontal fade AND a vertical fade combined with
+   mask-composite, and the two syntaxes (-webkit-mask-composite: source-in vs mask-composite: intersect) did
+   not both land — so the sides faded and the TOP stayed a hard horizontal line across the sky. A single
+   radial anchored at the bottom centre fades every edge at once and cannot half-apply. */
+/* ⚠️ LAND IS A FULL-WIDTH BAND, NOT A SPRITE. See the note in SailingSea: an island's plate is a painted
+   scene, and any treatment that leaves it with a left and a right edge reads as a photograph taped to the
+   window. Edge to edge there are no side edges to hide, and the single remaining top edge is dissolved with
+   one linear mask — which is the mask that reliably composites, unlike the radial one this went through on
+   a transformed <img> that computed correctly and painted nothing. */
+.sail-approach.is-island { left: 0; right: 0; will-change: auto;
+    background-size: cover; background-position: center bottom; background-repeat: no-repeat;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 46%, #000 88%, transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0%, #000 46%, #000 88%, transparent 100%); }
+.sail-approach-name { position: absolute; left: 50%; top: 12%; transform: translateX(-50%); z-index: 6;
+    pointer-events: none; white-space: nowrap; font-weight: 800; font-size: clamp(0.82rem, 3.4vw, 1.05rem);
+    letter-spacing: 0.06em; text-transform: uppercase; color: #ffe9b8;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.95), 0 0 18px rgba(255,190,90,0.5); transition: opacity 260ms linear; }
 @keyframes sailAmbient { 0% { left: -22%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: 118%; opacity: 0; } }
 @keyframes sailAmbientRev { 0% { left: 118%; opacity: 0; } 12% { opacity: 0.92; } 88% { opacity: 0.92; } 100% { left: -22%; opacity: 0; } }
 /* The WHOLE passing boat is the wave target when waveable — opt it back into pointer events (the ambient layer

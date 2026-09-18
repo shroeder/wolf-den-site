@@ -9,6 +9,7 @@ import CoinCta from "@/components/CoinCta";
 import CollectionPanel from "@/components/CollectionPanel";
 import MerchantScene from "@/components/MerchantScene";
 import FishingScene from "@/components/FishingScene";
+import SailingSea, { GUST_MS } from "@/components/SailingSea";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
 import ArenaClient from "@/components/ArenaClient";
 import ShipBattleScene from "@/components/ShipBattleScene";
@@ -21,18 +22,19 @@ import useScrollLock from "@/lib/useScrollLock";
 import ConsumableShelf from "@/components/ConsumableShelf";
 import Coin from "@/components/Coin";
 
-// How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
-// passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
-const GUST_MS = 3000;
-
-// ── DECK: the ONE source of truth for where a figure's FEET rest on each boat FORM (tier), as a `bottom`
-// % of the hull art. Because the big hero boat and the little background boats use the SAME art per form,
-// this single map drives the main crew (hero + pet), the ambient rider, AND the ambient pet — so they can
-// never drift apart again (the old three-separate-maps setup is what kept letting the background sailors
-// float while the main crew looked fine). Open boats (tier 1–2) have a low floor so figures sit LOW; taller
-// ships seat higher. These numbers were dialed in with the (now-removed) crew calibrator; retune by hand here
-// if a new boat form is added.
-const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30, 10: 34, 11: 26 };
+// How long the tailwind gust lasts, in ms. ONE source of truth — imported from SailingSea, which owns the
+// gust animation now. The boat's `sailGust` CSS animation, the passing-traffic speed-up (boostRef, below)
+// and the FX overlay are all timed to this so the whole moment ends together. There used to be a second
+// `const GUST_MS = 3000` right here; a number copied is a number that gets edited in one place only.
+//
+// ── THE DECK MAP LIVED HERE TOO, AS A SECOND COPY ────────────────────────────────────────────────────────
+// This file carried its own `const DECK = {1:26, 2:24, 3:27, 4:17, 5:31, 6:33, 7:30, 8:31, 9:30, 10:34,
+// 11:26}` plus a `deckPct(tier)` reader, while ALSO importing `boatDeck` from marketplace/deck-lines.js —
+// the very same eleven numbers with the very same `?? 30` fallback — and then READ FROM BOTH: `deckPct` for
+// the sea scene's crew and its ambient hulls, `boatDeck` for the FishingScene's deck line, in one component.
+// The numbers had not drifted APART yet; what had drifted is that nobody could any longer say which of the
+// two a redrawn hull needed re-measuring in, and the answer was both. The local copy is gone and `boatDeck`
+// is the only reader left. See [[reuse-the-rule-never-restate-it]].
 // Scan HEAT word by level (3 hot … 0 cold) — how close the nearest treasure is.
 const HEAT_WORD = { 3: "HOT", 2: "WARM", 1: "COOL", 0: "COLD" };
 // The actions that open a fight. A refusal from any of these has to be SAID — a battle button that silently
@@ -51,7 +53,6 @@ function chestSlice(cp, art) {
         backgroundPosition: `${cp.W > 1 ? (cp.rc / (cp.W - 1)) * 100 : 50}% ${cp.H > 1 ? (cp.rr / (cp.H - 1)) * 100 : 50}%`,
     };
 }
-const deckPct = (tier) => DECK[tier] ?? 30; // shared fallback for an unseen form
 
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
 // with an Augur "hot/cold" reading, a stamina budget, and a buried treasure chest to uncover. Win or
@@ -157,41 +158,10 @@ function bestHeldChestArt(state) {
     return held[held.length - 1]?.art || "/images/sailing/dig-chest.png";
 }
 
-// Tailwind gust FX: a screen flash, a burst of horizontal SPEED LINES ripping past (the main "we just surged"
-// cue), and a few leaves/debris for texture — all streaming left-to-right across the scene.
-function WindGust() {
-    return (
-        <div className="sail-gustfx" aria-hidden="true">
-            <span className="sail-flash" />
-            {Array.from({ length: 18 }, (_, i) => (
-                <span
-                    key={`s${i}`}
-                    className="sail-speedline"
-                    style={{
-                        "--i": i,
-                        top: `${3 + (i * 61) % 94}%`,
-                        width: `${34 + ((i * 13) % 5) * 10}%`,
-                        animationDelay: `${(i % 9) * 28}ms`,
-                    }}
-                />
-            ))}
-            {Array.from({ length: 9 }, (_, i) => (
-                <span
-                    key={`l${i}`}
-                    className="sail-leaf"
-                    style={{
-                        "--i": i,
-                        top: `${8 + (i * 53) % 82}%`,
-                        animationDelay: `${(i % 5) * 55}ms`,
-                        fontSize: `${0.7 + ((i * 7) % 4) * 0.2}rem`,
-                    }}
-                >
-                    {["🍃", "🍂", "·"][i % 3]}
-                </span>
-            ))}
-        </div>
-    );
-}
+// The tailwind gust FX overlay (flash + speed lines + leaves) used to be a second `WindGust` here. It moved
+// into SailingSea with the rest of the gust — the animation, the restart-safe replay and the animationend
+// cleanup all live in one place now, driven from here by nothing but an incrementing `gustKey`.
+// `Confetti` above stays: the dig recap, the level-up and the form-unlock cards all still draw it.
 
 // A crisp ship's-wheel (helm) for the primary Set-sail CTA — reads far better than the flat ⛵ emoji.
 function HelmIcon() {
@@ -257,8 +227,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
     const [windSaved, setWindSaved] = useState(false); // the tailwind-save perk just triggered
     const [windMsg, setWindMsg] = useState(null);      // "arrived Xm sooner" / why a tailwind couldn't fire
-    const [gusting, setGusting] = useState(false);     // the tailwind gust is currently playing
-    const [gustNonce, setGustNonce] = useState(0);     // bumps each catch so the FX overlay remounts + replays
+    // Bumped every time a tailwind actually catches. That is the WHOLE of this screen's gust state now —
+    // whether one is playing, the drop-a-paint-then-re-add restart and the animationend cleanup are
+    // SailingSea's business, because they belong to the animation and the animation lives there.
+    const [gustKey, setGustKey] = useState(0);
     const [bountyTick, setBountyTick] = useState(0);   // bumps after a voyage action → FeatureDailies re-fetches so a completed bounty flips to Claim live
     const [waveFx, setWaveFx] = useState(null);        // { xp, coins, minutes, k } — the "you waved!" reward toast
     const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
@@ -352,8 +324,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const chunkId = useRef(0);
     const ambientId = useRef(0);
     const fleetIdx = useRef(0);        // round-robin cursor so consecutive ships are DIFFERENT members
-    const boostRef = useRef(0);        // Date.now() until which traffic is sped up (after a tailwind)
-    const gustTimer = useRef(null);    // safety timer that clears `gusting` if the animationend event is missed
+    const boostRef = useRef(0);        // Date.now() until which traffic is sped up (after a tailwind) — read by the ambient spawner below
     const windMsgTimer = useRef(null); // clears the tailwind feedback toast
     const halfwayRef = useRef(null);   // departedAt we've already done the one-shot midpoint refetch for
     const lastProcRef = useRef(null);  // last dig-tool that procced, to flash each new proc once
@@ -480,23 +451,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         else progress = Math.max(0, Math.min(0.999, 1 - (arrivesAt - now) / state.voyageTotalMs));
     }
 
-    // Weather MOOD from the rolled horizon art (sky-<type>.png) — drives cloud density, water chop, and rain.
-    const skyType = ((sky || state.oceanBg || "").match(/sky-([a-z]+)\.png/) || [])[1] || "";
-    const mood = skyType === "storm" ? "storm"
-        : (skyType === "night" || skyType === "aurora") ? "night"
-        : (skyType === "overcast" || skyType === "fog") ? "overcast"
-        : "calm";
+    // The weather MOOD used to be derived here (sky-<type>.png → storm / night / overcast / calm) to drive the
+    // cloud density, the chop and the rain. It is derived inside SailingSea from the same `sky` string now —
+    // `moodOf()` there is the same three tests in the same order — so the scene cannot be handed a sky and a
+    // mood that disagree.
 
-    // Kick off the tailwind gust. Restart-safe: if a gust is already playing (you caught another one), drop the
-    // class for one paint then re-add it so the CSS animation replays from 0 instead of no-op'ing on the class it
-    // already has. Cleanup is driven by the boat's `onAnimationEnd`; the timer here is only a missed-event backstop.
-    const triggerGust = useCallback(() => {
-        if (gustTimer.current) clearTimeout(gustTimer.current);
-        setGustNonce((n) => n + 1);
-        setGusting(false);
-        requestAnimationFrame(() => requestAnimationFrame(() => setGusting(true)));
-        gustTimer.current = setTimeout(() => setGusting(false), GUST_MS + 150);
-    }, []);
+    // Kick off the tailwind gust: bump the key and SailingSea replays it, including the restart-safe case where
+    // you catch a second wind while the first is still running.
+    const triggerGust = useCallback(() => { setGustKey((n) => n + 1); }, []);
 
     const act = useCallback(async (action, extra = {}) => {
         setBusy(true);
@@ -846,105 +808,39 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 ) : (
                     /* ---------- The sea (idle / sailing / arrived) ---------- */
                     <>
-                        <div className={`sail-sea sail-mood-${mood}${gusting ? " is-gust" : ""}`}>
-                            {/* Random horizon backdrop; scrolls right→left while you're underway. FOUR copies with
-                                every other one mirrored (CSS) so the strip tiles SEAMLESSLY — the art isn't
-                                edge-matched, but a mirrored copy's edge always equals its neighbor's, killing the seam. */}
-                            {skyType === "night" ? (
-                                // A pure-CSS moonless night sky (dark gradient + a starfield). Tiles seamlessly with
-                                // no moon to mirror — the painted sky-night art put a moon on every mirrored copy.
-                                <div className="sail-nightsky" aria-hidden="true" />
-                            ) : (
-                                <div className={`sail-sky-scroll${liveStatus === "sailing" ? " is-scrolling" : ""}`} aria-hidden="true">
-                                    {[0, 1, 2, 3].map((n) => (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img key={n} src={sky || state.oceanBg} alt="" />
-                                    ))}
-                                </div>
-                            )}
-                            {/* Clouds drifting across the sky, independent of the horizon scroll (screen-blended so
-                                they pick up the art's warmth — sunset vs night). */}
-                            <div className={`sail-clouds${liveStatus === "sailing" ? " is-fast" : ""}`} aria-hidden="true"><i /><i /><i /></div>
-                            {/* A soft light column reflecting on the water under the horizon (blends with the sky's colour). */}
-                            <div className="sail-reflection" aria-hidden="true" />
-                            {/* Sun/moon glints shimmering on the swell — subtle at anchor, quicker underway. */}
-                            <div className={`sail-glints${liveStatus === "sailing" ? " is-fast" : ""}`} aria-hidden="true">
-                                <i /><i /><i /><i /><i /><i />
-                            </div>
-                            {/* Foreground water streaks racing past — faster than the horizon, for parallax depth (underway only). */}
-                            <div className={`sail-nearwater${liveStatus === "sailing" ? " is-scrolling" : ""}`} aria-hidden="true"><i /><i /><i /></div>
-                            {/* A depth gradient so the near water reads darker/deeper than the horizon. */}
-                            <div className="sail-depth" aria-hidden="true" />
-                            {/* Wildlife — the odd gull gliding across the sky, and an occasional breaching fish. */}
-                            <div className="sail-wildlife" aria-hidden="true">
-                                <svg className="sail-gull g1" viewBox="0 0 40 14"><path d="M2 12 Q11 2 20 11 Q29 2 38 12" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                <svg className="sail-gull g2" viewBox="0 0 40 14"><path d="M2 12 Q11 2 20 11 Q29 2 38 12" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                <span className="sail-fish"><svg viewBox="0 0 28 16"><path d="M2 8 C7 1 18 1 22 8 C18 15 7 15 2 8 Z M22 8 L27 4 L27 12 Z" fill="currentColor" /></svg><span className="sail-fish-splash" /></span>
-                            </div>
-                            {/* Rain — only when the rolled horizon is a storm. */}
-                            {mood === "storm" ? <div className="sail-rain" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div> : null}
-                            {/* Other sailors drifting across the horizon behind your boat (each waveable while sailing). */}
-                            <div className="sail-ambient">
-                                {ambient.map((b) => {
-                                    // Wave to a real passing sailor — the WHOLE boat is the tap target (with a big
-                                    // invisible hit area via .is-waveable::after), not just the tiny 👋 badge, so a
-                                    // small drifting boat is easy to tap.
-                                    const waveable = liveStatus === "sailing" && Boolean(b.name) && (state.waves?.left || 0) > 0;
-                                    return (
-                                    <span key={b.id}
-                                        className={`sail-ambient-boat${b.dir === "left" ? " is-rev" : ""}${b.faceLeft ? " is-faceleft" : ""}${waveable ? " is-waveable" : ""}`}
-                                        style={{ top: `${b.top}%`, animationDuration: `${b.dur}s` }}
-                                        {...(waveable ? { role: "button", tabIndex: 0, "aria-label": `Wave to ${b.name}`, onClick: (e) => { e.stopPropagation(); if (!busy) act("wave"); }, onKeyDown: (e) => { if ((e.key === "Enter" || e.key === " ") && !busy) { e.preventDefault(); act("wave"); } } } : {})}
-                                    >
-                                        <span className="sail-ambient-hull" style={{ "--rider-b": `${deckPct(b.tier)}%`, "--pet-b": `${deckPct(b.tier)}%` }}>
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={b.art} alt="" />
-                                            {b.pet ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img className="sail-ambient-pet" src={b.pet} alt="" style={b.petFlip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
-                                            ) : null}
-                                            {b.rider ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img className="sail-ambient-rider" src={b.rider} alt="" style={b.riderFlip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
-                                            ) : null}
-                                        </span>
-                                        {b.name ? <span className="sail-ambient-name">{b.name}</span> : null}
-                                        {waveable ? <span className="sail-wave-btn" aria-hidden="true">👋 Wave</span> : null}
-                                    </span>
-                                    );
-                                })}
-                            </div>
-                            <div className={`sail-boat${liveStatus === "sailing" ? " is-underway" : ""}`}>
-                                <div
-                                    className={`sail-boat-inner${celebrate === "depart" ? " is-casting" : ""}${gusting ? " is-gusting" : ""}${liveStatus === "sailing" ? " is-sailing" : ""}`}
-                                    onAnimationEnd={(e) => { if (e.animationName === "sailGust") setGusting(false); }}
-                                >
-                                    {liveStatus === "sailing" ? (
-                                        <>
-                                            <span className="sail-wake" aria-hidden="true"><i /><i /><i /><i /></span>
-                                            <span className="sail-bowwave" aria-hidden="true"><i /><i /></span>
-                                            <span className="sail-wind" aria-hidden="true"><i /><i /><i /></span>
-                                            <span className="sail-mist" aria-hidden="true"><i /><i /><i /></span>
-                                        </>
-                                    ) : null}
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img className={`sail-boat-img boat-aura-${state.tier}`} src={state.boatArt} alt="Your boat" />
-                                    <span className="sail-crew" style={{ "--crew-bottom": `${deckPct(state.tier)}%` }}>
-                                        {pet?.url ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img className="sail-pet" src={pet.url} alt="" style={pet.flip ? { transform: "scaleX(-1)" } : undefined} />
-                                        ) : null}
-                                        {hero?.spriteUrl ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img className="sail-hero" src={hero.spriteUrl} alt="" style={hero.spriteFlip ? { transform: "scaleX(-1)" } : undefined} />
-                                        ) : hero?.avatarUrl ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img className="sail-hero sail-hero-avatar" src={hero.avatarUrl} alt="" />
-                                        ) : null}
-                                    </span>
-                                </div>
-                            </div>
-                            {/* "You waved!" reward pop, floating over the scene. */}
+                        {/* ── THE SEA ──────────────────────────────────────────────────────────────────
+                            160 lines of ocean used to be welded in right here, reading this screen's state
+                            directly. It is SailingSea now — the same markup against the same `.sail-*`
+                            rules — so the expedition can put a boat on real water instead of lerping a glyph
+                            across a 220px strip. Everything below is the old inline scene's reads, mapped
+                            one-for-one onto props. */}
+                        <SailingSea
+                            sky={sky || state.oceanBg}
+                            boat={{ art: state.boatArt, tier: state.tier }}
+                            /* The hero's own sprite if he has one, else his avatar photo. SailingSea keeps
+                               that fallback chain (art → avatarUrl) in exactly that order. */
+                            hero={{ art: hero?.spriteUrl, flip: hero?.spriteFlip, avatarUrl: hero?.avatarUrl }}
+                            pet={pet}
+                            sailing={liveStatus === "sailing"}
+                            casting={celebrate === "depart"}
+                            gustKey={gustKey}
+                            ambient={ambient}
+                            /* ⚠️ THE CALLER DECIDES WHETHER A WAVE IS AVAILABLE, NOT THE SCENE.
+                               SailingSea's own `waveable` test is only `onWave && sailing && b.name`: it has
+                               no idea how many waves you have left today, and it must not — it draws the
+                               expedition's water too, which has no wave budget at all. So the day's budget is
+                               tested HERE and `onWave` is simply not passed once it is spent. Hand it a
+                               callback unconditionally and every passing sailor wears a 👋 badge that
+                               refuses. `busy` stays INSIDE the handler, exactly where the inline version had
+                               it: a wave already in flight must not make the badge blink out from under the
+                               thumb that is tapping it. */
+                            onWave={liveStatus === "sailing" && (state.waves?.left || 0) > 0
+                                ? () => { if (!busy) act("wave"); }
+                                : undefined}
+                            banner={celebrate === "arrive" ? "🏝️ LAND HO!" : null}
+                            cheer={celebrate === "arrive" || celebrate === "depart"}
+                        >
+                            {/* "You waved!" reward pop, floating over the scene (.sail-wavefx, z-index 7). */}
                             {waveFx ? (
                                 <div className="sail-wavefx" key={waveFx.k}>👋 +{waveFx.xp} XP · +<Coin /> {waveFx.coins} · −{waveFx.minutes}m</div>
                             ) : null}
@@ -953,13 +849,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 {liveStatus === "sailing" && <span>🧭 Sailing to the island · {fmtLeft(arrivesAt - now)}{(state.waves?.left || 0) > 0 ? <span className="muted"> · 👋 {state.waves.left} left</span> : null}</span>}
                                 {liveStatus === "arrived" && <span>🏝️ Landed! Time to dig.</span>}
                             </div>
-
-                            {/* Primary action docked to the bottom of the animation window so it reads as part of the scene.
-                                Suppressed when the Gold Merchant is here — his own card carries the "dig" button. */}
-                            {celebrate === "arrive" ? (<><div className="sail-landho">🏝️ LAND HO!</div><Confetti /></>) : null}
-                            {celebrate === "depart" ? (<><div className="sail-bonvoyage">⚓ BON VOYAGE!</div><Confetti /></>) : null}
-                            {gusting ? <WindGust key={gustNonce} /> : null}
-                        </div>
+                            {/* The landfall shout is the `banner` prop and the cast-off shout is a CHILD,
+                                because they are not the same element: `banner` renders .sail-landho, and
+                                .sail-bonvoyage is its own rule — blue glow, its own keyframes, sitting 4%
+                                higher. Both are z-index 6 over a z-index 5 confetti, so the confetti now
+                                sitting above this in the DOM changes nothing about what draws on top. */}
+                            {celebrate === "depart" ? <div className="sail-bonvoyage">⚓ BON VOYAGE!</div> : null}
+                        </SailingSea>
                         {/* BELOW the scene, not on top of it. It used to be absolutely positioned inside the
                             animation window "so it reads as part of the scene", but at full CTA size it covered
                             the ship — the thing the window exists to show. Suppressed when the Gold Merchant is

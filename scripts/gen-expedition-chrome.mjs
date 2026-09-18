@@ -39,8 +39,12 @@ const TO = 256;
 // film of alpha-2 across the whole plate casts a shadow of the whole SQUARE. What it looks like on screen is
 // a faint rectangle floating behind the sprite — the exact white-sticker-rim look the house style bans,
 // arriving by a route nothing was checking for. Caught by shooting the card and looking at it.
-// Anything under this threshold is nothing, so make it nothing.
-const ALPHA_FLOOR = 12;
+// ⚠️ 44, NOT 12. The first floor was set from the CORNERS, which came back at alpha 1-2 — but the film is
+// not uniform: a QA pass decoding the shipped PNG found the whole top edge at alpha 22-34, a grey wash that
+// survived the floor and drew the drop-shadow of a rectangle behind the chart on the harbour screen. Sampling
+// four corners is not sampling a plate. 44 is still far below anything the drawing itself uses (the subject
+// runs 128+) and above every film these have come back with.
+const ALPHA_FLOOR = 44;
 async function floorAlpha(img) {
     const { data, info } = await img.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     for (let i = 3; i < data.length; i += info.channels) if (data[i] < ALPHA_FLOOR) data[i] = 0;

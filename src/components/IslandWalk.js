@@ -31,7 +31,8 @@
 // island to check the claim. A request per step is the most expensive shape in this codebase (CLAUDE.md).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+
+import Exp from "@/lib/marketplace/expedition-audio.js";
 
 // ⚠️ PAINTED ART, NOT GLYPHS. Everything on this screen is drawn — the props, the prize, the walker, the
 // island behind them — so a line-art icon standing in the same row reads as something nobody finished. The
@@ -62,12 +63,14 @@ const NEAR = 1.42;   // the ferns/ice/coral at your feet, overtaking you
 // Where the ground line sits, as a fraction of the screen height measured from the BOTTOM. The walker's feet
 // are on it; everything the island stands on is above it; the near layer is below and in front.
 //
-// ⚠️ 0.24, NOT 0.3, AND IT IS THE BACKDROPS THAT DECIDE THIS. gen-islands.mjs asks every plate for its shore
+// ⚠️ 0.19, AND IT IS THE BACKDROPS THAT DECIDE THIS, NOT TASTE. gen-islands.mjs asks every plate for its shore
 // "across the BOTTOM third... its top edge at exactly the same height as in any other island scene", and the
 // twenty-five obey that loosely rather than exactly — Rime Shoal's ice starts high, Ember Hold's rock starts
-// low. At 0.3 the walker stood on Ember Hold's WATER. This sits low enough to be on the shore of the whole
-// set, which is the only line that can be right for all of them without re-drawing twenty-five paintings.
-const GROUND = 0.24;
+// low. At 0.3 the walker stood on Ember Hold's WATER; at 0.24 they still did on a tall desktop, because the
+// plate is drawn at 100% of the screen height so its shore band moves with the viewport. This sits low
+// enough to be on the shore of the whole set, which is the only line that can be right for all twenty-five
+// without repainting them.
+const GROUND = 0.19;
 
 // A little weather per water, drawn with nothing but divs — art would be a per-island cost for something that
 // only has to move. `n` is how many, `life` is seconds for one to cross.
@@ -86,22 +89,10 @@ const scatter = (i, salt) => {
     return x - Math.floor(x);
 };
 
-/** Mounts its children on document.body, so a fixed, full-screen scene is not a child of the page's layout. */
-function Portal({ children }) {
-    const [el] = useState(() => (typeof document === "undefined" ? null : document.createElement("div")));
-    useEffect(() => {
-        if (!el) return undefined;
-        document.body.appendChild(el);
-        // ⚠️ RESTORE THE SCROLL LOCK ON UNMOUNT, ALWAYS. A screen that takes the lock and gives it back only
-        // on a happy path leaves the whole site unscrollable behind it — see [[visual-rigs]], where exactly
-        // this cost three rounds of "the page is broken" that was a modal holding the lock after being hidden.
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-        return () => { document.body.removeChild(el); document.body.style.overflow = prev; };
-    }, [el]);
-    if (!el) return null;
-    return createPortal(children, el);
-}
+// ⚠️ THIS DREW ITS OWN PORTAL UNTIL THE JOURNEY EXISTED. It was the only full-screen beat, so it made its own
+// fixed surface and took the scroll lock itself. Now every beat is full-screen and the STAGE in
+// ExpeditionClient owns both — two nested portals would be two scroll locks, and the inner one restoring
+// `overflow` on unmount would hand it back while the outer stage is still up.
 
 export default function IslandWalk({ view, hero, boat, busy, onTake, onLeave }) {
     const isle = view?.island || {};
@@ -151,6 +142,16 @@ export default function IslandWalk({ view, hero, boat, busy, onTake, onLeave }) 
     const left = Math.floor(leftRaw);
     const out = left <= 0;
 
+    // ── THE TIDE, OUT LOUD ───────────────────────────────────────────────────────────────────────────────
+    // ⚠️ ON THE CROSSING, NOT ON THE CONDITION. `left <= 6` is true for every frame after the sixth-from-last
+    // step, so firing on the condition would play the warning sixty times a second until the tide ran out.
+    // A ref holds the last value it fired at, so each threshold speaks exactly once per expedition.
+    const saidRef = useRef({ low: false, out: false });
+    useEffect(() => {
+        if (out && !saidRef.current.out) { saidRef.current.out = true; Exp.tideOut(); }
+        else if (!out && left <= 6 && !saidRef.current.low) { saidRef.current.low = true; Exp.tideLow(); }
+    }, [left, out]);
+
     // ── THE SERVER IS THE AUTHORITY WHENEVER IT SPEAKS ───────────────────────────────────────────────────
     // A reload, or a take that landed, can move us. But the correction is HANDED TO THE LOOP rather than
     // applied here: calling setState straight out of an effect triggers a cascading render, and the loop is
@@ -172,7 +173,10 @@ export default function IslandWalk({ view, hero, boat, busy, onTake, onLeave }) 
             const straight = Math.abs(i - (Number(view?.entry) || 0));
             const claim = Math.min(tide, Math.max(straight, Math.round(spentRef.current)));
             const res = await onTake?.({ to: i, spent: claim });
-            if (res?.took?.reward?.length) setFlash({ i, reward: res.took.reward });
+            // ⚠️ THE SOUND IS THE ONLY THING THAT SAYS *WHAT* YOU PICKED UP WITHOUT READING. Five node kinds,
+            // five voices, and the mark is audibly the best of them — which matters because the reward chip
+            // is a line of text that is gone in a second and the prize is the reason the chart was spent.
+            if (res?.took?.reward?.length) { setFlash({ i, reward: res.took.reward }); Exp.take(node.kind); }
         } finally {
             takingRef.current = false;
         }
@@ -279,13 +283,17 @@ export default function IslandWalk({ view, hero, boat, busy, onTake, onLeave }) 
     // screen showed six and felt like a place for exactly that reason.
     // So the STRIP is scaled instead. The world is untouched, the camera works in screen pixels, and a phone
     // sees a little over three nodes with a walker sized for the screen rather than for a desktop.
-    const zoom = Math.max(0.66, Math.min(1, vw / 780));
+    // ⚠️ IT SCALES UP AS WELL AS DOWN. The clamp used to top out at 1, so every screen wider than 780px drew
+    // the same 96px walker — 7.5% of a 1280 screen and 3.75% of a 2560 one, halving in apparent size exactly
+    // as the room to show it doubled. It keeps climbing now, gently, to a ceiling that stops a desktop from
+    // becoming a diorama.
+    const zoom = Math.max(0.66, Math.min(1.5, vw / 780));
     const camera = -(pos * gap * zoom) + vw * anchor;
 
     const aimAt = useCallback((clientX) => {
         const box = rootRef.current?.getBoundingClientRect();
         if (!box || !box.width) return;
-        const z = Math.max(0.66, Math.min(1, box.width / 780));
+        const z = Math.max(0.66, Math.min(1.5, box.width / 780));
         const camNow = -(posRef.current * gap * z) + box.width * anchor;
         walkTo((clientX - box.left - camNow) / (gap * z));
     }, [anchor, gap, walkTo]);
@@ -324,8 +332,7 @@ export default function IslandWalk({ view, hero, boat, busy, onTake, onLeave }) 
     const amb = AMBIENT[isle.biome] || AMBIENT.coral;
 
     return (
-        <Portal>
-            <div ref={rootRef} className="iw"
+        <div ref={rootRef} className="iw"
                 style={{ "--ground": `${GROUND * 100}%`, "--tint": isle.tint || "#7fd6c8" }}
                 onPointerDown={(e) => {
                     // A press on the HUD or a button is not a walk. Those stop propagation themselves; this
@@ -435,7 +442,9 @@ export default function IslandWalk({ view, hero, boat, busy, onTake, onLeave }) 
                 }} />
 
                 {/* The day going, over everything. */}
-                <div className="iw-dusk" style={{ opacity: dusk * 0.6 }} aria-hidden="true" />
+                {/* 0.42, not 0.6: multiplied over the near layer's own darkness it crushed the bottom
+                    quarter of the screen to black at low tide — including the line telling you how to walk. */}
+                <div className="iw-dusk" style={{ opacity: dusk * 0.42 }} aria-hidden="true" />
 
                 {/* ── THE HUD ─────────────────────────────────────────────────────────────────────────── */}
                 <div className="iw-hud" onPointerDown={(e) => e.stopPropagation()}>
@@ -484,9 +493,8 @@ export default function IslandWalk({ view, hero, boat, busy, onTake, onLeave }) 
                 {out ? <p className="iw-tideout">The tide is out. The boat cannot wait.</p> : null}
                 {!walkedOnce && !out ? <p className="iw-hint">Press and hold anywhere to walk</p> : null}
 
-                <Style />
-            </div>
-        </Portal>
+            <Style />
+        </div>
     );
 }
 
@@ -500,8 +508,7 @@ function Style() {
                100dvh, not 100vh — on a phone 100vh is the address bar's idea of the screen and the bottom
                of the scene lands under the browser chrome. See [[verify-on-real-phone-sizes]]. */
             .iw {
-                position: fixed; inset: 0; z-index: 800; overflow: hidden;
-                height: 100vh; height: 100dvh; width: 100vw;
+                position: absolute; inset: 0; z-index: 10; overflow: hidden;
                 background: #0a1118;
                 touch-action: none; user-select: none; -webkit-user-select: none;
                 cursor: crosshair;
@@ -520,6 +527,14 @@ function Style() {
                 position: absolute; inset: 0;
                 background-size: auto 100%; background-repeat: repeat-x; background-color: #16222b;
             }
+            /* ⚠️ ON A WIDE SCREEN THE MIRROR SHOWS. The island plates are 3072x1024 — one 1536 panel beside a
+               flipped copy of itself, which is what makes the repeat seamless. Drawn at 100% of the height,
+               a 2560px screen is wide enough to hold BOTH panels at once, and the join stops being a hidden
+               seam and becomes a Rorschach: two identical forts on Ember Hold, a bilateral mountain on Rime
+               Shoal. Scaling the plate up on wide screens keeps a single panel wider than the viewport, so
+               only one half is ever in frame. */
+            @media (min-width: 1100px) { .iw-far { background-size: auto 132%; } }
+            @media (min-width: 1800px) { .iw-far { background-size: auto 168%; } }
             /* The tint is built inline from the island's own hex rather than with color-mix(), which is
                Chrome 111 / Safari 16.2 and would silently drop the whole declaration on an older phone —
                leaving the one thing that makes the Cinders look different from the Long Cold missing. */
@@ -629,19 +644,36 @@ function Style() {
                 50% { transform: translate3d(50vw, -22px, 0); } to { transform: translate3d(114vw, 0, 0); } }
 
             /* ── THE HUD ──────────────────────────────────────────────────────────────────────────────── */
+            /* ⚠️ THE HUD STOPS SPREADING. The island's name is flex:1, so on a 2560 screen it grew to 2272px and
+               flung the purse, the tide and the leave button to the far corner — at low tide the red warning
+               sat seventeen hundred pixels from the walker it was about to strand. It is a strip with a
+               maximum now, centred, like every other piece of chrome in the game.
+               ⚠️ AND ITS CURSOR IS NOT THE WALK CURSOR. It inherits crosshair from the stage while its own
+               pointerdown calls stopPropagation — a 2560x66 band advertising "walk here" and swallowing the
+               press. */
             .iw-hud {
-                position: absolute; left: 0; right: 0; top: 0; z-index: 120;
-                display: flex; align-items: center; gap: 8px;
+                position: absolute; left: 50%; transform: translateX(-50%); top: 0; z-index: 120;
+                width: 100%; max-width: 1100px;
+                display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
                 padding: calc(10px + env(safe-area-inset-top)) 12px 26px;
                 background: linear-gradient(180deg, rgba(6, 10, 15, 0.82), transparent);
-                pointer-events: auto;
+                pointer-events: auto; cursor: default;
             }
             /* ⚠️ A FLOOR UNDER THE NAME. A min-width of zero lets an island called The Overgrown Charter be
                squeezed down to "R_" by whatever the chips beside it happen to be that frame — which is
                exactly what a 20-character tide number did. The chips are the ones that give way now. */
-            .iw-name { font-weight: 800; color: #f2e4c6; font-size: 1rem; flex: 1 1 auto; min-width: 6.5rem;
+            /* ⚠️ THE NAME GETS ITS OWN LINE ON A PHONE, AND THAT FIXES TWO THINGS AT ONCE.
+               One row could not hold it: with the name floored at 6.5rem and both chips refusing to shrink,
+               the thing that fell off the end was "To the boat" — 9px past the right edge of a 360px screen,
+               inside an overflow:hidden stage, which is to say the only way off the island was unreachable.
+               (A five-digit purse pushed it 17px over; six digits, 24px.) And on the rows where it did fit,
+               "The Overgrown Charter" needed 160px and got 91, so it rendered as "The Overgr…".
+               Wrapping gives the name the full width and leaves the chips and the exit a row of their own,
+               where none of them has to give way to any of the others. */
+            .iw-name { font-weight: 800; color: #f2e4c6; font-size: 1rem; flex: 1 1 100%; min-width: 0;
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                 text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); }
+            @media (min-width: 430px) { .iw-name { flex: 1 1 auto; } }
             .iw-chip { position: relative; display: inline-flex; align-items: center; gap: 5px;
                 padding: 4px 10px; border-radius: 999px; flex: 0 0 auto;
                 background: rgba(0, 0, 0, 0.5); color: #e9dcbb; font-size: 0.82rem; font-weight: 700;
@@ -662,9 +694,12 @@ function Style() {
             .iw-tidebar span { display: block; height: 100%; background: #e8c069; transition: width 220ms linear; }
             .iw-chip.is-low .iw-tidebar span { background: #ff7a5a; }
 
-            .iw-leave { flex: 0 0 auto; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+            /* 40px minimum, because this is the only way off the island and it was 26px tall sitting 11px
+               from the top edge, where a phone's own gesture bar lives. */
+            .iw-leave { flex: 0 0 auto; margin-left: auto; padding: 10px 14px; min-height: 40px;
+                border-radius: 999px; cursor: pointer;
                 border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(0, 0, 0, 0.5);
-                color: #e9dcbb; font-size: 0.8rem; font-weight: 700; }
+                color: #e9dcbb; font-size: 0.82rem; font-weight: 700; }
             .iw-leave:disabled { opacity: 0.6; cursor: default; }
 
             /* ── THE BEARING ──────────────────────────────────────────────────────────────────────────── */
@@ -691,9 +726,11 @@ function Style() {
                 border-left: 10px solid #e8c069; }
             .iw-bearing.is-left .iw-bearrow { border-left: 0; border-right: 10px solid #e8c069; }
             .iw-bearart { width: 30px; height: 30px; object-fit: contain; display: block; }
-            .iw-bear-text { display: flex; flex-direction: column; line-height: 1.05; }
-            .iw-bear-text b { color: #f2e4c6; font-size: 0.95rem; }
-            .iw-bear-text i { font-style: normal; color: #b9a986; font-size: 0.64rem; white-space: nowrap; }
+            .iw-bear-text { display: flex; flex-direction: column; line-height: 1.2; }
+            .iw-bear-text b { color: #f2e4c6; font-size: 0.98rem; }
+            /* 0.64rem is 8.96px, and a 1.05 line-height on the parent was clipping the descenders off it. */
+            .iw-bear-text i { font-style: normal; color: #b9a986; font-size: 0.72rem; line-height: 1.35;
+                white-space: nowrap; }
 
             /* ── THE REST ─────────────────────────────────────────────────────────────────────────────── */
             .iw-flash { position: absolute; left: 0; right: 0; top: 24%; z-index: 130;
