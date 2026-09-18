@@ -700,7 +700,9 @@ function upgradeCost(nextLevel) { return 100 * (nextLevel + 1) * (nextLevel + 1)
 // Dig count is a DIGGING upgrade (not a boat lever): base budget + the Stamina track.
 function digStamina(staminaLevel = 0) { return BASE_STAMINA + Math.round(digTrackValue("stamina", staminaLevel)); }
 // The boat's level is EARNED BY UPGRADING, not by digging: one level per upgrade level bought across 5 tracks.
-function boatLevelFromUpgrades(s = 0, f = 0, r = 0, l = 0, rd = 0) {
+// Exported so the expedition can work out which of the eleven hulls to draw off a row it is already reading,
+// rather than restating the sum — see [[reuse-the-rule-never-restate-it]].
+export function boatLevelFromUpgrades(s = 0, f = 0, r = 0, l = 0, rd = 0) {
     return 1 + Math.max(0, s) + Math.max(0, f) + Math.max(0, r) + Math.max(0, l) + Math.max(0, rd);
 }
 

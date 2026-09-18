@@ -27,7 +27,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { captainsOpenTo } from "@/lib/marketplace/captains.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { openEncounterBattle, payFleetReward } from "@/lib/marketplace/sailing.js";
+import { boatArt, boatLevelFromUpgrades, boatName, boatTier, openEncounterBattle, payFleetReward } from "@/lib/marketplace/sailing.js";
 import { ISLANDS, islandById, islandCard, prizeFor } from "@/lib/marketplace/islands.js";
 import { chartFace, landfall, plotAccuracy, plotBand } from "@/lib/marketplace/chart-plot.js";
 import { TAKEABLE, nodeAt, nodeValue, reachable } from "@/lib/marketplace/island-world.js";
@@ -67,16 +67,35 @@ export async function getExpeditionState(buyerId) {
     // numbers is exactly the shape CLAUDE.md calls the bill. The avatar rides along because the walker on the
     // island has to BE the member — a gold capsule standing in for them is temp scaffolding, and the sprite is
     // one column on a row we are already touching.
+    // ⚠️ THE BOAT RIDES ALONG ON THIS ROW TOO, AND IT IS A LEFT JOIN. The hull that sails the thirty seconds
+    // and sits beached on the island is the member's OWN — one of eleven forms — not a glyph. mkt_sailing is
+    // LEFT JOINed because a member can hold a chart without ever having launched (a fleet win pays one), and
+    // an INNER JOIN there would drop the avatar and the chart count with it.
     const held = await db.queryOne(
         `SELECT (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS n,
-                b.avatar_sprite_url AS art, b.avatar_sprite_flip AS flip
-           FROM mkt_buyer b WHERE b.id = $1`, [buyerId]
+                b.avatar_sprite_url AS art, b.avatar_sprite_flip AS flip,
+                COALESCE(s.speed_level, 0) AS speed_level, COALESCE(s.luck_level, 0) AS luck_level,
+                COALESCE(s.rarity_level, 0) AS rarity_level, COALESCE(s.find_level, 0) AS find_level,
+                COALESCE(s.raid_level, 0) AS raid_level
+           FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
+          WHERE b.id = $1`, [buyerId]
     ).catch(() => null);
     const hero = { art: held?.art || null, flip: held?.flip === true };
+    const boat = shipOf(held);
     const charts = Number(held?.n) || 0;
 
-    if (!row) return { ok: true, open: false, charts, hero };
-    return { ok: true, open: true, charts, hero, expedition: viewOf(row) };
+    if (!row) return { ok: true, open: false, charts, hero, boat };
+    return { ok: true, open: true, charts, hero, boat, expedition: viewOf(row) };
+}
+
+// The hull to draw, off the five upgrade tracks — the SAME sum the helm and the profile take, called rather
+// than restated. A member who has never launched has no mkt_sailing row and still gets the starter dinghy,
+// because the alternative on screen is nothing at all where a boat should be.
+function shipOf(row) {
+    const level = boatLevelFromUpgrades(
+        row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0,
+    );
+    return { art: boatArt(level), name: boatName(level), tier: boatTier(level) };
 }
 
 

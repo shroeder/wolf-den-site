@@ -15,7 +15,13 @@
 // island to check the claim. A request per step is the most expensive shape in this codebase (CLAUDE.md).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GiSandsOfTime, GiSailboat, GiTwoCoins } from "react-icons/gi";
+
+// ⚠️ PAINTED ART, NOT GLYPHS. Everything on this screen is drawn — the props, the prize, the walker, the
+// island behind them — so a line-art icon standing in the same row reads as something nobody finished. The
+// purse is the doubloon the whole game already pays in, the tide is an hourglass drawn for it, and the boat
+// is the member's OWN hull, one of eleven forms, handed down from the server.
+const DOUBLOON = "/images/sailing/doubloon.png";
+const TIDEGLASS = "/images/islands/chrome/tideglass.png";
 
 // ⚠️ VERSIONED. Every one of these will be redrawn at least once and static art is served with max-age=86400,
 // so anybody who has opened an island keeps the old picture for a day unless this moves. Bump it on any
@@ -30,7 +36,7 @@ const v = (p) => (p ? `${p}${p.includes("?") ? "&" : "?"}v=${ART_V}` : null);
 // standing next to something and not being able to touch it reads as a bug.
 const REACH = 0.35;
 
-export default function IslandWalk({ view, hero, busy, onTake, onLeave }) {
+export default function IslandWalk({ view, hero, boat, busy, onTake, onLeave }) {
     const isle = view?.island || {};
     const ashore = view?.ashore || {};
     const nodes = useMemo(() => ashore.nodes || [], [ashore.nodes]);
@@ -173,9 +179,11 @@ export default function IslandWalk({ view, hero, busy, onTake, onLeave }) {
         <div className="iw">
             <div className="iw-bar">
                 <span className="iw-name">{isle.name}</span>
-                <span className="iw-chip"><GiTwoCoins className="iw-chipico" aria-hidden="true" />{view?.purse || 0}</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <span className="iw-chip"><img className="iw-chipico" src={v(DOUBLOON)} alt="" draggable="false" />{view?.purse || 0}</span>
                 <span className={`iw-chip${left <= 6 ? " is-low" : ""}`}>
-                    <GiSandsOfTime className="iw-chipico" aria-hidden="true" />{left}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="iw-chipico" src={v(TIDEGLASS)} alt="" draggable="false" />{left}
                 </span>
             </div>
 
@@ -225,9 +233,15 @@ export default function IslandWalk({ view, hero, busy, onTake, onLeave }) {
                         );
                     })}
 
-                    {/* THE BOAT, drawn where you beached, so the island always tells you where you came in. */}
-                    <div className="iw-boat" style={{ left: `${((Number(view?.entry) || 0) + (anchor > 0.5 ? 0.45 : -0.45)) * gap}px` }}>
-                        <GiSailboat className="iw-boatico" aria-hidden="true" />
+                    {/* THE BOAT, drawn where you beached, so the island always tells you where you came in —
+                        and it is the member's own hull, the same picture the helm and the profile draw.
+                        ⚠️ NEVER MIRRORED. Every hull in the game is lit from its own upper left and flipping
+                        one flips its light with it, which is why the wardens are drawn facing left rather
+                        than mirrored (see gen-islands.mjs). It sits bow-right exactly as it does at the helm. */}
+                    <div className="iw-boat" style={{ left: `${((Number(view?.entry) || 0) + (anchor > 0.5 ? 0.28 : -0.28)) * gap}px` }}>
+                        <span className="iw-boattile" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {boat?.art ? <img className="iw-boatimg" src={boat.art} alt={boat.name || ""} draggable="false" /> : null}
                     </div>
 
                     {/* THE WALKER — the member's own avatar, the same sprite the deck and the arena draw.
@@ -272,7 +286,8 @@ export default function IslandWalk({ view, hero, busy, onTake, onLeave }) {
                     background: rgba(0, 0, 0, 0.42); color: #e9dcbb; font-size: 0.8rem; font-weight: 700;
                     border: 1px solid rgba(255, 255, 255, 0.1); }
                 .iw-chip.is-low { color: #ffb4a0; border-color: rgba(255, 120, 90, 0.5); }
-                .iw-chipico { width: 15px; height: 15px; color: #d9b878; }
+                .iw-chipico { width: 16px; height: 16px; object-fit: contain; display: block;
+                    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
 
                 .iw-stage {
                     position: relative; width: 100%; height: 340px; border-radius: 12px; overflow: hidden;
@@ -309,8 +324,21 @@ export default function IslandWalk({ view, hero, busy, onTake, onLeave }) {
                     background: rgba(18, 14, 8, 0.9); border: 1px solid rgba(232, 192, 105, 0.55);
                     color: #f0dfb6; font-size: 0.72rem; font-weight: 700; }
 
-                .iw-boat { position: absolute; bottom: 10px; margin-left: -22px; opacity: 0.85; }
-                .iw-boatico { width: 44px; height: 44px; color: #cdbb98; }
+                /* ⚠️ BEACHED, AND IT HAS TO FIT ON THE STAGE AT LANDFALL. The camera holds the walker at
+                   the anchor fraction of the viewport (0.3 or 0.7, whichever way the mark lies), so the
+                   boat's own half-width plus its offset from the walker must stay inside that — 0.28 of a
+                   node gap is ~53px, plus 50px of hull, against 112px of room on a 375px phone. The first
+                   cut sat it 0.6 of a gap out at 112px wide and the bow was sliced clean off by the stage
+                   edge on every landfall. See [[sprite-amputation-vs-clipping]].
+                   Set a little higher and a little smaller than the walker so it reads as standing further
+                   back at the water's edge, the same depth cue the node lanes use, and BEHIND everything in
+                   z-order because you have already stepped off it. */
+                .iw-boat { position: absolute; bottom: 26px; margin-left: -50px; z-index: 4; opacity: 0.95; }
+                .iw-boattile { position: absolute; left: 50%; bottom: 8px; width: 78px; height: 18px;
+                    margin-left: -39px; border-radius: 50%; background: rgba(0, 0, 0, 0.34); filter: blur(4px); }
+                .iw-boatimg { position: relative; display: block; width: 100px; height: 100px;
+                    object-fit: contain; object-position: 50% 100%;
+                    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.55)); }
 
                 .iw-you { position: absolute; bottom: 14px; z-index: 60; }
                 .iw-youart { display: block; width: 86px; height: 86px; object-fit: contain; object-position: 50% 100%;

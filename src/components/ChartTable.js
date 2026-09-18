@@ -17,9 +17,22 @@
 // one inspector away. The pin is scored server-side, on commit, against a face it regenerates for itself.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GiCompass, GiSpyglass, GiScrollUnfurled } from "react-icons/gi";
 
 const STARS = 5;
+
+// ⚠️ TWO DIFFERENT KINDS OF PICTURE ON THIS SCREEN, AND THEY MUST NOT BE THE SAME KIND.
+// The chart and the spyglass are OBJECTS ON THE TABLE — painted props in the house style, drawn by
+// scripts/gen-expedition-chrome.mjs, sitting outside the paper. What is drawn ON the paper is INK: the
+// rings are SVG, the pin is an inked cross, and so the three landmarks are inked station marks in the same
+// SVG at the same ink colour. Dropping a painted, rim-lit sprite onto sepia parchment would read as a
+// sticker on a chart rather than as something the captain drew there — which is exactly what the compass
+// glyph that used to sit here read as.
+const CHART_ART = "/images/islands/chrome/chart.png";
+const SPYGLASS_ART = "/images/islands/chrome/spyglass.png";
+// ⚠️ VERSIONED — static art is served max-age=86400, so a redraw at the same path leaves everybody who has
+// opened a chart looking at the old picture for a day. See [[redrawn-art-must-be-versioned]].
+const ART_V = "1";
+const v = (p) => `${p}?v=${ART_V}`;
 
 export default function ChartTable({ chart, busy, onCommit }) {
     const soundings = chart?.soundings || [];
@@ -68,7 +81,8 @@ export default function ChartTable({ chart, busy, onCommit }) {
     return (
         <div className="ct">
             <div className="ct-head">
-                <GiScrollUnfurled className="ct-ico" aria-hidden="true" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="ct-ico" src={v(CHART_ART)} alt="" draggable="false" />
                 <div className="ct-headtext">
                     <div className="ct-title">His chart</div>
                     <div className="ct-stars" aria-label={`${grade} of ${STARS} stars`}>
@@ -117,7 +131,13 @@ export default function ChartTable({ chart, busy, onCommit }) {
                     return (
                         <div key={`m${s.k}`} className={`ct-mark is-${side}${above ? " is-above" : ""}`}
                             style={{ left: `${s.x * 100}%`, top: `${s.y * 100}%` }}>
-                            <GiCompass className="ct-markico" aria-hidden="true" />
+                            {/* ⚠️ THE STATION IS DRAWN HERE, NOT IN THE SVG, AND THAT IS ABOUT SIZE.
+                                The paper's viewBox is 100x100 with preserveAspectRatio="none", so anything
+                                drawn in it is a FRACTION of the paper: a cross that is a comfortable 12px
+                                across on a 375px phone is 31px across on a desktop, where it swallows its
+                                own label. Drawn here it is the same ink at the same size at every width,
+                                the way the pin's cross already is. */}
+                            <span className="ct-station" aria-hidden="true" />
                             <span className={`ct-marklabel${s.exact ? " exact" : ""}`}>
                                 <b>{s.mark}</b>
                                 <i>{s.says}</i>
@@ -134,7 +154,8 @@ export default function ChartTable({ chart, busy, onCommit }) {
 
             <div className="ct-foot">
                 <p className="ct-hint">
-                    <GiSpyglass className="ct-hintico" aria-hidden="true" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="ct-hintico" src={v(SPYGLASS_ART)} alt="" draggable="false" />
                     {grade >= 4
                         ? "He gave you leagues. Put the pin where the three rings meet."
                         : grade >= 2
@@ -153,7 +174,8 @@ export default function ChartTable({ chart, busy, onCommit }) {
             <style jsx>{`
                 .ct { display: flex; flex-direction: column; gap: 10px; }
                 .ct-head { display: flex; align-items: center; gap: 10px; }
-                .ct-ico { width: 26px; height: 26px; color: #d9b878; flex: 0 0 auto; }
+                .ct-ico { width: 38px; height: 38px; object-fit: contain; flex: 0 0 auto; display: block;
+                    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)); }
                 .ct-headtext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
                 .ct-title { font-weight: 700; font-size: 1.02rem; color: #f2e4c6; letter-spacing: 0.01em; }
                 .ct-stars { display: flex; gap: 3px; }
@@ -177,21 +199,36 @@ export default function ChartTable({ chart, busy, onCommit }) {
                 .ct-ring { fill: none; stroke: rgba(74, 44, 12, 0.20); }
                 .ct-edge { fill: none; stroke: rgba(74, 44, 12, 0.34); stroke-width: 0.35; stroke-dasharray: 2 2.4; }
 
-                .ct-mark { position: absolute; transform: translate(-50%, -50%); pointer-events: none;
-                    display: flex; flex-direction: column; align-items: center; }
-                .ct-mark.is-end { align-items: flex-end; transform: translate(-100%, -50%); }
-                .ct-mark.is-start { align-items: flex-start; transform: translate(0, -50%); }
-                .ct-mark.is-above { flex-direction: column-reverse; }
-                .ct-mark.is-above .ct-marklabel { margin: 0 0 2px; }
-                .ct-markico { width: 19px; height: 19px; color: #4a2c0c; flex: 0 0 auto;
-                    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.35)); }
-                .ct-mark.is-end .ct-markico { margin-right: -9px; }
-                .ct-mark.is-start .ct-markico { margin-left: -9px; }
+
+                /* A ZERO-SIZED ANCHOR ON THE SPOT. The station pins to it and the label hangs off it —
+                   which is the whole difference from the compass glyph that used to sit here: that was
+                   CENTRED WITH its label, so the pair straddled the point and neither was actually on it.
+                   A landmark is the centre of its own ring; if it is not drawn at the centre, the rings are
+                   telling you one thing and the picture another. */
+                .ct-mark { position: absolute; pointer-events: none; }
+                /* The surveyor's station: a ringed dot with the cross through it — "the bearing was taken
+                   from HERE". Ink, the same brown as the rings and a shade darker so it reads against its
+                   own band. The white hairline is the paper showing through, not a sticker rim. */
+                .ct-station { position: absolute; left: 0; top: 0; width: 15px; height: 15px;
+                    margin: -7.5px 0 0 -7.5px; border-radius: 50%;
+                    border: 1.5px solid rgba(58, 34, 8, 0.78);
+                    box-shadow: 0 0 0 1px rgba(247, 236, 210, 0.45); }
+                .ct-station::before, .ct-station::after { content: ""; position: absolute; left: 50%; top: 50%;
+                    background: rgba(58, 34, 8, 0.78); }
+                .ct-station::before { width: 25px; height: 1.5px; margin: -0.75px 0 0 -12.5px; }
+                .ct-station::after { width: 1.5px; height: 25px; margin: -12.5px 0 0 -0.75px; }
+
+                /* The label picks its side so it never runs off the paper, and clears the station's arms
+                   (12.5px of them) whichever side it lands on. */
                 .ct-marklabel {
-                    margin-top: 2px; display: flex; flex-direction: column; align-items: center; gap: 0;
+                    position: absolute; left: 50%; top: 15px; transform: translateX(-50%);
+                    display: flex; flex-direction: column; align-items: center; gap: 0;
                     padding: 2px 6px; border-radius: 5px; white-space: nowrap;
                     background: rgba(247, 236, 210, 0.82); border: 1px solid rgba(74, 44, 12, 0.3);
                 }
+                .ct-mark.is-above .ct-marklabel { top: auto; bottom: 15px; }
+                .ct-mark.is-end .ct-marklabel { left: auto; right: 15px; top: 50%; transform: translateY(-50%); }
+                .ct-mark.is-start .ct-marklabel { left: 15px; top: 50%; transform: translateY(-50%); }
                 .ct-marklabel b { font-size: 0.62rem; color: #40260a; font-weight: 700; letter-spacing: 0.01em; }
                 .ct-marklabel i { font-size: 0.58rem; color: #6b4a20; font-style: italic; }
                 .ct-marklabel.exact i { font-style: normal; font-weight: 700; color: #3d2a08; }
@@ -211,7 +248,8 @@ export default function ChartTable({ chart, busy, onCommit }) {
 
                 .ct-foot { display: flex; flex-direction: column; gap: 8px; }
                 .ct-hint { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 0.82rem; color: #cdbb98; line-height: 1.35; }
-                .ct-hintico { width: 17px; height: 17px; color: #d9b878; flex: 0 0 auto; }
+                .ct-hintico { width: 26px; height: 26px; object-fit: contain; flex: 0 0 auto; display: block;
+                    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5)); }
                 .ct-go {
                     width: 100%; padding: 13px 16px; border-radius: 10px; border: 0; cursor: pointer;
                     font-size: 1rem; font-weight: 700; letter-spacing: 0.02em;

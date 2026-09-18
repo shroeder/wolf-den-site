@@ -1022,6 +1022,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     Still owner-gated upstream — chartsReady is 0 for anyone the feature is shut to. */}
                 {(state.chartsReady || 0) > 0 ? (
                     <a className="sail-chart-cta" href="/marketplace/expedition">
+                        {/* The chart itself, the same plate the expedition opens with — a door into a
+                            feature should wear the thing it leads to. See gen-expedition-chrome.mjs. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="sail-chart-cta-art" src="/images/islands/chrome/chart.png?v=1" alt="" draggable="false" />
                         <span className="sail-chart-cta-main">
                             <b>A charted island</b>
                             <em>{state.chartsReady > 1 ? `${state.chartsReady} charts in hand` : "1 chart in hand"} · the best one is opened</em>

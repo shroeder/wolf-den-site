@@ -30,10 +30,15 @@ const STATES = {
     // so what is left to check is that the chart shows up and the sea is not shut.
     charted: {
         why: "a chart in hand: the helm offers a charted island and nothing is blocked",
-        // PRESENT, not `watch`: the embark picker sits under the boat by design, so "below the fold" is not a
-        // fault here — "not there at all" is. Three strengths, and picking the wrong one is how a check starts
+        // ⚠️ THE DOOR IS `.sail-chart-cta`, NOT A VOYAGE OPTION. This read `.sail-embark-opt.is-charted`
+        // until 2026-09-18 — a class that stopped existing when the chart came OUT of the duration picker
+        // and became its own row above it (see SailingClient). So this check had been reporting a problem
+        // about a thing that was working, on every run, for days. Another [[checks-that-cannot-fail]], in
+        // the failing direction: a rig that cries wolf is a rig nobody reads.
+        // PRESENT, not `watch`: the row sits under the boat by design, so "below the fold" is not a fault
+        // here — "not there at all" is. Three strengths, and picking the wrong one is how a check starts
         // failing for a thing that is working.
-        present: [".sail-embark-opt.is-charted"],
+        present: [".sail-chart-cta"],
         absent: [".sail-capblock"],
         make: () => { const s = clone(); s.chartsReady = 2; s.status = "idle"; return s; },
     },
@@ -41,7 +46,7 @@ const STATES = {
         why: "no chart: the charted option must not be there at all",
         watch: [],
         soft: [".sail-stations"],
-        absent: [".sail-embark-opt.is-charted", ".sail-capblock"],
+        absent: [".sail-chart-cta", ".sail-capblock"],
         make: () => { const s = clone(); s.chartsReady = 0; s.status = "idle"; return s; },
     },
     // Mid-voyage, which is what most members see most of the time.

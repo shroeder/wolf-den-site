@@ -15,6 +15,9 @@
 //   /marketplace/expedition/lab?scene=ashore       walking a good landfall
 //   /marketplace/expedition/lab?scene=ashore_bad   a wild guess: beached at the wrong end, thin tide
 //   /marketplace/expedition/lab?scene=lowtide      two steps of tide left
+//   /marketplace/expedition/lab?scene=summary      ashore; tap "Back to the boat" for the prize ending
+//   /marketplace/expedition/lab?scene=summary_missed   the same, with the mark left standing
+//   &boat=dinghy|galleon|celestial                 which of the eleven hulls the member sails
 //   &chrome=0                                      hide the scene picker, for filming
 //
 // ⚠️ IT BUILDS ITS STATE THROUGH THE REAL viewOf. A lab that assembles its own lookalike shape is a lab that
@@ -28,8 +31,8 @@
 import { useLayoutEffect, useState } from "react";
 import ExpeditionClient from "@/components/ExpeditionClient";
 import { viewOf } from "@/lib/marketplace/expedition-view.js";
-import { chartFace, landfall, plotAccuracy } from "@/lib/marketplace/chart-plot.js";
-import { islandById, ISLANDS } from "@/lib/marketplace/islands.js";
+import { chartFace, landfall, plotAccuracy, plotBand } from "@/lib/marketplace/chart-plot.js";
+import { islandById, islandCard, prizeFor, ISLANDS } from "@/lib/marketplace/islands.js";
 import { RUN_MARKS, escortFor, wardenFor } from "@/lib/marketplace/island-wardens.js";
 
 // A row exactly as mkt_ship_expedition would hold it.
@@ -67,10 +70,46 @@ const SCENES = {
     lowtide: { label: "Ashore · tide nearly out", row: () => { const r = fixtureRow({ grade: 5, seed: 5150, phase: "ashore", accuracy: 0.9 }); r.spent = r.tide - 3; return r; } },
     none: { label: "No chart", row: () => null },
     holding: { label: "A chart in hand", row: () => null, charts: 2 },
+    // ── THE TWO ENDINGS ──────────────────────────────────────────────────────────────────────────────
+    // Both mount ASHORE and are driven to the summary by the screen's own "Back to the boat" button, so
+    // what gets looked at is the real transition and the real shape the client is handed — not a summary
+    // card rendered straight. The difference between them is the one that matters on that card: whether
+    // the thing on the mark was taken or walked past.
+    summary: { label: "Summary · prize taken", row: () => { const r = fixtureRow({ grade: 5, seed: 5150, phase: "ashore", accuracy: 0.93 }); r.taken = [r.fix_index, r.entry + 1]; r.purse = 1180; return r; } },
+    summary_missed: { label: "Summary · mark left", row: () => { const r = fixtureRow({ grade: 1, seed: 8811, phase: "ashore", accuracy: 0.05 }); r.taken = [r.entry + 1]; r.purse = 240; return r; } },
 };
 
-export default function ExpeditionLab({ scene = "plot3", chrome = true }) {
+// The shape leaveIsland returns. Built from the same pure helpers the server builds it from, so a field
+// that moves there stops this lab too rather than letting it keep drawing yesterday's card.
+function summaryFor(row) {
+    const isle = islandById(row.island) || ISLANDS[0];
+    const taken = row.taken || [];
+    const gotPrize = taken.includes(Number(row.fix_index));
+    return {
+        island: islandCard(isle.id),
+        purse: Number(row.purse) || 0,
+        took: taken.length,
+        prize: gotPrize ? prizeFor(isle) : null,
+        accuracy: Number(row.accuracy) || 0,
+        band: plotBand(Number(row.accuracy) || 0),
+    };
+}
+
+// A stand-in avatar so the walker on the island is a FIGURE and not the fallback capsule — the real one
+// comes off mkt_buyer.avatar_sprite_url and the lab has no session.
+const HERO = { art: "/images/lab/wolf_pup-lv5.png", flip: false };
+
+// Three of the eleven forms: the starter, the middle and the top. Enough to see that the hull is the
+// member's and that the biggest one still fits the stage.
+const BOATS = {
+    dinghy: { art: "/images/sailing/boat-tier1-wood.png", name: "Wooden Dinghy", tier: 1 },
+    galleon: { art: "/images/sailing/boat-tier5-galleon.png", name: "Gilded Galleon", tier: 5 },
+    celestial: { art: "/images/sailing/boat-tier11-celestial.png", name: "Celestial Warship", tier: 11 },
+};
+
+export default function ExpeditionLab({ scene = "plot3", chrome = true, boat = "galleon" }) {
     const key = SCENES[scene] ? scene : "plot3";
+    const boatKey = BOATS[boat] ? boat : "galleon";
 
     // ── STUB FETCH, THEN MOUNT — IN THAT ORDER ───────────────────────────────────────────────────────────
     // ExpeditionClient fetches on mount, so the stub has to be installed BEFORE it renders or the first load
@@ -85,12 +124,24 @@ export default function ExpeditionLab({ scene = "plot3", chrome = true }) {
             if (url.includes("/sailing/expedition")) {
                 const def = SCENES[key];
                 const row = def.row();
-                // A stand-in avatar so the walker on the island is a FIGURE and not the fallback capsule —
-                // the real one comes off mkt_buyer.avatar_sprite_url and the lab has no session.
-                const hero = { art: "/images/lab/wolf_pup-lv5.png", flip: false };
+                // ⚠️ THE STUB HAS TO READ THE ACTION, NOT JUST THE PATH. Answering every POST with the same
+                // GET body meant "Back to the boat" handed back no summary at all, so the last screen of
+                // the whole loop was the one screen the lab could not reach — and it is the one carrying
+                // the island, the prize and the purse. Everything else still replays the same state.
+                const action = (() => { try { return JSON.parse(init?.body || "{}").action; } catch { return null; } })();
+                if (action === "leave" && row) {
+                    return new Response(JSON.stringify({ ok: true, summary: summaryFor(row), open: false, charts: 0, hero: HERO, boat: BOATS[boatKey] || BOATS.galleon }),
+                        { headers: { "Content-Type": "application/json" } });
+                }
+                const hero = HERO;
+                // ⚠️ AND A HULL, because the screen draws the member's own. The real one comes off the five
+                // upgrade tracks on mkt_sailing (see shipOf in expedition.js); `?boat=` picks a form here so
+                // a dinghy and a Celestial Warship can both be looked at without owning either — the two
+                // ends of the range are the ones that break a layout.
+                const boat = BOATS[boatKey] || BOATS.galleon;
                 return new Response(JSON.stringify(
-                    row ? { ok: true, open: true, charts: 1, hero, expedition: viewOf(row) }
-                        : { ok: true, open: false, charts: def.charts || 0, hero },
+                    row ? { ok: true, open: true, charts: 1, hero, boat, expedition: viewOf(row) }
+                        : { ok: true, open: false, charts: def.charts || 0, hero, boat },
                 ), { headers: { "Content-Type": "application/json" } });
             }
             if (url.endsWith("/api/marketplace/sailing")) {
@@ -101,24 +152,28 @@ export default function ExpeditionLab({ scene = "plot3", chrome = true }) {
         };
         setReady(true);
         return () => { window.fetch = real; };
-    }, [key]);
+    }, [key, boatKey]);
 
     return (
         <div>
             {chrome ? (
                 <div className="lab-bar">
                     {Object.entries(SCENES).map(([id, s]) => (
-                        <a key={id} className={`lab-pill${id === key ? " on" : ""}`} href={`?scene=${id}`}>{s.label}</a>
+                        <a key={id} className={`lab-pill${id === key ? " on" : ""}`} href={`?scene=${id}&boat=${boatKey}`}>{s.label}</a>
+                    ))}
+                    {Object.entries(BOATS).map(([id, b]) => (
+                        <a key={id} className={`lab-pill is-boat${id === boatKey ? " on" : ""}`} href={`?scene=${key}&boat=${id}`}>{b.name}</a>
                     ))}
                 </div>
             ) : null}
-            {ready ? <ExpeditionClient key={key} /> : null}
+            {ready ? <ExpeditionClient key={`${key}:${boatKey}`} /> : null}
             <style jsx>{`
                 .lab-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; }
                 .lab-pill { padding: 4px 10px; border-radius: 999px; font-size: 0.76rem; font-weight: 700;
                     background: rgba(0, 0, 0, 0.4); color: #cdbb98; text-decoration: none;
                     border: 1px solid rgba(255, 255, 255, 0.12); }
                 .lab-pill.on { background: #d5a445; color: #2a1c06; border-color: #f0cb79; }
+                .lab-pill.is-boat { border-style: dashed; }
             `}</style>
         </div>
     );

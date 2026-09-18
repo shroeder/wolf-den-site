@@ -13,7 +13,7 @@ export default async function ExpeditionLabPage({ searchParams }) {
     const sp = await searchParams;
     return (
         <main className="wrap" style={{ paddingTop: 8, paddingBottom: 28 }}>
-            <ExpeditionLab scene={sp?.scene || "plot3"} chrome={sp?.chrome !== "0"} />
+            <ExpeditionLab scene={sp?.scene || "plot3"} boat={sp?.boat || "galleon"} chrome={sp?.chrome !== "0"} />
         </main>
     );
 }
