@@ -18,7 +18,10 @@
 // asked for these to be COLOURFUL, and "washed palette" is the documented failure of low — it is the exact
 // axis being asked for. ~$0.063 an image at 1536x1024; the whole set below is about twenty cents.
 //
-// Run:  node scripts/gen-card-art.mjs [--force] [--only bite,hop]
+// Run:  node --import ./scripts/lib/register-loader.mjs scripts/gen-card-art.mjs [--force] [--only bite,hop]
+// ⚠️ THE LOADER IS NOT OPTIONAL any more. This imports collectibles.js for the pet prompts, and that file
+// has since grown an `@/lib/...` import of its own — plain node cannot resolve it, so the documented run
+// line above died silently with ERR_MODULE_NOT_FOUND. See lib/app-loader.mjs.
 import fs from "node:fs";
 import sharp from "sharp";
 import { housePrompt } from "../src/lib/marketplace/art-style.js";
@@ -136,6 +139,11 @@ function actionFor(card) {
         + "the lunge, speed streaks trailing behind";
     if (card.strength) return "rearing up as power gathers visibly around it, muscles set, light bleeding "
         + "off its shoulders";
+    // DEXTERITY HAD NO BRANCH, so the one card that only grants it (Chalk Tally) fell through to the generic
+    // "standing alert" pose — a portrait, which is the sticker this file exists to avoid. Dexterity is
+    // footwork, so it is drawn as footwork.
+    if (card.dexterity || card.dexterityEach) return "twisting in mid-air to land light on its feet, weight "
+        + "already shifting the other way, a scuff of dust where it pushed off";
     if (card.energy) return "surging forward in a burst, trailing bright light behind it";
     // No "ears up" — eleven of these are birds, fish and a sloth, and the phrase was writing a mammal over
     // the top of them.

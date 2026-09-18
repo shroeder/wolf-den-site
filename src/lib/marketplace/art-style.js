@@ -49,7 +49,8 @@ export const DIE_CUT =
 // A full-bleed environment, for backgrounds and boss/key art.
 export const SCENE =
     "A full-bleed scene filling the entire frame edge to edge, with clear foreground, midground and background " +
-    "depth, and lighting that reads instantly at a glance.";
+    "depth, and lighting that reads instantly at a glance. The subject is PAINTED INTO the scene and lit by it " +
+    "— never a cut-out laid on top: no rim, outline, glow or halo tracing its silhouette.";
 
 /**
  * Compose a house-style prompt.
