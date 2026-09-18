@@ -255,6 +255,16 @@ export const BADGE_BONUSES = {
     // ── FISHING → Angling (its own stat: more casts a day, rarer fish on the line), so fishing badges make you
     // a better fisherman. The Whole Ocean is the completionist prize: every species means fishing at night, in a
     // storm, in fog, and sailing forty voyages to reach deep water.
+    // ⚠️ SIX, AND IT WAS ASKED FOR AS ONE. Hand-granted, admin-only, not earnable — see the mkt_badge row.
+    // Luke's, for Shelby (Sunflower Jinxx), who wanted more hull and was vocal enough about it to get a badge
+    // named for the asking.
+    //
+    // It is six because of the TEN BEST rule in sumBadgeDomain: a member's ten biggest badges in a domain pay
+    // and the rest are decoration. She holds THIRTY-ONE sea badges. Measured on her real row: at 1 point this
+    // ranked 27th of 31 and paid her literally nothing — a badge granted for asking that answers the asking
+    // with zero. Five is the first value that clears her tenth; six clears it with a margin that a tie cannot
+    // eat. Anyone holding fewer sea badges gets the full six outright.
+    whiner: S({ ironclad: 6 }),
     fish_first: S({ angling: 1 }), fish_angler: S({ angling: 3 }), fish_master: S({ angling: 6, bounty: 3 }),
     fish_naturalist: S({ angling: 4 }), fish_deepwater: S({ angling: 5, trove: 3 }),
     fish_trophy: S({ angling: 4, bounty: 2 }), fish_record_holder: S({ angling: 5, bounty: 3 }),
