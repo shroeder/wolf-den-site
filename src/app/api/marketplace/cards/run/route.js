@@ -8,7 +8,7 @@ import {
 import { applyEventChoice, eventById, pickEvent } from "@/lib/marketplace/cards-events.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import {
-    ACTS, ALL_CARDS, BOSS_PERKS, CURSE_POOL, FINAL_ACT, KEYS, PERKS, ascRule, baseIdOf, beltSize,
+    ACTS, ALL_CARDS, ASC_MAX, BOSS_PERKS, CURSE_POOL, FINAL_ACT, KEYS, PERKS, ascRule, baseIdOf, beltSize,
     hasAllKeys, perkById, perkSum, restHeal, RUN_LENGTH, SKIP_EMBERS, canUpgrade, cardById, pickEncounter,
     removalCost, upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
@@ -612,11 +612,26 @@ export async function POST(request) {
             if (action === "restart") {
                 // Explicit, because loading no longer deals one — see startRun. A run given up is still a
                 // run that happened, and it goes in the history saying how far it actually got.
+                // Read the ending BEFORE the lines below overwrite it: `done` is what says whether the rung
+                // was beaten, and the save two lines down stamps "dead" over a victory.
+                const beatIt = run?.done === "won";
                 await recordRun(buyer.id, run, "dead");
                 await saveRun(buyer.id, { ...run, done: "dead", recorded: true });
-                // A new run is dealt on the rung asked for, defaulting to the one just finished — climbing
-                // back onto the same step is what anybody does after a loss.
-                return NextResponse.json({ run: await startRun(buyer.id, Number(body?.asc ?? run.asc ?? 0)) });
+                // ── A NEW RUN AFTER A WIN CLIMBS; AFTER A DEATH IT STANDS STILL ─────────────────────────
+                // The rung asked for wins, as it always has — the table sends one. What changed is the
+                // fallback for the New run button on the result screen, which sends none: it inherited the
+                // rung just played, so beating rung 1 and pressing the button in front of you dealt rung 1
+                // again. The win had already opened rung 2; the only way to actually climb onto it was to
+                // leave the room and sit back down, which nobody would guess.
+                //
+                // SoullessShiitake, who found it: "unless you leave and sit back down, it keeps you at the
+                // same rung" — after wasting multiple twenty-minute runs believing he had moved up.
+                //
+                // A death still deals the same rung, which is the right default for a loss and was never the
+                // complaint. Capped at ASC_MAX, and it can only ever be the step the win itself unlocked, so
+                // this cannot skip anybody up a ladder they have not earned.
+                const climbed = beatIt ? Math.min(ASC_MAX, (Number(run.asc) || 0) + 1) : (Number(run.asc) || 0);
+                return NextResponse.json({ run: await startRun(buyer.id, Number(body?.asc ?? climbed)) });
             }
 
             // ── A TAB THAT HAS NOT RELOADED SINCE THIS SHIPPED ──────────────────────────────────────

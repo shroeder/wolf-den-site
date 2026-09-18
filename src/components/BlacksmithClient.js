@@ -1140,7 +1140,7 @@ export function EnhanceResultModal({ res, onClose }) {
                         <div className="forge-tally">
                             <div className="forge-tally-row" style={{ animationDelay: `${TIERS.length * 130 + 120}ms` }}><span>⚡ Best combo</span><b style={{ color: "#ffcf7a" }}>×{combo}</b></div>
                             <div className="forge-tally-row" style={{ animationDelay: `${TIERS.length * 130 + 340}ms` }}><span>🎯 Score</span><b style={{ color: "#8fe3ff" }}>{accShown}%</b></div>
-                            {res.doubled ? <div className="forge-tally-row" style={{ animationDelay: `${TIERS.length * 130 + 560}ms` }}><span>✦ Master&apos;s Touch</span><b style={{ color: "#ffd75e" }}>DOUBLE!</b></div> : null}
+                            {res.doubled ? <div className="forge-tally-row" style={{ animationDelay: `${TIERS.length * 130 + 560}ms` }}><span>✦ Master&apos;s Touch</span><b style={{ color: "#ffd75e" }}>+1 STAT</b></div> : null}
                         </div>
                         {/* Connect the dots: run → grade → yield. */}
                         <div className="forge-tally-chain" style={{ animationDelay: `${chainDelay}ms` }}>

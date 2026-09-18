@@ -3465,7 +3465,15 @@ export function blockGain(base, unit = {}) {
 export function resolveCard(card, attacker = {}, defender = null) {
     if (!card) return {};
     const out = {};
-    if (card.damage) out.damage = attackDamage(card.damage, attacker, defender || {});
+    // ── THE FACE HAS TO COUNT STRENGTH THE WAY THE SWING DOES ───────────────────────────────────────────
+    // `strengthMult` was missing here and passed at resolution time, so a card whose whole point is that
+    // Strength counts three times printed it counting ONCE. GrayKitsune: "How does the strength counts 3
+    // times work? Because 28 is 14 base + 14 str. Where my thought is it should show 56." His thought was
+    // right and the number under his thumb was wrong — the swing has always dealt 56.
+    //
+    // This function is what the card FACE prints AND what the preview reads, which is the whole reason it
+    // exists; a multiplier applied in one of those two places is the defect it was written to prevent.
+    if (card.damage) out.damage = attackDamage(card.damage, attacker, defender || {}, card.strengthMult || 1);
     // ⚠️ THROUGH blockGain, NOT RAW. This function is what the CARD FACE prints as well as what the engine
     // applies (see the note above it), so a Frail that only bit at resolution time would show 8 on the card
     // and give you 6 — the exact class of two-sources-of-truth bug the templated card text exists to prevent.
@@ -4491,7 +4499,15 @@ export function foeAct(state, i) {
     // Nemesis spends alternate turns like this. It is a duration on the creature (ticked down in
     // startFoeTurn) rather than a flat state, so "it is untouchable for one turn" is what a move can say.
     if (intent.intangible) {
-        f = { ...f, intangible: (f.intangible || 0) + intent.intangible };
+        // SET TO THE LONGER, NEVER ADDED. Nemesis veils for 2 and the duration ticks down 1 at the top of its
+        // own turn, so a veil landing while one is still up used to make 3 — a move that says two turns buying
+        // three, and more each time it recurred. Sunflower: "the next turn with 1 intangible turn left it
+        // resets it to 2 more turns of it. Over and over." The same rule the arena's thorns already follow: a
+        // move you can throw repeatedly must not be able to multiply a number without a ceiling.
+        //
+        // (Whether the CADENCE is right — a 2-turn veil on a creature that acts every turn covers both of your
+        // turns, so re-applying every other turn is permanent cover — is a balance question, not this.)
+        f = { ...f, intangible: Math.max(f.intangible || 0, intent.intangible) };
         events.push({ type: "buff", on: f.id, key: "Intangible", amount: intent.intangible });
     }
     if (intent.heal) {

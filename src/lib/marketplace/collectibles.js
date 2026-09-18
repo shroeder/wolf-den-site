@@ -140,7 +140,7 @@ export const PET_STAT_META = {
     prep_cook: { label: "Prep Cook", icon: "🔪", desc: "Prep recipes yield an extra ingredient more often." },
     kitchen_master: { label: "Kitchen Master", icon: "👑", desc: "Lifts EVERY kitchen passive at once." },
     keen_eye: { label: "Keen Eye", icon: "👁️", desc: "Better odds of a BONUS higher-tier part when you salvage." },
-    masters_touch: { label: "Master's Touch", icon: "✨", desc: "Better odds an enhancement rolls DOUBLE the gains." },
+    masters_touch: { label: "Master's Touch", icon: "✨", desc: "Better odds an enhancement improves one more stat than your score earned." },
     steady_hand: { label: "Steady Hand", icon: "🖐️", desc: "Better odds a slip won't break your combo while enhancing." },
     forgemaster: { label: "Forgemaster", icon: "⚒️", desc: "Master of every craft — raises ALL four Forge odds at once (double parts, bonus parts, double gains & combo-saves)." },
 };

@@ -409,7 +409,22 @@ export async function startTrip(buyerId) {
     // mkt_mining has no column for that — nodes_mined and steps_taken are totals, not a deepest run. It buys
     // one safe floor and four floors of light instead; see LAMP_SAFE_DEPTH, and the card now says so.)
     const run = { depth: startDepth, haul: [], seamTier: 1, over: false, collapsed: false, last: null };
-    await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb, current_node_id = NULL WHERE buyer_id = $1`, [buyerId, JSON.stringify(run)]).catch(() => {});
+    // ── AND THE ROCK FACE FROM LAST TRIP SURVIVES THIS ONE ──────────────────────────────────────────────
+    // This used to clear current_node_id unconditionally, so going back down DELETED the seam you climbed out
+    // with — unswung, with no warning, along with any damage already put into it. Kaishiern: "I stopped at a
+    // mythril seam but had to close the game before I cracked it. When I came back the seam was gone but the
+    // run was still spent." Four members' rows today read seamTier 4 or 5 with no face to swing at.
+    //
+    // Only a face that is finished, expired or missing is cleared — a live one is yours until you break it.
+    await db.query(
+        `UPDATE mkt_mining m SET run_json = $2::jsonb,
+                current_node_id = CASE WHEN EXISTS (
+                    SELECT 1 FROM mkt_ore_node n
+                     WHERE n.id = m.current_node_id AND n.status = 'active' AND n.expires_at > NOW() AND n.hp > 0
+                ) THEN m.current_node_id ELSE NULL END
+          WHERE m.buyer_id = $1`,
+        [buyerId, JSON.stringify(run)]
+    ).catch(() => {});
     await trackActivity(buyerId, "mine_trip", {}).catch(() => {});
     // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
     // nothing says it is coming.
@@ -670,6 +685,24 @@ export async function surfaceRun(buyerId) {
 // The seam you walked out with becomes the rock you mine.
 async function cutSeam(buyerId, tier) {
     const o = oreTier(Math.max(1, Math.min(5, tier)));
+    // ── A WORSE SEAM NEVER PAVES OVER A BETTER ONE YOU HAVE NOT SWUNG AT ─────────────────────────────────
+    // The rock face is a single pointer, so whatever was cut last won — and the COLLAPSE path cuts tier 1.
+    // Surface with a Mythril face, go back down, have the roof come in, and the coal you crawled out with
+    // replaced the Mythril still standing at the face. ValkyrieSylve: "only had a coal seam waiting for me
+    // even though my screen showed I found a mithril seam." Her row still reads seamTier 5.
+    //
+    // A pending face also carries its DAMAGE (mkt_ore_node_hit), so replacing one throws away swings as well
+    // as tier. Keep the better rock and say nothing was cut: the haul pays out either way, and nobody has
+    // ever wanted the worse of two seams.
+    const pending = await db.queryOne(
+        `SELECT n.id, n.tier FROM mkt_mining m JOIN mkt_ore_node n ON n.id = m.current_node_id
+          WHERE m.buyer_id = $1 AND n.status = 'active' AND n.expires_at > NOW() AND n.hp > 0`,
+        [buyerId]
+    ).catch(() => null);
+    if (pending && Number(pending.tier) >= o.tier) {
+        const kept = oreTier(Number(pending.tier));
+        return { tier: kept.tier, name: kept.name, color: kept.color, art: oreArt(kept.tier), kept: true };
+    }
     const made = await db.queryOne(
         `INSERT INTO mkt_ore_node (tier, x, y, hp, hp_max, expires_at)
          VALUES ($1, 50, 70, $2, $2, NOW() + INTERVAL '12 hours') RETURNING id`,

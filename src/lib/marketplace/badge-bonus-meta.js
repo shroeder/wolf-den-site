@@ -91,7 +91,7 @@ export const BONUS_META = {
         stats: {
             efficient: { art: "/images/bonus/efficient.png", icon: "🛠️", label: "Salvage", suffix: "%" },
             keen_eye: { art: "/images/bonus/keen_eye.png", icon: "👁️", label: "Bonus Part", suffix: "%" },
-            masters_touch: { art: "/images/bonus/masters_touch.png", icon: "✨", label: "Double Forge", suffix: "%" },
+            masters_touch: { art: "/images/bonus/masters_touch.png", icon: "✨", label: "Extra forge stat", suffix: "%" },
             steady_hand: { art: "/images/bonus/steady_hand.png", icon: "🖐️", label: "Combo Save", suffix: "%" },
         },
     },

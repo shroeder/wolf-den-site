@@ -112,6 +112,28 @@ export async function enshrinePet(buyerId, petId, stone) {
     const { trackActivity } = await import("@/lib/marketplace/activity.js").catch(() => ({ trackActivity: null }));
     if (trackActivity) await trackActivity(buyerId, "pet_enshrined", { petId, stone: def.id, rarity: pet.rarity }).catch(() => {});
 
+    // ── THE BADGE LANDS WHEN IT IS EARNED, NOT WHEN THE HOUR TURNS ───────────────────────────────────────────
+    // Auto badges are swept at most once an hour off /auth/me, and deliberately: the old per-request sweep was
+    // 28% of everything this database read (see syncEarnedBadgesHourly and migrations/428). So the sweep is not
+    // the thing to change — but it means the badge for the thing you just did arrives whenever you next happen
+    // to load a page after the hour comes due. SoullessShiitake: "I just enshrined my 3rd pet, the badge even
+    // shows I am at 100% but its not giving me the badge." GrayKitsune, who had hit the same wall: "it took
+    // mine a bit, the next time I collected from my farm, then it popped."
+    //
+    // Enshrining is the one action that moves this count, so it grants the three thresholds itself — one COUNT
+    // query on an action somebody takes a handful of times ever, against a sweep that reads megabytes.
+    try {
+        const { grantEventBadge } = await import("@/lib/marketplace/badges.js");
+        const n = Number((await db.queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_pet_enshrined WHERE buyer_id = $1`, [buyerId]
+        ).catch(() => null))?.n) || 0;
+        // Thresholds from migrations/358 — 1, 3 and 10. Every one at or below the new count is granted, so a
+        // member who was owed an earlier one from before this shipped is caught up by their next stone.
+        for (const [need, slug] of [[1, "pet_enshrined"], [3, "pet_reliquary"], [10, "pet_pantheon"]]) {
+            if (n >= need) await grantEventBadge(buyerId, slug).catch(() => {});
+        }
+    } catch { /* a badge is never worth failing the enshrinement over */ }
+
     return {
         ok: true,
         petId, stone: def.id, stoneName: def.name, color: def.color,

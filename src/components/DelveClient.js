@@ -2,7 +2,7 @@
 
 import { dispatchStoneFound } from "@/components/PetStoneFound";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import DelveRun from "@/components/delves/DelveRun";
 import DelveHall from "@/components/delves/DelveHall";
@@ -57,6 +57,18 @@ export default function DelveClient({ initial }) {
     const dismiss = useCallback(async () => { setFinished(null); await act("dismiss"); }, [act]);
 
     const run = state.run && !state.run.over ? state.run : null;
+    // ── A NEW RUN OPENS AT THE TOP OF ITSELF ────────────────────────────────────────────────────────────
+    // The hall is a long page and the descend button is near the bottom of it, so the run screen mounted
+    // with the window still scrolled down there — past the stage, past the floor, past the buttons the
+    // whole screen is made of. ValkyrieSylve: "whenever I start a dungeon my screen snaps to the very
+    // bottom so I have to scroll up to actually do the mini-game." Nothing snapped; nothing moved it back.
+    //
+    // Keyed on the RUN starting rather than on every render, so it cannot fight the log box's own scroll
+    // (see DelveRun) or yank the page mid-fight.
+    const running = Boolean(run);
+    useEffect(() => {
+        if (running && typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "instant" });
+    }, [running]);
 
     return (
         <section className="card delve-wrap">

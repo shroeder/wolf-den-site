@@ -125,14 +125,14 @@ function regaliaBonus(ownedCount) {
 export const FORGE_UPGRADES = {
     efficient: { name: "Efficient Salvage", desc: "Chance for DOUBLE parts when you salvage.", max: 5, per: 0.0233, base: 250, unit: "%" },
     keen_eye: { name: "Keen Eye", desc: "Chance for a BONUS higher-tier part on salvage.", max: 5, per: 0.0167, base: 300, unit: "%" },
-    masters_touch: { name: "Master's Touch", desc: "Chance an enhancement rolls TWICE the gains.", max: 5, per: 0.015, base: 400, unit: "%" },
+    masters_touch: { name: "Master's Touch", desc: "Chance an enhancement improves ONE MORE STAT than your score earned.", max: 5, per: 0.015, base: 400, unit: "%" },
     steady_hand: { name: "Steady Hand", desc: "Chance a slip won't break your combo when you enhance.", max: 5, per: 0.05, base: 350, unit: "%" },
     transmute: { name: "Transmuter's Boon", desc: "Chance a combine yields TWO parts instead of one (+1% per level).", max: 5, per: 0.01, base: 300, unit: "%" },
     attune: { name: "Attunement", desc: "Chance an enhancement ATTUNES the piece — rolling a rare bonus stat for a spin-off feature (farm, pet XP, raids, sailing or the forge). +1% per level.", max: 5, per: 0.01, base: 500, unit: "%" },
 };
 // Themed icon + short effect label per perk, so the Perks list renders with the shared upgrade UI (like ship/dig/farm).
 const UPG_EMOJI = { efficient: "🛠️", keen_eye: "👁️", masters_touch: "✨", steady_hand: "🖐️", transmute: "⚗️", attune: "🔮" };
-const UPG_EFF_LABEL = { efficient: "Double-part chance", keen_eye: "Bonus-part chance", masters_touch: "Double-gain chance", steady_hand: "Combo-save chance", transmute: "Double-combine chance", attune: "Attune chance" };
+const UPG_EFF_LABEL = { efficient: "Double-part chance", keen_eye: "Bonus-part chance", masters_touch: "Extra-stat chance", steady_hand: "Combo-save chance", transmute: "Double-combine chance", attune: "Attune chance" };
 // Gold cost of the NEXT level: affordable base, doubling each level — mirrors the sailing/dig upgrade curves.
 const upgCost = (u, level) => Math.round(u.base * Math.pow(2, level));
 async function upgradeLevels(buyerId) {
@@ -593,8 +593,18 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     if (enhancePowers.has("smith_s_certainty") && scenario === 0) scenario = 1;
     const upg = await upgradeLevels(buyerId);
     const bf = await getForgeBonus(buyerId); // earned forge badges + owned forge pets boost double-gain odds
+    // ── MASTER'S TOUCH ADDS A STAT; IT HAS NEVER DOUBLED ANYTHING ───────────────────────────────────────
+    // Three places called it "TWICE the gains" / "DOUBLE!" and the code has always done this: one skill
+    // tier up, which is one MORE STAT improved, not a bigger number on each. Kaishiern, reading the
+    // result screen: "I got masters touch and three stats increased. The three stats were only moved up
+    // one point. Nothing was doubled. So what did masters touch do?" It gave him the third stat — the
+    // words were the only thing wrong, and they are fixed here and on the screen.
+    //
+    // ⚠️ AND IT COULD NOT FIRE ON A FLAWLESS RUN. Tier 4 is the top, so min(4, 4+1) is 4 — the roll won
+    // and changed nothing while still announcing itself. Claiming it only when the tier actually moves is
+    // the honest half; whether it should do something ELSE up there is a balance call and not this one.
     let doubled = false;
-    if (scenario > 0 && Math.random() < chance(upg, "masters_touch", bf)) { scenario = Math.min(4, scenario + 1); doubled = true; }
+    if (scenario > 0 && scenario < 4 && Math.random() < chance(upg, "masters_touch", bf)) { scenario = scenario + 1; doubled = true; }
     // The Master's Mark: one enhance in three advances TWO levels instead of one.
     const doubleLevel = enhancePowers.has("master_s_mark") && oneIn(3);
 
@@ -630,7 +640,10 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const forgedNew = Object.keys(parseBonus(cur?.stat_bonus)).filter((k) => !existing.includes(k)).length;
     const socketsLeft = Math.max(0, affixCeiling(item.rarity) - existing.length - forgedNew);
     const newPool = socketsLeft > 0 ? ADDABLE.filter((k) => !existing.includes(k)) : [];
-    const nextBonus = { ...parseBonus(cur?.stat_bonus) };
+    // What the piece already carried from earlier enhances, kept apart from nextBonus because nextBonus is
+    // about to be mutated and `isNew` below has to compare against the state BEFORE this swing.
+    const priorBonus = parseBonus(cur?.stat_bonus);
+    const nextBonus = { ...priorBonus };
     // No cap. A line grows for as long as you feed it — see the note at the top of this file.
     const gained = {};
     const apply = (k) => { nextBonus[k] = (nextBonus[k] || 0) + 1; gained[k] = (gained[k] || 0) + 1; };
@@ -727,7 +740,17 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const INTRINSIC = new Set(["base_damage", "armor", "speed", "block_chance"]);
     const statKeys = Array.from(new Set([...existing, ...forgedKeys]))
         .sort((a, z) => (INTRINSIC.has(a) ? 0 : 1) - (INTRINSIC.has(z) ? 0 : 1));
-    const statLines = statKeys.map((k) => ({ key: k, label: STAT_META[k]?.label || k, icon: STAT_META[k]?.icon || "", suffix: STAT_META[k]?.suffix || "", base: item.stats?.[k] || 0, forge: nextBonus[k] || 0, gained: gained[k] || 0, isNew: !existing.includes(k), intrinsic: INTRINSIC.has(k) }));
+    const statLines = statKeys.map((k) => ({ key: k, label: STAT_META[k]?.label || k, icon: STAT_META[k]?.icon || "", suffix: STAT_META[k]?.suffix || "", base: item.stats?.[k] || 0, forge: nextBonus[k] || 0, gained: gained[k] || 0,
+        // ── NEW MEANS THE PIECE DID NOT HAVE THIS LINE, NOT "IT IS NOT AN AFFIX" ──────────────────────
+        // This read `!existing.includes(k)`, and `existing` is the AFFIX list — it filters intrinsic
+        // stats out on purpose, so a piece of armour reported its own armour as a brand-new stat on
+        // every enhance it ever had. Sunflower: "every gear enhancement it always says 1 new stat and
+        // it's always armor. Like it always is considered new." Every armour wearer in the Den has been
+        // told that, every time, since the base lift shipped.
+        //
+        // A line is new when the piece had neither a base value nor a forged one before this swing.
+        isNew: !(Number(item.stats?.[k]) > 0) && !(Number(priorBonus[k]) > 0),
+        intrinsic: INTRINSIC.has(k) }));
     // The attunement outcome for the reveal: what (if anything) got rolled, plus the item's resulting affix.
     const attune = utilRoll ? { ...describeUtil(nextUtil), isNew: Boolean(utilRoll.isNew), upgraded: Boolean(utilRoll.upgraded) } : null;
     if (attune) grantEventBadge(buyerId, "forge_attuned").catch(() => {});
