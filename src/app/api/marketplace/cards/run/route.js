@@ -155,7 +155,7 @@ export const dynamic = "force-dynamic";
 // Everything else here was already the server's and always has been: which room is reachable, which party
 // stands in it, every card offered, the shop's stock and its prices, the deck, the trinkets, the bottles.
 export async function POST(request) {
-    return withRequestLogging(request, "POST /api/marketplace/cards/run", async ({ internalError }) => {
+    return withRequestLogging(request, "POST /api/marketplace/cards/run", async ({ internalError, logger }) => {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return NextResponse.json({ error: "not_signed_in" }, { status: 401 });
@@ -517,6 +517,31 @@ export async function POST(request) {
                     // of mine or somebody at the API by hand, and one query says which and whose.
                     run.refused = (Number(run.refused) || 0) + 1;
                     run.lastRefused = String(out.why || "").slice(0, 120);
+                    // ── AND NOW IT SAYS ENOUGH TO FIND OUT WHY ───────────────────────────────────────
+                    // The paragraph above promises this is zero for an honest player. It is not: 95
+                    // refusals across 32 runs and SIX members, 17 of them on runs that were then WON —
+                    // which is nobody's idea of an exploit and is therefore the bug it says it would be.
+                    //
+                    // The column could never answer it. `refused` is a count and `refused_why` keeps only
+                    // the LAST reason, so every one of those 95 reads "illegal_play" with no move, no hand
+                    // and no energy beside it. canPlay refuses on three different grounds — the uid is not
+                    // in the server's hand, the card costs more than the energy it holds, or the card is
+                    // unplayable — and telling those apart is the whole diagnosis. A hand that disagrees
+                    // about its CONTENTS is a draw-order divergence; one that disagrees about ENERGY is an
+                    // accounting slip in a batched turn.
+                    //
+                    // Logged, not stored: this is the failure path, it costs nothing on a normal turn, and
+                    // it stays backend-only — see [[no-temp-ui-scaffolding]].
+                    logger?.warn?.("cards.move_refused", {
+                        why: out.why,
+                        act: run.act, stop: run.stop, asc: run.asc,
+                        refusedSoFar: run.refused,
+                        // What the client asked for, against what the server was holding when it asked.
+                        moves: Array.isArray(body?.moves) ? body.moves.slice(0, 12) : null,
+                        serverHand: (out.state?.hand || run.fight?.hand || []).map((c) => `${c.uid}:${c.id}`).slice(0, 12),
+                        serverEnergy: out.state?.energy ?? run.fight?.energy ?? null,
+                        foesAlive: (out.state?.foes || run.fight?.foes || []).filter((f) => (f?.hp || 0) > 0).length,
+                    });
                     await saveRun(buyer.id, run);
                     return NextResponse.json({ error: out.why, run }, { status: 400 });
                 }
