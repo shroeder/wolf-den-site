@@ -54,14 +54,16 @@ export default async function SailingPage() {
     // other member on the horizon.
     const petId = me?.featured_collectible || null;
     const petXpRow = petId
-        ? await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyer.id, petId]).catch(() => null)
+        ? await db.queryOne(`SELECT xp, look_level FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyer.id, petId]).catch(() => null)
         : null;
     const petLvl = petId ? petLevelForXp(petXpRow?.xp || 0, collectibleById(petId)?.rarity) : 1;
     // The last surface. Your pet stands on your own deck, so it wears its enshrined form here too — the
     // alternative is one screen in the game where a transfigured animal quietly reverts.
     const { stoneMapFor } = await import("@/lib/marketplace/pet-ascension.js");
     const myStones = petId ? await stoneMapFor(buyer.id).catch(() => ({})) : {};
-    const petArt = petId ? pickPetSpriteForLevel(petBase[petId], petLevels[petId], petLvl, myStones[petId] || null) : null;
+    // The chosen look comes off the row already fetched above — a member who pinned this pet to an earlier
+    // rung sees that pet on their own deck too, or the one screen they look at most would contradict the rest.
+    const petArt = petId ? pickPetSpriteForLevel(petBase[petId], petLevels[petId], petLvl, myStones[petId] || null, petXpRow?.look_level || null) : null;
     const pet = petArt?.url ? { url: petArt.url, flip: petArt.flip || false } : null;
 
     return <SailingClient initial={state} hero={hero} pet={pet} captain={me?.display_name || me?.alias || "Captain"} />;

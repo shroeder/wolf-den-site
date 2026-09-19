@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { petsPeek, petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare, setPetWish } from "@/lib/marketplace/pets.js";
+import { petsPeek, petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare, setPetWish, setPetAppearance } from "@/lib/marketplace/pets.js";
 import { settlePetIncome, petIncomeRate } from "@/lib/marketplace/pet-income.js";
 import { db } from "@/lib/db";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -73,6 +73,9 @@ export async function POST(request) {
                 const { enshrinePet } = await import("@/lib/marketplace/pet-ascension.js");
                 res = await enshrinePet(buyer.id, String(b?.petId || ""), String(b?.stone || ""));
             }
+            // ⚠️ ABOVE THE FALL-THROUGH. The last branch is a bare `else` that EQUIPS, so an action added
+            // below it would not be an unknown action — it would silently equip whatever petId came with it.
+            else if (b?.action === "appearance") res = await setPetAppearance(buyer.id, String(b?.petId || ""), Number(b?.level) || 0);
             else res = await equipPet(buyer.id, String(b?.petId || ""));
             if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 });
             return NextResponse.json(res, { headers: { "Cache-Control": "no-store" } });

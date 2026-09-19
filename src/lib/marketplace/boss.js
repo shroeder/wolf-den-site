@@ -522,6 +522,9 @@ export async function getBossState(buyerId = null) {
     // it landed in a later microtask and still found `members` in the temporal dead zone, and the `.catch()`
     // turned the throw into an empty Map. Nothing failed, nothing logged: enshrined pets simply never wore
     // their stone form on the boss wall, which is the one wall the whole Den looks at.
+    // One query for the whole roster's chosen looks, alongside the one that fetches their stones.
+    const petLooks = await (async () => (await import("@/lib/marketplace/pet-level.js"))
+        .getPetLooksForBuyers(members.map((m) => m.id)))().catch(() => ({}));
     const petStones = await (async () => (await import("@/lib/marketplace/pet-ascension.js"))
         .stoneMapForMembers(members.map((m) => m.id)))().catch(() => new Map());
 
@@ -552,7 +555,8 @@ export async function getBossState(buyerId = null) {
             const petLvl = m.featured_collectible ? petLevelForXp(m.featured_pet_xp || 0, collectibleById(m.featured_collectible)?.rarity) : null;
             const petArt = m.featured_collectible
                 ? pickPetSpriteForLevel(petSprites[m.featured_collectible], petSpriteLevels[m.featured_collectible],
-                    petLvl || 1, (petStones.get(m.id) || {})[m.featured_collectible] || null)
+                    petLvl || 1, (petStones.get(m.id) || {})[m.featured_collectible] || null,
+                    (petLooks[m.id] || {})[m.featured_collectible] || null)
                 : null;
             const cos = sanitizeCosmetics(m.avatar_cosmetics);
             const badges = fighterBadges.get(m.id) || [];

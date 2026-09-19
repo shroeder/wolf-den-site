@@ -662,7 +662,7 @@ async function petArtMap(buyerId, petIds) {
                 // error anybody sees: every card simply goes back to its level-1 portrait. The whole feature
                 // fails silently and correctly-looking. (The same trap the marketplace's buyer_id columns
                 // have sprung before; the parameter comparisons are fine, it is column-to-column that breaks.)
-                `SELECT l.pet_id, l.xp, e.stone
+                `SELECT l.pet_id, l.xp, l.look_level, e.stone
                    FROM mkt_pet_level l
                    LEFT JOIN mkt_pet_enshrined e
                           ON e.buyer_id::text = l.buyer_id::text AND e.pet_id = l.pet_id
@@ -688,7 +688,7 @@ async function petArtMap(buyerId, petIds) {
         const pet = collectibleById(petId);
         const row = owned.get(petId);
         const level = row ? petLevelForXp(row.xp, pet?.rarity) : 1;
-        const art = pickPetSpriteForLevel(base[petId], levels[petId], level, row?.stone || null);
+        const art = pickPetSpriteForLevel(base[petId], levels[petId], level, row?.stone || null, row?.look_level || null);
         if (!art?.url) continue;
         out[petId] = {
             url: art.url, flip: art.flip === true,

@@ -95,6 +95,57 @@ export async function getPetXpMap(buyerId) {
     return Object.fromEntries(rows.map((r) => [r.pet_id, Number(r.xp) || 0]));
 }
 
+// ── WHAT EACH PET IS BEING SHOWN AS ──────────────────────────────────────────────────────────────────────────
+// A member may pin a pet's appearance to any rung it has already reached (see migration 453). These three read
+// and write that column and nothing else — the value is APPEARANCE ONLY and is never read by the perk engine,
+// the XP bar or any number on the card. The "cannot look higher" rule is NOT enforced here: it lives in
+// pickPetSpriteForLevel, which every render site goes through, so it holds even for a row written long ago.
+
+/** Map pet_id -> chosen look level for one member. Absent = show its real level. */
+export async function getPetLooks(buyerId) {
+    if (!buyerId) return {};
+    const rows = await db.query(`SELECT pet_id, look_level FROM mkt_pet_level WHERE buyer_id = $1 AND look_level IS NOT NULL`, [buyerId]).catch(() => []);
+    return Object.fromEntries(rows.map((r) => [r.pet_id, Number(r.look_level) || 0]));
+}
+
+/** Map buyer_id -> { pet_id: look } for several members at once — the screens that draw other people's pets
+ *  (the boss roster, a ship's crew) render many members in one pass and must not fire a query each. */
+export async function getPetLooksForBuyers(buyerIds = []) {
+    const ids = [...new Set((buyerIds || []).filter(Boolean).map(String))];
+    if (!ids.length) return {};
+    const rows = await db.query(
+        `SELECT buyer_id, pet_id, look_level FROM mkt_pet_level WHERE buyer_id = ANY($1) AND look_level IS NOT NULL`, [ids]
+    ).catch(() => []);
+    const out = {};
+    for (const r of rows) {
+        if (!out[r.buyer_id]) out[r.buyer_id] = {};
+        out[r.buyer_id][r.pet_id] = Number(r.look_level) || 0;
+    }
+    return out;
+}
+
+/** Pin a pet's appearance to `level`, or pass 0/null to go back to showing its real level. */
+export async function setPetLook(buyerId, petId, level) {
+    if (!buyerId || !petId) return { ok: false, error: "bad_request" };
+    const want = Math.floor(Number(level) || 0);
+    // Refused rather than clamped: a member tapping a rung they have not reached should be told no, not
+    // quietly given a different pet than the one they pressed. The render-time clamp is the safety net for
+    // rows written before a level changed; this is the door.
+    if (want && (want < 1 || want > PET_MAX_LEVEL)) return { ok: false, error: "bad_level" };
+    const xpRow = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);
+    if (want) {
+        const { collectibleById } = await import("@/lib/marketplace/collectibles.js");
+        const real = petLevelForXp(Number(xpRow?.xp) || 0, collectibleById(petId)?.rarity || "common");
+        if (want > real) return { ok: false, error: "not_reached", real };
+    }
+    await db.query(
+        `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, look_level, updated_at) VALUES ($1, $2, 0, $3, NOW())
+         ON CONFLICT (buyer_id, pet_id) DO UPDATE SET look_level = $3, updated_at = NOW()`,
+        [buyerId, petId, want || null]
+    ).catch(() => {});
+    return { ok: true, petId, look: want || null };
+}
+
 // Map buyer_id -> { pet_id: xp } for the whole pack (one query), for boss sizing.
 export async function getPetXpForBuyers() {
     const rows = await db.query(`SELECT buyer_id, pet_id, xp FROM mkt_pet_level`).catch(() => []);

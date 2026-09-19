@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 
 import MemberHeroCard from "@/components/MemberHeroCard";
 import PetArt from "@/components/PetArt";
@@ -192,6 +192,22 @@ export default function PetsClient() {
     const [modalErr, setModalErr] = useState(null);
     const [sending, setSending] = useState(false);
     const [detail, setDetail] = useState(null); // pet whose detail PAGE is open (in-flow, not a modal)
+    // ── THE APPEARANCE ROW OPENS ON THE RUNG THAT IS SELECTED ────────────────────────────────────────────
+    // The row scrolls sideways and a maxed pet's chosen rung is the LAST one, so on a phone it opened showing
+    // Lv1-Lv4 with nothing highlighted — the control looked like it had no current value at all. Scrolling the
+    // active tile into view on open is the difference between "pick one" and "here is the one you picked".
+    const lookRowRef = useRef(null);
+    useEffect(() => {
+        const row = lookRowRef.current;
+        if (!row) return undefined;
+        const t = setTimeout(() => {
+            const on = row.querySelector(".petx-look-opt.is-on");
+            // inline:"center" rather than scrollIntoView's default, and only the ROW scrolls — block:"nearest"
+            // stops it dragging the whole page down to the picker the moment a pet is opened.
+            on?.scrollIntoView({ inline: "center", block: "nearest", behavior: "instant" });
+        }, 60);
+        return () => clearTimeout(t);
+    }, [detail, state?.petLooks]);
     // Give-a-copy: folded into the detail page as an expandable member-search panel (no more @handle typing).
     const [giveOpen, setGiveOpen] = useState(false);
     const [memberQuery, setMemberQuery] = useState("");
@@ -352,10 +368,15 @@ export default function PetsClient() {
     const passiveEntries = Object.entries(state?.passiveTotals || {}).sort((a, b) => b[1] - a[1]);
     // The pet's sprite at its CURRENT level (leveled/evolved art), so cards + detail show the right form —
     // not always the base level-1 sprite. Null for unowned pets → PetArt falls back to the base sprite.
-    const leveledSprite = (petId) => {
-        const lv = state?.petLevels?.[petId]?.level;
-        return (lv && state?.petSprites?.[petId]?.[lv]) || null;
+    // A pinned APPEARANCE wins over the real level here, and only here — the level bar, the stars, the tier
+    // track and every number on the card still read the pet's actual level, because a look is cosmetic.
+    // Math.min so the client can never draw a rung above the one earned, the same guarantee the server makes.
+    const shownLevel = (petId) => {
+        const real = state?.petLevels?.[petId]?.level || 1;
+        const look = Number(state?.petLooks?.[petId]) || 0;
+        return look ? Math.max(1, Math.min(look, real)) : real;
     };
+    const leveledSprite = (petId) => state?.petSprites?.[petId]?.[shownLevel(petId)] || null;
 
     // The pet detail as a full in-flow page (breadcrumb back + normal scroll), with the give-a-copy flow
     // folded in as a member SEARCH → hero-card picker (no @handle typing).
@@ -411,6 +432,43 @@ export default function PetsClient() {
                                 {isFeatured
                                     ? "Equipped — earns 12% of your XP + a little over time. Leveling boosts its ⭐ signature (active)."
                                     : "Equip this pet to level it up (12% of your XP + a trickle over time)."}
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {/* ── APPEARANCE ── every rung this pet has already reached, as art you can tap.
+                        Levelling is one-way, so without this a member who loved the round little Lv2 form lost
+                        it permanently the first time the pet grew. Rungs ABOVE the pet's level are not drawn
+                        at all: they cannot be chosen, and showing them would spoil evolutions the member has
+                        not earned yet. Only appears once there is an actual choice to make. */}
+                    {lvl && lvl.level > 1 ? (
+                        <div className="petx-look">
+                            <div className="petx-tiers-cap">Appearance</div>
+                            <div className="petx-look-row" ref={lookRowRef}>
+                                {Array.from({ length: lvl.level }, (_, i) => i + 1).map((n) => {
+                                    const art = state?.petSprites?.[p.id]?.[n] || null;
+                                    const on = shownLevel(p.id) === n;
+                                    const stone = (state?.ascension?.enshrined || []).find((e) => e.petId === p.id)?.stone || null;
+                                    return (
+                                        <button
+                                            key={n}
+                                            type="button"
+                                            className={`petx-look-opt${on ? " is-on" : ""}${n === 6 && stone ? ` is-${stone}` : ""}`}
+                                            disabled={busy === p.id}
+                                            aria-pressed={on}
+                                            aria-label={`Show this pet at level ${n}`}
+                                            onClick={() => action(p.id, "appearance", { level: n === lvl.level ? 0 : n })}
+                                        >
+                                            <span className="petx-look-art"><PetArt id={p.id} url={art?.url} flip={art?.flip} /></span>
+                                            <span className="petx-look-lv">{n === 6 && stone ? (stone === "light" ? "Light" : "Dark") : `Lv ${n}`}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <div className="muted petx-look-note">
+                                {shownLevel(p.id) === lvl.level
+                                    ? "Showing its real level. Pick an earlier form to keep that look as it grows."
+                                    : <>Shown as <b>Lv {shownLevel(p.id)}</b> — it is really <b>Lv {lvl.level}</b>, and its ability is unchanged. <button type="button" className="petx-look-reset" onClick={() => action(p.id, "appearance", { level: 0 })}>Show its real level</button></>}
                             </div>
                         </div>
                     ) : null}

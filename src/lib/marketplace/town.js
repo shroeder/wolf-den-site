@@ -237,10 +237,10 @@ function activitySlot(id, event, path) {
 
 // The pet sprite at a member's ACTUAL level for their featured pet (evolved art at Lv2-5), so town pets reflect
 // their level like the boss scene does. Returns { url, flip } or null.
-function petSpriteForLevel(collId, petXp, petSprites, petSpriteLevels, stone = null) {
+function petSpriteForLevel(collId, petXp, petSprites, petSpriteLevels, stone = null, look = null) {
     if (!collId) return null;
     const lvl = petLevelForXp(petXp || 0, collectibleById(collId)?.rarity) || 1;
-    return pickPetSpriteForLevel(petSprites[collId], petSpriteLevels[collId], lvl, stone) || null;
+    return pickPetSpriteForLevel(petSprites[collId], petSpriteLevels[collId], lvl, stone, look) || null;
 }
 
 // Heartbeat: the caller is on the Town page RIGHT NOW. Bumps town_seen_at every poll; (re)starts town_since when
@@ -437,6 +437,10 @@ export async function getTownState(buyerId) {
     const { stoneMapForMembers } = await import("@/lib/marketplace/pet-ascension.js");
     const petStones = await stoneMapForMembers([...recent.map((r) => r.id), buyerId].filter(Boolean)).catch(() => new Map());
     const myStone = (petStones.get(buyerId) || {})[me?.featured_collectible] || null;
+    // Everyone visible in the plaza, in one query — the same fan-out the stones just did.
+    const { getPetLooksForBuyers } = await import("@/lib/marketplace/pet-level.js");
+    const petLooks = await getPetLooksForBuyers([...recent.map((r) => r.id), buyerId].filter(Boolean)).catch(() => ({}));
+    const myLook = (petLooks[buyerId] || {})[me?.featured_collectible] || null;
     const players = recent.map((r) => {
         const a = actBy[r.id];
         const mv = moverBy[r.id];
@@ -444,7 +448,8 @@ export async function getTownState(buyerId) {
         const fighting = fightingSet.has(String(r.id));
         const slot = activitySlot(r.id, a?.event, a?.path);
         const pet = petSpriteForLevel(r.featured_collectible, r.featured_pet_xp, petSprites, petSpriteLevels,
-            (petStones.get(r.id) || {})[r.featured_collectible] || null);
+            (petStones.get(r.id) || {})[r.featured_collectible] || null,
+            (petLooks[r.id] || {})[r.featured_collectible] || null);
         return {
             id: r.id,
             name: r.display_name || (r.alias ? `@${r.alias}` : "Wolf"),
@@ -515,8 +520,8 @@ export async function getTownState(buyerId) {
             x: myPos?.x ?? 50, y: myPos?.y ?? 80, facing: myPos?.facing ?? 1,
             chat: (buyerId ? chatBy[buyerId] : null) || null,
             inTown: true,
-            pet: petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels, myStone)?.url || null,
-            petFlip: Boolean(petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels, myStone)?.flip),
+            pet: petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels, myStone, myLook)?.url || null,
+            petFlip: Boolean(petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels, myStone, myLook)?.flip),
             gold: Number(me?.gold || 0),
         },
         players,

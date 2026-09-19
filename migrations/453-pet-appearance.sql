@@ -1,0 +1,15 @@
+-- ── CHOOSE WHAT YOUR PET LOOKS LIKE ──────────────────────────────────────────────────────────────────────────
+-- Luke: "people can select the appearance of each pet they own — in some cases people want their pet to look
+-- like one of a lower level. You can't make it look higher."
+--
+-- A pet's art is its level's art, and levelling is one-way, so a member who loved the round little Lv2 form
+-- lost it the moment they grew past it. This lets them pin any rung they have ALREADY REACHED and keep it.
+--
+-- APPEARANCE ONLY. The pet's real level still drives its ability, its XP bar and every number on its card —
+-- nothing reads this column but the sprite picker. It lands on mkt_pet_level because that is already the one
+-- row per (member, pet), so a look costs no new table and no new join.
+--
+-- NULL means "show my real level", which is what every existing row means and what every pet keeps until its
+-- owner chooses otherwise. The cap is enforced in pickPetSpriteForLevel — the single function every render
+-- site already goes through — so a stale value can never render a pet above the level it actually earned.
+ALTER TABLE mkt_pet_level ADD COLUMN IF NOT EXISTS look_level INT;

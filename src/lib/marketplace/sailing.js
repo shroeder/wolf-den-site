@@ -298,19 +298,22 @@ async function petArtByBuyer(pairs) {
         // SQL literals out of ids. This over-fetches a little (any listed member x any listed pet) and the
         // exact pair is matched in JS below.
         db.query(
-            `SELECT buyer_id, pet_id, xp FROM mkt_pet_level
+            `SELECT buyer_id, pet_id, xp, look_level FROM mkt_pet_level
               WHERE buyer_id = ANY($1::text[]) AND pet_id = ANY($2::text[])`,
             [[...new Set(wanted.map((w) => String(w.buyerId)))], [...new Set(wanted.map((w) => String(w.petId)))]]
         ).catch(() => []),
     ]);
     const xpFor = new Map((xpRows || []).map((r) => [`${r.buyer_id}|${r.pet_id}`, Number(r.xp) || 0]));
+    // Keyed the same way, off the same rows — a chosen look costs this path no extra query at all.
+    const lookFor = new Map((xpRows || []).map((r) => [`${r.buyer_id}|${r.pet_id}`, Number(r.look_level) || 0]));
     // Both captains' crews in one query — a battle draws two pets, not two hundred.
     const { stoneMapForMembers } = await import("@/lib/marketplace/pet-ascension.js");
     const crewStones = await stoneMapForMembers(wanted.map((w) => w.buyerId).filter(Boolean)).catch(() => new Map());
     const out = {};
     for (const w of wanted) {
         const lvl = petLevelForXp(xpFor.get(`${w.buyerId}|${w.petId}`) || 0, collectibleById(w.petId)?.rarity);
-        const art = pickPetSpriteForLevel(base[w.petId], levels[w.petId], lvl, (crewStones.get(w.buyerId) || {})[w.petId] || null);
+        const art = pickPetSpriteForLevel(base[w.petId], levels[w.petId], lvl, (crewStones.get(w.buyerId) || {})[w.petId] || null,
+            lookFor.get(`${w.buyerId}|${w.petId}`) || null);
         if (art?.url) out[w.buyerId] = { url: art.url, flip: art.flip === true };
     }
     return out;

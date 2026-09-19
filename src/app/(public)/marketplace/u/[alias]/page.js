@@ -110,13 +110,17 @@ export default async function UserProfilePage({ params }) {
     // see is half a prestige item — and the enshrined forms are the best-looking art in the game.
     const { stoneMapFor } = await import("@/lib/marketplace/pet-ascension.js");
     const petStones = await stoneMapFor(profile.id).catch(() => ({}));
+    // THE OWNER'S choice, not the viewer's — this is their profile and their pet. A look is a cosmetic
+    // decision about how an animal is presented, so it has to hold on the page other people actually read.
+    const { getPetLooks } = await import("@/lib/marketplace/pet-level.js");
+    const petLooks = await getPetLooks(profile.id).catch(() => ({}));
     const petsData = (pets.ownedIds || [])
         .map((id) => {
             const def = collectibleById(id);
             if (!def) return null;
             const lvl = pets.petLevels?.[id]?.level || 1;
             const stone = petStones[id] || null;
-            const art = pickPetSpriteForLevel(petSpriteBase[id], petSpriteLevels[id], lvl, stone);
+            const art = pickPetSpriteForLevel(petSpriteBase[id], petSpriteLevels[id], lvl, stone, petLooks[id] || null);
             // THE SIGNATURE, NOT `activeStat` — see petPerkAt. This printed the pet's fallback stat, so a
             // Kangaroo's public profile advertised "+24% Might" for a pet that grants Plaza Kick and no
             // Might whatsoever. Same bug as the level-up card, on the page other members read.

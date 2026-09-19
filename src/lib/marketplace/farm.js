@@ -517,13 +517,17 @@ export async function getFarm(ownerId, viewerId) {
     // Whose farm this is — a visitor sees the OWNER's enshrined forms, not their own.
     const { stoneMapFor } = await import("@/lib/marketplace/pet-ascension.js");
     const farmStones = await stoneMapFor(ownerId).catch(() => ({}));
+    // Whose farm this is, again: a visitor sees how the OWNER chose to show their pets, not how they show
+    // their own. Same rule as the stones directly above, for the same reason.
+    const { getPetLooks } = await import("@/lib/marketplace/pet-level.js");
+    const farmLooks = await getPetLooks(ownerId).catch(() => ({}));
     const pets = (state.ownedIds || [])
         .map((id) => {
             const def = collectibleById(id);
             const lvl = state.petLevels?.[id];
             // Show the sprite for the pet's CURRENT level (evolved 2-6), like the boss scene — not the Lv1
             // base — and its ENSHRINED form if it has one, which is the whole visible payoff of level six.
-            const sp = pickPetSpriteForLevel(sprites[id], levelSprites[id], lvl?.level || 1, farmStones[id] || null);
+            const sp = pickPetSpriteForLevel(sprites[id], levelSprites[id], lvl?.level || 1, farmStones[id] || null, farmLooks[id] || null);
             return {
                 id,
                 name: def?.name || id,

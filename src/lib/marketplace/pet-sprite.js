@@ -159,8 +159,18 @@ export async function petSpriteSet(petId) {
 
 // Pure: given a pet's base sprite ({url,flip}) + its level map, pick the art for `level` — the highest
 // evolved sprite at or below `level`, falling back to the base (Lv1). Used by every render site.
-export function pickPetSpriteForLevel(base, levelMap, level, stone = null) {
-    const lv = Math.max(1, Math.min(6, Math.floor(Number(level) || 1)));
+export function pickPetSpriteForLevel(base, levelMap, level, stone = null, look = null) {
+    const real = Math.max(1, Math.min(6, Math.floor(Number(level) || 1)));
+    // ── THE CHOSEN LOOK, AND WHY THE CAP IS HERE ─────────────────────────────────────────────────────────
+    // A member can show a pet at any rung it has ALREADY REACHED — Luke: "in some cases people want their pet
+    // to look like one of a lower level. You can't make it look higher."
+    //
+    // The clamp is in this function rather than at the eight call sites or on the write, because this is the
+    // one thing every render site in the game already goes through. Validating only on write would leave a
+    // stored 5 rendering as 5 on a pet that was somehow reset to 2, and validating at the call sites is eight
+    // chances to forget. Here it is arithmetic: a look can only ever pull a pet DOWN.
+    const want = Math.floor(Number(look) || 0);
+    const lv = want > 0 ? Math.max(1, Math.min(want, real)) : real;
     // ENSHRINED FIRST. A level-6 pet wears the form of the stone that enshrined it, and that is the whole
     // visible payoff of the climb — so it wins over every other rung. A level-6 pet with NO stone (the climb
     // finished, the ritual not yet performed) correctly falls through to its level-5 art: the transfiguration
@@ -174,6 +184,8 @@ export function pickPetSpriteForLevel(base, levelMap, level, stone = null) {
 
 // The level-appropriate sprite {url, flip} for ONE pet at a given level (base Lv1 → evolved 2–5). Used by the
 // level-up celebration so it shows the sprite you JUST evolved into, not the Lv1 base.
+// ⚠️ DELIBERATELY IGNORES THE CHOSEN LOOK. This is the card that says "your pet just became this" — showing it
+// wearing an older form the member picked would be celebrating a thing that did not happen.
 export async function getPetLevelSprite(petId, level) {
     const [base, levels] = await Promise.all([getPetSpriteData(), getPetSpriteLevelData()]);
     return pickPetSpriteForLevel(base[petId], levels[petId], level) || null;

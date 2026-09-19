@@ -10660,6 +10660,32 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .petx-level-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ffd75e, #ff9a6a); transition: width 0.4s ease; }
 /* Per-level bonus breakdown (each star's payoff) */
 /* Five levels across, not five rows down — compact, and it reads as a progression track you climb. */
+/* ── THE APPEARANCE PICKER ────────────────────────────────────────────────────────────────────────────────
+   A row of the pet's own art, one tile per rung it has reached, so the choice is made by looking rather than
+   by reading a number. Scrolls sideways rather than wrapping: six tiles at 375px would otherwise reflow into
+   a second row and push the level-six panel off the fold. */
+.petx-look { margin-top: 12px; }
+.petx-look-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.petx-look-row::-webkit-scrollbar { display: none; }
+.petx-look-opt {
+    flex: 0 0 auto; width: 74px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 6px 4px 5px; border-radius: 11px; cursor: pointer;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.09); color: #9a93a6;
+    transition: border-color .12s ease, background .12s ease, transform .12s ease;
+}
+.petx-look-opt:disabled { opacity: 0.55; cursor: default; }
+.petx-look-opt:not(:disabled):hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.2); }
+.petx-look-opt.is-on { background: rgba(255,186,90,0.14); border-color: rgba(255,186,90,0.75); color: #ffd9a8; box-shadow: 0 0 16px rgba(255,170,70,0.22); }
+/* The enshrined rung keeps its stone's colour here too, so the tile reads as the form it actually is. */
+.petx-look-opt.is-light.is-on { background: rgba(255,240,190,0.16); border-color: rgba(255,232,160,0.8); box-shadow: 0 0 18px rgba(255,225,150,0.3); }
+.petx-look-opt.is-dark.is-on { background: rgba(170,120,255,0.16); border-color: rgba(184,140,255,0.8); box-shadow: 0 0 18px rgba(160,110,255,0.3); }
+.petx-look-art { width: 54px; height: 54px; display: grid; place-items: center; }
+.petx-look-art img { width: 100%; height: 100%; object-fit: contain; }
+.petx-look-art svg { width: 68%; height: 68%; }
+.petx-look-lv { font-size: 0.66rem; font-weight: 900; letter-spacing: 0.03em; text-transform: uppercase; }
+.petx-look-note { font-size: 0.78rem; margin-top: 4px; line-height: 1.45; }
+.petx-look-reset { background: none; border: none; padding: 0; font: inherit; color: #ffba5a; font-weight: 800; text-decoration: underline; cursor: pointer; }
+
 .petx-tiers-cap { font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #8b93a0; margin: 9px 0 4px; }
 .petx-tiers { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .petx-tier { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 0.78rem; padding: 5px 2px; border-radius: 9px; color: #9a93a6; background: rgba(255,255,255,0.03); border: 1px solid transparent; }

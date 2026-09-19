@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { COLLECTIBLES, PET_STAT_META, collectibleById, isCollectibleUnlocked, petPassive, petPrice } from "@/lib/marketplace/collectibles.js";
-import { getPetXpMap, petLevelInfo, petPassiveLevelMult, accrueEquippedPetTrickle, startPetTrickleClock } from "@/lib/marketplace/pet-level.js";
+import { getPetXpMap, petLevelInfo, petPassiveLevelMult, accrueEquippedPetTrickle, startPetTrickleClock, getPetLooks } from "@/lib/marketplace/pet-level.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { getMemberMetrics } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
@@ -239,6 +239,11 @@ export async function petsState(buyerId, { sync = false, sprites = null } = {}) 
     const realWorldByPet = Object.fromEntries((realWorld || []).map((r) => [r.petId, { reward: r.reward, available: r.available, cooldownUntil: r.cooldownUntil }]));
     // The battle-sprite art for each owned pet at each level 1–5 (resolved: highest evolved sprite ≤ level,
     // else base). Powers the pets-page sprite display + the level-up "evolution" reveal. Only on page loads.
+    // ── THE ONE PLACE THAT DELIBERATELY IGNORES THE CHOSEN LOOK ──────────────────────────────────────────
+    // Every other render site resolves a pet to a single sprite. This screen builds the WHOLE ladder for each
+    // pet, because the ladder is what the appearance picker is made of — you cannot offer somebody a choice
+    // between rungs by handing them the one rung they already picked. The chosen look ships alongside as
+    // `petLooks` and the client uses it to mark which rung is on and to draw the pet everywhere else.
     const petSprites = {};
     if (wantSprites) {
         const { stoneMapFor } = await import("@/lib/marketplace/pet-ascension.js");
@@ -313,7 +318,33 @@ export async function petsState(buyerId, { sync = false, sprites = null } = {}) 
             .filter(([k, v]) => Number(v) && PET_STAT_META[k])
             .map(([k, v]) => [k, Math.round(Number(v) * 10) / 10]))
         : passiveTotals;
-    return { newPets, ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals: menagerieTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites, ascension, petWish: buyer?.pet_wish || null, breedersEye: await hasPower(buyerId, "breeder_s_eye").catch(() => false) };
+    // { petId: rung } for pets whose owner pinned an earlier appearance. Absent = show its real level.
+    const petLooks = await getPetLooks(buyerId).catch(() => ({}));
+    return { newPets, ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals: menagerieTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites, petLooks, ascension, petWish: buyer?.pet_wish || null, breedersEye: await hasPower(buyerId, "breeder_s_eye").catch(() => false) };
+}
+
+/**
+ * Pin one pet's APPEARANCE to a rung it has already reached — or pass 0 to go back to its real level.
+ *
+ * Luke: "people can select the appearance of each pet they own; in some cases people want their pet to look
+ * like one of a lower level. You can't make it look higher."
+ *
+ * Ownership is checked here against the same ownedIds every other pet action uses, so a pet nobody owns can
+ * never get a row. The "not higher than you have reached" rule is checked in setPetLook AND enforced again
+ * at render time in pickPetSpriteForLevel — the write refuses so the member gets told, the render clamps so
+ * a row that was valid when written can never outlive the level it was valid for.
+ */
+export async function setPetAppearance(buyerId, petId, level) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const id = String(petId || "");
+    if (!collectibleById(id)) return { ok: false, error: "not_found" };
+    // { sprites: false } — this only needs ownedIds, and the sprite ladder is the expensive half of this call.
+    const state = await petsState(buyerId, { sprites: false }).catch(() => null);
+    if (!state?.ownedIds?.includes(id)) return { ok: false, error: "not_owned" };
+    const { setPetLook } = await import("@/lib/marketplace/pet-level.js");
+    const res = await setPetLook(buyerId, id, level);
+    if (!res.ok) return res;
+    return { ok: true, petId: id, look: res.look };
 }
 
 /**
