@@ -53,6 +53,11 @@ export async function GET(request, { params }) {
                 // items were returned" for every consignor, permanently, while the data sat in the object
                 // one line up. A consignor with a $240 box still on the shelf looked like he had nothing.
                 inventory: dashboardResult.dashboard.inventory,
+                // ── THE LINES THAT MAKE UP "CURRENT OWED" ────────────────────────────────────────────
+                // One row per item sold since the last payout. A figure somebody is about to hand cash
+                // against should be able to show its working — this is what the number is made of, so the
+                // screen can itemise it instead of asking anyone to trust a total.
+                owedItems: dashboardResult.dashboard.sinceLastPayout || [],
                 payouts,
                 totalPaid,
                 receiptUrlTemplate: `/api/admin/consignors/${consignor.id}/payouts/{payoutId}/receipt`,
