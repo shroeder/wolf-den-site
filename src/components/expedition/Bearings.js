@@ -141,6 +141,14 @@ export default function Bearings({ view, sky, busy, onCommit }) {
         setTaken(next);
         if (score >= 0.4) { Exp.bearingLocked(k); Exp.chartKnit(k); }
         else Exp.bearingMissed();
+        // ── AND IT IS FELT ───────────────────────────────────────────────────────────────────────────
+        // This is the interaction the whole minigame is made of — three calls a run, and the moment the
+        // wire crosses is the only place skill shows. It had a colour and a sound and nothing in the hand.
+        // The pattern is the grade: a dead-on call is a double tap you notice, an ordinary one a single
+        // pulse, a miss a short dull buzz. navigator.vibrate is a no-op on desktop, so this costs nothing
+        // where there is nothing to feel.
+        const band = bearingBand(score).id;
+        navigator.vibrate?.(band === "true" ? [0, 18, 34, 26] : score >= 0.4 ? 22 : [0, 40]);
         setFlash({ k, score });
         if (next.length >= marks.length) {
             // ⚠️ THE LAST CALL COMMITS ITSELF. A "done" button after the third bearing is a button whose only
@@ -334,7 +342,20 @@ function Style() {
                 font-weight: 900; font-size: clamp(0.9rem, 4vw, 1.2rem); letter-spacing: 0.1em;
                 text-shadow: 0 2px 10px rgba(0,0,0,0.9); pointer-events: none;
                 animation: spyFlash 1100ms ease-out forwards; }
-            .spy-flash.is-true { color: #7fe0a8; }
+            /* ⚠️ THE TOP BAND IS BIGGER, AND THAT IS THE POINT. Every grade shared one size, so landing a
+               dead-on call looked exactly like scraping a rough one in a different colour — the peak moment
+               of the minigame, rendered as a palette swap. It is larger, brighter and carries its own glow
+               now; the lower bands are untouched, so the difference is visible without reading the word. */
+            .spy-flash.is-true { color: #7fe0a8; font-size: clamp(1.15rem, 5.4vw, 1.6rem);
+                text-shadow: 0 2px 10px rgba(0,0,0,0.9), 0 0 22px rgba(127, 224, 168, 0.75);
+                animation: spyFlashTrue 1250ms ease-out forwards; }
+            @keyframes spyFlashTrue {
+                0% { opacity: 0; transform: translateX(-50%) scale(0.6); }
+                16% { opacity: 1; transform: translateX(-50%) scale(1.26); }
+                30% { transform: translateX(-50%) scale(0.98); }
+                42% { transform: translateX(-50%) scale(1.06); }
+                100% { opacity: 0; transform: translateX(-50%) translateY(-26px) scale(1); }
+            }
             .spy-flash.is-good { color: #ffe9b8; }
             .spy-flash.is-rough { color: #e8c069; }
             .spy-flash.is-poor { color: #ff9f86; }
