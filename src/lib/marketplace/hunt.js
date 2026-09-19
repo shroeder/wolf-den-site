@@ -27,6 +27,21 @@ import { hash } from "@/lib/marketplace/world-hash.js";
 // a sixteen-hour wait — so the limiter has to be a number of GOES rather than a clock, or the feature has
 // simply moved the waiting somewhere else. Three is a first number for a prototype and is expected to move:
 // it is here, alone, so that moving it is one edit.
+// ── SHOW THE NEW LOOP INSTEAD OF THE OLD ONE ─────────────────────────────────────────────────────────────────
+// Luke: "right now I see the old sailing experience — three options to sail, each a different duration, and a
+// ship battles button. In the new experience this is all tied together. I'd like to see just that."
+//
+// The two loops cannot share a harbour. The old one asks how many HOURS you want to be away and sells battles
+// separately; the new one gives you a number of ATTEMPTS a day, and the fight, the captain, the chart, the
+// island are all inside one attempt. Showing both makes the page a menu of two games.
+//
+// ⚠️ OWNER ONLY, AND SEPARATE FROM CAPTAINS_PUBLIC ON PURPOSE. CAPTAINS_PUBLIC decides whether the expedition
+// EXISTS for somebody. This decides whether it REPLACES what they had. They are different questions and the
+// second one is the dangerous one: flipping it for everybody retires live sailing — durations, the dig, the
+// battle economy — for every member at once. Live sailing is untouched for everyone else while this is
+// owner-only, which is the whole point of a prototype.
+export const SEAMLESS_ONLY = true;
+
 export const SAILINGS_PER_DAY = 3;
 
 // ── WHICH SHIP COMES OVER THE HORIZON ────────────────────────────────────────────────────────────────────────

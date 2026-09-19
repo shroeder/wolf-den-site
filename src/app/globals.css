@@ -12582,6 +12582,13 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-forge-btn .chest-icon, .sail-forge-btn svg { flex: none; }
 .sail-forge-btn-chest { width: 24px; height: 24px; object-fit: contain; flex: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
 /* Embark: choose a voyage length before setting sail. */
+/* ── THE SEAMLESS HARBOUR ─────────────────────────────────────────────────────────────────────────────────
+   One door where the duration picker and the ship-battles button used to be, for an owner previewing the new
+   loop. It borrows the hero CTA styling so it reads as the page.s single action rather than a stray link.
+   See SEAMLESS_ONLY in hunt.js for why the old harbour is hidden rather than removed. */
+.sail-seamless { text-decoration: none; }
+.sail-seamless.is-spent { filter: saturate(0.45) brightness(0.82); }
+.sail-seamless-note { margin: 8px 2px 0; font-size: 0.82rem; line-height: 1.45; color: #9aa4b2; text-align: center; }
 .sail-embark { margin-top: 10px; display: grid; gap: 8px; }
 .sail-embark-title { font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .sail-embark-title .muted { font-weight: 600; }

@@ -934,8 +934,35 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </a>
                 ) : null}
 
-                {/* Embark: pick how long to be out — longer voyages roll better chest tiers. */}
-                {liveStatus === "idle" && (
+                {/* ── THE NEW LOOP, AND NOTHING ELSE ──────────────────────────────────────────────────────
+                    One attempt, and everything is inside it: you go looking, you fight what you find, you
+                    take her captain, you read the glass, you make the island and you walk it. There is no
+                    duration to choose because there is no waiting, and no separate battle button because the
+                    battle is the first thing that happens.
+
+                    The old harbour is hidden rather than deleted — it is still exactly what every other
+                    member sees, and SEAMLESS_ONLY is owner-only. See hunt.js. */}
+                {state.seamlessOnly ? (
+                    liveStatus === "idle" ? (
+                        <div className="sail-embark">
+                            <a className={`sail-cta sail-seamless${state.sailingsLeft > 0 ? "" : " is-spent"}`}
+                               href="/marketplace/expedition">
+                                <span className="sail-cta-stack">
+                                    <b>{state.expeditionOpen ? "Rejoin your expedition" : "Set sail"}</b>
+                                    <em>{state.expeditionOpen
+                                        ? "still out there · pick up where you left off"
+                                        : state.sailingsLeft > 0
+                                            ? `${state.sailingsLeft} of ${state.sailingsPerDay} sailings left today`
+                                            : "no sailings left today — they come back at midnight"}</em>
+                                </span>
+                            </a>
+                            <p className="sail-seamless-note">
+                                A sailing takes you out, finds you a ship, and everything after that &mdash; her
+                                captain, his chart, the island &mdash; happens in one go.
+                            </p>
+                        </div>
+                    ) : null
+                ) : liveStatus === "idle" && (
                     <div className="sail-embark">
                         <div className="sail-embark-title"><HelmIcon /> Choose your voyage <span className="muted">— longer trips bring better chests</span></div>
                         <div className="sail-embark-opts">
@@ -1082,7 +1109,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             </section>
 
-            <FeatureDailies feature="sailing" refreshKey={bountyTick} />
+            {/* ── NO VOYAGE BOUNTIES IN A LOOP WITH NO VOYAGES ────────────────────────────────────────────
+                Today's sailing bounties are "Set sail on a voyage", "Dig up buried treasure" and "Win a ship
+                battle" -- they are metered on voyage_start, dig_done and ship_battle, none of which the
+                seamless loop fires. A card of three tasks that cannot be completed is worse than no card.
+                The new loop has no dailies of its own yet; that is a gap worth filling, not a reason to show
+                the old ones. */}
+            {state.seamlessOnly ? null : <FeatureDailies feature="sailing" refreshKey={bountyTick} />}
 
             {/* The sea's collection sits OUTSIDE the stations and collapsed. It belonged to the Helm only by
                 accident of where it was pasted, and open it pushed the boat upgrades a screen down — but it is
@@ -1118,7 +1151,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 {[["helm", "st_helm", "Helm", "Boat upgrades"],
                   ...(state.combat ? [["guns", "st_guns", "Guns", "Raiding upgrades"]] : []),
                   ...(state.combat ? [["shop", "st_shop", "Shop", "The Quartermaster — spend doubloons"]] : []),
-                  ["dig", "st_dig", "Dig", "Tools & excavation"], ["rail", "st_rail", "Rail", "Fishing"]].map(([k, art, label, sub]) => (
+                  // ── NO DIG IN THE NEW LOOP ───────────────────────────────────────────────────────
+                  // The excavation board is welded to the voyage lifecycle: beginDig refuses unless the
+                  // voyage status is "arrived" and finishDig CLEARS the voyage. With no voyages there is
+                  // nothing it can ever open, so it is a station that leads to a locked door. The island
+                  // is where digging goes in this loop -- see the dig seam noted in islands.js.
+                  ...(state.seamlessOnly ? [] : [["dig", "st_dig", "Dig", "Tools & excavation"]]),
+                  ["rail", "st_rail", "Rail", "Fishing"]].map(([k, art, label, sub]) => (
                     <button key={k} type="button" className={station === k ? "on" : ""} onClick={() => setStation(k)} title={sub} aria-label={sub}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="sail-station-art" src={`/images/sailing/tracks/${art}.png`} alt="" draggable="false" />

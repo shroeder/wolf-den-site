@@ -19,6 +19,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { captainsOpenTo } from "@/lib/marketplace/captains.js";
+import { SAILINGS_PER_DAY, SEAMLESS_ONLY } from "@/lib/marketplace/hunt.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, foePlanks, BATTLE_STATE_V,
@@ -1896,16 +1897,32 @@ export async function getSailingState(buyerId, skyKey = null) {
     const brigRow = captainsOpenTo(isOwner(buyerId))
         ? await db.queryOne(
             `SELECT (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS charts,
-                    (SELECT COUNT(*)::int FROM mkt_ship_expedition WHERE buyer_id = $1 AND ended_at IS NULL) AS open`,
+                    (SELECT COUNT(*)::int FROM mkt_ship_expedition WHERE buyer_id = $1 AND ended_at IS NULL) AS open,
+                    -- The day's allowance, on the query that is already here. Chicago midnight via the
+                    -- round trip, NOT a bare comparison against (NOW() AT TIME ZONE zone)::date -- that form
+                    -- promotes the date with the SESSION zone (UTC on Neon) and rolls the day over at 7pm the
+                    -- evening before. Same expression expedition.js uses; see SINCE_MIDNIGHT there.
+                    -- (No backticks in here: this comment lives inside a JS template literal.)
+                    (SELECT COUNT(*)::int FROM mkt_ship_expedition
+                      WHERE buyer_id = $1
+                        AND opened_at >= date_trunc('day', NOW() AT TIME ZONE 'America/Chicago') AT TIME ZONE 'America/Chicago') AS today`,
             [buyerId]
         ).catch(() => null)
         : null;
     const chartsHeld = Number(brigRow?.charts) || 0;
     const expeditionOpen = (Number(brigRow?.open) || 0) > 0;
+    // The allowance, and whether this member's harbour is the new loop at all.
+    const seamlessOnly = SEAMLESS_ONLY && captainsOpenTo(isOwner(buyerId));
+    const sailingsLeft = Math.max(0, SAILINGS_PER_DAY - (Number(brigRow?.today) || 0));
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
         recipeShop, baits, baitCookable, deepFish, chartsHeld), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
         // Gated by the same captainsOpenTo above — false for anyone the feature is shut to, like chartsReady.
         expeditionOpen,
+        // When true the helm draws ONE door — a sailing attempt — instead of the duration picker and the
+        // battle button, because in the new loop the fight is inside the attempt. See SEAMLESS_ONLY.
+        seamlessOnly,
+        sailingsLeft,
+        sailingsPerDay: SAILINGS_PER_DAY,
         // ── THE PURSE, WHERE YOU CAN SEE IT ──────────────────────────────────────────────────────────
         // Sunflower Jinxx: "it gives boat stat lvl 22, then has dabloons and gold but the dabloons is always
         // 0. I can't see how many I have unless I look in the quartermaster." Always 0 is exactly right: the
