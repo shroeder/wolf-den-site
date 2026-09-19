@@ -9,6 +9,7 @@ import { getDecryptedCredential, resolveOpenAiKey, resolveSquareAccessToken } fr
 import { db } from "@/lib/db";
 import { logGeneration, logText } from "@/lib/marketplace/ai-ledger.js";
 import { createServerLogger } from "@/lib/server-logger";
+import { expandShopOrderLines } from "@/lib/admin-app/shop-order-lines.js";
 
 const proxyLogger = createServerLogger({ source: "api", subsystem: "admin-app-proxy" });
 
@@ -277,7 +278,20 @@ export async function handleProxy(request, upstreamKey, context) {
         return NextResponse.json({ error: "upstream_unreachable" }, { status: 502 });
     }
 
-    const responseBody = await upstreamResponse.text();
+    let responseBody = await upstreamResponse.text();
+
+    // ── ONLINE ORDERS ARRIVE AS ONE ANONYMOUS LUMP, AND THIS IS WHERE THEY ARE PUT BACK TOGETHER ─────────
+    // The website charges a single payment per basket without creating an itemised Square order, so Square
+    // invents one unnamed CUSTOM_AMOUNT line carrying only "Shop order <uuid>". Every report downstream then
+    // shows "Unknown Product · cost $0.00 · 97% margin".
+    //
+    // The phone reads Square THROUGH this proxy, so repairing it here fixes every screen at once with no app
+    // release — and it repairs orders already placed, which nothing else can: a paid Square order is
+    // immutable. See shop-order-lines.js for why the money is held exactly and when it refuses.
+    if (upstreamKey === "square" && upstreamResponse.ok && path.startsWith("/v2/orders")) {
+        responseBody = await expandShopOrderLines(responseBody)
+            .catch(() => responseBody);   // a reporting nicety must never be able to break the report
+    }
 
     // Everything the admin app sends to OpenAI comes through here, so this one place covers the whole app —
     // the entry interpreter, the COGS reader, the chat orchestrator, the catalog resolver — without any of
