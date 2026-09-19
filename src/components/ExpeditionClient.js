@@ -306,7 +306,15 @@ export default function ExpeditionClient() {
 
             {phase === "ashore" ? (
                 <IslandWalk view={view} hero={state.hero} boat={boat} busy={busy}
-                    onTake={(x) => post("take", x)}
+                    // ⚠️ A WARDEN ANSWERS WITH A FIGHT, NOT A REWARD. Walking onto one opens a real ship
+                    // battle on the server; without handing the client over to it the member would stand on
+                    // the node with a saved battle they cannot reach — the same shape as the reload case
+                    // resumeBattle exists for. Every other node still answers with loot and falls through.
+                    onTake={async (x) => {
+                        const d = await post("take", x);
+                        if (d?.fight) await resumeBattle();
+                        return d;
+                    }}
                     onLeave={async () => { const d = await post("leave"); if (d?.summary) setSummary(d.summary); }} />
             ) : null}
 

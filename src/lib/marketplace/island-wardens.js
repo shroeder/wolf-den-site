@@ -195,13 +195,23 @@ export function escortFor(islandId, seed) {
 }
 
 // ── WHERE THEY ARE WAITING ───────────────────────────────────────────────────────────────────────────────────
-// Fractions of the thirty-second run in. The escort comes alongside early enough that the run does not open
-// with a fight, and the warden is at the mouth of the anchorage — which is to say, you can SEE the island
-// while you fight it. That is most of why it is the second one.
-export const RUN_MARKS = [0.38, 0.78];
+// A fraction of the thirty-second run in. One mark, placed late enough that the run does not open with a
+// fight and early enough that it is not still going on when the island fills the screen.
+//
+// ⚠️ IT USED TO BE TWO, AND THE SECOND ONE WAS THE WARDEN. The warden is now met ASHORE, on the island it is
+// named for — see OPENS_FIGHT in island-world.js and takeNode in expedition.js. Half this roster is written
+// as a land thing ("The Bar Itself — a mile of beach that stood up", "Mother — the thicket is one plant and
+// you have its attention", "The Quiet Neighbour — street thing"), and all of them were being fought from a
+// boat at the mouth of the anchorage while a `warden` NODE sat on the island itself with art, a name and a
+// blurb and no fight wired to it. Luke's call, and it resolves both halves at once: the island gains the
+// only combat it has, and the creature is finally where its own description says it is.
+//
+// What is LOST is the composition note that put it here — you could see the island while you fought it. The
+// escort keeps the run from being empty, and the warden now has the island behind it instead.
+export const RUN_MARKS = [0.45];
 
-/** Both fights, in the order the run meets them. */
-export const runFoes = (islandId, seed) => [escortFor(islandId, seed), wardenFor(islandId)].filter(Boolean);
+/** The fight met on the way in. The warden is ashore now and is not one of these. */
+export const runFoes = (islandId, seed) => [escortFor(islandId, seed)].filter(Boolean);
 
 /** Every foe in the archipelago — forty rows — for the art generator and the sim. */
 export function allFoes() {

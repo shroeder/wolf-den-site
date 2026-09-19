@@ -92,6 +92,15 @@ export const STONE_SOURCES = {
     // number from expedition.js for the same reason sail_charted is: this table is the one place the supply
     // can be read off. ⚠️ It shares a run with sail_charted — re-run scripts/check-stones.mjs after moving it.
     island_shrine: { label: "an island shrine", chance: 0.06 },
+    // ── AND THE THING GUARDING IT ─────────────────────────────────────────────────────────────────────────
+    // The island's warden, beaten ashore. Luke's call on what it should pay: "a shot at the rare drop."
+    //
+    // MEASURED, not picked. Averaged over 10,000 laid-out islands a warden appears on 0.76 of them, so 0.12
+    // adds 0.091 stones per island against the 0.350 an island already yields — it becomes the second-best
+    // source on an island without displacing the mark, which is 0.280 of that total and must stay the
+    // reason you sailed. Re-measure before moving it: the warden's 2% node weight is what makes this number
+    // small enough to be safe.
+    island_warden: { label: "an island warden", chance: 0.12 },
     // The boss: only on a KILL, which is a whole-server event a few times a week.
     boss_kill: { label: "a boss kill", chance: 0.02 },
     // The Depths' dungeons: the floor-ten boss, one run per dungeon per day.

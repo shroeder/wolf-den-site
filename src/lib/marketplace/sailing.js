@@ -1577,6 +1577,20 @@ async function finishWardenBattle(buyerId, meta, res) {
     }
 }
 
+// ── THE SAME CREATURE, MET ASHORE ────────────────────────────────────────────────────────────────────────────
+// Its own kind rather than a flag on "warden", because the bookkeeping genuinely differs: the run's warden
+// closes a MARK and hands back the time the fight took (the run has a clock); this one closes a NODE and has
+// no clock to repay. Folding them together would mean a branch inside wardenBeaten for every line of it.
+// Never throws, same as its sibling: a warden that cannot be recorded was still beaten.
+async function finishShoreBattle(buyerId, meta, res) {
+    try {
+        const { shoreWardenBeaten } = await import("@/lib/marketplace/expedition.js");
+        return await shoreWardenBeaten(buyerId, meta, res);
+    } catch {
+        return [];
+    }
+}
+
 // ── THE HUNT AT THE FRONT OF AN EXPEDITION ───────────────────────────────────────────────────────────────────
 // The ship you went looking for. A win takes her captain and the journey moves to the beat that says so; a
 // loss ends the journey and spends the sailing. Dynamic import for the same reason the warden's is — sailing.js
@@ -3094,6 +3108,8 @@ export async function shipBattleReckoning(buyerId) {
     const meta = open.meta;
     const reward = meta.kind === "warden"
         ? await finishWardenBattle(buyerId, meta, res)
+        : meta.kind === "shore"
+        ? await finishShoreBattle(buyerId, meta, res)
         : meta.kind === "hunt"
         ? await finishHuntBattle(buyerId, meta, res)
         : meta.kind === "encounter"

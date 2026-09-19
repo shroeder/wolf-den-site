@@ -31,7 +31,7 @@ import { boatArt, boatLevelFromUpgrades, boatName, boatTier, openEncounterBattle
 import { ISLANDS, islandById, islandCard, prizeFor } from "@/lib/marketplace/islands.js";
 import { bearingAccuracy, bearingFace, bearingScore, chartFace, landfall, plotBand } from "@/lib/marketplace/chart-plot.js";
 import { HUNT_MS, SAILINGS_PER_DAY, huntCaptain, huntFoe, huntRankFor } from "@/lib/marketplace/hunt.js";
-import { TAKEABLE, nodeAt, nodeValue, reachable } from "@/lib/marketplace/island-world.js";
+import { TAKEABLE, nodeAt, nodeValue, reachable, OPENS_FIGHT } from "@/lib/marketplace/island-world.js";
 import { RUN_MS, phaseAfter, viewOf } from "@/lib/marketplace/expedition-view.js";
 import { RUN_MARKS, escortFor, wardenArt, wardenFor } from "@/lib/marketplace/island-wardens.js";
 
@@ -223,10 +223,10 @@ export async function commitBearings(buyerId, taken) {
     const accuracy = bearingAccuracy(face, list);
     const lf = landfall(chartFace(Number(row.seed), Number(row.grade)), accuracy, isle.span);
 
-    // The two encounters on the way in, decided here so the run has a schedule the server can check against.
+    // The encounter on the way in, decided here so the run has a schedule the server can check against.
+    // ONE foe now: the warden was the second mark and is met ashore instead — see RUN_MARKS.
     const escort = escortFor(isle.id, Number(row.seed));
-    const warden = wardenFor(isle.id);
-    const marks = [escort, warden].filter(Boolean).map((foe, i) => ({
+    const marks = [escort].filter(Boolean).map((foe, i) => ({
         at: RUN_MARKS[i] ?? 0.5, foe: foe.id, name: foe.name, art: foe.art,
         anchorage: Boolean(foe.anchorage), done: false,
     }));
@@ -459,6 +459,59 @@ export async function wardenBeaten(buyerId, meta, res) {
     return paid;
 }
 
+// ── ...AND THE WARDEN IS BEATEN ASHORE ───────────────────────────────────────────────────────────────────────
+// Called from sailing.js's battle finisher under meta.kind = "shore". The node was already claimed when the
+// fight opened, so there is no `taken` bookkeeping left to do — all that remains is paying for it.
+//
+// WHAT IT PAYS (Luke's call: "a shot at the rare drop"):
+//   · the warden's own loot, unchanged — coin at anchorage rate and a chest by tier. This FOLLOWED it ashore
+//     rather than being invented here, so moving the fight did not change what an expedition is worth.
+//   · forge parts at depth, because the escort pays parts on every run and a tier-4 warden should not pay
+//     less metal than the thing that escorted it.
+//   · and the shot itself: an ascension stone at STONE_SOURCES.island_warden. Measured at 0.12 against the
+//     0.76 wardens an island averages — see the note on that entry before touching it.
+//
+// A LOSS PAYS NOTHING AND THAT IS ALL IT COSTS. The node stays taken, the tide keeps running, the island and
+// the mark are still there. Same rule the run's wardens played by.
+export async function shoreWardenBeaten(buyerId, meta, res) {
+    const row = await readExpedition(buyerId);
+    if (!row) return [];
+    if (!res?.win) return [];
+
+    const isle = islandById(row.island) || ISLANDS[0];
+    const foe = wardenFor(isle.id);
+    if (!foe) return [];
+
+    const reward = {};
+    for (const l of foe.loot || []) {
+        if (l.kind === "doubloons") reward.doubloons = (reward.doubloons || 0) + l.n;
+        else if (l.kind === "chest") reward.chest = l.tier;
+        else if (l.kind === "parts") reward.parts = { tier: l.tier, n: l.n };
+    }
+    // Metal at depth. tierForRung is the ladder the foe itself was built on, so this cannot drift from its stats.
+    const tier = Math.max(1, Math.min(5, Math.ceil((Number(isle.rung) || 1) / 5)));
+    if (tier >= 4 && !reward.parts) reward.parts = { tier, n: tier >= 5 ? 2 : 1 };
+    reward.xp = 10 + isle.rung * 4;
+
+    let paid = await payFleetReward(buyerId, reward).catch(() => []);
+
+    // ── THE SHOT ─────────────────────────────────────────────────────────────────────────────────────────
+    // Through rollStone with a source declared in STONE_SOURCES, for the same reason the shrine and the mark
+    // are: that table is the one place the stone supply can be read off, and a bare number passed from here
+    // would make it a lie.
+    try {
+        const { rollStone } = await import("@/lib/marketplace/pet-ascension.js");
+        const { STONE_SOURCES } = await import("@/lib/marketplace/pet-stones.js");
+        const got = await rollStone(buyerId, STONE_SOURCES.island_warden.chance, "island_warden");
+        if (got) paid = [...paid, { kind: "stone", ...got }];
+    } catch { /* no stone, still a warden's worth of loot above */ }
+
+    const coin = paid.filter((p) => p.kind === "doubloons").reduce((a, p) => a + (p.n || 0), 0);
+    await db.query(`UPDATE mkt_ship_expedition SET purse = purse + $2 WHERE id = $1`, [row.id, coin]).catch(() => {});
+    await trackActivity(buyerId, "island_warden", { island: isle.id, rung: isle.rung, foe: foe.id }).catch(() => {});
+    return paid;
+}
+
 // ── 4 · THE BOAT BEACHES ─────────────────────────────────────────────────────────────────────────────────────
 // Only once the thirty seconds are genuinely up and both marks are behind you.
 // ── 3b · COMING ALONGSIDE ────────────────────────────────────────────────────────────────────────────────────
@@ -526,6 +579,54 @@ export async function takeNode(buyerId, { to, spent } = {}) {
     if (taken.includes(at)) return { ok: false, error: "already_taken" };
 
     const node = nodeAt(Number(row.seed), isle.id, at, Number(row.fix_index));
+
+    // ── SOMETHING ASHORE ─────────────────────────────────────────────────────────────────────────────────
+    // The island's warden. It has had art for five biomes, a name and a blurb since the island shipped, and
+    // until now walking up to it did NOTHING — `OPENS_FIGHT` was declared in island-world.js and read by no
+    // code at all, so the node fell through to the "nothing there" branch below and quietly ate a step.
+    //
+    // It is the same creature that used to be the run's second mark, moved to the island it is named for
+    // (Luke's call). Which means no new combat system and no new foe table: it opens the SAME ship battle
+    // through the SAME opener, exactly as reachMark did — the only differences are that nothing is paused
+    // (there is no run clock ashore) and the bookkeeping is a node rather than a mark.
+    //
+    // ⚠️ THE NODE IS CLAIMED BEFORE THE FIGHT IS OPENED, and losing does NOT give it back. That is the rule
+    // the run's wardens already played by ("a lost fight still ends the mark") and it is what stops a member
+    // re-opening the same warden until it rolls the stone. The cost of losing is the spoils and one step,
+    // never the island.
+    if (node.kind === OPENS_FIGHT) {
+        // A fight already open is a reload, not a new warden — same guard reachMark uses.
+        const busy = await db.queryOne(`SELECT battle_state FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+        if (busy?.battle_state) return { ok: true, fight: true, ...(await getExpeditionState(buyerId)) };
+
+        const foe = wardenFor(isle.id);
+        // A warden that cannot be staged is scenery, not a wall: bank the step and walk on. WARDENS has a row
+        // per island so this cannot fire today, but refusing here would pin a member on a node they cannot
+        // pass, on a table with a one-open-row index. Same reasoning as the skipped mark in reachMark.
+        if (!foe) {
+            await db.query(`UPDATE mkt_ship_expedition SET at_node = $2, spent = GREATEST(spent, $3) WHERE id = $1`,
+                [row.id, at, used]).catch(() => {});
+            return { ok: true, took: null, ...(await getExpeditionState(buyerId)) };
+        }
+
+        const claimedFight = await db.queryOne(
+            `UPDATE mkt_ship_expedition
+                SET at_node = $2, spent = GREATEST(spent, $3), taken = taken || $4::jsonb
+              WHERE id = $1 AND NOT (taken @> $4::jsonb)
+            RETURNING id`,
+            [row.id, at, used, jsonb([at])]
+        ).catch(() => null);
+        if (!claimedFight) return { ok: false, error: "already_taken", ...(await getExpeditionState(buyerId)) };
+
+        const sailingRow = await db.queryOne(`SELECT * FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+        await openEncounterBattle(buyerId, foe, sailingRow || {}, {
+            kind: "shore",
+            art: wardenArt(foe.id),
+            extra: { expeditionId: Number(row.id), nodeIndex: at, island: isle.id },
+        });
+        return { ok: true, fight: true, ...(await getExpeditionState(buyerId)) };
+    }
+
     if (!TAKEABLE.has(node.kind)) {
         // Nothing there, but the walk is real — bank the steps so the tide still runs down.
         await db.query(`UPDATE mkt_ship_expedition SET at_node = $2, spent = GREATEST(spent, $3) WHERE id = $1`,
