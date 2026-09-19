@@ -107,9 +107,33 @@ export default function ExpeditionClient() {
 
     useEffect(() => {
         let alive = true;
-        (async () => { await load(); if (alive) await resumeBattle(); })();
+        (async () => {
+            const d = await load();
+            if (!alive) return;
+            // ── ARRIVED WITH THE DECISION ALREADY MADE ───────────────────────────────────────────────
+            // The helm's own "Set sail" sends ?go=1. Answering the same question twice is the thing Luke
+            // hit ("irrelevant screen, I already hit set sail"), so the sailing starts here instead of
+            // drawing a harbour that asks again.
+            //
+            // GUARDED THREE WAYS, because this SPENDS one of three daily attempts: only when the flag is
+            // present, only when nothing is already under way, and only when there is an attempt left.
+            // The flag is stripped with replaceState BEFORE the request goes out, so a reload — or the
+            // back button — cannot spend a second one.
+            const go = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("go") === "1";
+            if (go) {
+                const url = new URL(window.location.href);
+                url.searchParams.delete("go");
+                window.history.replaceState(null, "", url.toString());
+                if (!d?.open && Number(d?.sailings) > 0) {
+                    Exp.unlock();
+                    await post("set_sail");
+                    if (!alive) return;
+                }
+            }
+            await resumeBattle();
+        })();
         return () => { alive = false; };
-    }, [load, resumeBattle]);
+    }, [load, post, resumeBattle]);
 
     // ── THE TWO CLOCKS ───────────────────────────────────────────────────────────────────────────────────
     // The hunt and the run are both "a stretch of sea with a thing at the end of it", and both are animated

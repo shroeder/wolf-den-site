@@ -945,8 +945,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 {state.seamlessOnly ? (
                     liveStatus === "idle" ? (
                         <div className="sail-embark">
+                            {/* ── ?go=1 — THE BUTTON DOES THE THING IT SAYS ───────────────────────────
+                                Without it this link landed on the expedition's own harbour screen, which
+                                asks "Set sail?" all over again. Luke, looking at it: "irrelevant screen, I
+                                already hit set sail." Two doors for one decision, and the second one is a
+                                worse version of the first because it has already been answered.
+                                The expedition client reads this, starts the sailing and strips the flag. */}
                             <a className={`sail-cta sail-seamless${state.sailingsLeft > 0 ? "" : " is-spent"}`}
-                               href="/marketplace/expedition">
+                               href={state.expeditionOpen || state.sailingsLeft <= 0
+                                   ? "/marketplace/expedition"
+                                   : "/marketplace/expedition?go=1"}>
                                 <span className="sail-cta-stack">
                                     <b>{state.expeditionOpen ? "Rejoin your expedition" : "Set sail"}</b>
                                     <em>{state.expeditionOpen
