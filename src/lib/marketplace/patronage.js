@@ -22,7 +22,7 @@
 // unrelated prize riding along behind the XP. See [[rewards-must-be-scoped]]: the anti-pattern is "you get a
 // thing, and then also a chest"; this is "the thing IS the hand". Nothing else in the codebase rolls on it.
 //
-// PURE — no database — like forest.js and captains.js, so the payout can be simulated across a thousand
+// PURE — no database — so the payout can be simulated across a thousand
 // receipts rather than argued about. patronage-store.js is the half that grants it.
 
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";

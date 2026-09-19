@@ -903,88 +903,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </>
                 )}
 
-                {/* ── ⚠️ A CHART IS NOT A VOYAGE, SO IT MUST NOT LIVE INSIDE THE VOYAGE PICKER ─────────────
-                    This row used to sit among the three durations, inside the `liveStatus === "idle"` block —
-                    a leftover from when a chart really WAS a fourth duration that started a sixteen-hour trip.
-                    It is an expedition now: you open it, plot it, sail thirty seconds and walk an island, all
-                    in one sitting, and none of it touches the boat's voyage.
 
-                    Leaving it in the picker meant an unrelated twelve-hour trip HID IT COMPLETELY. Luke, with
-                    two charts in hand and his boat at sea: "So I am waiting on my expedition? My vision for
-                    the new expeditions was they were no waiting." He was not waiting on the expedition. He
-                    could not see the door, because an ordinary voyage was standing in front of it.
-
-                    So it sits above the picker and renders on its own terms, whatever the boat is doing.
-                    Still owner-gated upstream — chartsReady is 0 for anyone the feature is shut to. */}
-                {/* ⚠️ NOT IN THE SEAMLESS HARBOUR. This row and the Set sail door below say the same thing —
-                    with an expedition open they both read "still out there · pick up where you left off",
-                    one above the other. The seamless door already covers every case (set sail, rejoin, none
-                    left), so this is the OLD harbour's chart row and belongs only to the old harbour. */}
-                {!state.seamlessOnly && ((state.chartsReady || 0) > 0 || state.expeditionOpen) ? (
-                    <a className="sail-chart-cta" href="/marketplace/expedition">
-                        {/* The chart itself, the same plate the expedition opens with — a door into a
-                            feature should wear the thing it leads to. See gen-expedition-chrome.mjs. */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img className="sail-chart-cta-art" src="/images/islands/chrome/chart.png?v=1" alt="" draggable="false" />
-                        <span className="sail-chart-cta-main">
-                            <b>{state.expeditionOpen ? "Your expedition" : "A charted island"}</b>
-                            {/* An expedition already under way is not an offer, it is somewhere you LEFT —
-                                so the row says so and stops advertising a chart it is not about to spend. */}
-                            <em>{state.expeditionOpen
-                                ? "Still out there · pick up where you left off"
-                                : (state.chartsReady > 1 ? `${state.chartsReady} charts in hand` : "1 chart in hand") + " · the best one is opened"}</em>
-                        </span>
-                        <span className="sail-chart-cta-go">{state.expeditionOpen ? "Rejoin" : "Open the chart"}</span>
-                    </a>
-                ) : null}
-
-                {/* ── THE NEW LOOP, AND NOTHING ELSE ──────────────────────────────────────────────────────
-                    One attempt, and everything is inside it: you go looking, you fight what you find, you
-                    take her captain, you read the glass, you make the island and you walk it. There is no
-                    duration to choose because there is no waiting, and no separate battle button because the
-                    battle is the first thing that happens.
-
-                    The old harbour is hidden rather than deleted — it is still exactly what every other
-                    member sees, and SEAMLESS_ONLY is owner-only. See hunt.js. */}
-                {state.seamlessOnly ? (
-                    liveStatus === "idle" ? (
-                        <div className="sail-embark">
-                            {/* ── ?go=1 — THE BUTTON DOES THE THING IT SAYS ───────────────────────────
-                                Without it this link landed on the expedition's own harbour screen, which
-                                asks "Set sail?" all over again. Luke, looking at it: "irrelevant screen, I
-                                already hit set sail." Two doors for one decision, and the second one is a
-                                worse version of the first because it has already been answered.
-                                The expedition client reads this, starts the sailing and strips the flag. */}
-                            {/* ⚠️ NOT `sail-cta`. That is the helm's compact arcade button — a chunky lip, a
-                                1.9s pulse and a skewed white SHINE SWEEP running across it. At its own size
-                                that reads as a juicy button; stretched to full width the sweep becomes a
-                                glare sitting across a flat yellow slab, which is exactly what it looked
-                                like. This door wears the EXPEDITION's button language instead (see .ex-go
-                                and .beat-go) — brass, vertical, no glare — because that is the feature it
-                                opens. */}
-                            <a className={`sail-seamless${state.sailingsLeft > 0 || state.expeditionOpen ? "" : " is-spent"}`}
-                               href={state.expeditionOpen || state.sailingsLeft <= 0
-                                   ? "/marketplace/expedition"
-                                   : "/marketplace/expedition?go=1"}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img className="sail-seamless-art" src="/images/islands/chrome/chart.png?v=1" alt="" draggable="false" />
-                                <span className="sail-seamless-text">
-                                    <b>{state.expeditionOpen ? "Rejoin your expedition" : "Set sail"}</b>
-                                    <em>{state.expeditionOpen
-                                        ? "still out there · pick up where you left off"
-                                        : state.sailingsLeft > 0
-                                            ? `${state.sailingsLeft} of ${state.sailingsPerDay} sailings left today`
-                                            : "none left today · they come back at midnight"}</em>
-                                </span>
-                                <span className="sail-seamless-go" aria-hidden="true">&rarr;</span>
-                            </a>
-                            <p className="sail-seamless-note">
-                                A sailing takes you out, finds you a ship, and everything after that &mdash; her
-                                captain, his chart, the island &mdash; happens in one go.
-                            </p>
-                        </div>
-                    ) : null
-                ) : liveStatus === "idle" && (
+                {/* Embark: pick how long to be out — longer voyages roll better chest tiers. */}
+                {liveStatus === "idle" && (
                     <div className="sail-embark">
                         <div className="sail-embark-title"><HelmIcon /> Choose your voyage <span className="muted">— longer trips bring better chests</span></div>
                         <div className="sail-embark-opts">
@@ -1050,17 +971,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     tailwind — arrive 1h sooner"), so nothing was scannable.
                     Now: compact equal-weight tiles, each an ICON + a one-word VERB + the detail underneath.
                     Three fit on one line on a phone, and you can tell them apart at a glance. */}
-                {/* ── AND FISHING KEEPS ITS DOOR IN THE NEW LOOP ──────────────────────────────────────────
-                    This row is gated on being AT SEA or just arrived, which was right when the only way to be
-                    docked-and-idle was between voyages. In the seamless loop you are idle the entire time you
-                    are not on an expedition, so the Fish tile never rendered at all and the only way to a rod
-                    was the Rail tab. Luke: "is fishing kind of lost inside sailing now? Maybe we could retain
-                    it being its own thing but accessible from the sailing screen."
-                    It already IS its own thing — the server offers a line at anchor (fishingView only refuses
-                    while digging), so nothing about fishing had to change. It just needed to be visible. */}
                 {(liveStatus === "sailing" || liveStatus === "digging"
                     || (liveStatus === "arrived" && state.fishing?.available)
-                    || (state.seamlessOnly && liveStatus === "idle" && state.fishing?.available)) && (
+                    ) && (
                     <div className="sail-actions">
                         {liveStatus === "sailing" && (
                             state.windAvailable
@@ -1141,13 +1054,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             </section>
 
-            {/* ── NO VOYAGE BOUNTIES IN A LOOP WITH NO VOYAGES ────────────────────────────────────────────
-                Today's sailing bounties are "Set sail on a voyage", "Dig up buried treasure" and "Win a ship
-                battle" -- they are metered on voyage_start, dig_done and ship_battle, none of which the
-                seamless loop fires. A card of three tasks that cannot be completed is worse than no card.
-                The new loop has no dailies of its own yet; that is a gap worth filling, not a reason to show
-                the old ones. */}
-            {state.seamlessOnly ? null : <FeatureDailies feature="sailing" refreshKey={bountyTick} />}
+            <FeatureDailies feature="sailing" refreshKey={bountyTick} />
 
             {/* The sea's collection sits OUTSIDE the stations and collapsed. It belonged to the Helm only by
                 accident of where it was pasted, and open it pushed the boat upgrades a screen down — but it is
@@ -1183,23 +1090,12 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 {[["helm", "st_helm", "Helm", "Boat upgrades"],
                   ...(state.combat ? [["guns", "st_guns", "Guns", "Raiding upgrades"]] : []),
                   ...(state.combat ? [["shop", "st_shop", "Shop", "The Quartermaster — spend doubloons"]] : []),
-                  // ── NO DIG IN THE NEW LOOP ───────────────────────────────────────────────────────
-                  // The excavation board is welded to the voyage lifecycle: beginDig refuses unless the
-                  // voyage status is "arrived" and finishDig CLEARS the voyage. With no voyages there is
-                  // nothing it can ever open, so it is a station that leads to a locked door. The island
-                  // is where digging goes in this loop -- see the dig seam noted in islands.js.
-                  ...(state.seamlessOnly ? [] : [["dig", "st_dig", "Dig", "Tools & excavation"]]),
+                  ["dig", "st_dig", "Dig", "Tools & excavation"],
                   ["rail", "st_rail", "Rail", "Fishing"]].map(([k, art, label, sub]) => (
                     <button key={k} type="button" className={station === k ? "on" : ""} onClick={() => setStation(k)} title={sub} aria-label={sub}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="sail-station-art" src={`/images/sailing/tracks/${art}.png`} alt="" draggable="false" />
                         <em>{label}</em>
-                        {/* A chart in hand is a voyage you can take and nothing on this row would say so.
-                            Owner-gated upstream and riding the query the page already runs, so for
-                            everybody else this is exactly the row it was. */}
-                        {k === "helm" && (state.chartsReady > 0 || state.expeditionOpen) ? (
-                            <i className="sail-station-dot" aria-label="A chart is ready" />
-                        ) : null}
                     </button>
                 ))}
             </div>

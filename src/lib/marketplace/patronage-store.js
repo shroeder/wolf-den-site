@@ -2,7 +2,7 @@ import "server-only";
 
 // ── THE DB HALF OF PATRONAGE ─────────────────────────────────────────────────────────────────────────────────
 // patronage.js holds the rules and is pure so the haul can be simulated across ten thousand receipts; this
-// holds the grants. Same split as forest/forest-store and captains/captains-store, for the same reason.
+// holds the grants. The pure half can then be simulated without a database in front of it.
 
 import { db } from "@/lib/db";
 // lifetimeSpendDollars lives in xp.js, beside the purchase event it reads. It was briefly redefined

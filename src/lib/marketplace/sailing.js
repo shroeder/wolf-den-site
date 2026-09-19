@@ -18,8 +18,6 @@ import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { captainsOpenTo } from "@/lib/marketplace/captains.js";
-import { SAILINGS_PER_DAY, SEAMLESS_ONLY } from "@/lib/marketplace/hunt.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, foePlanks, BATTLE_STATE_V,
@@ -1197,10 +1195,6 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // Every chest tier's real art, so the dig board can draw the one that is actually buried.
         chestArtMap: chestArt,
         // Embark duration choices — trip time + which shards each favours — for the "set sail" picker.
-        // ── AND A CHART, IF A CAPTAIN GAVE ONE UP ────────────────────────────────────────────────
-        // A COUNT, not the charts themselves: the embark row only needs to know whether the option
-        // exists and how many are in hand. Owner-gated with the rest — see captains.js CAPTAINS_PUBLIC.
-        chartsReady: charts,
         voyageOptions: VOYAGE_OPTIONS.map((o) => ({
             id: o.id, label: o.label,
             ms: Math.round(voyageDurationMs(speedLevel, level) * o.mult),
@@ -1497,7 +1491,7 @@ async function resolveDueEncounter(buyerId) {
  * Build the battle state for an encounter and save it under meta.kind.
  *
  * ⚠️ `kind` AND `extra` EXIST SO THE ISLANDS DO NOT NEED A SECOND COMBAT SYSTEM. An island warden is an
- * ENCOUNTERS-shaped object (see island-wardens.js) so everything below — the profiles, the limb points, the
+ * ENCOUNTERS-shaped object so everything below — the profiles, the limb points, the
  * zone map, the gun stages — works on it with nothing changed. What differs is only where the art lives and
  * who gets told when it ends, which is what these two arguments carry.
  */
@@ -1559,54 +1553,6 @@ export async function openEncounterBattle(buyerId, enc, row, { kind = "encounter
     if (setOpeningReckoning(await getOwnedPieceIds(buyerId).catch(() => []))) state.me.reck = RECKONING_AT;
     state.theirNext = planFoeRound(state, mine, foe);
     await saveBattle(buyerId, state, meta);
-}
-
-// ── AN ISLAND WARDEN IS BEATEN ───────────────────────────────────────────────────────────────────────────────
-// The run in carries two of these and expedition.js owns what they mean, so this hands straight over to it.
-// A DYNAMIC import on purpose: expedition.js imports this module for the opener and the payer, and a static
-// import both ways is a cycle. The same trick the pet perks use a few hundred lines up.
-//
-// ⚠️ IT NEVER THROWS. A warden that cannot be recorded must still have been BEATEN — the fight was won, the
-// spoils are the fight's, and an expedition row that failed to update is a bookkeeping problem and not the
-// player's. Same rule as the chart being written before the captive; see [[captains-brig]].
-async function finishWardenBattle(buyerId, meta, res) {
-    try {
-        const { wardenBeaten } = await import("@/lib/marketplace/expedition.js");
-        return await wardenBeaten(buyerId, meta, res);
-    } catch {
-        return [];
-    }
-}
-
-// ── THE SAME CREATURE, MET ASHORE ────────────────────────────────────────────────────────────────────────────
-// Its own kind rather than a flag on "warden", because the bookkeeping genuinely differs: the run's warden
-// closes a MARK and hands back the time the fight took (the run has a clock); this one closes a NODE and has
-// no clock to repay. Folding them together would mean a branch inside wardenBeaten for every line of it.
-// Never throws, same as its sibling: a warden that cannot be recorded was still beaten.
-async function finishShoreBattle(buyerId, meta, res) {
-    try {
-        const { shoreWardenBeaten } = await import("@/lib/marketplace/expedition.js");
-        return await shoreWardenBeaten(buyerId, meta, res);
-    } catch {
-        return [];
-    }
-}
-
-// ── THE HUNT AT THE FRONT OF AN EXPEDITION ───────────────────────────────────────────────────────────────────
-// The ship you went looking for. A win takes her captain and the journey moves to the beat that says so; a
-// loss ends the journey and spends the sailing. Dynamic import for the same reason the warden's is — sailing.js
-// and expedition.js import each other, and the cycle has to be broken on one side.
-//
-// ⚠️ THE SPOILS ARE THE CAPTAIN, NOT A LOOT ROW. Nothing is paid here. What was won is a chart, and the chart
-// is the whole rest of the journey — see the `spoils` phase in expedition.js.
-async function finishHuntBattle(buyerId, meta, res) {
-    try {
-        const { huntFinished } = await import("@/lib/marketplace/expedition.js");
-        const out = await huntFinished(buyerId, meta, res);
-        return out?.captain ? [{ kind: "captain", captain: out.captain }] : [];
-    } catch {
-        return [];
-    }
 }
 
 /** Pay out an encounter and let the voyage go again. `reckoning` is true if the last shot was the free volley. */
@@ -1747,13 +1693,6 @@ async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } =
     if (ENCOUNTERS.every((e) => beaten.includes(e.id))) await grantEventBadge(buyerId, "full_bestiary").catch(() => {});
 
     await trackActivity(buyerId, "sail_encounter", { type: meta.encId, outcome: res.win ? "win" : "lose", tier: enc?.tier || 0 }).catch(() => {});
-    // Her captain, if she had one. Encounters have a TIER rather than a fleet rank, so it is mapped to the
-    // middle of that tier's star band — starsForRank is ceil(rank/8), so tier 1 reads one star and tier 5
-    // reads five, which is the same ladder the fleet uses.
-    if (res.win && enc && enc.kind !== "monster") {
-        const took = await maybeCaptureCaptain(buyerId, Math.max(1, (Number(enc.tier) || 1) * 8 - 4));
-        if (took) spoils.push({ kind: "captain", captain: took });
-    }
     return spoils;
 }
 
@@ -1886,43 +1825,8 @@ export async function getSailingState(buyerId, skyKey = null) {
     // It rides the query that was already here rather than getting its own, and it is NOT a nav badge: a
     // badge in site chrome that reads a feature endpoint bills that feature on every page for every member
     // forever (see check:chrome and CLAUDE.md).
-    // ── AND WHETHER ONE IS ALREADY UNDER WAY ─────────────────────────────────────────────────────────
-    // Opening a chart STAMPS IT SAILED, so `charts` drops to zero the moment the expedition starts — and the
-    // helm's only door into the expedition was gated on that count being above zero. Close the tab halfway
-    // down an island and there was no way back to it: your tide, your island and an unclaimed prize sat on a
-    // row with a one-open-row index, which also meant you could not start another one. The feature had no
-    // front door for the state it spends most of its time in.
-    //
-    // A scalar subquery on the query that was already here, for the same reason the chart count rides it.
-    const brigRow = captainsOpenTo(isOwner(buyerId))
-        ? await db.queryOne(
-            `SELECT (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS charts,
-                    (SELECT COUNT(*)::int FROM mkt_ship_expedition WHERE buyer_id = $1 AND ended_at IS NULL) AS open,
-                    -- The day's allowance, on the query that is already here. Chicago midnight via the
-                    -- round trip, NOT a bare comparison against (NOW() AT TIME ZONE zone)::date -- that form
-                    -- promotes the date with the SESSION zone (UTC on Neon) and rolls the day over at 7pm the
-                    -- evening before. Same expression expedition.js uses; see SINCE_MIDNIGHT there.
-                    -- (No backticks in here: this comment lives inside a JS template literal.)
-                    (SELECT COUNT(*)::int FROM mkt_ship_expedition
-                      WHERE buyer_id = $1
-                        AND opened_at >= date_trunc('day', NOW() AT TIME ZONE 'America/Chicago') AT TIME ZONE 'America/Chicago') AS today`,
-            [buyerId]
-        ).catch(() => null)
-        : null;
-    const chartsHeld = Number(brigRow?.charts) || 0;
-    const expeditionOpen = (Number(brigRow?.open) || 0) > 0;
-    // The allowance, and whether this member's harbour is the new loop at all.
-    const seamlessOnly = SEAMLESS_ONLY && captainsOpenTo(isOwner(buyerId));
-    const sailingsLeft = Math.max(0, SAILINGS_PER_DAY - (Number(brigRow?.today) || 0));
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
-        recipeShop, baits, baitCookable, deepFish, chartsHeld), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
-        // Gated by the same captainsOpenTo above — false for anyone the feature is shut to, like chartsReady.
-        expeditionOpen,
-        // When true the helm draws ONE door — a sailing attempt — instead of the duration picker and the
-        // battle button, because in the new loop the fight is inside the attempt. See SEAMLESS_ONLY.
-        seamlessOnly,
-        sailingsLeft,
-        sailingsPerDay: SAILINGS_PER_DAY,
+        recipeShop, baits, baitCookable, deepFish, 0), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
         // ── THE PURSE, WHERE YOU CAN SEE IT ──────────────────────────────────────────────────────────
         // Sunflower Jinxx: "it gives boat stat lvl 22, then has dabloons and gold but the dabloons is always
         // 0. I can't see how many I have unless I look in the quartermaster." Always 0 is exactly right: the
@@ -2425,18 +2329,6 @@ export async function doRaid(buyerId, targetId = null) {
 // the fleet until the man below decks had been interrogated, and `maybeOfferCaptain` refused to take a second
 // captain while the first was still waiting. Both are gone with the minigame: there is nothing to wait for, so
 // there is nothing to block and no queue to manage. Luke: "you capture the captain, and he gives you the
-// treasure map."
-//
-// It only ever ADDS to a payout that has already been paid, and it swallows its own failures, so a chart that
-// does not write costs a chart and can never cost a win.
-async function maybeCaptureCaptain(buyerId, rank) {
-    if (!captainsOpenTo(isOwner(buyerId))) return null;
-    try {
-        const { captureCaptain } = await import("@/lib/marketplace/captains-store.js");
-        return await captureCaptain(buyerId, Math.max(1, Number(rank) || 1));
-    } catch { return null; /* the chart is a bonus — a battle never fails for it */ }
-}
-
 async function finishRaidBattle(buyerId, meta, res) {
     const spoils = [];
     if (res.win) {
@@ -3079,9 +2971,7 @@ export async function shipBattleVolley(buyerId, aim) {
     await saveBattle(buyerId, null, null);
     const meta = open.meta;
     let reward = [];
-    if (meta.kind === "warden") reward = await finishWardenBattle(buyerId, meta, res);
-    else if (meta.kind === "hunt") reward = await finishHuntBattle(buyerId, meta, res);
-    else if (meta.kind === "encounter") reward = await finishEncounterBattle(buyerId, meta, res);
+    if (meta.kind === "encounter") reward = await finishEncounterBattle(buyerId, meta, res);
     else if (meta.kind === "fleet") reward = await finishFleetBattle(buyerId, meta, res);
     else reward = await finishRaidBattle(buyerId, meta, res);
 
@@ -3123,13 +3013,7 @@ export async function shipBattleReckoning(buyerId) {
 
     await saveBattle(buyerId, null, null);
     const meta = open.meta;
-    const reward = meta.kind === "warden"
-        ? await finishWardenBattle(buyerId, meta, res)
-        : meta.kind === "shore"
-        ? await finishShoreBattle(buyerId, meta, res)
-        : meta.kind === "hunt"
-        ? await finishHuntBattle(buyerId, meta, res)
-        : meta.kind === "encounter"
+    const reward = meta.kind === "encounter"
         ? await finishEncounterBattle(buyerId, meta, res, { reckoning: true })
         : meta.kind === "fleet"
             ? await finishFleetBattle(buyerId, meta, res)
@@ -3440,12 +3324,6 @@ async function finishFleetBattle(buyerId, meta, res) {
         [buyerId, res.win && first ? want : depth, res.win ? 1 : 0, res.win ? 0 : 1]
     ).catch(() => {});
     await trackActivity(buyerId, "ship_battle_end", { rank: want, win: res.win, sunk: res.sunk, struck: Boolean(res.struck), rounds: res.state.round }).catch(() => {});
-    // ── AND YOU HAVE HER CAPTAIN, AND HE TELLS YOU WHERE SOMETHING IS ────────────────────────────────
-    // Written AFTER the reward is paid and never in front of it: this only ever ADDS, so a failure here
-    // costs a chart and cannot cost a win.
-    // ⚠️ OWNER-GATED, AND THE GATE COMES IN A PAIR — this half stops the capture, and chartsReady on the
-    // helm stops the charted voyage it would buy. See captainsOpenTo.
-    const captainTaken = res.win ? await maybeCaptureCaptain(buyerId, want) : null;
     if (res.win) {
         const depthNow = Math.max(depth, first ? want : depth);
         if (depthNow >= 1) await grantEventBadge(buyerId, "fleet_first_blood").catch(() => {});
@@ -3454,8 +3332,6 @@ async function finishFleetBattle(buyerId, meta, res) {
         if (depthNow >= MAX_FLEET_RANK) await grantEventBadge(buyerId, "fleet_admiral").catch(() => {});
         if (res.state.myHp >= res.state.myMax) await grantEventBadge(buyerId, "fleet_unscathed").catch(() => {});
     }
-    // The victory screen reads `captain` to draw him handing it over; everything else about `paid` is unchanged.
-    if (captainTaken) paid.push({ kind: "captain", captain: captainTaken });
     return paid;
 }
 

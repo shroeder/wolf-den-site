@@ -58,7 +58,7 @@ const CAPTAINS = {
     // rather than only sink, so these faces are looked at for far longer than the original fifteen ever
     // were: a captive sits in the brig being read. Written to be readable AS A DISPOSITION -- proud, frightened,
     // greedy or loyal is rolled per capture, so no face may commit to one, but every face has to be able to
-    // carry any of the four. See captains.js.
+    // carry any of the four.
     fleet_thorn: P("CUTTER THORNE -- a crisp young revenue officer in a spotless navy coat with white facings and brass buttons, bicorn hat under one arm, gloved hand resting on a sheathed sword. Correct, humourless, well-fed."),
     fleet_assize: P("THE ASSIZEMAN -- a gaunt magistrate at sea in black robes over a naval coat, a rolled warrant in one fist, spectacles, a coil of rope on his belt. Grim and utterly certain."),
     fleet_hammerfall: P("HAMMERFALL ORD -- an enormous bombardier in a scorched leather coat, one ear wrapped in bandage, a heavy iron mortar key slung over his shoulder, powder-burnt hands."),

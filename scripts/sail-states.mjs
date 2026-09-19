@@ -26,7 +26,7 @@ const clone = () => JSON.parse(JSON.stringify(base));
 const STATES = {
     // A chart in hand. This is what a captain is FOR: beat her, he gives up the anchorage, and the helm grows a
     // fourth voyage option that is not one of the three durations. ⚠️ There used to be an interrogation between
-    // those two things and a banner blocking the page until you had done it — both are gone (see captains.js),
+    // those two things and a banner blocking the page until you had done it — both are gone,
     // so what is left to check is that the chart shows up and the sea is not shut.
     charted: {
         why: "a chart in hand: the helm offers a charted island and nothing is blocked",
