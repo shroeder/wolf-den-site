@@ -82,6 +82,20 @@ export function viewOf(row) {
         };
     }
 
+    // ── SHE BEAT YOU ─────────────────────────────────────────────────────────────────────────────────────
+    // The one beat that is about something going wrong, so it is the one that most needs to name what
+    // happened. The quarry is already on the row (it was sent during the hunt), so the card can show the ship
+    // that did it rather than a shrug — being beaten by a named vessel is a story; "your expedition ended" is
+    // a bug report.
+    if (row.phase === "lost") {
+        return {
+            ...base,
+            lost: {
+                foe: j.foe ? { name: j.foe.name, cls: j.foe.cls, blurb: j.foe.blurb, art: j.foe.art, tier: j.foe.tier } : null,
+            },
+        };
+    }
+
     // ── SHE IS TAKEN ─────────────────────────────────────────────────────────────────────────────────────
     // The beat. Everything it needs to say what you got and why it matters: the man, his stars, the words he
     // said handing it over, and what a chart of that grade is — WITHOUT naming the island, which is the thing

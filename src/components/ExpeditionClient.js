@@ -37,7 +37,7 @@ import ShipBattleScene from "@/components/ShipBattleScene";
 import SailingSea from "@/components/SailingSea";
 import IslandWalk from "@/components/IslandWalk";
 import Bearings from "@/components/expedition/Bearings";
-import { CourseBeat, LandfallBeat, SpoilsBeat } from "@/components/expedition/Beat";
+import { CourseBeat, LandfallBeat, LostBeat, SpoilsBeat } from "@/components/expedition/Beat";
 import Exp from "@/lib/marketplace/expedition-audio.js";
 
 const EXP = "/api/marketplace/sailing/expedition";
@@ -282,6 +282,14 @@ export default function ExpeditionClient() {
                         onResume={resumeBattle}
                         onAshore={async () => { Exp.ashore(); const d = await post("ashore"); if (d?.ok) Exp.dock(); }} />
                 </SailingSea>
+            ) : null}
+
+            {/* The row is left OPEN on a loss (see huntFinished) precisely so this can be shown; its button is
+                what finally ends it. Without the branch the phase would render nothing at all — a live row
+                with no screen, which is the stuck state this journey has hit before. */}
+            {phase === "lost" ? (
+                <LostBeat lost={view.lost} sailings={state?.sailings} perDay={state?.perDay} busy={busy}
+                    onDone={async () => { await post("leave"); load(); }} />
             ) : null}
 
             {phase === "spoils" ? (

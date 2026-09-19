@@ -163,7 +163,19 @@ export async function huntFinished(buyerId, meta, res) {
     const row = await readExpedition(buyerId);
     if (!row || row.phase !== "hunt") return null;
     if (!res?.win) {
-        await db.query(`UPDATE mkt_ship_expedition SET phase = 'lost', ended_at = NOW() WHERE id = $1`, [row.id]).catch(() => {});
+        // ── THE ROW STAYS OPEN, AND THAT IS THE WHOLE FIX ────────────────────────────────────────────────
+        // This used to stamp ended_at here. readExpedition only returns rows with ended_at IS NULL, so the
+        // expedition vanished from the state on the client's very next poll — and since the client has a
+        // branch for every phase but this one, a member who lost the fight was dropped back onto the harbour
+        // screen with one fewer sailing and nothing anywhere saying why. The most expensive moment in the
+        // loop was the only one with no beat on it.
+        //
+        // Every other beat in this journey exists because Luke asked for one ("a whole beat dedicated to you
+        // understanding what you got and why"), and losing her is a thing that happened to you just as much
+        // as taking her is. So the phase is set, the row is left open, and `leave` ends it when the member
+        // has read the card. Gap 1 (the helm's Rejoin door) is what guarantees they can always get back to
+        // it — the two fixes hold each other up.
+        await db.query(`UPDATE mkt_ship_expedition SET phase = 'lost' WHERE id = $1`, [row.id]).catch(() => {});
         await trackActivity(buyerId, "expedition_lost", { rank: asObj(row.journey).rank || 0 }).catch(() => {});
         return { lost: true };
     }

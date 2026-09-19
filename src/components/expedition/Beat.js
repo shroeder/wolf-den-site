@@ -182,6 +182,49 @@ export function LandfallBeat({ summary, onDone }) {
     );
 }
 
+// ── SHE BEAT YOU ─────────────────────────────────────────────────────────────────────────────────────────────
+// The only beat about a loss, and the reason it exists at all: losing the hunt used to end the row on the
+// server, which made the whole expedition disappear from the client's next poll. A member who was beaten got
+// no card, no name, no sentence — just the harbour screen again with one fewer sailing on it, which reads
+// exactly like the feature eating your turn.
+//
+// It says three things and stops: who did it, that the sailing is gone, and that there are more (or not)
+// today. No retry button — the allowance IS the tension, and offering a way around it here would be
+// answering Luke's "a certain amount of sailing attempts per day" with "unless you ask twice".
+export function LostBeat({ lost, sailings, perDay, busy, onDone }) {
+    const foe = lost?.foe || null;
+    useEffect(() => { Exp.dock(); }, []);
+    const left = Math.max(0, Number(sailings) || 0);
+
+    return (
+        <div className="beat beat-spoils beat-end is-lost">
+            <div className="beat-glow" aria-hidden="true" />
+            <p className="beat-kicker">She had the better of it</p>
+
+            <div className="beat-portrait is-lost">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {foe?.art ? <img src={foe.art} alt="" draggable="false" /> : null}
+                <span className="beat-portrait-ring" aria-hidden="true" />
+            </div>
+
+            <h2 className="beat-name">{foe?.name || "She got away"}</h2>
+            {foe?.cls ? <p className="beat-sub">{foe.cls}</p> : null}
+
+            <div className="beat-rule" aria-hidden="true" />
+
+            <p className="beat-prize-band is-big">Her captain keeps his chart</p>
+            <p className="beat-sub">
+                {left > 0
+                    ? <>That sailing is spent. <b>{left}</b> of {perDay || 3} left today.</>
+                    : <>That was your last sailing today.</>}
+            </p>
+
+            <button className="beat-go" disabled={busy} onClick={onDone}>Back to the harbour</button>
+            <Style />
+        </div>
+    );
+}
+
 function ordinal(n) {
     const v = Number(n) || 0;
     const s = ["th", "st", "nd", "rd"];
@@ -228,6 +271,15 @@ function Style() {
             .beat-sub { position: relative; margin: 0; font-size: clamp(0.78rem, 3.3vw, 0.92rem); color: #b9a986; }
             @keyframes beatIn { from { opacity: 0; transform: translateY(14px) scale(0.94); } }
 
+            /* ── THE LOSS READS COLD ──────────────────────────────────────────────────────────────
+               Same layout as the capture beat on purpose: it is the same moment, and it went the other
+               way. What changes is the temperature — the win glows warm, this one is drained and blue,
+               so the two are told apart at a glance without reading a word. */
+            .beat.is-lost .beat-glow { background: radial-gradient(60% 50% at 50% 12%, rgba(90,130,180,0.34), transparent 70%); }
+            .beat.is-lost .beat-kicker { color: #9fb4c8; }
+            .beat-portrait.is-lost img { filter: grayscale(0.78) brightness(0.72) contrast(1.05); }
+            .beat-portrait.is-lost .beat-portrait-ring { border-color: rgba(150,175,200,0.5); box-shadow: 0 0 26px rgba(110,150,190,0.3); }
+            .beat.is-lost .beat-prize-band { color: #c3d2e0; }
             .beat-portrait { position: relative; width: clamp(104px, 34vw, 260px); aspect-ratio: 1;
                 animation: beatIn 620ms cubic-bezier(.2,1.2,.4,1) both; }
             .beat-portrait img { width: 100%; height: 100%; object-fit: contain;

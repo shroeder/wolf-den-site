@@ -1871,15 +1871,27 @@ export async function getSailingState(buyerId, skyKey = null) {
     // It rides the query that was already here rather than getting its own, and it is NOT a nav badge: a
     // badge in site chrome that reads a feature endpoint bills that feature on every page for every member
     // forever (see check:chrome and CLAUDE.md).
+    // ── AND WHETHER ONE IS ALREADY UNDER WAY ─────────────────────────────────────────────────────────
+    // Opening a chart STAMPS IT SAILED, so `charts` drops to zero the moment the expedition starts — and the
+    // helm's only door into the expedition was gated on that count being above zero. Close the tab halfway
+    // down an island and there was no way back to it: your tide, your island and an unclaimed prize sat on a
+    // row with a one-open-row index, which also meant you could not start another one. The feature had no
+    // front door for the state it spends most of its time in.
+    //
+    // A scalar subquery on the query that was already here, for the same reason the chart count rides it.
     const brigRow = captainsOpenTo(isOwner(buyerId))
         ? await db.queryOne(
-            `SELECT (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS charts`,
+            `SELECT (SELECT COUNT(*)::int FROM mkt_ship_chart WHERE buyer_id = $1 AND sailed_at IS NULL) AS charts,
+                    (SELECT COUNT(*)::int FROM mkt_ship_expedition WHERE buyer_id = $1 AND ended_at IS NULL) AS open`,
             [buyerId]
         ).catch(() => null)
         : null;
     const chartsHeld = Number(brigRow?.charts) || 0;
+    const expeditionOpen = (Number(brigRow?.open) || 0) > 0;
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
         recipeShop, baits, baitCookable, deepFish, chartsHeld), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        // Gated by the same captainsOpenTo above — false for anyone the feature is shut to, like chartsReady.
+        expeditionOpen,
         // ── THE PURSE, WHERE YOU CAN SEE IT ──────────────────────────────────────────────────────────
         // Sunflower Jinxx: "it gives boat stat lvl 22, then has dabloons and gold but the dabloons is always
         // 0. I can't see how many I have unless I look in the quartermaster." Always 0 is exactly right: the

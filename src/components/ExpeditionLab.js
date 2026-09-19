@@ -79,6 +79,10 @@ const SCENES = {
     hunt: { label: "Hunt", row: () => fixtureRow({ phase: "hunt", rank: 11, legAgo: HUNT_MS * 0.3 }) },
     hunt_close: { label: "Hunt · alongside", row: () => fixtureRow({ phase: "hunt", rank: 27, legAgo: HUNT_MS * 0.86 }) },
     spoils: { label: "Beat · the captain", row: () => fixtureRow({ phase: "spoils", rank: 27, grade: 4 }) },
+    // The other way that fight can go. Kept beside the capture beat because they are the same moment and
+    // the whole point of the card is that it reads cold where that one reads warm.
+    lost: { label: "Beat · she beat you", row: () => fixtureRow({ phase: "lost", rank: 27 }), sailings: 1 },
+    lost_last: { label: "Beat · beaten, none left", row: () => fixtureRow({ phase: "lost", rank: 34 }), sailings: 0 },
     glass1: { label: "Glass · 1 star", row: () => fixtureRow({ phase: "bearings", grade: 1, seed: 8811, rank: 3 }) },
     glass5: { label: "Glass · 5 stars", row: () => fixtureRow({ phase: "bearings", grade: 5, seed: 1207, rank: 37 }) },
     course: { label: "Beat · the course", row: () => fixtureRow({ phase: "course", grade: 4, seed: 3300, accuracy: 0.82 }) },
