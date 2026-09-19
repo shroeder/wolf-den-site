@@ -916,7 +916,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
                     So it sits above the picker and renders on its own terms, whatever the boat is doing.
                     Still owner-gated upstream — chartsReady is 0 for anyone the feature is shut to. */}
-                {(state.chartsReady || 0) > 0 || state.expeditionOpen ? (
+                {/* ⚠️ NOT IN THE SEAMLESS HARBOUR. This row and the Set sail door below say the same thing —
+                    with an expedition open they both read "still out there · pick up where you left off",
+                    one above the other. The seamless door already covers every case (set sail, rejoin, none
+                    left), so this is the OLD harbour's chart row and belongs only to the old harbour. */}
+                {!state.seamlessOnly && ((state.chartsReady || 0) > 0 || state.expeditionOpen) ? (
                     <a className="sail-chart-cta" href="/marketplace/expedition">
                         {/* The chart itself, the same plate the expedition opens with — a door into a
                             feature should wear the thing it leads to. See gen-expedition-chrome.mjs. */}
@@ -951,18 +955,28 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 already hit set sail." Two doors for one decision, and the second one is a
                                 worse version of the first because it has already been answered.
                                 The expedition client reads this, starts the sailing and strips the flag. */}
-                            <a className={`sail-cta sail-seamless${state.sailingsLeft > 0 ? "" : " is-spent"}`}
+                            {/* ⚠️ NOT `sail-cta`. That is the helm's compact arcade button — a chunky lip, a
+                                1.9s pulse and a skewed white SHINE SWEEP running across it. At its own size
+                                that reads as a juicy button; stretched to full width the sweep becomes a
+                                glare sitting across a flat yellow slab, which is exactly what it looked
+                                like. This door wears the EXPEDITION's button language instead (see .ex-go
+                                and .beat-go) — brass, vertical, no glare — because that is the feature it
+                                opens. */}
+                            <a className={`sail-seamless${state.sailingsLeft > 0 || state.expeditionOpen ? "" : " is-spent"}`}
                                href={state.expeditionOpen || state.sailingsLeft <= 0
                                    ? "/marketplace/expedition"
                                    : "/marketplace/expedition?go=1"}>
-                                <span className="sail-cta-stack">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className="sail-seamless-art" src="/images/islands/chrome/chart.png?v=1" alt="" draggable="false" />
+                                <span className="sail-seamless-text">
                                     <b>{state.expeditionOpen ? "Rejoin your expedition" : "Set sail"}</b>
                                     <em>{state.expeditionOpen
                                         ? "still out there · pick up where you left off"
                                         : state.sailingsLeft > 0
                                             ? `${state.sailingsLeft} of ${state.sailingsPerDay} sailings left today`
-                                            : "no sailings left today — they come back at midnight"}</em>
+                                            : "none left today · they come back at midnight"}</em>
                                 </span>
+                                <span className="sail-seamless-go" aria-hidden="true">&rarr;</span>
                             </a>
                             <p className="sail-seamless-note">
                                 A sailing takes you out, finds you a ship, and everything after that &mdash; her

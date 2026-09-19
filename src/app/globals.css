@@ -12586,8 +12586,31 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    One door where the duration picker and the ship-battles button used to be, for an owner previewing the new
    loop. It borrows the hero CTA styling so it reads as the page.s single action rather than a stray link.
    See SEAMLESS_ONLY in hunt.js for why the old harbour is hidden rather than removed. */
-.sail-seamless { text-decoration: none; }
-.sail-seamless.is-spent { filter: saturate(0.45) brightness(0.82); }
+/* ── THE DOOR INTO THE EXPEDITION ─────────────────────────────────────────────────────────────────────────
+   Brass, vertical, no glare. It used to borrow .sail-cta, whose skewed white sweep and 1.9s pulse are built
+   for a compact button and turn into a streak across a flat slab at full width. This is the same brass the
+   expedition's own buttons use (.ex-go / .beat-go), scaled up to hero size, so the door matches the room it
+   opens: the chart plate on the left, the action and the allowance stacked, an arrow on the right. */
+.sail-seamless { display: flex; align-items: center; gap: 14px; width: 100%;
+    padding: 13px 16px; border-radius: 14px; text-decoration: none; cursor: pointer;
+    color: #2a1c06; background: linear-gradient(180deg, #f6d98f, #e2b45c 52%, #cb9a3e);
+    box-shadow: 0 3px 0 #8d6a23, 0 12px 28px rgba(0,0,0,0.42), 0 0 26px rgba(226,180,92,0.26);
+    border: 1px solid rgba(255,244,214,0.5);
+    transition: transform .12s ease, box-shadow .12s ease; }
+.sail-seamless:active { transform: translateY(3px);
+    box-shadow: 0 0 0 #8d6a23, 0 6px 14px rgba(0,0,0,0.4), 0 0 18px rgba(226,180,92,0.2); }
+.sail-seamless-art { width: 46px; height: 46px; flex: none; object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.45)); }
+.sail-seamless-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; text-align: left; }
+.sail-seamless-text b { font-size: 1.12rem; font-weight: 900; line-height: 1.15; }
+/* The allowance is CONTEXT, not the headline — dark enough on brass to read, quiet enough not to compete. */
+.sail-seamless-text em { font-style: normal; font-size: 0.8rem; font-weight: 700; color: rgba(42,28,6,0.72); line-height: 1.3; }
+.sail-seamless-go { flex: none; font-size: 1.3rem; font-weight: 900; opacity: 0.6; }
+/* Spent: no glow, no lift, and plainly not the thing to press. */
+.sail-seamless.is-spent { background: linear-gradient(180deg, #6f6a5e, #565247);
+    color: #efe7d4; border-color: rgba(255,255,255,0.14); box-shadow: 0 2px 0 #3c392f, 0 8px 18px rgba(0,0,0,0.4); }
+.sail-seamless.is-spent .sail-seamless-text em { color: rgba(255,255,255,0.68); }
+.sail-seamless.is-spent .sail-seamless-art { filter: grayscale(0.7) brightness(0.85); }
 .sail-seamless-note { margin: 8px 2px 0; font-size: 0.82rem; line-height: 1.45; color: #9aa4b2; text-align: center; }
 .sail-embark { margin-top: 10px; display: grid; gap: 8px; }
 .sail-embark-title { font-weight: 800; font-size: 0.92rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
