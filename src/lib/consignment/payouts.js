@@ -113,6 +113,23 @@ export async function getTotalPaidForConsignor(consignorId) {
     return Number(row?.total_paid || 0);
 }
 
+// ── WHEN THIS CONSIGNOR WAS LAST SETTLED UP ──────────────────────────────────────────────────────────────────
+// The anchor for what they are owed NOW. Returns null for somebody who has never been paid, and the caller
+// then reckons from the beginning of trading.
+//
+// ⚠️ EVERY payout counts as a settlement, including a small or mistaken one. That is deliberate: this has to
+// be a fact about the ledger rather than a judgement about which payouts "look real", or the number quietly
+// changes depending on a threshold nobody can see. A payout recorded in error should be DELETED, not
+// filtered out here.
+export async function getLastPayoutAtForConsignor(consignorId) {
+    const row = await db.queryOne(
+        `SELECT MAX(paid_at) AS last_paid_at FROM consignor_payouts WHERE consignor_id = $1`,
+        [consignorId]
+    ).catch(() => null);
+
+    return row?.last_paid_at ? new Date(row.last_paid_at).toISOString() : null;
+}
+
 export async function createPayoutForConsignor(consignor, payload) {
     const receiptNumber = createReceiptNumber();
     const paidAt = payload.paidAt ? new Date(payload.paidAt) : new Date();

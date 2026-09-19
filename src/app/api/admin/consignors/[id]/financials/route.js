@@ -46,6 +46,13 @@ export async function GET(request, { params }) {
                     active: Boolean(consignor.active),
                 },
                 summary: dashboardResult.dashboard.summary,
+                // ⚠️ THE ITEMS WERE ALWAYS BEING BUILT AND THEN THROWN AWAY. getAdminConsignorDashboard above
+                // lists the consignor's whole Square category and counts the stock on every variation — the
+                // expensive half of this request — and this response then returned everything EXCEPT that
+                // list. The admin app's "Items In Consignment" panel therefore read "No active consignment
+                // items were returned" for every consignor, permanently, while the data sat in the object
+                // one line up. A consignor with a $240 box still on the shelf looked like he had nothing.
+                inventory: dashboardResult.dashboard.inventory,
                 payouts,
                 totalPaid,
                 receiptUrlTemplate: `/api/admin/consignors/${consignor.id}/payouts/{payoutId}/receipt`,

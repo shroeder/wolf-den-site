@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getConsignorById } from "@/lib/consignment/config";
-import { getTotalPaidForConsignor, listPayoutsForConsignor } from "@/lib/consignment/payouts";
+import { getLastPayoutAtForConsignor, getTotalPaidForConsignor, listPayoutsForConsignor } from "@/lib/consignment/payouts";
 import { getInventoryCounts, listConsignorCatalog, searchSalesForVariations } from "@/lib/consignment/square";
 import { listConsignmentTradeSales } from "@/lib/consignment/trade-sales";
 import { createServerLogger } from "@/lib/server-logger";
@@ -39,7 +39,29 @@ async function loadConsignor(consignorId) {
     return consignor;
 }
 
-async function buildSummary(consignor, inventory, salesForSummary, options = {}) {
+// ── WHAT WE OWE, AND WHY IT IS NOT A LIFETIME BALANCE ANY MORE ───────────────────────────────────────────────
+// This used to be `max(0, lifetime earned - lifetime paid)`, and that formula cannot be trusted on this data.
+//
+// The earned half is rebuilt from Square EVERY TIME it is read: a consignor's sales are found by listing the
+// items currently in their Square category and then searching orders for those variations. So the moment an
+// item is deleted from the catalogue — which is what happens to a card single when it sells out and somebody
+// tidies up — every sale it ever made disappears from "earned". The paid half never moves. Earned shrinks,
+// paid does not, and the balance drifts permanently toward "we already paid you".
+//
+// It had gone wrong in exactly that direction on a real consignor: his items had grossed about $1,290 across
+// their whole life (7 of them since deleted), $1,427.15 had been recorded as paid, and the screen therefore
+// read "Current owed $0.00" on a day one of his $240 boxes had just sold. The sale was recorded correctly and
+// attributed correctly; it was being netted against a deficit that only existed because older sales had
+// evaporated from the catalogue.
+//
+// So OWED IS NOW THE PERIOD SINCE THE LAST PAYOUT. A payout is a settlement: it says "everything up to this
+// moment is square". What is owed is what has sold since, which no amount of later catalogue tidying can
+// rewrite, because those sales are inside a window that starts after the last time money changed hands.
+//
+// The lifetime figures are still reported — totalPaid, estimatedPayoutGross, netBalance — because they are
+// useful context and because hiding them would make an overpayment invisible. They are simply no longer what
+// the "owed" number is computed from.
+async function buildSummary(consignor, inventory, salesForSummary, options = {}, sinceLastPayout = null) {
     const totalGrossRevenue = salesForSummary.reduce((sum, entry) => sum + Number(entry.grossRevenue || 0), 0);
     const totalRefunds = salesForSummary.reduce((sum, entry) => sum + Number(entry.refundedRevenue || 0), 0);
     const totalRevenue = salesForSummary.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
@@ -47,9 +69,14 @@ async function buildSummary(consignor, inventory, salesForSummary, options = {})
     const payoutRate = Number(consignor.payout_rate || 0);
     const estimatedPayoutGross = totalRevenue * payoutRate;
     const totalPaid = await getTotalPaidForConsignor(consignor.id);
-    const estimatedPayout = Math.max(0, estimatedPayoutGross - totalPaid);
-    // Signed balance: positive = still owed to the consignor, NEGATIVE = we've overpaid and the
-    // consignor owes the store back (estimatedPayout floors at 0 and would hide an overpayment).
+
+    // The window that actually decides the number on screen.
+    const sinceSales = sinceLastPayout?.sales || [];
+    const revenueSincePayout = sinceSales.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
+    const estimatedPayout = Math.max(0, revenueSincePayout * payoutRate);
+
+    // Kept, and still signed, so an overpayment is visible rather than floored away — it is just no longer
+    // what we ask anybody to pay.
     const netBalance = estimatedPayoutGross - totalPaid;
 
     return {
@@ -63,6 +90,11 @@ async function buildSummary(consignor, inventory, salesForSummary, options = {})
         netBalance,
         overpaid: netBalance < 0 ? -netBalance : 0,
         outstandingBalance: estimatedPayout,
+        // What the owed figure was measured over, so the screen can say "since 13 Aug" instead of asking
+        // anybody to take the number on faith.
+        lastPayoutAt: sinceLastPayout?.lastPayoutAt || null,
+        revenueSincePayout,
+        unitsSincePayout: sinceSales.reduce((sum, entry) => sum + Number(entry.quantitySold || 0), 0),
         catalogItems: inventory.length,
         unitsInStock: totalUnitsInStock,
         lookbackDays: Number(options.lookbackDays) || 90,
@@ -112,7 +144,24 @@ async function buildDashboard(consignor, options = {}) {
     const salesForSummary = [...squareSalesAllTime, ...tradeSalesAllTime];
 
     const payouts = await listPayoutsForConsignor(consignor.id);
-    const summary = await buildSummary(consignor, inventory, salesForSummary, options);
+
+    // ── THE SETTLEMENT WINDOW ────────────────────────────────────────────────────────────────────────────
+    // What has sold since the last time this consignor was paid — the window the owed figure is measured
+    // over. Its own fetch rather than a slice of the all-time numbers above, because those are aggregated
+    // per ITEM (one row carrying a total and a lastSoldAt) and an aggregate cannot be cut by date.
+    //
+    // It is the cheapest of the three reads: a few weeks of orders against a handful of variations, where
+    // the all-time pass walks the shop's whole order history. Somebody who has never been paid reckons from
+    // the beginning, which is the same answer the old lifetime sum would have given them.
+    const lastPayoutAt = await getLastPayoutAtForConsignor(consignor.id);
+    const sinceStart = lastPayoutAt || ALL_TIME_SALES_START_AT;
+    const [sinceSquare, sinceTrade] = await Promise.all([
+        searchSalesForVariations(variationLookup, { startAt: sinceStart, endAt: nowIso }),
+        listConsignmentTradeSales(consignor.id, { startAt: sinceStart, endAt: nowIso }),
+    ]);
+    const sinceLastPayout = { lastPayoutAt, sales: [...sinceSquare, ...sinceTrade] };
+
+    const summary = await buildSummary(consignor, inventory, salesForSummary, options, sinceLastPayout);
 
     portalDataLogger.info("consignment.portal_data.build_dashboard.succeeded", {
         consignorId: consignor.id,
@@ -120,7 +169,7 @@ async function buildDashboard(consignor, options = {}) {
         salesItems: sales.length,
     });
 
-    return { inventory, sales, payouts, summary };
+    return { inventory, sales, payouts, summary, sinceLastPayout: sinceLastPayout.sales };
 }
 
 export async function getConsignorInventory(consignorId) {
