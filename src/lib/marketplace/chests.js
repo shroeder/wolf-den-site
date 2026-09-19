@@ -219,8 +219,9 @@ export const SURPRISE_WEIGHT = { light: 1, normal: 3, heavy: 8 };
  *
  * ⚠️ THE ROLL HAPPENS BEFORE THE DATABASE IS ASKED ANYTHING. This runs on every action in the game — about
  * seven thousand a day — and a query per action is the bill (CLAUDE.md: round trips ARE the Active CPU
- * meter). Losing costs zero round trips. Only a winner, about one a day across the whole Den, pays for the
- * cap check and the grant.
+ * meter). Losing costs zero round trips. Only a winner pays for the cap check and the grant, and winners run
+ * about 2.4 a day Den-wide across the four tiers (measured, 14 days) — not the "one a day" this line used to
+ * claim.
  *
  * ⚠️ AND FORTUNE DELIBERATELY DOES NOT APPLY. Every other drop roll reads it, and reading it here would mean
  * a query on every action to answer a question that comes back "no" 99.98% of the time. It is also the wrong
@@ -273,25 +274,44 @@ const SURPRISE_WHERE = {
 
 /**
  * ── AND THE DEN HEARS ABOUT IT ───────────────────────────────────────────────────────────────────────────
- * A surprise nobody sees is not a surprise, it is an inventory that changed. These land about once a DAY
- * across the whole Den, so a line in the announce channel is a rare event rather than noise — and it goes
- * through postSystemChat, which means it is the Arbiter speaking and members who have muted milestone posts
- * do not get it.
+ * A surprise nobody sees is not a surprise, it is an inventory that changed. It goes through postSystemChat,
+ * which means it is the Arbiter speaking and members who have muted milestone posts do not get it.
+ *
+ * ⚠️ THIS USED TO CLAIM "about once a DAY across the whole Den", AND THAT NUMBER WAS NEVER CHECKED. Measured
+ * over 14 days of mkt_chest_grant it was 2.4 a day across the four tiers. The gate below is what makes the
+ * sentence true rather than the comment asserting it.
  *
  * Costs a round trip, and can afford to: nothing reaches this line unless a roll of about 1 in 5,676 has
  * already come in.
  */
+// ── ONLY THE TWO THAT ARE ACTUALLY RARE ──────────────────────────────────────────────────────────────────────
+// Luke: "do not announce chests unless they are super damn good."
+//
+// The comment above this used to say these land "about once a DAY across the whole Den". MEASURED over 14
+// days of real grants it was 2.4 a day, and ascendant alone was HALF of them:
+//
+//   ascendant  1.21/day     celestial  0.43/day
+//   eternal    0.64/day     primordial 0.14/day
+//
+// An ascendant chest turning up more than once a day is not news, it is weather, and five of them in an
+// evening is what the News room actually looked like. The two worth a line are the two the sentence below
+// was already written for — about one announcement every other day between them.
+//
+// ⚠️ THE DROP IS UNCHANGED. surpriseChest still grants all four tiers at the same odds; this governs only
+// whether the Den is told. Quieting a feed and nerfing a reward are different things and this is the first.
+const ANNOUNCED_TIERS = new Set(["primordial", "celestial"]);
+
 async function announceSurprise(buyerId, tier, source) {
+    if (!ANNOUNCED_TIERS.has(tier)) return false;
     const who = await db.queryOne(`SELECT display_name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const name = who?.display_name;
     if (!name) return false;
     const label = CHEST_TIERS[tier]?.label || `${tier} chest`;
     const where = SURPRISE_WHERE[source] || "somewhere in the Den";
-    // The two rarest are worth a different sentence. Everything else gets the plain one, because the plain
-    // one is the format members will see most and it should not read like a trumpet every time.
-    const body = tier === "primordial" || tier === "celestial"
-        ? `A ${label} — ${where}, and it went to ${name}. There is no telling where the next one turns up.`
-        : `${name} found a ${label} ${where}.`;
+    // One sentence now, and it is the big one — there is no longer a plain tier to contrast against, and
+    // anything that survives the gate above has earned the trumpet. ("A Celestial Chest", "A Primordial
+    // Chest" — both take "A", so the a/an the old plain line got wrong on every vowel cannot happen here.)
+    const body = `A ${label} — ${where}, and it went to ${name}. There is no telling where the next one turns up.`;
     const { postSystemChat } = await import("@/lib/marketplace/system-chat.js");
     return postSystemChat(body, "milestone");
 }
