@@ -1036,7 +1036,17 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     tailwind — arrive 1h sooner"), so nothing was scannable.
                     Now: compact equal-weight tiles, each an ICON + a one-word VERB + the detail underneath.
                     Three fit on one line on a phone, and you can tell them apart at a glance. */}
-                {(liveStatus === "sailing" || liveStatus === "digging" || (liveStatus === "arrived" && state.fishing?.available)) && (
+                {/* ── AND FISHING KEEPS ITS DOOR IN THE NEW LOOP ──────────────────────────────────────────
+                    This row is gated on being AT SEA or just arrived, which was right when the only way to be
+                    docked-and-idle was between voyages. In the seamless loop you are idle the entire time you
+                    are not on an expedition, so the Fish tile never rendered at all and the only way to a rod
+                    was the Rail tab. Luke: "is fishing kind of lost inside sailing now? Maybe we could retain
+                    it being its own thing but accessible from the sailing screen."
+                    It already IS its own thing — the server offers a line at anchor (fishingView only refuses
+                    while digging), so nothing about fishing had to change. It just needed to be visible. */}
+                {(liveStatus === "sailing" || liveStatus === "digging"
+                    || (liveStatus === "arrived" && state.fishing?.available)
+                    || (state.seamlessOnly && liveStatus === "idle" && state.fishing?.available)) && (
                     <div className="sail-actions">
                         {liveStatus === "sailing" && (
                             state.windAvailable
