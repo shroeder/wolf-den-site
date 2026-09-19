@@ -254,7 +254,13 @@ export default function Bearings({ view, sky, busy, onCommit }) {
                     ))}
                 </div>
                 {sent ? <span className="spy-chart-x" aria-hidden="true" /> : null}
-                <span className="spy-chart-label">{sent ? "The fix is made" : `${done} of ${marks.length} taken`}</span>
+                {/* ── AN EMPTY CHART HAS TO SAY WHAT IT IS ────────────────────────────────────────────
+                    Before the first bearing this panel is a blank sheet of paper — the largest thing on the
+                    screen, and mute. It reads as a piece of UI that failed to load rather than as the chart
+                    you are about to draw. One line turns it from missing into pending. */}
+                <span className="spy-chart-label">
+                    {sent ? "The fix is made" : done ? `${done} of ${marks.length} taken` : "Every mark you call draws a line here"}
+                </span>
             </div>
 
             <button className="spy-call" disabled={busy || sent || !target} onClick={call}>

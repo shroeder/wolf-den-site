@@ -49,6 +49,10 @@ const ART_V = "1";
 const v = (p) => (p ? `${p}${p.includes("?") ? "&" : "?"}v=${ART_V}` : null);
 
 /** The stage. One fixed, full-screen surface that outlives every beat drawn on it. */
+// The harbour's own weather. Every other beat takes its sky from the expedition's seed so the run is one
+// continuous afternoon; this screen happens before there is a seed at all, so it is always first light.
+const HARBOUR_SKY = "/images/sailing/sky-sunrise.png";
+
 function Stage({ children }) {
     const [el] = useState(() => (typeof document === "undefined" ? null : document.createElement("div")));
     useEffect(() => {
@@ -284,9 +288,31 @@ export default function ExpeditionClient() {
         );
     }
 
+    // ── THE FIRST SCREEN IS PART OF THE JOURNEY TOO ──────────────────────────────────────────────────────
+    // This returned bare while every other beat is wrapped in <Stage>, so the harbour rendered INLINE in the
+    // page — a small card with the shop's footer ("Locally owned trading card game store in Montgomery, MN")
+    // sitting underneath it, and then every screen after it was a full-bleed cinematic. The first thing
+    // anybody sees was the one thing that did not look like the feature.
     if (!state.open) {
-        return <Harbour state={state} busy={busy}
-            onSail={() => post("set_sail")} onOpenChart={() => post("open")} />;
+        return (
+            <Stage>
+                {/* ── THE HARBOUR IS A PLACE, NOT A DIALOG ────────────────────────────────────────────────
+                    Wrapped in the stage it stopped being an inline card under the shop footer, and it was
+                    still the only beat with no world behind it — a brown box on flat black, opening a
+                    journey whose every other screen is painted sea. It is your own boat at first light now,
+                    sitting still because you have not left yet, with the card over it.
+                    SUNRISE deliberately: the run ahead picks its own weather off the expedition's seed, and
+                    this is the one screen that is always BEFORE that, so it always reads as the morning. */}
+                <SailingSea
+                    sky={HARBOUR_SKY} boat={state.boat}
+                    hero={state.hero ? { art: state.hero.art, flip: state.hero.flip } : null}
+                    sailing={false} className="jx-sea">
+                    <Harbour state={state} busy={busy}
+                        onSail={() => post("set_sail")} onOpenChart={() => post("open")} />
+                </SailingSea>
+                <Style />
+            </Stage>
+        );
     }
 
     // ── THE STAGE ────────────────────────────────────────────────────────────────────────────────────────
@@ -537,11 +563,43 @@ function Style() {
 function PageStyle() {
     return (
         <style jsx global>{`
-            .ex-wrap { display: flex; flex-direction: column; gap: 14px; max-width: 620px; margin: 0 auto; padding: 14px; }
+            /* ⚠️ CENTRED IN THE STAGE, NOT STACKED AT THE TOP OF A PAGE. The harbour is a portal scene now
+               (see the Stage wrapper on it), so this has to own the full height and put the card in the
+               middle of it — left as it was, the card sat against the top edge of a black screen with the
+               rest of the viewport empty under it. min-height rather than height so a tall card on a short
+               phone still scrolls instead of being clipped. */
+            /* ⚠️ ABSOLUTE OVER THE SEA. As a normal block it sat in the flow BELOW the water rather than on
+               top of it, which put the card off the bottom of the screen. inset:0 with safe centring keeps
+               it over the scene and still lets a tall card scroll on a short phone. */
+            /* The bottom padding is what keeps the card OFF THE BOAT. Centred in the full height it sat
+               squarely over the masts and hid the ship you are about to take out, which is the one thing on
+               this screen worth looking at. Reserving the lower third biases the centring upward without
+               pinning the card to the top on a tall screen. */
+            .ex-wrap { position: absolute; inset: 0; z-index: 3;
+                display: flex; flex-direction: column; justify-content: safe center; align-items: center;
+                gap: 14px; padding: 18px 14px 34vh; overflow-y: auto; overflow-x: hidden; }
+            .ex-wrap > .ex-card { max-width: 480px; width: 100%;
+                /* Legible over painted water: the card was translucent enough that a wave crest read through
+                   the body copy. */
+                background: linear-gradient(180deg, rgba(18, 14, 9, 0.93), rgba(10, 8, 5, 0.95));
+                box-shadow: 0 18px 54px rgba(0, 0, 0, 0.6); }
             .ex-card { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
                 padding: 22px 18px; border-radius: 14px;
                 background: linear-gradient(180deg, rgba(32, 26, 16, 0.92), rgba(18, 15, 10, 0.94));
                 border: 1px solid rgba(232, 192, 105, 0.22); }
+            /* ── A SHORT PHONE STILL HAS TO SHOW THE BOAT ────────────────────────────────────────────
+               The card is a fixed stack of art, heading, two sentences, a tally and a button; on a 500px
+               viewport that is tall enough to cover the masts again however the wrapper is biased. So the
+               card itself compresses — same words, less air — and the reserve under it shrinks with it.
+               Measured at 375x500, which is a small phone with the browser chrome taking its share. */
+            @media (max-height: 620px) {
+                .ex-wrap { padding-bottom: 26vh; }
+                .ex-card { padding: 14px 16px; gap: 7px; }
+                .ex-chart { width: 56px; height: 56px; }
+                .ex-h { font-size: 1.12rem; }
+                .ex-quiet { font-size: 0.8rem; line-height: 1.35; }
+                .ex-tally { font-size: 0.8rem; }
+            }
             .ex-chart { width: 78px; height: 78px; object-fit: contain;
                 filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55)); }
             .ex-h { margin: 0; font-size: 1.3rem; color: #f2e4c6; }
