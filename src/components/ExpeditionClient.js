@@ -70,6 +70,16 @@ function Stage({ children }) {
 
 export default function ExpeditionClient() {
     const [state, setState] = useState(null);
+    // ── ARRIVED MID-DECISION ─────────────────────────────────────────────────────────────────────────────
+    // The helm's Set sail sends ?go=1 and this page starts the sailing on mount. But the mount effect cannot
+    // run before the first paint, so for one frame `state.open` was false and the HARBOUR rendered — the
+    // exact screen Luke had already answered, flashing up between pressing Set sail and being at sea.
+    //
+    // Read synchronously in the initial state so the very first paint already knows. It is cleared when the
+    // sailing has actually begun (or refused), and until then the harbour is never drawn.
+    const [launching, setLaunching] = useState(() => (
+        typeof window !== "undefined" && new URLSearchParams(window.location.search).get("go") === "1"
+    ));
     const [busy, setBusy] = useState(false);
     const [battle, setBattle] = useState(null);
     const [summary, setSummary] = useState(null);
@@ -124,15 +134,24 @@ export default function ExpeditionClient() {
             // The flag is stripped with replaceState BEFORE the request goes out, so a reload — or the
             // back button — cannot spend a second one.
             const go = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("go") === "1";
+            if (!go) setLaunching(false);
             if (go) {
                 const url = new URL(window.location.href);
                 url.searchParams.delete("go");
                 window.history.replaceState(null, "", url.toString());
-                if (!d?.open && Number(d?.sailings) > 0) {
-                    Exp.unlock();
-                    await post("set_sail");
-                    if (!alive) return;
+                // ⚠️ try/finally, NOT a bare await. If set_sail rejects — a dropped connection, a 500 — the
+                // flag would never clear and the member would sit on "Casting off…" forever, which is a
+                // worse screen than the harbour flash this exists to remove. Failing lands them on the
+                // harbour, where the button they pressed is still there to press again.
+                try {
+                    if (!d?.open && Number(d?.sailings) > 0) {
+                        Exp.unlock();
+                        await post("set_sail");
+                    }
+                } finally {
+                    if (alive) setLaunching(false);
                 }
+                if (!alive) return;
             }
             await resumeBattle();
         })();
@@ -276,7 +295,18 @@ export default function ExpeditionClient() {
     const sky = view?.sky || "/images/sailing/sky-goldenhour.png";
 
     // ── THE PAGE, WHEN NOTHING IS UNDERWAY ───────────────────────────────────────────────────────────────
-    if (!state) return <div className="ex-wrap"><p className="ex-quiet">Looking at the water…</p></div>;
+    // ⚠️ BOTH OF THESE MUST BE ON THE STAGE. A bare div here is a flash of the SITE — header, footer, shop
+    // copy — between the helm and the sea, which is the same seam the harbour had.
+    if (!state || launching) {
+        return (
+            <Stage>
+                <div className="ex-wrap">
+                    <p className="ex-quiet ex-launch">{launching ? "Casting off…" : "Looking at the water…"}</p>
+                </div>
+                <Style />
+            </Stage>
+        );
+    }
 
     // The ending stays on the stage, so the journey does not hand you back to a page to finish.
     if (summary) {
@@ -600,6 +630,11 @@ function PageStyle() {
                 .ex-quiet { font-size: 0.8rem; line-height: 1.35; }
                 .ex-tally { font-size: 0.8rem; }
             }
+            /* The half-second between pressing Set sail and the sea arriving. It is short, but it is the
+               seam between two screens and a bare grey line sitting in it reads as a stall. */
+            .ex-launch { font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase;
+                color: #d8c79c; animation: exLaunch 1.1s ease-in-out infinite; }
+            @keyframes exLaunch { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
             .ex-chart { width: 78px; height: 78px; object-fit: contain;
                 filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55)); }
             .ex-h { margin: 0; font-size: 1.3rem; color: #f2e4c6; }
