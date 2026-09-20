@@ -1445,7 +1445,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                 <p className="tw-hdr-sub">Tap the street to walk · tap a building to enter. <b>In town</b> = here now; <b>around</b> = online elsewhere.</p>
             </section>
 
-            <div ref={sceneRef} className="tw-scene" style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
+            <div ref={sceneRef} className={`tw-scene${spooky ? " is-spooky" : ""}`} style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
                 <SceneMusic vibe={raidActive ? "raid" : "town"} />
                 {/* ONE status bubble, top-left: who's here AND whether the shop is open. These were two separate
                     absolutely-positioned pills and they overlapped each other the moment the Den was open —
@@ -1860,7 +1860,6 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                     pointer-events: none besides. */}
                 {spooky ? (
                     <>
-                        <div className="hw-night" aria-hidden="true" />
                         {/* Three bands at different depths, speeds and directions. One band reads as a moving
                             texture; three at different rates read as air with depth in it. */}
                         <div className="hw-fog hw-fog-1" aria-hidden="true" />
@@ -3365,15 +3364,37 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     50% { translate: 7% -12%; opacity: 0.45; }
 }
 
+/* ── nightfall, WITHOUT a tint sheet over the plaza ───────────────────────────────────────────────────────
+   ⚠️ NO SCENE OVERLAY. The house rule is stated at FarmClient.js:1041 and it is about exactly this:
+   "Sprite brightness only -- NO scene tint/overlay (overlays wash the whole scene out; time-of-day mood must
+   be baked into the artwork itself)." The first pass here did the forbidden thing -- one full-scene panel of
+   indigo on mix-blend-mode: multiply -- and it has the failure the rule predicts: multiply drags every pixel
+   toward one colour, so a lit tavern window and the mud in front of it compress to the same murk and the
+   painting stops having contrast.
+
+   So the darkness is applied to the ARTWORK, layer by layer, with filters. A filter scales what is already
+   there instead of covering it: the warm windows stay warm RELATIVE to the stone, the ink contours survive,
+   and each band can be darkened by how far away it is supposed to be. Farther is darker and cooler; the
+   buildings hold the most light because they are the things with lamps in them.
+
+   The daylight sky is not darkened at all -- it is REPLACED. .hw-sky is the sky when the flag is up, which is
+   the "baked into the artwork" half of the rule rather than a sheet laid over noon. */
+.tw-scene.is-spooky .tw-far { display: none; }
+.tw-scene.is-spooky .tw-depth img { filter: brightness(0.38) saturate(0.5) hue-rotate(-14deg); }
+.tw-scene.is-spooky .tw-mid img { filter: brightness(0.44) saturate(0.55) hue-rotate(-12deg); }
+.tw-scene.is-spooky .tw-cobble img { filter: brightness(0.5) saturate(0.62) hue-rotate(-8deg); }
+.tw-scene.is-spooky .tw-fg img { filter: brightness(0.52) saturate(0.62) hue-rotate(-8deg); }
+.tw-scene.is-spooky .tw-centerpiece { filter: brightness(0.6) saturate(0.7); }
+/* :where() so this carries NO specificity and anything with its own lit state still wins -- the General Store
+   keeps its Market Day glow while the shop is open, which is the one building that should be brightest at
+   night. Written the other way round it would have quietly switched that off. */
+:where(.tw-scene.is-spooky) .tw-building-art,
+:where(.tw-scene.is-spooky) .tw-building-card { filter: brightness(0.66) saturate(0.82); }
+/* People get the gentlest nudge of all. The Farm rule calls for a TINY one on sprites, and a member standing
+   in their own town has to stay recognisable -- this is atmosphere, not a reason to lose your avatar. */
+.tw-scene.is-spooky .tw-sprite { filter: brightness(0.86) saturate(0.94); }
+
 /* ── the air ──────────────────────────────────────────────────────────────────────────────────────────── */
-/* Night over everything scenic: the buildings, the street and the people standing in it all go cold and dark.
-   Deliberately not opaque enough to kill readability -- you still have to be able to find a door. */
-.hw-night { position: absolute; inset: 0; z-index: 91; pointer-events: none;
-    background:
-        radial-gradient(120% 90% at 78% 12%, rgba(190,210,255,0.16), transparent 46%),
-        linear-gradient(180deg, rgba(10,6,26,0.34) 0%, rgba(12,7,30,0.44) 55%, rgba(6,4,18,0.6) 100%),
-        radial-gradient(130% 100% at 50% 52%, transparent 40%, rgba(0,0,0,0.5) 100%);
-    mix-blend-mode: multiply; }
 
 /* Fog. Each band is TWICE the scene wide and holds the same pattern twice, so sliding it exactly -50% lands
    the second copy where the first began -- a seamless loop with no visible seam and no image to fetch.
