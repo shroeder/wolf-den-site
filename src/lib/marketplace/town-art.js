@@ -268,13 +268,101 @@ Object.assign(ART_PROMPTS, {
     ),
 });
 
+// ── MORE THINGS TO GROUP ─────────────────────────────────────────────────────────────────────────────────────
+// Luke: "there should be a lot more Halloween decorations. And they should be kind of like grouped naturally
+// and not look like a pattern."
+//
+// A cluster only reads as a cluster if the things in it are DIFFERENT. Four pumpkins in a row is a pattern no
+// matter how the spacing is jittered; a scarecrow with a hay bale and three pumpkins at its feet is a scene.
+// These are the pieces the groups are built out of — big anchors that start a cluster, small fillers that
+// gather around one.
+Object.assign(ART_PROMPTS, {
+    hw_scarecrow: housePrompt(
+        "A ragged SCARECROW on a wooden cross-post — a stuffed burlap-sack head with stitched eyes and a " +
+        "crooked grin, a battered wide-brimmed hat, a patched checked shirt stuffed with straw, straw poking " +
+        "from the cuffs",
+        { extra: HW_NEAR_EXTRA }
+    ),
+    hw_haybale: housePrompt(
+        "A round bale of STRAW with two dry cornstalk bundles leaning against it and a small orange gourd " +
+        "resting on top",
+        { extra: HW_NEAR_EXTRA }
+    ),
+    hw_cauldron: housePrompt(
+        "A fat black iron CAULDRON on three legs over a low fire, filled with a bubbling luminous green brew " +
+        "that glows and casts light up the inside of the pot, a wooden stirring paddle leaning in it",
+        { extra: "It is a LIGHT SOURCE in a dark street: a sickly green glow burns out of the pot and up onto " +
+            "its own rim, with deep cool shadow everywhere else, and a warm orange fire glow underneath. The " +
+            "glow lives INSIDE the pot — no halo or bloom drawn outside its silhouette." }
+    ),
+    hw_gravestone: housePrompt(
+        "A weathered stone GRAVESTONE leaning crookedly out of a small mound of earth, a rounded top, cracked " +
+        "and mossy, a few dry weeds at its base. The stone is BLANK — no carving, no inscription, no marks",
+        { extra: HW_NEAR_EXTRA }
+    ),
+    hw_skeleton: housePrompt(
+        "A cartoon SKELETON sitting slumped on the ground with its legs stretched out and its back against " +
+        "nothing, arms loose at its sides, skull tipped to one side as if dozing",
+        { extra: HW_NEAR_EXTRA + " Friendly and comic rather than gruesome — clean rounded bones." }
+    ),
+    hw_pumpkin_stack: housePrompt(
+        "THREE carved pumpkins STACKED one on top of another into a little tower, largest at the bottom and " +
+        "smallest on top, each with a different cut face, all lit from within",
+        { extra: HW_NEAR_EXTRA }
+    ),
+    hw_crow: housePrompt(
+        "A single black CROW perched and facing to the LEFT, wings folded, head slightly hunched into its " +
+        "shoulders, one eye catching a spark of light",
+        { extra: HW_NEAR_EXTRA }
+    ),
+});
+
+// ── AND THE BUILDINGS, DRESSED ───────────────────────────────────────────────────────────────────────────────
+// Luke: "Let's make a Halloween version of each of the buildings."
+//
+// ⚠️ DERIVED FROM THE EXISTING PROMPT, NOT REWRITTEN. Each dressed twin is the building's OWN description with
+// a decorating clause spliced in ahead of the shared style block — so the Forge is unmistakably still the
+// Forge, same shape, same materials, same silhouette on the street, wearing pumpkins. Re-describing thirteen
+// buildings by hand would have produced thirteen subtly different buildings, and the swap would read as the
+// town being replaced rather than decorated.
+//
+// The accent rotates so they do not all get the identical treatment, which is the same "it looks like a
+// pattern" failure the decorations themselves had.
+const HW_ACCENTS = [
+    "carved glowing jack-o'-lanterns clustered on the step and a thick cobweb strung across one upper corner",
+    "a row of small orange paper lanterns strung along the eaves and two pumpkins flanking the door",
+    "dense grey cobwebs in the eaves and window corners, with a fat spider, and a pumpkin on the sill",
+    "black and orange triangular bunting strung across the front and a wreath of dry twigs on the door",
+    "a scattering of dry orange and brown leaves banked against its base, bare twisted branches leaning by the " +
+        "door, and a single candle burning in an upper window",
+    "cobwebs across the sign, a crow perched on the roof ridge, and stacked pumpkins beside the entrance",
+];
+const HW_BUILDING_IDS = ["tavern", "boss", "forge", "auction", "shop", "docks", "farm", "vault", "festival", "mine", "delves", "arena", "market"];
+const _hwBuildings = {};
+HW_BUILDING_IDS.forEach((id, i) => {
+    const base = ART_PROMPTS[id];
+    // A building whose prompt stopped using the shared style block would silently produce an UNDRESSED twin
+    // that looks identical to the plain one — worth skipping loudly-ish rather than shipping a no-op asset.
+    if (!base || !base.includes(BUILDING_STYLE)) return;
+    const dress =
+        `⚠️ THE BUILDING IS DECORATED FOR HALLOWEEN, and it is the same building: do not change its shape, ` +
+        `size, materials or purpose, only what has been hung on it. Specifically, it has ${HW_ACCENTS[i % HW_ACCENTS.length]}. ` +
+        `It is NIGHT, so any window that is lit glows warm amber against cool blue-violet shadow. ` +
+        `Festive and inviting rather than derelict or frightening — this is a town that decorated, not a ruin.`;
+    _hwBuildings[`hw_bld_${id}`] = base.replace(BUILDING_STYLE, `${dress} ${BUILDING_STYLE}`);
+});
+Object.assign(ART_PROMPTS, _hwBuildings);
+
 export const TOWN_ART_KEYS = Object.keys(ART_PROMPTS);
 
-// The seasonal set, named once so the generator script and the Town both mean the same nine things.
-export const HALLOWEEN_ART_KEYS = [
+// The seasonal set, named once so the generator script and the Town both mean the same things.
+export const HALLOWEEN_PROP_KEYS = [
     "hw_moon", "hw_witch_a", "hw_witch_b", "hw_bats", "hw_tree",
     "hw_pumpkin", "hw_lantern", "hw_candles", "hw_ghost",
+    "hw_scarecrow", "hw_haybale", "hw_cauldron", "hw_gravestone", "hw_skeleton", "hw_pumpkin_stack", "hw_crow",
 ];
+export const HALLOWEEN_BUILDING_KEYS = Object.keys(_hwBuildings);
+export const HALLOWEEN_ART_KEYS = [...HALLOWEEN_PROP_KEYS, ...HALLOWEEN_BUILDING_KEYS];
 
 // Generate (or regenerate) one town art asset and store its URL.
 export async function generateTownArt(key) {

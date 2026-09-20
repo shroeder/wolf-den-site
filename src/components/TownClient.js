@@ -603,46 +603,156 @@ const NOOP_POLL = async () => {};
 // would be storing a fact with no consequences outside this one browser.
 const HW_KEY = "wolfden-town-halloween";
 
-// Where the dressing stands in the street. `top` is against the SAME GROUND line the buildings use (72%), so a
-// pumpkin sits on the cobbles the buildings sit on; `h` is a percentage of the scene height. Hung things go
-// ABOVE the line, things on the floor a little below it so they read as nearer than the shopfronts.
-// Spaced by hand between the buildings rather than on a loop: an even scatter looks placed, an even SPACING
-// looks generated, and the buildings are 11% apart so anything regular lands on top of a door.
-// ⚠️ THE SPACING IS SET BY HOW MUCH OF THE STREET YOU CAN SEE AT ONCE, NOT BY WHAT LOOKS RIGHT IN THE LIST.
-// The first version put sixteen props between 4% and 96% and read as almost undecorated, because the street is
-// about 4,840px wide and the window onto it is about 800 — you see roughly a SIXTH of the town at a time, so
-// props 6% apart mean one or two on screen and long empty stretches between. A DOM probe counted 3 of 16 in
-// view, which is the thing a screenshot could not tell me: they were not broken, they were elsewhere.
+// ── WHERE THE DRESSING STANDS ────────────────────────────────────────────────────────────────────────────────
+// Luke: "Let's not have a linear spacing between the decorations. Let's create clusters of them... it literally
+// looks like you just took one and put it between each building, which is not what I'm looking for."
 //
-// So: one about every 3.4%, which puts four or five in shot wherever you stand. The offsets break the rhythm,
-// because the buildings sit on an exact 11% grid and anything evenly spaced eventually lines up with every
-// door at once.
-const HW_PROPS = (() => {
-    // ⚠️ THE LANTERNS STAND ON THE GROUND, THEY DO NOT HANG. They were first placed at 57% -- up at eave
-    // height, where a hung lantern belongs -- and could not be seen at all: buildings paint at z-index
-    // 100+x and props at 50, so every one of them was behind a roof. Raising the props above the buildings
-    // would have fixed the z-order and broken the picture, because a lantern hanging in mid-air with no eave
-    // and no chain above it reads as a bug. Standing it on the cobbles beside the door is simply true.
-    const SHAPES = [
-        { key: "hw_lantern", kind: "lantern", top: 74, h: 9 },
-        { key: "hw_pumpkin", kind: "pumpkin", top: 75, h: 9 },
-        { key: "hw_candles", kind: "candles", top: 74, h: 6.5 },
-        { key: "hw_pumpkin", kind: "pumpkin", top: 77, h: 11 },
-        { key: "hw_lantern", kind: "lantern", top: 76, h: 10 },
-        { key: "hw_candles", kind: "candles", top: 75, h: 7.5 },
-    ];
-    const JITTER = [0, 0.9, -0.7, 1.4, -1.1];
+// He is describing exactly what the first version did. One prop every 3.4% with a jitter table is still a
+// PATTERN — jitter only wobbles a grid, it does not remove it, and the eye finds the rhythm immediately.
+//
+// Real decorating is not spaced at all. It gathers where there is a reason to gather: either side of a door,
+// around the thing somebody put out first — and it leaves whole stretches bare, which is what makes the busy
+// parts read as busy. So this places GROUPS with themes, and the empty road between them is deliberate.
+//
+//   PORCH   every building gets its door flanked, because that is where anybody decorates first.
+//   YARD    themed scenes pitched in the gaps -- a little graveyard, a harvest corner, a witch's fire, a
+//           pumpkin patch, a pile of bones. Each has one big ANCHOR and smaller pieces gathered at its feet.
+//
+// ⚠️ SEEDED, NOT RANDOM. This module is evaluated on the server for SSR and again in the browser, so a
+// Math.random() here would deal a different street on each side and React would throw a hydration mismatch on
+// the whole plaza. mulberry32 off a fixed seed gives an irregular layout that is identical in both places.
+const hwRng = (seed) => () => {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+// Ground-standing pieces. `h` is a share of the scene height; `top` is against the buildings' GROUND line, and
+// varies a little per piece so a group does not line up along one invisible rule.
+const HW_PIECE = {
+    pumpkin: { key: "hw_pumpkin", kind: "pumpkin", h: [7, 11], top: [74, 78] },
+    stack: { key: "hw_pumpkin_stack", kind: "pumpkin", h: [13, 16], top: [74, 76] },
+    lantern: { key: "hw_lantern", kind: "lantern", h: [8, 11], top: [74, 77] },
+    candles: { key: "hw_candles", kind: "candles", h: [5, 8], top: [74, 77] },
+    cauldron: { key: "hw_cauldron", kind: "cauldron", h: [9, 12], top: [75, 77] },
+    grave: { key: "hw_gravestone", kind: "grave", h: [9, 13], top: [74, 77] },
+    skeleton: { key: "hw_skeleton", kind: "skeleton", h: [8, 11], top: [75, 78] },
+    scarecrow: { key: "hw_scarecrow", kind: "scarecrow", h: [17, 21], top: [74, 76] },
+    haybale: { key: "hw_haybale", kind: "haybale", h: [8, 11], top: [75, 78] },
+    crow: { key: "hw_crow", kind: "crow", h: [4, 6], top: [63, 70] },
+};
+
+// Each scene names its anchor first, then what gathers around it. Weights let the common things repeat.
+const HW_SCENES = [
+    { name: "graveyard", spread: 5.5, parts: ["grave", "grave", "grave", "crow", "candles"] },
+    { name: "harvest", spread: 6, parts: ["scarecrow", "haybale", "pumpkin", "pumpkin", "haybale"] },
+    { name: "witchfire", spread: 4.5, parts: ["cauldron", "candles", "pumpkin", "candles"] },
+    { name: "patch", spread: 5, parts: ["stack", "pumpkin", "pumpkin", "pumpkin", "pumpkin"] },
+    { name: "bones", spread: 4.5, parts: ["skeleton", "grave", "candles", "crow"] },
+    { name: "lanterns", spread: 4, parts: ["lantern", "lantern", "pumpkin", "candles"] },
+];
+
+/**
+ * Lay the town out for All Hallows'.
+ *
+ * Takes the REAL buildings so porches land on real doors — the street's building list is server state and can
+ * grow, and a hardcoded copy of their x positions would drift the first time one moved.
+ *
+ * ⚠️ THE BARE STRETCHES ARE THE FEATURE. The first attempt at this decorated every door AND dropped a scene
+ * in every gap, and measuring it found 90 pieces in 4 clusters with a biggest gap of 5.2% — a continuous
+ * ribbon of decoration from one end of the street to the other. Dense everywhere is just a different pattern:
+ * without empty road there is nothing for a cluster to be denser THAN. So roughly half the doors get dressed,
+ * yard scenes are only pitched where nothing else is within 7%, and the walk between them strides 9-20%.
+ */
+function buildHalloweenDressing(buildings) {
+    const rand = hwRng(0x4A5F17);
+    const pick = (lo, hi) => lo + rand() * (hi - lo);
     const out = [];
-    for (let i = 0; i < 28; i += 1) {
-        const shape = SHAPES[i % SHAPES.length];
-        const x = 2 + i * 3.4 + JITTER[i % JITTER.length];
-        out.push({ ...shape, x: Math.round(x * 10) / 10, flip: i % 3 === 0 });
+    const put = (name, x, hScale) => {
+        const piece = HW_PIECE[name];
+        if (!piece) return;
+        out.push({
+            key: piece.key, kind: piece.kind,
+            x: Math.round(Math.max(0.5, Math.min(99.5, x)) * 100) / 100,
+            top: Math.round(pick(piece.top[0], piece.top[1]) * 10) / 10,
+            h: Math.round(pick(piece.h[0], piece.h[1]) * (hScale || 1) * 10) / 10,
+            flip: rand() < 0.45,
+            delay: Math.round(rand() * 400) / 100,
+        });
+    };
+
+    // ── WHERE A GROUP GOES ───────────────────────────────────────────────────────────────────────────────
+    // Doors first, because that is what anybody decorates — but only about half of them, so the street has
+    // houses that bothered and houses that did not.
+    // ⚠️ THE DENSITY IS SET BY WHAT FITS ON A SCREEN. The camera shows ~16% of the street, so the question is
+    // not "how many decorations" but "how many PILES are in shot" -- and the answer has to be about two, or a
+    // given view lands in a gap and the town reads as bare even while the numbers look healthy. Nine clusters
+    // put roughly one on screen and a shot of the Auction House came back with nothing outside its door.
+    // ⚠️ THE PORCH RATE IS SET BY THE BUILDING SPACING, NOT BY TASTE. At 0.55 this dressed about eight of the
+    // fifteen doors, and since the buildings sit on an 11% grid every yard slot then fell within the 7%
+    // exclusion of a porch — so NO yard scene was ever placed and the whole town came out as pumpkins and
+    // lanterns, with not one gravestone, skeleton or cauldron in it. Fewer doors leaves room for the scenes
+    // that carry the variety.
+    const anchors = [];
+    for (const b of buildings) {
+        if (rand() < 0.62) anchors.push({ x: Number(b.x) || 0, porch: true });
     }
-    // Ghosts are the rare one — four in the whole town, drifting well above head height so they read as a
-    // surprise rather than as more street furniture.
-    for (const x of [14, 37, 62, 88]) out.push({ key: "hw_ghost", kind: "ghost", x, top: 48, h: 10 });
+    // Then yards, pitched only into road that is actually empty. The stride is long and uneven on purpose.
+    let walk = 4 + rand() * 5;
+    while (walk < 97) {
+        if (!anchors.some((a) => Math.abs(a.x - walk) < 4.5)) anchors.push({ x: walk, porch: false });
+        walk += 5.5 + rand() * 5;
+    }
+    anchors.sort((a, b) => a.x - b.x);
+
+    // ── WHAT IS IN IT ────────────────────────────────────────────────────────────────────────────────────
+    // Fixed compositions rather than a random slice of a list: a scene needs its anchor and its supporting
+    // pieces, and dealing them at random produced six pumpkins and one skeleton across the whole town.
+    const YARDS = [
+        ["grave", "grave", "grave", "crow", "candles", "pumpkin"],
+        ["scarecrow", "haybale", "pumpkin", "pumpkin", "haybale", "candles"],
+        ["cauldron", "candles", "pumpkin", "candles", "grave"],
+        ["stack", "pumpkin", "pumpkin", "candles", "pumpkin", "lantern"],
+        ["skeleton", "grave", "candles", "crow", "pumpkin"],
+        ["haybale", "pumpkin", "stack", "crow", "haybale", "candles"],
+        ["grave", "skeleton", "crow", "grave", "candles"],
+        ["scarecrow", "pumpkin", "candles", "haybale", "pumpkin", "lantern"],
+    ];
+    const PORCHES = [
+        ["lantern", "stack", "pumpkin", "candles", "pumpkin"],
+        ["pumpkin", "pumpkin", "lantern", "stack", "candles"],
+        ["lantern", "candles", "pumpkin", "pumpkin"],
+        ["stack", "lantern", "candles", "pumpkin", "lantern"],
+        ["pumpkin", "lantern", "stack", "candles"],
+    ];
+
+    anchors.forEach((a, i) => {
+        const set = a.porch ? PORCHES[(i + Math.floor(rand() * 2)) % PORCHES.length]
+            : YARDS[(i + Math.floor(rand() * 3)) % YARDS.length];
+        // The anchor piece sits nearly on the mark and the rest gather tight around it — a dense middle with
+        // thin edges, which is what a pile of things somebody set down actually looks like.
+        // ⚠️ TIGHTNESS IS MEASURED AGAINST THE SCREEN, NOT THE STREET. The camera shows about 16% of the town
+        // at once, so a group spread over 5% of the street covers a THIRD of the view and reads as scattered
+        // singles -- which is what it looked like, and is the very thing this was meant to stop. A pile has
+        // to sit inside roughly 2% of the street to look like one pile on screen.
+        set.forEach((part, k) => {
+            const lean = k === 0 ? (rand() - 0.5) * 0.5 : (rand() - 0.5) * (a.porch ? 2.1 : 1.9);
+            // Porch pieces skew to one side of the door rather than straddling it evenly.
+            const side = a.porch && k > 0 ? (rand() < 0.68 ? 1 : -1) * pick(0.5, 1.2) : 0;
+            put(part, a.x + lean + side, k === 0 ? 1 : pick(0.8, 1));
+        });
+    });
+
+    // ── GHOSTS ───────────────────────────────────────────────────────────────────────────────────────────
+    // Off the ground and off the grid entirely, so the one thing that floats is not also in a row.
+    for (const gx of [11, 29, 46, 63, 81, 94]) {
+        out.push({ key: "hw_ghost", kind: "ghost", x: gx + (rand() - 0.5) * 6,
+            top: Math.round(pick(42, 56) * 10) / 10, h: Math.round(pick(8, 12) * 10) / 10,
+            flip: rand() < 0.5, delay: Math.round(rand() * 700) / 100 });
+    }
     return out;
-})();
+}
 
 // Read during the FIRST render, not in an effect. A useEffect runs after the tree has already painted, so the
 // scene would mount in daylight and flip to night a frame later — a visible flash on every single visit, which
@@ -672,6 +782,8 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
     // Parallax rows are mirror-tiled to span the world; the counts below were sized for a 2900px street, so
     // they scale with it or a longer street simply runs out of scenery at the far end.
     const tiles = useCallback((base) => TILES(Math.ceil(base * (WORLD_W / WORLD_MIN))), [WORLD_W]);
+    // The seasonal layout is built FROM the buildings, so porches land on real doors even as the street grows.
+    const hwProps = useMemo(() => buildHalloweenDressing(buildings), [buildings]);
     const [me, setMe] = useState(() => ({ x: initial?.you?.x ?? 50, y: initial?.you?.y ?? 80, facing: initial?.you?.facing ?? 1, moving: false, moveDist: 0, wave: false }));
     const [others, setOthers] = useState({});
     const [viewportW, setViewportW] = useState(360);
@@ -1562,7 +1674,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         spaced so a lantern or a pumpkin lands near each building without covering its door.
                         Every one of them is a light source, so they also motivate the warm pools the fog picks
                         up — decoration that the lighting agrees with rather than stickers on a dark picture. */}
-                    {spooky ? HW_PROPS.map((p, i) => (art[p.key]?.url ? (
+                    {spooky ? hwProps.map((p, i) => (art[p.key]?.url ? (
                         // ⚠️ THE FLIP HAS TO BE PART OF THE SAME TRANSFORM. These are anchored the way the
                         // buildings are — translate(-50%, -100%) against the shared GROUND line — so writing
                         // scaleX(-1) on its own would REPLACE that anchor, not add to it, and drop the prop
@@ -1570,7 +1682,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         // eslint-disable-next-line @next/next/no-img-element
                         <img key={`hw-${i}`} className={`hw-prop hw-${p.kind}`} src={art[p.key].url} alt="" draggable={false}
                             style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${p.h}%`,
-                                animationDelay: `${(i % 7) * 0.41}s`,
+                                animationDelay: `${p.delay}s`,
                                 transform: `translate(-50%, -100%)${p.flip ? " scaleX(-1)" : ""}` }} />
                     ) : null)) : null}
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
@@ -1622,10 +1734,13 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                     ) : null}
                     {/* Buildings — locked (no entry) while a raid is on: defend the plaza first! */}
                     {buildings.map((b) => {
-                        const bart = art[b.id];
+                        // The dressed twin when the flag is up, falling back to the everyday building if that
+                        // one was never drawn — so a half-generated set degrades to a plain street, not a gap.
+                        const dressed = Boolean(spooky && art[`hw_bld_${b.id}`]);
+                        const bart = (dressed && art[`hw_bld_${b.id}`]) || art[b.id];
                         const shopOpen = marketDay && b.id === "shop"; // the real store's building lights up when the shop is open
                         return (
-                            <Link key={b.id} href={raidActive ? "#" : b.href} className={`tw-building${bart ? " has-art" : ""}${raidActive ? " is-locked" : ""}${shopOpen ? " is-openshop" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }} onClick={raidActive ? (e) => { e.preventDefault(); e.stopPropagation(); } : b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()} aria-disabled={raidActive || undefined}>
+                            <Link key={b.id} href={raidActive ? "#" : b.href} className={`tw-building${bart ? " has-art" : ""}${dressed ? " is-dressed" : ""}${raidActive ? " is-locked" : ""}${shopOpen ? " is-openshop" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }} onClick={raidActive ? (e) => { e.preventDefault(); e.stopPropagation(); } : b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()} aria-disabled={raidActive || undefined}>
                                 {shopOpen ? <span className="tw-openflag">OPEN</span> : null}
                                 {/* The same number the Town pill shows in the nav, now pointing at the door it
                                     belongs to. Getting a badge and then hunting the plaza for what caused it is
@@ -3353,6 +3468,16 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     animation: hwFlicker 1.9s ease-in-out infinite; }
 .hw-ghost { opacity: 0.72; filter: drop-shadow(0 0 20px rgba(150,220,255,0.6));
     animation: hwDrift 7.5s ease-in-out infinite; }
+/* The witch's pot burns green rather than amber, so it reads as the odd light in the street. */
+.hw-cauldron { filter: drop-shadow(0 0 17px rgba(120,255,140,0.6)) drop-shadow(0 6px 10px rgba(0,0,0,0.6));
+    animation: hwFlicker 2.3s ease-in-out infinite; }
+/* ⚠️ THE UNLIT PIECES DO NOT FLICKER AND DO NOT GLOW. A gravestone that pulses is a gravestone with a candle
+   inside it. These only catch what the street throws at them, so they get a brightness knock-down and a
+   contact shadow and nothing else — which is also what makes the lit pieces read AS lit. */
+.hw-grave, .hw-skeleton, .hw-scarecrow, .hw-haybale, .hw-crow {
+    filter: brightness(0.62) saturate(0.72) drop-shadow(0 5px 9px rgba(0,0,0,0.6)); }
+/* The crow sits up off the ground on a post or a roofline, so it gets no contact shadow under it. */
+.hw-crow { filter: brightness(0.5) saturate(0.6) drop-shadow(0 0 6px rgba(60,40,90,0.5)); }
 @keyframes hwFlicker {
     0%, 100% { opacity: 1; }
     42% { opacity: 0.9; }
@@ -3388,8 +3513,14 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 /* :where() so this carries NO specificity and anything with its own lit state still wins -- the General Store
    keeps its Market Day glow while the shop is open, which is the one building that should be brightest at
    night. Written the other way round it would have quietly switched that off. */
-:where(.tw-scene.is-spooky) .tw-building-art,
-:where(.tw-scene.is-spooky) .tw-building-card { filter: brightness(0.66) saturate(0.82); }
+/* ⚠️ ONLY THE EVERYDAY BUILDINGS GET DARKENED. The dressed twins were PAINTED for night -- warm windows
+   against cool shadow, already in the artwork -- so putting the night filter on them as well darkened them
+   twice and turned the Forge and the Auction House into blue monochrome. Which is the same mistake as the
+   tint sheet, just aimed at one layer: if the art already carries the light, leave it alone.
+   Both halves are wrapped in :where() so the pair stays at (0,1,0) and the Market Day glow on .is-openshop
+   still outranks it. */
+:where(.tw-scene.is-spooky) :where(.tw-building:not(.is-dressed)) .tw-building-art,
+:where(.tw-scene.is-spooky) :where(.tw-building:not(.is-dressed)) .tw-building-card { filter: brightness(0.66) saturate(0.82); }
 /* People get the gentlest nudge of all. The Farm rule calls for a TINY one on sprites, and a member standing
    in their own town has to stay recognisable -- this is atmosphere, not a reason to lose your avatar. */
 .tw-scene.is-spooky .tw-sprite { filter: brightness(0.86) saturate(0.94); }
