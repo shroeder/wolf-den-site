@@ -596,7 +596,73 @@ const QuestIcon = ({ name }) => {
 // exactly as it was passed. Production never sets it — see /marketplace/town/lab.
 const NOOP_POLL = async () => {};
 
-export default function TownClient({ initial, frozen = false }) {
+// ── THE HALLOWEEN FLAG ───────────────────────────────────────────────────────────────────────────────────────
+// `canDressUp` is the SERVER's answer to "may this member turn the dressing on" and arrives as a prop; whether
+// it is currently on is their own preference and lives here. localStorage rather than a column because this
+// changes nothing anybody else can see — no other member's plaza is affected by it, so a row and a migration
+// would be storing a fact with no consequences outside this one browser.
+const HW_KEY = "wolfden-town-halloween";
+
+// Where the dressing stands in the street. `top` is against the SAME GROUND line the buildings use (72%), so a
+// pumpkin sits on the cobbles the buildings sit on; `h` is a percentage of the scene height. Hung things go
+// ABOVE the line, things on the floor a little below it so they read as nearer than the shopfronts.
+// Spaced by hand between the buildings rather than on a loop: an even scatter looks placed, an even SPACING
+// looks generated, and the buildings are 11% apart so anything regular lands on top of a door.
+// ⚠️ THE SPACING IS SET BY HOW MUCH OF THE STREET YOU CAN SEE AT ONCE, NOT BY WHAT LOOKS RIGHT IN THE LIST.
+// The first version put sixteen props between 4% and 96% and read as almost undecorated, because the street is
+// about 4,840px wide and the window onto it is about 800 — you see roughly a SIXTH of the town at a time, so
+// props 6% apart mean one or two on screen and long empty stretches between. A DOM probe counted 3 of 16 in
+// view, which is the thing a screenshot could not tell me: they were not broken, they were elsewhere.
+//
+// So: one about every 3.4%, which puts four or five in shot wherever you stand. The offsets break the rhythm,
+// because the buildings sit on an exact 11% grid and anything evenly spaced eventually lines up with every
+// door at once.
+const HW_PROPS = (() => {
+    // ⚠️ THE LANTERNS STAND ON THE GROUND, THEY DO NOT HANG. They were first placed at 57% -- up at eave
+    // height, where a hung lantern belongs -- and could not be seen at all: buildings paint at z-index
+    // 100+x and props at 50, so every one of them was behind a roof. Raising the props above the buildings
+    // would have fixed the z-order and broken the picture, because a lantern hanging in mid-air with no eave
+    // and no chain above it reads as a bug. Standing it on the cobbles beside the door is simply true.
+    const SHAPES = [
+        { key: "hw_lantern", kind: "lantern", top: 74, h: 9 },
+        { key: "hw_pumpkin", kind: "pumpkin", top: 75, h: 9 },
+        { key: "hw_candles", kind: "candles", top: 74, h: 6.5 },
+        { key: "hw_pumpkin", kind: "pumpkin", top: 77, h: 11 },
+        { key: "hw_lantern", kind: "lantern", top: 76, h: 10 },
+        { key: "hw_candles", kind: "candles", top: 75, h: 7.5 },
+    ];
+    const JITTER = [0, 0.9, -0.7, 1.4, -1.1];
+    const out = [];
+    for (let i = 0; i < 28; i += 1) {
+        const shape = SHAPES[i % SHAPES.length];
+        const x = 2 + i * 3.4 + JITTER[i % JITTER.length];
+        out.push({ ...shape, x: Math.round(x * 10) / 10, flip: i % 3 === 0 });
+    }
+    // Ghosts are the rare one — four in the whole town, drifting well above head height so they read as a
+    // surprise rather than as more street furniture.
+    for (const x of [14, 37, 62, 88]) out.push({ key: "hw_ghost", kind: "ghost", x, top: 48, h: 10 });
+    return out;
+})();
+
+// Read during the FIRST render, not in an effect. A useEffect runs after the tree has already painted, so the
+// scene would mount in daylight and flip to night a frame later — a visible flash on every single visit, which
+// is the thing seasonal dressing most obviously must not do.
+function useHalloweenFlag(allowed) {
+    const [on, setOn] = useState(() => {
+        if (!allowed || typeof window === "undefined") return false;
+        try { return window.localStorage.getItem(HW_KEY) === "1"; } catch { return false; }
+    });
+    const toggle = () => setOn((was) => {
+        const next = !was;
+        try { window.localStorage.setItem(HW_KEY, next ? "1" : "0"); } catch { /* private mode; it just will not persist */ }
+        return next;
+    });
+    // Revoking the flag server-side has to actually turn the lights back on, even though the preference is
+    // remembered locally. `allowed` is the authority; the stored value only ever chooses BETWEEN what it allows.
+    return [Boolean(allowed) && on, toggle];
+}
+
+export default function TownClient({ initial, frozen = false, canDressUp = false }) {
     const [state, setState] = useState(initial || null);
     // The street's width, and everything that measures against it. Declared HERE because the camera below
     // reads it — a hook that depends on a value declared under it is the temporal-dead-zone trap check:hook-deps
@@ -610,6 +676,7 @@ export default function TownClient({ initial, frozen = false }) {
     const [others, setOthers] = useState({});
     const [viewportW, setViewportW] = useState(360);
     const [roster, setRoster] = useState(false);
+    const [spooky, toggleSpooky] = useHalloweenFlag(canDressUp);
     const [panExtra, setPanExtra] = useState(0); // manual drag-to-pan offset on top of the follow-camera
     // Remember where you were standing + looking, so hitting Back from a building drops you right where you left
     // off (not reset to spawn). Restored post-mount from sessionStorage; re-saved on every hero/camera change.
@@ -1366,6 +1433,14 @@ export default function TownClient({ initial, frozen = false }) {
                     </button>
                     <button type="button" className="tw-hdr-btn" onClick={() => setRoster(true)}>👥 Who&apos;s here</button>
                     <button type="button" className="tw-hdr-btn" onClick={() => setBoardOpen(true)}>🏛️ Town Hall</button>
+                    {/* The flag itself. Only rendered for whoever the server said may raise it, so for everybody
+                        else the control does not exist rather than existing and refusing. */}
+                    {canDressUp ? (
+                        <button type="button" className={`tw-hdr-btn tw-hwflag${spooky ? " is-on" : ""}`} onClick={toggleSpooky}
+                            aria-pressed={spooky} title={spooky ? "Put the town back to daylight" : "Dress the town for Halloween (only you see this)"}>
+                            <span className="tw-hwflag-moon" aria-hidden="true" />{spooky ? "All Hallows' on" : "All Hallows'"}
+                        </button>
+                    ) : null}
                 </div>
                 <p className="tw-hdr-sub">Tap the street to walk · tap a building to enter. <b>In town</b> = here now; <b>around</b> = online elsewhere.</p>
             </section>
@@ -1398,6 +1473,52 @@ export default function TownClient({ initial, frozen = false }) {
                         ))}
                     </div>
                 ) : (!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null)}
+                {/* ── ALL HALLOWS': THE SKY ────────────────────────────────────────────────────────────────
+                    Sits here in the DOM on purpose — after the far sky, BEFORE the depth and mid rooftop
+                    bands. Everything in this block is z-index 0 like its neighbours, so paint order is DOM
+                    order and the moon ends up behind the skyline rather than pasted over it. Which is where
+                    a moon goes.
+                    The witches and bats are NOT parallaxed: they are flying, so they cross the sky under
+                    their own power and ignore where the camera happens to be. */}
+                {spooky ? (
+                    <div className="hw-sky" aria-hidden="true">
+                        <div className="hw-stars" />
+                        {art.hw_moon?.url ? (
+                            // Barely parallaxed (0.08). The moon is supposed to be the one thing that does not
+                            // really move when you walk — but pinning it dead still reads as a sticker on the
+                            // glass, so it gets just enough drift to sit in the world.
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="hw-moon" src={art.hw_moon.url} alt=""
+                                style={{ transform: `translateX(${-cameraPx * 0.08}px)` }} draggable={false} />
+                        ) : null}
+                        {art.hw_witch_a?.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="hw-witch hw-witch-1" src={art.hw_witch_a.url} alt="" draggable={false} />
+                        ) : null}
+                        {art.hw_witch_b?.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="hw-witch hw-witch-2" src={art.hw_witch_b.url} alt="" draggable={false} />
+                        ) : null}
+                        {/* One bat sprite, flown three times at different heights, speeds and sizes. The prompt
+                            asked for a flock and the model drew a single bat, which turned out better: a real
+                            flock is things moving independently, and one drawn clump can only ever move as one. */}
+                        {art.hw_bats?.url ? [1, 2, 3].map((n) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={n} className={`hw-bat hw-bat-${n}`} src={art.hw_bats.url} alt="" draggable={false} />
+                        )) : null}
+                    </div>
+                ) : null}
+                {/* Dead trees on the horizon, parallaxed slower than the street so they sit back behind it. */}
+                {spooky && art.hw_tree?.url ? (
+                    <div className="hw-trees" aria-hidden="true"
+                        style={{ transform: `translateX(${-cameraPx * 0.5}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
+                        {[6, 22, 41, 58, 77, 93].map((x, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={x} src={art.hw_tree.url} alt="" draggable={false}
+                                style={{ left: `${x}%`, height: `${i % 2 ? 74 : 92}%`, transform: `scaleX(${i % 3 ? 1 : -1})` }} />
+                        ))}
+                    </div>
+                ) : null}
                 {/* "Grow the Plaza" DEPTH layers — each funded level stacks one more band FURTHER back (spires →
                     hills → distant castles). Farther layers scroll slower + sit hazier, so the town grows deeper
                     as it's invested in. Painted high-N-first so the nearest funded layer sits on top. */}
@@ -1435,6 +1556,23 @@ export default function TownClient({ initial, frozen = false }) {
                             <span className="tw-shiny-core" />
                         </button>
                     ) : null}
+                    {/* ── ALL HALLOWS': THE STREET ─────────────────────────────────────────────────────────
+                        These live INSIDE tw-world, so they are pinned to real places in the town and you walk
+                        past them, rather than riding the screen. Positions are percentages of the street, hand
+                        spaced so a lantern or a pumpkin lands near each building without covering its door.
+                        Every one of them is a light source, so they also motivate the warm pools the fog picks
+                        up — decoration that the lighting agrees with rather than stickers on a dark picture. */}
+                    {spooky ? HW_PROPS.map((p, i) => (art[p.key]?.url ? (
+                        // ⚠️ THE FLIP HAS TO BE PART OF THE SAME TRANSFORM. These are anchored the way the
+                        // buildings are — translate(-50%, -100%) against the shared GROUND line — so writing
+                        // scaleX(-1) on its own would REPLACE that anchor, not add to it, and drop the prop
+                        // half a street to the right and a whole prop-height down the screen.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={`hw-${i}`} className={`hw-prop hw-${p.kind}`} src={art[p.key].url} alt="" draggable={false}
+                            style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${p.h}%`,
+                                animationDelay: `${(i % 7) * 0.41}s`,
+                                transform: `translate(-50%, -100%)${p.flip ? " scaleX(-1)" : ""}` }} />
+                    ) : null)) : null}
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
                     {layered ? (
                         <div className="tw-cobble" aria-hidden="true">
@@ -1714,6 +1852,22 @@ export default function TownClient({ initial, frozen = false }) {
                     </div>
                 ) : null}
                 {state?.event && !state.event.defeated ? <div className="tw-raid-tip">Tap the foes to strike — your gear sets your damage.</div> : null}
+                {/* ── ALL HALLOWS': THE AIR ────────────────────────────────────────────────────────────────
+                    Last in the scene and OUTSIDE tw-world, so these two cover the whole plaza and do not
+                    scroll with the street — weather sits in front of the camera, not in the town.
+                    The tint lands at z-91 and the fog at z-95, which is under every piece of UI (the lowest
+                    is the online badge at 200), so nothing here can eat a tap or bury a button. Both are
+                    pointer-events: none besides. */}
+                {spooky ? (
+                    <>
+                        <div className="hw-night" aria-hidden="true" />
+                        {/* Three bands at different depths, speeds and directions. One band reads as a moving
+                            texture; three at different rates read as air with depth in it. */}
+                        <div className="hw-fog hw-fog-1" aria-hidden="true" />
+                        <div className="hw-fog hw-fog-2" aria-hidden="true" />
+                        <div className="hw-fog hw-fog-3" aria-hidden="true" />
+                    </>
+                ) : null}
             </div>
 
             <section className="card tw-chatbar">
@@ -3126,4 +3280,132 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-levelup-perk .muted { display: block; font-weight: 600; font-size: .76rem; color: #b7ad9a; margin-top: 2px; }
 .tw-levelup-btn { margin-top: 10px; padding: 11px 28px; border-radius: 999px; border: none; cursor: pointer; font-weight: 900; font-size: .95rem; color: #1c130a; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 5px 0 #b57f22; }
 .tw-levelup-btn:active { transform: translateY(2px); box-shadow: 0 3px 0 #b57f22; }
+
+/* ══ ALL HALLOWS' IN THE PLAZA ══════════════════════════════════════════════════════════════════════════════
+   A seasonal dressing that only the member holding the flag can see. Everything is drawn INSIDE .tw-scene,
+   which already clips (overflow: hidden), so nothing here can escape into the page.
+
+   The z-order it slots into, which is the whole trick:
+       0    far sky, the halloween sky, depth bands, mid rooftops   -- the moon lives here, behind the roofs
+       1    cobbles                                                 -- props sit at 50, on top of them
+       90   foreground wall
+       91   the night tint       -- over the town, so the buildings and the people in the street go dark too
+       95   the fog              -- over the tint, so it catches the light rather than sitting under it
+       200+ every piece of UI    -- untouched, and both layers are pointer-events: none regardless
+   ═══════════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* The flag itself, in the header row. Lit when it is flying. */
+.tw-hwflag.is-on { color: #ffcf8a; border-color: rgba(255,140,40,0.75);
+    background: linear-gradient(180deg, rgba(88,32,8,0.95), rgba(48,16,6,0.95)); box-shadow: 0 0 14px rgba(255,130,30,0.35); }
+.tw-hwflag-moon { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px;
+    vertical-align: -1px; background: #cfd6e6; box-shadow: inset -3px -1px 0 rgba(0,0,0,0.28); }
+.tw-hwflag.is-on .tw-hwflag-moon { background: #ffe9b0; box-shadow: inset -3px -1px 0 rgba(120,60,0,0.3), 0 0 8px rgba(255,200,90,0.9); }
+
+/* ── the sky ──────────────────────────────────────────────────────────────────────────────────────────── */
+.hw-sky { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    background: linear-gradient(180deg, #05040f 0%, #0d0a22 34%, #1b1038 60%, #2c1540 78%, rgba(58,26,58,0) 100%); }
+/* Stars, as three offset dot grids at different sizes so they do not read as a lattice. */
+.hw-stars { position: absolute; inset: 0; opacity: 0.85;
+    background-image:
+        radial-gradient(1.4px 1.4px at 12% 18%, #fff 50%, transparent 52%),
+        radial-gradient(1.2px 1.2px at 63% 9%, #e8e4ff 50%, transparent 52%),
+        radial-gradient(1.6px 1.6px at 81% 26%, #fff 50%, transparent 52%),
+        radial-gradient(1px 1px at 33% 31%, #cfd6ff 50%, transparent 52%),
+        radial-gradient(1.3px 1.3px at 47% 14%, #fff 50%, transparent 52%),
+        radial-gradient(1px 1px at 91% 12%, #d8d2ff 50%, transparent 52%),
+        radial-gradient(1.1px 1.1px at 24% 7%, #fff 50%, transparent 52%),
+        radial-gradient(1.5px 1.5px at 72% 35%, #fff 50%, transparent 52%);
+    animation: hwTwinkle 4.5s ease-in-out infinite; }
+@keyframes hwTwinkle { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.55; } }
+
+.hw-moon { position: absolute; right: 7%; top: 5%; height: 34%; width: auto; will-change: transform;
+    filter: drop-shadow(0 0 26px rgba(206,224,255,0.55)) drop-shadow(0 0 70px rgba(150,180,255,0.3)); }
+
+/* Witches and bats FLY: their motion is their own, not the camera's, so they are not parallaxed.
+   The left offset is animated rather than transform because the distance has to be a share of the SCENE, and a
+   percentage inside translateX() would resolve against the sprite's own width instead. Five elements moving
+   is nothing, and getting the travel right matters more than saving a layout pass on each of them. */
+.hw-witch, .hw-bat { position: absolute; width: auto; pointer-events: none;
+    filter: brightness(0.14) saturate(0.35) drop-shadow(0 0 7px rgba(90,60,140,0.55)); }
+.hw-witch-1 { height: 11%; top: 19%; animation: hwCross 34s linear infinite, hwBob 3.4s ease-in-out infinite; }
+.hw-witch-2 { height: 8%; top: 9%; animation: hwCross 52s linear infinite 12s, hwBob 4.6s ease-in-out infinite; }
+.hw-bat-1 { height: 4.5%; top: 27%; animation: hwCross 19s linear infinite 3s, hwBob 1.1s ease-in-out infinite; }
+.hw-bat-2 { height: 3.2%; top: 15%; animation: hwCross 26s linear infinite 9s, hwBob 0.9s ease-in-out infinite; }
+.hw-bat-3 { height: 5.5%; top: 34%; animation: hwCross 15s linear infinite 16s, hwBob 1.3s ease-in-out infinite; }
+/* Starts and ends fully off the clipped scene, so nothing ever pops into being mid-air. */
+@keyframes hwCross { from { left: 106%; } to { left: -18%; } }
+@keyframes hwBob { 0%, 100% { margin-top: 0; } 50% { margin-top: -1.6%; } }
+
+/* Dead trees on the horizon, parallaxed slower than the street so they read as standing back from it. */
+.hw-trees { position: absolute; left: 0; bottom: 40%; width: 100%; height: 26%; z-index: 0; pointer-events: none; }
+.hw-trees img { position: absolute; bottom: 0; width: auto;
+    filter: brightness(0.1) saturate(0.3); opacity: 0.92; }
+
+/* ── the street ───────────────────────────────────────────────────────────────────────────────────────── */
+/* Props ride INSIDE tw-world, so they are pinned to the town and you walk past them. */
+.hw-prop { position: absolute; width: auto; z-index: 50; pointer-events: none; }
+/* Each light gets a warm pool under it and a flicker. The delays are set per-prop in the markup so sixteen
+   flames do not breathe in unison, which is the thing that makes candlelight look like a CSS animation. */
+.hw-pumpkin { filter: drop-shadow(0 0 16px rgba(255,132,30,0.75)) drop-shadow(0 6px 10px rgba(0,0,0,0.6));
+    animation: hwFlicker 2.7s ease-in-out infinite; }
+.hw-lantern { filter: drop-shadow(0 0 18px rgba(255,170,60,0.7)) drop-shadow(0 6px 10px rgba(0,0,0,0.55));
+    animation: hwFlicker 3.3s ease-in-out infinite; }
+.hw-candles { filter: drop-shadow(0 0 13px rgba(255,190,90,0.7)) drop-shadow(0 4px 8px rgba(0,0,0,0.55));
+    animation: hwFlicker 1.9s ease-in-out infinite; }
+.hw-ghost { opacity: 0.72; filter: drop-shadow(0 0 20px rgba(150,220,255,0.6));
+    animation: hwDrift 7.5s ease-in-out infinite; }
+@keyframes hwFlicker {
+    0%, 100% { opacity: 1; }
+    42% { opacity: 0.9; }
+    55% { opacity: 1; }
+    70% { opacity: 0.84; }
+}
+@keyframes hwDrift {
+    0%, 100% { translate: 0 0; opacity: 0.72; }
+    50% { translate: 7% -12%; opacity: 0.45; }
+}
+
+/* ── the air ──────────────────────────────────────────────────────────────────────────────────────────── */
+/* Night over everything scenic: the buildings, the street and the people standing in it all go cold and dark.
+   Deliberately not opaque enough to kill readability -- you still have to be able to find a door. */
+.hw-night { position: absolute; inset: 0; z-index: 91; pointer-events: none;
+    background:
+        radial-gradient(120% 90% at 78% 12%, rgba(190,210,255,0.16), transparent 46%),
+        linear-gradient(180deg, rgba(10,6,26,0.34) 0%, rgba(12,7,30,0.44) 55%, rgba(6,4,18,0.6) 100%),
+        radial-gradient(130% 100% at 50% 52%, transparent 40%, rgba(0,0,0,0.5) 100%);
+    mix-blend-mode: multiply; }
+
+/* Fog. Each band is TWICE the scene wide and holds the same pattern twice, so sliding it exactly -50% lands
+   the second copy where the first began -- a seamless loop with no visible seam and no image to fetch.
+   Blur does the rest: the gradients themselves are crude blobs and never read as such once softened.
+
+   ⚠️ THREE BANDS MULTIPLY. The first pass ran them at 0.4 / 0.28 / 0.5 over heights of 26-34%, which each
+   looked like thin haze alone and stacked into a flat pale wall across the bottom third of the plaza -- the
+   cobbles, the people and every prop standing on them vanished behind it. Fog reads as fog at a fraction of
+   the opacity that reads as fog in ONE layer, so these are a third of what they were and sit lower. */
+.hw-fog { position: absolute; left: 0; width: 200%; z-index: 95; pointer-events: none;
+    will-change: transform; filter: blur(22px); }
+.hw-fog-1 { bottom: -6%; height: 26%; opacity: 0.16; animation: hwFogL 47s linear infinite;
+    background:
+        radial-gradient(40% 70% at 6% 68%, rgba(206,216,240,0.85), transparent 70%),
+        radial-gradient(34% 62% at 21% 82%, rgba(188,200,232,0.7), transparent 70%),
+        radial-gradient(44% 74% at 38% 62%, rgba(214,222,244,0.75), transparent 70%),
+        radial-gradient(40% 70% at 56% 68%, rgba(206,216,240,0.85), transparent 70%),
+        radial-gradient(34% 62% at 71% 82%, rgba(188,200,232,0.7), transparent 70%),
+        radial-gradient(44% 74% at 88% 62%, rgba(214,222,244,0.75), transparent 70%); }
+.hw-fog-2 { bottom: 3%; height: 19%; opacity: 0.11; animation: hwFogR 71s linear infinite;
+    background:
+        radial-gradient(46% 80% at 13% 60%, rgba(196,206,236,0.8), transparent 72%),
+        radial-gradient(38% 66% at 32% 78%, rgba(176,190,226,0.6), transparent 72%),
+        radial-gradient(46% 80% at 63% 60%, rgba(196,206,236,0.8), transparent 72%),
+        radial-gradient(38% 66% at 82% 78%, rgba(176,190,226,0.6), transparent 72%); }
+/* The nearest band: thicker, faster, and low enough that it rolls across people's feet. */
+.hw-fog-3 { bottom: -11%; height: 21%; opacity: 0.2; filter: blur(30px); animation: hwFogL 29s linear infinite;
+    background:
+        radial-gradient(50% 86% at 9% 74%, rgba(222,228,248,0.9), transparent 68%),
+        radial-gradient(42% 70% at 29% 86%, rgba(204,214,240,0.8), transparent 68%),
+        radial-gradient(50% 86% at 59% 74%, rgba(222,228,248,0.9), transparent 68%),
+        radial-gradient(42% 70% at 79% 86%, rgba(204,214,240,0.8), transparent 68%); }
+@keyframes hwFogL { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes hwFogR { from { transform: translateX(-50%); } to { transform: translateX(0); } }
 `;

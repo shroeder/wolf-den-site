@@ -77,6 +77,11 @@ export const QUIET_HIDE = [
     // is exactly where a game's primary button lives. It ate the click on the casino's Pull button and the
     // film showed thirty frames of a machine nobody had pulled.
     ".xp-toast",
+    // ── THE HANGOUT BONUS ────────────────────────────────────────────────────────────────────────────
+    // Server-driven, so no marker can pre-empt it: stand in the plaza long enough and a full-screen card
+    // lands over the middle of the town thanking you for it. Which is lovely, and it sat squarely on top
+    // of the scene during a Town shot — at z-index 1250 it is the highest thing on the page.
+    ".tw-buffcele",
     // Feature-launch cards are inline-styled with no class of their own; the aria-label is the only handle.
     "[aria-label^='New feature']",
     // The web-push permission card. Same failure as .xp-toast above and found the same way: it anchors to the

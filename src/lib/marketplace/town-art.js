@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { generateImage, generateWideSceneImage, generateSceneImage } from "@/lib/marketplace/openai-image.js";
+import { housePrompt } from "@/lib/marketplace/art-style.js";
 
 // AI art for the side-scrolling Wolf Den Town: one WIDE panoramic street background (repeated/mirrored so it
 // scrolls forever) + transparent BUILDING sprites laid on top of it. Static/shared — generate once + store.
@@ -193,7 +194,87 @@ for (const [id, ripe] of Object.entries(CROP_RIPE)) {
 }
 Object.assign(ART_PROMPTS, _cropPrompts);
 
+// ── ALL HALLOWS' IN THE PLAZA ────────────────────────────────────────────────────────────────────────────────
+// A seasonal dressing for the town, drawn through housePrompt() from art-style.js rather than the town's older
+// BUILDING_STYLE prose — these are die-cut objects composited into a scene, which is exactly what DIE_CUT is
+// for, and art-style.js is the one place the house look is supposed to come from.
+//
+// Two families, and they want opposite things:
+//   FAR   the moon, the witches, the bats, the dead tree. Read at 20-90px against a night sky and get tinted
+//         near-black in CSS, so all that survives is the SILHOUETTE. Asked for as bold, simple shapes.
+//   NEAR  pumpkins, lanterns, candles, the ghost. Sit among the buildings at 40-120px with their own light, so
+//         they carry warm interior glow that has to hold up close.
+//
+// ⚠️ THE WITCHES ARE DRAWN FACING LEFT, ON PURPOSE. They fly right-to-left across the sky, and a sprite drawn
+// facing the other way has to be flipped in CSS — which is fine until somebody adds a second animation and
+// flips it back. Drawn in the direction they travel, there is nothing to remember.
+const HW_FAR_EXTRA =
+    "Viewed SMALL against a night sky and read mostly as a SILHOUETTE: one bold simple unmistakable shape, " +
+    "strong clean outer contour, minimal interior detail, no fine filigree that would turn to mush. " +
+    "Cool moonlit palette — deep indigo, violet-black, with a thin cold rim light along the upper edge.";
+const HW_NEAR_EXTRA =
+    "It is a LIGHT SOURCE in a dark street: a warm amber-orange glow burns from inside it and spills onto its " +
+    "own nearest surfaces, with deep cool violet-blue shadow everywhere the glow does not reach. Strong warm/cool " +
+    "contrast. The glow lives INSIDE the object — no halo, aura or light bloom drawn outside its silhouette.";
+
+Object.assign(ART_PROMPTS, {
+    hw_moon: housePrompt(
+        "A huge FULL MOON, perfectly round, a pale bone-white disc with soft grey maria and shallow craters " +
+        "across its face and a faint cold blue-white edge",
+        { extra: "Just the round disc of the moon and nothing else — no clouds, no sky, no stars, no face, no " +
+            "rays or beams, no ring or halo around it. Flat-on, filling the frame as a clean circle." }
+    ),
+    hw_witch_a: housePrompt(
+        "A WITCH flying on a BROOMSTICK, seen from the side and travelling to the LEFT — a lean figure in a " +
+        "tattered pointed hat and a long ragged cloak streaming out behind her, hunched forward over the broom",
+        { extra: HW_FAR_EXTRA }
+    ),
+    hw_witch_b: housePrompt(
+        "A WITCH flying on a BROOMSTICK, seen from the side and travelling to the LEFT — sitting upright and " +
+        "side-saddle with one arm raised high, a wide floppy pointed hat and a billowing cloak, a small cat " +
+        "riding on the tail of the broom behind her",
+        { extra: HW_FAR_EXTRA }
+    ),
+    hw_bats: housePrompt(
+        "A small FLOCK OF FIVE BATS in flight, wings spread at different angles, loosely scattered as a group " +
+        "and all travelling the same way to the LEFT",
+        { extra: HW_FAR_EXTRA }
+    ),
+    hw_tree: housePrompt(
+        "A BARE DEAD TREE — a gnarled leafless trunk with crooked clawing branches twisting upward and outward, " +
+        "no leaves at all, roots gripping a small mound of earth",
+        { extra: HW_FAR_EXTRA }
+    ),
+    hw_pumpkin: housePrompt(
+        "A carved JACK-O'-LANTERN pumpkin sitting on the ground — a fat ribbed orange pumpkin with a crooked " +
+        "curled stem, a jagged triangular-eyed grinning face cut into the front, lit from within by a candle",
+        { extra: HW_NEAR_EXTRA }
+    ),
+    hw_lantern: housePrompt(
+        "An old wrought-IRON HANGING LANTERN with a domed cap and a ring at the top to hang it by, four panes " +
+        "of warped amber glass, a fat lit candle burning inside it",
+        { extra: HW_NEAR_EXTRA + " Drawn hanging, with the ring at the very top of the shape." }
+    ),
+    hw_candles: housePrompt(
+        "A CLUSTER OF FIVE MELTED CANDLES of different heights standing together on a small stone slab, thick " +
+        "wax drips running down their sides and pooling at the base, every wick lit",
+        { extra: HW_NEAR_EXTRA }
+    ),
+    hw_ghost: housePrompt(
+        "A small friendly cartoon GHOST — a rounded translucent pale spirit with a wispy trailing tail instead " +
+        "of legs, two simple dark eyes and a little open mouth, arms drifting out to the sides",
+        { extra: "Pale luminous blue-white and slightly translucent, glowing softly from within. Simple, " +
+            "rounded and charming rather than scary. No halo or light bloom drawn outside its silhouette." }
+    ),
+});
+
 export const TOWN_ART_KEYS = Object.keys(ART_PROMPTS);
+
+// The seasonal set, named once so the generator script and the Town both mean the same nine things.
+export const HALLOWEEN_ART_KEYS = [
+    "hw_moon", "hw_witch_a", "hw_witch_b", "hw_bats", "hw_tree",
+    "hw_pumpkin", "hw_lantern", "hw_candles", "hw_ghost",
+];
 
 // Generate (or regenerate) one town art asset and store its URL.
 export async function generateTownArt(key) {

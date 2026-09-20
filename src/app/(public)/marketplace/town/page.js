@@ -1,5 +1,6 @@
 import TownClient from "@/components/TownClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { canPreview } from "@/lib/marketplace/owner.js";
 import { getTownState } from "@/lib/marketplace/town.js";
 
 export const runtime = "nodejs";
@@ -20,9 +21,14 @@ export default async function TownPage() {
         );
     }
     const initial = await getTownState(buyer.id).catch(() => null);
+    // ── THE HALLOWEEN FLAG ───────────────────────────────────────────────────────────────────────────────
+    // Whether this member may TURN THE DRESSING ON, decided on the server — never a client check, or the
+    // whole plaza gets the seasonal art the moment somebody sets a localStorage key by hand. Whether it is
+    // currently on is the member's own business and lives in localStorage; this is only the door.
+    const canDressUp = canPreview("halloween", buyer.id);
     return (
         <div className="stack" style={{ maxWidth: 820, margin: "0 auto", padding: "0 12px" }}>
-            <TownClient initial={initial} />
+            <TownClient initial={initial} canDressUp={canDressUp} />
         </div>
     );
 }
