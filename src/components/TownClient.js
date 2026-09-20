@@ -597,11 +597,32 @@ const QuestIcon = ({ name }) => {
 const NOOP_POLL = async () => {};
 
 // ── THE HALLOWEEN FLAG ───────────────────────────────────────────────────────────────────────────────────────
-// `canDressUp` is the SERVER's answer to "may this member turn the dressing on" and arrives as a prop; whether
-// it is currently on is their own preference and lives here. localStorage rather than a column because this
-// changes nothing anybody else can see — no other member's plaza is affected by it, so a row and a migration
-// would be storing a fact with no consequences outside this one browser.
-const HW_KEY = "wolfden-town-halloween";
+// `canDressUp` is the SERVER's answer to "may this member raise it"; `initialOn` is whether they already have.
+//
+// ⚠️ IT LIVES ON THE ACCOUNT NOW, NOT IN localStorage. The first version reasoned that a purely cosmetic
+// toggle nobody else can see did not earn a column — which was true about its BLAST RADIUS and wrong about how
+// it gets used. Luke asked to have it switched on for his account, and a browser-local flag cannot answer
+// that: it does not follow him from the phone to the desktop, does not survive clearing site data, and nothing
+// on the server can read or set it. The state that a person thinks of as theirs belongs to the person.
+//
+// The write is optimistic and does NOT roll back on failure. The flag decorates a plaza; if the POST is lost
+// the worst case is that it forgets by the next page load, and stealing the decoration back out from under
+// somebody mid-tap to be technically correct would be the more annoying behaviour.
+function useHalloweenFlag(allowed, initialOn) {
+    const [on, setOn] = useState(Boolean(allowed && initialOn));
+    const toggle = () => setOn((was) => {
+        const next = !was;
+        fetch("/api/marketplace/town/halloween", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ on: next }),
+        }).catch(() => { /* cosmetic: a lost write just means it forgets by the next load */ });
+        return next;
+    });
+    // Revoking the preview has to turn the lights back on even for a member whose stored flag is still true,
+    // so `allowed` stays the authority and the stored value only ever chooses BETWEEN what it allows.
+    return [Boolean(allowed) && on, toggle];
+}
 
 // ── WHERE THE DRESSING STANDS ────────────────────────────────────────────────────────────────────────────────
 // Luke: "Let's not have a linear spacing between the decorations. Let's create clusters of them... it literally
@@ -781,25 +802,7 @@ function buildHalloweenDressing(buildings) {
     return out;
 }
 
-// Read during the FIRST render, not in an effect. A useEffect runs after the tree has already painted, so the
-// scene would mount in daylight and flip to night a frame later — a visible flash on every single visit, which
-// is the thing seasonal dressing most obviously must not do.
-function useHalloweenFlag(allowed) {
-    const [on, setOn] = useState(() => {
-        if (!allowed || typeof window === "undefined") return false;
-        try { return window.localStorage.getItem(HW_KEY) === "1"; } catch { return false; }
-    });
-    const toggle = () => setOn((was) => {
-        const next = !was;
-        try { window.localStorage.setItem(HW_KEY, next ? "1" : "0"); } catch { /* private mode; it just will not persist */ }
-        return next;
-    });
-    // Revoking the flag server-side has to actually turn the lights back on, even though the preference is
-    // remembered locally. `allowed` is the authority; the stored value only ever chooses BETWEEN what it allows.
-    return [Boolean(allowed) && on, toggle];
-}
-
-export default function TownClient({ initial, frozen = false, canDressUp = false }) {
+export default function TownClient({ initial, frozen = false, canDressUp = false, halloweenOn = false }) {
     const [state, setState] = useState(initial || null);
     // The street's width, and everything that measures against it. Declared HERE because the camera below
     // reads it — a hook that depends on a value declared under it is the temporal-dead-zone trap check:hook-deps
@@ -815,7 +818,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
     const [others, setOthers] = useState({});
     const [viewportW, setViewportW] = useState(360);
     const [roster, setRoster] = useState(false);
-    const [spooky, toggleSpooky] = useHalloweenFlag(canDressUp);
+    const [spooky, toggleSpooky] = useHalloweenFlag(canDressUp, halloweenOn);
     const [panExtra, setPanExtra] = useState(0); // manual drag-to-pan offset on top of the follow-camera
     // Remember where you were standing + looking, so hitting Back from a building drops you right where you left
     // off (not reset to spawn). Restored post-mount from sessionStorage; re-saved on every hero/camera change.
