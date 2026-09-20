@@ -125,7 +125,7 @@ export async function priorConsumption(variationIds, before) {
  * handed the wrong batch and the error would persist in the stored row. Sorting costs nothing against being
  * wrong quietly.
  */
-export async function costSales(sales) {
+export async function costSales(sales, { write = true, fresh = false } = {}) {
     const list = (Array.isArray(sales) ? sales : [])
         .map((s) => ({
             orderId: String(s?.orderId || "").trim(),
@@ -151,8 +151,17 @@ export async function costSales(sales) {
     // A full run clears the table first, so this correctly reads zero there. An incremental run reads the units
     // every prior run recorded for sales STRICTLY OLDER than the oldest sale in this walk — anything inside the
     // walk is about to be recomputed from scratch, so counting it here would spend those units twice.
-    const consumed = await priorConsumption(list.map((s) => s.variationId), list[0].soldAt);
+    // ⚠️ `fresh` EXISTS SO A DRY RUN CAN TELL THE TRUTH. A full run DELETEs the table before recomputing, so
+    // its opening position is genuinely zero — but a dry run of that same pass cannot delete anything, and
+    // would read the very rows it is pretending to replace, spending every batch twice and reporting a diff
+    // made of its own footprints. A plan that does not match the run it is planning is worse than no plan.
+    const consumed = fresh
+        ? new Map()
+        : await priorConsumption(list.map((s) => s.variationId), list[0].soldAt);
     let costed = 0, short = 0, skipped = 0;
+    // Every row this walk would write. Kept whether or not it is written, because the question "what would
+    // seeding these purchases DO to the numbers?" has to be answerable before it is done to them.
+    const rows = [];
 
     for (const sale of list) {
         const mine = batches.get(sale.variationId);
@@ -173,23 +182,33 @@ export async function costSales(sales) {
         // handing it a figure that only covers part of the line prices the rest at nothing — the exact
         // silent $0 the note on allocate() forbids. storedCosts() filters these out, and the line falls back
         // to the old per-unit cost, which at least prices every unit.
-        await db.query(
-            `INSERT INTO cogs_fifo_cost (order_id, line_uid, variation_id, sold_at, units, cost_cents, batches, short_units, computed_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, NOW())
-             ON CONFLICT (order_id, line_uid) DO UPDATE
-                SET variation_id = EXCLUDED.variation_id, sold_at = EXCLUDED.sold_at, units = EXCLUDED.units,
-                    cost_cents = EXCLUDED.cost_cents, batches = EXCLUDED.batches,
-                    short_units = EXCLUDED.short_units, computed_at = NOW()`,
-            [sale.orderId, sale.lineUid, sale.variationId, sale.soldAt.toISOString(), sale.units,
-             result.costCents, JSON.stringify(result.batches), result.short]
-        ).catch((error) => {
-            logger.warn("cogs.fifo.write_failed", { orderId: sale.orderId, message: error?.message });
+        rows.push({
+            orderId: sale.orderId, lineUid: sale.lineUid, variationId: sale.variationId,
+            soldAt: sale.soldAt, units: sale.units,
+            costCents: result.costCents, batches: result.batches, short: result.short,
         });
         costed += 1;
     }
 
-    logger.info("cogs.fifo.costed", { costed, short, skipped });
-    return { costed, short, skipped };
+    if (write) {
+        for (const r of rows) {
+            await db.query(
+                `INSERT INTO cogs_fifo_cost (order_id, line_uid, variation_id, sold_at, units, cost_cents, batches, short_units, computed_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, NOW())
+                 ON CONFLICT (order_id, line_uid) DO UPDATE
+                    SET variation_id = EXCLUDED.variation_id, sold_at = EXCLUDED.sold_at, units = EXCLUDED.units,
+                        cost_cents = EXCLUDED.cost_cents, batches = EXCLUDED.batches,
+                        short_units = EXCLUDED.short_units, computed_at = NOW()`,
+                [r.orderId, r.lineUid, r.variationId, r.soldAt.toISOString(), r.units,
+                 r.costCents, JSON.stringify(r.batches), r.short]
+            ).catch((error) => {
+                logger.warn("cogs.fifo.write_failed", { orderId: r.orderId, message: error?.message });
+            });
+        }
+    }
+
+    logger.info("cogs.fifo.costed", { costed, short, skipped, written: write });
+    return { costed, short, skipped, rows };
 }
 
 /** The stored cost for a set of sold lines, keyed "orderId|lineUid". Used by the proxy to annotate a report. */

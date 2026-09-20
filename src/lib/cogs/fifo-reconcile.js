@@ -43,6 +43,60 @@ async function locationIds() {
  * @param {boolean} opts.full   ignore the cursor and re-cost from the first purchase (after an edit to history)
  * @param {boolean} opts.dryRun work everything out and write nothing
  */
+
+/**
+ * What a planned walk would do to the stored numbers, in money.
+ *
+ * Returns counts, the net COGS movement, and the lines that move most — enough to decide whether a seed is
+ * right BEFORE it is applied. `removed` only means anything for a full run, which clears the table first;
+ * an incremental walk never sees the rows outside its window and must not report them as disappearing.
+ */
+async function comparePlanToStored(rows, { full = false } = {}) {
+    const stored = new Map();
+    for (const r of await db.query(
+        `SELECT order_id, line_uid, cost_cents, units, short_units FROM cogs_fifo_cost`
+    ).catch(() => [])) {
+        stored.set(`${r.order_id}|${r.line_uid}`, {
+            costCents: Number(r.cost_cents) || 0, short: Number(r.short_units) || 0,
+        });
+    }
+
+    let added = 0, changed = 0, same = 0, deltaCents = 0;
+    const movers = [];
+    const seen = new Set();
+    for (const r of rows) {
+        const key = `${r.orderId}|${r.lineUid}`;
+        seen.add(key);
+        const was = stored.get(key);
+        if (!was) {
+            added += 1;
+            // A line that is reportable only once it is no longer short is a real change in what the report
+            // says, so an added row only counts toward the money when it can actually be used.
+            if (r.short === 0) deltaCents += r.costCents;
+            movers.push({ key, variationId: r.variationId, from: null, to: r.costCents, d: r.costCents });
+            continue;
+        }
+        if (was.costCents === r.costCents && was.short === r.short) { same += 1; continue; }
+        changed += 1;
+        const fromUsable = was.short === 0 ? was.costCents : 0;
+        const toUsable = r.short === 0 ? r.costCents : 0;
+        deltaCents += toUsable - fromUsable;
+        movers.push({ key, variationId: r.variationId, from: was.costCents, to: r.costCents, d: toUsable - fromUsable });
+    }
+    const removed = full ? [...stored.keys()].filter((k) => !seen.has(k)).length : 0;
+
+    movers.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+    return {
+        summary: { added, changed, unchanged: same, removed, deltaDollars: Number((deltaCents / 100).toFixed(2)) },
+        movers: movers.slice(0, 25).map((m) => ({
+            line: m.key, variationId: m.variationId,
+            from: m.from == null ? null : Number((m.from / 100).toFixed(2)),
+            to: Number((m.to / 100).toFixed(2)),
+            change: Number((m.d / 100).toFixed(2)),
+        })),
+    };
+}
+
 export async function reconcileFifo({ full = false, dryRun = false } = {}) {
     const cursor = await db.queryOne(`SELECT scanned_to FROM cogs_fifo_cursor WHERE id = TRUE`).catch(() => null);
     const firstBuy = await db.queryOne(
@@ -104,9 +158,20 @@ export async function reconcileFifo({ full = false, dryRun = false } = {}) {
         next = page.cursor || null;
     } while (next);
 
+    // ── ⚠️ A DRY RUN SAYS WHAT WOULD CHANGE, NOT HOW MANY ORDERS IT SAW ─────────────────────────────────────
+    // Luke, on seeding the purchase history that FIFO still cannot see: "my concern is existing items, and how
+    // you can seed that properly without interrupting anything." This is the answer. Link some rows, run this,
+    // and it costs every sale in memory and diffs the result against what is stored — line by line, in money —
+    // without writing anything. The apply step is then the same pass with the writes turned on.
+    //
+    // It is safe to reach for at any time: the annotation on the proxy only ever ADDS a field where a stored
+    // row exists, so an item with no row behaves exactly as it does today. Seeding is per-item by construction.
     if (dryRun) {
-        logger.info("cogs.fifo.dry_run", { orders, lines: sales.length });
-        return { ok: true, dryRun: true, scanned: orders, lines: sales.length };
+        const planned = await costSales(sales, { write: false, fresh: full });
+        const diff = await comparePlanToStored(planned.rows, { full });
+        logger.info("cogs.fifo.dry_run", { orders, lines: sales.length, ...diff.summary });
+        return { ok: true, dryRun: true, scanned: orders, lines: sales.length,
+                 costed: planned.costed, short: planned.short, skipped: planned.skipped, ...diff };
     }
 
     // ⚠️ A FULL RUN CLEARS FIRST. Re-costing on top of old rows would leave sales that no longer exist (a
@@ -115,7 +180,7 @@ export async function reconcileFifo({ full = false, dryRun = false } = {}) {
         await db.query(`DELETE FROM cogs_fifo_cost`).catch(() => {});
     }
 
-    const result = await costSales(sales);
+    const result = await costSales(sales, { fresh: full });
 
     await db.query(
         `INSERT INTO cogs_fifo_cursor (id, scanned_to, last_run_at, orders_seen, lines_costed)

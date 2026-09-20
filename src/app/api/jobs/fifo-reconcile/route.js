@@ -31,8 +31,14 @@ export async function GET(request) {
             // `full` re-costs from the first purchase. It is for after history has been EDITED — a backfilled
             // link, a corrected paid_each — because those change which batch an old sale should have drawn
             // from, and an incremental run would leave every sale before the edit holding the old answer.
-            const full = new URL(request.url).searchParams.get("full") === "1";
-            const result = await reconcileFifo({ full });
+            const params = new URL(request.url).searchParams;
+            const full = params.get("full") === "1";
+            // ── ?dry=1 ── WORK IT ALL OUT AND WRITE NOTHING ──────────────────────────────────────────────
+            // The safe way to seed existing items: link some purchases, ask what that WOULD do to the stored
+            // costs, read the diff, then run it for real. Pair it with full=1 to plan a complete re-cost, which
+            // is what a backfill of historical links actually needs.
+            const dryRun = params.get("dry") === "1";
+            const result = await reconcileFifo({ full, dryRun });
 
             return NextResponse.json({ success: true, ...result });
         } catch (error) {
