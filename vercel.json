@@ -1,140 +1,144 @@
 {
-    "buildCommand": "bash scripts/build.sh",
-    "trailingSlash": false,
-    "headers": [
+  "buildCommand": "bash scripts/build.sh",
+  "trailingSlash": false,
+  "headers": [
+    {
+      "source": "/(images|logo)/(.*)",
+      "headers": [
         {
-            "source": "/(images|logo)/(.*)",
-            "headers": [
-                {
-                    "key": "Cache-Control",
-                    "value": "public, max-age=86400, stale-while-revalidate=604800"
-                }
-            ]
-        },
-        {
-            "source": "/(.*)",
-            "headers": [
-                {
-                    "key": "X-Content-Type-Options",
-                    "value": "nosniff"
-                },
-                {
-                    "key": "X-Frame-Options",
-                    "value": "DENY"
-                },
-                {
-                    "key": "X-XSS-Protection",
-                    "value": "1; mode=block"
-                },
-                {
-                    "key": "Referrer-Policy",
-                    "value": "strict-origin-when-cross-origin"
-                }
-            ]
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
         }
-    ],
-    "rewrites": [
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
         {
-            "source": "/sitemap.xml",
-            "destination": "/sitemap"
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         },
         {
-            "source": "/robots.txt",
-            "destination": "/robots"
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
         }
-    ],
-    "crons": [
-        {
-            "path": "/api/jobs/sail-encounters",
-            "schedule": "*/5 * * * *"
-        },
-        {
-            "path": "/api/jobs/town-hours",
-            "schedule": "0,30 * * * *"
-        },
-        {
-            "path": "/api/jobs/consignment-nightly-reports",
-            "schedule": "30 7 * * *"
-        },
-        {
-            "path": "/api/jobs/tcg-catalog-sync",
-            "schedule": "0 6 * * *"
-        },
-        {
-            "path": "/api/jobs/marketplace-reprice",
-            "schedule": "45 6 * * *"
-        },
-        {
-            "path": "/api/jobs/looking-for-alerts",
-            "schedule": "0 8 * * *"
-        },
-        {
-            "path": "/api/jobs/product-alerts",
-            "schedule": "0 9 * * *"
-        },
-        {
-            "path": "/api/jobs/avatar-sprites",
-            "schedule": "0,30 * * * *"
-        },
-        {
-            "path": "/api/jobs/leaderboard-badges",
-            "schedule": "0 * * * *"
-        },
-        {
-            "path": "/api/jobs/boss-auto-tick",
-            "schedule": "0,30 * * * *"
-        },
-        {
-            "path": "/api/jobs/boss-art",
-            "schedule": "0 * * * *"
-        },
-        {
-            "path": "/api/jobs/inventory-feed",
-            "schedule": "0,30 * * * *"
-        },
-        {
-            "path": "/api/jobs/marketplace-missions",
-            "schedule": "0 14 * * 1"
-        },
-        {
-            "path": "/api/jobs/marketplace-price-snapshot",
-            "schedule": "0 7 * * *"
-        },
-        {
-            "path": "/api/jobs/marketplace-square-sync",
-            "schedule": "0 * * * *"
-        },
-        {
-            "path": "/api/jobs/daily-strike-nudge",
-            "schedule": "0 22 * * *"
-        },
-        {
-            "path": "/api/jobs/crops-ready",
-            "schedule": "0,30 * * * *"
-        },
-        {
-            "path": "/api/jobs/recap-digest",
-            "schedule": "0 17 * * 3"
-        },
-        {
-            "path": "/api/jobs/timeclock-reminders",
-            "schedule": "0,30 * * * *"
-        },
-        {
-            "path": "/api/jobs/reminders",
-            "schedule": "5 * * * *"
-        },
-        {
-            "path": "/api/jobs/cash-refunds",
-            "schedule": "20 */4 * * *"
-        },
-        {
-            "path": "/api/jobs/prune-app-releases",
-            "schedule": "20 8 * * *"
-        },
-        {
-            "path": "/api/jobs/cost-sync",
-            "schedule": "40 * * * *"
-        }
-    ]
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/sitemap.xml",
+      "destination": "/sitemap"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/robots"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/jobs/sail-encounters",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/jobs/town-hours",
+      "schedule": "0,30 * * * *"
+    },
+    {
+      "path": "/api/jobs/consignment-nightly-reports",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/jobs/tcg-catalog-sync",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/jobs/marketplace-reprice",
+      "schedule": "45 6 * * *"
+    },
+    {
+      "path": "/api/jobs/looking-for-alerts",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/jobs/product-alerts",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/jobs/avatar-sprites",
+      "schedule": "0,30 * * * *"
+    },
+    {
+      "path": "/api/jobs/leaderboard-badges",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/jobs/boss-auto-tick",
+      "schedule": "0,30 * * * *"
+    },
+    {
+      "path": "/api/jobs/boss-art",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/jobs/inventory-feed",
+      "schedule": "0,30 * * * *"
+    },
+    {
+      "path": "/api/jobs/marketplace-missions",
+      "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/jobs/marketplace-price-snapshot",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/jobs/marketplace-square-sync",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/jobs/daily-strike-nudge",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/jobs/crops-ready",
+      "schedule": "0,30 * * * *"
+    },
+    {
+      "path": "/api/jobs/recap-digest",
+      "schedule": "0 17 * * 3"
+    },
+    {
+      "path": "/api/jobs/timeclock-reminders",
+      "schedule": "0,30 * * * *"
+    },
+    {
+      "path": "/api/jobs/reminders",
+      "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/jobs/cash-refunds",
+      "schedule": "20 */4 * * *"
+    },
+    {
+      "path": "/api/jobs/prune-app-releases",
+      "schedule": "20 8 * * *"
+    },
+    {
+      "path": "/api/jobs/cost-sync",
+      "schedule": "40 * * * *"
+    },
+    {
+      "path": "/api/jobs/fifo-reconcile",
+      "schedule": "15 8 * * *"
+    }
+  ]
 }

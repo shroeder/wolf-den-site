@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { logGeneration, logText } from "@/lib/marketplace/ai-ledger.js";
 import { createServerLogger } from "@/lib/server-logger";
 import { expandShopOrderLines } from "@/lib/admin-app/shop-order-lines.js";
+import { annotateFifoCosts } from "@/lib/admin-app/fifo-annotate.js";
 
 const proxyLogger = createServerLogger({ source: "api", subsystem: "admin-app-proxy" });
 
@@ -291,6 +292,13 @@ export async function handleProxy(request, upstreamKey, context) {
     if (upstreamKey === "square" && upstreamResponse.ok && path.startsWith("/v2/orders")) {
         responseBody = await expandShopOrderLines(responseBody)
             .catch(() => responseBody);   // a reporting nicety must never be able to break the report
+
+        // ── AND WHAT EACH LINE ACTUALLY COST ─────────────────────────────────────────────────────────
+        // FIFO cost belongs on the SALE, not on the item: it depends on how many of that item were sold
+        // before it. The reconciler has already worked each one out; this hangs it on the line the app is
+        // about to read. Added alongside the existing fields, never in place of them.
+        responseBody = await annotateFifoCosts(responseBody)
+            .catch(() => responseBody);
     }
 
     // Everything the admin app sends to OpenAI comes through here, so this one place covers the whole app —

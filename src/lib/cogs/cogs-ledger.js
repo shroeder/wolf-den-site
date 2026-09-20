@@ -63,6 +63,19 @@ function params(e, source) {
 // COGS-Entry rows have no entry_id and always insert fresh.
 export async function insertCogs(input) {
     const e = normalize(input);
+
+    // ── LINK IT TO THE CATALOG ITEM WHILE WE STILL KNOW WHAT IT IS ───────────────────────────────────────────
+    // FIFO stacks purchases by variation_id, so a row without one is invisible to it — 216 of the first 219
+    // rows had none, which is why eleven ETBs bought at $120 costed out at $115. The intake form has no item
+    // picker yet, so the name is all we get; this claims the link only when the name is an EXACT, unambiguous
+    // catalog match and otherwise leaves it null. See link-variation.js for why it refuses to guess.
+    if (!e.variationId && e.product) {
+        try {
+            const { resolveVariationByName } = await import("@/lib/cogs/link-variation.js");
+            const hit = await resolveVariationByName(e.product);
+            if (hit.variationId) e.variationId = hit.variationId;
+        } catch { /* a catalog hiccup must never stop a restock from being recorded */ }
+    }
     if (e.entryId) {
         const rows = await db.query(
             `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
