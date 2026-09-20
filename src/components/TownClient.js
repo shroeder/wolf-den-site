@@ -739,7 +739,11 @@ function buildHalloweenDressing(buildings) {
         set.forEach((part, k) => {
             const lean = k === 0 ? (rand() - 0.5) * 0.5 : (rand() - 0.5) * (a.porch ? 2.1 : 1.9);
             // Porch pieces skew to one side of the door rather than straddling it evenly.
-            const side = a.porch && k > 0 ? (rand() < 0.68 ? 1 : -1) * pick(0.5, 1.2) : 0;
+            // ⚠️ FAR ENOUGH OUT TO CLEAR THE BUILDING. Props sit at z-index 50 and buildings at 100+, so a porch
+            // piece tucked within a percent or so of the door is simply BEHIND the shopfront — and the only
+            // ones left visible are the strays at the edge of the pile, which is exactly the "decorations
+            // hanging out by themselves" Luke saw. Pushed clear of the footprint, the whole group reads.
+            const side = a.porch && k > 0 ? (rand() < 0.68 ? 1 : -1) * pick(1.9, 2.7) : 0;
             put(part, a.x + lean + side, k === 0 ? 1 : pick(0.8, 1));
         });
     });
@@ -1451,6 +1455,12 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
 
     const you = state?.you;
     const art = state?.art || {};
+    // Which parallax bands are wearing art that was PAINTED for night. Those must not also be filtered down to
+    // night — that is the double-darkening that turned the dressed buildings blue, and it is exactly the
+    // mismatch Luke spotted between the moon and the rooftops.
+    const litForNight = spooky
+        ? ["mid", "fg", "depth1", "depth3"].filter((k) => art[`hw_${k}`]?.url)
+        : [];
     const layered = Boolean(art.sky?.url && art.cobble?.url); // parallax sky + tiling cobble (reliable) vs legacy wide bg
     const projects = state?.projects || [];
     const townBonuses = state?.bonuses || {};
@@ -1580,7 +1590,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                 <p className="tw-hdr-sub">Tap the street to walk · tap a building to enter. <b>In town</b> = here now; <b>around</b> = online elsewhere.</p>
             </section>
 
-            <div ref={sceneRef} className={`tw-scene${spooky ? " is-spooky" : ""}`} style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
+            <div ref={sceneRef} className={`tw-scene${spooky ? " is-spooky" : ""}${litForNight.map((k) => ` night-${k}`).join("")}`} style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
                 <SceneMusic vibe={raidActive ? "raid" : "town"} />
                 {/* ONE status bubble, top-left: who's here AND whether the shop is open. These were two separate
                     absolutely-positioned pills and they overlapped each other the moment the Den was open —
@@ -1664,7 +1674,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         <div key={n} className="tw-depth" aria-hidden="true" style={{ opacity: Math.max(0.5, 0.92 - (n - 1) * 0.08), transform: `translateX(${-cameraPx * factor}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                             {tiles(11).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img key={k} src={art[`depth${n}`].url} alt="" draggable={false} />
+                                <img key={k} src={((spooky && art[`hw_depth${n}`]?.url) || art[`depth${n}`].url)} alt="" draggable={false} />
                             ))}
                         </div>
                     );
@@ -1676,7 +1686,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                     <div className="tw-mid" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.55}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                         {tiles(13).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img key={k} src={art.mid.url} alt="" draggable={false} />
+                            <img key={k} src={((spooky && art.hw_mid?.url) || art.mid.url)} alt="" draggable={false} />
                         ))}
                     </div>
                 ) : null}
@@ -1732,7 +1742,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         <div className="tw-fg" aria-hidden="true">
                             {tiles(24).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img key={k} src={art.fg.url} alt="" draggable={false} />
+                                <img key={k} src={((spooky && art.hw_fg?.url) || art.fg.url)} alt="" draggable={false} />
                             ))}
                         </div>
                     ) : null}
@@ -3505,7 +3515,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    inline per prop, and a transform in the stylesheet would REPLACE that anchor rather than add to it, dropping
    the tree half a street sideways. The rotate property is composited separately and leaves the anchor alone.
    Origin is the FOOT of the sprite, because that is where a tree is attached to the ground. */
-.hw-falltree { transform-origin: 50% 100%; animation: hwTreeSway 9s ease-in-out infinite;
+/* ⚠️ THE TREE SITS BETWEEN THE UNDERGROWTH AND THE BUILDINGS. At the props' default z-index of 50 it was
+   behind the foreground band (90) as well, so the trunk was swallowed and only a canopy floated above the
+   scenery — the z-order fault Luke spotted. Buildings run 100 + their x, so 95 puts the whole tree in front of
+   the undergrowth it is standing in and still behind every door it must never cover. */
+.hw-falltree { z-index: 95; transform-origin: 50% 100%; animation: hwTreeSway 9s ease-in-out infinite;
     filter: brightness(0.82) saturate(0.95) drop-shadow(0 8px 14px rgba(0,0,0,0.55)); }
 @keyframes hwTreeSway { 0%, 100% { rotate: -0.5deg; } 50% { rotate: 0.5deg; } }
 /* The crow sits up off the ground on a post or a roofline, so it gets no contact shadow under it. */
@@ -3542,6 +3556,16 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-scene.is-spooky .tw-cobble img { filter: brightness(0.5) saturate(0.62) hue-rotate(-8deg); }
 .tw-scene.is-spooky .tw-fg img { filter: brightness(0.52) saturate(0.62) hue-rotate(-8deg); }
 .tw-scene.is-spooky .tw-centerpiece { filter: brightness(0.6) saturate(0.7); }
+
+/* ⚠️ A BAND WEARING NIGHT-PAINTED ART IS NOT FILTERED, AND THIS MUST COME AFTER THE RULES IT UNDOES.
+   Those are already lit by the moon in the artwork; filtering them too is the double-darkening that made the
+   rooftops read as a blue version of a sunny afternoon while the moon beside them looked right.
+   Both this and the rule above it land on the SAME specificity — (0,3,1) either way — so the only thing
+   separating them is source order, and written above it this lost every time while looking correct. */
+.tw-scene.night-depth1 .tw-depth img,
+.tw-scene.night-depth3 .tw-depth img,
+.tw-scene.night-mid .tw-mid img,
+.tw-scene.night-fg .tw-fg img { filter: none; }
 /* :where() so this carries NO specificity and anything with its own lit state still wins -- the General Store
    keeps its Market Day glow while the shop is open, which is the one building that should be brightest at
    night. Written the other way round it would have quietly switched that off. */

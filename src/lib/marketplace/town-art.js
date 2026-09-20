@@ -347,6 +347,66 @@ Object.assign(ART_PROMPTS, {
     ),
 });
 
+// ── THE WOODS BEHIND THE TOWN ────────────────────────────────────────────────────────────────────────────────
+// Luke: "the color is seems right for all the buildings and for the background with the stars but those are
+// like darkish blue and then this the other colors like don't don't really line up with the lighting... maybe
+// what we go for is like more of a woods feel... more of like a dark creepy forest kind of vibe instead of the
+// the town kind of vibe."
+//
+// Two problems in one. The town's parallax bands are painted for DAYTIME and taken to night by a filter, and a
+// filter can darken a picture but it cannot relight one — so the rooftops and the stone wall came out as blue
+// versions of a sunny afternoon while the moon, the sky and the dressed buildings were lit from the start. The
+// answer is the same as it was for the buildings: paint these FOR night and leave the filter off them.
+//
+// And the subject changes with it. Rooftops and a cobbled retaining wall say "market square"; what the moon,
+// the witches and the bone-dry trees have been asking for all along is woods.
+//
+// ⚠️ EVERY ONE OF THESE IS A TRANSPARENT-TOPPED TILING BAND, exactly like the layer it replaces. Get that
+// wrong and it stops being a parallax band and becomes a picture with a hard edge scrolling across the sky.
+// ⚠️ TWO THINGS HERE ARE PAID FOR IN REROLLS, AND BOTH READ AS HARMLESS.
+//
+// "Under a full moon" made every one of these DRAW a moon. They are parallax bands that tile across the whole
+// street, so that moon then repeated every few hundred pixels as a row of pale discs marching across the sky
+// behind the real one. Describe the LIGHT, never the light source — the moon is a separate sprite and there
+// is exactly one of it.
+//
+// And saying "the top two-thirds is fully transparent" without also demanding full WIDTH got a small vignette
+// of trees in the middle of an otherwise empty frame: the model honoured the transparency and left the ends
+// empty too. A band has to be told it runs edge to edge, or it is not a band.
+const FOREST_NIGHT =
+    "Lit only by cold blue-white moonlight coming from OFF-FRAME: it rims the upper edges and everything else " +
+    "falls into deep blue-violet shadow, with NO warm daylight anywhere. " +
+    "⚠️ DO NOT DRAW THE MOON, a sun, stars, sky, clouds or any light source — this layer is composited over a " +
+    "sky that already has them, and anything drawn here is repeated across the whole width. " +
+    "⚠️ THE BAND RUNS UNBROKEN FROM THE EXTREME LEFT EDGE TO THE EXTREME RIGHT EDGE, filling the FULL WIDTH of " +
+    "the frame evenly with no gap, no empty ends, no vignette and no single focal subject — it is a continuous " +
+    "strip, not a picture of one thing. " +
+    "Painterly 2D side-scrolling video-game art, cel-shaded with clean confident edges, atmospheric and a " +
+    "little eerie but not gory. Designed to TILE LEFT-TO-RIGHT with no hard seam at either edge. " +
+    "No ground plane, no path, no people, no buildings, no text, no watermark, no border.";
+
+Object.assign(ART_PROMPTS, {
+    hw_depth1: `A FAR, LOW, SMALL silhouette of a distant forest ridge strung along the horizon — the tops of ` +
+        `countless pine and bare deciduous trees, tiny and hazy, reading as woods miles away. Kept LOW and modest ` +
+        `so it sits behind everything nearer. The TOP ~74% of the image is FULLY TRANSPARENT (alpha) with ` +
+        `nothing in it; only the low distant treeline occupies the bottom. ${FOREST_NIGHT}`,
+    hw_depth3: `A far ridge of tall dark PINE and bare CROOKED trees crowning distant hills, their spires and ` +
+        `claw-like branches breaking the skyline, softened by cold night haze into a deep blue-violet ` +
+        `silhouette. The TOP ~62% of the image is FULLY TRANSPARENT (alpha) with nothing in it; only the far ` +
+        `treeline occupies the lower portion. ${FOREST_NIGHT}`,
+    hw_mid: `A MIDGROUND wall of DENSE AUTUMN FOREST along the BOTTOM of the frame — crowded trunks and ` +
+        `interlocking canopies, some still heavy with russet and burnt-orange leaves catching the moonlight, ` +
+        `others bare and crooked with clawing branches, a few dead snags leaning between them, and impenetrable ` +
+        `blackness between the trunks. Nearer and larger than the far ridge. The TOP two-thirds of the image is ` +
+        `FULLY TRANSPARENT (alpha) with NOTHING in it — no baked sky, no moon, no haze — just the treeline cut ` +
+        `against transparency along the bottom. ${FOREST_NIGHT}`,
+    hw_fg: `A LOW foreground band of FOREST UNDERGROWTH running straight across the BOTTOM of the frame — a ` +
+        `fallen mossy log, tangled brambles and dead ferns, drifts of dry curled leaves, a few pale toadstools, ` +
+        `clumps of long dead grass, and a broken crooked wooden fence rail half-swallowed by it all. Nearer and ` +
+        `larger-detailed than everything behind it. The TOP ~65% of the image is FULLY TRANSPARENT (alpha) with ` +
+        `nothing in it — ONLY the undergrowth occupies the bottom. ${FOREST_NIGHT}`,
+});
+
 // ── AND THE BUILDINGS, DRESSED ───────────────────────────────────────────────────────────────────────────────
 // Luke: "Let's make a Halloween version of each of the buildings."
 //
@@ -391,6 +451,7 @@ export const HALLOWEEN_PROP_KEYS = [
     "hw_pumpkin", "hw_lantern", "hw_candles", "hw_ghost",
     "hw_scarecrow", "hw_haybale", "hw_cauldron", "hw_gravestone", "hw_skeleton", "hw_pumpkin_stack", "hw_crow",
     "hw_cobble", "hw_tree_fall",
+    "hw_depth1", "hw_depth3", "hw_mid", "hw_fg",
 ];
 export const HALLOWEEN_BUILDING_KEYS = Object.keys(_hwBuildings);
 export const HALLOWEEN_ART_KEYS = [...HALLOWEEN_PROP_KEYS, ...HALLOWEEN_BUILDING_KEYS];
