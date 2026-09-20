@@ -57,3 +57,4 @@ crew-sheet.png
 
 # Derived fixture states written by the state rigs (scripts/sail-states.mjs) — never committed.
 scripts/fixtures/.live/
+scripts/out/

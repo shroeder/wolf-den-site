@@ -61,6 +61,24 @@ async function comparePlanToStored(rows, { full = false } = {}) {
         });
     }
 
+    // ── ⚠️ "NEW" IS NOT "FREE", AND THE FIRST VERSION OF THIS REPORTED IT AS IF IT WERE ─────────────────────
+    // A line with no FIFO row is NOT uncosted on the report — it falls through to the per-item cost we recorded
+    // paying, and the phone shows that. So counting a newly-FIFO-costed line as a full +$X movement measures
+    // the growth of this TABLE, not the change to the margin anybody reads: the first seeding run reported
+    // "+$10,358" when most of those lines were already being costed, just by a different route.
+    // What moves the report is FIFO minus what the line costs today, and that is what is summed below.
+    const fallback = new Map();
+    for (const r of await db.query(`SELECT variation_id, unit_cost_cents FROM wolfden_item_cost`).catch(() => [])) {
+        fallback.set(String(r.variation_id), Number(r.unit_cost_cents) || 0);
+    }
+    // What the report shows for this line right now: its stored FIFO cost if it has a usable one, otherwise the
+    // recorded per-item cost times the units sold.
+    const costToday = (r) => {
+        const was = stored.get(`${r.orderId}|${r.lineUid}`);
+        if (was && was.short === 0) return was.costCents;
+        return Math.round((fallback.get(String(r.variationId)) || 0) * Number(r.units));
+    };
+
     let added = 0, changed = 0, same = 0, deltaCents = 0;
     const movers = [];
     const seen = new Set();
@@ -68,20 +86,21 @@ async function comparePlanToStored(rows, { full = false } = {}) {
         const key = `${r.orderId}|${r.lineUid}`;
         seen.add(key);
         const was = stored.get(key);
+        // Both sides are measured as WHAT THE REPORT SHOWS: today's figure (FIFO if usable, else the recorded
+        // per-item cost) against the figure this plan would put there. A short line stays unusable and so keeps
+        // falling back, which is why it contributes no movement rather than a zero.
+        const before = costToday(r);
+        const after = r.short === 0 ? r.costCents : before;
         if (!was) {
             added += 1;
-            // A line that is reportable only once it is no longer short is a real change in what the report
-            // says, so an added row only counts toward the money when it can actually be used.
-            if (r.short === 0) deltaCents += r.costCents;
-            movers.push({ key, variationId: r.variationId, from: null, to: r.costCents, d: r.costCents });
+            deltaCents += after - before;
+            movers.push({ key, variationId: r.variationId, from: before, to: after, d: after - before });
             continue;
         }
         if (was.costCents === r.costCents && was.short === r.short) { same += 1; continue; }
         changed += 1;
-        const fromUsable = was.short === 0 ? was.costCents : 0;
-        const toUsable = r.short === 0 ? r.costCents : 0;
-        deltaCents += toUsable - fromUsable;
-        movers.push({ key, variationId: r.variationId, from: was.costCents, to: r.costCents, d: toUsable - fromUsable });
+        deltaCents += after - before;
+        movers.push({ key, variationId: r.variationId, from: before, to: after, d: after - before });
     }
     const removed = full ? [...stored.keys()].filter((k) => !seen.has(k)).length : 0;
 
