@@ -5,6 +5,7 @@ import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import { itemById, STAT_META, describeStats, mergeStats, statValue, AFFIX_POOL, affixCeiling, isIntrinsicStat, pickWeightedAffix, FORGE, ascendedIdOf, canAscendItem, isAscendedId } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
+import { rarityRank } from "@/lib/marketplace/rarity.js";
 import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { pieceById } from "@/lib/marketplace/collection-pieces.js";
@@ -49,6 +50,17 @@ const COMBINE_COST = 5; // 5 of tier N → 1 of tier N+1
 // limit on how many things a piece does, not on how big any of them gets.
 
 // Salvaging a piece of gear → which tier + how many parts, by rarity.
+//
+// ⚠️ EVERY RARITY ON THE LADDER MUST BE IN HERE, AND THE MISS FAILS UPWARD. This table stopped at `eternal`
+// while the ladder grew two rungs above it, and `rarityTier`'s old `|| 1` turned that gap into the cheapest
+// possible answer: enhancing a CELESTIAL piece asked for Cinder Scrap, the tier-1 material, and salvaging one
+// paid out the common rate. Five combines separate tier 1 from tier 5 (5^4 = 625), so the best gear in the
+// game was being forged at 1/625th of its intended price — celestial_robe reached +13 for 632 Cinder Scrap
+// against the 395,000 Cinder-equivalent that is actually meant to cost.
+//
+// rarity.js opens with the warning that predicted exactly this ("a celestial item would … reforge at the
+// fallback price — and every one of those failures is silent"). The entries below close today's gap; the
+// fallback below makes the NEXT rung added fail safe instead of free.
 const SALVAGE = {
     common: { tier: 1, min: 1, max: 2 },
     rare: { tier: 2, min: 1, max: 3 },
@@ -57,8 +69,14 @@ const SALVAGE = {
     mythic: { tier: 5, min: 3, max: 5 },
     ascendant: { tier: 5, min: 4, max: 6 },
     eternal: { tier: 5, min: 5, max: 7 },
+    celestial: { tier: 5, min: 7, max: 10 },
+    primordial: { tier: 5, min: 10, max: 14 },
 };
-const rarityTier = (r) => SALVAGE[r]?.tier || 1;
+// ── AN UNKNOWN RARITY COSTS THE MOST, NOT THE LEAST ──────────────────────────────────────────────────────────
+// A rarity this table has never heard of is either a typo or a rung somebody added above the top. Pricing it
+// at tier 1 makes the second case a free upgrade path that nobody notices until a member has ridden it; pricing
+// it at MAX_TIER makes it expensive and visible. Wrong-and-expensive gets reported. Wrong-and-free does not.
+const rarityTier = (r) => SALVAGE[r]?.tier || (rarityRank(r) > rarityRank("common") ? MAX_TIER : 1);
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const GRADE_RANK = { good: 1, great: 2, perfect: 3, pixel: 4 };
 
@@ -293,7 +311,10 @@ export async function salvageItem(buyerId, itemId) {
     const enhRow = await db.queryOne(`SELECT level FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     const enhLevel = enhRow?.level || 0;
     await db.query(`DELETE FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {}); // the item is gone — drop its enhancement
-    const cfg = SALVAGE[item.rarity] || SALVAGE.common;
+    // ⚠️ A RARITY THIS TABLE DOES NOT KNOW IS A RUNG ABOVE THE TOP, NOT A COMMON. Falling back to
+    // SALVAGE.common is what made the rarest gear in the game melt down into 1-2 Cinder Scrap; the
+    // ladder only ever grows upward, so an unknown rarity resolves to its highest entry.
+    const cfg = SALVAGE[item.rarity] || (rarityRank(item.rarity) > rarityRank("common") ? SALVAGE.primordial : SALVAGE.common);
     const upg = await upgradeLevels(buyerId);
     const bf = await getForgeBonus(buyerId); // earned forge badges + owned forge pets boost salvage odds
     // Blacksmith's Regalia salvage bonus — OWNED, not worn (it is a collection). The same read feeds the drop

@@ -10186,6 +10186,74 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes elite-prism { to { background-position: 300% 0; } }
 @keyframes elite-throb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 
+/* ===== THE TOP TWO RUNGS — CELESTIAL AND PRIMORDIAL ====================================================
+   These had NO rule at all. The ladder above grew two rungs and this table stopped at eternal, so the two
+   rarest things in the game fell through to `var(--rar, #888)` — a grey plate on a near-black card, which is
+   the "dark blue" Luke was looking at. No colour, no halo, no animation: the rarest drop in the Den rendered
+   as the default, while ETERNAL (one rung below it) got a cycling prismatic aura.
+
+   So both are authored to sit clearly ABOVE eternal's prism, and they are deliberately not blue:
+   - CELESTIAL is light itself. A white-hot core inside an aurora that drifts cyan to violet and back, so it
+     reads as something lit from inside rather than something painted a colour.
+   - PRIMORDIAL is the older, hotter one: molten white-gold with a red undertow and a slow rotating sunburst,
+     the only card in the game carrying a conic ray. It should look like the first thing that ever burned.
+   Both keep --rar pointed at a real colour so every existing var(--rar) consumer — glyphs, signature text,
+   slot borders, the chest reveal — lights up correctly for free. */
+.rar-celestial { --rar: #a7f0ff; }
+/* WHITE-HOT, NOT GOLD. The first pass painted primordial #ffdf8a, which put the TOP rung in the same hue
+   family as LEGENDARY (#f5a623) four rungs below it — at a glance in a full bag they read as the same thing,
+   and a top tier that can be mistaken for a mid tier is not a top tier. Nothing else on the ladder is white,
+   so white is what it gets: the ember survives in the glow and the rays, never in the plate. */
+.rar-primordial { --rar: #fffdf0; }
+
+.equip-card.rar-celestial, .equip-slot.filled.rar-celestial { animation: rar-celestial 3.4s ease-in-out infinite; border-color: #a7f0ff !important; }
+@keyframes rar-celestial {
+    0%, 100% { box-shadow: 0 0 20px -1px #a7f0ff, inset 0 0 16px -5px #ffffff; }
+    50%      { box-shadow: 0 0 30px 1px #b98cff, inset 0 0 20px -4px #e8f9ff; }
+}
+/* The sunburst belongs to primordial alone — one rung, one effect nothing else in the game has. */
+.equip-card.rar-primordial, .equip-slot.filled.rar-primordial {
+    position: relative; overflow: hidden;
+    animation: rar-primordial 2.8s ease-in-out infinite; border-color: #fffdf0 !important;
+}
+.equip-card.rar-primordial::before, .equip-slot.filled.rar-primordial::before {
+    content: ""; position: absolute; inset: -60%; z-index: 0; pointer-events: none; opacity: 0.34;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(255,223,138,0.5) 14deg, transparent 30deg,
+        transparent 90deg, rgba(255,122,60,0.45) 104deg, transparent 120deg, transparent 180deg,
+        rgba(255,251,232,0.5) 194deg, transparent 210deg, transparent 270deg, rgba(255,160,60,0.45) 284deg, transparent 300deg);
+    animation: primordial-rays 9s linear infinite;
+}
+/* The card's own children have to sit ABOVE the rays or the sunburst paints over the item it belongs to. */
+.equip-card.rar-primordial > *, .equip-slot.filled.rar-primordial > * { position: relative; z-index: 1; }
+@keyframes rar-primordial {
+    0%, 100% { box-shadow: 0 0 24px -1px #fffdf0, inset 0 0 18px -6px #fffbe8; }
+    50%      { box-shadow: 0 0 38px 2px #ff7a3c, inset 0 0 22px -4px #ffdf8a; }
+}
+@keyframes primordial-rays { to { transform: rotate(360deg); } }
+
+/* Chest reveal: the two tiers that pay real store credit get the loudest halo in the game. */
+.chest-reward.rar-celestial { animation: chest-celestial 3.4s ease-in-out infinite; }
+.chest-reward.rar-celestial .chest-reward-name {
+    background: linear-gradient(90deg, #ffffff, #a7f0ff, #b98cff, #ffffff); background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    animation: elite-prism 2.4s linear infinite;
+}
+@keyframes chest-celestial {
+    0%, 100% { filter: drop-shadow(0 0 26px rgba(167, 240, 255, 0.9)); }
+    50%      { filter: drop-shadow(0 0 38px rgba(185, 140, 255, 0.95)); }
+}
+.chest-reward.rar-primordial { animation: chest-primordial 2.8s ease-in-out infinite; }
+.chest-reward.rar-primordial .chest-reward-glyph { animation: elite-throb 1.4s ease-in-out infinite; }
+.chest-reward.rar-primordial .chest-reward-name {
+    background: linear-gradient(90deg, #ffffff, #fffbe8, #ff7a3c, #ffffff); background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    animation: elite-prism 2.2s linear infinite;
+}
+@keyframes chest-primordial {
+    0%, 100% { filter: drop-shadow(0 0 30px rgba(255, 223, 138, 0.9)); }
+    50%      { filter: drop-shadow(0 0 44px rgba(255, 122, 60, 0.95)); }
+}
+
 .equip { display: flex; flex-direction: column; gap: 14px; }
 
 /* The paper-doll: 9 slots around the hero portrait. */

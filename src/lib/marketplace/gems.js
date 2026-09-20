@@ -116,10 +116,18 @@ export function sumGemStats(gemIds = [], powers = null) {
 // actually pay, so the bench read as a wall and the top half of the table was never bought at all. A socket is
 // not supposed to be the expensive part — the GEM is. Divided straight through so the shape of the ladder is
 // unchanged and only its height moves.
+// ⚠️ THE TOP TWO RUNGS WERE MISSING AND THE FALLBACK WAS `common`, so cutting a socket into a CELESTIAL piece
+// — the second-rarest thing in the game — cost 250 gold instead of the 6,667 an eternal pays. One has already
+// been cut at that price. Same cliff as SALVAGE in crafting.js and the .rar-* table in globals.css: a lookup
+// that stopped at `eternal` when the ladder grew two rungs past it, failing silently and downward every time.
 export const SOCKET_COST = {
     common: 250, rare: 500, epic: 1000, legendary: 2000, mythic: 3333, ascendant: 5000, eternal: 6667,
+    celestial: 8333, primordial: 10000,
 };
-export const socketCost = (rarity) => SOCKET_COST[rarity] || SOCKET_COST.common;
+// An unknown rarity resolves to the TOP of the ladder, not the bottom. Rarities are only ever added above the
+// last one, so "never heard of it" means "newer and rarer" — and a wrong-and-expensive price gets reported by
+// the member who paid it, where a wrong-and-free one is ridden quietly until somebody notices the exploit.
+export const socketCost = (rarity) => SOCKET_COST[rarity] || (rarity ? SOCKET_COST.primordial : SOCKET_COST.common);
 
 // Three of a kind make one of the tier above. Three rather than two because two is an upgrade path so cheap
 // that the lower tiers stop being drops and start being currency.
