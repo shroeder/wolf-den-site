@@ -154,6 +154,10 @@ async function pushLoyaltyClaim({ token, amountCents }) {
         body: `Show the QR so this customer banks points on their $${dollars} purchase.`,
         route: `loyaltyClaim/${token}/${cents}`,
         channels: ["full", "employee"],
+        // This is the push that fires on a completed in-store sale and carries its value, so it is the one
+        // that rings the sale tiers. `cents` is the pre-tax subtotal less any gift card sold on it — the same
+        // basis loyalty uses, so what you HEAR and what the customer earns agree.
+        sound: { kind: "sale", amountCents: cents },
         data: { token, amountCents: String(cents), claimUrl: `${SITE_URL}/marketplace/claim/${token}` },
     });
 }

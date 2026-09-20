@@ -476,6 +476,9 @@ export async function POST(request) {
                         body: `${orderItemCount} item${orderItemCount === 1 ? "" : "s"} · $${((updatedOrder.total_cents || 0) / 100).toFixed(2)}${updatedOrder.fulfillment_mode === "pickup" ? " · Pickup" : ""}`,
                         route: "shopOrders",
                         data: { orderId: updatedOrder.id },
+                        // An online order has its own sound rather than a size tier — what matters is that one
+                        // has landed and needs picking, not how big it is.
+                        sound: { kind: "order" },
                         // An online order is picked and packed by whoever is on shift, not only the owner, so it
                         // goes to the employee channel too. sendAdminPush defaults to ["full"] (owner devices),
                         // which is why staff phones stayed silent; the employee build already carries the

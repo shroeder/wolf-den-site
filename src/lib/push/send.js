@@ -64,6 +64,27 @@ async function getMessaging() {
     return messagingPromise;
 }
 
+// ── WHICH NOISE THE PHONE MAKES ──────────────────────────────────────────────────────────────────────────────
+// Luke: a different sound per event and per size — trades and sales split four ways by value, plus a unique one
+// for online orders.
+//
+// ⚠️ THE BANDS LIVE HERE AND NOWHERE ELSE. Each caller knows what happened and how much it was; none of them
+// should know where $50 sits, or the day a threshold moves it will move in the trade route and not the sale
+// one. Callers pass {kind, amountCents} and this decides.
+//
+// Edges stated so they cannot be misread: under $50 / $50 to under $100 / $100 to under $350 / $350 and over.
+const SOUND_TIERS = [5000, 10000, 35000];
+
+export function soundChannel(sound) {
+    const kind = String(sound?.kind || "");
+    if (kind === "order") return "wolfden_order_v1";
+    if (kind !== "trade" && kind !== "sale") return "wolfden_admin_v3";
+    const cents = Math.max(0, Math.trunc(Number(sound?.amountCents) || 0));
+    // findIndex returns -1 when the amount is past every threshold, which IS the top tier.
+    const i = SOUND_TIERS.findIndex((t) => cents < t);
+    return `wolfden_${kind}_${i === -1 ? 4 : i + 1}_v1`;
+}
+
 /**
  * Send a push to the owner's admin devices. Best-effort: never throws — callers fire and forget.
  * @param {object} opts
@@ -72,8 +93,9 @@ async function getMessaging() {
  * @param {string} [opts.route]  in-app route to deep-link to on tap (e.g. "shopOrders")
  * @param {Record<string,string|number>} [opts.data] extra data payload (stringified)
  * @param {string[]} [opts.channels] device channels to target (default ["full"]; e.g. ["full","employee"])
+ * @param {{kind: "trade"|"sale"|"order", amountCents?: number}} [opts.sound] which alert sound to ring
  */
-export async function sendAdminPush({ title, body, route = null, data = {}, channels = ["full"] }) {
+export async function sendAdminPush({ title, body, route = null, data = {}, channels = ["full"], sound = null }) {
     try {
         const messaging = await getMessaging();
         if (!messaging) {
@@ -112,7 +134,12 @@ export async function sendAdminPush({ title, body, route = null, data = {}, chan
         // good. Grouping by the version each device last reported removes the ordering problem entirely:
         // old phones keep the old channel, new phones get the chime, and each one moves over by itself the
         // moment it updates. Nothing to remember, nothing to sequence.
-        const CHIME_FROM_CODE = 652;              // the build that introduced wolfden_admin_v2
+        // ⚠️ TWO GATES, BECAUSE TWO BUILDS ADDED CHANNELS. 652 brought the single chime, 655 the ten tiered
+        // ones AND a quieter re-render of the chime — which, because a channel's sound is frozen at creation,
+        // had to become _v3 rather than reuse _v2. A phone reports the build it is on; it gets the newest set
+        // of channels that build actually has, and nothing newer.
+        const CHIME_FROM_CODE = 652;              // wolfden_admin_v2
+        const TIERS_FROM_CODE = 655;              // wolfden_admin_v3 + the nine tiered channels
         const versionCodeOf = (v) => {
             // "1.0.652" / "1.0.652-emp" -> 652. Anything unreadable counts as OLD, which is the safe way to
             // be wrong: the worst case is a missing chime, never a missing notification.
@@ -122,7 +149,10 @@ export async function sendAdminPush({ title, body, route = null, data = {}, chan
         const byChannel = new Map();
         for (const r of rows) {
             if (!r.fcm_token) continue;
-            const id = versionCodeOf(r.app_version) >= CHIME_FROM_CODE ? "wolfden_admin_v2" : "wolfden_admin";
+            const code = versionCodeOf(r.app_version);
+            const id = code >= TIERS_FROM_CODE
+                ? (sound ? soundChannel(sound) : "wolfden_admin_v3")
+                : (code >= CHIME_FROM_CODE ? "wolfden_admin_v2" : "wolfden_admin");
             if (!byChannel.has(id)) byChannel.set(id, []);
             byChannel.get(id).push(r.fcm_token);
         }

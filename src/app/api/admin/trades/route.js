@@ -76,6 +76,17 @@ export async function POST(request) {
                         body: bits.join(" · "),
                         route: "trades",
                         data: { tradeId: String(trade.id), ...(claim ? { claimToken: claim.token } : {}) },
+                        // What the trade was WORTH is everything we handed over for it — store credit, cash
+                        // and gift card together. Sounding on any one of them alone would rank a $400 trade
+                        // paid mostly in credit below a $60 cash one.
+                        sound: {
+                            kind: "trade",
+                            amountCents: Math.round(
+                                ((Number(trade.creditTotal) || 0)
+                                    + (Number(trade.cashTotal) || 0)
+                                    + (Number(trade.giftCardTotal) || 0)) * 100
+                            ),
+                        },
                     }).catch((e) => logger.warn?.("admin.trades.push.failure", { error: e?.message }));
                 }
                 logger.info("admin.trades.create.success", { tradeId: trade.id, created, claimed: Boolean(claim) });
