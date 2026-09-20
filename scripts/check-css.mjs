@@ -113,11 +113,30 @@ const STYLE_OPEN = /<style\s+jsx[^>]*>\{`/g;
 function scanStyledJsx(file) {
     const src = readFileSync(file, "utf8");
     const rel = path.relative(path.join(HERE, ".."), file).split(path.sep).join("/");
+    // ⚠️ A CSS TEMPLATE DOES NOT HAVE TO BE A <style jsx> BLOCK, AND THIS GATE ONLY LOOKED FOR THOSE.
+    // TownClient keeps its whole stylesheet in `export const TOWN_CSS = ...` so the powers lab can inject it,
+    // and that is still a template literal a backtick in a comment will terminate — it broke the build three
+    // separate times in one session while this gate reported the file clean. Both shapes are scanned now.
+    const blocks = [];
     for (const open of src.matchAll(STYLE_OPEN)) {
         const from = open.index + open[0].length;
         const close = src.indexOf(TICK + "}</style>", from);
-        const body = src.slice(from, close < 0 ? src.length : close);
-        for (const c of body.matchAll(/\/\*[\s\S]*?\*\//g)) {
+        blocks.push([from, close < 0 ? src.length : close]);
+    }
+    for (const open of src.matchAll(/(?:const|let|var)\s+[A-Za-z0-9_$]*CSS[A-Za-z0-9_$]*\s*=\s*`/g)) {
+        const from = open.index + open[0].length;
+        // ⚠️ DO NOT END THE BLOCK AT THE FIRST BACKTICK. That was the first attempt and it made a gate that
+        // could not fail: a stray backtick inside a comment IS the first one, so the body got cut before the
+        // comment's closing marker and the comment-matching regex -- which needs a closing marker -- found
+        // nothing at all. The check passed on the exact fault it was written for.
+        // The real terminator is a backtick that closes the statement, at the start of a line.
+        const close = src.indexOf(String.fromCharCode(10) + TICK + ";", from);
+        blocks.push([from, close < 0 ? src.length : close]);
+    }
+    for (const [from, to] of blocks) {
+        const body = src.slice(from, to);
+        // Both shapes: a complete comment, and one left unterminated BECAUSE the backtick ended the template.
+        for (const c of body.matchAll(/\/\*[\s\S]*?(?:\*\/|$)/g)) {
             if (!c[0].includes(TICK)) continue;
             const line = src.slice(0, from + c.index).split(String.fromCharCode(10)).length;
             problems.push(rel + ": a backtick inside a CSS comment at line " + line

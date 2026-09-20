@@ -317,6 +317,36 @@ Object.assign(ART_PROMPTS, {
     ),
 });
 
+// ── THE STREET ITSELF, IN AUTUMN ─────────────────────────────────────────────────────────────────────────────
+// A fall floor to lay under the whole town, and one big decorated tree standing in it.
+//
+// ⚠️ THE FLOOR IS PAINTED AT DUSK, NOT AT NIGHT, AND THAT IS DELIBERATE. Every other ground band — the mid
+// rooftops, the foreground wall — is lit for dusk in the artwork and taken down to night by the filters in
+// TownClient. Painting this one dark would put it out of step with its own neighbours and it would then get
+// darkened AGAIN on top, which is the mistake the dressed buildings taught. It matches its siblings and lets
+// the same filter do the same job to it.
+Object.assign(ART_PROMPTS, {
+    hw_cobble:
+        `A seamless COBBLESTONE STREET ground texture seen at a slight downward angle — worn rounded grey-brown ` +
+        `cobbles with mortar gaps, STREWN WITH FALLEN AUTUMN LEAVES in orange, russet, amber and deep red ` +
+        `scattered loosely across the stones, a few drifted into the mortar gaps and gathered into small ` +
+        `wind-piled clumps, some leaves curled and dry. The leaves are scattered UNEVENLY but spread over the ` +
+        `whole width, warm even dusk lighting, uniform across the WHOLE image with no focal point, NO objects, ` +
+        `NO people, NO buildings, NO sky, NO horizon, NO trees — just leaf-strewn cobblestones, designed to ` +
+        `tile left-to-right. ${STREET_STYLE}`,
+    hw_tree_fall: housePrompt(
+        "A large AUTUMN TREE in full fall colour — a thick gnarled trunk and spreading branches carrying a " +
+        "dense canopy of orange, russet, amber and deep red leaves, DECORATED FOR HALLOWEEN: several small lit " +
+        "lanterns hanging from the lower branches on short cords, a string of little black and orange " +
+        "triangular flags draped between two branches, a couple of carved glowing jack-o'-lanterns sitting " +
+        "among the roots, and a scatter of fallen leaves around its base",
+        { extra: "The WHOLE tree including the top of the canopy and the base of the trunk must be inside the " +
+            "frame. It is evening: the hanging lanterns and the carved pumpkins glow warm amber from within " +
+            "and light the leaves nearest them, while the rest of the canopy sits in cooler shadow. The glow " +
+            "lives inside the lanterns — no halo or light bloom drawn outside the tree's silhouette." }
+    ),
+});
+
 // ── AND THE BUILDINGS, DRESSED ───────────────────────────────────────────────────────────────────────────────
 // Luke: "Let's make a Halloween version of each of the buildings."
 //
@@ -360,6 +390,7 @@ export const HALLOWEEN_PROP_KEYS = [
     "hw_moon", "hw_witch_a", "hw_witch_b", "hw_bats", "hw_tree",
     "hw_pumpkin", "hw_lantern", "hw_candles", "hw_ghost",
     "hw_scarecrow", "hw_haybale", "hw_cauldron", "hw_gravestone", "hw_skeleton", "hw_pumpkin_stack", "hw_crow",
+    "hw_cobble", "hw_tree_fall",
 ];
 export const HALLOWEEN_BUILDING_KEYS = Object.keys(_hwBuildings);
 export const HALLOWEEN_ART_KEYS = [...HALLOWEEN_PROP_KEYS, ...HALLOWEEN_BUILDING_KEYS];
@@ -371,7 +402,10 @@ export async function generateTownArt(key) {
     let url;
     if (key === "background") url = await generateWideSceneImage(prompt, { pathPrefix: "marketplace/town", panels: 3 });
     else if (key === "tavern_interior") url = await generateWideSceneImage(prompt, { pathPrefix: "marketplace/town", panels: 2 }); // WIDE scrollable tavern room
-    else if (key === "sky" || key === "cobble") url = await generateSceneImage(prompt, { pathPrefix: "marketplace/town", meta: { origin: "admin", subject: key, label: `Town scene — ${key}` } }); // opaque scene layers
+    // ⚠️ THE FALL FLOOR IS A SCENE, NOT A SPRITE. Sent down the sprite path it would come back with a
+    // transparent background and tile as a row of floating leaves over the void — the ground bands are opaque
+    // full-bleed textures and hw_cobble is one of them.
+    else if (key === "sky" || key === "cobble" || key === "hw_cobble") url = await generateSceneImage(prompt, { pathPrefix: "marketplace/town", meta: { origin: "admin", subject: key, label: `Town scene — ${key}` } }); // opaque scene layers
     else url = await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/town", deHalo: true, meta: { origin: "admin", subject: key, label: `Town art — ${key}` } }); // transparent building sprite
     await db.query(
         `INSERT INTO mkt_town_art (art_key, url, updated_at) VALUES ($1, $2, NOW())

@@ -744,6 +744,29 @@ function buildHalloweenDressing(buildings) {
         });
     });
 
+    // ── THE AUTUMN TREES ─────────────────────────────────────────────────────────────────────────────────
+    // Landmarks rather than decorations: big, few, and deliberately NOT part of a cluster — a tree somebody
+    // hung lanterns in is a place, and three of them give the street something to be laid out around. Kept
+    // clear of every door so a canopy never covers the way into a building.
+    // ⚠️ PLACED IN THE REAL GAPS, NOT AT CHOSEN NUMBERS. Three hand-picked positions and a "must be 4% clear
+    // of any door" rule put exactly ONE tree in the whole town — because the buildings are about 6% apart, so
+    // the midpoint between two of them is only 3% from each and almost every spot failed. Measuring the gaps
+    // and standing a tree in the widest ones is both correct and self-adjusting as the street grows.
+    const doors = buildings.map((b) => Number(b.x) || 0).sort((a, b) => a - b);
+    const gaps = [];
+    for (let i = 1; i < doors.length; i += 1) gaps.push({ mid: (doors[i - 1] + doors[i]) / 2, w: doors[i] - doors[i - 1] });
+    if (doors.length) {
+        gaps.push({ mid: doors[0] / 2, w: doors[0] });                       // before the first building
+        gaps.push({ mid: (doors[doors.length - 1] + 100) / 2, w: 100 - doors[doors.length - 1] });
+    }
+    gaps.sort((a, b) => b.w - a.w);
+    for (const g of gaps.slice(0, 4)) {
+        if (g.w < 5) continue;   // no room for a canopy without covering a door
+        out.push({ key: "hw_tree_fall", kind: "falltree", x: g.mid + (rand() - 0.5) * Math.min(2, g.w - 4),
+            top: Math.round(pick(73, 75) * 10) / 10, h: Math.round(pick(30, 36) * 10) / 10,
+            flip: rand() < 0.5, delay: Math.round(rand() * 600) / 100 });
+    }
+
     // ── GHOSTS ───────────────────────────────────────────────────────────────────────────────────────────
     // Off the ground and off the grid entirely, so the one thing that floats is not also in a row.
     for (const gx of [11, 29, 46, 63, 81, 94]) {
@@ -1688,9 +1711,11 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
                     {layered ? (
                         <div className="tw-cobble" aria-hidden="true">
+                            {/* The street wears fallen leaves when the flag is up. Painted at the same dusk as
+                                the everyday cobbles on purpose, so the one night filter treats both alike. */}
                             {tiles(19).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img key={k} src={art.cobble.url} alt="" draggable={false} />
+                                <img key={k} src={((spooky && art.hw_cobble?.url) || art.cobble.url)} alt="" draggable={false} />
                             ))}
                         </div>
                     ) : art.background ? (
@@ -3476,6 +3501,13 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    contact shadow and nothing else — which is also what makes the lit pieces read AS lit. */
 .hw-grave, .hw-skeleton, .hw-scarecrow, .hw-haybale, .hw-crow {
     filter: brightness(0.62) saturate(0.72) drop-shadow(0 5px 9px rgba(0,0,0,0.6)); }
+/* ⚠️ THE TREE SWAYS WITH THE ROTATE PROPERTY, NOT WITH TRANSFORM. Its anchor -- translate(-50%, -100%) -- is written
+   inline per prop, and a transform in the stylesheet would REPLACE that anchor rather than add to it, dropping
+   the tree half a street sideways. The rotate property is composited separately and leaves the anchor alone.
+   Origin is the FOOT of the sprite, because that is where a tree is attached to the ground. */
+.hw-falltree { transform-origin: 50% 100%; animation: hwTreeSway 9s ease-in-out infinite;
+    filter: brightness(0.82) saturate(0.95) drop-shadow(0 8px 14px rgba(0,0,0,0.55)); }
+@keyframes hwTreeSway { 0%, 100% { rotate: -0.5deg; } 50% { rotate: 0.5deg; } }
 /* The crow sits up off the ground on a post or a roofline, so it gets no contact shadow under it. */
 .hw-crow { filter: brightness(0.5) saturate(0.6) drop-shadow(0 0 6px rgba(60,40,90,0.5)); }
 @keyframes hwFlicker {
