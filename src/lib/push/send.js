@@ -81,7 +81,7 @@ export async function sendAdminPush({ title, body, route = null, data = {}, chan
         }
 
         const rows = await db.query(
-            `SELECT DISTINCT fcm_token
+            `SELECT DISTINCT fcm_token, app_version
              FROM app_device
              WHERE channel = ANY($1)
                AND revoked = FALSE
@@ -100,17 +100,60 @@ export async function sendAdminPush({ title, body, route = null, data = {}, chan
             stringData[key] = value == null ? "" : String(value);
         }
 
-        const response = await messaging.sendEachForMulticast({
-            tokens,
-            notification: { title, body },
-            data: stringData,
-            android: {
-                priority: "high",
-                notification: { channelId: "wolfden_admin" },
-            },
-        });
+        // ── ⚠️ THE CHANNEL IS CHOSEN PER DEVICE, AND IT HAS TO BE ────────────────────────────────────────
+        // The custom alert chime lives on a NEW notification channel, because Android freezes a channel's
+        // sound when it is first created and will never change it afterwards (see PushManager.kt). That
+        // leaves a hazard: a push addressed to a channel a phone does not have is DROPPED by Android —
+        // silently, with no error, no tray entry and nothing in any log we can see. So sending the new
+        // channel id to a phone still on the old build does not merely lose the chime, it loses the alert.
+        //
+        // Flipping this constant by hand would have meant a window where exactly that was true, and a
+        // handset that never updates (Eric's is four hundred builds behind) would have stayed broken for
+        // good. Grouping by the version each device last reported removes the ordering problem entirely:
+        // old phones keep the old channel, new phones get the chime, and each one moves over by itself the
+        // moment it updates. Nothing to remember, nothing to sequence.
+        const CHIME_FROM_CODE = 652;              // the build that introduced wolfden_admin_v2
+        const versionCodeOf = (v) => {
+            // "1.0.652" / "1.0.652-emp" -> 652. Anything unreadable counts as OLD, which is the safe way to
+            // be wrong: the worst case is a missing chime, never a missing notification.
+            const n = Number(String(v || "").split("-")[0].split(".").pop());
+            return Number.isFinite(n) ? n : 0;
+        };
+        const byChannel = new Map();
+        for (const r of rows) {
+            if (!r.fcm_token) continue;
+            const id = versionCodeOf(r.app_version) >= CHIME_FROM_CODE ? "wolfden_admin_v2" : "wolfden_admin";
+            if (!byChannel.has(id)) byChannel.set(id, []);
+            byChannel.get(id).push(r.fcm_token);
+        }
+
+        const batches = [];
+        for (const [channelId, batchTokens] of byChannel) {
+            batches.push(await messaging.sendEachForMulticast({
+                tokens: batchTokens,
+                notification: { title, body },
+                data: stringData,
+                android: {
+                    priority: "high",
+                    notification: { channelId },
+                },
+            }));
+        }
+        // Folded back into one result so everything downstream — the success count and the dead-token prune —
+        // keeps working exactly as it did when this was a single send.
+        const response = {
+            successCount: batches.reduce((n, b) => n + b.successCount, 0),
+            failureCount: batches.reduce((n, b) => n + b.failureCount, 0),
+            responses: batches.flatMap((b) => b.responses),
+        };
+        const orderedTokens = [...byChannel.values()].flat();
 
         // Prune tokens FCM says are dead so we don't keep trying them.
+        //
+        // ⚠️ INDEXED AGAINST `orderedTokens`, NOT `tokens`. The responses are now the batches concatenated in
+        // channel order, which is NOT the order `tokens` was built in — so indexing the old array would line
+        // each verdict up against the wrong device and null out LIVE tokens while leaving the dead ones in
+        // place. A phone silently stops receiving anything and nothing says why.
         if (response.failureCount > 0) {
             const dead = [];
             response.responses.forEach((r, i) => {
@@ -120,7 +163,7 @@ export async function sendAdminPush({ title, body, route = null, data = {}, chan
                     code.includes("invalid-registration-token") ||
                     code.includes("invalid-argument")
                 ) {
-                    dead.push(tokens[i]);
+                    dead.push(orderedTokens[i]);
                 }
             });
 
