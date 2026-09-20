@@ -326,14 +326,27 @@ Object.assign(ART_PROMPTS, {
 // darkened AGAIN on top, which is the mistake the dressed buildings taught. It matches its siblings and lets
 // the same filter do the same job to it.
 Object.assign(ART_PROMPTS, {
+    // ⚠️ A TILING TEXTURE MUST HAVE NO FOCAL POINT AND NO BIG SHAPES. The first floor buried the cobbles under
+    // a solid carpet of leaves — dense enough that the repeat, and the mirror the street tiles it with, both
+    // read immediately as a pattern. Leaves are the ACCENT here; the stone is the floor. Sparse, small, and
+    // evenly spread is what disappears when it repeats.
+    // ⚠️ TWO SWINGS BEFORE THIS ONE, AND BOTH WERE THE SAME MISTAKE AT OPPOSITE ENDS. First a solid carpet of
+    // leaves: the cobbles vanished and the mirror-repeat was obvious. Then a sparse dusting on pale sandy
+    // stone: it read as a bare grey road with no autumn in it, LIGHTER than the undergrowth above it, which a
+    // night street must never be. What a tiling floor wants is medium coverage of SMALL pieces on DARK stone —
+    // enough leaf to say autumn, no shape big enough to become a landmark when it repeats.
     hw_cobble:
-        `A seamless COBBLESTONE STREET ground texture seen at a slight downward angle — worn rounded grey-brown ` +
-        `cobbles with mortar gaps, STREWN WITH FALLEN AUTUMN LEAVES in orange, russet, amber and deep red ` +
-        `scattered loosely across the stones, a few drifted into the mortar gaps and gathered into small ` +
-        `wind-piled clumps, some leaves curled and dry. The leaves are scattered UNEVENLY but spread over the ` +
-        `whole width, warm even dusk lighting, uniform across the WHOLE image with no focal point, NO objects, ` +
-        `NO people, NO buildings, NO sky, NO horizon, NO trees — just leaf-strewn cobblestones, designed to ` +
-        `tile left-to-right. ${STREET_STYLE}`,
+        `A seamless COBBLESTONE STREET ground texture seen at a slight downward angle. Worn rounded cobbles in ` +
+        `DEEP WARM GREY-BROWN with darker mortar gaps — rich and shadowed, NOT pale, NOT sandy, NOT bleached. ` +
+        `Fallen autumn leaves in russet, burnt orange and brown lie loose across it, covering roughly a THIRD ` +
+        `of the surface: plenty of leaf to read as autumn, with bare stone still clearly showing between them. ` +
+        `Individual small leaves and loose pairs only — NO drifts, NO piles, NO clump larger than three leaves. ` +
+        `⚠️ ABSOLUTELY UNIFORM ACROSS THE WHOLE IMAGE: no focal point, no dense patch, no bare patch, no large ` +
+        `shape — the density and the colour must be the SAME at the left edge, the middle and the right edge, ` +
+        `because this tiles and mirrors and any distinctive feature becomes a visible repeat. ` +
+        `The whole thing sits in DEEP EVENING SHADOW — a dark ground, not a lit one. ` +
+        `NO objects, NO people, NO buildings, NO sky, NO horizon, NO trees, NO branches. ` +
+        `Designed to tile left-to-right. ${STREET_STYLE}`,
     hw_tree_fall: housePrompt(
         "A large AUTUMN TREE in full fall colour — a thick gnarled trunk and spreading branches carrying a " +
         "dense canopy of orange, russet, amber and deep red leaves, DECORATED FOR HALLOWEEN: several small lit " +
@@ -394,12 +407,20 @@ Object.assign(ART_PROMPTS, {
         `claw-like branches breaking the skyline, softened by cold night haze into a deep blue-violet ` +
         `silhouette. The TOP ~62% of the image is FULLY TRANSPARENT (alpha) with nothing in it; only the far ` +
         `treeline occupies the lower portion. ${FOREST_NIGHT}`,
-    hw_mid: `A MIDGROUND wall of DENSE AUTUMN FOREST along the BOTTOM of the frame — crowded trunks and ` +
-        `interlocking canopies, some still heavy with russet and burnt-orange leaves catching the moonlight, ` +
-        `others bare and crooked with clawing branches, a few dead snags leaning between them, and impenetrable ` +
-        `blackness between the trunks. Nearer and larger than the far ridge. The TOP two-thirds of the image is ` +
-        `FULLY TRANSPARENT (alpha) with NOTHING in it — no baked sky, no moon, no haze — just the treeline cut ` +
-        `against transparency along the bottom. ${FOREST_NIGHT}`,
+    // ⚠️ NO HERO TREE. The first pass grew one big reddish canopy in the middle of the band, and a band tiles
+    // AND mirrors — so that one tree marched across the whole street back-to-back with its own reflection,
+    // which is the most obvious repeat in the scene. A treeline reads as a treeline when no single trunk is
+    // the subject; it is a WALL of forest, not a portrait of a tree.
+    hw_mid: `A MIDGROUND WALL OF DENSE AUTUMN FOREST filling the BOTTOM of the frame — MANY crowded trunks of ` +
+        `SIMILAR size and height standing shoulder to shoulder, their canopies overlapping into one continuous ` +
+        `ragged treeline, some still carrying muted russet and brown leaves, many bare and crooked, with ` +
+        `impenetrable blackness between the trunks. ` +
+        `⚠️ NO SINGLE DOMINANT TREE, no hero tree, no one canopy larger or brighter than its neighbours, no ` +
+        `centred subject, no gap and no clearing — the density, height and colour must be EVEN from the left ` +
+        `edge to the right edge, because this tiles and mirrors and any standout shape becomes a visible ` +
+        `repeat. Think of an unbroken hedge of woodland seen from outside it. ` +
+        `The TOP two-thirds of the image is FULLY TRANSPARENT (alpha) with NOTHING in it — no baked sky, no ` +
+        `haze — just the treeline cut against transparency along the bottom. ${FOREST_NIGHT}`,
     hw_fg: `A LOW foreground band of FOREST UNDERGROWTH running straight across the BOTTOM of the frame — a ` +
         `fallen mossy log, tangled brambles and dead ferns, drifts of dry curled leaves, a few pale toadstools, ` +
         `clumps of long dead grass, and a broken crooked wooden fence rail half-swallowed by it all. Nearer and ` +
