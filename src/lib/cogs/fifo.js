@@ -87,6 +87,35 @@ export async function batchesFor(variationIds) {
 }
 
 /**
+ * Units of each variation already spent by sales costed in EARLIER runs — the opening position for an
+ * incremental walk, keyed variationId -> units.
+ *
+ * `before` is the oldest sale about to be costed. Rows at or after it are excluded because the caller is
+ * recomputing them; counting them here would consume their batches twice and silently overprice everything
+ * behind them.
+ */
+export async function priorConsumption(variationIds, before) {
+    const ids = [...new Set((variationIds || []).map((v) => String(v || "").trim()).filter(Boolean))];
+    const out = new Map();
+    if (!ids.length || !before) return out;
+    const rows = await db.query(
+        `SELECT variation_id, COALESCE(SUM(units), 0) AS used
+           FROM cogs_fifo_cost
+          WHERE variation_id = ANY($1) AND sold_at < $2
+          GROUP BY variation_id`,
+        [ids, new Date(before).toISOString()]
+    ).catch((error) => {
+        // ⚠️ LOUD, AND EMPTY IS NOT A SAFE ANSWER HERE. Returning an empty map on failure would look exactly
+        // like "nothing has been sold yet" and hand every sale the oldest batch — the bug this function exists
+        // to prevent. The caller treats a throw as a failed run rather than costing anything wrongly.
+        logger.error("cogs.fifo.prior_consumption_failed", { message: error?.message });
+        throw error;
+    });
+    for (const r of rows) out.set(String(r.variation_id), Number(r.used) || 0);
+    return out;
+}
+
+/**
  * Cost every sale of these variations, oldest sale first, and write the answers down.
  *
  * `sales` is [{ orderId, lineUid, variationId, soldAt, units }] — the caller supplies them from Square, which
@@ -111,7 +140,18 @@ export async function costSales(sales) {
     if (!list.length) return { costed: 0, short: 0, skipped: 0 };
 
     const batches = await batchesFor(list.map((s) => s.variationId));
-    const consumed = new Map();   // variationId -> units already spent by earlier sales in this walk
+
+    // ── ⚠️ WHAT EARLIER RUNS ALREADY SPENT, NOT JUST THIS ONE ────────────────────────────────────────────────
+    // `consumed` used to start empty on every call, and the reconciler only walks forward from its cursor — so
+    // the FIRST sale of an item in tonight's incremental run was handed the OLDEST batch again, one that sales
+    // months ago had already emptied. Buy 11 ETBs at $120 and 5 at $115, sell 11, and the twelfth sale would
+    // read $120 for ever, which is the exact "last price wins" defect this table was built to kill, coming back
+    // one night later and much harder to see.
+    //
+    // A full run clears the table first, so this correctly reads zero there. An incremental run reads the units
+    // every prior run recorded for sales STRICTLY OLDER than the oldest sale in this walk — anything inside the
+    // walk is about to be recomputed from scratch, so counting it here would spend those units twice.
+    const consumed = await priorConsumption(list.map((s) => s.variationId), list[0].soldAt);
     let costed = 0, short = 0, skipped = 0;
 
     for (const sale of list) {
@@ -127,14 +167,21 @@ export async function costSales(sales) {
         if (result.units <= 0) { skipped += 1; continue; }
         if (result.short > 0) short += 1;
 
+        // ⚠️ `short` IS RECORDED, NOT ROUNDED AWAY. The row is written either way, because the units were
+        // sold and remainingFor() has to count them or the shelf valuation overstates what is left. But a
+        // short row is NOT safe to report: the app applies the stored cost as the cost of the whole line, so
+        // handing it a figure that only covers part of the line prices the rest at nothing — the exact
+        // silent $0 the note on allocate() forbids. storedCosts() filters these out, and the line falls back
+        // to the old per-unit cost, which at least prices every unit.
         await db.query(
-            `INSERT INTO cogs_fifo_cost (order_id, line_uid, variation_id, sold_at, units, cost_cents, batches, computed_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())
+            `INSERT INTO cogs_fifo_cost (order_id, line_uid, variation_id, sold_at, units, cost_cents, batches, short_units, computed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, NOW())
              ON CONFLICT (order_id, line_uid) DO UPDATE
                 SET variation_id = EXCLUDED.variation_id, sold_at = EXCLUDED.sold_at, units = EXCLUDED.units,
-                    cost_cents = EXCLUDED.cost_cents, batches = EXCLUDED.batches, computed_at = NOW()`,
+                    cost_cents = EXCLUDED.cost_cents, batches = EXCLUDED.batches,
+                    short_units = EXCLUDED.short_units, computed_at = NOW()`,
             [sale.orderId, sale.lineUid, sale.variationId, sale.soldAt.toISOString(), sale.units,
-             result.costCents, JSON.stringify(result.batches)]
+             result.costCents, JSON.stringify(result.batches), result.short]
         ).catch((error) => {
             logger.warn("cogs.fifo.write_failed", { orderId: sale.orderId, message: error?.message });
         });
@@ -149,9 +196,11 @@ export async function costSales(sales) {
 export async function storedCosts(pairs) {
     const list = (Array.isArray(pairs) ? pairs : []).filter((p) => p?.orderId && p?.lineUid);
     if (!list.length) return new Map();
+    // short_units = 0 is the whole point: only a line whose every unit was paid for by a recorded purchase
+    // can be reported as that line's cost. See the note at the write above.
     const rows = await db.query(
         `SELECT order_id, line_uid, cost_cents, units, batches
-           FROM cogs_fifo_cost WHERE order_id = ANY($1)`,
+           FROM cogs_fifo_cost WHERE order_id = ANY($1) AND short_units = 0`,
         [[...new Set(list.map((p) => String(p.orderId)))]]
     ).catch(() => []);
     return new Map(rows.map((r) => [`${r.order_id}|${r.line_uid}`, {
