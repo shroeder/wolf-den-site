@@ -664,6 +664,32 @@ const HW_PIECE = {
     crow: { key: "hw_crow", kind: "crow", h: [4, 6], top: [63, 70] },
 };
 
+// ── THE LEAVES COMING DOWN ───────────────────────────────────────────────────────────────────────────────
+// ⚠️ WRITTEN OUT, NOT ROLLED. These are rendered on the server too, so a Math.random() here is a hydration
+// mismatch -- the server picks one set of positions, the browser picks another, React throws the whole scene
+// away and rebuilds it. Fourteen hand-set leaves cost nothing and are the same on both sides.
+//
+// x is where it starts, drift is how far it slides while it falls (a leaf does not drop straight), dur is
+// how long it takes, and delay is spread across the whole cycle so the air is already full on arrival
+// rather than dumping fourteen leaves at once four seconds in. Sizes vary and the small ones are dimmer,
+// which is the whole depth cue: a leaf near the camera is big, sharp and fast.
+const HW_LEAVES = [
+    { x: 4, size: 13, dur: 11, delay: -2, drift: 7, spin: 420, dim: 1 },
+    { x: 11, size: 8, dur: 15, delay: -9, drift: -5, spin: -300, dim: 0.62 },
+    { x: 19, size: 11, dur: 13, delay: -5, drift: 6, spin: 380, dim: 0.85 },
+    { x: 26, size: 7, dur: 17, delay: -13, drift: -4, spin: 260, dim: 0.55 },
+    { x: 33, size: 14, dur: 10, delay: -7, drift: 8, spin: -460, dim: 1 },
+    { x: 41, size: 9, dur: 16, delay: -1, drift: -6, spin: 320, dim: 0.7 },
+    { x: 48, size: 12, dur: 12, delay: -10, drift: 5, spin: -360, dim: 0.9 },
+    { x: 55, size: 7, dur: 18, delay: -4, drift: -7, spin: 280, dim: 0.55 },
+    { x: 62, size: 13, dur: 11, delay: -14, drift: 6, spin: 440, dim: 1 },
+    { x: 69, size: 8, dur: 15, delay: -6, drift: -5, spin: -310, dim: 0.62 },
+    { x: 76, size: 11, dur: 13, delay: -11, drift: 7, spin: 400, dim: 0.85 },
+    { x: 83, size: 9, dur: 16, delay: -3, drift: -4, spin: -290, dim: 0.7 },
+    { x: 90, size: 14, dur: 10, delay: -8, drift: 5, spin: 480, dim: 1 },
+    { x: 96, size: 8, dur: 17, delay: -12, drift: -6, spin: 300, dim: 0.62 },
+];
+
 // ⚠️ WHICH OF THEM ARE ACTUALLY ALIGHT. A pool of light under a gravestone is a gravestone with a candle in
 // it, which is the same mistake as making it flicker -- see the note on the unlit pieces in the stylesheet.
 const HW_LIT = new Set(["pumpkin", "lantern", "candles", "cauldron"]);
@@ -1692,6 +1718,16 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                             <img className="hw-moon" src={art.hw_moon.url} alt=""
                                 style={{ transform: `translateX(${-cameraPx * 0.08}px)` }} draggable={false} />
                         ) : null}
+                        {/* ── CLOUD ACROSS THE MOON ────────────────────────────────────────────────────
+                            After the moon in the markup, so it passes IN FRONT of it. The colour is the
+                            trick: a mid slate that is very close to the night sky it crosses, so for most
+                            of its journey it is invisible -- it only becomes a cloud in the seconds it is
+                            over the one bright thing in the frame, which is exactly when a cloud is worth
+                            having. Three of them, at different heights and rates, so the sky is never
+                            metronomic. */}
+                        <div className="hw-cloud hw-cloud-1" />
+                        <div className="hw-cloud hw-cloud-2" />
+                        <div className="hw-cloud hw-cloud-3" />
                         {art.hw_witch_a?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img className="hw-witch hw-witch-1" src={art.hw_witch_a.url} alt="" draggable={false} />
@@ -2081,6 +2117,17 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                     <>
                         {/* Three bands at different depths, speeds and directions. One band reads as a moving
                             texture; three at different rates read as air with depth in it. */}
+                        {/* Softens the one hard edge in the picture: the forest band ends on a ruled
+                            horizontal line where it meets the ground, which reads as two images stacked
+                            rather than as a wood standing behind a town. */}
+                        <div className="hw-treemist" aria-hidden="true" />
+                        {HW_LEAVES.map((l, i) => (
+                            <span key={`leaf-${i}`} className="hw-leaf" aria-hidden="true"
+                                style={{ left: `${l.x}%`,
+                                    animationDuration: `${l.dur}s`, animationDelay: `${l.delay}s`,
+                                    "--w": `${l.size}px`, "--h": `${Math.round(l.size * 0.78)}px`, "--dim": l.dim,
+                                    "--drift": `${l.drift}vw`, "--spin": `${l.spin}deg` }} />
+                        ))}
                         <div className="hw-nearhaze" aria-hidden="true" />
                         <div className="hw-fog hw-fog-1" aria-hidden="true" />
                         <div className="hw-fog hw-fog-2" aria-hidden="true" />
@@ -3711,6 +3758,62 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    warm, screen-blended so it lifts the stone rather than tinting it, and confined to the bottom edge -- it
    is the near air catching light, NOT a sheet over the picture (FarmClient.js:1041). No animation: it is
    distance, and distance does not breathe. */
+/* ── THE CLOUD THAT ONLY EXISTS OVER THE MOON ───────────────────────────────────────────────────────────
+   Puffs built from overlapping radial gradients and then blurred hard, which is cheaper and softer than any
+   sprite this size could be. Slow: the fastest crosses in a minute and a half, because a cloud you can
+   watch move is a cloud that reads as an animation. */
+.hw-cloud { position: absolute; width: 46%; height: 17%; pointer-events: none; filter: blur(19px);
+    background:
+        radial-gradient(38% 58% at 22% 62%, rgba(44,48,80,0.62), transparent 72%),
+        radial-gradient(44% 72% at 46% 46%, rgba(50,54,88,0.68), transparent 72%),
+        radial-gradient(34% 54% at 70% 64%, rgba(40,44,74,0.58), transparent 72%),
+        radial-gradient(26% 42% at 86% 70%, rgba(36,40,68,0.5), transparent 74%);
+    animation-name: hwCloud; animation-timing-function: linear; animation-iteration-count: infinite; }
+.hw-cloud-1 { top: 6%; animation-duration: 94s; animation-delay: -18s; }
+.hw-cloud-2 { top: 17%; width: 34%; height: 13%; opacity: 0.8; animation-duration: 131s; animation-delay: -74s; }
+.hw-cloud-3 { top: 1%; width: 54%; height: 15%; opacity: 0.66; animation-duration: 167s; animation-delay: -41s; }
+@keyframes hwCloud { from { left: 104%; } to { left: -58%; } }
+
+/* ── FALLING LEAVES ─────────────────────────────────────────────────────────────────────────────────────
+   Drawn rather than drafted in: a leaf at this size is a rounded lozenge with a point at each end, which
+   border-radius gives for free, and an imported sprite would cost a request and a generation for something
+   twelve pixels across. They sit at 94 -- under the fog, so the far air passes in front of them, and under
+   every piece of UI.
+   ⚠️ TRANSLATE AND ROTATE AS SEPARATE PROPERTIES, not one transform. The fall, the sideways drift and the
+   spin have different rates, and writing them into a single transform makes the last one win. */
+/* ⚠️ THE ELEMENT IS A FULL-HEIGHT RAIL AND THE LEAF IS ITS ::before. Two bugs are dodged by that one move.
+   A percentage inside translate resolves against the ELEMENT, so a twelve-pixel leaf told to fall 118%
+   travelled fourteen pixels; using 118vh instead then fell the height of the WINDOW while the scene it is
+   clipped to is a little over half that, and roughly a third of the leaves were ever in shot. Animating
+   top fixed the distance -- a percentage there resolves against the containing block -- but put a layout
+   pass on every frame for fourteen elements.
+   A rail the height of the scene resolves BOTH: translate 108% of a full-height element is 108% of the
+   scene, and it stays a transform, which is composited and never touches layout. The visible leaf rides at
+   the top of the rail, sized off vars because a pseudo-element cannot be given inline dimensions. */
+.hw-leaf { position: absolute; top: 0; height: 100%; width: var(--w); z-index: 94; pointer-events: none;
+    animation-name: hwLeaf; animation-timing-function: linear; animation-iteration-count: infinite;
+    will-change: transform; }
+.hw-leaf::before { content: ""; display: block; width: var(--w); height: var(--h); border-radius: 0 62% 0 62%;
+    background: linear-gradient(140deg, #e8913a 0%, #c85f22 48%, #8f3d17 100%);
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+/* ⚠️ THE FADE CARRIES --dim, IT DOES NOT OVERWRITE IT. This said opacity: 1 through the middle of the
+   fall, which beats the inline opacity the small leaves were dimmed with -- so every leaf flew at full
+   strength and the whole near/far cue the table encodes did nothing at all. */
+@keyframes hwLeaf {
+    0% { translate: 0 -8%; rotate: 0deg; opacity: 0; }
+    8% { opacity: var(--dim); }
+    88% { opacity: var(--dim); }
+    100% { translate: var(--drift) 108%; rotate: var(--spin); opacity: 0; }
+}
+
+/* ── THE TREELINE IS NOT A RULED LINE ───────────────────────────────────────────────────────────────────
+   The forest band ends on a hard horizontal edge where it meets the ground, which reads as two pictures
+   stacked instead of a wood standing behind a town. A shallow bank of mist along that seam is what a cold
+   night puts there anyway, and it is the cheapest possible way to buy the distance back. */
+.tw-scene.is-spooky .hw-treemist { position: absolute; left: 0; right: 0; top: 46%; height: 16%;
+    z-index: 3; pointer-events: none; filter: blur(16px);
+    background: linear-gradient(180deg, rgba(150,168,205,0) 0%, rgba(158,175,210,0.24) 44%, rgba(140,158,196,0.15) 72%, rgba(120,140,180,0) 100%); }
+
 /* ── AND THE DOORS THROW LIGHT TOO ──────────────────────────────────────────────────────────────────────
    Every dressed building is lit from inside -- a forge fire, windows, a lantern over the door -- and until
    now not one of them touched the road: the brightest things in the street sat on stone that did not know
