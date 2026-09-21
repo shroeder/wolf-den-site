@@ -1892,12 +1892,12 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         a sheet over everything flattens every pixel to one colour; light has to be local).
                         Sized off the prop's height and held to a fixed ratio by aspect-ratio, so a pool
                         cannot stretch with the window the way a percentage width would. */}
-                    {spooky ? hwProps.filter((p) => HW_LIT.has(p.kind) && !p.near).map((p, i) => (
+                    {spooky ? hwProps.filter((p) => HW_LIT.has(p.kind)).map((p, i) => (
                         <span key={`hwp-${i}`} className={`hw-pool is-${p.kind}`} aria-hidden="true"
                             style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${Math.round(p.h * 62) / 100}%`,
                                 animationDelay: `${p.delay}s` }} />
                     )) : null}
-                    {spooky ? hwProps.filter((p) => !p.near).map((p, i) => (art[p.key]?.url ? (
+                    {spooky ? hwProps.map((p, i) => (art[p.key]?.url ? (
                         // ⚠️ THE FLIP HAS TO BE PART OF THE SAME TRANSFORM. These are anchored the way the
                         // buildings are — translate(-50%, -100%) against the shared GROUND line — so writing
                         // scaleX(-1) on its own would REPLACE that anchor, not add to it, and drop the prop
@@ -2205,35 +2205,6 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         {/* Softens the one hard edge in the picture: the forest band ends on a ruled
                             horizontal line where it meets the ground, which reads as two images stacked
                             rather than as a wood standing behind a town. */}
-                        {/* ── ⚠️ THE FRONT ROW IS ITS OWN LAYER, AND IT IS ABOVE THE WEATHER ───────────
-                            These used to ride inside tw-world at z-60 with everything else, and tw-world
-                            carries will-change: transform — which makes it a stacking context, so nothing
-                            inside it can ever draw above a scene-level layer no matter what z-index it is
-                            given. The fog sits at 95. So the props standing CLOSEST to the camera were the
-                            only ones with the full depth of the weather in front of them, and the near
-                            pumpkins came out milky and grey while a lantern twenty feet further back stayed
-                            crisp. That is backwards: haze accumulates with distance, so the nearest thing in
-                            the frame should be the clearest thing in it.
-                            Out here it is clear of the fog, and it gets the parallax it should have had from
-                            the start — 1.22x the street, because something near the lens sweeps past FASTER
-                            than the road does, not at the same rate. Same width and the same camera as
-                            tw-world, so the percentages still mean the same places in the town. */}
-                        <div className="hw-nearlayer" aria-hidden="true"
-                            style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx * 1.22}px)`,
-                                transition: dragging ? "none" : `transform ${camDur}s linear` }}>
-                            {hwProps.filter((p) => p.near && HW_LIT.has(p.kind)).map((p, i) => (
-                                <span key={`np-${i}`} className={`hw-pool is-${p.kind}`}
-                                    style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${Math.round(p.h * 62) / 100}%`,
-                                        animationDelay: `${p.delay}s` }} />
-                            ))}
-                            {hwProps.filter((p) => p.near).map((p, i) => (art[p.key]?.url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img key={`nr-${i}`} className={`hw-prop hw-${p.kind} is-near`} src={art[p.key].url} alt="" draggable={false}
-                                    style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${p.h}%`,
-                                        animationDelay: `${p.delay}s`,
-                                        transform: `translate(-50%, -100%)${p.flip ? " scaleX(-1)" : ""}` }} />
-                            ) : null))}
-                        </div>
                         <div className="hw-topfade" aria-hidden="true" />
                         <div className="hw-treemist" aria-hidden="true" />
                         {HW_LEAVES.map((l, i) => (
@@ -3732,17 +3703,24 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    the difference between a lamp and a sticker of a lamp -- and it is per-light, never a sheet.
    The ratio is held by aspect-ratio against a height in percent, because a width in percent is measured
    against the STREET and would stretch every pool into a smear on a wide screen. */
+/* ⚠️ NO BLEND MODE, AND THAT IS A PERFORMANCE DECISION, NOT A LOOK ONE. These were screen-blended, which is
+   the physically right way to add light -- but a blended layer has to READ THE BACKDROP to composite, and
+   the backdrop is the thing that moves when you walk. Fifty-odd pools, plus one under every dressed door,
+   meant about seventy backdrop reads per frame while the street was sliding, which is where the scroll went
+   choppy. On a ground this dark, a warm gradient composited normally is within a hair of the same picture --
+   screen only pulls away from normal blending over a BRIGHT backdrop, and there is not one down here. The
+   alphas are lifted a little to make up the small difference. */
 .hw-pool { position: absolute; width: auto; aspect-ratio: 3.4 / 1; z-index: 45; pointer-events: none;
-    transform: translate(-50%, -52%); border-radius: 50%; mix-blend-mode: screen;
+    transform: translate(-50%, -52%); border-radius: 50%;
     animation: hwPool 2.7s ease-in-out infinite; }
-.hw-pool.is-pumpkin { background: radial-gradient(closest-side, rgba(255,146,38,0.58), rgba(255,110,18,0.20) 48%, rgba(255,90,10,0) 78%); }
-.hw-pool.is-lantern { background: radial-gradient(closest-side, rgba(255,178,64,0.55), rgba(255,140,30,0.18) 48%, rgba(255,120,20,0) 78%); animation-duration: 3.3s; }
-.hw-pool.is-candles { background: radial-gradient(closest-side, rgba(255,198,96,0.48), rgba(255,160,50,0.15) 46%, rgba(255,140,30,0) 76%); animation-duration: 1.9s; }
+.hw-pool.is-pumpkin { background: radial-gradient(closest-side, rgba(255,158,46,0.66), rgba(255,116,22,0.24) 48%, rgba(255,90,10,0) 78%); }
+.hw-pool.is-lantern { background: radial-gradient(closest-side, rgba(255,188,74,0.62), rgba(255,146,34,0.22) 48%, rgba(255,120,20,0) 78%); animation-duration: 3.3s; }
+.hw-pool.is-candles { background: radial-gradient(closest-side, rgba(255,206,106,0.55), rgba(255,166,56,0.19) 46%, rgba(255,140,30,0) 76%); animation-duration: 1.9s; }
 /* The witch's pot burns green, so its light on the stone is green too. */
 /* A lamp post is the tallest light in the street, so it throws the widest pool and the steadiest one --
    an oil lantern in a glass case does not gutter the way an open candle does. */
-.hw-pool.is-lamppost { background: radial-gradient(closest-side, rgba(255,186,86,0.5), rgba(255,150,44,0.17) 46%, rgba(255,128,26,0) 78%); animation-duration: 5.2s; }
-.hw-pool.is-cauldron { background: radial-gradient(closest-side, rgba(126,255,148,0.46), rgba(70,220,110,0.15) 48%, rgba(50,200,90,0) 78%); animation-duration: 2.3s; }
+.hw-pool.is-lamppost { background: radial-gradient(closest-side, rgba(255,194,96,0.58), rgba(255,156,50,0.21) 46%, rgba(255,128,26,0) 78%); animation-duration: 5.2s; }
+.hw-pool.is-cauldron { background: radial-gradient(closest-side, rgba(136,255,158,0.53), rgba(76,226,116,0.19) 48%, rgba(50,200,90,0) 78%); animation-duration: 2.3s; }
 /* Breathes with the flame above it. Scale as well as opacity -- a light that only dims reads as a fading
    image, and one that only swells reads as a pulse; a flame does both, slightly, and never all the way. */
 @keyframes hwPool {
@@ -3901,16 +3879,21 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    sprite this size could be. Slow: the fastest crosses in a minute and a half, because a cloud you can
    watch move is a cloud that reads as an animation. */
 .hw-cloud { position: absolute; width: 46%; height: 17%; pointer-events: none; filter: blur(19px);
+    will-change: transform;
     background:
         radial-gradient(38% 58% at 22% 62%, rgba(44,48,80,0.62), transparent 72%),
         radial-gradient(44% 72% at 46% 46%, rgba(50,54,88,0.68), transparent 72%),
         radial-gradient(34% 54% at 70% 64%, rgba(40,44,74,0.58), transparent 72%),
         radial-gradient(26% 42% at 86% 70%, rgba(36,40,68,0.5), transparent 74%);
     animation-name: hwCloud; animation-timing-function: linear; animation-iteration-count: infinite; }
-.hw-cloud-1 { top: 6%; animation-duration: 94s; animation-delay: -18s; }
-.hw-cloud-2 { top: 17%; width: 34%; height: 13%; opacity: 0.8; animation-duration: 131s; animation-delay: -74s; }
-.hw-cloud-3 { top: 1%; width: 54%; height: 15%; opacity: 0.66; animation-duration: 167s; animation-delay: -41s; }
-@keyframes hwCloud { from { left: 104%; } to { left: -58%; } }
+.hw-cloud-1 { top: 6%; left: 0; animation-duration: 94s; animation-delay: -18s; }
+.hw-cloud-2 { top: 17%; left: 0; width: 34%; height: 13%; opacity: 0.8; animation-duration: 131s; animation-delay: -74s; }
+.hw-cloud-3 { top: 1%; left: 0; width: 54%; height: 15%; opacity: 0.66; animation-duration: 167s; animation-delay: -41s; }
+/* ⚠️ translate, NOT left. Animating the left property is a layout pass every frame, and these are the
+   most expensive elements on the page to lay out: half a screen wide and carrying a 19px blur, so each
+   pass re-blurs the whole area. Three at once is most of why the street went choppy. A transform is
+   composited — the blur is rasterised once and the layer is just moved. */
+@keyframes hwCloud { from { translate: 104vw 0; } to { translate: -58vw 0; } }
 
 /* ── FALLING LEAVES ─────────────────────────────────────────────────────────────────────────────────────
    Drawn rather than drafted in: a leaf at this size is a rounded lozenge with a point at each end, which
@@ -3960,17 +3943,27 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-scene.is-spooky .tw-building.is-dressed::before {
     content: ""; position: absolute; left: 50%; bottom: 0; width: 158%; aspect-ratio: 3.6 / 1;
     transform: translate(-50%, 46%); border-radius: 50%; z-index: -1; pointer-events: none;
-    mix-blend-mode: screen;
-    background: radial-gradient(closest-side, rgba(255,166,58,0.32), rgba(255,128,28,0.10) 46%, rgba(255,110,20,0) 76%); }
-/* The front row's own layer: full height of the scene, above the fog, riding its own faster camera. */
-.hw-nearlayer { position: absolute; top: 0; left: 0; height: 100%; z-index: 96; pointer-events: none;
-    will-change: transform; }
+    background: radial-gradient(closest-side, rgba(255,174,66,0.38), rgba(255,134,32,0.13) 46%, rgba(255,110,20,0) 76%); }
 /* ⚠️ DARK AND SATURATED, NOT DIM AND GREY. saturate(0.6) plus a brightness knock-down made a pumpkin the
    colour of wet cardboard, and anything the fog then added on top turned it to mush. What sells a near
    object at night is that it is UNDERLIT and rich, not that it is faded: it keeps its colour and loses its
    light. Held below the street's brightness so it still reads as being in front of the lamps. */
+/* ── THE FRONT ROW LIVES IN THE WORLD AGAIN ────────────────────────────────────────────────────────────
+   It spent a while in a layer of its own outside tw-world, because tw-world carries will-change: transform
+   and therefore traps its children under the scene-level fog at 95, which was washing the nearest props
+   milky. Two things then made that layer pointless. The fog bank moved up off the front row, which was the
+   real fix for the washing; and the row stopped parallaxing, so it now moves at exactly the street's rate
+   and there is nothing left for a second camera to do.
+   ⚠️ IT WAS ALSO NOT FREE. It was a second full-width transformed layer with its own transition, and about
+   two dozen more elements to reconcile on every pointermove of a drag — added in the same pass Luke then
+   said "Scrolling is choppy now". Work I introduced and could not measure away is work to delete, not work
+   to optimise.
+   ⚠️ A KNOCK-DOWN, NOT A BLACKOUT. 0.38 was picked to keep the row from competing with the street and it
+   overshot -- Luke: "For elements dont need to be so dark." A jack-o'-lantern a few feet from you is one of
+   the brightest things in a Halloween street, not a silhouette of one. Held just under the street so it
+   still reads as being in front of the lamps rather than lit by them. */
 .hw-prop.is-near { z-index: 60;
-    filter: brightness(0.38) saturate(1.05) contrast(1.06) drop-shadow(0 7px 14px rgba(0,0,0,0.7)); }
+    filter: brightness(0.82) saturate(1.02) drop-shadow(0 7px 14px rgba(0,0,0,0.62)); }
 .tw-scene.is-spooky .hw-nearhaze { position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
     z-index: 44; pointer-events: none; mix-blend-mode: screen;
     background:
