@@ -293,6 +293,31 @@ export async function getMemberMetrics(buyerId) {
         [buyerId, COLLECTIBLES.filter((p) => p.casinoExclusive).map((p) => p.id)],
     ).catch(() => null);
 
+    // ── THE CARD GAME, IN ONE ROUND TRIP ─────────────────────────────────────────────────────────────
+    // ⚠️ THE COUNTERS AND THE RUN HISTORY ARE TWO TABLES AND THIS IS ONE QUERY. Both are small, both are
+    // keyed by buyer, and reaching for them separately is the pattern CLAUDE.md warns costs a fortune on
+    // Active CPU -- every badge track render would have paid two handshakes instead of one.
+    //
+    // Depth is (act-1)*16+stop because best_stop in the counters table is per-ACT: all 29 players who have
+    // touched the game are sitting on 16 and it can carry no badge at all. 52 is the final boss.
+    const cardRow = await db.queryOne(
+        `SELECT COALESCE(p.burns, 0)::int         AS burns,
+                COALESCE(p.best_strength, 0)::int AS strength,
+                COALESCE(p.best_hit, 0)::int      AS hit,
+                COALESCE(r.depth, 0)::int         AS depth,
+                COALESCE(r.wins, 0)::int          AS wins,
+                COALESCE(r.asc_won, 0)::int       AS asc_won
+           FROM (SELECT 1) AS one
+           LEFT JOIN mkt_cards_progress p ON p.buyer_id = $1
+           LEFT JOIN (
+                SELECT MAX((act - 1) * 16 + stop)                          AS depth,
+                       COUNT(*) FILTER (WHERE outcome = 'won')             AS wins,
+                       MAX(asc_level) FILTER (WHERE outcome = 'won')       AS asc_won
+                  FROM mkt_cards_result WHERE buyer_id = $1
+           ) r ON TRUE`,
+        [buyerId],
+    ).catch(() => null);
+
     const progress = await getRewardsProgress(buyerId).catch(() => ({}));
     const allMilestones = ["spend", "first_purchase", "discord_link", "profile_complete", "daily_active"].every((k) => Boolean(progress[k]));
     // Onboarding completionist: every one-time getting-started task done (the EARN checklist's one-timers).
@@ -399,6 +424,13 @@ export async function getMemberMetrics(buyerId) {
         casinoJackpots: casinoRow?.jackpots || 0,
         casinoPerfect: casinoRow?.perfect || 0,
         casinoPets: casinoPetRow?.n || 0,
+        // The card game. depth is the deepest rung reached, not the current one.
+        cardsDepth: cardRow?.depth || 0,
+        cardsWins: cardRow?.wins || 0,
+        cardsAscWon: cardRow?.asc_won || 0,
+        cardsBurns: cardRow?.burns || 0,
+        cardsStrength: cardRow?.strength || 0,
+        cardsHit: cardRow?.hit || 0,
     };
 }
 
@@ -670,6 +702,13 @@ export function progressForRule(rule, threshold, m) {
         case "auction_buys": return { current: m.auctionBuys, target: t }; // items BOUGHT on the Auction House
         case "auction_top_sale": return { current: m.auctionTopSale, target: t }; // biggest single sale (gold)
         case "casino_plays": return { current: m.casinoPlays, target: t };       // pulls, spins and tickets
+        // ── THE CARD GAME ────────────────────────────────────────────────────────────────────────────
+        case "cards_depth": return { current: m.cardsDepth, target: t };         // (act-1)*16+stop, 52 is the last boss
+        case "cards_wins": return { current: m.cardsWins, target: t };
+        case "cards_asc_won": return { current: m.cardsAscWon, target: t };      // highest ascension actually WON
+        case "cards_burns": return { current: m.cardsBurns, target: t };
+        case "cards_strength": return { current: m.cardsStrength, target: t };   // most Strength held in one fight
+        case "cards_hit": return { current: m.cardsHit, target: t };             // biggest single card hit
         case "casino_wagered": return { current: m.casinoWagered, target: t };   // lifetime gold across the floor
         case "casino_jackpot": return { current: m.casinoJackpots, target: t };  // three wolves on the slot
         // `casino_pocket` lived here until the wheel was removed. Its badge ("Called It") was held by

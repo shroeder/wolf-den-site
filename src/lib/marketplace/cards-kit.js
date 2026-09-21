@@ -4757,6 +4757,16 @@ export function applyMoves(start, moves, { potionAt = () => null } = {}) {
     const list = Array.isArray(moves) ? moves : [];
     if (list.length > MOVES_MAX) return { ok: false, why: "too_long" };
     let state = start;
+    // ── WHAT THE TURN WAS WORTH, FOR THE BADGES ──────────────────────────────────────────────────────────
+    // Two numbers nothing was keeping: the biggest single hit and the highest Strength held. Both are
+    // properties of a MOMENT inside a turn, so neither survives into the end-of-turn state the server saves
+    // -- Strength can be spent down by a Siphon and the hit is gone the instant the foe's bar redraws.
+    // Collected here because this is the one place every move passes through.
+    //
+    // ⚠️ CARD DAMAGE ONLY. endTurn also emits damage events -- thorns, poison ticking on a foe's own turn --
+    // and none of those are a STRIKE. A badge for hitting something hard should mean you hit it.
+    let peakHit = 0;
+    let peakStrength = Math.max(0, Number(start.hero?.strength) || 0);
     for (const move of list) {
         // A move after the fight is over is not a fight anybody had.
         if (!state || state.over) return { ok: false, why: "move_after_over" };
@@ -4767,7 +4777,11 @@ export function applyMoves(start, moves, { potionAt = () => null } = {}) {
             // canPlay owns affordability, playability and whether that card is even in the hand -- the same
             // question the screen asks before it lets a finger land on one.
             if (!canPlay(state, uid)) return { ok: false, why: "illegal_play" };
-            state = playCard(state, uid, target).state;
+            const played = playCard(state, uid, target);
+            state = played.state;
+            for (const ev of played.events || []) {
+                if (ev.type === "damage" && ev.on !== "hero") peakHit = Math.max(peakHit, Number(ev.amount) || 0);
+            }
         } else if (kind === "d") {
             const id = potionAt(Number(move[1]));
             if (!id) return { ok: false, why: "no_such_potion" };
@@ -4779,8 +4793,9 @@ export function applyMoves(start, moves, { potionAt = () => null } = {}) {
         } else {
             return { ok: false, why: "bad_move" };
         }
+        peakStrength = Math.max(peakStrength, Number(state.hero?.strength) || 0);
     }
-    return { ok: true, state };
+    return { ok: true, state, peak: { hit: peakHit, strength: peakStrength } };
 }
 
 export function endTurn(state) {

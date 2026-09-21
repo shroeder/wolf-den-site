@@ -69,10 +69,13 @@ for (const r of targets) {
     }
     const webp = await sharp(filledPng).webp({ quality: 92 }).toBuffer();
     const blob = await put(`marketplace/town/${Date.now()}-${Math.round(Math.random() * 1e6)}.webp`, webp, {
-        // ⚠️ THE TOKEN IS PASSED, NOT INHERITED. Left to read the environment the client finds the project has
-        // OIDC enabled, prefers it, and fails with "OIDC is enabled for this project, but not for the
-        // development environment" even though BLOB_READ_WRITE_TOKEN is sitting right there. Handing it over
-        // explicitly is the only thing that makes a local script able to publish.
+        // ⚠️ THE TOKEN IS PASSED, NOT INHERITED — AND HERE IS WHY, now that it is actually known.
+        // This file loads the WHOLE of accounting_app/.env into process.env, and that file contains
+        // BLOB_STORE_ID. @vercel/blob treats a store id as a signal to use its OIDC auth path, and then dies
+        // with "OIDC is enabled for this project, but not for the development environment" while
+        // BLOB_READ_WRITE_TOKEN sits ignored beside it. gen-halloween-art.mjs has always worked from the same
+        // machine because it sets exactly three keys and never BLOB_STORE_ID.
+        // Passing the token explicitly overrides the choice; setting fewer keys avoids it entirely.
         access: "public", contentType: "image/webp", cacheControlMaxAge: 31536000,
         token: process.env.BLOB_READ_WRITE_TOKEN,
     });

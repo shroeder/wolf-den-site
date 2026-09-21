@@ -557,6 +557,28 @@ export async function bumpCardProgress(buyerId, field, { bestStop = 0 } = {}) {
 }
 
 /**
+ * The two high-water marks the badges hang off: biggest single hit, highest Strength held.
+ *
+ * ⚠️ GREATEST, NOT ASSIGNMENT. These are records, and a quiet turn must never lower one — the same rule
+ * best_stop already follows above, and for the same reason: a fight that peaked at 3 Strength does not undo
+ * the fight that peaked at fifty.
+ */
+export async function noteCardPeaks(buyerId, { hit = 0, strength = 0 } = {}) {
+    const h = Math.max(0, Math.floor(Number(hit) || 0));
+    const st = Math.max(0, Math.floor(Number(strength) || 0));
+    if (!buyerId || (h <= 0 && st <= 0)) return;
+    await db.query(
+        `INSERT INTO mkt_cards_progress (buyer_id, best_hit, best_strength, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (buyer_id) DO UPDATE
+            SET best_hit = GREATEST(mkt_cards_progress.best_hit, EXCLUDED.best_hit),
+                best_strength = GREATEST(mkt_cards_progress.best_strength, EXCLUDED.best_strength),
+                updated_at = NOW()`,
+        [buyerId, h, st]
+    ).catch(() => {});
+}
+
+/**
  * ── WHAT YOU OWN, AND HOW FAR YOU HAVE TAKEN IT ──────────────────────────────────────────────────────────
  * Luke: "have you decided how we should incorporate pet upgrade levels impact on the cards?" — and the answer
  * this returns the data for is: a level changes how a card ARRIVES, never what it does. See cardOffers.
@@ -826,7 +848,11 @@ export async function advanceFight(buyerId, run, moves) {
     });
     if (!out.ok) return out;
     run.fight = out.state;
-    return { ok: true, state: out.state };
+    // ⚠️ BANKED HERE, NOT IN THE ROUTE. The peaks belong to the moves that were just applied, and this is the
+    // only function that sees them — the route gets a state back and a state has already forgotten both.
+    // Awaited, because a fire-and-forget write dies when the handler returns (see [[vercel-unawaited-async-dies]]).
+    await noteCardPeaks(buyerId, out.peak || {});
+    return { ok: true, state: out.state, peak: out.peak };
 }
 
 /** The fight this room is, dealt from the room and the seed alone. */
