@@ -279,7 +279,7 @@ function qualityForOutput(resizeTo) {
     return resizeTo && resizeTo <= TILE_PX ? "low" : "medium";
 }
 
-export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = null, faceRight = false, resizeTo = null, deHalo = false, frameSprite = false, meta = {} } = {}) {
+export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = null, faceRight = false, resizeTo = null, deHalo = false, fillHoles = null, frameSprite = false, meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
     quality = quality || qualityForOutput(resizeTo);
@@ -309,6 +309,11 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     // Future-proof the die-cut white halo: safely peel it off die-cut sprite generations (no-ops when there's
     // no halo, keeps the original if a pale subject would go ragged). Callers opt in; never used on scenes.
     if (deHalo) { const { deHaloBuffer } = await import("@/lib/marketplace/dehalo.js"); buffer = await deHaloBuffer(buffer); }
+    // ⚠️ AFTER THE PEEL, NEVER BEFORE IT. De-halo works inward from the transparent border and is not allowed
+    // to reach an interior; this fills exactly what it cannot touch — SEALED transparent regions, which on a
+    // building are the doorway and the windows. Run the other way round, the fill would wall off the border
+    // and leave the halo with nothing to peel from. See fill-holes.js for the sprite that prompted it.
+    if (fillHoles) { const { fillHolesBuffer } = await import("@/lib/marketplace/fill-holes.js"); buffer = await fillHolesBuffer(buffer, fillHoles); }
     // Re-seat the subject with a consistent margin (sprite-cleanup.js). This cannot restore a subject the
     // model drew off the edge — those pixels were never in the file — but it stops a merely-TIGHT draw from
     // reading as guillotined, and it makes two sprites side by side the same apparent size. It deliberately

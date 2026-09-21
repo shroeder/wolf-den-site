@@ -662,6 +662,7 @@ const HW_PIECE = {
     scarecrow: { key: "hw_scarecrow", kind: "scarecrow", h: [17, 21], top: [74, 76] },
     haybale: { key: "hw_haybale", kind: "haybale", h: [8, 11], top: [75, 78] },
     crow: { key: "hw_crow", kind: "crow", h: [4, 6], top: [63, 70] },
+    lamppost: { key: "hw_lamppost", kind: "lamppost", h: [21, 24], top: [74, 76] },
 };
 
 // ── THE LEAVES COMING DOWN ───────────────────────────────────────────────────────────────────────────────
@@ -692,7 +693,7 @@ const HW_LEAVES = [
 
 // ⚠️ WHICH OF THEM ARE ACTUALLY ALIGHT. A pool of light under a gravestone is a gravestone with a candle in
 // it, which is the same mistake as making it flicker -- see the note on the unlit pieces in the stylesheet.
-const HW_LIT = new Set(["pumpkin", "lantern", "candles", "cauldron"]);
+const HW_LIT = new Set(["pumpkin", "lantern", "candles", "cauldron", "lamppost"]);
 
 // Each scene names its anchor first, then what gathers around it. Weights let the common things repeat.
 const HW_SCENES = [
@@ -799,6 +800,16 @@ function buildHalloweenDressing(buildings) {
         });
     });
 
+    // ── THE LAMP POSTS ───────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ AND THESE ARE THE ONE THING IN THE DRESSING THAT IS DELIBERATELY EVENLY SPACED. Everything else in
+    // here fights to avoid a pattern, because a pumpkin every nine percent reads as wallpaper. Street lighting
+    // is the opposite: it is regular BECAUSE somebody planned it, and a lamp post at a random interval reads
+    // as a mistake rather than as character. Luke: "lanterns should be in places that nake sense. Add lamp
+    // posts." Every 8% of the street, with only a hand's width of jitter so it never looks stamped.
+    for (let x = 4; x < 100; x += 8) {
+        put("lamppost", x + (rand() - 0.5) * 0.9, 1);
+    }
+
     // ── THE AUTUMN TREES ─────────────────────────────────────────────────────────────────────────────────
     // Landmarks rather than decorations: big, few, and deliberately NOT part of a cluster — a tree somebody
     // hung lanterns in is a place, and three of them give the street something to be laid out around. Kept
@@ -821,7 +832,12 @@ function buildHalloweenDressing(buildings) {
     //
     // So the road is quartered and each quarter stands the widest gap IT has. Still placed in real gaps and
     // still self-adjusting as the street grows -- it just cannot pile the whole avenue into one furlong.
-    const BANDS = 4;
+    // ⚠️ SEVEN BANDS, NOT FOUR. Four spread the canopies down the whole street, which was the fix that put a
+    // tree in the opening shot at all -- but four trees over a street the camera sees a sixth of at a time is
+    // still roughly one tree every screen and a half. Luke, standing at the fountain: "Only one tree in town."
+    // Seven is a tree a little more often than once per view, which is a street with trees ON it rather than
+    // a street with a tree somewhere.
+    const BANDS = 7;
     const chosen = [];
     for (let band = 0; band < BANDS; band += 1) {
         const lo = (band * 100) / BANDS;
@@ -1821,12 +1837,12 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         a sheet over everything flattens every pixel to one colour; light has to be local).
                         Sized off the prop's height and held to a fixed ratio by aspect-ratio, so a pool
                         cannot stretch with the window the way a percentage width would. */}
-                    {spooky ? hwProps.filter((p) => HW_LIT.has(p.kind)).map((p, i) => (
+                    {spooky ? hwProps.filter((p) => HW_LIT.has(p.kind) && !p.near).map((p, i) => (
                         <span key={`hwp-${i}`} className={`hw-pool is-${p.kind}`} aria-hidden="true"
                             style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${Math.round(p.h * 62) / 100}%`,
                                 animationDelay: `${p.delay}s` }} />
                     )) : null}
-                    {spooky ? hwProps.map((p, i) => (art[p.key]?.url ? (
+                    {spooky ? hwProps.filter((p) => !p.near).map((p, i) => (art[p.key]?.url ? (
                         // ⚠️ THE FLIP HAS TO BE PART OF THE SAME TRANSFORM. These are anchored the way the
                         // buildings are — translate(-50%, -100%) against the shared GROUND line — so writing
                         // scaleX(-1) on its own would REPLACE that anchor, not add to it, and drop the prop
@@ -2134,6 +2150,36 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         {/* Softens the one hard edge in the picture: the forest band ends on a ruled
                             horizontal line where it meets the ground, which reads as two images stacked
                             rather than as a wood standing behind a town. */}
+                        {/* ── ⚠️ THE FRONT ROW IS ITS OWN LAYER, AND IT IS ABOVE THE WEATHER ───────────
+                            These used to ride inside tw-world at z-60 with everything else, and tw-world
+                            carries will-change: transform — which makes it a stacking context, so nothing
+                            inside it can ever draw above a scene-level layer no matter what z-index it is
+                            given. The fog sits at 95. So the props standing CLOSEST to the camera were the
+                            only ones with the full depth of the weather in front of them, and the near
+                            pumpkins came out milky and grey while a lantern twenty feet further back stayed
+                            crisp. That is backwards: haze accumulates with distance, so the nearest thing in
+                            the frame should be the clearest thing in it.
+                            Out here it is clear of the fog, and it gets the parallax it should have had from
+                            the start — 1.22x the street, because something near the lens sweeps past FASTER
+                            than the road does, not at the same rate. Same width and the same camera as
+                            tw-world, so the percentages still mean the same places in the town. */}
+                        <div className="hw-nearlayer" aria-hidden="true"
+                            style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx * 1.22}px)`,
+                                transition: dragging ? "none" : `transform ${camDur}s linear` }}>
+                            {hwProps.filter((p) => p.near && HW_LIT.has(p.kind)).map((p, i) => (
+                                <span key={`np-${i}`} className={`hw-pool is-${p.kind}`}
+                                    style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${Math.round(p.h * 62) / 100}%`,
+                                        animationDelay: `${p.delay}s` }} />
+                            ))}
+                            {hwProps.filter((p) => p.near).map((p, i) => (art[p.key]?.url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={`nr-${i}`} className={`hw-prop hw-${p.kind} is-near`} src={art[p.key].url} alt="" draggable={false}
+                                    style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${p.h}%`,
+                                        animationDelay: `${p.delay}s`,
+                                        transform: `translate(-50%, -100%)${p.flip ? " scaleX(-1)" : ""}` }} />
+                            ) : null))}
+                        </div>
+                        <div className="hw-topfade" aria-hidden="true" />
                         <div className="hw-treemist" aria-hidden="true" />
                         {HW_LEAVES.map((l, i) => (
                             <span key={`leaf-${i}`} className="hw-leaf" aria-hidden="true"
@@ -3638,6 +3684,9 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .hw-pool.is-lantern { background: radial-gradient(closest-side, rgba(255,178,64,0.55), rgba(255,140,30,0.18) 48%, rgba(255,120,20,0) 78%); animation-duration: 3.3s; }
 .hw-pool.is-candles { background: radial-gradient(closest-side, rgba(255,198,96,0.48), rgba(255,160,50,0.15) 46%, rgba(255,140,30,0) 76%); animation-duration: 1.9s; }
 /* The witch's pot burns green, so its light on the stone is green too. */
+/* A lamp post is the tallest light in the street, so it throws the widest pool and the steadiest one --
+   an oil lantern in a glass case does not gutter the way an open candle does. */
+.hw-pool.is-lamppost { background: radial-gradient(closest-side, rgba(255,186,86,0.5), rgba(255,150,44,0.17) 46%, rgba(255,128,26,0) 78%); animation-duration: 5.2s; }
 .hw-pool.is-cauldron { background: radial-gradient(closest-side, rgba(126,255,148,0.46), rgba(70,220,110,0.15) 48%, rgba(50,200,90,0) 78%); animation-duration: 2.3s; }
 /* Breathes with the flame above it. Scale as well as opacity -- a light that only dims reads as a fading
    image, and one that only swells reads as a pulse; a flame does both, slightly, and never all the way. */
@@ -3653,6 +3702,9 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     animation: hwFlicker 3.3s ease-in-out infinite; }
 .hw-candles { filter: drop-shadow(0 0 13px rgba(255,190,90,0.7)) drop-shadow(0 4px 8px rgba(0,0,0,0.55));
     animation: hwFlicker 1.9s ease-in-out infinite; }
+/* Glassed in and up on a post, so it glows harder and breathes slower than anything at ground level. */
+.hw-lamppost { filter: drop-shadow(0 0 22px rgba(255,178,70,0.75)) drop-shadow(0 6px 11px rgba(0,0,0,0.6));
+    animation: hwFlicker 5.2s ease-in-out infinite; }
 .hw-ghost { opacity: 0.72; filter: drop-shadow(0 0 20px rgba(150,220,255,0.6));
     animation: hwDrift 7.5s ease-in-out infinite; }
 /* The witch's pot burns green rather than amber, so it reads as the odd light in the street. */
@@ -3745,7 +3797,13 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    the opacity that reads as fog in ONE layer, so these are a third of what they were and sit lower. */
 .hw-fog { position: absolute; left: 0; width: 200%; z-index: 95; pointer-events: none;
     will-change: transform; filter: blur(22px); }
-.hw-fog-1 { bottom: -6%; height: 26%; opacity: 0.30; animation: hwFogL 47s linear infinite;
+/* ⚠️ THE BANK SITS BEHIND THE NEAR ROW, NOT ON IT. These were pinned to the very bottom of the frame, which
+   put the thickest air in the scene directly over the props standing CLOSEST to the camera -- the near
+   pumpkins came out milky, like stage pieces behind frosted glass, while a street lantern twenty feet
+   further back was crisp. That is the wrong way round in every sense: atmosphere accumulates with DISTANCE,
+   so the nearest thing in the picture should be the clearest thing in it. Lifted so the bank lies across the
+   street and the middle ground and only its lower tail reaches the front row. */
+.hw-fog-1 { bottom: 10%; height: 26%; opacity: 0.30; animation: hwFogL 47s linear infinite;
     background:
         radial-gradient(40% 70% at 6% 68%, rgba(206,216,240,0.85), transparent 70%),
         radial-gradient(34% 62% at 21% 82%, rgba(188,200,232,0.7), transparent 70%),
@@ -3753,14 +3811,14 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
         radial-gradient(40% 70% at 56% 68%, rgba(206,216,240,0.85), transparent 70%),
         radial-gradient(34% 62% at 71% 82%, rgba(188,200,232,0.7), transparent 70%),
         radial-gradient(44% 74% at 88% 62%, rgba(214,222,244,0.75), transparent 70%); }
-.hw-fog-2 { bottom: 3%; height: 19%; opacity: 0.22; animation: hwFogR 71s linear infinite;
+.hw-fog-2 { bottom: 16%; height: 19%; opacity: 0.22; animation: hwFogR 71s linear infinite;
     background:
         radial-gradient(46% 80% at 13% 60%, rgba(196,206,236,0.8), transparent 72%),
         radial-gradient(38% 66% at 32% 78%, rgba(176,190,226,0.6), transparent 72%),
         radial-gradient(46% 80% at 63% 60%, rgba(196,206,236,0.8), transparent 72%),
         radial-gradient(38% 66% at 82% 78%, rgba(176,190,226,0.6), transparent 72%); }
 /* The nearest band: thicker, faster, and low enough that it rolls across people's feet. */
-.hw-fog-3 { bottom: -11%; height: 21%; opacity: 0.34; filter: blur(30px); animation: hwFogL 29s linear infinite;
+.hw-fog-3 { bottom: 5%; height: 21%; opacity: 0.30; filter: blur(30px); animation: hwFogL 29s linear infinite;
     background:
         radial-gradient(50% 86% at 9% 74%, rgba(222,228,248,0.9), transparent 68%),
         radial-gradient(42% 70% at 29% 86%, rgba(204,214,240,0.8), transparent 68%),
@@ -3772,6 +3830,17 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    warm, screen-blended so it lifts the stone rather than tinting it, and confined to the bottom edge -- it
    is the near air catching light, NOT a sheet over the picture (FarmClient.js:1041). No animation: it is
    distance, and distance does not breathe. */
+/* ── THE TOP EDGE IS NOT A GUILLOTINE ───────────────────────────────────────────────────────────────────
+   Luke: "I hate how sharp it cuts off on top." The scene is a clipped box, so the night sky -- and whatever
+   of the moon happens to be up there -- ended on a dead straight horizontal line against the page. A card
+   edge is fine around a photograph; it is not fine around a sky, because a sky has no edge and drawing one
+   tells you immediately that you are looking at a panel. Fading the last few percent into the page's own
+   dark lets it run off the top instead of stopping. Under everything except the UI, and it never eats a tap.
+   Sized in percent so it scales with the scene rather than sitting as a fixed band on a phone. */
+.tw-scene.is-spooky .hw-topfade { position: absolute; left: 0; right: 0; top: 0; height: 13%;
+    z-index: 93; pointer-events: none;
+    background: linear-gradient(180deg, rgba(10,9,16,0.92) 0%, rgba(10,9,16,0.55) 38%, rgba(10,9,16,0.18) 72%, rgba(10,9,16,0) 100%); }
+
 /* ── THE CLOUD THAT ONLY EXISTS OVER THE MOON ───────────────────────────────────────────────────────────
    Puffs built from overlapping radial gradients and then blurred hard, which is cheaper and softer than any
    sprite this size could be. Slow: the fastest crosses in a minute and a half, because a cloud you can
@@ -3838,10 +3907,16 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     transform: translate(-50%, 46%); border-radius: 50%; z-index: -1; pointer-events: none;
     mix-blend-mode: screen;
     background: radial-gradient(closest-side, rgba(255,166,58,0.32), rgba(255,128,28,0.10) 46%, rgba(255,110,20,0) 76%); }
-/* The near row stands in FRONT of the street (props are 50), and takes a knock-down because it is below
-   the lamps rather than under them -- nearer the camera is not nearer the light. */
-.hw-prop.is-near { z-index: 60; filter: brightness(0.44) saturate(0.6) drop-shadow(0 6px 12px rgba(0,0,0,0.65)); }
-.tw-scene.is-spooky .hw-nearhaze { position: absolute; left: 0; right: 0; bottom: 0; height: 30%;
+/* The front row's own layer: full height of the scene, above the fog, riding its own faster camera. */
+.hw-nearlayer { position: absolute; top: 0; left: 0; height: 100%; z-index: 96; pointer-events: none;
+    will-change: transform; }
+/* ⚠️ DARK AND SATURATED, NOT DIM AND GREY. saturate(0.6) plus a brightness knock-down made a pumpkin the
+   colour of wet cardboard, and anything the fog then added on top turned it to mush. What sells a near
+   object at night is that it is UNDERLIT and rich, not that it is faded: it keeps its colour and loses its
+   light. Held below the street's brightness so it still reads as being in front of the lamps. */
+.hw-prop.is-near { z-index: 60;
+    filter: brightness(0.38) saturate(1.05) contrast(1.06) drop-shadow(0 7px 14px rgba(0,0,0,0.7)); }
+.tw-scene.is-spooky .hw-nearhaze { position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
     z-index: 44; pointer-events: none; mix-blend-mode: screen;
     background:
         linear-gradient(180deg, rgba(255,138,44,0) 0%, rgba(255,132,40,0.07) 46%, rgba(255,118,32,0.13) 100%),

@@ -255,6 +255,22 @@ Object.assign(ART_PROMPTS, {
         "of warped amber glass, a fat lit candle burning inside it",
         { extra: HW_NEAR_EXTRA + " Drawn hanging, with the ring at the very top of the shape." }
     ),
+    // ⚠️ A LANTERN NEEDS SOMETHING TO HANG FROM. hw_lantern is drawn hanging, by its ring, and the street had
+    // nothing to hang it on -- so every one of them sat on bare cobbles like a lamp somebody put down and
+    // walked away from. Luke, looking at the plaza: "lanterns should be in places that nake sense. Add lamp
+    // posts." This is the fixture: tall enough to read from across the street, and the only thing in the
+    // dressing that is deliberately EVENLY spaced, because that is what street lighting is.
+    hw_lamppost: housePrompt(
+        "A tall ORNATE CAST-IRON STREET LAMP POST standing upright on a stepped square base, a slender fluted " +
+        "column rising to a short scrolled bracket, and hanging from it a four-sided glass lantern head with a " +
+        "peaked cap and a finial, the warm amber flame inside clearly lit and glowing through the glass. " +
+        "Black weathered iron with a few autumn leaves caught at the foot of the base",
+        { extra: HW_NEAR_EXTRA + " Drawn standing upright and STRICTLY VERTICAL, the full post from the base " +
+            "on the ground to the finial at the very top, the base flat at the bottom edge of the shape. " +
+            "TALL AND NARROW: the post is roughly four times taller than it is wide. ⚠️ THE WHOLE POST FITS " +
+            "INSIDE THE FRAME WITH CLEAR EMPTY MARGIN BELOW THE BASE — the first draw had the base cut off " +
+            "by the bottom edge. Leave room under it; nothing touches any edge of the image." }
+    ),
     hw_candles: housePrompt(
         "A CLUSTER OF FIVE MELTED CANDLES of different heights standing together on a small stone slab, thick " +
         "wax drips running down their sides and pooling at the base, every wick lit",
@@ -335,11 +351,21 @@ Object.assign(ART_PROMPTS, {
     // stone: it read as a bare grey road with no autumn in it, LIGHTER than the undergrowth above it, which a
     // night street must never be. What a tiling floor wants is medium coverage of SMALL pieces on DARK stone —
     // enough leaf to say autumn, no shape big enough to become a landmark when it repeats.
+    // ⚠️ AND A FOURTH SWING, BECAUSE IT CAME BACK AS BRICKWORK. Luke: "floor looks bad." The last one drew
+    // flat rectangular blocks in one uniform red-brown, which is a brick wall lying down, not a street: no
+    // stone-to-stone colour change, no rounded edges, no sense that anything is lit. The fix is not more
+    // leaves -- it is making the STONES read. Rounded and irregular, each one a slightly different tone, and
+    // a damp sheen so the lamplight has something to catch, which is what makes a night street look wet and
+    // alive rather than like a sheet of cardboard.
     hw_cobble:
-        `A seamless COBBLESTONE STREET ground texture seen at a slight downward angle. Worn rounded cobbles in ` +
-        `DEEP WARM GREY-BROWN with darker mortar gaps — rich and shadowed, NOT pale, NOT sandy, NOT bleached. ` +
-        `Fallen autumn leaves in russet, burnt orange and brown lie loose across it, covering roughly a THIRD ` +
-        `of the surface: plenty of leaf to read as autumn, with bare stone still clearly showing between them. ` +
+        `A seamless COBBLESTONE STREET ground texture seen at a slight downward angle. ROUNDED, IRREGULAR, ` +
+        `MANY-SIDED cobbles of clearly VARYING SIZE, each stone a slightly different tone — some cooler grey, ` +
+        `some warmer brown, a few nearly black — set in dark recessed mortar so every stone reads separately. ` +
+        `NOT rectangular bricks, NOT a regular grid, NOT one flat colour. The stones are faintly DAMP, with a ` +
+        `soft sheen along their top edges as if catching lamplight, and worn smooth in the middle of the road. ` +
+        `Overall DEEP WARM GREY-BROWN — rich and shadowed, NOT pale, NOT sandy, NOT bleached. ` +
+        `Fallen autumn leaves in russet, burnt orange and brown lie loose across it, covering roughly a QUARTER ` +
+        `of the surface — enough to read as autumn, with the STONEWORK still the thing you see first. ` +
         `Individual small leaves and loose pairs only — NO drifts, NO piles, NO clump larger than three leaves. ` +
         `⚠️ ABSOLUTELY UNIFORM ACROSS THE WHOLE IMAGE: no focal point, no dense patch, no bare patch, no large ` +
         `shape — the density and the colour must be the SAME at the left edge, the middle and the right edge, ` +
@@ -459,7 +485,10 @@ HW_BUILDING_IDS.forEach((id, i) => {
         `⚠️ THE BUILDING IS DECORATED FOR HALLOWEEN, and it is the same building: do not change its shape, ` +
         `size, materials or purpose, only what has been hung on it. Specifically, it has ${HW_ACCENTS[i % HW_ACCENTS.length]}. ` +
         `It is NIGHT, so any window that is lit glows warm amber against cool blue-violet shadow. ` +
-        `Festive and inviting rather than derelict or frightening — this is a town that decorated, not a ruin.`;
+        `Festive and inviting rather than derelict or frightening — this is a town that decorated, not a ruin. ` +
+        `⚠️ ANY DOORWAY, ARCHWAY, TUNNEL MOUTH OR OPEN ENTRANCE IS FILLED WITH SOLID BLACK DARKNESS. The only ` +
+        `transparent part of this image is the area OUTSIDE the building's silhouette — you must not be able ` +
+        `to see through the door. An archway left empty comes back as a white hole with the sky behind it.`;
     _hwBuildings[`hw_bld_${id}`] = base.replace(BUILDING_STYLE, `${dress} ${BUILDING_STYLE}`);
 });
 Object.assign(ART_PROMPTS, _hwBuildings);
@@ -471,7 +500,7 @@ export const HALLOWEEN_PROP_KEYS = [
     "hw_moon", "hw_witch_a", "hw_witch_b", "hw_bats", "hw_tree",
     "hw_pumpkin", "hw_lantern", "hw_candles", "hw_ghost",
     "hw_scarecrow", "hw_haybale", "hw_cauldron", "hw_gravestone", "hw_skeleton", "hw_pumpkin_stack", "hw_crow",
-    "hw_cobble", "hw_tree_fall",
+    "hw_cobble", "hw_tree_fall", "hw_lamppost",
     "hw_depth1", "hw_depth3", "hw_mid", "hw_fg",
 ];
 export const HALLOWEEN_BUILDING_KEYS = Object.keys(_hwBuildings);
@@ -488,7 +517,10 @@ export async function generateTownArt(key) {
     // transparent background and tile as a row of floating leaves over the void — the ground bands are opaque
     // full-bleed textures and hw_cobble is one of them.
     else if (key === "sky" || key === "cobble" || key === "hw_cobble") url = await generateSceneImage(prompt, { pathPrefix: "marketplace/town", meta: { origin: "admin", subject: key, label: `Town scene — ${key}` } }); // opaque scene layers
-    else url = await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/town", deHalo: true, meta: { origin: "admin", subject: key, label: `Town art — ${key}` } }); // transparent building sprite
+    // fillHoles: a building's doorway is not background. Left open, the sprite has a hole in it and the street
+    // behind shows through the door -- see fill-holes.js. Deep blue-black, because every opening in this town
+    // is either unlit or lit from far inside, and both read darker than the wall around them.
+    else url = await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/town", deHalo: true, fillHoles: "#0d1020", meta: { origin: "admin", subject: key, label: `Town art — ${key}` } }); // transparent building sprite
     await db.query(
         `INSERT INTO mkt_town_art (art_key, url, updated_at) VALUES ($1, $2, NOW())
          ON CONFLICT (art_key) DO UPDATE SET url = $2, updated_at = NOW()`,
