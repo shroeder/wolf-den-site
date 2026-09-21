@@ -1908,6 +1908,17 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                                 animationDelay: `${p.delay}s`,
                                 transform: `translate(-50%, -100%)${p.flip ? " scaleX(-1)" : ""}` }} />
                     ) : null)) : null}
+                    {/* ── WHERE THE ROAD STARTS ────────────────────────────────────────────────────────
+                        .tw-cobble is a band with a top edge, so the street began on a dead straight
+                        horizontal line: warm brown below it, cold blue undergrowth above, and nothing at
+                        all in between. Luke: "We need a layer to abstract the sharp line of thr walking
+                        path." A real path has no edge either — it just stops being path, across a couple
+                        of feet of scuffed dirt and blown leaf. This carries the road's own colour up over
+                        the seam and lets it die out, blurred so there is no second line where this one
+                        ends. Its own sibling rather than a second child of the ternary below, which takes
+                        one expression and cannot hold two.
+                        z-2: over the cobbles, under everything that stands ON them. */}
+                    {spooky ? <div className="hw-pathblend" aria-hidden="true" /> : null}
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
                     {layered ? (
                         <div className="tw-cobble" aria-hidden="true">
@@ -3735,8 +3746,15 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     animation: hwFlicker 3.3s ease-in-out infinite; }
 .hw-candles { filter: drop-shadow(0 0 13px rgba(255,190,90,0.7)) drop-shadow(0 4px 8px rgba(0,0,0,0.55));
     animation: hwFlicker 1.9s ease-in-out infinite; }
-/* Glassed in and up on a post, so it glows harder and breathes slower than anything at ground level. */
-.hw-lamppost { filter: drop-shadow(0 0 22px rgba(255,178,70,0.75)) drop-shadow(0 6px 11px rgba(0,0,0,0.6));
+/* Glassed in and up on a post, so it glows harder and breathes slower than anything at ground level.
+   ⚠️ AND IT SITS ABOVE THE FOREGROUND WALL. Props are z-50 and .tw-fg is z-90, which is fine for everything
+   else in the dressing because a pumpkin is 7-11% tall and never reaches it. A lamp post is 21-24%: anchored
+   with its base at 75% from the top it reaches up to about 47% from the bottom, and .tw-fg spans 37.5% to
+   71.5% — so the top of every post, lantern head included, was drawn BEHIND the wall. Luke: "Lantern is cut
+   off." The autumn trees already carry 95 for exactly this reason. 92 keeps the posts clear of the wall and
+   still under the canopies, which is the right order: a lamp stands in front of the hedge and under a tree. */
+.hw-lamppost { z-index: 92;
+    filter: drop-shadow(0 0 22px rgba(255,178,70,0.75)) drop-shadow(0 6px 11px rgba(0,0,0,0.6));
     animation: hwFlicker 5.2s ease-in-out infinite; }
 .hw-ghost { opacity: 0.72; filter: drop-shadow(0 0 20px rgba(150,220,255,0.6));
     animation: hwDrift 7.5s ease-in-out infinite; }
@@ -3926,6 +3944,14 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     88% { opacity: var(--dim); }
     100% { translate: var(--drift) 108%; rotate: var(--spin); opacity: 0; }
 }
+
+.tw-scene.is-spooky .hw-pathblend { position: absolute; left: 0; right: 0; bottom: 40%; height: 10%;
+    z-index: 2; pointer-events: none; filter: blur(11px);
+    background: linear-gradient(180deg,
+        rgba(62,42,28,0) 0%,
+        rgba(62,42,28,0.16) 34%,
+        rgba(66,45,30,0.38) 62%,
+        rgba(70,48,32,0.52) 100%); }
 
 /* ── THE TREELINE IS NOT A RULED LINE ───────────────────────────────────────────────────────────────────
    The forest band ends on a hard horizontal edge where it meets the ground, which reads as two pictures
