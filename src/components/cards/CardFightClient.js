@@ -11,7 +11,7 @@ import {
 import {
     ACTS, DRAG_SLOP, KEYS, KEY_WHY, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal, keyProgress,
     heroEndTurn, intentDamage, resolveCard, splitDamage, startFoeTurn, stopLabel,
-    drinkPotion, playCard, startFight, BOSS_PERKS, POTIONS, perkById,
+    drinkPotion, playCard, startFight, BOSS_PERKS, POTIONS, perkById, applyMoves,
 } from "@/lib/marketplace/cards-kit.js";
 // ── THE FACE IS NOT DRAWN HERE ANY MORE ──────────────────────────────────────────────────────────────────
 // It moved to CardFace.js the day the merchant started selling cards, along with every rule that paints it —
@@ -253,13 +253,45 @@ export default function CardFightClient({ fixture, run = null }) {
         // Kaishiern, in bugs: "I'm stuck on a fight in the card game. I've beaten this fight four times now
         // but it won't load past it." Four times is this flag, once per reload.
         reported.current = null;
-        land({
+        let state = {
             ...next.fight,
             hero: { ...next.fight.hero, art: fixture.hero.art, flip: fixture.hero.flip, name: fixture.hero.name },
             foes: next.fight.foes.map((f, i) => ({
                 ...f, art: fixture.foes[i]?.art ?? f.art, flip: fixture.foes[i]?.flip ?? f.flip,
             })),
-        });
+        };
+        // ── ⚠️ AND WHAT IT HAS NOT BEEN TOLD ABOUT YET GOES BACK ON TOP — THE REFUSAL BUG ─────────
+        // The server's fight is authoritative only for the moves it has actually SEEN. The end-of-turn flush
+        // is sent on a timer and answered while the next turn is already being played, so by the time this
+        // runs the player has usually thrown their first card of it — booked into `fightRef` and sitting in
+        // `pending`. Landing the server's state flat threw that card's effect off the screen while leaving
+        // the move in the queue: the card came BACK to the hand with its energy refunded, so it got played a
+        // second time, and the server then met the same uid twice — legal once, gone the next — and refused
+        // the turn. `illegal_play`, on 23 of the 25 runs that carry a refusal, 29 of them on the act-three
+        // run Kaishiern abandoned.
+        //
+        // So the unsent moves are replayed on top, through the SAME applyMoves the server will run them
+        // through. The two cannot disagree by construction: identical state, identical function, identical
+        // list. The screen stops flickering backwards and the double-play it was provoking cannot happen.
+        //
+        // A replay that does NOT take is a queue worth nothing — the server would refuse it for the same
+        // reason we just did — so it is dropped here rather than sent to be refused there.
+        if (pending.current.length) {
+            const belt = [...(next.potions || [])];
+            const out = applyMoves(state, pending.current, {
+                // The server spends the belt by INDEX and a slot cannot be drunk twice; mirrored exactly,
+                // against the belt this answer came back carrying.
+                potionAt: (slot) => {
+                    const id = belt[slot];
+                    if (!id) return null;
+                    belt.splice(slot, 1);
+                    return id;
+                },
+            });
+            if (out.ok) state = out.state;
+            else pending.current = [];
+        }
+        land(state);
     }, [land, fixture]);
 
     // ── SENDING THE TURN ────────────────────────────────────────────────────────────────────────────
