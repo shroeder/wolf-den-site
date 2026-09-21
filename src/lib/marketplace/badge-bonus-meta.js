@@ -204,6 +204,25 @@ export const BADGE_BONUSES = {
     casino_three_wolves: C(1, 3), casino_perfect: C(1, 0, 3),
     // The longest two on the floor: every exclusive pet, and the door behind the rope.
     casino_the_five: C(4, 2, 2), casino_vip_room: C(2),
+    // ── The card game → power ─────────────────────────────────────────────────────────────────────────────
+    // ⚠️ COMBAT, NOT CARDS, AND FOR THE CASINO'S REASON ONE BLOCK UP. Paying into the deck-builder would be
+    // the badge improving the odds: the card game is balanced against Spire and measured by a simulator that
+    // plays the same engine the browser does, so a member carrying seventeen badges' worth of hidden power
+    // would be playing a different game from the one every balance number was read off. It pays where the
+    // effort was spent instead — it is a COMBAT game, and the daily boss is where that reads.
+    //
+    // Each family pays in its own currency, the way the casino's two secrets pay crit rather than a wage:
+    //   · depth and wins   raw Might — hours on the ladder
+    //   · ascension        the same, and the tenth is pierce-tier because nobody holds it (see the note on C)
+    //   · burns            crit CHANCE — thinning a deck is precision, not force
+    //   · Strength held    raw Might, because that is literally the stat
+    //   · one big strike   crit POWER — a nod to the hit rather than the hours
+    cards_act1: C(1), cards_act3: C(2),
+    cards_win: C(1), cards_win_10: C(2), cards_win_25: C(3),
+    cards_asc_1: C(2), cards_asc_5: C(3), cards_asc_10: C(5, 3),
+    cards_burn_10: C(1, 2), cards_burn_40: C(2, 3), cards_burn_80: C(3, 4),
+    cards_str_10: C(1), cards_str_25: C(2), cards_str_50: C(3),
+    cards_hit_50: C(1, 0, 2), cards_hit_150: C(2, 0, 3), cards_hit_300: C(3, 0, 4),
     // ── Bounties → power ──
     bounty_poster: C(1), bounty_hunter: C(2), bounty_pro: C(3), bounty_legend: C(5, 3),
     // ── Trading → power / crit ──
