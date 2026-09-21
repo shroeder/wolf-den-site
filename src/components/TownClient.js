@@ -1728,20 +1728,34 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         <div className="hw-cloud hw-cloud-1" />
                         <div className="hw-cloud hw-cloud-2" />
                         <div className="hw-cloud hw-cloud-3" />
+                        {/* ── ⚠️ THE SKY BELONGS TO THE TOWN, NOT TO THE SCREEN ────────────────────────
+                            These already fly: hwCross walks each of them across and off, on its own clock.
+                            What they did NOT do is move when YOU move -- no camera term, so walking the
+                            length of the street left the witches nailed to the glass while the whole town
+                            slid underneath them. It is the same fault the moon has a note about one block
+                            up, and it is worse out here, because a thing that is visibly flying is the last
+                            thing that should be welded to the viewport.
+                            So they take the camera like every other distance does, at their own rate: the
+                            high small witch drifts least, the low big one more, the bats -- nearest of the
+                            three -- most, and all of them far under the street's 1.0. hwCross owns `left`
+                            and hwBob owns margin-top, so `transform` is free and none of them collide. */}
                         {art.hw_witch_a?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img className="hw-witch hw-witch-1" src={art.hw_witch_a.url} alt="" draggable={false} />
+                            <img className="hw-witch hw-witch-1" src={art.hw_witch_a.url} alt="" draggable={false}
+                                style={{ transform: `translateX(${-cameraPx * 0.2}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }} />
                         ) : null}
                         {art.hw_witch_b?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img className="hw-witch hw-witch-2" src={art.hw_witch_b.url} alt="" draggable={false} />
+                            <img className="hw-witch hw-witch-2" src={art.hw_witch_b.url} alt="" draggable={false}
+                                style={{ transform: `translateX(${-cameraPx * 0.14}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }} />
                         ) : null}
                         {/* One bat sprite, flown three times at different heights, speeds and sizes. The prompt
                             asked for a flock and the model drew a single bat, which turned out better: a real
                             flock is things moving independently, and one drawn clump can only ever move as one. */}
                         {art.hw_bats?.url ? [1, 2, 3].map((n) => (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img key={n} className={`hw-bat hw-bat-${n}`} src={art.hw_bats.url} alt="" draggable={false} />
+                            <img key={n} className={`hw-bat hw-bat-${n}`} src={art.hw_bats.url} alt="" draggable={false}
+                                style={{ transform: `translateX(${-cameraPx * 0.28}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }} />
                         )) : null}
                     </div>
                 ) : null}
