@@ -1919,6 +1919,22 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         one expression and cannot hold two.
                         z-2: over the cobbles, under everything that stands ON them. */}
                     {spooky ? <div className="hw-pathblend" aria-hidden="true" /> : null}
+                    {/* ⚠️ AND THE THING THAT ACTUALLY HIDES THE LINE. The gradient above only softens the
+                        CONTRAST across the seam; the edge survives it, because an edge is a shape and not a
+                        tone. This is the shape: a strip of verge standing on the join with a deliberately
+                        ragged top, so the straight line is broken by grass and thistle at a dozen different
+                        heights and there is no longer a continuous edge to see.
+                        ⚠️ NOT MIRRORED, unlike every other band here. The others alternate scaleX(-1) to
+                        disguise a repeat; this one is drawn to tile directly, so flipping every second copy
+                        would put a seam exactly where the art already has none. */}
+                    {spooky && art.hw_verge?.url ? (
+                        <div className="hw-verge" aria-hidden="true">
+                            {tiles(13).map((k) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={k} src={art.hw_verge.url} alt="" draggable={false} />
+                            ))}
+                        </div>
+                    ) : null}
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
                     {layered ? (
                         <div className="tw-cobble" aria-hidden="true">
@@ -3945,6 +3961,24 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     100% { translate: var(--drift) 108%; rotate: var(--spin); opacity: 0; }
 }
 
+/* ⚠️ LIT, OR IT HIDES NOTHING. Drawn under FOREST_NIGHT it comes back near-black, and a black silhouette
+   against the near-black undergrowth above it has no edge to read — the ragged top, which is the entire
+   reason this strip exists, simply vanished and the straight line came back. It is standing at the edge of
+   a lit road, so it is lifted and warmed until the individual blades separate from the dark behind them. */
+/* ⚠️ 91, ABOVE .tw-fg. It went in at z-2 -- over the cobbles, under everything standing on them -- which
+   sounded right and hid it completely: .tw-fg is the existing undergrowth band at z-90 and it spans 501 to
+   685 on a scene running 347 to 887, so it covered the whole strip. Measured, not guessed; the verge was
+   rendering perfectly and being painted over.
+   And .tw-fg's own bottom edge is half of what makes the line. A strip meant to break that edge has to be
+   in FRONT of it. Nothing is lost underneath: the props stand at 747 and below, well clear of both.
+   ⚠️ AND WARMED, NOT JUST BRIGHTENED. Lifting a near-black blue strip with brightness and saturation alone
+   turns it TEAL, which then sits as a cold band across a warm lit road and draws more attention than the
+   line it was hiding. sepia pulls it back through brown before the saturation goes on, so it lands as dry
+   autumn grass lit from the street rather than as a hedge under a different moon. */
+.hw-verge { position: absolute; left: 0; bottom: 38%; height: 26%; display: flex; align-items: flex-end;
+    z-index: 91; pointer-events: none;
+    filter: brightness(1.5) sepia(0.42) saturate(1.45) hue-rotate(-14deg); }
+.hw-verge img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 .tw-scene.is-spooky .hw-pathblend { position: absolute; left: 0; right: 0; bottom: 40%; height: 10%;
     z-index: 2; pointer-events: none; filter: blur(11px);
     background: linear-gradient(180deg,

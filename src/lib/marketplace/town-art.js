@@ -447,6 +447,23 @@ Object.assign(ART_PROMPTS, {
         `repeat. Think of an unbroken hedge of woodland seen from outside it. ` +
         `The TOP two-thirds of the image is FULLY TRANSPARENT (alpha) with NOTHING in it — no baked sky, no ` +
         `haze — just the treeline cut against transparency along the bottom. ${FOREST_NIGHT}`,
+    // ⚠️ THIS EXISTS TO DESTROY A STRAIGHT LINE. .tw-cobble is a band, so the street starts on a ruled
+    // horizontal edge — cold blue undergrowth above it, warm brown road below, and a gradient across the seam
+    // only softens the contrast; the EDGE is still there because an edge is a shape, not a tone. Luke, twice:
+    // "We need a layer to abstract the sharp line of thr walking path" / "a layer to help hidd rhe shear line
+    // of the floor." What hides a line is an irregular silhouette standing on it, so this is a strip of verge
+    // whose whole job is a ragged top: weeds, dead grass, leaf drift, the stuff that always grows exactly
+    // where a path stops being a path.
+    hw_verge: `A narrow horizontal strip of AUTUMN VERGE — the scrubby edge where a stone road meets woodland. ` +
+        `Tufts of dry tan grass of UNEVEN heights, low brambles, a few dead ferns and thistles, and drifts of ` +
+        `curled russet and brown fallen leaves banked up among them. ` +
+        `⚠️ THE TOP EDGE MUST BE RAGGED AND IRREGULAR — grass blades and stems of clearly DIFFERENT heights ` +
+        `breaking upward at different points, never a level hedge-line and never a straight top. ` +
+        `The BOTTOM edge is where it meets the road: dense leaf litter, flat and solid, running the full width. ` +
+        `The TOP ~55% of the image is FULLY TRANSPARENT (alpha) with nothing in it at all. ` +
+        `Seamless left-to-right: it tiles, so the left and right edges must continue into each other and there ` +
+        `must be NO landmark, no single tall plant, nothing distinctive enough to be spotted repeating. ` +
+        `NO fence, NO posts, NO logs, NO mushrooms, NO animals, NO sky, NO ground beyond the strip. ${FOREST_NIGHT}`,
     hw_fg: `A LOW foreground band of FOREST UNDERGROWTH running straight across the BOTTOM of the frame — a ` +
         `fallen mossy log, tangled brambles and dead ferns, drifts of dry curled leaves, a few pale toadstools, ` +
         `clumps of long dead grass, and a broken crooked wooden fence rail half-swallowed by it all. Nearer and ` +
@@ -495,12 +512,15 @@ Object.assign(ART_PROMPTS, _hwBuildings);
 
 export const TOWN_ART_KEYS = Object.keys(ART_PROMPTS);
 
+// A door is an opening; a gap in a bramble is not. See the note at the generateImage call below.
+const isBuildingKey = (key) => HW_BUILDING_IDS.includes(key) || key.startsWith("hw_bld_");
+
 // The seasonal set, named once so the generator script and the Town both mean the same things.
 export const HALLOWEEN_PROP_KEYS = [
     "hw_moon", "hw_witch_a", "hw_witch_b", "hw_bats", "hw_tree",
     "hw_pumpkin", "hw_lantern", "hw_candles", "hw_ghost",
     "hw_scarecrow", "hw_haybale", "hw_cauldron", "hw_gravestone", "hw_skeleton", "hw_pumpkin_stack", "hw_crow",
-    "hw_cobble", "hw_tree_fall", "hw_lamppost",
+    "hw_cobble", "hw_tree_fall", "hw_lamppost", "hw_verge",
     "hw_depth1", "hw_depth3", "hw_mid", "hw_fg",
 ];
 export const HALLOWEEN_BUILDING_KEYS = Object.keys(_hwBuildings);
@@ -520,7 +540,12 @@ export async function generateTownArt(key) {
     // fillHoles: a building's doorway is not background. Left open, the sprite has a hole in it and the street
     // behind shows through the door -- see fill-holes.js. Deep blue-black, because every opening in this town
     // is either unlit or lit from far inside, and both read darker than the wall around them.
-    else url = await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/town", deHalo: true, fillHoles: "#0d1020", meta: { origin: "admin", subject: key, label: `Town art — ${key}` } }); // transparent building sprite
+    //
+    // ⚠️ BUILDINGS ONLY, AND THAT MATTERS. A sealed transparent region in a BUILDING is always an opening and
+    // always wrong. In a thicket it is a GAP -- the space between two brambles that you are supposed to see
+    // the night through -- and filling those would stud every undergrowth band with dark blobs. Applied to
+    // everything, this would have quietly ruined hw_fg and hw_verge the next time either was drawn.
+    else url = await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/town", deHalo: true, fillHoles: isBuildingKey(key) ? "#0d1020" : null, meta: { origin: "admin", subject: key, label: `Town art — ${key}` } }); // transparent building sprite
     await db.query(
         `INSERT INTO mkt_town_art (art_key, url, updated_at) VALUES ($1, $2, NOW())
          ON CONFLICT (art_key) DO UPDATE SET url = $2, updated_at = NOW()`,
