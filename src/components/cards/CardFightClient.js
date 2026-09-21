@@ -63,6 +63,18 @@ const ACT_SCENE = {
     3: "/images/cards/scene-spire.webp",
 };
 
+// ── WHAT THE SERVER'S REFUSAL MEANS, IN A SENTENCE ───────────────────────────────────────────────────────
+// applyMoves answers with a reason code and the route hands it back on a 400. These are the ones a PLAYER can
+// end up looking at; anything unlisted falls back to the plain sentence at the call site. Kept short and free
+// of blame — every one of them is our bug, not a thing they did wrong (see the route's note on the 95
+// refusals, 17 of which were on runs that went on to be won).
+const REFUSAL_WORDS = {
+    illegal_play: "The table and this screen disagreed about your hand.",
+    move_after_over: "That turn arrived after the fight had already finished.",
+    no_fight: "The table has no fight open in this room any more.",
+    illegal_drink: "The table would not take that bottle.",
+    no_such_potion: "The table could not find that bottle in your belt.",
+};
 const DIE_MS = 460;
 const CLOSE_MS = 340;
 
@@ -128,6 +140,8 @@ export default function CardFightClient({ fixture, run = null }) {
     // thing that crosses between them is `hp` at the moment a fight ends.
     const [runState, setRunState] = useState(run);
     const [busy, setBusy] = useState(false);
+    // What went wrong on the last request, in words a player can read. Null when the last one was fine.
+    const [oops, setOops] = useState(null);
     // The card being taken off the reward screen, and the trinket an elite just handed over — both are
     // held here rather than read off the run, because the server reports a deck and a strip that are
     // ALREADY changed and the whole point of both moments is the half-second before that is true.
@@ -147,6 +161,14 @@ export default function CardFightClient({ fixture, run = null }) {
         // -- the run is server-side, so a reload lands back in the same room. Here for the NEXT deploy that
         // changes this contract, not for the one that added it.
         if (d?.reload) { window.location.reload(); return null; }
+        // ⚠️ AND IT IS SAID OUT LOUD. Every failure here used to be swallowed — a dead fetch became
+        // null, a 400 became a run with no reward on it, and the screen just drew its empty state with no
+        // word about why. Kaishiern spent a run believing it was her connection: "I thought it was maybe
+        // poor internet connection but even on WiFi it still wouldn't load past the fight." It was a refused
+        // move. A player cannot act on a failure nobody tells them about.
+        setOops(!r ? "The table could not be reached."
+            : !r.ok ? (REFUSAL_WORDS[d?.error] || "The table would not take that turn.")
+            : null);
         if (d?.run) setRunState(d.run);
         return d?.run || null;
     }, []);
@@ -219,6 +241,18 @@ export default function CardFightClient({ fixture, run = null }) {
         // state it predicted -- that is the one the death or the victory is animating out of -- and the run
         // beside it carries what was won.
         if (!next?.fight?.hand || next.fight.foes?.length !== fixture.foes.length) return;
+        // ── ⚠️ A LIVE FIGHT COMING BACK RE-ARMS THE REPORT — THE STUCK-RUN BUG ────────────────────
+        // `reported` is set the instant the screen decides the fight is over, BEFORE the post that tells the
+        // server. If the server REFUSES those moves it answers 400 with the room still live, and this adopts
+        // it: the fight is on again. Without clearing the flag here the effect below early-returns for the
+        // rest of the mount (`reported.current === fight.over`), so winning a second time posts NOTHING — the
+        // moves sit in the queue, the run never learns the room was won, and the reward screen renders its
+        // empty state for ever. The route's own note already measured this happening: "95 refusals across 32
+        // runs and SIX members, 17 of them on runs that were then WON".
+        //
+        // Kaishiern, in bugs: "I'm stuck on a fight in the card game. I've beaten this fight four times now
+        // but it won't load past it." Four times is this flag, once per reload.
+        reported.current = null;
         land({
             ...next.fight,
             hero: { ...next.fight.hero, art: fixture.hero.art, flip: fixture.hero.flip, name: fixture.hero.name },
@@ -255,6 +289,26 @@ export default function CardFightClient({ fixture, run = null }) {
         // that lands here -- there is no end-turn to carry it, so the queue has to go now.
         flush();
     }, [run, fight.over, flush]);
+
+    // ── AND A WAY OUT OF THE EMPTY REWARD SCREEN ────────────────────────────────────────────────────
+    // The screen can only be sure of one thing when a won fight has no reward beside it: the server does not
+    // agree that the room is over. There are exactly two reasons, and they want different answers.
+    //
+    //   · the moves are STILL IN THE QUEUE   the report never went, or went and was refused — send them again
+    //   · the queue is EMPTY                 flush() already discarded them (it empties before it posts, so a
+    //                                        failed request takes the turn with it) and nothing on this screen
+    //                                        can reconstruct the turn. The server's copy of the run is the only
+    //                                        truth left, so go and re-read it.
+    //
+    // The second one costs the fight — she plays the room again. That is the honest price of a turn the server
+    // never received, and it is a great deal better than the ellipsis this replaced, which cost the whole run.
+    const retryWin = useCallback(async () => {
+        setOops(null);
+        // flush() empties the queue before it posts, so a second press after a failed retry finds it empty
+        // and falls through to the reload — which is the right answer by then, not a missed case.
+        if (pending.current.length) { await flush(); return; }
+        window.location.reload();
+    }, [flush]);
 
     // WHICH foe is mid-beat, and whether it is swinging or guarding. One at a time, by construction.
     const [actor, setActor] = useState(null);
@@ -1572,7 +1626,22 @@ export default function CardFightClient({ fixture, run = null }) {
                             </div>
                         </div>
                     ) : runState && fight.over === "win" && !runState.done && !runState.offers?.length ? (
-                        <div className="cf-choose"><div className="cf-title"><span>…</span></div></div>
+                        /* ── ⚠️ THE ROOM IS WON AND THE TABLE HAS NOTHING TO SHOW FOR IT ──────────────────
+                            This branch used to render one ellipsis in a box: no reason, no button, nothing to
+                            press. It reads as a spinner, so it was taken for one — Kaishiern sat through a
+                            whole run of it before giving up, and the run was already unwinnable by then.
+
+                            Spire is the argument here as everywhere else: its combat reward ALWAYS has a way
+                            off it. There is a Skip under the cards and it works even when you want nothing.
+                            A screen that can be reached and not left is the one shape a reward must never
+                            take, and an ellipsis is not an exit. */
+                        <div className="cf-choose">
+                            <div className="cf-title"><span>The table lost your turn</span></div>
+                            <p className="cf-note">{oops || "The room is won here, but the table has not banked it."}</p>
+                            <button type="button" className="cf-pill" disabled={busy} onClick={retryWin}>
+                                {busy ? "Sending…" : "Send it again"}
+                            </button>
+                        </div>
                     ) : runState && fight.over === "win" && runState.offers?.length ? (
                         <div className="cf-choose">
                             {/* Spire's banner says "Choose a Card" and nothing else — the floor number lives up in the HUD
