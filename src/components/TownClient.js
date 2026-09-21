@@ -664,6 +664,10 @@ const HW_PIECE = {
     crow: { key: "hw_crow", kind: "crow", h: [4, 6], top: [63, 70] },
 };
 
+// ⚠️ WHICH OF THEM ARE ACTUALLY ALIGHT. A pool of light under a gravestone is a gravestone with a candle in
+// it, which is the same mistake as making it flicker -- see the note on the unlit pieces in the stylesheet.
+const HW_LIT = new Set(["pumpkin", "lantern", "candles", "cauldron"]);
+
 // Each scene names its anchor first, then what gathers around it. Weights let the common things repeat.
 const HW_SCENES = [
     { name: "graveyard", spread: 5.5, parts: ["grave", "grave", "grave", "crow", "candles"] },
@@ -784,12 +788,61 @@ function buildHalloweenDressing(buildings) {
         gaps.push({ mid: doors[0] / 2, w: doors[0] });                       // before the first building
         gaps.push({ mid: (doors[doors.length - 1] + 100) / 2, w: 100 - doors[doors.length - 1] });
     }
-    gaps.sort((a, b) => b.w - a.w);
-    for (const g of gaps.slice(0, 4)) {
+    // ⚠️ THE WIDEST FOUR GAPS ARE NOT FOUR PLACES — THEY WERE ALL IN THE SAME STRETCH OF ROAD. Taking the
+    // four biggest put every canopy at x 32, 47, 57 and 94 of a street whose opening view is the first 16%:
+    // measured in the browser, all four stood between 1533px and 4414px while the camera showed 322 to 1118.
+    // Four trees in the town and not one of them in the shot anybody sees first.
+    //
+    // So the road is quartered and each quarter stands the widest gap IT has. Still placed in real gaps and
+    // still self-adjusting as the street grows -- it just cannot pile the whole avenue into one furlong.
+    const BANDS = 4;
+    const chosen = [];
+    for (let band = 0; band < BANDS; band += 1) {
+        const lo = (band * 100) / BANDS;
+        const hi = ((band + 1) * 100) / BANDS;
+        const here = gaps.filter((g) => g.mid >= lo && g.mid < hi && g.w >= 5).sort((a, b) => b.w - a.w);
+        if (here.length) chosen.push(here[0]);
+    }
+    for (const g of chosen) {
         if (g.w < 5) continue;   // no room for a canopy without covering a door
         out.push({ key: "hw_tree_fall", kind: "falltree", x: g.mid + (rand() - 0.5) * Math.min(2, g.w - 4),
             top: Math.round(pick(73, 75) * 10) / 10, h: Math.round(pick(30, 36) * 10) / 10,
             flip: rand() < 0.5, delay: Math.round(rand() * 600) / 100 });
+    }
+
+    // ── THE NEAR ROW ─────────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ THE BOTTOM QUARTER OF THE FRAME WAS EMPTY ROAD. Everything stood on one ground line at 74-78%, so
+    // the whole town sat at exactly one distance and the picture went flat and dark below it.
+    //
+    // The first attempt was a blurred canopy over each bottom corner. It does not work at any size: big
+    // enough to read as foreground and it buries the scarecrow and a building label; small enough to keep
+    // clear of them and it is an invisible smudge. Blur is not depth, it is just blur.
+    //
+    // This is depth: the same props, on a ground line much nearer the camera, drawn half again as large.
+    // They are BELOW the street rather than in it, so they cannot cover a door or a name, and walking past
+    // them shifts them against the town behind -- which is the parallax the scene already has and was not
+    // using at the bottom of the frame.
+    //
+    // The stacks in here DO carry a flame, because a pumpkin stack near the camera is the best thing in the
+    // frame and cutting it to keep a tidy rule would have been the wrong trade. They are knocked down by
+    // .is-near like the rest, so the light they throw reads as near and low rather than competing with the
+    // street -- which is the only thing the exclusion was ever protecting.
+    // ⚠️ COUNTED AGAINST THE WINDOW, NOT AGAINST THE STREET. Eight of these looked like plenty written down
+    // and put ONE in shot: the street measures about 4,900px and the camera shows 796 of it, so a row of
+    // eight is one prop every 612px and most screens got none. Sixteen is roughly two and a half in view at
+    // any time, which is what a foreground needs to be a foreground rather than an occasional boulder.
+    const NEAR = ["haybale", "grave", "stack", "haybale", "skeleton", "stack", "grave", "haybale",
+        "grave", "stack", "haybale", "skeleton", "stack", "grave", "haybale", "grave"];
+    for (let i = 0; i < NEAR.length; i += 1) {
+        const piece = HW_PIECE[NEAR[i]];
+        if (!piece) continue;
+        out.push({
+            key: piece.key, kind: piece.kind, near: true,
+            x: Math.round((((i + 0.5) * 100) / NEAR.length + (rand() - 0.5) * 7) * 100) / 100,
+            top: Math.round(pick(86, 96) * 10) / 10,
+            h: Math.round(pick(piece.h[0], piece.h[1]) * pick(1.5, 1.9) * 10) / 10,
+            flip: rand() < 0.5, delay: Math.round(rand() * 600) / 100,
+        });
     }
 
     // ── GHOSTS ───────────────────────────────────────────────────────────────────────────────────────────
@@ -1710,13 +1763,26 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         spaced so a lantern or a pumpkin lands near each building without covering its door.
                         Every one of them is a light source, so they also motivate the warm pools the fog picks
                         up — decoration that the lighting agrees with rather than stickers on a dark picture. */}
+                    {/* ── THE LIGHT ON THE GROUND ──────────────────────────────────────────────────────
+                        A drop-shadow glow haloes the SPRITE and stops there, which is why the street read
+                        flat and dark under sixteen lit flames: every pumpkin was a lamp that lit nothing.
+                        This is the light itself, an ellipse thrown on the cobbles at the prop's own foot,
+                        screen-blended so it ADDS instead of tinting (see the rule at FarmClient.js:1041 --
+                        a sheet over everything flattens every pixel to one colour; light has to be local).
+                        Sized off the prop's height and held to a fixed ratio by aspect-ratio, so a pool
+                        cannot stretch with the window the way a percentage width would. */}
+                    {spooky ? hwProps.filter((p) => HW_LIT.has(p.kind)).map((p, i) => (
+                        <span key={`hwp-${i}`} className={`hw-pool is-${p.kind}`} aria-hidden="true"
+                            style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${Math.round(p.h * 62) / 100}%`,
+                                animationDelay: `${p.delay}s` }} />
+                    )) : null}
                     {spooky ? hwProps.map((p, i) => (art[p.key]?.url ? (
                         // ⚠️ THE FLIP HAS TO BE PART OF THE SAME TRANSFORM. These are anchored the way the
                         // buildings are — translate(-50%, -100%) against the shared GROUND line — so writing
                         // scaleX(-1) on its own would REPLACE that anchor, not add to it, and drop the prop
                         // half a street to the right and a whole prop-height down the screen.
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img key={`hw-${i}`} className={`hw-prop hw-${p.kind}`} src={art[p.key].url} alt="" draggable={false}
+                        <img key={`hw-${i}`} className={`hw-prop hw-${p.kind}${p.near ? " is-near" : ""}`} src={art[p.key].url} alt="" draggable={false}
                             style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${p.h}%`,
                                 animationDelay: `${p.delay}s`,
                                 transform: `translate(-50%, -100%)${p.flip ? " scaleX(-1)" : ""}` }} />
@@ -2015,6 +2081,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                     <>
                         {/* Three bands at different depths, speeds and directions. One band reads as a moving
                             texture; three at different rates read as air with depth in it. */}
+                        <div className="hw-nearhaze" aria-hidden="true" />
                         <div className="hw-fog hw-fog-1" aria-hidden="true" />
                         <div className="hw-fog hw-fog-2" aria-hidden="true" />
                         <div className="hw-fog hw-fog-3" aria-hidden="true" />
@@ -3496,6 +3563,27 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 /* ── the street ───────────────────────────────────────────────────────────────────────────────────────── */
 /* Props ride INSIDE tw-world, so they are pinned to the town and you walk past them. */
 .hw-prop { position: absolute; width: auto; z-index: 50; pointer-events: none; }
+
+/* ── THE POOL OF LIGHT EACH FLAME THROWS ────────────────────────────────────────────────────────────────
+   Sits at 45: over the cobbles (1) and under the props (50), so a pumpkin stands IN its own light rather
+   than behind it. mix-blend-mode: screen makes it add to the stone instead of painting over it, which is
+   the difference between a lamp and a sticker of a lamp -- and it is per-light, never a sheet.
+   The ratio is held by aspect-ratio against a height in percent, because a width in percent is measured
+   against the STREET and would stretch every pool into a smear on a wide screen. */
+.hw-pool { position: absolute; width: auto; aspect-ratio: 3.4 / 1; z-index: 45; pointer-events: none;
+    transform: translate(-50%, -52%); border-radius: 50%; mix-blend-mode: screen;
+    animation: hwPool 2.7s ease-in-out infinite; }
+.hw-pool.is-pumpkin { background: radial-gradient(closest-side, rgba(255,146,38,0.58), rgba(255,110,18,0.20) 48%, rgba(255,90,10,0) 78%); }
+.hw-pool.is-lantern { background: radial-gradient(closest-side, rgba(255,178,64,0.55), rgba(255,140,30,0.18) 48%, rgba(255,120,20,0) 78%); animation-duration: 3.3s; }
+.hw-pool.is-candles { background: radial-gradient(closest-side, rgba(255,198,96,0.48), rgba(255,160,50,0.15) 46%, rgba(255,140,30,0) 76%); animation-duration: 1.9s; }
+/* The witch's pot burns green, so its light on the stone is green too. */
+.hw-pool.is-cauldron { background: radial-gradient(closest-side, rgba(126,255,148,0.46), rgba(70,220,110,0.15) 48%, rgba(50,200,90,0) 78%); animation-duration: 2.3s; }
+/* Breathes with the flame above it. Scale as well as opacity -- a light that only dims reads as a fading
+   image, and one that only swells reads as a pulse; a flame does both, slightly, and never all the way. */
+@keyframes hwPool {
+    0%, 100% { opacity: 0.88; transform: translate(-50%, -52%) scale(1); }
+    50% { opacity: 1; transform: translate(-50%, -52%) scale(1.06); }
+}
 /* Each light gets a warm pool under it and a flicker. The delays are set per-prop in the markup so sixteen
    flames do not breathe in unison, which is the thing that makes candlelight look like a CSS animation. */
 .hw-pumpkin { filter: drop-shadow(0 0 16px rgba(255,132,30,0.75)) drop-shadow(0 6px 10px rgba(0,0,0,0.6));
@@ -3596,7 +3684,7 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    the opacity that reads as fog in ONE layer, so these are a third of what they were and sit lower. */
 .hw-fog { position: absolute; left: 0; width: 200%; z-index: 95; pointer-events: none;
     will-change: transform; filter: blur(22px); }
-.hw-fog-1 { bottom: -6%; height: 26%; opacity: 0.16; animation: hwFogL 47s linear infinite;
+.hw-fog-1 { bottom: -6%; height: 26%; opacity: 0.30; animation: hwFogL 47s linear infinite;
     background:
         radial-gradient(40% 70% at 6% 68%, rgba(206,216,240,0.85), transparent 70%),
         radial-gradient(34% 62% at 21% 82%, rgba(188,200,232,0.7), transparent 70%),
@@ -3604,19 +3692,43 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
         radial-gradient(40% 70% at 56% 68%, rgba(206,216,240,0.85), transparent 70%),
         radial-gradient(34% 62% at 71% 82%, rgba(188,200,232,0.7), transparent 70%),
         radial-gradient(44% 74% at 88% 62%, rgba(214,222,244,0.75), transparent 70%); }
-.hw-fog-2 { bottom: 3%; height: 19%; opacity: 0.11; animation: hwFogR 71s linear infinite;
+.hw-fog-2 { bottom: 3%; height: 19%; opacity: 0.22; animation: hwFogR 71s linear infinite;
     background:
         radial-gradient(46% 80% at 13% 60%, rgba(196,206,236,0.8), transparent 72%),
         radial-gradient(38% 66% at 32% 78%, rgba(176,190,226,0.6), transparent 72%),
         radial-gradient(46% 80% at 63% 60%, rgba(196,206,236,0.8), transparent 72%),
         radial-gradient(38% 66% at 82% 78%, rgba(176,190,226,0.6), transparent 72%); }
 /* The nearest band: thicker, faster, and low enough that it rolls across people's feet. */
-.hw-fog-3 { bottom: -11%; height: 21%; opacity: 0.2; filter: blur(30px); animation: hwFogL 29s linear infinite;
+.hw-fog-3 { bottom: -11%; height: 21%; opacity: 0.34; filter: blur(30px); animation: hwFogL 29s linear infinite;
     background:
         radial-gradient(50% 86% at 9% 74%, rgba(222,228,248,0.9), transparent 68%),
         radial-gradient(42% 70% at 29% 86%, rgba(204,214,240,0.8), transparent 68%),
         radial-gradient(50% 86% at 59% 74%, rgba(222,228,248,0.9), transparent 68%),
         radial-gradient(42% 70% at 79% 86%, rgba(204,214,240,0.8), transparent 68%); }
+/* ── THE NEAR GROUND IS NOT A HOLE ──────────────────────────────────────────────────────────────────────
+   Below the cobble band the scene ran to flat black, so a street with sixteen lamps on it ended in a void
+   about a fifth of the frame deep. This is the haze those lamps actually put into the air in front of you:
+   warm, screen-blended so it lifts the stone rather than tinting it, and confined to the bottom edge -- it
+   is the near air catching light, NOT a sheet over the picture (FarmClient.js:1041). No animation: it is
+   distance, and distance does not breathe. */
+/* ── AND THE DOORS THROW LIGHT TOO ──────────────────────────────────────────────────────────────────────
+   Every dressed building is lit from inside -- a forge fire, windows, a lantern over the door -- and until
+   now not one of them touched the road: the brightest things in the street sat on stone that did not know
+   they were there. Same trick as the props, one size up, behind the building's own art (z-index: -1 inside
+   its stacking context) so it lies ON the cobbles rather than over the woodwork. */
+.tw-scene.is-spooky .tw-building.is-dressed::before {
+    content: ""; position: absolute; left: 50%; bottom: 0; width: 158%; aspect-ratio: 3.6 / 1;
+    transform: translate(-50%, 46%); border-radius: 50%; z-index: -1; pointer-events: none;
+    mix-blend-mode: screen;
+    background: radial-gradient(closest-side, rgba(255,166,58,0.32), rgba(255,128,28,0.10) 46%, rgba(255,110,20,0) 76%); }
+/* The near row stands in FRONT of the street (props are 50), and takes a knock-down because it is below
+   the lamps rather than under them -- nearer the camera is not nearer the light. */
+.hw-prop.is-near { z-index: 60; filter: brightness(0.44) saturate(0.6) drop-shadow(0 6px 12px rgba(0,0,0,0.65)); }
+.tw-scene.is-spooky .hw-nearhaze { position: absolute; left: 0; right: 0; bottom: 0; height: 30%;
+    z-index: 44; pointer-events: none; mix-blend-mode: screen;
+    background:
+        linear-gradient(180deg, rgba(255,138,44,0) 0%, rgba(255,132,40,0.07) 46%, rgba(255,118,32,0.13) 100%),
+        radial-gradient(70% 100% at 50% 118%, rgba(255,150,50,0.16), rgba(255,120,30,0) 72%); }
 @keyframes hwFogL { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @keyframes hwFogR { from { transform: translateX(-50%); } to { transform: translateX(0); } }
 `;
