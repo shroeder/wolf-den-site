@@ -717,7 +717,32 @@ const HW_SCENES = [
  * without empty road there is nothing for a cluster to be denser THAN. So roughly half the doors get dressed,
  * yard scenes are only pitched where nothing else is within 7%, and the walk between them strides 9-20%.
  */
-function buildHalloweenDressing(buildings) {
+// ⚠️ THE STREET IS NOT EMPTY BETWEEN THE DOORS. The dressing was handed the BUILDINGS and nothing else, so
+// as far as it knew the whole space between two shopfronts was free — and it is not: the wolf fountain stands
+// in it, and five NPCs stand in it at 9, 31, 42, 53 and 64. A thirty-percent-tall canopy dropped on the
+// fountain buries the landmark, the wishing badge over it and the merchant beside it all at once. Luke:
+// "a bunch of stuff is overlapping."
+//
+// Trees need a wide berth because a canopy is far wider than its trunk; a lamp post is a stick and only needs
+// enough room not to grow out of somebody's head.
+// ⚠️ WRITTEN ONCE. These were five numbers typed into five style attributes and a sixth copy in the dressing,
+// and the copy was already wrong: it had 9/31/42/53/64 and the street also has the voting booth, which stands
+// at 76 and moves to 89 when somebody is in the stockade. Measured in the browser, that cost a tree at 71.2
+// (4.8 from a post) and a lamp at 75.8 (0.2 from one) — the drift the comment below was written to prevent,
+// arriving about ten minutes after it was written. BOTH booth positions are reserved: a canopy that is only
+// in the way half the time is still in the way.
+const NPC_X = { crier: 9, smith: 31, auction: 42, merchant: 53, quest: 64, booth: 76, boothHeld: 89 };
+const NPC_POSTS = Object.values(NPC_X);
+// Measured rather than guessed, against the real street: WORLD_W is about 4,841px, so one percent is ~48px.
+// A canopy at 30-36% of the scene is ~160px across, call it 3.3%; an NPC sprite is 86px, ~1.8%; the fountain
+// is the widest thing out there at roughly 4%. Half of each pair summed is 2.6% for an NPC and 3.7% for the
+// fountain, so four-something is the point where nothing actually touches. 5.5 was a guess and it was over-
+// tight: it cost three of seven bands their tree on a street that had room for them.
+const TREE_CLEAR = 4.2;
+const LAMP_CLEAR = 2.2;
+const clearOf = (x, occupied, by) => occupied.every((o) => Math.abs(x - o) > by);
+
+function buildHalloweenDressing(buildings, occupied = []) {
     const rand = hwRng(0x4A5F17);
     const pick = (lo, hi) => lo + rand() * (hi - lo);
     const out = [];
@@ -807,7 +832,15 @@ function buildHalloweenDressing(buildings) {
     // as a mistake rather than as character. Luke: "lanterns should be in places that nake sense. Add lamp
     // posts." Every 8% of the street, with only a hand's width of jitter so it never looks stamped.
     for (let x = 4; x < 100; x += 8) {
-        put("lamppost", x + (rand() - 0.5) * 0.9, 1);
+        let at = x + (rand() - 0.5) * 0.9;
+        // Nudged aside rather than dropped: a missing lamp in an evenly lit street is a hole somebody
+        // notices, where one standing a stride off its mark is just a street.
+        if (!clearOf(at, occupied, LAMP_CLEAR)) {
+            const shifted = [at - LAMP_CLEAR * 1.4, at + LAMP_CLEAR * 1.4].find((c) => clearOf(c, occupied, LAMP_CLEAR));
+            if (!shifted) continue;
+            at = shifted;
+        }
+        put("lamppost", at, 1);
     }
 
     // ── THE AUTUMN TREES ─────────────────────────────────────────────────────────────────────────────────
@@ -842,12 +875,31 @@ function buildHalloweenDressing(buildings) {
     for (let band = 0; band < BANDS; band += 1) {
         const lo = (band * 100) / BANDS;
         const hi = ((band + 1) * 100) / BANDS;
+        // ⚠️ THE WHOLE GAP IS SEARCHED, NOT JUST ITS MIDDLE. Testing only the midpoint threw away any gap
+        // whose CENTRE happened to sit near a post even when one end of it was wide open — with eight posts
+        // on this street that took seven bands down to three trees, which walks straight back into the
+        // complaint that started this ("Only one tree in town"). Walking the span keeps both: nothing stands
+        // on anybody, and a band only goes without when it genuinely has nowhere to put a canopy.
         const here = gaps.filter((g) => g.mid >= lo && g.mid < hi && g.w >= 5).sort((a, b) => b.w - a.w);
-        if (here.length) chosen.push(here[0]);
+        for (const g of here) {
+            const room = Math.min(2.4, (g.w - 4) / 2);
+            // Bands are searched independently, so two of them reaching toward their shared edge put a pair
+            // of canopies 2% apart -- measured, 57.7 and 59.7 -- which reads as one lumpy tree rather than
+            // two. Previously chosen trunks count as occupied for the next band.
+            const taken = chosen.map((c) => c.x);
+            const spot = [0, -0.34, 0.34, -0.62, 0.62].map((f) => g.mid + f * g.w)
+                .find((x) => x > 1 && x < 99 && clearOf(x, occupied, TREE_CLEAR) && clearOf(x, taken, TREE_CLEAR));
+            if (spot === undefined) continue;
+            chosen.push({ x: spot, room });
+            break;
+        }
     }
-    for (const g of chosen) {
-        if (g.w < 5) continue;   // no room for a canopy without covering a door
-        out.push({ key: "hw_tree_fall", kind: "falltree", x: g.mid + (rand() - 0.5) * Math.min(2, g.w - 4),
+    for (const c of chosen) {
+        // Jitter, then keep it only if it is still clear — a nudge that puts the canopy back on a shopkeeper
+        // is not worth the variety it buys.
+        const jittered = c.x + (rand() - 0.5) * c.room;
+        const x = clearOf(jittered, occupied, TREE_CLEAR) ? jittered : c.x;
+        out.push({ key: "hw_tree_fall", kind: "falltree", x,
             top: Math.round(pick(73, 75) * 10) / 10, h: Math.round(pick(30, 36) * 10) / 10,
             flip: rand() < 0.5, delay: Math.round(rand() * 600) / 100 });
     }
@@ -908,7 +960,10 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
     // they scale with it or a longer street simply runs out of scenery at the far end.
     const tiles = useCallback((base) => TILES(Math.ceil(base * (WORLD_W / WORLD_MIN))), [WORLD_W]);
     // The seasonal layout is built FROM the buildings, so porches land on real doors even as the street grows.
-    const hwProps = useMemo(() => buildHalloweenDressing(buildings), [buildings]);
+    // The fountain moves with the town's own state; the NPC posts come from NPC_X, which the markup below now
+    // reads too, so the two cannot drift apart again.
+    const hwOccupied = useMemo(() => [...NPC_POSTS, Number(state?.wellX) || 20], [state?.wellX]);
+    const hwProps = useMemo(() => buildHalloweenDressing(buildings, hwOccupied), [buildings, hwOccupied]);
     const [me, setMe] = useState(() => ({ x: initial?.you?.x ?? 50, y: initial?.you?.y ?? 80, facing: initial?.you?.facing ?? 1, moving: false, moveDist: 0, wave: false }));
     const [others, setOthers] = useState({});
     const [viewportW, setViewportW] = useState(360);
@@ -1944,7 +1999,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                     {!raidActive ? (
                       <>
                     {/* Blacksmith NPC by the Forge — tap for a tip + a shortcut in */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "31%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
+                    <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.smith}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
                         {art.smith?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={art.smith.url} alt="Blacksmith" draggable={false} />
@@ -1959,7 +2014,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         gone. A shut booth with a sign is a schedule; an absent booth is a bug. */}
                     {stockade?.election?.phase === "voting" ? (
                         <button type="button" className="tw-npc-btn tw-votebooth"
-                            style={{ left: stockade?.occupant ? "89%" : "76%", top: `${GROUND + 6}%` }}
+                            style={{ left: stockade?.occupant ? `${NPC_X.boothHeld}%` : `${NPC_X.booth}%`, top: `${GROUND + 6}%` }}
                             onClick={(e) => { e.stopPropagation(); setVoteOpen(true); }} aria-label="The voting booth">
                             <span className="tw-npc-bubble">🗳️ Who goes in the stockade?</span>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1986,7 +2041,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                             ) : <span className="tw-npc-emoji">⛓️</span>}
                         </button>
                     ) : null}
-                    <button type="button" className="tw-npc-btn" style={{ left: "9%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
+                    <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.crier}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
                         {crierLines.length ? <span className="tw-npc-bubble">📣 {crierLines[crierMsg % crierLines.length]}</span> : null}
                         {art.crier?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -1994,7 +2049,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         ) : <span className="tw-npc-emoji">📣</span>}
                     </button>
                     {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "64%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); load(); }} aria-label="Quest Giver">
+                    <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.quest}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); load(); }} aria-label="Quest Giver">
                         <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
                         {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
                         {art.questgiver?.url ? (
@@ -2003,7 +2058,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         ) : <span className="tw-npc-emoji">📜</span>}
                     </button>
                     {/* Traveling Merchant — tap to browse wares */}
-                    <button type="button" className="tw-npc-btn" style={{ left: "53%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
+                    <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.merchant}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
                         <span className="tw-npc-bubble">🧳 Wares for sale!</span>
                         {art.merchant?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -2011,7 +2066,7 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         ) : <span className="tw-npc-emoji">🧳</span>}
                     </button>
                     {/* Auctioneer — links out to the Auction House */}
-                    <Link href="/marketplace/auction" className="tw-npc-btn" style={{ left: "42%", top: `${GROUND + 6}%` }} onClick={(e) => e.stopPropagation()} aria-label="Auction House">
+                    <Link href="/marketplace/auction" className="tw-npc-btn" style={{ left: `${NPC_X.auction}%`, top: `${GROUND + 6}%` }} onClick={(e) => e.stopPropagation()} aria-label="Auction House">
                         <span className="tw-npc-bubble">🔨 Auction House!</span>
                         {art.auctioneer?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
