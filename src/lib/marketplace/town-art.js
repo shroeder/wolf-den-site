@@ -459,11 +459,30 @@ Object.assign(ART_PROMPTS, {
         `curled russet and brown fallen leaves banked up among them. ` +
         `⚠️ THE TOP EDGE MUST BE RAGGED AND IRREGULAR — grass blades and stems of clearly DIFFERENT heights ` +
         `breaking upward at different points, never a level hedge-line and never a straight top. ` +
-        `The BOTTOM edge is where it meets the road: dense leaf litter, flat and solid, running the full width. ` +
+        `⚠️ THE BOTTOM EDGE MUST DISSOLVE, NOT STOP. Toward the bottom the leaf litter THINS OUT into sparse, ` +
+        `separated individual leaves with bare gaps between them, and the lowest strip of the image is FULLY ` +
+        `TRANSPARENT. There must be NO solid band, NO flat mass and NO straight edge anywhere along the ` +
+        `bottom — the first draw of this asked for "dense leaf litter, flat and solid" along the bottom and ` +
+        `that flat edge IS the ruled line across the street this strip was made to hide. ` +
         `The TOP ~55% of the image is FULLY TRANSPARENT (alpha) with nothing in it at all. ` +
         `Seamless left-to-right: it tiles, so the left and right edges must continue into each other and there ` +
         `must be NO landmark, no single tall plant, nothing distinctive enough to be spotted repeating. ` +
         `NO fence, NO posts, NO logs, NO mushrooms, NO animals, NO sky, NO ground beyond the strip. ${FOREST_NIGHT}`,
+    // ⚠️ A SHAPE, NOT A TONE. The straight edge where .tw-fg stops has now survived a gradient across the
+    // seam AND a mask fading the band out: measured, the mask moved the sharpest step from y=685 to y=730 and
+    // left its magnitude alone at about -9.5. A tonal trick relocates an edge, it does not destroy one. Only
+    // an irregular silhouette standing ON it does. Luke: "We need creepy shrubs or something."
+    // Drawn as a single sprite so it can be scattered at uneven intervals and flipped -- a tiling strip is
+    // just a straighter line with texture on it.
+    hw_shrub: housePrompt(
+        "A single dead, gnarled SHRUB — a low tangled bush of bare crooked twigs with no leaves, splayed and " +
+        "uneven, a few dry brown curled leaves caught in the lower branches, its base sitting in a small drift " +
+        "of fallen leaves",
+        { extra: HW_NEAR_EXTRA + " ⚠️ THE TOP MUST BE RAGGED AND ASYMMETRIC — twigs of clearly different " +
+            "heights splaying out at different angles, NEVER a rounded hedge dome and never a flat top. " +
+            "Wider than it is tall. The base is flat along the bottom edge of the shape where it meets the " +
+            "ground. NO pot, NO fence, NO wall, NO ground beyond the small leaf drift at its foot." }
+    ),
     hw_fg: `A LOW foreground band of FOREST UNDERGROWTH running straight across the BOTTOM of the frame — a ` +
         `fallen mossy log, tangled brambles and dead ferns, drifts of dry curled leaves, a few pale toadstools, ` +
         `clumps of long dead grass, and a broken crooked wooden fence rail half-swallowed by it all. Nearer and ` +
@@ -520,7 +539,7 @@ export const HALLOWEEN_PROP_KEYS = [
     "hw_moon", "hw_witch_a", "hw_witch_b", "hw_bats", "hw_tree",
     "hw_pumpkin", "hw_lantern", "hw_candles", "hw_ghost",
     "hw_scarecrow", "hw_haybale", "hw_cauldron", "hw_gravestone", "hw_skeleton", "hw_pumpkin_stack", "hw_crow",
-    "hw_cobble", "hw_tree_fall", "hw_lamppost", "hw_verge",
+    "hw_cobble", "hw_tree_fall", "hw_lamppost", "hw_verge", "hw_shrub",
     "hw_depth1", "hw_depth3", "hw_mid", "hw_fg",
 ];
 export const HALLOWEEN_BUILDING_KEYS = Object.keys(_hwBuildings);

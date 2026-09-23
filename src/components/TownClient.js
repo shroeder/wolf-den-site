@@ -753,6 +753,11 @@ function buildHalloweenDressing(buildings, occupied = []) {
             key: piece.key, kind: piece.kind,
             x: Math.round(Math.max(0.5, Math.min(99.5, x)) * 100) / 100,
             top: Math.round(pick(piece.top[0], piece.top[1]) * 10) / 10,
+            // ⚠️ THE POOLS MUST NOT ALL BEGIN AT THE SAME HEIGHT. Every lit prop stands on the same ground
+            // line, so every pool's TOP landed within ten pixels of its neighbours -- measured, 726 to 736
+            // across all fifty-four of them. Fifty-four soft gradients starting on one line still add up to
+            // one hard line, and that is the straight edge across the floor, not the undergrowth above it.
+            poolDy: Math.round(pick(-1.6, 1.6) * 10) / 10,
             h: Math.round(pick(piece.h[0], piece.h[1]) * (hScale || 1) * 10) / 10,
             flip: rand() < 0.45,
             delay: Math.round(rand() * 400) / 100,
@@ -824,6 +829,35 @@ function buildHalloweenDressing(buildings, occupied = []) {
             put(part, a.x + lean + side, k === 0 ? 1 : pick(0.8, 1));
         });
     });
+
+    // ── THE SHRUB LINE ───────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ THE ONE JOB IS BREAKING A STRAIGHT EDGE, AND TWO TONAL ATTEMPTS FAILED AT IT FIRST. A gradient
+    // across the seam softened the contrast and left the edge; a mask fading .tw-fg out moved the sharpest
+    // step from y=685 to y=730 and left its magnitude alone at about -9.5. Measured both times. An edge is a
+    // SHAPE, and only a shape destroys it. Luke: "We need creepy shrubs or something."
+    //
+    // ⚠️ AND THEIR OWN FEET MUST NOT BECOME THE NEXT LINE. Standing eighteen shrubs at one height would
+    // replace a ruled edge with a ruled row of bases, which is the same bug wearing twigs. The ground line
+    // wanders three percent, the spacing carries more jitter than its own step, and every other one is
+    // flipped.
+    // ⚠️ COUNTED AGAINST THE WINDOW AGAIN. Eighteen shrubs sounded like a hedge and put THREE on screen: the
+    // street is ~4,841px, the camera shows 796, and each shrub is about 50px wide -- under a fifth of the
+    // line covered, which is why the first attempt looked identical to no attempt. Every 2.6% with bigger
+    // bushes is roughly seven in view, overlapping, which is what a continuous edge needs to disappear.
+    for (let x = 1; x < 100; x += 2.6) {
+        out.push({
+            key: "hw_shrub", kind: "shrub",
+            x: Math.round(Math.max(0.5, Math.min(99.5, x + (rand() - 0.5) * 1.9)) * 100) / 100,
+            // ⚠️ THEIR FEET GO BELOW THE JOIN, NOT ONTO IT. Standing them at 61.5-65 put every base at
+            // viewport 679-698 with the edge at ~700 — so the bushes lined up ALONG the line and their own
+            // bottoms became a second straight edge, which is the failure this whole block exists to avoid.
+            // Rooted lower, the leaf drift at each foot sits on the cobbles and the join passes behind them.
+            top: Math.round(pick(65, 71) * 10) / 10,
+            h: Math.round(pick(12, 18) * 10) / 10,
+            flip: rand() < 0.5,
+            delay: Math.round(rand() * 600) / 100,
+        });
+    }
 
     // ── THE LAMP POSTS ───────────────────────────────────────────────────────────────────────────────────
     // ⚠️ AND THESE ARE THE ONE THING IN THE DRESSING THAT IS DELIBERATELY EVENLY SPACED. Everything else in
@@ -1894,8 +1928,8 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                         cannot stretch with the window the way a percentage width would. */}
                     {spooky ? hwProps.filter((p) => HW_LIT.has(p.kind)).map((p, i) => (
                         <span key={`hwp-${i}`} className={`hw-pool is-${p.kind}`} aria-hidden="true"
-                            style={{ left: `${p.x}%`, top: `${p.top}%`, height: `${Math.round(p.h * 62) / 100}%`,
-                                animationDelay: `${p.delay}s` }} />
+                            style={{ left: `${p.x}%`, top: `${p.top + (p.poolDy || 0)}%`,
+                                height: `${Math.round(p.h * 58) / 100}%`, animationDelay: `${p.delay}s` }} />
                     )) : null}
                     {spooky ? hwProps.map((p, i) => (art[p.key]?.url ? (
                         // ⚠️ THE FLIP HAS TO BE PART OF THE SAME TRANSFORM. These are anchored the way the
@@ -3737,6 +3771,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    choppy. On a ground this dark, a warm gradient composited normally is within a hair of the same picture --
    screen only pulls away from normal blending over a BRIGHT backdrop, and there is not one down here. The
    alphas are lifted a little to make up the small difference. */
+/* ⚠️ SMALL AND SEPARATE, NOT BIG AND SOFT. Enlarging these (0.62 to 0.95 height, 3.4 to 2.5 ratio) to make
+   each one's falloff gentler did the opposite of the intent: fifty-four pools over a 796px window already
+   total more than its width, so bigger ones MERGED into one continuous warm wash whose top edge was a
+   cleaner line than before -- measured, the step went from -9.7 to -11.0. Discrete puddles with dark stone
+   showing between them cannot form a band at all. */
 .hw-pool { position: absolute; width: auto; aspect-ratio: 3.4 / 1; z-index: 45; pointer-events: none;
     transform: translate(-50%, -52%); border-radius: 50%;
     animation: hwPool 2.7s ease-in-out infinite; }
@@ -3975,7 +4014,25 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    turns it TEAL, which then sits as a cold band across a warm lit road and draws more attention than the
    line it was hiding. sepia pulls it back through brown before the saturation goes on, so it lands as dry
    autumn grass lit from the street rather than as a hedge under a different moon. */
-.hw-verge { position: absolute; left: 0; bottom: 38%; height: 26%; display: flex; align-items: flex-end;
+/* ⚠️ 34%, NOT 38% — IT WAS MISSING BY THREE PIXELS. Measured: the sharpest step in the street is .tw-fg's
+   bottom at viewport 685, and at 38% this strip ran 542 to 682. It finished just above the one edge it was
+   drawn to cover, which is why two rounds of tuning its colour changed nothing. Its dense leaf-litter bottom
+   now sits below the join instead of on top of it. */
+/* ⚠️ THICKER, BECAUSE A 3px MISS AND A THIN STRIP ARE THE SAME BUG. The shrubs above cover about 68% of
+   the width -- good for character, useless as a seal, and the bare third is exactly where the line still
+   shows. This is the only layer that runs edge to edge, so it has to be the one that covers the join: at 26%
+   its opaque leaf litter was a ~20px band that had to land within a few pixels of y=685 to do anything. At
+   40% the litter is a band deep enough that the join is inside it everywhere, whatever the scene height. */
+/* ⚠️ THE MASK IS THE FIX, AND IT IS IN CSS BECAUSE THE PROMPT DOES NOT HOLD. hw_verge is drawn asking for a
+   bottom edge that thins to scattered leaves and then to nothing; measured on the returned file, the mean
+   alpha of its bottom fifth is 254 out of 255. It is a solid rectangle. So the strip added to hide a ruled
+   line across the street WAS the ruled line -- its own hard bottom -- and thickening it from 26% to 40% only
+   pushed that edge further out into open floor, which is why the measured step got worse each time.
+   A mask cannot be ignored by a model. The bottom third fades out, so wherever the art stops there is no
+   edge left to see. */
+.hw-verge { position: absolute; left: 0; bottom: 36%; height: 30%;
+    -webkit-mask-image: linear-gradient(to bottom, #000 58%, rgba(0,0,0,0.45) 82%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 58%, rgba(0,0,0,0.45) 82%, transparent 100%); display: flex; align-items: flex-end;
     z-index: 91; pointer-events: none;
     filter: brightness(1.5) sepia(0.42) saturate(1.45) hue-rotate(-14deg); }
 .hw-verge img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
@@ -4022,6 +4079,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    overshot -- Luke: "For elements dont need to be so dark." A jack-o'-lantern a few feet from you is one of
    the brightest things in a Halloween street, not a silhouette of one. Held just under the street so it
    still reads as being in front of the lamps rather than lit by them. */
+/* Standing ON the join between the undergrowth band and the street, so they must draw in FRONT of .tw-fg
+   (90) -- behind it they would be hidden by the very edge they exist to break. Under the lamp posts at 92
+   and the canopies at 95, which is the right order: a shrub is behind a lamp and under a tree.
+   Knocked down because they sit at the back of the street, not in the light of it. */
+.hw-shrub { z-index: 91; filter: brightness(0.66) saturate(0.78) drop-shadow(0 4px 7px rgba(0,0,0,0.5)); }
 .hw-prop.is-near { z-index: 60;
     filter: brightness(0.82) saturate(1.02) drop-shadow(0 7px 14px rgba(0,0,0,0.62)); }
 .tw-scene.is-spooky .hw-nearhaze { position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
