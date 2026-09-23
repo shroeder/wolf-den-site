@@ -4562,9 +4562,23 @@ export function foeAct(state, i) {
     }
     // ── STRENGTH TAKEN AWAY, AND IT DOES NOT TICK BACK ──────────────────────────────────────────────
     // Siphon Soul. Weak is a duration; this is not — the hero simply hits for less with everything for the
-    // rest of the fight, and attackDamage already floors a swing at zero so a negative total is safe.
+    // rest of the fight.
+    //
+    // ⚠️ BUT IT HAS A FLOOR NOW, BECAUSE UNBOUNDED IT IS A DEATH SPIRAL WITH NO EXIT. The old note here said
+    // a negative total was safe because attackDamage floors a swing at zero. That is true of one swing and
+    // false of a fight: the drain has no cap, the Headsman cycles back to Siphon every second or third turn,
+    // and every point taken makes the fight last longer, which buys it another Siphon. Past about -6 a
+    // starter deck deals literally nothing and the run cannot be won or escaped, only waited out.
+    //
+    // Sunflower Jinxx: "All my damage cards were reduced to 0 damage. There was nothing I could do. Every
+    // other turn was him lowering it more, I hadn't even fought the first act boss yet so I had next to no
+    // cards for damage so I was doomed early." Kaishiern hit the same thing the day before.
+    //
+    // -3 keeps the identity — a 6-damage Strike halves to 3, everything degrades, the threat is real — and
+    // removes the state where the only legal moves are all worth nothing. It floors the TOTAL, not the step,
+    // so a hero at +10 Strength still loses a point per Siphon as before.
     if (intent.strengthDown) {
-        hero = { ...hero, strength: (hero.strength || 0) - intent.strengthDown };
+        hero = { ...hero, strength: Math.max(STRENGTH_DRAIN_FLOOR, (hero.strength || 0) - intent.strengthDown) };
         events.push({ type: "debuff", on: "hero", amount: intent.strengthDown, stat: "strength" });
     }
     // The same one door the cards use, so an Artifact charge eats a creature's debuff exactly as it eats
@@ -4750,6 +4764,9 @@ export function heroEndTurn(state) {
 //
 // ⚠️ CAPPED. This runs on request CPU, which is the bill (see CLAUDE.md), and an unbounded array from a client
 // is an unbounded loop. A real turn is a handful of moves; a thousand is already absurd.
+// How far a fight's Strength drain may take you. See the note where it is applied.
+export const STRENGTH_DRAIN_FLOOR = -3;
+
 export const MOVES_MAX = 2000;
 
 export function applyMoves(start, moves, { potionAt = () => null } = {}) {

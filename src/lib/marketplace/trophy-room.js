@@ -112,7 +112,12 @@ const RECORD_HINT = {
     "Chest points": "Chest value banked, weighted by tier. This is what unlocks the dig tools.",
     "Fragments held": "Shards left over when fragments were retired. They were paid out as chests and doubloons.",
     "Line recharges": "Times you paid for more casts after the day's ran out.",
-    "Best combo": "The longest unbroken run of good swings in a single descent.",
+    // ⚠️ IT IS NOT LOOT AND IT IS NOT A DESCENT. `kept` is a GRADE threshold on the swing timing, and the
+    // counter lives on mkt_ore_node_hit keyed by node — a fresh node has no prior row, so the run restarts
+    // the moment you move to the next seam. ValkyrieSylve read this as "8 strikes that produce loot", had
+    // 10-11 loot swings across a run, and reported the number as wrong. The number was right; the sentence
+    // was describing a different thing on both counts.
+    "Best combo": "The longest unbroken run of well-timed swings on a SINGLE seam — it restarts at the next one, and it counts timing, not loot.",
     "Best read streak": "The longest run of correctly read seams while surveying.",
     "Masterwork runs": "Descents finished at the top grade.",
     "Emberheart cracked": "The rarest seam in the mine, opened.",
