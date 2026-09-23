@@ -678,7 +678,7 @@ export const FISH_TRACKS = {
     // `art` is a painted sprite in /images/sailing/tracks; `icon` stays as the fallback glyph only.
     line: { max: 5, per: 1, cap: 5, kind: "count", name: "Line", art: "line", icon: "🎣", desc: "Extra casts each day." },
     lure: { max: 5, per: 0.05, cap: 0.25, kind: "pct", name: "Lure", art: "lure", icon: "✨", desc: "Better odds of a rarer species." },
-    net: { max: 5, per: 0.02, cap: 0.10, kind: "pct", name: "Net", art: "net", icon: "🪣", desc: "More casts bring up treasure instead of a fish." },
+    net: { max: 5, per: 0.02, cap: 0.10, kind: "pct", name: "Net", art: "net", icon: "🪣", desc: "More casts bring up treasure ALONGSIDE the fish." },
         // "Floors the size" reads as REDUCES it — ValkyrieSylve, in the plaza: "What does Gaff do in the rail
     // now?" It sets a floor UNDER the size, and the reason that is worth buying is one screen away: a
     // fish’s payout runs 45% of its species value at the small end to full value at the top, so a bigger
@@ -943,8 +943,14 @@ export async function castLine(buyerId, { status = "sailing", angling = 0, bait 
     // Fortune widens the treasure window on top of the Net track and a dredging pet. The SPECIES roll is
     // deliberately left alone: Angling, Lure and bait are the stats built to pull a rarer fish, and a luck
     // stat that also did their job would make three tracks redundant. Fortune finds THINGS, not fish.
-    const isTreasure = (dredgeNet && oneIn(4))
-        || Math.random() < luckyChance(TREASURE_CHANCE + fishTrackValue("net", lv.net) + seaPets.dredge / 100, await fortuneFor(buyerId).catch(() => 0));
+    // ⚠️ THE NET TRACK IS NO LONGER IN THIS ROLL. It used to add up to +10% here, which meant every level of
+    // it bought you FEWER FISH -- the perk's own description said so out loud ("treasure instead of a fish")
+    // and the best two anglers in the Den read that and refused to level it. Kaishiern: "I think the fishing
+    // perk that increases odds of getting treasure instead of fish should be changed to increase odds of
+    // getting treasure WITH a fish not instead of. Otherwise people will choose not to level it like Valk and
+    // I." A track people deliberately avoid is not a choice, it is a trap. It rolls a SEPARATE bonus below.
+    let isTreasure = (dredgeNet && oneIn(4))
+        || Math.random() < luckyChance(TREASURE_CHANCE + seaPets.dredge / 100, await fortuneFor(buyerId).catch(() => 0));
     // ── ASCENSION POWERS ON A CAST ───────────────────────────────────────────────────────────────────────
     // Every one of these decides WHAT IS ON THE LINE, so they all read at the species roll rather than being
     // scattered through the reel. Cold Bait and The Full Creel are first-cast-of-the-day powers, so they need
@@ -967,6 +973,17 @@ export async function castLine(buyerId, { status = "sailing", angling = 0, bait 
             if (spent) baitUsed = { id: bait, name: def.name, tilt: def.tilt, rarity: def.rarity };
         }
     }
+    // ── ⚠️ BAIT BUYS A FISH ──────────────────────────────────────────────────────────────────────────────
+    // Sunflower Jinxx: "Would it be possible to make it if you use bait you actually get a fish? I made the
+    // glass minnow bait that uses star essence and I got 8 dabloons." Bait is COOKED -- it costs ingredients,
+    // sometimes star essence -- and it is sold as tilting the species roll. Spending one and being handed
+    // doubloons off the sea floor instead of a fish is the cast eating the ingredient and giving nothing the
+    // bait was for. A bait cast is a fishing cast now; the treasure roll is skipped entirely.
+    // Only when the pantry actually gave one up: a bait that failed to leave the shelf must not buy anything.
+    if (baitUsed) isTreasure = false;
+    // And the Net track pays here instead -- treasure ALONGSIDE the fish, on a cast that is still a fish.
+    const bonusTreasure = !isTreasure && Math.random() < fishTrackValue("net", lv.net);
+
     let rareTilt = anglingEffects(angling).rareTilt + fishTrackValue("lure", lv.lure) + seaPets.bite / 100
         + (baitUsed?.tilt || 0);
     if (castPowers.has("long_haul") && oneIn(4)) rareTilt += 2;        // two tiers rarer than it rolled
@@ -1003,6 +1020,8 @@ export async function castLine(buyerId, { status = "sailing", angling = 0, bait 
         species: species.id,
         monster: monster ? monster.id : null,
         treasure: !monster && isTreasure ? { kind: rollTreasure(), tier: pickWeighted(TREASURE_TIER) } : null,
+        // Rides with the fish rather than replacing it — see the Net note at the treasure roll.
+        bonusTreasure: !monster && bonusTreasure ? { kind: rollTreasure(), tier: pickWeighted(TREASURE_TIER) } : null,
         roll: Math.round(Math.random() * 1000) / 1000,     // the luck half of the final weight
         castAt: Date.now(),
         biteAt: Date.now() + Math.round(BITE_MIN_MS + Math.random() * (BITE_MAX_MS - BITE_MIN_MS)),
@@ -1276,6 +1295,20 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     }
     if (bonusFish.length) await checkFishingBadges(buyerId).catch(() => {});
 
+    // ── ⚠️ THE NET'S BONUS, PAID WITH THE FISH ───────────────────────────────────────────────────────────
+    // The Net track no longer replaces a catch, so its treasure is granted HERE, on a cast that already put a
+    // fish in the boat. Same grantHaul and same reel-quality upgrade the replacement treasure gets, so the
+    // minigame still matters; it simply arrives as well as the fish instead of instead of it.
+    let netHaul = null;
+    if (state.bonusTreasure) {
+        let bTier = state.bonusTreasure.tier || "common";
+        if (q >= 0.75) bTier = RARITY_ORDER[Math.min(RARITY_ORDER.length - 1, RARITY_ORDER.indexOf(bTier) + 1)];
+        netHaul = await grantHaul(buyerId, state.bonusTreasure.kind, bTier).catch(() => null);
+        // Same fallback as the replacement treasure: something you already own pays a fragment rather than
+        // reporting a prize the member never receives.
+        netHaul = netHaul || await grantHaul(buyerId, "fragment", bTier).catch(() => null);
+        if (netHaul) await trackActivity(buyerId, "fish_net_bonus", { kind: netHaul.kind || "none", tier: bTier }).catch(() => {});
+    }
     await trackActivity(buyerId, "fish_caught", { species: species.id, rarity: species.rarity, cm, quality: q, gold, xp, firstEver, personalBest }).catch(() => {});
     // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
     // nothing says it is coming.
@@ -1297,6 +1330,8 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
         beatsRange: cm > species.lb[1],
         denBest: denBest ? Number(denBest.lb) : null,
         gold, xp, extras,
+        // The Net's haul, so the reel screen can show it beside the fish rather than paying it silently.
+        netHaul,
         quality: q,
         firstEver, personalBest, denRecord,
         previousBest: prev?.best ? round1(Number(prev.best)) : null,

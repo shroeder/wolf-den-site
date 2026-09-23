@@ -52,7 +52,7 @@ export const ASCENSION_POWERS = {
     whistle: { item: "ascendant_ascendant_hood", name: "The Whistle", tier: "ascendant", cls: "B", desc: "A pet you swap out keeps its ability for the rest of the day." },
     auctioneer_s_seat: { item: "ascendant_ascendant_scale", name: "The Auctioneer's Seat", tier: "ascendant", cls: "A", desc: "You pay no listing fee, and listing never takes the item out of your bags." },
     merchant_s_word: { item: "ascendant_ascendant_waistguard", name: "Merchant's Word", tier: "ascendant", cls: "B", desc: "A trade you offer holds its items in escrow without taking them off you." },
-    standing_offer: { item: "ascendant_ascendant_tracks", name: "The Standing Offer", tier: "ascendant", cls: "B", desc: "One item a day, the shop buys from you at the price it sells for." },
+    standing_offer: { item: "ascendant_ascendant_tracks", name: "The Standing Offer", tier: "ascendant", cls: "B", desc: "One item a day, the shop pays TRIPLE the usual sell-back price for it." },
     purser_s_exchange: { item: "ascendant_ascendant_cloak", name: "The Purser's Exchange", tier: "ascendant", cls: "B", desc: "Doubloons and laurels convert freely into one another. Gold stays out of it." },
     counting_house: { item: "ascendant_ascendant_amulet", name: "The Counting House", tier: "ascendant", cls: "B", desc: "The gold in your purse earns interest, paid at every check-in." },
     merchant_s_eye: { item: "ascendant_ascendant_signet", name: "The Merchant's Eye", tier: "ascendant", cls: "A", desc: "One daily deal each day is offered to you at half price." },

@@ -375,6 +375,8 @@ function chargeState(ownedRow, item) {
 // items hold real-world value, so they can't be sold for gold.
 // Celestial and primordial were added when the top of the ladder was extended. Without them a sell-back
 // returned `undefined` gold, which is not a smaller number — it is a broken transaction.
+// What the Standing Offer pays over the counter price — a shop's markup, once a day. See its use below.
+export const STANDING_OFFER_MULT = 3;
 const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900, ascendant: 2500, eternal: 6000, celestial: 12000, primordial: 20000 };
 // Power ordering for the shop so it reads as one clean worst→best ladder (the catalog itself is grouped
 // by when items were added, which otherwise makes the shop restart at "worst" every batch).
@@ -593,9 +595,19 @@ export async function sellItem(buyerId, itemId) {
     // version of that trade anybody takes on purpose.
     // The Standing Offer: once a day, the shop pays what it SELLS for rather than the sell-back value. The
     // gap is the whole point — sell-back is deliberately a fraction of the shelf price.
+    // ⚠️ THIS POWER HAS NEVER ONCE FIRED. It was gated on `item.price`, and NO item in the game carries a
+    // price field — all 634 pieces of gear, and every other item besides, have none. `item?.price` is always
+    // falsy, so the branch was unreachable from the day it shipped and an ascendant-tier power did nothing at
+    // all. ValkyrieSylve reported it as broken and was told in-channel that she had misread what it does; she
+    // had not, the power was dead.
+    //
+    // There is no shelf price to pay, either: gear is not sold for gold anywhere, so "the price it sells for"
+    // never had anything to point at. The nearest true thing is the markup a shop takes over what it pays
+    // you, so the Offer pays a multiple of the sell-back value instead, and the description below says the
+    // number out loud rather than describing a field that does not exist.
     let value = sellValueOf(item);
-    if (item?.price && await claimPowerUse(buyerId, "standing_offer")) {
-        value = Math.max(value, Math.round(Number(item.price) || 0));
+    if (await claimPowerUse(buyerId, "standing_offer")) {
+        value = Math.round(value * STANDING_OFFER_MULT);
     }
     // Remove ownership atomically-ish: delete the owned row (source of truth) and only pay out if it existed.
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {});

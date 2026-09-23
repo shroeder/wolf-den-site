@@ -162,7 +162,13 @@ export const ITEM_SETS = [
         items: ["gc_quadrant", "gc_rammer", "gc_bell", "gc_marque", "gc_horn", "gc_colours"],
         bonuses: [{ need: 2, sea: { broadside: 4 } }, { need: 4, sea: { broadside: 5, ironclad: 5 } }],
         capstone: { openingReckoning: true, sea: { broadside: 5, plunder: 5 },
-            desc: "Beat to Quarters: every fight at sea opens with a Reckoning already charged — one free broadside before she answers." },
+            // ⚠️ "EVERY FIGHT AT SEA" WAS NOT TRUE AND COST TWO BUG REPORTS. openEncounterBattle applies this
+            // and the fleet ladder deliberately does not — the set is bought with doubloons, which only
+            // encounters pay, and that exclusion is written into the code beside the line that grants it.
+            // The description promised every sea fight, so ValkyrieSylve completed the set, went straight to
+            // a ship battle, got nothing and reported it broken; GrayKitsune had already reported the same
+            // thing once. It is not broken, it was mis-sold. Say which fight it is.
+            desc: "Beat to Quarters: every ENCOUNTER at sea opens with a Reckoning already charged — one free broadside before she answers. Fleet battles are not encounters and do not get it." },
         weakness: null,
     },
     // ── FARM SETS ── bonuses are FARM affinity (seedLuck/growSpeed/harvestLuck/goldHarvest), NOT boss power, and
