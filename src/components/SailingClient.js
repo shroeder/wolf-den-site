@@ -189,7 +189,7 @@ function Stars({ level }) {
     return <span className="sail-stars">{Array.from({ length: 5 }, (_, i) => <span key={i} className={i < tier ? "on" : "off"}>★</span>)}</span>;
 }
 
-export default function SailingClient({ initial, hero, pet, captain }) {
+export default function SailingClient({ initial, hero, pet, captain, halloween = false }) {
     const [state, setState] = useState(initial);
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState(null);
@@ -295,6 +295,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // real-weather sky if we have one, else the local time of day. Then quietly refresh the cache for next load
     // (no live change), or offer the location prompt.
     useLayoutEffect(() => {
+        // ⚠️ THE FLAG OUTRANKS THE WEATHER. When the game is dressed up the sky is a costume, not a forecast,
+        // so none of the clock / cached / real-weather logic below may run — otherwise the haunted horizon the
+        // server rendered is replaced by a sunset a fraction of a second after the first paint, and the ONLY
+        // symptom is a flicker nobody can reproduce on demand.
+        if (halloween) { setSky("/images/sailing/sky-haunted.png"); return; }
         const h = new Date().getHours();
         const t = h < 5 ? "night" : h < 7 ? "sunrise" : h < 17 ? "clearday" : h < 19 ? "goldenhour" : h < 20 ? "sunset" : h < 21 ? "dusk" : "night";
         let chosen = `/images/sailing/sky-${t}.png`;
@@ -316,7 +321,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             fetchAmbiance(null, !hadCache);
             if (pref !== "no") setGeoPrompt(true);
         }
-    }, [requestAmbiance, fetchAmbiance]);
+    }, [requestAmbiance, fetchAmbiance, halloween]);
 
     const stateRef = useRef(state);
     useEffect(() => { stateRef.current = state; }, [state]);
@@ -815,6 +820,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             across a 220px strip. Everything below is the old inline scene's reads, mapped
                             one-for-one onto props. */}
                         <SailingSea
+                            halloween={halloween}
                             sky={sky || state.oceanBg}
                             boat={{ art: state.boatArt, tier: state.tier }}
                             /* The hero's own sprite if he has one, else his avatar photo. SailingSea keeps

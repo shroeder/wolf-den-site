@@ -49,6 +49,16 @@ const STATES = {
         absent: [".sail-chart-cta", ".sail-capblock"],
         make: () => { const s = clone(); s.chartsReady = 0; s.status = "idle"; return s; },
     },
+    // The town's Halloween flag raised. Everything about the dressing is cosmetic, so what this state is
+    // really checking is that the costume did not COST anything: the stations still reach the screen and the
+    // helm still works with a moon, bats, mist and pumpkins layered over the same scene.
+    halloween: {
+        why: "the flag is up: the sea is dressed and nothing it added is in the way",
+        watch: [],
+        soft: [".sail-stations"],
+        present: [".sail-hw-moon", ".sail-hw-bat", ".sail-hw-buoy"],
+        make: () => { const s = clone(); s.halloween = true; s.chartsReady = 0; s.status = "idle"; return s; },
+    },
     // Mid-voyage, which is what most members see most of the time.
     sailing: {
         why: "ship is out: the clock is the screen",

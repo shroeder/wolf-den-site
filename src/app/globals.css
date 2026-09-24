@@ -11626,6 +11626,123 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes skyScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 /* Moonless CSS night sky — a deep-blue gradient with a hand-scattered starfield in the upper sky. No moon
    (the painted night art's moon mirror-tiled onto every copy), and it's uniform so there's zero seam. */
+/* ── HALLOWEEN ON THE WATER ────────────────────────────────────────────────────────────────────────────────
+   Raised by the town's flag, which the sailing page reads from the same column the plaza writes.
+
+   ⚠️ THERE IS NO TINT LAYER HERE, DELIBERATELY. A full-scene multiply flattens every layer to one colour and
+   the painted hull stops reading as painted — that is the rule the plaza's lighting pass established. The
+   whole mood comes from REPLACED ART (sky-haunted.png) plus the discrete objects below, each sitting at its
+   own depth in the existing z-order: moon behind the clouds, mist on the waterline, bats in the middle
+   distance, pumpkins in the water with the near swell.
+
+   ⚠️ THE MOON IS A DOM ELEMENT AND MUST STAY ONE. Painting it into the sky strip puts four of them on screen,
+   because the strip is four copies with every other one mirrored. This also lets it hang still while the
+   cloud scrolls past behind it, which is what a moon does and what a painted-in one cannot. */
+/* ⚠️ IT MUST NOT READ AS A SUN, WHICH THE FIRST VERSION DID. A saturated orange disc with a big soft halo in
+   a bright sky is a sun; the green horizon behind it only made that worse. Three things separate the two:
+   a HARVEST MOON is pale rather than hot (bone-white through to amber, not orange through to red), its glow
+   is tight rather than a wide bloom, and its MARIA are unmistakable — a sun has no markings, so the blotches
+   are what actually says "moon" at this size. */
+.sail-sea.is-halloween .sail-hw-moon {
+    position: absolute;
+    z-index: 0;                 /* behind the clouds (1), above the sky strip (0) — it is IN the weather */
+    top: 7%; right: 15%;
+    /* ⚠️ SIZED FROM THE SCENE, NOT IN FIXED PIXELS. At a flat 96px this was a tasteful harvest moon on a
+       1300px desktop scene and an eclipse on a 340px phone — it filled a third of the water and sat on top of
+       the ship. A percentage resolves against the sea panel, and the px cap stops it growing silly on a wide
+       monitor. */
+    /* 11%, not 17%: the cap means the moon is ~7% of a 1300px desktop scene, so a phone share much above
+       that is not "the same moon smaller", it is a different composition. */
+    width: min(96px, 11%);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 40% 36%, #fff6e2 0%, #ffe6ba 38%, #f6c98a 68%, #d99f5e 100%);
+    box-shadow: 0 0 22px 4px rgba(255, 228, 176, .34), 0 0 66px 20px rgba(214, 150, 70, .16);
+    opacity: .97;
+}
+.sail-sea.is-halloween .sail-hw-moon::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    /* Bigger, softer and darker than the first pass — at 96px these have to be readable as markings rather
+       than as noise, or the disc goes back to looking like a light source. */
+    background:
+        radial-gradient(13px 11px at 33% 57%, rgba(150, 110, 60, .34), transparent 72%),
+        radial-gradient(9px 9px at 62% 34%, rgba(150, 110, 60, .30), transparent 72%),
+        radial-gradient(16px 12px at 57% 72%, rgba(150, 110, 60, .26), transparent 74%),
+        radial-gradient(7px 7px at 44% 24%, rgba(150, 110, 60, .22), transparent 72%);
+}
+
+/* Mist ON THE WATERLINE only — a band, not a wash, so the hull above it stays clean. */
+.sail-sea.is-halloween .sail-hw-mist { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.sail-sea.is-halloween .sail-hw-mist i {
+    position: absolute; left: -30%; width: 160%; height: 16%;
+    background: radial-gradient(ellipse at 50% 50%, rgba(120, 255, 170, .16), rgba(120, 255, 170, 0) 68%);
+    animation: hwMist 34s linear infinite;
+}
+.sail-sea.is-halloween .sail-hw-mist i:nth-child(1) { bottom: 26%; animation-duration: 41s; }
+.sail-sea.is-halloween .sail-hw-mist i:nth-child(2) { bottom: 18%; animation-duration: 29s; animation-direction: reverse; opacity: .7; }
+@keyframes hwMist { from { transform: translateX(-12%); } to { transform: translateX(12%); } }
+
+/* Bats in the middle distance — the slot the gulls occupy on a calm day. */
+.sail-sea.is-halloween .sail-wildlife .sail-gull { display: none; }
+.sail-sea.is-halloween .sail-hw-bats { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+/* ⚠️ A BLACK BAT ON A BLACK SKY IS NOTHING. The first pass crossed the TOP of the frame, which on the
+   haunted horizon is near-black cloud, in near-black ink — the rig happily reported them on screen and the
+   screenshot showed empty sky. They fly across the GREEN GLOW instead, which is the one bright band in the
+   scene, and carry a faint rim so they still read on the dark stretches between. */
+.sail-sea.is-halloween .sail-hw-bat {
+    position: absolute;
+    color: #120b19;
+    /* Same reasoning as the moon: vw so a bat is a bat at both sizes rather than a moth on desktop and a
+       crow on a phone. The per-bat variation rides on top as a multiplier of the clamped base. */
+    font-size: calc(clamp(10px, 1.5vw, 19px) + (var(--i) % 3) * clamp(3px, .5vw, 6px));
+    top: calc(28% + (var(--i) * 6%));
+    left: 0;
+    opacity: .95;
+    /* The rim does the work, not the fill: a bat should stay a dark silhouette, so legibility on black cloud
+       has to come from the edge. Two stacked shadows — a tight bright one to catch the shape and a wider
+       faint one to lift it off the cloud behind. */
+    filter: drop-shadow(0 0 2px rgba(198, 255, 219, .8)) drop-shadow(0 0 7px rgba(120, 255, 180, .35));
+    animation: hwBatCross calc(26s - (var(--i) * 2s)) linear infinite, hwBatFlit .42s ease-in-out infinite alternate;
+    animation-delay: calc(var(--i) * -5.5s), 0s;
+}
+.sail-sea.is-halloween .sail-hw-bats.is-fast .sail-hw-bat { animation-duration: calc(15s - (var(--i) * 1.2s)), .3s; }
+/* ⚠️ ANIMATE `left`, NOT `translateX(%)`. A percentage in a transform resolves against THE ELEMENT'S OWN
+   WIDTH — so translateX(950%) on a 20px bat is 190px of travel, and on a 1300px scene that is a twitch near
+   the left edge and then a restart. It looked like the bats were not rendering; they were, they just never
+   got anywhere. Percentages in `left` resolve against the containing block, which is what was wanted. */
+@keyframes hwBatCross { from { left: -10%; } to { left: 108%; } }
+@keyframes hwBatFlit { from { translate: 0 -3px; } to { translate: 0 3px; } }
+
+/* Jack-o'-lanterns bobbing in the near water, in front of the hull's own waterline. */
+.sail-sea.is-halloween .sail-hw-buoys { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+.sail-sea.is-halloween .sail-hw-buoy {
+    position: absolute;
+    color: #ff8a2b;
+    font-size: calc(clamp(12px, 1.4vw, 17px) + (var(--i) % 2) * clamp(4px, .5vw, 6px));
+    /* Lifted off the very bottom of the water. At 7% they sat below the fold on a 441px phone — the harsh
+       measure that takes the browser's own 226px of furniture off a 375x667 device — so the one piece of
+       dressing actually IN the water was the one nobody would ever see. */
+    bottom: calc(15% + (var(--i) * 4%));
+    left: calc(8% + (var(--i) * 34%));
+    filter: drop-shadow(0 0 9px rgba(255, 138, 43, .55));
+    animation: hwBob calc(3.4s + (var(--i) * .5s)) ease-in-out infinite alternate;
+}
+/* Underway they stream past instead of bobbing in place, the way the near water already does. */
+.sail-sea.is-halloween .sail-hw-buoys.is-scrolling .sail-hw-buoy {
+    animation: hwBob calc(2.2s + (var(--i) * .4s)) ease-in-out infinite alternate,
+               hwBuoyDrift calc(9s + (var(--i) * 2s)) linear infinite;
+    animation-delay: 0s, calc(var(--i) * -3s);
+}
+@keyframes hwBob { from { translate: 0 2px; rotate: -5deg; } to { translate: 0 -3px; rotate: 5deg; } }
+@keyframes hwBuoyDrift { from { transform: translateX(130%); } to { transform: translateX(-260%); } }
+
+@media (prefers-reduced-motion: reduce) {
+    /* The Den deliberately ignores prefers-reduced-motion for its own animations, but a bat crossing the
+       frame every few seconds is ambience rather than feedback, so it is the one thing here worth stilling. */
+    .sail-sea.is-halloween .sail-hw-bat { animation: hwBatFlit 1.4s ease-in-out infinite alternate; left: 18%; }
+}
+
 .sail-nightsky { position: absolute; inset: 0; z-index: 0;
     background:
         radial-gradient(2px 2px at 15% 12%, #fff, transparent 100%),

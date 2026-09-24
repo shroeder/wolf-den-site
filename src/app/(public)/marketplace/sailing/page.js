@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { canPreview } from "@/lib/marketplace/owner.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
@@ -31,7 +32,10 @@ export default async function SailingPage() {
     const [state, me, petBase, petLevels] = await Promise.all([
         fixture ? Promise.resolve(fixture) : getSailingState(buyer.id),
         db.queryOne(
-            `SELECT display_name, alias, avatar_url, avatar_config, avatar_cosmetics, avatar_sprite_url, avatar_sprite_flip, featured_collectible
+            // town_halloween rides along on the query that was already being made rather than earning a
+            // second round trip — see CLAUDE.md on narrowing calls. One extra column is free; one extra
+            // queryOne is a TLS handshake on the Active CPU meter, which is the bill.
+            `SELECT display_name, alias, avatar_url, avatar_config, avatar_cosmetics, avatar_sprite_url, avatar_sprite_flip, featured_collectible, town_halloween
                FROM mkt_buyer WHERE id = $1`,
             [buyer.id]
         ).catch(() => null),
@@ -39,10 +43,23 @@ export default async function SailingPage() {
         getPetSpriteLevelData().catch(() => ({})),
     ]);
 
+    // ── ONE FLAG DRESSES THE WHOLE GAME ──────────────────────────────────────────────────────────────────
+    // The same `town_halloween` column and the same `canPreview("halloween")` gate the plaza uses. Luke asked
+    // for sailing to follow the town's flag, not to carry a second switch of its own — two toggles would mean
+    // a half-decorated game and a bug report about the one you forgot.
+    //
+    // A fixture may also raise it, so the dressed-up sea can be looked at locally without writing the flag
+    // onto a real account first — devFixture is a hard no-op in production, so this cannot be forged live.
+    const halloween = Boolean(fixture?.halloween)
+        || (canPreview("halloween", buyer.id) && Boolean(me?.town_halloween));
+
     // Render the sky the CLIENT last chose (stored in a cookie) so a refresh shows the right backdrop from the
     // first paint — no flash from the server's random pick to the client's real-world/time-of-day one.
     const skyCookie = (await cookies()).get("wolfden-sail-sky")?.value;
     if (skyCookie && /^\/images\/sailing\/sky-[a-z]+\.png$/.test(skyCookie)) state.sky = skyCookie;
+    // ⚠️ AFTER the cookie, so the haunted sky wins. A stored sky is a preference about weather; the flag is a
+    // deliberate choice to dress the game up, and a cached sunset must not quietly undo it on the next load.
+    if (halloween) state.sky = "/images/sailing/sky-haunted.png";
 
     const hero = {
         spriteUrl: me?.avatar_sprite_url || null,
@@ -66,5 +83,5 @@ export default async function SailingPage() {
     const petArt = petId ? pickPetSpriteForLevel(petBase[petId], petLevels[petId], petLvl, myStones[petId] || null, petXpRow?.look_level || null) : null;
     const pet = petArt?.url ? { url: petArt.url, flip: petArt.flip || false } : null;
 
-    return <SailingClient initial={state} hero={hero} pet={pet} captain={me?.display_name || me?.alias || "Captain"} />;
+    return <SailingClient initial={state} hero={hero} pet={pet} captain={me?.display_name || me?.alias || "Captain"} halloween={halloween} />;
 }

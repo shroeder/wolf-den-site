@@ -19,6 +19,7 @@
 // the whole codebase. `approach` draws a thing on the horizon that grows as it closes, so a sail or an island
 // is something you SEE before it is something you are told about.
 
+import { GiBat, GiPumpkinLantern } from "react-icons/gi";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
@@ -75,9 +76,11 @@ const skyTypeOf = (sky) => ((sky || "").match(/sky-([a-z]+)\.png/) || [])[1] || 
  * @param {object}   [p.approach] { kind:"ship"|"island", art, at:0..1, name } — a thing closing on you
  * @param {string}   [p.banner]   a big word across the scene ("LAND HO!")
  * @param {boolean}  [p.cheer]    confetti with the banner
+ * @param {boolean}  [p.halloween] the town's Halloween flag is up — dress the water
  * @param {string}   [p.className]
  */
 export default function SailingSea({
+    halloween = false,
     sky, boat, hero, pet, sailing = false, gustKey = 0, casting = false,
     ambient = [], onWave, approach = null, banner = null, cheer = false,
     className = "", children,
@@ -127,7 +130,7 @@ export default function SailingSea({
     const apSide = 78 - ap * 34;
 
     return (
-        <div className={`sail-sea sail-mood-${mood}${gusting ? " is-gust" : ""}${className ? ` ${className}` : ""}`}>
+        <div className={`sail-sea sail-mood-${mood}${halloween ? " is-halloween" : ""}${gusting ? " is-gust" : ""}${className ? ` ${className}` : ""}`}>
             {/* The horizon. FOUR copies with every other one mirrored (in CSS) so the strip tiles SEAMLESSLY —
                 the art is not edge-matched, but a mirrored copy's edge always equals its neighbour's. */}
             {skyType === "night" ? (
@@ -151,6 +154,38 @@ export default function SailingSea({
                 <span className="sail-fish"><svg viewBox="0 0 28 16"><path d="M2 8 C7 1 18 1 22 8 C18 15 7 15 2 8 Z M22 8 L27 4 L27 12 Z" fill="currentColor" /></svg><span className="sail-fish-splash" /></span>
             </div>
             {mood === "storm" ? <div className="sail-rain" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div> : null}
+
+            {/* ── THE HALLOWEEN DRESSING ───────────────────────────────────────────────────────────────────
+                ⚠️ NOT A TINT OVER THE TOP. A multiply scrim across the scene flattens every layer to one
+                colour and the boat stops reading as painted — the plaza already learned that. The mood here
+                comes from REPLACED ART (sky-haunted.png) plus these DISCRETE objects at their own depths.
+
+                ⚠️ AND THE MOON LIVES HERE, NOT IN THE SKY ART. The horizon strip is four copies with every
+                other one mirrored, so anything singular painted into it appears four times — which is what
+                killed the original painted night sky. As a DOM element it is drawn once, and it can hang
+                still while the clouds scroll behind it, which is what a moon actually does. */}
+            {halloween ? (
+                <>
+                    <div className="sail-hw-moon" aria-hidden="true" />
+                    <div className="sail-hw-mist" aria-hidden="true"><i /><i /></div>
+                    <div className={`sail-hw-bats${sailing ? " is-fast" : ""}`} aria-hidden="true">
+                        {[0, 1, 2, 3, 4].map((i) => (
+                            <span key={i} className="sail-hw-bat" style={{ "--i": i }}>
+                                <GiBat />
+                            </span>
+                        ))}
+                    </div>
+                    {/* Jack-o'-lanterns bobbing past on the water — the same trick the ambient boats use, so
+                        they sit in the water rather than on top of the picture. */}
+                    <div className={`sail-hw-buoys${sailing ? " is-scrolling" : ""}`} aria-hidden="true">
+                        {[0, 1, 2].map((i) => (
+                            <span key={i} className="sail-hw-buoy" style={{ "--i": i }}>
+                                <GiPumpkinLantern />
+                            </span>
+                        ))}
+                    </div>
+                </>
+            ) : null}
 
             {/* Other sailors drifting across the horizon behind your boat. */}
             <div className="sail-ambient">
