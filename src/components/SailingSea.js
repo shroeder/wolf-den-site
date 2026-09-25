@@ -19,7 +19,7 @@
 // the whole codebase. `approach` draws a thing on the horizon that grows as it closes, so a sail or an island
 // is something you SEE before it is something you are told about.
 
-import { GiBat, GiPumpkinLantern } from "react-icons/gi";
+import { GiBat, GiPumpkinLantern, GiWitchFlight, GiSkullCrossedBones } from "react-icons/gi";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
@@ -183,7 +183,27 @@ export default function SailingSea({
                                 <GiPumpkinLantern />
                             </span>
                         ))}
+                        {/* One piece of flotsam that is NOT a pumpkin. Three identical lanterns read as a
+                            repeating asset; a fourth thing that is bone-white says somebody arranged this. */}
+                        <span className="sail-hw-buoy is-bone" style={{ "--i": 3 }}>
+                            <GiSkullCrossedBones />
+                        </span>
                     </div>
+
+                    {/* ⚠️ THE WITCH CROSSES THE MOON, WHICH IS THE ONLY REASON SHE READS AT ALL. A small dark
+                        silhouette anywhere else on this sky is invisible; passing over the one bright disc in
+                        the frame she is unmistakable for the second and a half it takes. So her path is tuned
+                        to the moon's position rather than being another thing drifting across the screen. */}
+                    <div className="sail-hw-witch" aria-hidden="true"><GiWitchFlight /></div>
+
+                    {/* A fog bank, distinct from the thin mist: slower, taller, and it passes IN FRONT of the
+                        distant traffic but behind your own hull, which is what gives the water depth. */}
+                    <div className={`sail-hw-fog${sailing ? " is-scrolling" : ""}`} aria-hidden="true"><i /><i /></div>
+
+                    {/* The moon laid on the water. The scene already has a white specular reflection for a sun;
+                        left alone it sat in the middle of a green sea under an orange moon and read as a
+                        completely different light source. */}
+                    <div className="sail-hw-moonpath" aria-hidden="true" />
                 </>
             ) : null}
 
@@ -193,7 +213,7 @@ export default function SailingSea({
                     const waveable = Boolean(onWave) && sailing && Boolean(b.name);
                     return (
                         <span key={b.id}
-                            className={`sail-ambient-boat${b.dir === "left" ? " is-rev" : ""}${b.faceLeft ? " is-faceleft" : ""}${waveable ? " is-waveable" : ""}`}
+                            className={`sail-ambient-boat${b.dir === "left" ? " is-rev" : ""}${b.faceLeft ? " is-faceleft" : ""}${waveable ? " is-waveable" : ""}${b.ghost ? " is-ghost" : ""}`}
                             style={{ top: `${b.top}%`, animationDuration: `${b.dur}s` }}
                             {...(waveable ? {
                                 role: "button", tabIndex: 0, "aria-label": `Wave to ${b.name}`,

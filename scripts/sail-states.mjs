@@ -56,7 +56,10 @@ const STATES = {
         why: "the flag is up: the sea is dressed and nothing it added is in the way",
         watch: [],
         soft: [".sail-stations"],
-        present: [".sail-hw-moon", ".sail-hw-bat", ".sail-hw-buoy"],
+        // ⚠️ THE WITCH IS NOT CHECKED, ON PURPOSE. She is opacity:0 for most of a 22s loop by design, so a
+        // single sampled frame reports her "HIDDEN by css" nearly every run — a check that fails while the
+        // feature works is a check nobody reads twice. Everything else here is always on screen.
+        present: [".sail-hw-moon", ".sail-hw-bat", ".sail-hw-buoy", ".sail-hw-fog", ".sail-hw-moonpath"],
         make: () => { const s = clone(); s.halloween = true; s.chartsReady = 0; s.status = "idle"; return s; },
     },
     // Mid-voyage, which is what most members see most of the time.

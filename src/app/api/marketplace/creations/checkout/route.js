@@ -88,7 +88,12 @@ export async function POST(request) {
                 const paid = await finalizeCreationPurchase(purchaseId);
                 if (paid.granted) {
                     sendAdminPush({
-                        sound: { kind: "sale", amountCents },
+                        // ⚠️ tier.priceCents, NOT amountCents. `amountCents` is declared further down this
+                        // same scope for the CARD path, so reading it here is a temporal-dead-zone throw at
+                        // runtime — the push would have taken the whole credit checkout down with it. The
+                        // value is identical; the binding is not yet alive. Caught by npm run lint:undef,
+                        // which exists for exactly this and which next build cannot see.
+                        sound: { kind: "sale", amountCents: tier.priceCents },
                         title: "🎨 Creation tokens bought with credit",
                         body: `${buyer.alias ? `@${buyer.alias}` : "A member"} spent $${(tier.priceCents / 100).toFixed(2)} of store credit on ${tier.tokens} creation tokens.`,
                         data: { type: "creation_purchase", buyerId: buyer.id, tierId: tier.id, paidWith: "credit" },

@@ -391,8 +391,23 @@ export default function SailingClient({ initial, hero, pet, captain, halloween =
                 // Boosting ships whip across within the gust window so the speed-up ends with the animation, not after.
                 // Slower crawl while sailing so a passing sailor LINGERS long enough to tap the wave (was 20–29s).
                 const dur = boosting ? 2.8 + Math.random() * 1.4 : sailingNow ? 30 + Math.random() * 12 : 15 + Math.random() * 8;
+                // ── THE GHOST SHIP ───────────────────────────────────────────────────────────────────────
+                // With the flag up, roughly one passing sail in four is not a member at all. It uses the hull
+                // the game already owns for its ghost form, carries NO NAME — so it cannot be waved at, which
+                // is what would give it away as a real player — and drifts slower than the rest.
+                //
+                // Rare on purpose. A spectre every few seconds is set dressing; one you are not sure you saw
+                // is the thing worth having.
+                const spectral = halloween && Math.random() < 0.25;
                 setAmbient((a) => [...a, {
-                    id, art: pick.art, name: pick.name, rider: pick.rider, riderFlip: pick.riderFlip, pet: pick.pet, petFlip: pick.petFlip,
+                    id,
+                    art: spectral ? "/images/sailing/boat-tier9-ghost.png" : pick.art,
+                    ghost: spectral,
+                    name: spectral ? null : pick.name,
+                    rider: spectral ? null : pick.rider,
+                    riderFlip: pick.riderFlip,
+                    pet: spectral ? null : pick.pet,
+                    petFlip: pick.petFlip,
                     tier: Number((pick.art.match(/boat-tier(\d+)/) || [])[1]) || 1, // deck height differs by boat form
                     dir, faceLeft: dir === "left" && !sailingNow, top: 46 + Math.random() * 8, dur, // seat the hull near the horizon waterline, not floating above it
                 }]);
@@ -404,7 +419,7 @@ export default function SailingClient({ initial, hero, pet, captain, halloween =
         };
         timer = setTimeout(spawn, 1800);
         return () => { alive = false; clearTimeout(timer); };
-    }, []);
+    }, [halloween]);
 
     // Clock + arrival detection: when the voyage timer crosses arrival, fire the chime + Land-ho celebration.
     useEffect(() => {

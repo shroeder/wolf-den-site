@@ -11737,6 +11737,99 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes hwBob { from { translate: 0 2px; rotate: -5deg; } to { translate: 0 -3px; rotate: 5deg; } }
 @keyframes hwBuoyDrift { from { transform: translateX(130%); } to { transform: translateX(-260%); } }
 
+/* ── THE WITCH ─────────────────────────────────────────────────────────────────────────────────────────────
+   ⚠️ HER PATH IS TUNED TO THE MOON, not to the frame. A small dark silhouette anywhere else on this sky is
+   invisible; crossing the one bright disc in the picture she is unmistakable for the second she is on it.
+   She is also RARE — a 22s loop with most of it spent off-screen — because a witch every few seconds is
+   wallpaper and one you half-caught is the thing worth having. */
+.sail-sea.is-halloween .sail-hw-witch {
+    position: absolute;
+    z-index: 2;                       /* in front of the clouds, behind the hulls */
+    top: 4%;
+    right: -14%;
+    color: #0d0716;
+    font-size: clamp(16px, 2.4vw, 30px);
+    opacity: 0;
+    filter: drop-shadow(0 0 3px rgba(255, 228, 176, .55));
+    animation: hwWitch 22s linear infinite;
+}
+@keyframes hwWitch {
+    0%   { right: -14%; top: 4%; opacity: 0; }
+    6%   { opacity: .95; }
+    /* Across the moon, which sits at right:15% top:7% — she passes just over it. */
+    14%  { right: 15%; top: 6%; opacity: 1; }
+    26%  { opacity: .9; }
+    34%  { right: 96%; top: 11%; opacity: 0; }
+    100% { right: 96%; top: 11%; opacity: 0; }
+}
+
+/* ── THE MOON ON THE WATER ─────────────────────────────────────────────────────────────────────────────────
+   The scene already draws a white specular reflection for a sun. Left alone it sat in the middle of a green
+   sea under an orange moon and read as a second, contradictory light source — so the white one is hidden and
+   this takes its place, under the moon rather than under the middle of the frame. */
+.sail-sea.is-halloween .sail-reflection { display: none; }
+.sail-sea.is-halloween .sail-hw-moonpath {
+    position: absolute;
+    z-index: 1;
+    right: 13%;
+    top: 45%;
+    width: 24%;
+    height: 38%;
+    transform: translateX(50%);
+    /* ⚠️ A RADIAL FALLOFF, NOT A VERTICAL GRADIENT. A linear-gradient only fades top-to-bottom, so the box's
+       LEFT AND RIGHT EDGES stay hard — 5px of blur on a 200px-wide element does nothing to that — and it
+       rendered as a translucent rectangle sitting behind the distant ship. Moonlight on water has no edges. */
+    background: radial-gradient(ellipse 58% 92% at 50% 4%,
+        rgba(255, 221, 160, .46) 0%, rgba(255, 198, 120, .20) 42%, rgba(255, 190, 110, .06) 68%, transparent 88%);
+    filter: blur(9px);
+    mix-blend-mode: screen;
+    animation: hwMoonPath 5.5s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes hwMoonPath {
+    0%, 100% { opacity: .45; transform: translateX(50%) scaleX(0.88); }
+    50%      { opacity: .8;  transform: translateX(50%) scaleX(1.18); }
+}
+/* The water's own glints go green, so the surface belongs to this sky rather than the last one. */
+.sail-sea.is-halloween .sail-glints i {
+    background: linear-gradient(90deg, transparent, rgba(150, 255, 190, 0.5) 50%, transparent);
+}
+
+/* ── THE FOG BANK ──────────────────────────────────────────────────────────────────────────────────────────
+   Distinct from the thin waterline mist: slower, taller, and sitting at a depth where it passes IN FRONT of
+   the distant traffic and BEHIND your own hull. That ordering is the whole effect — fog that crosses
+   everything equally is a filter, fog that swallows the far ships is weather. */
+.sail-sea.is-halloween .sail-hw-fog { position: absolute; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
+.sail-sea.is-halloween .sail-hw-fog i {
+    position: absolute;
+    left: -40%;
+    width: 180%;
+    height: 26%;
+    bottom: 30%;
+    background: radial-gradient(ellipse at 50% 60%, rgba(178, 226, 200, .20), rgba(178, 226, 200, .07) 55%, transparent 76%);
+    animation: hwFog 68s linear infinite;
+}
+.sail-sea.is-halloween .sail-hw-fog i:nth-child(2) { bottom: 38%; height: 20%; opacity: .7; animation-duration: 95s; animation-direction: reverse; }
+.sail-sea.is-halloween .sail-hw-fog.is-scrolling i { animation-duration: 26s; }
+.sail-sea.is-halloween .sail-hw-fog.is-scrolling i:nth-child(2) { animation-duration: 34s; }
+@keyframes hwFog { from { transform: translateX(-18%); } to { transform: translateX(18%); } }
+
+/* ── A GHOST SHIP AMONG THE TRAFFIC ────────────────────────────────────────────────────────────────────────
+   The hull is the game's own ghost form, so it is a ship this world already contains rather than a new asset.
+   What makes it read as spectral is that you can see the sky THROUGH it. */
+.sail-sea.is-halloween .sail-ambient-boat.is-ghost img {
+    opacity: .5;
+    filter: brightness(1.25) saturate(0.35) drop-shadow(0 0 8px rgba(150, 255, 200, .5));
+    animation: hwGhostFade 7s ease-in-out infinite;
+}
+@keyframes hwGhostFade { 0%, 100% { opacity: .5; } 45% { opacity: .26; } }
+
+/* The bone in the water, to break up three identical lanterns. */
+.sail-sea.is-halloween .sail-hw-buoy.is-bone {
+    color: #e8e2d4;
+    filter: drop-shadow(0 0 7px rgba(190, 255, 215, .45));
+}
+
 @media (prefers-reduced-motion: reduce) {
     /* The Den deliberately ignores prefers-reduced-motion for its own animations, but a bat crossing the
        frame every few seconds is ambience rather than feedback, so it is the one thing here worth stilling. */
