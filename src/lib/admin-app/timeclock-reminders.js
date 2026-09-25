@@ -51,7 +51,7 @@ export async function runTimeclockReminders({ dryRun = false } = {}) {
     const push = async (key, title, body, channels = ["employee"]) => {
         out.sent.push(key);
         if (dryRun) return;
-        await sendAdminPush({ title, body, route: "timeclock", data: { type: "timeclock", key }, channels }).catch(() => {});
+        await sendAdminPush({ title, body, route: "timeclock", sound: { kind: "reminder" }, data: { type: "timeclock", key }, channels }).catch(() => {});
     };
 
     // ── CLOCK IN: fire in the window BEFORE opening, once per day, only if they're not already in.

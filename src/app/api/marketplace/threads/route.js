@@ -43,6 +43,7 @@ async function nudge(threadId, senderSide, preview) {
         // storefront, not other vendors in the marketplace.
         if (senderSide === "buyer" && isOwnerStorefront(p.vendor_name)) {
             await sendAdminPush({
+                sound: { kind: "message" },
                 title: "💬 New buyer message",
                 body: `${p.buyer_name || "A buyer"} → ${p.vendor_name || "vendor"}: ${preview.slice(0, 90)}`,
                 route: "marketplace",

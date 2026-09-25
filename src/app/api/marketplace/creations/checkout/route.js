@@ -88,6 +88,7 @@ export async function POST(request) {
                 const paid = await finalizeCreationPurchase(purchaseId);
                 if (paid.granted) {
                     sendAdminPush({
+                        sound: { kind: "sale", amountCents },
                         title: "🎨 Creation tokens bought with credit",
                         body: `${buyer.alias ? `@${buyer.alias}` : "A member"} spent $${(tier.priceCents / 100).toFixed(2)} of store credit on ${tier.tokens} creation tokens.`,
                         data: { type: "creation_purchase", buyerId: buyer.id, tierId: tier.id, paidWith: "credit" },
@@ -168,6 +169,7 @@ export async function POST(request) {
 
             if (result.granted) {
                 sendAdminPush({
+                    sound: { kind: "sale", amountCents },
                     title: "🎨 Creation tokens purchased",
                     body: `${buyer.alias ? `@${buyer.alias}` : "A member"} bought ${tier.tokens} creation tokens (+${tier.coins.toLocaleString()} coins) for $${(amountCents / 100).toFixed(2)}.`,
                     data: { type: "creation_purchase", buyerId: buyer.id, tierId: tier.id },

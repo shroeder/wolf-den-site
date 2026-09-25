@@ -150,6 +150,7 @@ export async function POST(request) {
             // Ping the owner's phone that a coin/credit sale just happened (best-effort).
             if (result.credited) {
                 sendAdminPush({
+                    sound: { kind: "sale", amountCents },
                     title: "💳 Store credit purchased",
                     body: `${buyer.alias ? `@${buyer.alias}` : "A member"} bought $${(amountCents / 100).toFixed(2)} credit (+${coins.toLocaleString()} coins).`,
                     route: `storeCredit:${buyer.id}`, // tapping opens the Store Credit area focused on this buyer

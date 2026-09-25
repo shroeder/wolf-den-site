@@ -70,6 +70,7 @@ export async function createWant({
     await trackActivity(buyerId, "want_post", { catalogProductId, qty, maxPrice: normalizedMax }).catch(() => {});
 
     await sendAdminPush({
+        sound: { kind: "member" },
         title: "🔎 New buy order",
         body: `Wants ${product.name || "a product"}${qty > 1 ? ` ×${qty}` : ""}${normalizedMax != null ? ` · up to $${normalizedMax.toFixed(2)}` : ""}`,
         route: "marketplace",

@@ -69,6 +69,7 @@ export async function POST(request) {
         if (!quiet && (!lastPush.has(key) || now - lastPush.get(key) > PUSH_COOLDOWN_MS)) {
             lastPush.set(key, now);
             await sendAdminPush({
+                sound: { kind: "error" },
                 title: "A page crashed",
                 body: `${path} — ${message}${who ? ` · ${who}` : ""}`,
                 // "crashes", not "marketplace" — the old route dropped you on the VENDOR screen, which told

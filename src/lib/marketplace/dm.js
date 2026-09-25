@@ -328,7 +328,7 @@ export async function reportMember(userId, { threadId = null, messageId = null, 
             `SELECT COALESCE(NULLIF(display_name,''), alias, 'A member') AS a,
                     (SELECT COALESCE(NULLIF(display_name,''), alias, 'a member') FROM mkt_buyer WHERE id = $2) AS b
                FROM mkt_buyer WHERE id = $1`, [userId, otherId]).catch(() => null);
-        await sendAdminPush({ title: "A message was reported",
+        await sendAdminPush({ title: "A message was reported", sound: { kind: "message" },
             body: `${who?.a || "A member"} reported ${who?.b || "a member"} — ${why}.`, route: "messages" });
     } catch { /* the report is filed either way; the ping is best-effort */ }
     return { ok: true, blocked: true, reported: true };

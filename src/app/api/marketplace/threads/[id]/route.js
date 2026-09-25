@@ -43,6 +43,7 @@ async function nudge(threadId, senderSide, preview) {
         // Owner push: only when a buyer messages the OWNER's own storefront (not other vendors).
         if (senderSide === "buyer" && isOwnerStorefront(p.vendor_name)) {
             await sendAdminPush({
+                sound: { kind: "message" },
                 title: "💬 New buyer message",
                 body: `${p.buyer_name || "A buyer"} → ${p.vendor_name || "vendor"}: ${preview.slice(0, 90)}`,
                 route: "marketplace",

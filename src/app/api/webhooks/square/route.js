@@ -275,6 +275,8 @@ async function handleStoreCreditRedemption(payload) {
         const dollars = (amountCents / 100).toFixed(2);
         if (buyerId && result.deducted) {
             await sendAdminPush({
+                // Credit being spent IS a sale at the counter, so it rings on the sale tier for its size.
+                sound: { kind: "sale", amountCents },
                 title: "🏦 Store credit used",
                 body: `$${dollars} deducted from ${alias || "a member"} — tap to review.`,
                 route: "store_credit_redeem",
@@ -285,6 +287,8 @@ async function handleStoreCreditRedemption(payload) {
             // Member known but the balance couldn't cover it (or a transient deduct miss) — flag for manual
             // handling, but still hand the app the member so staff can pick them straight away.
             await sendAdminPush({
+                // Credit being spent IS a sale at the counter, so it rings on the sale tier for its size.
+                sound: { kind: "sale", amountCents },
                 title: "🏦 Store credit used",
                 body: `$${dollars} in store credit used by ${alias || "a member"}, but it wasn't auto-deducted — tap to record it.`,
                 route: "store_credit_redeem",
@@ -293,6 +297,8 @@ async function handleStoreCreditRedemption(payload) {
             });
         } else {
             await sendAdminPush({
+                // Credit being spent IS a sale at the counter, so it rings on the sale tier for its size.
+                sound: { kind: "sale", amountCents },
                 title: "🏦 Store credit used",
                 body: `$${dollars} in store credit was used — tap to record it (pick the member).`,
                 route: "store_credit_redeem",

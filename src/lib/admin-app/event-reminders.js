@@ -90,6 +90,7 @@ export async function runEventReminders({ dryRun = false, now = new Date() } = {
         out.sent.push(ev.id);
         if (!dryRun) {
             await sendAdminPush({
+                sound: { kind: "reminder" },
                 title: ev.title,
                 body: ev.body,
                 data: { type: "store_event", event: ev.id },

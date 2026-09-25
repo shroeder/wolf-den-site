@@ -75,9 +75,22 @@ async function getMessaging() {
 // Edges stated so they cannot be misread: under $50 / $50 to under $100 / $100 to under $350 / $350 and over.
 const SOUND_TIERS = [5000, 10000, 35000];
 
+// The kinds that are not money and do not have tiers: one channel each, named by what happened.
+const FLAT_CHANNELS = {
+    order: "wolfden_order_v1",
+    message: "wolfden_message_v1",
+    member: "wolfden_member_v1",
+    reminder: "wolfden_reminder_v1",
+    error: "wolfden_error_v1",
+};
+
 export function soundChannel(sound) {
     const kind = String(sound?.kind || "");
-    if (kind === "order") return "wolfden_order_v1";
+    if (FLAT_CHANNELS[kind]) return FLAT_CHANNELS[kind];
+    // ⚠️ THE FALLTHROUGH IS THE BUG THIS KEEPS REINTRODUCING. Any caller that passes no `sound` lands here,
+    // on the general chime — which is why Luke heard the same noise for a DM, a new member, a reminder and a
+    // crash for months. It is a correct default and a terrible silent one, so when adding a push, pick a
+    // kind. There is one for every event the app sends.
     if (kind !== "trade" && kind !== "sale") return "wolfden_admin_v3";
     const cents = Math.max(0, Math.trunc(Number(sound?.amountCents) || 0));
     // findIndex returns -1 when the amount is past every threshold, which IS the top tier.

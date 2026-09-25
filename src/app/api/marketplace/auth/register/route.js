@@ -34,6 +34,7 @@ export async function POST(request) {
                 // Ping the owner/admin app that a new member joined (fire-and-forget).
                 const who = buyer.displayName || [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || buyer.email;
                 after(() => sendAdminPush({
+                    sound: { kind: "member" },
                     title: "🐺 New member joined!",
                     body: `${who} just signed up in the app.`,
                     route: `members?member=${buyer.id}`, // deep-link straight to the new member's profile

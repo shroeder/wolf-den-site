@@ -100,6 +100,7 @@ export async function createApplication(input = {}) {
     }
 
     await sendAdminPush({
+        sound: { kind: "member" },
         title: "🧑‍💼 New vendor application",
         body: `${application.business_name}${application.location_label ? ` · ${application.location_label}` : ""} (${application.email})`,
         route: "marketplace",

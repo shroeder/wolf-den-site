@@ -113,6 +113,7 @@ export async function runReminders({ dryRun = false } = {}) {
         ).catch(() => null);
         if (!claimed) continue; // another run got there first
         await sendAdminPush({
+            sound: { kind: "reminder" },
             title: `⏰ ${r.title}`,
             body: r.body || "Tap to open reminders.",
             route: "reminders",
