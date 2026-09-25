@@ -121,11 +121,14 @@ export async function getWageCents(teamMemberId) {
 // pinned in the config, so break-even quietly billed overhead only.
 export async function employeeHoursByDay(teamMemberIds, fromISO, toISO) {
     const ids = (Array.isArray(teamMemberIds) ? teamMemberIds : [teamMemberIds]).filter(Boolean);
-    if (!ids.length) return { ok: false, reason: "no_team_members", byDay: {}, totalHours: 0 };
+    if (!ids.length) return { ok: false, reason: "no_team_members", byDay: {}, totalHours: 0, openHours: 0 };
     const byDay = {};
     const byMemberDay = {}; // memberId -> { date: hours } — each person is priced at THEIR own wage
     let cursor = null;
     let totalHours = 0;
+    // How much of totalHours is still being worked, so a caller can say "so far" rather than presenting an
+    // accruing number as a finished one.
+    let openHours = 0;
     let pages = 0;
     do {
         const body = {
@@ -133,12 +136,28 @@ export async function employeeHoursByDay(teamMemberIds, fromISO, toISO) {
             limit: 200, ...(cursor ? { cursor } : {}),
         };
         const r = await squareCall("/v2/labor/shifts/search", { method: "POST", body: JSON.stringify(body) }).catch(() => null);
-        if (!r?.ok) return { ok: false, reason: "square_error", status: r?.status || 0, byDay: {}, byMemberDay: {}, totalHours: 0 };
+        if (!r?.ok) return { ok: false, reason: "square_error", status: r?.status || 0, byDay: {}, byMemberDay: {}, totalHours: 0, openHours: 0 };
         for (const s of r.json?.shifts || []) {
             const start = s?.start_at ? new Date(s.start_at) : null;
             const end = s?.end_at ? new Date(s.end_at) : null;
-            if (!start || !end) continue; // open shift (not clocked out yet) — skip until closed
-            let hrs = (end.getTime() - start.getTime()) / 3.6e6;
+            if (!start) continue;
+            // ── AN OPEN SHIFT ACCRUES, IT IS NOT ZERO ────────────────────────────────────────────────────
+            // This used to `continue` on a shift with no end_at, so anybody still on the clock counted as no
+            // labor at all. Luke, on the Today screen: "need to see the break even against the daily cost
+            // plus wage cost EVEN BEFORE THE SHIFT ENDS." Skipping is the one answer that is certainly wrong
+            // — it says the shop is closer to break-even than it is, and it says so for the whole of every
+            // trading day, which is precisely when somebody is looking.
+            //
+            // So an open shift is billed from its start to NOW (or to the end of the window, whichever comes
+            // first, so a historical query is not credited with time that had not happened yet).
+            //
+            // ⚠️ CAPPED AT 16 HOURS. An open shift from three weeks ago is a missed clock-out, not somebody
+            // still working, and accruing it to `now` would bill hundreds of hours against a day that is
+            // long closed. 16h is past any real shift here and well short of a forgotten one.
+            const openShift = !end;
+            const stop = end ?? new Date(Math.min(Date.now(), new Date(toISO).getTime()));
+            let hrs = (stop.getTime() - start.getTime()) / 3.6e6;
+            if (openShift) { hrs = Math.min(hrs, 16); openHours += Math.max(0, hrs); }
             for (const br of s?.breaks || []) { // subtract unpaid breaks
                 if (br?.is_paid === false && br?.start_at && br?.end_at) hrs -= (new Date(br.end_at) - new Date(br.start_at)) / 3.6e6;
             }
@@ -152,7 +171,7 @@ export async function employeeHoursByDay(teamMemberIds, fromISO, toISO) {
         cursor = r.json?.cursor || null;
         pages += 1;
     } while (cursor && pages < 25);
-    return { ok: true, byDay, byMemberDay, totalHours };
+    return { ok: true, byDay, byMemberDay, totalHours, openHours };
 }
 
 // ── Break-even summary over a date range ──────────────────────────────────────────────────────────────────
@@ -236,6 +255,10 @@ export async function breakevenSummary({ from, to }) {
                 hours: Math.round(m.hours * 100) / 100, totalCents: m.cents,
             })),
             totalHours: Math.round(totalHours * 100) / 100, totalCents: totalLabor,
+            // Hours inside totalHours that are still being worked. A caller showing a live figure has to be
+            // able to say "so far" — presenting an accruing number as a settled one is how a screen ends up
+            // quietly wrong for the whole of every trading day.
+            openHours: Math.round((hours.openHours || 0) * 100) / 100,
         },
         config,
         breakEvenPerDayCents: Math.round(dailyOverheadCents), // labor varies by day; overhead is the fixed floor
