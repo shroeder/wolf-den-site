@@ -11737,6 +11737,107 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes hwBob { from { translate: 0 2px; rotate: -5deg; } to { translate: 0 -3px; rotate: 5deg; } }
 @keyframes hwBuoyDrift { from { transform: translateX(130%); } to { transform: translateX(-260%); } }
 
+/* ── ON THE BOAT ITSELF ────────────────────────────────────────────────────────────────────────────────────
+   ⚠️ THE FIRST PASS PUT EVERYTHING BEHIND THE HULL. Sky, moon, bats, fog, pumpkins — all of it in background
+   layers, all of it small, most of it far away. Luke, on seeing it: "I see a new background. I was expecting
+   a lot more." He was right: the boat is what the eye lands on and it was the one thing left undressed.
+
+   These ride INSIDE .sail-boat-inner, so they rock with the hull, lean with a gust and pull away with the
+   ship instead of sitting still behind it. */
+.sail-sea.is-halloween .sail-hw-rig { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.sail-sea.is-halloween .sail-hw-deckpump {
+    position: absolute;
+    color: #ff922b;
+    /* Tied to the hull's own width so it sits right on every boat form, not just the one it was tuned on. */
+    font-size: clamp(15px, 4.4vw, 26px);
+    filter: drop-shadow(0 0 10px rgba(255, 146, 43, .85)) drop-shadow(0 0 22px rgba(255, 110, 20, .45));
+    animation: hwDeckFlicker 2.1s ease-in-out infinite;
+}
+/* Either side of the deck, low, where a lantern would actually be set down. */
+.sail-sea.is-halloween .sail-hw-deckpump.p1 { left: 20%; bottom: 15%; }
+.sail-sea.is-halloween .sail-hw-deckpump.p2 { right: 18%; bottom: 13%; font-size: clamp(12px, 3.4vw, 21px); animation-delay: .7s; }
+@keyframes hwDeckFlicker {
+    0%, 100% { opacity: 1; }
+    45%      { opacity: .72; }
+    60%      { opacity: .95; }
+}
+/* A web slung in the rigging, up where the sails are. */
+.sail-sea.is-halloween .sail-hw-rigweb {
+    position: absolute;
+    left: 6%;
+    top: 4%;
+    color: rgba(226, 240, 232, .5);
+    font-size: clamp(26px, 8vw, 52px);
+    transform: rotate(-12deg);
+}
+
+/* ── THE FRAME ─────────────────────────────────────────────────────────────────────────────────────────────
+   The cheapest big signal available: webs in the panel's corners and a bruised glow around its edge. They are
+   read before anything inside the picture, because they change the SHAPE of the thing rather than adding one
+   more small object to a dark scene. */
+.sail-sea.is-halloween .sail-hw-corners { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+.sail-sea.is-halloween .sail-hw-corners span {
+    position: absolute;
+    color: rgba(214, 235, 222, .42);
+    font-size: clamp(46px, 13vw, 104px);
+    line-height: 0;
+}
+/* ⚠️ SEATED IN THE CORNER, NOT HUNG OFF IT. At -14% the web was cut by the panel's edge and read as a
+   broken shape rather than as a web spanning a corner — which is the one thing a corner web has to do. */
+.sail-sea.is-halloween .sail-hw-corners .c1 { top: -5%; left: -3%; }
+.sail-sea.is-halloween .sail-hw-corners .c2 { top: -5%; right: -3%; transform: scaleX(-1); }
+/* Bottom corners too, smaller — two webs read as a decorated frame, four read as a cobwebbed one. */
+.sail-sea.is-halloween .sail-hw-corners .c1::after,
+.sail-sea.is-halloween .sail-hw-corners .c2::after { content: none; }
+.sail-sea.is-halloween .sail-hw-vignette {
+    position: absolute; inset: 0; z-index: 7; pointer-events: none;
+    /* ⚠️ AN EDGE GLOW, NOT A SCRIM. It is transparent through the whole middle of the frame, so the painted
+       hull keeps its own colour — the rule the plaza's lighting pass set. Only the border is tinted. */
+    box-shadow:
+        inset 0 0 44px 10px rgba(72, 20, 96, .55),
+        inset 0 0 120px 24px rgba(28, 8, 40, .45);
+}
+
+/* ── SOMETHING BIG IN THE WATER ────────────────────────────────────────────────────────────────────────────
+   Bats and pumpkins are all small and far away. One large shape breaking the surface is what makes the sea
+   feel occupied rather than decorated — and it rises on a long loop, so it is an EVENT rather than scenery
+   that stops being noticed by the second voyage. */
+.sail-sea.is-halloween .sail-hw-tentacle {
+    position: absolute;
+    z-index: 2;                    /* behind your hull, in front of the horizon traffic */
+    left: 8%;
+    bottom: 4%;
+    color: #123526;
+    font-size: clamp(54px, 15vw, 130px);
+    line-height: 0;
+    opacity: 0;
+    transform-origin: bottom center;
+    filter: drop-shadow(0 0 14px rgba(90, 255, 170, .35));
+    animation: hwTentacle 19s ease-in-out infinite;
+}
+@keyframes hwTentacle {
+    0%, 62%   { opacity: 0; transform: translateY(46%) rotate(-6deg); }
+    70%       { opacity: .92; transform: translateY(0) rotate(2deg); }
+    80%       { opacity: .92; transform: translateY(-4%) rotate(-3deg); }
+    90%       { opacity: 0; transform: translateY(40%) rotate(4deg); }
+    100%      { opacity: 0; transform: translateY(46%) rotate(-6deg); }
+}
+
+/* Two bats near the camera, in FRONT of the hull and several times the size of the distant ones. Distance was
+   doing all the work before, so every bat was a speck. */
+.sail-sea.is-halloween .sail-hw-bat.is-near {
+    z-index: 8;
+    font-size: clamp(34px, 9vw, 64px);
+    color: #0a0610;
+    opacity: .92;
+    filter: drop-shadow(0 0 5px rgba(198, 255, 219, .5));
+    top: auto;
+    left: 0;
+}
+.sail-sea.is-halloween .sail-hw-bat.is-near.n1 { top: 12%; animation: hwBatNear 13s linear infinite, hwBatFlit .3s ease-in-out infinite alternate; }
+.sail-sea.is-halloween .sail-hw-bat.is-near.n2 { top: 44%; animation: hwBatNear 17s linear infinite, hwBatFlit .36s ease-in-out infinite alternate; animation-delay: -7s, 0s; }
+@keyframes hwBatNear { from { left: -16%; } to { left: 112%; } }
+
 /* ── THE WITCH ─────────────────────────────────────────────────────────────────────────────────────────────
    ⚠️ HER PATH IS TUNED TO THE MOON, not to the frame. A small dark silhouette anywhere else on this sky is
    invisible; crossing the one bright disc in the picture she is unmistakable for the second she is on it.

@@ -19,7 +19,7 @@
 // the whole codebase. `approach` draws a thing on the horizon that grows as it closes, so a sail or an island
 // is something you SEE before it is something you are told about.
 
-import { GiBat, GiPumpkinLantern, GiWitchFlight, GiSkullCrossedBones } from "react-icons/gi";
+import { GiBat, GiPumpkinLantern, GiWitchFlight, GiSkullCrossedBones, GiSpiderWeb, GiKrakenTentacle } from "react-icons/gi";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
@@ -169,23 +169,28 @@ export default function SailingSea({
                     <div className="sail-hw-moon" aria-hidden="true" />
                     <div className="sail-hw-mist" aria-hidden="true"><i /><i /></div>
                     <div className={`sail-hw-bats${sailing ? " is-fast" : ""}`} aria-hidden="true">
-                        {[0, 1, 2, 3, 4].map((i) => (
+                        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
                             <span key={i} className="sail-hw-bat" style={{ "--i": i }}>
                                 <GiBat />
                             </span>
                         ))}
+                        {/* Two close ones, in FRONT of the hull and several times the size. Distance was
+                            doing all the work before, so every bat was a speck — a pair near the camera is
+                            what makes the rest read as a flock rather than as noise. */}
+                        <span className="sail-hw-bat is-near n1"><GiBat /></span>
+                        <span className="sail-hw-bat is-near n2"><GiBat /></span>
                     </div>
                     {/* Jack-o'-lanterns bobbing past on the water — the same trick the ambient boats use, so
                         they sit in the water rather than on top of the picture. */}
                     <div className={`sail-hw-buoys${sailing ? " is-scrolling" : ""}`} aria-hidden="true">
-                        {[0, 1, 2].map((i) => (
+                        {[0, 1, 2, 3, 4].map((i) => (
                             <span key={i} className="sail-hw-buoy" style={{ "--i": i }}>
                                 <GiPumpkinLantern />
                             </span>
                         ))}
                         {/* One piece of flotsam that is NOT a pumpkin. Three identical lanterns read as a
                             repeating asset; a fourth thing that is bone-white says somebody arranged this. */}
-                        <span className="sail-hw-buoy is-bone" style={{ "--i": 3 }}>
+                        <span className="sail-hw-buoy is-bone" style={{ "--i": 5 }}>
                             <GiSkullCrossedBones />
                         </span>
                     </div>
@@ -204,6 +209,20 @@ export default function SailingSea({
                         left alone it sat in the middle of a green sea under an orange moon and read as a
                         completely different light source. */}
                     <div className="sail-hw-moonpath" aria-hidden="true" />
+
+                    {/* ⚠️ THE FRAME IS THE CHEAPEST BIG SIGNAL THERE IS. Webs in the corners of the panel and
+                        a bruised glow around its edge are read before anything inside it, because they change
+                        the SHAPE of the thing rather than adding another small object to a dark picture. */}
+                    <div className="sail-hw-corners" aria-hidden="true">
+                        <span className="c1"><GiSpiderWeb /></span>
+                        <span className="c2"><GiSpiderWeb /></span>
+                    </div>
+                    <div className="sail-hw-vignette" aria-hidden="true" />
+
+                    {/* Something large in the water. The bats and pumpkins are all small and far away; one
+                        big shape breaking the surface is what makes the sea feel occupied rather than
+                        decorated. It rises and sinks on a long loop, so it is an event, not scenery. */}
+                    <div className="sail-hw-tentacle" aria-hidden="true"><GiKrakenTentacle /></div>
                 </>
             ) : null}
 
@@ -276,6 +295,18 @@ export default function SailingSea({
                     ) : null}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className={`sail-boat-img boat-aura-${tier}`} src={boat?.art} alt="Your boat" />
+                    {/* ⚠️ ON THE BOAT, NOT BEHIND IT. Everything in the first pass lived in the background
+                        layers, so the whole costume amounted to "a new sky" — the hull is the thing you
+                        actually look at and it was the one thing untouched. Lanterns sit ON the deck line
+                        and a web hangs in the rigging, so the dressing arrives with the boat rather than
+                        behind it. */}
+                    {halloween ? (
+                        <span className="sail-hw-rig" aria-hidden="true">
+                            <span className="sail-hw-deckpump p1"><GiPumpkinLantern /></span>
+                            <span className="sail-hw-deckpump p2"><GiPumpkinLantern /></span>
+                            <span className="sail-hw-rigweb"><GiSpiderWeb /></span>
+                        </span>
+                    ) : null}
                     <span className="sail-crew" style={{ "--crew-bottom": `${deck}%` }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         {pet?.url ? <img className="sail-pet" src={pet.url} alt="" style={pet.flip ? { transform: "scaleX(-1)" } : undefined} /> : null}
