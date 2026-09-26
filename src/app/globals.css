@@ -12814,6 +12814,51 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* The empty hole under the dirt reads as a grave shaft rather than a warm burrow. */
 .dig-wrap.is-halloween .dig-hole { background: radial-gradient(120% 120% at 50% 30%, #0d1a17, #050a09); }
 
+/* ── THE PIT ITSELF, HAUNTED ──────────────────────────────────────────────────────────────────────────────
+   Under the grid, over the backdrop, and deaf to the pointer. See the note in SailingClient: the earth
+   changing colour is not a costume, and a tile that a decoration swallowed is a dig the player paid for. */
+.dig-haunt { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+/* The layer that passes in FRONT of the dirt. z-index beats .dig-gridwrap's 1 below, and it stays
+   pointer-transparent — a decoration that eats a tap costs a dig. */
+.dig-haunt-fore { z-index: 2; }
+.dig-haunt-skull, .dig-haunt-ghost { position: absolute; background-size: contain; background-repeat: no-repeat;
+    background-position: bottom center; }
+/* Half-sunk in the floor strip at the bottom of the pit — something the digging turned up, not an ornament
+   set down on the dirt. The overflow on .dig-haunt does the burying. */
+.dig-haunt-skull { width: 96px; height: 96px; left: -14px; bottom: -30px; opacity: 0.72;
+    background-image: url("/images/sailing/hw/skull.png");
+    transform: rotate(-9deg); filter: drop-shadow(0 0 10px rgba(120, 255, 180, 0.18)); }
+/* Rises out of the far corner and sinks back. 19s, because a ghost that is always there is scenery and a
+   ghost you catch once in a while is a ghost. */
+.dig-haunt-ghost { width: 78px; height: 78px; right: 6px; bottom: 34%; opacity: 0;
+    background-image: url("/images/sailing/hw/ghost.png");
+    animation: digGhostRise 19s ease-in-out infinite; }
+@keyframes digGhostRise {
+    0%, 62% { opacity: 0; translate: 0 26px; }
+    72%, 86% { opacity: 0.5; translate: 0 -10px; }
+    100% { opacity: 0; translate: 0 -40px; }
+}
+/* Vein-light coming off the walls, drifting up the pit. The one thing here that is drawn rather than a
+   sprite, because a mote of light has no shape to draw. */
+.dig-wisp { position: absolute; width: 5px; height: 5px; border-radius: 50%;
+    left: calc(8% + var(--i) * 15%); bottom: -8px;
+    background: radial-gradient(circle, rgba(200, 255, 220, 0.95), rgba(120, 255, 180, 0.35) 45%, transparent 70%);
+    /* Six wisps on one keyframe would rise in a rank like a lift; the index staggers and slows each one. */
+    animation: digWispRise calc(9s + var(--i) * 1.7s) linear infinite;
+    animation-delay: calc(var(--i) * -2.6s); opacity: 0; }
+@keyframes digWispRise {
+    0% { opacity: 0; translate: 0 0; }
+    14% { opacity: 0.85; }
+    70% { opacity: 0.5; }
+    100% { opacity: 0; translate: calc(var(--i) * 4px - 10px) -300px; }
+}
+/* The grid has to win the stacking order outright — z-index:0 on the haunt layer is not enough on its own
+   once the tiles start painting their own shadows. */
+.dig-wrap.is-halloween .dig-hud,
+.dig-wrap.is-halloween .dig-stambar,
+.dig-wrap.is-halloween .dig-instruct,
+.dig-wrap.is-halloween .dig-gridwrap { position: relative; z-index: 1; }
+
 .dig-tile { aspect-ratio: 1; border: none; border-radius: 9px; cursor: pointer; position: relative; overflow: hidden;
     background: radial-gradient(120% 120% at 50% 20%, #3a2716, #1b1108); /* the pit floor */
     box-shadow: inset 0 4px 7px rgba(0,0,0,0.6);

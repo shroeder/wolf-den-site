@@ -767,6 +767,39 @@ export default function SailingClient({ initial, hero, pet, captain, halloween =
                         className={`dig-wrap${halloween ? " is-halloween" : ""}`}
                         style={{ backgroundImage: `url(${halloween ? HAUNTED_DIG_BG : state.digBg})` }}
                     >
+                        {/* ── WHAT MAKES IT A HAUNTED PIT RATHER THAN GREEN DIRT ──────────────────────
+                            The backdrop and the earth both changed and the screen still read as "the dirt is
+                            a different colour", because nothing on it MOVED. A dig is a static grid by
+                            nature, so the life has to come from the pit around it.
+
+                            ⚠️ SPRITES AND MOTION, NOT A TINT. The skull is the same generated sprite the sea
+                            uses, sunk into the floor strip so it reads as something the digging turned up,
+                            and the ghost rises out of the pit and sinks back on a long loop. The wisps are
+                            the only CSS-drawn thing here and they are meant to be — they are points of
+                            light, which is the one thing a sprite would be worse at.
+
+                            ⚠️ BEHIND THE GRID AND pointer-events:none. Everything in this layer sits over
+                            the backdrop and UNDER the tiles: a decoration that eats a tap costs a dig, and a
+                            dig is the currency of this entire screen. */}
+                        {halloween ? (
+                            <>
+                                {/* Behind the tiles: the skull is IN the pit, so the grid occludes it the
+                                    same way the dirt would. */}
+                                <div className="dig-haunt" aria-hidden="true">
+                                    <span className="dig-haunt-skull" />
+                                </div>
+                                {/* ⚠️ IN FRONT OF THE TILES, AND THIS IS THE WHOLE POINT. Both of these
+                                    started behind the grid and the grid is 7x7 across the full width, so the
+                                    ghost rose entirely behind the dirt and was never once on camera — the
+                                    animation measured as running and nothing could see it. A ghost and a
+                                    wisp pass in FRONT of the ground; they are the only two things here that
+                                    do, they are pointer-transparent, and neither goes over half opacity. */}
+                                <div className="dig-haunt dig-haunt-fore" aria-hidden="true">
+                                    <span className="dig-haunt-ghost" />
+                                    {[0, 1, 2, 3, 4, 5].map((i) => <i key={i} className="dig-wisp" style={{ "--i": i }} />)}
+                                </div>
+                            </>
+                        ) : null}
                         <div className="dig-hud">
                             <span className="dig-frag">🎁 {dig.found}/{dig.buried} chest</span>
                             {/* The lure's promise, while there is still dirt to move. Told at the payout it is
