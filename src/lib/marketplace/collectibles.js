@@ -10,6 +10,7 @@ import {
     GiBat, GiScorpion, GiTigerHead, GiSeahorse, GiEagleEmblem, GiLion, GiGorilla, GiCrocJaws, GiHydra,
     GiGriffinSymbol, GiUnicorn, GiSpikedDragonHead, GiPegasus, GiDinosaurRex, GiWhaleTail, GiChameleonGlyph,
     GiDragonHead, GiDragonSpiral, GiSpectre,
+    GiWrappedSweet, GiPumpkinLantern, GiBoneGnawer, GiGhost,
     // Expanded roster
     GiPenguin, GiHedgehog, GiTurtle, GiTurtleShell, GiParrotHead, GiMonkey, GiPanda, GiDolphin, GiCrab, GiSheep, GiKangaroo,
     GiFalconMoon,
@@ -502,6 +503,34 @@ export const COLLECTIBLES = [
       // Asked for by Cameron (YoshiHwan) — "like an icy caterpillar". Luke: "needs to be cute the whole way
       // through", with a picture of Snom.
       spritePrompt: "an adorable chubby little caterpillar with a soft round snow-white body in a few plump segments, a row of pale blue translucent ice crystals growing along its back like a tiny frozen mane, two small curled antennae, a very small friendly face with simple round black dot eyes and a tiny content smile, no visible mouth teeth, stubby soft little nubs for legs, a faint sparkle of frost in the air around it, sweet and huggable" },
+
+    // ── THE HALLOWEEN PETS ───────────────────────────────────────────────────────────────────────────────
+    // One per Halloween chest, which is the whole reason to want a SPECIFIC chest rather than any chest.
+    //
+    // ⚠️ source: "halloween", NOT "chest". The ordinary chest pet pool is `p.source === "chest"` (see
+    // maybeGrantChestPet), so anything marked "chest" here would start falling out of wooden chests in July.
+    // A new source keeps them where they were promised — and keeps them from being the leaky-and-unobtainable
+    // shape that `ownerOnly` content has landed in before.
+    //
+    // `cute` on the two sweet ones. Without it every rung of the evolution ladder is "battle-hardened",
+    // "scarred", "imposing" — right for a skeleton wolf, and it would turn a candy sprite into a monster by
+    // rung three. Jack and Rattle are MEANT to get grimmer; Sugar and Boo are not.
+    { id: "hw_sugar_sprite", name: "Sugar Sprite", Icon: GiWrappedSweet, color: "#ffb347", rarity: "rare",
+      source: "halloween", activeStat: "fortune", cute: true,
+      hint: "Sweet, and far too pleased about it.",
+      spritePrompt: "an adorable tiny candy sprite, a small round body made of glossy candy-corn layers — white tip, orange middle, yellow base — with little translucent sugar-wafer wings, simple friendly round black dot eyes and a small content smile, stubby little arms, a faint sparkle of sugar dust in the air around it, sweet and huggable" },
+    { id: "hw_jack", name: "Jack", Icon: GiPumpkinLantern, color: "#ff7a18", rarity: "epic",
+      source: "halloween", activeStat: "gold_find",
+      hint: "Grins whether or not anything is funny.",
+      spritePrompt: "a small lively jack-o'-lantern creature, a ripe orange pumpkin for a head and body with a carved triangular-eyed grin lit by a warm candle glow from within, a curling green vine stem on top with one leaf, short twiggy little arms and legs of dark wood, standing upright and alert" },
+    { id: "hw_rattle", name: "Rattle", Icon: GiBoneGnawer, color: "#d8d2c4", rarity: "legendary",
+      source: "halloween", activeStat: "ferocity",
+      hint: "The pack kept one of its own.",
+      spritePrompt: "a small skeletal wolf pup, clean pale bone with a wolf-shaped skull and visible ribcage and leg bones, two soft green will-o-wisp lights burning where its eyes would be, ears and tail suggested in bone, standing in an eager alert puppy stance, grim but not gory, no blood, no flesh" },
+    { id: "hw_boo", name: "Boo", Icon: GiGhost, color: "#bfe9ff", rarity: "epic",
+      source: "halloween", activeStat: "xp_gain", cute: true,
+      hint: "Has been practising for weeks.",
+      spritePrompt: "an adorable little ghost, a soft translucent pale blue-white rounded body trailing away into a wispy vapour tail instead of legs so it hovers, two simple round black dot eyes and a small open oh-shaped mouth mid-boo, tiny wispy nub arms raised, glowing gently, sweet and harmless rather than scary" },
 ];
 
 const BY_ID = Object.fromEntries(COLLECTIBLES.map((c) => [c.id, c]));
