@@ -203,7 +203,11 @@ export default function SailingSea({
                         meets the sea — anchored to the bottom of the frame they would be standing in the
                         foreground froth instead of out at sea. */}
                     <div className={`sail-hw-flotsam${sailing ? " is-scrolling" : ""}`} aria-hidden="true">
-                        <span className="f1 is-pumpkin" /><span className="f2 is-skull" /><span className="f3 is-pumpkin" />
+                        {/* ⚠️ NO PUMPKINS OUT HERE. A lantern lashed to your own deck is something a crew put
+                            there; one bobbing in the open ocean came from nowhere and belongs to nobody.
+                            Luke: "get rid of the floating pumpkins, bro." Bone in the water needs no such
+                            explanation — the sea is full of things that sank. */}
+                        <span className="f1 is-skull" /><span className="f2 is-skull" />
                     </div>
                     <div className="sail-hw-serpent" aria-hidden="true" />
                     <div className="sail-hw-tentacle" aria-hidden="true" />
