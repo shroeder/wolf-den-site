@@ -21,6 +21,7 @@ import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
 import ConsumableShelf from "@/components/ConsumableShelf";
 import Coin from "@/components/Coin";
+import { HAUNTED_SKY } from "@/lib/marketplace/sailing-art.js";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth — imported from SailingSea, which owns the
 // gust animation now. The boat's `sailGust` CSS animation, the passing-traffic speed-up (boostRef, below)
@@ -299,7 +300,7 @@ export default function SailingClient({ initial, hero, pet, captain, halloween =
         // so none of the clock / cached / real-weather logic below may run — otherwise the haunted horizon the
         // server rendered is replaced by a sunset a fraction of a second after the first paint, and the ONLY
         // symptom is a flicker nobody can reproduce on demand.
-        if (halloween) { setSky("/images/sailing/sky-haunted.png"); return; }
+        if (halloween) { setSky(HAUNTED_SKY); return; }
         const h = new Date().getHours();
         const t = h < 5 ? "night" : h < 7 ? "sunrise" : h < 17 ? "clearday" : h < 19 ? "goldenhour" : h < 20 ? "sunset" : h < 21 ? "dusk" : "night";
         let chosen = `/images/sailing/sky-${t}.png`;

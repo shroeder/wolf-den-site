@@ -11,6 +11,7 @@ import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { getSailingState } from "@/lib/marketplace/sailing.js";
+import { HAUNTED_SKY } from "@/lib/marketplace/sailing-art.js";
 import { devFixture } from "@/lib/dev-fixture.js";
 
 export const dynamic = "force-dynamic";
@@ -56,10 +57,10 @@ export default async function SailingPage() {
     // Render the sky the CLIENT last chose (stored in a cookie) so a refresh shows the right backdrop from the
     // first paint — no flash from the server's random pick to the client's real-world/time-of-day one.
     const skyCookie = (await cookies()).get("wolfden-sail-sky")?.value;
-    if (skyCookie && /^\/images\/sailing\/sky-[a-z]+\.png$/.test(skyCookie)) state.sky = skyCookie;
+    if (skyCookie && /^\/images\/sailing\/sky-[a-z]+\.png(\?v=\d+)?$/.test(skyCookie)) state.sky = skyCookie;
     // ⚠️ AFTER the cookie, so the haunted sky wins. A stored sky is a preference about weather; the flag is a
     // deliberate choice to dress the game up, and a cached sunset must not quietly undo it on the next load.
-    if (halloween) state.sky = "/images/sailing/sky-haunted.png";
+    if (halloween) state.sky = HAUNTED_SKY;
 
     const hero = {
         spriteUrl: me?.avatar_sprite_url || null,
