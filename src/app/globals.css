@@ -12787,6 +12787,33 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Each tile is a raised, beveled MOUND OF DIRT sitting in a dark pit — the raised bevel (like a classic
    minesweeper tile) reads as tappable. Its height tracks remaining depth, so each dig visibly lowers the dirt
    and the pit shows through above → you're digging DOWN through the dirt. */
+/* ══ THE DIG, WITH THE HALLOWEEN FLAG UP ══════════════════════════════════════════════════════════════════
+   The backdrop swap alone is not enough: the dirt blocks are warm sunlit brown, and a brown block on cold
+   grave earth looks like a tile from another screen sitting on top of this one. The EARTH ITSELF has to
+   change with the pit.
+
+   ⚠️ REPLACED COLOUR, NOT A FILTER. A hue-rotate over the tiles would drag the found-treasure flash and the
+   dirt chunks along with it; each layer is repainted instead, so the gold of a chest still reads as gold.
+   Same rule as the sea: mood comes from the artwork, never from a pane over the top. */
+.dig-wrap.is-halloween .dig-tile {
+    background: radial-gradient(120% 120% at 50% 20%, #1e2a2a, #0b1414);   /* a colder pit floor */
+}
+.dig-wrap.is-halloween .dig-dirt {
+    background:
+        /* The top crust catches the green vein-light from the wall instead of sunlight. */
+        linear-gradient(rgba(176, 255, 210, 0.22), rgba(176, 255, 210, 0) 26%),
+        repeating-linear-gradient(180deg, #33453c 0 5px, #2a3a33 5px 10px),
+        linear-gradient(#32443b, #1a2620);
+    box-shadow: inset 0 2px 0 rgba(190, 255, 220, 0.28), inset 0 -6px 8px rgba(0, 0, 0, 0.5),
+        inset 3px 0 0 rgba(255, 255, 255, 0.05), inset -3px 0 0 rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.55);
+}
+/* The clods that fly when a tile is struck, and the pebbles in the block, follow the earth they came from. */
+.dig-wrap.is-halloween .dig-dirt::before,
+.dig-wrap.is-halloween .dig-dirt::after { background: rgba(0, 0, 0, 0.3); box-shadow: 0 1px 0 rgba(190, 255, 220, 0.12); }
+.dig-wrap.is-halloween .dig-chunks i { background: #34473e; }
+/* The empty hole under the dirt reads as a grave shaft rather than a warm burrow. */
+.dig-wrap.is-halloween .dig-hole { background: radial-gradient(120% 120% at 50% 30%, #0d1a17, #050a09); }
+
 .dig-tile { aspect-ratio: 1; border: none; border-radius: 9px; cursor: pointer; position: relative; overflow: hidden;
     background: radial-gradient(120% 120% at 50% 20%, #3a2716, #1b1108); /* the pit floor */
     box-shadow: inset 0 4px 7px rgba(0,0,0,0.6);

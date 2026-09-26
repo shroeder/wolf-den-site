@@ -21,7 +21,7 @@ import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
 import ConsumableShelf from "@/components/ConsumableShelf";
 import Coin from "@/components/Coin";
-import { HAUNTED_SKY } from "@/lib/marketplace/sailing-art.js";
+import { HAUNTED_SKY, HAUNTED_DIG_BG } from "@/lib/marketplace/sailing-art.js";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth — imported from SailingSea, which owns the
 // gust animation now. The boat's `sailGust` CSS animation, the passing-traffic speed-up (boostRef, below)
@@ -751,8 +751,22 @@ export default function SailingClient({ initial, hero, pet, captain, halloween =
                 ) : null}
 
                 {liveStatus === "digging" && dig ? (
-                    /* ---------- Excavation dig minigame ---------- */
-                    <div className="dig-wrap" style={{ backgroundImage: `url(${state.digBg})` }}>
+                    /* ---------- Excavation dig minigame ----------
+                       ⚠️ THE FLAG REPLACES THE ART, IT DOES NOT TINT IT. The pit keeps its own composition —
+                       wall, veins, things embedded to find, floor strip — and swaps to the grave-dirt
+                       painting, so it is the same screen at the wrong time of year rather than a different
+                       one. `is-halloween` carries the same swap down to the tiles.
+
+                       ⚠️ AND THIS IS A PLAIN BLOCK COMMENT, NOT THE BRACE-AND-STAR JSX FORM. Directly inside
+                       a ternary's parenthesised branch there is no JSX yet, so the brace form is parsed as an
+                       object literal and the build dies on "Expected '</', got 'ident'" pointing at the NEXT
+                       line. Note the wording rather than the symbols: writing that form out literally here
+                       would close this very comment early, which is the second way the same edit broke.
+                       ---------- */
+                    <div
+                        className={`dig-wrap${halloween ? " is-halloween" : ""}`}
+                        style={{ backgroundImage: `url(${halloween ? HAUNTED_DIG_BG : state.digBg})` }}
+                    >
                         <div className="dig-hud">
                             <span className="dig-frag">🎁 {dig.found}/{dig.buried} chest</span>
                             {/* The lure's promise, while there is still dirt to move. Told at the payout it is

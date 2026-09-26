@@ -15,3 +15,6 @@ export const SAILING_ART_V = 5;
 
 /** The haunted sky, cache-busted. Both the server page and the client picker must use this, not a literal. */
 export const HAUNTED_SKY = `/images/sailing/sky-haunted.png?v=${SAILING_ART_V}`;
+
+/** The dig pit, when the flag is up. A NEW path, so it needs no version — only replacement does. */
+export const HAUNTED_DIG_BG = "/images/sailing/dig-haunted.png";
