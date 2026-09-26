@@ -11729,8 +11729,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    overlay: it drags every pixel toward one colour and the painted hull stops reading as painted. The rule
    lives at FarmClient.js:1041 and this is the second time it has been broken in this feature. Mood comes
    from the artwork — a replaced sky and lit objects — never from a layer on top. */
-.sail-sea.is-halloween .sail-hw-bats,
-.sail-sea.is-halloween .sail-hw-flotsam { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.sail-sea.is-halloween .sail-hw-bats { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 
 /* ── THE BAT, TWO FRAMES ───────────────────────────────────────────────────────────────────────────────────
    Wings-up and wings-down are stacked in the same box and cross-faded on a steps(1) animation, so the swap is
@@ -11819,54 +11818,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     100% { left: 102%; top: 22%; opacity: 0; }
 }
 
-/* ── THINGS FLOATING PAST AT THE WATERLINE ─────────────────────────────────────────────────────────────────
-   ⚠️ SEATED ON THE PAINTED WATERLINE (≈60% down the sky art), not on the bottom of the panel. Anchored to the
-   frame's edge they would be bobbing in the foreground froth right under the camera instead of out at sea. */
-.sail-sea.is-halloween .sail-hw-flotsam { z-index: 6; }
-/* ⚠️ IT ALWAYS DRIFTS, DOCKED OR NOT. The first version only moved these while the ship was under way, so at
-   anchor a pumpkin and a skull sat bobbing on one spot like they were pegged to the seabed. Luke: "we can't
-   have static items like pumpkins and skulls on the water, it makes no sense." Water moves whether or not you
-   do — docked they drift on the current, slowly; under way they stream past. Bobbing rides on top of the
-   drift in both cases, never instead of it.
-
-   The drift is applied to an inner wrapper rather than the same element as the bob, because two animations
-   both writing `transform` on one element means the last one declared silently wins. */
-.sail-sea.is-halloween .sail-hw-flotsam span {
-    position: absolute;
-    background: center bottom / contain no-repeat;
-    animation: hwBob 3.6s ease-in-out infinite alternate, hwDrift 54s linear infinite;
-}
-.sail-sea.is-halloween .sail-hw-flotsam .is-skull { background-image: url("/images/sailing/hw/skull.png"); filter: drop-shadow(0 0 8px rgba(190, 255, 215, .3)); }
-/* ⚠️ BOTH DURATIONS, ALWAYS. A single `animation-duration` value applies to EVERY animation on the element,
-   so `animation-duration: 3s` next to `animation: hwBob …, hwDrift …` silently sets the DRIFT to 3 seconds
-   too — a pumpkin crossing the whole sea three times a minute. Measured, not guessed: the drift check read
-   one piece moving 1px in six seconds because it was looping so fast it landed back where it started. Every
-   override here names the bob and the drift separately. */
-.sail-sea.is-halloween .sail-hw-flotsam .f1 { left: 9%;  bottom: 22%; width: clamp(24px, 5.5vw, 44px); aspect-ratio: 1; }
-.sail-sea.is-halloween .sail-hw-flotsam .f2 { left: 74%; bottom: 11%; width: clamp(26px, 6vw, 46px); aspect-ratio: 1; animation-duration: 4.4s, 61s; }
-/* ⚠️ KEEP THE MIDDLE LANE CLEAR. The hull sits at left:50% and is wide — on a phone it spans roughly 35-65%
-   of the panel — so a floating object at 40% lands ON the boat and reads as cargo rather than as flotsam.
-   Everything drifting stays outside that band. */
-/* ⚠️ `translate`/`rotate`, NOT `transform`. This runs alongside hwDrift, which animates
-   `transform` — two animations writing the SAME property means the later one wins outright and
-   the other silently does nothing. Two different hwBob definitions existed for a moment, and
-   the transform-based one was the later, so the drift was quietly cancelling the bob. */
+/* Nothing drifts on the surface any more. Pumpkins went first — a lantern in the open ocean belongs to
+   nobody — and the skulls followed for the same reason: bobbing debris is set dressing, and every piece of it
+   read as litter rather than as menace. What is left in the water is the two things that RISE out of it,
+   which is what Luke asked for in the first place: "real scary things in the water."
+   The bob keyframes stay; the risers use them. */
 @keyframes hwBob { from { translate: 0 2px; rotate: -4deg; } to { translate: 0 -3px; rotate: 4deg; } }
-/* Staggered so the three are never in step — three objects crossing together is a conveyor belt. */
-.sail-sea.is-halloween .sail-hw-flotsam .f1 { animation-delay: 0s, -6s; }
-.sail-sea.is-halloween .sail-hw-flotsam .f2 { animation-delay: 0s, -25s; }
-/* Under way the current becomes the ship's own speed. */
-.sail-sea.is-halloween .sail-hw-flotsam.is-scrolling span { animation-duration: 2.2s, 11s; }
-.sail-sea.is-halloween .sail-hw-flotsam.is-scrolling .f2 { animation-duration: 2.6s, 13s; }
-.sail-sea.is-halloween .sail-hw-flotsam.is-scrolling .f1 { animation-delay: 0s, 0s; }
-.sail-sea.is-halloween .sail-hw-flotsam.is-scrolling .f2 { animation-delay: 0s, -4s; }
-/* The bob and the drift coexist on one element because hwBob animates the INDIVIDUAL `translate` and `rotate`
-   properties while this animates `transform` — different properties, composed by the browser rather than
-   fighting. Two animations both writing `transform` would not work: the later one simply wins. */
-@keyframes hwDrift {
-    from { transform: translateX(118%); }
-    to   { transform: translateX(-236%); }
-}
 
 /* ── THE THINGS THAT RISE ──────────────────────────────────────────────────────────────────────────────────
    Luke: "real scary things in the water." Two of them, on long out-of-phase loops so the sea is occupied

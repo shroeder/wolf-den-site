@@ -193,22 +193,6 @@ export default function SailingSea({
 
                     {/* A ghost drifting the other way, so the sky is not all one direction. */}
                     <div className="sail-hw-ghost" aria-hidden="true" />
-
-                    {/* ── THE WATER ────────────────────────────────────────────────────────────────────
-                        Luke asked for "real scary things in the water that float by". Two kinds: things
-                        that DRIFT PAST at the waterline, and something big that RISES out of it.
-
-                        ⚠️ THE RISERS SIT ON THE WATERLINE, NOT ON THE PANEL EDGE. Both sprites were drawn
-                        with a clean flat bottom so they can be seated exactly where the painted horizon
-                        meets the sea — anchored to the bottom of the frame they would be standing in the
-                        foreground froth instead of out at sea. */}
-                    <div className={`sail-hw-flotsam${sailing ? " is-scrolling" : ""}`} aria-hidden="true">
-                        {/* ⚠️ NO PUMPKINS OUT HERE. A lantern lashed to your own deck is something a crew put
-                            there; one bobbing in the open ocean came from nowhere and belongs to nobody.
-                            Luke: "get rid of the floating pumpkins, bro." Bone in the water needs no such
-                            explanation — the sea is full of things that sank. */}
-                        <span className="f1 is-skull" /><span className="f2 is-skull" />
-                    </div>
                     <div className="sail-hw-serpent" aria-hidden="true" />
                     <div className="sail-hw-tentacle" aria-hidden="true" />
                 </>

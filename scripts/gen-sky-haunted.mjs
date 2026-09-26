@@ -40,21 +40,35 @@ if (fs.existsSync(FILE) && !FORCE) {
 
 // The house naval style, matched to the other ten skies so the haunted one is plainly the same game with the
 // lights changed — not a different art pack bolted on.
+// ⚠️ THE WATER HAS TO READ AS WATER, WHICH IS WHAT THE FIRST THREE ATTEMPTS GOT WRONG. Every one of them
+// painted a sea in the same value and hue as the cloud above it — technically a horizon, visually one
+// continuous murk, so the eye never found a surface and the boat looked like it was hanging in fog. Moving
+// the horizon line did not help, because the line was never the problem.
+//
+// So the prompt now spends its words on CONTRAST across the horizon and on SURFACE DETAIL: waves with lit
+// crests, a moon path, a hard edge. A sea that is obviously a sea at a glance, from six feet away, on a
+// phone.
 const PROMPT =
     "Wide cinematic HORIZON BACKDROP for a cartoon mobile game, painterly cel-shaded style with bold shapes "
-    + "and rich saturated colour. A HAUNTED HALLOWEEN NIGHT SKY over open ocean: heavy rolling cloud banks lit "
-    + "from within by a sickly acid-green and violet glow, ragged wisps of mist trailing beneath them, a deep "
-    + "bruised purple-black upper sky fading to a cold poison-green haze along the waterline. Thin tendrils of "
-    + "fog crawling across the distant water. Eerie, oppressive, beautiful — a ghost-story sky. "
-    + "COMPOSITION: the HORIZON LINE sits at roughly 58% of the way down the image — a little below the "
-    + "middle. Sky fills the upper 58% and OPEN DARK WATER fills the whole lower 42%, reaching all the way "
-    + "to the bottom edge. The water must be a generous band, not a strip. "
-    + "⚠️ ABSOLUTELY NO SINGLE FOCAL OBJECT ANYWHERE. NO MOON, no sun, no stars picked out, no lightning bolt, "
-    + "no island, no land, no rocks, no lighthouse, no ships, no sails, no birds, no bats, no figures, no "
-    + "text. The cloud must be EVEN AND CONTINUOUS ACROSS THE WHOLE WIDTH with no centrepiece and no gap that "
-    + "draws the eye — this image is tiled and mirrored end to end, so any one distinctive shape will visibly "
-    + "repeat four times. Treat it as WEATHER, not as a scene. "
-    + "Keep the left and right edges similar in tone and density so the tiling reads as continuous cloud.";
+    + "and rich saturated colour. A HAUNTED HALLOWEEN NIGHT AT SEA. "
+    + "COMPOSITION, and this is the most important part: the image is split by a CRISP, CLEARLY VISIBLE "
+    + "HORIZON LINE at roughly 55% of the way down. "
+    + "ABOVE the line — a bruised purple-black night sky with heavy rolling cloud banks lit from within by a "
+    + "sickly acid-green glow. "
+    + "BELOW the line — OPEN OCEAN, and it must be UNMISTAKABLY WATER: clearly DARKER and MORE BLUE than the "
+    + "sky above it, with distinct rolling waves and swells drawn as individual shapes, pale moonlit "
+    + "highlights running along the crests, and the wave shapes getting LARGER and more detailed toward the "
+    + "bottom of the frame as the water comes nearer the viewer. "
+    + "⚠️ THE SEA AND THE SKY MUST BE STRONGLY DIFFERENT IN BRIGHTNESS AND COLOUR so the horizon reads "
+    + "instantly. Do NOT let the cloud colour bleed down into the water. Do NOT paint a dark murky band that "
+    + "could be either. The water is a deep blue-teal with visible surface texture; the sky is purple and "
+    + "green. Somebody glancing at this for half a second must see where the sea starts. "
+    + "⚠️ ABSOLUTELY NO SINGLE FOCAL OBJECT ANYWHERE. NO MOON, no sun, no stars picked out, no lightning, no "
+    + "island, no land, no rocks, no lighthouse, no ships, no sails, no birds, no bats, no figures, no text. "
+    + "The cloud and the waves must both be EVEN AND CONTINUOUS ACROSS THE WHOLE WIDTH with no centrepiece — "
+    + "this image is tiled and mirrored end to end, so any one distinctive shape will visibly repeat four "
+    + "times. Treat it as WEATHER AND WATER, not as a scene. "
+    + "Keep the left and right edges similar in tone and density so the tiling reads as continuous.";
 
 console.log("generating the haunted horizon (medium quality, ~$0.06)...");
 const res = await fetch("https://api.openai.com/v1/images/generations", {
