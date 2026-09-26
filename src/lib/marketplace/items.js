@@ -837,17 +837,38 @@ export const ITEMS = [
     // NO reqLevel, same as the season pieces: nothing gates equipping any more, so the number is display
     // only, and printing "Level 90" on something won at level 30 is a lie in the direction that costs the
     // member the use of it. The chest IS the requirement and ITEM_SOURCE_LABEL says so.
-    { id: "hw_hollow_crown", name: "Hollow Crown", slot: "helmet", rarity: "legendary", icon: "GiPumpkinLantern", flavor: "Someone cut a face in it. The face stayed.", stats: { might: 30, crit_chance: 22 }, reqLevel: null, source: "halloween", sort: 1300 },
-    { id: "hw_gravemould_cuirass", name: "Grave-Mould Cuirass", slot: "chest", rarity: "legendary", icon: "GiBreastplate", flavor: "Dug up twice. Worn once.", stats: { ferocity: 34, might: 24 }, reqLevel: null, source: "halloween", sort: 1301 },
-    { id: "hw_reapers_sickle", name: "Reaper's Sickle", slot: "main_hand", rarity: "mythic", icon: "GiSickle", flavor: "It is a harvest tool. It was always a harvest tool.", stats: { might: 42, crit_power: 26 }, reqLevel: null, source: "halloween", sort: 1302 },
-    { id: "hw_wisp_lantern", name: "Wisp Lantern", slot: "off_hand", rarity: "legendary", icon: "GiOldLantern", flavor: "Follow it and see.", stats: { fortune: 30, xp_gain: 18 }, reqLevel: null, source: "halloween", sort: 1303 },
-    { id: "hw_gravewalkers", name: "Gravewalkers", slot: "boots", rarity: "legendary", icon: "GiBoots", flavor: "Quiet on purpose.", stats: { crit_chance: 30, ferocity: 20 }, reqLevel: null, source: "halloween", sort: 1304 },
-    { id: "hw_cord_small_hours", name: "Cord of Small Hours", slot: "belt", rarity: "legendary", icon: "GiBelt", flavor: "Knotted once for every hour nobody was awake.", stats: { might: 28, fortune: 22 }, reqLevel: null, source: "halloween", sort: 1305 },
-    { id: "hw_ninth_night_shroud", name: "Shroud of the Ninth Night", slot: "back", rarity: "mythic", icon: "GiCape", flavor: "Eight nights it was only a sheet.", stats: { ferocity: 40, crit_chance: 28 }, reqLevel: null, source: "halloween", sort: 1306 },
+    { id: "hw_hollow_crown", name: "Hollow Crown", slot: "helmet", rarity: "legendary", icon: "GiPumpkinLantern", flavor: "Someone cut a face in it. The face stayed.", stats: {}, reqLevel: null, source: "halloween", sort: 1300 },
+    { id: "hw_gravemould_cuirass", name: "Grave-Mould Cuirass", slot: "chest", rarity: "legendary", icon: "GiBreastplate", flavor: "Dug up twice. Worn once.", stats: {}, reqLevel: null, source: "halloween", sort: 1301 },
+    { id: "hw_reapers_sickle", name: "Reaper's Sickle", slot: "main_hand", rarity: "mythic", icon: "GiSickle", flavor: "It is a harvest tool. It was always a harvest tool.", stats: {}, reqLevel: null, source: "halloween", sort: 1302 },
+    { id: "hw_wisp_lantern", name: "Wisp Lantern", slot: "off_hand", rarity: "legendary", icon: "GiOldLantern", flavor: "Follow it and see.", stats: {}, reqLevel: null, source: "halloween", sort: 1303 },
+    { id: "hw_gravewalkers", name: "Gravewalkers", slot: "boots", rarity: "legendary", icon: "GiBoots", flavor: "Quiet on purpose.", stats: {}, reqLevel: null, source: "halloween", sort: 1304 },
+    { id: "hw_cord_small_hours", name: "Cord of Small Hours", slot: "belt", rarity: "legendary", icon: "GiBelt", flavor: "Knotted once for every hour nobody was awake.", stats: {}, reqLevel: null, source: "halloween", sort: 1305 },
+    { id: "hw_ninth_night_shroud", name: "Shroud of the Ninth Night", slot: "back", rarity: "mythic", icon: "GiCape", flavor: "Eight nights it was only a sheet.", stats: {}, reqLevel: null, source: "halloween", sort: 1306 },
     // The chase piece, and the only ascendant in the set — the Ghost chest is the top of the ladder and has
     // to hold something the other three cannot.
-    { id: "hw_candle_eye", name: "Candle-Eye Amulet", slot: "amulet", rarity: "ascendant", icon: "GiCandleFlame", flavor: "It watches the wick, not you. Mostly.", stats: { fortune: 46, crit_power: 34 }, reqLevel: null, source: "halloween", sort: 1307 },
+    { id: "hw_candle_eye", name: "Candle-Eye Amulet", slot: "amulet", rarity: "ascendant", icon: "GiCandleFlame", flavor: "It watches the wick, not you. Mostly.", stats: {}, reqLevel: null, source: "halloween", sort: 1307 },
 
+    // ⚠️ NO AUTHORED `stats` ON ANY OF THESE, ON PURPOSE. Four IIFEs below re-derive every number on every
+    // item at import from (id, rarity), and any authored affix past that rarity's AFFIX_COUNT is DISCARDED —
+    // so an authored stat is a claim this file cannot keep. Both the Coldspot Mirror's fortune and the
+    // Trailing Hem's ferocity were dropped exactly that way: written here, never shipped.
+    //
+    // Two things were tried before landing here, and neither works. Writing the DERIVED values back is not a
+    // fixed point (the derivation converts ferocity into vitality each pass, so it drifts on every run).
+    // Trimming to the one stat that survived is whack-a-mole: the draw is seeded off the whole literal, so
+    // removing an affix re-rolls the others and a DIFFERENT one gets dropped.
+    //
+    // An empty literal is the only honest input. Rarity and slot decide what the piece is, which is exactly
+    // the contract every other item in this file has actually been under since the generator was written.
+    // ⚠️ A `stats` LITERAL IS AN INPUT, NOT A DESCRIPTION. Four IIFEs below re-derive every number on every
+    // item at import from (id, rarity) — see the generated-stats block — so what a member actually sees is
+    // the OUTPUT, and an authored affix past the rarity's AFFIX_COUNT is discarded outright. The Coldspot
+    // Mirror's fortune and the Trailing Hem's ferocity were both dropped in exactly that way: authored,
+    // never shipped, and a lie to anybody reading this file. Only the identity stat is claimed on those two.
+    //
+    // (Writing the derived values back into these literals does NOT fix it and was tried: the derivation is
+    // not a fixed point — it converts ferocity into vitality each pass, so a second run of the same transform
+    // produces different numbers again.)
     // ── AND THE SEVEN THAT MAKE THEM THREE SETS ──────────────────────────────────────────────────────────
     // The first eight were one piece per slot: a set, singular, and a chase with exactly one shape. Three
     // sets is three shapes — a Fortune build, a Ferocity build and a Crit build — which is the difference
@@ -860,13 +881,13 @@ export const ITEMS = [
     // Pieces are shared between sets only where the theme genuinely overlaps — they are not, in fact,
     // shared at all below. Fifteen pieces, three fives, no overlap, so finishing one set is a real choice
     // about which chests to spend rather than a side effect of opening enough of anything.
-    { id: "hw_nine_candles", name: "Ring of Nine Candles", slot: "ring", rarity: "legendary", icon: "GiCandleLight", flavor: "Eight are lit. The ninth is for later.", stats: { fortune: 28, crit_chance: 20 }, reqLevel: null, source: "halloween", sort: 1308 },
-    { id: "hw_quiet_row_skullcap", name: "Skullcap of the Quiet Row", slot: "helmet", rarity: "legendary", icon: "GiSkullMask", flavor: "Third from the end, under the yew.", stats: { ferocity: 30, might: 20 }, reqLevel: null, source: "halloween", sort: 1309 },
-    { id: "hw_femur_maul", name: "Femur Maul", slot: "main_hand", rarity: "mythic", icon: "GiBoneMace", flavor: "It belonged to something that walked upright.", stats: { might: 40, ferocity: 28 }, reqLevel: null, source: "halloween", sort: 1310 },
-    { id: "hw_knucklebone_charm", name: "Knucklebone Charm", slot: "amulet", rarity: "legendary", icon: "GiCrossedBones", flavor: "Rattle them and ask again.", stats: { ferocity: 28, fortune: 20 }, reqLevel: null, source: "halloween", sort: 1311 },
-    { id: "hw_coldspot_mirror", name: "Coldspot Mirror", slot: "off_hand", rarity: "legendary", icon: "GiMirrorMirror", flavor: "Nothing is behind you. Check anyway.", stats: { crit_chance: 30, fortune: 18 }, reqLevel: null, source: "halloween", sort: 1312 },
-    { id: "hw_trailing_hem", name: "Trailing Hem", slot: "boots", rarity: "legendary", icon: "GiLegArmor", flavor: "It does not quite reach the floor. It never has.", stats: { crit_chance: 28, ferocity: 20 }, reqLevel: null, source: "halloween", sort: 1313 },
-    { id: "hw_poltergeist_chain", name: "Poltergeist's Chain", slot: "main_hand", rarity: "mythic", icon: "GiChainedHeart", flavor: "You will hear it before the room does.", stats: { crit_chance: 38, crit_power: 28 }, reqLevel: null, source: "halloween", sort: 1314 },
+    { id: "hw_nine_candles", name: "Ring of Nine Candles", slot: "ring", rarity: "legendary", icon: "GiCandleLight", flavor: "Eight are lit. The ninth is for later.", stats: {}, reqLevel: null, source: "halloween", sort: 1308 },
+    { id: "hw_quiet_row_skullcap", name: "Skullcap of the Quiet Row", slot: "helmet", rarity: "legendary", icon: "GiSkullMask", flavor: "Third from the end, under the yew.", stats: {}, reqLevel: null, source: "halloween", sort: 1309 },
+    { id: "hw_femur_maul", name: "Femur Maul", slot: "main_hand", rarity: "mythic", icon: "GiBoneMace", flavor: "It belonged to something that walked upright.", stats: {}, reqLevel: null, source: "halloween", sort: 1310 },
+    { id: "hw_knucklebone_charm", name: "Knucklebone Charm", slot: "amulet", rarity: "legendary", icon: "GiCrossedBones", flavor: "Rattle them and ask again.", stats: {}, reqLevel: null, source: "halloween", sort: 1311 },
+    { id: "hw_coldspot_mirror", name: "Coldspot Mirror", slot: "off_hand", rarity: "legendary", icon: "GiMirrorMirror", flavor: "Nothing is behind you. Check anyway.", stats: {}, reqLevel: null, source: "halloween", sort: 1312 },
+    { id: "hw_trailing_hem", name: "Trailing Hem", slot: "boots", rarity: "legendary", icon: "GiLegArmor", flavor: "It does not quite reach the floor. It never has.", stats: {}, reqLevel: null, source: "halloween", sort: 1313 },
+    { id: "hw_poltergeist_chain", name: "Poltergeist's Chain", slot: "main_hand", rarity: "mythic", icon: "GiChainedHeart", flavor: "You will hear it before the room does.", stats: {}, reqLevel: null, source: "halloween", sort: 1314 },
 ];
 
 // ── THE ASCENDED TWIN: THE SAME PIECE, RAISED ────────────────────────────────────────────────────────────────
