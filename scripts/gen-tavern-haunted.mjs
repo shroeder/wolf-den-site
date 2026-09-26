@@ -51,6 +51,11 @@ const PROMPT =
     + "⚠️ THE NEAR FLOOR MUST BE EMPTY: the bottom quarter of the image is bare open plank floor across the "
     + "full width — no tables, no stools, no barrels, no pumpkins, no props of any kind in the foreground — "
     + "because characters stand there. All furniture sits in the MIDDLE band and behind. "
+    + "⚠️ FRAMING — THE CAMERA IS PULLED WAY BACK. This is a LONG room seen from a distance, not a close-up "
+    + "of one corner: the whole width of the tavern is visible end to end, the ceiling beams and the floor "
+    + "are BOTH fully in frame, and the furniture is SMALL in the frame — at least six or seven round tables "
+    + "with their stools spread across the width, the fireplace no more than about a fifth of the image "
+    + "width. A wide establishing shot of a whole room, never a zoomed-in view of a fireplace. "
     + "Mood: warm firelit tavern gone spooky — green firelight and orange candlelight together, deep shadows, "
     + "cosy rather than frightening. Painterly 2D video-game background, cel-shaded with confident outlines. "
     + "No text, no watermark, no UI, no border.";
