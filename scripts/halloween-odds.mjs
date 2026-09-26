@@ -81,30 +81,51 @@ else console.log(`  Candy stays the common outcome everywhere — thinnest is ${
 // ⚠️ CHECKED HERE BECAUSE NOTHING ELSE CHECKS IT. Two pieces of one set on the same slot is a set nobody can
 // finish on a body, and the gate that used to catch that is gone. It is cheap to assert and impossible to
 // spot by reading a list of fifteen ids.
-const ITEMS_SRC = readFileSync("src/lib/marketplace/items.js", "utf8");
-const SETS_SRC = readFileSync("src/lib/marketplace/sets.js", "utf8");
-const slotOf = (id) => (ITEMS_SRC.match(new RegExp(`id: "${id}", name: "[^"]*", slot: "([a-z_]+)"`)) || [])[1] || null;
+// ⚠️ READ FROM THE MODULES, NOT SCRAPED OUT OF THE SOURCE. The first cut matched `id: "...", name: "..."`
+// with a regex and reported all fifteen pieces as orphans the moment the sets gained `collection: true` —
+// the field order changed and the pattern stopped matching, so a passing check turned into a false alarm
+// about a thing that was fine. The rates above have to be scraped (they are local consts), but ITEM_SETS and
+// ITEMS are exported, and an exported value is never worth pattern-matching for.
+const S = await import("../src/lib/marketplace/sets.js");
+const I = await import("../src/lib/marketplace/items.js");
+const slotOf = (id) => I.ITEMS.find((x) => x.id === id)?.slot || null;
 
 console.log("\n  THE SETS\n");
-const setRe = /id: "(hw_[a-z_]+)", name: "([^"]+)",\s*\n\s*items: \[([^\]]*)\]/g;
-let m, setCount = 0, inSets = new Set();
-while ((m = setRe.exec(SETS_SRC))) {
-    setCount += 1;
-    const ids = m[3].split(",").map((x) => x.trim().replace(/"/g, "")).filter(Boolean);
-    ids.forEach((id) => inSets.add(id));
-    const slots = ids.map(slotOf);
+const hwSets = S.ITEM_SETS.filter((x) => x.id.startsWith("hw_"));
+const inSets = new Set();
+for (const set of hwSets) {
+    set.items.forEach((id) => inSets.add(id));
+    const slots = set.items.map(slotOf);
     const dupes = slots.filter((x, i) => slots.indexOf(x) !== i);
-    const unknown = ids.filter((id) => !slotOf(id));
-    console.log(`  ${m[2].padEnd(20)} ${ids.length} pieces   ${slots.join(", ")}`);
+    const unknown = set.items.filter((id) => !slotOf(id));
+    console.log(`  ${set.name.padEnd(20)} ${set.items.length} pieces  ${String(set.feature || "combat").padEnd(7)} ${slots.join(", ")}`);
     if (unknown.length) { console.log(`     ⚠️  not in ITEMS: ${unknown.join(", ")}`); bad += 1; }
     if (dupes.length) { console.log(`     ⚠️  TWO PIECES ON THE SAME SLOT (${dupes.join(", ")}) — this set cannot be worn complete`); bad += 1; }
 }
 // Every Halloween piece should belong to a set. One that does not is a piece with no chase attached to it.
-const allHw = [...ITEMS_SRC.matchAll(/id: "(hw_[a-z_]+)", name: "[^"]*", slot:/g)].map((x) => x[1]);
+const allHw = I.ITEMS.filter(I.isHalloweenItem).map((x) => x.id);
 const orphans = allHw.filter((id) => !inSets.has(id));
+const setCount = hwSets.length;
 console.log(`\n  ${allHw.length} pieces across ${setCount} sets`
     + (orphans.length ? `  ⚠️  ${orphans.length} in no set: ${orphans.join(", ")}` : "  — every piece belongs to one"));
 if (orphans.length) bad += 1;
+
+// ── AND NONE OF IT TOUCHES A BOSS FIGHT ──────────────────────────────────────────────────────────────────
+// Luke: "Don't affect boss fights in any meaningful way." The three sets are collection sets, so the promise
+// is structural rather than a matter of tuning — but "structural" is what everyone says right up until a
+// capstone key gets added back. So it is measured: every piece equipped, a full set of all three, a crit, at
+// every boss-HP fraction any capstone in the game keys off. The answer has to be exactly x1.
+const allPieces = hwSets.flatMap((x) => x.items);
+console.log("\n  BOSS IMPACT\n");
+for (const frac of [1.0, 0.8, 0.5, 0.2, 0.1]) {
+    const r = S.setCombatMult(allPieces, { crit: true, hitIndex: 0, bossHpFrac: frac,
+        bossMaxHp: 9_000_000, hittersToday: 12, bossWeakness: "shadow" });
+    const clean = Math.abs(r.mult - 1) < 1e-9;
+    if (!clean) { console.log(`  ⚠️  boss at ${Math.round(frac * 100)}% HP → x${r.mult.toFixed(3)} (${(r.fired || []).join(", ")})`); bad += 1; }
+}
+const withStats = hwSets.filter((x) => (x.bonuses || []).some((b) => b.stats));
+if (withStats.length) { console.log(`  ⚠️  ${withStats.map((x) => x.name).join(", ")} grant raw combat stats`); bad += 1; }
+if (!withStats.length) console.log("  All three are collection sets — x1.000 at every boss HP fraction, with every piece equipped and a crit.");
 
 // ── AND WHAT THAT MEANS IN CHESTS ────────────────────────────────────────────────────────────────────────
 // ⚠️ THE UNIT IS ONE SET, NOT THE WHOLE CATALOGUE. Nobody chases fifteen pieces; they chase the build they
