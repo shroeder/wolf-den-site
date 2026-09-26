@@ -1,7 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { GLINT_DECOS, decorationById } from "@/lib/marketplace/decorations.js";
+import { GLINT_DECOS, HALLOWEEN_DECOS, decorationById } from "@/lib/marketplace/decorations.js";
+import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
 import { grantDecoration } from "@/lib/marketplace/farm-decorations.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
@@ -57,6 +58,12 @@ const SHINY_SPAWN_CHANCE = 0.04;     // per 30-min cron tick (~2/day avg, capped
 
 // The current live (unclaimed, unexpired) glint, or null. Shape is town-state friendly. x/y are % positions;
 // y is kept high so it hides among the rooftops/sky. No reward info leaks — that's rolled at claim time.
+// ── WHAT THE GLINT CAN BE ────────────────────────────────────────────────────────────────────────────────
+// ⚠️ ONE LIST, READ TWICE. The "which of these do they already hold" query and the pick BOTH read this — with
+// two expressions the seasonal ones could be excluded from the held-check and then picked anyway, handing a
+// member a duplicate of something they own and calling it a find.
+const GLINT_POOL = HALLOWEEN_PUBLIC ? [...GLINT_DECOS, ...HALLOWEEN_DECOS] : GLINT_DECOS;
+
 export async function getActiveShiny() {
     const row = await db.queryOne(
         `SELECT id, x, y FROM mkt_town_shiny WHERE claimed_by IS NULL AND expires_at > NOW() ORDER BY spawned_at DESC LIMIT 1`
@@ -112,10 +119,10 @@ export async function claimShiny(buyerId, shinyId) {
     // you hold all eight — at which point a duplicate is the honest answer.
     const ownedRows = await db.query(
         `SELECT deco_id FROM mkt_deco_owned WHERE buyer_id = $1 AND deco_id = ANY($2::text[]) AND qty > 0`,
-        [buyerId, GLINT_DECOS],
+        [buyerId, GLINT_POOL],
     ).catch(() => []);
     const held = new Set((ownedRows || []).map((r) => r.deco_id));
-    const fresh = GLINT_DECOS.filter((id) => !held.has(id));
+    const fresh = GLINT_POOL.filter((id) => !held.has(id));
     const pool = fresh.length ? fresh : GLINT_DECOS;
     const reward = pool[Math.floor(Math.random() * pool.length)];
     const claimed = await db.queryOne(

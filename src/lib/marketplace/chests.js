@@ -563,6 +563,16 @@ const HW_PET_CHANCE = { hw_candycorn: 0.04, hw_pumpkin: 0.06, hw_skeleton: 0.09,
 const HW_SIGNATURE_PET = { hw_candycorn: "hw_sugar_sprite", hw_pumpkin: "hw_jack", hw_skeleton: "hw_rattle", hw_ghost: "hw_boo" };
 const HW_SIGNATURE_SHARE = 0.7;
 
+// ── A SEASONAL FARM DECORATION ───────────────────────────────────────────────────────────────────────────
+// Luke: "unlockable seasonal farm decorations... from the wheel. And other places like chests or wherever
+// else we give out decorations." This is the chest half of that.
+//
+// ⚠️ IT SITS ABOVE CANDY AND BELOW THE PET, which is the whole of its tuning. Candy is the floor — what a
+// chest pays most of the time — so a rung placed under it would almost never fire; a rung placed above the
+// GEAR would eat the chase the chest exists for. There are eight decorations and they come from the wheel
+// and the town glint as well, so the chest does not have to carry the set on its own.
+const HW_DECO_CHANCE = { hw_candycorn: 0.10, hw_pumpkin: 0.12, hw_skeleton: 0.14, hw_ghost: 0.16 };
+
 async function openHalloweenChest(buyerId, tier, remaining) {
     await db.query(`INSERT INTO mkt_chest_open (buyer_id, tier, count, source) VALUES ($1, $2, 1, $3)`, [buyerId, tier, "open"]).catch(() => {});
     await trackActivity(buyerId, "open_chest", { tier });
@@ -601,6 +611,27 @@ async function openHalloweenChest(buyerId, tier, remaining) {
             const { grantPet } = await import("@/lib/marketplace/pet-drops.js");
             const got = await grantPet(buyerId, pick, "chest", { tier }).catch(() => null);
             if (got) return { ok: true, remaining, pet: got };
+        }
+    }
+
+    // ── A FARM DECORATION ────────────────────────────────────────────────────────────────────────────────
+    // Un-owned only. A member who already has all eight falls THROUGH to the candy rather than being handed a
+    // duplicate — a decoration is a thing you own once, so a second copy is a blank reveal with a name on it.
+    if (Math.random() < (HW_DECO_CHANCE[tier] || 0)) {
+        const { HALLOWEEN_DECOS, decorationById } = await import("@/lib/marketplace/decorations.js");
+        const rows = await db.query(`SELECT deco_id FROM mkt_deco_owned WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+        const owned = new Set(rows.map((r) => r.deco_id));
+        const fresh = HALLOWEEN_DECOS.filter((id) => !owned.has(id));
+        if (fresh.length) {
+            const id = fresh[Math.floor(Math.random() * fresh.length)];
+            const { grantDecoration } = await import("@/lib/marketplace/farm-decorations.js");
+            // grantDecoration returns { ok: false, error } for a bad id rather than throwing, so the truthy
+            // check has to be on `.ok` — `!== null` would treat a refusal as a success and eat the chest.
+            const got = await grantDecoration(buyerId, id, 1, `chest:${tier}`).catch(() => null);
+            const def = decorationById(id);
+            if (got?.ok && def) {
+                return { ok: true, remaining, decoration: { id, name: def.name, emoji: def.emoji, rarity: def.rarity } };
+            }
         }
     }
 

@@ -28,6 +28,7 @@ const table = (src, name) => {
 
 const gear = table(SRC, "HW_GEAR_CHANCE");
 const pet = table(SRC, "HW_PET_CHANCE");
+const deco = table(SRC, "HW_DECO_CHANCE");
 const ghostShare = Number(HW.match(/const GHOST_SHARE = ([\d.]+);/)?.[1]);
 const sub = table(HW, "SUBSTITUTE");
 
@@ -48,15 +49,17 @@ console.log(`  mythic+     100.0%        (never substituted — see the note in 
 // ── THE CHAIN ────────────────────────────────────────────────────────────────────────────────────────────
 // First match wins, so each rung's real share is what is left after the ones above it.
 console.log("\n\n  THE CHAIN — what is inside one, first match wins\n");
-console.log("  chest              exclusive gear      pet      candy");
+console.log("  chest              exclusive gear      pet     decoration   candy");
 console.log("  " + "-".repeat(70));
 const rows = [];
 for (const t of HALLOWEEN_CHESTS) {
+    // First match wins, so each rung's real share is what is left after the ones above it.
     const g = gear[t] || 0;
     const p = (1 - g) * (pet[t] || 0);
-    const c = 1 - g - p;
-    rows.push({ t, g, p, c });
-    console.log(`  ${t.padEnd(18)} ${(g * 100).toFixed(1).padStart(6)}%        ${(p * 100).toFixed(1).padStart(5)}%    ${(c * 100).toFixed(1).padStart(5)}%`);
+    const d = (1 - g - p) * (deco[t] || 0);
+    const c = 1 - g - p - d;
+    rows.push({ t, g, p, d, c });
+    console.log(`  ${t.padEnd(18)} ${(g * 100).toFixed(1).padStart(6)}%        ${(p * 100).toFixed(1).padStart(5)}%    ${(d * 100).toFixed(1).padStart(6)}%   ${(c * 100).toFixed(1).padStart(5)}%`);
 }
 
 // ── THE TWO THINGS THAT MUST BE TRUE ─────────────────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@
 //   fertPower   → fertilizer cuts +X% more of the remaining grow time
 //   goldHarvest → +X% gold from every harvest
 import { SEASON_HIDDEN } from "@/lib/marketplace/arena-season.js";
+import { HALLOWEEN_HIDDEN } from "@/lib/marketplace/halloween.js";
 import { housePrompt } from "@/lib/marketplace/art-style.js";
 import { COIN_ICON } from "@/lib/coin-icon";
 import { textIcon } from "@/lib/coin-icon.js";
@@ -178,6 +179,45 @@ export const DECORATIONS = [
     deco("deco_glint_gilded_acorn", "Gilded Acorn", "🌰", "epic", "glint", null, { stat: "fertPower", value: 5 }, "a polished golden acorn on a tiny pedestal, gleaming like treasure"),
     deco("deco_glint_starforge", "Starforge Relic", "⭐", "epic", "glint", null, { stat: "growSpeed", value: 6 }, "a small floating anvil-shaped relic forged from a star, ringed with orbiting sparks of light"),
     deco("deco_glint_aurora_orb", "Aurora Orb", "🔮", "epic", "glint", null, { stat: "harvestLuck", value: 5 }, "a crystal orb swirling with shifting aurora-borealis light, greens and purples"),
+    // ── HALLOWEEN · won only while the flag is up ────────────────────────────────────────────────────────
+    // Luke: "unlockable seasonal farm decorations, only unlockable during the halloween phase. Maybe from the
+    // wheel. And other places like chests or wherever else we give out decorations."
+    //
+    // `source: "halloween"` is a source no EXISTING hand-out path can reach — the same lock the Petting Stand
+    // uses, and for the same reason. Every path filters by source, so a new source is invisible to all of them
+    // until one is taught about it deliberately:
+    //
+    //   the wheel      DECORATIONS.filter(d => d.source === "spin")     -> now also "halloween", event only
+    //   the glint      GLINT_DECOS, i.e. source === "glint"             -> now also "halloween", event only
+    //   both shops     price && ["shop","special"].includes(source)     -> price is null, so never
+    //   the level track d.source === "level"                            -> never
+    //   a Halloween chest                                               -> a new rung, event only by definition
+    //
+    // ⚠️ `unreleased: HALLOWEEN_HIDDEN` KEEPS THEM OUT OF THE CATALOGUE DRAWER while the event is down, but
+    // PUBLIC_DECORATIONS makes an exception for anything you already own — so a member who won one last
+    // October still sees it, can still place it, and keeps the buff. A seasonal exclusive is a thing you kept,
+    // not a thing that is taken back.
+    //
+    // Buffs follow the house curve: rares cosmetic or tiny, epics a real 5-6, the one mythic a little more.
+    // Nothing here is stronger than its year-round equivalent — a costume must not be the best farm build.
+    deco("deco_hw_jack_o_lantern", "Grinning Jack", "🎃", "rare", "halloween", null, { stat: "goldHarvest", value: 4 },
+        "a carved jack-o'-lantern with a wide grin and a candle burning inside, sitting on a little pile of straw", null),
+    deco("deco_hw_scarecrow", "The Night Watchman", "🌾", "rare", "halloween", null, { stat: "seedLuck", value: 4 },
+        "a lopsided scarecrow on a post in a tattered coat and a burlap hood, a crow perched on one shoulder", null),
+    deco("deco_hw_gravestone", "Leaning Headstone", "🪦", "rare", "halloween", null, null,
+        "a weathered stone grave marker leaning in the earth, moss in its carved letters, a few dead leaves at its foot", null),
+    deco("deco_hw_cauldron", "Bubbling Cauldron", "🫕", "epic", "halloween", null, { stat: "fertPower", value: 6 },
+        "a black iron cauldron on three legs over a low fire, bubbling with glowing green brew and curling vapour", null),
+    deco("deco_hw_candle_ring", "Ring of Nine Candles", "🕯️", "epic", "halloween", null, { stat: "harvestLuck", value: 5 },
+        "nine tall dripping candles standing in a ring on the ground, eight lit with warm flame and one unlit", null),
+    deco("deco_hw_web_corner", "Old Cobweb", "🕸️", "epic", "halloween", null, { stat: "petXp", value: 5 },
+        "a big silver cobweb strung between two crooked fence posts, dew on the strands, one fat patient spider", null),
+    deco("deco_hw_ghost_lamp", "Wisp Lamp", "👻", "epic", "halloween", null, { stat: "growSpeed", value: 5 },
+        "an old iron lamp post with no flame in it, a pale blue-white wisp of a ghost drifting inside the glass instead", null),
+    // The one to chase. A little bigger, a little better, and the only mythic in the set.
+    deco("deco_hw_pumpkin_king", "The Pumpkin King", "👑", "mythic", "halloween", null, { stat: "goldHarvest", value: 8 },
+        "an enormous crowned pumpkin sitting on a throne of twisted vines and corn stalks, its carved face lit from within with warm orange fire, smaller pumpkins bowing at its base", null),
+
     // ── THE PETTING STAND ── the one decoration you cannot win, find, or be given ─────────────────────────
     // Sold ONLY inside the $5 Petting Stand package (store credit + coins + this), so it needs a source no
     // existing hand-out path can reach. Every one of them filters by source and this matches none:
@@ -248,6 +288,15 @@ export const GLINT_DECOS = DECORATIONS.filter((d) => d.source === "glint").map((
 // owns it — which keeps the owner (and any early tester granted one) able to see and place theirs while it is
 // invisible to everyone else. Grant paths are guarded separately by `source`; this is the display half, and the
 // two must both hold. See the memory note on ownerOnly content being simultaneously leaky and unobtainable.
+// ⚠️ APPLIED AFTER THE LIST, because deco() has no `unreleased` argument and giving it one would mean
+// touching all hundred declarations to add a default. A seasonal decoration is hidden from the catalogue
+// drawer while the flag is down and visible again when it is up — and always visible to somebody who owns it,
+// which PUBLIC_DECORATIONS already handles.
+for (const d of DECORATIONS) if (d.source === "halloween") d.unreleased = HALLOWEEN_HIDDEN;
+
+/** Every decoration the Halloween event can hand out, in any of its three ways. */
+export const HALLOWEEN_DECOS = DECORATIONS.filter((d) => d.source === "halloween").map((d) => d.id);
+
 export const PUBLIC_DECORATIONS = (ownedIds = null) => {
     const own = ownedIds instanceof Set ? ownedIds : new Set(ownedIds || []);
     return DECORATIONS.filter((d) => !d.unreleased || own.has(d.id));

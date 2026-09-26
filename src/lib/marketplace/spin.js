@@ -603,7 +603,16 @@ async function grantPrize(buyerId, prize, opts = {}) {
     if (prize.kind === "decoration") {
         const { DECORATIONS } = await import("@/lib/marketplace/decorations.js");
         const { grantDecoration } = await import("@/lib/marketplace/farm-decorations.js");
-        const pool = DECORATIONS.filter((d) => d.source === "spin");
+        // ── ⚠️ AND THE SEASONAL ONES, WHILE THE FLAG IS UP ───────────────────────────────────────────
+        // Luke: "only unlockable during the halloween phase. Maybe from the wheel." The event adds to this
+        // pool rather than replacing it, so the ordinary eighteen stay winnable all October — a seasonal
+        // event that takes the normal rewards away is a month of worse wheel.
+        //
+        // HALLOWEEN_PUBLIC is the single switch, so this rung closes by itself in November and the
+        // decorations that were won stay owned. See halloween.js.
+        const { HALLOWEEN_PUBLIC } = await import("@/lib/marketplace/halloween.js");
+        const pool = DECORATIONS.filter((d) => d.source === "spin"
+            || (HALLOWEEN_PUBLIC && d.source === "halloween"));
         const owned = new Set((await db.query(`SELECT deco_id FROM mkt_deco_owned WHERE buyer_id = $1`, [buyerId]).catch(() => []) || []).map((r) => r.deco_id));
         const fresh = pool.filter((d) => !owned.has(d.id));
         // Own every one of them? Pay gold rather than landing on a blank wedge — same as the recipe wedge above.
