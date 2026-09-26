@@ -1737,7 +1737,17 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
     if (inTavern) {
         return (
             <div className="stack reveal">
-                <TavernInterior bgUrl={art.tavern_interior?.url} diceUrl={art.dice?.url} npcArt={{ barkeep: art.barkeep?.url, gambler: art.gambler?.url, cardsharp: art.cardsharp?.url }} iconArt={{ pint: art.tavern_pint?.url, round: art.tavern_round?.url }} me={you ? { sprite: you.sprite, flip: you.flip } : null} onLeave={() => setInTavern(false)} />
+                {/* ── THE TAVERN, DRESSED ──────────────────────────────────────────────────────────────
+                    The same room with the lights changed, not a different room: bar, fireplace, beams and
+                    tables all stay where they were, so a member walks into the tavern they know and finds it
+                    decorated. Falls back to the ordinary room whenever the haunted art has not been drawn,
+                    which reads as "no costume" rather than as a broken image.
+
+                    ⚠️ THE NEAR FLOOR HAD TO STAY EMPTY. Characters stand at FLOOR_Y = 95% — the very bottom
+                    edge — so a stool painted in the foreground puts the barkeep inside the furniture. The
+                    generator measures the bottom band against the shipping room's own score rather than
+                    trusting the prompt to keep it clear (scripts/gen-tavern-haunted.mjs). */}
+                <TavernInterior bgUrl={(spooky && art.tavern_interior_haunted?.url) || art.tavern_interior?.url} diceUrl={art.dice?.url} npcArt={{ barkeep: art.barkeep?.url, gambler: art.gambler?.url, cardsharp: art.cardsharp?.url }} iconArt={{ pint: art.tavern_pint?.url, round: art.tavern_round?.url }} me={you ? { sprite: you.sprite, flip: you.flip } : null} onLeave={() => setInTavern(false)} />
             </div>
         );
     }
