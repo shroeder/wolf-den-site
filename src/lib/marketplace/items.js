@@ -847,6 +847,26 @@ export const ITEMS = [
     // The chase piece, and the only ascendant in the set — the Ghost chest is the top of the ladder and has
     // to hold something the other three cannot.
     { id: "hw_candle_eye", name: "Candle-Eye Amulet", slot: "amulet", rarity: "ascendant", icon: "GiCandleFlame", flavor: "It watches the wick, not you. Mostly.", stats: { fortune: 46, crit_power: 34 }, reqLevel: null, source: "halloween", sort: 1307 },
+
+    // ── AND THE SEVEN THAT MAKE THEM THREE SETS ──────────────────────────────────────────────────────────
+    // The first eight were one piece per slot: a set, singular, and a chase with exactly one shape. Three
+    // sets is three shapes — a Fortune build, a Ferocity build and a Crit build — which is the difference
+    // between a collection you finish and a loadout you choose.
+    //
+    // ⚠️ EVERY SET'S FIVE PIECES SIT IN FIVE DIFFERENT SLOTS. Two pieces of one set on the same slot is a
+    // set that cannot be completed on a body, and nothing in the game checks it — the gate for this was
+    // removed, so it is checked by hand here and by the assertion in scripts/halloween-odds.mjs.
+    //
+    // Pieces are shared between sets only where the theme genuinely overlaps — they are not, in fact,
+    // shared at all below. Fifteen pieces, three fives, no overlap, so finishing one set is a real choice
+    // about which chests to spend rather than a side effect of opening enough of anything.
+    { id: "hw_nine_candles", name: "Ring of Nine Candles", slot: "ring", rarity: "legendary", icon: "GiCandleLight", flavor: "Eight are lit. The ninth is for later.", stats: { fortune: 28, crit_chance: 20 }, reqLevel: null, source: "halloween", sort: 1308 },
+    { id: "hw_quiet_row_skullcap", name: "Skullcap of the Quiet Row", slot: "helmet", rarity: "legendary", icon: "GiSkullMask", flavor: "Third from the end, under the yew.", stats: { ferocity: 30, might: 20 }, reqLevel: null, source: "halloween", sort: 1309 },
+    { id: "hw_femur_maul", name: "Femur Maul", slot: "main_hand", rarity: "mythic", icon: "GiBoneMace", flavor: "It belonged to something that walked upright.", stats: { might: 40, ferocity: 28 }, reqLevel: null, source: "halloween", sort: 1310 },
+    { id: "hw_knucklebone_charm", name: "Knucklebone Charm", slot: "amulet", rarity: "legendary", icon: "GiCrossedBones", flavor: "Rattle them and ask again.", stats: { ferocity: 28, fortune: 20 }, reqLevel: null, source: "halloween", sort: 1311 },
+    { id: "hw_coldspot_mirror", name: "Coldspot Mirror", slot: "off_hand", rarity: "legendary", icon: "GiMirrorMirror", flavor: "Nothing is behind you. Check anyway.", stats: { crit_chance: 30, fortune: 18 }, reqLevel: null, source: "halloween", sort: 1312 },
+    { id: "hw_trailing_hem", name: "Trailing Hem", slot: "boots", rarity: "legendary", icon: "GiLegArmor", flavor: "It does not quite reach the floor. It never has.", stats: { crit_chance: 28, ferocity: 20 }, reqLevel: null, source: "halloween", sort: 1313 },
+    { id: "hw_poltergeist_chain", name: "Poltergeist's Chain", slot: "main_hand", rarity: "mythic", icon: "GiChainedHeart", flavor: "You will hear it before the room does.", stats: { crit_chance: 38, crit_power: 28 }, reqLevel: null, source: "halloween", sort: 1314 },
 ];
 
 // ── THE ASCENDED TWIN: THE SAME PIECE, RAISED ────────────────────────────────────────────────────────────────

@@ -60,8 +60,8 @@ for (const t of HALLOWEEN_CHESTS) {
 }
 
 // ── THE TWO THINGS THAT MUST BE TRUE ─────────────────────────────────────────────────────────────────────
-console.log("\n");
 let bad = 0;
+console.log("\n");
 // A ladder has to climb, or the four chests are four names for one object.
 for (let i = 1; i < rows.length; i += 1) {
     if (rows[i].g <= rows[i - 1].g || rows[i].p <= rows[i - 1].p) {
@@ -77,8 +77,40 @@ const thinnest = rows.reduce((a, b) => (a.c < b.c ? a : b));
 if (thinnest.c < 0.5) { console.log(`  ⚠️  ${thinnest.t} pays candy only ${(thinnest.c * 100).toFixed(0)}% of the time`); bad += 1; }
 else console.log(`  Candy stays the common outcome everywhere — thinnest is ${thinnest.t} at ${(thinnest.c * 100).toFixed(0)}%.`);
 
+// ── THE SETS ─────────────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ CHECKED HERE BECAUSE NOTHING ELSE CHECKS IT. Two pieces of one set on the same slot is a set nobody can
+// finish on a body, and the gate that used to catch that is gone. It is cheap to assert and impossible to
+// spot by reading a list of fifteen ids.
+const ITEMS_SRC = readFileSync("src/lib/marketplace/items.js", "utf8");
+const SETS_SRC = readFileSync("src/lib/marketplace/sets.js", "utf8");
+const slotOf = (id) => (ITEMS_SRC.match(new RegExp(`id: "${id}", name: "[^"]*", slot: "([a-z_]+)"`)) || [])[1] || null;
+
+console.log("\n  THE SETS\n");
+const setRe = /id: "(hw_[a-z_]+)", name: "([^"]+)",\s*\n\s*items: \[([^\]]*)\]/g;
+let m, setCount = 0, inSets = new Set();
+while ((m = setRe.exec(SETS_SRC))) {
+    setCount += 1;
+    const ids = m[3].split(",").map((x) => x.trim().replace(/"/g, "")).filter(Boolean);
+    ids.forEach((id) => inSets.add(id));
+    const slots = ids.map(slotOf);
+    const dupes = slots.filter((x, i) => slots.indexOf(x) !== i);
+    const unknown = ids.filter((id) => !slotOf(id));
+    console.log(`  ${m[2].padEnd(20)} ${ids.length} pieces   ${slots.join(", ")}`);
+    if (unknown.length) { console.log(`     ⚠️  not in ITEMS: ${unknown.join(", ")}`); bad += 1; }
+    if (dupes.length) { console.log(`     ⚠️  TWO PIECES ON THE SAME SLOT (${dupes.join(", ")}) — this set cannot be worn complete`); bad += 1; }
+}
+// Every Halloween piece should belong to a set. One that does not is a piece with no chase attached to it.
+const allHw = [...ITEMS_SRC.matchAll(/id: "(hw_[a-z_]+)", name: "[^"]*", slot:/g)].map((x) => x[1]);
+const orphans = allHw.filter((id) => !inSets.has(id));
+console.log(`\n  ${allHw.length} pieces across ${setCount} sets`
+    + (orphans.length ? `  ⚠️  ${orphans.length} in no set: ${orphans.join(", ")}` : "  — every piece belongs to one"));
+if (orphans.length) bad += 1;
+
 // ── AND WHAT THAT MEANS IN CHESTS ────────────────────────────────────────────────────────────────────────
-// The number that actually matters to a member: how many ordinary chests to a full eight-piece set.
-console.log("\n  Roughly, to finish the eight-piece set from a given chest alone:");
-for (const r of rows) console.log(`    ${r.t.padEnd(18)} ${Math.round(8 / r.g)} chests`);
+// ⚠️ THE UNIT IS ONE SET, NOT THE WHOLE CATALOGUE. Nobody chases fifteen pieces; they chase the build they
+// want. And the draw is over every un-owned Halloween piece, so the chests needed for five SPECIFIC ones
+// scale with the size of the whole pool — which is exactly the thing that changed when the catalogue went
+// from eight pieces to fifteen, and exactly the thing that would otherwise be noticed in November.
+console.log("\n  Roughly, to finish ONE five-piece set from a given chest alone:");
+for (const r of rows) console.log(`    ${r.t.padEnd(18)} ${Math.round(allHw.length / r.g)} chests`);
 console.log(`\n  ${bad ? `${bad} problem(s).` : "No problems."}\n`);

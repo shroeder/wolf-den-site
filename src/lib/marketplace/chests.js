@@ -547,8 +547,15 @@ export async function openChests(buyerId, { tier = null, max = BULK_OPEN_CAP } =
 // The ladder runs candy corn -> pumpkin -> skeleton -> ghost, and what climbs is the CHANCE, never the pool:
 // every Halloween chest can hand you any of the eight pieces, the ghost chest just does it far more often. A
 // ladder where the cheap chest cannot reach the good item is a ladder that makes the cheap chest litter.
-const HW_GEAR_CHANCE = { hw_candycorn: 0.08, hw_pumpkin: 0.14, hw_skeleton: 0.22, hw_ghost: 0.32 };
-const HW_PET_CHANCE = { hw_candycorn: 0.03, hw_pumpkin: 0.05, hw_skeleton: 0.08, hw_ghost: 0.14 };
+//
+// ⚠️ TUNED AGAINST THE MEASURED CHEST BUDGET, NOT AGAINST FEEL. The Den granted 5,747 sub-mythic chests in
+// 28 days, so at a 12% substitution an ACTIVE member meets roughly 40-80 Halloween chests across a month and
+// a middling one meets about ten. The first cut of these rates (8/14/22/32) was written before that was
+// measured and paid an active member about six pieces out of fifteen for the whole event — a chase nobody
+// finishes is a chase nobody starts. Re-run scripts/halloween-odds.mjs before touching them; it carries the
+// arithmetic and the measurement together.
+const HW_GEAR_CHANCE = { hw_candycorn: 0.12, hw_pumpkin: 0.20, hw_skeleton: 0.28, hw_ghost: 0.40 };
+const HW_PET_CHANCE = { hw_candycorn: 0.04, hw_pumpkin: 0.06, hw_skeleton: 0.09, hw_ghost: 0.15 };
 
 // Each chest leads with its own pet — that is what makes somebody want a SPECIFIC chest rather than any
 // chest. It can still produce one of the others, because a member who already owns Jack must not find that

@@ -171,6 +171,48 @@ export const ITEM_SETS = [
             desc: "Beat to Quarters: every ENCOUNTER at sea opens with a Reckoning already charged — one free broadside before she answers. Fleet battles are not encounters and do not get it." },
         weakness: null,
     },
+    // ── HALLOWEEN SETS ───────────────────────────────────────────────────────────────────────────────────
+    // Three, and they are three different builds rather than three names: Fortune, Ferocity and Crit Chance
+    // at two pieces, which is this file's own rule about a set owning ONE stat so the first line you read is
+    // its whole personality.
+    //
+    // ⚠️ weakness: null ON ALL THREE, AND THAT IS THE HONEST VALUE. Every existing set declares a weakness
+    // out of "exposed" / "unstable" / "sluggish" / "hunted" / "frail", and the bosses in the database carry
+    // "light" / "fire" / "shadow" / "earth" / "water" — element keys. The two vocabularies have never once
+    // intersected, so `set.weakness === bossWeakness` on line 524 has never been true and the x1.25 SYNERGY
+    // bonus has never fired for any set in the game. Giving these three a REAL element key would hand the
+    // seasonal sets a multiplier that no permanent set has ever received, which is a stealth buff hiding
+    // inside a costume. null is what every other set actually does today. The bug is reported separately;
+    // fixing it changes boss balance for everybody and is not a thing to slip in here.
+    {
+        id: "hw_harvest", name: "Hollowed Harvest",
+        items: ["hw_hollow_crown", "hw_reapers_sickle", "hw_wisp_lantern", "hw_cord_small_hours", "hw_nine_candles"],
+        bonuses: [{ need: 2, stats: { fortune: 10 } }, { need: 4, stats: { fortune: 16, crit_chance: 10 } }],
+        // ⚠️ A NEW CAPSTONE KEY, AND IT IS WIRED. `onslaught` is the mirror of `execute` — the existing
+        // capstones all pay out at the END of a fight (execute under 25%, giant on a big pool) or on a
+        // condition of the swing, and nothing rewarded opening hard. The pet layer has had onslaughtPct for
+        // ages, so the shape is precedented; setCombatMult had no equivalent. Added there in the same breath
+        // as this line, because a capstone no code reads is the commonest bug in this codebase.
+        capstone: { onslaught: 0.5, desc: "Full set: +50% damage while the boss is still above 75% HP." },
+        weakness: null,
+    },
+    {
+        id: "hw_gravebound", name: "Gravebound",
+        items: ["hw_quiet_row_skullcap", "hw_gravemould_cuirass", "hw_femur_maul", "hw_gravewalkers", "hw_knucklebone_charm"],
+        bonuses: [{ need: 2, stats: { ferocity: 10 } }, { need: 4, stats: { ferocity: 16, might: 12 } }],
+        // Shares `execute` with The Undying, which is a collection set and so is never a loadout you choose
+        // INSTEAD of this one — the two never sit on the same decision.
+        capstone: { execute: 0.6, desc: "Full set: +60% damage once the boss is under 25% HP." },
+        weakness: null,
+    },
+    {
+        id: "hw_unquiet", name: "The Unquiet",
+        items: ["hw_poltergeist_chain", "hw_coldspot_mirror", "hw_ninth_night_shroud", "hw_trailing_hem", "hw_candle_eye"],
+        bonuses: [{ need: 2, stats: { crit_chance: 10 } }, { need: 4, stats: { crit_chance: 16, crit_power: 18 } }],
+        capstone: { crit_bonus: 0.45, desc: "Full set: your CRITICAL hits deal +45%." },
+        weakness: null,
+    },
+
     // ── FARM SETS ── bonuses are FARM affinity (seedLuck/growSpeed/harvestLuck/goldHarvest), NOT boss power, and
     // capstones are farm powers read+applied in farm-crops.js (setFarmGrowBonus / setFarmDoubleHarvest). Pieces
     // are utility-slot gear (helmet/belt/back/amulet/off_hand/ring) with FARM affixes — see items.js.
@@ -528,6 +570,10 @@ export function setCombatMult(equippedIds, ctx = {}) {
             if (c.crit_bonus && crit) { mult *= 1 + c.crit_bonus; fired.push(set.name); }
             if (c.erupt && rand() < c.erupt.chance) { mult *= c.erupt.mult; fired.push(`${set.name} ERUPTS`); }
             if (c.execute && bossHpFrac <= 0.25) { mult *= 1 + c.execute; fired.push(`${set.name} — EXECUTE`); }
+            // The mirror of execute: paid while the boss is still nearly whole. bossHpFrac is already in ctx
+            // — this rung costs one line, and without it Hollowed Harvest's capstone would be a sentence on
+            // a card that no code reads.
+            if (c.onslaught && bossHpFrac >= 0.75) { mult *= 1 + c.onslaught; fired.push(`${set.name} — ONSLAUGHT`); }
             if (c.giant && bossMaxHp >= GIANT_HP) { mult *= 1 + c.giant; fired.push(set.name); }
             if (c.first_double && hitIndex === 0) { mult *= 2; fired.push(set.name); }
             if (c.pack) { const b = Math.min(0.25, 0.03 * Math.max(0, hittersToday - 1)); if (b > 0) { mult *= 1 + b; fired.push(set.name); } }
