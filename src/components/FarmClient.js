@@ -1030,9 +1030,20 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Backdrop per view (single images, shown as a cover): Inside = barn, Garden = soil beds, Outside = your custom
     // bg (or the live preview) or the weather/time scene. Custom backgrounds only apply Outside.
     const customBg = view === "outside" ? (farm.customBgDraft || farm.customBg) : null;
+    // ── THE HALLOWEEN FIELD ──────────────────────────────────────────────────────────────────────────────
+    // ⚠️ IT REPLACES THE DEFAULT, NEVER A CUSTOM BACKGROUND. Luke: "The default bg if you don't have custom
+    // generate bg." A generated background is a thing a member spent a creation on; painting a seasonal
+    // costume over it would be taking something they own for a month.
+    //
+    // ⚠️ AND THE GROUND LINE IS WHY THIS IS ONE IMAGE AND NOT SIX. Pets, crops, decorations and the hero are
+    // positioned in PERCENT of the scene and stand between 80% and 92% — they know nothing about the picture
+    // behind them. The haunted field was drawn to put its horizon at 70%, measured on the returned image
+    // rather than hoped for (see scripts/gen-farm-haunted.mjs), so every sprite still stands on painted grass.
+    // It also drops the weather/time swap for the duration, which is the point: on Halloween it is night.
+    const haunted = view === "outside" && !customBg ? (farm.halloweenBg || null) : null;
     const bgUrl = view === "inside" ? VIEW_BG.inside
         : view === "garden" ? VIEW_BG.garden
-        : (customBg || pickFarmBg(visTod, wx.condition));
+        : (customBg || haunted || pickFarmBg(visTod, wx.condition));
     const showWeather = view === "outside"; // weather effects only in the open pasture
     // Decorate Outside & Inside; the Garden is just for planting and the Trophy Room hangs what it hangs.
     // Stated POSITIVELY on purpose — as `view !== "garden"` every view added later opted in by default, which
