@@ -19,7 +19,6 @@
 // the whole codebase. `approach` draws a thing on the horizon that grows as it closes, so a sail or an island
 // is something you SEE before it is something you are told about.
 
-import { GiBat, GiPumpkinLantern, GiWitchFlight, GiSkullCrossedBones, GiSpiderWeb, GiKrakenTentacle } from "react-icons/gi";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
@@ -156,73 +155,58 @@ export default function SailingSea({
             {mood === "storm" ? <div className="sail-rain" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /></div> : null}
 
             {/* ── THE HALLOWEEN DRESSING ───────────────────────────────────────────────────────────────────
-                ⚠️ NOT A TINT OVER THE TOP. A multiply scrim across the scene flattens every layer to one
-                colour and the boat stops reading as painted — the plaza already learned that. The mood here
-                comes from REPLACED ART (sky-haunted.png) plus these DISCRETE objects at their own depths.
+                ⚠️ SPRITES, NOT GLYPHS. The first version used react-icons — GiBat, GiPumpkinLantern,
+                GiWitchFlight — flat single-colour vector paths pasted over painted cel-shaded art. Luke:
+                "we don't like all the cheap icons, and it looks really cheap... bats that just don't even
+                move and they don't even look like sprites. Don't you know the rule is to always use
+                sprites?" He is right and it is a standing rule: a glyph has no palette, no rim light and no
+                volume, and there is nothing in a single path to animate.
 
-                ⚠️ AND THE MOON LIVES HERE, NOT IN THE SKY ART. The horizon strip is four copies with every
-                other one mirrored, so anything singular painted into it appears four times — which is what
-                killed the original painted night sky. As a DOM element it is drawn once, and it can hang
-                still while the clouds scroll behind it, which is what a moon actually does. */}
+                ⚠️ AND NO SCENE TINT. The vignette that used to sit over this is gone. Darkening the corners
+                of the frame is the same mistake as a multiply overlay — it drags every pixel toward one
+                colour and the painted hull stops reading as painted. Mood comes from the artwork.
+
+                ⚠️ THE BAT IS TWO FRAMES, alternated on a steps() animation. A sprite that slides without
+                changing shape reads as a sticker being dragged, which was the actual complaint. */}
             {halloween ? (
                 <>
                     <div className="sail-hw-moon" aria-hidden="true" />
                     <div className="sail-hw-mist" aria-hidden="true"><i /><i /></div>
-                    <div className={`sail-hw-bats${sailing ? " is-fast" : ""}`} aria-hidden="true">
-                        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-                            <span key={i} className="sail-hw-bat" style={{ "--i": i }}>
-                                <GiBat />
-                            </span>
-                        ))}
-                        {/* Two close ones, in FRONT of the hull and several times the size. Distance was
-                            doing all the work before, so every bat was a speck — a pair near the camera is
-                            what makes the rest read as a flock rather than as noise. */}
-                        <span className="sail-hw-bat is-near n1"><GiBat /></span>
-                        <span className="sail-hw-bat is-near n2"><GiBat /></span>
-                    </div>
-                    {/* Jack-o'-lanterns bobbing past on the water — the same trick the ambient boats use, so
-                        they sit in the water rather than on top of the picture. */}
-                    <div className={`sail-hw-buoys${sailing ? " is-scrolling" : ""}`} aria-hidden="true">
-                        {[0, 1, 2, 3, 4].map((i) => (
-                            <span key={i} className="sail-hw-buoy" style={{ "--i": i }}>
-                                <GiPumpkinLantern />
-                            </span>
-                        ))}
-                        {/* One piece of flotsam that is NOT a pumpkin. Three identical lanterns read as a
-                            repeating asset; a fourth thing that is bone-white says somebody arranged this. */}
-                        <span className="sail-hw-buoy is-bone" style={{ "--i": 5 }}>
-                            <GiSkullCrossedBones />
-                        </span>
-                    </div>
-
-                    {/* ⚠️ THE WITCH CROSSES THE MOON, WHICH IS THE ONLY REASON SHE READS AT ALL. A small dark
-                        silhouette anywhere else on this sky is invisible; passing over the one bright disc in
-                        the frame she is unmistakable for the second and a half it takes. So her path is tuned
-                        to the moon's position rather than being another thing drifting across the screen. */}
-                    <div className="sail-hw-witch" aria-hidden="true"><GiWitchFlight /></div>
-
-                    {/* A fog bank, distinct from the thin mist: slower, taller, and it passes IN FRONT of the
-                        distant traffic but behind your own hull, which is what gives the water depth. */}
                     <div className={`sail-hw-fog${sailing ? " is-scrolling" : ""}`} aria-hidden="true"><i /><i /></div>
-
-                    {/* The moon laid on the water. The scene already has a white specular reflection for a sun;
-                        left alone it sat in the middle of a green sea under an orange moon and read as a
-                        completely different light source. */}
                     <div className="sail-hw-moonpath" aria-hidden="true" />
 
-                    {/* ⚠️ THE FRAME IS THE CHEAPEST BIG SIGNAL THERE IS. Webs in the corners of the panel and
-                        a bruised glow around its edge are read before anything inside it, because they change
-                        the SHAPE of the thing rather than adding another small object to a dark picture. */}
-                    <div className="sail-hw-corners" aria-hidden="true">
-                        <span className="c1"><GiSpiderWeb /></span>
-                        <span className="c2"><GiSpiderWeb /></span>
+                    {/* The sky. Five far bats plus two near the camera, so distance is doing something
+                        rather than everything being the same speck. */}
+                    <div className={`sail-hw-bats${sailing ? " is-fast" : ""}`} aria-hidden="true">
+                        {[0, 1, 2, 3, 4].map((i) => (
+                            <span key={i} className="sail-hw-bat" style={{ "--i": i }}>
+                                <i className="f-up" /><i className="f-down" />
+                            </span>
+                        ))}
+                        <span className="sail-hw-bat is-near n1"><i className="f-up" /><i className="f-down" /></span>
+                        <span className="sail-hw-bat is-near n2"><i className="f-up" /><i className="f-down" /></span>
                     </div>
-                    <div className="sail-hw-vignette" aria-hidden="true" />
 
-                    {/* Something large in the water. The bats and pumpkins are all small and far away; one
-                        big shape breaking the surface is what makes the sea feel occupied rather than
-                        decorated. It rises and sinks on a long loop, so it is an event, not scenery. */}
-                    <div className="sail-hw-tentacle" aria-hidden="true"><GiKrakenTentacle /></div>
+                    {/* Her path is tuned to the moon: a silhouette anywhere else on this sky is invisible,
+                        and crossing the one bright disc she is unmistakable for the second she is on it. */}
+                    <div className="sail-hw-witch" aria-hidden="true" />
+
+                    {/* A ghost drifting the other way, so the sky is not all one direction. */}
+                    <div className="sail-hw-ghost" aria-hidden="true" />
+
+                    {/* ── THE WATER ────────────────────────────────────────────────────────────────────
+                        Luke asked for "real scary things in the water that float by". Two kinds: things
+                        that DRIFT PAST at the waterline, and something big that RISES out of it.
+
+                        ⚠️ THE RISERS SIT ON THE WATERLINE, NOT ON THE PANEL EDGE. Both sprites were drawn
+                        with a clean flat bottom so they can be seated exactly where the painted horizon
+                        meets the sea — anchored to the bottom of the frame they would be standing in the
+                        foreground froth instead of out at sea. */}
+                    <div className={`sail-hw-flotsam${sailing ? " is-scrolling" : ""}`} aria-hidden="true">
+                        <span className="f1 is-pumpkin" /><span className="f2 is-skull" /><span className="f3 is-pumpkin" />
+                    </div>
+                    <div className="sail-hw-serpent" aria-hidden="true" />
+                    <div className="sail-hw-tentacle" aria-hidden="true" />
                 </>
             ) : null}
 
@@ -295,16 +279,14 @@ export default function SailingSea({
                     ) : null}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className={`sail-boat-img boat-aura-${tier}`} src={boat?.art} alt="Your boat" />
-                    {/* ⚠️ ON THE BOAT, NOT BEHIND IT. Everything in the first pass lived in the background
-                        layers, so the whole costume amounted to "a new sky" — the hull is the thing you
-                        actually look at and it was the one thing untouched. Lanterns sit ON the deck line
-                        and a web hangs in the rigging, so the dressing arrives with the boat rather than
-                        behind it. */}
+                    {/* ⚠️ ON THE BOAT, NOT BEHIND IT. Everything in the first pass lived in a background
+                        layer, so the whole costume amounted to "a new sky" — the hull is what the eye lands
+                        on. These ride inside .sail-boat-inner, so they rock with the hull and lean with a
+                        gust rather than sitting still behind it. */}
                     {halloween ? (
                         <span className="sail-hw-rig" aria-hidden="true">
-                            <span className="sail-hw-deckpump p1"><GiPumpkinLantern /></span>
-                            <span className="sail-hw-deckpump p2"><GiPumpkinLantern /></span>
-                            <span className="sail-hw-rigweb"><GiSpiderWeb /></span>
+                            <span className="sail-hw-deckpump p1" />
+                            <span className="sail-hw-deckpump p2" />
                         </span>
                     ) : null}
                     <span className="sail-crew" style={{ "--crew-bottom": `${deck}%` }}>

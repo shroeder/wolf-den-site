@@ -2,6 +2,11 @@
 //
 // Run:  node scripts/gen-sky-haunted.mjs [--force]
 //
+// ⚠️ AND THE HORIZON SITS AT ~58%, LIKE EVERY OTHER SKY. The first version put it three quarters of the way
+// down, which measured at 86% against 53-67% for the ten existing horizons — so the boat sat crammed into a
+// sliver of water at the bottom of the panel. Luke: "the water line is too low." Measured, not guessed: the
+// check is the sharpest brightness step in the lower two thirds of each image.
+//
 // ⚠️ NOTHING SINGULAR IN THE SKY. NO MOON, NO ONE BIG SHAPE. This is the trap that already cost the night
 // sky its painted art: the horizon strip is drawn as FOUR copies with every other one mirrored
 // (.sail-sky-scroll img:nth-child(even) { transform: scaleX(-1) }), which is what makes a non-tiling painting
@@ -41,8 +46,9 @@ const PROMPT =
     + "from within by a sickly acid-green and violet glow, ragged wisps of mist trailing beneath them, a deep "
     + "bruised purple-black upper sky fading to a cold poison-green haze along the waterline. Thin tendrils of "
     + "fog crawling across the distant water. Eerie, oppressive, beautiful — a ghost-story sky. "
-    + "COMPOSITION: the HORIZON LINE sits low, roughly three quarters of the way down; sky fills the upper "
-    + "three quarters and a narrow band of dark glassy water runs along the bottom. "
+    + "COMPOSITION: the HORIZON LINE sits at roughly 58% of the way down the image — a little below the "
+    + "middle. Sky fills the upper 58% and OPEN DARK WATER fills the whole lower 42%, reaching all the way "
+    + "to the bottom edge. The water must be a generous band, not a strip. "
     + "⚠️ ABSOLUTELY NO SINGLE FOCAL OBJECT ANYWHERE. NO MOON, no sun, no stars picked out, no lightning bolt, "
     + "no island, no land, no rocks, no lighthouse, no ships, no sails, no birds, no bats, no figures, no "
     + "text. The cloud must be EVEN AND CONTINUOUS ACROSS THE WHOLE WIDTH with no centrepiece and no gap that "
@@ -67,9 +73,39 @@ const body = await res.json();
 if (!res.ok) throw new Error(`${res.status} ${JSON.stringify(body).slice(0, 300)}`);
 
 const png = Buffer.from(body.data[0].b64_json, "base64");
-// Matched to the other skies: same pixel dimensions, no alpha. They are opaque backdrops and an alpha channel
-// would only add weight to a layer that has nothing behind it.
-await sharp(png).resize(1536, 1024, { fit: "cover" }).removeAlpha().png({ quality: 90 }).toFile(FILE);
+
+// ── PUT THE HORIZON WHERE IT WAS ASKED FOR ───────────────────────────────────────────────────────────────
+// ⚠️ THE MODEL WILL NOT HIT A STATED PERCENTAGE. "Three quarters down" produced 86%; "roughly 58%" produced
+// 75%. Rerolling the prompt is paying per attempt for a number that can be measured and fixed for free — so
+// the horizon is FOUND in the returned image and the sky above it is cropped until the water fills the share
+// it should. Deterministic, costs nothing, and works whatever the model felt like drawing.
+const WANT_WATER = 0.40;                       // water as a share of the final image
+const probe = await sharp(png).resize({ width: 200 }).greyscale().raw().toBuffer({ resolveWithObject: true });
+const rows = [];
+for (let y = 0; y < probe.info.height; y++) {
+    let sum = 0;
+    for (let x = 0; x < probe.info.width; x++) sum += probe.data[y * probe.info.width + x];
+    rows.push(sum / probe.info.width);
+}
+let bestY = 0, bestD = 0;
+for (let y = Math.floor(probe.info.height * 0.3); y < probe.info.height - 2; y++) {
+    const d = Math.abs(rows[y + 1] - rows[y]);
+    if (d > bestD) { bestD = d; bestY = y; }
+}
+const horizonFrac = bestY / probe.info.height;
+const meta0 = await sharp(png).metadata();
+const horizonPx = Math.round(horizonFrac * meta0.height);
+const waterPx = meta0.height - horizonPx;
+// Height that puts `waterPx` at WANT_WATER of the frame; never taller than what we have.
+const targetH = Math.min(meta0.height, Math.round(waterPx / WANT_WATER));
+const cropTop = meta0.height - targetH;
+console.log(`horizon found at ${(horizonFrac * 100).toFixed(0)}% — cropping ${cropTop}px of sky so water is ${(WANT_WATER * 100).toFixed(0)}%`);
+
+await sharp(png)
+    .extract({ left: 0, top: cropTop, width: meta0.width, height: targetH })
+    .removeAlpha()
+    .png({ quality: 90 })
+    .toFile(FILE);
 
 const meta = await sharp(FILE).metadata();
 const size = fs.statSync(FILE).size;
