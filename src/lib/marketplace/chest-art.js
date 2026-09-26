@@ -1,8 +1,8 @@
 import "server-only";
 
 import { getSetting, setSetting } from "@/lib/settings.js";
-import { housePrompt } from "@/lib/marketplace/art-style.js";
 import { generateImage } from "@/lib/marketplace/openai-image.js";
+import { CHEST_ART_PROMPTS, CHEST_ART_TIERS } from "@/lib/marketplace/chest-art-prompts.js";
 
 // AI-generated loot-chest icons (one closed treasure chest per tier), stored as Blob URLs in settings so
 // the equipment screen can show real game art instead of an emoji. Admin-triggered + regenerable (chest
@@ -10,42 +10,9 @@ import { generateImage } from "@/lib/marketplace/openai-image.js";
 
 const SETTING_KEY = "chest_art";
 
-// Subject + the shared house style. The negative clauses about boxes matter regardless of style: gpt-image-1
-// will happily draw a cardboard shipping box if you just say "chest".
-const STYLE = housePrompt(
-    "A fantasy RPG treasure chest with a CURVED DOMED lid, thick metal corner brackets, a big ornate front lock " +
-    "plate with a keyhole, and reinforcing bands with rivets. Closed lid, three-quarter view from slightly above.",
-    { extra: "It is a treasure chest, NOT a cardboard box, NOT a cube, NOT a crate, NOT a suitcase, no packing tape, no flat flaps." }
-);
-
-export const CHEST_ART_PROMPTS = {
-    wooden:
-        "A rugged wooden treasure chest of thick weathered oak planks bound with dark wrought-iron straps, warm " +
-        "rich brown wood tones with a worn adventurer feel. " + STYLE,
-    iron:
-        "A sturdy dungeon treasure chest clad in riveted brushed-steel plates and heavy dark iron bands with a " +
-        "chunky padlock, cool gunmetal and silver tones. " + STYLE,
-    gold:
-        "A lavish royal treasure chest of polished gold with elaborate engraved scrollwork filigree, jewel inlays, " +
-        "and a glowing keyhole, radiant warm gold with a soft magical shine. " + STYLE,
-    mythic:
-        "A magical crystalline treasure chest of dark obsidian and glowing emerald-teal crystal, etched arcane runes " +
-        "pulsing with energy, floating light motes and a mystical aura. " + STYLE,
-    ascendant:
-        "A transcendent treasure chest wreathed in molten orange-gold fire and embers, its dark metal cracked with " +
-        "glowing lava veins, radiating intense heat and sparks, blazing beyond legendary. " + STYLE,
-    eternal:
-        "A godlike treasure chest radiating impossible prismatic rainbow light that shifts through hot pink, violet " +
-        "and cyan, crackling with divine energy and shimmering aura, the pinnacle of all loot. " + STYLE,
-    celestial:
-        "A cosmic treasure chest seemingly carved from deep space, its surface a swirling nebula of stars and " +
-        "galaxies in deep violet and indigo with glowing constellations and stardust. " + STYLE,
-    primordial:
-        "The ultimate primordial treasure chest of ancient white-gold metal blazing with blinding radiant light, " +
-        "carved with glowing origin runes, an overwhelming divine aura — the source of all treasure. " + STYLE,
-};
-
-export const CHEST_ART_TIERS = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
+// The prompts and the tier list live in chest-art-prompts.js — a file with no "@/" imports, so the
+// generator script can read the same prose the cron does instead of keeping a second copy that drifts.
+export { CHEST_ART_PROMPTS, CHEST_ART_TIERS };
 
 // The stored tier -> image URL map (or {} if none generated yet).
 export async function getChestArt() {
