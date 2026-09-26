@@ -91,6 +91,46 @@ export const ASCENSION_EFFECTS = {
             note: "No wind, no tide, no reason. It simply has not stopped." },
     },
 
+    // ── THE FOUR FROM THE HALLOWEEN CHESTS ────────────────────────────────────────────────────────────────
+    // Same shape as everything above: the Lightstone teaches a second trade, the Darkstone deepens the one it
+    // was born with — except where the ability it was born with has no headroom, in which case both widen.
+    //
+    // ⚠️ AND THE STONES ARE READ OFF THE ANIMAL, NOT OFF A TEMPLATE. Two of these pets are CUTE and two are
+    // grim, and their level-6 art transfigures accordingly — so a Darkstone that means "more teeth" on Rattle
+    // has to mean something else entirely on a candy sprite, or the stone and the sprite tell a member two
+    // different stories about the same choice.
+    hw_sugar_sprite: {
+        // ⚠️ THE GRAFT HAS TO BE AS WIDE AS THE ABILITY IT IS OFFERED AGAINST. First cut grafted beachcomber
+        // — two extra finds in the dig — against an amplified Fortune, which applies to every roll in the
+        // game. check:ascension called it: "NARROW LIGHT — beachcomber is one feature, fortune is
+        // everywhere." A stone nobody would ever pick is not a choice. A sugar rush is account-wide, so the
+        // Lightstone is too.
+        light: { name: "Sugar Rush", kind: "graft", key: "xp_gain", scale: 1.0,
+            note: "It has not stopped talking since the second one." },
+        dark: { name: "Sickly Sweet", kind: "amplify", mult: 2 },
+    },
+    hw_jack: {
+        // A lantern that walks itself home. gold_find deepened, or the light it carries turned on the ground
+        // it walks over — a jack-o'-lantern is a light somebody made to find their way by.
+        light: { name: "Lights the Lane", kind: "graft", key: "fortune", scale: 1.0,
+            note: "Somebody cut the face so the road could be seen. It has been walking it since." },
+        dark: { name: "Never Goes Out", kind: "amplify", mult: 2 },
+    },
+    hw_rattle: {
+        // The pack kept one of its own, and this is the stone where that matters: ferocity is the passive
+        // half of a strike, so the Lightstone teaches him the OTHER half rather than a neighbouring trade.
+        light: { name: "Still Answers the Horn", kind: "graft", key: "first_hit", scale: 0.9,
+            note: "He does not remember the hunt. He remembers being called." },
+        dark: { name: "Marrow-Deep", kind: "amplify", mult: 1.8 },
+    },
+    hw_boo: {
+        // xp_gain deepened, or the long patient half of it grafted on. A ghost has nothing but time, which is
+        // the joke and also the reason the graft is at full scale.
+        light: { name: "Has Been Practising", kind: "graft", key: "tenacity", scale: 1.0,
+            note: "Weeks of it. In a cupboard. It is very pleased with how it is coming along." },
+        dark: { name: "Still Here", kind: "amplify", mult: 2 },
+    },
+
     // ── THE CASINO'S FIVE AND SABLE'S THREE ───────────────────────────────────────────────────────────────
     // All eight were falling through to FALLBACK_EFFECT — the deliberately dull pair — and check:ascension
     // was already failing on every one of them. Two were worse than dull: the Ferret and the Magpie both

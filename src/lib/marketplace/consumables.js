@@ -124,6 +124,21 @@ export const CONSUMABLES = {
     sail_tailwind_charm: { name: "Tailwind Charm", emoji: "🌬️", kind: "sail", desc: "Summon a gust — shave 2 hours off your current voyage.", price: 700, effect: { type: "sail_tailwind", hours: 2 } },
     sail_prospectors_charm: { name: "Prospector's Charm", emoji: "⛏️", kind: "sail", desc: "Your next dig has a good chance of TWO chests buried instead of one — and pays +50% more doubloons if you fall short.", price: 600, effect: { type: "sail_lure" } },
     sail_raiding_horn: { name: "Raiding Horn", emoji: "📯", kind: "sail", desc: "Sound the horn to regain one spent daily raid.", price: 900, effect: { type: "sail_raid" } },
+
+    // ── CANDY ────────────────────────────────────────────────────────────────────────────────────────────
+    // What a Halloween chest pays most of the time. Drop-only (`price: null`) — candy is the event's supply,
+    // and putting it on the shop shelf would make the chest the slow way to get it.
+    //
+    // ⚠️ EVERY ONE OF THESE USES AN EFFECT TYPE THAT ALREADY EXISTS. That is not laziness, it is the rule
+    // this file keeps breaking when it is ignored: an effect printed on a card that no code consumes is the
+    // Den's commonest bug by a distance. A brand-new `type` here would need a handler written in the same
+    // breath or the candy is a picture of a sweet. These are live the moment they are granted.
+    candy_corn: { name: "Candy Corn", emoji: "🍬", kind: "candy", price: null, desc: "Feed your equipped pet +500 pet XP.", effect: { type: "pet_xp", amount: 500 } },
+    candy_caramel_apple: { name: "Caramel Apple", emoji: "🍎", kind: "candy", price: null, desc: "Gain +3 manual daily strikes today.", effect: { type: "strikes", amount: 3 } },
+    candy_sour_worm: { name: "Sour Worm", emoji: "🪱", kind: "candy", price: null, desc: "DOUBLE your daily strike damage for 12 hours.", effect: { type: "damage", mult: 2, hours: 12 } },
+    candy_chocolate_skull: { name: "Chocolate Skull", emoji: "💀", kind: "candy", price: null, desc: "Instantly gain 1,200 XP. Fixed — Happy Hour does not multiply it.", effect: { type: "xp", amount: 1200 } },
+    candy_popcorn_ball: { name: "Popcorn Ball", emoji: "🍿", kind: "candy", price: null, desc: "Gain +3 wheel spins.", effect: { type: "spin_token", amount: 3 } },
+    candy_licorice_bat: { name: "Licorice Bat", emoji: "🦇", kind: "candy", price: null, desc: "A haul of 8 fertilizer for your crops.", effect: { type: "farm_fertilizer", count: 8 } },
 };
 
 // Inject the tiered seed packs from the shared catalog (single source of truth for tiers/weights/prices).

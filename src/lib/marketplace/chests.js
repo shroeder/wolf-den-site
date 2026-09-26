@@ -3,10 +3,11 @@ import "server-only";
 import { db } from "@/lib/db";
 import { RARITIES } from "@/lib/marketplace/rarity.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
-import { ITEMS } from "@/lib/marketplace/items.js";
+import { ITEMS, isHalloweenItem } from "@/lib/marketplace/items.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { maybeGrantChestPet } from "@/lib/marketplace/pet-drops.js";
+import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
@@ -15,6 +16,7 @@ import { hasPower, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powe
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
+import { HALLOWEEN_CHESTS, HALLOWEEN_PUBLIC, halloweenSwap, isHalloweenChest } from "@/lib/marketplace/halloween.js";
 
 // Loot chests: opened for random gear. Every tier is a SPREAD that shifts its odds toward better gear as
 // you go up — but NONE guarantee a rarity, so even the top chest can under-roll and even a wooden chest has
@@ -114,8 +116,30 @@ export const CHEST_TIERS = {
         weights: { ascendant: 20, eternal: 30, celestial: 45, primordial: 5 } },
     primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0",
         weights: { ascendant: 5, eternal: 20, celestial: 30, primordial: 45 } },
+    // ── THE HALLOWEEN CHESTS ─────────────────────────────────────────────────────────────────────────────
+    // ⚠️ NO `weights`, ON PURPOSE. These do not roll a rarity and never reach the gear pool — openChest
+    // branches into openHalloweenChest before any of that, and their whole chain is three rungs long
+    // (exclusive gear, a pet, candy). A weights map here would be a table nothing reads, which is the
+    // failure mode this codebase produces more than any other.
+    //
+    // They still live in CHEST_TIERS because that is what makes the storage, the grant history, the bulk
+    // open and the chest screen work without a second implementation of any of them.
+    hw_candycorn: { label: "Candy Corn Chest", emoji: "🍬", color: "#ffb347", halloween: true },
+    hw_pumpkin: { label: "Pumpkin Chest", emoji: "🎃", color: "#ff7a18", halloween: true },
+    hw_skeleton: { label: "Skeleton Chest", emoji: "💀", color: "#d8d2c4", halloween: true },
+    hw_ghost: { label: "Ghost Chest", emoji: "👻", color: "#bfe9ff", halloween: true },
 };
+// The GEAR ladder, wooden→primordial. Everything that means "a better chest than that one" reads this.
 export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
+
+// ⚠️ THE SEASONAL CHESTS ARE NOT ON CHEST_ORDER, and that is not tidiness. CHEST_ORDER is walked BACKWARDS
+// to mean "richest first" (see openChests) — append four seasonal chests to the end of it and a member who
+// taps "open everything" spends their pumpkin chests before their primordial one, because the list says the
+// pumpkin is richer. It is not richer, it is a different axis. So it gets its own list, displayed after the
+// ladder and swept after it too.
+export const SEASONAL_ORDER = HALLOWEEN_CHESTS;
+/** Every tier a member can be holding, in the order the chest screen shows them. */
+export const ALL_CHEST_ORDER = [...CHEST_ORDER, ...SEASONAL_ORDER];
 
 // Gold consolation ("dust") when you already own every eligible item of the rolled rarity.
 const DUST = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900, ascendant: 3000, eternal: 8000, celestial: 15000, primordial: 40000 };
@@ -342,17 +366,44 @@ function rollRarity(weights) {
 // Grant chests. `ctx` = { source, meta } records WHERE each chest came from in the audit log (mkt_chest_grant),
 // so "where did this member get that chest?" is always answerable. Logging is best-effort — never blocks a grant.
 export async function addChests(buyerId, tally, { source = "unknown", meta = null } = {}) {
-    for (const [t, n] of Object.entries(tally)) {
-        if (!n) continue;
-        await db.query(
-            `INSERT INTO mkt_user_chest (buyer_id, tier, count) VALUES ($1, $2, $3)
-             ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_user_chest.count + $3`,
-            [buyerId, t, n]
-        ).catch(() => {});
-        await db.query(
-            `INSERT INTO mkt_chest_grant (buyer_id, tier, count, source, meta) VALUES ($1, $2, $3, $4, $5::jsonb)`,
-            [buyerId, t, n, String(source || "unknown").slice(0, 40), JSON.stringify(meta || {})]
-        ).catch(() => {});
+    for (const [tier, granted] of Object.entries(tally)) {
+        if (!granted) continue;
+        // ── THE HALLOWEEN FAUCET ─────────────────────────────────────────────────────────────────────────
+        // Luke: "we will distribute chests like we do other chests. Randomly. Not common but not rare, so
+        // uncommon chance for a chest under mythic to be a Halloween chest."
+        //
+        // ⚠️ HERE, AND ONLY HERE. Every chest in the game arrives through addChests — the wheel, the boss,
+        // quests, the mine, digging, the merchant, level-ups, the surprise roll. Putting the substitution at
+        // the door means not one of those callers has to learn the event exists, and there is no second
+        // faucet to remember to turn off in November.
+        //
+        // ⚠️ PER CHEST, NOT PER GRANT. A grant of five wooden chests is five separate rolls, so a stack
+        // comes out a plausible MIX — five pumpkin chests out of one quest would read as a bug, and rolling
+        // once for the stack would waste the only faucet there is.
+        //
+        // halloweenSwap returns its input untouched while the event is off, so this is a no-op the rest of
+        // the year and needs no guard of its own.
+        const bags = {};
+        for (let i = 0; i < granted; i += 1) {
+            const to = halloweenSwap(tier);
+            bags[to] = (bags[to] || 0) + 1;
+        }
+        for (const [t, n] of Object.entries(bags)) {
+            await db.query(
+                `INSERT INTO mkt_user_chest (buyer_id, tier, count) VALUES ($1, $2, $3)
+                 ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_user_chest.count + $3`,
+                [buyerId, t, n]
+            ).catch(() => {});
+            await db.query(
+                `INSERT INTO mkt_chest_grant (buyer_id, tier, count, source, meta) VALUES ($1, $2, $3, $4, $5::jsonb)`,
+                // The row records what was ACTUALLY given; `swappedFrom` records what it would have been.
+                // Without that second field the event is invisible in the ledger, and every question worth
+                // asking afterwards — did the rate feel right, which tier fed it, how many did the Den see —
+                // needs to know the pumpkin chest used to be an iron one.
+                [buyerId, t, n, String(source || "unknown").slice(0, 40),
+                    JSON.stringify(t === tier ? (meta || {}) : { ...(meta || {}), swappedFrom: tier })]
+            ).catch(() => {});
+        }
     }
 }
 
@@ -426,7 +477,11 @@ export async function getChests(buyerId) {
         getChestArt().catch(() => ({})),
     ]);
     const counts = Object.fromEntries(rows.map((r) => [r.tier, r.count]));
-    return CHEST_ORDER.filter((t) => counts[t]).map((t) => ({ tier: t, count: counts[t], ...CHEST_TIERS[t], image: art[t] || null }));
+    // A seasonal chest is listed only while the event is on. Anything a member is still holding when it ends
+    // stays in the table untouched — it reappears next Halloween rather than being deleted out from under them.
+    return ALL_CHEST_ORDER
+        .filter((t) => counts[t] && (!isHalloweenChest(t) || HALLOWEEN_PUBLIC))
+        .map((t) => ({ tier: t, count: counts[t], ...CHEST_TIERS[t], image: art[t] || null }));
 }
 
 // ── OPENING A PILE OF THEM ───────────────────────────────────────────────────────────────────────────────────
@@ -454,7 +509,9 @@ export async function openChests(buyerId, { tier = null, max = BULK_OPEN_CAP } =
     const limit = Math.max(1, Math.min(BULK_OPEN_CAP, Number(max) || BULK_OPEN_CAP));
 
     // Richest first. CHEST_ORDER runs wooden→primordial, so this walks it backwards.
-    const order = tier ? [tier] : [...CHEST_ORDER].reverse();
+    // Richest first down the gear ladder, and only then the seasonal ones — see the note by SEASONAL_ORDER
+    // for why these are two lists and not one.
+    const order = tier ? [tier] : [...[...CHEST_ORDER].reverse(), ...(HALLOWEEN_PUBLIC ? SEASONAL_ORDER : [])];
     const opens = [];
     for (const t of order) {
         while (opens.length < limit) {
@@ -482,13 +539,95 @@ export async function openChests(buyerId, { tier = null, max = BULK_OPEN_CAP } =
     };
 }
 
+// ── WHAT A HALLOWEEN CHEST HOLDS ─────────────────────────────────────────────────────────────────────────
+// Three rungs, first match wins: an exclusive piece, a pet, or candy. The ordinary chest is a seven-rung
+// chain and every rung added to it steals from the one below — which is how a primordial chest ended up
+// reaching its gear pool 9.8% of the time. Three rungs is a thing a person can hold in their head.
+//
+// The ladder runs candy corn -> pumpkin -> skeleton -> ghost, and what climbs is the CHANCE, never the pool:
+// every Halloween chest can hand you any of the eight pieces, the ghost chest just does it far more often. A
+// ladder where the cheap chest cannot reach the good item is a ladder that makes the cheap chest litter.
+const HW_GEAR_CHANCE = { hw_candycorn: 0.08, hw_pumpkin: 0.14, hw_skeleton: 0.22, hw_ghost: 0.32 };
+const HW_PET_CHANCE = { hw_candycorn: 0.03, hw_pumpkin: 0.05, hw_skeleton: 0.08, hw_ghost: 0.14 };
+
+// Each chest leads with its own pet — that is what makes somebody want a SPECIFIC chest rather than any
+// chest. It can still produce one of the others, because a member who already owns Jack must not find that
+// his pumpkin chests have grown a dead rung.
+const HW_SIGNATURE_PET = { hw_candycorn: "hw_sugar_sprite", hw_pumpkin: "hw_jack", hw_skeleton: "hw_rattle", hw_ghost: "hw_boo" };
+const HW_SIGNATURE_SHARE = 0.7;
+
+async function openHalloweenChest(buyerId, tier, remaining) {
+    await db.query(`INSERT INTO mkt_chest_open (buyer_id, tier, count, source) VALUES ($1, $2, 1, $3)`, [buyerId, tier, "open"]).catch(() => {});
+    await trackActivity(buyerId, "open_chest", { tier });
+    const fortune = await fortuneFor(buyerId).catch(() => 0);
+
+    // ── THE EXCLUSIVE PIECE ──────────────────────────────────────────────────────────────────────────────
+    // Un-owned only, and a member holding the full set falls THROUGH to the pet and the candy rather than
+    // being paid gold dust. Dust is the ordinary chest's answer to a finished collection; on an eight-piece
+    // seasonal set it would mean the chest stopped being a Halloween chest the moment you completed it.
+    if (Math.random() < (HW_GEAR_CHANCE[tier] || 0)) {
+        const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+        const owned = new Set(ownedRows.map((r) => r.item_id));
+        const pool = ITEMS.filter((i) => isHalloweenItem(i) && !owned.has(i.id));
+        if (pool.length) {
+            const item = pool[Math.floor(Math.random() * pool.length)];
+            // `via` is a STRING that lands in acquired_via, not an options bag — an object here writes
+            // "[object Object]" into the column every existing report groups by.
+            await grantItem(buyerId, item.id, "chest").catch(() => {});
+            return { ok: true, remaining, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, flavor: item.flavor } };
+        }
+    }
+
+    // ── THE PET ──────────────────────────────────────────────────────────────────────────────────────────
+    // Luck rides this rung and not the gear one, which is the rule the ordinary chest learned the hard way:
+    // fortune must never decide WHICH branch you take when one branch displaces another, or the luckiest
+    // member in the Den becomes the unluckiest gear-opener in it. A pet is a find, not a substitution.
+    if (Math.random() < luckyChance(HW_PET_CHANCE[tier] || 0, fortune)) {
+        const ownedRows = await db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []);
+        const ownedPets = new Set(ownedRows.map((r) => r.ref));
+        const hwPets = COLLECTIBLES.filter((c) => c.source === "halloween" && !ownedPets.has(c.id));
+        if (hwPets.length) {
+            const signature = hwPets.find((c) => c.id === HW_SIGNATURE_PET[tier]);
+            const pick = (signature && Math.random() < HW_SIGNATURE_SHARE)
+                ? signature
+                : hwPets[Math.floor(Math.random() * hwPets.length)];
+            const { grantPet } = await import("@/lib/marketplace/pet-drops.js");
+            const got = await grantPet(buyerId, pick, "chest", { tier }).catch(() => null);
+            if (got) return { ok: true, remaining, pet: got };
+        }
+    }
+
+    // ── CANDY ────────────────────────────────────────────────────────────────────────────────────────────
+    // The commonest outcome by a distance, so it has to be worth opening for on its own — this is what a
+    // member gets most times they open one of these. Every candy is drop-only and every effect is one the
+    // game already handles, so not one of them is a picture of a sweet.
+    const candy = Object.keys(CONSUMABLES).filter((id) => CONSUMABLES[id].kind === "candy");
+    const cid = candy[Math.floor(Math.random() * candy.length)];
+    await grantConsumable(buyerId, cid);
+    const c = CONSUMABLES[cid];
+    return { ok: true, remaining, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
+}
+
 // Open one chest of a tier: roll a rarity, grant a random un-owned item of it (or gold dust if you own
 // them all). Returns the reveal for the animation.
 export async function openChest(buyerId, tier) {
     const def = CHEST_TIERS[tier];
     if (!def) return { ok: false, error: "unknown_tier" };
+    // A seasonal chest cannot be opened while the event is down. Not consumed, not lost — the row sits there
+    // until next Halloween. Checked BEFORE the decrement, obviously.
+    if (isHalloweenChest(tier) && !HALLOWEEN_PUBLIC) return { ok: false, error: "event_closed" };
     const dec = await db.queryOne(`UPDATE mkt_user_chest SET count = count - 1 WHERE buyer_id = $1 AND tier = $2 AND count > 0 RETURNING count`, [buyerId, tier]).catch(() => null);
     if (!dec) return { ok: false, error: "no_chest" };
+    // ── AND A HALLOWEEN CHEST GOES NOWHERE NEAR THE CHAIN BELOW ──────────────────────────────────────────
+    // Branching here rather than threading four new tiers through seven rolls is the whole design. Every
+    // table in the rest of this function is keyed by tier — RECIPE_CHANCE, SEED_CHANCE, GEM_CHEST_CHANCE,
+    // SCROLL_CHEST_CHANCE, CHEST_CONSUMABLES, DUST, def.weights — and a missing key in any of them does not
+    // read as zero. It reads as undefined, then as NaN through a comparison, then as a silent nothing. That
+    // exact bug is written up at the top of this file about celestial and primordial.
+    //
+    // It is also what keeps the promise: no gold dust, no seeds, no ordinary gear. You never open a pumpkin
+    // chest and get a Short Bow.
+    if (isHalloweenChest(tier)) return openHalloweenChest(buyerId, tier, dec.count);
     // ── FORTUNE RIDES EVERY ROLL BELOW ───────────────────────────────────────────────────────────────────
     // A chest is a priority chain: recipe, then seed, then pet, then gem, then scroll, then consumable, then
     // ordinary gear. Luck raises the chance at every rung, which is exactly what "better drop rates" should

@@ -70,6 +70,12 @@ export const isSeasonItem = (i) => i?.source === "season";
 // existed each time, it just was not shared.
 export const isForgedItem = (i) => i?.source === "forge";
 
+// ── HALLOWEEN, AND ONLY OUT OF A HALLOWEEN CHEST ─────────────────────────────────────────────────────────────
+// The fourth reason a piece must not fall out of a fish, and it is the same shape of lock as the three above
+// for the same reason each of them needed one: every random reward path builds its pool by filtering ITEMS,
+// so an exclusive that is merely "not granted anywhere else" is an exclusive the fishing rod hands out.
+export const isHalloweenItem = (i) => i?.source === "halloween";
+
 // Twin ids are the base id plus a suffix, so anything keyed by item id (sets, elements, sprites) can find its
 // way back to the piece it came from with baseIdOf() instead of keeping a second table.
 export const ASCEND_SUFFIX = "__ascended";
@@ -79,7 +85,8 @@ export const isAscendedId = (id) => String(id || "").endsWith(ASCEND_SUFFIX);
 
 /** Every item a RANDOM reward is allowed to hand out. Use this instead of filtering ITEMS directly. */
 export const randomDropPool = (predicate) =>
-    ITEMS.filter((i) => !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && !isSeasonItem(i) && !isForgedItem(i) && (typeof predicate === "function" ? predicate(i) : true));
+    ITEMS.filter((i) => !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && !isSeasonItem(i) && !isForgedItem(i)
+        && !isHalloweenItem(i) && (typeof predicate === "function" ? predicate(i) : true));
 
 /**
  * A feature's OWN unlaunched gear, for that feature's own reward code — and nothing else.
@@ -202,6 +209,7 @@ export const ITEM_SOURCE_LABEL = {
     // 41 of which redeemed nothing, and members came in to ask for those.
     admin: "Redeemed at the counter in the shop",
     season: "Won at a rung of the Long Road, in one season only",
+    halloween: "Found only in a Halloween chest",
 };
 
 // The "how do I get this" line a member reads. One function, so a screen can never invent its own wording
@@ -816,6 +824,29 @@ export const ITEMS = [
     // things rather than a source of stronger ones. Somebody who never walks the Road is not behind.
     { id: "s1_roadwardens_mantle", name: "The Roadwarden's Mantle", slot: "back", rarity: "eternal", icon: "GiCape", flavor: "Heavy at the shoulder. It has been rained on for years.", stats: { ferocity: 44, might: 30 }, reqLevel: null, source: "season", season: 1, rung: 75, sort: 1200 },
     { id: "s1_hinge_iron_greaves", name: "Hinge-Iron Greaves", slot: "boots", rarity: "primordial", icon: "GiGreaves", flavor: "Cut from the pin the door turned on.", stats: { ferocity: 74, might: 56 }, reqLevel: null, source: "season", season: 1, rung: 175, charged: true, charges: 1, cooldownDays: 365, chargeReward: "store_credit_20", chargeRewardLabel: REWARDS.store_credit_20, sort: 1201 },
+
+    // ── HALLOWEEN EXCLUSIVES ─────────────────────────────────────────────────────────────────────────────
+    // Eight pieces, one per slot, so it is a set somebody can actually finish and wear rather than a handful
+    // of odds and ends that fight each other for the same finger.
+    //
+    // ⚠️ PITCHED LEGENDARY→MYTHIC, WITH ONE ASCENDANT, AND NOT A STEP ABOVE. The gear ceiling is a balance
+    // fact the whole Arena is tuned against, and an event is a source of EXCLUSIVE things rather than of
+    // stronger ones — the same call the Long Road's exclusives are written to, for the same reason. Somebody
+    // who is away for October is not behind when they come back.
+    //
+    // NO reqLevel, same as the season pieces: nothing gates equipping any more, so the number is display
+    // only, and printing "Level 90" on something won at level 30 is a lie in the direction that costs the
+    // member the use of it. The chest IS the requirement and ITEM_SOURCE_LABEL says so.
+    { id: "hw_hollow_crown", name: "Hollow Crown", slot: "helmet", rarity: "legendary", icon: "GiPumpkinLantern", flavor: "Someone cut a face in it. The face stayed.", stats: { might: 30, crit_chance: 22 }, reqLevel: null, source: "halloween", sort: 1300 },
+    { id: "hw_gravemould_cuirass", name: "Grave-Mould Cuirass", slot: "chest", rarity: "legendary", icon: "GiBreastplate", flavor: "Dug up twice. Worn once.", stats: { ferocity: 34, might: 24 }, reqLevel: null, source: "halloween", sort: 1301 },
+    { id: "hw_reapers_sickle", name: "Reaper's Sickle", slot: "main_hand", rarity: "mythic", icon: "GiSickle", flavor: "It is a harvest tool. It was always a harvest tool.", stats: { might: 42, crit_power: 26 }, reqLevel: null, source: "halloween", sort: 1302 },
+    { id: "hw_wisp_lantern", name: "Wisp Lantern", slot: "off_hand", rarity: "legendary", icon: "GiOldLantern", flavor: "Follow it and see.", stats: { fortune: 30, xp_gain: 18 }, reqLevel: null, source: "halloween", sort: 1303 },
+    { id: "hw_gravewalkers", name: "Gravewalkers", slot: "boots", rarity: "legendary", icon: "GiBoots", flavor: "Quiet on purpose.", stats: { crit_chance: 30, ferocity: 20 }, reqLevel: null, source: "halloween", sort: 1304 },
+    { id: "hw_cord_small_hours", name: "Cord of Small Hours", slot: "belt", rarity: "legendary", icon: "GiBelt", flavor: "Knotted once for every hour nobody was awake.", stats: { might: 28, fortune: 22 }, reqLevel: null, source: "halloween", sort: 1305 },
+    { id: "hw_ninth_night_shroud", name: "Shroud of the Ninth Night", slot: "back", rarity: "mythic", icon: "GiCape", flavor: "Eight nights it was only a sheet.", stats: { ferocity: 40, crit_chance: 28 }, reqLevel: null, source: "halloween", sort: 1306 },
+    // The chase piece, and the only ascendant in the set — the Ghost chest is the top of the ladder and has
+    // to hold something the other three cannot.
+    { id: "hw_candle_eye", name: "Candle-Eye Amulet", slot: "amulet", rarity: "ascendant", icon: "GiCandleFlame", flavor: "It watches the wick, not you. Mostly.", stats: { fortune: 46, crit_power: 34 }, reqLevel: null, source: "halloween", sort: 1307 },
 ];
 
 // ── THE ASCENDED TWIN: THE SAME PIECE, RAISED ────────────────────────────────────────────────────────────────
@@ -842,7 +873,7 @@ const ASCEND_TO = "ascendant";
 
 /** Can this piece be raised by a Prismatic Stone? The cap is Luke's: ascendant and no further. */
 export const canAscendItem = (i) => Boolean(i?.slot) && !i?.charged && !isForgedItem(i)
-    && !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && !isSeasonItem(i)
+    && !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && !isSeasonItem(i) && !isHalloweenItem(i)
     && rarityRank(i?.rarity) > -1 && rarityRank(i?.rarity) < rarityRank(ASCEND_TO);
 
 for (const base of ITEMS.filter(canAscendItem)) {
