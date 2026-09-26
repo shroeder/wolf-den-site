@@ -205,7 +205,10 @@ export const DECORATIONS = [
     deco("deco_hw_scarecrow", "The Night Watchman", "🌾", "rare", "halloween", null, { stat: "seedLuck", value: 4 },
         "a lopsided scarecrow on a post in a tattered coat and a burlap hood, a crow perched on one shoulder", null),
     deco("deco_hw_gravestone", "Leaning Headstone", "🪦", "rare", "halloween", null, null,
-        "a weathered stone grave marker leaning in the earth, moss in its carved letters, a few dead leaves at its foot", null),
+        // ⚠️ NEVER SAY "LETTERS" TO AN IMAGE MODEL. "moss in its carved letters" came back with the word MOSS
+        // chiselled across the stone — it read the description of the surface as the text to write on it. The
+        // house style already forbids text; naming letters at all invites one through anyway.
+        "a weathered blank stone grave marker leaning in the earth, its face smooth and completely empty with no writing, no words and no carved symbols of any kind, patches of moss on the stone, a few dead leaves at its foot", null),
     deco("deco_hw_cauldron", "Bubbling Cauldron", "🫕", "epic", "halloween", null, { stat: "fertPower", value: 6 },
         "a black iron cauldron on three legs over a low fire, bubbling with glowing green brew and curling vapour", null),
     deco("deco_hw_candle_ring", "Ring of Nine Candles", "🕯️", "epic", "halloween", null, { stat: "harvestLuck", value: 5 },
