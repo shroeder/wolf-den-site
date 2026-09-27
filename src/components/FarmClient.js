@@ -1560,7 +1560,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                         })}
 
                         {/* The farmer strolls the Outside & Inside (not the tidy Garden) — tap to connect */}
-                        {view !== "garden" && farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} groundShift={groundShift} brightness={farm.spriteBrightness ?? 1} onTap={() => setOwnerMenu(true)} /> : null}
+                        {/* ⚠️ NO HUMANS IN THE TANK. Luke, twice: "dont have the character in there, doesnt
+                            make sense" / "No humans in there". The first pass only gated the VISITORS block,
+                            and the figure still standing on the gravel was this one — the farm owner's own
+                            walker, drawn from a different branch. Both are out now. The aquarium shows fish. */}
+                        {view !== "garden" && view !== "aquarium" && farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} groundShift={groundShift} brightness={farm.spriteBrightness ?? 1} onTap={() => setOwnerMenu(true)} /> : null}
 
                         {/* The hog's box is left Outside in the open pasture, and it waits. */}
                         {view === "outside" && farm.mine && farm.pigAvailable ? <GiftBox busy={pigBusy} onOpen={openPigBox} /> : null}
