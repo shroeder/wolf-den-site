@@ -630,7 +630,12 @@ async function openHalloweenChest(buyerId, tier, remaining) {
             const got = await grantDecoration(buyerId, id, 1, `chest:${tier}`).catch(() => null);
             const def = decorationById(id);
             if (got?.ok && def) {
-                return { ok: true, remaining, decoration: { id, name: def.name, emoji: def.emoji, rarity: def.rarity } };
+                // ⚠️ SEND THE SPRITE, NOT JUST THE EMOJI. The reveal falls back to the emoji when there is
+                // no art, which is correct for a prop nobody has drawn yet and wrong for these eight, which
+                // have sprites — a member winning The Pumpkin King should see the Pumpkin King, not 👑.
+                const { decorationSpriteMap } = await import("@/lib/marketplace/decoration-sprites.js");
+                const art = await decorationSpriteMap().catch(() => ({}));
+                return { ok: true, remaining, decoration: { id, name: def.name, emoji: def.emoji, rarity: def.rarity, spriteUrl: art?.[id] || null } };
             }
         }
     }

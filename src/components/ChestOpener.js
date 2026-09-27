@@ -29,6 +29,7 @@ function rarityOf(reveal) {
     if (reveal?.consumable) return reveal.consumable.kind === "relic" ? "eternal" : "legendary";
     if (reveal?.pet) return reveal.pet.rarity || "rare";
     if (reveal?.recipe) return "epic";
+    if (reveal?.decoration) return reveal.decoration.rarity || "rare";
     // A handful of seeds celebrates at the BEST one in it — a Star Fruit out of a gold chest should not be
     // announced at the rarity of the wheat sitting next to it.
     if (Array.isArray(reveal?.seeds) && reveal.seeds.length) {
@@ -300,6 +301,7 @@ function bulkLine(o) {
     if (o.pet) return { name: o.pet.name, sub: "companion", rarity: o.pet.rarity || "rare" };
     if (o.gem) return { name: o.gem.name, sub: "gem", rarity: rarityOf(o) };
     if (o.recipe) return { name: o.recipe.name, sub: "recipe", rarity: "epic" };
+    if (o.decoration) return { name: o.decoration.name, sub: "decoration", rarity: o.decoration.rarity || "rare" };
     if (o.consumable) return { name: o.consumable.name, sub: o.consumable.kind || "supply", rarity: rarityOf(o) };
     if (Array.isArray(o.seeds) && o.seeds.length) {
         return { name: o.seeds.length === 1 ? `${o.seeds[0].name} seed` : `${o.seeds.length} seeds`, sub: "for the farm", rarity: rarityOf(o) };
@@ -397,6 +399,11 @@ function RewardReveal({ reveal, onClose, onAgain }) {
     // and told "You already own that gear — take the dust!" That is the whole cost of returning a new kind
     // from the server without teaching the reveal about it.
     const isSeeds = Array.isArray(reveal?.seeds) && reveal.seeds.length > 0;
+    // ⚠️ AND THE COMMENT ABOVE CAME TRUE AGAIN, SAME WEEK. The Halloween chests grew a decoration rung on
+    // the server and nothing here was taught about it, so a member winning The Pumpkin King would have been
+    // shown the DUST card — "you already own that gear" — for a mythic farm prop they had just been handed.
+    // Exactly the gem bug, rewritten. A new kind from the server is not done until this file knows it.
+    const isDeco = Boolean(reveal?.decoration);
 
     const particles = useMemo(() => {
         const n = PARTICLE_COUNT[rarity] || 16;
@@ -431,7 +438,7 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                     ))}
                 </div>
                 <div className={`chest-reward rar-${rarity}`} style={{ "--rar": color }}>
-                    <span className="chest-rarity-tag">{isSeeds ? `${RARITY_LABEL[rarity] || rarity} SEEDS`.toUpperCase() : isRecipe ? "RECIPE" : isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : isPet ? "🐾 PET" : (RARITY_LABEL[rarity] || rarity)}</span>
+                    <span className="chest-rarity-tag">{isSeeds ? `${RARITY_LABEL[rarity] || rarity} SEEDS`.toUpperCase() : isRecipe ? "RECIPE" : isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : isPet ? "🐾 PET" : isDeco ? "🏡 DECORATION" : (RARITY_LABEL[rarity] || rarity)}</span>
                     {isSeeds ? (
                         <>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -466,6 +473,17 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                             <img src="/images/cooking/dish.png" alt="" className="chest-reward-glyph" draggable="false" />
                             <div className="chest-reward-name">{reveal.recipe.name}</div>
                             <div className="chest-reward-sub muted">A new recipe for the Kitchen&rsquo;s book.</div>
+                        </>
+                    ) : isDeco ? (
+                        <>
+                            {/* Sprite, falling back to the catalogue emoji — the same chain the Decorate
+                                tray uses (see FarmDecorations), rather than a fourth way of drawing a prop. */}
+                            {reveal.decoration.spriteUrl
+                                // eslint-disable-next-line @next/next/no-img-element
+                                ? <img src={reveal.decoration.spriteUrl} alt="" className="chest-reward-glyph" draggable="false" />
+                                : <span className="chest-reward-glyph" style={{ fontSize: 64 }}>{reveal.decoration.emoji}</span>}
+                            <div className="chest-reward-name">{reveal.decoration.name}</div>
+                            <div className="chest-reward-sub muted">A decoration for your farm — place it from the Decorate tray.</div>
                         </>
                     ) : isPet ? (
                         <>
