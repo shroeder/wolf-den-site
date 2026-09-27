@@ -19,7 +19,7 @@ import MiningMinigame from "@/components/MiningMinigame";
 // call lives in useMine, and each tab renders from props — so "what happens when you climb out" has exactly one
 // answer instead of one per screen.
 
-export default function MiningClient({ initial }) {
+export default function MiningClient({ initial, halloween = false }) {
     const m = useMine(initial);
     const { state: s, node, msg, busy, tab, setTab, tripsLeft } = m;
 
@@ -72,12 +72,13 @@ export default function MiningClient({ initial }) {
                 <DescendTab
                     s={s} msg={msg} busy={busy} card={m.card}
                     startTrip={m.startTrip} buyTrip={m.buyTrip} goDeeper={m.goDeeper} surface={m.surface} upgrade={m.upgrade}
+                    halloween={halloween}
                 />
             ) : tab === "mine" ? (
                 <FaceTab
                     s={s} node={node} msg={msg} busy={busy} floats={m.floats} shake={m.shake}
                     tripsLeft={tripsLeft} backToTunnel={m.backToTunnel}
-                    onBreak={m.openBreak} upgrade={m.upgrade}
+                    onBreak={m.openBreak} upgrade={m.upgrade} halloween={halloween}
                 />
             ) : (
                 <SmeltTab

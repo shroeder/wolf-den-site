@@ -5,6 +5,8 @@ import MiningClient from "@/components/MiningClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getMiningState } from "@/lib/marketplace/mining.js";
 import { devFixture } from "@/lib/dev-fixture.js";
+import { canPreview } from "@/lib/marketplace/owner.js";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -24,5 +26,10 @@ export default async function MiningPage() {
     // same contract the Kitchen used before it opened up.
     if (!state?.unlocked) redirect("/marketplace/town");
 
-    return <MiningClient initial={state} />;
+    // The same gate the plaza, the sea, the dig and the farm use — the member's own town_halloween column
+    // behind canPreview. One flag, five screens; see halloween.js for why that is one switch and not five.
+    const hw = canPreview("halloween", buyer.id)
+        ? await db.queryOne(`SELECT town_halloween FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null)
+        : null;
+    return <MiningClient initial={state} halloween={Boolean(hw?.town_halloween)} />;
 }

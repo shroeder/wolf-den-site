@@ -39,7 +39,7 @@ function NoSeam({ s, tripsLeft, backToTunnel }) {
     );
 }
 
-export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, backToTunnel, onBreak, upgrade }) {
+export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, backToTunnel, onBreak, upgrade, halloween = false }) {
     const live = Boolean(node && node.pct > 0);
     const lvls = s.stats?.upgradeLevels ?? 0;
 
@@ -47,6 +47,24 @@ export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, 
         <>
             <div className={`mine-face${node ? "" : " is-empty"}`} key={node?.id || "none"}>
                 <div className="mine-face-bg" aria-hidden="true" />
+                {/* ── THE SEAM, WITH THE FLAG UP ───────────────────────────────────────────────────────
+                    ⚠️ THE DIG PIT'S LAYER, REUSED — not a second one written to look the same. Those rules
+                    live in globals.css, are inset:0 and pointer-events:none, and do not care what they sit
+                    inside: a skull half-sunk at the bottom edge, a ghost that rises and sinks on a long
+                    loop, and vein-light drifting up. A tunnel is the one place in the game where all three
+                    already make sense without changing a word.
+
+                    It sits over the cave wall and UNDER the rock, so nothing here can swallow a swing —
+                    a decoration that eats a tap in the mine costs a trip, and there are three a day. */}
+                {halloween ? (
+                    <>
+                        <div className="dig-haunt" aria-hidden="true"><span className="dig-haunt-skull" /></div>
+                        <div className="dig-haunt dig-haunt-fore" aria-hidden="true">
+                            <span className="dig-haunt-ghost" />
+                            {[0, 1, 2, 3, 4, 5].map((i) => <i key={i} className="dig-wisp" style={{ "--i": i }} />)}
+                        </div>
+                    </>
+                ) : null}
                 {node ? (
                     <>
                         <div className="mine-rock" style={{ "--ore": node.color, animation: shake ? "mineHit .18s ease" : undefined }} key={shake}>

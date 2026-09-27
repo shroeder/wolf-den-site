@@ -46,7 +46,7 @@ function TunnelCard({ card }) {
     );
 }
 
-export default function DescendTab({ s, msg, busy, card, startTrip, buyTrip, goDeeper, surface, upgrade }) {
+export default function DescendTab({ s, msg, busy, card, startTrip, buyTrip, goDeeper, surface, upgrade, halloween = false }) {
     const run = s.run;
     const tripsLeft = s.trips?.left ?? 0;
     const recharge = s.trips?.recharge;
@@ -95,6 +95,21 @@ export default function DescendTab({ s, msg, busy, card, startTrip, buyTrip, goD
         <>
             <div className="mine-face is-descend">
                 <div className="mine-face-bg is-descend" aria-hidden="true" />
+                {/* ── THE TUNNEL MOUTH, WITH THE FLAG UP ───────────────────────────────────────────────
+                    ⚠️ THIS TAB, NOT JUST THE SEAM. The layer went on the Mine tab first and could not be
+                    found on camera, because the Mine OPENS on Descend — this is the screen somebody
+                    actually lands on, and the one that was still plain. Reuses the dig pit's rules from
+                    globals.css rather than a second copy: inset:0, pointer-events:none, and a tunnel is
+                    the one place a skull and a drifting wisp need no explaining. */}
+                {halloween ? (
+                    <>
+                        <div className="dig-haunt" aria-hidden="true"><span className="dig-haunt-skull" /></div>
+                        <div className="dig-haunt dig-haunt-fore" aria-hidden="true">
+                            <span className="dig-haunt-ghost" />
+                            {[0, 1, 2, 3, 4, 5].map((i) => <i key={i} className="dig-wisp" style={{ "--i": i }} />)}
+                        </div>
+                    </>
+                ) : null}
                 {run ? (
                     <>
                         <div className="mine-depth">DEPTH {run.depth}</div>
