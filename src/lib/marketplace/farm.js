@@ -533,6 +533,10 @@ export async function getFarm(ownerId, viewerId) {
                 name: def?.name || id,
                 rarity: def?.rarity || "common",
                 source: def?.source || null,
+                // ⚠️ IT HAS TO TRAVEL. The aquarium decides which room a pet lives in from this flag, and the
+                // client only ever sees the fields listed here — a property left on the catalogue row is a
+                // property the farm screen does not have. See WATER_PETS in collectibles.js.
+                water: Boolean(def?.water),
                 level: lvl?.level || 1,
                 xp: lvl?.xp || 0,
                 into: lvl?.into || 0,

@@ -533,6 +533,27 @@ export const COLLECTIBLES = [
       spritePrompt: "an adorable little ghost, a soft translucent pale blue-white rounded body trailing away into a wispy vapour tail instead of legs so it hovers, two simple round black dot eyes and a small open oh-shaped mouth mid-boo, tiny wispy nub arms raised, glowing gently, sweet and harmless rather than scary" },
 ];
 
+// ── THE AQUARIUM ROSTER ──────────────────────────────────────────────────────────────────────────────────
+// Luke: "let's make an aquarium area in the farm for all the water type pets."
+//
+// ⚠️ AUTHORED, NOT MATCHED ON THE NAME. A regex over names and sprite prompts finds twenty-eight candidates
+// and seven of them are wrong in ways that matter: the Sky Whale "swims the clouds", the Molten Salamander is
+// made of fire, the Forgeheart Wyrm lives in a furnace, the Croupier's Cat sits at a card table. Putting a
+// fire lizard in a fish tank is exactly the kind of thing nobody notices in a list and everybody notices on
+// the screen. So the roster is written out, and a pet joins it by being added here.
+//
+// The Bosun and Ironback are deliberately NOT here: a drowned sailor and a thing that "rides the waterline"
+// are of the sea without living in it, and an aquarium is for creatures that swim.
+const WATER_PETS = new Set([
+    "frog", "seahorse", "penguin", "crab", "turtle", "dolphin", "hydra",
+    "tropical_fish", "axolotl", "squid", "jellyfish", "octopus", "anglerfish", "sea_wyrm", "ammonite",
+    "sea_serpent", "kraken", "reef_seahorse", "lantern_jelly", "deep_angler", "tidecaller",
+]);
+for (const c of COLLECTIBLES) if (WATER_PETS.has(c.id)) c.water = true;
+
+/** Does this pet belong in the farm's aquarium rather than the pasture or the barn? */
+export const isWaterPet = (pet) => Boolean(pet?.water);
+
 const BY_ID = Object.fromEntries(COLLECTIBLES.map((c) => [c.id, c]));
 
 // The elite pet unlocked by obtaining an item of a given top rarity (or null).

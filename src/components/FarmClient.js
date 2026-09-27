@@ -294,11 +294,39 @@ export default function FarmClient({ initial, viewingAlias }) {
     const petMinX = FARM_PAD; // left edge of the pets' roaming band
     // Each pet gets a "home" slot spread evenly across its band and wanders around it. Deterministic init so
     // server & client HTML match (no hydration mismatch); the scheduler takes over on mount.
+    // ── WHERE A PET LIVES ────────────────────────────────────────────────────────────────────────────────
+    // Land pets alternate between the pasture and the barn, which is what the index parity is for — it splits
+    // them evenly without anybody having to decide. A WATER pet ignores that and goes to the aquarium: a
+    // dolphin standing in a barn was always a little odd, and now there is somewhere for it.
+    //
+    // ⚠️ INDEXED OFF THE PET, NOT THE POSITION. `i % 2` is a property of where a pet sits in the array, so a
+    // pet that moved in the list would change rooms; `water` is a property of the animal.
+    //
+    // Declared HERE, above viewSlotOf, because the slot maths now counts a pet's neighbours by asking which
+    // room each one is in — see the note there about why two-room arithmetic stopped being true.
+    const petView = useCallback((i) => (pets[i]?.water ? "aquarium" : (i % 2 === 0 ? "outside" : "inside")), [pets]);
+
     const petSlotX = useCallback((idx, count) => (count <= 1 ? 50 : petMinX + (idx / (count - 1)) * (100 - FARM_PAD - petMinX)), [petMinX]);
-    // Each view (Outside/Inside) shows every OTHER pet, so spread by the pet's slot WITHIN its own view (even →
-    // Outside, odd → Inside) — not the global index — so BOTH views fill the full width evenly and the first pet
-    // in each always sits at the far-left edge (never bunched on the right).
-    const viewSlotOf = useCallback((i, n) => ({ idx: Math.floor(i / 2), count: i % 2 === 0 ? Math.ceil(n / 2) : Math.floor(n / 2) }), []);
+    // Each view shows a SUBSET of the pets, so a pet is spread by its slot WITHIN ITS OWN ROOM rather than by
+    // its global index — that is what makes every room fill the full width evenly, with its first pet at the
+    // far-left edge instead of everybody bunched on the right.
+    //
+    // ⚠️ THIS USED TO ASSUME EXACTLY TWO ROOMS. It was `Math.floor(i / 2)` against `n / 2` — even index goes
+    // Outside, odd goes Inside — which was true right up until the aquarium made it three. Water pets then
+    // took X positions computed for a room they are not in, and they came out stacked on top of each other
+    // with their name tags overlapping: the Crab sitting on the Turtle, the Squid on the Axolotl.
+    //
+    // Counted off the real room assignment now, so it stays correct however many rooms there end up being.
+    const viewSlotOf = useCallback((i, n) => {
+        const mine = petView(i);
+        let idx = 0, count = 0;
+        for (let k = 0; k < n; k += 1) {
+            if (petView(k) !== mine) continue;
+            if (k < i) idx += 1;
+            count += 1;
+        }
+        return { idx, count };
+    }, [petView]);
     const homeX = useCallback((i) => { const s = viewSlotOf(i, pets.length); return petSlotX(s.idx, s.count); }, [petSlotX, viewSlotOf, pets.length]);
     const [pos, setPos] = useState(() => pets.map((_, i) => {
         const s = viewSlotOf(i, pets.length);
@@ -1023,7 +1051,6 @@ export default function FarmClient({ initial, viewingAlias }) {
     // ── Three farm views: 🌾 Garden (plant/harvest), 🏡 Outside (pasture + your custom bg), 🛖 Inside (barn).
     // Pets auto-split by index parity (even → Outside, odd → Inside); crops live in the Garden; a decoration
     // belongs to Outside OR Inside; each view's single backdrop scrolls sideways. (`view` state declared earlier.) ──
-    const petView = (i) => (i % 2 === 0 ? "outside" : "inside");
     const viewPetCount = view === "garden" ? 0 : pets.filter((p, i) => petView(i) === view && !standSeatedIds.has(p.id)).length;
     const wx = { tod: weather.tod, condition: weather.condition, located: weather.located, forced: false };
     const visTod = wx.tod;
@@ -1043,6 +1070,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     const haunted = view === "outside" && !customBg ? (farm.halloweenBg || null) : null;
     const bgUrl = view === "inside" ? VIEW_BG.inside
         : view === "garden" ? VIEW_BG.garden
+        : view === "aquarium" ? (farm.aquariumBg || null)
         : (customBg || haunted || pickFarmBg(visTod, wx.condition));
     const showWeather = view === "outside"; // weather effects only in the open pasture
     // Decorate Outside & Inside; the Garden is just for planting and the Trophy Room hangs what it hangs.
@@ -1056,7 +1084,18 @@ export default function FarmClient({ initial, viewingAlias }) {
     // The barn's straw floor sits lower than the open grass, so drop sprites down onto it — otherwise the hero and
     // pets float against the back wall. (Feet are anchored by translate(-50%,-100%), so a bigger y = lower = on the floor.)
     const groundShift = view === "inside" ? 13 : 0; // barn straw floor sits lower; controls moved out of the way so we can drop the animals further
-    const petGroundY = (y) => Math.min(97, y + groundShift);
+    // ── ⚠️ IN THE AQUARIUM NOTHING STANDS ON ANYTHING ────────────────────────────────────────────────────
+    // Every other view grounds its sprites: y is 82-90% and the feet are anchored, so a pet's soles land on
+    // painted grass or straw. A tank has no floor to stand on — an octopus on the sand reads as a dead
+    // octopus — so the same per-pet y is REMAPPED into a swim band instead of shifted down.
+    //
+    // 82-90 becomes 30-70, which is the open water the backdrop was drawn to keep clear (see
+    // gen-farm-aquarium.mjs, where the middle band is measured rather than hoped for). It is a remap of the
+    // EXISTING spread rather than a new random, so each pet keeps its own depth run to run instead of
+    // teleporting every time the page is opened.
+    const petGroundY = (y) => (view === "aquarium"
+        ? 30 + Math.max(0, Math.min(8, y - 82)) * 5
+        : Math.min(97, y + groundShift));
 
     // Full screen is GONE. It was a CSS overlay pinned over the viewport and it had accumulated a special case
     // everywhere it touched — its own control row, its own backdrop path, its own height rule — for a view of the
@@ -1315,7 +1354,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 and as a farm tab it was reachable only by people already tending a garden, while showing it
                 meant hiding the whole pasture underneath. */}
             <div className="farm-viewtabs">
-                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"], ["art", "🎨", "Art"]]
+                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"], ["aquarium", "🐠", "Aquarium"], ["art", "🎨", "Art"]]
                     // The Garden and your Art are yours alone. Gated on the SERVER too, so this is presentation.
                     .filter(([v]) => farm.mine || (v !== "garden" && v !== "art"))
                     .map(([v, ico, label]) => {
@@ -1334,7 +1373,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 })}
             </div>
 
-            {farm.mine && liveNudge > 0 && (view === "outside" || view === "inside") ? (
+            {farm.mine && liveNudge > 0 && (view === "outside" || view === "inside" || view === "aquarium") ? (
                 <div className="farm-petnudge">🐾 <b>{liveNudge}</b> free {liveNudge === 1 ? "petting" : "pettings"} left today — tap your pets for XP &amp; gold!</div>
             ) : null}
 
@@ -1383,6 +1422,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                     >
                         {/* Backdrop — full height, natural width (its width sets the scrollable field). */}
                         {bgUrl ? (
+                            // The aquarium is one image, like the Garden: a tank has ends, and mirroring it
+                            // three times would put the same coral on both sides of a seam.
                             (view === "outside" || view === "inside") ? (
                                 // Outside/Inside: repeat the backdrop 3× with the mirror trick [A A' A] so it scrolls as one
                                 // seamless wide scene (Garden stays a single image because crops sit at fixed positions).
@@ -1413,7 +1454,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         <div style={{ position: "absolute", inset: 0, filter: objFilter }}>
                         {/* Live VISITORS — real wolves currently viewing this farm. On your OWN farm you're the farmer
                             (don't also show yourself as a guest); when VISITING you appear so you see yourself here. */}
-                        {(view === "outside" || view === "inside") ? (
+                        {(view === "outside" || view === "inside" || view === "aquarium") ? (
                             // Visitors used to stand at 83-89%, BELOW the pets (~82%) and jammed against the bottom
                             // edge, so a visiting hero read as falling off the screen rather than standing in the
                             // pasture. Same band as the pets now (76-82%), sharing the grass.

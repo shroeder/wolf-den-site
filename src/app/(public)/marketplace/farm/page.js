@@ -52,6 +52,10 @@ export default async function FarmPage({ searchParams }) {
     // and a redraw has to reach phones without a deploy. Null until it has been drawn, which reads as "no
     // costume" rather than as a broken image.
     farm.halloweenBg = farm.halloween ? await getSetting("farm_bg_haunted", null).catch(() => null) : null;
+    // The aquarium's tank. Same reasoning as the haunted field: generated art lives in settings so a redraw
+    // reaches phones without a deploy, and resolved here because FarmClient seeds its state once and a
+    // backdrop arriving later would flash an empty panel first.
+    farm.aquariumBg = await getSetting("farm_bg_aquarium", null).catch(() => null);
 
     // ── THE KEY IS LOAD-BEARING ──────────────────────────────────────────────────────────────────────────────
     // FarmClient seeds ALL of its state from `initial` with useState, and a <Link> from one farm to another is
