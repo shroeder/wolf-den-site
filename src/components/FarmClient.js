@@ -1454,7 +1454,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                         <div style={{ position: "absolute", inset: 0, filter: objFilter }}>
                         {/* Live VISITORS — real wolves currently viewing this farm. On your OWN farm you're the farmer
                             (don't also show yourself as a guest); when VISITING you appear so you see yourself here. */}
-                        {(view === "outside" || view === "inside" || view === "aquarium") ? (
+                        {/* ⚠️ NOBODY STANDS IN THE TANK. Luke: "dont have the character in there, doesnt make
+                            sense" — and he is right: a wolf in a cardigan on the gravel at the bottom of an
+                            aquarium reads as a drowning, not a visit. The aquarium shows its fish and nothing
+                            else; people belong in the pasture and the barn. */}
+                        {(view === "outside" || view === "inside") ? (
                             // Visitors used to stand at 83-89%, BELOW the pets (~82%) and jammed against the bottom
                             // edge, so a visiting hero read as falling off the screen rather than standing in the
                             // pasture. Same band as the pets now (76-82%), sharing the grass.
