@@ -2840,7 +2840,9 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                 // Keyed on the foe so a second raider mounts a FRESH fight. ArenaClient seeds its state from
                 // `initial` once, on mount — handing the same instance a new bout would leave the previous
                 // one on screen.
-                <ArenaClient key={fight.bout?.foe?.id || "raid"} initial={fight} boutOnly
+                // `spooky` rides along: a raid you started from a dressed plaza should not drop you into a
+                // sunlit colosseum. Same flag, same screen, one step further in.
+                <ArenaClient key={fight.bout?.foe?.id || "raid"} initial={fight} boutOnly halloween={spooky}
                     onLeave={(done) => {
                         // ── WHAT THAT FIGHT PAID ─────────────────────────────────────────────────────
                         // The raid's running haul used to be summed from the per-duel reward that came

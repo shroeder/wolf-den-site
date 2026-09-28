@@ -234,6 +234,10 @@ export default function ArenaLab() {
     const [chrome, setChrome] = useState(true);
     const [nonce, setNonce] = useState(0);
     const [fxBench, setFxBench] = useState(false);
+    // ?hw=1 dresses the ring. The real flag is a column on the member's row and the plate is the whole point
+    // of the change, so without this the only way to look at it is to raise Halloween on a live account and
+    // spend a real bout on the real ladder.
+    const [halloween, setHalloween] = useState(false);
     const handlerRef = useRef(null);
 
     // The scene chosen by the URL, so a screenshot run is just a list of addresses.
@@ -243,6 +247,7 @@ export default function ArenaLab() {
         if (s && SCENES[s]) setScene(s);
         if (q.get("chrome") === "0") setChrome(false);
         if (q.get("fx") === "1") setFxBench(true);
+        if (q.get("hw") === "1") setHalloween(true);
     }, []);
 
     const initial = useMemo(() => {
@@ -314,7 +319,7 @@ export default function ArenaLab() {
             <div className="stack reveal lab-stage">
                 {/* key remounts ArenaClient so a scene switch starts clean rather than inheriting the last one's
                     animation state — the exact bug that makes a screenshot lie. */}
-                <ArenaClient key={`${scene}-${nonce}`} initial={initial} />
+                <ArenaClient key={`${scene}-${nonce}-${halloween ? "hw" : "x"}`} initial={initial} halloween={halloween} />
             </div>
 
             <style jsx global>{`

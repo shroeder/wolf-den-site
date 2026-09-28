@@ -1161,7 +1161,7 @@ function Recap({ bout, busy, onClose }) {
  * falls back to navigating, which still matters for a raid bout opened before any of this shipped and found
  * in progress on the Arena page.
  */
-export default function ArenaClient({ initial, boutOnly = false, onLeave = null }) {
+export default function ArenaClient({ initial, boutOnly = false, onLeave = null, halloween = false }) {
     const [st, setSt] = useState(initial);
     const [busy, setBusy] = useState(false);
     // ── WHAT HAPPENED WHILE YOU WERE GONE, AT THE DOOR ───────────────────────────────────────────────
@@ -2687,9 +2687,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         thing out of the sea on a rope. You reeled a Young Kraken over the rail and then both
                         of you were standing on sand under strung pennants. The fight is on the boat; the
                         backdrop is the only part of the ring that has to know it. */}
+                    {/* The Halloween plate is a COSTUME ON THE COLOSSEUM — same framing, same horizon, so the
+                        ring you climbed is the ring you fight in, decorated. The deck keeps its own art on
+                        purpose: a fight on your own boat is not in the colosseum at all, and dressing it
+                        would be dressing a different place. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="ar-ring-bg"
-                        src={bout.fishing ? "/images/arena/deck-bg.webp" : "/images/arena/arena-bg.webp"}
+                        src={bout.fishing ? "/images/arena/deck-bg.webp"
+                            : halloween ? "/images/arena/arena-bg-haunted.webp" : "/images/arena/arena-bg.webp"}
                         alt="" draggable="false" />
                     <span className="ar-ring-scrim" aria-hidden="true" />
                     {/* ── AMBIENT ── dust turning in the light over the sand. A turn-based fight spends most of

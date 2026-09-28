@@ -46,6 +46,20 @@ const ART = {
         watermark, no UI, no border.`, "scene"],
 
     "arena-bg": [`A wide atmospheric fantasy COLOSSEUM INTERIOR background plate, empty of characters: a sunlit sand arena floor in the foreground, curved tiers of weathered honey-coloured stone seating rising behind, deep shadowed archways around the ring, colourful triangular pennants strung above, dust motes in warm low sunlight, deep perspective. Painterly cel-shaded 2D video-game art, bold clean outlines, rich saturated colour, dramatic moody lighting, fantasy action-RPG style. No characters, no creatures, no people, no text, no words, no logo, no watermark, no UI, no border.`, "scene"],
+    // ── THE SAME COLOSSEUM, WITH THE HALLOWEEN FLAG UP ──────────────────────────────────────────────────
+    // A COSTUME ON THE PLATE ABOVE, not a different venue. Same framing, same horizon, same deep perspective,
+    // for the reason deck-bg gives: the two have to be interchangeable behind the fighters, and a member who
+    // walks into the ring during the event should recognise the place they climbed.
+    //
+    // ⚠️ IT HAS TO STAY LIT. `.ar-ring-bg` already carries brightness(1.2) on top of a vignette AND a bottom
+    // linear, and the comment over those rules records what happened the last time this plate went dark: a
+    // 375px phone measured the ring at RGB 44,37,28 — a fight happening in a nearly black box. A night scene
+    // is the one costume that can walk straight back into that, so the moonlight on the sand is not mood here,
+    // it is the requirement.
+    //
+    // ⚠️ AND THE NEAR SAND STAYS EMPTY. Fighters stand at bottom:13% of the ring against a plate anchored to
+    // its bottom edge, so a pumpkin painted in the foreground is a pumpkin somebody is standing inside.
+    "arena-bg-haunted": [`A wide atmospheric fantasy COLOSSEUM INTERIOR background plate AT NIGHT decorated for HALLOWEEN, empty of characters: a MOONLIT pale sand arena floor in the foreground brightly lit by a huge full moon, curved tiers of weathered honey-coloured stone seating rising behind, deep shadowed archways around the ring hung with COBWEBS, iron braziers burning with EERIE GREEN FLAME spaced around the tiers, carved GLOWING JACK-O-LANTERNS lining the front edge of the seating, tattered ORANGE AND BLACK triangular pennants strung above, a few BATS in the sky, thin low mist drifting across the sand, a huge full moon low behind the tiers, deep perspective. IMPORTANT: the foreground sand is BARE AND OPEN and clearly LIT by moonlight across the full width — no pumpkins, no props, no decorations on the near sand, because game characters are drawn standing there. A moonlit night scene, luminous and readable, NOT a dark one. Painterly cel-shaded 2D video-game art, bold clean outlines, rich saturated colour, dramatic moody lighting, fantasy action-RPG style. No characters, no creatures, no people, no text, no words, no logo, no watermark, no UI, no border.`, "scene"],
     // ── SKILL ICONS ── one per ARCHETYPE, so an ability is represented by the MOVE rather than by the ring
     // or cape it happens to come from. Element colour is applied in CSS on top, so nineteen icons cover every
     // affinity without nineteen more generations.
