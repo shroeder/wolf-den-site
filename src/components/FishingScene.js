@@ -500,7 +500,7 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
 // Exported so the dedicated /marketplace/fishing page renders the SAME boards. It used to be reachable only
 // through this modal — which is only offered while a voyage is in flight — so your own log was invisible
 // whenever your boat was docked.
-export function FishingLog({ log, known, total, records, onClose }) {
+export function FishingLog({ log, known, total, season = null, records, onClose }) {
     const [tab, setTab] = useState("log");
     // `records` arrives as { records, top } — the per-species board and the ranked leaderboard.
     const perSpecies = records?.records || [];
@@ -532,9 +532,18 @@ export function FishingLog({ log, known, total, records, onClose }) {
             {tab === "log" ? (
                 <>
                     <p className="fish-log-progress">{known} of {total} species logged</p>
+                    {/* The event's own count, on its own line. It is NOT added to the one above: the seasonal
+                        species are outside the collection's denominator on purpose (see HALLOWEEN_FISH), and
+                        a member who reads "36 of 34" stops trusting either number. */}
+                    {season ? (
+                        <p className="fish-log-season">
+                            {season.label} · {season.known} of {season.total}
+                            {season.open ? null : <em> · the water has gone back to normal</em>}
+                        </p>
+                    ) : null}
                     <div className="fish-log-grid">
                         {(log || []).map((f) => (
-                            <div key={f.id} className={`fish-log-row${f.caught ? "" : " is-unknown"}`}>
+                            <div key={f.id} className={`fish-log-row${f.caught ? "" : " is-unknown"}${f.season ? " is-season" : ""}`}>
                                 {f.caught ? <FishArt id={f.id} emoji={f.emoji} size={34} className="fish-log-art" /> : <span className="fish-log-emoji" style={{ color: RARITY_COLOR[f.rarity] }}>❓</span>}
                                 <span className="fish-log-name">
                                     {f.caught ? f.name : "???"}
@@ -979,7 +988,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                 </div>
 
                 {phase === "log" ? (
-                    <FishingLog log={fishing?.log} known={fishing?.speciesKnown || 0} total={fishing?.speciesTotal || 0} records={records} onClose={() => setPhase("idle")} />
+                    <FishingLog log={fishing?.log} known={fishing?.speciesKnown || 0} total={fishing?.speciesTotal || 0} season={fishing?.season || null} records={records} onClose={() => setPhase("idle")} />
                 ) : phase === "idle" ? (
                     <div className="fish-stage">
                         {/* ── THE BOAT IS ON SCREEN BEFORE YOU CAST ───────────────────────────────────────

@@ -82,6 +82,29 @@ const FISH = {
     fish_lightless: "A vast eyeless creature from the deepest trench in profile, its dark slate body outlined "
         + "by a cold violet rim light so the whole silhouette reads clearly, a wide seam of a mouth glowing "
         + "faint white, and many long trailing filaments tipped with small pale lights",
+    // ── ALL HALLOWS' ── the four that are only in the water while the event is on (HALLOWEEN_FISH in
+    // fishing.js). Written to read as SPECIMENS ON THE SAME PLATE as the other forty — same side-on pose,
+    // same house style, no cobwebs and no bunting — because a fish drawn like a decoration stops being a
+    // fish. The season is in the animal itself: candle, bone, gourd, drowned gold.
+    //
+    // Each one carries its own light for the same reason the deep-water six were rerolled: the log draws
+    // these at 44px, and an orange-on-black fish at 44px is a smudge. Glow is what survives the downscale.
+    fish_hw_wickfish: "A pale waxy fish in profile, its back ridged like melted candle wax with a single "
+        + "lit wick burning with a small warm flame just behind its head, soft drips down its flank, eyes "
+        + "reflecting the flame",
+    fish_hw_bonepike: "A skeletal pike swimming in profile, all ribs and long needle jaws, bleached bone "
+        + "white with a faint green witch-light glowing between the bones where its body should be",
+    // ⚠️ REROLLED. "a curl of green vine for a tail" came back as a detached yellow curl floating in the
+    // empty space beside the fish — the model drew the vine as a separate object rather than as the tail,
+    // and a die-cut sprite with a loose mark in its alpha reads as a rendering fault at every size. The
+    // pumpkin stem carries the same idea attached to the animal.
+    fish_hw_gourdfin: "A fish in profile whose whole head is a carved glowing jack-o-lantern with a grinning "
+        + "triangle-eyed face lit from inside and a short green pumpkin stem curling on top of its head, a "
+        + "deep orange pumpkin-ribbed body and broad trailing fins the colour of autumn leaves. Nothing "
+        + "floating separately beside the fish: one single connected animal and nothing else.",
+    fish_hw_drownedcrown: "A huge dark eel-like fish in profile wearing a heavy drowned golden crown grown "
+        + "onto its brow, barnacled and trailing weed, its body deep bruise-purple with cold gold light "
+        + "seeping from the seams of its scales, regal and ancient",
 };
 
 const shrink = (buf) => sharp(buf)

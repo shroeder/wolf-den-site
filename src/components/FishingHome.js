@@ -145,7 +145,7 @@ export default function FishingHome({ fishing, gold = 0, status = null }) {
                 {/* eslint-enable @next/next/no-img-element */}
             </div>
 
-            <FishingLog log={fishing?.log} known={known} total={total} records={records} onClose={null} />
+            <FishingLog log={fishing?.log} known={known} total={total} season={fishing?.season || null} records={records} onClose={null} />
         </div>
     );
 }

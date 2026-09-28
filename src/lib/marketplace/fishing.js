@@ -5,6 +5,7 @@ import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import { shopIsOpenNow } from "@/lib/marketplace/store-hours.js";
 import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
+import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
 import { baitById, spendFromPantry } from "@/lib/marketplace/cooking.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -151,10 +152,41 @@ const DEEP_FISH = [
     F("fish_lightless", "The Lightless Thing", "\u{1F41A}", "mythic", 0.1, [900, 11000], 520, 300),
 ];
 
-// Lookups resolve BOTH lists. A pantry row, a record on the board and a cooking ingredient all key off an id
+// ── WHAT IS IN THE WATER ONLY IN OCTOBER ─────────────────────────────────────────────────────────────────
+// Four species that exist while the Halloween event is on and at no other time. SAME SHAPE AS DEEP_FISH and
+// for the same reasons, which are worth restating because getting either one wrong is a permanent mistake:
+//
+// ⚠️ NOT FOUR MORE ROWS IN `FISH`. `FISH` is the compendium, FISH_COUNT, the odds column and the denominator
+// behind "34 of 34 species logged". Putting a seasonal fish in it would move the finish line for every member
+// who did not fish in October — and unlike the deep charts, which are a shelf you can always go and buy, a
+// month that has ended cannot be bought. It would be a completion nobody can ever complete again.
+//
+// THE ODDS SIT ON TOP, exactly like the charts: 6.0 against the base table's 100, so a Halloween species is
+// about one cast in eighteen and the ordinary table's internal balance is untouched. A cast still lands one
+// fish — the event adds things to FIND, not casts and not income.
+//
+// Paid at their own band's going rate rather than above it. The deep species pay a premium because they cost
+// 15,000 chips; these cost nothing, and a seasonal fish that out-earns the ocean turns a costume into a
+// payday. Compare fish_eel (rare, 18), fish_stormpike (epic, 48), fish_marlin (legendary, 104) and
+// fish_starfish (mythic, 300) — these sit beside them, not above.
+//
+// ⚠️ GATED ON HALLOWEEN_PUBLIC ALONE, NOT ON `town_halloween`. The costume toggle is a preference about how
+// your world LOOKS; this is content. A member who prefers the undecorated plaza must not quietly lose four
+// species for it — the chests make exactly the same distinction, and for the same reason.
+const HALLOWEEN_FISH = [
+    F("fish_hw_wickfish", "Wickfish", "\u{1F56F}️", "rare", 3.20, [0.6, 5.0], 18, 12),
+    F("fish_hw_bonepike", "Bone Pike", "\u{1F9B4}", "epic", 1.90, [4, 36], 48, 32),
+    F("fish_hw_gourdfin", "Gourdfin", "\u{1F383}", "legendary", 0.72, [30, 260], 110, 76),
+    F("fish_hw_drownedcrown", "The Drowned Crown", "\u{1F451}", "mythic", 0.18, [200, 2600], 300, 224),
+];
+export const HALLOWEEN_FISH_IDS = HALLOWEEN_FISH.map((f) => f.id);
+const IS_HALLOWEEN_FISH = new Set(HALLOWEEN_FISH_IDS);
+
+// Lookups resolve EVERY list. A pantry row, a record on the board and a cooking ingredient all key off an id
 // that is already in the member's own data, so failing to resolve one would break an owner's kitchen rather
-// than protect anything. Rolling is what is gated, not naming.
-const ALL_FISH = [...FISH, ...DEEP_FISH];
+// than protect anything — and in November it would break it for everybody who fished in October. Rolling is
+// what is gated, not naming.
+const ALL_FISH = [...FISH, ...DEEP_FISH, ...HALLOWEEN_FISH];
 // EXPORTED so locked-content.js can build the "may this member see this ref" gate off the real list rather
 // than a copy of it. Ids only — the species themselves stay private, because a caller that can read a deep
 // fish's name and weight is a caller that can leak them.
@@ -163,8 +195,21 @@ const BY_ID = new Map(ALL_FISH.map((f) => [f.id, f]));
 export const fishById = (id) => BY_ID.get(id) || null;
 export const FISH_COUNT = FISH.length;
 
-/** The table this member fishes. Owners get the deep water folded in; nobody else can see that it exists. */
-export const fishTableFor = (deep) => (deep ? ALL_FISH : FISH);
+/**
+ * The member's PERMANENT table — the one the log, the odds column and the species denominator are built from.
+ * Owners get the deep water folded in; nobody else can see that it exists.
+ *
+ * ⚠️ NO SEASONAL SPECIES HERE, deliberately. This is the list that answers "how many are there", and that
+ * answer has to read the same in November as it did in October.
+ */
+export const fishTableFor = (deep) => (deep ? [...FISH, ...DEEP_FISH] : FISH);
+
+/**
+ * The table a CAST rolls against — the permanent one plus whatever the season has put in the water. Separate
+ * from fishTableFor because the two questions genuinely differ for one month a year: what can I catch today,
+ * versus what my collection is measured against.
+ */
+export const rollTableFor = (deep) => (HALLOWEEN_PUBLIC ? [...fishTableFor(deep), ...HALLOWEEN_FISH] : fishTableFor(deep));
 
 const RARITY_ORDER = ["common", "rare", "epic", "legendary", "mythic"];
 const RARITY_RANK = Object.fromEntries(RARITY_ORDER.map((r, i) => [r, i]));
@@ -730,8 +775,9 @@ const castsAvailable = (row, angling, lineLevel) => castsPerDay(angling, lineLev
 // Every species is in the water on every cast. Angling still tilts the odds toward the good stuff, because a
 // stat that does nothing is worse than no stat — but it can only ever bend the curve, never unlock a species.
 function rollSpecies(rareTilt = 0, deep = false) {
-    // `rareTilt` already includes the Lure track — see castLine. `deep` folds in the Deep Water Charts.
-    const table = fishTableFor(deep);
+    // `rareTilt` already includes the Lure track — see castLine. `deep` folds in the Deep Water Charts, and
+    // rollTableFor folds in the Halloween species for as long as the event is on.
+    const table = rollTableFor(deep);
     const weights = table.map((f) => f.odds * (f.rarity === "common" ? 1 : 1 + rareTilt));
     const total = weights.reduce((a, b) => a + b, 0);
     let r = Math.random() * total;
@@ -847,7 +893,18 @@ export function fishingView(row, angling = 0, status = "idle", deep = false) {
     const lv = fishTrackLevels(row);
     const { max, used, bought } = castsFor(row, angling);
     const hooked = row?.fish_state || null;
-    const caughtIds = Object.keys(log);
+    const table = fishTableFor(deep);
+    // ── WHAT COUNTS TOWARD "34 OF 34" ────────────────────────────────────────────────────────────────
+    // ⚠️ THE MEMBER'S OWN TABLE, not every key in the log. This used to be Object.keys(log).length, which
+    // counts anything that has ever been landed — so the first member to catch a Halloween species would
+    // have read "35 of 34 species logged". Seasonal fish are a shelf beside the collection, never a part
+    // of its denominator, and the numerator has to agree with that or the pair stops meaning anything.
+    const caughtIds = table.filter((f) => log[f.id]).map((f) => f.id);
+    // ── THE SEASONAL SHELF ───────────────────────────────────────────────────────────────────────────
+    // On the list while the event is running, and afterwards only if you actually landed it. A fish you
+    // caught never disappears out of your own book — that is the whole reward for having been here — but
+    // one you never met stops being advertised the moment the water goes back to normal.
+    const seasonRows = HALLOWEEN_FISH.filter((f) => HALLOWEEN_PUBLIC || log[f.id]);
     return {
         // Docked counts. This used to require being at sea, which silently hid the whole feature from anyone
         // who hadn't sent their boat out — they'd open Sailing, see no fishing anywhere, and have no way to
@@ -878,21 +935,31 @@ export function fishingView(row, angling = 0, status = "idle", deep = false) {
         totalCaught: Number(row?.fish_caught) || 0,
         speciesKnown: caughtIds.length,
         // The denominator moves with the table. An owner is chasing 40 species, everyone else 34 — and a
-        // non-owner's "34 of 34" stays a real completion rather than silently becoming 34 of 40.
-        speciesTotal: fishTableFor(deep).length,
+        // non-owner's "34 of 34" stays a real completion rather than silently becoming 34 of 40. October
+        // does not move it either; see the note on HALLOWEEN_FISH.
+        speciesTotal: table.length,
+        // The event's own count, kept apart from the one above so neither can spoil the other. Null when
+        // there is nothing seasonal to show, which is how the client knows to draw no shelf at all.
+        season: seasonRows.length
+            ? { key: "halloween", label: "All Hallows' catch", open: HALLOWEEN_PUBLIC,
+                known: seasonRows.filter((f) => log[f.id]).length, total: HALLOWEEN_FISH.length }
+            : null,
         // The full log, always — this is the actual reward, so it should never be a second round-trip. Every
         // species shows its real odds, because within the water you can actually fish there is nothing to
         // spoil, and "1 in 500" is a better hook than a vague hint about deeper water.
         //
         // BUILT FROM THE MEMBER'S OWN TABLE, not filtered from the full one. A filter is one forgotten call
         // away from listing six fish nobody outside the Counter is supposed to know exist.
-        log: fishTableFor(deep).map((f) => {
+        log: [...table, ...seasonRows].map((f) => {
             const e = log[f.id];
             return {
                 id: f.id, name: f.name, emoji: f.emoji, rarity: f.rarity,
                 lb: f.lb, gold: f.gold, odds: f.odds,
                 caught: Number(e?.n) || 0,
                 best: e?.best ? Number(e.best) : null,
+                // Tagged rather than sorted into a second list: every tab in the log grid reads this one
+                // array, and a parallel array is a second thing to remember in three places.
+                ...(IS_HALLOWEEN_FISH.has(f.id) ? { season: "halloween" } : {}),
             };
         }),
     };
@@ -1470,7 +1537,15 @@ export async function denFishRecords() {
           ORDER BY c.species, c.lb DESC, c.caught_at ASC`
     ).catch(() => []);
     const byId = new Map((rows || []).map((r) => [r.species, r]));
-    return FISH.map((f) => {
+    // ── THE SEASONAL SPECIES ARE ON THE BOARD TOO ────────────────────────────────────────────────────
+    // While the event runs, because four unclaimed records is the best thing this board can say to a member
+    // in October — and afterwards for as long as somebody holds one, because a record is a trophy and a
+    // trophy does not expire with the month.
+    //
+    // The deep six are still absent, and that is not an oversight: this board is public, and a public page
+    // listing species only a Counter customer can reach is the leak the whole DEEP_FISH split exists to stop.
+    const season = HALLOWEEN_FISH.filter((f) => HALLOWEEN_PUBLIC || byId.has(f.id));
+    return [...FISH, ...season].map((f) => {
         const r = byId.get(f.id);
         return {
             id: f.id, name: f.name, emoji: f.emoji, rarity: f.rarity, max: f.lb[1],

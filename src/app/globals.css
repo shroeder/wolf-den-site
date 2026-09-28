@@ -13980,6 +13980,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fish-log-grid { display: flex; flex-direction: column; gap: 4px; }
 .fish-log-row { position: relative; display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 10px; background: #151b24; border: 1px solid #212a36; }
 .fish-log-row.is-unknown { opacity: 0.5; }
+/* THE SEASONAL SHELF. A warm edge is the whole marker — these rows sit in the same grid as the collection,
+   in the same order, because a second grid is a second thing to scroll past for eleven months of the year.
+   The tint is enough to say "this one is not part of the 34" without turning the log into two lists. */
+.fish-log-row.is-season { border-color: rgba(255,140,60,0.42); background: linear-gradient(180deg, #1d1720, #151b24); }
+.fish-log-season { text-align: center; font-size: 0.78rem; font-weight: 800; color: #ff9a4d; margin: -4px 0 9px; }
+.fish-log-season em { font-style: normal; font-weight: 600; color: #8b7f76; }
 .fish-log-row.is-biting { border-color: rgba(88,217,137,0.45); }
 .fish-log-emoji { font-size: 1.3rem; width: 26px; text-align: center; }
 .fish-log-name { display: flex; flex-direction: column; line-height: 1.2; font-weight: 800; font-size: 0.88rem; }
