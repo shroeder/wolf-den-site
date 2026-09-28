@@ -12852,6 +12852,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     70% { opacity: 0.5; }
     100% { opacity: 0; translate: calc(var(--i) * 4px - 10px) -300px; }
 }
+
+/* ── THE SAME HAUNT, OVER A FIGHT INSTEAD OF A HOLE ───────────────────────────────────────────────────────
+   The pit is empty and the stage is not: the boss stands at `right: -7%` and fills the whole right half, so
+   the ghost's corner in the dig is occupied here — it came up ON the boss's shoulder and read as part of his
+   art rather than as something passing behind him. The one reliably empty patch on this stage is the middle,
+   under the HP bar and above the fighters' heads, so that is where it rises.
+   Only the placement changes; the rise, the timing and the sprite stay the dig's. */
+.dig-haunt-battle .dig-haunt-ghost { right: auto; left: 44%; bottom: 44%; width: 86px; height: 86px; }
 /* The grid has to win the stacking order outright — z-index:0 on the haunt layer is not enough on its own
    once the tiles start painting their own shadows. */
 .dig-wrap.is-halloween .dig-hud,

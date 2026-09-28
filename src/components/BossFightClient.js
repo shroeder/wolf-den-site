@@ -19,7 +19,7 @@ import Coin from "@/components/Coin";
 // from the whole pack (server-driven). Polls so you watch the community drain it live.
 const RARITY_TXT = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 
-export default function BossFightClient() {
+export default function BossFightClient({ halloween = false }) {
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
     const [hit, setHit] = useState(false);
@@ -240,7 +240,7 @@ export default function BossFightClient() {
             ) : null}
 
             <div className="boss-stage-wrap">
-                <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} youElement={you?.element} canCheer={Boolean(you) && !boss.defeated} cheersLeft={you?.cheersLeft ?? 0} onCheer={cheer} />
+                <BossBattleScene boss={{ ...boss, hp: Math.round(displayHp) }} fighters={fighters} defaultSprite={data.defaultSpriteUrl} hit={hit} floaters={floaters} pct={pct} youElement={you?.element} canCheer={Boolean(you) && !boss.defeated} cheersLeft={you?.cheersLeft ?? 0} onCheer={cheer} halloween={halloween} />
                 {cheerToast ? (
                     <div className="cheer-toast" key={cheerToast.key}>
                         <div className="cheer-toast-main">📣 You cheered {cheerToast.targetName}!</div>

@@ -56,7 +56,7 @@ const CHEER_EMOJI = ["📣", "🎉", "⭐", "👏", "🙌", "✨", "💥", "📣
 export const BORDER_COL = { ember: "#ff7a3c", bronze: "#cd7f32", aqua: "#5ad0d0", neon: "#39ff14", silver: "#c0c0c0", crimson: "#e23b4e", emerald: "#2ecc71", sunset: "#ff8c5a", sky: "#4aa3ff", rose: "#ff5fa2", gold: "#ffd75e", ocean: "#2aa9c8", aurora: "#7cffb2", amethyst: "#b76bff", frost: "#a8e6ff", inferno: "#ff5a2c", rainbow: "#ff6bd6", cosmic: "#8f7cff", legendary: "#ffd75e", solar: "#ffb24a", abyss: "#6a4fe0", godray: "#fff2b0", singularity: "#b76bff", role_volunteer: "#7cffb2", role_staff: "#ffd75e", role_dev: "#8fb8ff", role_admin: "#ff5a5a" };
 export const AURA_COL = { aura_gold: "#ffd75e", aura_aqua: "#5ad0d0", aura_violet: "#b76bff", aura_rainbow: "#ff6bd6", aura_ember: "#ff7a3c", aura_frost: "#a8e6ff", aura_cosmic: "#8f7cff" };
 
-export default function BossBattleScene({ boss, fighters = [], defaultSprite = null, hit = false, floaters = [], pct = 100, youElement = null, canCheer = false, cheersLeft = 0, onCheer = null }) {
+export default function BossBattleScene({ boss, fighters = [], defaultSprite = null, hit = false, floaters = [], pct = 100, youElement = null, canCheer = false, cheersLeft = 0, onCheer = null, halloween = false }) {
     // Build the roster: real fighters (with art), padded a little so the stage isn't empty. "You" first so
     // the viewer sees themselves in the opening wave.
     const roster = useMemo(() => {
@@ -126,6 +126,23 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
     return (
         <div className="battle">
             <div className="battle-bg" style={boss.backgroundUrl ? { backgroundImage: `url(${boss.backgroundUrl})` } : undefined} />
+            {/* ── THE FIGHT, WITH THE FLAG UP ──────────────────────────────────────────────────────────
+                ⚠️ A LAYER OVER THE BOSS'S OWN ART, NOT A REPLACEMENT FOR IT. Every boss carries its own
+                background_url, drawn for that boss — swapping it for a seasonal one would throw away the
+                art the week was built around and make every October boss look like the same fight.
+
+                Reuses the dig pit's rules from globals.css: inset:0, pointer-events:none, and nothing in
+                them assumes a pit. The skull is left out on purpose — a battlefield is not a grave, and
+                the two things worth having over a fight are something drifting and something glowing.
+
+                pointer-events:none matters more here than anywhere: a tap on this screen is a strike, and
+                there are only so many a day. */}
+            {halloween ? (
+                <div className="dig-haunt dig-haunt-fore dig-haunt-battle" aria-hidden="true">
+                    <span className="dig-haunt-ghost" />
+                    {[0, 1, 2, 3, 4, 5].map((i) => <i key={i} className="dig-wisp" style={{ "--i": i }} />)}
+                </div>
+            ) : null}
             <div className="battle-vignette" />
             <div className="battle-ground" />
 
