@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { canPreview } from "@/lib/marketplace/owner.js";
+import { canDressUp } from "@/lib/marketplace/owner.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -22,7 +22,7 @@ export async function POST(request) {
         try {
             const buyer = await getAuthenticatedBuyer();
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
-            if (!canPreview("halloween", buyer.id)) return noStore({ error: "not_available" }, { status: 403 });
+            if (!canDressUp(buyer.id)) return noStore({ error: "not_available" }, { status: 403 });
 
             const body = await request.json().catch(() => ({}));
             const on = body?.on === true;

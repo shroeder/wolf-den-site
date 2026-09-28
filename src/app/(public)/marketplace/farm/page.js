@@ -4,7 +4,7 @@ import FarmClient from "@/components/FarmClient";
 import { featuredPackage } from "@/lib/marketplace/packages-server.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getFarm, resolveFarmOwner } from "@/lib/marketplace/farm.js";
-import { isOwner, canPreview } from "@/lib/marketplace/owner.js";
+import { isOwner, canDressUp } from "@/lib/marketplace/owner.js";
 import { db } from "@/lib/db";
 import { getSetting } from "@/lib/settings.js";
 
@@ -37,14 +37,14 @@ export default async function FarmPage({ searchParams }) {
     farm.packageOffer = !u ? await featuredPackage(buyer.id, { withArt: true }).catch(() => null) : null;
 
     // ── THE FARM, WITH THE HALLOWEEN FLAG UP ─────────────────────────────────────────────────────────────
-    // Same gate the plaza and the sea use: the member's own `town_halloween` column, behind canPreview. It is
+    // Same gate the plaza and the sea use: the member's own `town_halloween` column, behind canDressUp. It is
     // resolved for the VIEWER, not the farm's owner — the flag dresses the world for whoever raised it, and
     // walking onto somebody else's pasture should not undress it.
     //
     // ⚠️ RESOLVED HERE AND HANDED OVER, rather than fetched by the client. FarmClient seeds all of its state
     // from `initial` with useState and does not re-fetch on mount, so a backdrop arriving later would flash
     // the ordinary field first — which is exactly the thing a costume must not do.
-    const hw = canPreview("halloween", buyer.id)
+    const hw = canDressUp(buyer.id)
         ? await db.queryOne(`SELECT town_halloween FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null)
         : null;
     farm.halloween = Boolean(hw?.town_halloween);

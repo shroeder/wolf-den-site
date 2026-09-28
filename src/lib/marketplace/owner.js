@@ -1,3 +1,5 @@
+import { HALLOWEEN_PUBLIC } from "./halloween.js";
+
 // Owner-only gate for in-development features. Rather than a feature flag, unreleased systems (e.g. the
 // Sailing minigame) check the authenticated buyer against this allow-list so ONLY the shop owner account can
 // see them on the live site. Add teammates' buyer ids here to let them preview too.
@@ -36,6 +38,25 @@ export function canPreview(feature, buyerId) {
     if (isOwner(buyerId)) return true;
     if (!buyerId) return false;
     return Boolean(PREVIEW_GUESTS[feature]?.has(String(buyerId)));
+}
+
+// ── THE COSTUME'S DOOR, AND THE ONLY ONE ─────────────────────────────────────────────────────────────────────
+// ⚠️ A GATE THAT DOES NOT HEAR THE LAUNCH SWITCH IS A GATE THAT NEVER OPENS. The Halloween event turns on with
+// one line — HALLOWEEN_PUBLIC in halloween.js — and that line was wired to the chests, the items, the pets and
+// the substitution roll. It was NOT wired to the dressing: the plaza, the sea, the farm, the mine and the boss
+// each asked `canPreview("halloween")`, which is owners and invited guests forever. So launch day would have
+// handed the whole Den pumpkin chests out of a world that stayed undecorated, and the toggle that dresses it
+// would not have been drawn for anybody who could use it.
+//
+// One question, asked in six places, answered here: the event is open, OR you were invited early.
+// See the note in halloween.js about why five booleans is how you ship four of them.
+//
+// Signed out is always false, the same as canPreview: the costume is raised per member, in a column on their
+// own row, so there is nothing to dress without one — and a `true` here would send a `WHERE id = null` at the
+// database on the next line.
+export function canDressUp(buyerId) {
+    if (!buyerId) return false;
+    return HALLOWEEN_PUBLIC || canPreview("halloween", buyerId);
 }
 
 export function isOwner(buyerId) {

@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { canPreview } from "@/lib/marketplace/owner.js";
+import { canDressUp } from "@/lib/marketplace/owner.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
@@ -45,14 +45,14 @@ export default async function SailingPage() {
     ]);
 
     // ── ONE FLAG DRESSES THE WHOLE GAME ──────────────────────────────────────────────────────────────────
-    // The same `town_halloween` column and the same `canPreview("halloween")` gate the plaza uses. Luke asked
+    // The same `town_halloween` column and the same `canDressUp` gate the plaza uses. Luke asked
     // for sailing to follow the town's flag, not to carry a second switch of its own — two toggles would mean
     // a half-decorated game and a bug report about the one you forgot.
     //
     // A fixture may also raise it, so the dressed-up sea can be looked at locally without writing the flag
     // onto a real account first — devFixture is a hard no-op in production, so this cannot be forged live.
     const halloween = Boolean(fixture?.halloween)
-        || (canPreview("halloween", buyer.id) && Boolean(me?.town_halloween));
+        || (canDressUp(buyer.id) && Boolean(me?.town_halloween));
 
     // Render the sky the CLIENT last chose (stored in a cookie) so a refresh shows the right backdrop from the
     // first paint — no flash from the server's random pick to the client's real-world/time-of-day one.

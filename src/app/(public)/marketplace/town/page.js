@@ -1,7 +1,7 @@
 import TownClient from "@/components/TownClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { db } from "@/lib/db";
-import { canPreview } from "@/lib/marketplace/owner.js";
+import { canDressUp } from "@/lib/marketplace/owner.js";
 import { getTownState } from "@/lib/marketplace/town.js";
 
 export const runtime = "nodejs";
@@ -26,16 +26,16 @@ export default async function TownPage() {
     // Whether this member may TURN THE DRESSING ON, decided on the server — never a client check, or the
     // whole plaza gets the seasonal art the moment somebody sets a localStorage key by hand. Whether it is
     // currently on is the member's own business and lives in localStorage; this is only the door.
-    const canDressUp = canPreview("halloween", buyer.id);
+    const canDress = canDressUp(buyer.id);
     // Whether they already raised it. Read on the server so the plaza renders dressed on the FIRST paint —
     // fetching it client-side would show a lit daytime town for a frame and then drop the sun, on every visit.
-    const halloweenOn = canDressUp
+    const halloweenOn = canDress
         ? Boolean((await db.queryOne(`SELECT town_halloween FROM mkt_buyer WHERE id = $1`, [buyer.id])
             .catch(() => null))?.town_halloween)
         : false;
     return (
         <div className="stack" style={{ maxWidth: 820, margin: "0 auto", padding: "0 12px" }}>
-            <TownClient initial={initial} canDressUp={canDressUp} halloweenOn={halloweenOn} />
+            <TownClient initial={initial} canDressUp={canDress} halloweenOn={halloweenOn} />
         </div>
     );
 }
