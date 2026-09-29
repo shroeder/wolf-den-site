@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { grantConsumable, CONSUMABLES, DISH_PET_XP } from "@/lib/marketplace/consumables.js";
+import { grantConsumable, CONSUMABLES, dishPetXp } from "@/lib/marketplace/consumables.js";
 import { RECIPES, MASTER_RECIPES, SEASON_RECIPES, FULL_BOOK, recipeById, recipeBookFor } from "@/lib/marketplace/cooking-recipes.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -1168,7 +1168,7 @@ export async function getKitchenState(buyerId) {
             // What the PLATE is worth to a pet. The ladder below is what the cook pays; this is the dish itself,
             // which you keep and can feed. Sent per recipe so the card can state the number before you spend
             // the ingredients — the reveal already says it afterwards, which is the wrong end for a decision.
-            petXp: r.kind === "dish" ? (DISH_PET_XP[r.tier] || 0) : 0,
+            petXp: r.kind === "dish" ? dishPetXp(r.tier) : 0,
             payout: r.kind === "dish" ? {
                 // In LADDER order — bottom rung first. Sorting by anything else would go straight back to
                 // implying a lottery.
@@ -1267,8 +1267,19 @@ export async function getKitchenState(buyerId) {
             .sort((a, b) => a.kind.localeCompare(b.kind) || b.qty - a.qty),
         pantryTotal: pantryRows.reduce((s, r) => s + Number(r.qty), 0),
         recipes,
-        known: knownRows.length,
-        recipeTotal: RECIPES.length,
+        // ── BOTH NUMBERS OFF THE SAME LIST, OR THEY CANNOT ADD UP ────────────────────────────────────
+        // ⚠️ `known` was knownRows.length (every page you hold, master and season pages included) while
+        // `recipeTotal` was RECIPES.length (the ordinary book alone) — two counts of two different books
+        // printed as one fraction. ValkyrieSylve: "Recipe page says it's 96/98 recipes, but when hiding
+        // recipes, it says 3 are hidden. Is there a secret 99th recipe?" There is not: she held 95 of the
+        // 98 ordinary pages plus one season page, so 95 + 3 hidden = 98 and the numerator was counting a
+        // page the denominator had never heard of. SoullessShiitake worked that out in-channel before I
+        // got to it, which is the third time this month somebody has answered a report for me.
+        //
+        // `recipes` is the list the screen draws and the list `hiddenCount` counts, so both halves of the
+        // fraction come off it now and found + hidden is the total by construction.
+        known: recipes.filter((r) => r.known).length,
+        recipeTotal: recipes.length,
         tracks: Object.entries(COOK_TRACKS).map(([id, def]) => {
             const level = Number(row?.[TRACK_COL[id]]) || 0;
             return {
@@ -1611,7 +1622,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         // Deliberately outside payRung: a rung goes through `serve()` and is multiplied by `portions`, and the
         // Tasting Menu pays a rung for every other dish the ingredients covered. Pet XP should follow the dish
         // you actually cooked, once, so the number on the card is the number you get.
-        const dishXp = DISH_PET_XP[rec.tier] || 0;
+        const dishXp = rec.kind === "dish" ? dishPetXp(rec.tier) : 0;
         await grantConsumable(buyerId, rec.id, 1).catch(() => {});
         made = { kind: "dish", id: rec.id, name: rec.name, desc: lbl.desc,
             // `missedBand` is the near-miss: you cooked well enough to be in the running for the top rungs and

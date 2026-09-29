@@ -46,7 +46,7 @@ export default function PublicFishing({ log, displayLabel = "They" }) {
                         </span>
                         <span className="fish-log-best">
                             <strong>{weightLabel(f.best)}</strong>
-                            {f.beatsRange ? <em className="fish-over">🏆 record class</em> : null}
+                            {f.beatsRange ? <em className="fish-over">🏆 freak size</em> : null}
                         </span>
                     </div>
                 ))}

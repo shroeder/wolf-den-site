@@ -152,6 +152,10 @@ export default function BossFightClient({ halloween = false }) {
             swings.forEach((h, i) => setTimeout(() => popDamage(h.damage, h.crit), i * 260));
             setBurst({
                 ability: res.ability, damage: res.damage, crit: res.crit, proc: res.proc,
+                // How far OVER the ceiling the stack ran, or 0. A member whose gear already reaches it gets
+                // nothing at all from a damage potion, and until now the only evidence of that was a number
+                // that failed to move. See the note at `capped` in boss.js.
+                capped: res.capped || 0,
                 strikes: swings.length, crits: res.crits || swings.filter((h) => h.crit).length,
                 key: floatId.current++,
             });
@@ -269,6 +273,12 @@ export default function BossFightClient({ halloween = false }) {
                         ) : null}
                         <div className="boss-burst-name">{burst.crit ? "💥 " : ""}{burst.ability}{burst.crit ? " 💥" : ""}</div>
                         <div className="boss-burst-dmg">-{burst.damage.toLocaleString()}</div>
+                        {/* The ceiling, said out loud. Six systems multiply into a boss strike and the product
+                            is capped; past that point a damage potion buys nothing, and a potion that changes
+                            no number reads as a broken potion rather than as a rule. */}
+                        {burst.capped ? (
+                            <div className="boss-burst-cap">AT THE CEILING · ×{burst.capped} of it went nowhere</div>
+                        ) : null}
                     </div>
                 ) : null}
             </div>

@@ -176,8 +176,24 @@ for (const p of SEED_PACKS) {
 //
 // BAIT IS NOT FEEDABLE, and neither are preps. Both already have an `out` that lands in the pantry: bait is
 // spent on a cast, a prep is spent on the next recipe. Only `kind: "dish"` becomes food.
-export const DISH_PET_XP = { 1: 10, 2: 25, 3: 60, 4: 150, 5: 350 };
-export const DISH_TIER_NAME = { 1: "Simple", 2: "Hearty", 3: "Fine", 4: "Exquisite", 5: "Legendary" };
+// ⚠️ THIS TABLE STOPPED AT FIVE AND THE KITCHEN HAS SIX TIERS. Master (tier 6) fell off the end of both maps,
+// and the lookup below fell back to `DISH_PET_XP[1]` — so the six dishes behind a 25,000-chip book, built out
+// of the most expensive preps in the game, fed a pet TEN experience, the same as a bowl of porridge, off a
+// card that read "undefined dish". Eric D: "Just made a master recipe, but it only gives my pet 10 exp. A
+// mythic recipe gives 350, so I think the master recipes should give something quite better than that."
+//
+// It is the same fault as the rarity tables that stopped at eternal: a ladder lookup that FALLS BACK DOWNWARD
+// turns the best thing in a system into the worst one, silently, and nothing throws. The fallback below now
+// fails UPWARD — an unmapped tier takes the highest rung defined rather than the lowest.
+//
+// 850 continues the ladder the other five already walk (x2.4 a rung: 10, 25, 60, 150, 350), rather than being
+// a number chosen for how it feels. SEASON_RECIPES are tier 5 on purpose and are unaffected.
+export const DISH_PET_XP = { 1: 10, 2: 25, 3: 60, 4: 150, 5: 350, 6: 850 };
+export const DISH_TIER_NAME = { 1: "Simple", 2: "Hearty", 3: "Fine", 4: "Exquisite", 5: "Legendary", 6: "Master" };
+// Fail UPWARD, never down: the top rung is a far safer guess for an unmapped tier than the bottom one.
+const TOP_DISH_TIER = Math.max(...Object.keys(DISH_PET_XP).map(Number));
+export const dishPetXp = (tier) => DISH_PET_XP[tier] ?? DISH_PET_XP[TOP_DISH_TIER];
+export const dishTierName = (tier) => DISH_TIER_NAME[tier] ?? DISH_TIER_NAME[TOP_DISH_TIER];
 
 // The dish's consumable id IS its recipe id - one name for one thing, so the sprite already sitting in
 // mkt_cooking_sprite under that key is the sprite the stash draws (see consumable-sprites.js). Guarded, because
@@ -197,14 +213,14 @@ export const DISH_IDS = [];
 for (const r of [...RECIPES, ...MASTER_RECIPES, ...SEASON_RECIPES]) {
     if (r.kind !== "dish") continue;
     if (CONSUMABLES[r.id]) throw new Error(`cooking recipe "${r.id}" collides with an existing consumable id`);
-    const amount = DISH_PET_XP[r.tier] || DISH_PET_XP[1];
+    const amount = dishPetXp(r.tier);
     CONSUMABLES[r.id] = {
         name: r.name,
         emoji: "🍽️",
         kind: "dish",
         price: null, // cooked, never bought - the Kitchen is the only source
         tier: r.tier,
-        desc: `${DISH_TIER_NAME[r.tier]} dish. Feed your equipped pet +${amount.toLocaleString()} pet XP.`,
+        desc: `${dishTierName(r.tier)} dish. Feed your equipped pet +${amount.toLocaleString()} pet XP.`,
         effect: { type: "pet_xp", amount },
     };
     DISH_IDS.push(r.id);

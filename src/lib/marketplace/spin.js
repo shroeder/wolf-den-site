@@ -313,10 +313,44 @@ const MINI_WHEEL_PRIZES = [
     { label: "Gold Chest", sprite: "chest-gold", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
 ];
 
-// mini-wheel.png has nine painted wedges (dividers measured every 40 degrees). Same contract, same hard stop.
+// ── THE GOLDEN WHEEL'S BONUS ROUND ───────────────────────────────────────────────────────────────────────
+// ⚠️ THE GOLDEN WHEEL UPGRADED EVERYTHING EXCEPT THE ROUND IT SENDS YOU TO. Buying it moves the floor to 600,
+// cuts the gems deeper (t3-t4 against t1-t2) and lifts every chest a tier — and then its MINI WHEEL wedge
+// dropped you onto this same nine-wedge disc, whose floor is 400 gold and whose gem is a t2. So the rarest
+// outcome on the best wheel in the game was a strict DOWNGRADE on the wheel that produced it.
+//
+// ValkyrieSylve, twice: "After getting the new prize wheel upgrade it would appear the mini-wheel DID NOT get
+// the same treatment. My reward was a flawed emerald, when I can get a deep cut gem at a higher odds rate on
+// the new wheel." Kaishiern: "The bonus wheel prizes shouldn't be smaller than the smallest prize on the
+// regular wheel." Both right, and it is the same shape as the MINI JACKPOT that used to pay less than an
+// ordinary rare wedge: a thing announced as better that measurably was not.
+//
+// Upgraded by the SAME rules the Golden Wheel applies to the ordinary one, not by invented numbers — gold
+// roughly doubled, chests up a tier each (iron -> gold, gold -> mythic), gems cut deeper, consumables doubled.
+// The weights are untouched, so the shape of the round is identical and only what each wedge pays moves.
+//
+// ⚠️ THE EVOLVE STONE'S WEIGHT IS DELIBERATELY NOT TOUCHED. Its rate is measured — scripts/check-stones.mjs
+// exists because over-supply is the failure mode for stones (pet-stones.js), and a Golden Wheel owner already
+// reaches this round slightly more often. Raising it here would move a monthly rate that was chosen, not felt.
+const GOLD_MINI_WHEEL_PRIZES = [
+    { label: "900 gold", sprite: "coins-big", weight: 17, kind: "gold", amount: 900 },
+    { label: "EVOLVE STONE", sprite: "/images/pets/stone-light.png", weight: 1, rare: true, tier: "jackpot", kind: "stone" },
+    { label: "Choice Seeds", sprite: "seed-pouch", weight: 11, rare: true, tier: "rare", kind: "seed", band: "spin_mini", n: 5 },
+    { label: "Deep Cut Gem", sprite: "/images/gems/sapphire_t3.png", weight: 12, kind: "gem", minTier: 3, maxTier: 4 },
+    { label: "1,500 gold", sprite: "coins-big", weight: 11, kind: "gold", amount: 1500 },
+    { label: "Gold Chest", sprite: "chest-gold", weight: 11, kind: "chest", tierId: "gold" },
+    { label: "Forge Parts", sprite: PARTS_WEDGE_SPRITE, weight: 10, kind: "parts" },
+    { label: "Second Wind", sprite: "potion-red", weight: 9, kind: "consumable", consumable: "pot_secondwind", n: 2 },
+    { label: "Mythic Chest", sprite: "chest-mythic", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "mythic" },
+];
+
+// mini-wheel.png has nine painted wedges (dividers measured every 40 degrees). Same contract, same hard stop —
+// and it holds for BOTH lists, because they are drawn on the same disc.
 export const MINI_WHEEL_WEDGES = 9;
-if (MINI_WHEEL_PRIZES.length !== MINI_WHEEL_WEDGES) {
-    throw new Error(`mini wheel has ${MINI_WHEEL_PRIZES.length} prizes but mini-wheel.png has ${MINI_WHEEL_WEDGES} wedges - repaint the disc or fix the list`);
+for (const list of [MINI_WHEEL_PRIZES, GOLD_MINI_WHEEL_PRIZES]) {
+    if (list.length !== MINI_WHEEL_WEDGES) {
+        throw new Error(`mini wheel has ${list.length} prizes but mini-wheel.png has ${MINI_WHEEL_WEDGES} wedges - repaint the disc or fix the list`);
+    }
 }
 
 // Wheel-exclusive gear the BONUS GAME awards (ids match items.js + mkt_item_sprite). All RARE; the match-3
@@ -380,12 +414,17 @@ async function winJackpotPot(buyerId) {
 // The MINI WHEEL bonus round: roll a prize on the small wheel, grant it, and return the wheel + winning index
 // so the client can animate it.
 async function rollMiniWheel(buyerId) {
-    const idx = (() => { const pick = pickWeighted(MINI_WHEEL_PRIZES); return MINI_WHEEL_PRIZES.indexOf(pick); })();
-    const prize = MINI_WHEEL_PRIZES[idx];
+    // Which bonus disc you land on follows the wheel you were spinning, asked the one way it is ever asked
+    // (see wheelForMember) rather than by reading the perk again here.
+    const gold = Boolean(buyerId) && await hasUnlock(buyerId, "wheel_gold").catch(() => false);
+    const list = gold ? GOLD_MINI_WHEEL_PRIZES : MINI_WHEEL_PRIZES;
+    const idx = (() => { const pick = pickWeighted(list); return list.indexOf(pick); })();
+    const prize = list[idx];
     const display = await grantPrize(buyerId, prize);
     return {
-        prizes: MINI_WHEEL_PRIZES.map((p) => ({ label: p.label, sprite: P(p.sprite), tier: p.tier || (p.rare ? "rare" : "normal") })),
+        prizes: list.map((p) => ({ label: p.label, sprite: P(p.sprite), tier: p.tier || (p.rare ? "rare" : "normal") })),
         index: idx,
+        gold,
         prize: { ...display, tier: prize.tier || (prize.rare ? "rare" : "normal") },
     };
 }

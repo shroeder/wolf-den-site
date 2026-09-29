@@ -583,8 +583,12 @@ async function openHalloweenChest(buyerId, tier, remaining) {
     // being paid gold dust. Dust is the ordinary chest's answer to a finished collection; on an eight-piece
     // seasonal set it would mean the chest stopped being a Halloween chest the moment you completed it.
     if (Math.random() < (HW_GEAR_CHANCE[tier] || 0)) {
-        const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-        const owned = new Set(ownedRows.map((r) => r.item_id));
+        // Listed pieces count as owned here too — same reason as the ordinary chest roll below.
+        const [ownedRows, listedRows] = await Promise.all([
+            db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+            db.query(`SELECT item_id FROM mkt_auction WHERE seller_id = $1 AND status = 'active'`, [buyerId]).catch(() => []),
+        ]);
+        const owned = new Set([...ownedRows.map((r) => r.item_id), ...listedRows.map((r) => r.item_id)]);
         const pool = ITEMS.filter((i) => isHalloweenItem(i) && !owned.has(i.id));
         if (pool.length) {
             const item = pool[Math.floor(Math.random() * pool.length)];
@@ -807,8 +811,25 @@ export async function openChest(buyerId, tier) {
         return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
     }
 
-    const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-    const owned = new Set(ownedRows.map((r) => r.item_id));
+    // ── WHAT YOU "OWN" INCLUDES WHAT IS SITTING ON THE AUCTION BLOCK ─────────────────────────────────────
+    // ⚠️ LISTING A PIECE DELETES ITS mkt_user_item ROW (see listAuctionItem), which is the whole mechanism —
+    // it is out of your bag while it is on the shelf. Every "do you already own this?" question in the game
+    // therefore answers NO about it, and this one decides what a chest is allowed to hand you.
+    //
+    // GrayKitsune: "If I have an item on auction and open a chest, I can 'obtain' that item without obtaining
+    // anything. Had cinder axe on auction, opened a gold chest and 'obtained' another cinder axe and it's
+    // nowhere in my inventory." The chest genuinely granted it — his row is stamped acquired_via 'chest' —
+    // and the copy on the shelf is the one that died: grantItem is ON CONFLICT DO NOTHING, so when the
+    // listing later came home there was already a row and the return silently did nothing. A gold chest's
+    // whole roll spent on a piece he was in the middle of selling, and a listing that could never come back.
+    //
+    // So a listed piece counts as owned here. The safety net for the return itself is in cancelAuctionListing
+    // and expireAuctions — the two halves of one fault, fixed at both ends.
+    const [ownedRows, listedRows] = await Promise.all([
+        db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.query(`SELECT item_id FROM mkt_auction WHERE seller_id = $1 AND status = 'active'`, [buyerId]).catch(() => []),
+    ]);
+    const owned = new Set([...ownedRows.map((r) => r.item_id), ...listedRows.map((r) => r.item_id)]);
     // A chest-luck companion can promote the roll one rarity band up — stated exactly on the pet card.
     const RARITY_LADDER = RARITIES;   // shared ladder — it now runs two tiers past eternal
     let rarity = rollRarity(def.weights);

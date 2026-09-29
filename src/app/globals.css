@@ -9949,6 +9949,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     color: #ffe28a; text-shadow: 0 2px 8px #000; }
 .boss-burst-dmg { font-weight: 900; font-size: clamp(2.4rem, 11vw, 5rem); color: #fff; text-shadow: 0 3px 14px #000, 0 0 28px rgba(255,120,60,0.85); line-height: 1; }
 .boss-burst.is-crit .boss-burst-dmg { color: #ff5a5a; }
+/* The damage ceiling, reported under the number it decided. Deliberately quiet — it is information, not a
+   prize, and it must not compete with the damage it explains. */
+.boss-burst-cap { margin-top: 0.35rem; font-weight: 800; font-size: 0.78rem; letter-spacing: 0.06em; color: #ffd75e; text-shadow: 0 2px 8px #000; }
 .boss-burst.is-crit .boss-burst-name { color: #ff8a5a; }
 @keyframes boss-burst-in { 0% { opacity: 0; transform: scale(0.5); } 15% { opacity: 1; transform: scale(1.12); } 35% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05) translateY(-16px); } }
 

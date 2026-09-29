@@ -1176,7 +1176,15 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                             an open-ended trophy tail), and a percentage-toward-a-ceiling reads as "nearly
                             done — no point trying again", which is the opposite of what a record board is for.
                             The comparisons that survive are the two that can always be beaten. */}
-                        {result.beatsRange ? <div className="fish-trophy-flag">🏆 BIGGER THAN ANY ON RECORD FOR ITS KIND</div> : null}
+                        {/* ⚠️ THIS FLAG IS NOT A RECORD CHECK AND MUST NOT SAY IT IS. `beatsRange` is
+                            `cm > species.lb[1]` — heavier than the species is supposed to GROW. It never looks
+                            at your log or at the Den board, so it fires happily on a fish smaller than one you
+                            have already landed. SoullessShiitake: "Just had a fish i caught at 1.7 lbs tell me
+                            its the biggest one on record, when it doesn't even top my personal best at 1.8."
+                            DrkMotion hit it the next day with a 7.3lb lobster. Both were reading the banner
+                            exactly as written; the two real records are the two cells directly below it, which
+                            ARE checked (personalBest and denRecord). So this says what it actually means. */}
+                        {result.beatsRange ? <div className="fish-trophy-flag">🏆 A FREAK — BIGGER THAN THIS SPECIES GROWS</div> : null}
                         <div className="fish-compare">
                             <div className={`fish-compare-cell${result.personalBest ? " is-beat" : ""}`}>
                                 <em>your best</em>

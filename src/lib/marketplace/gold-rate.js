@@ -156,6 +156,20 @@ export const mints = (reason) => MINT_REASONS.has(reason);
 export const heavy = (reason) => HEAVY_FAUCETS.has(reason);
 
 /**
+ * The EFFECTIVE rate a given reason is paid at — the number `mint` will actually multiply by.
+ *
+ * ⚠️ ANY PLACE THAT QUOTES A PRICE IN THE SAME COIN A PRIZE IS PAID IN MUST ASK THIS, NOT `GOLD_MINT_RATE`.
+ * The delve merchants did the second thing. Their prices were converted with the global floor (0.4) while
+ * their payouts went out through `mint(gold, "delve")`, and "delve" is a HEAVY faucet — so the prize was worth
+ * half the rate the price was charged at, and every priced offer in the dungeon quietly cost double what it
+ * returned. SoullessShiitake, on the sealed box: "It told me I should be getting 178, it only gave me 34, it
+ * cost me 51." 178 x 0.2 is 34 and the price was taken at 0.4. He was reading the bug off the screen.
+ *
+ * One function, so the two numbers can never come from two different rules again. See [[gold-mint-rate-lever]].
+ */
+export const mintRate = (reason) => GOLD_MINT_RATE * (HEAVY_FAUCETS.has(reason) ? HEAVY_FAUCET_FACTOR : 1);
+
+/**
  * Size a reward on its way out.
  *
  * `mint(120, "harvest")` → 60. `mint(120, "trade_refund")` → 120, untouched.

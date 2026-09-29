@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { GOLD_MINT_RATE } from "@/lib/marketplace/gold-rate.js";
+import { mintRate } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { addChests, surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
@@ -137,7 +137,15 @@ function buildOffer(run, d, ev) {
     // Quoted AND charged in the same units the prize is paid in, so the ratios the offers were designed
     // around survive the mint rate wherever it is set. One helper, because the number on the button and the
     // number taken out of the purse are the same number. See [[gold-mint-rate-lever]].
-    const price = (n) => Math.max(1, Math.round(n * GOLD_MINT_RATE));
+    //
+    // ⚠️ AND IT HAS TO BE THE DELVE'S OWN RATE, NOT THE GLOBAL FLOOR. This read GOLD_MINT_RATE (0.4) while the
+    // payout leaves through mint(gold, "delve") — and "delve" is one of the named HEAVY faucets, which pay
+    // GOLD_MINT_RATE x 0.5, today 0.2. So the fix above halved the prices and left them still charged at
+    // exactly TWICE the rate the prize came back at: the ratio it was written to protect survived the rename
+    // and not the arithmetic. SoullessShiitake, on the sealed box: "It told me I should be getting 178, it
+    // only gave me 34, it cost me 51." g(4) = 178, minted at 0.2 = 34 (he got 34); the price was taken at
+    // 0.4. Asking mintRate("delve") is the same question the payout asks, so the two cannot drift again.
+    const price = (n) => Math.max(1, Math.round(n * mintRate("delve")));
     const x = (mult) => Math.round(((d.xpPer[0] + d.xpPer[1]) / 2) * mult);
     const big = d.minLevel >= 30 ? "gold" : "iron";
     const small = d.minLevel >= 30 ? "iron" : "wooden";

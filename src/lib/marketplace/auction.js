@@ -6,7 +6,7 @@ import { itemById, describeStats, describeFarm, describeSea, describeDepth, stat
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
-import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { grantItem, getEquippedIds, sellValueOf } from "@/lib/marketplace/inventory.js";
 import { transferItemEnhancement, enhanceDetailsFor } from "@/lib/marketplace/crafting.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { transferItemElement, describeItemElements, getElementOverrides, getElementOverridesForMembers } from "@/lib/marketplace/item-element.js";
@@ -151,7 +151,7 @@ export async function expireAuctions() {
     }
     for (const r of due) {
         if (relisted.has(r.id)) continue;
-        await grantItem(r.seller_id, r.item_id, "auction_return").catch(() => {});
+        await returnListedItem(r.seller_id, r.item_id, "auction_return").catch(() => {});
     }
     // Tell the seller their listing died. It used to just quietly reappear in their inventory, so unless they
     // went looking they never learned it hadn't sold — and couldn't decide to relist it cheaper.
@@ -292,6 +292,28 @@ export async function getAuctionState(buyerId) {
     return { owner: true, listings, sellable, mine, gold: Number(goldRow?.gold || 0), feePct: LIST_FEE_PCT, durations: DURATIONS, auctioneer: artRow?.url || null };
 }
 
+// ── A LISTING THAT CANNOT COME HOME IS PAID FOR, NOT DELETED ─────────────────────────────────────────────────
+// `grantItem` is ON CONFLICT DO NOTHING, and gear is one-of-a-kind per member — so if a second copy of the
+// piece reached the bag while the first was on the shelf, returning the listing did precisely nothing and the
+// item on the block evaporated in silence. That is how GrayKitsune's Cinder Axe went: a gold chest handed him
+// one while his was listed (chests no longer do that — see chests.js), and cancelling the listing then had
+// nowhere to put it.
+//
+// Closing the chest hole makes this rare rather than impossible: a trade, an admin grant or a level unlock can
+// still land the same id first. So the return always resolves to SOMETHING. If the bag already holds the
+// piece, the seller is paid its sell-back value in gold instead, told which listing it was, and the coin is
+// logged under its own reason so it is visible in the ledger rather than appearing from nowhere.
+async function returnListedItem(sellerId, itemId, via = "auction_return") {
+    const res = await grantItem(sellerId, itemId, via).catch(() => ({ ok: false }));
+    if (res?.granted) return { returned: true, gold: 0 };
+    const it = itemById(itemId);
+    const value = sellValueOf(it);
+    if (!value) return { returned: false, gold: 0 };   // a charged perk item has no sell-back; nothing to pay
+    const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [sellerId, value]).catch(() => null);
+    await logCoin(sellerId, value, "auction_return_paid", { balanceAfter: row?.gold, meta: { itemId, name: it?.name || itemId } }).catch(() => {});
+    return { returned: false, gold: value };
+}
+
 // List an owned, unequipped item at `price` gold for `days` days. Charges the 5% fee up front; removes the item.
 export async function listAuctionItem(buyerId, itemId, price, days) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
@@ -383,7 +405,7 @@ export async function cancelAuctionListing(buyerId, listingId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const row = await db.queryOne(`UPDATE mkt_auction SET status = 'cancelled' WHERE id = $1 AND seller_id = $2 AND status = 'active' RETURNING item_id`, [listingId, buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "gone" };
-    await grantItem(buyerId, row.item_id, "auction_return").catch(() => {});
-    await trackActivity(buyerId, "auction_cancel", { itemId: row.item_id }).catch(() => {});
-    return { ok: true };
+    const back = await returnListedItem(buyerId, row.item_id, "auction_return").catch(() => ({ returned: true, gold: 0 }));
+    await trackActivity(buyerId, "auction_cancel", { itemId: row.item_id, paidGold: back.gold || 0 }).catch(() => {});
+    return { ok: true, ...(back.gold ? { paidGold: back.gold } : {}) };
 }

@@ -1405,7 +1405,21 @@ export async function attackBoss(buyerId) {
     // A single ceiling on the stack. It bites only where several systems are already at their own limits,
     // which is exactly the case that was running away; a member with one good signature and no pet never
     // reaches it and never notices it.
-    const stack = Math.min(BOSS_MULT_CAP, buffMult * sig.mult * petMult * wMult * setHit.mult);
+    const raw = buffMult * sig.mult * petMult * wMult * setHit.mult;
+    const stack = Math.min(BOSS_MULT_CAP, raw);
+    // ── AND THE MEMBER IS TOLD WHEN THE CEILING IS THE THING DECIDING THEIR NUMBER ───────────────────────
+    // ⚠️ A CEILING NOBODY CAN SEE IS INDISTINGUISHABLE FROM A BROKEN POTION. ValkyrieSylve: "I used a triple
+    // damage consumable yesterday for my boss strikes and hit for 2.2 mil. Today I used a double damage
+    // consumable and hit for 2.3 mil? Seems a bit off." Her rows say she is exactly right and nothing is
+    // broken: no potion at all pays her ~110k a strike, x2 pays ~230k (the full doubling), and x3 pays ~235k —
+    // because her gear stack alone is ~9.5, so x2 lands just under BOSS_MULT_CAP and x3 lands well over it and
+    // is clipped back to the same number. She drank a Bottled Fury for nothing and the screen said nothing.
+    //
+    // This does NOT change what anybody hits for; it reports the fact. `capped` is the multiple that was
+    // thrown away, so the swing card can say the strike is at its ceiling — which is the difference between a
+    // player learning a rule and a player concluding an item is broken. Whether a consumable SHOULD be clipped
+    // by a ceiling that exists to contain runaway GEAR is a balance question and is Luke's, not mine.
+    const capped = raw > BOSS_MULT_CAP ? Math.round((raw / BOSS_MULT_CAP) * 100) / 100 : 0;
     const damage = Math.round(swing.damage * stack + (onHit.bonusDamage || 0));
     const crit = swing.crit;
     const ability = pickAbility(crit);
@@ -1480,7 +1494,7 @@ export async function attackBoss(buyerId) {
             stone = await rollStone(buyerId, STONE_SOURCES.boss_kill.chance, "boss_kill");
         } catch { /* never let it fail the kill */ }
     }
-    return { ok: true, damage, crit, ability, stone, proc: sig.proc || setHit.proc || petProc || elemProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
+    return { ok: true, damage, crit, ability, stone, proc: sig.proc || setHit.proc || petProc || elemProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name, capped };
 }
 
 // ── UNLEASH EVERYTHING ───────────────────────────────────────────────────────────────────────────────────────
