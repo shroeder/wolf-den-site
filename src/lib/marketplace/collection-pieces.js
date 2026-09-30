@@ -43,6 +43,26 @@ export const COLLECTION_PIECES = [
     { id: "wg_belt", set: "wheelwarden", name: "Fangbite Belt", rarity: "rare", icon: "GiBelt", flavor: "Buckled with a snarling wolf.", source: "wheel_bonus", sort: 977 },
     { id: "wg_boots", set: "wheelwarden", name: "Prowler Boots", rarity: "rare", icon: "GiLeatherBoot", flavor: "Quiet on any trail.", source: "wheel_bonus", sort: 978 },
     { id: "wg_axe", set: "wheelwarden", name: "Moonhowl Axe", rarity: "rare", icon: "GiBattleAxe", flavor: "It hums under a full moon.", source: "wheel_bonus", sort: 979 },
+
+    // ── FORTUNE'S OWN — the Golden Wheel's set ───────────────────────────────────────────────────────────
+    // ⚠️ IT EXISTS BECAUSE THE BONUS GAME RAN OUT OF THINGS TO GIVE. Eight members hold all ten Wheelwarden
+    // pieces and 44 of the last 100 bonus rounds paid a duplicate — so for the people furthest along, the
+    // wheel's best wedge had become a chest with a match-3 animation in front of it. GrayKitsune read the
+    // board of gear he already owned as a set the game was withholding, which is the only sane reading.
+    //
+    // Gated on OWNING THE GOLDEN WHEEL, not on having finished Wheelwarden: it is the upgraded wheel's own
+    // set, the thing 20,000 chips actually buys beyond bigger numbers. Epic rather than rare, and gilded
+    // rather than wolf-pelt, so the two sets read as two tiers at a glance.
+    { id: "gw_crown", set: "goldwheel", name: "Aurum Crown", rarity: "epic", icon: "GiCrown", flavor: "The wheel crowns its own.", source: "wheel_bonus_gold", sort: 980 },
+    { id: "gw_saber", set: "goldwheel", name: "Goldfang Saber", rarity: "epic", icon: "GiCrescentBlade", flavor: "Struck from a jackpot that never got spent.", source: "wheel_bonus_gold", sort: 981 },
+    { id: "gw_aegis", set: "goldwheel", name: "Sunburst Aegis", rarity: "epic", icon: "GiShield", flavor: "Turns the light back at whoever sent it.", source: "wheel_bonus_gold", sort: 982 },
+    { id: "gw_mantle", set: "goldwheel", name: "Gilded Mantle", rarity: "epic", icon: "GiCape", flavor: "Heavier than it looks. Most gold is.", source: "wheel_bonus_gold", sort: 983 },
+    { id: "gw_pendant", set: "goldwheel", name: "Midas Pendant", rarity: "epic", icon: "GiGemPendant", flavor: "Warm even in January.", source: "wheel_bonus_gold", sort: 984 },
+    { id: "gw_signet", set: "goldwheel", name: "Fortune's Signet", rarity: "epic", icon: "GiRing", flavor: "Seals nothing. Opens a surprising amount.", source: "wheel_bonus_gold", sort: 985 },
+    { id: "gw_plate", set: "goldwheel", name: "Aurelian Plate", rarity: "epic", icon: "GiChestArmor", flavor: "Gilt over good steel — the gilt is not the point.", source: "wheel_bonus_gold", sort: 986 },
+    { id: "gw_girdle", set: "goldwheel", name: "Coinspinner Girdle", rarity: "epic", icon: "GiBelt", flavor: "Chimes when you walk. You stop noticing.", source: "wheel_bonus_gold", sort: 987 },
+    { id: "gw_treads", set: "goldwheel", name: "Gilded Treads", rarity: "epic", icon: "GiLeatherBoot", flavor: "They find the lucky side of a room.", source: "wheel_bonus_gold", sort: 988 },
+    { id: "gw_maul", set: "goldwheel", name: "Jackpot Maul", rarity: "epic", icon: "GiThorHammer", flavor: "Lands like the wheel stopping on the last wedge.", source: "wheel_bonus_gold", sort: 989 },
     { id: "dv_lamp_helm", set: "delver", name: "Deeplamp Helm", rarity: "rare", icon: "GiMiningHelmet", flavor: "The flame gutters when the air goes bad. Listen to it.", depth: { nerve: 4 }, source: "mining", sort: 980 },
     { id: "dv_rope_belt", set: "delver", name: "Knotted Descent Belt", rarity: "rare", icon: "GiRopeCoil", flavor: "Forty feet of rope and every knot tied twice.", depth: { nerve: 4 }, source: "mining", sort: 981 },
     { id: "dv_lodestone", set: "delver", name: "Lodestone Pendant", rarity: "epic", icon: "GiCompass", flavor: "It pulls toward the richest rock. Follow it, not your gut.", depth: { lodesense: 5 }, source: "mining", sort: 982 },

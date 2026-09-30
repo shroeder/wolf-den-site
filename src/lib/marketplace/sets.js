@@ -253,6 +253,25 @@ export const ITEM_SETS = [
         capstone: { wheelRespin: 0.12, desc: "Lucky Streak: a 12% chance each spin is FREE — your spin is refunded." },
         weakness: null,
     },
+    {
+        // ── FORTUNE'S OWN — what the Golden Wheel is actually for ────────────────────────────────────
+        // Reachable only by somebody who bought the Golden Wheel: its bonus round boards these instead of
+        // the Wheelwarden pieces. Eight members had finished Wheelwarden and were being handed duplicates,
+        // so the wheel's best wedge had quietly become a chest with an animation in front of it.
+        id: "goldwheel", collection: true, feature: "wheel", name: "Fortune's Own",
+        items: ["gw_crown", "gw_saber", "gw_aegis", "gw_mantle", "gw_pendant", "gw_signet", "gw_plate", "gw_girdle", "gw_treads", "gw_maul"],
+        full: 10,
+        bonuses: [
+            { need: 3, wheel: { luck: 10 } },
+            { need: 6, wheel: { luck: 12 } },
+            { need: 10, wheel: { luck: 15 } },
+        ],
+        // ⚠️ DELIBERATELY SMALLER THAN WHEELWARDEN'S RESPIN, BECAUSE THESE STACK. setWheelRespinChance adds
+        // every full-set capstone together; a holder of all three wheel sets would otherwise sit at 30% free
+        // spins on top of 87% Lucky Spin. The chase is the reward here, not another number on the pile.
+        capstone: { wheelRespin: 0.08, desc: "Fortune's Own: an 8% chance each spin is FREE — your spin is refunded." },
+        weakness: null,
+    },
     // ── DEPTHS SETS ── one per verb the Mine asks of you. Bonuses are DEPTH affinity (see items.js DEPTH_META),
     // never boss power, and the capstones are mine-only powers read in mining.js.
     {
@@ -509,6 +528,13 @@ export function setDepthCapstones(ownedIds) {
 // Aggregate WHEEL bonuses granted by active set-bonus tiers (read by spin.js — never boss). `luck` = % chance
 // per spin to trigger a Lucky Spin (bonus gold on gold prizes). It's a proc, not a
 // guaranteed per-spin bonus.
+// ⚠️ AND LUCK HAS A CEILING NOW. It never did — every wheel set's tiers were summed with nothing on top, and
+// the respin capstone beside it has been capped at 50% since it shipped. With a third wheel set in the game a
+// holder of all of them reaches 87%, which is not a proc any more, it is a guarantee with extra steps. 60 is
+// generous (better than one spin in two) and keeps the Lucky Spin a thing that HAPPENS rather than a thing
+// that is simply on.
+const WHEEL_LUCK_CAP = 60;
+
 export function setWheelBonus(ownedIds) {
     const counts = collectedCounts(ownedIds);
     const total = { luck: 0 };
@@ -518,6 +544,7 @@ export function setWheelBonus(ownedIds) {
             if (n >= tier.need && tier.wheel) for (const [k, v] of Object.entries(tier.wheel)) total[k] = (total[k] || 0) + v;
         }
     }
+    total.luck = Math.min(WHEEL_LUCK_CAP, total.luck);
     return total;
 }
 // Full-set WHEEL capstone: chance a spin is refunded (free re-spin). Consumed in spin.js doSpin.

@@ -17,6 +17,21 @@ const JOBS = [
     { out: "public/images/spin/gear/wg-belt.png", size: "1024x1024", prompt: SPRITE("ornate war belt with a golden wolf-head buckle and fang studs") },
     { out: "public/images/spin/gear/wg-boots.png", size: "1024x1024", prompt: SPRITE("pair of ornate fur-lined prowler boots with steel toes, fantasy gear") },
     { out: "public/images/spin/gear/wg-axe.png", size: "1024x1024", prompt: SPRITE("curved fantasy war axe with a wolf-etched steel head and leather-wrapped haft") },
+
+    // ── FORTUNE'S OWN — the Golden Wheel's set ───────────────────────────────────────────────────────────
+    // Gilded where the Wheelwarden set is pelt-and-steel, so the two read as two tiers side by side on the
+    // same board. Same wolf motif throughout — this is the same den, one shelf up — but the metal is the
+    // subject rather than the trim.
+    { out: "public/images/spin/gear/gw-crown.png", size: "1024x1024", prompt: SPRITE("ornate golden crown with wolf-ear points and a single amber gem at the brow, fantasy regalia") },
+    { out: "public/images/spin/gear/gw-saber.png", size: "1024x1024", prompt: SPRITE("curved golden saber with a wolf-head pommel and a gleaming damascened blade, fantasy weapon") },
+    { out: "public/images/spin/gear/gw-aegis.png", size: "1024x1024", prompt: SPRITE("round golden shield embossed with a radiant sunburst around a wolf head, fantasy armor") },
+    { out: "public/images/spin/gear/gw-mantle.png", size: "1024x1024", prompt: SPRITE("rich cloak of deep wine cloth with heavy gold-embroidered trim and a wolf-head clasp, fantasy garment") },
+    { out: "public/images/spin/gear/gw-pendant.png", size: "1024x1024", prompt: SPRITE("golden pendant amulet on a fine chain, a glowing amber stone set in a wolf-head bezel") },
+    { out: "public/images/spin/gear/gw-signet.png", size: "1024x1024", prompt: SPRITE("heavy gold signet ring engraved with a wolf head, a tiny amber stone at its center") },
+    { out: "public/images/spin/gear/gw-plate.png", size: "1024x1024", prompt: SPRITE("gilded steel breastplate with wolf-head pauldrons and gold filigree, ornate fantasy armor") },
+    { out: "public/images/spin/gear/gw-girdle.png", size: "1024x1024", prompt: SPRITE("ornate golden war belt hung with small gold coins and a wolf-head buckle") },
+    { out: "public/images/spin/gear/gw-treads.png", size: "1024x1024", prompt: SPRITE("pair of ornate boots in dark leather with gilded greaves and gold buckles, fantasy gear") },
+    { out: "public/images/spin/gear/gw-maul.png", size: "1024x1024", prompt: SPRITE("great two-handed golden warhammer maul with a wolf-head head and banded gold haft, fantasy weapon") },
     { out: "public/images/spin/mini-wheel.png", size: "1024x1024", prompt: `A small top-down fantasy prize wheel with EIGHT equal jewel-tone wedge segments and thin gold dividers, a tiny gold wolf medallion in the center, ornate gold rim, playful and inviting. NO pointer, NO arrow. ${STYLE}` },
 
     { out: "public/images/spin/prizes/coins-small.png", size: "1024x1024", prompt: SPRITE("small neat stack of shiny gold coins") },

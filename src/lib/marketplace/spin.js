@@ -356,6 +356,18 @@ for (const list of [MINI_WHEEL_PRIZES, GOLD_MINI_WHEEL_PRIZES]) {
 // Wheel-exclusive gear the BONUS GAME awards (ids match items.js + mkt_item_sprite). All RARE; the match-3
 // board draws BOARD_ITEMS of these at random, three tiles each.
 const WHEEL_GEAR = ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", "wg_blade", "wg_chest", "wg_belt", "wg_boots", "wg_axe"];
+
+// ── AND THE GOLDEN WHEEL HAS ITS OWN SET TO CHASE ────────────────────────────────────────────────────────
+// Fortune's Own. Boarded instead of the Wheelwarden pieces for anybody who bought the Golden Wheel — which
+// is the answer to the thing the bonus game had become for the people furthest along: eight members hold all
+// ten Wheelwarden pieces, 44 of the last 100 rounds paid a duplicate, and the best wedge on the wheel was a
+// chest with a match-3 animation in front of it.
+//
+// A Golden Wheel owner who has not finished Wheelwarden still chases THIS set rather than the old one. The
+// upgraded wheel is meant to be the better wheel; sending its owner back to the rare-tier collection would
+// be the same fault as the mini wheel had, where an upgrade improved everything except the round it feeds.
+const GOLD_WHEEL_GEAR = ["gw_crown", "gw_saber", "gw_aegis", "gw_mantle", "gw_pendant", "gw_signet", "gw_plate", "gw_girdle", "gw_treads", "gw_maul"];
+const bonusGearFor = (wheelId) => (wheelId === "wheel_gold" ? GOLD_WHEEL_GEAR : WHEEL_GEAR);
 // ── WHAT A FINISHED SET IS PAID INSTEAD ──────────────────────────────────────────────────────────────────────
 // Once all ten are yours the bonus round has nothing new to hand over, and it used to hand over nothing at all
 // (see bonusFlip). Luke's call is a chest roll, and the tier is the wheel's OWN top chest rather than a number
@@ -457,7 +469,9 @@ async function rollBonusGame(buyerId) {
     // bonus round that pays nothing. Falls back to the full list once the set is complete, so the game still
     // runs rather than erroring on an empty board.
     const ownedSet = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
-    const fresh = WHEEL_GEAR.filter((id) => !ownedSet.has(id));
+    const wheel = await wheelForMember(buyerId, 1);
+    const pool = bonusGearFor(wheel.id);
+    const fresh = pool.filter((id) => !ownedSet.has(id));
     // ── THE FALLBACK WAS FIRING AT HALF A SET, NOT AT A FULL ONE ─────────────────────────────────────────
     // Kaishiern: "What happens if you get a duplicate collectible? I got a second wolf fang blade from the
     // wheel."
@@ -473,7 +487,7 @@ async function rollBonusGame(buyerId) {
     //
     // The board SHRINKS instead. Fewer kinds, still three tiles each, still an honest reveal -- a member two
     // pieces from a set gets a six-tile board and both of them are things they do not own.
-    const chosen = shuffle([...(fresh.length ? fresh : WHEEL_GEAR)]).slice(0, BOARD_ITEMS);
+    const chosen = shuffle([...(fresh.length ? fresh : pool)]).slice(0, BOARD_ITEMS);
     const tiles = shuffle(chosen.flatMap((id) => [id, id, id]));
     await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ board: tiles, flipped: [], done: false, need: 3 })]).catch(() => {});
 
@@ -487,7 +501,6 @@ async function rollBonusGame(buyerId) {
     // not the tail case the wording assumes. The client uses `complete` to say up front that this one pays
     // a chest, and which chest.
     const complete = fresh.length === 0;
-    const wheel = await wheelForMember(buyerId, 1);
     const tier = dupeChestFor(wheel.id);
     return {
         size: tiles.length,
