@@ -362,7 +362,15 @@ const WHEEL_GEAR = ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", 
 // invented for this: the Gold Chest wedge above sits at weight 4 and the BONUS GAME wedge at weight 5, so
 // finishing the collection turns the bonus wedge into a slightly-likelier version of the best chest the wheel
 // already gives — an upgrade for having completed it, rather than a wedge that goes dead.
-const BONUS_DUPE_CHEST = "gold";
+// ⚠️ AND WHICH CHEST DEPENDS ON WHICH WHEEL THEY SPIN. This was a flat "gold" — the ordinary wheel's top
+// chest — which meant a Golden Wheel owner who had finished the collection was paid LESS by the reward for
+// finishing it than their own wheel hands out: the Golden Wheel's top wedge is a Mythic Chest. Six of the
+// eight members holding all ten pieces own the Golden Wheel, and 44 of the last 100 bonus rounds landed on
+// this path, so it is most of what the bonus game now pays to the people furthest along.
+//
+// Same shape as the mini wheel, which upgraded everything except the round it sent you to.
+const BONUS_DUPE_CHEST = { wheel: "gold", wheel_gold: "mythic" };
+const dupeChestFor = (wheelId) => BONUS_DUPE_CHEST[wheelId] || "gold";
 const BOARD_ITEMS = 6; // distinct gear on the board (× 3 tiles each = 18 tiles → big, readable match-3)
 
 // LEVEL ONLY. A perk wheel is never reachable from here — it is bought, not grown into — and skipping it in
@@ -468,7 +476,26 @@ async function rollBonusGame(buyerId) {
     const chosen = shuffle([...(fresh.length ? fresh : WHEEL_GEAR)]).slice(0, BOARD_ITEMS);
     const tiles = shuffle(chosen.flatMap((id) => [id, id, id]));
     await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ board: tiles, flipped: [], done: false, need: 3 })]).catch(() => {});
-    return { size: tiles.length, need: 3, roster: chosen.map(gearCard) };
+
+    // ── AND THE ROUND SAYS WHAT IT IS PAYING BEFORE IT IS PLAYED ─────────────────────────────────────────
+    // ⚠️ THE SCREEN PROMISED "the first gear you match 3 of is yours to keep" TO PEOPLE WHO OWN ALL TEN. It
+    // is false for them, and the round then contradicts itself at the end with "actually every piece is
+    // already yours, have a chest". GrayKitsune came away thinking there was a set of gear he had not been
+    // given yet — which is the only reasonable reading of being shown ten gear cards and told to keep one.
+    //
+    // Eight members hold the complete set and 44 of the last 100 bonus rounds landed on this path, so it is
+    // not the tail case the wording assumes. The client uses `complete` to say up front that this one pays
+    // a chest, and which chest.
+    const complete = fresh.length === 0;
+    const wheel = await wheelForMember(buyerId, 1);
+    const tier = dupeChestFor(wheel.id);
+    return {
+        size: tiles.length,
+        need: 3,
+        roster: chosen.map(gearCard),
+        complete,
+        chest: complete ? { tier, label: CHEST_TIERS[tier]?.label || "Chest" } : null,
+    };
 }
 
 // Flip one tile of the active match-3 board. Reveals its gear; when the player reaches three of a kind, grants
@@ -495,8 +522,10 @@ export async function bonusFlip(buyerId, index) {
         const granted = await grantPiece(buyerId, revealedId, "wheel_bonus").catch(() => false);
         let chest = null;
         if (!granted) {
-            await addChests(buyerId, { [BONUS_DUPE_CHEST]: 1 }, { source: "spin_bonus_dupe", meta: { piece: revealedId } }).catch(() => {});
-            chest = { tier: BONUS_DUPE_CHEST, label: CHEST_TIERS[BONUS_DUPE_CHEST]?.label || "Chest" };
+            const wheel = await wheelForMember(buyerId, 1);
+            const tier = dupeChestFor(wheel.id);
+            await addChests(buyerId, { [tier]: 1 }, { source: "spin_bonus_dupe", meta: { piece: revealedId, wheel: wheel.id } }).catch(() => {});
+            chest = { tier, label: CHEST_TIERS[tier]?.label || "Chest" };
         }
         await trackActivity(buyerId, granted ? "spin_bonus_win" : "spin_bonus_dupe", { item: revealedId, chest: chest?.tier || null }).catch(() => {});
         winner = { ...gearCard(revealedId), duplicate: !granted, chest };

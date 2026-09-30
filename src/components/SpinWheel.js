@@ -106,7 +106,7 @@ export default function SpinWheel() {
         if (!payload) return;
         const flipped = {};
         if (payload.revealed) for (const [i, card] of Object.entries(payload.revealed)) flipped[i] = card;
-        setBonus({ size: payload.size, need: payload.need || 3, roster: payload.roster || [], flipped, done: false, won: null, busy: false });
+        setBonus({ size: payload.size, need: payload.need || 3, roster: payload.roster || [], complete: Boolean(payload.complete), chest: payload.chest || null, flipped, done: false, won: null, busy: false });
     }, []);
 
     const load = useCallback(async () => {
@@ -445,8 +445,19 @@ export default function SpinWheel() {
                 <Portal><div className="cw-bonus-full">
                     <button type="button" className="cw-bonus-close" onClick={() => setBonus(null)} aria-label="Close">✕</button>
                     <div className="cw-bonus-inner">
-                        <div className="cw-bonus-title">🎁 Match 3 to Win!</div>
-                        <p className="cw-bonus-sub">{bonus.done ? "THREE OF A KIND!" : "Flip tiles — the first gear you match 3 of is yours to keep."}</p>
+                        {/* ⚠️ "yours to keep" IS A LIE TO ANYONE HOLDING ALL TEN PIECES, and eight members
+                            are. They were shown a board of gear, told to keep one, and then told afterwards
+                            that every piece was already theirs — which reads as a set of gear the game is
+                            withholding. A completed collection says so BEFORE the round, and names what it
+                            actually pays. */}
+                        <div className="cw-bonus-title">{bonus.complete ? "🎁 Collection Complete" : "🎁 Match 3 to Win!"}</div>
+                        <p className="cw-bonus-sub">
+                            {bonus.done
+                                ? "THREE OF A KIND!"
+                                : bonus.complete
+                                    ? `Every Wheelwarden piece is already yours — so this round pays a ${bonus.chest?.label || "chest"} instead. Flip for it.`
+                                    : "Flip tiles — the first gear you match 3 of is yours to keep."}
+                        </p>
 
                         {!bonus.done ? (
                             <div className="cw-bonus-track">
