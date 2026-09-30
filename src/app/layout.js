@@ -1,7 +1,7 @@
 import "./globals.css";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
-import { SITE_URL } from "@/lib/site";
+import { SITE_URL, STORE_PHONE_TEL } from "@/lib/site";
 import { openingHoursSpecification } from "@/lib/marketplace/store-hours.js";
 import Telemetry from "@/components/Telemetry";
 import ChunkRecovery from "@/components/ChunkRecovery";
@@ -81,7 +81,7 @@ const localBusinessSchema = {
     description:
         "Locally owned trading card game store in Montgomery, Minnesota offering Pokemon cards, Magic: The Gathering, singles, sealed product, accessories, and community play.",
     url: SITE_URL,
-    telephone: "+17014090782",
+    telephone: STORE_PHONE_TEL,
     email: "luke@wolfdengamingmn.com",
     address: {
         "@type": "PostalAddress",

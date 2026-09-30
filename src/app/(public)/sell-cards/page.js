@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import SellCardsClient from "@/components/SellCardsClient";
+import { STORE_PHONE_TEL } from "@/lib/site";
 
 export const metadata = {
     title: "Sell Pokemon & Magic Cards",
@@ -29,7 +30,7 @@ export default function SellCardsPage() {
                     <a className="button primary" href="#sell-form">
                         Start Selling
                     </a>
-                    <a className="button" href="tel:+17014090782">
+                    <a className="button" href={`tel:${STORE_PHONE_TEL}`}>
                         Call Store
                     </a>
                 </div>

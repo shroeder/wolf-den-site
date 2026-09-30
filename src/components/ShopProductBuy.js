@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useState } from "react";
+import { STORE_PHONE, STORE_PHONE_TEL } from "@/lib/site";
 
 // BUYING, ON THE PRODUCT PAGE ITSELF.
 //
@@ -15,7 +16,7 @@ import { useCallback, useState } from "react";
 // Same cart endpoint and the same rules as the grid: only when payments are on and there is stock. When the
 // store cannot take the order online the phone CTA is still the right answer — it is just no longer the only
 // answer.
-export default function ShopProductBuy({ catalogObjectId, inStock, paymentsEnabled, phone = "+17014090782", phoneLabel = "(701) 409-0782" }) {
+export default function ShopProductBuy({ catalogObjectId, inStock, paymentsEnabled, phone = STORE_PHONE_TEL, phoneLabel = STORE_PHONE }) {
     const [busy, setBusy] = useState(false);
     const [added, setAdded] = useState(false);
     const [error, setError] = useState("");

@@ -1,13 +1,15 @@
 import Link from "next/link";
 
 import { closedSummary, hoursSummary } from "@/lib/marketplace/store-hours.js";
+import { STORE_PHONE, STORE_PHONE_TEL } from "@/lib/site";
 
 const ADDRESS = "300 1st St S, Montgomery, MN 56069";
 const MAPS_URL = "https://www.google.com/maps/search/?api=1&query=300+1st+St+S+Montgomery+MN+56069";
 const DISCORD_URL = "https://discord.gg/Pad8U2KVsD";
 const FACEBOOK_URL = "https://www.facebook.com/WolfDenGamesMN";
-const PHONE = "(701) 409-0782";
-const PHONE_TEL = "+17014090782";
+// Read from lib/site.js rather than typed here — see the note beside STORE_PHONE.
+const PHONE = STORE_PHONE;
+const PHONE_TEL = STORE_PHONE_TEL;
 const EMAIL = "luke@wolfdengamingmn.com";
 
 const TOWNS = "Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, Belle Plaine";
