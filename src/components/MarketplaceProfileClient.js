@@ -192,6 +192,10 @@ export default function MarketplaceProfileClient({ embedded = false }) {
                 <input id="pf-last" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last" />
 
                 <label htmlFor="pf-phone">Phone</label>
+                {/* ⚠️ THE PLACEHOLDER WAS "(555) 123-4567". 555 is only guaranteed-fictional in the
+                    555-0100..0199 block — 555-1234 sits outside it and can be somebody's live number. And a
+                    Los Angeles-shaped example in a shop in Montgomery is a poor format hint anyway: the job
+                    of a placeholder is to show the shape people here actually type. */}
                 <input
                     id="pf-phone"
                     type="tel"
@@ -199,7 +203,7 @@ export default function MarketplaceProfileClient({ embedded = false }) {
                     autoComplete="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="(555) 123-4567"
+                    placeholder="(507) 555-0123"
                 />
                 <p className="muted" style={{ fontSize: "0.8rem" }}>Add your phone so we can find you at the register and credit in-store purchases.</p>
 
