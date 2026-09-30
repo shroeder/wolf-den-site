@@ -29,7 +29,10 @@ export async function getGems(buyerId, powers = null) {
         // it would have found a bench that refused to fuse gems it could afford to fuse.
         powers ? Promise.resolve(powers) : equippedPowers(buyerId).catch(() => new Set()),
     ]);
-    const need = fuseCountFor(pw);
+    // ⚠️ THE COST IS PER TIER NOW, so it cannot be computed once for the whole bag — a Chipped wants three
+    // and a Brilliant wants five. Computing it once was the old shape and would have printed "Fuse x3" on
+    // every row while charging four and five at the top, which is the exact class of lie the comment above
+    // was written about.
     const held = new Map(rows.map((r) => [r.gem_id, Number(r.count) || 0]));
     // Everything you hold, in catalog order, so the bag reads as a set you are filling rather than a list of
     // whatever happened to drop.
@@ -37,10 +40,11 @@ export async function getGems(buyerId, powers = null) {
         const next = g.tier + 1 <= FUSE_MAX_TIER
             ? GEMS.find((x) => x.kind === g.kind && x.tier === g.tier + 1) || null
             : null;
+        const need = fuseCountFor(pw, g.tier);
         return {
             ...g,
             count: held.get(g.id),
-            // What three of them would make, and whether you are holding three.
+            // What a fuse of THIS tier would make, and whether they are holding enough.
             // The TIER WORD on both sides, so the button can say what it spends as well as what it makes.
             tierName: tierByN(g.tier)?.name || null,
             fuseInto: next ? { id: next.id, name: next.name, stats: next.stats, tierName: tierByN(next.tier)?.name || null } : null,
@@ -214,15 +218,15 @@ export async function transferSockets(fromId, toId, itemId, reason = "traded") {
 export async function fuseGems(buyerId, id) {
     const gem = gemById(id);
     if (!gem) return { ok: false, error: "bad_gem" };
-    // The ladder stops at Polished — above that a jewel is mined or it is not had. Checked here as well as
-    // hidden in the bag, because a shop rule that only exists in the UI is not a rule.
+    // The ladder runs the whole way now; the COST is what makes the top of it a haul. Checked here as well
+    // as hidden in the bag, because a shop rule that only exists in the UI is not a rule.
     if (gem.tier + 1 > FUSE_MAX_TIER) return { ok: false, error: "max_tier" };
     const next = gemById(gemId(gem.kind, gem.tier + 1));
     if (!next) return { ok: false, error: "max_tier" };
 
     // Spend conditionally — three at once, in one statement, so two taps cannot both pass a count check that
     // only one of them can afford.
-    const need = fuseCountFor(await equippedPowers(buyerId));
+    const need = fuseCountFor(await equippedPowers(buyerId), gem.tier);
     const spent = await db.queryOne(
         `UPDATE mkt_gem SET count = count - $3 WHERE buyer_id = $1 AND gem_id = $2 AND count >= $3 RETURNING count`,
         [buyerId, gem.id, need]

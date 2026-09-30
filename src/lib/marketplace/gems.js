@@ -132,21 +132,41 @@ export const socketCost = (rarity) => SOCKET_COST[rarity] || (rarity ? SOCKET_CO
 // Three of a kind make one of the tier above. Three rather than two because two is an upgrade path so cheap
 // that the lower tiers stop being drops and start being currency.
 export const FUSE_COUNT = 3;
-// The Steady Bench drops it to two. The fuse CANNOT FAIL — it is a deterministic spend-three-get-one — so the
-// power as first written ("a failed fuse returns all three gems") was aimed at an outcome that does not exist.
-// What it can honestly do is make the ladder cheaper.
-export const fuseCountFor = (powers) => (powers?.has?.("steady_bench") ? 2 : FUSE_COUNT);
 
-// ── AND THE LADDER STOPS AT POLISHED ─────────────────────────────────────────────────────────────────────────
-// Fusing tops out at tier 3. Anything above it has to come out of the rock.
+// ── AND IT COSTS MORE THE HIGHER YOU CLIMB ───────────────────────────────────────────────────────────────
+// Keyed by the tier being fused FROM. The cheap end stays cheap so a shallow mine's chips are still worth
+// picking up; the top two steps cost more, which is what keeps a Flawless a long haul instead of arithmetic.
 //
-// Without this ceiling the top of the game is arithmetic: nine Polished make a Flawless, Polished are on sale
-// in the Armoury for laurels, so the best jewel in the game costs about ten thousand laurels and a spreadsheet
-// — no depth, no risk, no luck. A Brilliant should be a good year and a Flawless should be a thing the Den
-// hears about, and neither is possible if they can be assembled.
+// A Flawless costs 5 Brilliant = 20 Polished = 60 Flawed = 180 Chipped. That is a season of picking
+// everything up, not a spreadsheet — and every low gem now has somewhere to go, which is what the ladder was
+// always supposed to do.
+const FUSE_COST = { 1: 3, 2: 3, 3: 4, 4: 5 };
+
+// The Steady Bench takes one off each step. The fuse CANNOT FAIL — it is a deterministic spend-N-get-one —
+// so the power as first written ("a failed fuse returns all three gems") was aimed at an outcome that does
+// not exist. What it can honestly do is make the ladder cheaper.
+export const fuseCountFor = (powers, fromTier = 1) => {
+    const base = FUSE_COST[Number(fromTier)] || FUSE_COUNT;
+    return powers?.has?.("steady_bench") ? Math.max(2, base - 1) : base;
+};
+
+// ── THE LADDER GOES ALL THE WAY NOW ──────────────────────────────────────────────────────────────────────
+// It used to stop at Polished. The reasoning was that nine Polished make a Flawless and the Armoury sells
+// Polished for laurels, so the best jewel in the game would cost about ten thousand laurels and a
+// spreadsheet — no depth, no risk, no luck.
 //
-// Chipped through Polished still fuse, which is what keeps the shallow mine's chips worth picking up.
-export const FUSE_MAX_TIER = 3;
+// ⚠️ THAT CEILING KILLED THE THING IT WAS PROTECTING. Measured against the live rows: NOBODY IN THE DEN OWNS
+// A FLAWLESS. Not one, ever. Six members hold any Brilliant at all, twenty-one between them, and every one
+// of those came out of a wheel. "A Flawless should be a thing the Den hears about" became a gem that does
+// not exist, and a member with a pile of Polished had nowhere to spend them.
+//
+// The Armoury fear was also overstated. It does not SELL a Polished on demand — it is a weighted rotation
+// where that row sits at weight 12 among many, so you cannot go and buy nine of them. And sixty Polished
+// exist in the entire game across thirteen people; nine of them is fifteen per cent of every one there is.
+//
+// So the ladder opens and the COST carries the weight instead (see FUSE_COST): the top steps want four and
+// five, which makes a Flawless 180 Chipped deep. Luke's call, and the data agrees with him.
+export const FUSE_MAX_TIER = 5;
 
 // ONE socket per piece for now. Written as a number rather than a boolean because the bench is the only thing
 // that would have to change to allow two, and every read below already counts rather than tests.
