@@ -414,7 +414,7 @@ export const COLLECTIBLES = [
     // ⚠️ THIS MAKES A PUNISHMENT REWARDING, deliberately. The pack controls nominations, so if somebody
     // starts courting the stocks to farm it, the pack simply stops putting them there — self-correcting, and
     // funnier than any rule we could write. The one-election-at-a-time cadence is the real cap.
-    { id: "super_devil", name: "Super Devil", Icon: GiDevilMask, color: "#c2384a", rarity: "legendary", source: "achievement", activeStat: "ferocity", achievement: "Sentenced to the stockade 10 times", spritePrompt: "a small cute black devil imp with short curved horns, a little pointed tail and big innocent eyes, standing with its hands behind its back looking far too pleased with itself" },
+    { id: "super_devil", name: "Super Devil", Icon: GiDevilMask, color: "#c2384a", rarity: "legendary", source: "achievement", activeStat: "ferocity", achievement: "Sentenced to the stockade 10 times", spritePrompt: "a small cute black devil imp with short curved horns, a little pointed tail and big innocent eyes, standing with its hands behind its back looking far too pleased with itself", ascendSpecies: "a HULKING, HEAVILY MUSCLED adult black demon with a thick corded chest and massive shoulders, long sweeping curved horns, a heavy barbed tail and a hard snarling brow - the grown form of a devil imp, towering and monstrous. It is NEVER small, NEVER round-bodied, NEVER cute, and it does NOT revert to a baby form" },
 
     // ── PATRONAGE · WHAT THE COUNTER REMEMBERS ────────────────────────────────────────────────────────
     // Luke: "when someone buys stuff at the store and uses the qr code we need to make it way more rewarding

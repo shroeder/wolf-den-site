@@ -167,7 +167,21 @@ function catalogue() {
     for (const m of src.matchAll(/\{ id: "([a-z0-9_]+)",[\s\S]{0,1400}?spritePrompt: "([^"]+)"/g)) {
         // `cute: true` rides along so the enshrined forms can be kept sweet — see CUTE_GUARD. Matched inside
         // the same window the prompt came from, which is why the window has to reach past spritePrompt.
-        out.push({ id: m[1], prompt: m[2], cute: /\bcute:\s*true\b/.test(m[0]) });
+        //
+        // ⚠️ AND `ascendSpecies` OVERRIDES THE SPECIES CLAUSE FOR LEVEL 6 ONLY. That clause is fed from
+        // spritePrompt, which describes the pet at LEVEL ONE -- so for any pet whose base form is deliberately
+        // sweet, the sentence naming the subject actively fights the Lv5 anchor it is editing. The Super
+        // Devil's reads "a small CUTE black devil imp ... big INNOCENT eyes", and both enshrined forms duly
+        // came back as the baby, undoing four rungs of getting bigger. Luke: "Level 6s both need to be buff
+        // and demonic, not cute."
+        //
+        // Opt-in, so nothing about the other 135 pets changes: declare it only when the ascended form is
+        // meant to be a different animal from the one in the cot.
+        const tail = src.slice(m.index, m.index + 2600);
+        const stop = tail.indexOf('{ id: "', 10);
+        const win = stop > 0 ? tail.slice(0, stop) : tail;
+        const asc = win.match(/ascendSpecies: "([^"]+)"/);
+        out.push({ id: m[1], prompt: asc ? asc[1] : m[2], cute: /\bcute:\s*true\b/.test(win) });
     }
     return out;
 }
