@@ -345,6 +345,22 @@ export const POOL = {
     impervious: { id: "impervious", pet: "ironback", name: "Impervious", cost: 2, kind: "skill", target: "self", tier: 3,
         block: 30, exhaust: true, text: "Gain {block} Block. Exhaust.",
         upgrade: { block: 40 } },
+    // ── THE STOCKADE PET'S CARD ──────────────────────────────────────────────────────────────────────
+    // The card pool is pet-gated, so a pet with no card is a dead end for anyone building a deck — they own
+    // it, and the draft never offers them anything for it.
+    //
+    // Deliberately built from mechanics that already exist. Thorns and damage are both implemented and both
+    // priced by the field-driven scorer, so this needed no engine change, no new tag to draw, and nothing
+    // new for a foe to deal — the four things a genuinely new keyword would have cost.
+    //
+    // Thorns is the right mechanic for THIS pet: it is damage you deal by being hit, which is exactly how
+    // the thing was earned.
+    payitback: {
+        id: "payitback", pet: "super_devil", name: "Pay It Back", cost: 1, kind: "attack", target: "foe", tier: 2,
+        damage: 7, thorns: 3,
+        text: "Deal {damage} damage. Gain {thorns} Thorns.",
+        upgrade: { damage: 10, thorns: 4 },
+    },
     seeingred: { id: "seeingred", pet: "spirit_fox", name: "Seeing Red", cost: 1, kind: "skill", target: "self", tier: 3,
         energy: 2, exhaust: true, text: "Gain 2 energy. Exhaust.",
         upgrade: { cost: 0 } },

@@ -639,6 +639,16 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Eats the Whole Board", kind: "graft", key: "kitchen_larder", scale: 0.9, note: "It has opinions, and it has finished." },
     },
 
+    // ── THE STOCKADE PET'S TWO ENDINGS ───────────────────────────────────────────────────────────────
+    // Luke: "at first like a cute looking black devil with horns, but it evolves into a really nasty
+    // looking devil with horns." The engine already forks here — Lv6 takes whichever stone you spend and
+    // wears it for the rest of its life — so the nasty version is the DARK stone and the Light stone gets
+    // the other ending: it does not become good, it becomes respectable, which is worse.
+    super_devil: {
+        light: { name: "Time Served", kind: "graft", key: "tenacity", scale: 1, note: "It has paid for what it did, and it would like you to know that." },
+        dark: { name: "Unrepentant", kind: "graft", key: "first_hit", scale: 0.9, note: "It did not learn anything in there." },
+    },
+
     // ── THE MINE'S FIVE AND THE SHIP'S FIVE ──────────────────────────────────────────────────────────────────
     // These ten were never written, so every one fell through to FALLBACK_EFFECT: Light amplify x1 — the
     // identity, i.e. nothing — against Dark amplify x1.5. GrayKitsune, in global chat: "Ironback (tortoise

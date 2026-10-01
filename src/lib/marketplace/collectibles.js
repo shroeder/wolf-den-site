@@ -16,7 +16,7 @@ import {
     GiFalconMoon,
     GiFlamingo, GiBee, GiSloth, GiRaccoonHead, GiBeaver, GiToucan, GiLadybug, GiButterfly, GiCaterpillar, GiJellyfish,
     GiOctopus, GiSquid, GiAxolotl, GiTropicalFish, GiSeaSerpent, GiKrakenTentacle, GiWyvern, GiMinotaur,
-    GiCentaur, GiMammoth, GiPolarBear, GiVulture, GiFairy, GiImp, GiElephant,
+    GiCentaur, GiMammoth, GiPolarBear, GiVulture, GiFairy, GiImp, GiElephant, GiDevilMask,
     GiAnglerFish, GiSeaDragon, GiFishMonster,
     // Farm/pastoral pets
     GiPig, GiRooster, GiScarecrow, GiMouse, GiGoose,
@@ -76,6 +76,8 @@ export const PET_PASSIVE_STAT = {
     // Achievement
     ladybug: "seedLuck", bee: "xp_gain", sloth: "pierce", beaver: "gold_find", raccoon: "gold_find",
     flamingo: "xp_gain", toucan: "gold_find",
+    // Earned in the stocks, so the passive is what the stocks test: tenacity.
+    super_devil: "tenacity",
     // Forge (earned by using The Forge) — FORGE passives that improve your smithing odds (crafting.js), fitting
     // how each is earned: salvagers → part yield, enhancers → enhance odds.
     ember_whelp: "efficient", cinder_hound: "steady_hand", anvil_golem: "keen_eye", molten_salamander: "masters_touch", forgeheart_wyrm: "forgemaster",
@@ -401,6 +403,18 @@ export const COLLECTIBLES = [
     { id: "hearth_cat", name: "Hearth Cat", Icon: GiCat, color: "#ff8a3c", rarity: "epic", source: "achievement", activeStat: "hot_hands", achievement: "Cook 100 dishes", spritePrompt: "a plump ginger cat curled up asleep, its fur glowing faintly like banked embers, warm orange light coming off its belly" },
     { id: "spice_moth", name: "Spice Moth", Icon: GiButterfly, color: "#c9a2ff", rarity: "legendary", source: "achievement", activeStat: "generous", achievement: "Cook a dish of every tier", spritePrompt: "a large velvety moth with wings patterned like ground spices in saffron, paprika and violet, trailing a fine shimmer of powder" },
     { id: "gourmand_dragon", name: "Gourmand Dragon", Icon: GiDragonHead, color: "#ffd75e", rarity: "mythic", source: "achievement", activeStat: "kitchen_master", achievement: "Cook 500 dishes AND a flawless timing run", spritePrompt: "a small round gold dragon with an enormous well-fed belly, a napkin tucked under its chin, holding a tiny silver fork, extremely pleased with itself" },
+
+    // ── THE STOCKADE PET — the only one in the Den you earn by being PUNISHED ─────────────────────────
+    // Luke's idea, and the number is the whole design. He proposed 20 sentences; the pack has held 62
+    // elections since 7 August and the most-stockaded member in the Den has SIX. At the observed rate 20 is
+    // roughly six months away for him alone, and elections run one at a time with one winner each — so even
+    // winning every remaining election it is three weeks of flawless infamy. Twenty ships a pet nobody ever
+    // holds. Ten: nobody has it today, so nobody starts ahead, and the leader is four away.
+    //
+    // ⚠️ THIS MAKES A PUNISHMENT REWARDING, deliberately. The pack controls nominations, so if somebody
+    // starts courting the stocks to farm it, the pack simply stops putting them there — self-correcting, and
+    // funnier than any rule we could write. The one-election-at-a-time cadence is the real cap.
+    { id: "super_devil", name: "Super Devil", Icon: GiDevilMask, color: "#c2384a", rarity: "legendary", source: "achievement", activeStat: "ferocity", achievement: "Sentenced to the stockade 10 times", spritePrompt: "a small cute black devil imp with short curved horns, a little pointed tail and big innocent eyes, standing with its hands behind its back looking far too pleased with itself" },
 
     // ── PATRONAGE · WHAT THE COUNTER REMEMBERS ────────────────────────────────────────────────────────
     // Luke: "when someone buys stuff at the store and uses the qr code we need to make it way more rewarding

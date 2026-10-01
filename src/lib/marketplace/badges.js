@@ -178,6 +178,14 @@ export async function getMemberMetrics(buyerId) {
         [buyerId]
     ).catch(() => null);
     const forgeLevelRow = await db.queryOne(`SELECT COALESCE(MAX(level), 0)::int AS n FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    // ── TIMES SENTENCED TO THE STOCKADE ──────────────────────────────────────────────────────────────
+    // Counts SETTLED elections only. An election with a winner but no settled_at is still being counted —
+    // the sentence has not been handed down, and a pet that unlocks on a verdict that can still change
+    // would be handing out a reward for something that did not finish happening.
+    const stockadeRow = await db.queryOne(
+        `SELECT COUNT(*)::int AS n FROM mkt_stockade_election WHERE winner_id = $1 AND settled_at IS NOT NULL`,
+        [buyerId]
+    ).catch(() => null);
     // The Kitchen's counters, for the cooking pet unlocks. Nulls all the way through if they've never cooked.
     const kitchenRow = await db.queryOne(
         `SELECT cooks_total, preps_total, tiers_cooked, best_quality FROM mkt_kitchen WHERE buyer_id = $1`,
@@ -407,6 +415,8 @@ export async function getMemberMetrics(buyerId) {
         cheersGiven: Number(buyer?.cheers_given || 0),
         cheersReceived: Number(buyer?.cheers_received || 0),
         creditPurchased: Math.round(Number(creditRow?.c || 0) / 100), // lifetime $ of store credit bought
+        // Times the pack has voted this member into the stockade. Unlocks the Imp (10) — see pets.js.
+        stockadeSentences: stockadeRow?.n || 0,
         forgeEnhances: forgeRow?.enhances || 0,
         forgeSalvages: forgeRow?.salvages || 0,
         // Kitchen metrics, for the cooking pet unlocks (see pets.js ACHIEVEMENTS).

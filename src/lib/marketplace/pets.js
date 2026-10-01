@@ -46,6 +46,10 @@ const ACHIEVEMENT_PET_RULES = {
     hearth_cat: (m) => (m.cooksTotal || 0) >= 100,
     spice_moth: (m) => ((m.cookTiers || 0) & 31) === 31,
     gourmand_dragon: (m) => (m.cooksTotal || 0) >= 500 && Number(m.cookBestQuality || 0) >= 0.92,
+    // STOCKADE pet. Settled sentences only — see badges.js for why a verdict that can still change must not
+    // pay out. Ten, not twenty: at the Den's real rate twenty is about six months for the most-punished
+    // member alive, and nobody else is close.
+    super_devil: (m) => (m.stockadeSentences || 0) >= 10,
 };
 
 // Grant any achievement pets the member has newly qualified for. Best-effort; returns newly-granted ids.

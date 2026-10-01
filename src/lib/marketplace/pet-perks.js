@@ -278,6 +278,8 @@ export const PET_PERKS = {
     hearth_cat: { name: "Banked Embers", key: "kitchen_heat" },
     spice_moth: { name: "Second Helping", key: "kitchen_portion" },
     gourmand_dragon: { name: "Gourmand's Palate", key: "recipe_nose" },
+    // The stockade pet. "first_blood" because the thing you learn in the boards is to swing before they do.
+    super_devil: { name: "Grudge", key: "first_blood" },
     // Fishing
     reef_seahorse: { name: "Reef Sense", key: "angler_bite" },
     lantern_jelly: { name: "Lantern Glow", key: "sea_dredge" },
