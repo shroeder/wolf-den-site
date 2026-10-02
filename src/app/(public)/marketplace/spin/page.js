@@ -19,11 +19,16 @@ export default async function SpinPage() {
         : null;
     const spooky = Boolean(hw?.town_halloween);
 
-    // The dressing is made of art the town already has — the moon, a crow, two pumpkins. Nothing new was
-    // drawn for this. Fetched only when the flag is up so an ordinary spin costs no extra query.
+    // The wheel itself is painted for the season (wheel-disc-hw.webp / wheel-frame-hw.webp, static assets);
+    // these two are the sky around it, borrowed from the town's own art. Fetched only when the flag is up,
+    // so an ordinary spin costs no extra query.
+    //
+    // ⚠️ ASK FOR EXACTLY WHAT IS RENDERED. This used to also pull hw_pumpkin and hw_pumpkin_stack, which
+    // SpinWheel stopped drawing when the wheel gained its own jack-o-lantern hub and crest — two rows read
+    // on every dressed spin and handed to a component that ignores them.
     const art = spooky
         ? Object.fromEntries((await db
-            .query(`SELECT art_key, url FROM mkt_town_art WHERE art_key IN ('hw_moon','hw_crow','hw_pumpkin','hw_pumpkin_stack')`)
+            .query(`SELECT art_key, url FROM mkt_town_art WHERE art_key IN ('hw_moon','hw_crow')`)
             .catch(() => [])).map((r) => [r.art_key, r.url]))
         : {};
 

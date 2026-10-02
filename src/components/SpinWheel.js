@@ -324,10 +324,15 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
             <div className={`cw-stage${spinning ? " is-spinning" : ""}`}>
                 {/* ── ALL HALLOWS' DRESSING ────────────────────────────────────────────────────────
                     Behind the wheel and in front of it, never ON it: the disc carries the prize icons and
-                    anything painted over them costs a member the one thing the screen is for. The moon sits
-                    behind, the crow perches on the frame's ornament, and the pumpkins stand at the foot.
+                    anything painted over them costs a member the one thing the screen is for.
 
-                    All four are art the TOWN already has (mkt_town_art). Nothing was drawn for this. */}
+                    ⚠️ TWO PIECES NOW, AND THE CUT WAS DELIBERATE. There were four — a moon, a crow and two
+                    pumpkins standing at the foot — from when the wheel itself was the ordinary gold disc
+                    under a filter and the dressing was carrying the whole season on its own. The wheel is
+                    painted for Hallowe'en now, with a jack-o-lantern hub and a jack-o-lantern crest. Two
+                    more pumpkins leaning against it is the same joke a fourth time, and it reads as clutter
+                    around something that no longer needs the help. The moon and the crow stay because they
+                    are the two that are not pumpkins. */}
                 {halloween && hwArt.hw_moon ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img className="cw-hw-moon" src={hwArt.hw_moon} alt="" draggable="false" />
@@ -335,7 +340,7 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
                 <div className={`cw-ring${wonIdx != null && !spinning ? " has-won" : ""}${st?.wheel?.id === "wheel_gold" ? " is-gold" : ""}${halloween ? " is-spooky" : ""}`}>
                     <div ref={rotorRef} className="cw-rotor" style={{ transform: `translate(-50%, -50%) rotate(${rot}deg)`, transition: phase === "lead" ? `transform ${LEAD_MS}ms linear` : phase === "land" ? `transform ${SPIN_MS}ms cubic-bezier(0.08,0.72,0.04,1)` : "none" }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img className="cw-disc" src="/images/spin/wheel-disc.png" alt="" draggable="false" />
+                        <img className="cw-disc" src={halloween ? "/images/spin/wheel-disc-hw.webp" : "/images/spin/wheel-disc.png"} alt="" draggable="false" />
                         <div className="cw-icons">
                             {prizes.map((p, i) => (
                                 <div key={i} className={`cw-ico tier-${p.tier}${wonIdx === i && !spinning ? " is-won" : ""}`} style={iconPos(i, WEDGE_OFFSET, WEDGE_DEG, ICON_R)}>
@@ -346,7 +351,7 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
                         </div>
                     </div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="cw-frame" src="/images/spin/wheel-frame.png" alt="" draggable="false" />
+                    <img className="cw-frame" src={halloween ? "/images/spin/wheel-frame-hw.webp" : "/images/spin/wheel-frame.png"} alt="" draggable="false" />
                     {/* No separate pointer marker — the frame's wolf ornament ends in a gold chevron at dead
                         top, and that IS the pointer. See .cw-ring.has-won for why the winner draws over it. */}
                     {halloween ? (
@@ -357,14 +362,6 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
                             {hwArt.hw_crow ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img className="cw-hw-crow" src={hwArt.hw_crow} alt="" draggable="false" />
-                            ) : null}
-                            {hwArt.hw_pumpkin ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img className="cw-hw-pump cw-hw-pump-l" src={hwArt.hw_pumpkin} alt="" draggable="false" />
-                            ) : null}
-                            {hwArt.hw_pumpkin_stack ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img className="cw-hw-pump cw-hw-pump-r" src={hwArt.hw_pumpkin_stack} alt="" draggable="false" />
                             ) : null}
                         </>
                     ) : null}
@@ -687,30 +684,34 @@ const CW_CSS = `
 .cw-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.45)); }
 .cw-stage.is-spinning .cw-frame { animation: cwBuzz 0.14s steps(2) infinite; }
 
-/* ── ALL HALLOWS' ───────────────────────────────────────────────────────────────────────────────────────
-   ⚠️ THE DISC IS RECOLOURED, NOT REPLACED. The same move .cw-ring.is-gold already makes for the Golden
-   Wheel: one filter on the round element. A second disc image would be a second thing to keep in step with
-   the wedge geometry, and the geometry is what the landing animation is measured against.
+/* ── ALL HALLOWS' ─────────────────────────────────────────────────────────────────────────────────────────
+   ⚠️ THE WHEEL IS A SECOND PAINTING, NOT A FILTER OVER THE FIRST. This started as one — grayscale, sepia,
+   saturate and hue-rotate on .cw-disc, the same move .cw-ring.is-gold makes for the Golden Wheel — and
+   Luke's read of it was exact: "it looks like you've tried to recolor it... the wheel's the core feature".
+   A duotone of the gold wheel is the gold wheel in a hat. wheel-disc-hw.webp and wheel-frame-hw.webp are
+   painted for the season instead: pumpkin-and-witch-purple wedges around a carved jack-o-lantern hub,
+   inside a ring of blackened branches and guttering candles, under a jack-o-lantern crest whose bone fang
+   is the pointer.
 
-   ⚠️ AND THE FILTER IS ON THE DISC ONLY, NEVER ON .cw-ring. A filter on the ring would drag the prize icons
-   and the frame's pointer chevron through the same hue rotation — the icons are how a member reads what
-   each wedge is, and tinting them orange would make a Mythic and a Legendary the same colour. */
-/* ⚠️ GREY IT OUT FIRST. The first attempt was a hue-rotate alone and it barely moved: the disc is a dozen
-   saturated pastels, and rotating a rainbow gives you a different rainbow. Crushing it to greyscale first
-   throws away the hues that were fighting, and the sepia+saturate that follows then has one tone to push
-   rather than twelve. The result is a duotone wheel instead of a slightly-warmer carnival. */
+   ⚠️ THE SECOND DISC IS STILL EXACTLY 20 WEDGES ON THE SAME PHASE, and that is why it is drawn rather
+   than generated — see scripts/gen-spin-hw-wheel.mjs. WEDGE_DEG and WEDGE_OFFSET are the contract between
+   the prize array, the icon ring and the landing animation, and none of them know which picture is
+   underneath.
+
+   What is left here is only light. The icons and the pointer are never filtered: the icons are how a member
+   reads what each wedge is, and the fang is how they read which one won. */
 .cw-ring.is-spooky .cw-disc {
-    filter: grayscale(1) sepia(1) saturate(5.4) hue-rotate(-24deg) brightness(1.06) contrast(1.05);
     box-shadow: 0 8px 26px rgba(0,0,0,0.7), 0 0 40px -6px rgba(255,110,10,0.6);
 }
-/* ⚠️ AND is-gold MUST NOT ALSO APPLY. Both modifiers can be on the ring at once — the Golden Wheel dressed
-   for Hallowe'en is exactly the case in the screenshot — and they are the same specificity, so the two disc
-   filters were fighting over source order. Named together, the spooky one wins outright. */
+/* ⚠️ AND THE GOLDEN WHEEL'S FILTER MUST BE TURNED OFF, NOT LEFT TO SOURCE ORDER. Both modifiers can be on
+   the ring at once — the Golden Wheel dressed for Hallowe'en — and .cw-ring.is-gold .cw-disc would push a
+   sepia over art that is already orange, turning the witch-purple wedges brown. The glow is kept, because
+   that is what tells a member they are on the Golden Wheel; only the hue shift goes. */
 .cw-ring.is-gold.is-spooky .cw-disc {
-    filter: grayscale(1) sepia(1) saturate(5.4) hue-rotate(-24deg) brightness(1.06) contrast(1.05);
+    filter: none;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.7), 0 0 0 3px #ff9a2e, 0 0 34px rgba(255,154,46,0.6), 0 0 70px rgba(150,60,220,0.3);
 }
-/* The frame keeps its shape and loses its gold: cooler, dimmer, so the orange disc is the brightest thing. */
-.cw-ring.is-spooky .cw-frame { filter: saturate(0.72) brightness(0.86) hue-rotate(-14deg); }
+.cw-ring.is-gold.is-spooky .cw-ico-img { filter: drop-shadow(0 0 4px rgba(255,154,46,0.75)); }
 /* The stage glow goes from warm gold to witch-light. */
 .cw-stage:has(.cw-ring.is-spooky)::before {
     background: radial-gradient(circle, rgba(140,70,220,0.20), rgba(255,110,20,0.10) 52%, transparent 72%);
@@ -726,8 +727,8 @@ const CW_CSS = `
 }
 @keyframes cwHwMoon { 0%, 100% { opacity: 0.44; } 50% { opacity: 0.58; } }
 
-/* ⚠️ OFFSET FROM DEAD TOP ON PURPOSE. The frame's chevron at 12 o'clock is the pointer; a crow sitting on
-   it would cover the one mark the member reads to know which wedge won. */
+/* ⚠️ OFFSET FROM DEAD TOP ON PURPOSE. The jack-o-lantern crest at 12 o'clock is the pointer — its bone
+   fang is the mark a member reads to know which wedge won — so the bird perches beside it, never on it. */
 .cw-hw-crow {
     position: absolute; top: -7%; left: 68%; width: 15%;
     pointer-events: none; z-index: 3; transform-origin: 50% 90%;
@@ -736,18 +737,10 @@ const CW_CSS = `
 }
 @keyframes cwHwCrow { 0%, 92%, 100% { transform: rotate(0deg); } 95% { transform: rotate(-7deg); } 98% { transform: rotate(4deg); } }
 
-/* Pumpkins at the foot, outside the disc so they never sit over a prize icon. */
-.cw-hw-pump { position: absolute; bottom: -4%; width: 17%; pointer-events: none; z-index: 3;
-    filter: drop-shadow(0 5px 10px rgba(0,0,0,0.6)); }
-.cw-hw-pump-l { left: 2%; animation: cwHwFlicker 2.9s ease-in-out infinite; }
-.cw-hw-pump-r { right: 0%; width: 20%; animation: cwHwFlicker 3.7s ease-in-out infinite reverse; }
-@keyframes cwHwFlicker { 0%, 100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.6)) brightness(1); }
-                         50%      { filter: drop-shadow(0 5px 14px rgba(0,0,0,0.6)) brightness(1.12); } }
-
 /* ⚠️ THE WHEEL STILL HAS TO BE READ WHILE IT SPINS. Everything above is decoration and none of it moves
    with the rotor, so a member watching the pointer is never tracking a moving pumpkin by mistake. */
 @media (prefers-reduced-motion: reduce) {
-    .cw-hw-moon, .cw-hw-crow, .cw-hw-pump { animation: none; }
+    .cw-hw-moon, .cw-hw-crow { animation: none; }
 }
 @keyframes cwBuzz { 0% { transform: translate(0,0); } 50% { transform: translate(0,-0.6px); } }
 
