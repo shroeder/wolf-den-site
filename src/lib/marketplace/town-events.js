@@ -1102,8 +1102,23 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
         [buyerId, ev.started_at || new Date(Date.now() - 3600000)]
     ).catch(() => null);
     const xpLeft = Math.max(0, DUEL_XP_BUDGET * budgetX - Number(xpSpent?.xp || 0));
+    // ── ⚠️ "CAPPED" AND "JUST RAN OUT" ARE DIFFERENT SENTENCES, AND ONLY ONE IS WORTH SAYING ────────────
+    // Sunflower Jinxx: "Anyone notice how every raid mob you kill always says 'Raid spoils are done for the
+    // day - the fight still counts'. What is that referring to?"
+    //
+    // It was telling the truth and telling it far too often. The XP budget is 280 against an average 17 a
+    // kill, so it is dry after about sixteen — and members are doing a hundred and thirty in two days, which
+    // meant the same sentence on more than a hundred consecutive recaps. A notice repeated that many times
+    // stops being information and becomes furniture; Sunflower had read it so many times she no longer knew
+    // what it referred to, which is the clearest possible evidence it was not working.
+    //
+    // So it fires on the TRANSITION: the fight that actually crossed the line still says so, and the fights
+    // afterwards stay quiet. Nothing about the budget or the payout changes here — this is only about when
+    // the member is told.
     const cappedGold = coin > 0 && goldLeft <= 0;
     const cappedXp = xp > 0 && xpLeft <= 0;
+    const crossedGold = coin > 0 && goldLeft > 0 && coin > goldLeft;
+    const crossedXp = xp > 0 && xpLeft > 0 && xp > xpLeft;
     coin = mint(Math.min(coin, goldLeft), "town_duel");
     xp = Math.min(xp, xpLeft);
 
@@ -1119,7 +1134,10 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
         struck, redirected: String(struck) !== String(enemyId),
         wins: Number(mine?.hits || 0), foeEmoji: type.emoji || "🗡️", cleared,
         grade: grade.key, gradeLabel: grade.label,
-        // Tell the client the spoils are done, so it can say so instead of silently paying zero.
-        capped: cappedGold || cappedXp,
+        // Tell the client the spoils are done, so it can say so instead of silently paying zero — but only
+        // on the fight that ran them out. `cappedNow` is kept separately for anything that wants the state
+        // rather than the event.
+        capped: crossedGold || crossedXp,
+        cappedNow: cappedGold || cappedXp,
     };
 }

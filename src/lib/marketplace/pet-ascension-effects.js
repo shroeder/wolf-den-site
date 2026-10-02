@@ -295,6 +295,10 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "The River Toll", kind: "amplify", mult: 1.9 },
     },
     hydra: {
+        // GrayKitsune: "Lightstone Hydra and Signature ability Octopus conflict/count as the same boss
+        // strike? The text doesnt mention cap 1 or I wouldn't have enshrined Hydra, and probably would have
+        // raised a different pet entirely." He is right on both counts — it is the same key, they do not
+        // stack, and nothing said so before he spent the stone.
         light: { name: "Another Head", kind: "graft", key: "extra_strike", scale: 1, note: "Cut one off." },
         dark: { name: "Two More Heads", kind: "graft", key: "crit_chance", scale: 0.9, note: "Cut one off and count again." },
     },

@@ -92,6 +92,15 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
                                 <em className="pens-stone-best">
                                     {m.eff?.adds ? "A second ability, on top of its own." : "Its own ability, harder."}
                                 </em>
+                                {/* ⚠️ SAID WHERE THE DECISION IS MADE, NOT IN THE PATCH NOTES. A stone is
+                                    spent once and cannot be taken back, and a graft whose ability you
+                                    already have from your signature pet does nothing at all — the stronger
+                                    source simply wins. GrayKitsune found that out by spending one. */}
+                                {m.eff?.adds && m.eff?.stacks === false ? (
+                                    <span className="pens-stone-note">
+                                        Does not stack. If another pet already gives you this, the stronger one applies.
+                                    </span>
+                                ) : null}
                                 {m.eff?.note ? <span className="pens-stone-note">{m.eff.note}</span> : null}
                             </div>
                         );

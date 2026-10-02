@@ -2101,12 +2101,21 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                                 <b>⛓️ {stockade.occupant.name}</b>
                                 {stockade.occupant.reason ? <em>&ldquo;{stockade.occupant.reason}&rdquo;</em> : null}
                             </span>
-                            {stockade.occupant.artUrl ? (
-                                // The combined picture: them drawn INTO the boards, one image.
+                            {stockade.occupant.artUrl || stockade.occupant.spriteUrl ? (
+                                // ⚠️ FALL BACK TO THE MEMBER'S OWN SPRITE, NOT TO EMPTY BOARDS. The combined
+                                // picture is drawn once per occupant and cached, so for the minutes before it
+                                // lands — and forever if it failed — this showed the EMPTY stockade prop with
+                                // a name plate floating beside it. ValkyrieSylve: "There is no character
+                                // avatar for the person in the stockade. Looks empty on the screen but still
+                                // shows a name."
+                                //
+                                // The panel at the other end of this file already fell back to spriteUrl. Two
+                                // renders of one thing with two different fallbacks is how one of them ends up
+                                // being the broken-looking one.
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={stockade.occupant.artUrl} alt={`${stockade.occupant.name} in the stockade`} draggable={false} />
+                                <img src={stockade.occupant.artUrl || stockade.occupant.spriteUrl} alt={`${stockade.occupant.name} in the stockade`} draggable={false} />
                             ) : art.stockade?.url ? (
-                                // Fallback while the combined draw is pending or if it failed: the empty prop.
+                                // Only when we have neither: the empty prop rather than nothing at all.
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={art.stockade.url} alt="The Stockade" draggable={false} />
                             ) : <span className="tw-npc-emoji">⛓️</span>}

@@ -449,6 +449,8 @@ export const SYSTEM_PERK_CAP = {
 // choice, and it was computing that number without the ceilings: the Molten Phoenix's Darkstone advertised
 // "+170% damage" against an onslaught cap of 120%. A card that overstates by fifty points on a permanent
 // decision is worse than no card. One table, read by both.
+// Every key applyPerk resolves with best() — a second source replaces rather than adds. Derived below from
+// PROC_CAP so adding a capped proc automatically marks it, plus extra_strike which is capped differently.
 export const PROC_CAP = {
     erupt: 0.6,          // the chance, not the multiplier
     chain_strike: 0.6,
@@ -468,6 +470,10 @@ export const PROC_CAP = {
     bleed: 0.08,
     bleed_leech: 0.08,
 };
+
+// extra_strike is resolved with best() too but is capped by its own daily roll rather than by PROC_CAP,
+// so it is named here explicitly instead of being inferred.
+const MAX_WINS_KEYS = new Set([...Object.keys(PROC_CAP), "extra_strike"]);
 
 export function petPerkValue(rarity, key) {
     if (key === "extra_strike") return 1; // a pet grants EXACTLY one extra daily strike — never rarity/level-scaled
@@ -746,6 +752,19 @@ export function ascensionEffectView(pet, stone) {
         // A grafted ability is a SECOND thing the pet learns; an amplified one is the thing it already did,
         // harder. Worth saying which, because it changes whether the pet's own card still tells the whole story.
         adds: eff.kind === "graft",
+        // ── ⚠️ WHETHER A SECOND SOURCE OF THIS ABILITY DOES ANYTHING ────────────────────────────────
+        // applyPerk resolves every proc with best(), so a second source REPLACES rather than adds — the
+        // stronger one applies and the weaker is wasted. That is deliberate and is not changing here.
+        //
+        // What was wrong is that it was invisible at the only moment it matters. GrayKitsune enshrined a
+        // Hydra with a Lightstone for "Another Head", which grafts extra_strike, while his Octopus
+        // signature already WAS extra_strike: "The text doesnt mention cap 1 or I wouldn't have enshrined
+        // Hydra, and probably would have raised a different pet entirely." A stone spent on an ability he
+        // already had, with nothing on the panel to warn him.
+        //
+        // 49 graft effects across ten proc keys carry the same trap, so this is computed once from the
+        // cap table rather than written into 49 notes that would drift apart within a season.
+        stacks: !MAX_WINS_KEYS.has(key),
         value: scaled,
         // Enshrined, so the wording must not promise a leash it does not have — see perkDesc.
         desc: perkDesc(key, scaled, PET_ENSHRINED_LEVEL, { enshrined: true }),
