@@ -73,7 +73,7 @@ function Portal({ children }) {
     return createPortal(children, el);
 }
 
-export default function SpinWheel() {
+export default function SpinWheel({ halloween = false, hwArt = {} }) {
     const [st, setSt] = useState(null);
     const [rot, setRot] = useState(0);
     // Which wedge the server picked, kept after the spin so the winning slice can be marked at rest. Without
@@ -322,7 +322,17 @@ export default function SpinWheel() {
             </div>
 
             <div className={`cw-stage${spinning ? " is-spinning" : ""}`}>
-                <div className={`cw-ring${wonIdx != null && !spinning ? " has-won" : ""}${st?.wheel?.id === "wheel_gold" ? " is-gold" : ""}`}>
+                {/* ── ALL HALLOWS' DRESSING ────────────────────────────────────────────────────────
+                    Behind the wheel and in front of it, never ON it: the disc carries the prize icons and
+                    anything painted over them costs a member the one thing the screen is for. The moon sits
+                    behind, the crow perches on the frame's ornament, and the pumpkins stand at the foot.
+
+                    All four are art the TOWN already has (mkt_town_art). Nothing was drawn for this. */}
+                {halloween && hwArt.hw_moon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="cw-hw-moon" src={hwArt.hw_moon} alt="" draggable="false" />
+                ) : null}
+                <div className={`cw-ring${wonIdx != null && !spinning ? " has-won" : ""}${st?.wheel?.id === "wheel_gold" ? " is-gold" : ""}${halloween ? " is-spooky" : ""}`}>
                     <div ref={rotorRef} className="cw-rotor" style={{ transform: `translate(-50%, -50%) rotate(${rot}deg)`, transition: phase === "lead" ? `transform ${LEAD_MS}ms linear` : phase === "land" ? `transform ${SPIN_MS}ms cubic-bezier(0.08,0.72,0.04,1)` : "none" }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="cw-disc" src="/images/spin/wheel-disc.png" alt="" draggable="false" />
@@ -339,6 +349,25 @@ export default function SpinWheel() {
                     <img className="cw-frame" src="/images/spin/wheel-frame.png" alt="" draggable="false" />
                     {/* No separate pointer marker — the frame's wolf ornament ends in a gold chevron at dead
                         top, and that IS the pointer. See .cw-ring.has-won for why the winner draws over it. */}
+                    {halloween ? (
+                        <>
+                            {/* ⚠️ THE CROW SITS BESIDE THE CHEVRON, NOT ON IT. That chevron is the pointer —
+                                the one piece of this screen a member reads to know what they won — so the
+                                bird is offset and kept under it in z. */}
+                            {hwArt.hw_crow ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="cw-hw-crow" src={hwArt.hw_crow} alt="" draggable="false" />
+                            ) : null}
+                            {hwArt.hw_pumpkin ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="cw-hw-pump cw-hw-pump-l" src={hwArt.hw_pumpkin} alt="" draggable="false" />
+                            ) : null}
+                            {hwArt.hw_pumpkin_stack ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="cw-hw-pump cw-hw-pump-r" src={hwArt.hw_pumpkin_stack} alt="" draggable="false" />
+                            ) : null}
+                        </>
+                    ) : null}
                 </div>
             </div>
 
@@ -657,6 +686,57 @@ const CW_CSS = `
     to { transform: scale(1.3); filter: drop-shadow(0 0 16px #ffd75e) drop-shadow(0 0 26px #ffb020); } }
 .cw-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.45)); }
 .cw-stage.is-spinning .cw-frame { animation: cwBuzz 0.14s steps(2) infinite; }
+
+/* ── ALL HALLOWS' ───────────────────────────────────────────────────────────────────────────────────────
+   ⚠️ THE DISC IS RECOLOURED, NOT REPLACED. The same move .cw-ring.is-gold already makes for the Golden
+   Wheel: one filter on the round element. A second disc image would be a second thing to keep in step with
+   the wedge geometry, and the geometry is what the landing animation is measured against.
+
+   ⚠️ AND THE FILTER IS ON THE DISC ONLY, NEVER ON .cw-ring. A filter on the ring would drag the prize icons
+   and the frame's pointer chevron through the same hue rotation — the icons are how a member reads what
+   each wedge is, and tinting them orange would make a Mythic and a Legendary the same colour. */
+.cw-ring.is-spooky .cw-disc {
+    filter: sepia(0.55) saturate(2.2) hue-rotate(-28deg) brightness(0.92) contrast(1.08);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.65), 0 0 34px -8px rgba(255,120,20,0.55);
+}
+/* The frame keeps its shape and loses its gold: cooler, dimmer, so the orange disc is the brightest thing. */
+.cw-ring.is-spooky .cw-frame { filter: saturate(0.72) brightness(0.86) hue-rotate(-14deg); }
+/* The stage glow goes from warm gold to witch-light. */
+.cw-stage:has(.cw-ring.is-spooky)::before {
+    background: radial-gradient(circle, rgba(140,70,220,0.20), rgba(255,110,20,0.10) 52%, transparent 72%);
+}
+
+/* The moon, behind everything, low and large so it reads as sky rather than as a sticker on the wheel. */
+.cw-hw-moon {
+    position: absolute; top: -6%; left: 50%; width: 62%; transform: translateX(-50%);
+    opacity: 0.5; filter: blur(0.3px) brightness(1.05); pointer-events: none; z-index: 0;
+    animation: cwHwMoon 9s ease-in-out infinite;
+}
+@keyframes cwHwMoon { 0%, 100% { opacity: 0.44; } 50% { opacity: 0.58; } }
+
+/* ⚠️ OFFSET FROM DEAD TOP ON PURPOSE. The frame's chevron at 12 o'clock is the pointer; a crow sitting on
+   it would cover the one mark the member reads to know which wedge won. */
+.cw-hw-crow {
+    position: absolute; top: -7%; left: 68%; width: 15%;
+    pointer-events: none; z-index: 3; transform-origin: 50% 90%;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+    animation: cwHwCrow 4.4s ease-in-out infinite;
+}
+@keyframes cwHwCrow { 0%, 92%, 100% { transform: rotate(0deg); } 95% { transform: rotate(-7deg); } 98% { transform: rotate(4deg); } }
+
+/* Pumpkins at the foot, outside the disc so they never sit over a prize icon. */
+.cw-hw-pump { position: absolute; bottom: -4%; width: 17%; pointer-events: none; z-index: 3;
+    filter: drop-shadow(0 5px 10px rgba(0,0,0,0.6)); }
+.cw-hw-pump-l { left: 2%; animation: cwHwFlicker 2.9s ease-in-out infinite; }
+.cw-hw-pump-r { right: 0%; width: 20%; animation: cwHwFlicker 3.7s ease-in-out infinite reverse; }
+@keyframes cwHwFlicker { 0%, 100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.6)) brightness(1); }
+                         50%      { filter: drop-shadow(0 5px 14px rgba(0,0,0,0.6)) brightness(1.12); } }
+
+/* ⚠️ THE WHEEL STILL HAS TO BE READ WHILE IT SPINS. Everything above is decoration and none of it moves
+   with the rotor, so a member watching the pointer is never tracking a moving pumpkin by mistake. */
+@media (prefers-reduced-motion: reduce) {
+    .cw-hw-moon, .cw-hw-crow, .cw-hw-pump { animation: none; }
+}
 @keyframes cwBuzz { 0% { transform: translate(0,0); } 50% { transform: translate(0,-0.6px); } }
 
 
