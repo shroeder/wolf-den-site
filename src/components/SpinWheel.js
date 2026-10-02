@@ -695,9 +695,19 @@ const CW_CSS = `
    ⚠️ AND THE FILTER IS ON THE DISC ONLY, NEVER ON .cw-ring. A filter on the ring would drag the prize icons
    and the frame's pointer chevron through the same hue rotation — the icons are how a member reads what
    each wedge is, and tinting them orange would make a Mythic and a Legendary the same colour. */
+/* ⚠️ GREY IT OUT FIRST. The first attempt was a hue-rotate alone and it barely moved: the disc is a dozen
+   saturated pastels, and rotating a rainbow gives you a different rainbow. Crushing it to greyscale first
+   throws away the hues that were fighting, and the sepia+saturate that follows then has one tone to push
+   rather than twelve. The result is a duotone wheel instead of a slightly-warmer carnival. */
 .cw-ring.is-spooky .cw-disc {
-    filter: sepia(0.55) saturate(2.2) hue-rotate(-28deg) brightness(0.92) contrast(1.08);
-    box-shadow: 0 8px 26px rgba(0,0,0,0.65), 0 0 34px -8px rgba(255,120,20,0.55);
+    filter: grayscale(1) sepia(1) saturate(5.4) hue-rotate(-24deg) brightness(1.06) contrast(1.05);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.7), 0 0 40px -6px rgba(255,110,10,0.6);
+}
+/* ⚠️ AND is-gold MUST NOT ALSO APPLY. Both modifiers can be on the ring at once — the Golden Wheel dressed
+   for Hallowe'en is exactly the case in the screenshot — and they are the same specificity, so the two disc
+   filters were fighting over source order. Named together, the spooky one wins outright. */
+.cw-ring.is-gold.is-spooky .cw-disc {
+    filter: grayscale(1) sepia(1) saturate(5.4) hue-rotate(-24deg) brightness(1.06) contrast(1.05);
 }
 /* The frame keeps its shape and loses its gold: cooler, dimmer, so the orange disc is the brightest thing. */
 .cw-ring.is-spooky .cw-frame { filter: saturate(0.72) brightness(0.86) hue-rotate(-14deg); }
@@ -707,9 +717,11 @@ const CW_CSS = `
 }
 
 /* The moon, behind everything, low and large so it reads as sky rather than as a sticker on the wheel. */
+/* ⚠️ OFF-CENTRE, BECAUSE DEAD CENTRE IS BEHIND THE WOLF. The frame's ornament sits at 12 o'clock and the
+   first placement put the moon directly behind it, where it read as a grey smudge rather than a moon. */
 .cw-hw-moon {
-    position: absolute; top: -6%; left: 50%; width: 62%; transform: translateX(-50%);
-    opacity: 0.5; filter: blur(0.3px) brightness(1.05); pointer-events: none; z-index: 0;
+    position: absolute; top: -11%; left: 22%; width: 34%; transform: translateX(-50%);
+    opacity: 0.5; filter: brightness(1.02); pointer-events: none; z-index: 0;
     animation: cwHwMoon 9s ease-in-out infinite;
 }
 @keyframes cwHwMoon { 0%, 100% { opacity: 0.44; } 50% { opacity: 0.58; } }
