@@ -4096,7 +4096,18 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    and the canopies at 95, which is the right order: a shrub is behind a lamp and under a tree.
    Knocked down because they sit at the back of the street, not in the light of it. */
 .hw-shrub { z-index: 91; filter: brightness(0.66) saturate(0.78) drop-shadow(0 4px 7px rgba(0,0,0,0.5)); }
-.hw-prop.is-near { z-index: 60;
+/* ⚠️ ABOVE THE BUILDINGS, BECAUSE THESE ARE THE FOREGROUND. The near props are placed at top 86-96% --
+   the very bottom of the frame, nearest the camera -- and they sat at 60, under buildings that run 100-200.
+   So a pumpkin stack standing in front of the General Store was drawn BEHIND it and behind its name plate.
+   Luke: "The pumpkins can u make their z index higher".
+
+   210 and not higher: it clears every building (100 + x, x maxing at 100) and still passes UNDER the
+   enemies at 240+, the boss at 260 and the walking avatars at 300+. Raising it past those would have your
+   own character disappear behind a haybale while you walked down the street.
+
+   The ordinary scene props stay at 50 on purpose. Those are dressed AROUND the buildings rather than in
+   front of them, and lifting those too would put a gravestone over a shopfront. */
+.hw-prop.is-near { z-index: 210;
     filter: brightness(0.82) saturate(1.02) drop-shadow(0 7px 14px rgba(0,0,0,0.62)); }
 .tw-scene.is-spooky .hw-nearhaze { position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
     z-index: 44; pointer-events: none; mix-blend-mode: screen;
