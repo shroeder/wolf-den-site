@@ -92,6 +92,51 @@ const RARITY_RING = {
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const FARM_PAD = 6; // % margin so pets (anchored by their center) never clip off the field edges
+
+// ── ⚠️ THE AQUARIUM IS LAID OUT IN TWO DIMENSIONS. EVERY OTHER VIEW IS LAID OUT IN ONE. ──────────────────
+// Luke: "all the pets are too clumped together. They should be spread out throughout the aquarium."
+//
+// The pasture and the barn have a GROUND LINE. Every animal stands on it, so the only axis a layout gets to
+// spend is horizontal, and the one-dimensional slot maths below is exactly right for them. The aquarium
+// inherited that and it does not fit: eleven pets strung along a single line, in a room whose whole point is
+// that it has depth, put every fish in the top half with the sand empty underneath — and at eleven across
+// they were ~9% apart while a name tag is nearer 25% wide, so they sat on top of each other too.
+//
+// So water pets get rows. The row is `idx % AQ_ROWS` rather than `idx / AQ_ROWS` on purpose: interleaving
+// means consecutive slots land on DIFFERENT depths, so two pets that are neighbours horizontally are never
+// also neighbours vertically, which is what stops the name tags colliding.
+// ⚠️ THE ROW COUNT IS CAPPED BUT NOT FIXED — IT IS DRIVEN BY AQ_PER_ROW. A constant 3 rows looks right at
+// eleven pets and absurd at three, where it stacks them in a vertical line down the middle of the tank with
+// the whole width empty. Rows are added as fish arrive instead, three to a row, up to four rows.
+const AQ_PER_ROW = 3;
+const AQ_ROWS = 4;
+
+// The band the fish may occupy, in % of the scene. The bottom is where the painted sand starts — measured off
+// the backdrop, not guessed — and the top leaves room for a sprite, which hangs ABOVE its y (the anchor is
+// translate(-50%,-100%), so y is the sprite's bottom edge, not its middle).
+// ⚠️ AQ_TOP CLEARS THE "Locked" PILL, it is not just taste. That pill sits in the scene's top-right corner,
+// and a sprite hangs ~60px ABOVE its y — so at 22 the top row's rightmost fish (the Squid) had its head
+// tucked behind the pill. 26 puts the tallest element's top at ~12% of the scene, below the pill's ~10.5%.
+const AQ_TOP = 26;
+const AQ_BOTTOM = 78;
+
+// ⚠️ THE AQUARIUM NEEDS A WIDER MARGIN THAN THE FIELD, AND THE NAME TAG IS WHY. FARM_PAD is 6, which is
+// right for a 46px sprite anchored at its centre — but the tag underneath it reads "Lantern Jelly ·L1" and is
+// more than twice the sprite's width, so at 6% the first and last of a row ran off the edge as "eahorse" and
+// "enguin". Three to a row at 16% leaves roughly 120px between neighbours on a 390px phone, which is the
+// widest tag plus a hair, and keeps both ends inside the glass.
+const AQ_PAD = 16;
+
+// ── ⚠️ A GRID IS NOT A SHOAL ─────────────────────────────────────────────────────────────────────────────
+// Rows alone fixed the clumping and introduced a different tell: on a wide screen the three columns sit at
+// 16/50/84% of a 1700px tank, which reads as a spreadsheet of fish with dead water between the columns.
+// Every pet gets a small fixed offset from its slot so the arrangement looks swum-into rather than placed.
+//
+// ⚠️ INTEGER MATHS ONLY — NO Math.sin, NO Math.random. This runs during the server render AND again on
+// hydration, and the two have to agree to the last digit or React throws the tree away. wheel-geometry.js
+// records the same trap: Node and Chrome do not always agree on trig's final bits, which showed up there as
+// `left: 22.492917678460892%` against `22.49291767846089%`. Integer ops are exact in both.
+const aqWobble = (n) => ((((n * 1103515245 + 12345) >>> 16) % 2000) / 1000) - 1; // stable, in [-1, 1)
 // Fixed ring of coins that burst outward behind the box as it opens (deterministic → SSR-safe).
 const PIG_BURST = Array.from({ length: 12 }, (_, i) => ({ a: i * 30, d: 74 + (i % 3) * 16, t: 0.7 + (i % 4) * 0.12 }));
 // ── Procedural sound (Web Audio, no asset files → CSP-safe) ─────────────────────────────────────────────────
@@ -306,7 +351,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     // room each one is in — see the note there about why two-room arithmetic stopped being true.
     const petView = useCallback((i) => (pets[i]?.water ? "aquarium" : (i % 2 === 0 ? "outside" : "inside")), [pets]);
 
-    const petSlotX = useCallback((idx, count) => (count <= 1 ? 50 : petMinX + (idx / (count - 1)) * (100 - FARM_PAD - petMinX)), [petMinX]);
+    // `pad` is the margin this particular row keeps from the edges — FARM_PAD out in the field, AQ_PAD in the
+    // tank, where the name tags are the widest thing on screen. See the AQ_PAD note up top.
+    const petSlotX = useCallback((idx, count, pad = petMinX) => (count <= 1 ? 50 : pad + (idx / (count - 1)) * (100 - pad - pad)), [petMinX]);
     // Each view shows a SUBSET of the pets, so a pet is spread by its slot WITHIN ITS OWN ROOM rather than by
     // its global index — that is what makes every room fill the full width evenly, with its first pet at the
     // far-left edge instead of everybody bunched on the right.
@@ -327,12 +374,47 @@ export default function FarmClient({ initial, viewingAlias }) {
         }
         return { idx, count };
     }, [petView]);
-    const homeX = useCallback((i) => { const s = viewSlotOf(i, pets.length); return petSlotX(s.idx, s.count); }, [petSlotX, viewSlotOf, pets.length]);
+    // Which row a water pet swims in, and which of that row's fish it is. See the AQ_ROWS note up top for why
+    // the row is the REMAINDER rather than the quotient.
+    const aqSlot = useCallback((i) => {
+        const { idx, count } = viewSlotOf(i, pets.length);
+        const rows = Math.max(1, Math.min(AQ_ROWS, Math.ceil(count / AQ_PER_ROW)));
+        return {
+            row: idx % rows,
+            rows,
+            inRow: Math.floor(idx / rows),
+            rowCount: Math.ceil((count - (idx % rows)) / rows),
+        };
+    }, [viewSlotOf, pets.length]);
+
+    // A pet's home column. In the water it is its position WITHIN ITS ROW, so three or four fish share the
+    // full width instead of eleven — which is the difference between ~31% apart and ~9%.
+    const homeX = useCallback((i) => {
+        if (petView(i) === "aquarium") {
+            const a = aqSlot(i);
+            // Clamped to the tank's own margins so the wobble can never push a name tag back off the glass.
+            return clamp(petSlotX(a.inRow, a.rowCount, AQ_PAD) + aqWobble(i * 2) * 5, AQ_PAD, 100 - AQ_PAD);
+        }
+        const s = viewSlotOf(i, pets.length);
+        return petSlotX(s.idx, s.count);
+    }, [petSlotX, viewSlotOf, petView, aqSlot, pets.length]);
+
+    // A pet's home DEPTH. On land this is the old grounded scatter — a couple of % of wobble along the ground
+    // line, nothing more. In the water it is a real coordinate, evenly spaced down the tank.
+    const homeY = useCallback((i) => {
+        if (petView(i) !== "aquarium") return 82 + ((i * 5) % 9);
+        const a = aqSlot(i);
+        const base = a.rows <= 1 ? (AQ_TOP + AQ_BOTTOM) / 2 : AQ_TOP + (a.row / (a.rows - 1)) * (AQ_BOTTOM - AQ_TOP);
+        // Smaller than the horizontal wobble: depth is the axis the row separation is spent on, and the gap
+        // between rows is only ~13px wider than a sprite and its name tag.
+        return clamp(base + aqWobble(i * 2 + 1) * 2.5, AQ_TOP, AQ_BOTTOM);
+    }, [petView, aqSlot]);
+
     const [pos, setPos] = useState(() => pets.map((_, i) => {
         const s = viewSlotOf(i, pets.length);
         return {
-            x: petSlotX(s.idx, s.count),
-            y: 82 + ((i * 5) % 9), // grounded on the grass (spread is HORIZONTAL — see the wide field below)
+            x: petView(i) === "aquarium" ? homeX(i) : petSlotX(s.idx, s.count),
+            y: homeY(i),
             flip: i % 2 === 1,
             dur: 2, // seconds for the current stroll (varies per move → different speeds)
             moving: false,
@@ -461,8 +543,25 @@ export default function FarmClient({ initial, viewingAlias }) {
         const timers = [];
         const push = (t) => timers.push(t);
         const step = (i) => {
-            const nx = clamp(homeX(i) + rand(-7, 7), petMinX, 100 - FARM_PAD); // roam widely around its home column
-            const ny = 80 + rand(0, 12); // stay grounded on the grass
+            const water = petView(i) === "aquarium";
+            // ⚠️ A FISH DRIFTS LESS FAR THAN A SHEEP WANDERS, and it is bounded by the TANK's margins. At the
+            // field's +/-7 and FARM_PAD a fish swam straight back out to the glass and its name tag was cut
+            // off again — the layout had moved it off the edge and the roam put it back.
+            const nx = water
+                ? clamp(homeX(i) + rand(-5, 5), AQ_PAD, 100 - AQ_PAD)
+                : clamp(homeX(i) + rand(-7, 7), petMinX, 100 - FARM_PAD); // roam widely around its home column
+            // ⚠️ A FISH DRIFTS AROUND ITS OWN DEPTH; A SHEEP JUST STANDS ON THE GROUND. The land branch is a
+            // flat random because every land pet shares one ground line. The water branch has to stay near the
+            // row it was given, or the rows dissolve back into the single clump they were introduced to fix.
+            // The drift is deliberately smaller than half the row gap (~25%) so neighbouring rows never swap.
+            // ⚠️ THE VERTICAL DRIFT IS TINY ON PURPOSE — IT IS BOUNDED BY THE ROW GAP, NOT BY TASTE. Four rows
+            // across AQ_TOP..AQ_BOTTOM leaves ~73px between them on a phone, and a sprite plus its name tag is
+            // ~60px tall. That is 13px of slack, so a drift of +/-5% (21px each way) let two rows close on each
+            // other and one fish's body covered the row above's name tag. Fish wander sideways; depth barely
+            // moves. The horizontal drift above is where the life in the tank comes from.
+            const ny = water
+                ? clamp(homeY(i) + rand(-2, 2), AQ_TOP - 2, AQ_BOTTOM + 2)
+                : 80 + rand(0, 12); // stay grounded on the grass
             const dur = rand(1.3, 3.8); // different speeds each hop
             setPos((prev) => {
                 if (!prev[i]) return prev;
@@ -1087,15 +1186,16 @@ export default function FarmClient({ initial, viewingAlias }) {
     // ── ⚠️ IN THE AQUARIUM NOTHING STANDS ON ANYTHING ────────────────────────────────────────────────────
     // Every other view grounds its sprites: y is 82-90% and the feet are anchored, so a pet's soles land on
     // painted grass or straw. A tank has no floor to stand on — an octopus on the sand reads as a dead
-    // octopus — so the same per-pet y is REMAPPED into a swim band instead of shifted down.
+    // octopus — so a water pet carries a real depth instead, assigned by homeY() from its row.
     //
-    // 82-90 becomes 30-70, which is the open water the backdrop was drawn to keep clear (see
-    // gen-farm-aquarium.mjs, where the middle band is measured rather than hoped for). It is a remap of the
-    // EXISTING spread rather than a new random, so each pet keeps its own depth run to run instead of
-    // teleporting every time the page is opened.
-    const petGroundY = (y) => (view === "aquarium"
-        ? 30 + Math.max(0, Math.min(8, y - 82)) * 5
-        : Math.min(97, y + groundShift));
+    // ⚠️ THIS USED TO BE A REMAP, AND THE REMAP WAS THE CLUMP. It took the grounded y and squeezed it:
+    // `30 + clamp(y - 82, 0, 8) * 5`, mapping 82-90 onto 30-70. Two things went wrong with that. The band was
+    // only 40% of the tank, so the painted sand sat empty under a row of fish. And the roam wrote y into
+    // 80-92 while the remap only accepted 82-90, so a THIRD of every hop landed outside it and got clamped —
+    // pinning those fish to exactly 30 or exactly 70 and stacking them on two hard lines.
+    //
+    // Now the water branch is a pass-through: by the time y arrives here it is already a tank coordinate.
+    const petGroundY = (y) => (view === "aquarium" ? y : Math.min(97, y + groundShift));
 
     // Full screen is GONE. It was a CSS overlay pinned over the viewport and it had accumulated a special case
     // everywhere it touched — its own control row, its own backdrop path, its own height rule — for a view of the
@@ -1513,7 +1613,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {pets.map((pet, i) => {
                             if (view === "garden" || petView(i) !== view) return null; // pets live in Outside / Inside, split by index
                             if (standSeatedIds.has(pet.id)) return null; // it's on the stand — drawn there instead
-                            const p = pos[i] || { x: 50, y: 82, flip: false, dur: 2, moving: false, hopMs: 500 };
+                            // The fallback is its HOME, not a hardcoded patch of grass: y 82 is the ground
+                            // line, and in the tank that is the sand a fish should never be lying on.
+                            const p = pos[i] || { x: homeX(i), y: homeY(i), flip: false, dur: 2, moving: false, hopMs: 500 };
                             const canTap = farm.canPet && !pet.petted && !pet.maxed;
                             return (
                                 <button
