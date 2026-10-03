@@ -128,6 +128,36 @@ function manualHit(level, stats = {}, { forceCrit = false } = {}) {
 // pack's real, ever-growing DPS. New bosses now size off the PREVIOUS boss's OBSERVED kill pace (see
 // sizeNextBossHp), which self-corrects toward this target regardless of how strong the pack has become.
 const BOSS_TARGET_DAYS = 10;
+// ── ⚠️ EVERY BOSS IS TEN TIMES THE SIZE THE MATHS SAYS ───────────────────────────────────────────────────────
+// Luke: "Boss hp needs to be 10x, current and future."
+//
+// This is a DELIBERATE OVERRIDE OF THE SIZER, not a correction to it. Everything above still computes what a
+// BOSS_TARGET_DAYS fight would really cost at the pack's measured pace; this multiplies that answer. The two
+// are kept separate on purpose — projectBossHp stays an honest projection of what the pack can do, so the
+// admin screen's working still adds up and the next person to tune the curve is reading real numbers.
+//
+// ⚠️ IT IS VERY NEARLY A TEN TIMES LONGER FIGHT, AND THE OLD NOTE IN THIS FILE WILL TELL YOU OTHERWISE.
+// The comment above about the pack doubling every four and a half days is from an earlier era and is no
+// longer what packGrowthPerDay measures: the live reading on 2026-10-03 is +3.3% a day, a doubling every
+// three weeks, not every four and a half days. Compounding at that rate barely dents a tenfold increase.
+//
+// Measured against the live pack (142 members, 53.2M damage a day):
+//
+//     1x   a fresh boss runs about   8 days      <- the previous five came in at 3.8-6.1
+//     3x                            25 days
+//     5x                            35 days
+//     10x                           51 days
+//
+// So this is a seven-week boss, chosen deliberately, and the first one will be the test of whether the pack
+// stays interested that long. If it wants to come down, 3 and 5 are the rungs above — and this constant is
+// the only thing to change, for current and future both.
+//
+// ⚠️ AND IT HAS TO LIVE INSIDE THE RATCHET AND THE STEP CAP, NOT OUTSIDE THEM. Both of those compare against
+// the PREVIOUS boss's max_hp, which already carries this multiplier — so applying it after them would compare
+// a 1x number against a 10x cap and let the basis grow twentyfold a cycle, and applying it before the
+// `* 1.05` ratchet would multiply an already-multiplied floor. It is applied to the pace-derived figure, and
+// everything after that works in the same units. See sizeNextBossHp.
+export const BOSS_HP_MULT = 10;
 // A little headroom so the next boss isn't undersized by the pack leveling/growing between fights.
 const BOSS_PACK_GROWTH = 1.1;
 // ── THE PACK DOES NOT STAND STILL, AND THAT IS THE WHOLE BUG ─────────────────────────────────────────────────
@@ -341,11 +371,25 @@ const ABILITIES = ["Fang Strike", "Howling Slash", "Pack Fury", "Savage Bite", "
 const CRIT_ABILITIES = ["APEX PREDATOR", "BLOODMOON CRIT", "PACK LEADER'S WRATH", "DEVASTATION"];
 const pickAbility = (crit) => (crit ? CRIT_ABILITIES : ABILITIES)[Math.floor(Math.random() * (crit ? CRIT_ABILITIES : ABILITIES).length)];
 
+// ── ⚠️ hp AND max_hp ARE BIGINT, AND A BIGINT ARRIVES AS A STRING ────────────────────────────────────────
+// Migration 458 widened both columns because a boss is now ten times the size and 6,651,370,000 does not fit
+// in an int. The driver returns int as a NUMBER and bigint as TEXT, so every boss row started carrying its
+// two most-used fields as strings the moment that migration ran.
+//
+// Most of what the game does with them survives it by accident — `hp / max_hp`, `hp <= max_hp * 0.3` and
+// `Math.min(hp, …)` all coerce — which is exactly what makes it dangerous: it fails only on `+` and on
+// `toLocaleString`, so the bug is not "the boss screen is broken", it is "the HP reads 5717014540 without
+// commas, and one addition somewhere silently concatenates".
+//
+// Fixed once, at the door, rather than at the thirty-odd places downstream that treat them as numbers.
+const withNumericHp = (row) => (row ? { ...row, hp: Number(row.hp), max_hp: Number(row.max_hp) } : row);
+
 // The current LIVE boss (admin-released). No auto-spawn, and it does NOT expire on a timer — it stays live
 // until the pack kills it (HP hits 0). ends_at is informational only. Returns null between bosses.
 export async function getActiveBoss() {
     return db
         .queryOne(`SELECT * FROM boss_event WHERE status = 'live' AND defeated_at IS NULL ORDER BY started_at DESC LIMIT 1`)
+        .then(withNumericHp)
         .catch(() => null);
 }
 
@@ -451,6 +495,7 @@ export async function getBossState(buyerId = null) {
         // No live boss — show the aftermath of the most recent kill for a week (winner + prize + stats).
         boss = await db
             .queryOne(`SELECT * FROM boss_event WHERE status = 'ended' AND defeated_at IS NOT NULL AND defeated_at > NOW() - INTERVAL '7 days' ORDER BY defeated_at DESC LIMIT 1`)
+            .then(withNumericHp)
             .catch(() => null);
         if (!boss) return { boss: null };
     }
@@ -462,14 +507,17 @@ export async function getBossState(buyerId = null) {
             .query(
                 `SELECT b.id, b.alias, b.display_name, b.avatar_url, b.avatar_config, b.avatar_cosmetics, b.avatar_sprite_url, b.avatar_sprite_flip, b.xp,
                         b.equipped_border, b.equipped_frame, b.equipped_background,
-                        SUM(h.damage)::int AS dmg,
+                        SUM(h.damage)::bigint AS dmg,
                         COUNT(*) FILTER (WHERE h.kind = 'manual')::int AS hits
                    FROM boss_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
                   WHERE h.boss_id = $1
                   GROUP BY b.id ORDER BY dmg DESC`,
                 [boss.id]
             )
-            .catch(() => []),
+            .catch(() => [])
+            // See the note at the fighters query below: a widened cast returns text, so every row's dmg is
+            // made a number at the door.
+            .then((rows) => rows.map((r) => ({ ...r, dmg: Number(r.dmg) || 0 }))),
         getDefaultSpriteUrl().catch(() => null),
     ]);
     // Pet battle sprites (shared per pet) so each member's active pet can fight beside them.
@@ -707,18 +755,24 @@ export async function getBossState(buyerId = null) {
 // Final recap for a specific (usually ended) boss — powers the "see final stats" page linked from the
 // defeat notifications, since the live boss page has already ROTATED to the next boss by then.
 export async function getBossRecap(bossId, buyerId = null) {
-    const boss = await db.queryOne(`SELECT * FROM boss_event WHERE id = $1`, [bossId]).catch(() => null);
+    const boss = withNumericHp(await db.queryOne(`SELECT * FROM boss_event WHERE id = $1`, [bossId]).catch(() => null));
     if (!boss) return null;
     const divisor = Math.max(1, boss.ticket_divisor || 100);
     const rows = await db
         .query(
             `SELECT b.id, b.display_name, b.alias, b.avatar_url, b.avatar_config, b.avatar_cosmetics, b.xp,
-                    SUM(h.damage)::int AS dmg, COUNT(*) FILTER (WHERE h.kind = 'manual')::int AS hits
+                    SUM(h.damage)::bigint AS dmg, COUNT(*) FILTER (WHERE h.kind = 'manual')::int AS hits
                FROM boss_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
               WHERE h.boss_id = $1 GROUP BY b.id HAVING SUM(h.damage) > 0 ORDER BY dmg DESC`,
             [bossId]
         )
         .catch(() => []);
+    // ⚠️ ::bigint COMES BACK AS A STRING, SO IT IS COERCED HERE AND NOWHERE ELSE. The cast had to widen — one
+    // member can now take more than 2.1 billion off a boss — but the driver hands a bigint back as text where it
+    // handed an int back as a number, and `rows.reduce((s, r) => s + r.dmg, 0)` then concatenates instead of
+    // adding: the pack total came out "0093435546". Coerced once at the query rather than at each of the four
+    // places downstream that treat it as a number.
+    for (const r of rows) r.dmg = Number(r.dmg) || 0;
     const totalDamage = rows.reduce((s, r) => s + (r.dmg || 0), 0);
     const leaderboard = rows.slice(0, 15).map((r, i) => ({
         rank: i + 1,
@@ -968,11 +1022,14 @@ function weightedDraw(pool, weightFn) {
 //   • IN-GAME CHASE GEAR → the #1 damage dealer (skill reward).
 //   • LOOT CHESTS       → EVERYONE rolls a chance; more contribution = higher chance + a slightly better tier.
 async function finalizeBossKill(bossId) {
-    const boss = await db.queryOne(`SELECT * FROM boss_event WHERE id = $1`, [bossId]).catch(() => null);
+    const boss = withNumericHp(await db.queryOne(`SELECT * FROM boss_event WHERE id = $1`, [bossId]).catch(() => null));
     if (!boss) return;
 
     const parts = await db
-        .query(`SELECT buyer_id, SUM(damage)::int AS dmg FROM boss_hit WHERE boss_id = $1 GROUP BY buyer_id HAVING SUM(damage) > 0`, [bossId])
+        .query(`SELECT buyer_id, SUM(damage)::bigint AS dmg FROM boss_hit WHERE boss_id = $1 GROUP BY buyer_id HAVING SUM(damage) > 0`, [bossId])
+        // Text from a bigint cast — see the note at the leaderboard. These rows are sorted and divided into
+        // raffle tickets, and a string sorts and divides by coercion but SUMS by concatenation.
+        .then((rows) => (rows || []).map((r) => ({ ...r, dmg: Number(r.dmg) || 0 })))
         .catch(() => []);
     const pool = parts.map((p) => ({
         id: p.buyer_id,
@@ -1241,6 +1298,9 @@ async function sizeNextBossHp(prevBoss) {
     const projected = await projectBossHp({}).then((r) => r.hp).catch(() => 0);
     let hp = observedDaily ? observedDaily * BOSS_TARGET_DAYS * BOSS_PACK_GROWTH : projected;
     if (projected) hp = Math.max(hp, projected);
+    // Into multiplied units HERE — before the ratchet and the step cap below, both of which compare against a
+    // previous max_hp that already carries it. See the note on BOSS_HP_MULT for what goes wrong either side.
+    hp *= BOSS_HP_MULT;
     if (!hp) hp = prevBoss?.max_hp || 500000;
     hp = Math.max(hp, (prevBoss?.max_hp || 0) * 1.05); // a new boss is never weaker than the last
     // ...and never wildly stronger, either. That floor is a RATCHET: whatever number comes out here becomes the
@@ -1285,6 +1345,7 @@ const PREPARE_NEXT_AT_PCT = 0.05;
 export async function prepareNextBoss() {
     const live = await db
         .queryOne(`SELECT id, name, hp, max_hp FROM boss_event WHERE status = 'live' AND defeated_at IS NULL LIMIT 1`)
+        .then(withNumericHp)
         .catch(() => null);
     if (!live) return { skipped: "no_live_boss" };
     const pct = Number(live.max_hp) > 0 ? Number(live.hp) / Number(live.max_hp) : 1;
@@ -1454,7 +1515,7 @@ export async function attackBoss(buyerId) {
     );
     if (!slot) return { error: "no_attacks_left", attacksLeft: 0 };
     // Slot reserved — now deal the damage.
-    const row = await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, damage]);
+    const row = withNumericHp(await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, damage]));
     if (!row) {
         // Boss already dead — release the reserved slot so the swing isn't wasted.
         await db.query(`UPDATE mkt_boss_swing SET n = GREATEST(0, n - 1) WHERE buyer_id = $1 AND boss_id = $2 AND day = (NOW() AT TIME ZONE 'America/Chicago')::date`, [buyerId, boss.id]).catch(() => {});
@@ -1617,7 +1678,7 @@ export async function cheer(buyerId, targetId) {
 
     // The cheered hero surges — bonus damage credited to THEM (kind='cheer' keeps it out of manual swing counts).
     let hp = boss.hp, maxHp = boss.max_hp;
-    const row1 = await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, dmg]);
+    const row1 = withNumericHp(await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, dmg]));
     if (row1) {
         hp = row1.hp; maxHp = row1.max_hp;
         await db.query(`INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ($1, $2, $3, 'cheer')`, [boss.id, targetId, dmg]).catch(() => {});
@@ -1630,7 +1691,7 @@ export async function cheer(buyerId, targetId) {
     }
     // First-cheer-of-day item proc: YOU also strike the boss.
     if (procs.selfDamage > 0 && row1) {
-        const row2 = await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, procs.selfDamage]);
+        const row2 = withNumericHp(await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp, max_hp`, [boss.id, procs.selfDamage]));
         if (row2) {
             hp = row2.hp; maxHp = row2.max_hp;
             await db.query(`INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ($1, $2, $3, 'cheer')`, [boss.id, buyerId, procs.selfDamage]).catch(() => {});
@@ -1704,7 +1765,7 @@ export async function runBossAutoTick() {
     if (!rows.length) return { applied: 0, fighters: 0 };
 
     const total = rows.reduce((s, r) => s + r.damage, 0);
-    const hpRow = await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp`, [boss.id, total]);
+    const hpRow = withNumericHp(await db.queryOne(`UPDATE boss_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND defeated_at IS NULL RETURNING hp`, [boss.id, total]));
     if (!hpRow) return { skipped: "already_defeated" };
 
     // One batched insert attributing the tick's damage to each member.

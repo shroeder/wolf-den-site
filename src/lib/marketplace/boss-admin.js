@@ -4,7 +4,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
 import { pickWeakness } from "@/lib/marketplace/boss-weakness.js";
-import { projectBossHp } from "@/lib/marketplace/boss.js";
+import { projectBossHp, BOSS_HP_MULT } from "@/lib/marketplace/boss.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { generateImage, generateSceneImage, storeImage } from "@/lib/marketplace/openai-image.js";
 
@@ -33,13 +33,17 @@ export async function getBossRecapAdmin(bossId) {
     const divisor = Math.max(1, boss.ticket_divisor || 100);
     const rows = await db
         .query(
-            `SELECT b.id, b.display_name, b.alias, b.email, SUM(h.damage)::int AS dmg,
+            `SELECT b.id, b.display_name, b.alias, b.email, SUM(h.damage)::bigint AS dmg,
                     COUNT(*) FILTER (WHERE h.kind = 'manual')::int AS hits
                FROM boss_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
               WHERE h.boss_id = $1 GROUP BY b.id HAVING SUM(h.damage) > 0 ORDER BY dmg DESC`,
             [bossId]
         )
         .catch(() => []);
+    // ⚠️ ::bigint COMES BACK AS A STRING. The cast widened because one member can now take more than 2.1
+    // billion off a boss, and the driver returns text for a bigint where it returned a number for an int —
+    // so this reduce concatenated instead of adding. Coerced at the door.
+    for (const r of rows) r.dmg = Number(r.dmg) || 0;
     const totalDamage = rows.reduce((s, r) => s + (r.dmg || 0), 0);
     const leaderboard = rows.map((r, i) => ({
         rank: i + 1, name: r.display_name || r.alias || "Member", alias: r.alias || null,
@@ -101,7 +105,11 @@ export async function listBossesAdmin() {
 export async function createDraftBoss({ name, description, maxHp, rewardsText, ticketDivisor }) {
     // No HP given → auto-size to the current pack (count + levels) for a ~1-week fight. Explicit value wins.
     const explicit = Number(maxHp);
-    const hp = explicit > 0 ? Math.max(100, Math.floor(explicit)) : (await projectBossHp({})).hp;
+    // ⚠️ THE AUTO-SIZED PATH CARRIES BOSS_HP_MULT, THE TYPED ONE DOES NOT. A hand-made boss built off the
+    // projection has to come out the same size as one the game sizes itself, or "10x, current and future"
+    // would quietly mean "except the ones Luke makes by hand". A number typed into the box is still taken
+    // literally — if somebody asks for 4,000,000 they get 4,000,000, not forty.
+    const hp = explicit > 0 ? Math.max(100, Math.floor(explicit)) : (await projectBossHp({})).hp * BOSS_HP_MULT;
     const div = Math.max(1, Math.floor(Number(ticketDivisor) || 100));
     return db.queryOne(
         `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, rewards_text, ticket_divisor, weakness)
