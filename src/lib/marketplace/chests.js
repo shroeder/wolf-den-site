@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { RARITIES } from "@/lib/marketplace/rarity.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { ITEMS, isHalloweenItem } from "@/lib/marketplace/items.js";
+import { itemsOfSet } from "@/lib/marketplace/sets.js";
+import { HALLOWEEN_WHEEL_SET } from "@/lib/marketplace/halloween.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { maybeGrantChestPet } from "@/lib/marketplace/pet-drops.js";
@@ -554,6 +556,11 @@ export async function openChests(buyerId, { tier = null, max = BULK_OPEN_CAP } =
 // measured and paid an active member about six pieces out of fifteen for the whole event — a chase nobody
 // finishes is a chase nobody starts. Re-run scripts/halloween-odds.mjs before touching them; it carries the
 // arithmetic and the measurement together.
+// The five pieces of The Unquiet, read from the set itself rather than listed again here. A second copy of
+// those ids is a second thing to update the day a piece is renamed, and the copy that gets missed is the one
+// that quietly puts the wheel's exclusive set back into the chest pool.
+const WHEEL_SET_PIECES = new Set(itemsOfSet(HALLOWEEN_WHEEL_SET) || []);
+
 const HW_GEAR_CHANCE = { hw_candycorn: 0.12, hw_pumpkin: 0.20, hw_skeleton: 0.28, hw_ghost: 0.40 };
 const HW_PET_CHANCE = { hw_candycorn: 0.04, hw_pumpkin: 0.06, hw_skeleton: 0.09, hw_ghost: 0.15 };
 
@@ -589,7 +596,14 @@ async function openHalloweenChest(buyerId, tier, remaining) {
             db.query(`SELECT item_id FROM mkt_auction WHERE seller_id = $1 AND status = 'active'`, [buyerId]).catch(() => []),
         ]);
         const owned = new Set([...ownedRows.map((r) => r.item_id), ...listedRows.map((r) => r.item_id)]);
-        const pool = ITEMS.filter((i) => isHalloweenItem(i) && !owned.has(i.id));
+        // ⚠️ THE UNQUIET IS NOT IN THIS POOL — IT IS THE WHEEL'S SET. Luke: "a set for halloween you can only
+        // get from the wheel during halloween." Its five pieces come off THE OFFERING (spin.js) and nowhere
+        // else, so a chest that could also hand them over would make "only from the wheel" false on the one
+        // screen that says it. See HALLOWEEN_WHEEL_SET.
+        //
+        // The other two Halloween sets are still here: Hollowed Harvest and Gravebound have nothing to do with
+        // the wheel, and this is where they belong.
+        const pool = ITEMS.filter((i) => isHalloweenItem(i) && !owned.has(i.id) && !WHEEL_SET_PIECES.has(i.id));
         if (pool.length) {
             const item = pool[Math.floor(Math.random() * pool.length)];
             // `via` is a STRING that lands in acquired_via, not an options bag — an object here writes

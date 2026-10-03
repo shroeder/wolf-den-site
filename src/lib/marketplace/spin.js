@@ -10,7 +10,8 @@ import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
 import { pieceById } from "@/lib/marketplace/collection-pieces.js";
 import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
-import { setWheelBonus, setWheelRespinChance } from "@/lib/marketplace/sets.js";
+import { setWheelBonus, setWheelRespinChance, itemsOfSet } from "@/lib/marketplace/sets.js";
+import { HALLOWEEN_PUBLIC, HALLOWEEN_WHEEL_SET } from "@/lib/marketplace/halloween.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
@@ -260,6 +261,38 @@ const GOLD_WHEEL = {
 };
 WHEELS.push(GOLD_WHEEL);
 
+// ── THE OFFERING — THE HALLOWE'EN WEDGE ──────────────────────────────────────────────────────────────────
+// Luke: "a set for halloween you can only get from the wheel during halloween" and "a new pick-em on the
+// wheel". This is both: the wedge opens a pick-one-of-three, and The Unquiet comes out of it or nowhere.
+//
+// ⚠️ IT REPLACES A WEDGE, IT DOES NOT ADD ONE. WHEEL_WEDGES is the contract between this array and the disc
+// painting and the guard below throws on a 21st — see the note there about MAJOR JACKPOT being drawn on top
+// of "50 gold" for as long as nobody counted the array.
+//
+// ⚠️ AND THE WEDGE IT TAKES IS THE ADRENALINE VIAL, ON BOTH WHEELS. Picking the victim mattered more than it
+// looks. It cannot be a rare or a jackpot — the event must not make the wheel stingier — and it should be the
+// wedge least missed for a month, which is the same reasoning that put Farm Decoration where "200 XP" used to
+// be. A single combat potion is it. Every wheel has exactly one, so the swap is found rather than indexed.
+//
+// ⚠️ THE WEIGHT IS THE WHOLE BALANCE OF THE EVENT, SO HERE IS THE ARITHMETIC. The ordinary wheel's weights
+// total 141. At weight 14 the Offering is 14/149 ~= 9.4% of spins. A member spinning once a day for a 31-day
+// event takes ~31 spins (more with tickets), so ~2.9 rounds; at two pieces offered in three slots that is
+// ~1.9 pieces. FIVE pieces therefore needs roughly 8 rounds, which is NOT reachable on free spins alone —
+// deliberately. The set is the event's chase, not its participation prize, and tickets are what close the
+// gap. If Luke wants it finishable on free spins alone this is the one number to raise: 40 would do it.
+const OFFERING_WEIGHT = 14;
+if (HALLOWEEN_PUBLIC) {
+    for (const w of WHEELS) {
+        const i = w.prizes.findIndex((pz) => pz.consumable === "pot_adrenaline");
+        // A fresh object per wheel. A shared literal would be one row of a module table that two wheels both
+        // point at, and the next person to write a field onto "the prize" would write it onto both.
+        // An absolute path, so P() leaves it alone: every other prize sprite in this file is a 1.5MB PNG under
+        // /images/spin/prizes (33MB for that one folder), and matching that convention on a file the wheel
+        // downloads on every load is not a convention worth matching. 31KB as WebP.
+        if (i >= 0) w.prizes[i] = { label: "THE OFFERING", sprite: "/images/spin/prizes/offering.webp", weight: OFFERING_WEIGHT, tier: "bonus", kind: "pickem" };
+    }
+}
+
 export const WHEEL_WEDGES = 20;
 for (const w of WHEELS) {
     if (w.prizes.length !== WHEEL_WEDGES) {
@@ -459,6 +492,112 @@ const gearCard = (id) => {
     return { id, name: it?.name || "Wheel Gear", rarity: it?.rarity || "rare", sprite: gearSprite(id), slot: it?.slot || null, stats: it?.stats ? describeStats(it.stats) : "" };
 };
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i -= 1) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+// ── THE OFFERING: A PICK-ONE-OF-THREE ────────────────────────────────────────────────────────────────────
+// Three carved pumpkins, face down. Pick one, keep what is in it, and see what was in the other two.
+//
+// ⚠️ WHY IT IS NOT THE MATCH-3 AGAIN. The bonus game asks you to keep flipping until you have three of a
+// kind, which is a reveal with a known ending — you always win the thing you matched. A pick-em is one
+// irreversible choice and two things you will never get, which is a different feeling and the reason the
+// format exists. It also runs in a single tap, which matters for a wedge that comes up three times as often
+// as the bonus game does.
+//
+// ⚠️ THE CONTENTS ARE NEVER SENT UNTIL THE CHOICE IS MADE. rollPickEm returns a COUNT and nothing else; the
+// slots live on mkt_buyer.spin_bonus and only pickEmChoose reveals them. The match-3 next door has the same
+// property for the same reason — a board sent to the client is a board the client can read.
+const UNQUIET_PIECES = itemsOfSet(HALLOWEEN_WHEEL_SET);
+// Two of the three slots hold a piece you are missing. Not three: a pick with no wrong answer is not a pick,
+// and the empty pumpkin is what makes the other two worth choosing between.
+const OFFERING_PIECES = 2;
+// What an empty pumpkin pays. Scaled per wheel for the same reason the dupe chest is — the Golden Wheel's
+// floor is 600 and a 300-gold consolation on it would read as a punishment for owning the better wheel.
+const OFFERING_TRICK_GOLD = { wheel: 300, wheel_gold: 700 };
+
+/** The card the client draws for one revealed pumpkin. Sprites come from the DB for items, which is why this
+ *  is async where gearCard is not — the Wheelwarden trophies have files on disk, the Hallowe'en gear does
+ *  not. */
+async function offeringCards(slots) {
+    const ids = slots.filter((sl) => sl.kind === "piece").map((sl) => sl.id);
+    const rows = ids.length
+        ? await db.query(`SELECT item_id, url FROM mkt_item_sprite WHERE item_id = ANY($1)`, [ids]).catch(() => [])
+        : [];
+    const art = new Map((rows || []).map((r) => [r.item_id, r.url]));
+    return slots.map((sl) => {
+        if (sl.kind === "piece") {
+            const it = itemById(sl.id);
+            return { kind: "piece", id: sl.id, name: it?.name || "A piece of The Unquiet", rarity: it?.rarity || "legendary", sprite: art.get(sl.id) || null, slot: it?.slot || null };
+        }
+        if (sl.kind === "chest") return { kind: "chest", name: CHEST_TIERS[sl.tierId]?.label || "Chest", rarity: "rare", sprite: P(`chest-${sl.tierId}`) };
+        return { kind: "gold", name: `${sl.amount.toLocaleString()} gold`, rarity: "normal", sprite: P("coins-small") };
+    });
+}
+
+async function rollPickEm(buyerId) {
+    const wheel = await wheelForMember(buyerId, 1);
+    const { getOwnedGearIds } = await import("@/lib/marketplace/inventory.js");
+    const owned = new Set(await getOwnedGearIds(buyerId).catch(() => []));
+    const missing = UNQUIET_PIECES.filter((id) => !owned.has(id));
+
+    // ── A FINISHED SET IS TOLD SO BEFORE IT PICKS ────────────────────────────────────────────────────────
+    // The match-3 learned this the hard way: it showed ten gear cards to members who owned all ten and said
+    // "the first one you match is yours to keep", which is false for them, and GrayKitsune came away believing
+    // there was a set he had not been given. Same contract here — when there is nothing left to win the round
+    // says what it pays INSTEAD, up front, and still lets you pick, because the ritual is the fun part.
+    const complete = missing.length === 0;
+    const tier = dupeChestFor(wheel.id);
+    const gold = OFFERING_TRICK_GOLD[wheel.id] || 300;
+
+    const slots = complete
+        ? [{ kind: "chest", tierId: tier }, { kind: "chest", tierId: tier }, { kind: "chest", tierId: tier }]
+        : shuffle([
+            ...shuffle([...missing]).slice(0, OFFERING_PIECES).map((id) => ({ kind: "piece", id })),
+            ...Array.from({ length: 3 - Math.min(OFFERING_PIECES, missing.length) }, () => ({ kind: "gold", amount: gold })),
+        ]);
+
+    await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ kind: "pickem", slots, picked: null, done: false })]).catch(() => {});
+    return {
+        size: slots.length,
+        complete,
+        chest: complete ? { tier, label: CHEST_TIERS[tier]?.label || "Chest" } : null,
+        setName: "The Unquiet",
+        found: UNQUIET_PIECES.length - missing.length,
+        total: UNQUIET_PIECES.length,
+    };
+}
+
+/** Open one pumpkin. Grants what is in it and reveals all three. */
+export async function pickEmChoose(buyerId, index) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const row = await db.queryOne(`SELECT spin_bonus FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const g = row?.spin_bonus;
+    // ⚠️ THE KIND CHECK IS NOT DECORATION. spin_bonus is one column holding whichever sub-game is open, so a
+    // match-3 board must not be openable through this door and vice versa. bonusFlip's own guard is
+    // `Array.isArray(g.board)`, which a pick-em payload fails — these two refuse each other from both sides.
+    if (!g || g.kind !== "pickem" || !Array.isArray(g.slots)) return { ok: false, error: "no_game" };
+    if (g.done) return { ok: false, error: "done" };
+    const i = Number(index);
+    if (!Number.isInteger(i) || i < 0 || i >= g.slots.length) return { ok: false, error: "bad_index" };
+
+    const chosen = g.slots[i];
+    let text = "";
+    if (chosen.kind === "piece") {
+        const { grantItem: give } = await import("@/lib/marketplace/inventory.js");
+        await give(buyerId, chosen.id, "spin_offering").catch(() => {});
+        text = `${itemById(chosen.id)?.name || "A piece"} — a piece of The Unquiet!`;
+    } else if (chosen.kind === "chest") {
+        await addChests(buyerId, { [chosen.tierId]: 1 }, { source: "spin_offering" }).catch(() => {});
+        text = `${CHEST_TIERS[chosen.tierId]?.label || "A chest"} — your set is complete.`;
+    } else {
+        // Through grantPrize so the gold rides mint() like every other coin the wheel pays. A bare UPDATE here
+        // would be a second, unmetered faucet — see gold-rate.js for why there is exactly one lever.
+        const paid = await grantPrize(buyerId, { kind: "gold", amount: chosen.amount, label: "The Offering", sprite: "coins-small" }, {});
+        text = paid?.text || `${chosen.amount.toLocaleString()} gold`;
+    }
+
+    await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ ...g, picked: i, done: true })]).catch(() => {});
+    const cards = await offeringCards(g.slots);
+    return { ok: true, picked: i, won: cards[i], reveal: cards, text, ...(await getSpinState(buyerId)) };
+}
 
 // The BONUS GAME is a MATCH-3: a board of face-down tiles, THREE of every gear on it (so the end reveal is
 // honest — every piece really is there three times). The player flips tiles until they get three of a kind;
@@ -771,6 +910,24 @@ export async function getSpinState(buyerId) {
         return { size: g.board.length, need: g.need || 3, roster: [...new Set(g.board)].map(gearCard), revealed };
     })();
     const wheel = await wheelForMember(buyerId, level);
+    // ── AN UNPICKED OFFERING IS RE-OPENED THE SAME WAY AN UNFINISHED BOARD IS ────────────────────────────
+    // The match-3 can be stepped away from and come back to, and the pick-em has to be too. It is ONE tap, so
+    // the window is small — which makes it worse, not better: a member who reloads in that window has taken
+    // their spin and been paid nothing, and the round would be sitting in the column with no way back to it.
+    //
+    // ⚠️ THE CONTENTS ARE STILL NOT SENT. This returns the COUNT and whether the set is already complete, the
+    // same as rollPickEm does. A resume that shipped the slots would hand the client the answer.
+    const offerResume = (() => {
+        const g = row?.spin_bonus;
+        if (!g || g.kind !== "pickem" || !Array.isArray(g.slots) || g.done) return null;
+        const complete = g.slots.every((sl) => sl.kind === "chest");
+        const tier = dupeChestFor(wheel.id);
+        return {
+            size: g.slots.length, complete,
+            chest: complete ? { tier, label: CHEST_TIERS[tier]?.label || "Chest" } : null,
+            setName: "The Unquiet",
+        };
+    })();
     const freeAvailable = asDay(row?.free_spin_day) !== today();
     // Extra-spin price escalates 1000, 2000, 3000… per store-day (resets at midnight Central).
     const boughtToday = asDay(row?.spin_buys_day) === today() ? (row?.spin_buys_count || 0) : 0;
@@ -784,19 +941,30 @@ export async function getSpinState(buyerId) {
         tokens: row?.tokens || 0,
         spinCount: row?.spin_count || 0,
         bonusResume, // an unfinished match-3 board to re-open on load
+        offerResume, // an unpicked Offering to re-open on load
         freeAvailable,
         tokenCost,
         extraSpinsToday: boughtToday,
         isOwner: isOwner(buyerId), // owner-only free-reset button (debugging)
         // The Wheelwarden chase — ten wheel-exclusive pieces, shown on the wheel that drops them.
         collections: await (async () => {
-            const [{ collectionsForFeature }, { getOwnedPieceIds: ownedPieces }] = await Promise.all([
+            const [{ collectionsForFeature }, { getOwnedSetIds: ownedForSets }] = await Promise.all([
                 import("@/lib/marketplace/sets.js"),
                 import("@/lib/marketplace/collection-owned.js"),
             ]);
-            // Collections count TROPHIES, which live in mkt_user_collection — reading the item bag here would
-        // report every set as 0 collected.
-        return collectionsForFeature("wheel", await ownedPieces(buyerId).catch(() => []));
+    // ⚠️ THE PANEL MUST ASK THE SAME QUESTION THE BONUS ASKS. This read getOwnedPieceIds, with a comment
+    // saying collections count TROPHIES and that reading the item bag would report every set as 0. That was
+    // true when every collection set was made of trophies. It is not any more: the three Hallowe'en sets
+    // (Hollowed Harvest, Gravebound, The Unquiet) are made of real ITEMS, which live in mkt_user_item — so
+    // the trophy table reported exactly the 0 the comment was warning about, and the inversion was invisible
+    // because the BONUS reads getOwnedSetIds and was paying out correctly the whole time. A member could hold
+    // three pieces of The Unquiet, be getting its wheel luck, and see "0/5 found" on the screen that exists
+    // to show the chase.
+    //
+    // getOwnedSetIds is gear + trophies, and it is the function every set bonus in the game already goes
+    // through, so panel and payout now agree by construction rather than by two call sites staying in step.
+    // It costs one extra query on a screen-load path, which is the right trade for a number that was wrong.
+        return collectionsForFeature("wheel", await ownedForSets(buyerId).catch(() => []));
         })().catch(() => []),
         jackpotPot: await getJackpotPot(), // shared progressive MAJOR JACKPOT
         wheel: wheelView(wheel),
@@ -873,15 +1041,17 @@ export async function doSpin(buyerId) {
     let display;
     let miniWheel = null;
     let bonusGame = null;
+    let pickEm = null;
     // ── DEALER'S CHOICE ──────────────────────────────────────────────────────────────────────────────────
     // The claim is made HERE, after the wedge is known, and never for a sub-game wedge: the Mini Wheel and the
     // Bonus Game resolve into a second interaction that has already paid out by the time anyone could choose,
     // so offering a re-roll on one would either strand the sub-game or pay it twice. Spending the day's single
     // use on a wedge it cannot apply to would be the worst of both.
-    const subGame = prize.kind === "mini_wheel" || prize.kind === "bonus_game";
+    const subGame = prize.kind === "mini_wheel" || prize.kind === "bonus_game" || prize.kind === "pickem";
     const dealer = !subGame && (await claimPowerUse(buyerId, "dealer_s_choice"));
     if (prize.kind === "mini_wheel") { miniWheel = await rollMiniWheel(buyerId); display = { sprite: P(prize.sprite), text: "Mini Wheel — a richer spin!" }; }
     else if (prize.kind === "bonus_game") { bonusGame = await rollBonusGame(buyerId); display = { sprite: P(prize.sprite), text: "Bonus Game — pick your gear!" }; }
+    else if (prize.kind === "pickem") { pickEm = await rollPickEm(buyerId); display = { sprite: P(prize.sprite), text: "The Offering — choose a pumpkin." }; }
     // Held, not paid. The member has not chosen yet, and a prize that has been handed over cannot be swapped
     // for the other one without clawing it back.
     else if (dealer) {
@@ -907,8 +1077,9 @@ export async function doSpin(buyerId) {
         jackpot: Boolean(prize.jackpot), mini: Boolean(prize.mini), rare: Boolean(prize.rare),
         respin: Boolean(prize.kind === "respin"),
         miniWheel: Boolean(prize.kind === "mini_wheel"), bonusGame: Boolean(prize.kind === "bonus_game"),
+        pickEm: Boolean(prize.kind === "pickem"),
     };
-    return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, refunded, lucky, dealer, ...(await getSpinState(buyerId)) };
+    return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, pickEm, refunded, lucky, dealer, ...(await getSpinState(buyerId)) };
 }
 
 // ── DEALER'S CHOICE: THE SECOND WEDGE, AND THE DECISION ──────────────────────────────────────────────────────
@@ -975,6 +1146,7 @@ export async function resetSpin(buyerId) {
 export async function ownerSpinTrigger(buyerId, what) {
     if (!buyerId || !isOwner(buyerId)) return { ok: false, error: "forbidden" };
     if (what === "bonus") { const bonusGame = await rollBonusGame(buyerId); return { ok: true, bonusGame, ...(await getSpinState(buyerId)) }; }
+    if (what === "offering") { const pickEm = await rollPickEm(buyerId); return { ok: true, pickEm, ...(await getSpinState(buyerId)) }; }
     if (what === "mini") { const miniWheel = await rollMiniWheel(buyerId); return { ok: true, miniWheel, ...(await getSpinState(buyerId)) }; }
     return { ok: false, error: "bad_trigger" };
 }

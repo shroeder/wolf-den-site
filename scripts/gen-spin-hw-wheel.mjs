@@ -74,6 +74,29 @@ const JOBS = [
             + "transparent center and transparent outside the ring. " + STYLE,
     },
     {
+        // The wedge icon for THE OFFERING. It sits on the disc with the other nineteen prize sprites, so it is
+        // briefed like one of those and not like the wheel furniture above: a single object, die-cut, read at
+        // about 40px. Three pumpkins rather than one, because the pick-em is a choice BETWEEN three and the
+        // icon should say so before the round opens.
+        slug: "offering",
+        out: "public/images/spin/prizes/offering.png",
+        prompt: "Three small carved jack-o-lanterns sitting side by side in a row on a weathered wooden board, "
+            + "the middle one slightly larger and turned forward, each lit from within with a warm orange glow "
+            + "through its carved eyes and grin. A single compact group filling the frame, read as one object. "
+            + STYLE,
+    },
+    {
+        // The face of an UNOPENED pumpkin in the pick-em. One pumpkin, not the trio above: the three cards
+        // have to read as three of the same thing, and a trio drawn on each of three cards is nine pumpkins
+        // and no signal. Closed and unlit, because what is inside it is the question the round asks.
+        slug: "offer-lid",
+        out: "out/hw-wheel/offer-lid-raw.png",
+        prompt: "A single carved jack-o-lantern pumpkin seen from the front, sitting closed with its lid on "
+            + "and a short curled stem, its carved triangular eyes and jagged grin DARK and unlit with no "
+            + "light inside it and no glow. Deep orange ribbed rind, a couple of dry leaves at its base. One "
+            + "object, centered, filling the frame. " + STYLE,
+    },
+    {
         slug: "hw-pointer",
         // ⚠️ THE FANG IS SHORT ON PURPOSE AND THE BRIEF SAYS SO TWICE. The tip has to park at 0.78 rotor
         // radii to clear the prize icons, and the whole ornament is scaled to make that true — so every
@@ -122,8 +145,12 @@ if (!DRAW_ONLY) {
         });
         const body = await res.json();
         if (!res.ok) throw new Error(`${j.slug}: ${res.status} ${JSON.stringify(body).slice(0, 300)}`);
-        fs.writeFileSync(path.join(PARTS, `${j.slug}.png`), Buffer.from(body.data[0].b64_json, "base64"));
-        console.log(`  painted ${j.slug}`);
+        // A job with an `out` is a finished asset in its own right (the wedge icon); everything else is a
+        // part that the composite below assembles.
+        const dest = j.out || path.join(PARTS, `${j.slug}.png`);
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.writeFileSync(dest, Buffer.from(body.data[0].b64_json, "base64"));
+        console.log(`  painted ${j.slug} -> ${dest}`);
     }
 } else {
     console.log("--draw: compositing from the parts already in out/hw-wheel, no generation.");

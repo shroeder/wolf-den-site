@@ -53,3 +53,17 @@ export function halloweenSwap(tier, roll = Math.random(), ghostRoll = Math.rando
     if (roll >= HALLOWEEN_SUBSTITUTION) return tier;
     return ghostRoll < GHOST_SHARE ? "hw_ghost" : swap;
 }
+
+// ── THE UNQUIET IS THE WHEEL'S SET, AND ONLY THE WHEEL'S ─────────────────────────────────────────────────
+// Luke: "a set for halloween you can only get from the wheel during halloween."
+//
+// Three Halloween sets were authored together and all three dropped from Halloween CHESTS. That was already
+// odd for this one: The Unquiet's bonuses are wheel luck and a free-respin capstone, and sets.js files it
+// under `feature: "wheel"`, so the one set whose every line is about the wheel was the one you could not win
+// at it. It comes off the chest table and onto THE OFFERING (see spin.js) — its only source while the event
+// is up, and no source at all once the event is down.
+//
+// ⚠️ THE OTHER TWO STAY ON CHESTS. Hollowed Harvest (farm) and Gravebound (depth) have nothing to do with the
+// wheel, and moving them there would make one wedge the source of fifteen pieces in a month — which is not a
+// chase, it is a queue. Only the wheel's own set moves.
+export const HALLOWEEN_WHEEL_SET = "hw_unquiet";

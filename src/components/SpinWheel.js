@@ -85,8 +85,9 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
     const [celebrate, setCelebrate] = useState(null);
     const [mini, setMini] = useState(null);       // { prizes, index, prize } bonus mini-wheel
     const [bonus, setBonus] = useState(null);      // { reveals } pick-a-box gear game
+    const [offer, setOffer] = useState(null);      // THE OFFERING — the Hallowe'en pick-one-of-three
     const [inspect, setInspect] = useState(null);  // a legend prize the player tapped to inspect
-    useScrollLock(Boolean(celebrate) || Boolean(mini) || Boolean(bonus) || Boolean(inspect));
+    useScrollLock(Boolean(celebrate) || Boolean(mini) || Boolean(bonus) || Boolean(offer) || Boolean(inspect));
     const [msg, setMsg] = useState(null);
     const [refundFlash, setRefundFlash] = useState(false); // Wheelwarden capstone: "FREE SPIN!" celebration
     const [lowCoins, setLowCoins] = useState(false);
@@ -99,6 +100,8 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
     const runSpinRef = useRef(null);
     const bonusRef = useRef(null);
     useEffect(() => { bonusRef.current = bonus; }, [bonus]); // current bonus state for the flip guard (no stale closure)
+    const offerRef = useRef(null);
+    useEffect(() => { offerRef.current = offer; }, [offer]);
     useEffect(() => { rotRef.current = rot; }, [rot]);
 
     // Open the match-3 board from a fresh bonusGame payload OR a bonusResume (revealed tiles pre-filled).
@@ -109,11 +112,26 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
         setBonus({ size: payload.size, need: payload.need || 3, roster: payload.roster || [], complete: Boolean(payload.complete), chest: payload.chest || null, flipped, done: false, won: null, busy: false });
     }, []);
 
+    // THE OFFERING opens the same way: from a fresh payload, or from an unpicked one found on load.
+    const openOffer = useCallback((payload) => {
+        if (!payload) return;
+        setOffer({
+            size: payload.size || 3, complete: Boolean(payload.complete), chest: payload.chest || null,
+            setName: payload.setName || "The Unquiet",
+            found: payload.found, total: payload.total,
+            picked: null, reveal: null, busy: false,
+        });
+    }, []);
+
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/spin", { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
-        if (d) { setSt(d); if (d.bonusResume && !bonusRef.current) openBonus(d.bonusResume); } // resume an unfinished game
-    }, [openBonus]);
+        if (d) {
+            setSt(d);
+            if (d.bonusResume && !bonusRef.current) openBonus(d.bonusResume);   // resume an unfinished game
+            if (d.offerResume && !offerRef.current) openOffer(d.offerResume);   // ...or an unpicked Offering
+        }
+    }, [openBonus, openOffer]);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount (setState is post-await, not sync)
     useEffect(() => { load(); return () => { clearTimeout(timerRef.current); cancelAnimationFrame(rafRef.current); }; }, [load]);
 
@@ -182,11 +200,12 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
         timerRef.current = setTimeout(() => {
             cancelAnimationFrame(rafRef.current);
             setSpinning(false); setPhase("idle");
-            setSt((s) => ({ ...s, ...d, prize: undefined, miniWheel: undefined, bonusGame: undefined }));
+            setSt((s) => ({ ...s, ...d, prize: undefined, miniWheel: undefined, bonusGame: undefined, pickEm: undefined }));
             if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
             // Route to the right outcome.
             if (d.prize?.miniWheel && d.miniWheel) { setMini({ ...d.miniWheel, rot: 0, spinning: false, revealed: false }); playWin("bonus"); return; }
             if (d.prize?.bonusGame && d.bonusGame) { openBonus(d.bonusGame); playWin("bonus"); return; }
+            if (d.prize?.pickEm && d.pickEm) { openOffer(d.pickEm); playWin("bonus"); return; }
             setResult(d.prize);
             const kind = d.prize?.jackpot ? "jackpot" : d.prize?.mini ? "mini" : d.prize?.respin ? "bonus" : null;
             // The major jackpot gets to breathe — 4.6s was barely past the shockwave for a once-in-133 win.
@@ -197,7 +216,7 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
             if (d.prize?.respin && chainRef.current < 6) { chainRef.current += 1; setTimeout(() => runSpinRef.current?.(), 1400); }
             else chainRef.current = 0;
         }, SPIN_MS);
-    }, [startTickLoop, openBonus, liveAngle]);
+    }, [startTickLoop, openBonus, openOffer, liveAngle]);
     useEffect(() => { runSpinRef.current = runSpin; }, [runSpin]);
 
     const spin = useCallback(async () => {
@@ -277,6 +296,26 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
         const t = setTimeout(() => onMiniLanded(), 4200);
         return () => clearTimeout(t);
     }, [mini, onMiniLanded]);
+
+    // ── OPEN ONE PUMPKIN ─────────────────────────────────────────────────────────────────────────────────
+    // One irreversible tap. The guard is `busy || picked != null` rather than a disabled attribute alone,
+    // because the three pumpkins are the only thing on screen and a double-tap on a phone is the normal way
+    // to press something — a second POST would come back "done" and read to the member as the round breaking.
+    const chooseOffer = useCallback(async (i) => {
+        const cur = offerRef.current;
+        if (!cur || cur.busy || cur.picked != null) return;
+        setOffer((o) => (o ? { ...o, busy: true } : o));
+        const r = await fetch("/api/marketplace/spin", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "pickem_choose", index: i }),
+        }).catch(() => null);
+        const d = r?.ok ? await r.json().catch(() => null) : null;
+        if (!d?.ok) { setOffer((o) => (o ? { ...o, busy: false } : o)); return; }
+        setOffer((o) => (o ? { ...o, busy: false, picked: d.picked, reveal: d.reveal, won: d.won, text: d.text } : o));
+        setSt((prev) => ({ ...prev, ...d, prize: undefined, pickEm: undefined }));
+        if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
+        try { playWin(d.won?.kind === "piece" ? "rare" : "normal"); } catch { /* audio is never load-bearing */ }
+    }, []);
 
     const revealBonus = useCallback(async (i) => {
         const b = bonusRef.current; // read CURRENT state via ref — the old `allow`-in-updater trick never ran in time
@@ -549,6 +588,72 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
                             </div>
                         ) : (
                             <p className="cw-bonus-hint">Tap ✕ to step away — your board is saved and you can finish it later.</p>
+                        )}
+                    </div>
+                </div></Portal>
+            ) : null}
+
+            {/* ── THE OFFERING — the Hallowe'en pick-one-of-three ──────────────────────────────────────
+                Three carved pumpkins, face down. One tap, and the other two open to show what was in them.
+
+                ⚠️ THE OTHER TWO ARE REVEALED ON PURPOSE, and it is the whole point of a pick-em. A round
+                that only showed what you won would be a random grant with a tap in front of it; seeing the
+                piece you walked past is what makes the choice a choice. It is also why the contents never
+                reach the client until after the pick — see rollPickEm. */}
+            {offer ? (
+                <Portal><div className="cw-bonus-full">
+                    {/* Closable before picking BECAUSE it resumes (offerResume). Stepping away from an
+                        unpicked Offering costs nothing; it is waiting on the next load. */}
+                    <button type="button" className="cw-bonus-close" onClick={() => setOffer(null)} aria-label="Close">✕</button>
+                    <div className="cw-bonus-inner">
+                        <div className="cw-bonus-title">{offer.complete ? "🎃 The Unquiet is yours" : "🎃 The Offering"}</div>
+                        <p className="cw-bonus-sub">
+                            {offer.picked != null
+                                ? offer.text
+                                : offer.complete
+                                    ? <>Every piece of <b>{offer.setName}</b> is already in your cabinet, so tonight&rsquo;s offering pays <b>{offer.chest?.label ? `a ${offer.chest.label}` : "a chest"}</b>. Choose anyway.</>
+                                    : <>Two of these hide a piece of <b>{offer.setName}</b> — won here and nowhere else. One is empty. Choose one.</>}
+                        </p>
+                        {offer.found != null && offer.total ? (
+                            <p className="cw-offer-prog">{offer.found} of {offer.total} found</p>
+                        ) : null}
+
+                        <div className="cw-offer-row">
+                            {Array.from({ length: offer.size }).map((_, i) => {
+                                const card = offer.reveal ? offer.reveal[i] : null;
+                                const won = offer.picked === i;
+                                return (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        className={`cw-offer-pick${card ? " is-open" : ""}${won ? " is-won" : ""}${offer.picked != null && !won ? " is-passed" : ""}`}
+                                        style={card ? { "--rar": rarCol(card.rarity) } : undefined}
+                                        onClick={() => chooseOffer(i)}
+                                        disabled={offer.busy || offer.picked != null}
+                                        aria-label={card ? card.name : `Pumpkin ${i + 1}`}
+                                    >
+                                        {card ? (
+                                            <>
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                {card.sprite ? <img src={card.sprite} alt="" className="cw-offer-img" /> : null}
+                                                <span className="cw-offer-name">{card.name}</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src="/images/spin/prizes/offer-lid.webp" alt="" className="cw-offer-img cw-offer-lid" />
+                                                <span className="cw-offer-name">?</span>
+                                            </>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {offer.picked != null ? (
+                            <button type="button" className="cw-collect" onClick={() => setOffer(null)}>Collect</button>
+                        ) : (
+                            <p className="cw-bonus-hint">Tap ✕ to step away — the offering keeps until you choose.</p>
                         )}
                     </div>
                 </div></Portal>
@@ -863,6 +968,36 @@ const CW_CSS = `
 .cw-bonus-win-txt { position: relative; font-size: 1.2rem; color: #ecd6bc; } .cw-bonus-win-txt b { color: #fff; }
 .cw-bonus-win-stats { position: relative; font-size: 0.9rem; font-weight: 800; color: #d7e9ff; background: rgba(255,255,255,0.06); border: 1px solid color-mix(in srgb, var(--rar) 45%, transparent); border-radius: 999px; padding: 4px 12px; }
 .cw-bonus-hint { margin-top: 10px; font-size: 11px; color: #9a8fc0; }
+
+/* ── THE OFFERING ────────────────────────────────────────────────────────────────────────────────────────
+   Three big tap targets in a row. They stay a row at every width rather than wrapping to a grid: the whole
+   read of a pick-em is "these three are the same and one of them is yours", and a 2+1 wrap says one of them
+   is different. On a narrow phone they shrink instead. */
+.cw-offer-prog { margin: 2px 0 0; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: #c9a6ff; text-transform: uppercase; }
+.cw-offer-row { display: flex; gap: 10px; justify-content: center; align-items: stretch; margin: 16px 0 4px; width: 100%; max-width: 460px; }
+.cw-offer-pick { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 12px 6px 10px; border-radius: 16px; cursor: pointer;
+    background: linear-gradient(180deg, rgba(60,30,80,0.92), rgba(28,14,40,0.96));
+    border: 2px solid rgba(255,150,40,0.35); color: #f6e9d2;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.5); transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease;
+    -webkit-tap-highlight-color: transparent; }
+.cw-offer-pick:not(:disabled):hover { transform: translateY(-4px); border-color: rgba(255,170,60,0.75); box-shadow: 0 10px 24px rgba(0,0,0,0.6), 0 0 22px rgba(255,140,30,0.35); }
+.cw-offer-pick:disabled { cursor: default; }
+.cw-offer-img { width: 100%; max-width: 86px; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
+/* The unopened lid flickers like the candle inside it. Each one on its own cadence so three pumpkins sitting
+   side by side never pulse in step, which reads as a loading state rather than as candlelight. */
+.cw-offer-pick:not(.is-open) .cw-offer-lid { animation: cwOfferFlicker 2.6s ease-in-out infinite; }
+.cw-offer-pick:nth-child(2):not(.is-open) .cw-offer-lid { animation-duration: 3.3s; animation-delay: .4s; }
+.cw-offer-pick:nth-child(3):not(.is-open) .cw-offer-lid { animation-duration: 2.1s; animation-delay: .9s; }
+@keyframes cwOfferFlicker { 0%, 100% { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)) brightness(1); }
+                            50%      { filter: drop-shadow(0 3px 10px rgba(255,130,20,0.5)) brightness(1.14); } }
+.cw-offer-name { font-size: 11.5px; font-weight: 800; line-height: 1.2; text-align: center; text-wrap: balance; }
+/* The one you took is lit in its own rarity colour; the two you passed go quiet. Both states are needed —
+   a reveal where everything looks equally won does not tell you what you chose. */
+.cw-offer-pick.is-won { border-color: var(--rar, #ffd75e); box-shadow: 0 0 0 2px var(--rar, #ffd75e), 0 10px 26px rgba(0,0,0,0.6), 0 0 34px color-mix(in srgb, var(--rar, #ffd75e) 55%, transparent); }
+.cw-offer-pick.is-won .cw-offer-name { color: var(--rar, #ffd75e); }
+.cw-offer-pick.is-passed { opacity: 0.44; filter: saturate(0.5); }
+@media (prefers-reduced-motion: reduce) { .cw-offer-pick .cw-offer-lid { animation: none; } }
 
 .cw-celebrate { position: fixed; inset: 0; z-index: 320; display: grid; place-items: center; background: rgba(6,4,10,0.72); backdrop-filter: blur(3px); }
 .cw-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }

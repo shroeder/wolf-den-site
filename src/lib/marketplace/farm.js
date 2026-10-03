@@ -224,13 +224,23 @@ export async function farmNeighbours(viewerId, { limit = 8 } = {}) {
 
 // The farm's own collection sets, for the permanent panel on the farm screen. Owned-based (see sets.js).
 async function farmCollections(buyerId) {
-    const [{ collectionsForFeature }, { getOwnedPieceIds: ownedPieces }] = await Promise.all([
+    const [{ collectionsForFeature }, { getOwnedSetIds: ownedForSets }] = await Promise.all([
         import("@/lib/marketplace/sets.js"),
         import("@/lib/marketplace/collection-owned.js"),
     ]);
-    // Collections count TROPHIES, which live in mkt_user_collection — reading the item bag here would
-        // report every set as 0 collected.
-        return collectionsForFeature("farm", await ownedPieces(buyerId).catch(() => []));
+    // ⚠️ THE PANEL MUST ASK THE SAME QUESTION THE BONUS ASKS. This read getOwnedPieceIds, with a comment
+    // saying collections count TROPHIES and that reading the item bag would report every set as 0. That was
+    // true when every collection set was made of trophies. It is not any more: the three Hallowe'en sets
+    // (Hollowed Harvest, Gravebound, The Unquiet) are made of real ITEMS, which live in mkt_user_item — so
+    // the trophy table reported exactly the 0 the comment was warning about, and the inversion was invisible
+    // because the BONUS reads getOwnedSetIds and was paying out correctly the whole time. A member could hold
+    // three pieces of The Unquiet, be getting its wheel luck, and see "0/5 found" on the screen that exists
+    // to show the chase.
+    //
+    // getOwnedSetIds is gear + trophies, and it is the function every set bonus in the game already goes
+    // through, so panel and payout now agree by construction rather than by two call sites staying in step.
+    // It costs one extra query on a screen-load path, which is the right trade for a number that was wrong.
+        return collectionsForFeature("farm", await ownedForSets(buyerId).catch(() => []));
 }
 
 // Resolve a farm owner by @alias (for inspecting someone else's farm). Returns { id, name, alias } or null.
