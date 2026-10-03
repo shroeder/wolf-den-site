@@ -19,7 +19,7 @@ import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { itemById, ITEMS, isOwnerOnlyItem, isForgedItem } from "@/lib/marketplace/items.js";
 import { recordGift } from "@/lib/marketplace/gifts.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
-import { memberDamageMult, memberBonusStrikes, activeBoosts } from "@/lib/marketplace/consumables.js";
+import { memberDamageMult, memberEdgeMult, memberBonusStrikes, activeBoosts } from "@/lib/marketplace/consumables.js";
 import { signatureStrikeBonus, signatureForcesCrit, signatureHit, signatureOnHit, beastbondMult, warbannerBonusForItem, rollCheerProcs } from "@/lib/marketplace/signatures.js";
 import { grantDoubloons } from "@/lib/marketplace/sailing.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
@@ -1420,7 +1420,22 @@ export async function attackBoss(buyerId) {
     // player learning a rule and a player concluding an item is broken. Whether a consumable SHOULD be clipped
     // by a ceiling that exists to contain runaway GEAR is a balance question and is Luke's, not mine.
     const capped = raw > BOSS_MULT_CAP ? Math.round((raw / BOSS_MULT_CAP) * 100) / 100 : 0;
-    const damage = Math.round(swing.damage * stack + (onHit.bonusDamage || 0));
+    // ── THE WHETSTONE SHARPENS THE SWING, NOT THE STACK ──────────────────────────────────────────────────
+    // ⚠️ IT IS OUTSIDE Math.min(BOSS_MULT_CAP, …) ON PURPOSE, AND THAT IS THE ENTIRE ITEM. Every other
+    // damage consumable joins `buffMult` and is therefore inside `raw`, which the line above clips at 20 —
+    // so for the members whose gear already stacks past the ceiling (ValkyrieSylve's is ~9.5) a ×3 potion
+    // pays exactly what a ×2 pays, which is what she reported and what the note above explains. A consumable
+    // that does nothing for the people most likely to drink it is not much of a consumable.
+    //
+    // The whetstone multiplies the BASE instead. Multiplying swing.damage is identical to multiplying the
+    // base inside manualHit — crit is a flat multiple of the roll, so the two commute — and it stays out of
+    // the capped product, so +25% is +25% for everybody, at the ceiling or nowhere near it.
+    //
+    // It is deliberately smaller than the potions (see hw_whetstone in consumables.js). This is not a way
+    // around the ceiling for the whole roster; it is the one consumable whose worth does not depend on how
+    // much gear you are already carrying.
+    const edgeMult = await memberEdgeMult(buyerId).catch(() => 1);
+    const damage = Math.round(swing.damage * edgeMult * stack + (onHit.bonusDamage || 0));
     const crit = swing.crit;
     const ability = pickAbility(crit);
 

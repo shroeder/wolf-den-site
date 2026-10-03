@@ -139,6 +139,42 @@ export const CONSUMABLES = {
     candy_chocolate_skull: { name: "Chocolate Skull", emoji: "💀", kind: "candy", price: null, desc: "Instantly gain 1,200 XP. Fixed — Happy Hour does not multiply it.", effect: { type: "xp", amount: 1200 } },
     candy_popcorn_ball: { name: "Popcorn Ball", emoji: "🍿", kind: "candy", price: null, desc: "Gain +3 wheel spins.", effect: { type: "spin_token", amount: 3 } },
     candy_licorice_bat: { name: "Licorice Bat", emoji: "🦇", kind: "candy", price: null, desc: "A haul of 8 fertilizer for your crops.", effect: { type: "farm_fertilizer", count: 8 } },
+
+    // ── ALL HALLOWS' RELICS — the rung above the candy ───────────────────────────────────────────────────
+    // Luke: "consumables Halloween specific, pet xp, char xp, halloween sharpening stone increases base wpn
+    // damage."
+    //
+    // ⚠️ THE PET-XP AND CHAR-XP ONES ALREADY EXISTED AS CANDY, and these do not replace them. Candy Corn
+    // (+500 pet XP) and the Chocolate Skull (+1,200 XP) are the COMMONEST thing a Hallowe'en chest pays —
+    // deliberately, it is what you get most times you open one. Adding a second +500 candy would have
+    // diluted that pool with a duplicate. These are the same two ideas at a tier worth chasing, on their own
+    // rarer rung (see HW_RELIC_CHANCE in chests.js), next to the thing that is genuinely new.
+    //
+    // They are `price: null` and no shop lists them, so the only way to one is a Hallowe'en chest — which
+    // cannot be granted at all while HALLOWEEN_PUBLIC is false. That is the whole gate.
+    hw_soul_cake: { name: "Soul Cake", emoji: "🍰", kind: "treat", price: null,
+        desc: "Feed your equipped pet +1,500 pet XP.", effect: { type: "pet_xp", amount: 1500 } },
+    hw_black_almanac: { name: "The Black Almanac", emoji: "📕", kind: "scroll", price: null,
+        desc: "Instantly gain 5,000 XP. Fixed — Happy Hour does not multiply it.", effect: { type: "xp", amount: 5000 } },
+    // ── AND THE ONE THAT IS A NEW LEVER, NOT A BIGGER NUMBER ─────────────────────────────────────────────
+    // Every damage consumable in the game multiplies the strike: ×2, ×3, for N hours. That product is
+    // clipped by BOSS_MULT_CAP (20), and for the strongest members in the Den it is ALREADY clipped before
+    // they drink anything — ValkyrieSylve's gear stack alone is ~9.5, so her Bottled Fury (×3) paid her the
+    // same number as a Berserker's Brew (×2) and she reported it as a bug. It was not a bug; it was a
+    // ceiling nobody could see.
+    //
+    // The whetstone raises the BASE of the swing instead, which sits inside swing.damage — before might,
+    // before the roll, and OUTSIDE the capped product. So it is the one damage consumable that still does
+    // something for a member the ceiling is already deciding, and the only one whose value does not quietly
+    // depend on how much gear you have. See the note at the damage line in boss.js.
+    //
+    // ⚠️ IT IS WEAKER THAN THE POTIONS FOR EVERYONE ELSE, AND THAT IS THE DESIGN. +25% against a ×2 is a
+    // quarter of the gain for a member nowhere near the cap. The stone is the late-game consumable; the
+    // potions stay the early-game ones; neither obsoletes the other. 25 and 12 are the two numbers to move
+    // if Luke wants it pitched differently — they are the whole balance of the item.
+    hw_whetstone: { name: "Hallowed Whetstone", emoji: "🪓", kind: "stone", price: null,
+        desc: "Sharpen your blade: +25% BASE damage on your daily strikes for 12 hours. Unlike the potions, this is not clipped when your multipliers hit their ceiling.",
+        effect: { type: "edge", pct: 25, hours: 12 } },
 };
 
 // Inject the tiered seed packs from the shared catalog (single source of truth for tiers/weights/prices).
@@ -264,6 +300,16 @@ export async function memberDamageMult(buyerId) {
     return rows.reduce((m, r) => Math.max(m, Number(r.magnitude) || 1), 1);
 }
 
+// ── THE WHETSTONE: THE SAME RULE, A DIFFERENT PLACE IN THE SUM ───────────────────────────────────────────────
+// Strongest-wins, exactly like the damage multiplier above — two whetstones are not +50%. What differs is
+// WHERE it lands: this multiplies the base of the swing rather than joining the capped product, so it is the
+// one that still pays a member whose multipliers are already at BOSS_MULT_CAP. See boss.js.
+export async function memberEdgeMult(buyerId) {
+    if (!buyerId) return 1;
+    const rows = await db.query(`SELECT magnitude FROM mkt_user_boost WHERE buyer_id = $1 AND kind = 'edge' AND expires_at > NOW()`, [buyerId]).catch(() => []);
+    return rows.reduce((m, r) => Math.max(m, Number(r.magnitude) || 1), 1);
+}
+
 // ── AND THERE IS A LIMIT TO HOW MANY TIMES A DAY YOU CAN SWING ───────────────────────────────────────────────
 // Strikes DO add up — that is the right shape for them, and unlike the damage multiplier it is linear, so ten
 // vials is ten times one vial rather than a thousand. But it had no ceiling at all, and the supply here is a
@@ -289,9 +335,13 @@ export async function activeBoosts(buyerId) {
     // attacks" show as "+10 attacks today", not two identical badges).
     let strikeTotal = 0; let strikeExpiry = null;
     const damage = new Map(); // magnitude → { count, expiresAt }
+    const edge = new Map();   // magnitude → { count, expiresAt } — the whetstone
     for (const r of rows) {
         if (r.kind === "strikes") { strikeTotal += Number(r.magnitude) || 0; strikeExpiry = r.expires_at; }
         else if (r.kind === "damage") { const m = Number(r.magnitude); const cur = damage.get(m) || { count: 0, expiresAt: r.expires_at }; cur.count += 1; cur.expiresAt = r.expires_at; damage.set(m, cur); }
+        // Same shape as damage: keyed by magnitude so two different strengths read as two badges and two of
+        // the same read as one. A buff with no badge is the complaint this whole function exists to answer.
+        else if (r.kind === "edge") { const m = Number(r.magnitude); const cur = edge.get(m) || { count: 0, expiresAt: r.expires_at }; cur.count += 1; cur.expiresAt = r.expires_at; edge.set(m, cur); }
     }
     // ── AND IT SAYS WHAT IS ACTUALLY APPLYING ────────────────────────────────────────────────────────────
     // This used to print "2× damage (×4)" for four brews, which read as eight — or as sixteen, which is what
@@ -315,6 +365,14 @@ export async function activeBoosts(buyerId) {
         out.push({ kind: "damage", magnitude: m, expiresAt: info.expiresAt,
             label: `${m}× damage${isTop ? "" : " (waiting — a stronger one is running)"}` });
     }
+    // The whetstone reads as a PERCENTAGE, not a multiple, because that is what it is and because "1.25×
+    // damage" sitting beside "2× damage" would read as the weaker of the two when it is frequently the only
+    // one of the pair doing anything. Strongest-wins here too, so the queued ones say so.
+    const topEdge = Math.max(1, ...[...edge.keys()]);
+    for (const [m, info] of edge) {
+        out.push({ kind: "edge", magnitude: m, expiresAt: info.expiresAt,
+            label: `+${Math.round((m - 1) * 100)}% base damage${m === topEdge ? "" : " (waiting — a sharper one is running)"}` });
+    }
     return out;
 }
 
@@ -331,7 +389,7 @@ export async function activeBoosts(buyerId) {
 // is, and the one that got missed would be the one nobody could find — which is the bug this is fixing. The
 // effect a thing HAS is already the honest answer to which screen it belongs on.
 const FEATURE_BY_EFFECT = {
-    strikes: "boss", damage: "boss",
+    strikes: "boss", damage: "boss", edge: "boss",
     recharge: "gear", reset_cooldown: "gear",
     forge_enhance: "forge", forge_enchant: "forge", forge_ascend: "forge",
     pet_xp: "pets", pet_level: "pets",
@@ -555,6 +613,9 @@ export function stackNote(id) {
     if (e.type === "damage") {
         return `Using another of the same strength adds ${e.hours}h to the clock rather than raising the multiplier. A stronger boost takes over while it lasts.`;
     }
+    if (e.type === "edge") {
+        return `Using another adds ${e.hours}h to the clock rather than sharpening it further — the same rule the damage potions follow.`;
+    }
     if (e.type === "strikes") return `Extra strikes add up, to a maximum of ${MAX_POTION_STRIKES} a day from potions.`;
     if (e.type === "xp") return "Each one pays its own XP. Using several is the same as using them one at a time.";
     if (e.type === "spin_token") return "Tokens add to your pile. Nothing is lost by holding them.";
@@ -563,7 +624,7 @@ export function stackNote(id) {
 }
 
 export const BULK_USE_CAP = 25;
-const BULK_USABLE = new Set(["xp", "strikes", "damage", "spin_token"]);
+const BULK_USABLE = new Set(["xp", "strikes", "damage", "spin_token", "edge"]);
 
 /** Is there a sensible "use all" for this consumable? The shelf asks so it can draw the button. */
 export const canBulkUse = (id) => BULK_USABLE.has(CONSUMABLES[id]?.effect?.type);
@@ -894,6 +955,27 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         applied = ext
             ? `${e.mult}× boss damage extended by ${e.hours}h`
             : `${e.mult}× boss damage for ${e.hours}h`;
+    } else if (e.type === "edge") {
+        // ⚠️ EXTEND, NEVER STACK — the Nicholas bug, avoided rather than repeated. The damage branch above
+        // learned this the expensive way: every use INSERTed its own row, memberDamageMult took the
+        // strongest, and "use all" shredded twenty-five bottles for the effect of one. Written the same way
+        // from the start here, because this item is bulk-usable too.
+        const mag = 1 + (Number(e.pct) || 0) / 100;
+        const ext = await db.queryOne(
+            `UPDATE mkt_user_boost
+                SET expires_at = expires_at + ($3 || ' hours')::interval
+              WHERE ctid = (SELECT ctid FROM mkt_user_boost
+                             WHERE buyer_id = $1 AND kind = 'edge' AND magnitude = $2 AND expires_at > NOW()
+                             ORDER BY expires_at DESC LIMIT 1)
+              RETURNING expires_at`,
+            [buyerId, mag, String(e.hours)],
+        ).catch(() => null);
+        if (!ext) {
+            await db.query(`INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'edge', $2, NOW() + ($3 || ' hours')::interval)`, [buyerId, mag, String(e.hours)]).catch(() => {});
+        }
+        applied = ext
+            ? `+${e.pct}% base strike damage extended by ${e.hours}h`
+            : `+${e.pct}% base strike damage for ${e.hours}h`;
     }
     // Every other branch above tracks its use; this one never did, so spin tokens, XP scrolls, strike potions
     // and damage potions were all invisible to telemetry. That's how 1,213 XP-scroll uses in 90 minutes left no

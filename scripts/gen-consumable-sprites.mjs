@@ -55,6 +55,13 @@ const SUBJECTS = {
     // crystal rather than a cut jewel so it does not read as a shop gem at 40px — the silhouette has to say
     // "raw thing you FOUND", because that is the only way anybody gets one.
     prismatic_stone: "A single rough-cut PRISMATIC STONE the size of a fist — a raw angular crystal, its broad facets splitting light into bands of orange, magenta, cyan and gold like the inside of an opal, a molten orange core burning deep inside it, crisp bright specular highlights along the sharpest edges, three or four tiny chips of the same crystal floating just off its surface. Uncut and natural, not a jeweller's gemstone, no setting, no metal, no ring. Rendered as a GLOSSY THREE-DIMENSIONAL object with soft depth, rich internal reflections and refraction through the crystal, only a thin dark contour where it needs one — not flat vector art and not a thick cartoon outline",
+    // ── ALL HALLOWS' RELICS ──────────────────────────────────────────────────────────────────────────
+    // Objects, not effects, like the rest of this map. The almanac is CLOSED and CLASPED on purpose: the
+    // house note at the top of this file says an unfurled scroll comes back with misspelled words printed on
+    // it, and an open book is the same trap with more surface to write on.
+    hw_whetstone: "A rectangular dark-grey WHETSTONE block with worn rounded corners and a honed groove down its face, bound at one end with a strip of black leather, a line of orange ember-light burning along its sharpened edge and a wisp of smoke curling off it",
+    hw_soul_cake: "A small round spiced SOUL CAKE — a golden-brown baked bun dusted with sugar, plump dark currants pressed into the top in a simple cross shape, one bite of warm crumb showing at its edge",
+    hw_black_almanac: "A thick CLOSED BOOK bound in cracked black leather, held shut by two tarnished brass clasps, its page edges stained dark and gilded, a faint violet glow leaking from between the pages. Firmly closed — no open pages, no visible writing surface",
     delve_second_descent: "A heavy antique BRASS KEY, warm golden metal with dark tarnish in the crevices, its bow a circle of four interlocking rings and its bit cut with four distinct wards, bright cyan light burning in the cuts and along the shaft, strong highlights down one edge, older than any lock still standing",
 };
 

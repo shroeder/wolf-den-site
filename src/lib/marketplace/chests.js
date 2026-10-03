@@ -579,6 +579,16 @@ const HW_SIGNATURE_SHARE = 0.7;
 // GEAR would eat the chase the chest exists for. There are eight decorations and they come from the wheel
 // and the town glint as well, so the chest does not have to carry the set on its own.
 const HW_DECO_CHANCE = { hw_candycorn: 0.10, hw_pumpkin: 0.12, hw_skeleton: 0.14, hw_ghost: 0.16 };
+// ── THE RELIC RUNG ───────────────────────────────────────────────────────────────────────────────────────
+// Three Hallowe'en consumables that are worth opening a chest FOR, sitting between the decoration and the
+// candy. Rarer than a decoration and far rarer than candy, because two of them are simply big numbers and
+// the third changes what a strike is worth — see hw_whetstone in consumables.js.
+//
+// The ladder climbs the same way every other rung here does: the chance rises with the chest, the POOL never
+// changes. A ghost chest is four times as likely to pay a relic as a candy corn one, and neither of them can
+// pay a relic the other cannot.
+const HW_RELIC_CHANCE = { hw_candycorn: 0.04, hw_pumpkin: 0.06, hw_skeleton: 0.09, hw_ghost: 0.16 };
+const HW_RELICS = ["hw_whetstone", "hw_soul_cake", "hw_black_almanac"];
 
 async function openHalloweenChest(buyerId, tier, remaining) {
     await db.query(`INSERT INTO mkt_chest_open (buyer_id, tier, count, source) VALUES ($1, $2, 1, $3)`, [buyerId, tier, "open"]).catch(() => {});
@@ -656,6 +666,18 @@ async function openHalloweenChest(buyerId, tier, remaining) {
                 return { ok: true, remaining, decoration: { id, name: def.name, emoji: def.emoji, rarity: def.rarity, spriteUrl: art?.[id] || null } };
             }
         }
+    }
+
+    // ── A RELIC ──────────────────────────────────────────────────────────────────────────────────────────
+    // Unlike the three rungs above it, this one has nothing to check against what the member already owns:
+    // consumables stack, so a second Soul Cake is a second Soul Cake and not a blank reveal. That is also why
+    // it sits BELOW the decoration — a rung that can always pay would otherwise swallow the ones that can run
+    // out of things to give.
+    if (Math.random() < (HW_RELIC_CHANCE[tier] || 0)) {
+        const rid = HW_RELICS[Math.floor(Math.random() * HW_RELICS.length)];
+        await grantConsumable(buyerId, rid).catch(() => {});
+        const r = CONSUMABLES[rid];
+        return { ok: true, remaining, consumable: { id: rid, name: r.name, emoji: r.emoji, kind: r.kind, desc: r.desc } };
     }
 
     // ── CANDY ────────────────────────────────────────────────────────────────────────────────────────────
