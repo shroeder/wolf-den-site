@@ -15,7 +15,11 @@ import fs from "node:fs";
 process.env.DATABASE_URL = process.env.DATABASE_URL
     || fs.readFileSync(".env.local", "utf8").match(/^DATABASE_URL=["']?([^"'\r\n]+)/m)[1];
 
-const { CONSUMABLES, grantConsumable, useConsumable, memberEdgeMult } = await import("@/lib/marketplace/consumables.js");
+// ⚠️ RENAMED ON IMPORT, AND NOT FOR STYLE. eslint-plugin-react-hooks matches on the IDENTIFIER, so a
+// plain function called `useConsumable` reads as a React hook wherever it is called — and calling it at
+// the top level of a node script is then a rules-of-hooks error in a file that has never seen React.
+// Binding it to a non-`use` name is the whole fix.
+const { CONSUMABLES, grantConsumable, useConsumable: consume, memberEdgeMult } = await import("@/lib/marketplace/consumables.js");
 const { BOSS_MULT_CAP } = await import("@/lib/marketplace/boss.js");
 const { db } = await import("@/lib/db");
 
@@ -32,7 +36,7 @@ const before = await memberEdgeMult(ME);
 check("no edge boost running before the test", before === 1, `memberEdgeMult = ${before}`);
 
 await grantConsumable(ME, ID, 1);
-const used = await useConsumable(ME, ID);
+const used = await consume(ME, ID);
 check("using it succeeds", used?.ok === true, used?.applied || used?.error);
 
 const after = await memberEdgeMult(ME);
@@ -61,7 +65,7 @@ check(
 
 // ── 3. a second one extends rather than sharpening further ───────────────────────────────────────────────
 await grantConsumable(ME, ID, 1);
-await useConsumable(ME, ID);
+await consume(ME, ID);
 const twice = await memberEdgeMult(ME);
 check("a second whetstone does not raise the multiplier", Math.abs(twice - want) < 1e-9, `still ${twice}`);
 const rows = await db.query(`SELECT COUNT(*)::int AS n FROM mkt_user_boost WHERE buyer_id = $1 AND kind = 'edge' AND expires_at > NOW()`, [ME]);

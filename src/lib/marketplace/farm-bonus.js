@@ -44,7 +44,17 @@ export async function farmBonuses(buyerId) {
     for (const k of Object.keys(trophyFarm)) gearFarm[k] = (gearFarm[k] || 0) + trophyFarm[k];
     // (b2) FARM set tiers (Harvester / Forager). COLLECTION sets: owning the piece is what counts, so this
     // reads the owned list — nobody has to keep a farming loadout to farm well any more.
-    const setFarm = setFarmBonus(ownedPieces);
+    // ── ⚠️ THE SET TIERS READ GEAR TOO, AND THE PER-PIECE AFFIX ABOVE DOES NOT ──────────────────────────
+    // Two different questions off two different lists, and they are easy to collapse into one by accident.
+    // The affix above is a TROPHY'S OWN STAT and only trophies have one, so it reads mkt_user_collection.
+    // A set TIER asks "how many of this set do you own", and three of the collection sets are made of real
+    // ITEMS (the Hallowe'en three) rather than trophies — so asking the trophy table alone answered 0 for
+    // them and their need-2 and need-4 tiers paid nothing at all, silently, while their CAPSTONES worked
+    // fine because those already read getOwnedSetIds.
+    //
+    // getOwnedSetIds is gear + trophies, and collectedCounts only counts sets flagged `collection`, so no
+    // combat set can creep in through this door.
+    const setFarm = setFarmBonus(await getOwnedSetIds(buyerId).catch(() => []));
     const utilFarm = utilTotals.farm || {};
     // (a) decorations + (b) equipped gear farm affixes + (b2) farm set bonuses + (d) farm/pet badges + (e) forge attunements
     for (const k of Object.keys(out)) out[k] = (deco[k] || 0) + (gearFarm[k] || 0) + (setFarm[k] || 0) + (badgeFarm[k] || 0) + (utilFarm[k] || 0);

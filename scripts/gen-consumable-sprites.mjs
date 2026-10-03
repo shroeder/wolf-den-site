@@ -55,6 +55,16 @@ const SUBJECTS = {
     // crystal rather than a cut jewel so it does not read as a shop gem at 40px — the silhouette has to say
     // "raw thing you FOUND", because that is the only way anybody gets one.
     prismatic_stone: "A single rough-cut PRISMATIC STONE the size of a fist — a raw angular crystal, its broad facets splitting light into bands of orange, magenta, cyan and gold like the inside of an opal, a molten orange core burning deep inside it, crisp bright specular highlights along the sharpest edges, three or four tiny chips of the same crystal floating just off its surface. Uncut and natural, not a jeweller's gemstone, no setting, no metal, no ring. Rendered as a GLOSSY THREE-DIMENSIONAL object with soft depth, rich internal reflections and refraction through the crystal, only a thin dark contour where it needs one — not flat vector art and not a thick cartoon outline",
+    // ── THE CANDY ────────────────────────────────────────────────────────────────────────────────────
+    // The commonest thing a Hallowe'en chest pays, and all six were falling back to the generic teal potion —
+    // so the usual outcome of opening the event's own chest looked like a bottle of mystery liquid. Sweets
+    // are the easy case for the house rule at the top of this file: none of them has a label to misspell.
+    candy_corn: "Three CANDY CORN sweets in a small loose pile — tapered triangular candies banded white at the tip, orange in the middle and yellow at the base, glossy and waxy",
+    candy_caramel_apple: "A CARAMEL APPLE on a short wooden stick — a round red apple thickly coated in glossy amber caramel with a drip running down one side, chopped nuts pressed into the coating",
+    candy_sour_worm: "A single gummy SOUR WORM curled into an S — a ribbed translucent jelly worm banded lime green and cherry red, thickly dusted with sour sugar crystals",
+    candy_chocolate_skull: "A small SKULL moulded from dark chocolate, glossy and rounded with soft edges, a hairline crack across the crown and a dusting of cocoa",
+    candy_popcorn_ball: "A round POPCORN BALL bound together with amber syrup, individual popped kernels bulging all over its surface, catching the light",
+    candy_licorice_bat: "A soft black LICORICE sweet shaped like a BAT with spread scalloped wings, glossy and slightly squashed, lightly dusted with sugar",
     // ── ALL HALLOWS' RELICS ──────────────────────────────────────────────────────────────────────────
     // Objects, not effects, like the rest of this map. The almanac is CLOSED and CLASPED on purpose: the
     // house note at the top of this file says an unfurled scroll comes back with misspelled words printed on

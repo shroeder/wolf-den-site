@@ -229,7 +229,7 @@ async function computeDepthAffinity(buyerId) {
     // silently dropped forever. (That exact bug cost sailing four of its eight effects for months.)
     const depth = { nerve: 0, lodesense: 0, hew: 0, prospect: 0, bellows: 0, crucible: 0 };
     if (!buyerId) return depth;
-    const [{ sumItemDepth }, { setDepthBonus }, { getEquippedIds }, { sumPieceDepth }, { getOwnedPieceIds }] = await Promise.all([
+    const [{ sumItemDepth }, { setDepthBonus }, { getEquippedIds }, { sumPieceDepth }, { getOwnedPieceIds, getOwnedSetIds }] = await Promise.all([
         import("@/lib/marketplace/items.js"),
         import("@/lib/marketplace/sets.js"),
         import("@/lib/marketplace/inventory.js"),
@@ -245,7 +245,17 @@ async function computeDepthAffinity(buyerId) {
     const gear = sumItemDepth(Object.values(bySlot || {}));
     const trophyDepth = sumPieceDepth(ownedPieces);
     for (const k in depth) depth[k] += (gear[k] || 0) + (trophyDepth[k] || 0);
-    const set = setDepthBonus(ownedPieces);
+    // ── ⚠️ THE SET TIERS READ GEAR TOO, AND THE PER-PIECE AFFIX ABOVE DOES NOT ──────────────────────────
+    // Two different questions off two different lists, and they are easy to collapse into one by accident.
+    // The affix above is a TROPHY'S OWN STAT and only trophies have one, so it reads mkt_user_collection.
+    // A set TIER asks "how many of this set do you own", and three of the collection sets are made of real
+    // ITEMS (the Hallowe'en three) rather than trophies — so asking the trophy table alone answered 0 for
+    // Gravebound and its need-2 and need-4 tiers paid nothing at all, silently, while its CAPSTONE worked
+    // fine because setDepthCapstones already reads getOwnedSetIds.
+    //
+    // getOwnedSetIds is gear + trophies, and collectedCounts only counts sets flagged `collection`, so no
+    // combat set can creep in through this door.
+    const set = setDepthBonus(await getOwnedSetIds(buyerId).catch(() => []));
     for (const k in depth) depth[k] += set[k] || 0;
 
     const me = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
