@@ -547,6 +547,41 @@ export const COLLECTIBLES = [
       spritePrompt: "an adorable little ghost, a soft translucent pale blue-white rounded body trailing away into a wispy vapour tail instead of legs so it hovers, two simple round black dot eyes and a small open oh-shaped mouth mid-boo, tiny wispy nub arms raised, glowing gently, sweet and harmless rather than scary" },
 ];
 
+// ── THE GOURDFATHER'S THREE ─────────────────────────────────────────────────────────────────────────────
+// Bought with candy across his counter, and available nowhere else in the game.
+//
+// ⚠️ source: "gourdfather", NOT "halloween". chests.js picks the Hallowe'en chest's pet from
+// `c.source === "halloween"`, so filing these there would quietly make them chest drops as well — and the
+// whole point of the stall is that these three are the things you SAVED for. A new source is exclusive by
+// construction: every pet pool in this file filters by an explicit source, and none of them has heard of
+// this one.
+//
+// One of each useful activeStat so a buyer is choosing a ROLE and not a rarity, and priced in that order.
+const GOURDFATHER_PETS = [
+    {
+        id: "gf_gourdpup", name: "Gourd Pup", Icon: GiHound, color: "#e8731c", rarity: "epic",
+        source: "gourdfather", activeStat: "fortune",
+        hint: "He grew it himself. He will tell you about it.",
+        spritePrompt: "a small round puppy whose head is a carved pumpkin with a cheerful grin lit from inside, a stubby vine for a tail, little clawed paws, bounding happily",
+        ascendSpecies: "a HUGE broad-shouldered hound with a great carved pumpkin for a head blazing with inner fire, vines coiling down its powerful legs, embers falling from its jaws",
+    },
+    {
+        id: "gf_wispling", name: "Wispling", Icon: GiSpectre, color: "#9ad7c4", rarity: "legendary",
+        source: "gourdfather", activeStat: "ferocity",
+        hint: "Follows you home. Does not knock.",
+        spritePrompt: "a tiny shy will-o-the-wisp spirit, a small pale flame with two big soft eyes and little wisps of trailing vapour for arms, glowing gentle green-white",
+        ascendSpecies: "a TOWERING wraith of cold green corpse-fire with a long trailing body, two burning hollow eyes and sweeping arms of flame, terrible and bright",
+    },
+    {
+        id: "gf_candy_golem", name: "The Candy Golem", Icon: GiRockGolem, color: "#f25c8a", rarity: "mythic",
+        source: "gourdfather", activeStat: "might",
+        hint: "Every sweet anyone failed to collect, walking.",
+        spritePrompt: "a small lumpy golem built out of brightly wrapped sweets, candy corn and lollipops stuck together with toffee, stubby arms and a sugar-crust face",
+        ascendSpecies: "a COLOSSAL hulking brute of fused confectionery, slabs of toffee and shattered candy armour across its shoulders, molten sugar glowing in the cracks of its chest",
+    },
+];
+for (const p of GOURDFATHER_PETS) COLLECTIBLES.push(p);
+
 // ── THE AQUARIUM ROSTER ──────────────────────────────────────────────────────────────────────────────────
 // Luke: "let's make an aquarium area in the farm for all the water type pets."
 //

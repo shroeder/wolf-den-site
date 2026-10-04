@@ -210,6 +210,7 @@ export const ITEM_SOURCE_LABEL = {
     admin: "Redeemed at the counter in the shop",
     season: "Won at a rung of the Long Road, in one season only",
     halloween: "Found only in a Halloween chest",
+    gourdfather: "Bought from the Gourdfather, for candy, in October",
 };
 
 // The "how do I get this" line a member reads. One function, so a screen can never invent its own wording
@@ -837,6 +838,19 @@ export const ITEMS = [
     // NO reqLevel, same as the season pieces: nothing gates equipping any more, so the number is display
     // only, and printing "Level 90" on something won at level 30 is a lie in the direction that costs the
     // member the use of it. The chest IS the requirement and ITEM_SOURCE_LABEL says so.
+    // ── HARVEST'S END · the Gourdfather's set, bought with candy and nowhere else ────────────────────────
+    // ⚠️ FIVE DISTINCT SLOTS, CHECKED BY HAND. This is a WORN set — its bonus is the reward for wearing the
+    // pieces together — so two pieces sharing a slot would make the full set physically impossible to
+    // assemble, and nothing in the build catches it. helmet / chest / main_hand / boots / amulet.
+    //
+    // ⚠️ source: "gourdfather", NOT "halloween". isHalloweenItem is `source === "halloween"` and the
+    // Hallowe'en chest's gear pool is built straight off it, so filing these there would put the stall's
+    // exclusive set into a chest. A new source is invisible to every pool in the game, which is the point.
+    { id: "gf_hollowed_crown", name: "Crown of Guttered Candles", slot: "helmet", rarity: "legendary", icon: "GiCandleFlame", flavor: "Nine wicks, and he lights them in a particular order.", stats: {}, reqLevel: null, source: "gourdfather", sort: 1330 },
+    { id: "gf_harvest_mantle", name: "Mantle of the Last Harvest", slot: "chest", rarity: "legendary", icon: "GiCape", flavor: "Stitched from the final sheaf. It remembers the field.", stats: {}, reqLevel: null, source: "gourdfather", sort: 1331 },
+    { id: "gf_reapers_due", name: "The Reaper's Due", slot: "main_hand", rarity: "mythic", icon: "GiScythe", flavor: "He is very clear that it is only on loan.", stats: {}, reqLevel: null, source: "gourdfather", sort: 1332 },
+    { id: "gf_furrow_walkers", name: "Furrow-Walkers", slot: "boots", rarity: "legendary", icon: "GiLeatherBoot", flavor: "They know the way between the rows in the dark.", stats: {}, reqLevel: null, source: "gourdfather", sort: 1333 },
+    { id: "gf_ninth_night", name: "Charm of the Ninth Night", slot: "amulet", rarity: "mythic", icon: "GiPumpkinLantern", flavor: "Count the nights yourself if you do not believe him.", stats: {}, reqLevel: null, source: "gourdfather", sort: 1334 },
     { id: "hw_hollow_crown", name: "Hollow Crown", slot: "helmet", rarity: "legendary", icon: "GiPumpkinLantern", flavor: "Someone cut a face in it. The face stayed.", stats: {}, reqLevel: null, source: "halloween", sort: 1300 },
     { id: "hw_gravemould_cuirass", name: "Grave-Mould Cuirass", slot: "chest", rarity: "legendary", icon: "GiBreastplate", flavor: "Dug up twice. Worn once.", stats: {}, reqLevel: null, source: "halloween", sort: 1301 },
     { id: "hw_reapers_sickle", name: "Reaper's Sickle", slot: "main_hand", rarity: "mythic", icon: "GiSickle", flavor: "It is a harvest tool. It was always a harvest tool.", stats: {}, reqLevel: null, source: "halloween", sort: 1302 },
@@ -913,8 +927,14 @@ export const ITEMS = [
 const ASCEND_TO = "ascendant";
 
 /** Can this piece be raised by a Prismatic Stone? The cap is Luke's: ascendant and no further. */
+export const isGourdfatherItem = (i) => i?.source === "gourdfather";
+// ⚠️ THE STALL'S GEAR DOES NOT ASCEND, for the same reason the Hallowe'en gear does not: a Prismatic Stone
+// spent on a piece you can only buy during one month makes an Ascended twin of a seasonal item, and the twin
+// outlives the season. Added here rather than left out — this blacklist is the kind that fails OPEN, so a new
+// source that nobody adds is a new source that quietly becomes ascendable.
 export const canAscendItem = (i) => Boolean(i?.slot) && !i?.charged && !isForgedItem(i)
     && !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && !isSeasonItem(i) && !isHalloweenItem(i)
+    && !isGourdfatherItem(i)
     && rarityRank(i?.rarity) > -1 && rarityRank(i?.rarity) < rarityRank(ASCEND_TO);
 
 for (const base of ITEMS.filter(canAscendItem)) {

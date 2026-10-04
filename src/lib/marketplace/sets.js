@@ -192,6 +192,23 @@ export const ITEM_SETS = [
     //
     // Every key below is one the game already reads (setFarmGrowBonus, setDepthCapstones, setWheelCapstones),
     // so none of these is a sentence on a card that no code consumes.
+    // ── HARVEST'S END · the Gourdfather's set ────────────────────────────────────────────────────────────
+    // ⚠️ A WORN SET, NOT A COLLECTION. The three Hallowe'en sets below are collections — they pay for being
+    // OWNED, because their bonuses go to farming and delving and mining, which are things you do with your
+    // hands. This one is combat gear and its bonus is the reward for CHOOSING to wear it over your best
+    // loadout, which is the decision a combat set exists to pose. Five distinct slots, so it can actually
+    // all be worn at once.
+    //
+    // Pitched against Warlord's Regalia, the yardstick worn set: 8/12 might there, 7/11 here, and a capstone
+    // a shade under its +50% crit. A month-only set must never be the best set in the game — somebody who
+    // missed October would be permanently behind, which is the one thing a seasonal item must not do.
+    {
+        id: "gf_harvests_end", name: "Harvest's End",
+        items: ["gf_hollowed_crown", "gf_harvest_mantle", "gf_reapers_due", "gf_furrow_walkers", "gf_ninth_night"],
+        bonuses: [{ need: 2, stats: { might: 7 } }, { need: 4, stats: { might: 11, crit_power: 10 } }],
+        capstone: { crit_bonus: 0.4, desc: "Full set: your CRITICAL hits deal +40%." },
+        weakness: null,
+    },
     {
         id: "hw_harvest", collection: true, feature: "farm", name: "Hollowed Harvest",
         items: ["hw_hollow_crown", "hw_reapers_sickle", "hw_wisp_lantern", "hw_cord_small_hours", "hw_nine_candles"],

@@ -221,6 +221,27 @@ export const DECORATIONS = [
     deco("deco_hw_pumpkin_king", "The Pumpkin King", "👑", "mythic", "halloween", null, { stat: "goldHarvest", value: 8 },
         "an enormous crowned pumpkin sitting on a throne of twisted vines and corn stalks, its carved face lit from within with warm orange fire, smaller pumpkins bowing at its base", null),
 
+    // ── THE GOURDFATHER'S STALL · bought with candy, from him, and nowhere else ──────────────────────────
+    // Luke: "an npc in town for the halloween event where u can exchange candy for unique rewards like gift
+    // boxes, a few new pets, and maybe like a halloween themed set of items, and aome farm decorations. All
+    // on top of the stuff we already added so like the pets and items are all new that this guy would offer
+    // you."
+    //
+    // ⚠️ source: "gourdfather", NOT "halloween". The eight above are source "halloween" and the wheel, the
+    // glint and the Hallowe'en chests all reach them. These four must be reachable ONLY across his counter,
+    // and a NEW source is exclusive by construction rather than by everyone remembering a rule — every pool
+    // in the game filters by an explicit source, so none of them can see a source they have never heard of.
+    // Same move the Petting Stand makes directly below, and the same reason.
+    deco("deco_gf_candy_cauldron", "The Candy Cauldron", "\u{1F36C}", "epic", "gourdfather", null, { stat: "goldHarvest", value: 6 },
+        "a big black iron cauldron tipped on its side in the grass, spilling a bright heap of wrapped sweets and candy corn across the ground"),
+    deco("deco_gf_lantern_arch", "The Lantern Arch", "\u{1FA94}", "epic", "gourdfather", null, { stat: "growSpeed", value: 6 },
+        "a tall arch of twisted bare branches wound with dozens of small lit paper lanterns, wide enough to walk under"),
+    deco("deco_gf_black_cat", "The Black Cat", "\u{1F408}", "rare", "gourdfather", null, { stat: "harvestLuck", value: 5 },
+        "a sleek black cat sitting upright and composed on a weathered stone post, tail curled around its feet, eyes bright amber"),
+    // The big one. Priced like it and sized like it.
+    deco("deco_gf_gourd_throne", "The Gourdfather's Throne", "\u{1F451}", "mythic", "gourdfather", null, { stat: "seedLuck", value: 9 },
+        "an enormous ornate throne built entirely from stacked carved pumpkins and twisted corn stalks, every gourd lit from within, a scatter of fallen leaves at its base"),
+
     // ── THE PETTING STAND ── the one decoration you cannot win, find, or be given ─────────────────────────
     // Sold ONLY inside the $5 Petting Stand package (store credit + coins + this), so it needs a source no
     // existing hand-out path can reach. Every one of them filters by source and this matches none:
@@ -299,6 +320,12 @@ for (const d of DECORATIONS) if (d.source === "halloween") d.unreleased = HALLOW
 
 /** Every decoration the Halloween event can hand out, in any of its three ways. */
 export const HALLOWEEN_DECOS = DECORATIONS.filter((d) => d.source === "halloween").map((d) => d.id);
+
+// The Gourdfather's four. Hidden from the catalogue drawer the same way, and for the same reason — a member
+// who bought one last October keeps seeing it (PUBLIC_DECORATIONS makes an exception for what you own), while
+// nobody browsing in July is shown four things they cannot buy.
+for (const d of DECORATIONS) if (d.source === "gourdfather") d.unreleased = HALLOWEEN_HIDDEN;
+export const GOURDFATHER_DECOS = DECORATIONS.filter((d) => d.source === "gourdfather").map((d) => d.id);
 
 export const PUBLIC_DECORATIONS = (ownedIds = null) => {
     const own = ownedIds instanceof Set ? ownedIds : new Set(ownedIds || []);
