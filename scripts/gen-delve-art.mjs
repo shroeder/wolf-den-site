@@ -116,6 +116,27 @@ const ART = {
     // ── PER-DUNGEON encounter icons ─────────────────────────────────────────────────────────────────────────
     // One chest icon shared by all four decks quietly undid the theming the decks exist for: a Warren chest is
     // a farmer strongbox in the dirt, a Spire chest is a display case in a starfield. 8 kinds x 4 dungeons.
+    // ── THE LANTERN CRYPT'S EIGHT ──────────────────────────────────────────────────────────────────
+    // One icon per non-fight kind, same as the other four dungeons carry. These are what a floor SHOWS you
+    // before you choose, so each has to say its kind at a glance and say "crypt" at the same time: the chest
+    // is grave goods, the merchant is a pedlar's tray, the rest is a bench somebody put there for the living.
+    //
+    // ⚠️ WITHOUT THESE, encounterArt FALLS THROUGH TO A PATH THAT DOES NOT EXIST — it returns
+    // `ev-<dungeon>-<kind>.webp` unconditionally for every non-fight floor, so a missing file is a broken
+    // image on eight floors in ten rather than a tidy fallback. (And a 404 <img> fires onError before React
+    // hydrates, which is how every card in the game once wore a broken-image glyph.)
+    "ev-lanterncrypt-chest": [`${OBJ} An iron-bound burial coffer on a stone slab, lid ajar spilling warm orange light, dried corn husks and candle stubs heaped against it.`, "icon"],
+    "ev-lanterncrypt-cache": [`${OBJ} A shallow stone offering bowl overflowing with tarnished coins and wrapped sweets, two melted candle stubs stuck to its rim.`, "icon"],
+    "ev-lanterncrypt-merchant": [`${OBJ} A pedlar's tray of carved gourds, corked jars and tied herb bundles, a small hooded lantern hanging from its handle. No people.`, "icon"],
+    "ev-lanterncrypt-shrine": [`${OBJ} A small stone shrine basin of still dark water with nine tall lit candles standing around it, dried flowers laid on the rim.`, "icon"],
+    "ev-lanterncrypt-well": [`${OBJ} A round stone well mouth sunk in a crypt floor, its lip thick with melted candle wax, a faint orange glow far down the shaft.`, "icon"],
+    "ev-lanterncrypt-trap": [`${OBJ} A broken crypt floor slab tipped open over a pit of rusted iron spikes and shattered grave markers, cold mist rising out of it.`, "icon"],
+    "ev-lanterncrypt-rest": [`${OBJ} A worn stone bench in a dry barrow alcove with a steady lit lantern and a folded blanket on it.`, "icon"],
+    // ⚠️ REROLLED. The first draw came back with a pale cream sticker rim all the way round the group — the
+    // one thing the house rule says to redraw rather than filter off. Describing the doors as SEPARATE and
+    // weathered breaks up the single flat silhouette that was inviting the rim in the first place.
+    "ev-lanterncrypt-puzzle": [`${OBJ} Three separate weathered stone doorways standing side by side, each a distinct slab of pitted grey rock with a different carved jack-o-lantern face glowing orange from within, gaps of darkness between them, candle stubs melted on their ledges. Absolutely no pale or white outline around the shapes.`, "icon"],
+
     "ev-hollow-chest": [`${OBJ} A muddy iron-bound wooden strongbox half-sunk in dark earth, pale tree roots growing over the lid.`, "icon"],
     "ev-hollow-cache": [`${OBJ} A spilled leather purse of coins in dark soil, a few acorns and a gold ring among them.`, "icon"],
     "ev-hollow-merchant": [`${OBJ} A forager blanket laid on packed earth with bundled herbs, clay jars and a hooded lantern. No people.`, "icon"],
@@ -154,6 +175,16 @@ const ART = {
 
     // ── RARE FINDS ── the 1-in-13 floors. Each gets its own picture, because these are the only floors anyone
     // tells someone else about and a generic strongbox would waste them. Scenes, not cutouts: the reward is a room.
+    // ── THE CRYPT'S THREE RARE FINDS ───────────────────────────────────────────────────────────────
+    // ~0.9% a floor each, so about one run in fourteen shows you one. They are rooms rather than objects —
+    // the payoff is walking into somewhere nobody has been, which is why they are SCENES at `rare` and not
+    // die-cut icons.
+    // ⚠️ REROLLED. "Shelves of candles" in a dark vault came back as a wine cellar — rows of dark bottles in
+    // the gloom. The candles have to be the LIGHT as well as the subject, so a few hundred of them are lit
+    // and the rest read off them.
+    "rare-candlevault": [`${SCENE} A vast sealed stone vault whose every wall is a honeycomb of small niches, each holding one tall pale white candle — thousands of them, unlit, packed close and clearly readable as CANDLES with wicks. A few dozen near the front are lit and throw warm light across the rest. A name plate under every niche. Cold grey stone, warm candleflame.`, "rare"],
+    "rare-kingstithe": [`${SCENE} A barrow chamber heaped to the vault with coins, rings and offerings, sorted into neat counted stacks, hundreds of candle stubs burning on top of the piles. Warm gold against grey stone.`, "rare"],
+    "rare-lastharvest": [`${SCENE} An underground stone hall with a whole year's harvest laid out whole and perfect on long trestle tables — sheaves, gourds, fruit, bread — none of it rotted, lit by hanging lanterns.`, "rare"],
     "rare-seedvault": [`${SCENE} A small dry stone chamber sealed inside a mass of tree roots, shelves of ancient labelled seed jars glowing faintly gold, untouched dust.`, "rare"],
     "rare-kinghoard": [`${SCENE} An earthen chamber heaped with generations of stolen bright things — coins, rings, cutlery, glass — piled to the ceiling, lit warm gold.`, "rare"],
     "rare-orchardheart": [`${SCENE} The interior of an enormous split tree root, hollow and dry, its walls glowing amber, something bright resting at the centre.`, "rare"],

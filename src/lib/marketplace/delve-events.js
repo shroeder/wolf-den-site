@@ -292,7 +292,96 @@ const ASTRAL = [
     E("as_hourglass", KIND.puzzle, "An Hourglass, Running Up", "Turning it over would presumably do something.", { weight: 8 }),
 ];
 
-export const DECKS = { hollow: HOLLOW, sunken: SUNKEN, ember: EMBER, astral: ASTRAL };
+// ── THE LANTERN CRYPT ── ceremonial, kept, attended. Candles, offerings, places laid for the dead. ──────────
+// The Hallowe'en dungeon, and the only seasonal deck. Its voice is the one thing none of the other four have:
+// everything down here has been ARRANGED. The Warren is animal and the Deep is industrial, but the crypt is
+// HOUSEKEPT — candles relit, offerings laid out, chairs set in a circle, a place at the table. Nothing in it
+// is abandoned, which is what makes it worse than if it were. The question every floor is asking is who is
+// still doing the keeping.
+//
+// Same 53 slots, same kind spread and the same weight skeleton as the other four, so a crypt run paces
+// exactly like a Warren run — 11 fights, 3 mimics, 8 chests (2 of them rare), 5 caches (1 rare), 4 merchants,
+// 4 shrines, 3 wells, 6 traps, 4 rests, 5 puzzles, 634 points of weight. What differs is every word and the
+// handful of multipliers below, which is how the other three differ from each other.
+const LANTERN = [
+    E("lc_satup", KIND.fight, "It Was Sitting Up", "It had been laid out properly, hands folded. It is not lying down any more.", { weight: 30 }),
+    E("lc_snuffed", KIND.fight, "The Candle Goes Out", "And something crosses the room while you cannot see it.", { weight: 26 }),
+    E("lc_row", KIND.fight, "A Row of Them", "Nine graves, nine markers, and every one of the markers is lying flat.", { weight: 20, dmgMult: 1.25, lootMult: 1.4 }),
+    E("lc_guttering", KIND.fight, "A Guttering Wick", "Almost out, and burning hard the way they do right at the end.", { weight: 17, hpMult: 0.6, dmgMult: 1.3 }),
+    E("lc_sexton", KIND.fight, "The Sexton", "He has kept this crypt for eighty years and he is still on duty.", { weight: 11, hpMult: 1.6, lootMult: 2 }),
+
+    E("lc_mimic_offering", KIND.mimic, "An Offering, Untouched", "Bread, coins and a lit candle, set out neatly on the slab. Nobody has taken any of it.", { weight: 8, dmgMult: 1.3 }),
+    E("lc_mimic_coffin", KIND.mimic, "A Coffin Left Open", "Lined, cushioned and empty. Waiting is the word for it.", { weight: 5, dmgMult: 1.5, lootMult: 1.8 }),
+
+    // The crypt's chests are GIFTS rather than loot — things carried down and left on purpose — so the common
+    // one pays a little above the house rate and the picked-over one is the exception that proves it.
+    E("lc_gravegoods", KIND.chest, "The Grave Goods", "Everything they thought he would need, still stacked exactly where it was left.", { weight: 18, lootMult: 1.4 }),
+    E("lc_locker", KIND.chest, "A Sexton's Locker", "Tools, tapers, and forty years of things found and never claimed.", { weight: 15 }),
+    E("lc_pickedover", KIND.chest, "Picked Over", "Somebody was here first. They were not thorough, but they were here.", { weight: 11, lootMult: 0.6 }),
+
+    E("lc_tollbowl", KIND.cache, "The Toll Bowl", "Coins pressed into the hands of the dead, and the dead have let go of them.", { weight: 16 }),
+    E("lc_bellrope", KIND.cache, "A Bell Rope of Coins", "Threaded on a cord so the dead could ring for help. Nobody ever did.", { weight: 9, lootMult: 1.8 }),
+
+    E("lc_keeper", KIND.merchant, "The Lantern-Keeper", "She walks the crypt relighting whatever has gone out, and she will sell you a flame.", { weight: 13 }),
+    E("lc_robber", KIND.merchant, "A Grave Robber, Candidly", "He is not pretending to be anything else, and his prices are fair.", { weight: 8 }),
+
+    E("lc_stillwater", KIND.shrine, "A Bowl of Still Water", "Left out for the thirsty. It has never been drunk and it has never gone bad.", { weight: 13 }),
+    E("lc_nine", KIND.shrine, "The Nine Candles", "Light one and ask. Light two and it costs you something.", { weight: 9, bargain: true }),
+
+    E("lc_shaft", KIND.well, "The Wishing Shaft", "Drop a coin in and listen. It takes a long time to land.", { weight: 11 }),
+
+    E("lc_lid", KIND.trap, "The Floor Is Not a Floor", "It is a lid, and it has been holding for a very long time.", { weight: 14 }),
+    E("lc_wax", KIND.trap, "Wax Underfoot", "Decades of it, poured smooth, and nothing for a boot to hold on to.", { weight: 12 }),
+    E("lc_behindyou", KIND.trap, "The Candles Go Out Behind You", "One at a time, in order, at walking pace.", { weight: 10 }),
+
+    E("lc_bench", KIND.rest, "The Visitors' Bench", "Put here for the living. The first thing down here that was.", { weight: 11 }),
+    E("lc_alcove", KIND.rest, "A Lit Alcove", "Warm, dry, and somebody has left a cup out.", { weight: 12 }),
+
+    E("lc_faces", KIND.puzzle, "Three Faces", "Three sealed doors, three carved grins. Only one of them is smiling.", { weight: 10 }),
+    E("lc_book", KIND.puzzle, "The Visitors' Book", "Every name that ever came down here, in order. There is a space at the bottom.", { weight: 9 }),
+
+    // ── RARE ──
+    E("lc_candlevault", KIND.chest, "The Candle Vault", "A sealed room holding ten thousand candles. Not one of them is lit, and every one has a name on it.", { weight: 2, rare: true, art: "rare-candlevault", lootMult: 5 }),
+    E("lc_kingstithe", KIND.cache, "The Hollow King's Tithe", "Every coin anybody in this valley has ever left for the dead, heaped in one chamber, counted.", { weight: 1, rare: true, art: "rare-kingstithe", lootMult: 7 }),
+    E("lc_lastharvest", KIND.chest, "The Last Harvest", "A whole year's crop carried down and laid out whole. None of it has rotted. None of it is going to.", { weight: 2, rare: true, art: "rare-lastharvest", lootMult: 6 }),
+
+    E("lc_draught", KIND.fight, "Something Blew Past You", "You felt the draught of it. There is no door open down here.", { weight: 24 }),
+    E("lc_procession", KIND.fight, "The Procession", "They are not coming for you. They are also not going around you.", { weight: 22 }),
+    E("lc_hungry", KIND.fight, "It Is Still Hungry", "The offering bowl at its feet is empty, and has been for a long time.", { weight: 19, dmgMult: 1.3, lootMult: 1.5 }),
+    E("lc_mourners", KIND.fight, "A Pair of Mourners", "They have stood either side of this door for a century and they have had enough of visitors.", { weight: 16, hpMult: 1.35, dmgMult: 1.15, lootMult: 1.5 }),
+    E("lc_burnedthrough", KIND.fight, "Burned Nearly Through", "Barely holding together, and in a hurry about it.", { weight: 15, hpMult: 0.65, dmgMult: 1.35 }),
+    E("lc_turn", KIND.fight, "The Lanterns All Turn", "Every flame in the corridor leans towards you at once.", { weight: 13, hpMult: 1.2, dmgMult: 1.2, lootMult: 1.3 }),
+    E("lc_mimic_gift", KIND.mimic, "A Gift Basket", "Wrapped in cloth and tied with string, and the tag has your name on it.", { weight: 6, dmgMult: 1.4 }),
+    E("lc_shelf", KIND.chest, "The Offering Shelf", "A month of gifts for the dead, and the dead have not touched a thing.", { weight: 15 }),
+    E("lc_coffer", KIND.chest, "A Harvest Coffer", "Packed for a feast nobody ever came down to eat.", { weight: 13 }),
+    E("lc_falsemarker", KIND.chest, "Behind the False Marker", "One grave marker is a door, and it is not even locked.", { weight: 10, lootMult: 1.5 }),
+    E("lc_pennies", KIND.cache, "Pennies on the Eyes", "A whole row of them, and nobody left to object.", { weight: 12, lootMult: 1.3 }),
+    E("lc_childhoard", KIND.cache, "A Child's Hoard", "Buttons, glass, three gold rings, and a very good system.", { weight: 11 }),
+    E("lc_soulcaker", KIND.merchant, "The Soul-Caker", "She is baking down here, for them. There is enough for you as well.", { weight: 11 }),
+    E("lc_grandmother", KIND.merchant, "Somebody's Grandmother", "Dead forty years and still running a stall. She asks after your mother.", { weight: 7 }),
+    E("lc_hearth", KIND.shrine, "The Hearth They Keep Lit", "Not for warmth. For company. It works on you anyway.", { weight: 11 }),
+    E("lc_dolly", KIND.shrine, "A Corn Dolly in a Niche", "Woven from the last sheaf of the year. It will take a year off your luck, or hand you one.", { weight: 8, bargain: true }),
+    E("lc_floodedgrave", KIND.well, "A Flooded Grave", "Full of black water and a hundred years of other people's hopes.", { weight: 10 }),
+    E("lc_bellshaft", KIND.well, "The Bell Shaft", "Coins go down it. Sometimes the bell at the bottom answers.", { weight: 8 }),
+    E("lc_barrow", KIND.trap, "A Collapsed Barrow", "The roof came down here once already. It remembers how.", { weight: 13 }),
+    E("lc_cold", KIND.trap, "A Snuffed Corridor", "Cold enough to hurt, and it was warm when you walked into it.", { weight: 11 }),
+    E("lc_markers", KIND.trap, "Grave Markers, Falling", "Stacked three deep along the wall and very badly balanced.", { weight: 10 }),
+    E("lc_vigil", KIND.rest, "The Vigil Room", "Chairs in a circle, a lamp in the middle, and nobody keeping the vigil tonight.", { weight: 10 }),
+    E("lc_placeset", KIND.rest, "Somebody Set a Place for You", "Bread, water, and a chair pulled out. You sit down before you think about it.", { weight: 9 }),
+    E("lc_whichcandle", KIND.puzzle, "Which Candle Is Yours", "A hundred of them burning, each with a name cut into the wax. You recognise one.", { weight: 10 }),
+    E("lc_bellpull", KIND.puzzle, "The Bell Pull", "Two cords hanging side by side. One rings upstairs. One rings further down.", { weight: 9 }),
+    E("lc_chiselled", KIND.puzzle, "A Name Half Chiselled Out", "Somebody started taking it off the stone and stopped. You could finish it, or you could not.", { weight: 8 }),
+];
+
+// ⚠️ THE CRYPT IS A KEY IN HERE, AND IT HAS TO BE. `eventsFor` falls back to an empty array for an unknown
+// dungeon, and dealFloors builds its bag from that — so a missing key is not a missing FEATURE, it is a run
+// that deals zero floors and then pushes the boss on at depth 10. The Lantern Crypt shipped exactly like that:
+// its own backdrop, its own four foes, its own boss and its own loot table, and you walked in the door and
+// were standing in front of the Hollow King. Nobody hit it (0 rows) because it is behind the Hallowe'en flag.
+//
+// ⚠️ AND IT IS NOT IN `DUNGEONS` — see the note in delve-catalog.js. That array is the denominator for the
+// `delve_all_four` badge; this deck lives beside it instead for the same reason.
+export const DECKS = { hollow: HOLLOW, sunken: SUNKEN, ember: EMBER, astral: ASTRAL, lanterncrypt: LANTERN };
 
 /** The deck a dungeon draws from. Nothing is shared, so an unknown id has no floors rather than everyone's. */
 export const eventsFor = (dungeonId) => DECKS[dungeonId] || [];

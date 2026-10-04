@@ -140,6 +140,13 @@ function dealFloors(dungeon, extra = 0) {
     return floors;
 }
 
+// ⚠️ EXPORTED FOR ONE VERIFIER AND NOTHING ELSE. dealFloors is the only place that knows a run is ten floors
+// with at least five fights and no repeats, and the Lantern Crypt shipped dealing ONE floor because its deck
+// was missing — a fault no unit of this file could have caught from the outside, because from the outside the
+// function returned a perfectly valid array. scripts/verify-lantern-crypt.mjs deals a few hundred real runs
+// through this exact function; a test that re-implemented the dealing would have agreed with the bug.
+export const __dealFloorsForTest = (dungeon, extra = 0) => dealFloors(dungeon, extra);
+
 /** A foe for a fight floor. HP is a multiple of YOUR attack, so a fight is ~3 exchanges whatever you're wearing. */
 function makeFoe(dungeon, event, might, floor = null) {
     const base = foeForFloor(dungeon, floor) || dungeon.foes[0];
