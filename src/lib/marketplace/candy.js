@@ -48,16 +48,21 @@ export const CANDY_RATES = {
     fish: 1,
     harvest: 1,
     mine: 1,
-    // The event's own faucets.
-    trick_or_treat: 0,      // the door decides its own amount — see halloween-town.js
+    // ── THE EVENT'S OWN FAUCET ───────────────────────────────────────────────────────────────────────
+    // Rated 1 because the DOOR decides the amount, not the table: trick-or-treat.js calls
+    // grantCandy(id, "trick_or_treat_door", n) and the multiplier carries the payout. It still goes through
+    // this function rather than writing the balance directly, because the daily cap lives here and a faucet
+    // outside the only ceiling the event has is not a faucet, it is a leak.
+    trick_or_treat_door: 1,
 };
 
 // ── THE CEILING ──────────────────────────────────────────────────────────────────────────────────────────
 // 250 a day. The arithmetic: the richest HONEST day is roughly a dungeon clear (25) + its boss (10) + a spin
-// (5) + six boss strikes (18) + a raid (8) + a dozen harvests and casts (12) + the trick-or-treat round,
-// which is about 120 before the doors and about 190 with them. The cap sits a third above that, so a member
-// who plays everything never meets it and a member grinding one repeatable action in a loop hits it inside an
-// hour and stops. It bounds the event's mint at 250/member/day whatever anybody does.
+// (5) + six boss strikes (18) + a raid (8) + a dozen harvests and casts (12) + the eighteen-door
+// trick-or-treat round (~99) — about 120 before the doors and about 220 with them. So the ceiling is
+// REACHABLE by somebody who does genuinely everything, and only by them, while a member grinding one
+// repeatable action in a loop hits it inside an hour and stops. It bounds the event's mint at 250 a member a
+// day whatever anybody does.
 export const DAILY_CANDY_CAP = 250;
 
 /** What this member has EARNED today (spends do not refund cap room — see the note in grantCandy). */

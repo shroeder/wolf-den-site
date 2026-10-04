@@ -7,6 +7,8 @@ import { attackTownEvent, spawnTownEvent, duelRaidEnemy, bossRaidStrike, endTown
 import { claimTownQuest } from "@/lib/marketplace/town-quests.js";
 import { claimWishingWell } from "@/lib/marketplace/town-projects.js";
 import { claimShiny } from "@/lib/marketplace/town-shiny.js";
+import { stallView, buyFromStall } from "@/lib/marketplace/gourdfather.js";
+import { knock, knockedToday } from "@/lib/marketplace/trick-or-treat.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -61,6 +63,14 @@ export async function POST(request) {
             else if (body?.action === "quest_claim") res = await claimTownQuest(buyer.id, body?.key);
             else if (body?.action === "well_claim") res = await claimWishingWell(buyer.id);
             else if (body?.action === "claim_shiny") res = await claimShiny(buyer.id, body?.shinyId);
+            // ── THE HALLOWE'EN PLAZA ──────────────────────────────────────────────────────────────────
+            // Both of these are no-ops with the event down (the modules check HALLOWEEN_PUBLIC themselves),
+            // so there is nothing to gate here — and that is deliberate rather than lazy: a second gate in
+            // the route is a second place to forget when the flag flips.
+            else if (body?.action === "gourd_stall") res = { ok: true, ...(await stallView(buyer.id)) };
+            else if (body?.action === "gourd_buy") res = await buyFromStall(buyer.id, String(body?.id || ""));
+            else if (body?.action === "knock") res = await knock(buyer.id, String(body?.door || ""));
+            else if (body?.action === "knocked") res = { ok: true, doors: await knockedToday(buyer.id) };
             // Raid controls are PRIMARY-OWNER only (Luke) — a co-owner must not be able to fire a raid at the
             // whole membership. The in-Town spawn is now a REAL surprise drop: full HP + push everyone.
             else if (body?.action === "spawn_event") res = isPrimaryOwner(buyer.id) ? await spawnTownEvent(body?.kind || "bandit_raid") : { ok: false, error: "forbidden" };

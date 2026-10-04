@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Gi from "react-icons/gi";
 
 import ArenaClient from "@/components/ArenaClient";
+import GourdfatherStall from "@/components/GourdfatherStall";
 import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
 import CoinCta from "@/components/CoinCta";
@@ -731,7 +732,10 @@ const HW_SCENES = [
 // (4.8 from a post) and a lamp at 75.8 (0.2 from one) — the drift the comment below was written to prevent,
 // arriving about ten minutes after it was written. BOTH booth positions are reserved: a canopy that is only
 // in the way half the time is still in the way.
-const NPC_X = { crier: 9, smith: 31, auction: 42, merchant: 53, quest: 64, booth: 76, boothHeld: 89 };
+// 20 puts the Gourdfather between the crier and the smith, which is the widest gap on the street and more
+// than TREE_CLEAR from either — he is the biggest thing out there and crowding him into a neighbour is
+// how a landmark turns into clutter.
+const NPC_X = { crier: 9, gourdfather: 20, smith: 31, auction: 42, merchant: 53, quest: 64, booth: 76, boothHeld: 89 };
 const NPC_POSTS = Object.values(NPC_X);
 // Measured rather than guessed, against the real street: WORLD_W is about 4,841px, so one percent is ~48px.
 // A canopy at 30-36% of the scene is ~160px across, call it 3.3%; an NPC sprite is 86px, ~1.8%; the fountain
@@ -983,7 +987,7 @@ function buildHalloweenDressing(buildings, occupied = []) {
     return out;
 }
 
-export default function TownClient({ initial, frozen = false, canDressUp = false, halloweenOn = false }) {
+export default function TownClient({ initial, frozen = false, canDressUp = false, halloweenOn = false, gourd = null }) {
     const [state, setState] = useState(initial || null);
     // The street's width, and everything that measures against it. Declared HERE because the camera below
     // reads it — a hook that depends on a value declared under it is the temporal-dead-zone trap check:hook-deps
@@ -1031,6 +1035,9 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
     const wellClear = useRef(null);
     const [inTavern, setInTavern] = useState(false);  // stepped inside the Tavern interior
     const [merchantOpen, setMerchantOpen] = useState(false);
+    const [gourdOpen, setGourdOpen] = useState(false);
+    // His street bark rotates on its own clock. An index, not a string — see the note in the stall.
+    const [gourdBark, setGourdBark] = useState(0);
     const [merchantBusy, setMerchantBusy] = useState(false);
     const [merchantFlash, setMerchantFlash] = useState(null);
     const [gambleReveal, setGambleReveal] = useState(null); // big gear-gamble reveal: { phase:"rolling"|"reveal", item, dupeAll, refund }
@@ -1191,7 +1198,15 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
     // Lock the page scroll while any Town overlay is open, so the background can't scroll underneath it.
     // `fight` counts as a modal: it is a full-screen layer, so the street beneath it must not scroll and the
     // scene's pointer handlers must not fire — else a tap aimed at Attack also walks your hero.
-    const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || questOpen || smithOpen || stockOpen || Boolean(gambleReveal) || Boolean(fight);
+    // He changes his mind every eleven seconds. Eleven rather than a round ten so he never falls into step
+    // with the crier beside him, which reads as the two of them being the same clock rather than two people.
+    useEffect(() => {
+        if (!gourd) return undefined;
+        const t = setInterval(() => setGourdBark((n) => n + 1), 11000);
+        return () => clearInterval(t);
+    }, [gourd]);
+
+    const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || gourdOpen || questOpen || smithOpen || stockOpen || Boolean(gambleReveal) || Boolean(fight);
     // …and stop the scene's own pointer handlers from firing while an overlay is up (else tapping a modal
     // button was walking the hero + scrolling the street behind the panel). Read via a ref so the [] -deps
     // pointer callbacks always see the live value.
@@ -2128,6 +2143,25 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                             <img src={art.crier.url} alt="Town Crier" draggable={false} />
                         ) : <span className="tw-npc-emoji">📣</span>}
                     </button>
+                    {/* ── THE GOURDFATHER ──────────────────────────────────────────────────────────────
+                        Only while the event is up — `gourd` is null otherwise and the plaza has never heard
+                        of him. He is DELIBERATELY BIGGER than the other NPCs: he is a pumpkin the size of a
+                        cart and the whole joke falls flat if he renders at the same 86px as the smith.
+
+                        ⚠️ NOT GATED ON THE COSTUME TOGGLE. `dressed` is a preference about how your plaza
+                        LOOKS; he is content, and a member who prefers the undecorated street must not lose
+                        the event's shop and its currency over a cosmetic choice. Same distinction the
+                        chests and the Hallowe'en fish already make. */}
+                    {gourd ? (
+                        <button type="button" className="tw-npc-btn gf-npc" style={{ left: `${NPC_X.gourdfather}%`, top: `${GROUND + 6}%` }}
+                            onClick={(e) => { e.stopPropagation(); setGourdOpen(true); }} aria-label="The Gourdfather">
+                            <span className="tw-npc-bubble gf-bubble">{gourd.idle[gourdBark % gourd.idle.length]}</span>
+                            {art.gourdfather?.url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={art.gourdfather.url} alt="The Gourdfather" draggable={false} />
+                            ) : <span className="tw-npc-emoji">🎃</span>}
+                        </button>
+                    ) : null}
                     {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
                     <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.quest}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); load(); }} aria-label="Quest Giver">
                         <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
@@ -2541,6 +2575,10 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
             ) : null}
 
             {/* Traveling Merchant wares */}
+            {gourdOpen && gourd ? (
+                <GourdfatherStall art={art.gourdfather?.url || null} lines={gourd} onClose={() => setGourdOpen(false)} />
+            ) : null}
+
             {merchantOpen ? (
                 <div className="tw-roster" onClick={() => setMerchantOpen(false)} role="presentation">
                     <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
@@ -3494,6 +3532,16 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-stockade .tw-npc-bubble { background: rgba(120,32,32,0.92); border-color: rgba(255,140,140,0.5); }
 .tw-npc-btn img { height: 86px; width: auto; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
 .tw-npc-emoji { font-size: 50px; line-height: 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+
+/* ── THE GOURDFATHER ────────────────────────────────────────────────────────────────────────────────────
+   Twice the width of an ordinary NPC. He is a pumpkin the size of a cart and the whole joke is the scale —
+   rendered at the same 86px as the blacksmith he reads as a decorative gourd somebody left in the street. */
+.gf-npc img { width: 170px !important; max-width: none !important; }
+.gf-npc .tw-npc-emoji { font-size: 92px; }
+/* His bubble is wider and sits higher, because his lines are longer than anyone else's and his head is in
+   the way of where a normal bubble would go. */
+.gf-bubble { max-width: 230px; margin-bottom: 9px;
+    background: linear-gradient(180deg, #fff6e2, #ffd9a0); color: #2a1403; font-weight: 800; }
 .tw-npc-btn:hover img, .tw-npc-btn:hover .tw-npc-emoji { filter: drop-shadow(0 0 8px rgba(255,215,110,0.8)); }
 .tw-npc-bubble { max-width: 155px; font-size: 10px; font-weight: 800; line-height: 1.2; text-align: center; color: #241206; background: linear-gradient(180deg,#fff,#ffe9b0); border-radius: 9px; padding: 4px 9px; margin-bottom: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.45); }
 .tw-merchant-flash { text-align: center; font-weight: 800; color: #ffe0b0; background: rgba(255,215,110,0.12); border: 1px solid rgba(255,215,110,0.35); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; }
