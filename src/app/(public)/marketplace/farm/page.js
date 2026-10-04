@@ -4,7 +4,7 @@ import FarmClient from "@/components/FarmClient";
 import { featuredPackage } from "@/lib/marketplace/packages-server.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getFarm, resolveFarmOwner } from "@/lib/marketplace/farm.js";
-import { isOwner, canDressUp } from "@/lib/marketplace/owner.js";
+import { isOwner, halloweenOn } from "@/lib/marketplace/owner.js";
 import { db } from "@/lib/db";
 import { getSetting } from "@/lib/settings.js";
 
@@ -37,17 +37,18 @@ export default async function FarmPage({ searchParams }) {
     farm.packageOffer = !u ? await featuredPackage(buyer.id, { withArt: true }).catch(() => null) : null;
 
     // ── THE FARM, WITH THE HALLOWEEN FLAG UP ─────────────────────────────────────────────────────────────
-    // Same gate the plaza and the sea use: the member's own `town_halloween` column, behind canDressUp. It is
+    // Same gate the plaza and the sea use: the member's own `town_halloween` column, behind halloweenOn. It is
     // resolved for the VIEWER, not the farm's owner — the flag dresses the world for whoever raised it, and
     // walking onto somebody else's pasture should not undress it.
     //
     // ⚠️ RESOLVED HERE AND HANDED OVER, rather than fetched by the client. FarmClient seeds all of its state
     // from `initial` with useState and does not re-fetch on mount, so a backdrop arriving later would flash
     // the ordinary field first — which is exactly the thing a costume must not do.
-    const hw = canDressUp(buyer.id)
-        ? await db.queryOne(`SELECT town_halloween FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null)
-        : null;
-    farm.halloween = Boolean(hw?.town_halloween);
+    // ⚠️ ONE QUESTION NOW. This used to be canDressUp() AND a `town_halloween` column read — two gates that
+    // could disagree, which is how the plaza came to be decorated for a member who could not see the
+    // Gourdfather standing in it. See halloweenOn in owner.js.
+    const hw = halloweenOn(buyer?.id);
+    farm.halloween = hw;
     // The art lives in settings rather than in the source, because it is generated (scripts/gen-farm-haunted)
     // and a redraw has to reach phones without a deploy. Null until it has been drawn, which reads as "no
     // costume" rather than as a broken image.

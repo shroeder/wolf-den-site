@@ -6,7 +6,7 @@ import QuestsClient from "@/components/QuestsClient";
 import ViewPing from "@/components/ViewPing";
 import ConsumableShelf from "@/components/ConsumableShelf";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { canDressUp } from "@/lib/marketplace/owner.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -20,13 +20,14 @@ export const metadata = {
 // The weekly community boss event — real, shared, persistent HP.
 export default async function BossPage() {
     // The same gate as the plaza, the sea, the dig, the farm and the mine — the member's own town_halloween
-    // behind canDressUp. Resolved here rather than added to the boss API, because the API answer is shared
+    // behind halloweenOn. Resolved here rather than added to the boss API, because the API answer is shared
     // and cached across everybody and this is a per-member preference.
     const buyer = await getAuthenticatedBuyer().catch(() => null);
-    const hw = buyer && canDressUp(buyer.id)
-        ? await db.queryOne(`SELECT town_halloween FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null)
-        : null;
-    const halloween = Boolean(hw?.town_halloween);
+    // ⚠️ ONE QUESTION NOW. This used to be canDressUp() AND a `town_halloween` column read — two gates that
+    // could disagree, which is how the plaza came to be decorated for a member who could not see the
+    // Gourdfather standing in it. See halloweenOn in owner.js.
+    const hw = halloweenOn(buyer?.id);
+    const halloween = hw;
     return (
         <div className="stack reveal">
             <ViewPing event="view_boss" />

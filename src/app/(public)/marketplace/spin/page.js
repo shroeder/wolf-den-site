@@ -1,7 +1,7 @@
 import ConsumableShelf from "@/components/ConsumableShelf";
 import SpinWheel from "@/components/SpinWheel";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { canDressUp } from "@/lib/marketplace/owner.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -9,15 +9,16 @@ export const metadata = { title: "Daily Spin · The Wolf Den" };
 
 export default async function SpinPage() {
     // ── THE SAME ONE QUESTION EVERY DRESSED SCREEN ASKS ──────────────────────────────────────────────
-    // canDressUp, then the member's own town_halloween — the contract the town, the arena and the boss
+    // halloweenOn, then the member's own town_halloween — the contract the town, the arena and the boss
     // screen already use. Resolved HERE rather than inside SpinWheel because the wheel renders its disc
     // immediately: a costume arriving a tick later would show the ordinary wheel and then swap, which is
     // the one thing a costume must never do.
     const buyer = await getAuthenticatedBuyer().catch(() => null);
-    const hw = buyer && canDressUp(buyer.id)
-        ? await db.queryOne(`SELECT town_halloween FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null)
-        : null;
-    const spooky = Boolean(hw?.town_halloween);
+    // ⚠️ ONE QUESTION NOW. This used to be canDressUp() AND a `town_halloween` column read — two gates that
+    // could disagree, which is how the plaza came to be decorated for a member who could not see the
+    // Gourdfather standing in it. See halloweenOn in owner.js.
+    const hw = halloweenOn(buyer?.id);
+    const spooky = hw;
 
     // The wheel itself is painted for the season (wheel-disc-hw.webp / wheel-frame-hw.webp, static assets);
     // these two are the sky around it, borrowed from the town's own art. Fetched only when the flag is up,

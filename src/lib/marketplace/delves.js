@@ -7,7 +7,7 @@ import { mint } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
-import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
@@ -166,7 +166,7 @@ export async function getDelveState(buyerId) {
 
     // The crypt joins the hall only while the event is up. DUNGEONS itself is untouched — see the note on
     // HALLOWEEN_DUNGEON about why it must never become the fifth element of that array.
-    const open = HALLOWEEN_PUBLIC ? [...DUNGEONS, HALLOWEEN_DUNGEON] : DUNGEONS;
+    const open = halloweenOn(buyerId) ? [...DUNGEONS, HALLOWEEN_DUNGEON] : DUNGEONS;
     const dungeons = open.map((d) => ({
         id: d.id, name: d.name, blurb: d.blurb, tint: d.tint, bg: d.bg, minLevel: d.minLevel,
         floors: DELVE_FLOORS,

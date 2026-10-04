@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { canDressUp } from "@/lib/marketplace/owner.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
@@ -36,7 +36,7 @@ export default async function SailingPage() {
             // town_halloween rides along on the query that was already being made rather than earning a
             // second round trip — see CLAUDE.md on narrowing calls. One extra column is free; one extra
             // queryOne is a TLS handshake on the Active CPU meter, which is the bill.
-            `SELECT display_name, alias, avatar_url, avatar_config, avatar_cosmetics, avatar_sprite_url, avatar_sprite_flip, featured_collectible, town_halloween
+            `SELECT display_name, alias, avatar_url, avatar_config, avatar_cosmetics, avatar_sprite_url, avatar_sprite_flip, featured_collectible
                FROM mkt_buyer WHERE id = $1`,
             [buyer.id]
         ).catch(() => null),
@@ -45,14 +45,13 @@ export default async function SailingPage() {
     ]);
 
     // ── ONE FLAG DRESSES THE WHOLE GAME ──────────────────────────────────────────────────────────────────
-    // The same `town_halloween` column and the same `canDressUp` gate the plaza uses. Luke asked
+    // The same `town_halloween` column and the same `halloweenOn` gate the plaza uses. Luke asked
     // for sailing to follow the town's flag, not to carry a second switch of its own — two toggles would mean
     // a half-decorated game and a bug report about the one you forgot.
     //
     // A fixture may also raise it, so the dressed-up sea can be looked at locally without writing the flag
     // onto a real account first — devFixture is a hard no-op in production, so this cannot be forged live.
-    const halloween = Boolean(fixture?.halloween)
-        || (canDressUp(buyer.id) && Boolean(me?.town_halloween));
+    const halloween = Boolean(fixture?.halloween) || halloweenOn(buyer.id);
 
     // Render the sky the CLIENT last chose (stored in a cookie) so a refresh shows the right backdrop from the
     // first paint — no flash from the server's random pick to the client's real-world/time-of-day one.

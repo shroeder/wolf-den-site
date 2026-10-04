@@ -597,34 +597,6 @@ const QuestIcon = ({ name }) => {
 // exactly as it was passed. Production never sets it — see /marketplace/town/lab.
 const NOOP_POLL = async () => {};
 
-// ── THE HALLOWEEN FLAG ───────────────────────────────────────────────────────────────────────────────────────
-// `canDressUp` is the SERVER's answer to "may this member raise it"; `initialOn` is whether they already have.
-//
-// ⚠️ IT LIVES ON THE ACCOUNT NOW, NOT IN localStorage. The first version reasoned that a purely cosmetic
-// toggle nobody else can see did not earn a column — which was true about its BLAST RADIUS and wrong about how
-// it gets used. Luke asked to have it switched on for his account, and a browser-local flag cannot answer
-// that: it does not follow him from the phone to the desktop, does not survive clearing site data, and nothing
-// on the server can read or set it. The state that a person thinks of as theirs belongs to the person.
-//
-// The write is optimistic and does NOT roll back on failure. The flag decorates a plaza; if the POST is lost
-// the worst case is that it forgets by the next page load, and stealing the decoration back out from under
-// somebody mid-tap to be technically correct would be the more annoying behaviour.
-function useHalloweenFlag(allowed, initialOn) {
-    const [on, setOn] = useState(Boolean(allowed && initialOn));
-    const toggle = () => setOn((was) => {
-        const next = !was;
-        fetch("/api/marketplace/town/halloween", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ on: next }),
-        }).catch(() => { /* cosmetic: a lost write just means it forgets by the next load */ });
-        return next;
-    });
-    // Revoking the preview has to turn the lights back on even for a member whose stored flag is still true,
-    // so `allowed` stays the authority and the stored value only ever chooses BETWEEN what it allows.
-    return [Boolean(allowed) && on, toggle];
-}
-
 // ── WHERE THE DRESSING STANDS ────────────────────────────────────────────────────────────────────────────────
 // Luke: "Let's not have a linear spacing between the decorations. Let's create clusters of them... it literally
 // looks like you just took one and put it between each building, which is not what I'm looking for."
@@ -914,20 +886,34 @@ function buildHalloweenDressing(buildings, occupied = []) {
     // is the opposite: it is regular BECAUSE somebody planned it, and a lamp post at a random interval reads
     // as a mistake rather than as character. Luke: "lanterns should be in places that nake sense. Add lamp
     // posts." Every 8% of the street, with only a hand's width of jitter so it never looks stamped.
+    const placedLamps = [];
     for (let x = 4; x < 100; x += 8) {
         let at = x + (rand() - 0.5) * 0.9;
         // Nudged aside rather than dropped: a missing lamp in an evenly lit street is a hole somebody
         // notices, where one standing a stride off its mark is just a street.
-        // Two different questions with two different answers: stay off a person, and stay off a sign.
-        const lampOk = (c) => clearOf(c, occupied, LAMP_CLEAR) && clearOf(c, signs, SIGN_CLEAR);
+        // ⚠️ THREE QUESTIONS, AND THE THIRD IS THE ONE I LEFT OUT. Stay off a person, stay off a sign — and
+        // stay off ANOTHER LAMP. Luke: "I see 2 lamp posts on top of each other." The nudge below walks a
+        // lamp sideways until it clears the first two, and with the sign rule added it walks further and more
+        // often — so two neighbouring posts could be shifted toward each other and land on the same stretch
+        // of pavement. A rule that moves things without knowing where it already moved things is a rule that
+        // stacks them.
+        const lampOk = (c) => clearOf(c, occupied, LAMP_CLEAR)
+            && clearOf(c, signs, SIGN_CLEAR)
+            && clearOf(c, placedLamps, LAMP_CLEAR * 1.6);
         if (!lampOk(at)) {
             // Widened the search: with signs in play the old single stride of LAMP_CLEAR * 1.4 was often not
             // enough to get out from under a name, and the lamp was dropped instead of moved — which is the
             // hole in an evenly lit street this nudge exists to avoid.
-            const shifted = [-1, 1].flatMap((d) => [1.4, 2.2, 3.0].map((k) => at + d * LAMP_CLEAR * k)).find(lampOk);
+            // ⚠️ THE NUDGE MUST STAY INSIDE THE STRIDE. Lamps march every 8%, so a shift of 3.0 * LAMP_CLEAR
+            // is 6.6% — most of the way to the NEXT lamp's slot, where it then fails the new lamp-vs-lamp
+            // rule and gets dropped instead of moved. Three of twelve were being lost that way. Capped at
+            // 2.2 (4.84%), which is comfortably over a sign and comfortably short of the neighbour, with
+            // half-steps added so there is more than one way to succeed.
+            const shifted = [-1, 1].flatMap((d) => [1.0, 1.4, 1.8, 2.2].map((k) => at + d * LAMP_CLEAR * k)).find(lampOk);
             if (!shifted) continue;
             at = shifted;
         }
+        placedLamps.push(at);
         put("lamppost", at, 1);
     }
 
@@ -1074,7 +1060,7 @@ function buildHalloweenDressing(buildings, occupied = []) {
     return out;
 }
 
-export default function TownClient({ initial, frozen = false, canDressUp = false, halloweenOn = false, gourd = null }) {
+export default function TownClient({ initial, frozen = false, halloween = false, gourd = null }) {
     const [state, setState] = useState(initial || null);
     // The street's width, and everything that measures against it. Declared HERE because the camera below
     // reads it — a hook that depends on a value declared under it is the temporal-dead-zone trap check:hook-deps
@@ -1093,7 +1079,11 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
     const [others, setOthers] = useState({});
     const [viewportW, setViewportW] = useState(360);
     const [roster, setRoster] = useState(false);
-    const [spooky, toggleSpooky] = useHalloweenFlag(canDressUp, halloweenOn);
+    // ⚠️ ONE FLAG, AND IT COMES FROM THE SERVER. There used to be a per-member toggle on top of the gate —
+    // so the plaza could be decorated while the Gourdfather standing in it did not exist, which is exactly
+    // what Luke hit. `halloween` is halloweenOn(buyerId): HALLOWEEN_PUBLIC, or an invited preview. See
+    // owner.js. There is nothing to toggle any more, so there is nothing that can disagree.
+    const spooky = halloween;
     const [panExtra, setPanExtra] = useState(0); // manual drag-to-pan offset on top of the follow-camera
     // Remember where you were standing + looking, so hitting Back from a building drops you right where you left
     // off (not reset to spawn). Restored post-mount from sessionStorage; re-saved on every hero/camera change.
@@ -1877,14 +1867,6 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
                     </button>
                     <button type="button" className="tw-hdr-btn" onClick={() => setRoster(true)}>👥 Who&apos;s here</button>
                     <button type="button" className="tw-hdr-btn" onClick={() => setBoardOpen(true)}>🏛️ Town Hall</button>
-                    {/* The flag itself. Only rendered for whoever the server said may raise it, so for everybody
-                        else the control does not exist rather than existing and refusing. */}
-                    {canDressUp ? (
-                        <button type="button" className={`tw-hdr-btn tw-hwflag${spooky ? " is-on" : ""}`} onClick={toggleSpooky}
-                            aria-pressed={spooky} title={spooky ? "Put the town back to daylight" : "Dress the town for Halloween (only you see this)"}>
-                            <span className="tw-hwflag-moon" aria-hidden="true" />{spooky ? "All Hallows' on" : "All Hallows'"}
-                        </button>
-                    ) : null}
                 </div>
                 <p className="tw-hdr-sub">Tap the street to walk · tap a building to enter. <b>In town</b> = here now; <b>around</b> = online elsewhere.</p>
             </section>
@@ -4031,7 +4013,16 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-scene.is-spooky .tw-mid img { filter: brightness(0.44) saturate(0.55) hue-rotate(-12deg); }
 .tw-scene.is-spooky .tw-cobble img { filter: brightness(0.5) saturate(0.62) hue-rotate(-8deg); }
 .tw-scene.is-spooky .tw-fg img { filter: brightness(0.52) saturate(0.62) hue-rotate(-8deg); }
-.tw-scene.is-spooky .tw-centerpiece { filter: brightness(0.6) saturate(0.7); }
+/* ⚠️ THE WELL IS FOREGROUND, SO IT IS LIT LIKE FOREGROUND. Luke: "The wishing well looks very dark." It sat
+   at 0.6 — dimmer than the buildings at 0.66 and far dimmer than the people at 0.86 — because it had been
+   grouped with the parallax rows behind it. It is not back there: it stands at z 200, in front of every
+   building, a few feet from the camera. The depth rule above this block is the whole reason the street reads
+   as having depth, and the well was on the wrong rung of it.
+   ⚠️ AND filter REPLACES, IT DOES NOT ADD. The bare brightness here wiped the drop-shadow .tw-centerpiece
+   sets, so the landmark lost its contact shadow the moment the lights went out, and the gold "Make a wish!"
+   glow on .can-wish was being multiplied down by 0.6 as well — the one thing on it that is supposed to catch
+   your eye. The shadow is restated here and the knock-down is gentle enough to leave the glow alone. */
+.tw-scene.is-spooky .tw-centerpiece { filter: brightness(0.86) saturate(0.92) drop-shadow(0 8px 12px rgba(0,0,0,0.5)); }
 
 /* ⚠️ A BAND WEARING NIGHT-PAINTED ART IS NOT FILTERED, AND THIS MUST COME AFTER THE RULES IT UNDOES.
    Those are already lit by the moon in the artwork; filtering them too is the double-darkening that made the

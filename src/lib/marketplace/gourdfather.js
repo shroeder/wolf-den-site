@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { spendCandy, candyBalance } from "@/lib/marketplace/candy.js";
 import { CHEST_TIERS, addChests } from "@/lib/marketplace/chests.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
@@ -156,7 +156,7 @@ const byId = (id) => STALL.find((x) => x.id === id) || null;
 
 /** What the stall looks like to this member: prices, art, and what they already hold. */
 export async function stallView(buyerId) {
-    if (!HALLOWEEN_PUBLIC) return { open: false, stock: [], candy: 0 };
+    if (!halloweenOn(buyerId)) return { open: false, stock: [], candy: 0 };
 
     const [ownedPets, ownedItems, ownedDecos, candy] = await Promise.all([
         // ⚠️ PETS ARE COSMETIC UNLOCKS, not their own table — `category = 'pet'` in mkt_cosmetic_unlock.
@@ -196,7 +196,7 @@ export async function stallView(buyerId) {
 /** Buy one thing. Spends first (atomically), then grants — see the note on the order. */
 export async function buyFromStall(buyerId, id) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    if (!HALLOWEEN_PUBLIC) return { ok: false, error: "closed" };
+    if (!halloweenOn(buyerId)) return { ok: false, error: "closed" };
     const row = byId(id);
     if (!row) return { ok: false, error: "no_such_item" };
 

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import ArenaClient from "@/components/ArenaClient";
 import { getArenaState } from "@/lib/marketplace/arena.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { canDressUp } from "@/lib/marketplace/owner.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -22,17 +22,18 @@ export default async function ArenaPage() {
     if (!state?.unlocked) redirect("/marketplace/town");
 
     // ── THE RING, WITH THE HALLOWEEN FLAG UP ─────────────────────────────────────────────────────────
-    // The same one question every dressed screen asks — canDressUp, then the member's own town_halloween.
+    // The same one question every dressed screen asks — halloweenOn, then the member's own town_halloween.
     // Resolved on the server and handed over as a prop because ArenaClient seeds from `initial` and never
     // refetches the backdrop; a plate arriving later would flash the sunlit colosseum first, which is the
     // one thing a costume must not do.
-    const hw = canDressUp(buyer.id)
-        ? await db.queryOne(`SELECT town_halloween FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null)
-        : null;
+    // ⚠️ ONE QUESTION NOW. This used to be canDressUp() AND a `town_halloween` column read — two gates that
+    // could disagree, which is how the plaza came to be decorated for a member who could not see the
+    // Gourdfather standing in it. See halloweenOn in owner.js.
+    const hw = halloweenOn(buyer?.id);
 
     return (
         <div className="stack reveal">
-            <ArenaClient initial={state} halloween={Boolean(hw?.town_halloween)} />
+            <ArenaClient initial={state} halloween={hw} />
         </div>
     );
 }

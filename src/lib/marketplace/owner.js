@@ -54,7 +54,20 @@ export function canPreview(feature, buyerId) {
 // Signed out is always false, the same as canPreview: the costume is raised per member, in a column on their
 // own row, so there is nothing to dress without one — and a `true` here would send a `WHERE id = null` at the
 // database on the next line.
-export function canDressUp(buyerId) {
+/**
+ * ⚠️ THE ONE HALLOWE'EN FLAG. Luke: "we only need one halloween feature flag."
+ *
+ * There were two, and they disagreed. This was the first — HALLOWEEN_PUBLIC, or an invited preview — and it
+ * gated the DRESSING. Every piece of CONTENT (the Gourdfather, the candy, the crypt, the doors) gated on the
+ * bare HALLOWEEN_PUBLIC instead. And on top of both sat a per-member `town_halloween` column, so a screen
+ * actually asked TWO questions and the plaza could be decorated while the shop that belongs in it did not
+ * exist. Luke had his toggle on and could not see the pumpkin, which is exactly that gap.
+ *
+ * Now there is one question and everything asks it. An owner or an invited guest always sees the event;
+ * everybody else sees it the moment HALLOWEEN_PUBLIC flips. The per-member toggle is gone — it was a
+ * preference nobody asked for that could only ever put a member in a state where half the event existed.
+ */
+export function halloweenOn(buyerId) {
     if (!buyerId) return false;
     return HALLOWEEN_PUBLIC || canPreview("halloween", buyerId);
 }

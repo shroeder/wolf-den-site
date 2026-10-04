@@ -33,8 +33,14 @@ const today = () => db.queryOne(`SELECT (NOW() AT TIME ZONE 'America/Chicago')::
 export async function getOccupant() {
     return db
         .queryOne(
+            // ⚠️ avatar_url IS THE THIRD FALLBACK, AND IT IS WHY THE BOARDS ARE NOT EMPTY. Luke: "the
+            // stockade has someones name in it but no sprite." Both of the other two can be null at once —
+            // occupant_art_url until the composite has been drawn (or if the draw failed), and
+            // avatar_sprite_url for any member who has never had a hero sprite generated. A member with
+            // neither put their NAME on the boards above nobody at all, which reads as broken rather than as
+            // empty. Every account has an avatar_url.
             `SELECT s.buyer_id, s.reason, s.placed_at, s.shame_count, s.fruit_count, s.occupant_art_url,
-                    b.alias, b.display_name, b.avatar_sprite_url, b.avatar_sprite_flip
+                    b.alias, b.display_name, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url
                FROM mkt_stockade s
                JOIN mkt_buyer b ON b.id = s.buyer_id
               WHERE s.released_at IS NULL
@@ -95,7 +101,9 @@ export async function getStockadeState(viewerId) {
         occupant: {
             alias: occupant.alias,
             name: occupant.display_name || occupant.alias,
-            spriteUrl: occupant.avatar_sprite_url || null,
+            // The hero sprite if there is one, their plain avatar if there is not. The town picks
+            // artUrl || spriteUrl, so this is the last thing standing between a name and an empty pillory.
+            spriteUrl: occupant.avatar_sprite_url || occupant.avatar_url || null,
             spriteFlip: occupant.avatar_sprite_flip === true,
             // The combined stockade+occupant picture. Null until it's drawn (or if the draw failed), in which
             // case the town falls back to the empty fixture.

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { storeDay } from "@/lib/marketplace/store-day.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
 import { addChests } from "@/lib/marketplace/chests.js";
@@ -70,7 +70,7 @@ const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 
 /** Which doors this member has already knocked on today. */
 export async function knockedToday(buyerId) {
-    if (!buyerId || !HALLOWEEN_PUBLIC) return [];
+    if (!buyerId || !halloweenOn(buyerId)) return [];
     const rows = await db.query(
         `SELECT door FROM mkt_trick_or_treat WHERE buyer_id = $1 AND day = $2::date`,
         [buyerId, storeDay().dayKey],
@@ -87,7 +87,7 @@ export async function knockedToday(buyerId) {
  */
 export async function knock(buyerId, door) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    if (!HALLOWEEN_PUBLIC) return { ok: false, error: "closed" };
+    if (!halloweenOn(buyerId)) return { ok: false, error: "closed" };
     const d = DOORS[door];
     if (!d) return { ok: false, error: "no_such_door" };
 

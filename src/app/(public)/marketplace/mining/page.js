@@ -5,7 +5,7 @@ import MiningClient from "@/components/MiningClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getMiningState } from "@/lib/marketplace/mining.js";
 import { devFixture } from "@/lib/dev-fixture.js";
-import { canDressUp } from "@/lib/marketplace/owner.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -27,9 +27,10 @@ export default async function MiningPage() {
     if (!state?.unlocked) redirect("/marketplace/town");
 
     // The same gate the plaza, the sea, the dig and the farm use — the member's own town_halloween column
-    // behind canDressUp. One flag, five screens; see halloween.js for why that is one switch and not five.
-    const hw = canDressUp(buyer.id)
-        ? await db.queryOne(`SELECT town_halloween FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null)
-        : null;
-    return <MiningClient initial={state} halloween={Boolean(hw?.town_halloween)} />;
+    // behind halloweenOn. One flag, five screens; see halloween.js for why that is one switch and not five.
+    // ⚠️ ONE QUESTION NOW. This used to be canDressUp() AND a `town_halloween` column read — two gates that
+    // could disagree, which is how the plaza came to be decorated for a member who could not see the
+    // Gourdfather standing in it. See halloweenOn in owner.js.
+    const hw = halloweenOn(buyer?.id);
+    return <MiningClient initial={state} halloween={hw} />;
 }

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { storeDay } from "@/lib/marketplace/store-day.js";
 
 // ── CANDY: THE EVENT CURRENCY ────────────────────────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ export async function candyBalance(buyerId) {
  * being off). Callers that want to tell the member use the return value rather than the rate.
  */
 export async function grantCandy(buyerId, source, times = 1) {
-    if (!HALLOWEEN_PUBLIC || !buyerId) return 0;
+    if (!buyerId || !halloweenOn(buyerId)) return 0;
     const rate = CANDY_RATES[source];
     if (!rate || times <= 0) return 0;
 
