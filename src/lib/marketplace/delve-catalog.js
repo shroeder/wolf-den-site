@@ -141,7 +141,41 @@ export const DUNGEONS = [
         ],
     },
 ];
-export const dungeonById = (id) => DUNGEONS.find((d) => d.id === id) || null;
+
+// ── THE LANTERN CRYPT — the Hallowe'en dungeon ───────────────────────────────────────────────────────────
+// Luke: "Lets make a halloween themed dungeon."
+//
+// ⚠️ IT IS NOT A FIFTH ENTRY IN `DUNGEONS`, FOR THE REASON THE HALLOWE'EN FISH ARE NOT A 35TH FISH. That
+// array is a DENOMINATOR as well as a list: delve-floors.js grants the `delve_all_four` badge on
+// `set.size >= DUNGEONS.length`, so a fifth member would quietly move that badge's finish line to five — and
+// then in November, when the crypt is gone, to a five nobody can ever reach again. A seasonal thing must
+// never be able to break a permanent completion.
+//
+// Pitched at minLevel 25, between the Sunken Vault and the Ember Deep, with difficulty and pay interpolated
+// to match — the event should be reachable by most of the Den rather than being another thing only the top
+// of it sees, and the draw here is the candy and the exclusives rather than the gold.
+export const HALLOWEEN_DUNGEON = {
+    id: "lanterncrypt", name: "The Lantern Crypt", minLevel: 25, tint: "#ff8a2c",
+    blurb: "A barrow under the pumpkin field, opened for one month only. Something in it has been counting the nights.",
+    bg: "/images/delves/bg-lanterncrypt.webp",
+    loot: { parts: [2, 4], chest: "iron", bigChest: "gold", frags: [5, 8], gear: ["rare", "epic"], gearOdds: 0.075 },
+    foeX: 2.8, bossX: 6.8, dmg: [25, 39], goldPer: [38, 68], xpPer: [9, 15],
+    boss: { id: "lanterncrypt_boss", name: "The Hollow King", dmg: [34, 52], sprite: "/images/delves/foe-hollow-king.webp",
+        blurb: "It wears a crown of candle stubs, and every one of them is still lit." },
+    foes: [
+        { id: "wickwraith", name: "Wick Wraith", sprite: "/images/delves/foe-wickwraith.webp" },
+        { id: "gourdling", name: "Gourdling", sprite: "/images/delves/foe-gourdling.webp" },
+        { id: "barrowhound", name: "Barrow Hound", sprite: "/images/delves/foe-barrowhound.webp" },
+        { id: "sheetshade", name: "Sheet Shade", sprite: "/images/delves/foe-sheetshade.webp" },
+    ],
+};
+
+// ⚠️ LOOKUPS RESOLVE THE CRYPT WHETHER OR NOT THE EVENT IS UP, and that is deliberate — the same call the
+// fish module makes. A run saved in October is read back in November by a member opening their history; a
+// dungeon id that stops resolving would break that screen rather than protect anything. Rolling INTO the
+// crypt is what the flag gates (see delves.js), not naming it.
+const ALL_DUNGEONS = [...DUNGEONS, HALLOWEEN_DUNGEON];
+export const dungeonById = (id) => ALL_DUNGEONS.find((d) => d.id === id) || null;
 
 // ── WHAT A FIGHT IS WORTH ────────────────────────────────────────────────────────────────────────────────────
 // Killing something used to pay gold and XP and nothing else, which made every fight in the dungeon the same

@@ -36,6 +36,32 @@ const ART = {
     "bg-ember": [`${SCENE} A magma seam broken open inside a mine: cracked black basalt, rivers of glowing orange lava in the floor channels, hanging chains and a ruined forge, embers drifting in the air. Fierce oranges and deep charcoal.`, "scene"],
     "bg-astral": [`${SCENE} The interior of an impossible tower: floating stone stairs going in several directions, a starfield visible THROUGH the walls, violet nebula light, drifting motes, geometry that does not quite meet. Deep violets and cold silver.`, "scene"],
 
+
+    // ── THE LANTERN CRYPT — the Hallowe'en dungeon ───────────────────────────────────────────────────
+    // Same eleven backdrops and five sprites every other dungeon carries. The house language above is kept
+    // verbatim so the crypt reads as one more room in the same bestiary rather than a guest from another
+    // game — a seasonal dungeon that looks imported is the "path of least resistance" note all over again.
+    //
+    // The palette is the one thing held apart: pumpkin orange and candle-light against cold barrow stone,
+    // so a glance at the hall tells you which door is the event's without reading a word.
+    "bg-lanterncrypt": [`${SCENE} A barrow crypt beneath a pumpkin field: low mossy stone arches, carved grave markers leaning in packed earth, hundreds of guttering candle stubs on every ledge, enormous carved jack-o-lanterns glowing in the alcoves, cold blue mist pooling on the floor. Pumpkin orange candlelight against damp grey stone.`, "scene"],
+    "bg-lanterncrypt-fight": [`${SCENE} A low vaulted burial chamber of damp grey stone, candle stubs burning in wall niches, a carved pumpkin split open on the floor, roots breaking through the ceiling, cold mist at ankle height.`, "scene"],
+    "bg-lanterncrypt-boss": [`${SCENE} The deepest barrow hall: a throne of stacked grave markers and corn stalks under a vaulted roof, a ring of hundreds of lit candles on the floor, a vast harvest moon showing through a broken ceiling, orange light and long shadows. Empty of characters.`, "scene"],
+    "bg-lanterncrypt-chest": [`${SCENE} A burial alcove holding an iron-bound coffer on a stone slab, its lid ajar spilling warm orange light, dried corn husks and candle wax heaped around it.`, "scene"],
+    "bg-lanterncrypt-cache": [`${SCENE} A heap of tarnished coins, rings and sweets spilled across a cracked stone sarcophagus lid, candle stubs burning at its corners, cobwebs strung above.`, "scene"],
+    "bg-lanterncrypt-merchant": [`${SCENE} A pedlar's barrow cart wedged into a crypt passage, hung with lanterns and bundled herbs, jars and carved gourds laid out on a plank counter. Empty of people.`, "scene"],
+    "bg-lanterncrypt-shrine": [`${SCENE} A small stone shrine alcove with a shallow basin of still dark water, nine tall candles burning around it, dried flowers and a bone charm laid on the rim.`, "scene"],
+    "bg-lanterncrypt-well": [`${SCENE} A round stone well sunk into a crypt floor, its mouth ringed with melted candle wax, a faint orange glow far down the shaft, coins scattered on the lip.`, "scene"],
+    "bg-lanterncrypt-trap": [`${SCENE} A collapsed stretch of crypt floor opening onto a pit of broken grave markers and rusted iron spikes, candlelight catching their edges, cold mist rising out of it.`, "scene"],
+    "bg-lanterncrypt-rest": [`${SCENE} A quiet dry alcove in a barrow wall with a worn stone bench, a single steady lantern, a folded blanket and a cold hearth. Calm and safe.`, "scene"],
+    "bg-lanterncrypt-puzzle": [`${SCENE} A crypt wall set with three identical sealed stone doors, each carved with a different jack-o-lantern face, orange light seaming their edges.`, "scene"],
+
+    "foe-hollow-king": [`${FOE} A towering gaunt crowned figure in rotted burial robes, a hollow carved pumpkin for a head with fire burning inside it, a crown of melted candle stubs still lit around its brow, long skeletal hands, corn stalks and grave soil clinging to the hem.`, "boss"],
+    "foe-wickwraith": [`${FOE} A hovering tattered shroud with no body inside it, a single tall burning candle where its head should be, pale wax running down the cloth, thin grasping sleeves.`, "foe"],
+    "foe-gourdling": [`${FOE} A squat scurrying creature made of a carved pumpkin on stubby root legs, a jagged grin lit from within, torn vine arms, trailing seeds and pulp.`, "foe"],
+    "foe-barrowhound": [`${FOE} A gaunt skeletal hound of a dog with earth-matted fur peeling off exposed ribs, eye sockets burning pale orange, grave soil falling from its jaws.`, "foe"],
+    "foe-sheetshade": [`${FOE} A classic draped-sheet ghost with two torn eye holes, the cloth grey and grave-stained, trailing away into mist below with no feet, one arm reaching out.`, "foe"],
+
     // ── bosses ──
     "foe-warren-mother": [`${FOE} An enormous matriarch badger-beast far too large for its tunnels, grey-black striped fur matted with earth, heavy clawed forelimbs, milky blind eyes, low and wide.`, "boss"],
     "foe-drowned-warden": [`${FOE} A drowned armoured vault guard, waterlogged plate armour crusted with barnacles and green weed, a heavy iron vault key on a chain around its neck, dark water pouring from its helm.`, "boss"],

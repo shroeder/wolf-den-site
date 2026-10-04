@@ -7,11 +7,12 @@ import { mint } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
+import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import {
-    BOSS_PAY_MULT, DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, KIND, MIN_FIGHTS,
+    BOSS_PAY_MULT, DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, HALLOWEEN_DUNGEON, KIND, MIN_FIGHTS,
     delveMight, delveVigour, dungeonById, encounterArt, encounterBg, eventsFor, FIGHT_DROPS, foeForFloor,
     potionCount, potionHealFrac, wardCut,
     DELVE_SHARD_DOUBLOONS,
@@ -163,7 +164,10 @@ export async function getDelveState(buyerId) {
     const runs = row?.runs_json || {};
     const today = row?.today;
 
-    const dungeons = DUNGEONS.map((d) => ({
+    // The crypt joins the hall only while the event is up. DUNGEONS itself is untouched — see the note on
+    // HALLOWEEN_DUNGEON about why it must never become the fifth element of that array.
+    const open = HALLOWEEN_PUBLIC ? [...DUNGEONS, HALLOWEEN_DUNGEON] : DUNGEONS;
+    const dungeons = open.map((d) => ({
         id: d.id, name: d.name, blurb: d.blurb, tint: d.tint, bg: d.bg, minLevel: d.minLevel,
         floors: DELVE_FLOORS,
         boss: { name: d.boss.name, sprite: d.boss.sprite },
