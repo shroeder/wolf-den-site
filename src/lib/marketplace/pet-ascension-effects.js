@@ -109,6 +109,36 @@ export const ASCENSION_EFFECTS = {
             note: "It has not stopped talking since the second one." },
         dark: { name: "Sickly Sweet", kind: "amplify", mult: 2 },
     },
+    // ── THE GOURDFATHER'S THREE ─────────────────────────────────────────────────────────────────────────
+    // Authored rather than left to the fallback, which is the whole reason pet-stone-check.mjs exists: an
+    // unauthored pet gets the generic pair, and the generic LIGHT grafts the stat the pet already has — so
+    // the choice between the two stones is a choice between a no-op and a bigger version of what you had.
+    // Eric D noticed that from the outside on the last batch and these would have shipped with the same
+    // fault. The sweep flagged all three; this is the fix.
+    //
+    // The rule, same as the other 123: the Lightstone grafts a stat the pet does NOT already carry, so it
+    // teaches the animal a second trade; the Darkstone deepens the one it was born with.
+    gf_gourdpup: {
+        // Born carrying fortune — he is lucky, in the way a dog that always finds the one dropped sausage is
+        // lucky. The Lightstone points that nose at what is INSIDE things instead of what is on the floor.
+        light: { name: "Knows Which Box", kind: "graft", key: "chest_luck", scale: 1.0,
+            note: "He sat in front of one particular crate for an hour. He was right about the crate." },
+        dark: { name: "Grown Into It", kind: "amplify", mult: 2 },
+    },
+    gf_wispling: {
+        // A wisp is the thing you follow off the path, so the Lightstone makes it lead rather than follow:
+        // first_hit is the opener, which is the one moment a light in the dark actually decides anything.
+        light: { name: "Goes First", kind: "graft", key: "first_hit", scale: 0.9,
+            note: "It is always a little further ahead than you left it." },
+        dark: { name: "Burns Colder", kind: "amplify", mult: 1.9 },
+    },
+    gf_candy_golem: {
+        // Every sweet nobody collected, walking. It is made of the things that were left over, so the
+        // Lightstone is about what SURVIVES a hit rather than what it lands — tenacity, not more might.
+        light: { name: "Made Of Leftovers", kind: "graft", key: "tenacity", scale: 1.1,
+            note: "Knock a piece off and it picks the piece up." },
+        dark: { name: "Set Hard", kind: "amplify", mult: 2.1 },
+    },
     hw_jack: {
         // A lantern that walks itself home. gold_find deepened, or the light it carries turned on the ground
         // it walks over — a jack-o'-lantern is a light somebody made to find their way by.
