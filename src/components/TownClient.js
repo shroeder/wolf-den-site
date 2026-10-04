@@ -1803,7 +1803,13 @@ export default function TownClient({ initial, frozen = false, canDressUp = false
             </section>
 
             <div ref={sceneRef} className={`tw-scene${spooky ? " is-spooky" : ""}${litForNight.map((k) => ` night-${k}`).join("")}`} style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
-                <SceneMusic vibe={raidActive ? "raid" : "town"} />
+                {/* ⚠️ THE TUNE FOLLOWS THE COSTUME, NOT THE EVENT FLAG. Music is atmosphere, and `spooky`
+                    is the member's own choice about how their plaza looks — somebody who turned the dressing
+                    off because they do not want the dark town does not want the haunted loop either. The
+                    Gourdfather, the candy and the chests go the other way (they are CONTENT and follow
+                    HALLOWEEN_PUBLIC); this is the same line the fish module draws, from the other side.
+                    A raid still wins: the plaza is on fire and that outranks the season. */}
+                <SceneMusic vibe={raidActive ? "raid" : spooky ? "town_hw" : "town"} />
                 {/* ONE status bubble, top-left: who's here AND whether the shop is open. These were two separate
                     absolutely-positioned pills and they overlapped each other the moment the Den was open —
                     the "1 in town" count sat underneath "Open until 9 PM". They're the same kind of
@@ -3536,7 +3542,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 /* ── THE GOURDFATHER ────────────────────────────────────────────────────────────────────────────────────
    Twice the width of an ordinary NPC. He is a pumpkin the size of a cart and the whole joke is the scale —
    rendered at the same 86px as the blacksmith he reads as a decorative gourd somebody left in the street. */
-.gf-npc img { width: 170px !important; max-width: none !important; }
+/* ⚠️ SIZED BY HEIGHT, NOT WIDTH, AND THAT WAS A BUG. The base NPC rule fixes the height at 86 and lets the
+   width follow, so overriding only the WIDTH left the height where it was — and there is no object-fit on
+   this element, so the Gourdfather rendered as a 170 by 86 oval, squashed to half his height. Overriding the
+   height and letting the width follow is the only way round that keeps him round. */
+.gf-npc img { height: 150px !important; width: auto !important; max-width: none !important; }
 .gf-npc .tw-npc-emoji { font-size: 92px; }
 /* His bubble is wider and sits higher, because his lines are longer than anyone else's and his head is in
    the way of where a normal bubble would go. */

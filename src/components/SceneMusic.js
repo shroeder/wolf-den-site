@@ -38,6 +38,20 @@ const RAID_LEAD = { 0: 76, 2: 74, 4: 72, 6: 74, 8: 76, 12: 79, 16: 72, 18: 71, 2
 // under a fight where you sit and choose an order, so it has to stay listenable for a couple of minutes.
 const SEA_LEAD = { 0: 69, 4: 72, 6: 74, 8: 76, 14: 74, 16: 72, 20: 69, 22: 67, 24: 65, 28: 69, 30: 72 };
 
+// ── ALL HALLOWS' IN THE PLAZA ───────────────────────────────────────────────────────────────────────────
+// Luke: "we need halloween music in town for the event."
+//
+// The town's ordinary loop is C-G-Am-F, which is the most cheerful four chords in western music and cannot
+// be made to sound haunted by slowing it down. This is a different progression, not the same one in a hat:
+// Am-F-Dm-E descends and then the E — MAJOR, over a minor key — pulls back to the top with its third raised.
+// That raised G# against the A minor is the whole effect; it is the sound every spooky tune ever written
+// borrows, and it is one note.
+//
+// The lead leans on it: the last bar opens on the G# itself, so the loop turns over on the note that does not
+// belong. Sparse and in a high register, because the thing that makes a plaza feel haunted is the SPACE
+// between the notes rather than more of them.
+const HALLOWEEN_LEAD = { 0: 69, 3: 72, 6: 71, 8: 72, 11: 77, 14: 76, 16: 74, 19: 77, 22: 76, 24: 68, 27: 71, 30: 69 };
+
 // -- ONE TUNE PER CABINET ------------------------------------------------------------------------------------
 // Luke: "every game should have its own music and sound fx." The casino floor had a tune and every machine on
 // it had silence -- sitting down actually turned the music OFF, which is backwards: the floor is the corridor
@@ -77,6 +91,11 @@ const VIBES = {
     // pushes would be nagging by the third loop — and people stand in this room for half an hour.
     casino: { bpm: 92, lpf: 1150, prog: ["Am", "Dm", "G", "C"], lead: CASINO_LEAD, arpType: "sine",
         arpGain: 0.055, bassType: "triangle", bassGain: 0.2, arpRelease: 0.7, master: 0.36 },
+    // Slower than the town's 104 — it is night out there — and filtered well down, so the arp sits back and
+    // the bass carries it. Same instruments as the town loop on purpose: this is the same plaza wearing a
+    // costume, not a different place.
+    town_hw: { bpm: 88, lpf: 1200, prog: ["Am", "F", "Dm", "E"], lead: HALLOWEEN_LEAD, arpType: "triangle",
+        arpGain: 0.055, bassType: "triangle", bassGain: 0.17, arpRelease: 0.7, master: 0.40 },
     tavern: { bpm: 76, lpf: 950, prog: ["Am", "F", "C", "G"], lead: null, arpType: "triangle", arpGain: 0.05, bassType: "sine", bassGain: 0.17, arpRelease: 0.95, master: 0.4 },
     // Raid — a fast, tense minor loop with a driving bass + urgent lead; kicks in while a town event is active.
     raid: { bpm: 144, lpf: 2500, prog: ["Am", "Em", "Dm", "E"], lead: RAID_LEAD, arpType: "triangle", arpGain: 0.06, bassType: "triangle", bassGain: 0.22, arpRelease: 0.28, master: 0.46 },
