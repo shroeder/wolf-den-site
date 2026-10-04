@@ -771,6 +771,11 @@ const SIGN_CLEAR = 1.6;
 // A yard scene spreads its pieces over about 2% of road, so half of it is 1%; an NPC is 0.63% wide and the
 // Gourdfather is 1.48%. 2.6% keeps the widest of them out of the biggest of us.
 const SCENE_CLEAR = 2.6;
+// A ghost drifts between the trees, so it keeps off a shopfront where it can — but this is a PREFERENCE, not
+// the fix. Measured: the doors are 5.9% apart, so a gap's midpoint is 2.95% from each of them and no spacing
+// wide enough to clear a 244px facade exists anywhere on this street except the fountain's. Trying to solve it
+// sideways is how the trees went from seven to one. 2.6 nudges a ghost toward a gap and never strands it.
+const GHOST_CLEAR = 2.6;
 const clearOf = (x, occupied, by) => occupied.every((o) => Math.abs(x - o) > by);
 
 function buildHalloweenDressing(buildings, occupied = []) {
@@ -970,14 +975,19 @@ function buildHalloweenDressing(buildings, occupied = []) {
             // of canopies 2% apart -- measured, 57.7 and 59.7 -- which reads as one lumpy tree rather than
             // two. Previously chosen trunks count as occupied for the next band.
             const taken = chosen.map((c) => c.x);
-            // ⚠️ AND CLEAR OF THE SIGNS. A canopy is the widest thing the dressing places, so it needs a
-            // wider berth from a name than a lamp post does — TREE_CLEAR against the posts, and the tree's
-            // own half-width against a sign. The stretch BEFORE the first building is where this bit: that
-            // gap's midpoint is half the Tavern's x, which on this street is 2% away, and a canopy is wider
-            // than that. The Tavern's name was under a tree and a lamp post at the same time.
+            // ⚠️ AND CLEAR OF THE SIGNS — AT 2.5, NOT AT TREE_CLEAR. The Tavern's name was under a canopy
+            // AND a lamp post, because the gap BEFORE the first building has its midpoint at half the
+            // Tavern's x, which on this street is 2% away. So trees need a sign rule.
+            //
+            // ⚠️ BUT IT MUST BE NARROWER THAN THE GAPS, AND MY FIRST NUMBER WAS NOT. TREE_CLEAR * 0.75 is
+            // 3.15%, the doors sit about 5.9% apart, and a gap's midpoint is therefore only ~2.95% from each
+            // of them — so almost every band failed and the town went from seven trees to ONE. That is the
+            // exact failure the note above this block describes ("Only one tree in town"), reproduced by the
+            // fix for a different bug. 2.5 is a canopy's half-width plus a label's, which clears a name and
+            // still fits in the gap it is standing in.
             const spot = [0, -0.34, 0.34, -0.62, 0.62].map((f) => g.mid + f * g.w)
                 .find((x) => x > 1 && x < 99 && clearOf(x, occupied, TREE_CLEAR)
-                    && clearOf(x, taken, TREE_CLEAR) && clearOf(x, signs, TREE_CLEAR * 0.75));
+                    && clearOf(x, taken, TREE_CLEAR) && clearOf(x, signs, 2.5));
             if (spot === undefined) continue;
             chosen.push({ x: spot, room });
             break;
@@ -1030,9 +1040,35 @@ function buildHalloweenDressing(buildings, occupied = []) {
 
     // ── GHOSTS ───────────────────────────────────────────────────────────────────────────────────────────
     // Off the ground and off the grid entirely, so the one thing that floats is not also in a row.
-    for (const gx of [11, 29, 46, 63, 81, 94]) {
-        out.push({ key: "hw_ghost", kind: "ghost", x: gx + (rand() - 0.5) * 6,
-            top: Math.round(pick(42, 56) * 10) / 10, h: Math.round(pick(8, 12) * 10) / 10,
+    //
+    // ⚠️ AND OUT FROM BEHIND THE ROOFS. A ghost hangs at 42-56% of the frame, which is exactly where the
+    // upper storeys are, and it draws at z 50 against a building's 100-200 — so one that drifts to a
+    // shopfront is not dimly behind it, it is GONE. Measured: four of the six were 100% hidden, which is two
+    // thirds of the ghosts in the town doing nothing at all.
+    //
+    // Nudged into the nearest gap rather than dropped: six fixed posts is what keeps them off the grid in
+    // the first place, and a missing ghost cannot be seen to be missing. They stay BEHIND the buildings in
+    // z — a spectre in front of the Tavern would be a sticker on the glass, and the whole point is that it
+    // is out in the trees.
+    for (const g0 of [11, 29, 46, 63, 81, 94]) {
+        // ⚠️ THE JITTER IS PART OF THE CANDIDATE, NOT APPLIED AFTER IT. The first version checked the post
+        // for clearance and THEN added +/-3% of drift, which walked two of the six straight back behind the
+        // roof the check had just moved them out from. A nudge that happens after the test is a nudge the
+        // test never saw.
+        const drift = (rand() - 0.5) * 6;
+        let gx = g0 + drift;
+        if (!clearOf(gx, signs, GHOST_CLEAR)) {
+            gx = [-1, 1].flatMap((d) => [1, 1.6, 2.2].map((k) => g0 + drift + d * GHOST_CLEAR * k))
+                .find((c) => c > 2 && c < 98 && clearOf(c, signs, GHOST_CLEAR)) ?? gx;
+        }
+        out.push({ key: "hw_ghost", kind: "ghost", x: gx,
+            // ⚠️ ABOVE THE ROOFLINE, WHICH IS THE ACTUAL FIX. Every building art tops out at 35.4% of the
+            // scene (measured — they are a uniform height), and these anchored at 42-56%, which is their
+            // BOTTOM edge: so every ghost hung squarely in the band the houses occupy and the four that
+            // drifted over one were simply gone. Anchored at 26-34% they sit on or above the ridge, against
+            // the treeline and the sky, which is both visible everywhere and where a thing that floats
+            // belongs. The x-clearance above is now only a preference for the gaps.
+            top: Math.round(pick(26, 34) * 10) / 10, h: Math.round(pick(8, 12) * 10) / 10,
             flip: rand() < 0.5, delay: Math.round(rand() * 700) / 100 });
     }
     return out;
