@@ -61,6 +61,11 @@ export const DOORS = {
     crier: { label: "The Town Crier", treat: "He announces your arrival, your costume and your candy total to the entire plaza.", trick: "He rings the bell directly beside your ear and apologises with sweets." },
     smith: { label: "The Blacksmith", treat: "A sweet still warm from sitting too near the forge. It is better that way.", trick: "He has hidden the sweets inside a helmet. You must retrieve them. He times you." },
     merchant: { label: "The Traveling Merchant", treat: "He produces sweets from a pocket you are certain was not there a moment ago.", trick: "He tries to sell you your own sweets back. He is laughing before he finishes the sentence." },
+    // ⚠️ THE ARENA IS HERE BECAUSE IT IS ON THE STREET. It is owner-gated, so almost nobody sees this door —
+    // but a building standing in the plaza with no pail on its step is a hole in the ritual for whoever CAN
+    // see it, and the client only draws a pail for a door this file knows about. Every building on the street
+    // gets one; the gate decides who is standing there to knock.
+    arena: { label: "The Arena", treat: "A trainer leans over the rail, drops sweets into your bag, and tells you to come back when you are bigger.", trick: "“Fight me for them.” You decline. “Correct answer,” he says, and pays you anyway." },
     quest: { label: "The Quest Giver", treat: "She writes “TREAT — DELIVERED” on a scroll, stamps it, and hands you the sweets.", trick: "She makes you say the whole rhyme. All of it. In front of people. Then she pays double." },
 };
 

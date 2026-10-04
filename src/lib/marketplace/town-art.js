@@ -260,6 +260,34 @@ Object.assign(ART_PROMPTS, {
         "curled stem, a jagged triangular-eyed grinning face cut into the front, lit from within by a candle",
         { extra: HW_NEAR_EXTRA }
     ),
+    // ── THE TRICK-OR-TREAT MARKERS ───────────────────────────────────────────────────────────────────
+    // Luke: "Trick or treating is an immersive thing, nothing in a modal. You go door to door at each
+    // buikding." So every door in the plaza wears one of these, and it is the thing you tap — which means it
+    // has to read as A CONTAINER YOU PUT SWEETS IN from across a 2900px street at about 44px tall.
+    //
+    // ⚠️ IT IS NOT hw_pumpkin AND IT MUST NOT BE. There is already a jack-o'-lantern sprite scattered along
+    // the street as scenery; using it for the one interactive thing on every porch would make half the
+    // decorations look tappable and the markers look like decorations. A PAIL with a handle is a different
+    // silhouette at a glance, and a handle is the whole point: you carry it door to door.
+    //
+    // Two states, drawn as two sprites rather than one sprite and a filter. A spent door has to read as spent
+    // at marker size, and the honest way to say "this one is done" is an empty tipped pail — a dimmed full one
+    // just looks like the same pail in worse light. (Same reasoning as the seasonal-reskin rule: a filter over
+    // the old art is the path of least resistance and it says nothing.)
+    hw_treat_full: housePrompt(
+        "A child's TRICK-OR-TREAT PAIL standing upright on the ground, brimming over — a round orange pail " +
+        "with a carved jack-o'-lantern face on the front and a sturdy arched black handle across the top, " +
+        "heaped above the rim with wrapped sweets in bright red, purple and cream twists of paper, one or two " +
+        "spilling onto the ground beside it",
+        { extra: HW_NEAR_EXTRA }
+    ),
+    hw_treat_spent: housePrompt(
+        "An EMPTY trick-or-treat pail lying tipped over on its side on the ground — the same round orange " +
+        "pail with a carved jack-o'-lantern face and an arched black handle, knocked onto its side with its " +
+        "mouth towards the viewer, completely empty inside, two stray screwed-up sweet wrappers on the ground " +
+        "beside it",
+        { extra: HW_NEAR_EXTRA }
+    ),
     hw_lantern: housePrompt(
         "An old wrought-IRON HANGING LANTERN with a domed cap and a ring at the top to hang it by, four panes " +
         "of warped amber glass, a fat lit candle burning inside it",
@@ -548,6 +576,7 @@ const isBuildingKey = (key) => HW_BUILDING_IDS.includes(key) || key.startsWith("
 export const HALLOWEEN_PROP_KEYS = [
     "hw_moon", "hw_witch_a", "hw_witch_b", "hw_bats", "hw_tree",
     "hw_pumpkin", "hw_lantern", "hw_candles", "hw_ghost",
+    "hw_treat_full", "hw_treat_spent",
     "hw_scarecrow", "hw_haybale", "hw_cauldron", "hw_gravestone", "hw_skeleton", "hw_pumpkin_stack", "hw_crow",
     "hw_cobble", "hw_tree_fall", "hw_lamppost", "hw_verge", "hw_shrub",
     "hw_depth1", "hw_depth3", "hw_mid", "hw_fg",

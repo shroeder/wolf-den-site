@@ -726,6 +726,38 @@ const NPC_POSTS = Object.values(NPC_X);
 // is the widest thing out there at roughly 4%. Half of each pair summed is 2.6% for an NPC and 3.7% for the
 // fountain, so four-something is the point where nothing actually touches. 5.5 was a guess and it was over-
 // tight: it cost three of seven bands their tree on a street that had room for them.
+// ── WHERE YOU KNOCK ──────────────────────────────────────────────────────────────────────────────────────
+// Eighteen doors: every building on the street, plus the four NPCs who are standing out in it. A building's x
+// comes from the state (the street spaces itself out for however many you can see), and an NPC's from NPC_X —
+// so the pail always lands beside the thing it belongs to, whatever the street did that day.
+//
+// ⚠️ THE OFFSET IS SMALL, AND IT IS A FIRST CHOICE RATHER THAN A RULE. A building sprite is up to 244px wide
+// on a ~2900px street, so ±4.2% is still inside it; 1.5% puts the pail on the near corner of the porch,
+// touching the building and clear of its door and its label. Pushed any further out it stops reading as THIS
+// house's pail — filmed at 1.9 it had drifted into the gap and read as "a pail by the lamp post".
+//
+// ⚠️ BUT A FIXED OFFSET PUT SIX OF THE EIGHTEEN UNDER SOMEBODY. Measured on the real street: the Forge's pail
+// was 68% behind the Gourdfather, the Mine's 97% behind the Quest Giver, the Dungeons' entirely behind the
+// stockade, the Market's 68% behind the voting booth — and the Town Crier's own pail was covering the Town
+// Crier. The NPCs stand at hand-picked spots and the buildings space themselves out for however many you can
+// see, so the two sets slide past each other every time the street changes and no single number survives it.
+// Hence DOOR_OFFSETS: nearest-first, and the first one that clears everything wins. Same shape as the lamp
+// placement below, for the same reason and after the same bug.
+const DOOR_OFFSETS = [1.5, -1.5, 2.5, -2.5, 3.4, -3.4, 4.4, -4.4];
+// How far a pail's centre must sit from an NPC's. A pail is 54px wide and an ordinary NPC sprite is 86px, so
+// 3.2% of the street keeps them apart.
+//
+// ⚠️ THE GOURDFATHER NEEDS HIS OWN NUMBER AND IT IS NEARLY DOUBLE. He is drawn at 150px against everybody
+// else's 86 — he is the biggest thing on the street on purpose — so the clearance that works for the Town
+// Crier left the Forge's pail 58% behind his pumpkin. Measured, not guessed: the first pass used one figure
+// for everyone and that was the one door it could not place.
+const DOOR_CLEAR = 3.2;
+const DOOR_CLEAR_GOURD = 5.4;
+// The four NPC doors, and only these four: the Gourdfather is the one running the night and does not hand out
+// sweets to himself, the auctioneer is a Link into the auction house, and the vote booth and the stockade are
+// not doors anybody lives behind.
+const NPC_DOORS = ["crier", "smith", "merchant", "quest"];
+
 const TREE_CLEAR = 4.2;
 const LAMP_CLEAR = 2.2;
 // ── ⚠️ AND A THIRD CLEARANCE, FOR THE THING NOTHING WAS CHECKING: THE SIGNS ───────────────────────────────
@@ -1066,6 +1098,9 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // reads it — a hook that depends on a value declared under it is the temporal-dead-zone trap check:hook-deps
     // exists to catch. The well rides in the same layout as the buildings, hence the +1.
     const buildings = state?.buildings || [];
+    // Every door in the plaza, with the spot it stands on. Buildings sit on the ground line (their art is
+    // anchored at GROUND - 4 and is 176px tall, so the pail goes at their foot); the NPCs stand a little
+    // nearer the camera at GROUND + 6 and their pails go in front of them, hence the higher z.
     const WORLD_W = worldWidthFor(buildings.length + 1);
     // Parallax rows are mirror-tiled to span the world; the counts below were sized for a 2900px street, so
     // they scale with it or a longer street simply runs out of scenery at the far end.
@@ -1113,6 +1148,63 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     const [inTavern, setInTavern] = useState(false);  // stepped inside the Tavern interior
     const [merchantOpen, setMerchantOpen] = useState(false);
     const [gourdOpen, setGourdOpen] = useState(false);
+    // ── TRICK OR TREAT, IN THE STREET ────────────────────────────────────────────────────────────────
+    // Luke: "Trick or treating is an immersive thing, nothing in a modal. You go door to door at each
+    // buikding." Which doors are done comes down with the FIRST RENDER (gourd.knocked) rather than from a
+    // fetch after mount: a plaza that paints eighteen full pails and then quietly empties six of them a
+    // moment later tells you that you have knocked by taking something away, which reads as a bug.
+    const [knocked, setKnocked] = useState(() => new Set(gourd?.knocked || []));
+    // The answer at the door, shown where the door is. One at a time — you are standing at one porch.
+    const [bark, setBark] = useState(null);
+    const [knocking, setKnocking] = useState(null);
+
+    //
+    // ⚠️ WHICH DOORS EXIST COMES FROM THE SERVER (gourd.doors), NOT FROM THIS LIST. trick-or-treat.js owns
+    // DOORS and refuses a knock on anything that is not in it, so a client that invented its own list would
+    // draw pails that answer `no_such_door` — and a building the member cannot see (the gated ones) has no
+    // door at all. The street supplies the position, the server supplies the guest list, and a door needs
+    // both to appear.
+    const doorBook = useMemo(() => new Map((gourd?.doors || []).map((d) => [d.id, d.label])), [gourd]);
+    const doorPosts = useMemo(() => {
+        if (!gourd) return [];
+        // Everything already standing in the street that a pail must not land on top of: every NPC post, and
+        // every pail placed before this one. The stockade and the vote booth share the booth's x, so one entry
+        // covers both.
+        const taken = Object.entries(NPC_X)
+            .filter(([, x]) => Number.isFinite(x))
+            .map(([id, x]) => ({ x, clear: id === "gourdfather" ? DOOR_CLEAR_GOURD : DOOR_CLEAR }));
+        const posts = [
+            ...buildings.map((b) => ({ id: b.id, x: b.x, top: GROUND + 2.2, z: 220 })),
+            ...NPC_DOORS.map((id) => ({ id, x: NPC_X[id], top: GROUND + 7.4, z: 260 })),
+        ].filter((d) => Number.isFinite(d.x) && doorBook.has(d.id));
+        return posts.map((d) => {
+            // The NPC doors are the exception: the pail belongs to the person standing there, so their own
+            // post is not an obstacle to clear — only everybody else's.
+            const mine = NPC_DOORS.includes(d.id) ? NPC_X[d.id] : null;
+            const blockers = taken.filter((t) => t.x !== mine);
+            // ⚠️ SCORED, NOT FIRST-THAT-FITS. The first version took the first offset that cleared EVERY
+            // blocker and fell back to the nearest one when none did — and on a street this crowded "none
+            // did" is the common case, so raising the clearance made things WORSE: more doors failed the
+            // test, more of them fell back to the same spot, and three ended up fully behind somebody.
+            // Scoring the candidates by their worst clearance means a tighter standard can only ever move a
+            // pail somewhere better, never dump it back on the default.
+            const score = (dx) => Math.min(...blockers.map((t) => Math.abs(d.x + dx - t.x) / t.clear), 9);
+            let at = DOOR_OFFSETS[0];
+            let best = -1;
+            for (const dx of DOOR_OFFSETS) {
+                // A full clearance is a pass — stop at the nearest one that gets there, so a pail that can
+                // hug its own porch does. Past that, the roomiest spot wins.
+                const sc = Math.min(score(dx), 1);
+                if (sc > best + 0.001) { best = sc; at = dx; }
+                if (best >= 1) break;
+            }
+            // Its own pail now blocks the next one, so two neighbouring doors cannot stack.
+            taken.push({ x: d.x + at, clear: DOOR_CLEAR });
+            return { ...d, x: d.x + at, label: doorBook.get(d.id) };
+        });
+    }, [gourd, buildings, doorBook]);
+    const doorsLeft = doorPosts.filter((d) => !knocked.has(d.id)).length;
+    const barkAt = bark ? (doorPosts.find((d) => d.id === bark.door)?.x ?? null) : null;
     // His street bark rotates on its own clock. An index, not a string — see the note in the stall.
     const [gourdBark, setGourdBark] = useState(0);
     const [merchantBusy, setMerchantBusy] = useState(false);
@@ -1282,6 +1374,31 @@ export default function TownClient({ initial, frozen = false, halloween = false,
         const t = setInterval(() => setGourdBark((n) => n + 1), 11000);
         return () => clearInterval(t);
     }, [gourd]);
+
+    // ⚠️ THE DOOR IS MARKED KNOCKED BEFORE THE ANSWER COMES BACK, and then only ever marked, never unmarked.
+    // The server's own insert is the lock (one row per door per day, ON CONFLICT DO NOTHING), so the worst a
+    // double-tap can do is get `already_knocked` — and a marker that waits for the round trip is a marker you
+    // can tap three times on a slow phone, which looks exactly like a reward that did not pay.
+    const knock = useCallback(async (door) => {
+        if (knocking || knocked.has(door)) return;
+        setKnocking(door);
+        setKnocked((k) => new Set(k).add(door));
+        const d = await fetch("/api/marketplace/town", {
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "knock", door }),
+        }).then((r) => r.json()).catch(() => null);
+        setKnocking(null);
+        if (d?.ok) {
+            setBark({ door, line: d.line, candy: d.candy || 0, sweet: d.sweet || null, chest: Boolean(d.chest), trick: Boolean(d.trick) });
+            if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
+        }
+    }, [knocking, knocked]);
+
+    // The answer hangs over the porch and then goes. Long enough to read two sentences out loud.
+    useEffect(() => {
+        if (!bark) return undefined;
+        const t = setTimeout(() => setBark(null), 7000);
+        return () => clearTimeout(t);
+    }, [bark]);
 
     const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || gourdOpen || questOpen || smithOpen || stockOpen || Boolean(gambleReveal) || Boolean(fight);
     // …and stop the scene's own pointer handlers from firing while an overlay is up (else tapping a modal
@@ -2156,6 +2273,57 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             </Link>
                         );
                     })}
+                    {/* ── TRICK OR TREAT: THE DOORS ────────────────────────────────────────────────────
+                        A pail on every porch, and you walk the street and tap them. This is the whole feature
+                        — there is no list of it anywhere, on purpose. Luke: "Trick or treating is an immersive
+                        thing, nothing in a modal. You go door to door at each buikding."
+
+                        ⚠️ A SIBLING OF THE BUILDING, NOT A CHILD OF IT. Each building is a <Link>, and a
+                        button inside an anchor is invalid markup that behaves differently in every browser —
+                        and tapping the pail would also walk you into the Forge. These sit beside them in the
+                        world, at z 220: above the buildings (100-200) so a pail is never behind the porch it
+                        is standing on, and below the NPCs (250) so nobody is hidden by one.
+
+                        Hidden during a raid along with everything else friendly — there is nobody home to
+                        answer the door while the plaza is being defended. */}
+                    {gourd && !raidActive ? (
+                        <>
+                            {doorPosts.map((d) => {
+                                const done = knocked.has(d.id);
+                                const pail = done ? art.hw_treat_spent?.url : art.hw_treat_full?.url;
+                                return (
+                                    <button
+                                        key={`door-${d.id}`}
+                                        type="button"
+                                        className={`tw-door${done ? " is-done" : ""}`}
+                                        style={{ left: `${d.x}%`, top: `${d.top}%`, zIndex: d.z }}
+                                        disabled={done || knocking === d.id}
+                                        onClick={(e) => { e.stopPropagation(); knock(d.id); }}
+                                        aria-label={done ? `${d.label} — already knocked tonight` : `Knock on ${d.label}`}
+                                        title={done ? "Already knocked tonight" : `Knock on ${d.label}`}
+                                    >
+                                        {pail ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={pail} alt="" draggable={false} />
+                                        ) : <span className="tw-door-dot" aria-hidden="true" />}
+                                    </button>
+                                );
+                            })}
+                            {/* The answer, over the door you just knocked on. It is the payload — the candy is
+                                incidental and the joke is the reward — so it gets room to be read rather than
+                                a toast in the corner of the screen. */}
+                            {bark && barkAt != null ? (
+                                <div className={`tw-door-say${bark.trick ? " is-trick" : ""}`} style={{ left: `${barkAt}%` }} role="status">
+                                    <p>{bark.line}</p>
+                                    <span className="tw-door-got">
+                                        {bark.candy ? `+${bark.candy} candy` : "no candy left here"}
+                                        {bark.sweet ? ` · ${bark.sweet.name}` : ""}
+                                        {bark.chest ? " · and a sealed box!" : ""}
+                                    </span>
+                                </div>
+                            ) : null}
+                        </>
+                    ) : null}
                     {/* Plaza NPCs — they duck for cover during a raid (hidden while foes are about). */}
                     {!raidActive ? (
                       <>
@@ -2230,7 +2398,15 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     {gourd ? (
                         <button type="button" className="tw-npc-btn gf-npc" style={{ left: `${NPC_X.gourdfather}%`, top: `${GROUND + 6}%` }}
                             onClick={(e) => { e.stopPropagation(); setGourdOpen(true); }} aria-label="The Gourdfather">
-                            <span className="tw-npc-bubble gf-bubble">{gourd.idle[gourdBark % gourd.idle.length]}</span>
+                            {/* He is the host of the night, so the count lives in his mouth rather than in a
+                                pill bolted to the corner of the scene. One less thing floating over the town,
+                                and it is the sentence a member actually wants: is there anything left out
+                                there. */}
+                            <span className="tw-npc-bubble gf-bubble">
+                                {doorsLeft > 0
+                                    ? `${doorsLeft} door${doorsLeft === 1 ? "" : "s"} still ${doorsLeft === 1 ? "has" : "have"} sweets tonight!`
+                                    : gourd.idle[gourdBark % gourd.idle.length]}
+                            </span>
                             {art.gourdfather?.url ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={art.gourdfather.url} alt="The Gourdfather" draggable={false} />
@@ -3178,6 +3354,64 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-av.is-around { opacity: 0.42; filter: grayscale(0.55); }
 .tw-av.is-around .tw-bubble { display: none; }
 /* The hidden shiny glint — tiny + faint; a soft twinkle you'll only catch if you're looking. */
+/* ── TRICK OR TREAT: THE PAIL ON THE PORCH ────────────────────────────────────────────────────────────
+   54px against a 176px building is about right for a pail on a doorstep, and it is also the smallest this can
+   be and still win an argument with the scenery: the street is already strewn with decorative jack-o'-lanterns
+   at a similar size, and at 44px -- filmed, next to the Festival Stage -- the one thing you can PRESS read as
+   one more pumpkin in a row of them. The handle is the silhouette that separates them, so it has to be big
+   enough to see, and the light below does the rest.
+
+   ⚠️ NO CSS FILTER ON THE SPENT ONE. A dim-and-desaturate over the full pail was the first version and it read
+   as the same pail in worse light rather than as a door that is finished; hw_treat_spent is a SECOND DRAWING,
+   tipped over and empty, so a spent porch says so by its silhouette from across the street. (The seasonal
+   rule, applied at the size of one prop: repaint it, do not tint it.) All the spent state does here is take
+   away the hover, the bob and the glow -- it stops behaving like something you can press. */
+.tw-door { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0;
+    cursor: pointer; line-height: 0; transition: transform .14s ease; }
+.tw-door img { height: 54px; width: auto; display: block;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6)) drop-shadow(0 0 9px rgba(255,160,50,0.45));
+    animation: twDoorBob 2.6s ease-in-out infinite; transform-origin: 50% 100%; }
+.tw-door:hover { transform: translate(-50%, -100%) translateY(-3px); }
+.tw-door:hover img { filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6)) drop-shadow(0 0 14px rgba(255,190,80,0.95)); }
+.tw-door:focus-visible { outline: 2px solid #ffcf6a; outline-offset: 3px; border-radius: 8px; }
+/* The light the pail is throwing on the cobbles. Screen-blended so it ADDS rather than tinting -- the same
+   rule the other lit props follow (a sheet over everything flattens every pixel to one colour). It is also
+   the affordance: a decoration does not breathe, and this one does. */
+.tw-door:not(.is-done)::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 60px;
+    aspect-ratio: 3 / 1; transform: translateX(-50%); border-radius: 50%; pointer-events: none;
+    background: radial-gradient(ellipse, rgba(255,170,60,0.55), rgba(255,120,20,0.16) 55%, transparent 72%);
+    mix-blend-mode: screen; animation: twDoorPool 2.6s ease-in-out infinite; }
+@keyframes twDoorPool { 0%, 100% { opacity: 0.72; } 50% { opacity: 1; } }
+.tw-door.is-done { cursor: default; }
+.tw-door.is-done img { height: 44px; opacity: 0.72; animation: none;
+    filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
+.tw-door.is-done:hover { transform: translate(-50%, -100%); }
+/* The fallback when the sprite has not been drawn yet -- a lit spot on the step, so the door is still
+   findable and still tappable rather than silently absent. */
+.tw-door-dot { display: block; width: 18px; height: 18px; border-radius: 999px;
+    background: radial-gradient(circle, #ffcf6a, #e8700f 70%); box-shadow: 0 0 12px rgba(255,160,50,0.9); }
+@keyframes twDoorBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+/* ── AND WHAT THEY SAY BACK ───────────────────────────────────────────────────────────────────────────
+   Over the porch you just knocked on, because that is the point: the line is the reward and the candy is the
+   receipt. Anchored at the door's own x inside tw-world, so it rides the street -- a toast pinned to the
+   viewport would be the modal this feature was taken out of, in a smaller shape. */
+.tw-door-say { position: absolute; top: 34%; transform: translateX(-50%); z-index: 320; width: 230px;
+    padding: 10px 12px 9px; border-radius: 13px; pointer-events: none;
+    background: linear-gradient(180deg, rgba(42,20,6,0.97), rgba(26,12,4,0.97));
+    border: 1px solid rgba(255,170,60,0.55); box-shadow: 0 10px 26px rgba(0,0,0,0.65);
+    animation: twDoorSay .22s cubic-bezier(.2,1,.3,1) both; }
+.tw-door-say::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px;
+    transform: translateX(-50%) rotate(45deg); background: rgba(26,12,4,0.97);
+    border-right: 1px solid rgba(255,170,60,0.55); border-bottom: 1px solid rgba(255,170,60,0.55); }
+.tw-door-say p { margin: 0 0 6px; font-size: 11.5px; line-height: 1.42; color: #ffe8c8; }
+.tw-door-say.is-trick { border-color: rgba(186,120,255,0.6); }
+.tw-door-say.is-trick::after { border-right-color: rgba(186,120,255,0.6); border-bottom-color: rgba(186,120,255,0.6); }
+.tw-door-got { display: block; font-size: 10.5px; font-weight: 900; letter-spacing: .05em;
+    text-transform: uppercase; color: #ffcf6a; }
+@keyframes twDoorSay { from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(.96); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } }
+
 .tw-shiny { position: absolute; z-index: 200; width: 22px; height: 22px; transform: translate(-50%, -50%); background: none; border: none; padding: 0; cursor: pointer; }
 .tw-shiny-core { position: absolute; inset: 0; margin: auto; width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle, #ffffff 0%, #fff6c8 40%, rgba(255,246,200,0) 72%); box-shadow: 0 0 6px 2px rgba(255,255,255,0.5); opacity: 0.5; animation: twShinyTwinkle 3.4s ease-in-out infinite; }
 @keyframes twShinyTwinkle { 0%,100% { opacity: 0.16; transform: scale(0.7) rotate(0deg); } 45% { opacity: 0.85; transform: scale(1.15) rotate(45deg); } 60% { opacity: 0.5; } }

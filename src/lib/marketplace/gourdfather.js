@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { spendCandy, candyBalance } from "@/lib/marketplace/candy.js";
 import { CHEST_TIERS, addChests } from "@/lib/marketplace/chests.js";
+import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
 import { decorationById } from "@/lib/marketplace/decorations.js";
@@ -158,22 +159,38 @@ const byId = (id) => STALL.find((x) => x.id === id) || null;
 export async function stallView(buyerId) {
     if (!halloweenOn(buyerId)) return { open: false, stock: [], candy: 0 };
 
-    const [ownedPets, ownedItems, ownedDecos, candy] = await Promise.all([
+    // ── THE ART, FOUR TABLES AT ONCE ──────────────────────────────────────────────────────
+    // ⚠️ EVERY WARE IN HERE ALREADY HAD A SPRITE AND THE STALL WAS DRAWING NONE OF THEM. Items, pets and
+    // decorations each keep their art in their own table and chests keep theirs in a settings blob, so a shop
+    // that sells all four has to ask four places — and the first version of this asked none, which is why
+    // Luke's note was "sprites for each item". The whole catalogue is 16 rows; these are four indexed reads
+    // in the same Promise.all as the ownership checks, so the shelf costs no extra round trip.
+    const ids = { item: [], pet: [], deco: [], chest: [] };
+    for (const w of STALL) ids[w.kind]?.push(w.id);
+    const [ownedPets, ownedItems, ownedDecos, candy, itemArt, petArt, decoArt, chestArt] = await Promise.all([
         // ⚠️ PETS ARE COSMETIC UNLOCKS, not their own table — `category = 'pet'` in mkt_cosmetic_unlock.
         // There is no mkt_user_collectible; grantPet writes here and so does every other pet source.
         db.query(`SELECT ref AS id FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
         db.query(`SELECT item_id AS id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT deco_id AS id FROM mkt_deco_owned WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         candyBalance(buyerId),
+        db.query(`SELECT item_id AS k, url FROM mkt_item_sprite WHERE item_id = ANY($1)`, [ids.item]).catch(() => []),
+        db.query(`SELECT pet_id AS k, url FROM mkt_pet_sprite WHERE pet_id = ANY($1)`, [ids.pet]).catch(() => []),
+        db.query(`SELECT deco_id AS k, url FROM mkt_deco_sprite WHERE deco_id = ANY($1)`, [ids.deco]).catch(() => []),
+        getChestArt().catch(() => ({})),
     ]);
+    const sprite = Object.fromEntries([...itemArt, ...petArt, ...decoArt].map((r) => [r.k, r.url]));
+    for (const t of ids.chest) if (chestArt?.[t]) sprite[t] = chestArt[t];
     const have = new Set([...ownedPets, ...ownedItems, ...ownedDecos].map((r) => r.id));
 
     const stock = STALL.map((row) => {
-        const base = { ...row, owned: false, name: row.id, blurb: null, rarity: null };
+        const base = { ...row, owned: false, name: row.id, blurb: null, rarity: null, sprite: sprite[row.id] || null };
         if (row.kind === "chest") {
             const c = CHEST_TIERS[row.id];
-            return { ...base, name: c?.label || row.id, rarity: "rare", emoji: c?.emoji || null,
-                blurb: "A sealed box. He insists he does not know what is in it." };
+            // ⚠️ NO BLURB. All four said the same sentence, under a shelf heading that says it once already —
+            // four identical lines of italic text under four different pictures, which reads as a template
+            // nobody finished. The picture and the price are the whole of what distinguishes these.
+            return { ...base, name: c?.label || row.id, rarity: "rare", emoji: c?.emoji || null };
         }
         if (row.kind === "pet") {
             const p = COLLECTIBLES.find((x) => x.id === row.id);
