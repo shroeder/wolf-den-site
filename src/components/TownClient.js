@@ -732,10 +732,22 @@ const HW_SCENES = [
 // (4.8 from a post) and a lamp at 75.8 (0.2 from one) — the drift the comment below was written to prevent,
 // arriving about ten minutes after it was written. BOTH booth positions are reserved: a canopy that is only
 // in the way half the time is still in the way.
-// 20 puts the Gourdfather between the crier and the smith, which is the widest gap on the street and more
-// than TREE_CLEAR from either — he is the biggest thing out there and crowding him into a neighbour is
-// how a landmark turns into clutter.
-const NPC_X = { crier: 9, gourdfather: 20, smith: 31, auction: 42, merchant: 53, quest: 64, booth: 76, boothHeld: 89 };
+// ⚠️ 18.6, AND IT WAS 20 UNTIL IT WAS MEASURED. The first placement checked him against his NEIGHBOURS IN
+// THIS OBJECT — crier 9, smith 31 — pronounced it the widest gap on the street, and never looked at the
+// BUILDINGS. The Auction House stands at 21.6. That is the exact mistake the note above describes from the
+// other side: the dressing knew the buildings and not the posts, and this knew the posts and not the
+// buildings.
+//
+// It matters here and not for the others because he is 142px wide against an ordinary NPC's 60. A normal NPC
+// standing 1.6% from a shopfront is a shopkeeper standing by his door — the crier is 0.9% from the Boss
+// Arena and looks right. At two and a half times the width he stops being beside the building and starts
+// sitting ON its sign: the Auction House's name read "...tion House" with him in front of it.
+//
+// The clearance is sized to the LABEL, not to the building art. 244px of shopfront needs 4% to clear and the
+// street has no such gap anywhere except the fountain's; a building NAME is ~80px, so 2.31% is where his body
+// stops covering it. 18.6 is the roomiest spot in this stretch at 2.9% from the nearest name and 9.6% from
+// the nearest post.
+const NPC_X = { crier: 9, gourdfather: 18.6, smith: 31, auction: 42, merchant: 53, quest: 64, booth: 76, boothHeld: 89 };
 const NPC_POSTS = Object.values(NPC_X);
 // Measured rather than guessed, against the real street: WORLD_W is about 4,841px, so one percent is ~48px.
 // A canopy at 30-36% of the scene is ~160px across, call it 3.3%; an NPC sprite is 86px, ~1.8%; the fountain
@@ -744,10 +756,28 @@ const NPC_POSTS = Object.values(NPC_X);
 // tight: it cost three of seven bands their tree on a street that had room for them.
 const TREE_CLEAR = 4.2;
 const LAMP_CLEAR = 2.2;
+// ── ⚠️ AND A THIRD CLEARANCE, FOR THE THING NOTHING WAS CHECKING: THE SIGNS ───────────────────────────────
+// `occupied` is the NPC posts and the fountain. The buildings were never in it, because the dressing is built
+// FROM the buildings and deliberately decorates their doors — so "avoid the buildings" would have switched
+// the porches off. The consequence nobody had measured: a lamp post lands every 8% of the street whatever is
+// already there, and a building NAME sits under every door. Measured in the browser, that had the Tavern's
+// name under a lamp post AND a fall tree, the General Store's under a lamp post, and the Kitchen's under a
+// tree — four shopfronts you cannot read the name of.
+//
+// Doors stay decorated; only the two things tall enough to cross a SIGN now keep away from one. A label is
+// about 80px (0.83% of the street at ~48px per percent) and a lamp is a stick, so 1.6% is clear with room to
+// spare, and a canopy gets the tree's own wider berth.
+const SIGN_CLEAR = 1.6;
+// A yard scene spreads its pieces over about 2% of road, so half of it is 1%; an NPC is 0.63% wide and the
+// Gourdfather is 1.48%. 2.6% keeps the widest of them out of the biggest of us.
+const SCENE_CLEAR = 2.6;
 const clearOf = (x, occupied, by) => occupied.every((o) => Math.abs(x - o) > by);
 
 function buildHalloweenDressing(buildings, occupied = []) {
     const rand = hwRng(0x4A5F17);
+    // Where the names are. Separate from `occupied` on purpose — the porches are SUPPOSED to land on doors,
+    // so this list is only consulted by the two things tall enough to cover a sign. See SIGN_CLEAR.
+    const signs = buildings.map((b) => Number(b.x) || 0);
     const pick = (lo, hi) => lo + rand() * (hi - lo);
     const out = [];
     const put = (name, x, hScale) => {
@@ -785,9 +815,19 @@ function buildHalloweenDressing(buildings, occupied = []) {
         if (rand() < 0.62) anchors.push({ x: Number(b.x) || 0, porch: true });
     }
     // Then yards, pitched only into road that is actually empty. The stride is long and uneven on purpose.
+    // ⚠️ AND NOT ON TOP OF A PERSON. A yard scene is five pieces spread over ~2% of road, and it was pitched
+    // against the other ANCHORS only — so it never knew the vote booth, the stockade or the Gourdfather were
+    // standing there. Measured in the browser: candles and two pumpkins inside the vote booth, a pumpkin and
+    // candles inside the stockade, a pumpkin inside the Gourdfather.
+    //
+    // ⚠️ THE PORCHES ABOVE ARE DELIBERATELY NOT GIVEN THIS RULE. An NPC stands at the door he belongs to —
+    // the crier is 0.9% from the Boss Arena — so "keep scenes off the posts" applied to porches would switch
+    // off the decoration at exactly the doors anybody is looking at. Only the free-road yards keep clear.
     let walk = 4 + rand() * 5;
     while (walk < 97) {
-        if (!anchors.some((a) => Math.abs(a.x - walk) < 4.5)) anchors.push({ x: walk, porch: false });
+        if (!anchors.some((a) => Math.abs(a.x - walk) < 4.5) && clearOf(walk, occupied, SCENE_CLEAR)) {
+            anchors.push({ x: walk, porch: false });
+        }
         walk += 5.5 + rand() * 5;
     }
     anchors.sort((a, b) => a.x - b.x);
@@ -873,8 +913,13 @@ function buildHalloweenDressing(buildings, occupied = []) {
         let at = x + (rand() - 0.5) * 0.9;
         // Nudged aside rather than dropped: a missing lamp in an evenly lit street is a hole somebody
         // notices, where one standing a stride off its mark is just a street.
-        if (!clearOf(at, occupied, LAMP_CLEAR)) {
-            const shifted = [at - LAMP_CLEAR * 1.4, at + LAMP_CLEAR * 1.4].find((c) => clearOf(c, occupied, LAMP_CLEAR));
+        // Two different questions with two different answers: stay off a person, and stay off a sign.
+        const lampOk = (c) => clearOf(c, occupied, LAMP_CLEAR) && clearOf(c, signs, SIGN_CLEAR);
+        if (!lampOk(at)) {
+            // Widened the search: with signs in play the old single stride of LAMP_CLEAR * 1.4 was often not
+            // enough to get out from under a name, and the lamp was dropped instead of moved — which is the
+            // hole in an evenly lit street this nudge exists to avoid.
+            const shifted = [-1, 1].flatMap((d) => [1.4, 2.2, 3.0].map((k) => at + d * LAMP_CLEAR * k)).find(lampOk);
             if (!shifted) continue;
             at = shifted;
         }
@@ -925,8 +970,14 @@ function buildHalloweenDressing(buildings, occupied = []) {
             // of canopies 2% apart -- measured, 57.7 and 59.7 -- which reads as one lumpy tree rather than
             // two. Previously chosen trunks count as occupied for the next band.
             const taken = chosen.map((c) => c.x);
+            // ⚠️ AND CLEAR OF THE SIGNS. A canopy is the widest thing the dressing places, so it needs a
+            // wider berth from a name than a lamp post does — TREE_CLEAR against the posts, and the tree's
+            // own half-width against a sign. The stretch BEFORE the first building is where this bit: that
+            // gap's midpoint is half the Tavern's x, which on this street is 2% away, and a canopy is wider
+            // than that. The Tavern's name was under a tree and a lamp post at the same time.
             const spot = [0, -0.34, 0.34, -0.62, 0.62].map((f) => g.mid + f * g.w)
-                .find((x) => x > 1 && x < 99 && clearOf(x, occupied, TREE_CLEAR) && clearOf(x, taken, TREE_CLEAR));
+                .find((x) => x > 1 && x < 99 && clearOf(x, occupied, TREE_CLEAR)
+                    && clearOf(x, taken, TREE_CLEAR) && clearOf(x, signs, TREE_CLEAR * 0.75));
             if (spot === undefined) continue;
             chosen.push({ x: spot, room });
             break;
