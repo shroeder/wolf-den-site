@@ -260,6 +260,39 @@ Object.assign(ART_PROMPTS, {
         "curled stem, a jagged triangular-eyed grinning face cut into the front, lit from within by a candle",
         { extra: HW_NEAR_EXTRA }
     ),
+    // ── THE CANDY ITSELF ─────────────────────────────────────────────────────────────────────────────
+    // Luke: "Lets have a strong iconic sprite for candy as well as show it wherever its referred to."
+    //
+    // ⚠️ THIS ONE IS DRAWN FOR 16px, NOT FOR 1024. It is the event's CURRENCY MARK — it sits inline beside a
+    // number, in a price button, in a HUD pill — so it is read at about the size of a full stop and it has to
+    // survive that. Which means one object, one silhouette, no scene: a twist-wrapped sweet is a bar with a
+    // pinch at each end and nothing else, and that shape is still legible when it is fourteen pixels across.
+    // Everything the house prompt usually adds — ground, contact shadow, context — is what destroys an icon at
+    // that size, so this says "on nothing" and means it.
+    hw_candy: housePrompt(
+        "ONE single TWIST-WRAPPED SWEET, drawn large and centred and filling the frame, floating on nothing — " +
+        "a plump oval sweet in a glossy wrapper of deep orange, the wrapper twisted and pinched into a little " +
+        "flared fan at each end, a bright highlight across the top of the oval, a bold dark outline all the " +
+        "way round so the shape reads at the size of a thumbnail",
+        { extra: "Centred, filling the frame, seen straight on. No ground, no shadow beneath it, no scenery, " +
+                 "no other objects. ONE sweet only. It must stay legible shrunk to 16 pixels." }
+    ),
+    // Two more for the burst, so a handful of sweets flying out of a pail is a HANDFUL rather than one sweet
+    // printed nine times. Same treatment, same size discipline.
+    hw_candy_b: housePrompt(
+        "ONE single piece of CANDY CORN, drawn large and centred and filling the frame, floating on nothing — " +
+        "the classic fat tapering triangle in three banded stripes, white at the narrow tip, orange in the " +
+        "middle, deep yellow at the wide base, glossy, with a bold dark outline all the way round",
+        { extra: "Centred, filling the frame, seen straight on. No ground, no shadow beneath it, no scenery, " +
+                 "no other objects. ONE piece only. It must stay legible shrunk to 16 pixels." }
+    ),
+    hw_candy_c: housePrompt(
+        "ONE single round SWIRL LOLLIPOP on a short white stick, drawn large and centred and filling the " +
+        "frame, floating on nothing — a fat glossy disc with a spiral of purple and cream winding into its " +
+        "centre, the stick angled down to one side, a bold dark outline all the way round",
+        { extra: "Centred, filling the frame, seen straight on. No ground, no shadow beneath it, no scenery, " +
+                 "no other objects. ONE lollipop only. It must stay legible shrunk to 16 pixels." }
+    ),
     // ── THE TRICK-OR-TREAT MARKERS ───────────────────────────────────────────────────────────────────
     // Luke: "Trick or treating is an immersive thing, nothing in a modal. You go door to door at each
     // buikding." So every door in the plaza wears one of these, and it is the thing you tap — which means it
@@ -576,7 +609,7 @@ const isBuildingKey = (key) => HW_BUILDING_IDS.includes(key) || key.startsWith("
 export const HALLOWEEN_PROP_KEYS = [
     "hw_moon", "hw_witch_a", "hw_witch_b", "hw_bats", "hw_tree",
     "hw_pumpkin", "hw_lantern", "hw_candles", "hw_ghost",
-    "hw_treat_full", "hw_treat_spent",
+    "hw_treat_full", "hw_treat_spent", "hw_candy", "hw_candy_b", "hw_candy_c",
     "hw_scarecrow", "hw_haybale", "hw_cauldron", "hw_gravestone", "hw_skeleton", "hw_pumpkin_stack", "hw_crow",
     "hw_cobble", "hw_tree_fall", "hw_lamppost", "hw_verge", "hw_shrub",
     "hw_depth1", "hw_depth3", "hw_mid", "hw_fg",

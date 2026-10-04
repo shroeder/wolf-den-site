@@ -13,12 +13,13 @@ import { useCallback, useEffect, useState } from "react";
 // ⚠️ AND THERE IS NO SCROLLER INSIDE THIS ONE. `.tw-roster-panel` is already a 70dvh scroll box, so an
 // `overflow-y: auto` on the stock list underneath it meant two nested scrollers sharing one thumb-drag: on a
 // phone the inner one swallows the gesture, you reach its end, and the sheet beneath refuses to move. One
-// panel, one scroll.
+// panel, one scroll — and the inspector below obeys the same rule.
 //
-// ⚠️ AND THE DIALOGUE IS PASSED IN, NOT IMPORTED. gourdfather.js is `server-only` — it reads the database —
-// so a client component that imported his lines would take the whole module with it and fail the build. The
-// page hands them down as props, which also means his mouth and his prices can never disagree about whether
-// the event is on.
+// ⚠️ AND THE DIALOGUE AND THE DETAIL ARE PASSED IN, NOT IMPORTED. gourdfather.js is `server-only` — it reads
+// the database, ITEMS, COLLECTIBLES and the decoration tables — so a client component that imported any of it
+// would drag the whole catalogue into the browser bundle for sixteen rows. The page hands the lines down and
+// the server builds the stat lines, which also means his mouth and his prices can never disagree about
+// whether the event is on.
 
 // His shelves, in the order a member reads them: the thing you can afford today, then the thing you are
 // saving for. The headings are not decoration — each group is a different KIND of purchase (a sealed gamble,
@@ -31,13 +32,30 @@ const SHELVES = [
     { kind: "deco", title: "For the Farm", note: "Standing decorations." },
 ];
 
-export default function GourdfatherStall({ art, lines, onClose }) {
+const RARITY_LABEL = { rare: "Rare", epic: "Epic", legendary: "Legendary", mythic: "Mythic" };
+
+/**
+ * The candy mark. Luke: "Lets have a strong iconic sprite for candy as well as show it wherever its referred
+ * to." Every number in this panel that counts candy wears it, so the currency is recognised by its picture
+ * before the word is read — which is the only thing that separates it from the gold, chips, doubloons and
+ * laurels a member is already holding.
+ */
+function Candy({ src, size = 15 }) {
+    if (!src) return null;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="gf-candy-mark" src={src} alt="" draggable={false} style={{ width: size, height: size }} />;
+}
+
+export default function GourdfatherStall({ art, candyArt = null, lines, onClose }) {
     const [stall, setStall] = useState(null);
     const [busy, setBusy] = useState(null);
     // His current line. An INDEX rather than the string, so a re-render does not reshuffle his mouth
     // mid-sentence — the same reason the wheel keeps its own rotation in a ref.
     const [say, setSay] = useState({ bank: "greet", n: Math.floor(Math.random() * 1000) });
     const [flash, setFlash] = useState(null);
+    // The ware being looked at properly. An ID rather than the row, so a refresh after a purchase updates
+    // what the open inspector is showing instead of leaving a stale copy of it on screen.
+    const [inspect, setInspect] = useState(null);
 
     const post = useCallback(async (body) => {
         const r = await fetch("/api/marketplace/town", {
@@ -77,6 +95,7 @@ export default function GourdfatherStall({ art, lines, onClose }) {
     const line = bank.length ? bank[say.n % bank.length] : "";
     const candy = stall?.candy ?? 0;
     const stock = stall?.stock || [];
+    const looking = inspect ? stock.find((w) => w.id === inspect) || null : null;
 
     return (
         <div className="tw-roster" onClick={onClose} role="presentation">
@@ -87,7 +106,7 @@ export default function GourdfatherStall({ art, lines, onClose }) {
                         <img className="gf-face" src={art} alt="" draggable={false} />
                     ) : null}
                     <strong className="gf-name">The Gourdfather</strong>
-                    <span className="gf-candy">{candy.toLocaleString()} candy</span>
+                    <span className="gf-candy"><Candy src={candyArt} size={16} />{candy.toLocaleString()}</span>
                     <button type="button" onClick={onClose} aria-label="Close">✕</button>
                 </div>
 
@@ -108,7 +127,20 @@ export default function GourdfatherStall({ art, lines, onClose }) {
                                 {rows.map((w) => {
                                     const afford = candy >= w.candy;
                                     return (
-                                        <div key={w.id} className={`gf-ware r-${w.rarity || "rare"}${w.owned ? " is-owned" : ""}`}>
+                                        // ⚠️ THE ROW IS THE BUTTON AND THE PRICE IS A BUTTON INSIDE IT, which is
+                                        // not allowed — so the row is a <div> with a tap handler and its own
+                                        // role, and the price keeps being a real <button>. Nesting them would
+                                        // be invalid markup that behaves differently in every browser, and
+                                        // "inspect" would fire every time somebody bought something.
+                                        <div
+                                            key={w.id}
+                                            className={`gf-ware r-${w.rarity || "rare"}${w.owned ? " is-owned" : ""}`}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => setInspect(w.id)}
+                                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setInspect(w.id); } }}
+                                            aria-label={`Look at ${w.name}`}
+                                        >
                                             {/* ⚠️ A PICTURE, NOT A GLYPH. Every one of these sixteen already had a
                                                 sprite drawn for it in its own table and this shop was listing
                                                 them as lines of text. */}
@@ -127,13 +159,10 @@ export default function GourdfatherStall({ art, lines, onClose }) {
                                                 type="button"
                                                 className="gf-buy"
                                                 disabled={w.owned || !afford || busy === w.id}
-                                                onClick={() => buy(w.id)}
+                                                onClick={(e) => { e.stopPropagation(); buy(w.id); }}
                                             >
-                                                {/* The unit, under the number. A bare "2,200" on a button in a
-                                                    game with gold, chips, doubloons and laurels in it is a
-                                                    number in an unnamed currency. */}
                                                 {w.owned ? "Yours" : busy === w.id ? "…" : (
-                                                    <><b>{w.candy.toLocaleString()}</b><i>candy</i></>
+                                                    <><Candy src={candyArt} size={13} /><b>{w.candy.toLocaleString()}</b></>
                                                 )}
                                             </button>
                                         </div>
@@ -144,6 +173,57 @@ export default function GourdfatherStall({ art, lines, onClose }) {
                     );
                 })}
             </div>
+
+            {/* ── THE LONG LOOK ───────────────────────────────────────────────────────────────────────
+                Luke: "Also need to be able to click and havr an inspection modal". A row has space for a name
+                and a price; a scythe has four stats, a slot, a rarity and a line of flavour, and buying 500
+                candy of something you have only seen the name of is a purchase made blind.
+
+                It sits OVER the stall rather than replacing it, so closing it puts you back exactly where you
+                were in a list you may have scrolled a long way down. */}
+            {looking ? (
+                <div className="gf-look" onClick={(e) => { e.stopPropagation(); setInspect(null); }} role="presentation">
+                    <div className={`gf-look-card r-${looking.rarity || "rare"}`} onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="gf-look-x" onClick={() => setInspect(null)} aria-label="Close">✕</button>
+                        <span className="gf-look-pic">
+                            {looking.sprite ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={looking.sprite} alt="" draggable={false} />
+                            ) : null}
+                        </span>
+                        <h3>{looking.name}</h3>
+                        <p className="gf-look-tags">
+                            {looking.rarity ? <span className="gf-tag">{RARITY_LABEL[looking.rarity] || looking.rarity}</span> : null}
+                            {looking.slot ? <span className="gf-tag">{String(looking.slot).replace("_", " ")}</span> : null}
+                            {looking.owned ? <span className="gf-tag is-owned">Owned</span> : null}
+                        </p>
+                        {looking.stats?.length ? (
+                            <dl className="gf-look-stats">
+                                {looking.stats.map((st) => (
+                                    <div key={st.key} title={st.desc || undefined}>
+                                        <dt>{st.label}</dt>
+                                        <dd>{st.value}</dd>
+                                    </div>
+                                ))}
+                            </dl>
+                        ) : null}
+                        {looking.blurb ? <p className="gf-look-flavor">{looking.blurb}</p> : null}
+                        {looking.note ? <p className="gf-look-note">{looking.note}</p> : null}
+                        <button
+                            type="button"
+                            className="gf-look-buy"
+                            disabled={looking.owned || candy < looking.candy || busy === looking.id}
+                            onClick={() => buy(looking.id)}
+                        >
+                            {looking.owned ? "Already yours"
+                                : busy === looking.id ? "…"
+                                    : candy < looking.candy
+                                        ? <>Need <Candy src={candyArt} size={14} />{(looking.candy - candy).toLocaleString()} more</>
+                                        : <>Buy for <Candy src={candyArt} size={14} />{looking.candy.toLocaleString()}</>}
+                        </button>
+                    </div>
+                </div>
+            ) : null}
             <style>{CSS}</style>
         </div>
     );
@@ -154,8 +234,10 @@ const CSS = `
 .gf-head { gap: 8px; align-items: center; }
 .gf-face { width: 42px; height: 42px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
 .gf-name { flex: 1; min-width: 0; }
-.gf-candy { font-weight: 900; font-size: 0.86rem; color: #ffcf6a; white-space: nowrap;
-    background: rgba(255,170,60,0.14); border: 1px solid rgba(255,170,60,0.34); border-radius: 999px; padding: 3px 10px; }
+.gf-candy-mark { object-fit: contain; flex: 0 0 auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)); }
+.gf-candy { display: inline-flex; align-items: center; gap: 5px; font-weight: 900; font-size: 0.9rem;
+    color: #ffcf6a; white-space: nowrap; font-variant-numeric: tabular-nums;
+    background: rgba(255,170,60,0.14); border: 1px solid rgba(255,170,60,0.34); border-radius: 999px; padding: 3px 11px 3px 8px; }
 /* His line sits in a bubble that is always the same height for one or two lines, so the panel does not jump
    every time he changes his mind. */
 .gf-say { margin: -2px 2px 10px; padding: 9px 12px; border-radius: 12px; min-height: 2.9em; display: flex; align-items: center;
@@ -173,7 +255,10 @@ const CSS = `
    drag on a phone. See the note at the top of this file. */
 .gf-stock { display: flex; flex-direction: column; gap: 7px; }
 .gf-ware { display: flex; align-items: center; gap: 10px; padding: 8px 11px 8px 8px; border-radius: 11px;
-    background: rgba(255,255,255,0.045); border: 1px solid var(--r, rgba(255,255,255,0.12)); }
+    background: rgba(255,255,255,0.045); border: 1px solid var(--r, rgba(255,255,255,0.12)); cursor: pointer;
+    transition: background .12s ease, transform .12s ease; }
+.gf-ware:hover { background: rgba(255,255,255,0.08); transform: translateY(-1px); }
+.gf-ware:focus-visible { outline: 2px solid #ffcf6a; outline-offset: 2px; }
 .gf-ware.r-rare { --r: rgba(92,180,255,0.45); } .gf-ware.r-epic { --r: rgba(186,120,255,0.45); }
 .gf-ware.r-legendary { --r: rgba(255,180,60,0.5); } .gf-ware.r-mythic { --r: rgba(92,224,192,0.5); }
 .gf-ware.is-owned { opacity: 0.5; }
@@ -186,11 +271,57 @@ const CSS = `
 .gf-ware-body b { font-size: 0.92rem; color: #fff; }
 .gf-slot { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .06em; color: #9aa2ab; font-style: normal; }
 .gf-blurb { font-size: 0.76rem; color: #b6ab9a; font-style: italic; line-height: 1.3; }
-.gf-buy { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 0;
-    min-width: 62px; padding: 6px 11px; border-radius: 13px; font-weight: 900; font-size: 0.82rem; cursor: pointer;
+.gf-buy { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 4px;
+    min-width: 72px; padding: 9px 12px 9px 10px; border-radius: 999px; cursor: pointer;
     background: linear-gradient(180deg, #ffcf6a, #e89a1c); border: none; color: #2a1403; white-space: nowrap;
-    font-variant-numeric: tabular-nums; line-height: 1.12; }
-.gf-buy b { font-size: 0.92rem; }
-.gf-buy i { font-style: normal; font-size: 8.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; opacity: 0.72; }
+    font-variant-numeric: tabular-nums; }
+.gf-buy b { font-size: 0.9rem; font-weight: 900; }
 .gf-buy:disabled { background: rgba(255,255,255,0.08); color: #8b93a0; cursor: default; }
+/* ⚠️ DIMMED, NOT GREYED. A greyscaled 13px sweet is a grey blob -- filmed, it stopped being recognisable as
+   the currency at exactly the moment the button is telling you that you cannot afford it, which is when
+   knowing WHICH currency matters most. The button's own colour already says disabled. */
+.gf-buy:disabled .gf-candy-mark { opacity: 0.62; }
+
+/* ── THE INSPECTOR ────────────────────────────────────────────────────────────────────────────────────
+   z 420 — above .tw-roster (400), because it opens FROM the stall and has to sit over it. */
+.gf-look { position: fixed; inset: 0; z-index: 420; display: grid; place-items: center; padding: 18px;
+    background: rgba(6,4,12,0.72); backdrop-filter: blur(4px); animation: gfLookIn .18s ease both; }
+@keyframes gfLookIn { from { opacity: 0; } to { opacity: 1; } }
+.gf-look-card { position: relative; width: 100%; max-width: 340px; max-height: 86dvh; overflow-y: auto;
+    padding: 18px 18px 16px; border-radius: 20px; text-align: center;
+    background: linear-gradient(180deg, #221842, #140d26);
+    border: 1px solid var(--r, rgba(255,255,255,0.16)); box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+    animation: gfLookUp .24s cubic-bezier(.2,1,.3,1) both; }
+@keyframes gfLookUp { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+.gf-look-card.r-rare { --r: rgba(92,180,255,0.6); } .gf-look-card.r-epic { --r: rgba(186,120,255,0.6); }
+.gf-look-card.r-legendary { --r: rgba(255,180,60,0.65); } .gf-look-card.r-mythic { --r: rgba(92,224,192,0.65); }
+.gf-look-x { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 999px;
+    background: rgba(255,255,255,0.08); border: none; color: #e8e2d6; font-size: 15px; cursor: pointer; }
+/* The picture at a size worth looking at — the whole reason this panel exists. The glow behind it is the
+   rarity, so the card says how good the thing is before you have read a word of it. */
+.gf-look-pic { display: grid; place-items: center; width: 152px; height: 152px; margin: 4px auto 10px;
+    border-radius: 20px; background: radial-gradient(circle at 50% 58%, var(--r, rgba(255,255,255,0.2)), rgba(0,0,0,0.3) 68%); }
+.gf-look-pic img { max-width: 136px; max-height: 136px; object-fit: contain;
+    filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)); }
+.gf-look-card h3 { margin: 0 0 7px; font-size: 1.12rem; color: #fff; text-wrap: balance; }
+.gf-look-tags { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; margin: 0 0 11px; }
+.gf-tag { font-size: 0.66rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em;
+    padding: 3px 9px; border-radius: 999px; color: #e6dcc9;
+    background: rgba(255,255,255,0.07); border: 1px solid var(--r, rgba(255,255,255,0.18)); }
+.gf-tag.is-owned { color: #9af5c6; border-color: rgba(90,220,160,0.5); }
+.gf-look-stats { display: flex; flex-direction: column; gap: 1px; margin: 0 0 11px; text-align: left;
+    border-radius: 11px; overflow: hidden; background: rgba(0,0,0,0.26); }
+.gf-look-stats > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    padding: 8px 12px; }
+.gf-look-stats > div:nth-child(even) { background: rgba(255,255,255,0.035); }
+.gf-look-stats dt { margin: 0; font-size: 0.8rem; color: #c3b9a8; text-transform: capitalize; }
+.gf-look-stats dd { margin: 0; font-size: 0.92rem; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
+.gf-look-flavor { margin: 0 0 8px; font-size: 0.84rem; font-style: italic; color: #d9cbb4; line-height: 1.42; }
+.gf-look-note { margin: 0 0 12px; font-size: 0.79rem; color: #9b9080; line-height: 1.45; }
+.gf-look-buy { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%;
+    padding: 12px; border-radius: 13px; font-size: 0.94rem; font-weight: 900; cursor: pointer;
+    background: linear-gradient(180deg, #ffcf6a, #e89a1c); border: none; color: #2a1403;
+    font-variant-numeric: tabular-nums; }
+.gf-look-buy:disabled { background: rgba(255,255,255,0.07); color: #8b93a0; cursor: default; }
+.gf-look-buy:disabled .gf-candy-mark { opacity: 0.62; }
 `;

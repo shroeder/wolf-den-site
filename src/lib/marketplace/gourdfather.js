@@ -6,8 +6,8 @@ import { spendCandy, candyBalance } from "@/lib/marketplace/candy.js";
 import { CHEST_TIERS, addChests } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
-import { ITEMS } from "@/lib/marketplace/items.js";
-import { decorationById } from "@/lib/marketplace/decorations.js";
+import { ITEMS, STAT_META } from "@/lib/marketplace/items.js";
+import { decorationById, DECO_STATS } from "@/lib/marketplace/decorations.js";
 
 // ── THE GOURDFATHER ──────────────────────────────────────────────────────────────────────────────────────
 // Luke: "The new town npc will be a giant talking pumpkin. With lots to say. Hes silly and crazy dialogue."
@@ -155,6 +155,59 @@ export const STALL = [
 
 const byId = (id) => STALL.find((x) => x.id === id) || null;
 
+// ── WHAT A GIFT BOX CAN HOLD ─────────────────────────────────────────────────────────────────────────────
+// Luke: "Also need to be able to click and havr an inspection modal". A sealed box is the one ware with
+// nothing to inspect — it has no stats and no slot — so this is the honest thing to put in its place: what
+// the tier is FOR, in a sentence, rather than the odds table (which is a chain and reads as a lie in
+// isolation — see chest-odds.mjs). Ordered as the stall is: each one is a step up on all four counts.
+const CHEST_NOTE = {
+    hw_candycorn: "The cheapest box he will sell you. Sweets, mostly, and now and then something better.",
+    hw_pumpkin: "A better class of box. Twice the chance of a piece of gear, and half again the chance of a friend.",
+    hw_skeleton: "He handles this one carefully. Gear is likely, a pet is a real possibility, and the sweets inside are the good ones.",
+    hw_ghost: "The best box on the cart. Four times the first one's odds of gear, and the only one he will not joke about.",
+};
+
+/**
+ * The long look at one ware — what the inspector shows.
+ *
+ * ⚠️ IT IS BUILT HERE, NOT IN THE PANEL. The stall is a client component and every one of these tables
+ * (ITEMS, STAT_META, DECO_STATS, COLLECTIBLES) is a server module; a panel that imported them to render a
+ * stat line would pull the whole catalogue into the browser bundle for sixteen rows. The same reason his
+ * dialogue is passed down rather than imported.
+ */
+function detailFor(row) {
+    if (row.kind === "item") {
+        const i = ITEMS.find((x) => x.id === row.id);
+        // Stats in the order the item declares them — a weapon leads with its damage, armour with its armour,
+        // which is what you look at first on each.
+        const stats = Object.entries(i?.stats || {}).map(([k, v]) => ({
+            key: k,
+            label: STAT_META[k]?.label || k.replace(/_/g, " "),
+            desc: STAT_META[k]?.desc || null,
+            value: `${v}${STAT_META[k]?.suffix ?? ""}`,
+        }));
+        return { stats, note: null };
+    }
+    if (row.kind === "pet") {
+        const p = COLLECTIBLES.find((x) => x.id === row.id);
+        return {
+            stats: p?.activeStat
+                ? [{ key: "activeStat", label: "Boosts", value: String(p.activeStat).replace(/_/g, " ") }]
+                : [],
+            note: "Pets level with you and fight beside you. This one is sold once and never again.",
+        };
+    }
+    if (row.kind === "deco") {
+        const d = decorationById(row.id);
+        const b = d?.buff ? DECO_STATS[d.buff.stat] : null;
+        return {
+            stats: b ? [{ key: d.buff.stat, label: b.label, value: `+${d.buff.value}${b.suffix || ""}` }] : [],
+            note: b ? "Stands on your farm and pays while it stands there." : "Stands on your farm. Purely for looking at.",
+        };
+    }
+    return { stats: [], note: CHEST_NOTE[row.id] || null };
+}
+
 /** What the stall looks like to this member: prices, art, and what they already hold. */
 export async function stallView(buyerId) {
     if (!halloweenOn(buyerId)) return { open: false, stock: [], candy: 0 };
@@ -184,7 +237,8 @@ export async function stallView(buyerId) {
     const have = new Set([...ownedPets, ...ownedItems, ...ownedDecos].map((r) => r.id));
 
     const stock = STALL.map((row) => {
-        const base = { ...row, owned: false, name: row.id, blurb: null, rarity: null, sprite: sprite[row.id] || null };
+        const base = { ...row, owned: false, name: row.id, blurb: null, rarity: null,
+            sprite: sprite[row.id] || null, ...detailFor(row) };
         if (row.kind === "chest") {
             const c = CHEST_TIERS[row.id];
             // ⚠️ NO BLURB. All four said the same sentence, under a shelf heading that says it once already —

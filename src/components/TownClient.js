@@ -6,6 +6,7 @@ import * as Gi from "react-icons/gi";
 
 import ArenaClient from "@/components/ArenaClient";
 import GourdfatherStall from "@/components/GourdfatherStall";
+import { knockHaptic, knockSound, stopTownAudio } from "@/components/town/town-audio.js";
 import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
 import CoinCta from "@/components/CoinCta";
@@ -758,6 +759,50 @@ const DOOR_CLEAR_GOURD = 5.4;
 // not doors anybody lives behind.
 const NPC_DOORS = ["crier", "smith", "merchant", "quest"];
 
+// ── THE CANDY EXPLOSION ──────────────────────────────────────────────────────────────────────────────────
+// Luke: "the bowl tap should be a dopamine inducing event. Id expect a noise vibration and vfx, maybe a candy
+// explosion."
+//
+// Sweets come out of the pail on real arcs: each one gets a launch angle, a speed and a spin, and gravity
+// does the rest in a CSS keyframe. The numbers are rolled ONCE per knock and handed to the DOM as custom
+// properties, which is the whole trick — the animation itself is one keyframe shared by every piece, so a
+// burst of eighteen costs the compositor eighteen transforms and nothing else. Rolling them in the keyframe
+// is impossible and animating them in JS would be eighteen rAF callbacks competing with the camera.
+//
+// ⚠️ THE COUNT IS THE PAYOUT, AND THAT IS THE POINT. A door that pays 7 throws more than a door that pays 4,
+// so the size of the burst IS the number before you have read it. A fixed burst would be a nice animation
+// that tells you nothing; this one is the receipt.
+const BURST_MIN = 7;
+const BURST_PER_CANDY = 1.6;
+const BURST_MAX = 22;
+// Three drawings rather than one printed eighteen times -- a twist wrap, a candy corn, a lollipop. At 20px
+// the difference between them is barely a shape, and it is exactly enough that a handful reads as a HANDFUL.
+const BURST_ART = ["hw_candy", "hw_candy_b", "hw_candy_c"];
+
+function rollBurst(candy, chest) {
+    const n = Math.min(BURST_MAX, Math.max(BURST_MIN, Math.round((candy || 1) * BURST_PER_CANDY) + (chest ? 8 : 0)));
+    return Array.from({ length: n }, (_, i) => {
+        // Fired upward and outward in a fan, never straight down: the pail is on the ground, so the whole
+        // spray belongs above it. -150deg..-30deg is that fan, with the edges of it weaker so the shape is a
+        // bloom rather than a wall.
+        const a = (-150 + Math.random() * 120) * (Math.PI / 180);
+        const v = 46 + Math.random() * 62;
+        return {
+            i,
+            art: BURST_ART[i % BURST_ART.length],
+            dx: Math.cos(a) * v,
+            // The rise is the launch; the fall below it is gravity and is always further, which is what makes
+            // an arc look like weight rather than like a firework.
+            up: Math.abs(Math.sin(a) * v),
+            drop: 70 + Math.random() * 50,
+            spin: (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 420),
+            size: 13 + Math.random() * 11,
+            delay: Math.random() * 0.07,
+            dur: 0.72 + Math.random() * 0.4,
+        };
+    });
+}
+
 const TREE_CLEAR = 4.2;
 const LAMP_CLEAR = 2.2;
 // ── ⚠️ AND A THIRD CLEARANCE, FOR THE THING NOTHING WAS CHECKING: THE SIGNS ───────────────────────────────
@@ -1157,6 +1202,9 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // The answer at the door, shown where the door is. One at a time — you are standing at one porch.
     const [bark, setBark] = useState(null);
     const [knocking, setKnocking] = useState(null);
+    // The sweets in the air. Keyed by knock so React replaces the whole spray rather than reusing nodes and
+    // restarting half of them mid-flight.
+    const [burst, setBurst] = useState(null);
 
     //
     // ⚠️ WHICH DOORS EXIST COMES FROM THE SERVER (gourd.doors), NOT FROM THIS LIST. trick-or-treat.js owns
@@ -1205,6 +1253,10 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     }, [gourd, buildings, doorBook]);
     const doorsLeft = doorPosts.filter((d) => !knocked.has(d.id)).length;
     const barkAt = bark ? (doorPosts.find((d) => d.id === bark.door)?.x ?? null) : null;
+    // The spray starts at the pail's mouth, which is its top -- hence the small lift off the post's own top.
+    const burstAt = burst
+        ? (() => { const d = doorPosts.find((x) => x.id === burst.door); return d ? { x: d.x, top: d.top - 2.4 } : null; })()
+        : null;
     // His street bark rotates on its own clock. An index, not a string — see the note in the stall.
     const [gourdBark, setGourdBark] = useState(0);
     const [merchantBusy, setMerchantBusy] = useState(false);
@@ -1383,15 +1435,38 @@ export default function TownClient({ initial, frozen = false, halloween = false,
         if (knocking || knocked.has(door)) return;
         setKnocking(door);
         setKnocked((k) => new Set(k).add(door));
+        // ⚠️ THE SOUND AND THE SHAKE GO BEFORE THE REQUEST, NOT AFTER IT. A tap has to answer in the same
+        // frame or it does not feel like a tap — waiting ~200ms for the server to confirm before making any
+        // noise is the difference between a door and a form submission. The server cannot refuse a knock the
+        // client already knows is unknocked (the marker is gone the moment you press it), so there is nothing
+        // being promised here that can fail to arrive. The BURST waits, because its size is the payout.
+        knockSound({ candy: 5 });
+        knockHaptic({ candy: 5 });
         const d = await fetch("/api/marketplace/town", {
             method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "knock", door }),
         }).then((r) => r.json()).catch(() => null);
         setKnocking(null);
         if (d?.ok) {
             setBark({ door, line: d.line, candy: d.candy || 0, sweet: d.sweet || null, chest: Boolean(d.chest), trick: Boolean(d.trick) });
+            setBurst({ door, at: Date.now(), bits: rollBurst(d.candy, Boolean(d.chest)) });
+            // The second half of the sound, now that we know what actually came out of the bowl — the joke,
+            // the right-sized handful, and the flourish for a sweet or a box.
+            knockSound({ candy: d.candy || 0, trick: Boolean(d.trick), sweet: Boolean(d.sweet), chest: Boolean(d.chest) });
+            if (d.chest) knockHaptic({ candy: d.candy || 0, chest: true });
             if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
         }
     }, [knocking, knocked]);
+
+    // Sweets are swept up once they have landed. Tied to the burst's own id so a second knock during the
+    // first one's flight cannot clear the new spray with the old timer.
+    useEffect(() => {
+        if (!burst) return undefined;
+        const t = setTimeout(() => setBurst((b) => (b && b.at === burst.at ? null : b)), 1500);
+        return () => clearTimeout(t);
+    }, [burst]);
+
+    // One bus for the plaza, dropped when you leave it.
+    useEffect(() => () => stopTownAudio(), []);
 
     // The answer hangs over the porch and then goes. Long enough to read two sentences out loud.
     useEffect(() => {
@@ -1851,6 +1926,21 @@ export default function TownClient({ initial, frozen = false, halloween = false,
 
     const you = state?.you;
     const art = state?.art || {};
+
+    // ⚠️ BELOW `art`, AND THAT IS NOT A STYLE CHOICE. Sitting above it this read `art` in its own
+    // dependency array during render, which is a temporal-dead-zone access: every visit to the plaza
+    // threw "Cannot access 'art' before initialization" and rendered nothing at all. The build and all
+    // five gates passed on it — only opening the page found it.
+    // ⚠️ THE SWEETS ARE FETCHED BEFORE THE FIRST KNOCK, NOT DURING IT. A burst lasts about a second; a cold
+    // sprite fetch takes longer than that on a phone, so without this the first door of the night pays in
+    // invisible candy and every one after it looks fine — the worst possible order for a reward.
+    useEffect(() => {
+        if (!gourd || typeof window === "undefined") return;
+        for (const k of BURST_ART) {
+            const u = art[k]?.url;
+            if (u) { const im = new Image(); im.src = u; }
+        }
+    }, [gourd, art]);
     // Which parallax bands are wearing art that was PAINTED for night. Those must not also be filtered down to
     // night — that is the double-darkening that turned the dressed buildings blue, and it is exactly the
     // mismatch Luke spotted between the moon and the rooftops.
@@ -2309,6 +2399,37 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                     </button>
                                 );
                             })}
+                            {/* ── THE SWEETS IN THE AIR ────────────────────────────────────────────
+                                Drawn at the pail's own spot inside tw-world, so the spray rides the street
+                                with the door it came out of rather than hanging in the middle of the screen.
+                                pointer-events: none throughout — eighteen pieces of candy between your thumb
+                                and the next porch would make the street untappable for a second. */}
+                            {burst && burstAt != null ? (
+                                <span className="tw-burst" style={{ left: `${burstAt.x}%`, top: `${burstAt.top}%` }} aria-hidden="true">
+                                    {burst.bits.map((p) => (
+                                        art[p.art]?.url ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                key={p.i}
+                                                src={art[p.art].url}
+                                                alt=""
+                                                draggable={false}
+                                                style={{
+                                                    "--dx": `${p.dx}px`, "--up": `${p.up}px`, "--drop": `${p.drop}px`,
+                                                    // ⚠️ WIDTH AND HEIGHT, NOT WIDTH ALONE. An <img> that has
+                                                    // not loaded yet with only a width set lays out 0px tall,
+                                                    // so the very first burst of the night — the one that
+                                                    // matters — flew as nothing at all while the browser
+                                                    // fetched the sprite. These are square, so this is also
+                                                    // just true.
+                                                    "--spin": `${p.spin}deg`, width: `${p.size}px`, height: `${p.size}px`,
+                                                    animationDelay: `${p.delay}s`, animationDuration: `${p.dur}s`,
+                                                }}
+                                            />
+                                        ) : null
+                                    ))}
+                                </span>
+                            ) : null}
                             {/* The answer, over the door you just knocked on. It is the payload — the candy is
                                 incidental and the joke is the reward — so it gets room to be read rather than
                                 a toast in the corner of the screen. */}
@@ -2316,7 +2437,15 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 <div className={`tw-door-say${bark.trick ? " is-trick" : ""}`} style={{ left: `${barkAt}%` }} role="status">
                                     <p>{bark.line}</p>
                                     <span className="tw-door-got">
-                                        {bark.candy ? `+${bark.candy} candy` : "no candy left here"}
+                                        {bark.candy ? (
+                                            <>
+                                                {art.hw_candy?.url ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img className="tw-candy-mark" src={art.hw_candy.url} alt="" draggable={false} />
+                                                ) : null}
+                                                +{bark.candy}
+                                            </>
+                                        ) : "no candy left here"}
                                         {bark.sweet ? ` · ${bark.sweet.name}` : ""}
                                         {bark.chest ? " · and a sealed box!" : ""}
                                     </span>
@@ -2827,7 +2956,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
 
             {/* Traveling Merchant wares */}
             {gourdOpen && gourd ? (
-                <GourdfatherStall art={art.gourdfather?.url || null} lines={gourd} onClose={() => setGourdOpen(false)} />
+                <GourdfatherStall art={art.gourdfather?.url || null} candyArt={art.hw_candy?.url || null} lines={gourd} onClose={() => setGourdOpen(false)} />
             ) : null}
 
             {merchantOpen ? (
@@ -3392,6 +3521,44 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     background: radial-gradient(circle, #ffcf6a, #e8700f 70%); box-shadow: 0 0 12px rgba(255,160,50,0.9); }
 @keyframes twDoorBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 
+/* ── THE CANDY EXPLOSION ──────────────────────────────────────────────────────────────────────────────
+   One keyframe, shared by every piece; everything that makes a piece ITS OWN piece arrives as a custom
+   property set on the element. That is why a burst of twenty-two is free: the compositor animates twenty-two
+   transforms off a single rule rather than running twenty-two animations it has to parse.
+
+   The arc is deliberately NOT symmetrical. Up fast, over at the top, then down further than it came -- the
+   0-40-100 split is a ball thrown rather than a firework, and a firework is what every even-weighted version
+   of this looked like. The spin keeps turning the whole way through, including the fall, because a wrapped
+   sweet has no reason to stop.
+
+   ⚠️ NO prefers-reduced-motion EXEMPTION, deliberately -- the house rule in this game is that animations
+   always play (see the note on the wheel). This one is also the reward itself, so turning it off would be
+   removing the payout, not the decoration. */
+.tw-burst { position: absolute; transform: translate(-50%, -100%); z-index: 300; pointer-events: none;
+    width: 0; height: 0; }
+.tw-burst img { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform, opacity;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)) drop-shadow(0 0 7px rgba(255,180,70,0.6));
+    animation-name: twCandyFly; animation-timing-function: cubic-bezier(.22,.6,.3,1); animation-fill-mode: both; }
+@keyframes twCandyFly {
+    0%   { transform: translate(-50%, -50%) scale(0.5) rotate(0deg); opacity: 0; }
+    12%  { opacity: 1; }
+    40%  { transform: translate(calc(-50% + var(--dx) * 0.55), calc(-50% - var(--up))) scale(1) rotate(calc(var(--spin) * 0.42)); opacity: 1; }
+    78%  { opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% - var(--up) + var(--drop))) scale(0.86) rotate(var(--spin)); opacity: 0; }
+}
+/* The flash at the mouth of the pail. It is one frame of light that the sweets come out of, and without it
+   the first piece simply appears -- the eye reads a pop as "that came from THERE" and a fade as "that was
+   always there". */
+.tw-burst::before { content: ""; position: absolute; left: 0; top: 0; width: 86px; aspect-ratio: 1;
+    transform: translate(-50%, -50%); border-radius: 50%; mix-blend-mode: screen; pointer-events: none;
+    background: radial-gradient(circle, rgba(255,226,150,0.95), rgba(255,150,40,0.45) 38%, transparent 68%);
+    animation: twCandyPop .42s cubic-bezier(.16,.9,.3,1) both; }
+@keyframes twCandyPop {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+    22%  { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+}
+
 /* ── AND WHAT THEY SAY BACK ───────────────────────────────────────────────────────────────────────────
    Over the porch you just knocked on, because that is the point: the line is the reward and the candy is the
    receipt. Anchored at the door's own x inside tw-world, so it rides the street -- a toast pinned to the
@@ -3407,8 +3574,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-door-say p { margin: 0 0 6px; font-size: 11.5px; line-height: 1.42; color: #ffe8c8; }
 .tw-door-say.is-trick { border-color: rgba(186,120,255,0.6); }
 .tw-door-say.is-trick::after { border-right-color: rgba(186,120,255,0.6); border-bottom-color: rgba(186,120,255,0.6); }
-.tw-door-got { display: block; font-size: 10.5px; font-weight: 900; letter-spacing: .05em;
-    text-transform: uppercase; color: #ffcf6a; }
+.tw-door-got { display: flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 900;
+    letter-spacing: .05em; text-transform: uppercase; color: #ffcf6a; }
+/* The currency mark. Drawn at 16px because that is what it was DRAWN FOR -- see hw_candy in town-art.js. */
+.tw-candy-mark { width: 16px; height: 16px; object-fit: contain; flex: 0 0 auto;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
 @keyframes twDoorSay { from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(.96); }
     to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } }
 
