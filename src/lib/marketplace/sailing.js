@@ -415,7 +415,11 @@ function seaEffects(sea = {}) {
 
 // Roll the merchant ONCE per voyage, lazily, at the "arrived" interstitial (landed, no dig yet, not rolled).
 // merchant_json: NULL = not rolled; {none:true} = rolled/no merchant; an object = the merchant is here.
-async function rollMerchant(buyerId, retry = 0) {
+// `guarantee` forces the merchant WITHOUT spending a Treasure Map — it is how Market Day gets its restock.
+// Before maps stacked, both did the same thing (set the boolean) because a boolean cannot tell the two apart;
+// now that it is a count, a free restock that wrote the column would overwrite a member's banked maps and a
+// restock that decremented it would charge them a map for a power they paid for with something else.
+async function rollMerchant(buyerId, retry = 0, { guarantee = false } = {}) {
     const row = await readRow(buyerId);
     if (!row || row.dig_state || row.merchant_json != null) return;
     // A PAUSED VOYAGE HAS NOT ARRIVED. The clock stops while something is alongside, and `returns_at` is only
@@ -444,7 +448,10 @@ async function rollMerchant(buyerId, retry = 0) {
         if (pick) await grantConsumable(buyerId, pick.consumable, 1).catch(() => {});
     }
 
-    const forced = row.force_merchant === true; // Treasure Map guarantees the merchant this landing
+    // ⚠️ A COUNT, NOT A FLAG. See mig460 — Treasure Maps bank the way Lucky Lures do, so this column holds how
+    // many are waiting and this landing spends exactly one of them.
+    const maps = Number(row.force_merchant) || 0;
+    const forced = guarantee || maps > 0; // a Treasure Map (or Market Day) guarantees the merchant this landing
     // luckyChance passes a forced 1 straight back out — a Treasure Map is a guarantee, not a probability.
     const chance = forced ? 1 : luckyChance(MERCHANT_BASE_CHANCE + await merchantFindBonus(buyerId), await fortuneFor(buyerId).catch(() => 0));
     let offer = { none: true };
@@ -475,19 +482,28 @@ async function rollMerchant(buyerId, retry = 0) {
     // pop on the next one and it didnt, just vanished instead." SoullessShiitake hit the same thing on the
     // 7th. Both are this window, which is small and is exactly as wide as one landing's page load.
     //
-    // So the update only fires while the flag still reads the way this roll decided against, which makes the
-    // read and the clear one atomic decision. A roll that loses that comparison lost to a map, so it rolls
-    // again — once — and that second pass reads force_merchant as true and honours it.
+    // So the update only fires while the column still reads the way this roll decided against, which makes the
+    // read and the spend one atomic decision. A roll that loses that comparison lost to a map, so it rolls
+    // again — once — and that second pass sees the map and honours it.
+    //
+    // ⚠️ THE COMPARISON IS THE EXACT COUNT, AND IT HAS TO BE. As a boolean this compared TRUE/FALSE, which
+    // could not see a third map arriving while two were already banked. `COALESCE(force_merchant, 0) = $3`
+    // notices any change at all, so every version of that race ends in a re-roll rather than a silent loss.
+    //
+    // And the spend is ONE, not a clear: a landing honours one map and leaves the rest in the bank. `spend` is
+    // 0 when a free guarantee (Market Day) is what forced this roll — see the note on the signature.
+    const spend = !guarantee && maps > 0 ? 1 : 0;
     const rolled = await db.queryOne(
-        `UPDATE mkt_sailing SET merchant_json = $2::jsonb, force_merchant = FALSE, updated_at = NOW()
-          WHERE buyer_id = $1 AND merchant_json IS NULL AND COALESCE(force_merchant, FALSE) = $3
+        `UPDATE mkt_sailing SET merchant_json = $2::jsonb,
+                force_merchant = GREATEST(0, COALESCE(force_merchant, 0) - $4), updated_at = NOW()
+          WHERE buyer_id = $1 AND merchant_json IS NULL AND COALESCE(force_merchant, 0) = $3
           RETURNING buyer_id`,
-        [buyerId, JSON.stringify(offer), forced]).catch(() => null);
+        [buyerId, JSON.stringify(offer), maps, spend]).catch(() => null);
     if (!rolled && retry < 1) {
         const again = await readRow(buyerId).catch(() => null);
         // Only when the shelf is still empty: a lost race against another DELIVERY is the case the guard was
         // already handling correctly and must not be rolled a second time.
-        if (again && again.merchant_json == null) return rollMerchant(buyerId, retry + 1);
+        if (again && again.merchant_json == null) return rollMerchant(buyerId, retry + 1, { guarantee });
     }
     if (rolled && !offer.none) {
         await grantEventBadge(buyerId, "merchant_met").catch(() => {}); // "Gold Rush" — met the merchant
@@ -3391,19 +3407,28 @@ async function finishFleetBattle(buyerId, meta, res) {
  * Returns the sentence to show the member, so the message matches what actually happened.
  */
 export async function applyTreasureMap(buyerId) {
-    await db.query(`UPDATE mkt_sailing SET force_merchant = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    // ⚠️ BANKS, rather than overwrites — mig460. As a boolean this threw away every map after the first, which
+    // is the whole of Sunflower's report: she used three and met one merchant. The sentences below say the
+    // stack, because a second map that is visibly worth something is the point of banking them.
+    const bank = await db.queryOne(
+        `UPDATE mkt_sailing SET force_merchant = COALESCE(force_merchant, 0) + 1 WHERE buyer_id = $1
+          RETURNING force_merchant`, [buyerId]).catch(() => null);
+    const marks = Number(bank?.force_merchant) || 1;
+    const held = marks > 1 ? ` You are holding ${marks} marks now — one for each of your next ${marks} landings.` : "";
     const row = await readRow(buyerId);
     const ashore = row?.departed_at && row?.returns_at && !row.encounter_paused_at
         && Date.now() >= new Date(row.returns_at).getTime();
     // ⚠️ THESE TWO SENTENCES USED TO SAY THE MAP WAS STILL IN THE PACK. It is not — useConsumable spends it
     // before this function is reached, and what carries forward is the MARK it leaves, not the paper. A
     // player told "the map is in your pack" who then cannot find one reasonably concludes it was eaten.
-    if (!ashore) return "The map is spent and the mark is set — the Gold Merchant will be waiting when you make landfall.";
-    if (row?.dig_state) return "You have already started digging here, so the mark holds for your next landing instead.";
+    if (!ashore) return `The map is spent and the mark is set — the Gold Merchant will be waiting when you make landfall.${held}`;
+    if (row?.dig_state) return `You have already started digging here, so the mark holds for your next landing instead.${held}`;
     // Ashore, shelf already decided: tear it up and roll again, with the map's guarantee in force.
     await db.query(`UPDATE mkt_sailing SET merchant_json = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     await rollMerchant(buyerId).catch(() => {});
-    return "The Gold Merchant is on the beach — go and see what's on the cart.";
+    // marks - 1: the one this landing just spent is gone, the rest are still in the bank.
+    const rest = marks > 1 ? ` ${marks - 1} more ${marks === 2 ? "mark is" : "marks are"} banked for your next landings.` : "";
+    return `The Gold Merchant is on the beach — go and see what's on the cart.${rest}`;
 }
 
 export async function marketDay(buyerId) {
@@ -3413,8 +3438,12 @@ export async function marketDay(buyerId) {
         && Date.now() >= new Date(row.returns_at).getTime();
     if (!ashore) return { ok: false, error: "not_ashore", ...(await getSailingState(buyerId)) };
     if (!(await claimPowerUse(buyerId, "market_day"))) return { ok: false, error: "no_market_day", ...(await getSailingState(buyerId)) };
-    await db.query(`UPDATE mkt_sailing SET merchant_json = NULL, force_merchant = TRUE, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
-    await rollMerchant(buyerId).catch(() => {});
+    // ⚠️ THE GUARANTEE IS PASSED, NOT WRITTEN. This used to set force_merchant, which was free while the column
+    // was a boolean and is theft now it is a count: writing it would overwrite a member's banked Treasure Maps,
+    // and leaving the write in place while the roll decrements would charge them a map for a power they bought
+    // with a daily use. rollMerchant's `guarantee` forces the shelf and spends nothing.
+    await db.query(`UPDATE mkt_sailing SET merchant_json = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    await rollMerchant(buyerId, 0, { guarantee: true }).catch(() => {});
     await trackActivity(buyerId, "market_day", {}).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
 }

@@ -84,7 +84,7 @@ export const CONSUMABLES = {
     // SAILING relics — drop-only one-shots that bend the sailing systems. Used from your stash; effects land on
     // your next voyage / dig / raid (see the sail_* handlers in useConsumable).
     sail_war_drum: { name: "War Drum", emoji: "🥁", kind: "relic", price: null, desc: "Beat the drums to regain one spent daily raid.", effect: { type: "sail_raid" } },
-    sail_treasure_map: { name: "Treasure Map", emoji: "🗺️", kind: "relic", price: null, desc: "Your next landing is guaranteed to meet the Gold Merchant — including this one, if you are already ashore.", effect: { type: "sail_merchant" } },
+    sail_treasure_map: { name: "Treasure Map", emoji: "🗺️", kind: "relic", price: null, desc: "Your next landing is guaranteed to meet the Gold Merchant — including this one, if you are already ashore. Marks bank, so several maps cover several landings.", effect: { type: "sail_merchant" } },
     sail_lucky_lure: { name: "Lucky Lure", emoji: "🎣", kind: "relic", price: null, desc: "Your next dig has a good chance of TWO chests buried instead of one — and pays +50% more doubloons if you fall short.", effect: { type: "sail_lure" } },
     sail_storm_bottle: { name: "Storm in a Bottle", emoji: "🌪️", kind: "relic", price: null, desc: "Uncork mid-voyage to HALVE the remaining sail time.", effect: { type: "sail_storm" } },
     sail_kraken_bait: { name: "Kraken Bait", emoji: "🦑", kind: "relic", price: null, desc: "Your next voyage is guaranteed a marine encounter.", effect: { type: "sail_encounter" } },
@@ -462,7 +462,8 @@ export async function featureConsumables(buyerId, feature) {
         const lures = Number(r?.dig_lure) || 0;
         if (lures > 0) active.push({ kind: "sail_lure", label: lures === 1 ? "Next dig is charmed" : `${lures} charmed digs banked` });
         if (r?.force_encounter) active.push({ kind: "sail_encounter", label: "Next voyage draws an encounter" });
-        if (r?.force_merchant) active.push({ kind: "sail_merchant", label: "Next landing meets the Gold Merchant" });
+        const marks = Number(r?.force_merchant) || 0;
+        if (marks > 0) active.push({ kind: "sail_merchant", label: marks === 1 ? "Next landing meets the Gold Merchant" : `${marks} merchant marks banked` });
     }
     if (f === "farm") {
         const r = await db.queryOne(`SELECT COALESCE(farm_harvest_luck,0)::int AS luck, COALESCE(farm_fertilizer,0)::int AS fert FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
@@ -620,6 +621,11 @@ export function stackNote(id) {
     if (e.type === "xp") return "Each one pays its own XP. Using several is the same as using them one at a time.";
     if (e.type === "spin_token") return "Tokens add to your pile. Nothing is lost by holding them.";
     if (e.type === "pet_xp") return "Each one feeds its own XP to the pet.";
+    // Both sea relics bank. Sunflower Jinxx asked for this sentence when the map did not — "can we add text
+    // that this is one of the few that don't if they aren't supposed to?" — and the honest answer was to make
+    // it stack and then write the sentence.
+    if (e.type === "sail_lure") return "Charges add up. Each dig spends one, so using several banks several charmed digs.";
+    if (e.type === "sail_merchant") return "Marks add up. Each landing spends one, so using several guarantees the merchant on several landings.";
     return null;   // one-shots and targeted items: there is no stack to describe
 }
 
