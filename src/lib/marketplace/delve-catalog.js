@@ -151,16 +151,35 @@ export const DUNGEONS = [
 // then in November, when the crypt is gone, to a five nobody can ever reach again. A seasonal thing must
 // never be able to break a permanent completion.
 //
-// Pitched at minLevel 25, between the Sunken Vault and the Ember Deep, with difficulty and pay interpolated
-// to match — the event should be reachable by most of the Den rather than being another thing only the top
-// of it sees, and the draw here is the candy and the exclusives rather than the gold.
+// ── IT SITS ON THE EMBER DEEP'S RUNG ─────────────────────────────────────────────────────────────────────
+// Luke: "Difficulty of fight should be around level 30 of other dungeons." The Ember Deep IS the level-30
+// dungeon, so the crypt's fight numbers are its numbers, to the digit: foeX 2.9, bossX 7.0, [30,46] off an
+// ordinary foe and [41,62] off the boss.
+//
+// It was pitched a rung lower (minLevel 25, interpolated between the Vault and the Deep) on the argument that
+// the event should be reachable by most of the Den. That argument did not survive the census: 97 of the 122
+// members with any XP are below level 25 and could never enter it at ALL. The gate was never buying the
+// reach it was written for.
+//
+// ⚠️ SO THE GATE MOVES WITH THE DAMAGE, AND IT HAS TO. `dmg` is FLAT — the foe hits for [30,46] whoever walks
+// in, while your health is delveVigour(level, gear), which is not. Every other dungeon's minLevel is the
+// rung its damage is written for; leaving this one at 25 while raising the damage to 30 would mean the only
+// dungeon in the game where the door lets you into a fight the gate was supposed to stop. It costs four
+// people their entry — Rumorleigh (27), Kathryn (26), Alstier1 (25) and Mr.Wakey (25) — and that is worth
+// saying out loud rather than burying, because nobody else in the Den is in that band.
+//
+// ⚠️ AND THE PAY MOVES WITH IT. Across all four rungs, danger and gold/XP rise together; shipping one
+// dungeon as dangerous as the Ember Deep and a third worse paid would make it strictly dominated — the same
+// risk, less money, and nothing on screen explaining why. The LOOT table stays where it is: the crypt's
+// payout is the candy, the gift boxes and the Harvest's End set, and that is the part that should not look
+// like anybody else's.
 export const HALLOWEEN_DUNGEON = {
-    id: "lanterncrypt", name: "The Lantern Crypt", minLevel: 25, tint: "#ff8a2c",
+    id: "lanterncrypt", name: "The Lantern Crypt", minLevel: 30, tint: "#ff8a2c",
     blurb: "A barrow under the pumpkin field, opened for one month only. Something in it has been counting the nights.",
     bg: "/images/delves/bg-lanterncrypt.webp",
     loot: { parts: [2, 4], chest: "iron", bigChest: "gold", frags: [5, 8], gear: ["rare", "epic"], gearOdds: 0.075 },
-    foeX: 2.8, bossX: 6.8, dmg: [25, 39], goldPer: [38, 68], xpPer: [9, 15],
-    boss: { id: "lanterncrypt_boss", name: "The Hollow King", dmg: [34, 52], sprite: "/images/delves/foe-hollow-king.webp",
+    foeX: 2.9, bossX: 7.0, dmg: [30, 46], goldPer: [48, 82], xpPer: [12, 19],
+    boss: { id: "lanterncrypt_boss", name: "The Hollow King", dmg: [41, 62], sprite: "/images/delves/foe-hollow-king.webp",
         blurb: "It wears a crown of candle stubs, and every one of them is still lit." },
     foes: [
         { id: "wickwraith", name: "Wick Wraith", sprite: "/images/delves/foe-wickwraith.webp" },

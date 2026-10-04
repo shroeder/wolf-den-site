@@ -79,6 +79,22 @@ for (const f of [...HALLOWEEN_DUNGEON.foes.map((x) => x.sprite), HALLOWEEN_DUNGE
 for (const u of want) if (!fs.existsSync(`public${u}`)) missing.push(u);
 check(missing.length === 0, `all ${want.size} pictures exist on disk`, missing.join(", "));
 
+// ── AND IT FIGHTS AT THE RUNG IT IS GATED AT ────────────────────────────────────────────────────────────
+// Luke: "Difficulty of fight should be around level 30 of other dungeons." The Ember Deep is that rung, so
+// this asserts the crypt's fight numbers ARE the Ember Deep's — a thing that is one careless edit away from
+// drifting, and drifts invisibly because both dungeons still work perfectly while disagreeing.
+const ember = DUNGEONS.find((d) => d.id === "ember");
+const same = (k, a, b) => check(JSON.stringify(a) === JSON.stringify(b), `${k} matches the Ember Deep`, JSON.stringify(a));
+same("foe HP multiplier", HALLOWEEN_DUNGEON.foeX, ember.foeX);
+same("boss HP multiplier", HALLOWEEN_DUNGEON.bossX, ember.bossX);
+same("foe damage", HALLOWEEN_DUNGEON.dmg, ember.dmg);
+same("boss damage", HALLOWEEN_DUNGEON.boss.dmg, ember.boss.dmg);
+same("gold a floor", HALLOWEEN_DUNGEON.goldPer, ember.goldPer);
+same("xp a floor", HALLOWEEN_DUNGEON.xpPer, ember.xpPer);
+// ⚠️ THE GATE IS PART OF THE DIFFICULTY. `dmg` is flat and your health is not, so a dungeon whose damage is
+// written for level 30 and whose door opens at 25 is a trap with a sign on it saying it is safe.
+check(HALLOWEEN_DUNGEON.minLevel === ember.minLevel, "and the door opens at the same level", `${HALLOWEEN_DUNGEON.minLevel}`);
+
 // ── AND THE OTHER FOUR STILL DEAL ───────────────────────────────────────────────────────────────────────
 // The deck file is shared, so a change for the crypt that quietly broke the Ember Deep would be exactly the
 // kind of regression nobody notices until somebody is already halfway down one.
