@@ -23,6 +23,7 @@ import { memberDamageMult, memberEdgeMult, memberBonusStrikes, activeBoosts } fr
 import { signatureStrikeBonus, signatureForcesCrit, signatureHit, signatureOnHit, beastbondMult, warbannerBonusForItem, rollCheerProcs } from "@/lib/marketplace/signatures.js";
 import { grantDoubloons } from "@/lib/marketplace/sailing.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { grantCandy } from "@/lib/marketplace/candy.js";
 import { syncEarnedBadges, grantRandomDropBadge, getBadgePassives } from "@/lib/marketplace/badges.js";
 import { grantBossTrophy } from "@/lib/marketplace/boss-trophy.js";
 import { broadcastBossDefeated, broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
@@ -1539,6 +1540,11 @@ export async function attackBoss(buyerId) {
     // Striking the boss is the single biggest thing anybody does in a day, so it carries the heaviest
     // ticket in the table. Outside the gold guard on purpose: a strike is a strike whether or not this
     // particular hit happened to pay coin.
+
+    // ── CANDY ────────────────────────────────────────────────────────────────────────────────────────
+    // One of the event's faucets. Named rather than hooked onto trackActivity, and capped by the day's
+    // total rather than per action — see candy.js for why both of those are the whole design.
+    await grantCandy(buyerId, "boss_strike").catch(() => {});
 
     const defeated = await markDefeatIfDead(boss.id, row.hp, buyerId);
     await syncEarnedBadges(buyerId).catch(() => {});

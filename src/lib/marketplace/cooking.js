@@ -19,6 +19,7 @@ import { addParts } from "@/lib/marketplace/crafting.js";
 import { grantSeed } from "@/lib/marketplace/farm-crops.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { grantCandy } from "@/lib/marketplace/candy.js";
 import { equippedPowers, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
@@ -1659,6 +1660,10 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // Daily bounties. A prep counts for the prep task, a dish for the dish task, and a run graded "perfect" or
     // better counts for the skill one — so the three tasks can't all be cleared by the same three taps.
     await bumpQuestProgress(buyerId, rec.kind === "prep" ? "cook_prep" : "cook_dish", 1).catch(() => {});
+    // ── CANDY ────────────────────────────────────────────────────────────────────────────────────────
+    // One of the event's faucets. Named rather than hooked onto trackActivity, and capped by the day's
+    // total rather than per action — see candy.js for why both of those are the whole design.
+    await grantCandy(buyerId, "cook").catch(() => {});
     if (q >= 0.72) await bumpQuestProgress(buyerId, "cook_clean", 1).catch(() => {});
 
     return {

@@ -9,6 +9,7 @@ import { addChests, surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/che
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { grantCandy } from "@/lib/marketplace/candy.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
@@ -593,6 +594,10 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
     await bumpQuestProgress(buyerId, "delve_floor", floorsDone).catch(() => {});
     await bumpTownQuest(buyerId, "delver_deep", floorsDone).catch(() => {});
     if (cleared) await bumpQuestProgress(buyerId, "delve_clear", 1).catch(() => {});
+    // ── CANDY ────────────────────────────────────────────────────────────────────────────────────────
+    // One of the event's faucets. Named rather than hooked onto trackActivity, and capped by the day's
+    // total rather than per action — see candy.js for why both of those are the whole design.
+    if (cleared) await grantCandy(buyerId, "delve_clear").catch(() => {});
 
     return {
         ok: true,

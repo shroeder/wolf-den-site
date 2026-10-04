@@ -13,6 +13,7 @@ import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/
 import { setWheelBonus, setWheelRespinChance, itemsOfSet } from "@/lib/marketplace/sets.js";
 import { HALLOWEEN_PUBLIC, HALLOWEEN_WHEEL_SET } from "@/lib/marketplace/halloween.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { grantCandy } from "@/lib/marketplace/candy.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -1064,6 +1065,10 @@ export async function doSpin(buyerId) {
     let refunded = false;
     if (respinChance > 0 && Math.random() < respinChance) { await grantSpinTokens(buyerId, 1).catch(() => {}); refunded = true; }
     await bumpQuestProgress(buyerId, "spin", 1).catch(() => {});
+    // ── CANDY ────────────────────────────────────────────────────────────────────────────────────────
+    // One of the event's faucets. Named rather than hooked onto trackActivity, and capped by the day's
+    // total rather than per action — see candy.js for why both of those are the whole design.
+    await grantCandy(buyerId, "daily_spin").catch(() => {});
     await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
     // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
     // nothing says it is coming.

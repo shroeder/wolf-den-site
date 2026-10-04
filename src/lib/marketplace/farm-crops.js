@@ -5,6 +5,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { grantCandy } from "@/lib/marketplace/candy.js";
 import { syncEarnedBadges, grantEventBadge } from "@/lib/marketplace/badges.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
@@ -596,6 +597,10 @@ export async function harvestPlot(buyerId, slot) {
     // nothing says it is coming.
     await surpriseChest(buyerId, "farm_harvest", SURPRISE_WEIGHT.light).catch(() => {});
     await bumpQuestProgress(buyerId, "harvest_crop", 1).catch(() => {});
+    // ── CANDY ────────────────────────────────────────────────────────────────────────────────────────
+    // One of the event's faucets. Named rather than hooked onto trackActivity, and capped by the day's
+    // total rather than per action — see candy.js for why both of those are the whole design.
+    await grantCandy(buyerId, "harvest").catch(() => {});
     // Earned cosmetic: the "Harvest Crown" border at 20 lifetime harvests. Reuses the harvest_crop activity
     // count (just logged above), so it needs no new counter. Idempotent grant into mkt_cosmetic_unlock.
     const harvested = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_activity_event WHERE buyer_id = $1 AND event = 'harvest_crop'`, [buyerId]).catch(() => null);

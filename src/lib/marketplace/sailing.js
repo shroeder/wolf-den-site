@@ -37,6 +37,7 @@ import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge, getBadgeSea } from "@/lib/marketplace/badges.js";
 import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { grantCandy } from "@/lib/marketplace/candy.js";
 import { dropSeedFrom, grantSeedFromBand } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
@@ -2155,6 +2156,10 @@ export async function fishLand(buyerId, { quality = 0, missed = false, sky = nul
     if (res.ok && res.landed) {
         // A landed fish is a sailing daily too — same metric pump the rest of the feature uses.
         await bumpQuestProgress(buyerId, "fish", 1).catch(() => {});
+    // ── CANDY ────────────────────────────────────────────────────────────────────────────────────────
+    // One of the event's faucets. Named rather than hooked onto trackActivity, and capped by the day's
+    // total rather than per action — see candy.js for why both of those are the whole design.
+        await grantCandy(buyerId, "fish").catch(() => {});
     }
     // ORDER MATTERS AND IT BITES. The sailing state is spread LAST because the screen needs its fresh values
     // (gold balance, casts, status) to win — but that means every key the catch shares with it gets
@@ -2259,6 +2264,10 @@ export async function doRaid(buyerId, targetId = null) {
                 raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW()
           WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     await bumpQuestProgress(buyerId, "raid_do", 1).catch(() => {});
+    // ── CANDY ────────────────────────────────────────────────────────────────────────────────────────
+    // One of the event's faucets. Named rather than hooked onto trackActivity, and capped by the day's
+    // total rather than per action — see candy.js for why both of those are the whole design.
+    await grantCandy(buyerId, "raid").catch(() => {});
     // AND `ship_battle`, because the player did not choose this. There is ONE button — the opponent list was
     // deliberately removed and matchOpponent decides between a fleet ship and a rival captain — so a bounty
     // that ticked only on the fleet half was completable by luck and by nothing else. That is exactly why
