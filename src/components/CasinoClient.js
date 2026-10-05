@@ -12,6 +12,7 @@ import { Cas } from "@/components/casino/casino-audio.js";
 import Slot5 from "@/components/casino/Slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
 import Ladder from "@/components/casino/Ladder.js";
+import WinTally from "@/components/casino/WinTally";
 import Leaderboard from "@/components/casino/Leaderboard.js";
 import Gachapon from "@/components/casino/Gachapon.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
@@ -916,6 +917,20 @@ export default function CasinoClient({ initial, halloween = false }) {
     // own ending before the animation reached it.
     //
     // With a single purse there is a single number to hold, and it cannot drift out of step with itself.
+    // ── EVERY WIN COUNTS UP, ON EVERY MACHINE ───────────────────────────────────────────────────────
+    // Luke: "Every machine is fucking this up. It needs to be obvious and juicy dopamine rewarding
+    // visually count up when we win no matter what the win amount."
+    //
+    // The five-reels had WinTally and the other four cabinets had A LINE OF TEXT — "1,200 gold — 3x" —
+    // under the reels. That is a receipt, not a win. The same count-up, the same rising ping, the same
+    // tiers now fire for the three-reel, keno, blackjack and bingo.
+    //
+    // ⚠️ FIRED FROM absorb AND NOWHERE ELSE, which is the only reason one component can serve four games.
+    // absorb is the single point every reveal in this file ends at — the reels have stopped, the balls are
+    // called, the hand is turned — so a tally raised there cannot run before the thing it is celebrating.
+    // spin5 does NOT go through absorb (it settles itself and owns its own WinTally), so the five-reels
+    // cannot double up.
+    const [tally, setTally] = useState(null);
     const heldGold = useRef(null);
     const settleGold = useCallback(() => {
         const n = heldGold.current;
@@ -932,6 +947,9 @@ export default function CasinoClient({ initial, halloween = false }) {
         // going out is not a spoiler — it is the thing you just did, and a bet that costs nothing visibly
         // feels free. `staked` is the server's own balance at that instant rather than balance - bet: the
         // on-the-house perk hands a stake straight back and only the server knows.
+        // The previous celebration is over the moment a new stake leaves — otherwise a fast player stacks
+        // two counts on top of each other and neither of them is readable.
+        setTally(null);
         heldGold.current = holding ? (r?.gold ?? null) : null;
         setSt((p) => (p ? {
             ...p,
@@ -950,6 +968,15 @@ export default function CasinoClient({ initial, halloween = false }) {
         // celebration calls absorb at exactly that moment, which is why this lives here rather than in five
         // separate timeouts that would drift apart the first time one of them was retuned.
         settleGold();
+        // ⚠️ NO FLOOR ON THE AMOUNT. "no matter what the win amount" — a 2x on a 25 bet gets the same
+        // treatment as a 400x, just a shorter one, because WinTally's tiers already scale the length and
+        // loudness to the multiple. A threshold here would recreate exactly the complaint: a machine that
+        // pays you and says nothing.
+        const wonNow = Number(r.won || 0);
+        if (wonNow > 0) {
+            const stake = Number(r.bet) > 0 ? Number(r.bet) : Number(bet) || 0;
+            setTally({ gold: wonNow, multiple: stake > 0 ? wonNow / stake : 0, k: `${at?.id || "x"}:${Date.now()}` });
+        }
         if (r.prize) { setPrize(r.prize); Sfx.gemSet?.(); Haptic.crit(); }
         // The quiet ones. Said plainly and briefly — the pet paying for a pull is a nice thing to notice, not
         // an event to stop the room for.
@@ -959,7 +986,7 @@ export default function CasinoClient({ initial, halloween = false }) {
         // THE PET BANNER USED TO LIVE HERE. `r.pet` was one of the five arriving off a play at 1-in-455 to
         // 1-in-5,556; they are 50,000 gold at the Counter now and nothing sends that key any more. Removed
         // rather than left dormant — a handler for an event that can never happen reads as a working feature.
-    }, [settleGold]);
+    }, [settleGold, bet, at]);
 
     // ── THE FIVE-REEL MACHINE'S OWN SPIN ────────────────────────────────────────────────────────────────
     // Its own action rather than a flag on `pull`: a different engine, a different currency and a different
@@ -1991,6 +2018,13 @@ export default function CasinoClient({ initial, halloween = false }) {
                         "--mast": `url(/images/casino/mast/${at.id}.webp)`,
                         "--room": `url(/images/casino/room/${at.id}.webp)` }}
                     role="dialog" aria-modal="true" aria-label={at.label}>
+                    {/* Over the whole seat rather than inside any one game's markup — four cabinets with
+                        four different layouts, one celebration, and it is never in the way of the next tap
+                        because WinTally takes no pointer events and clears itself. */}
+                    {tally ? (
+                        <WinTally key={tally.k} gold={tally.gold} multiple={tally.multiple}
+                            tone={ACCENT[at.id] || "#ffd75e"} onDone={() => setTally(null)} />
+                    ) : null}
                     <div className="cas-panel-head">
                         {/* A WORD, NOT AN ARROW. An arrow in the corner of a full-screen game is browser
                             furniture — it reads as "go back a page", which on a machine you have money in is

@@ -22,6 +22,10 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 // ⚠️ AND THE CLAIM ROW IS WRITTEN BEFORE THE THING IS GRANTED. Same rule as the trick-or-treat door and the
 // gachapon token: a double-tap must lose the race rather than win a second chest. The insert is the lock.
 
+// Rarity per collectible, so a rung can be framed in the same colour the pet is framed in everywhere else.
+// Built once at module load from the one catalogue, rather than a second list that drifts from it.
+const COLLECTIBLE_RARITY = Object.fromEntries(COLLECTIBLES.map((c) => [c.id, c.rarity]));
+
 const LABEL = {
     stat: (ref) => STAT_META[ref]?.label || ref,
     pet: (ref) => COLLECTIBLES.find((c) => c.id === ref)?.name || ref,
@@ -67,6 +71,31 @@ export async function ladder(buyerId) {
         vipStanding(buyerId).catch(() => ({ vip: false })),
     ]);
 
+    // ── THE ART, FOR EVERY RUNG THAT HAS ANY ───────────────────────────────────────────────────────────
+    // Luke, looking at the Counter: "Absolutely horrendous, you lost all the amazing sprites and beauty."
+    //
+    // He is right, and it was not today's rename — it was the rework. The Counter used to be a SHELF, and
+    // the shelf drew every pet as the card the rest of the game draws, with its real sprite on it. The
+    // ladder that replaced it kept the prices and the progress and threw the pictures away, so a screen
+    // whose entire job is to make you want the next thing became a column of identical yellow buttons.
+    //
+    // ⚠️ TWO QUERIES FOR THE WHOLE SCREEN, NOT ONE PER RUNG. The shelf resolved art inside a per-item
+    // detailFor(), which is fine for a list you page through and is 20+ round trips for a ladder that shows
+    // everything at once — and round trips are Active CPU, which is the meter that actually bills. The pet
+    // ids are collected first and fetched in a single ANY($1); chests and stones carry their art in code.
+    const petIds = [...new Set(entitlements(won)
+        .filter((e) => e.kind === "pet" || e.kind === "vip_pet").map((e) => e.ref))];
+    const petArt = petIds.length
+        ? await db.query(`SELECT pet_id, url FROM mkt_pet_sprite WHERE pet_id = ANY($1) AND url IS NOT NULL`, [petIds])
+            .then((rows) => Object.fromEntries(rows.map((r) => [r.pet_id, r.url]))).catch(() => ({}))
+        : {};
+
+    const artFor = (kind, ref) => {
+        if (kind === "pet" || kind === "vip_pet") return petArt[ref] || null;
+        if (kind === "chest") return CHEST_TIERS[ref]?.art || null;
+        return null;
+    };
+
     const rungs = entitlements(won).map((e) => {
         const key = `${e.kind}:${e.ref}`;
         // Stat levels and the one-time unlocks can both have been BOUGHT before today; everything else has
@@ -86,6 +115,11 @@ export async function ladder(buyerId) {
             ready,
             next: e.next,
             toGo: Math.max(0, e.next - won),
+            // Null for a stat track or a door, which have no object to show — the client draws its own
+            // glyph for those rather than a broken frame. See the note on img onError: an SSR 404 beats
+            // React to the event, so a missing sprite must never be rendered as an <img> at all.
+            art: artFor(e.kind, e.ref),
+            rarity: e.kind === "pet" || e.kind === "vip_pet" ? (COLLECTIBLE_RARITY[e.ref] || null) : null,
             // A VIP rung a non-VIP has earned is shown, and locked. Hiding it would make the rope invisible
             // rather than exclusive, and the whole point of a rope is that you can see past it.
             locked: Boolean(e.vip) && !standing.vip,
@@ -156,5 +190,22 @@ export async function claim(buyerId, kind, ref) {
     }
 
     await trackActivity(buyerId, "casino_claim", { kind, ref, won: state.won }).catch(() => {});
-    return { ok: true, gave, ...(await ladder(buyerId)) };
+
+    // ── WHAT TO SHOW THEM ───────────────────────────────────────────────────────────────────────────
+    // Luke: "The claim is a huge disservice."
+    //
+    // Taking a mythic pet off this ladder used to return a STRING, and the screen printed it as a line of
+    // small text for three seconds. That is a receipt for the best moment the room has — the thing a member
+    // ground 250,000 gold for — so the picture goes back with the name, and the client makes a moment of it.
+    //
+    // Read off the freshly rebuilt ladder rather than resolved a second time: one source for the art means
+    // the reveal and the shelf can never show two different pictures of the same animal.
+    const next = await ladder(buyerId);
+    const shown = next.rungs.find((r) => r.kind === kind && r.ref === ref) || null;
+    return {
+        ok: true,
+        gave,
+        got: { name: gave, kind, art: shown?.art || null, rarity: shown?.rarity || null },
+        ...next,
+    };
 }
