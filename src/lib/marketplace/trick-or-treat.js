@@ -5,6 +5,7 @@ import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { storeDay } from "@/lib/marketplace/store-day.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
 import { addChests } from "@/lib/marketplace/chests.js";
+import { rollTicket } from "@/lib/marketplace/gachapon.js";
 
 // ── TRICK OR TREAT ───────────────────────────────────────────────────────────────────────────────────────
 // Luke: "you can trick or tre[a]t day in town. Which each npc and building."
@@ -113,6 +114,7 @@ export async function knock(buyerId, door) {
     const { grantCandy } = await import("@/lib/marketplace/candy.js");
     // Rated 1 in CANDY_RATES because the door decides the amount; the multiplier carries the payout.
     const paid = await grantCandy(buyerId, "trick_or_treat_door", candy);
+    await rollTicket(buyerId, "trick_or_treat_door").catch(() => {});
 
     let sweet = null;
     let chest = null;

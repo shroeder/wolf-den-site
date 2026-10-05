@@ -54,6 +54,10 @@ export const CANDY_RATES = {
     // this function rather than writing the balance directly, because the daily cap lives here and a faucet
     // outside the only ceiling the event has is not a faucet, it is a leak.
     trick_or_treat_door: 1,
+    // Same arrangement as the door: the CAPSULE decides the amount and passes it as the multiplier, so this
+    // is 1 and gachapon.js carries the payout. It still comes through here because the daily ceiling lives
+    // here, and a capsule that wrote the balance directly would be the biggest hole in the event.
+    gacha: 1,
 };
 
 // ── THE CEILING ──────────────────────────────────────────────────────────────────────────────────────────

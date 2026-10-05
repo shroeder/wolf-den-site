@@ -152,6 +152,16 @@ export const CONSUMABLES = {
     //
     // They are `price: null` and no shop lists them, so the only way to one is a Hallowe'en chest — which
     // cannot be granted at all while HALLOWEEN_PUBLIC is false. That is the whole gate.
+    // ── THE GACHAPON TICKET ──────────────────────────────────────────────────────────────────────────────
+    // Luke: "Wouldn't it be cool it we could randomly get like a halloween ticket that you could use on like a
+    // gachapon machine. The tickets would be rare drops."
+    //
+    // ⚠️ IT HAS NO `effect`, AND THAT IS THE DESIGN RATHER THAN AN OMISSION. A ticket is not used from the
+    // shelf — it is spent BY THE MACHINE, in the casino, as part of the pull. Giving it an effect here would
+    // put a "Use" button on it that consumed the ticket and did nothing visible, which is the worst possible
+    // outcome for the rarest drop in the event. useConsumable refuses it by name; see the guard there.
+    hw_ticket: { name: "Hallowe'en Token", emoji: "🎟️", kind: "ticket", price: null,
+        desc: "A brass token stamped with a grinning pumpkin. The gachapon in the casino takes exactly one." },
     hw_soul_cake: { name: "Soul Cake", emoji: "🍰", kind: "treat", price: null,
         desc: "Feed your equipped pet +1,500 pet XP.", effect: { type: "pet_xp", amount: 1500 } },
     hw_black_almanac: { name: "The Black Almanac", emoji: "📕", kind: "scroll", price: null,
@@ -679,6 +689,12 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
     const c = CONSUMABLES[id];
     if (!buyerId || !c) return { ok: false, error: "unknown" };
     const e = c.effect;
+
+    // ⚠️ A TICKET IS SPENT BY THE MACHINE, NOT FROM THE SHELF. It has no effect at all, so without this guard
+    // it would fall all the way through to the bottom of this function and return a generic failure — after
+    // the member had already tapped a Use button that should never have been drawn. Named, so the shelf can
+    // say where to take it.
+    if (!e) return { ok: false, error: c.kind === "ticket" ? "use_at_gachapon" : "not_usable" };
 
     // Forge scrolls are consumed at the Forge (they need the enhance flow / an item+element picker), not here.
     if (e.type === "forge_enhance" || e.type === "forge_enchant" || e.type === "forge_ascend") return { ok: false, error: "use_at_forge" };

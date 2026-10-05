@@ -118,6 +118,25 @@ export const ASCENSION_EFFECTS = {
     //
     // The rule, same as the other 123: the Lightstone grafts a stat the pet does NOT already carry, so it
     // teaches the animal a second trade; the Darkstone deepens the one it was born with.
+    // ── THE GACHAPON PAIR ────────────────────────────────────────────────────────────────────────────
+    // Same rule as the other 125: the Lightstone GRAFTS a trade the animal does not already have, the
+    // Darkstone AMPLIFIES the one it was born with. A graft that duplicates the born stat makes the choice
+    // between the two stones a choice between a no-op and a bigger version of what you had, which is the
+    // fault pet-stone-check.mjs exists to catch.
+    gx_capsule_imp: {
+        // Born lucky — he is what came out of the machine. The Lightstone turns that luck on what is INSIDE
+        // the next thing you open, which is the only sentence a creature from a prize capsule should have.
+        light: { name: "Knows the Weight", kind: "graft", key: "chest_luck", scale: 1.1,
+            note: "He shakes it once by his ear and then hands it back, or he does not hand it back." },
+        dark: { name: "Always Was", kind: "amplify", mult: 2.1 },
+    },
+    gx_lantern_moth: {
+        // Born carrying crit_power — the one enormous hit a thing with no body should not be able to land.
+        // The Lightstone is the OPENER instead: a moth is what arrives first at a light.
+        light: { name: "First at the Light", kind: "graft", key: "first_hit", scale: 1.0,
+            note: "It is already circling by the time you have struck the match." },
+        dark: { name: "Burned Bright", kind: "amplify", mult: 1.95 },
+    },
     gf_gourdpup: {
         // Born carrying fortune — he is lucky, in the way a dog that always finds the one dropped sausage is
         // lucky. The Lightstone points that nose at what is INSIDE things instead of what is on the floor.

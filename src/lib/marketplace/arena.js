@@ -3,6 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { grantCandy } from "@/lib/marketplace/candy.js";
+import { rollTicket } from "@/lib/marketplace/gachapon.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { bars as liveBars, tempoOf } from "@/lib/marketplace/arena-atb.js";
@@ -2669,6 +2671,11 @@ async function finishBout(buyerId, row, b, won) {
         }
         // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the line above IS the gold.
         await awardXp(buyerId, "arena_win", { points: xp, gold: 0 }).catch(() => {});
+        // ⚠️ THE CANDY FAUCET FOR THIS WAS DECLARED AND NEVER WIRED. CANDY_RATES has carried `arena_win: 4`
+        // since the event shipped and no call site ever paid it — a rate in a table nobody calls is a faucet
+        // that does not exist. Both go here, at the moment the win actually resolves.
+        await grantCandy(buyerId, "arena_win").catch(() => {});
+        await rollTicket(buyerId, "arena_win").catch(() => {});
     } else {
         reward = { gold: 0, xp: 0, vp: 0, laurels, feats: [], arenaXp: axp };
     }

@@ -593,6 +593,11 @@ const HW_RELICS = ["hw_whetstone", "hw_soul_cake", "hw_black_almanac"];
 async function openHalloweenChest(buyerId, tier, remaining) {
     await db.query(`INSERT INTO mkt_chest_open (buyer_id, tier, count, source) VALUES ($1, $2, 1, $3)`, [buyerId, tier, "open"]).catch(() => {});
     await trackActivity(buyerId, "open_chest", { tier });
+    // ⚠️ BOTH OPEN PATHS, and that is the whole point of putting it beside the telemetry: the Hallowe'en
+    // chest and the ordinary chest are two different functions, and a ticket that dropped from only one
+    // of them would be a rate nobody could ever work out from playing. Same line, same place, twice.
+    // ⚠️ DYNAMIC, because gachapon.js imports chests.js for addChests — a static import here is a cycle.
+    await import("@/lib/marketplace/gachapon.js").then((m) => m.rollTicket(buyerId, "chest_open")).catch(() => {});
     const fortune = await fortuneFor(buyerId).catch(() => 0);
 
     // ── THE EXCLUSIVE PIECE ──────────────────────────────────────────────────────────────────────────────
@@ -731,6 +736,8 @@ export async function openChest(buyerId, tier) {
         [buyerId, tier, "open"],
     ).catch(() => {});
     await trackActivity(buyerId, "open_chest", { tier });
+    // ⚠️ DYNAMIC, because gachapon.js imports chests.js for addChests — a static import here is a cycle.
+    await import("@/lib/marketplace/gachapon.js").then((m) => m.rollTicket(buyerId, "chest_open")).catch(() => {});
     // Chest opens can also drop a farming seed (tier scales rarity). Dynamic import avoids a chests↔farm-crops
     // static import cycle (farm-crops pulls in quests/xp, which pull in chests).
     // A RECIPE IS ONE OF THE THINGS A CHEST CAN CONTAIN — rolled here, in the chest's own priority chain,

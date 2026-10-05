@@ -325,6 +325,31 @@ export const HALLOWEEN_DECOS = DECORATIONS.filter((d) => d.source === "halloween
 // who bought one last October keeps seeing it (PUBLIC_DECORATIONS makes an exception for what you own), while
 // nobody browsing in July is shown four things they cannot buy.
 for (const d of DECORATIONS) if (d.source === "gourdfather") d.unreleased = HALLOWEEN_HIDDEN;
+// ── THE GACHAPON EXCLUSIVES ──────────────────────────────────────────────────────────────────────────────
+// Three, and the machine is the only place any of them comes from. `source: "gachapon"` keeps them out of
+// PUBLIC_DECORATIONS the same way the Gourdfather's are kept out — a decoration with a price is a decoration
+// the shop will sell, so all three have `price: null` and that is load-bearing, not tidiness.
+//
+// They carry real buffs rather than being ornaments. A prize you win from a machine that eats a rare ticket
+// should do something on the farm you put it on; the three cosmetic-only Hallowe'en pieces already cover
+// "purely for looking at".
+export const GACHAPON_DECOS_LIST = [
+    deco("deco_gx_capsule_tree", "The Capsule Tree", "🌳", "legendary", "gachapon", null, { stat: "harvestLuck", value: 7 },
+        "bare autumn tree hung all over with glowing coloured gachapon capsules like fruit, a few fallen open among its roots"),
+    deco("deco_gx_lucky_lantern", "The Lucky Lantern", "🏮", "epic", "gachapon", null, { stat: "seedLuck", value: 5 },
+        "tall black iron lamp post whose glass globe has been replaced with an enormous glowing orange gachapon capsule"),
+    deco("deco_gx_prize_pumpkin", "The Prize Pumpkin", "🎃", "mythic", "gachapon", null, { stat: "goldHarvest", value: 9 },
+        "enormous carved pumpkin split open down the middle with a huge glowing prize capsule nested inside it like a seed"),
+];
+DECORATIONS.push(...GACHAPON_DECOS_LIST);
+// ⚠️ AND HIDDEN FROM THE DRAWER, EXACTLY LIKE THE GOURDFATHER'S FOUR. Pushing them onto DECORATIONS happens
+// AFTER the `source === "halloween"` and `source === "gourdfather"` sweeps above have already run, so they
+// are not caught by either and shipped visible to the whole Den — three mythic-and-legendary pieces nobody
+// could obtain, advertised in the catalogue in July. PUBLIC_DECORATIONS still makes its exception for what
+// you already own, so a member who wins one keeps seeing it forever.
+for (const d of GACHAPON_DECOS_LIST) d.unreleased = HALLOWEEN_HIDDEN;
+export const GACHAPON_DECOS = GACHAPON_DECOS_LIST.map((d) => d.id);
+
 export const GOURDFATHER_DECOS = DECORATIONS.filter((d) => d.source === "gourdfather").map((d) => d.id);
 
 export const PUBLIC_DECORATIONS = (ownedIds = null) => {

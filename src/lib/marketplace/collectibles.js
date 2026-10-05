@@ -5,30 +5,12 @@
 import { SEASON_HIDDEN } from "@/lib/marketplace/arena-season.js";
 import { CARDS_HIDDEN } from "@/lib/marketplace/cards-gate.js";
 import { STAT_META } from "@/lib/marketplace/items.js";
-import {
-    GiRabbit, GiFrog, GiChicken, GiCat, GiFox, GiWolfHead, GiOwl, GiBearFace, GiRaven, GiSnake, GiDeer,
-    GiBat, GiScorpion, GiTigerHead, GiSeahorse, GiEagleEmblem, GiLion, GiGorilla, GiCrocJaws, GiHydra,
-    GiGriffinSymbol, GiUnicorn, GiSpikedDragonHead, GiPegasus, GiDinosaurRex, GiWhaleTail, GiChameleonGlyph,
-    GiDragonHead, GiDragonSpiral, GiSpectre,
-    GiWrappedSweet, GiPumpkinLantern, GiBoneGnawer, GiGhost,
-    // Expanded roster
-    GiPenguin, GiHedgehog, GiTurtle, GiTurtleShell, GiParrotHead, GiMonkey, GiPanda, GiDolphin, GiCrab, GiSheep, GiKangaroo,
-    GiFalconMoon,
-    GiFlamingo, GiBee, GiSloth, GiRaccoonHead, GiBeaver, GiToucan, GiLadybug, GiButterfly, GiCaterpillar, GiJellyfish,
-    GiOctopus, GiSquid, GiAxolotl, GiTropicalFish, GiSeaSerpent, GiKrakenTentacle, GiWyvern, GiMinotaur,
-    GiCentaur, GiMammoth, GiPolarBear, GiVulture, GiFairy, GiImp, GiElephant, GiDevilMask,
-    GiAnglerFish, GiSeaDragon, GiFishMonster,
-    // Farm/pastoral pets
-    GiPig, GiRooster, GiScarecrow, GiMouse, GiGoose,
-    // Forge pets
-    GiSmallFire, GiHound, GiRockGolem, GiSalamander, GiFireBreath,
-    GiRat, GiTeapot,
-    // Mine pets
-    GiEarthWorm, GiBeetleShell, GiGolemHead, GiCrystalGrowth, GiScarabBeetle,
-    GiStarSwirl, GiAmmonite,
-    // The patronage ladder — see PATRON pets below.
-    GiStagHead, GiLynxHead, GiRamProfile, GiSaberToothedCatHead, GiWolfHowl,
-} from "react-icons/gi";
+import { // Expanded roster
+    GiPenguin, // Farm/pastoral pets
+    GiPig, // Forge pets
+    GiSmallFire, // Mine pets
+    GiEarthWorm, // The patronage ladder — see PATRON pets below.
+    GiStagHead, GiAmmonite, GiAnglerFish, GiAxolotl, GiBat, GiBearFace, GiBeaver, GiBee, GiBeetleShell, GiBoneGnawer, GiButterfly, GiCat, GiCaterpillar, GiCentaur, GiChameleonGlyph, GiChicken, GiCrab, GiCrocJaws, GiCrystalGrowth, GiDeer, GiDevilMask, GiDinosaurRex, GiDolphin, GiDragonHead, GiDragonSpiral, GiEagleEmblem, GiElephant, GiFairy, GiFalconMoon, GiFireBreath, GiFishMonster, GiFlamingo, GiFox, GiFrog, GiGhost, GiGolemHead, GiGoose, GiGorilla, GiGriffinSymbol, GiHedgehog, GiHound, GiHydra, GiImp, GiJellyfish, GiKangaroo, GiKrakenTentacle, GiLadybug, GiLion, GiLynxHead, GiMammoth, GiMinotaur, GiMonkey, GiMouse, GiOctopus, GiOwl, GiPanda, GiParrotHead, GiPegasus, GiPolarBear, GiPumpkinLantern, GiRabbit, GiRaccoonHead, GiRamProfile, GiRat, GiRaven, GiRockGolem, GiRooster, GiSaberToothedCatHead, GiSalamander, GiScarabBeetle, GiScarecrow, GiScorpion, GiSeaDragon, GiSeaSerpent, GiSeahorse, GiSheep, GiSloth, GiSnake, GiSpectre, GiSpikedDragonHead, GiSquid, GiStarSwirl, GiTeapot, GiTigerHead, GiToucan, GiTropicalFish, GiTurtle, GiTurtleShell, GiUnicorn, GiVulture, GiWhaleTail, GiWolfHead, GiWolfHowl, GiWrappedSweet, GiWyvern } from "react-icons/gi";
 
 // Passive bonus each OWNED pet contributes to your account (all owned pets stack), by rarity.
 export const PET_PASSIVE_BY_RARITY = { common: 1, rare: 2, epic: 4, legendary: 6, mythic: 9, ascendant: 13, eternal: 18 };
@@ -558,6 +540,27 @@ export const COLLECTIBLES = [
 //
 // One of each useful activeStat so a buyer is choosing a ROLE and not a rarity, and priced in that order.
 const GOURDFATHER_PETS = [
+    // ── THE GACHAPON EXCLUSIVES ──────────────────────────────────────────────────────────────────────
+    // ⚠️ THE MACHINE IS THE ONLY PLACE THESE EXIST. Luke: "Each thing would be exclusive and unique to the
+    // server." Nothing else may roll them — no chest, no wheel, no shop — which is a thing to keep checking
+    // rather than to assume: a pet with `source` set and no table entry anywhere else is only exclusive for
+    // as long as nobody adds a `COLLECTIBLES.filter(rarity === "mythic")` somewhere and gives it away.
+    //
+    // ⚠️ AND THE BRACE IS ON THE SAME LINE AS THE id. The sprite generators match /\{ id: "…"/ to find pets,
+    // so an entry wrapped the pretty way across two lines reports "0 pets, 0 skipped" and silently draws
+    // nothing. That has already cost one session.
+    { id: "gx_capsule_imp", name: "The Capsule Imp", Icon: GiImp, color: "#ff7a3d", rarity: "mythic",
+        source: "gachapon", activeStat: "fortune",
+        hint: "He was in the first capsule. He has been in every machine since, waiting.",
+        spritePrompt: "a tiny grinning orange imp curled up inside a cracked-open plastic gachapon capsule, wearing the clear top half of the capsule tilted on his head like a helmet, little horns poking through it, stubby arms gripping the rim",
+        ascendSpecies: "a BROAD horned devil hauling itself out of an enormous split capsule, the dome shattering around its shoulders, molten orange light pouring from the seams, one huge hand splayed on the rim",
+    },
+    { id: "gx_lantern_moth", name: "The Lantern Moth", Icon: GiButterfly, color: "#ffcf6a", rarity: "legendary",
+        source: "gachapon", activeStat: "crit_power",
+        hint: "It came for the porch light and it has not left since.",
+        spritePrompt: "a plump velvety moth with soft grey-brown wings, each wing bearing a glowing amber eyespot lit like a little lantern, feathery antennae, warm light spilling from under its body",
+        ascendSpecies: "a VAST moth with a four-metre wingspan, its wings black velvet blazing with huge molten-amber eyespots like furnace doors, embers falling from its wingbeats, terrible and warm",
+    },
     { id: "gf_gourdpup", name: "Gourd Pup", Icon: GiHound, color: "#e8731c", rarity: "epic",
         source: "gourdfather", activeStat: "fortune",
         hint: "He grew it himself. He will tell you about it.",

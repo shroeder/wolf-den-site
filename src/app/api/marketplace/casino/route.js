@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { gambleWin, getCasinoState, moveCasino, playKeno, spinSlot } from "@/lib/marketplace/casino.js";
+import { gachaView, pull as gachaPull } from "@/lib/marketplace/gachapon.js";
 import { spinSlot5 } from "@/lib/marketplace/casino-slot5-play.js";
 import { chipShelf, buyChips, claimDailyChips } from "@/lib/marketplace/chips.js";
 import { buyWithChips } from "@/lib/marketplace/chip-store.js";
@@ -139,6 +140,13 @@ export async function POST(request) {
                 // from a POST body is one verb that can put somebody in a room they cannot enter.
                 case "vip_move":
                     return noStore(await moveCasino(buyer.id, { x: b?.x, y: b?.y, facing: b?.facing, zone: VIP_ZONE }));
+                // ── THE HALLOWE'EN GACHAPON ─────────────────────────────────────────────────────────
+                // ⚠️ `gacha_pull` TAKES NO ARGUMENTS AT ALL, and that is the security model. It spends one
+                // ticket and rolls one prize entirely server-side; there is nothing in the body for a
+                // client to influence, which matters more here than anywhere else in this file because this
+                // is the one action in the game that can mint real store credit.
+                case "gacha_view": return noStore({ ok: true, ...(await gachaView(buyer.id)) });
+                case "gacha_pull": return noStore(await gachaPull(buyer.id));
                 default: return noStore({ ok: false, error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

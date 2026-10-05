@@ -20,6 +20,7 @@ import { grantSeed } from "@/lib/marketplace/farm-crops.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { grantCandy } from "@/lib/marketplace/candy.js";
+import { rollTicket } from "@/lib/marketplace/gachapon.js";
 import { equippedPowers, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
@@ -1664,6 +1665,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // One of the event's faucets. Named rather than hooked onto trackActivity, and capped by the day's
     // total rather than per action — see candy.js for why both of those are the whole design.
     await grantCandy(buyerId, "cook").catch(() => {});
+    await rollTicket(buyerId, "cook").catch(() => {});
     if (q >= 0.72) await bumpQuestProgress(buyerId, "cook_clean", 1).catch(() => {});
 
     return {

@@ -18578,7 +18578,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    world is exactly TWO tiles at every screen size, every arch sits at a fixed fraction of it, and the arch
    the rope hangs on is in the same place on a phone and on a desktop. `--room` is already clamped, so this
    cannot run away. */
-.cas-world { width: calc(var(--room) * 7.32); }
+/* ⚠️ 7.32 -> 8.52: ONE MORE MACHINE BAY, FOR THE GACHAPON. 7.32 was exactly two wall tiles; the wall is
+   repeat-x so it simply repeats further, and the extra 1.2 is one cabinet spacing plus the end wall the
+   Counter used to have behind it. Every x in MACHINES and DECOR was multiplied by 7.32/8.52 in the same
+   change, so nothing already on this floor moved by a pixel — see the note on MACHINES. */
+.cas-world { width: calc(var(--room) * 8.52); }
 /* The floor used to be a 38%-tall wash with a hard top border, which was the only thing telling you where
    the ground was when the room was a gradient. The room is a painted wall now and has its own carpet, so
    that border drew a bright seam straight across the middle of the arches. What is left is a soft pool of

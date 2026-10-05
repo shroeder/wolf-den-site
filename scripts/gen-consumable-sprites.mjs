@@ -35,6 +35,11 @@ const BASE =
 // Each one described as an OBJECT, not by its effect — "a crate of fertilizer" reads at 40px, "your next five
 // harvests roll better" does not.
 const SUBJECTS = {
+    // ⚠️ THE TICKET NEEDS A PICTURE MORE THAN MOST OF THESE DO. It is the rarest drop in the event and the
+    // only thing in the game that opens the gachapon, so it is the one item a member will go looking for in
+    // their bag — and an item with no sprite falls back to an emoji, which this game does not use in its UI.
+    hw_ticket: "a heavy brass arcade token stamped with a grinning jack-o'-lantern face in relief, milled edge, warm worn metal with a little tarnish in the recesses",
+
     forge_power_scroll: "A tightly ROLLED scroll of cream parchment bound with a glowing orange cord, faint sparks rising from its ends. Completely rolled — no flat face, no writing surface",
     forge_enchant_scroll: "A tightly ROLLED violet-tinged scroll bound with a silver cord set with a small glowing purple gem, motes of magic drifting off it. Completely rolled — no flat face",
     sail_war_drum: "A squat wooden WAR DRUM with taut hide, iron banding and rope lacing, two carved beaters resting across the top",

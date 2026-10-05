@@ -15,6 +15,7 @@ import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { setDepthCapstones } from "@/lib/marketplace/sets.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { grantCandy } from "@/lib/marketplace/candy.js";
+import { rollTicket } from "@/lib/marketplace/gachapon.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { hasPower, equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
@@ -1567,6 +1568,7 @@ async function claimNode(buyerId, node, row, run = {}) {
     // One of the event's faucets. Named rather than hooked onto trackActivity, and capped by the day's
     // total rather than per action — see candy.js for why both of those are the whole design.
     await grantCandy(buyerId, "mine").catch(() => {});
+    await rollTicket(buyerId, "mine").catch(() => {});
     await bumpTownQuest(buyerId, "collier", 1).catch(() => {});
 
     // BADGES. Granted at the moment they're earned, like fishing's and digging's — the counters live on

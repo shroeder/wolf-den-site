@@ -12,6 +12,7 @@ import { Cas } from "@/components/casino/casino-audio.js";
 import Slot5 from "@/components/casino/Slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
 import ChipStore from "@/components/casino/ChipStore.js";
+import Gachapon from "@/components/casino/Gachapon.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
 import { callFor, letterFor, lineName, nearLinesOf } from "@/lib/marketplace/bingo-kit.js";
 import { chipsFor } from "@/lib/marketplace/chip-rate.js";
@@ -130,25 +131,47 @@ function SoundToggle({ off, onToggle }) {
 // ratio against it. Nothing about how the floor feels to cross has changed.
 //
 // What the arithmetic bought is everything below 14, which is now the VIP bay.
+//
+// ── AND AGAIN, FOR THE GACHAPON ──────────────────────────────────────────────────────────────────────
+// Luke: "put the gachapon machine somewhere in the casino to the right of the casino rewars desk, might need
+// to repeat the bg one more time to make room for it."
+//
+// The wall is `repeat-x`, so it already repeats as far as the world runs — there was never a "one more time"
+// to perform, only a wider world for it to repeat across. `.cas-world` went from `--room * 7.32` (exactly two
+// wall tiles) to 8.52: one more machine bay, plus the same end wall the Counter used to have behind it.
+//
+// ⚠️ SO EVERY x BELOW IS THE OLD ONE MULTIPLIED BY 7.32/8.52. The positions are percentages of the world, and
+// growing the world without touching them would have pushed all nine machines 16% further apart IN PIXELS —
+// the same mistake in reverse that the paragraph above is about. Rescaled, every existing cabinet is standing
+// exactly where it was standing yesterday, and the only new floor is the new floor.
 const MACHINES = [
-    { id: "slot", x: 20, label: "The Hunt", kind: "Slots", live: true },
-    { id: "slot2", x: 29, label: "The Harvest", kind: "Slots", live: true },
-    { id: "slot3", x: 38, label: "The Deep", kind: "Slots", live: true },
-    { id: "slot4", x: 47, label: "The Menagerie", kind: "Slots", live: true },
-    { id: "slot5", x: 56, label: "The Vault", kind: "Slots", live: true },
-    { id: "keno", x: 65, label: "Keno", kind: "Keno", live: true },
-    { id: "bingo", x: 74, label: "The Hall", kind: "Bingo", live: true },
-    { id: "blackjack", x: 83, label: "The Table", kind: "Blackjack", live: true },
+    { id: "slot", x: 17.2, label: "The Hunt", kind: "Slots", live: true },
+    { id: "slot2", x: 24.9, label: "The Harvest", kind: "Slots", live: true },
+    { id: "slot3", x: 32.6, label: "The Deep", kind: "Slots", live: true },
+    { id: "slot4", x: 40.4, label: "The Menagerie", kind: "Slots", live: true },
+    { id: "slot5", x: 48.1, label: "The Vault", kind: "Slots", live: true },
+    { id: "keno", x: 55.8, label: "Keno", kind: "Keno", live: true },
+    { id: "bingo", x: 63.6, label: "The Hall", kind: "Bingo", live: true },
+    { id: "blackjack", x: 71.3, label: "The Table", kind: "Blackjack", live: true },
     // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────
     // At the far end, past every machine, which is where a cashier's window belongs: you walk the whole
     // floor to reach it and you pass everything you could have been playing on the way back. It is the only
     // thing in the room that is not a game, and the only place chips are worth anything.
-    { id: "store", x: 92, label: "The Counter", kind: "Tokens", live: true },
+    { id: "store", x: 79.0, label: "The Counter", kind: "Tokens", live: true },
+    // ── AND THE GACHAPON, ONE BAY PAST IT ────────────────────────────────────────────────────────────
+    // Exactly one machine-spacing to the right of the Counter, which is where Luke put it and is also the
+    // only place it belongs: it is the second thing in the room that is not a game of chance you bet gold
+    // on, and the two not-a-cabinet things standing together at the end reads as a prize corner rather than
+    // as a tenth slot machine somebody ran out of room for.
+    { id: "gacha", x: 86.7, label: "The Gachapon", kind: "Tokens", live: true },
 ];
 
 // Where the rope is: on the wall's SECOND arch, which lands at 11.8% of the world once both the world and
 // the wall tile are sized off --room (see .cas-world). Not a free choice — it is where an arch actually is.
-const VIP_X = 11.8;
+// ⚠️ RESCALED WITH EVERYTHING ELSE. This is a percentage of the WORLD pointing at an arch in a tile whose
+// size is fixed to --room — so when the world got wider, 11.8% stopped landing on the arch and started
+// landing on the pillar beside it. 10.1 is the same arch, in the same pixels, in a bigger room.
+const VIP_X = 10.1;
 
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
 // arriving rather than threading a needle.
@@ -194,15 +217,19 @@ const DEAL_MS = 300;
 // that used to stand at 2.5 is gone: the VIP door brings its own, and a second velvet rope four points away
 // from it would read as two halves of one barrier.
 const DECOR = [
-    { id: "plant", x: 15.5, back: true },
-    { id: "stool", x: 24.5 },
-    { id: "plant", x: 33.5 },
-    { id: "rope", x: 42.5, back: true },
-    { id: "stool", x: 51.5 },
-    { id: "plant", x: 60.5, back: true },
-    { id: "stool", x: 69.5 },
-    { id: "plant", x: 78.5 },
-    { id: "stool", x: 87.5, back: true },
+    { id: "plant", x: 13.3, back: true },
+    { id: "stool", x: 21.0 },
+    { id: "plant", x: 28.8 },
+    { id: "rope", x: 36.5, back: true },
+    { id: "stool", x: 44.2 },
+    { id: "plant", x: 52.0, back: true },
+    { id: "stool", x: 59.7 },
+    { id: "plant", x: 67.4 },
+    { id: "stool", x: 75.2, back: true },
+    // The new bay gets its own light and a stool, or the gachapon stands at the end of a lit room in
+    // the dark — which reads as "unfinished", not as "quiet corner".
+    { id: "stool", x: 83.0 },
+    { id: "plant", x: 90.5, back: true },
 ];
 
 // ── THE LIGHTING ────────────────────────────────────────────────────────────────────────────────────────
@@ -211,7 +238,11 @@ const DECOR = [
 // is what actually does the work, because a lamp that does not light anything is just a picture of a lamp.
 // Hung against the machines rather than with them, so the two rhythms never line up — a light directly over
 // every cabinet turns the room into wallpaper. Re-spaced with the row; the first one now lights the VIP bay.
-const LAMPS = [8, 24, 40, 56, 72, 88];
+// ⚠️ RESCALED, AND ONE MORE FOR THE NEW BAY. Same multiplier as MACHINES and DECOR (7.32/8.52), so the six
+// that were already on the wall have not moved; 92 is the seventh, over the gachapon, because the room got
+// longer and a wall of evenly spaced lamps that stops short of the end reads as a room somebody ran out of
+// budget for.
+const LAMPS = [6.9, 20.6, 34.4, 48.1, 61.9, 75.6, 89.4];
 
 // ── EACH CABINET BURNS A DIFFERENT COLOUR ────────────────────────────────────────────────────────────────────
 // Nine games sharing one gold accent is nine games that look like one game with the middle swapped out. Each
@@ -1876,7 +1907,7 @@ export default function CasinoClient({ initial }) {
             {/* THE COUNTER IS NOT A CABINET, so it keeps the floor's tune rather than asking for one of
                 its own — and asking for one it does not have is how it ended up playing the TOWN folk loop,
                 which check:casino caught before anybody heard it. */}
-            <SceneMusic vibe={seated && at && at.id !== "store" ? at.id : "casino"} place="inline" muted={soundOff} />
+            <SceneMusic vibe={seated && at && at.id !== "store" && at.id !== "gacha" ? at.id : "casino"} place="inline" muted={soundOff} />
             {!seated ? (
                 <div className="cas-audiobar">
                     <SoundToggle off={soundOff} onToggle={toggleSound} />
@@ -2180,6 +2211,15 @@ export default function CasinoClient({ initial }) {
                         this is. */}
                     {at.live && at.id === "store" ? (
                         <ChipStore tokens={st?.tokens} onBuy={buyChip} onRefresh={shelf} />
+                    ) : at.live && at.id === "gacha" ? (
+                        /* ⚠️ IT TAKES NOTHING FROM THIS COMPONENT. Every other cabinet on the floor is handed
+                           chips, a bet, a rate and a spin handler, because they are all the same game with
+                           different art. The gachapon shares nothing with them — a different currency (a
+                           ticket), a different verb, and the only payout in the building that is real money —
+                           so it owns its own state and talks to its own two actions. Threading it through the
+                           slot plumbing would be the "two games behind one verb" mistake the note on `spin5`
+                           above was written about. */
+                        <Gachapon onClose={() => setAt(null)} />
                     ) : at.live && SLOTS5[at.id] ? (
                         <Slot5
                             machineId={at.id}
@@ -2598,7 +2638,13 @@ export default function CasinoClient({ initial }) {
                         three-reel game, on the three-reel table, for gold. Shot on the deployed page and
                         there they both were, "Spin · 100" above and "Pull · 100" below, forty pixels apart.
                         One machine, one button. */}
-                    {at.live && !SLOTS5[at.id] && at.id !== "store" ? (
+                    {/* ⚠️ AND THE GACHAPON IS THE SECOND EXCLUSION, FOR THE SAME REASON AS THE COUNTER.
+                        Filmed with only the `store` guard in place: the shared bet row and a gold "Play ·
+                        100" sat straight across the machine's own "Insert a token", forty pixels apart and
+                        spending a different currency on a different game. The exclusion list is the honest
+                        shape here — this row belongs to the three-reel cabinet, and anything that is not one
+                        has to say so. */}
+                    {at.live && !SLOTS5[at.id] && at.id !== "store" && at.id !== "gacha" ? (
                         <div className="cas-controls">
                             {/* ── WHAT THE CARD DID, WHERE YOU CAN SEE IT ─────────────────────────────
                                 Luke: "win amount hidden."
