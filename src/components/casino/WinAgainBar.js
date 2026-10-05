@@ -20,7 +20,7 @@ import { Haptic } from "@/components/arena/arena-audio.js";
 const STEP_MS = 260;        // one slot lighting — the "boom"
 const BLOW_MS = 2200;       // the explosion, on top of everything, before the round carries on
 
-// No `bet` any more: the row arrives in chips, so there is nothing left here to convert — and a
+// No `bet` any more: the row arrives in gold, so there is nothing left here to convert — and a
 // prop the component does not read is a second opinion about units waiting to disagree with the first.
 export default function WinAgainBar({ meter, firing, onFired }) {
     const slots = meter?.slots || 5;
@@ -99,7 +99,7 @@ export default function WinAgainBar({ meter, firing, onFired }) {
                 {/* The divider before it — a rule in the rack, so the sum cannot be counted as a sixth win. */}
                 <i className="wa-div" aria-hidden="true" />
                 <div className={`wa-total${firing && total != null ? " is-paid" : ""}`}>
-                    {/* The row arrives in chips now (see the meter payload), so the total is a plain sum —
+                    {/* The row arrives in gold now (see the meter payload), so the total is a plain sum —
                         it used to multiply by the bet a second time, which is where the four-times-too-big
                         numbers came from. */}
                     <b>{Math.round(firing && total != null ? total : recent.reduce((a, n) => a + n, 0)).toLocaleString()}</b>

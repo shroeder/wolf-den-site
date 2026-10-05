@@ -65,7 +65,7 @@ export default function TheWarren({ warren, onDone, owner = false }) {
     // which now persists for a whole room — so reading the haul off it left the previous geode's number on
     // screen while you chose the next one.
     const [haul, setHaul] = useState(null);
-    const [hops, setHops] = useState([]);           // critters currently out, with their chips
+    const [hops, setHops] = useState([]);           // critters currently out, with their gold
     const [won, setWon] = useState(0);
     const [banner, setBanner] = useState(null);     // "mother" | "hoard"
     // ── THE ELDER, OUT ON THE FLOOR ──────────────────────────────────────────────────────────────────────
@@ -137,7 +137,7 @@ export default function TheWarren({ warren, onDone, owner = false }) {
             // advance, every extra animal is a small escalation on its own.
             const list = next.pups;
             for (let i = 0; i < list.length; i += 1) {
-                const chips = list[i];
+                const gold = list[i];
                 // ── AND THEY LAND ON THE FLOOR ───────────────────────────────────────────────────────────
                 // Not beside the egg they came out of — down in the open ground under the wall, which is
                 // where the reference machine puts them and which is the better idea for a reason worth
@@ -154,7 +154,7 @@ export default function TheWarren({ warren, onDone, owner = false }) {
                 const fan = ((i % 2 ? 1 : -1) * Math.ceil(i / 2)) * 7.5;
                 setHops((p) => [...p, {
                     id: `${stage}-${at}-${i}-${slot}`,
-                    chips,
+                    gold,
                     art: pool.length ? pool[(i + at + stage) % pool.length] : null,
                     x: Math.min(93, Math.max(7, eggX + fan)),
                     // A shallow depth ladder so a crowd of twenty is a crowd rather than a queue.
@@ -162,7 +162,7 @@ export default function TheWarren({ warren, onDone, owner = false }) {
                     flip: i % 2 === 0,
                     delay: (i % 3) * 40,
                 }]);
-                setWon((n) => n + chips);
+                setWon((n) => n + gold);
                 // Rising pitch down the line, so a long train sounds like a build rather than a loop.
                 Cas.coin(Math.min(4, i));
                 Haptic.hit(0.28 + Math.min(0.4, i * 0.06));
@@ -307,7 +307,7 @@ export default function TheWarren({ warren, onDone, owner = false }) {
         // The counter is accumulated by the walk, so jumping the cursor left it reading 0 over a run that
         // had already paid four rooms — and the number on screen while you judge the geode is the number
         // the geode is about to be added to. Seeded with what the skipped visits came to, read off the
-        // server's own pup values (`chips` in the walk below is exactly this list).
+        // server's own pup values (`gold` in the walk below is exactly this list).
         setWon(stages.slice(0, k).reduce((a, st) => a
             + st.opened.reduce((b, n) => b + (n.pups || []).reduce((c, v) => c + v, 0), 0)
             + (st.geode || 0), 0));
@@ -433,7 +433,7 @@ export default function TheWarren({ warren, onDone, owner = false }) {
                 {hops.map((h) => (
                     <span key={h.id} className={`wr-critter${h.flip ? " is-flip" : ""}`}
                         style={{ left: `${h.x}%`, bottom: `${4 + h.y}px`, "--delay": `${h.delay}ms` }}>
-                        <u>+{h.chips.toLocaleString()}</u>
+                        <u>+{h.gold.toLocaleString()}</u>
                         {h.art
                             // eslint-disable-next-line @next/next/no-img-element
                             ? <img src={h.art} alt="" draggable="false" />
@@ -471,7 +471,7 @@ export default function TheWarren({ warren, onDone, owner = false }) {
                 Luke: "it should total up everything for you at the end of the bonus. And then have a
                 button in the middle that says you're done."
 
-                It ended on a small button along the bottom edge reading "Take 46 chips", under a screen
+                It ended on a small button along the bottom edge reading "Take 46 gold", under a screen
                 still full of eggs — which is a receipt, not an ending. A run through the Warren is the
                 longest thing on this floor and it deserves to be added up: how deep you got, how many
                 eggs you opened, how many animals are standing on the floor, and the number, once, at the

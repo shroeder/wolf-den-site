@@ -336,6 +336,33 @@ export const COLLECTIBLES = [
         activeStat: "xp_gain", hint: "Works the floor at four in the morning and misses nothing",
         spritePrompt: "a small pale grey owl in a threadbare waistcoat perched on a stack of ledgers, round spectacles, tired knowing eyes" },
 
+    // ── THE COUNTER'S THREE ───────────────────────────────────────────────────────────────────────────
+    // ⚠️ THESE WERE CLAIMABLE FOR DAYS BEFORE THEY EXISTED. The casino rework put five pet rungs on the
+    // Counter's ladder, keyed by id, and three of those ids were never written here. The ladder found no
+    // collectible, fell back to printing the raw key, and handed out mkt_cosmetic_unlock rows for animals
+    // the game could not draw — nine of them, to real members, who had earned them. Luke, looking at the
+    // ladder: "No pet images? Not clear if u unlocked or not."
+    //
+    // So they are written as what the members were promised, not quietly removed from under them.
+    //
+    // ⚠️ AND NONE OF THEM TOUCHES THE COIN RETURN. Every perk here is `prizeChance`, which rolls the prize
+    // faucet — NOT freePlay or lossRefund, which are a direct add to RTP. The floor is tuned to 105% and
+    // these are the rungs the heaviest players reach first, so a pet that paid back gold would raise the
+    // return for exactly the people already furthest ahead of it. The check that used to prove the ceiling
+    // (check-casino, with all five owned) is gone, which is the other reason not to spend the budget blind.
+    { id: "brass_magpie", name: "The Brass Magpie", Icon: GiRaven, color: "#b5892f", rarity: "epic", source: "casino",
+        casinoExclusive: true, casinoPerk: { prizeChance: 0.004 },
+        activeStat: "fortune", hint: "Took the brass one because nobody was watching the brass one",
+        spritePrompt: "a magpie with dull brass-sheened wings perched on the lip of a tarnished brass bowl, a small brass token in its beak, black and white plumage with a warm metallic gleam" },
+    { id: "jade_tortoise", name: "The Jade Tortoise", Icon: GiTurtle, color: "#4ba57a", rarity: "legendary", source: "casino",
+        casinoExclusive: true, casinoPerk: { prizeChance: 0.006 },
+        activeStat: "gold_find", hint: "Has outlasted every system anyone ever brought in here",
+        spritePrompt: "a small ancient tortoise with a polished carved jade shell veined in gold, settled on a green baize table, eyes half closed and unimpressed" },
+    { id: "onyx_hare", name: "The Onyx Hare", Icon: GiRabbit, color: "#6b6478", rarity: "mythic", source: "casino",
+        casinoExclusive: true, casinoPerk: { prizeChance: 0.01 },
+        activeStat: "fortune", hint: "Only ever seen on the way out, and always ahead",
+        spritePrompt: "a lean hare carved from glossy black onyx with faint violet light in its eyes, mid-stride and alert, polished stone fur catching a single highlight" },
+
     // ── THE THREE BEHIND THE ROPE ─────────────────────────────────────────────
     // Luke: "there's a VIP only vendor next to the bartender, and if you talk to him he has a secret list of
     // things you can only get from him if you're in the VIP room — maybe two or three unique pets."

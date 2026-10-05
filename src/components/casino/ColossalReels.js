@@ -66,7 +66,7 @@ const MAX_HOLDS = 3;
 // The count plus its held beat — what a paying spin costs in time before the machine moves on.
 const holdFor = (multiple) => { const t = tierFor(multiple); return t.ms + t.hold + 160; };
 
-export default function ColossalReels({ machineId, art, bet, data, onDone, onReadout, playing, pressed = false, chips }) {
+export default function ColossalReels({ machineId, art, bet, data, onDone, onReadout, playing, pressed = false, gold }) {
     const m = slot5(machineId);
     const rows = data?.rows || 12;
 
@@ -98,7 +98,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
     const readout = useMemo(() => {
         if (paid && !isBigWin(paid.multiple)) return { kind: "paid", ...paid };
         if (free) return { kind: "free", at: free.at, of: free.of, mult: spin?.applied || 1 };
-        if (won > 0) return { kind: "won", chips: won };
+        if (won > 0) return { kind: "won", gold: won };
         return null;
     }, [paid, free, won, spin]);
     useEffect(() => { onReadout?.(readout); }, [readout, onReadout]);
@@ -227,10 +227,10 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
         // moved on. It hands to WinTally now — one component, every cabinet — and a spin that pays big is
         // not over until the count is: `holdFor` is how long the celebration owns the screen, and the play
         // loop waits it out rather than starting the next free spin over the top of it.
-        if (sp.chips) {
-            setPaid({ chips: sp.chips, multiple: sp.multiple || 0, k: Date.now() });
+        if (sp.gold) {
+            setPaid({ gold: sp.gold, multiple: sp.multiple || 0, k: Date.now() });
             await wait(holdFor(sp.multiple || 0));
-            setWon((n) => n + sp.chips);
+            setWon((n) => n + sp.gold);
             setPaid(null);
         }
     }, []);
@@ -277,12 +277,12 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
                 // both. What differs is what a COLOSSAL round has to report: the moons that opened it, the
                 // biggest multiplier the bonus reel handed over, and the best single spin.
                 const sps = data.free.spins || [];
-                const total = sps.reduce((n, x) => n + (x.chips || 0), 0);
+                const total = sps.reduce((n, x) => n + (x.gold || 0), 0);
                 setTally({
                     total,
                     spins: sps.length,
                     scatters: data.free.scatters,
-                    best: Math.max(0, ...sps.map((x) => x.chips || 0)),
+                    best: Math.max(0, ...sps.map((x) => x.gold || 0)),
                     mult: Math.max(1, ...sps.map((x) => x.applied || 1)),
                     sent: sps.filter((x) => (x.sent || []).length).length,
                 });
@@ -578,7 +578,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
             </div>
 
             {/* ── NO RIBBON ────────────────────────────────────────────────────────────────────────────
-                Balance and chips are in the page header now, beside the coin and chip sprites — they were
+                Balance and gold are in the page header now, beside the coin and chip sprites — they were
                 the only permanent things on this strip and they were already half-shown up there. What is
                 left is WHAT THIS PRESS PAID, which is not a readout: it is an event, it matters for about
                 four seconds, and a number that spends most of its life reading 0 does not deserve a
@@ -600,7 +600,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
             {/* A big one takes the whole cabinet — title, coins, and a number climbing at the size it is
                 worth. See WinTally for what "big" means and why it is read off the multiple. */}
             {paid && isBigWin(paid.multiple) ? (
-                <WinTally key={paid.k} gold={paid.chips} multiple={paid.multiple} tone={symbolTone(m.wild, machineId)} />
+                <WinTally key={paid.k} gold={paid.gold} multiple={paid.multiple} tone={symbolTone(m.wild, machineId)} />
             ) : null}
 
             {/* Three moons between the two boards, and what they bought. */}

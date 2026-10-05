@@ -77,7 +77,7 @@ const WALK_PER_SEC = 46;
 const WALK_TICK_MS = 40;
 
 // ⚠️ BOTH PURSES. The vendor behind the rope sells off the Counter's shelf, which is priced in
-// TOKENS — so the number beside the door has to be the one the till will actually take. `chips` still
+// TOKENS — so the number beside the door has to be the one the till will actually take. `gold` still
 // comes in because the lounge's own tables are played with them. See tokens.js and migration 436.
 export default function VipLounge({ state, gold, me, onClose, onGold }) {
     const [st, setSt] = useState(state || null);
@@ -267,7 +267,7 @@ export default function VipLounge({ state, gold, me, onClose, onGold }) {
 
     const talk = useCallback(async () => {
         unlock();
-        Cas.chips?.();
+        Cas.bet?.();
         Haptic.hit(0.35);
         setOpen(near);
         if (near === "bartender") {
@@ -281,7 +281,7 @@ export default function VipLounge({ state, gold, me, onClose, onGold }) {
         setBusy(true);
         const r = await POST({ action: "vip_note", body: note });
         setBusy(false);
-        if (r?.ok) { setNote(""); setSt((p) => ({ ...p, notes: r.notes })); Cas.chips?.(); Haptic.hit(0.4); }
+        if (r?.ok) { setNote(""); setSt((p) => ({ ...p, notes: r.notes })); Cas.bet?.(); Haptic.hit(0.4); }
         else setSaying(r?.reason || "That didn't go up.");
     }, [busy, note]);
 

@@ -157,7 +157,7 @@ const MACHINES = [
     // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────
     // At the far end, past every machine, which is where a cashier's window belongs: you walk the whole
     // floor to reach it and you pass everything you could have been playing on the way back. It is the only
-    // thing in the room that is not a game, and the only place chips are worth anything.
+    // thing in the room that is not a game, and the only place gold are worth anything.
     { id: "store", x: 79.0, label: "The Counter", kind: "Gold", live: true },
     // ── AND THE GACHAPON, ONE BAY PAST IT ────────────────────────────────────────────────────────────
     // Exactly one machine-spacing to the right of the Counter, which is where Luke put it and is also the
@@ -448,9 +448,9 @@ const OUTCOME = {
 // ── WHO THE HAND WENT TO ─────────────────────────────────────────────────────────────────────────────────────
 // The felt named the outcome in a sentence and then did nothing with it: the winning cards looked exactly like
 // the losing ones and the stake sat in the betting spot whoever had just taken it. Luke: "we should highlight
-// the cards of who won and animate the chips to go one way or the other."
+// the cards of who won and animate the gold to go one way or the other."
 //
-// Both halves read from this one map, so the cards that light up and the direction the chips travel can never
+// Both halves read from this one map, so the cards that light up and the direction the gold travel can never
 // disagree — which they would within a month if the seat worked it out from h.outcome and the stack worked it
 // out from hand.won.
 const WON_BY = {
@@ -507,15 +507,15 @@ function Card({ card, delay = 0, flip = false, dead = false }) {
 }
 
 // ── TOMBSTONE: THE CAGE ──────────────────────────────────────────────────────────────────────────────────────
-// It sold chips for gold one for one and handed out a free thousand a day, and it sat directly under the
-// purse because a member with no chips had no way to play at all.
+// It sold gold for gold one for one and handed out a free thousand a day, and it sat directly under the
+// purse because a member with no gold had no way to play at all.
 //
 // Both halves are gone with the currency. The floor is staked in GOLD now, so a window that converts gold
-// into chips would be converting a currency into itself; and the free thousand was 16,441 a day minted for
+// into gold would be converting a currency into itself; and the free thousand was 16,441 a day minted for
 // turning up, which is the one faucet Luke named directly.
 //
 // ⚠️ THE API ACTIONS WENT FIRST AND THIS DID NOT, which is the worst order to do it in. For a few hours the
-// floor carried a loud gold button reading "Claim 1,000 free chips" wired to an action that answers
+// floor carried a loud gold button reading "Claim 1,000 free gold" wired to an action that answers
 // `bad_action` — a feature that looks alive, takes a tap, and fails. Found by filming the wall for something
 // else entirely and seeing it sitting at the top of the frame. Delete the SCREEN before the endpoint, or at
 // the very least in the same commit.
@@ -957,7 +957,7 @@ export default function CasinoClient({ initial, halloween = false }) {
         else if (r.refund > 0) setNote({ kind: "refund", text: `The Croupier's Cat pushes ${money(r.refund)} back.` });
         else setNote(null);
         // THE PET BANNER USED TO LIVE HERE. `r.pet` was one of the five arriving off a play at 1-in-455 to
-        // 1-in-5,556; they are 50,000 chips at the Counter now and nothing sends that key any more. Removed
+        // 1-in-5,556; they are 50,000 gold at the Counter now and nothing sends that key any more. Removed
         // rather than left dormant — a handler for an event that can never happen reads as a working feature.
     }, [settleGold]);
 
@@ -1016,7 +1016,11 @@ export default function CasinoClient({ initial, halloween = false }) {
         timers.current.push(setTimeout(() => {
             setSpinning(false);
             setSpin(r);
-            setSt((p) => ({ ...p, gold: r.gold }));
+            // ⚠️ THE BALANCE IS NOT PUBLISHED HERE. absorb(r) does it, at the end of the whole reveal.
+            // This line used to set `gold`, which was the member's main wallet and had nothing to do with the
+            // machine — the purse on screen was a different field, held separately. Now that there is ONE
+            // purse, writing it here pays the win the instant the reels stop and before every bonus the spin
+            // triggered has played, which is the exact bug the hold exists to prevent.
 
             // One clunk per reel as it settles, on the same clock the strips use, PITCHED UP each time —
             // rising pitch reads as rising tension with no explanation needed, and the third reel is where
@@ -1200,7 +1204,8 @@ export default function CasinoClient({ initial, halloween = false }) {
             return;
         }
         setHand(r.hand || null);
-        if (r.gold != null) setSt((p) => ({ ...p, gold: r.gold }));
+        // Same as the reels: the purse moves in absorb, once the hand has finished being shown. Publishing
+        // here paid a blackjack before the dealer had turned a card.
         // A card landing is a small sound; the hand ENDING is the moment. Splitting them is what keeps a hit
         // from feeling like a result.
         // A card landing is a small sound; the hand ENDING is the moment. The deal already played its own
@@ -1251,7 +1256,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                 // the door notices the moment somebody's standing changes. Forgetting it here is half of why
                 // the rope told the owner "members only": the API had the answer and nothing merged it.
                 // ── BUT NOT THE PURSE, IF A MACHINE IS STILL MID-SENTENCE ────────────────────────
-                // Luke: "when we are low on chips it still tends to reveal the final number early."
+                // Luke: "when we are low on gold it still tends to reveal the final number early."
                 // This is why, and it had nothing to do with being low — it is a six-second timer against a
                 // reveal that runs three to six, so it landed inside one about half the time. The poll asks
                 // the server for the truth, and the server's truth INCLUDES the win the reels have not shown
@@ -1415,7 +1420,7 @@ export default function CasinoClient({ initial, halloween = false }) {
     // celebrating on the response instead of on the last ball.
     //
     // A SPLIT settles on the money rather than on an outcome, because there is no single outcome to read: two
-    // hands can go different ways. Net-positive means the chips come to you. (One hand pushing while the other
+    // hands can go different ways. Net-positive means the gold come to you. (One hand pushing while the other
     // loses returns the pushed stake and reads as a win by this rule — the per-hand labels above it still say
     // what really happened, and it is the rarest board at this table.)
     const bjPot = useMemo(() => {
@@ -1489,14 +1494,18 @@ export default function CasinoClient({ initial, halloween = false }) {
         const r = await casPost({ action: "gamble", machine: at?.id });
         setBusy(false);
         if (!r?.ok) { setErr("That didn't go through."); return; }
-        setSt((p) => ({ ...p, gold: r.gold }));
+        // ⚠️ HELD BY HAND, NOT THROUGH stakeNow. The gamble's `staked` is the BET AMOUNT, not a balance —
+        // every other response on this floor uses that name for the purse the instant the stake left, and
+        // handing this one to stakeNow would print the size of the bet as the player's gold. The coin is in
+        // the air either way, so the number waits for it to land.
+        heldGold.current = r.gold ?? null;
         setMeters((p) => ({ ...p, [r.machine]: { ...(p[r.machine] || {}), pending: 0 } }));
         setFx({ gambled: { won: r.won, amount: r.staked, payout: r.payout } });
         if (r.won) {
             setFlash("win"); Cas.coins(0.6); Haptic.crit(); throwBurst("coin", ACCENT[at?.id] || "#ffd75e");
-            timers.current.push(setTimeout(() => setFlash(null), 1400));
-        } else { Cas.bust(); Haptic.hit(0.5); }
-    }, [busy, at]);
+            timers.current.push(setTimeout(() => { setFlash(null); settleGold(); }, 1400));
+        } else { Cas.bust(); Haptic.hit(0.5); timers.current.push(setTimeout(settleGold, 900)); }
+    }, [busy, at, settleGold]);
 
     // Standing at the rope, on the same rule as standing at a cabinet.
     const vipNear = Math.abs(x - VIP_X) <= REACH;
@@ -1504,7 +1513,7 @@ export default function CasinoClient({ initial, halloween = false }) {
 
     // ── ONE BALL LEFT ────────────────────────────────────────────────────────────────────────────────────
     // Non-null only in the gap before the tenth ball, and only when the next rung actually pays something —
-    // there is no drama in "one more for nothing". `chips` is what that next rung is worth at the selected
+    // there is no drama in "one more for nothing". `gold` is what that next rung is worth at the selected
     // stake, through the same conversion the till uses.
     const kenoPending = useMemo(() => {
         if (!keno || !busy) return null;
@@ -1513,7 +1522,7 @@ export default function CasinoClient({ initial, halloween = false }) {
         const hits = (keno.picks || ticket).filter((n) => keno.drawn.slice(0, kenoOut).includes(n)).length;
         const next = st?.keno?.pays?.[hits + 1];
         if (!next) return null;
-        return { hits, chips: payoutFor(Math.round(bet * next), 1) };
+        return { hits, gold: payoutFor(Math.round(bet * next), 1) };
     }, [keno, busy, kenoOut, ticket, st?.keno?.pays, bet]);
 
     // Today's pattern as a Set, so the card can ask 25 times per render without rebuilding an array each time.
@@ -1602,7 +1611,7 @@ export default function CasinoClient({ initial, halloween = false }) {
     if (vip) {
         return (
             <VipLounge state={vip} gold={st?.gold} me={st?.me}
-                onGold={(n) => setSt((p) => ({ ...p, chips: n }))}
+                onGold={(n) => setSt((p) => ({ ...p, gold: n }))}
                 onClose={() => setVip(null)} />
         );
     }
@@ -1613,7 +1622,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                 <a className="cas-out" href="/marketplace/town">← Town</a>
                 <b className="cas-name">The Casino</b>
                 {/* ── ⚠️ TWO PURSES, AND THEY ARE NEVER ADDED ───────────────────────────
-                    Luke: "You buy chips, you earn tokens by winning, that way chips always goes down."
+                    Luke: "You buy gold, you earn tokens by winning, that way gold always goes down."
                     CHIPS are what you feed a machine and they only ever go down. TOKENS are what a machine
                     pays and the only thing the Counter takes. One figure could not say which of the two a
                     spin had just moved, and the whole point of the split is that a spin moves both, in
@@ -1622,18 +1631,18 @@ export default function CasinoClient({ initial, halloween = false }) {
                     {/* ── ONE PURSE, BECAUSE THERE IS ONE CURRENCY ──────────────────────────────────
                         There were two: CHIPS were what you fed a machine and TOKENS were what it paid, and
                         the split existed because one figure could not say which of them a spin had moved.
-                        Both are gone — the floor takes gold and pays gold — and this read "0 chips · 0
+                        Both are gone — the floor takes gold and pays gold — and this read "0 gold · 0
                         tokens" at the top of the room until it was filmed. */}
                     {money(st?.gold)}<i>gold</i>
                 </span>
             </header>
 
             {/* ── BUYING CHIPS ────────────────────────────────────────────────────────────────────────────
-                Luke: "lets make it so you can buy chips and make it so everything takes chips to play. maybe
-                1 to 1 coins buy chips. and each day you can claim 1000 chips for free."
-                The floor takes chips at every machine now, so this is the only door onto it — which is
+                Luke: "lets make it so you can buy gold and make it so everything takes gold to play. maybe
+                1 to 1 coins buy gold. and each day you can claim 1000 gold for free."
+                The floor takes gold at every machine now, so this is the only door onto it — which is
                 exactly why it is the first thing under the header rather than a tab somewhere. */}
-            {/* The cage stood here — gold for chips, and the free thousand a day. See the tombstone above. */}
+            {/* The cage stood here — gold for gold, and the free thousand a day. See the tombstone above. */}
 
             {/* ── WHO IS WORKING THE FLOOR FOR YOU ────────────────────────────────────────────────────────
                 The five casino pets do nothing you can see at the moment they fire — a stake quietly comes
@@ -1992,7 +2001,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                         {/* ── THE PURSE THE MACHINE ACTUALLY SPENDS ────────────────────────────────
                             Luke asked for both here — "just show the coin amount with the coin sprite and
                             the chip amount with the chip sprite" — and that was right while the floor took
-                            gold. It does not any more. Gold buys chips AT THE CAGE, which is on the floor
+                            gold. It does not any more. Gold buys gold AT THE CAGE, which is on the floor
                             page and unreachable from a seat, so the coin figure up here answered a question
                             nobody sitting down can act on. "balance still showing coin for many slots when
                             it isnt relevant." One sprite, one number, and it is the one the bet comes from. */}
@@ -2004,7 +2013,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                             gives is a machine you cannot tell you are winning at. See tokens.js. */}
                         <span className="cas-purse-sm">
                             {/* The coin, not the chip: this is what the machine in front of you takes now. There were
-                                two figures here — chips fed in, tokens won — and both currencies are gone. */}
+                                two figures here — gold fed in, tokens won — and both currencies are gone. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/images/casino/hud-coin.webp" alt="" width={15} height={15} />
                             <b className="cas-purse-gold">{money(st?.gold)}</b>
@@ -2202,10 +2211,10 @@ export default function CasinoClient({ initial, halloween = false }) {
                                     const here = Boolean(keno && !busy && keno.hits.length === k);
                                     // Exactly what playKeno does: the multiple lands on the gold stake, and
                                     // that gold is converted once. Mirrored step for step, not approximated.
-                                    const chips = payoutFor(Math.round(bet * pays), 1);
+                                    const gold = payoutFor(Math.round(bet * pays), 1);
                                     return (
                                         <span key={k} className={`cas-keno-rung${here ? " is-here" : ""}`}>
-                                            <i>{k} of 5</i><b>{money(chips)}</b>
+                                            <i>{k} of 5</i><b>{money(gold)}</b>
                                         </span>
                                     );
                                 })}
@@ -2221,7 +2230,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 {keno && !busy
                                     ? `${keno.hits.length} of 5${keno.goldMine ? ` · the golden ball doubled it` : ""} — ${keno.won > 0 ? `${money(keno.won)} gold` : "nothing"}`
                                     : kenoPending
-                                        ? `${kenoPending.hits} of 5 · one more is ${money(kenoPending.chips)}`
+                                        ? `${kenoPending.hits} of 5 · one more is ${money(kenoPending.gold)}`
                                         : keno ? `${kenoOut} of ${keno.drawn.length} drawn…`
                                             : `${ticket.length} of 5 picked`}
                             </p>
@@ -2235,14 +2244,14 @@ export default function CasinoClient({ initial, halloween = false }) {
                         there is no state in which the screen and the paytable disagree about which game
                         this is. */}
                     {at.live && at.id === "store" ? (
-                        /* ⚠️ THE COUNTER IS NOT A SHOP ANY MORE. CounterShelf sold fifteen things for chips, and
-                           chips no longer exist — the floor is staked in gold now and everything the Counter
+                        /* ⚠️ THE COUNTER IS NOT A SHOP ANY MORE. CounterShelf sold fifteen things for gold, and
+                           gold no longer exist — the floor is staked in gold now and everything the Counter
                            used to sell is claimed off lifetime winnings instead. Same cabinet, same place on
                            the floor, completely different verb. */
                         <Ladder onClose={() => setAt(null)} />
                     ) : at.live && at.id === "gacha" ? (
                         /* ⚠️ IT TAKES NOTHING FROM THIS COMPONENT. Every other cabinet on the floor is handed
-                           chips, a bet, a rate and a spin handler, because they are all the same game with
+                           gold, a bet, a rate and a spin handler, because they are all the same game with
                            different art. The gachapon shares nothing with them — a different currency (a
                            ticket), a different verb, and the only payout in the building that is real money —
                            so it owns its own state and talks to its own two actions. Threading it through the
@@ -2606,7 +2615,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                             {/* ── WHAT IS ACTUALLY ON THE TABLE ──────────────────────────────────
                                 The stake was a number inside a button at the bottom of the screen, which is
                                 the one place on a blackjack table money never is. It sits in the betting
-                                spot now, as chips, and it doubles when you double — so the thing you stand
+                                spot now, as gold, and it doubles when you double — so the thing you stand
                                 to lose is on the felt in front of you rather than in the UI. */}
                             {/* And when the hand is over the stack does not just sit there — it goes to
                                 whoever won it, up the felt to the dealer or down off the table to you. The
@@ -2627,7 +2636,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                     moment — on the line announcing that you had won. Luke: "remove rake from
                                     this, we don't want to rake anything." Both are gone because the rake is
                                     gone; what stands in its place is the thing that IS true now, which is
-                                    that the table pays TOKENS — chips are what it took to sit down. */}
+                                    that the table pays TOKENS — gold are what it took to sit down. */}
                                 {!hand ? "Blackjack pays 3:2. Dealer stands on all 17."
                                     : hand.open ? (hand.hands?.[hand.active]?.canSplit ? "Hit, stand, double, or split." : "Hit, stand, or double.")
                                         : hand.outcome === "split" ? "Both hands played."
@@ -2685,7 +2694,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 button about it.
 
                                 It belongs with the controls anyway. "Two lines pays 1.5x", "31 of 40
-                                called…" and "Four corners — 2,500 chips" are all answers about the card you
+                                called…" and "Four corners — 2,500 gold" are all answers about the card you
                                 are buying or the one you just bought, and the buy button is where that
                                 conversation happens. Pinned, it is legible from the first ball to the last
                                 without scrolling away from the card to read it. */}
@@ -2693,7 +2702,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 <p className={`cas-result is-pinned${card && !busy && card.won > 0 ? " is-win" : ""}`}>
                                     {/* Chips, for the stake that is selected — same reason as the keno
                                         ladder above. "Six pays 200x" was true of the gold you put in and
-                                        had nothing to do with the number that lands in your chips. */}
+                                        had nothing to do with the number that lands in your gold. */}
                                     {!card ? `A line pays ${money(payoutFor(Math.round(bet * (st?.bingo?.pays?.[1] ?? 1)), 1))} · six pays ${money(payoutFor(Math.round(bet * (st?.bingo?.pays?.[6] ?? 200)), 1))}`
                                         : dragon && busy
                                             ? (dragon.burnt?.length
@@ -2705,7 +2714,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                                     : "Not this time."}
                                 </p>
                             ) : null}
-                            {/* The stake row goes away mid-hand. The bet is already placed and the chips are
+                            {/* The stake row goes away mid-hand. The bet is already placed and the gold are
                                 already gone — leaving four stake buttons live under a hand in progress asks
                                 a question that has no answer until the hand is over.
                                 NOT the `hidden` attribute: it works by the user-agent rule
@@ -2750,11 +2759,11 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 </button>
                             ) : null}
                             {/* ── EVERY GATE ON THIS SCREEN COUNTS CHIPS ───────────────────────────────
-                                All five of these read `st.gold` until now, and the server takes chips at
+                                All five of these read `st.gold` until now, and the server takes gold at
                                 every machine — so the Deal / Pull / Buy-a-card button disabled itself and
-                                said "Not enough gold" to players holding thousands of chips. It is not a
+                                said "Not enough gold" to players holding thousands of gold. It is not a
                                 label bug: `disabled` was set from the wrong purse, so the floor was shut to
-                                anyone who had spent their gold buying the chips they were trying to play. */}
+                                anyone who had spent their gold buying the gold they were trying to play. */}
                             {at.id === "blackjack" && hand?.open ? null : (
                             <button type="button" className="cas-pull"
                                 disabled={busy || (st?.gold || 0) < bet || (at.id === "keno" && ticket.length !== 5)}

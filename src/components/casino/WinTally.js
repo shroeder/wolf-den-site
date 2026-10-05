@@ -8,7 +8,7 @@ import { Haptic } from "@/components/arena/arena-audio.js";
 
 // ── THE COUNT IS THE CELEBRATION ─────────────────────────────────────────────────────────────────────────────
 // Luke: "we are missing the slow count up and celebration when you win... across all slots we don't do a good
-// job counting up the chips. It's a big dopamine opportunity."
+// job counting up the gold. It's a big dopamine opportunity."
 //
 // He is right, and the reason is that every cabinet had its own idea of what a win looks like. The five-reel
 // machines ticked a number up in a 13px line under the glass over about eight tenths of a second; the colossal
@@ -27,7 +27,7 @@ import { Haptic } from "@/components/arena/arena-audio.js";
 //   cabinet: a title, coins thrown, a held beat. Below that it stays out of the way. A machine that shouts
 //   about everything is a machine that shouts about nothing — see the note on CELEBRATE_AT.
 //
-// The tiers below are read off the multiple, not the chips, because a 200-chip win means something different
+// The tiers below are read off the multiple, not the gold, because a 200-chip win means something different
 // at a 20 stake than at a 500 one and only the multiple knows which.
 const TIERS = [
     // Ordinary. No title, no coins, no splash — it counts where it stands, briskly.
@@ -52,12 +52,12 @@ export const tierFor = (multiple) => {
 export const isBigWin = (multiple) => tierFor(multiple).label !== null;
 
 /**
- * @param {number} chips     what the spin paid, in chips
- * @param {number} multiple  chips ÷ stake — what decides how loud this is
+ * @param {number} gold     what the spin paid, in gold
+ * @param {number} multiple  gold ÷ stake — what decides how loud this is
  * @param {string} tone      the machine's colour, for the coins and the glow
  * @param {Function} onDone  called once the count and its held beat are over
  */
-export default function WinTally({ chips = 0, multiple = 0, tone = "#ffd75e", ms = null, onDone = null }) {
+export default function WinTally({ gold = 0, multiple = 0, tone = "#ffd75e", ms = null, onDone = null }) {
     // `ms` overrides the tier's own duration. There is one caller: the free-round recap, which is counting a
     // whole round rather than a spin and wants longer than the ordinary tier would give it. The TIER still
     // decides everything else, so a recap cannot accidentally become a splash.
@@ -71,7 +71,7 @@ export default function WinTally({ chips = 0, multiple = 0, tone = "#ffd75e", ms
     doneRef.current = onDone;
 
     useEffect(() => {
-        if (!chips) return undefined;
+        if (!gold) return undefined;
         setAt(0); setOver(false);
         // ── THE SOUND OF A NUMBER GOING UP ───────────────────────────────────────────────────────────────
         // One ping per frame is a buzz, so it fires every fourth and the PITCH rises with the count. That
@@ -85,7 +85,7 @@ export default function WinTally({ chips = 0, multiple = 0, tone = "#ffd75e", ms
             // Fast at first and easing to a stop: the number should look like it is ARRIVING at a total,
             // not like a timer running out.
             const e = 1 - Math.pow(1 - k, 3);
-            setAt(Math.round(chips * e));
+            setAt(Math.round(gold * e));
             frame += 1;
             if (frame % 4 === 0 && k < 1) Cas.coin(Math.round(k * 10) - 3);
             if (k < 1) { raf = requestAnimationFrame(step); return; }
@@ -95,7 +95,7 @@ export default function WinTally({ chips = 0, multiple = 0, tone = "#ffd75e", ms
         };
         raf = requestAnimationFrame(step);
         return () => { dead = true; cancelAnimationFrame(raf); };
-    }, [chips, tier]);
+    }, [gold, tier]);
 
     // The held beat AFTER the number lands. Without it a big win vanishes at the exact moment it finishes
     // being impressive, which is the one frame nobody should be looking at an empty screen.
@@ -105,13 +105,13 @@ export default function WinTally({ chips = 0, multiple = 0, tone = "#ffd75e", ms
         return () => clearTimeout(t);
     }, [over, tier]);
 
-    if (!chips) return null;
+    if (!gold) return null;
 
     // Ordinary wins stay a line. Only the tiers with a title take the cabinet.
     if (!tier.label) {
         return (
             <span className="wt-line" style={{ "--tone": tone }}>
-                <b>{at.toLocaleString()}</b> chips
+                <b>{at.toLocaleString()}</b> gold
             </span>
         );
     }

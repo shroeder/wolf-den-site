@@ -65,20 +65,20 @@ export default function HoldAndSpin({ hold, onDone }) {
     const filled = cur.held.filter(Boolean).length;
 
     // ── WHAT IS ON THE BOARD RIGHT NOW ───────────────────────────────────────────────────────────────────
-    // This read `hold.chips` — the FINAL total — from the first frame, so a round in which fourteen coins
-    // landed over four seconds showed the same number the whole way through and the header said "chips if it
+    // This read `hold.gold` — the FINAL total — from the first frame, so a round in which fourteen coins
+    // landed over four seconds showed the same number the whole way through and the header said "gold if it
     // stops here" above a figure that had nothing to do with stopping here.
     //
     // The entire mechanic of a hold and spin is watching a number grow while the respins run out. Printing
     // the answer first does not weaken that; it removes it. Exactly what showing the free round's payout
     // before the free round did, and it is the same mistake: the screen was handed the ending and put it on
     // top of the beginning.
-    // The final figure comes from the server, not from this sum: each cell is rounded to whole chips on its
+    // The final figure comes from the server, not from this sum: each cell is rounded to whole gold on its
     // own, so fifteen of them added up disagree with the round's own total by a chip or two — and the header
     // said 57 above a button offering 58. While it runs, the sum is the honest running answer; the moment it
     // stops, the number is the one being paid.
     const onBoard = done
-        ? Number(hold?.chips || 0)
+        ? Number(hold?.gold || 0)
         : cur.held.reduce((a, v, i) => a + (v ? (hold?.cellChips?.[i] || 0) : 0), 0);
 
     return (
@@ -99,7 +99,7 @@ export default function HoldAndSpin({ hold, onDone }) {
             <div className="hs-grid">
                 {Array.from({ length: CELLS }, (_, i) => {
                     const v = cur.held[i];
-                    const chips = hold?.cellChips?.[i] || 0;
+                    const gold = hold?.cellChips?.[i] || 0;
                     const tier = hold?.cellTier?.[i] ?? 1;
                     return (
                         <span key={i} className={`hs-cell${v ? ` is-held is-t${tier}` : ""}${flash.includes(i) ? " is-new" : ""}`}>
@@ -111,7 +111,7 @@ export default function HoldAndSpin({ hold, onDone }) {
                                 <>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={`/images/casino/bank_${COIN[tier]}.webp`} alt="" draggable="false" />
-                                    <b>{chips.toLocaleString()}</b>
+                                    <b>{gold.toLocaleString()}</b>
                                 </>
                             ) : <i aria-hidden="true" />}
                         </span>
@@ -127,7 +127,7 @@ export default function HoldAndSpin({ hold, onDone }) {
 
             {done ? (
                 <button type="button" className="hs-go" onClick={finish}>
-                    Take {Number(hold?.chips || 0).toLocaleString()} chips
+                    Take {Number(hold?.gold || 0).toLocaleString()} gold
                 </button>
             ) : null}
         </div>
