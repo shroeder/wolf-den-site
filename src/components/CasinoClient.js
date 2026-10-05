@@ -163,8 +163,14 @@ const MACHINES = [
     // only place it belongs: it is the second thing in the room that is not a game of chance you bet gold
     // on, and the two not-a-cabinet things standing together at the end reads as a prize corner rather than
     // as a tenth slot machine somebody ran out of room for.
-    { id: "gacha", x: 86.7, label: "The Gachapon", kind: "Tokens", live: true },
 ];
+
+// ⚠️ THE GACHAPON IS NOT IN MACHINES, FOR THE REASON THE CRYPT IS NOT IN DUNGEONS. That array is read as "the
+// floor" by everything from the walk-to logic to the minimap; a seasonal cabinet living in it would be a
+// permanent tenth machine that answers `closed` for eleven months of the year. It is appended at render time
+// while the event is up and simply is not there when it is not — see the page, which answers halloweenOn on
+// the server so the floor paints with the right number of cabinets on the first frame.
+const GACHA_MACHINE = { id: "gacha", x: 86.7, label: "The Gachapon", kind: "Tokens", live: true };
 
 // Where the rope is: on the wall's SECOND arch, which lands at 11.8% of the world once both the world and
 // the wall tile are sized off --room (see .cas-world). Not a free choice — it is where an arch actually is.
@@ -543,7 +549,12 @@ function Cage({ st, setSt }) {
     );
 }
 
-export default function CasinoClient({ initial }) {
+export default function CasinoClient({ initial, halloween = false }) {
+    // ⚠️ ONE DERIVED LIST, READ BY ALL THREE. MACHINES is consulted in three places — the walk-to lookup, the
+    // "what am I standing next to" check and the render — and a seasonal cabinet appended in only the render
+    // would draw a machine you could see, walk past, and never arrive at. useMemo rather than a bare concat
+    // so the array identity is stable and the proximity effect does not re-run every frame.
+    const machines = useMemo(() => (halloween ? [...MACHINES, GACHA_MACHINE] : MACHINES), [halloween]);
     const [st, setSt] = useState(initial);
     // ── WALKING IN FACING SOMETHING ──────────────────────────────────────────────────────────────────────
     // `?at=blackjack` starts you at that cabinet instead of at the door. The floor is six machines wide and
@@ -728,7 +739,7 @@ export default function CasinoClient({ initial }) {
         const want = new URLSearchParams(window.location.search).get("at");
         // Arriving from a link puts you AT the machine rather than walking you the length of the floor to
         // it: a link is a door, not a stroll.
-        const m = MACHINES.find((mm) => mm.id === want);
+        const m = machines.find((mm) => mm.id === want);
         if (m) setX(m.x);
         const el = roomRef.current;
         if (!el) return;
@@ -878,7 +889,7 @@ export default function CasinoClient({ initial }) {
     // What you are standing in front of. Recomputed from position rather than remembered, so walking away
     // closes the machine without anything having to tell it to.
     useEffect(() => {
-        const near = MACHINES.find((m) => Math.abs(m.x - x) <= REACH);
+        const near = machines.find((m) => Math.abs(m.x - x) <= REACH);
         // Coming into reach of a machine says so — once, on the step that arrives, and never again while you
         // stand at the same one. A chime on every step would be the room nagging.
         setAt((prev) => {
@@ -1804,7 +1815,7 @@ export default function CasinoClient({ initial }) {
                     <b>{vipNear ? (st?.vip?.allowed ? "Go in" : "Members, or a pass") : "The Lounge"}</b>
                 </button>
 
-                {MACHINES.map((m) => (
+                {machines.map((m) => (
                     <button key={m.id} type="button"
                         className={`cas-mach${m.live ? " is-live" : ""}${at?.id === m.id ? " is-near" : ""}`}
                         style={{ left: `${m.x}%` }}

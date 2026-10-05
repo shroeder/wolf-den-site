@@ -6,6 +6,7 @@ import { bingoState } from "@/lib/marketplace/bingo.js";
 import { blackjackState } from "@/lib/marketplace/blackjack.js";
 import { getCasinoState } from "@/lib/marketplace/casino.js";
 import { vipShadows, vipStanding } from "@/lib/marketplace/vip.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -39,10 +40,21 @@ export default async function CasinoPage() {
         getCasinoState(buyer.id), blackjackState(buyer.id), bingoState(),
         vipStanding(buyer.id), vipShadows(),
     ]);
+    // ── THE GACHAPON IS ONLY THERE WHILE THE EVENT IS ───────────────────────────────────────────────────
+    // Luke: "Keep in mind this system is only on when the halloween event is on."
+    //
+    // ⚠️ THE SERVER ALREADY REFUSED IT — gachaView, pull and rollTicket are all gated on halloweenOn — but the
+    // CABINET was in MACHINES unconditionally, so in November the floor would have carried a tenth machine
+    // standing in its own bay that answered `closed` to anybody who walked up to it. An unobtainable thing
+    // that is still advertised is the exact shape of the ownerOnly landmine: leaky one way, dead the other.
+    //
+    // Answered here rather than fetched, so the floor paints with the right number of machines on the FIRST
+    // frame — a cabinet that appears a beat after the room does is a cabinet that looks like a bug.
+    const hw = halloweenOn(buyer.id);
     return (
         <CasinoClient initial={{
             ...floor, blackjack: table, bingo: hall,
             vip: { allowed: standing.vip, shadows },
-        }} />
+        }} halloween={hw} />
     );
 }
