@@ -158,7 +158,7 @@ const MACHINES = [
     // At the far end, past every machine, which is where a cashier's window belongs: you walk the whole
     // floor to reach it and you pass everything you could have been playing on the way back. It is the only
     // thing in the room that is not a game, and the only place chips are worth anything.
-    { id: "store", x: 79.0, label: "The Counter", kind: "Tokens", live: true },
+    { id: "store", x: 79.0, label: "The Counter", kind: "Gold", live: true },
     // ── AND THE GACHAPON, ONE BAY PAST IT ────────────────────────────────────────────────────────────
     // Exactly one machine-spacing to the right of the Counter, which is where Luke put it and is also the
     // only place it belongs: it is the second thing in the room that is not a game of chance you bet gold
@@ -171,7 +171,7 @@ const MACHINES = [
 // permanent tenth machine that answers `closed` for eleven months of the year. It is appended at render time
 // while the event is up and simply is not there when it is not — see the page, which answers halloweenOn on
 // the server so the floor paints with the right number of cabinets on the first frame.
-const GACHA_MACHINE = { id: "gacha", x: 86.7, label: "The Gachapon", kind: "Tokens", live: true, v: 2 };
+const GACHA_MACHINE = { id: "gacha", x: 86.7, label: "The Gachapon", kind: "Tickets", live: true, v: 2 };
 
 // Where the rope is: on the wall's SECOND arch, which lands at 11.8% of the world once both the world and
 // the wall tile are sized off --room (see .cas-world). Not a free choice — it is where an arch actually is.
@@ -973,7 +973,7 @@ export default function CasinoClient({ initial, halloween = false }) {
     const spin5 = useCallback(async (offerId, force, stake = null) => {
         const r = await casPost({ action: "spin5", bet: Number(stake) > 0 ? Number(stake) : bet, machine: at?.id, offer: offerId, force: force || undefined });
         if (!r?.ok) {
-            setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage."
+            setErr(r?.error === "no_chips" ? "Not enough gold for that bet."
                 : r?.error === "closed" ? "This machine is not open yet."
                 : "That didn't go through.");
             return r || { ok: false };
@@ -1010,7 +1010,7 @@ export default function CasinoClient({ initial, halloween = false }) {
 
         if (!r?.ok) {
             setSpinning(false); setBusy(false);
-            setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage." : "That didn't go through.");
+            setErr(r?.error === "no_chips" ? "Not enough gold for that bet." : "That didn't go through.");
             return;
         }
 
@@ -1119,7 +1119,7 @@ export default function CasinoClient({ initial, halloween = false }) {
         const r = await casPost(body);
         if (!r?.ok) {
             setBusy(false);
-            setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage."
+            setErr(r?.error === "no_chips" ? "Not enough gold for that bet."
                 : r?.error === "bad_ticket" ? "Pick five numbers first."
                     : "That didn't go through.");
             return;
@@ -1196,7 +1196,7 @@ export default function CasinoClient({ initial, halloween = false }) {
         const r = await casPost({ action, ...body });
         setBusy(false);
         if (!r?.ok) {
-            setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage."
+            setErr(r?.error === "no_chips" ? "Not enough gold for that bet."
                 : r?.error === "cannot_double" ? "You can only double on your first two cards."
                     : r?.error === "no_hand" ? "That hand is already finished."
                         : "That didn't go through.");
@@ -1291,7 +1291,7 @@ export default function CasinoClient({ initial, halloween = false }) {
         const r = await casPost({ action: "bingo", bet, force: force || undefined });
         if (!r?.ok) {
             setBusy(false);
-            setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage." : "That didn't go through.");
+            setErr(r?.error === "no_chips" ? "Not enough gold for that bet." : "That didn't go through.");
             return;
         }
         setCard(r);
@@ -1792,10 +1792,14 @@ export default function CasinoClient({ initial, halloween = false }) {
                         // "Members only. The rope stays where it is." — furniture stating a rule, and it
                         // told you nothing about what to do next.
                         //
-                        // He names BOTH ways past him, because there are two and one of them is buyable:
-                        // the role is real money spent, and the pass is a million chips at the Counter. A
-                        // door that only says no is a dead end; this one is a price.
-                        setErr("The doorman does not move. \u201cMembers, or a pass. The Counter sells one \u2014 a million tokens.\u201d");
+                        // He names BOTH ways past him, because there are two and neither is bought any
+                        // more: the role is real money spent, and the pass is a RUNG — 1.5m won across your
+                        // life on this floor. A door that only says no is a dead end; this one is a target.
+                        //
+                        // It used to quote "a million tokens at the Counter", which outlived both the
+                        // currency and the shop: the Counter stopped selling at the rework and tokens stopped
+                        // existing at the sweep. A door is the last place that should be quoting a dead price.
+                        setErr("The doorman does not move. \u201cMembers, or a pass. The pass is not for sale \u2014 it is won. One and a half million, across your life on this floor.\u201d");
                     }}>
                     {/* Inside the arch. The people are real \u2014 their own avatars, at their own positions in
                         the lounge \u2014 pushed back with a dark wash and a little scale so they read as being
@@ -2224,7 +2228,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 drawn…". */}
                             <p className={`cas-result${keno?.won > 0 ? " is-win" : ""}${kenoPending ? " is-edge" : ""}`}>
                                 {keno && !busy
-                                    ? `${keno.hits.length} of 5${keno.goldMine ? ` · the golden ball doubled it` : ""} — ${keno.won > 0 ? `${money(keno.won)} tokens` : "nothing"}`
+                                    ? `${keno.hits.length} of 5${keno.goldMine ? ` · the golden ball doubled it` : ""} — ${keno.won > 0 ? `${money(keno.won)} gold` : "nothing"}`
                                     : kenoPending
                                         ? `${kenoPending.hits} of 5 · one more is ${money(kenoPending.chips)}`
                                         : keno ? `${kenoOut} of ${keno.drawn.length} drawn…`
@@ -2638,7 +2642,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                     : hand.open ? (hand.hands?.[hand.active]?.canSplit ? "Hit, stand, double, or split." : "Hit, stand, or double.")
                                         : hand.outcome === "split" ? "Both hands played."
                                             : OUTCOME[hand.outcome] || "Hand over."}
-                                {hand && !hand.open && hand.won > 0 ? ` +${money(hand.won)} tokens` : ""}
+                                {hand && !hand.open && hand.won > 0 ? ` +${money(hand.won)} gold` : ""}
                             </p>
                         </div>
                     ) : null}
@@ -2674,7 +2678,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                         One machine, one button. */}
                     {/* ⚠️ AND THE GACHAPON IS THE SECOND EXCLUSION, FOR THE SAME REASON AS THE COUNTER.
                         Filmed with only the `store` guard in place: the shared bet row and a gold "Play ·
-                        100" sat straight across the machine's own "Insert a token", forty pixels apart and
+                        100" sat straight across the machine's own "Insert a ticket", forty pixels apart and
                         spending a different currency on a different game. The exclusion list is the honest
                         shape here — this row belongs to the three-reel cabinet, and anything that is not one
                         has to say so. */}
@@ -2707,7 +2711,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                                 : "The dragon passes — every square was already yours.")
                                             : busy ? `${called} of ${card.drawn.length} called…`
                                                 : card.label
-                                                    ? `${card.label} — ${card.won > 0 ? `${money(card.won)} tokens` : "no pay"}`
+                                                    ? `${card.label} — ${card.won > 0 ? `${money(card.won)} gold` : "no pay"}`
                                                     : "Not this time."}
                                 </p>
                             ) : null}

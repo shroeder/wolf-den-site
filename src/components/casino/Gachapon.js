@@ -92,14 +92,14 @@ export default function Gachapon({ onClose }) {
     // bad pull: the ticket is already gone, exactly as it would be.
     const insert = useCallback(async () => {
         if (busy || step !== STEP.idle) return;
-        if (!view?.tickets) { setErr("You have no tokens. They turn up while you play."); return; }
+        if (!view?.tickets) { setErr("You have no tickets. They turn up while you play."); return; }
         setBusy(true);
         setErr(null);
         coinIn();
         const d = await post({ action: "gacha_pull" });
         setBusy(false);
         if (!d?.ok) {
-            setErr(d?.error === "no_ticket" ? "That token is already spent." : "The machine did not take it. Try again.");
+            setErr(d?.error === "no_ticket" ? "That ticket is already spent." : "The machine did not take it. Try again.");
             return;
         }
         pending.current = d.won;
@@ -198,7 +198,7 @@ export default function Gachapon({ onClose }) {
         <div className="gx-wrap" role="dialog" aria-label="The Hallowe'en Gachapon">
             <div className="gx-head">
                 <b>The Hallowe&apos;en Gachapon</b>
-                <span className="gx-tokens">{tickets} {tickets === 1 ? "token" : "tokens"}</span>
+                <span className="gx-tokens">{tickets} {tickets === 1 ? "ticket" : "tickets"}</span>
                 <button type="button" className="gx-x" onClick={onClose} aria-label="Step away">✕</button>
             </div>
 
@@ -296,8 +296,8 @@ export default function Gachapon({ onClose }) {
 
                     {/* ── WHAT TO DO NEXT, IN ONE LINE ───────────────────────────────────────────────── */}
                     <div className="gx-say">
-                        {step === STEP.idle && tickets > 0 ? <>Drop a token in.</> : null}
-                        {step === STEP.idle && !tickets ? <>No tokens. They turn up while you play — strikes, chests, catches, harvests.</> : null}
+                        {step === STEP.idle && tickets > 0 ? <>Drop a ticket in.</> : null}
+                        {step === STEP.idle && !tickets ? <>No tickets. They turn up while you play — strikes, chests, catches, harvests.</> : null}
                         {step === STEP.cranking ? <><b>Turn the crank.</b> All the way round.</> : null}
                         {step === STEP.dropping ? <>Something is coming down…</> : null}
                         {step === STEP.tray ? <><b>Twist it open.</b></> : null}
@@ -308,7 +308,7 @@ export default function Gachapon({ onClose }) {
                     <div className="gx-acts">
                         {step === STEP.idle ? (
                             <button type="button" className="gx-go" disabled={busy || !tickets} onClick={insert}>
-                                {busy ? "…" : "Insert a token"}
+                                {busy ? "…" : "Insert a ticket"}
                             </button>
                         ) : null}
                         <button type="button" className="gx-flat" onClick={() => setShowIndex(true)}>See what is in it</button>

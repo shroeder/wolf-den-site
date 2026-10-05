@@ -6,7 +6,6 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // table, gold instead. See casino-bank.js.
 import { coinBalance, moveCoin, recordWon } from "@/lib/marketplace/casino-bank.js";
 import { CHIP_RATE, DAILY_CHIPS, chipsFor } from "@/lib/marketplace/chips.js";
-import { moveTokens, tokenBalance } from "@/lib/marketplace/tokens.js";
 
 import { db } from "@/lib/db";
 import { trackActivity } from "@/lib/marketplace/activity.js";

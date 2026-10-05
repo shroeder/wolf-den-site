@@ -88,7 +88,7 @@ export default function ChipStore({ tokens, onBuy, onRefresh, single = false }) 
             setSaid({ good: true, text: `${r.name} is yours.` });
             Cas.jackpot(); Haptic.crit();
         } else {
-            setSaid({ good: false, text: r?.error === "not_enough_chips" ? "Not enough tokens for that."
+            setSaid({ good: false, text: r?.error === "not_enough_gold" ? "Not enough gold for that."
                 : r?.error === "already_owned" ? "You already have that one."
                 // Not a failure — the opposite. They have finished the band this page draws from, and being
                 // told "that did not go through" for that is the machine blaming you for being good at it.
@@ -111,7 +111,7 @@ export default function ChipStore({ tokens, onBuy, onRefresh, single = false }) 
         <div className="cs">
             <div className="cs-head">
                 <b>{Number(tokens ?? shelf?.balance ?? 0).toLocaleString()}</b>
-                <i>tokens</i>
+                <i>gold</i>
             </div>
             <p className="cs-intro">Won at the machines. Good here and nowhere else.</p>
 
@@ -193,7 +193,7 @@ export default function ChipStore({ tokens, onBuy, onRefresh, single = false }) 
                                 <>
                                     <b>{item.price.toLocaleString()}</b>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src="/images/casino/hud-chip.webp" alt="tokens" width={16} height={16} />
+                                    <img src="/images/casino/hud-chip.webp" alt="gold" width={16} height={16} />
                                 </>
                             )}
                         </span>
@@ -240,10 +240,10 @@ export default function ChipStore({ tokens, onBuy, onRefresh, single = false }) 
                             disabled={Boolean(busy) || open.owned || !open.afford}
                             onClick={() => buy(open)}>
                             {open.owned ? "You already have this"
-                                : !open.afford ? `${(open.price - (tokens ?? shelf.balance ?? 0)).toLocaleString()} more tokens needed`
+                                : !open.afford ? `${(open.price - (tokens ?? shelf.balance ?? 0)).toLocaleString()} more gold needed`
                                 : busy === open.id ? "…"
-                                : open.kind === "stat" ? `Train — ${open.price.toLocaleString()} tokens`
-                                : `Take it — ${open.price.toLocaleString()} tokens`}
+                                : open.kind === "stat" ? `Train — ${open.price.toLocaleString()} gold`
+                                : `Take it — ${open.price.toLocaleString()} gold`}
                         </button>
                     </div>
                 </div>

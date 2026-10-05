@@ -7,7 +7,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // the cage, and gold no longer touches the floor.) The original read: the stake is still gold because a
 // table that took chips and paid chips would be a closed loop that never touches the economy it belongs to.
 import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
-import { moveTokens } from "@/lib/marketplace/tokens.js";
+import { moveCoin } from "@/lib/marketplace/casino-bank.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE SHARED FLOOR ─────────────────────────────────────────────────────────────────────────────────────────
@@ -132,18 +132,17 @@ export async function settleBets(buyerId, game, { roll, score, reason }) {
         // `won` is what the SCORER returned, which is in gold — the units the stake was taken in and the units
         // the paytable is written in. The ticket row keeps that number, because it is the honest record of what
         // the bet was worth; the payout is converted once, here, and nowhere else.
-        const wonChips = won > 0 ? chipsFor(won, 1) : 0;
-        if (wonChips > 0) {
-        // ⚠️ THE WIN IS PAID IN TOKENS, NOT CHIPS. The stake left as chips and does not come back — see
-        // tokens.js and migration 436. Every game on the floor pays the same currency, so the Counter's
-        // prices mean one thing no matter which machine somebody prefers.
-            await moveTokens(buyerId, wonChips, reason, {
+        if (won > 0) {
+        // PAID IN GOLD, in the same units the stake was taken in. This paid TOKENS until the floor went
+        // coin-in-coin-out; tokens are now a dead purse, so a settled round was quietly paying into a
+        // balance nobody can spend. There is no conversion left to do — the scorer already works in gold.
+            await moveCoin(buyerId, won, reason, {
                 ref: String(row.id),
-                meta: { bet: row.stake, round: String(row.round), wonGold: won, rate: CHIP_RATE },
+                meta: { bet: row.stake, round: String(row.round), wonGold: won },
             });
         }
         results.push({ id: String(row.id), round: Number(row.round), stake: row.stake, choice, outcome,
-            won: wonChips, wonGold: won, detail });
+            won, wonGold: won, detail });
     }
     return results;
 }
