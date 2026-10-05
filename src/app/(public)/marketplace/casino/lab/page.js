@@ -15,10 +15,10 @@ import { playSpin, slot5 } from "@/lib/marketplace/casino-slot5.js";
 // resolved reel art, the live pot — and simply has no member on it, so this is the actual server payload
 // rather than my guess at what it looks like. Only the purse is overridden, so the chip strip can be seen in
 // each state it has: ?claimed=1 for after today's free thousand is gone, ?broke=1 for no gold to convert,
-// ?chips=N for any purse — ?chips=10 is the one that proves a machine still refuses a bet it cannot cover.
+// ?gold=N for any purse — ?gold=10 is the one that proves a machine still refuses a bet it cannot cover.
 //
 // ?spin=1 also hands the client a REAL spin off the five-reel engine — playSpin, the same function the route
-// calls — so the reveal can be filmed without an account and without staking anybody's chips. The lab stubs
+// calls — so the reveal can be filmed without an account and without staking anybody's gold. The lab stubs
 // only the POST that would need a session; the grid being landed is the engine's own.
 //
 // ⚠ THE BIG YELLOW DISC ON THE FLOOR IS NOT A BUG. It is `.cas-blank.is-you`, the deliberate stand-in for a
@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Casino Lab", robots: { index: false, follow: false } };
 
 // One spin off the real engine, shaped the way the route shapes it — the grid, the winning lines, and each
-// line's payout converted to chips at the real rate. Kept spinning until it finds a paying one, because the
+// line's payout converted to gold at the real rate. Kept spinning until it finds a paying one, because the
 // thing being watched here is WHEN the win reaches the purse, and a losing spin ends at the same number
 // either way. It is a genuine outcome, just a selected one; nothing about the grid is invented.
 const BET = 100;
@@ -42,7 +42,7 @@ function oneSpin() {
         if (!wins.length || r.free || r.hold || r.chain || r.gems || r.warren || r.winAgain) continue;
         return {
             grid: r.grid, bet: BET,
-            lines: wins.map((w) => ({ ...w, chips: Math.max(1, Math.round(w.amount)) })),
+            lines: wins.map((w) => ({ ...w, gold: Math.max(1, Math.round(w.amount)) })),
             won: Math.max(1, Math.round((r.base.total || 0))),
         };
     }
@@ -58,7 +58,7 @@ export default async function Page({ searchParams }) {
     return (
         <CasinoLab spin={q?.spin ? oneSpin() : null} initial={{
             ...floor, blackjack: table, bingo: hall,
-            gold: q?.broke ? 40 : 25000, chips: q?.chips != null ? Number(q.chips) : 4820, dailyChips: !q?.claimed,
+            gold: q?.gold != null ? Number(q.gold) : (q?.broke ? 40 : 25000),
             vip: { allowed: false, shadows: [] },
         }} />
     );

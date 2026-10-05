@@ -24,8 +24,13 @@ for (const id of ids) {
     const need = m.winAgain.need;
     const depth = new Map();
     let fired = 0;
+    // ⚠️ THE METER CARRIES BETWEEN SPINS AND THAT IS THE POINT OF IT. The row of last-five-wins is the thing
+    // WIN IT AGAIN pays out, so a harness that passes a fresh [] every spin is measuring a different machine
+    // from the one in the cabinet. Threaded exactly the way spinSlot5 threads it in production.
+    let meter = [];
     for (let i = 0; i < SPINS; i += 1) {
-        const r = playSpin(id, 100);
+        const r = playSpin(m, { bet: 100, meter });
+        meter = r?.meter || [];
         const c = r?.chain?.cascades || 0;
         depth.set(c, (depth.get(c) || 0) + 1);
         if (r?.winAgain) fired += 1;

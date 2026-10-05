@@ -10,17 +10,17 @@ import CasinoClient from "@/components/CasinoClient";
 // a screen that no longer exists.
 //
 // The casino needs this more than most. Everything on that floor is behind a session, so the only way it has
-// ever been WATCHED is by signing in as a real member and staking real chips — which is why the reveal timing
+// ever been WATCHED is by signing in as a real member and staking real gold — which is why the reveal timing
 // ("the purse announces the win before the reels do") was reported by a player rather than caught here.
 //
 // The spin is not fabricated: the page runs the engine's own playSpin server-side and hands the landed grid
 // down. This only wraps it in the envelope the route would have put around it, with the two balances that are
-// the whole point of the exercise — `staked` for the instant the bet leaves, `chips` for after the win.
+// the whole point of the exercise — `staked` for the instant the bet leaves, `gold` for after the win.
 export default function CasinoLab({ initial, spin }) {
     const [ready, setReady] = useState(false);
     useEffect(() => {
         const real = window.fetch.bind(window);
-        const start = Number(initial?.chips) || 0;
+        const start = Number(initial?.gold) || 0;
         // The win comes off the engine's own paying spin — see oneSpin in the lab page. A losing spin cannot
         // show you the difference between the two orderings, because both end at the same number.
         const bet = spin?.bet || 100;
@@ -33,7 +33,7 @@ export default function CasinoLab({ initial, spin }) {
                     return new Response(JSON.stringify({
                         ok: true, grid: spin.grid, lines: spin.lines || [], bet,
                         staked: start - bet,        // the moment the stake leaves
-                        chips: start - bet + won,   // and again once the machine has finished saying so
+                        gold: start - bet + won,   // and again once the machine has finished saying so
                         machine: body.machine || "slot", won,
                     }), { status: 200, headers: { "content-type": "application/json" } });
                 }
