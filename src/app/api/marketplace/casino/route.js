@@ -5,6 +5,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { gambleWin, getCasinoState, moveCasino, playKeno, spinSlot } from "@/lib/marketplace/casino.js";
 import { gachaView, pull as gachaPull } from "@/lib/marketplace/gachapon.js";
 import { ladder, claim as claimRung } from "@/lib/marketplace/casino-claim.js";
+import { leaderboard } from "@/lib/marketplace/casino-leaderboard.js";
 import { spinSlot5 } from "@/lib/marketplace/casino-slot5-play.js";
 import { chipShelf, buyChips } from "@/lib/marketplace/chips.js";
 import { buyWithChips } from "@/lib/marketplace/chip-store.js";
@@ -155,6 +156,10 @@ export async function POST(request) {
                 // stored number — so there is nothing in this body that can move a payout. That matters more
                 // here than on the old shelf: the shelf charged for what it handed over and this does not.
                 case "ladder": return noStore({ ok: true, ...(await ladder(buyer.id)) });
+                // ⚠️ THE BOARD TAKES NO ARGUMENTS AND RETURNS EVERYBODY. It is a scoreboard — the one screen
+                // in the casino where other people's numbers are the point — so it reads the same column the
+                // Counter does rather than deriving its own, or the two would disagree within a week.
+                case "leaderboard": return noStore({ ok: true, ...(await leaderboard(buyer.id)) });
                 case "ladder_claim":
                     return noStore(await claimRung(buyer.id, String(b?.kind || ""), String(b?.ref || "")));
                 case "gacha_view": return noStore({ ok: true, ...(await gachaView(buyer.id)) });

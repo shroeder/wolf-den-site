@@ -12,6 +12,7 @@ import { Cas } from "@/components/casino/casino-audio.js";
 import Slot5 from "@/components/casino/Slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
 import Ladder from "@/components/casino/Ladder.js";
+import Leaderboard from "@/components/casino/Leaderboard.js";
 import Gachapon from "@/components/casino/Gachapon.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
 import { callFor, letterFor, lineName, nearLinesOf } from "@/lib/marketplace/bingo-kit.js";
@@ -178,6 +179,19 @@ const GACHA_MACHINE = { id: "gacha", x: 86.7, label: "The Gachapon", kind: "Toke
 // size is fixed to --room — so when the world got wider, 11.8% stopped landing on the arch and started
 // landing on the pillar beside it. 10.1 is the same arch, in the same pixels, in a bigger room.
 const VIP_X = 10.1;
+
+// ── AND THE BOARD HANGS ON THE NEXT ARCH ALONG ───────────────────────────────────────────────────────────
+// Luke: "maybe to get there its a little up leaderboard sprite on the wall of the casino you can click to
+// inspect."
+//
+// 17.8 is the THIRD arch of the first wall tile, found the same way the rope's arch was: the tile is
+// 3 x 1.22 x --room wide and its arches sit at fixed fractions of it (see the note in globals.css). Putting
+// it between two arches instead would hang a heavy brass frame on a pillar, which is where a thing like this
+// visibly does not go.
+//
+// Past the rope and before the first slot, so it is the second thing you pass walking in and you pass it
+// again on the way to the Counter — which is the walk it is trying to make you take.
+const BOARD_X = 17.8;
 
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
 // arriving rather than threading a needle.
@@ -492,62 +506,19 @@ function Card({ card, delay = 0, flip = false, dead = false }) {
     );
 }
 
-// ── THE CAGE ─────────────────────────────────────────────────────────────────────────────────────────────────
-// Gold in, chips out, one for one — and the free thousand a day. Every machine on this floor takes chips now,
-// so a member with none has no way to play at all; this is the door, and it is directly under the purse for
-// that reason rather than filed behind a tab.
+// ── TOMBSTONE: THE CAGE ──────────────────────────────────────────────────────────────────────────────────────
+// It sold chips for gold one for one and handed out a free thousand a day, and it sat directly under the
+// purse because a member with no chips had no way to play at all.
 //
-// The free claim is FIRST and it is loud when it is available, because it is the thing somebody with an empty
-// purse needs to see. Once it is spent it stays visible but goes quiet — a button that vanishes when used
-// reads as a bug, and "come back tomorrow" is information.
-const BUY_STEPS = [1000, 5000, 25000];
-
-function Cage({ st, setSt }) {
-    const [busy, setBusy] = useState(null);
-    const [note, setNote] = useState("");
-    const gold = Number(st?.gold) || 0;
-
-    const post = async (body, key) => {
-        setBusy(key); setNote("");
-        const r = await casPost(body);
-        setBusy(null);
-        if (!r?.ok) {
-            setNote(r?.error === "not_enough_gold" ? "Not enough gold for that."
-                : r?.error === "already_claimed" ? "Already claimed today — back tomorrow."
-                : "That didn't go through.");
-            return;
-        }
-        // The server hands back both balances it moved; nothing here recomputes either.
-        setSt((p) => ({ ...p,
-            chips: r.chipsAfter ?? p.chips,
-            gold: r.gold ?? p.gold,
-            dailyChips: body.action === "chips_daily" ? false : p.dailyChips }));
-        setNote(body.action === "chips_daily" ? `+${money(r.chips)} chips` : `+${money(r.chips)} chips`);
-    };
-
-    return (
-        <div className="cas-buy">
-            <button type="button" className={`cas-buy-free${st?.dailyChips ? " is-on" : ""}`}
-                disabled={!st?.dailyChips || busy === "daily"}
-                onClick={() => post({ action: "chips_daily" }, "daily")}>
-                {busy === "daily" ? "…" : st?.dailyChips
-                    ? `Claim ${money(st?.dailyChipsN || 1000)} free chips`
-                    : "Free chips claimed — back tomorrow"}
-            </button>
-            <div className="cas-buy-row">
-                {BUY_STEPS.map((n) => (
-                    <button key={n} type="button" className="cas-buy-add" disabled={gold < n || busy === `b${n}`}
-                        onClick={() => post({ action: "chips_buy", gold: n }, `b${n}`)}>
-                        {busy === `b${n}` ? "…" : `Buy ${money(n)}`}
-                    </button>
-                ))}
-            </div>
-            <span className="cas-buy-gold">
-                {note || `${money(gold)} gold · 1 gold buys 1 chip`}
-            </span>
-        </div>
-    );
-}
+// Both halves are gone with the currency. The floor is staked in GOLD now, so a window that converts gold
+// into chips would be converting a currency into itself; and the free thousand was 16,441 a day minted for
+// turning up, which is the one faucet Luke named directly.
+//
+// ⚠️ THE API ACTIONS WENT FIRST AND THIS DID NOT, which is the worst order to do it in. For a few hours the
+// floor carried a loud gold button reading "Claim 1,000 free chips" wired to an action that answers
+// `bad_action` — a feature that looks alive, takes a tap, and fails. Found by filming the wall for something
+// else entirely and seeing it sitting at the top of the frame. Delete the SCREEN before the endpoint, or at
+// the very least in the same commit.
 
 export default function CasinoClient({ initial, halloween = false }) {
     // ⚠️ ONE DERIVED LIST, READ BY ALL THREE. MACHINES is consulted in three places — the walk-to lookup, the
@@ -573,6 +544,8 @@ export default function CasinoClient({ initial, halloween = false }) {
     const [x, setX] = useState(17);
     const [facing, setFacing] = useState(1);
     const [at, setAt] = useState(null);          // the machine you are standing at
+    // The board is a LOOK, not a room — it has no state of its own beyond being open.
+    const [boardOpen, setBoardOpen] = useState(false);
     const [bet, setBet] = useState(100);
     const [spin, setSpin] = useState(null);      // the last pull, for the reels and the callout
     const [busy, setBusy] = useState(false);
@@ -1530,6 +1503,7 @@ export default function CasinoClient({ initial, halloween = false }) {
 
     // Standing at the rope, on the same rule as standing at a cabinet.
     const vipNear = Math.abs(x - VIP_X) <= REACH;
+    const boardNear = Math.abs(x - BOARD_X) <= REACH;
 
     // ── ONE BALL LEFT ────────────────────────────────────────────────────────────────────────────────────
     // Non-null only in the gap before the tenth ball, and only when the next rung actually pays something —
@@ -1630,7 +1604,7 @@ export default function CasinoClient({ initial, halloween = false }) {
     // everybody else is concerned.
     if (vip) {
         return (
-            <VipLounge state={vip} chips={st?.chips} tokens={st?.tokens} me={st?.me}
+            <VipLounge state={vip} gold={st?.gold} me={st?.me}
                 onChips={(n) => setSt((p) => ({ ...p, chips: n }))}
                 onClose={() => setVip(null)} />
         );
@@ -1648,8 +1622,12 @@ export default function CasinoClient({ initial, halloween = false }) {
                     spin had just moved, and the whole point of the split is that a spin moves both, in
                     opposite directions. See tokens.js and migration 436. */}
                 <span className="cas-purse">
-                    {money(st?.chips)}<i>chips</i>
-                    <b className="cas-purse-tok">{money(st?.tokens)}<i>tokens</i></b>
+                    {/* ── ONE PURSE, BECAUSE THERE IS ONE CURRENCY ──────────────────────────────────
+                        There were two: CHIPS were what you fed a machine and TOKENS were what it paid, and
+                        the split existed because one figure could not say which of them a spin had moved.
+                        Both are gone — the floor takes gold and pays gold — and this read "0 chips · 0
+                        tokens" at the top of the room until it was filmed. */}
+                    {money(st?.gold)}<i>gold</i>
                 </span>
             </header>
 
@@ -1658,7 +1636,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                 1 to 1 coins buy chips. and each day you can claim 1000 chips for free."
                 The floor takes chips at every machine now, so this is the only door onto it — which is
                 exactly why it is the first thing under the header rather than a tab somewhere. */}
-            <Cage st={st} setSt={setSt} />
+            {/* The cage stood here — gold for chips, and the free thousand a day. See the tombstone above. */}
 
             {/* ── WHO IS WORKING THE FLOOR FOR YOU ────────────────────────────────────────────────────────
                 The five casino pets do nothing you can see at the moment they fire — a stake quietly comes
@@ -1748,6 +1726,31 @@ export default function CasinoClient({ initial, halloween = false }) {
                     behind the pillar and be cut off by it, which is the "don't clip through the walls" half
                     of the note. And they are darkened and shrunk rather than drawn plain, because the point
                     is that they are further away, in another room, behind a rope. */}
+                {/* ── THE BOARD ───────────────────────────────────────────────────────────────────
+                    Luke: "a little up leaderboard sprite on the wall of the casino you can click to
+                    inspect."
+
+                    Hung on an arch rather than between two, because a heavy brass frame visibly does
+                    not go on a pillar — same geometry the rope uses, three arches along. It lights up
+                    as you come alongside.
+
+                    ONE TAP from anywhere on the floor. That is the decision the rope had to make too:
+                    walk-then-tap is right for a MACHINE, where the first tap is you deciding to look at
+                    it, and wrong for a sign on a wall, which is a thing you read from where you are. */}
+                <button type="button"
+                    className={`cas-board${boardNear ? " is-near" : ""}`}
+                    style={{ left: `${BOARD_X}%` }}
+                    aria-label="The board — most won here, all time"
+                    onClick={() => {
+                        if (draggedJustNow()) return;
+                        if (!boardNear) setX(BOARD_X);
+                        setBoardOpen(true);
+                    }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/casino/wall-board.webp" alt="" draggable={false} />
+                    <span className="cas-board-tag">The Board</span>
+                </button>
+
                 <button type="button"
                     className={`cas-vipdoor${vipNear ? " is-near" : ""}${st?.vip?.allowed ? " is-open" : ""}`}
                     aria-label={st?.vip?.allowed ? "The VIP lounge" : "The VIP lounge \u2014 members only"}
@@ -1983,10 +1986,11 @@ export default function CasinoClient({ initial, halloween = false }) {
                             the only place they go. A machine that shows you what it takes and hides what it
                             gives is a machine you cannot tell you are winning at. See tokens.js. */}
                         <span className="cas-purse-sm">
+                            {/* The coin, not the chip: this is what the machine in front of you takes now. There were
+                                two figures here — chips fed in, tokens won — and both currencies are gone. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src="/images/casino/hud-chip.webp" alt="" width={15} height={15} />
-                            <b className="cas-purse-chips">{money(st?.chips)}</b>
-                            <b className="cas-purse-tok">{money(st?.tokens)}<i>tokens</i></b>
+                            <img src="/images/casino/hud-coin.webp" alt="" width={15} height={15} />
+                            <b className="cas-purse-chips">{money(st?.gold)}</b>
                         </span>
                     </div>
 
@@ -2795,6 +2799,19 @@ export default function CasinoClient({ initial, halloween = false }) {
                 <FeatureDailies feature="casino" />
             </div>
 
+
+            {/* ── THE BOARD, OPEN ─────────────────────────────────────────────────────────────────
+                A LOOK rather than a room: it lies over the floor, closes to exactly where you were
+                standing, and nothing about the casino's own state changes while it is up. That is why it is
+                not a cabinet — walking INTO something and reading something off a wall are different verbs,
+                and the floor already has plenty of the first. */}
+            {boardOpen ? (
+                <div className="cas-sheet" onClick={() => setBoardOpen(false)} role="presentation">
+                    <div className="cas-sheet-in" onClick={(e) => e.stopPropagation()}>
+                        <Leaderboard onClose={() => setBoardOpen(false)} />
+                    </div>
+                </div>
+            ) : null}
         </section>
     );
 }

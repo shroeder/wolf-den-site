@@ -79,7 +79,7 @@ const WALK_TICK_MS = 40;
 // ⚠️ BOTH PURSES. The vendor behind the rope sells off the Counter's shelf, which is priced in
 // TOKENS — so the number beside the door has to be the one the till will actually take. `chips` still
 // comes in because the lounge's own tables are played with them. See tokens.js and migration 436.
-export default function VipLounge({ state, chips, tokens, me, onClose, onChips }) {
+export default function VipLounge({ state, gold, me, onClose, onChips }) {
     const [st, setSt] = useState(state || null);
     const [x, setX] = useState(24);
     const [facing, setFacing] = useState(1);
@@ -293,12 +293,14 @@ export default function VipLounge({ state, chips, tokens, me, onClose, onChips }
         if (r?.ok) setSt((p) => ({ ...p, notes: r.notes }));
     }, [busy]);
 
-    const shelf = useCallback(() => POST({ action: "chip_shelf", vip: true }), []);
-    const buy = useCallback(async (item) => {
-        const r = await POST({ action: "chip_buy", item });
-        if (r?.ok && typeof r.balance === "number") onChips?.(r.balance);
-        return r;
-    }, [onChips]);
+    // ── TOMBSTONE: SABLE'S TILL ──────────────────────────────────────────────────────────────
+    // `shelf` read her VIP-only list and `buy` spent tokens off it. Her case is on the Counter's
+    // ladder now — same three pets, same stones, same page, claimed off lifetime winnings and
+    // still VIP-gated — so there is nothing left in here to sell.
+    //
+    // Deleted rather than left: lint:undef's no-dead-handler rule caught both the moment the
+    // mount went, which is exactly what it is for. Two handlers pointing at API actions that
+    // still answer would be a second, unreachable till.
 
     const mine = (st?.notes || []).find((n) => n.mine) || null;
 
@@ -326,9 +328,12 @@ export default function VipLounge({ state, chips, tokens, me, onClose, onChips }
             <header className="vip-top">
                 <button type="button" className="vip-out" onClick={onClose}>← The floor</button>
                 <b>The Lounge</b>
-                <span className="vip-purse">{Number(tokens || 0).toLocaleString()}
+                {/* ⚠️ GOLD, NOT TOKENS. Sable's case was priced in tokens and the number beside her door
+                    had to be the one her till would take. Both old currencies are gone, so this was
+                    printing a permanent zero next to a vendor who no longer sells anything. */}
+                <span className="vip-purse">{Number(gold || 0).toLocaleString()}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/images/casino/hud-chip.webp" alt="tokens" width={14} height={14} />
+                    <img src="/images/casino/hud-coin.webp" alt="gold" width={14} height={14} />
                 </span>
             </header>
 
@@ -474,7 +479,15 @@ export default function VipLounge({ state, chips, tokens, me, onClose, onChips }
                     <div className="vip-modal-body">
                         <h4>Sable opens the case</h4>
                         <p className="vip-said">Three of them. Nobody out on the floor can have these.</p>
-                        <ChipStore tokens={tokens} onBuy={buy} onRefresh={shelf} single />
+                        {/* ── SABLE'S CASE IS ON THE LADDER NOW ───────────────────────────────────────────
+                            Her three pets, her stones and her page used to be bought here with tokens. They are
+                            rungs on the Counter's ladder — still VIP-only, claimed off lifetime winnings like
+                            everything else. A second till in here would be the one shop left in a building that
+                            stopped having shops, and it would be the one nobody could find. */}
+                        <p className="vip-case-note">
+                            Sable keeps her case behind the bar now. What is in it is yours at the Counter, the
+                            moment you have won enough — and only ever yours, because only you can get in here.
+                        </p>
                     </div>
                   </div>
                 </div>

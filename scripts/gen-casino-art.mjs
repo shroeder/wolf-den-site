@@ -257,6 +257,33 @@ const JOBS = {
     // ── THE TWO NUMBERS IN THE HEADER ────────────────────────────────────────────────────────────────
     // Luke: "just show the coin amount with the coin sprite and the chip amount with the chip sprite... that
     // way we can free up that entire row." Two tiny icons buy back a whole strip of the screen.
+    // ── THE BOARD ON THE WALL ────────────────────────────────────────────────────────────────────────
+    // Luke: "lets expose a leaderboard of lifetime winnings for the casino... maybe to get there its a little
+    // up leaderboard sprite on the wall of the casino you can click to inspect."
+    //
+    // ⚠️ IT HANGS ON A PAINTED WALL, SO IT NEEDS A TOP EDGE AND A SHADOW SIDE. Every other sprite in this
+    // folder is an object standing on a floor and is lit from the front; a thing on a wall is lit from above
+    // and reads as stuck on unless it has visible thickness. Hence "seen slightly from below" — the player's
+    // eye level is the carpet, and the board is above the machines.
+    //
+    // ⚠️ DO NOT CALL IT A HALL OF FAME BOARD. The first draw asked for exactly that and said "COMPLETELY
+    // BLANK — no names, no numbers, no text" four different ways; it came back with HALL OF FAME across the
+    // top in gold capitals and a card-sharp in a top hat underneath. Naming the concept is what summons the
+    // writing — the same trap as the gravestone that came back with MOSS chiselled on it. So this asks for an
+    // EMPTY FRAME and never says what it is for. The names and numbers are HTML drawn over the top, where
+    // they can be real.
+    "wall-board": {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "An EMPTY ornate brass display frame hung on a wall — a heavy bevelled brass surround with a "
+            + "small crown crest centred on its top rail and two little lamps on brackets angled down from "
+            + "the upper corners, enclosing a plain polished dark slate panel, a worn brass rail across the "
+            + "bottom",
+            { framing: "sprite", extra: "A TALL PORTRAIT rectangle, roughly 3 wide by 4 high, seen straight "
+                + "on and very slightly from below so the underside of the frame shows. Lit from above. The "
+                + "slate panel inside is plain and smooth and entirely featureless — an empty surface. "
+                + "Nothing else in frame, no wall behind it." }),
+    },
     "hud-coin": {
         size: "1024x1024",
         prompt: housePrompt(
