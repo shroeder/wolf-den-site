@@ -41,6 +41,10 @@ export const CANDY_RATES = {
     delve_clear: 25,        // a whole ten-floor run
     delve_boss: 10,         // the tenth floor specifically
     raid: 8,                // a daily allowance
+    // ⚠️ A TOWN RAID IS NOT THE SEA RAID ABOVE. `raid` is sailing's, which is a daily allowance you spend;
+    // this is the plaza one — rarer, longer, and the whole Den turns out for it — so it pays the most of
+    // anything on this table except a dungeon clear.
+    town_raid: 20,
     arena_win: 4,
     chest_open: 2,
     cook: 2,

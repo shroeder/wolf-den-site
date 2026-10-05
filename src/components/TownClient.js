@@ -45,7 +45,11 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // extras just overflow the world and are clipped by the scene.
 const TILES = (n) => Array.from({ length: n }, (_, i) => i);
 // Which town-art sprite each raid kind uses (falls back to the event emoji until the art is generated).
-const EVENT_ART = { bandit_raid: "bandit", goblin_swarm: "goblin", treasure_golem: "golem" };
+// ⚠️ ONLY THE BOSS RAIDS AND THE TWO OLDEST SKIRMISHES ARE IN HERE, and that is not an oversight — a
+// skirmish draws its foes from the faction roster (foe_<art>_<role>) and only a BOSS has one portrait for
+// the whole raid. frost_pack, drowned_crew, hollow_court and the two Hallowe'en skirmishes are all absent
+// for the same reason.
+const EVENT_ART = { bandit_raid: "bandit", goblin_swarm: "goblin", treasure_golem: "golem", the_thresher: "thresher" };
 const CAT_LABEL = { civic: "🏛️ Civic", building: "🏚️ Buildings", service: "🧭 Services", unlock: "🌟 New buildings" };
 // Pretty relative timestamp for the plaza chat log ("just now", "5m", "3h", then a date).
 const relTime = (iso) => {

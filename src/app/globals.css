@@ -23556,11 +23556,14 @@ body.cas-seated .social-fab { display: none; }
    across The Hunt's marquee. The answer is height, not sideways: 56% puts it up at the arch springing, where
    a picture would hang in a room with a ceiling this high, and clear of every cabinet top.
 
+   ⚠️ 56% -> 66%, ON LUKE'S CALL: "can u move the board up a bit". At 56 its caption was landing on the
+   marquee of whatever cabinet stood under it, which on a phone is most of them.
+
    ⚠️ AND IT IS LIT FROM THE START. The first version only glowed when you were standing at it, which meant
    a dark brass frame on a dark wall that nobody would ever walk over to — the glow was the thing telling you
    it was there, and it was gated behind having already found it. It is lit always; coming alongside makes it
    brighter. */
-.cas-board { position: absolute; bottom: 56%; transform: translateX(-50%); z-index: 2;
+.cas-board { position: absolute; bottom: 66%; transform: translateX(-50%); z-index: 2;
     width: calc(var(--room) * 0.17); -webkit-appearance: none; appearance: none; border: 0; background: none;
     padding: 0; cursor: pointer; line-height: 0;
     transition: transform .16s ease, filter .16s ease; }
@@ -23579,6 +23582,13 @@ body.cas-seated .social-fab { display: none; }
 /* The label sits UNDER the frame rather than on it: the slate is blank on purpose (see the note in
    gen-casino-art.mjs about what happens when you ask an image model for a sign) and a caption printed over
    painted brass would fight the lamps. */
+/* The leader's hero, on the slate. The sprite is drawn with a blank panel on purpose (see the note in
+   gen-casino-art.mjs about asking an image model for a sign), and this is what the blank is for. */
+.cas-board-face { position: absolute; left: 50%; top: 46%; width: 52%; aspect-ratio: 1;
+    transform: translate(-50%, -50%); display: grid; place-items: center; pointer-events: none; }
+.cas-board-face img { max-width: 100%; max-height: 100%; object-fit: contain;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.65)); }
+
 .cas-board-tag { position: absolute; left: 50%; bottom: -17px; transform: translateX(-50%);
     font-size: 9.5px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: #ffd98a;
     background: rgba(18,12,30,0.8); border-radius: 999px; padding: 2px 8px; white-space: nowrap;

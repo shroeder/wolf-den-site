@@ -124,6 +124,26 @@ const FACTIONS = {
             chieftain: { label: "Captain Grine", emoji: "☠️", hint: "Whatever went down with the ship came back up." },
         },
     },
+    husk_tide: {
+        art: "husk",
+        names: {
+            scrapper: { label: "Husk Walker", emoji: "🌾", hint: "Straw and twine. It comes apart easily — there are just a lot of them." },
+            archer: { label: "Thorn-Flinger", emoji: "🪶", hint: "Throws from the back and the crows go with it." },
+            shieldbearer: { label: "Bale Golem", emoji: "🧱", hint: "Wire-bound and heavy. Sloppy timing barely marks it." },
+            elite: { label: "The Scarecrow Priest", emoji: "🕯️", hint: "A turnip lantern and a sickle, and it knows what it is doing." },
+            chieftain: { label: "Old Mother Harvest", emoji: "👑", hint: "She has been standing in that field a long time. Put her down and the rest fall over." },
+        },
+    },
+    candle_wake: {
+        art: "wake",
+        names: {
+            scrapper: { label: "Wick Walker", emoji: "🕯️", hint: "A candle melted onto a corpse. Slow, and it does not stop." },
+            archer: { label: "Ash-Thrower", emoji: "⚱️", hint: "Grave-ash, still smouldering, and it has good aim." },
+            shieldbearer: { label: "Coffin-Bearer", emoji: "⚰️", hint: "It is wearing its own coffin. Nothing you swing gets through." },
+            elite: { label: "The Mourner", emoji: "🖤", hint: "It casts, and it is genuinely grieving, which somehow makes it worse." },
+            chieftain: { label: "The Bellringer", emoji: "🔔", hint: "It rang for all of them. Stop the bell and the wake ends." },
+        },
+    },
     hollow_court: {
         art: "hollow",
         names: {
@@ -220,6 +240,11 @@ const FACTION_SHAPE = {
     drowned_crew: { scrapper: "wall", archer: "brute", shieldbearer: "wall", elite: "wall", chieftain: "wall" },
     // Bodies are ordinary; what hurts is what they cast.
     hollow_court: { scrapper: "balanced", archer: "duelist", shieldbearer: "wall", elite: "balanced", chieftain: "balanced" },
+    // Thin and numerous — the same shape as the frost pack, which is the right one for the EASY seasonal
+    // raid: eleven bodies that each die to one good swing is a raid a new member can actually contribute to.
+    husk_tide: { scrapper: "duelist", archer: "duelist", shieldbearer: "brute", elite: "berserker", chieftain: "berserker" },
+    // And the hard one. Walls and casters: nothing lands for much and what hurts you is what they throw.
+    candle_wake: { scrapper: "wall", archer: "balanced", shieldbearer: "wall", elite: "balanced", chieftain: "wall" },
 };
 
 /** Everything the arena needs to fight one of these, resolved from the kind and the faction it belongs to. */

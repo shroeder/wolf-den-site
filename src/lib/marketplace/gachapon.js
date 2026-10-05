@@ -59,6 +59,9 @@ export const TICKET_ODDS = {
     mine: 1 / 150,
     cook: 1 / 90,
     raid: 1 / 30,
+    // The plaza raid. The best single odds on the table: it happens a few times a week at most, the whole
+    // Den is in it, and it is the one activity where a token feels like a trophy rather than a trickle.
+    town_raid: 1 / 8,
     trick_or_treat_door: 1 / 75,
 };
 

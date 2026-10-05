@@ -171,7 +171,7 @@ const MACHINES = [
 // permanent tenth machine that answers `closed` for eleven months of the year. It is appended at render time
 // while the event is up and simply is not there when it is not — see the page, which answers halloweenOn on
 // the server so the floor paints with the right number of cabinets on the first frame.
-const GACHA_MACHINE = { id: "gacha", x: 86.7, label: "The Gachapon", kind: "Tokens", live: true };
+const GACHA_MACHINE = { id: "gacha", x: 86.7, label: "The Gachapon", kind: "Tokens", live: true, v: 2 };
 
 // Where the rope is: on the wall's SECOND arch, which lands at 11.8% of the world once both the world and
 // the wall tile are sized off --room (see .cas-world). Not a free choice — it is where an arch actually is.
@@ -546,6 +546,12 @@ export default function CasinoClient({ initial, halloween = false }) {
     const [at, setAt] = useState(null);          // the machine you are standing at
     // The board is a LOOK, not a room — it has no state of its own beyond being open.
     const [boardOpen, setBoardOpen] = useState(false);
+    // ⚠️ HELD SEPARATELY FROM `st`, AND THAT IS THE POINT. The floor polls and REPLACES st wholesale, so
+    // anything the page put in `initial` that the poll does not also return is wiped on the first tick —
+    // which is exactly what happened to the leader: the board painted him and then went blank a few seconds
+    // later. Putting him in the polled payload instead would mean a leaderboard query on every tick for a
+    // number that changes a few times a week.
+    const [boardTop] = useState(() => initial?.boardTop || null);
     const [bet, setBet] = useState(100);
     const [spin, setSpin] = useState(null);      // the last pull, for the reels and the callout
     const [busy, setBusy] = useState(false);
@@ -1748,7 +1754,18 @@ export default function CasinoClient({ initial, halloween = false }) {
                     }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/images/casino/wall-board.webp" alt="" draggable={false} />
-                    <span className="cas-board-tag">The Board</span>
+                    {/* ── WHOSE BOARD IT IS ───────────────────────────────────────────────────────
+                        Luke: "have the bumbet one dudes sprite in there."
+                        The slate was drawn blank so that something real could go on it, and the realest thing
+                        available is whoever is currently top of it. A hall of fame with nobody in it is a frame;
+                        with the leader's own hero standing in it, it is a thing you want off them. */}
+                    {boardTop?.sprite ? (
+                        <span className="cas-board-face">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={boardTop.sprite} alt="" draggable={false} />
+                        </span>
+                    ) : null}
+                    <span className="cas-board-tag">{boardTop?.name || "The Board"}</span>
                 </button>
 
                 <button type="button"
@@ -1835,7 +1852,12 @@ export default function CasinoClient({ initial, halloween = false }) {
                             to do it in — art costs money to get wrong, and the plan changed three times. */}
                         <span className="cas-mach-body">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={`/images/casino/${m.id}.webp`} alt="" draggable="false" />
+                            {/* ⚠️ `v` IS A CACHE BUST AND IT IS NOT OPTIONAL HERE. The gachapon cabinet shipped one
+                                release BEFORE its sprite did, so for a few hours this path was a real 404 — and a
+                                browser caches a 404 as happily as it caches an image. Everybody who opened the casino
+                                in that window keeps a broken picture until it expires, and deploying the file does not
+                                fix it. Same rule as a redrawn sprite: new bytes at an old path need a new path. */}
+                            <img src={`/images/casino/${m.id}.webp${m.v ? `?v=${m.v}` : ""}`} alt="" draggable="false" />
                         </span>
                         <b>{m.label}</b>
                         {/* Only when there is something to warn about. On a working machine this repeated

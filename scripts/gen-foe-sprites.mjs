@@ -72,6 +72,25 @@ const FOES = {
     hollow_archer: "A drifting spectral whisperer in grey court silks, hands weaving pale spell-light, mouth open in a soundless word",
     hollow_shieldbearer: "An empty suit of ornate gilded plate armour standing on its own, tower shield planted, cold blue light spilling from the visor",
     hollow_elite: "A court magister in rich violet and gold robes, spectral and half-transparent, arcane sigils burning in the air around raised hands",
+    // ── THE HALLOWE'EN PAIR, AND WHAT COMES AFTER THEM ───────────────────────────────────────────────
+    // Two skirmish factions that build toward one boss. They are a SEQUENCE, so they are drawn as one: the
+    // Husk Tide is the field itself getting up and walking, the Candle Wake is what the field was covering,
+    // and the Thresher is the thing both of them were heralding.
+    //
+    // ⚠️ KEPT AWAY FROM THE HOLLOW COURT, which is already candles and spectres and is the faction a
+    // Hallowe'en set is most likely to collide with. The Wake is EARTHY where the Court is courtly — grave
+    // soil, bell rope, coffin boards — so the two read as different events rather than one reskin.
+    husk_scrapper: "A shambling figure made of bound corn husks and twine with a sackcloth head, stitched eyes, straw spilling from its seams, arms hanging long",
+    husk_archer: "A gaunt scarecrow on a broken pole, one arm drawn back to fling a fistful of black thorns, a flock of crows bursting from its shoulders",
+    husk_shieldbearer: "A squat heavy golem built from stacked hay bales bound in rusted wire, baling hooks for hands, a cracked millstone strapped across its chest as a shield",
+    husk_elite: "A tall scarecrow priest in a tattered black cassock, a carved turnip lantern for a head burning low, a sickle in one hand and a censer of smoking chaff in the other",
+    husk_chieftain: "Old Mother Harvest — an enormous crooked scarecrow queen in layered sackcloth and dried wheat, a crown of bound corn dollies, long thorn-fingers spread wide",
+
+    wake_scrapper: "A grave-soiled corpse in a rotted burial shroud with a thick candle melted onto its skull, wax running down over its face, arms reaching",
+    wake_archer: "A hunched gravedigger skeleton flinging a handful of smouldering grave-ash, a lantern of greasy green flame hooked on its belt",
+    wake_shieldbearer: "A pair of heavy coffin boards strapped to a broad lumbering corpse as a shield, iron coffin nails driven through its forearms, head bowed under the weight",
+    wake_elite: "A towering veiled mourner in heavy black funeral weeds trailing long ragged bone-white gauze that billows outward, a wide mourning veil and tall collar framing an empty hood lit from within by a cold blue glow, arms spread wide, a brass grave-bell swinging from one hand and a pale guttering candle in the other, a ring of floating white grave-ribbons orbiting it",
+    wake_chieftain: "The Bellringer — a towering sexton in a mouldering greatcoat, an enormous cracked bronze grave-bell hung on its back, bell-rope coiled around one arm, lantern eyes",
     hollow_chieftain: "The Hollow Regent — a towering crowned spectre in ruined royal regalia on a throne of candles, sceptre raised, eyes two cold flames",
 };
 

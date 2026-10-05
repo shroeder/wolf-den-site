@@ -1,5 +1,6 @@
 import "server-only";
 
+import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { broadcastToEveryone } from "@/lib/push/broadcast.js";
@@ -13,6 +14,8 @@ import { getPetCombatBonus } from "@/lib/marketplace/pet-combat.js";
 import { hasPower } from "@/lib/marketplace/ascension-powers.js";
 import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { rollWeaponSkill } from "@/lib/marketplace/raid-skills.js";
+import { grantCandy } from "@/lib/marketplace/candy.js";
+import { rollTicket } from "@/lib/marketplace/gachapon.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { addChests } from "@/lib/marketplace/chests.js";
@@ -64,6 +67,44 @@ export const TOWN_EVENT_TYPES = {
     hollow_court: {
         name: "The Hollow Court", emoji: "🕯️", hp: 3200, enemies: 7, rewardGold: 3400, durationMin: 16, duelPower: 21,
         pushTitle: "🕯️ The Hollow Court is holding session in the plaza.", pushBody: "They are casting. Your element and your cooldowns decide this one.",
+    },
+    // ── THE HALLOWE'EN THREE ─────────────────────────────────────────────────────────────────────────
+    // Luke: "let's add 3 of theme. One thats a big old boss one, other two are the build up ones."
+    //
+    // They are a SEQUENCE and the tuning says so. The Husk Tide is the cheapest and the fastest — a lot of
+    // thin bodies, the lowest duelPower on the floor, the one a member two weeks old can help with. The
+    // Candle Wake is the hard skirmish: casters, long health pools, the raid where your element decides it.
+    // And the Thresher is what both of them were heralds of.
+    //
+    // ⚠️ `season: "halloween"` IS THE WHOLE GATE AND IT IS CHECKED IN pickSpawnKind, NOT HERE. A town raid is
+    // GLOBAL — it pushes every member's phone and fills the plaza — so these must not spawn while the event
+    // is only up for the owner. That is the one place in the game where halloweenOn(buyerId) is the WRONG
+    // question: there is no buyer, and a seasonal raid firing during a private preview would announce the
+    // whole event to the Den a month early.
+    husk_tide: {
+        name: "The Husk Tide", emoji: "🌾", season: "halloween",
+        hp: 2300, enemies: 11, rewardGold: 2300, durationMin: 12, duelPower: 13,
+        pushTitle: "🌾 The field got up and walked into the plaza.",
+        pushBody: "Husks, and a great many of them. They are not tough — there are just more than you think.",
+    },
+    candle_wake: {
+        name: "The Candle Wake", emoji: "🕯️", season: "halloween",
+        hp: 3100, enemies: 7, rewardGold: 3300, durationMin: 16, duelPower: 20,
+        pushTitle: "🕯️ Something came up out of the barrow and it is holding a wake.",
+        pushBody: "They are slow, they are heavy and they are carrying their own coffins. Bring something that cuts.",
+    },
+    // The second BOSS RAID. Same shape as the golem — one huge shared target, passive DPS for being in the
+    // square, timing strikes on top — because that is the property Luke wanted bosses to have: "bosses of
+    // raids should always include everyone." A seasonal boss that only the fastest tappers could contribute
+    // to would be the one raid of the year that most of the Den watched.
+    //
+    // 560,000 against the golem's 520,000: the same 5-10 people, 5-10 minutes window, nudged up because by
+    // the time this runs the Den has had a month of Hallowe'en gear out of the crypt and the gachapon.
+    the_thresher: {
+        name: "The Thresher", emoji: "🪓", season: "halloween", boss: true, siege: true,
+        hp: 560000, testHp: 56000, rewardGold: 4500, durationMin: 20,
+        pushTitle: "🪓 THE THRESHER IS STANDING IN THE PLAZA.",
+        pushBody: "It is the size of the Town Hall and it is holding a blade. Everybody out, all at once.",
     },
     // The golem is a BOSS RAID (not a skirmish): ONE huge shared boss everyone strikes together, its HP bar drains
     // for the whole pack, and killing it ENDS the raid. No per-hit rewards — only a rich completion reward.
@@ -553,7 +594,13 @@ export async function townEventsLive() {
 const BOSS_EVERY_DAYS = 7;
 
 async function pickSpawnKind() {
-    const kinds = Object.keys(TOWN_EVENT_TYPES);
+    // ⚠️ SEASONAL KINDS ARE OUT OF THE DRAW UNLESS THE SEASON IS PUBLIC. A raid is the loudest thing this
+    // game does — it pushes every phone and fills the plaza — so it is gated on HALLOWEEN_PUBLIC rather than
+    // on halloweenOn(buyer): there is no buyer here, and a Hallowe'en raid firing during the owner's private
+    // preview would announce the entire event to the Den weeks early. The flag is the same one that decides
+    // whether the plaza is dressed at all.
+    const inSeason = (k) => !TOWN_EVENT_TYPES[k].season || (TOWN_EVENT_TYPES[k].season === "halloween" && HALLOWEEN_PUBLIC);
+    const kinds = Object.keys(TOWN_EVENT_TYPES).filter(inSeason);
     const bosses = kinds.filter((k) => TOWN_EVENT_TYPES[k].boss);
     const ordinary = kinds.filter((k) => !TOWN_EVENT_TYPES[k].boss);
     if (bosses.length) {
@@ -703,6 +750,15 @@ async function resolveTownEvent(eventId, outcome) {
             // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and this runs per fighter.
             if (xp > 0) await awardXp(h.buyer_id, "boss_raid", { points: xp, gold: 0, dedupeKey: `boss_raid:${eventId}:${h.buyer_id}` }).catch(() => {});
             await addChests(h.buyer_id, { [chest]: 1 }, { source: "boss_raid" }).catch(() => {});
+            // ── ⚠️ THE ONE ACTIVITY THAT PAID NOTHING INTO THE EVENT ─────────────────────────────
+            // Candy and gachapon tokens were wired into boss strikes, dungeon clears, arena wins, chest
+            // opens, fishing, harvests, mining, cooking, trick-or-treat doors and SAILING raids — and not
+            // into town raids, which is the biggest single thing the Den does together. A member rallied
+            // into the plaza for a sixteen-minute fight during a Hallowe'en event and came away with less
+            // seasonal currency than one harvest. Both are gated on halloweenOn inside their own modules,
+            // so these two lines do nothing at all when the event is down.
+            await grantCandy(h.buyer_id, "town_raid").catch(() => {});
+            await rollTicket(h.buyer_id, "town_raid").catch(() => {});
             // Record WHAT they got, not just the gold — the end-of-raid recap itemises this, and without the xp
             // and chest stored there's nothing to show anyone who didn't land the killing blow.
             await db.query(
@@ -744,6 +800,9 @@ async function resolveTownEvent(eventId, outcome) {
             await logCoin(h.buyer_id, compGold, "raid_complete", { balanceAfter: paid?.gold, ref: String(eventId), meta: { waves, chieftainDown } }).catch(() => {});
         }
         if (compXp > 0) await awardXp(h.buyer_id, "raid_complete", { points: compXp, gold: 0, dedupeKey: `raid_complete:${eventId}:${h.buyer_id}` }).catch(() => {});
+        // Same two lines as the boss raid above, and for the same reason — see the note there.
+        await grantCandy(h.buyer_id, "town_raid").catch(() => {});
+        await rollTicket(h.buyer_id, "town_raid").catch(() => {});
         await db.query(
             `UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = COALESCE(reward_gold,0) + $3, reward_xp = COALESCE(reward_xp,0) + $4
               WHERE event_id = $1 AND buyer_id = $2`,

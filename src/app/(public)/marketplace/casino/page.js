@@ -7,6 +7,7 @@ import { blackjackState } from "@/lib/marketplace/blackjack.js";
 import { getCasinoState } from "@/lib/marketplace/casino.js";
 import { vipShadows, vipStanding } from "@/lib/marketplace/vip.js";
 import { halloweenOn } from "@/lib/marketplace/owner.js";
+import { leaderboard } from "@/lib/marketplace/casino-leaderboard.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -36,9 +37,16 @@ export default async function CasinoPage() {
     //
     // Caught by check:feel, which could not reach the lounge at all and said so instead of quietly passing.
     // That is the entire argument for the gate opening every room rather than the first one.
-    const [floor, table, hall, standing, shadows] = await Promise.all([
+    const [floor, table, hall, standing, shadows, board] = await Promise.all([
         getCasinoState(buyer.id), blackjackState(buyer.id), bingoState(),
         vipStanding(buyer.id), vipShadows(),
+        // Luke: "have the number one dude's sprite in there." Just the top row — the board on the wall needs a
+        // face and a name, and the full standings are already a fetch away behind the tap.
+        //
+        // RIDES THE EXISTING Promise.all RATHER THAN BEING AWAITED AFTER IT. Two more queries in parallel with
+        // five calls that were already in flight costs the room nothing; the same two awaited on their own line
+        // would add a whole round trip to every casino visit for a face on a wall.
+        leaderboard(buyer.id).catch(() => null),
     ]);
     // ── THE GACHAPON IS ONLY THERE WHILE THE EVENT IS ───────────────────────────────────────────────────
     // Luke: "Keep in mind this system is only on when the halloween event is on."
@@ -55,6 +63,7 @@ export default async function CasinoPage() {
         <CasinoClient initial={{
             ...floor, blackjack: table, bingo: hall,
             vip: { allowed: standing.vip, shadows },
+            boardTop: board?.top?.[0] || null,
         }} halloween={hw} />
     );
 }
