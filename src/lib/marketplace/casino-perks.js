@@ -170,7 +170,7 @@ export async function casinoStatBonus(buyerId) {
 /**
  * Buy one level of a perk. Returns the new level, or null if the chips could not be taken.
  *
- * THE PRICE IS READ FROM THE ROW, NOT FROM THE CALLER. `buyWithChips` quotes a price to the screen and this
+ * THE PRICE IS READ FROM THE ROW, NOT FROM THE CALLER. `buyFromCounter` quotes a price to the screen and this
  * charges one; both compute it from the same function given the same level, which is the only arrangement
  * where the two cannot disagree. See the note in chip-store.js.
  */

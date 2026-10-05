@@ -157,7 +157,7 @@ export async function maybeGrantFishingPet(buyerId, fishRarity = "common") {
 // and 1 in 5,556. Luke: "we don't do bolt-on rolls like this." The table agreed with him before he said it —
 // 145 recorded plays and not one of the five had ever dropped for anybody.
 //
-// They are 50,000 chips each on the Counter now (CHIP_STORE in chips.js), and they keep their casinoPerk, so
+// They are 50,000 chips each on the Counter now (COUNTER_STORE in chips.js), and they keep their casinoPerk, so
 // buying one still buys a slightly kinder floor. Deleted rather than stubbed: a function that returns null for
 // ever is a trap for whoever next goes looking for where casino pets come from.
 //

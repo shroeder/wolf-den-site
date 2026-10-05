@@ -7,7 +7,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // winnings), so a chip would be a currency with nothing to spend it on. Same function shape, same ledger
 // table, gold instead. See casino-bank.js.
 import { coinBalance, moveCoin, recordWon } from "@/lib/marketplace/casino-bank.js";
-import { chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { payoutFor } from "@/lib/marketplace/casino-payout.js";
 import { slot5, playSpin, FREE_SPIN_OFFERS, LINES, COLOSSAL_ROWS, COLOSSAL_TOTAL_LINES } from "@/lib/marketplace/casino-slot5.js";
 import { MIN_BET, MAX_BET, tickCasinoQuests } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -152,7 +152,7 @@ async function warrenArt() {
 
 // ── THE WIN IT AGAIN METER ───────────────────────────────────────────────────────────────────────────────────
 // The Vault remembers its last few wins and pays the lot back when a spin tumbles three times in a row. Held
-// in mkt_casino_meter.recent (mig401) as MULTIPLES OF THE BET, never chips: a meter filled at 25 a spin and
+// in mkt_casino_meter.recent (mig401) as MULTIPLES OF THE BET, never gold: a meter filled at 25 a spin and
 // emptied at 2,500 would hand somebody a number nobody won.
 //
 // Read before the spin and written after, in one place, so there is no path where a spin pays out of the
@@ -195,7 +195,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     // A spin costs GOLD. moveCoin carries the conditional debit and writes its own ledger row, so this is
     // the whole of taking a stake — see the note in chips.js about why the cage moved to the front.
     const bank = await moveCoin(buyerId, -stake, "casino_slot5_bet", { meta: { bet: stake, machine: m.id } });
-    if (bank == null) return { ok: false, error: "no_chips" };
+    if (bank == null) return { ok: false, error: "not_enough_gold" };
 
     // The force is read from the request but only honoured for the owner — a POST body is something anybody
     // can write, and "the button is hidden" is not a permission check.
@@ -211,7 +211,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     // only here. Rounding once on the total rather than per win matters: three lines paying 0.4 chips each
     // round to zero individually and to one together, and a machine that pays nothing for a three-line win
     // is a machine somebody will rightly call broken.
-    const won = chipsFor(stake, r.total / stake);
+    const won = payoutFor(stake, r.total / stake);
     // ── AND WHERE EVERY ONE OF THOSE CHIPS CAME FROM ─────────────────────────────────────────────────────
     // The ledger used to record the payout and three of the eight places it could have come from, so "was
     // that a payline or a bonus" had no answer for most wins — see the header of casino-win-source.js. The
@@ -235,9 +235,9 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     // ⚠️ AND THE TWO BALANCES ARE NEVER ADDED. `bank` is chips after the stake; `won` is tokens. They are
     // different quantities that happen to share a scale, which is exactly the trap casino-report.js was
     // rewritten to get out of — read its header before writing anything that puts them in one number.
-    let tokens = null;
+    let after = null;
     if (won > 0) {
-        tokens = await moveCoin(buyerId, won, want ? "slot5_forced" : "slot5", {
+        after = await moveCoin(buyerId, won, want ? "slot5_forced" : "slot5", {
             ref: m.id,
             meta: { bet: stake, machine: m.id, forced: Boolean(want), from },
         });
@@ -273,7 +273,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     await tickCasinoQuests(buyerId, "slot5", won);
     await trackActivity(buyerId, "casino_play", {
         game: "slot5", machine: m.id, bet: stake,
-        wonChips: won, multiple: Number((r.total / stake).toFixed(3)),
+        wonGold: won, multiple: Number((r.total / stake).toFixed(3)),
         features, forced: Boolean(want), from,
     }).catch(() => {});
     // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and nothing
@@ -286,8 +286,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         // ⚠️ `chips` NO LONGER GOES UP. It is the fuel left after the stake and nothing this spin did can
         // raise it; a win lands in `tokens`. The screen shows both, and the purse at the top of the floor
         // is the CHIP one — that is the number a player is spending.
-        chips: bank ?? await coinBalance(buyerId),
-        tokens: tokens ?? await coinBalance(buyerId),
+        gold: after ?? bank ?? await coinBalance(buyerId),
         // The balance the instant the stake left, before a single reel has stopped. Kept even though
         // `chips` is now the same number: the client reads it, and a spin that pays nothing and a spin
         // whose reveal has not finished are still two different states to it.
@@ -315,7 +314,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // as `next` does: on an ORDINARY spin it is the row as it now stands, i.e. the one carrying this
             // spin's fresh entry, so leaving the bonus in here would leak it just as loudly.
             recent: (r.winAgain ? r.winAgain.row : hideBonus(r.meter || []))
-                .map((v) => (v > 0 ? chipsFor(stake, v) : 0)),
+                .map((v) => (v > 0 ? payoutFor(stake, v) : 0)),
             // ── AND WHAT THE ROW LOOKS LIKE ONCE THE DUST SETTLES ───────────────────────────────
             // `recent` on a firing spin is the row that was PAID, because the animation lights those
             // slots before it empties them — so the row the fire leaves behind was never sent, and the
@@ -333,17 +332,17 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // adds it to the first slot when the Gem Vault closes, which is also the better moment for it:
             // the bonus you just played visibly lands in the meter instead of having been there all along.
             // The row SAVED above is the full one, so a reload mid-bonus settles on the right number.
-            next: hideBonus(r.meter || []).map((v) => (v > 0 ? chipsFor(stake, v) : 0)),
-            topUp: r.meterBonus > 0 ? chipsFor(stake, r.meterBonus) : 0,
+            next: hideBonus(r.meter || []).map((v) => (v > 0 ? payoutFor(stake, v) : 0)),
+            topUp: r.meterBonus > 0 ? payoutFor(stake, r.meterBonus) : 0,
             cleared: Boolean(r.winAgain),
-            fired: r.winAgain ? { total: chipsFor(stake, r.winAgain.paid), cascades: r.winAgain.cascades } : null,
+            fired: r.winAgain ? { total: payoutFor(stake, r.winAgain.paid), cascades: r.winAgain.cascades } : null,
         } : null,
         // ── THE GEM VAULT ────────────────────────────────────────────────────────────────────────────
         // The whole board and the order it comes out in. The screen maps the tile a finger landed on to the
         // next stone in that order — see runGems for why that is the honest way round.
         gems: r.gems ? {
             order: r.gems.order, board: r.gems.board, won: r.gems.won, sets: r.gems.sets, tiles: r.gems.tiles,
-            total: chipsFor(stake, r.gems.total / stake),
+            total: payoutFor(stake, r.gems.total / stake),
         } : null,
         // ── THE TUMBLE ───────────────────────────────────────────────────────────────────────────────
         // A cascading machine sends the WHOLE chain: every grid, which cells broke, the multiplier at that
@@ -370,8 +369,8 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                         grid: st.grid,
                         broken: st.broken,
                         mult: st.mult,
-                        chips: chipsFor(stake, run / stake),
-                        wins: st.wins.map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
+                        gold: payoutFor(stake, run / stake),
+                        wins: st.wins.map((w) => ({ ...w, gold: payoutFor(stake, w.amount / stake) })),
                     };
                 });
             })(),
@@ -390,7 +389,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         // written twice — and the copy rounded per line instead of once, so a three-doubloon line printed
         // "0 chips" under a line it had just drawn across the grid. Converted here, by the same function
         // that pays the total, and the client only renders the number.
-        lines: r.base.wins.filter((w) => w.kind === "line").map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
+        lines: r.base.wins.filter((w) => w.kind === "line").map((w) => ({ ...w, gold: payoutFor(stake, w.amount / stake) })),
         scatters: r.base.scatters,
         scatterWin: r.base.wins.find((w) => w.kind === "scatter") || null,
         // ── THE FREE ROUND, SPIN BY SPIN ─────────────────────────────────────────────────────────────
@@ -407,7 +406,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         // by a scatter count. Everything is converted to chips here, like every other payout in this file.
         colossal: r.colossal ? (() => {
             const c = r.colossal;
-            const toChips = (list) => list.map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) }));
+            const toChips = (list) => list.map((w) => ({ ...w, gold: payoutFor(stake, w.amount / stake) }));
             const spinOf = (x) => ({
                 main: x.main, col: x.col, sent: x.sent, giants: x.giants,
                 mainWins: toChips(x.mainWins), colWins: toChips(x.colWins),
@@ -415,7 +414,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                 // screen can draw the reel honestly rather than inferring a multiplier from the payout.
                 reelMult: x.reelMult, applied: x.applied,
                 scatters: x.scatters,
-                chips: chipsFor(stake, x.total / stake),
+                gold: payoutFor(stake, x.total / stake),
                 multiple: x.total / stake,
             });
             return {
@@ -429,7 +428,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                     label: r.free.label,
                     base: r.free.base,
                     scatters: r.free.scatters,
-                    chips: chipsFor(stake, r.free.total / stake),
+                    gold: payoutFor(stake, r.free.total / stake),
                     spins: r.free.spins.map(spinOf),
                 } : null,
             };
@@ -468,9 +467,9 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                 grid: sp.grid,
                 wins: sp.wins
                     .filter((w) => w.kind === "line")
-                    .map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
+                    .map((w) => ({ ...w, gold: payoutFor(stake, w.amount / stake) })),
                 scatterWin: sp.wins.find((w) => w.kind === "scatter") || null,
-                chips: chipsFor(stake, sp.total / stake),
+                gold: payoutFor(stake, sp.total / stake),
                 // What this one spin paid as a multiple of the bet, so the screen knows when a single free
                 // spin deserves the horns rather than a coin rattle.
                 multiple: sp.total / stake,
@@ -487,8 +486,8 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                             run += st.paid;
                             return {
                                 grid: st.grid, broken: st.broken, mult: st.mult,
-                                chips: chipsFor(stake, run / stake),
-                                wins: st.wins.map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
+                                gold: payoutFor(stake, run / stake),
+                                wins: st.wins.map((w) => ({ ...w, gold: payoutFor(stake, w.amount / stake) })),
                             };
                         });
                     })(),
@@ -513,7 +512,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                 pearls: sp.pearls || [],
             })),
             total: r.free.total,
-            chips: chipsFor(stake, r.free.total / stake),
+            gold: payoutFor(stake, r.free.total / stake),
         } : null,
         // ── THE WARREN ───────────────────────────────────────────────────────────────────────────────
         // Every stage, every burrow, every critter, resolved before the first tap — the screen reveals, it
@@ -537,20 +536,20 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                 name: st.name,
                 room: st.stage + 1,
                 geode: st.geode != null
-                    ? chipsFor(stake, (st.geode * (stake / LINES.length)) / stake)
+                    ? payoutFor(stake, (st.geode * (stake / LINES.length)) / stake)
                     : null,
                 opened: st.opened.map((n) => (n.kind === "pups"
-                    ? { kind: "pups", pups: n.pups.map((v) => chipsFor(stake, (v * (stake / LINES.length)) / stake)) }
+                    ? { kind: "pups", pups: n.pups.map((v) => payoutFor(stake, (v * (stake / LINES.length)) / stake)) }
                     : { kind: n.kind })),
                 // ── AND WHAT THE WALL STILL HELD ─────────────────────────────────────────────────
                 // Only on the visit the Mother ended, because that is the only one with anything left
                 // to say. Converted the same way as `opened` — the screen must never do arithmetic on
                 // a payout, and a number shown in different units from the one beside it is a lie.
                 rest: st.rest ? st.rest.map((n) => (n.kind === "pups"
-                    ? { kind: "pups", pups: n.pups.map((v) => chipsFor(stake, (v * (stake / LINES.length)) / stake)) }
+                    ? { kind: "pups", pups: n.pups.map((v) => payoutFor(stake, (v * (stake / LINES.length)) / stake)) }
                     : { kind: n.kind })) : null,
             })),
-            chips: chipsFor(stake, r.warren.total / stake),
+            gold: payoutFor(stake, r.warren.total / stake),
             art: await warrenArt(),
         } : null,
 
@@ -568,9 +567,9 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                 grid: sp.grid,
                 wins: sp.wins
                     .filter((w) => w.kind === "line")
-                    .map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
+                    .map((w) => ({ ...w, gold: payoutFor(stake, w.amount / stake) })),
                 scatterWin: sp.wins.find((w) => w.kind === "scatter") || null,
-                chips: chipsFor(stake, sp.total / stake),
+                gold: payoutFor(stake, sp.total / stake),
                 multiple: sp.total / stake,
                 // Cells already locked when this spin started, and the ones that clamp shut on it.
                 held: sp.held || [],
@@ -578,13 +577,12 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                 retrigger: sp.retrigger || null,
             })),
             total: r.locked.total,
-            chips: chipsFor(stake, r.locked.total / stake),
+            gold: payoutFor(stake, r.locked.total / stake),
         } : null,
         // In chips, which is the only number on this screen a member should have to hold in their head.
-        wonChips: won,
+        wonGold: won,
         // And the multiple, for the "big win" threshold — see the note on celebration below.
         multiple: r.total / stake,
-        rate: CHIP_RATE,
         lineCount: LINES.length,
     };
 }

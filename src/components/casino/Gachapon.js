@@ -198,7 +198,7 @@ export default function Gachapon({ onClose }) {
         <div className="gx-wrap" role="dialog" aria-label="The Hallowe'en Gachapon">
             <div className="gx-head">
                 <b>The Hallowe&apos;en Gachapon</b>
-                <span className="gx-tokens">{tickets} {tickets === 1 ? "ticket" : "tickets"}</span>
+                <span className="gx-tickets">{tickets} {tickets === 1 ? "ticket" : "tickets"}</span>
                 <button type="button" className="gx-x" onClick={onClose} aria-label="Step away">✕</button>
             </div>
 
@@ -343,7 +343,7 @@ const CSS = `
 .gx-wrap { position: relative; display: flex; flex-direction: column; gap: 10px; color: #f0e6d6; }
 .gx-head { display: flex; align-items: center; gap: 8px; }
 .gx-head b { flex: 1; font-size: 1rem; color: #ffd98a; }
-.gx-tokens { font-size: 0.78rem; font-weight: 900; color: #2a1403; white-space: nowrap;
+.gx-tickets { font-size: 0.78rem; font-weight: 900; color: #2a1403; white-space: nowrap;
     background: linear-gradient(180deg, #ffcf6a, #e89a1c); border-radius: 999px; padding: 3px 11px; }
 .gx-x { width: 28px; height: 28px; border-radius: 999px; background: rgba(255,255,255,0.08); border: none;
     color: #e8e2d6; font-size: 14px; cursor: pointer; }

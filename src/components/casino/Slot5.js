@@ -162,7 +162,7 @@ const RUN_CELLS = 6;
 // the note in measureBrake for why this is above 1.
 const BRAKE = 1.45;
 
-export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], owner, art, busy }) {
+export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, gold, bet, onBet, stakes = [25, 100, 500, 2500], owner, art, busy }) {
     const [grid, setGrid] = useState(null);        // what is on screen now
     const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);       // how many reels have come to rest
@@ -223,7 +223,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
     const [meterFire, setMeterFire] = useState(null);
     // ── THE ROW ONLY MOVES WHEN THE SPIN IS OVER ─────────────────────────────────────────────────────
     // Luke: "what the heck is Win It Again tracking — I'd expect 21 to have been pushed into the top left
-    // box." He was watching a cascade two breaks in with 21 chips on the counter, and the row already read
+    // box." He was watching a cascade two breaks in with 21 gold on the counter, and the row already read
     // 82 in slot one: the spin's FINAL reel total, printed before the reels had finished paying it.
     //
     // Same leak as the gem bonus had. The server settles the whole spin the instant you press the button,
@@ -273,7 +273,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
         : null;
     useEffect(() => { Cas.music(musicBed); }, [musicBed]);
     useEffect(() => () => Cas.music(null), []);
-    const [freeWon, setFreeWon] = useState(0);     // chips taken so far in the round
+    const [freeWon, setFreeWon] = useState(0);     // gold taken so far in the round
     // Whichever win list is currently being drawn — the base spin's, or the free spin on screen. `lit` reads
     // this rather than the base result, which is what lets a free spin light its own lines.
     const [activeWins, setActiveWins] = useState([]);
@@ -343,12 +343,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
     // the balance and do the arithmetic yourself. A control that is live and does nothing is worse than one
     // that is plainly off — the second tells you something, the first reads as a broken machine.
     // ── AFFORDABILITY IS A CHIP QUESTION ─────────────────────────────────────────────────────────────────
-    // This read GOLD, and the machine charges CHIPS. On a chips-only floor that is not a cosmetic mismatch:
+    // This read GOLD, and the machine charges CHIPS. On a gold-only floor that is not a cosmetic mismatch:
     // `locked` includes `broke`, so the spin button went disabled and said NOT ENOUGH to anybody whose gold
-    // had run down, no matter how many chips they were holding. Brecken22 was sitting on 4,114 chips and 92
+    // had run down, no matter how many gold they were holding. Brecken22 was sitting on 4,114 gold and 92
     // gold — the floor's heaviest player that day, locked out of every machine on it.
     // The number the button asks about must be the number the server subtracts.
-    const broke = Number(chips ?? 0) < Number(bet ?? 0);
+    const broke = Number(gold ?? 0) < Number(bet ?? 0);
     // ── AND NOT WHILE ANYTHING IS STILL PLAYING ──────────────────────────────────────────────────────────
     // Luke: "You shouldn't be able to spin while it's spinning or counting up after the spin."
     //
@@ -373,18 +373,18 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
     // ── BEING BROKE MUST NOT FREEZE THE STAKE ROW ────────────────────────────────────────────────────────
     // This has now been the same bug twice, in two different controls, for the same reason.
     //
-    // It was the - and + stepper: `locked` disabled them as well as SPIN, so a player short of chips could
+    // It was the - and + stepper: `locked` disabled them as well as SPIN, so a player short of gold could
     // not step DOWN to a stake they COULD afford — while the message directly above the panel said "or step
     // the bet down". Then the stepper was replaced by the four stake buttons, the new buttons were wired to
     // `locked` because that is what the old ones used, and the fix went with the control it was written for.
     //
-    // Luke, on The Deep, holding 443 chips with the bet on 500: "cant change selection." Every stake in the
+    // Luke, on The Deep, holding 443 gold with the bet on 500: "cant change selection." Every stake in the
     // row was dead — including the 25 and the 100 he could pay for — because he could not afford the one that
     // happened to be selected. The machine's own advice, printed two lines above the row, was impossible to
     // take, and the only way out was to leave the cabinet.
     //
     // The row is the way OUT of being broke, so it can only ever be closed by the machine being busy. Each
-    // button still checks its OWN price (`chips < v`), which is the check that belongs on a stake.
+    // button still checks its OWN price (`gold < v`), which is the check that belongs on a stake.
     //
     // ⚠️ THERE ARE TWO OF THESE ROWS — the panel's and the Colossal Reels layout's — and they are separate
     // JSX. Fixing the one you are looking at is how this survived the first repair; both are changed here.
@@ -398,7 +398,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
     // tally — so the only thing to do with a good win was sit and watch it be counted at you.
     //
     // It ends the count, it does NOT spin. A press meant as "hurry up" must never be the press that stakes
-    // the next hundred chips: the two are a fifth of a second apart and one of them costs money. Skipping
+    // the next hundred gold: the two are a fifth of a second apart and one of them costs money. Skipping
     // reaches `atRest` by the ordinary route, so the balance still settles through onSettled and the next
     // press is an ordinary spin.
     const canSkip = counting && !spinning && !busy;
@@ -692,11 +692,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
         setBreaking([]);
         // A RUNNING TOTAL, SET NOT ADDED. Each step carries what the whole spin is worth so far (see the
         // note on the server side), so adding them would count every break as many times as breaks remain.
-        setChainWon(st.chips);
+        setChainWon(st.gold);
 
         // ── AND IT ACCELERATES ───────────────────────────────────────────────────────────────────────
         // The first version held every break for 920ms and the chain read as a slideshow: a line lit, sat
-        // there for two-thirds of a second saying "4 Syrup Cake — 2 chips", and only then broke. Nobody
+        // there for two-thirds of a second saying "4 Syrup Cake — 2 gold", and only then broke. Nobody
         // reads that line. They are watching the multiplier.
         //
         // Real cascade cabinets SPEED UP as the chain deepens, and it is the single cheapest piece of drama
@@ -864,12 +864,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
         // What happens once this spin has finished playing: credit it, sound it, and — if it bought more
         // spins — stop and SAY SO before moving on.
         const settle = () => {
-            if (sp.chips > 0) {
-                setFreeWon((n) => n + sp.chips);
+            if (sp.gold > 0) {
+                setFreeWon((n) => n + sp.gold);
                 // A big one inside the round gets the horns, the same as it would in the base game. A
                 // round where every spin sounds identical is a round with no shape to it.
                 if (sp.multiple >= BIG_WIN_AT) { Cas.jackpot(); Haptic.crit(); }
-                else { Cas.coins(Math.min(1, sp.chips / 400)); Haptic.hit(0.35); }
+                else { Cas.coins(Math.min(1, sp.gold / 400)); Haptic.hit(0.35); }
             }
             // ── AND MORE SPINS, IF IT BOUGHT THEM ────────────────────────────────────────────────────
             // Luke, on the free round arriving with no fanfare: "I didn't even know that I got the free
@@ -984,7 +984,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
     const isColossal = useMemo(() => Boolean(slot5(machineId).colossal), [machineId]);
     useEffect(() => {
         if (isColossal) return undefined;
-        if (phase !== "done" || !(Number(result?.wonChips || 0) > 0)) return undefined;
+        if (phase !== "done" || !(Number(result?.wonGold || 0) > 0)) return undefined;
         setCelebrating(true);
         const t = setTimeout(() => setCelebrating(false), holdCeiling(result?.multiple || 0));
         return () => clearTimeout(t);
@@ -1005,7 +1005,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
         if (showLine < 0 || !activeWins.length) return null;
         const w = activeWins[showLine];
         if (!w) return null;
-        return { line: lines[w.line], count: w.count, symbol: w.symbol, chips: w.chips };
+        return { line: lines[w.line], count: w.count, symbol: w.symbol, gold: w.gold };
     }, [showLine, activeWins, lines]);
 
     // ── THE BONUS TAKES THE WHOLE BOARD ──────────────────────────────────────────────────────────────────
@@ -1071,14 +1071,14 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                     style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)`,
                         "--room": `url(/images/casino/room/${machineId}.webp)` }}>
                     <ColossalReels machineId={machineId} art={art} bet={bet} data={result?.colossal}
-                        chips={chips}
+                        gold={gold}
                         playing={Boolean(result?.colossal)} pressed={phase === "spin"}
                         onReadout={setColReadout} onDone={() => setPhase("done")} />
                 </div>
 
-                {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
+                {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} onClose={() => setPays(false)} /> : null}
 
-                {/* NO SEPARATE READOUT. Balance and chips moved onto the cabinet's own ribbon — they were
+                {/* NO SEPARATE READOUT. Balance and gold moved onto the cabinet's own ribbon — they were
                     a two-column panel of their own under the machine, which is 86px spent on two numbers
                     you glance at. What is left below the glass is the one control anybody presses. */}
                 {/* ── PAYS IS A BUTTON IN THE ROW, NOT A STICKER ON THE GLASS ──────────────────────────
@@ -1110,9 +1110,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                                         : "Won"}</i>
                                     {/* WinTally renders its own <b>, so it is dropped in rather than wrapped. */}
                                     {colReadout.kind === "paid"
-                                        ? <WinTally key={colReadout.k} chips={colReadout.chips}
+                                        ? <WinTally key={colReadout.k} gold={colReadout.gold}
                                             multiple={colReadout.multiple} tone={symbolTone(slot5(machineId).wild, machineId)} />
-                                        : <b>{(colReadout.chips || 0).toLocaleString()}</b>}
+                                        : <b>{(colReadout.gold || 0).toLocaleString()}</b>}
                                 </span>
                             ) : null}
                         </span>
@@ -1120,8 +1120,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                             {stakes.map((v) => (
                                 <button key={v} type="button"
                                     className={`s5-stake${v === bet ? " is-on" : ""}`}
-                                    disabled={playing || Number(chips ?? 0) < v}
-                                    onClick={() => { onBet?.(v); Cas.chips(); pull(null, v); }}>
+                                    disabled={playing || Number(gold ?? 0) < v}
+                                    onClick={() => { onBet?.(v); Cas.bet(); pull(null, v); }}>
                                     {v.toLocaleString()}
                                 </button>
                             ))}
@@ -1176,7 +1176,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                     firing={meterFire}
                     onFired={() => { setMeterFire(null); const go = afterMeter.current; afterMeter.current = null; go?.(); }} />
             ) : null}
-            {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
+            {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} onClose={() => setPays(false)} /> : null}
             {/* ── THE GRID ────────────────────────────────────────────────────────────────────────────── */}
             {/* ── A MACHINE, NOT A GRID ON A PAGE ─────────────────────────────────────────────────────
                 Luke: "setting the slot machine screen apart from the background." It was a dark grid on a
@@ -1430,7 +1430,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                         background image, all of it `white-space: nowrap` inside a bar that is
                         `overflow: hidden`. So none of it wraps and none of it shrinks — it simply grows
                         past the edge of the picture it is supposed to be sitting in and then gets sliced
-                        off by the bar. `x12` already overflows the disc, and this round pays in chips off
+                        off by the bar. `x12` already overflows the disc, and this round pays in gold off
                         a 2,500 stake, so "THIS ROUND" reaches six and seven figures on a real bonus.
 
                         Nothing here can be solved by picking a smaller size, because the whole range from
@@ -1560,7 +1560,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                             </>);
                         })()}
                         {tallyGrew > 0 ? <span><i>Retriggered</i><b>+{tallyGrew}</b></span> : null}
-                        <span><i>Best spin</i><b>{Math.max(0, ...result[round].spins.map((x) => x.chips || 0)).toLocaleString()}</b></span>
+                        <span><i>Best spin</i><b>{Math.max(0, ...result[round].spins.map((x) => x.gold || 0)).toLocaleString()}</b></span>
                     </div>
                     <button type="button" className="s5-go" onClick={() => setPhase(result.hold ? "pick" : result.warren ? "warren" : "done")}>Collect</button>
                 </div>
@@ -1569,18 +1569,18 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
             {/* ── A BIG ONE TAKES THE CABINET ─────────────────────────────────────────────────────────
                 Luke: "add a splash screen that says big win", and coins with it. Ten times the stake and
                 up, on every machine on the floor — see WinTally for what the tiers are and why the count
-                is timed off the multiple rather than off the chips. Inside `.s5-cab` on purpose: the same
+                is timed off the multiple rather than off the gold. Inside `.s5-cab` on purpose: the same
                 rule the tumble bar and the shout already follow, so it covers the glass rather than
                 shoving the panel down the page. */}
-            {phase === "done" && celebrating && result?.wonChips && isBigWin(result.multiple) ? (
-                <WinTally key={`b${result.id || result.wonChips}`} chips={result.wonChips}
+            {phase === "done" && celebrating && result?.wonGold && isBigWin(result.multiple) ? (
+                <WinTally key={`b${result.id || result.wonGold}`} gold={result.wonGold}
                     multiple={result.multiple || 0} tone={symbolTone(slot5(machineId).wild, machineId)}
                     onDone={() => setCelebrating(false)} />
             ) : null}
             </div>
 
             {/* ── WHAT JUST HAPPENED ──────────────────────────────────────────────────────────────────── */}
-            {/* NOT UNTIL THE WHOLE SPIN HAS FINISHED PLAYING. `wonChips` is the total including the free
+            {/* NOT UNTIL THE WHOLE SPIN HAS FINISHED PLAYING. `wonGold` is the total including the free
                 round and the pick, so showing it the moment the reels stopped printed the answer above a
                 bonus round that had not been watched yet — the ten spins would then run with their own
                 outcome already on screen. It waits for "done".
@@ -1589,9 +1589,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                 expression position is a parse error, and it is one this file has already made once. */}
             <div className="s5-say">
                 {phase === "spin" ? <span className="s5-dim">…</span>
-                    : lit ? <span><b>{lit.count}</b> {symbolName(lit.symbol, machineId)} — <b>{lit.chips.toLocaleString()}</b> tokens</span>
-                    : result?.wonChips && phase === "done" && !isBigWin(result.multiple)
-                        ? <WinTally key={`w${result.id || result.wonChips}`} chips={result.wonChips}
+                    : lit ? <span><b>{lit.count}</b> {symbolName(lit.symbol, machineId)} — <b>{lit.gold.toLocaleString()}</b> tokens</span>
+                    : result?.wonGold && phase === "done" && !isBigWin(result.multiple)
+                        ? <WinTally key={`w${result.id || result.wonGold}`} gold={result.wonGold}
                             multiple={result.multiple || 0} tone={symbolTone(slot5(machineId).wild, machineId)}
                             onDone={() => setCelebrating(false)} />
                     : result && phase === "done" ? <span className="s5-dim">No line this time.</span>
@@ -1631,7 +1631,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                 either lower the bet or go and earn, and both need the size of the gap. */}
             {broke ? (
                 <p className="s5-short">
-                    {(Number(bet) - Number(chips ?? 0)).toLocaleString()} more gold for a {Number(bet).toLocaleString()} spin
+                    {(Number(bet) - Number(gold ?? 0)).toLocaleString()} more gold for a {Number(bet).toLocaleString()} spin
                     {bet > (stakes[0] ?? 0) ? <> — or step the bet down</> : null}
                 </p>
             ) : null}
@@ -1653,12 +1653,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
             {/* ── ONE NUMBER, AND IT IS THE ONE THE MACHINE SPENDS ────────────────────────────────────
                 Luke: "balance still showing coin for many slots when it isnt relevant."
                 This was two cells, Balance and Chips, and Balance was GOLD — which the floor stopped taking
-                when every machine moved to chips. A second figure beside the one that matters is not extra
+                when every machine moved to gold. A second figure beside the one that matters is not extra
                 information, it is a question about which of them the bet comes out of, asked on every spin.
                 BET IS STILL NOT HERE: the stepper below prints it, larger, next to the controls that change
                 it, and the same number twice on one screen is one of them being ignored. */}
             <div className="s5-readout is-one">
-                <span className="s5-ro-chips"><i>Gold</i><b>{Number(chips || 0).toLocaleString()}</b></span>
+                <span className="s5-ro-gold"><i>Gold</i><b>{Number(gold || 0).toLocaleString()}</b></span>
             </div>
 
             <div className="s5-panel">
@@ -1680,8 +1680,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                     {stakes.map((v) => (
                         <button key={v} type="button"
                             className={`s5-stake${v === bet ? " is-on" : ""}`}
-                            disabled={playing || Number(chips ?? 0) < v}
-                            onClick={() => { onBet?.(v); Cas.chips(); pull(null, v); }}>
+                            disabled={playing || Number(gold ?? 0) < v}
+                            onClick={() => { onBet?.(v); Cas.bet(); pull(null, v); }}>
                             {v.toLocaleString()}
                         </button>
                     ))}

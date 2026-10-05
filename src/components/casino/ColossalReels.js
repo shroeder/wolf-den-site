@@ -600,7 +600,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
             {/* A big one takes the whole cabinet — title, coins, and a number climbing at the size it is
                 worth. See WinTally for what "big" means and why it is read off the multiple. */}
             {paid && isBigWin(paid.multiple) ? (
-                <WinTally key={paid.k} chips={paid.chips} multiple={paid.multiple} tone={symbolTone(m.wild, machineId)} />
+                <WinTally key={paid.k} gold={paid.chips} multiple={paid.multiple} tone={symbolTone(m.wild, machineId)} />
             ) : null}
 
             {/* Three moons between the two boards, and what they bought. */}
@@ -631,7 +631,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
                         and WinTally would draw its full-screen splash inside the recap. The round gets a
                         longer count than a spin would because it is a bigger number and the whole point of
                         the screen is watching it arrive. */}
-                    <span className="s5-tally-n"><WinTally chips={tally.total} multiple={0} ms={1700}
+                    <span className="s5-tally-n"><WinTally gold={tally.total} multiple={0} ms={1700}
                         tone={symbolTone(m.wild, machineId)} /></span>
                     <span className="s5-tally-sub">gold</span>
                     <div className="s5-tally-rows">

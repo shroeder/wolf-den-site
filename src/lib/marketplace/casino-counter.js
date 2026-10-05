@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { CHIP_RATE, chipsFor } from "@/lib/marketplace/chip-rate.js";
+import { payoutFor } from "@/lib/marketplace/casino-payout.js";
 import { STAT_TRACKS, STAT_STEP, UNLOCKS, statCost } from "@/lib/marketplace/casino-perks.js";
 import { GEM_KINDS, GEM_TIERS, gemId } from "@/lib/marketplace/gems.js";
 
@@ -31,7 +31,6 @@ const VIP_GEMS = GEM_KINDS.map((k) => ({
 // function, and the two things that most need them are not the server: the SCREEN, which has to be able to
 // say what a paytable multiple is worth in the currency it will actually be paid in, and the GATES, which
 // are plain node scripts and were dying on `server-only` for the sake of one number. See the note there.
-export { CHIP_RATE, chipsFor } from "@/lib/marketplace/chip-rate.js";
 
 // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────────────
 // Priced against the rate above, and REPRICED WITH IT: when the rate went 0.08 -> 0.25 every price here was
@@ -44,7 +43,7 @@ export { CHIP_RATE, chipsFor } from "@/lib/marketplace/chip-rate.js";
 //
 // `once` items are bought a single time ever and the partial unique index in the migration enforces it
 // server-side; the shelf only hides them.
-export const CHIP_STORE = [
+export const COUNTER_STORE = [
     // ── EVERY REF ON THIS SHELF IS A REAL CATALOG ID ─────────────────────────────────────────────────────
     // The first cut of this list invented all of them — `casino_neon`, `lucky_cat`, `tonic` — and every one
     // would have taken the chips, written an unlock row and delivered nothing, because no catalog has an
@@ -98,7 +97,7 @@ export const CHIP_STORE = [
 // Luke: "a VIP only vendor next to the bartender — he has a secret list of things that you can only get from
 // him if you're in the VIP room, that you spend your chips to get, like maybe two or three unique pets."
 //
-// The SAME shelf machinery, with a flag. `vip: true` items are refused by buyWithChips unless the buyer has
+// The SAME shelf machinery, with a flag. `vip: true` items are refused by buyFromCounter unless the buyer has
 // VIP standing at the moment of purchase, and they never appear on the Counter's list at all — a shelf that
 // shows you three things you cannot buy is a shelf that exists to make you feel outside.
 //
@@ -149,7 +148,7 @@ export const CHIP_STORE = [
 // 50,000 CHIPS EACH, up from 20,000, on Luke's call.
 export const VIP_STORE = [
     { id: "vip_ferret", kind: "pet", ref: "house_ferret", name: "The House Ferret", price: 50000, once: true, vip: true,
-        blurb: "Knows which floorboard the chips roll under." },
+        blurb: "Knows which floorboard the coins roll under." },
     { id: "vip_lynx", kind: "pet", ref: "velvet_lynx", name: "Velvet Lynx", price: 50000, once: true, vip: true,
         blurb: "Has never once been asked to leave." },
     { id: "vip_crane", kind: "pet", ref: "midnight_crane", name: "Midnight Crane", price: 50000, once: true, vip: true,
@@ -208,9 +207,9 @@ export const UNLOCK_STORE = [
             blurb: "Comes in when the floor empties. The books are always right by morning." },
 ];
 
-// Both shelves are looked up through one function, because `chipItem` is what buyWithChips validates against
+// Both shelves are looked up through one function, because `counterItem` is what buyFromCounter validates against
 // and a second lookup table is how an item becomes purchasable from the wrong room.
-export const chipItem = (id) => CHIP_STORE.find((i) => i.id === id)
+export const counterItem = (id) => COUNTER_STORE.find((i) => i.id === id)
     || VIP_STORE.find((i) => i.id === id)
     || STAT_STORE.find((i) => i.id === id)
     || UNLOCK_STORE.find((i) => i.id === id)
@@ -274,91 +273,17 @@ export const basePriceFor = (item, perks = {}) => (
  * together would both pass a read-first check and both succeed; the same mistake in the slot bet path is
  * commented at length in casino.js, and it is the one race in this file that costs real money.
  */
-export async function moveChips(buyerId, delta, reason, { ref = null, meta = null } = {}) {
-    if (!buyerId || !delta || !reason) return null;
-    const n = Math.round(delta);
-    const row = n < 0
-        ? await db.queryOne(
-            `UPDATE mkt_buyer SET chips = chips + $2 WHERE id = $1 AND chips >= $3 RETURNING chips`,
-            [buyerId, n, Math.abs(n)])
-        : await db.queryOne(`UPDATE mkt_buyer SET chips = chips + $2 WHERE id = $1 RETURNING chips`, [buyerId, n]);
-    if (!row) return null;
-    // AWAITED, and still best-effort. Un-awaited it was a fire-and-forget write on Vercel, which tears the
-    // sandbox down the moment the handler returns - the row lands only if the fetch happens to finish
-    // first. The .catch keeps a ledger failure from breaking the move it is recording.
-    await db.query(
-        `INSERT INTO mkt_chip_event (buyer_id, delta, balance_after, reason, ref, meta)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [buyerId, n, Number(row.chips), reason, ref, meta ? JSON.stringify(meta) : null]
-    ).catch(() => {});
-    return Number(row.chips);
-}
-
-export async function chipBalance(buyerId) {
-    const row = await db.queryOne(`SELECT COALESCE(chips, 0)::bigint AS chips FROM mkt_buyer WHERE id = $1`, [buyerId]);
-    return Number(row?.chips || 0);
-}
-
-// ── THE CAGE ─────────────────────────────────────────────────────────────────────────────────────────────────
-// Luke: "lets make it so you can buy chips and make it so everything takes chips to play. maybe 1 to 1 coins
-// buy chips. and each day you can claim 1000 chips for free."
+// ── TOMBSTONE: THE CHIP PURSE ────────────────────────────────────────────────────────────────────────────────
+// moveChips, chipBalance, CHIP_BUY_RATE, buyChips and DAILY_CHIPS stood here: the cage's machinery — gold in,
+// chips out, a thousand free a day, and a balance that only ever went down.
 //
-// The floor used to take GOLD at every machine and pay CHIPS, so the conversion happened once, invisibly, on
-// the way out — and it was the entire house edge (see the note at the top of chip-rate.js). Buying at the cage
-// moves that conversion to the front, where you can see it, and the edge moves into the machines, which is why
-// every paytable came down to 0.95 first.
-//
-// ONE TO ONE, so a chip is a gold piece you have decided to gamble. There is no exchange-rate arithmetic to do
-// on the floor and no second price to reason about: a 100-chip spin costs 100 gold, and what it is worth is
-// still decided entirely by the Counter's prices.
-export const CHIP_BUY_RATE = 1;
+// All of it went with the rework. The floor is coin in, coin out: one purse, staked and paid in gold, so
+// there is no conversion to make and nothing to buy before you can play. These were the last functions in
+// the repo capable of minting a chip, and nothing had called any of them since the sweep.
 
-/** Buy chips with gold, one for one. Atomic on the gold side — you cannot buy chips you cannot afford. */
-export async function buyChips(buyerId, gold) {
-    const n = Math.max(1, Math.round(Number(gold) || 0));
-    if (!buyerId) return { ok: false, error: "not_signed_in" };
-    // Conditional debit: two tabs cannot both buy the same last coin.
-    const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, n],
-    ).catch(() => null);
-    if (!paid) return { ok: false, error: "not_enough_gold" };
-    const chips = Math.round(n * CHIP_BUY_RATE);
-    await logCoin(buyerId, -n, "casino_chips_buy", { balanceAfter: paid.gold, meta: { chips } }).catch(() => {});
-    const after = await moveChips(buyerId, chips, "casino_chips_buy", { meta: { gold: n } });
-    return { ok: true, gold: paid.gold, chips, chipsAfter: after ?? (await chipBalance(buyerId)) };
-}
-
-// ── AND A THOUSAND A DAY FOR NOTHING ─────────────────────────────────────────────────────────────────────────
-// Luke: "each day you can claim 1000 chips for free."
-//
-// Once the floor takes chips, a member with no gold has no way onto it at all — and the casino is the one
-// feature in the Den that could otherwise become a thing only the rich play. A thousand is ten spins at the
-// hundred-chip table, which is a real sitting rather than a token.
-//
-// Guarded on its own DAY COLUMN with a conditional update, exactly like the Loot Pig's box: the claim is spent
-// by the write, so a double tap or two tabs cannot take it twice.
-export const DAILY_CHIPS = 1000;
-
-// ── TOMBSTONE: THE FREE THOUSAND A DAY ───────────────────────────────────────────────────────────────────
-// Luke: "Also no more claiming 1k per day."
-//
-// claimDailyChips and dailyChipsReady lived here. Measured before they went: 559 claims over 34 days, which
-// is 16,441 chips a day minted for nothing — the second largest faucet on the floor after bingo, and the
-// only one that paid you for turning up rather than for playing.
-//
-// It made sense while the Counter was a SHOP and chips were the price of everything on it: a daily trickle
-// was the on-ramp for somebody who had never pulled a handle. The Counter is a ladder now, climbed by
-// winning, and a currency you are handed for free cannot climb it — there is nothing left for a free
-// thousand to be the on-ramp TO.
-//
-// DAILY_CHIPS is kept below only because getCasinoState still reports it to a screen that no longer draws
-// it; both go the next time that screen is touched.
-
-
-/** What this member has already bought that can only be bought once. */
 export async function ownedOnce(buyerId) {
     const rows = await db.query(
-        `SELECT item_id FROM mkt_chip_purchase WHERE buyer_id = $1 AND once`, [buyerId]).catch(() => []);
+        `SELECT item_id FROM mkt_counter_purchase WHERE buyer_id = $1 AND once`, [buyerId]).catch(() => []);
     return new Set(rows.map((r) => r.item_id));
 }
 
@@ -387,7 +312,7 @@ async function detailFor(item) {
                 blurb: t.blurb,
                 lines: [
                     { label: "Each purchase", value: `+${t.per} ${t.stat}` },
-                    { label: "First point", value: `${STAT_STEP.toLocaleString()} chips` },
+                    { label: "First point", value: `${STAT_STEP.toLocaleString()} gold` },
                     { label: "Every point after", value: `${STAT_STEP.toLocaleString()} more than the last` },
                 ],
                 foot: "Permanent, and it counts everywhere your gear does — the Arena, the Road, raids and ship battles. There is no ceiling.",
@@ -606,37 +531,31 @@ export async function casinoTrophies(buyerId) {
  * obvious alternative and it is the wrong one: a shelf whose job is to show you three things you cannot buy
  * exists to make you feel outside.
  */
-export async function chipShelf(buyerId, { vip = false, shelf = null } = {}) {
+export async function counterShelf(buyerId, { vip = false, shelf = null } = {}) {
     // `shelf` names which counter is asking. `vip` is kept for the vendor behind the rope, which was the
     // first caller and is the one that must never show anything else.
     const list = shelf === "stat" ? STAT_STORE
         : shelf === "unlock" ? UNLOCK_STORE
-            : vip ? VIP_STORE : CHIP_STORE;
+            : vip ? VIP_STORE : COUNTER_STORE;
     const { getCasinoPerks } = await import("@/lib/marketplace/casino-perks.js");
-    // ⚠️ `balance` IS THE TOKEN BALANCE, because this shelf is priced in tokens — the Counter stopped
-    // taking chips (see chip-store.js and migration 436). It keeps the name because the screen reads it by
-    // that name and the meaning is unchanged: it is what you have to spend HERE. `chips` rides along beside
-    // it so the same screen can also say what is left to play with, which is now a different number.
-    const { tokenBalance } = await import("@/lib/marketplace/tokens.js");
-    const [balance, chips, owned, trophies, perks] = await Promise.all([
-        tokenBalance(buyerId), chipBalance(buyerId), ownedOnce(buyerId),
+    // `balance` is GOLD — one purse, the same one the cabinets spend. It used to be the token balance
+    // beside a separate chip balance, which is why the screen once showed two numbers; there is one number
+    // now and both names point at it until the client is renamed off them.
+    const { coinBalance } = await import("@/lib/marketplace/casino-bank.js");
+    const [balance, owned, trophies, perks] = await Promise.all([
+        coinBalance(buyerId), ownedOnce(buyerId),
         casinoTrophies(buyerId), getCasinoPerks(buyerId),
     ]);
     const discount = counterDiscount(trophies);
     const details = await Promise.all(list.map((i) => detailFor(i).catch(() => null)));
     return {
         balance,
-        chips,
+        gold: balance,
         // What the floor's own trophies are taking off, and what earned it — a discount nobody can see the
         // source of is a discount nobody believes they have, which is the same argument as the pet rail at
         // the top of the casino screen.
         discount,
         trophies,
-        // The rate goes with the shelf so the screen can print the GOLD behind every price without keeping
-        // its own copy of it. A second copy is a shelf that lies the day the rate moves — and it moved once
-        // already, 0.08 to 0.25, which is exactly when a hardcoded copy would have started quoting prices
-        // three times too low.
-        rate: CHIP_RATE,
         // What the member already has, so the stat cards can show "level 7 -> 8" rather than a bare price and
         // the unlock cards can show themselves as bought.
         perks,
@@ -648,7 +567,7 @@ export async function chipShelf(buyerId, { vip = false, shelf = null } = {}) {
             stat: i.kind === "stat" ? i.stat : undefined,
             // `price` is what it COSTS THIS MEMBER, and `was` is the list price when the two differ. The till
             // recomputes the same number from the same function rather than trusting this one — see
-            // buyWithChips. A screen and a payment path doing their own arithmetic is how somebody gets
+            // buyFromCounter. A screen and a payment path doing their own arithmetic is how somebody gets
             // charged a price they were never shown.
             price: pricedFor(basePriceFor(i, perks), discount),
             was: discount > 0 ? basePriceFor(i, perks) : null,

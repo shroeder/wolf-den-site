@@ -7,8 +7,8 @@ import { gachaView, pull as gachaPull } from "@/lib/marketplace/gachapon.js";
 import { ladder, claim as claimRung } from "@/lib/marketplace/casino-claim.js";
 import { leaderboard } from "@/lib/marketplace/casino-leaderboard.js";
 import { spinSlot5 } from "@/lib/marketplace/casino-slot5-play.js";
-import { chipShelf, buyChips } from "@/lib/marketplace/chips.js";
-import { buyWithChips } from "@/lib/marketplace/chip-store.js";
+import { counterShelf } from "@/lib/marketplace/casino-counter.js";
+import { buyFromCounter } from "@/lib/marketplace/casino-counter-buy.js";
 // Composed HERE rather than inside getCasinoState: casino.js must not import blackjack.js, because
 // blackjack.js imports casino.js for the floor's shared furniture (perks, prizes, bounties) and a cycle
 // between the two would be a runtime landmine in a serverless bundle rather than a compile error.
@@ -83,21 +83,18 @@ export async function POST(request) {
                     return noStore(await spinSlot5(buyer.id, { bet: b?.bet, machine: b?.machine, offerId: b?.offer, force: b?.force }));
                 // ── THE COUNTER ── the shelf, and buying off it. The price is read from the catalog in code,
                 // never from the body; `item` is only a key.
-                // `vip: true` asks for the VENDOR's list instead of the Counter's. chipShelf refuses nothing
+                // `vip: true` asks for the VENDOR's list instead of the Counter's. counterShelf refuses nothing
                 // by itself — the till is where a VIP item is gated — but the two rooms show two lists.
                 // `shelf` names WHICH counter: "stat" for the permanent upgrades, "unlock" for the four
                 // doors, otherwise the chest shelf. `vip` is kept for the vendor behind the rope, which was
                 // the first caller. An unknown value falls through to the ordinary Counter rather than
                 // erroring — a POST body is something anybody can write, and the worst a lie about it can
                 // buy is the shelf everyone can already see.
-                case "chip_shelf": return noStore({ ok: true, ...(await chipShelf(buyer.id, {
+                case "counter_shelf": return noStore({ ok: true, ...(await counterShelf(buyer.id, {
                     vip: b?.vip === true,
                     shelf: ["stat", "unlock"].includes(b?.shelf) ? b.shelf : null,
                 })) });
-                case "chip_buy": return noStore(await buyWithChips(buyer.id, String(b?.item || "")));
-                // ── THE CAGE ── gold for chips, one for one, and the free thousand a day. `chip_buy` above is
-                // the COUNTER (spending chips on goods); these two are the window that fills the purse.
-                case "chips_buy": return noStore(await buyChips(buyer.id, Number(b?.gold) || 0));
+                case "counter_buy": return noStore(await buyFromCounter(buyer.id, String(b?.item || "")));
                 // ── AND THE FREE THOUSAND A DAY IS GONE ──────────────────────────────────────────────
                 // `chips_daily` lived here. 559 claims over 34 days, 16,441 a day minted for turning up —
                 // the second largest faucet on the floor. A removed action falls through to `bad_action`,

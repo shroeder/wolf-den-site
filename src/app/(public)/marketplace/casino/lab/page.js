@@ -4,7 +4,6 @@ import CasinoLab from "@/components/CasinoLab";
 import { bingoState } from "@/lib/marketplace/bingo.js";
 import { blackjackState } from "@/lib/marketplace/blackjack.js";
 import { getCasinoState } from "@/lib/marketplace/casino.js";
-import { CHIP_RATE } from "@/lib/marketplace/chip-rate.js";
 import { playSpin, slot5 } from "@/lib/marketplace/casino-slot5.js";
 
 // ── DEV ONLY: THE REAL FLOOR, WITH NOBODY SIGNED IN ──────────────────────────────────────────────────────────
@@ -43,8 +42,8 @@ function oneSpin() {
         if (!wins.length || r.free || r.hold || r.chain || r.gems || r.warren || r.winAgain) continue;
         return {
             grid: r.grid, bet: BET,
-            lines: wins.map((w) => ({ ...w, chips: Math.max(1, Math.round(w.amount * CHIP_RATE)) })),
-            won: Math.max(1, Math.round((r.base.total || 0) * CHIP_RATE)),
+            lines: wins.map((w) => ({ ...w, chips: Math.max(1, Math.round(w.amount)) })),
+            won: Math.max(1, Math.round((r.base.total || 0))),
         };
     }
     return null;

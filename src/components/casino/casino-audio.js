@@ -417,7 +417,7 @@ export const Cas = {
     },
 
     // Chips going down. Several, because nobody bets one chip.
-    chips() {
+    bet() {
         for (let i = 0; i < 3; i += 1) {
             noise({ at: i * 0.022, dur: 0.04, gain: 0.06, type: "bandpass", freq: 2400 - i * 300, q: 3 });
             tone({ at: i * 0.022, freq: 520 - i * 40, type: "square", dur: 0.035, gain: 0.035 });

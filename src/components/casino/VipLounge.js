@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
-import ChipStore from "@/components/casino/ChipStore.js";
+import CounterShelf from "@/components/casino/CounterShelf.js";
 
 // ── BEHIND THE ROPE ──────────────────────────────────────────────────────────────────────────────────────────
 // The room a VIP walks into.
@@ -27,7 +27,7 @@ import ChipStore from "@/components/casino/ChipStore.js";
 //   length now, in the hero's own chibi build, standing on the floor he stands on.
 //
 // Everything else is still borrowed rather than rebuilt: the `vip` chat channel, `mkt_town_presence` for who
-// else is here, and the Counter's own ChipStore for the vendor.
+// else is here, and the Counter's own CounterShelf for the vendor.
 
 // ── AND THE LOUNGE MAY NOT HANG EITHER ───────────────────────────────────────────────────────────────────────
 // The same bare fetch the casino floor used to use, with the same missing timeout. I wrote a whole commit
@@ -79,7 +79,7 @@ const WALK_TICK_MS = 40;
 // ⚠️ BOTH PURSES. The vendor behind the rope sells off the Counter's shelf, which is priced in
 // TOKENS — so the number beside the door has to be the one the till will actually take. `chips` still
 // comes in because the lounge's own tables are played with them. See tokens.js and migration 436.
-export default function VipLounge({ state, gold, me, onClose, onChips }) {
+export default function VipLounge({ state, gold, me, onClose, onGold }) {
     const [st, setSt] = useState(state || null);
     const [x, setX] = useState(24);
     const [facing, setFacing] = useState(1);

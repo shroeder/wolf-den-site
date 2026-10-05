@@ -2,8 +2,8 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import {
-    chipItem, chipShelf, casinoTrophies, counterDiscount, pricedFor, basePriceFor,
-} from "@/lib/marketplace/chips.js";
+    counterItem, counterShelf, casinoTrophies, counterDiscount, pricedFor, basePriceFor,
+} from "@/lib/marketplace/casino-counter.js";
 import { moveCoin } from "@/lib/marketplace/casino-bank.js";
 import { getCasinoPerks, grantCasinoPerk, revokeCasinoPerk } from "@/lib/marketplace/casino-perks.js";
 import { addChests } from "@/lib/marketplace/chests.js";
@@ -26,9 +26,9 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 // door out of the gold economy, which is the entire reason the machines can pay what they pay.
 
 /** One purchase. Returns the updated shelf so the screen never has to re-ask. */
-export async function buyWithChips(buyerId, itemId) {
+export async function buyFromCounter(buyerId, itemId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const item = chipItem(itemId);
+    const item = counterItem(itemId);
     if (!item) return { ok: false, error: "no_such_item" };
 
     // ── THE VENDOR BEHIND THE ROPE SELLS TO VIPS ───────────────────────────────────────
@@ -72,7 +72,7 @@ export async function buyWithChips(buyerId, itemId) {
     }
     if (item.once) {
         const had = await db.queryOne(
-            `SELECT 1 FROM mkt_chip_purchase WHERE buyer_id = $1 AND item_id = $2 AND once LIMIT 1`,
+            `SELECT 1 FROM mkt_counter_purchase WHERE buyer_id = $1 AND item_id = $2 AND once LIMIT 1`,
             [buyerId, item.id]).catch(() => null);
         if (had) return { ok: false, error: "already_owned" };
     }
@@ -100,7 +100,7 @@ export async function buyWithChips(buyerId, itemId) {
     // The receipt, and the second half of the once-only guard. If THIS is the write that loses the race, the
     // member has paid for something they already own — so the refund is not optional and not best-effort.
     const receipt = await db.queryOne(
-        `INSERT INTO mkt_chip_purchase (buyer_id, item_id, price, once)
+        `INSERT INTO mkt_counter_purchase (buyer_id, item_id, price, once)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (buyer_id, item_id) WHERE once DO NOTHING
          RETURNING id`,
@@ -118,7 +118,7 @@ export async function buyWithChips(buyerId, itemId) {
         // Put it back, and take the receipt with it — otherwise a once-only item is marked owned and was
         // never delivered, which is the worst outcome available and the hardest to notice.
         await moveCoin(buyerId, price, "store_refund", { ref: item.id, meta: { why: "grant failed" } });
-        if (receipt) await db.query(`DELETE FROM mkt_chip_purchase WHERE id = $1`, [receipt.id]).catch(() => {});
+        if (receipt) await db.query(`DELETE FROM mkt_counter_purchase WHERE id = $1`, [receipt.id]).catch(() => {});
         return { ok: false, error: "grant_failed" };
     }
 
@@ -132,7 +132,7 @@ export async function buyWithChips(buyerId, itemId) {
     await trackActivity(buyerId, "casino_buy", {
         item: item.id, kind: item.kind, ref: item.ref || null, price, vip: Boolean(item.vip),
     }).catch(() => {});
-    return { ok: true, bought: item.id, name: item.name, ...(await chipShelf(buyerId, back)) };
+    return { ok: true, bought: item.id, name: item.name, ...(await counterShelf(buyerId, back)) };
 }
 
 // ── DELIVERING THE GOODS ─────────────────────────────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ async function grant(buyerId, item) {
         }
         // ── A PAGE, ROLLED AT THE COUNTER ────────────────────────────────────────────
         // The only thing on any shelf that is decided at the moment of sale. It returns false rather than
-        // throwing when there is nothing left to teach, which is all it has to do — buyWithChips refunds the
+        // throwing when there is nothing left to teach, which is all it has to do — buyFromCounter refunds the
         // chips and deletes the receipt on a grant that comes back false, so the "paid for a book they had
         // already finished" case is already covered by the path every other kind uses. There is a nicer
         // refusal in front of it too, before any money moves, purely so the member gets told WHY.
@@ -196,7 +196,7 @@ async function grant(buyerId, item) {
             // has to have actually moved, or the chips go home.
             const before = await db.queryOne(
                 `SELECT count FROM mkt_user_chest WHERE buyer_id = $1 AND tier = $2`, [buyerId, item.ref]);
-            await addChests(buyerId, { [item.ref]: 1 }, { source: "chip_store", meta: { item: item.id } });
+            await addChests(buyerId, { [item.ref]: 1 }, { source: "casino_counter", meta: { item: item.id } });
             const after = await db.queryOne(
                 `SELECT count FROM mkt_user_chest WHERE buyer_id = $1 AND tier = $2`, [buyerId, item.ref]);
             return Boolean(after) && Number(after.count) > Number(before?.count || 0);

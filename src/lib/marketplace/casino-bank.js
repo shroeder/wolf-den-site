@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 // is gone — the Counter is a ladder now, claimed off lifetime winnings rather than bought — so a chip would
 // be a currency with no reason to exist. Every bet and every payout on this floor is GOLD.
 //
-// ⚠️ THE LEDGER STAYS WHERE IT WAS, AND THAT IS DELIBERATE. These writes still land in mkt_chip_event, which
+// ⚠️ THE LEDGER STAYS WHERE IT WAS, AND THAT IS DELIBERATE. These writes still land in mkt_casino_ledger, which
 // is the casino's own book: every report, every audit script and every argument about somebody's balance
 // reads it, and it holds both sides of every play in one table. Moving the rows to mkt_coin_event would mix
 // the floor into every harvest and quest in the game and cost the one place that can answer "what did this
@@ -42,7 +42,7 @@ export async function moveCoin(buyerId, delta, reason, { ref = null, meta = null
     // sandbox down the moment the handler returns — the row lands only if the fetch happens to finish first.
     // The .catch keeps a ledger failure from breaking the move it is recording.
     await db.query(
-        `INSERT INTO mkt_chip_event (buyer_id, delta, balance_after, reason, ref, meta)
+        `INSERT INTO mkt_casino_ledger (buyer_id, delta, balance_after, reason, ref, meta)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [buyerId, n, Number(row.gold), reason, ref, meta ? JSON.stringify(meta) : null],
     ).catch(() => {});

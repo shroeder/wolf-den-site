@@ -16,7 +16,7 @@ import Leaderboard from "@/components/casino/Leaderboard.js";
 import Gachapon from "@/components/casino/Gachapon.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
 import { callFor, letterFor, lineName, nearLinesOf } from "@/lib/marketplace/bingo-kit.js";
-import { chipsFor } from "@/lib/marketplace/chip-rate.js";
+import { payoutFor } from "@/lib/marketplace/casino-payout.js";
 
 // ── NO REQUEST ON THIS FLOOR MAY HANG FOR EVER ───────────────────────────────────────────────────────────────
 // Every call below used to be a bare `fetch(...).catch(() => null)`, and a bare fetch has no timeout: on a
@@ -908,37 +908,34 @@ export default function CasinoClient({ initial, halloween = false }) {
     // spoiler — it is the thing you just did, and a bet that does not visibly cost anything feels free. The
     // win is HELD until the reveal is over. `staked` is the server's own balance the instant the bet left,
     // not `balance - bet`: the on-the-house perk hands a stake straight back and only the server knows.
-    const heldChips = useRef(null);
-    // ── AND THE WIN IS TOKENS NOW, SO THE HOLD HAS TO HOLD TOKENS ────────────────────────────────────────
-    // SoullessShiitake: "in bingo, the tokens are updating with how much you win before the numbers get
-    // called ... its like its instantly trading chips for tokens on button press, before running the
-    // animation." That is exactly what it was doing. This whole hold was built when a win was paid in CHIPS;
-    // migration 436 moved wins to TOKENS and the hold was never told, so the one purse that could go up was
-    // the one purse nothing was holding back. Every reveal in the room printed its own ending — the reels,
-    // the wheel, the table and the card — because the number at the top had already moved.
-    const heldTokens = useRef(null);
-    const settleChips = useCallback(() => {
-        const n = heldChips.current;
-        const t = heldTokens.current;
-        if (n == null && t == null) return;
-        heldChips.current = null;
-        heldTokens.current = null;
-        setSt((p) => (p ? { ...p, ...(n != null ? { chips: n } : {}), ...(t != null ? { tokens: t } : {}) } : p));
+    // ── ONE PURSE, ONE HOLD ─────────────────────────────────────────────────────────────────────────
+    // There were two refs here, because a stake left one purse and a win landed in another — and the bug
+    // that came with that shape was SoullessShiitake's: "the tokens are updating with how much you win
+    // before the numbers get called." The hold was built around the purse that could only go down, so the
+    // one that could go UP was the one nothing was holding back, and every reveal in the room printed its
+    // own ending before the animation reached it.
+    //
+    // With a single purse there is a single number to hold, and it cannot drift out of step with itself.
+    const heldGold = useRef(null);
+    const settleGold = useCallback(() => {
+        const n = heldGold.current;
+        if (n == null) return;
+        heldGold.current = null;
+        setSt((p) => (p ? { ...p, gold: n } : p));
     }, []);
     // Take the stake, hold the outcome. A response with no `staked` (a machine that has not been converted,
     // or an error path) falls through to showing the final figure at once, which is the old behaviour rather
     // than a blank purse.
     const stakeNow = useCallback((r) => {
         const holding = r?.staked != null;
-        heldChips.current = holding ? (r?.chips ?? null) : null;
-        // The win landed in TOKENS, and it waits with the rest of the outcome. `chips` below is the fuel left
-        // after the stake and cannot have gone up — see the note on the response in casino-slot5-play.js.
-        heldTokens.current = holding ? (r?.tokens ?? null) : null;
+        // The final balance waits for the reveal; the stake is shown the moment it leaves, because money
+        // going out is not a spoiler — it is the thing you just did, and a bet that costs nothing visibly
+        // feels free. `staked` is the server's own balance at that instant rather than balance - bet: the
+        // on-the-house perk hands a stake straight back and only the server knows.
+        heldGold.current = holding ? (r?.gold ?? null) : null;
         setSt((p) => (p ? {
             ...p,
-            chips: r?.staked ?? r?.chips ?? p.chips,
-            tokens: holding ? p.tokens : (r?.tokens ?? p.tokens),
-            ...(r?.gold != null ? { gold: r.gold } : {}),
+            gold: holding ? (r.staked ?? p.gold) : (r?.gold ?? p.gold),
         } : p));
     }, []);
 
@@ -946,13 +943,13 @@ export default function CasinoClient({ initial, halloween = false }) {
     // Walking away mid-spin unmounts the machine, so the callback that would have released the balance never
     // fires — and because the poll now defers to the hold, the purse would sit on a stale figure for as long
     // as you stayed on the floor. Standing up is the end of the reveal whether the reels agreed or not.
-    useEffect(() => { if (!seated) settleChips(); }, [seated, settleChips]);
+    useEffect(() => { if (!seated) settleGold(); }, [seated, settleGold]);
 
     const absorb = useCallback((r) => {
         // The reveal is over, so the win can be paid into the number at the top. Every game that ends with a
         // celebration calls absorb at exactly that moment, which is why this lives here rather than in five
         // separate timeouts that would drift apart the first time one of them was retuned.
-        settleChips();
+        settleGold();
         if (r.prize) { setPrize(r.prize); Sfx.gemSet?.(); Haptic.crit(); }
         // The quiet ones. Said plainly and briefly — the pet paying for a pull is a nice thing to notice, not
         // an event to stop the room for.
@@ -962,7 +959,7 @@ export default function CasinoClient({ initial, halloween = false }) {
         // THE PET BANNER USED TO LIVE HERE. `r.pet` was one of the five arriving off a play at 1-in-455 to
         // 1-in-5,556; they are 50,000 chips at the Counter now and nothing sends that key any more. Removed
         // rather than left dormant — a handler for an event that can never happen reads as a working feature.
-    }, [settleChips]);
+    }, [settleGold]);
 
     // ── THE FIVE-REEL MACHINE'S OWN SPIN ────────────────────────────────────────────────────────────────
     // Its own action rather than a flag on `pull`: a different engine, a different currency and a different
@@ -973,7 +970,7 @@ export default function CasinoClient({ initial, halloween = false }) {
     const spin5 = useCallback(async (offerId, force, stake = null) => {
         const r = await casPost({ action: "spin5", bet: Number(stake) > 0 ? Number(stake) : bet, machine: at?.id, offer: offerId, force: force || undefined });
         if (!r?.ok) {
-            setErr(r?.error === "no_chips" ? "Not enough gold for that bet."
+            setErr(r?.error === "not_enough_gold" ? "Not enough gold for that bet."
                 : r?.error === "closed" ? "This machine is not open yet."
                 : "That didn't go through.");
             return r || { ok: false };
@@ -1010,7 +1007,7 @@ export default function CasinoClient({ initial, halloween = false }) {
 
         if (!r?.ok) {
             setSpinning(false); setBusy(false);
-            setErr(r?.error === "no_chips" ? "Not enough gold for that bet." : "That didn't go through.");
+            setErr(r?.error === "not_enough_gold" ? "Not enough gold for that bet." : "That didn't go through.");
             return;
         }
 
@@ -1115,11 +1112,11 @@ export default function CasinoClient({ initial, halloween = false }) {
         setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null);
         setBurst(null); setKenoOut(0);
         // Chips going down on the felt, not a UI blip.
-        Cas.chips();
+        Cas.bet();
         const r = await casPost(body);
         if (!r?.ok) {
             setBusy(false);
-            setErr(r?.error === "no_chips" ? "Not enough gold for that bet."
+            setErr(r?.error === "not_enough_gold" ? "Not enough gold for that bet."
                 : r?.error === "bad_ticket" ? "Pick five numbers first."
                     : "That didn't go through.");
             return;
@@ -1192,11 +1189,11 @@ export default function CasinoClient({ initial, halloween = false }) {
         if (action === "bj_deal") { setPrize(null); setNote(null); setBurst(null); }
         // Chips down, then the shoe. The cards themselves are voiced by the reveal effect, on the same clock
         // the animation uses — firing one here as well would sound a card that is not on the felt yet.
-        if (action === "bj_deal") { Cas.chips(); timers.current.push(setTimeout(() => Cas.shoe(), 140)); }
+        if (action === "bj_deal") { Cas.bet(); timers.current.push(setTimeout(() => Cas.shoe(), 140)); }
         const r = await casPost({ action, ...body });
         setBusy(false);
         if (!r?.ok) {
-            setErr(r?.error === "no_chips" ? "Not enough gold for that bet."
+            setErr(r?.error === "not_enough_gold" ? "Not enough gold for that bet."
                 : r?.error === "cannot_double" ? "You can only double on your first two cards."
                     : r?.error === "no_hand" ? "That hand is already finished."
                         : "That didn't go through.");
@@ -1263,18 +1260,12 @@ export default function CasinoClient({ initial, halloween = false }) {
                 //
                 // Everything else on the poll still merges — the poll exists for the other people in the
                 // room and they must keep moving. Only the balance waits, and only while one is held.
+                // ⚠️ THE BALANCE DEFERS TO THE HOLD. Everything else on the poll merges — it exists for
+                // the other people in the room and they have to keep moving — but a poll landing mid-reveal
+                // must not print the ending six seconds into an animation that is still running.
                 setSt((p) => ({
-                    ...p, others: r.others, gold: r.gold, vip: r.vip ?? p?.vip,
-                    chips: heldChips.current != null ? p?.chips : (r.chips ?? p?.chips),
-                    // ⚠️ ITS OWN REF, not heldChips. A response can hold a token win without a chip figure
-                    // beside it, and reading the chip hold to decide whether to publish the TOKEN balance
-                    // let the poll print the ending six seconds into a reveal that was still running.
-                    // The token purse rides the same hold as the chip purse: while a win is being
-                    // counted up on screen the number must not jump ahead of the animation. It was
-                    // simply absent here, so tokens moved only on a reload, which is how members
-                    // came to describe a win as "paying chips" -- the only figure that visibly moved
-                    // was the wrong one. See stakeNow, which merges the same two fields.
-                    tokens: heldTokens.current != null ? p?.tokens : (r.tokens ?? p?.tokens),
+                    ...p, others: r.others, vip: r.vip ?? p?.vip,
+                    gold: heldGold.current != null ? p?.gold : (r.gold ?? p?.gold),
                 }));
                 if (r.pot) setPot(r.pot.amount);
             }
@@ -1287,11 +1278,11 @@ export default function CasinoClient({ initial, halloween = false }) {
         unlock();
         setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null);
         setCard(null); setCalled(0); setBurst(null); setDragon(null); setDragonLit(0);
-        Cas.chips();
+        Cas.bet();
         const r = await casPost({ action: "bingo", bet, force: force || undefined });
         if (!r?.ok) {
             setBusy(false);
-            setErr(r?.error === "no_chips" ? "Not enough gold for that bet." : "That didn't go through.");
+            setErr(r?.error === "not_enough_gold" ? "Not enough gold for that bet." : "That didn't go through.");
             return;
         }
         setCard(r);
@@ -1522,7 +1513,7 @@ export default function CasinoClient({ initial, halloween = false }) {
         const hits = (keno.picks || ticket).filter((n) => keno.drawn.slice(0, kenoOut).includes(n)).length;
         const next = st?.keno?.pays?.[hits + 1];
         if (!next) return null;
-        return { hits, chips: chipsFor(Math.round(bet * next), 1) };
+        return { hits, chips: payoutFor(Math.round(bet * next), 1) };
     }, [keno, busy, kenoOut, ticket, st?.keno?.pays, bet]);
 
     // Today's pattern as a Set, so the card can ask 25 times per render without rebuilding an array each time.
@@ -1611,7 +1602,7 @@ export default function CasinoClient({ initial, halloween = false }) {
     if (vip) {
         return (
             <VipLounge state={vip} gold={st?.gold} me={st?.me}
-                onChips={(n) => setSt((p) => ({ ...p, chips: n }))}
+                onGold={(n) => setSt((p) => ({ ...p, chips: n }))}
                 onClose={() => setVip(null)} />
         );
     }
@@ -1847,7 +1838,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                             // whole screen, did it in silence and without the phone moving. Every other
                             // machine in this room answers a press; the room itself did not.
                             unlock();
-                            Cas.chips();
+                            Cas.bet();
                             Haptic.hit(0.4);
                             setSeated(true);
                         }}>
@@ -2016,7 +2007,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 two figures here — chips fed in, tokens won — and both currencies are gone. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/images/casino/hud-coin.webp" alt="" width={15} height={15} />
-                            <b className="cas-purse-chips">{money(st?.gold)}</b>
+                            <b className="cas-purse-gold">{money(st?.gold)}</b>
                         </span>
                     </div>
 
@@ -2130,7 +2121,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 <span className="cas-keno-title">Pick five of forty. Ten come out.</span>
                                 <span className="cas-keno-tools">
                                     <button type="button" className="cas-keno-tool" disabled={busy}
-                                        onClick={() => { unlock(); Cas.chips(); setTicket(quickPick()); }}>Quick pick</button>
+                                        onClick={() => { unlock(); Cas.bet(); setTicket(quickPick()); }}>Quick pick</button>
                                     <button type="button" className="cas-keno-tool" disabled={busy || !ticket.length}
                                         onClick={() => { unlock(); setTicket([]); }}>Clear</button>
                                 </span>
@@ -2211,7 +2202,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                     const here = Boolean(keno && !busy && keno.hits.length === k);
                                     // Exactly what playKeno does: the multiple lands on the gold stake, and
                                     // that gold is converted once. Mirrored step for step, not approximated.
-                                    const chips = chipsFor(Math.round(bet * pays), 1);
+                                    const chips = payoutFor(Math.round(bet * pays), 1);
                                     return (
                                         <span key={k} className={`cas-keno-rung${here ? " is-here" : ""}`}>
                                             <i>{k} of 5</i><b>{money(chips)}</b>
@@ -2244,7 +2235,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                         there is no state in which the screen and the paytable disagree about which game
                         this is. */}
                     {at.live && at.id === "store" ? (
-                        /* ⚠️ THE COUNTER IS NOT A SHOP ANY MORE. ChipStore sold fifteen things for chips, and
+                        /* ⚠️ THE COUNTER IS NOT A SHOP ANY MORE. CounterShelf sold fifteen things for chips, and
                            chips no longer exist — the floor is staked in gold now and everything the Counter
                            used to sell is claimed off lifetime winnings instead. Same cabinet, same place on
                            the floor, completely different verb. */
@@ -2263,11 +2254,10 @@ export default function CasinoClient({ initial, halloween = false }) {
                             machineId={at.id}
                             lines={SLOT5_LINES}
                             onSpin={spin5}
-                            onSettled={settleChips}
-                            chips={st?.chips}
+                            onSettled={settleGold}
+                            gold={st?.gold}
                             bet={bet}
                             onBet={setBet}
-                            rate={st?.chipRate}
                             owner={st?.owner}
                             art={st?.art}
                             busy={busy} />
@@ -2470,7 +2460,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                         <i>{card?.pattern ? "You got it." : st.bingo.pattern.blurb}</i>
                                     </span>
                                     <span className="cas-bpat-pay">
-                                        +{money(chipsFor(Math.round(bet * st.bingo.pattern.pay), 1))}
+                                        +{money(payoutFor(Math.round(bet * st.bingo.pattern.pay), 1))}
                                     </span>
                                 </div>
                             ) : null}
@@ -2704,7 +2694,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                     {/* Chips, for the stake that is selected — same reason as the keno
                                         ladder above. "Six pays 200x" was true of the gold you put in and
                                         had nothing to do with the number that lands in your chips. */}
-                                    {!card ? `A line pays ${money(chipsFor(Math.round(bet * (st?.bingo?.pays?.[1] ?? 1)), 1))} · six pays ${money(chipsFor(Math.round(bet * (st?.bingo?.pays?.[6] ?? 200)), 1))}`
+                                    {!card ? `A line pays ${money(payoutFor(Math.round(bet * (st?.bingo?.pays?.[1] ?? 1)), 1))} · six pays ${money(payoutFor(Math.round(bet * (st?.bingo?.pays?.[6] ?? 200)), 1))}`
                                         : dragon && busy
                                             ? (dragon.burnt?.length
                                                 ? `The dragon burns ${dragonLit} of ${dragon.burnt.length}…`
@@ -2742,11 +2732,11 @@ export default function CasinoClient({ initial, halloween = false }) {
                                     <button type="button" className="cas-act" disabled={busy} onClick={() => table("bj_hit")}>Hit</button>
                                     <button type="button" className="cas-act is-stand" disabled={busy} onClick={() => table("bj_stand")}>Stand</button>
                                     <button type="button" className="cas-act is-double"
-                                        disabled={busy || !hand.hands?.[hand.active]?.canDouble || (st?.chips || 0) < hand.stake}
+                                        disabled={busy || !hand.hands?.[hand.active]?.canDouble || (st?.gold || 0) < hand.stake}
                                         onClick={() => table("bj_double")}>Double</button>
                                     {hand.hands?.[hand.active]?.canSplit ? (
                                         <button type="button" className="cas-act is-split"
-                                            disabled={busy || (st?.chips || 0) < hand.stake}
+                                            disabled={busy || (st?.gold || 0) < hand.stake}
                                             onClick={() => table("bj_split")}>Split</button>
                                     ) : null}
                                 </div>
@@ -2767,7 +2757,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 anyone who had spent their gold buying the chips they were trying to play. */}
                             {at.id === "blackjack" && hand?.open ? null : (
                             <button type="button" className="cas-pull"
-                                disabled={busy || (st?.chips || 0) < bet || (at.id === "keno" && ticket.length !== 5)}
+                                disabled={busy || (st?.gold || 0) < bet || (at.id === "keno" && ticket.length !== 5)}
                                 onClick={() => {
                                     if (SLOTS.has(at.id)) return pull();
                                     if (at.id === "blackjack") return table("bj_deal", { bet });
@@ -2779,7 +2769,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 {busy ? "…"
                                     : SLOTS.has(at.id) && (meters[at.id]?.freePulls || 0) > 0
                                         ? `Free pull · ${meters[at.id].freePulls} left`
-                                        : (st?.chips || 0) < bet ? "Not enough gold"
+                                        : (st?.gold || 0) < bet ? "Not enough gold"
                                         : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
                                             : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
                             </button>
@@ -2798,7 +2788,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                             {at.id === "bingo" && st?.owner ? (
                                 <div className="cas-owner">
                                     <span>Owner</span>
-                                    <button type="button" disabled={busy || (st?.chips || 0) < bet}
+                                    <button type="button" disabled={busy || (st?.gold || 0) < bet}
                                         onClick={() => buyCard("dragon")}>Force the dragon</button>
                                 </div>
                             ) : null}

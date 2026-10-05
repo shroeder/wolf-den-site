@@ -5,7 +5,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // winnings), so a chip would be a currency with nothing to spend it on. Same function shape, same ledger
 // table, gold instead. See casino-bank.js.
 import { coinBalance, moveCoin, recordWon } from "@/lib/marketplace/casino-bank.js";
-import { CHIP_RATE, DAILY_CHIPS, chipsFor } from "@/lib/marketplace/chips.js";
+import { payoutFor } from "@/lib/marketplace/casino-payout.js";
 
 import { db } from "@/lib/db";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -596,7 +596,7 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
         bank = await coinBalance(buyerId);
     } else {
         bank = await moveCoin(buyerId, -stake, "casino_slot_bet", { meta: { bet: stake, machine: m.id } });
-        if (bank == null) return { ok: false, error: "no_chips" };
+        if (bank == null) return { ok: false, error: "not_enough_gold" };
     }
 
     if (!free && onTheHouse(perks)) {
@@ -664,7 +664,7 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     // Same shape as every other cabinet's line, so one query answers "what does the floor pay" across all of
     // them rather than needing a special case for the oldest machine.
     await trackActivity(buyerId, "casino_play", {
-        game: "slot", machine: m.id, bet: stake, wonChips: won,
+        game: "slot", machine: m.id, bet: stake, wonGold: won,
         multiple: stake ? Number((won / stake).toFixed(3)) : 0,
         features: [
             ...(free ? ["free"] : []), ...(nudged ? ["nudge"] : []), ...(onHouse ? ["on_house"] : []),
@@ -680,10 +680,11 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     await surpriseChest(buyerId, "casino", SURPRISE_WEIGHT.light).catch(() => {});
 
     return {
-        // Both purses: `chips` is the fuel left after the stake (it cannot have gone up) and `tokens`
-        // is where the win landed. See tokens.js.
+        // ONE PURSE, TWO MOMENTS OF IT. `staked` is the balance the instant the bet left and `gold` is
+        // the balance after the win landed — the client shows the first immediately and holds the second
+        // back until the reels have finished saying so.
         ok: true, machine: m.id, reels, mult, bet: stake, won,
-        chips: bank, tokens: await coinBalance(buyerId), prize, onHouse,
+        gold: await coinBalance(buyerId), staked: bank, prize, onHouse,
         free, nudged, awarded, struck: struck > 1 ? struck : null, tipped: tipped > 0 ? tipped : null,
         fed: fx.fed?.length ? fx.fed : null, burst: fx.burst?.length ? fx.burst : null,
         potWon: potWon > 0 ? potWon : null, pot: await readPot(),
@@ -915,7 +916,7 @@ export async function gambleWin(buyerId, { machine } = {}) {
     // moveTokens' own `tokens >= n` guard, the same one the Counter uses, so a gamble cannot go through on
     // a balance that has already been spent on a pet.
     let bank = await moveCoin(buyerId, -stake, "casino_gamble_bet", { meta: { machine: m.id } });
-    if (bank == null) return { ok: false, error: "no_chips" };
+    if (bank == null) return { ok: false, error: "not_enough_gold" };
 
     const won = Math.random() < GAMBLE_WIN_CHANCE;
     if (won) {
@@ -933,11 +934,8 @@ export async function gambleWin(buyerId, { machine } = {}) {
     await trackActivity(buyerId, "casino_gamble", {
         machine: m.id, staked: stake, won: Boolean(won), payout: won ? stake * 2 : 0,
     }).catch(() => {});
-    // `bank` is the TOKEN balance here, not the chip one — this whole function moves tokens. The field
-    // keeps its name because the client reads it by that name; `tokens` carries the same number under the
-    // name that is now true, and the chip purse is sent so the header can redraw both.
-    return { ok: true, machine: m.id, staked: stake, won, payout: won ? stake * 2 : 0,
-        chips: await coinBalance(buyerId), tokens: bank };
+    // `bank` is the balance after the gamble resolved, which is the only balance there is.
+    return { ok: true, machine: m.id, staked: stake, won, payout: won ? stake * 2 : 0, gold: bank };
 }
 
 // ── THE CROUPIER'S CAT ───────────────────────────────────────────────────────────────────────────────────────
@@ -1129,8 +1127,8 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
 
     const perks = await casinoPerks(buyerId);
     // A ticket costs GOLD. moveCoin carries its own conditional debit and writes its own ledger row.
-    let chips = await moveCoin(buyerId, -stake, "casino_keno_bet", { meta: { bet: stake, picks: clean } });
-    if (chips == null) return { ok: false, error: "no_chips" };
+    let bal = await moveCoin(buyerId, -stake, "casino_keno_bet", { meta: { bet: stake, picks: clean } });
+    if (bal == null) return { ok: false, error: "not_enough_gold" };
     // ── THE BALANCE THE MOMENT THE STAKE LEAVES ──────────────────────────────────────────────────────
     // Sent alongside the final figure so the purse can drop by the bet immediately and only climb back when
     // the reels, the balls or the card have finished saying what happened. Luke: "im able to see the new
@@ -1138,12 +1136,12 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     // screen was being told the ending before the animation started. Computed here rather than as
     // `balance - bet` on the client, because a stake is not always the bet: the on-the-house perk hands it
     // straight back, and only the server knows whether it fired.
-    const staked = chips;
+    const staked = bal;
 
     let onHouse = false;
     if (onTheHouse(perks)) {
         const back = await moveCoin(buyerId, stake, "casino_on_the_house", { meta: { game: "keno" } });
-        if (back != null) { onHouse = true; chips = back; }
+        if (back != null) { onHouse = true; bal = back; }
     }
 
     // `goldIdx`, not `gold` — this function already has a `gold` and it is the player s balance. Two
@@ -1159,16 +1157,16 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     const pays = (KENO_PAYS[hits.length] || 0) * (goldMine ? GOLD_BALL_MULT : 1);
     // The paytable is in multiples of the stake — gold units. One conversion, here, like everywhere else.
     const wonGold = Math.round(stake * pays);
-    const won = wonGold > 0 ? chipsFor(wonGold, 1) : 0;
+    const won = wonGold > 0 ? payoutFor(wonGold, 1) : 0;
     // `chips` already holds the balance after the stake was taken — the win moves it again rather than
     // shadowing it. Two `let chips` in one scope is a build error, and the second one silently meaning
     // something different from the first would be worse than one.
     // ⚠️ TOKENS, and `chips` DOES NOT MOVE — it is the fuel left after the stake. Same correction as
     // the three-reel cabinet above: keno was still paying the currency it took.
-    let tokens = null;
+    let gold = null;
     if (won > 0) {
-        tokens = await moveCoin(buyerId, won, "casino_keno_win", {
-            meta: { bet: stake, hits: hits.length, picks: clean, wonGold, rate: CHIP_RATE },
+        gold = await moveCoin(buyerId, won, "casino_keno_win", {
+            meta: { bet: stake, hits: hits.length, picks: clean, wonGold },
         });
         // ⚠️ THE LADDER'S CURRENCY, WRITTEN IN THE SAME BREATH AS THE PAYOUT. casino_won is what every
         // rung at the Counter is claimed against, and it only ever counts a WIN — a refund or a void hand
@@ -1177,7 +1175,7 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         await recordWon(buyerId, won);
     }
     await trackActivity(buyerId, "casino_play", {
-        game: "keno", bet: stake, wonChips: won,
+        game: "keno", bet: stake, wonGold: won,
         multiple: Number((pays || 0).toFixed(3)),
         // How many numbers they picked is the one choice this game gives them, so it is worth keeping.
         features: [], picks: clean.length, hits: hits.length,
@@ -1199,7 +1197,7 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         if (Math.random() < REFUND_CHANCE) {
             refund = Math.max(1, Math.round(stake * Math.min(1, perks.lossRefund / REFUND_CHANCE)));
             const back = await moveCoin(buyerId, refund, "casino_cat_refund", { meta: { game: "keno" } });
-            if (back != null) chips = back; else refund = 0;
+            if (back != null) bal = back; else refund = 0;
         }
     }
 
@@ -1209,8 +1207,8 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     // "Play 5 times on the floor" while a losing one counted as one. The second call also invented the
     // metric `casino_keno_win`, which no bounty and no quest has ever asked for.
     await tickCasinoQuests(buyerId, "keno", won);
-    if (chips == null) chips = await coinBalance(buyerId);
-    if (tokens == null) tokens = await coinBalance(buyerId);
+    if (bal == null) bal = await coinBalance(buyerId);
+    if (gold == null) gold = await coinBalance(buyerId);
 
     return {
         ok: true,
@@ -1227,8 +1225,7 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         pays,
         won,
         wonGold,
-        chips,
-        tokens,
+        gold,
         staked,
         onHouse,
         refund,
@@ -1390,28 +1387,17 @@ export async function getCasinoState(buyerId) {
     ]);
     return {
         gold: Number(me?.gold) || 0,
-        // ── ⚠️ ONE PURSE. THE FLOOR IS GOLD, AND THESE TWO NAMES ARE THE SAME NUMBER. ────────────────
-        // Luke: "The casino needs to use gold not tokens."
+        // ── ONE PURSE, AND ONE NAME FOR IT ───────────────────────────────────────────────────────────
+        // Luke: "Its gold only. No token or chips please even down to the wording."
         //
-        // These read mkt_buyer.chips and mkt_buyer.tokens, and the sweep that moved the floor onto gold set
-        // both of those columns to zero for every member alive. Every cabinet checks `chips` to decide
-        // whether you can afford a spin, so the entire casino opened with the real balance in the header and
-        // NOT ENOUGH on the machine. Nothing threw. It read as being broke.
+        // `gold` above is the whole purse. This object used to carry `tokens` and `chips` beside it, both
+        // reading columns the sweep had zeroed — which is how the floor came to show a real balance in the
+        // header and NOT ENOUGH on every cabinet at the same moment. The fields and the columns they read
+        // are both gone, and every screen asks for `gold` like the rest of the game.
         //
-        // They keep their names because the whole client reads them by these names — the cabinets, the
-        // tables, the lounge shelf — and renaming the field across every game to fix a balance is how a
-        // one-line outage becomes a six-file one. The names are a shim; the number is gold, and the dead
-        // columns are gone from the query above so this cannot quietly happen again.
-        tokens: Number(me?.gold) || 0,
-        chips: Number(me?.gold) || 0,
-        // Is today's free thousand still there? Read with the rest of the state rather than on its own, so
-        // the cage can draw the button lit or spent without a second round trip on every visit.
-        dailyChips: Boolean(me?.daily_ready),
-        dailyChipsN: DAILY_CHIPS,
-        // And the rate, so a paytable can print what a line is actually worth in chips before a single spin
-        // has happened. The client must never keep its own copy of this — it moved once already, 0.08 to
-        // 0.25, and a hardcoded copy would have quoted every payout three times too low.
-        chipRate: CHIP_RATE,
+        // TOMBSTONE: dailyChips / dailyChipsN / chipRate. The free thousand a day went with the rework
+        // ("no more claiming 1k per day"), the cage that drew the button is a tombstone of its own, and the
+        // rate was the gold-to-chip conversion on a floor that now has one currency and needs none.
         // ⚠ Owner only, and only so the machine can show its force-a-bonus buttons. Goes with them.
         owner: isOwner(buyerId),
         me: { sprite: me?.avatar_sprite_url || null },

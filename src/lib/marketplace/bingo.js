@@ -7,19 +7,19 @@ import {
 } from "@/lib/marketplace/bingo-kit.js";
 import { storeDay, weekdayOf } from "@/lib/marketplace/store-day.js";
 import { casinoPerks, rollCasinoPrize, tickCasinoQuests } from "@/lib/marketplace/casino.js";
-// Chips in, chips out. The stake used to be gold — see the long note in blackjack.js — and the cage now sells
-// the chips instead, so the conversion happens once, in front of you, rather than invisibly at every machine.
-// ⚠️ COIN IN, COIN OUT. These used to be moveChips — the floor took chips and paid chips, and chips
+// Chips in, bal out. The stake used to be gold — see the long note in blackjack.js — and the cage now sells
+// the bal instead, so the conversion happens once, in front of you, rather than invisibly at every machine.
+// ⚠️ COIN IN, COIN OUT. These used to be moveChips — the floor took bal and paid bal, and bal
 // had exactly one sink. That whole layer is gone (the Counter is a ladder now, claimed off lifetime
 // winnings), so a chip would be a currency with nothing to spend it on. Same function shape, same ledger
 // table, gold instead. See casino-bank.js.
 import { coinBalance, moveCoin, recordWon } from "@/lib/marketplace/casino-bank.js";
-import { chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { payoutFor } from "@/lib/marketplace/casino-payout.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── THE BINGO HALL ───────────────────────────────────────────────────────────────────────────────────────────
-// The money half. The rules and the maths are in bingo-kit.js, which knows nothing about gold or chips — same
+// The money half. The rules and the maths are in bingo-kit.js, which knows nothing about gold or bal — same
 // split as blackjack, and for the same reason: check:bingo deals two million cards through the real scoring
 // function, and it cannot do that through a module that needs a database.
 //
@@ -86,8 +86,8 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     // moveCoin carries its own conditional debit (`AND gold >= n`) and writes its own ledger row, so this is
     // the whole of taking a stake now — the gold guard, the balance read and the logCoin it replaced were
     // three statements doing what one does.
-    let chips = await moveCoin(buyerId, -stake, "casino_bingo_bet", { meta: { bet: stake } });
-    if (chips == null) return { ok: false, error: "no_chips" };
+    let bal = await moveCoin(buyerId, -stake, "casino_bingo_bet", { meta: { bet: stake } });
+    if (bal == null) return { ok: false, error: "not_enough_gold" };
     // ── THE BALANCE THE MOMENT THE STAKE LEAVES ──────────────────────────────────────────────────────
     // Sent alongside the final figure so the purse can drop by the bet immediately and only climb back when
     // the reels, the balls or the card have finished saying what happened. Luke: "im able to see the new
@@ -95,12 +95,12 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     // screen was being told the ending before the animation started. Computed here rather than as
     // `balance - bet` on the client, because a stake is not always the bet: the on-the-house perk hands it
     // straight back, and only the server knows whether it fired.
-    const staked = chips;
+    const staked = bal;
 
     let onHouse = false;
     if ((perks.freePlay || 0) > 0 && Math.random() < perks.freePlay) {
         const back = await moveCoin(buyerId, stake, "casino_on_the_house", { meta: { game: "bingo" } });
-        if (back != null) { onHouse = true; chips = back; }
+        if (back != null) { onHouse = true; bal = back; }
     }
 
     const card = makeCard();
@@ -128,19 +128,19 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     // `wonGold` is the paytable's own units — a multiple of what the card cost. The conversion happens once,
     // here, exactly as it does at every slot cabinet and now at the blackjack table.
     const wonGold = Math.round(stake * (score.mult + patternHit.mult));
-    const won = wonGold > 0 ? chipsFor(wonGold, 1) : 0;
-    // `chips` already holds the balance after the stake, and the stake is the ONLY thing that moved it.
-    let tokens = null;
+    const won = wonGold > 0 ? payoutFor(wonGold, 1) : 0;
+    // `bal` already holds the balance after the stake, and the stake is the ONLY thing that moved it.
+    let gold = null;
     if (won > 0) {
-        // ⚠ The win is TOKENS; the stake was chips and is gone. See tokens.js.
-        // -- THE WIN BALANCE IS TOKENS AND MUST NOT LAND IN `chips` --------------------------------
+        // ⚠ The win is TOKENS; the stake was bal and is gone. See tokens.js.
+        // -- THE WIN BALANCE IS TOKENS AND MUST NOT LAND IN `bal` --------------------------------
         // It did, and members watched their chip purse GO UP on a win -- Sunflower Jinxx: "it was
-        // paying me in chips when I won, not tokens". moveTokens returns the TOKEN balance, and
-        // assigning it to `chips` handed the screen a chip figure that was really a token count,
+        // paying me in bal when I won, not tokens". moveTokens returns the TOKEN balance, and
+        // assigning it to `bal` handed the screen a chip figure that was really a token count,
         // which is the one thing the split exists to make impossible. Two purses, two variables.
-        tokens = await moveCoin(buyerId, won, "casino_bingo_win", {
+        gold = await moveCoin(buyerId, won, "casino_bingo_win", {
             meta: { bet: stake, tier: score.tier, lines: score.lines.length, dragon: burnt.length,
-            pattern: patternHit.hit ? today.id : null, patternMult: patternHit.mult, wonGold, rate: CHIP_RATE },
+            pattern: patternHit.hit ? today.id : null, patternMult: patternHit.mult, wonGold },
         });
         // ⚠️ THE LADDER'S CURRENCY, WRITTEN IN THE SAME BREATH AS THE PAYOUT. casino_won is what every
         // rung at the Counter is claimed against, and it only ever counts a WIN — a refund or a void hand
@@ -148,10 +148,10 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
         // betting and cancelling.
         await recordWon(buyerId, won);
     }
-    if (chips == null) chips = await coinBalance(buyerId);
-    if (tokens == null) tokens = await coinBalance(buyerId);
+    if (bal == null) bal = await coinBalance(buyerId);
+    if (gold == null) gold = await coinBalance(buyerId);
     await trackActivity(buyerId, "casino_play", {
-        game: "bingo", bet: stake, wonChips: won,
+        game: "bingo", bet: stake, wonGold: won,
         multiple: Number((score.mult || 0).toFixed(3)),
         // The dragon is the feature this game was built around, so its reach is the thing to watch.
         features: [...(burnt.length ? ["dragon"] : []), ...(patternHit.hit ? [`pattern:${today.id}`] : [])],
@@ -195,11 +195,7 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
         bet: stake,
         won,
         wonGold,
-        chips,
-        // ⚠️ THIS SAID `chips` TWICE. The second was meant to be the token purse and the slip meant
-        // bingo returned no token balance at all, so the header's tokens figure only ever moved on a
-        // reload -- Eric D: "if you refresh the casino page, it should show it as tokens won".
-        tokens,
+        gold,
         prize,
         onHouse,
     };

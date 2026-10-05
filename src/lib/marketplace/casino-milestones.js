@@ -25,8 +25,8 @@
 
 // ── THE INTERVALS, AND WHY THEY ARE THESE NUMBERS ────────────────────────────────────────────────────────
 // ⚠️ THE FIRST SET WAS WRONG BY A FACTOR OF SIX, AND ONLY THE PRICING SCRIPT CAUGHT IT. They were calibrated
-// against a "top player 241,512" read out of mkt_token_event — which is a DIFFERENT token system, not the
-// casino's ledger. The real figure, from mkt_chip_event and now seeded into mkt_buyer.casino_won, is
+// against a "top player 241,512" read out of mkt_casino_ledger_legacy — which is a DIFFERENT token system, not the
+// casino's ledger. The real figure, from mkt_casino_ledger and now seeded into mkt_buyer.casino_won, is
 // 1,339,736. At the old intervals the Den's first day would have been 101 Mythic chests and one member
 // taking +44 might. Re-run scripts/casino-ladder.mjs after touching anything here; it is the only thing
 // standing between a ladder and a landslide.

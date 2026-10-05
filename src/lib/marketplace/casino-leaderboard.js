@@ -47,7 +47,7 @@ export async function leaderboard(buyerId) {
         // The last seven days, from the casino's own ledger. A separate read rather than a column, because
         // "recently" is a question with a moving answer and a stored one would need a sweep to stay true.
         db.query(
-            `SELECT buyer_id, SUM(GREATEST(delta, 0))::bigint AS n FROM mkt_chip_event
+            `SELECT buyer_id, SUM(GREATEST(delta, 0))::bigint AS n FROM mkt_casino_ledger
               WHERE delta > 0 AND reason = ANY($1) AND created_at > NOW() - INTERVAL '7 days'
               GROUP BY buyer_id`, [WINS],
         ).catch(() => []),

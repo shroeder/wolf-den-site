@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { SLOTS5, lookFor, symbolName, LINES } from "@/lib/marketplace/casino-slot5.js";
+import { payoutFor } from "@/lib/marketplace/casino-payout.js";
 
 // ── WHAT IT PAYS ─────────────────────────────────────────────────────────────────────────────────────────────
 // Every real cabinet has this behind a button and it is not decoration: a slot machine is the only game in the
@@ -37,12 +38,18 @@ const ROLE_WORD = {
     bonus: "BONUS",
 };
 
-/** The five-reel table: every paying symbol, best first, in chips at this bet. */
-function rowsForFive(machineId, bet, rate) {
+/** The five-reel table: every paying symbol, best first, in gold at this bet. */
+//
+// ⚠️ IT ASKS payoutFor, IT DOES NOT DO THE ARITHMETIC. This took a `rate` prop threaded down from the floor
+// and multiplied by it, with a default of 0.25 — so the moment the server stopped sending a rate, the default
+// took over and every number in this table would have been quoted at a QUARTER of what the machine actually
+// pays. The table and the machine must round the same way or the table is a lie, so they now call the one
+// function that knows the rule.
+function rowsForFive(machineId, bet) {
     const m = SLOTS5[machineId];
     if (!m) return null;
     const lineBet = bet / LINES.length;
-    const chips = (mult) => Math.max(1, Math.round(lineBet * mult * rate));
+    const chips = (mult) => payoutFor(lineBet, mult);
     const rows = Object.entries(m.pays)
         .map(([id, by]) => ({
             id,
@@ -57,7 +64,7 @@ function rowsForFive(machineId, bet, rate) {
         id: m.scatter,
         role: "scatter",
         tone: lookFor(machineId, m.scatter)?.tone || "#cbd3dc",
-        cells: [3, 4, 5].map((n) => (m.scatterPays[n] ? Math.max(1, Math.round(bet * m.scatterPays[n] * rate)) : null)),
+        cells: [3, 4, 5].map((n) => (m.scatterPays[n] ? payoutFor(bet, m.scatterPays[n]) : null)),
     };
     return { rows: [...rows, sc], heads: ["3", "4", "5"], m };
 }
@@ -83,10 +90,10 @@ function rowsForThree(table, bet) {
     return { rows, heads: ["2", "3"], m: null };
 }
 
-export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25, onClose }) {
+export default function Paytable({ machineId, kind, table, art, bet, onClose }) {
     const built = useMemo(
-        () => (kind === "five" ? rowsForFive(machineId, bet, rate) : rowsForThree(table, bet)),
-        [kind, machineId, bet, rate, table],
+        () => (kind === "five" ? rowsForFive(machineId, bet) : rowsForThree(table, bet)),
+        [kind, machineId, bet, table],
     );
     if (!built) return null;
     const { rows, heads, m } = built;

@@ -15,12 +15,12 @@ import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 // being asked for; it is the same number in a unit you can feel.
 
 // ⚠️ IT TAKES TOKENS, AND IT WAS BEING HANDED CHIPS. The shelf has been priced in tokens since
-// migration 436 — chipShelf returns the token balance as `balance` — but this component preferred a
+// migration 436 — counterShelf returns the token balance as `balance` — but this component preferred a
 // `chips` prop over it, so the number on the till and every "can you afford it" check were reading the
 // wrong purse. They matched only because the migration seeded one from the other; the first spin pulled
 // them apart. Luke, looking at the Counter: "did we update to be tokens?" The prices had. The screen had
 // not, and underneath the label it was doing arithmetic with fuel.
-export default function ChipStore({ tokens, onBuy, onRefresh, single = false }) {
+export default function CounterShelf({ tokens, onBuy, onRefresh, single = false }) {
     const [shelf, setShelf] = useState(null);
     const [busy, setBusy] = useState(null);
     const [said, setSaid] = useState(null);
@@ -120,7 +120,7 @@ export default function ChipStore({ tokens, onBuy, onRefresh, single = false }) 
                 {[["chest", "Chests"], ["stat", "Training"], ["unlock", "The Doors"]].map(([id, label]) => (
                     <button key={id} type="button" role="tab" aria-selected={tab === id}
                         className={`cs-tab${tab === id ? " is-on" : ""}`}
-                        onClick={() => { if (tab === id) return; unlock(); Cas.chips(); Haptic.hit(0.2); setSaid(null); setTab(id); }}>
+                        onClick={() => { if (tab === id) return; unlock(); Cas.bet(); Haptic.hit(0.2); setSaid(null); setTab(id); }}>
                         {label}
                     </button>
                 ))}
@@ -145,7 +145,7 @@ export default function ChipStore({ tokens, onBuy, onRefresh, single = false }) 
                             // check:feel, on the counter: "never buzzed the phone." Picking a thing up off
                             // the shelf made a sound and nothing else — and this is the screen where the
                             // numbers are largest, so it is the worst one to feel like a list.
-                            unlock(); Cas.chips(); Haptic.hit(0.25); setOpen(item);
+                            unlock(); Cas.bet(); Haptic.hit(0.25); setOpen(item);
                         }}>
                         {/* THE THING ITSELF. Every one of these is drawn — gems, forge parts, consumables
                             and decorations all carry a sprite somewhere in the game — and the counter was

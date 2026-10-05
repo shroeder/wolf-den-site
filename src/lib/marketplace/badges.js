@@ -274,7 +274,7 @@ export async function getMemberMetrics(buyerId) {
     // tracking gold rather than chips."
     //
     // Exactly right, and it was total rather than partial: this read mkt_coin_event, every stake on the floor
-    // now lands in mkt_chip_event, so the moment the machines took chips these four counters stopped moving
+    // now lands in mkt_casino_ledger, so the moment the machines took chips these four counters stopped moving
     // altogether. His 39 plays are the ones he made before the conversion.
     //
     // Both, unioned, rather than switching to the chip ledger — switching would have reset every member's
@@ -286,7 +286,7 @@ export async function getMemberMetrics(buyerId) {
         `WITH plays AS (
              SELECT reason, delta, meta FROM mkt_coin_event WHERE buyer_id = $1 AND reason LIKE 'casino_%'
              UNION ALL
-             SELECT reason, delta, meta FROM mkt_chip_event WHERE buyer_id = $1 AND reason LIKE 'casino_%')
+             SELECT reason, delta, meta FROM mkt_casino_ledger WHERE buyer_id = $1 AND reason LIKE 'casino_%')
          SELECT COUNT(*) FILTER (WHERE reason ~ '_bet$')::int AS plays,
                 COALESCE(-SUM(delta) FILTER (WHERE reason ~ '_bet$'), 0)::bigint AS wagered,
                 COUNT(*) FILTER (WHERE reason = 'casino_slot_win' AND meta->>'jackpot' = 'true')::int AS jackpots,

@@ -24,7 +24,7 @@ import { casinoPerks, rollCasinoPrize, tickCasinoQuests } from "@/lib/marketplac
 // winnings), so a chip would be a currency with nothing to spend it on. Same function shape, same ledger
 // table, gold instead. See casino-bank.js.
 import { coinBalance, moveCoin, recordWon } from "@/lib/marketplace/casino-bank.js";
-import { chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { payoutFor } from "@/lib/marketplace/casino-payout.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
@@ -134,24 +134,22 @@ async function settleAll(buyerId, row, dealerCards, hands) {
     // about chips, and the rate is applied here and only here. `chipsFor` also floors any non-zero return at
     // one chip, which matters at this table more than anywhere: a 25-gold push returns 6.25, and a push that
     // rounds to nothing is the machine telling you that you lost a hand you did not lose.
-    const back = chipsFor(backGold, 1);
-    const won = chipsFor(wonGold, 1);
+    const back = payoutFor(backGold, 1);
+    const won = payoutFor(wonGold, 1);
 
-    // -- TWO PURSES, TWO VARIABLES ----------------------------------------------------------------
-    // `chips` used to hold whatever moveTokens returned, which is the TOKEN balance -- so a winning
-    // hand reported a chip figure that was really a token count, and no token figure at all. Same
-    // slip as bingo, same symptom members saw: the win looked like it paid chips.
-    let chips = null;
-    let tokens = null;
+    // ONE PURSE. This carried a chip balance and a token balance side by side; both have been the same
+    // gold balance since the rework, and keeping two names for one number is what let a payout ship
+    // reading the wrong one.
+    let after = null;
     if (back > 0) {
         // ⚠️ TOKENS, and that includes the part of `back` that is the returned stake. On this floor a
         // stake does not come back — the chips were spent to sit down. A push therefore pays your
         // stake in tokens rather than refunding chips, which is the same arithmetic for the player
         // and keeps the one rule the whole split rests on: chips only ever go down. See tokens.js.
-        tokens = await moveCoin(buyerId, back, "casino_blackjack_win", {
+        after = await moveCoin(buyerId, back, "casino_blackjack_win", {
             ref: String(row.id),
             meta: { bet: results.reduce((n, r) => n + r.bet, 0), outcomes: results.map((r) => r.outcome),
-                goldStaked: row.stake, backGold, wonGold, rate: CHIP_RATE, hands: hands.length },
+                goldStaked: row.stake, backGold, wonGold, hands: hands.length },
         });
         // ⚠️ THE LADDER'S CURRENCY, WRITTEN IN THE SAME BREATH AS THE PAYOUT. casino_won is what every
         // rung at the Counter is claimed against, and it only ever counts a WIN — a refund or a void hand
@@ -159,10 +157,9 @@ async function settleAll(buyerId, row, dealerCards, hands) {
         // betting and cancelling.
         await recordWon(buyerId, back);
     }
-    if (chips == null) chips = await coinBalance(buyerId);
-    if (tokens == null) tokens = await coinBalance(buyerId);
+    if (after == null) after = await coinBalance(buyerId);
     await trackActivity(buyerId, "casino_play", {
-        game: "blackjack", bet: row.stake, wonChips: back,
+        game: "blackjack", bet: row.stake, wonGold: back,
         multiple: row.stake ? Number((backGold / row.stake).toFixed(3)) : 0,
         features: results.map((r) => r.outcome), hands: hands.length,
     }).catch(() => {});
@@ -192,7 +189,7 @@ async function settleAll(buyerId, row, dealerCards, hands) {
     const shape = done || { ...row, status: "done", dealer: dealerCards, hands: finished, outcome, won, rake };
 
     // The rest of the floor's furniture: bounties tick and a prize can land. The five pets are NOT in play
-    // here any more — they are bought at the Counter, not dropped (see chips.js CHIP_STORE).
+    // here any more — they are bought at the Counter, not dropped (see chips.js COUNTER_STORE).
     // exactly as they are at every other machine. A hand of blackjack is one play — a hit is not, and neither
     // is the second half of a split — which is why this lives in settlement and not in the action handlers.
     const perks = await casinoPerks(buyerId);
@@ -200,7 +197,7 @@ async function settleAll(buyerId, row, dealerCards, hands) {
     // A natural twenty-one is this table's jackpot: it is the rarest good outcome and the one worth a prize.
     const prize = await rollCasinoPrize(buyerId, { jackpot: results.some((r) => r.outcome === "blackjack"), perks });
 
-    return { hand: publicView(shape, { reveal: true }), gold, chips, tokens, won, wonGold, outcome, prize };
+    return { hand: publicView(shape, { reveal: true }), gold: after, won, wonGold, outcome, prize };
 }
 
 /**
@@ -219,7 +216,7 @@ async function advance(buyerId, row, hands, active) {
     const alive = hands.some((h) => !handValue(h.cards).bust);
     const dealer = alive ? playDealer(parse(row.dealer, []), shoe) : parse(row.dealer, []);
     const s = await settleAll(buyerId, row, dealer, hands);
-    return { ok: true, gold: s.gold, chips: s.chips, tokens: s.tokens, hand: s.hand, bet: row.stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
+    return { ok: true, gold: s.gold, hand: s.hand, bet: row.stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
 }
 
 /**
@@ -245,7 +242,7 @@ export async function dealBlackjack(buyerId, { bet } = {}) {
 
     const stake = clampBet(bet);
     const paid = await takeStake(buyerId, stake, { bet: stake });
-    if (!paid) return { ok: false, error: "no_chips" };
+    if (!paid) return { ok: false, error: "not_enough_gold" };
 
     const shoe = freshShoe();
     const player = [shoe.pop(), shoe.pop()];
@@ -267,10 +264,10 @@ export async function dealBlackjack(buyerId, { bet } = {}) {
     // A natural on either side ends it immediately — there is no turn to take.
     if (isBlackjack(player) || isBlackjack(dealer)) {
         const s = await settleAll(buyerId, row, dealer, hands);
-        return { ok: true, natural: true, gold: s.gold, chips: s.chips, tokens: s.tokens, hand: s.hand, bet: stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
+        return { ok: true, natural: true, gold: s.gold, hand: s.hand, bet: stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
     }
     // `paid` is the chip balance moveCoin handed back — no gold moved anywhere in this file.
-    return { ok: true, chips: paid, hand: publicView(row), bet: stake };
+    return { ok: true, gold: paid, hand: publicView(row), bet: stake };
 }
 
 /** HIT. One card to the hand in play. Busting moves the turn on rather than making somebody press stand on a
@@ -318,7 +315,7 @@ export async function doubleBlackjack(buyerId) {
     if (!hand || hand.cards.length !== 2 || hand.doubled || hand.splitAces) return { ok: false, error: "cannot_double" };
 
     const paid = await takeStake(buyerId, row.stake, { bet: row.stake, doubled: true });
-    if (!paid) return { ok: false, error: "no_chips" };
+    if (!paid) return { ok: false, error: "not_enough_gold" };
 
     const shoe = parse(row.shoe, []);
     hand.cards = [...hand.cards, shoe.pop()];
@@ -351,7 +348,7 @@ export async function splitBlackjack(buyerId) {
     if (!hand || hands.length !== 1 || !canSplit(hand.cards, hand.fromSplit)) return { ok: false, error: "cannot_split" };
 
     const paid = await takeStake(buyerId, row.stake, { bet: row.stake, split: true });
-    if (!paid) return { ok: false, error: "no_chips" };
+    if (!paid) return { ok: false, error: "not_enough_gold" };
 
     const shoe = parse(row.shoe, []);
     const splitAces = pairValue(hand.cards[0]) === 11;
@@ -373,7 +370,7 @@ export async function splitBlackjack(buyerId) {
         const shoeNow = parse(saved.shoe, []);
         const dealer = playDealer(parse(saved.dealer, []), shoeNow);
         const s = await settleAll(buyerId, saved, dealer, split);
-        return { ok: true, gold: s.gold, chips: s.chips, tokens: s.tokens, hand: s.hand, bet: row.stake * 2, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
+        return { ok: true, gold: s.gold, hand: s.hand, bet: row.stake * 2, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
     }
     return { ok: true, hand: publicView(saved) };
 }

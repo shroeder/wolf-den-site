@@ -19483,7 +19483,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* A little air before the second purse, so "coin 1,111" and "chip 431,117" read as two things rather than
    as one long number. */
 .cas-purse-sm img + * { margin-right: 3px; }
-.cas-purse-sm .cas-purse-chips { color: #7fe0a0; }
+.cas-purse-sm .cas-purse-gold { color: #7fe0a0; }
 .cas-purse-sm i { font-style: normal; font-size: 8.5px; color: #98a0aa; margin-left: 3px; }
 
 /* Everything between the title bar and the controls is the game, and it gets whatever room is left. */
@@ -20481,7 +20481,7 @@ body.cas-seated .social-fab { display: none; }
 .s5-readout i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .12em;
     text-transform: uppercase; color: #7d8792; }
 .s5-readout b { font-size: 15px; font-weight: 800; color: #eaf1f8; font-variant-numeric: tabular-nums; }
-.s5-ro-chips b { color: var(--acc, #ffd75e); }
+.s5-ro-gold b { color: var(--acc, #ffd75e); }
 
 /* ONE STEPPER, NOT FOUR BUTTONS. It scales to any number of stakes without growing, and it shows the bet
    as a VALUE rather than as the selected one of a row. */
