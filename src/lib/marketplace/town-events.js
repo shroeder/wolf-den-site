@@ -601,8 +601,28 @@ async function pickSpawnKind() {
     // whether the plaza is dressed at all.
     const inSeason = (k) => !TOWN_EVENT_TYPES[k].season || (TOWN_EVENT_TYPES[k].season === "halloween" && HALLOWEEN_PUBLIC);
     const kinds = Object.keys(TOWN_EVENT_TYPES).filter(inSeason);
-    const bosses = kinds.filter((k) => TOWN_EVENT_TYPES[k].boss);
-    const ordinary = kinds.filter((k) => !TOWN_EVENT_TYPES[k].boss);
+
+    // ── IN SEASON, THE SEASON *IS* THE RAIDS ────────────────────────────────────────────────────────
+    // Luke: "the theme should be halloween raids."
+    //
+    // Seasonal kinds REPLACE the year-round ones rather than joining them. Letting them merely join the pool
+    // is the version that looks right in the diff and wrong in the plaza: the Den would spend October being
+    // called out for a bandit raid every other siren, in a town painted for Hallowe'en, with a seasonal
+    // currency that bandits do not drop. An event that only themes half of the thing it is an event for reads
+    // as the theme failing to apply, not as variety.
+    //
+    // Variety does not actually suffer — two seasonal skirmishes and a seasonal boss is the same count the
+    // year-round roster offers, and they are swapped back the moment the flag goes down.
+    //
+    // ⚠️ APPLIED PER-BUCKET, NOT TO `kinds` WHOLESALE. A season with skirmishes but no boss of its own must
+    // still be able to draw the year-round boss, or adding a seasonal skirmish next year would silently
+    // switch the boss raid off for the length of that event.
+    const seasonal = (list) => {
+        const only = list.filter((k) => TOWN_EVENT_TYPES[k].season);
+        return only.length ? only : list;
+    };
+    const bosses = seasonal(kinds.filter((k) => TOWN_EVENT_TYPES[k].boss));
+    const ordinary = seasonal(kinds.filter((k) => !TOWN_EVENT_TYPES[k].boss));
     if (bosses.length) {
         const recent = await db.queryOne(
             `SELECT id FROM mkt_town_event
