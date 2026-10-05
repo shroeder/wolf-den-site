@@ -1378,29 +1378,32 @@ export async function getCasinoState(buyerId) {
         // claim as unavailable until the column is there. Same shape as getGlobalChat's channel fallback.
         (async () => {
             const withDay = await db.queryOne(
-                `SELECT gold, COALESCE(chips, 0)::bigint AS chips, COALESCE(tokens, 0)::bigint AS tokens,
-                        avatar_sprite_url,
+                `SELECT gold, avatar_sprite_url,
                         (chips_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date) AS daily_ready
                    FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
             if (withDay) return withDay;
             return db.queryOne(
-                `SELECT gold, COALESCE(chips, 0)::bigint AS chips, avatar_sprite_url, FALSE AS daily_ready
+                `SELECT gold, avatar_sprite_url, FALSE AS daily_ready
                    FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
         })(),
         casinoOccupants(buyerId),
     ]);
     return {
         gold: Number(me?.gold) || 0,
-        // ⚠️ `tokens` COMES OFF THE FIRST QUERY ONLY. The fallback beside it exists for the minutes
-        // between this code serving and migration 436 landing — which is precisely when `tokens` is not a
-        // column — so naming it there would make the fallback throw for the one window it exists to cover,
-        // and the floor would open with no purse at all. Zero until the column is there is correct: nobody
-        // has won a token yet either. Same argument as `chips_day` in the query above.
-        tokens: Number(me?.tokens) || 0,
-        // The casino's own currency. The five-reel machines pay in chips and the counter spends them, so the
-        // purse on that screen shows both — see chips.js. Sent from the first load rather than only in a spin
-        // response, or a member who walks in and does not pull is told they have none.
-        chips: Number(me?.chips) || 0,
+        // ── ⚠️ ONE PURSE. THE FLOOR IS GOLD, AND THESE TWO NAMES ARE THE SAME NUMBER. ────────────────
+        // Luke: "The casino needs to use gold not tokens."
+        //
+        // These read mkt_buyer.chips and mkt_buyer.tokens, and the sweep that moved the floor onto gold set
+        // both of those columns to zero for every member alive. Every cabinet checks `chips` to decide
+        // whether you can afford a spin, so the entire casino opened with the real balance in the header and
+        // NOT ENOUGH on the machine. Nothing threw. It read as being broke.
+        //
+        // They keep their names because the whole client reads them by these names — the cabinets, the
+        // tables, the lounge shelf — and renaming the field across every game to fix a balance is how a
+        // one-line outage becomes a six-file one. The names are a shim; the number is gold, and the dead
+        // columns are gone from the query above so this cannot quietly happen again.
+        tokens: Number(me?.gold) || 0,
+        chips: Number(me?.gold) || 0,
         // Is today's free thousand still there? Read with the rest of the state rather than on its own, so
         // the cage can draw the button lit or spent without a second round trip on every visit.
         dailyChips: Boolean(me?.daily_ready),

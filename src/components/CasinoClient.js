@@ -2779,7 +2779,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 {busy ? "…"
                                     : SLOTS.has(at.id) && (meters[at.id]?.freePulls || 0) > 0
                                         ? `Free pull · ${meters[at.id].freePulls} left`
-                                        : (st?.chips || 0) < bet ? "Not enough chips"
+                                        : (st?.chips || 0) < bet ? "Not enough gold"
                                         : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
                                             : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
                             </button>

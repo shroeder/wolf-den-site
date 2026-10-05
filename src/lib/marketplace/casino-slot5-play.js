@@ -286,7 +286,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         // ⚠️ `chips` NO LONGER GOES UP. It is the fuel left after the stake and nothing this spin did can
         // raise it; a win lands in `tokens`. The screen shows both, and the purse at the top of the floor
         // is the CHIP one — that is the number a player is spending.
-        chips: bank ?? await chipsOf(buyerId),
+        chips: bank ?? await coinBalance(buyerId),
         tokens: tokens ?? await coinBalance(buyerId),
         // The balance the instant the stake left, before a single reel has stopped. Kept even though
         // `chips` is now the same number: the client reads it, and a spin that pays nothing and a spin
@@ -603,11 +603,6 @@ const SEA_PETS = new Set(["crab", "turtle", "marlin", "dolphin", "penguin", "sea
 // Falls back to the whole catalogue for anybody who owns none yet, rather than showing an empty paddock: a
 // bonus round that looks broken because you have not played another feature is worse than a generic one.
 // Sprites come from mkt_pet_sprite, the same table the farm and the boss screen read.
-
-async function chipsOf(buyerId) {
-    const row = await db.queryOne(`SELECT COALESCE(chips, 0)::bigint AS chips FROM mkt_buyer WHERE id = $1`, [buyerId]);
-    return Number(row?.chips || 0);
-}
 
 // ── WHAT COUNTS AS A WIN WORTH CELEBRATING ───────────────────────────────────────────────────────────────────
 // About seven wins in ten on a twenty-line machine pay back less than the stake. That is not a trick — it is

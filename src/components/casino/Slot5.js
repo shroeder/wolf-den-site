@@ -1631,7 +1631,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                 either lower the bet or go and earn, and both need the size of the gap. */}
             {broke ? (
                 <p className="s5-short">
-                    {(Number(bet) - Number(chips ?? 0)).toLocaleString()} more chips for a {Number(bet).toLocaleString()} spin
+                    {(Number(bet) - Number(chips ?? 0)).toLocaleString()} more gold for a {Number(bet).toLocaleString()} spin
                     {bet > (stakes[0] ?? 0) ? <> — or step the bet down</> : null}
                 </p>
             ) : null}
@@ -1658,7 +1658,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                 BET IS STILL NOT HERE: the stepper below prints it, larger, next to the controls that change
                 it, and the same number twice on one screen is one of them being ignored. */}
             <div className="s5-readout is-one">
-                <span className="s5-ro-chips"><i>Chips</i><b>{Number(chips || 0).toLocaleString()}</b></span>
+                <span className="s5-ro-chips"><i>Gold</i><b>{Number(chips || 0).toLocaleString()}</b></span>
             </div>
 
             <div className="s5-panel">
