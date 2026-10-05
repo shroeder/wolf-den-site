@@ -305,10 +305,10 @@ export const cornersOf = (card, drawn, burnt = []) => {
 // 3,517 real cards it returned 134.6% against the 124.8% its table says, while slot5 sat at 65% and keno at
 // 33% purely because their big wins had not landed yet. See scripts/casino-rtp-audit.mjs.
 //
-// 0.88/1.2482 is the factor that puts the simulated table on the new floor target. It is a 30% cut and there
-// is no way to make it smaller: the game was handing back a quarter more than it took, in a currency that is
-// now gold.
-export const BINGO_PAY = 0.578;
+// 1.05/1.2482 is the factor that puts the simulated table on the floor's target. It is still the deepest cut
+// on the floor, but at 0.690 it lands bingo LEVEL with every other cabinet rather than below them — which is
+// the right outcome for the machine two thirds of the Den plays.
+export const BINGO_PAY = 0.690;
 
 export const BINGO_PAYS = {
     // ⚠️ A WIN MUST NOT COST YOU MONEY. SunflowerJinxx: "A 100 chip bingo bet is paying less than the bet."

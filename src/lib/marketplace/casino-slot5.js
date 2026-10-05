@@ -695,15 +695,34 @@ const VAULT = {
 // its cabinet's RTP is different on every machine (The Vault needs 1.074 where The Menagerie needs 0.918
 // for the same return).
 //
-// 88% rather than 95%: this is the only machine family in the game that takes gold off a member, and the
-// whole ladder that replaced the Counter is paid out of the house's share. A floor that keeps twelve per
-// cent is a floor that can afford the rungs.
-export const TARGET_RTP = 0.88;
-HUNT.pay = 0.915;
-HARVEST.pay = 0.919;
-DEEP.pay = 0.923;
-MENAGERIE.pay = 0.918;
-VAULT.pay = 0.894;   // THREE passes to converge, exactly as the note above warns
+// ── AND THE TARGET IS 1.05, WHICH IS LUKE'S CALL AND IS BACKED BY TWO MONTHS OF LEDGER ───────────────────────
+// Luke: "I think 105 should be the target."
+//
+// ⚠️ THAT IS ABOVE 100%, AND IT IS DELIBERATE. The floor is a net FAUCET: it hands back five per cent more
+// than it takes, for ever, and the only limit on how much somebody can farm out of it is how long they are
+// willing to sit there. That is the thing to have eyes open about, so here is the size of it, measured
+// rather than feared:
+//
+//   the Den stakes ~75,000 gold a day on this floor
+//   at 105% the floor mints ~113,000 gold a MONTH
+//   the Den is holding ~974,000 gold in total
+//
+// ⚠️ AND IT IS A CUT, NOT A RAISE. The tables were designed at 121.5% and REALISED 107.6% over 2.5 million
+// gold of actual play — so the floor has been minting about 172,000 a month already and the economy carried
+// it without anybody noticing. 105% is tighter than the status quo and a great deal tighter than the design.
+//
+// 88% was the textbook answer and it was briefly the shipped one. It would have made the floor BURN 271,000 a
+// month — a 440,000-a-month swing against a 974,000 stock, which is not a retune, it is a confiscation.
+//
+// If this ever needs bounding, this is the dial, and the thing to watch is the daily STAKE rather than the
+// RTP: a faucet above 100% is bounded by volume, so the question is never "what does it pay" but "how much
+// can one person put through it in an evening".
+export const TARGET_RTP = 1.05;
+HUNT.pay = 1.113;
+HARVEST.pay = 1.092;
+DEEP.pay = 1.099;
+MENAGERIE.pay = 1.096;
+VAULT.pay = 1.113;   // THREE passes to converge, exactly as the note above warns
 
 // Multiplies every paying number a cabinet owns. `pays` is symbol -> count -> multiple of the line bet and
 // `scatterPays` is count -> multiple of the total bet; both are payouts and nothing else in the machine is.

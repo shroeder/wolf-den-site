@@ -38,7 +38,15 @@ for (const [id, m] of Object.entries(SLOTS5)) {
         }
     }
     const rtp = paid / staked;
-    check(rtp < 1, `${m.name || id} returns less than it takes`, `${(rtp * 100).toFixed(1)}%`);
+    // ⚠️ THIS USED TO BE "no cabinet may return more than it takes", and it cannot be any more. The
+    // floor's target is 1.05 — a deliberate net faucet, Luke's call, backed by the tables having
+    // REALISED 107.6% for two months without the economy moving. What still has to hold is that no
+    // cabinet strays far from the number the whole floor was costed against: one machine quietly at
+    // 130% while the rest are at 105% is the bug this catches, and it is invisible from playing.
+    //
+    // ±8 points, because a 270,000-spin read still swings several on cabinets with bonus rounds this big.
+    check(Math.abs(rtp - TARGET_RTP) <= 0.08, `${m.name || id} sits on the floor's target`,
+        `${(rtp * 100).toFixed(1)}% vs ${(TARGET_RTP * 100).toFixed(0)}%`);
 }
 
 // ── 2. THE LADDER IS A LADDER ───────────────────────────────────────────────────────────────────────────
@@ -82,5 +90,19 @@ check(Number(left.n) === 0, "no member is left holding a currency nothing accept
 const seeded = await db.queryOne(`SELECT COUNT(*)::int n, MAX(casino_won)::bigint m FROM mkt_buyer WHERE casino_won > 0`);
 check(Number(seeded.n) > 20, "lifetime winnings were carried across, not reset", `${seeded.n} members, top ${Number(seeded.m).toLocaleString()}`);
 
-console.log(fails ? `\n${fails} FAILED` : "\nthe floor takes gold, pays gold, and keeps 12%.");
+// ── 5. AND WHAT THE FLOOR MINTS, IN GOLD A MONTH ──────────────────────────────────────────
+// ⚠️ A FAUCET ABOVE 100% IS BOUNDED BY VOLUME, NOT BY ITS RATE. The RTP says how generous the floor
+// is; only the daily stake says how much gold that actually is. This is the number to watch if it ever
+// needs reining in, and the one that would move first if somebody worked out how to grind it.
+const vol = await db.queryOne(
+    `SELECT MIN(created_at) a, MAX(created_at) b, COALESCE(-SUM(delta),0)::bigint staked
+       FROM mkt_chip_event WHERE reason LIKE '%_bet' AND delta < 0`);
+const days = Math.max(1, Math.round((new Date(vol.b) - new Date(vol.a)) / 86400000));
+const perMonth = (TARGET_RTP - 1) * (Number(vol.staked) / days) * 30;
+console.log(`
+  at ${Math.round(Number(vol.staked) / days).toLocaleString()} gold staked a day, the floor ${perMonth >= 0 ? "MINTS" : "burns"} ${Math.abs(Math.round(perMonth)).toLocaleString()} gold a month.`);
+
+console.log(fails ? `
+${fails} FAILED` : `
+the floor takes gold, pays gold, and returns ${(TARGET_RTP * 100).toFixed(0)}%.`);
 process.exit(fails ? 1 : 0);

@@ -1021,11 +1021,11 @@ export const KENO_DRAWN = 10;
 // instruction points — bring the LOW one up, never level the others down. The dial multiplies the whole
 // ladder so the SHAPE is untouched: two hits still returns your stake, five hits is still the thing you are
 // there for, and the golden ball still doubles whatever landed. Exactly the same treatment the cabinets got.
-// ⚠️ 1.277 -> 0.928. Keno's exact RTP was 121.02% — it is a solved table rather than a sampled one, so that
-// figure is not an estimate — and 0.88/1.2102 is the factor that puts it on the new floor target. Same
-// reason as the slot dials: a 121% machine paying GOLD is a printer. Measured after: 88.0%, exactly, because
-// scaling every pay by a constant scales the return by the same constant.
-export const KENO_PAY = 0.928;
+// ⚠️ 1.277 -> 1.108. Keno's exact RTP was 121.02% — it is a solved table rather than a sampled one, so that
+// figure is not an estimate — and 1.05/1.2102 is the factor that puts it on the floor's target. Same
+// reason as the slot dials, and exact rather than sampled: five picks from forty is a closed-form sum, which
+// is why keno never needs the second solver pass the slot cabinets do.
+export const KENO_PAY = 1.108;
 export const KENO_PAYS = Object.fromEntries(
     Object.entries({ 0: 0, 1: 0, 2: 1, 3: 2.7, 4: 22, 5: 540 })
         .map(([k, v]) => [k, Number((v * KENO_PAY).toPrecision(6))]),
