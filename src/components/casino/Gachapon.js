@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { clunk, coinIn, crack, land, ratchet, reveal, roll, stopGachaAudio } from "@/components/casino/gacha-audio.js";
+import GachaPit from "@/components/casino/GachaPit.js";
 
 // ── THE HALLOWE'EN GACHAPON ──────────────────────────────────────────────────────────────────────────────
 // Luke: "it would be awesome if it was like a real simulation so it really felt like a real gachapon machine."
@@ -26,39 +27,23 @@ import { clunk, coinIn, crack, land, ratchet, reveal, roll, stopGachaAudio } fro
 // the player drags, and a machine that pays real money must not have its outcome anywhere near the client.
 // What the client gets to choose is only which capsule in the globe LOOKS like it left.
 
-// How many capsules are visible in the globe. Enough to read as "full" and few enough that the layout is
-// cheap — 48 absolutely positioned spans, laid out once, is nothing; three hundred would be a jank.
-const GLOBE_N = 48;
-
-// The shell colours, matched to the server's CAPSULES. Repeated here because this is a client component and
-// gachapon.js is server-only — the server sends `tone` with every prize and every result, so the two can only
-// disagree about the DECORATIVE globe, never about what you actually won.
-const SHELLS = ["#ff9a2e", "#ff9a2e", "#ff9a2e", "#54a8ff", "#54a8ff", "#b878ff", "#ffcf3a"];
-
-// A deterministic jumble. Math.random() in a render would reshuffle the whole globe on every state change —
-// the capsules would twitch every time the ticket count changed — so the layout is built once from an index.
-function globeLayout() {
-    const out = [];
-    let seed = 1337;
-    const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-    for (let i = 0; i < GLOBE_N; i += 1) {
-        // Rejection-sample into a disc so they pile in a circle rather than in a square with bald corners.
-        let x = 0; let y = 0;
-        do { x = rnd() * 2 - 1; y = rnd() * 2 - 1; } while (x * x + y * y > 0.86);
-        out.push({
-            i,
-            // Pulled downward, because capsules sit in the bottom of a globe rather than floating in it.
-            x: 50 + x * 42,
-            y: 46 + (y * 0.5 + 0.34) * 46,
-            size: 13 + rnd() * 7,
-            tone: SHELLS[Math.floor(rnd() * SHELLS.length)],
-            spin: rnd() * 360,
-            // Each one settles on its own clock, so the pile breathes instead of pulsing as a block.
-            delay: rnd() * 2.4,
-        });
-    }
-    return out;
-}
+// ── WHERE THE GLOBE IS IN THE SPRITE ─────────────────────────────────────────────────────────────────────
+// Measured off gacha-rig.webp rather than eyeballed: the widest bright run in the top half of the drawing is
+// the glass sphere, and it sits with its centre 47.7% across and 27.2% down the machine, 81.9% of the
+// machine's width wide. Those three numbers put the ball pit exactly inside the painted glass, and if the
+// machine is ever redrawn they are the three things to re-measure.
+// ⚠️ THESE ARE PERCENTAGES OF THE WHOLE IMAGE, NOT OF THE DRAWING INSIDE IT. The first set was measured
+// against the sprite's CONTENT box — the machine is 199px wide inside a 384px canvas, so the rest is
+// transparent padding — and then used as CSS percentages, which resolve against the <img> element. The globe
+// came out nearly twice its size and a ring of prizes floated around the outside of the machine.
+//
+//   content box: x 95-294, y 4-379 of a 384x384 sprite
+//   globe centre: 95 + 0.477x199 = 190  ->  49.5% of the image
+//                 4  + 0.272x375 = 106  ->  27.6%
+//   globe width:  0.819 x 199     = 163  ->  42.4%
+// 38 rather than 42.4: a little inside the painted glass, so the sphere's own rim and the brass collar at
+// its base frame the prizes instead of being covered by them.
+const GLOBE = { x: 49.5, y: 26.5, d: 38 };
 
 const STEP = { idle: "idle", cranking: "cranking", dropping: "dropping", tray: "tray", open: "open" };
 
@@ -72,7 +57,15 @@ export default function Gachapon({ onClose }) {
     const [showIndex, setShowIndex] = useState(false);
     const [err, setErr] = useState(null);
 
-    const capsules = useMemo(globeLayout, []);
+    // How hard the capsules are being churned, 0..1. Driven by the handle, read by the pit.
+    // ⚠️ WHAT GOES IN THE GLOBE IS WHAT HAS A PICTURE. Store credit has no sprite and never will;
+    // neither does 'a piece of Harvest's End, drawn at random'. A ball pit with four blank
+    // placeholders in it is the circle-full-of-circles problem again, in a smaller way — so the
+    // glass holds the twelve things that can actually be recognised through it, and the shelf
+    // behind 'see what is in it' is where the complete list lives.
+    const ballPrizes = useMemo(() => (view?.prizes || []).filter((p) => p.sprite).slice(0, 12), [view]);
+    // How hard the capsules are being churned, 0..1. Driven by the handle, read by the pit.
+    const churn = step === STEP.cranking && turn > 0 ? Math.min(1, 0.35 + turn) : 0;
     const drag = useRef({ on: false, last: 0, ticks: 0 });
     const pending = useRef(null);                 // the server's answer, held until the handle is round
 
@@ -132,7 +125,8 @@ export default function Gachapon({ onClose }) {
         clunk();
         // One capsule leaves the globe — the rest are left to fall into the gap by the CSS, which is the
         // small lie that makes the pile look like it is under gravity.
-        setGone((g) => [...g, (g.length * 7) % GLOBE_N]);
+        // The pit keeps churning for a beat after the handle lands, which is the mechanism
+        // settling — capsules do not stop the instant the crank does.
         setTimeout(() => { roll(); }, 150);
         setTimeout(() => { land(); setStep(STEP.tray); }, 560);
     }, []);
@@ -241,28 +235,34 @@ export default function Gachapon({ onClose }) {
                 </div>
             ) : (
                 <div className="gx-machine">
-                    {/* ── THE GLOBE ──────────────────────────────────────────────────────────────────── */}
-                    <div className="gx-globe" aria-hidden="true">
-                        <span className="gx-glass" />
-                        {capsules.map((c) => (
-                            <span
-                                key={c.i}
-                                className={`gx-cap${gone.includes(c.i) ? " is-gone" : ""}`}
-                                style={{
-                                    left: `${c.x}%`, top: `${c.y}%`, width: c.size, height: c.size,
-                                    background: c.tone, animationDelay: `${c.delay}s`,
-                                    transform: `translate(-50%, -50%) rotate(${c.spin}deg)`,
-                                }}
-                            />
-                        ))}
-                        <span className="gx-shine" />
-                    </div>
+                    {/* ── THE MACHINE ─────────────────────────────────────────────────────────────────
+                        Luke: "I was actually like hoping for actual like interactive sprite of a gachapon
+                        machine and seeing the ball roll out and everything like that."
 
-                    {/* ── THE CHUTE AND THE TRAY ─────────────────────────────────────────────────────── */}
-                    <div className="gx-lower">
+                        So it is one drawn machine, and everything interactive is registered ONTO it rather
+                        than drawn beside it: the ball pit sits inside the painted glass at measured
+                        coordinates, the crank hit-area is over the painted handle, and the capsule comes out
+                        of the painted chute. A row of CSS boxes next to a picture of a machine is a control
+                        panel; this is the machine. */}
+                    <div className="gx-rig">
+                        {/* THE PRIZES, BEHIND THE GLASS. The pit is clipped to a circle laid exactly over
+                            the painted sphere — see GLOBE, measured off the sprite. The sheen goes on top of
+                            them so they read as being INSIDE the glass rather than stuck to the front of it. */}
+                        <span className="gx-globe-box"
+                            style={{ left: `${GLOBE.x}%`, top: `${GLOBE.y}%`, width: `${GLOBE.d}%` }}>
+                            <GachaPit prizes={ballPrizes} churn={churn} />
+                            <span className="gx-sheen" />
+                        </span>
+
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="gx-rig-art" src="/images/casino/gacha-rig.webp" alt="" draggable={false} />
+
+                        {/* THE HANDLE. Invisible, sitting on the painted crank — the brass handle you can
+                            see IS the thing you grab, and a second drawn dial beside it would be the machine
+                            having two cranks. */}
                         <div
                             ref={dialRef}
-                            className={`gx-dial${step === STEP.cranking ? " is-live" : ""}`}
+                            className={`gx-crank${step === STEP.cranking ? " is-live" : ""}`}
                             style={{ "--turn": `${turn * 180}deg` }}
                             onPointerDown={onDown}
                             onPointerMove={onMove}
@@ -276,20 +276,22 @@ export default function Gachapon({ onClose }) {
                             aria-valuemin={0}
                             aria-valuemax={100}
                         >
-                            <span className="gx-dial-face" />
-                            <span className="gx-handle" />
+                            <span className="gx-crank-arm" />
                         </div>
 
-                        <div className="gx-tray">
-                            {step === STEP.dropping ? (
-                                <span className="gx-falling" style={{ background: liveTone }} aria-hidden="true" />
-                            ) : null}
-                            {step === STEP.tray ? (
-                                <button type="button" className="gx-prize-cap" style={{ background: liveTone }} onClick={openIt} aria-label="Twist it open">
-                                    <span className="gx-seam" />
-                                </button>
-                            ) : null}
-                        </div>
+                        {/* THE BALL, COMING OUT. It falls down the inside of the machine, turns at the chute
+                            and rolls out of the painted mouth — which is why it is one keyframe with a bend
+                            in it rather than a straight drop: a capsule that appears in a tray has not come
+                            out of anything. */}
+                        {step === STEP.dropping ? (
+                            <span className="gx-ball-out" style={{ background: liveTone }} aria-hidden="true" />
+                        ) : null}
+                        {step === STEP.tray ? (
+                            <button type="button" className="gx-prize-cap" style={{ background: liveTone }}
+                                onClick={openIt} aria-label="Twist it open">
+                                <span className="gx-seam" />
+                            </button>
+                        ) : null}
                     </div>
 
                     {/* ── WHAT TO DO NEXT, IN ONE LINE ───────────────────────────────────────────────── */}
@@ -347,79 +349,81 @@ const CSS = `
     color: #e8e2d6; font-size: 14px; cursor: pointer; }
 .gx-machine { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 
-/* ── THE GLOBE ────────────────────────────────────────────────────────────────────────────────────────
-   A real globe is a sphere of clear plastic with a pile of capsules in the bottom of it, lit from the front.
-   The three layers here are that: the capsules, a glass sheen OVER them, and a bright spot where the light
-   is. Painting the glass under the capsules was the first attempt and it read as a plate of sweets. */
-.gx-globe { position: relative; width: min(74vw, 260px); aspect-ratio: 1; border-radius: 50%;
-    background: radial-gradient(circle at 36% 28%, rgba(255,255,255,0.16), rgba(20,12,34,0.6) 62%, rgba(8,4,16,0.86));
-    border: 3px solid rgba(255,255,255,0.14); overflow: hidden;
-    box-shadow: inset 0 -18px 34px rgba(0,0,0,0.6), 0 14px 32px rgba(0,0,0,0.55); }
-.gx-glass { position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
-    background: linear-gradient(145deg, rgba(255,255,255,0.14) 0%, transparent 38%); }
-.gx-cap { position: absolute; border-radius: 50%; pointer-events: none;
-    box-shadow: inset -2px -3px 5px rgba(0,0,0,0.42), inset 2px 3px 4px rgba(255,255,255,0.4);
-    animation: gxSettle 3.6s ease-in-out infinite; }
-/* The pile breathing. A capsule in a full globe is never quite still — the machine hums, people lean on it,
-   and the ones underneath are taking the weight. Tiny, and on its own clock per capsule. */
-@keyframes gxSettle {
-    0%, 100% { margin-top: 0; }
-    50% { margin-top: -1.5px; }
-}
-/* ⚠️ A DISPENSED CAPSULE FALLS OUT OF THE BOTTOM, it does not fade. The globe is glass — a capsule that
-   dissolved in mid-pile would be the one moment the whole illusion was being asked to carry weight and
-   quietly refused. */
-.gx-cap.is-gone { animation: gxDispense .5s cubic-bezier(.5,0,.9,.4) forwards; }
-@keyframes gxDispense {
-    to { transform: translate(-50%, 160px) scale(0.6); opacity: 0; }
-}
-.gx-shine { position: absolute; left: 22%; top: 14%; width: 26%; height: 18%; border-radius: 50%;
-    background: radial-gradient(ellipse, rgba(255,255,255,0.5), transparent 70%); pointer-events: none; }
+/* ── THE MACHINE ──────────────────────────────────────────────────────────────────────────────────────
+   One drawn machine, and everything else registered onto it. The art is the only thing that sets the size;
+   every overlay below is a percentage OF IT, so the whole rig scales as one object and nothing drifts off
+   its painted part when the panel is narrower. */
+.gx-rig { position: relative; width: min(72vw, 250px); margin: 0 auto; }
+.gx-rig-art { position: relative; z-index: 2; width: 100%; height: auto; display: block;
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,0.6)); pointer-events: none; }
 
-.gx-lower { display: flex; align-items: flex-end; gap: 16px; }
+/* ⚠️ IN FRONT OF THE ART, NOT BEHIND IT. The plan was prizes at z1 with the painted glass drawing over
+   their edges — which needs the sphere to be a HOLE, and the model drew it as frosted white glass. Behind
+   it they were simply invisible: a beautiful empty machine.
+   So the pit sits on top at z3, clipped to a circle a little inside the painted sphere, and the glass rim
+   and brass collar frame it. The sheen above does the rest of the work of putting them inside the bowl. */
+.gx-globe-box { position: absolute; z-index: 3; aspect-ratio: 1; transform: translate(-50%, -50%);
+    border-radius: 50%; overflow: hidden; }
+.gx-pit { position: absolute; inset: 0; display: block; }
+.gx-ball { position: absolute; width: 34%; aspect-ratio: 1; display: grid; place-items: center;
+    will-change: transform, left, top; }
+.gx-ball img { width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+.gx-ball i { width: 72%; aspect-ratio: 1; border-radius: 50%; background: var(--t, #ff9a2e);
+    box-shadow: inset -3px -4px 7px rgba(0,0,0,0.4), inset 3px 4px 6px rgba(255,255,255,0.4); }
+/* The sheen goes on top of the prizes and under the painted frame: curved glass has a highlight and the
+   things behind it are dimmed towards the bottom of the bowl. Without it the sprites read as stickers. */
+.gx-sheen { position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+    background: linear-gradient(152deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.05) 26%, transparent 46%),
+        radial-gradient(circle at 50% 118%, rgba(0,0,0,0.42), transparent 55%); }
 
 /* ── THE CRANK ────────────────────────────────────────────────────────────────────────────────────────
-   touch-action: none is load-bearing, not tidiness: without it the browser claims the drag as a page scroll
-   on the first vertical pixel and the handle simply stops following your thumb halfway round. */
-.gx-dial { position: relative; width: 86px; height: 86px; border-radius: 50%; touch-action: none;
-    background: radial-gradient(circle at 40% 34%, #4a4252, #241c30 70%);
-    border: 3px solid rgba(255,215,110,0.3); cursor: grab; flex: 0 0 auto; }
-.gx-dial.is-live { border-color: #ffcf6a; box-shadow: 0 0 20px rgba(255,200,80,0.55); cursor: grab; }
-.gx-dial.is-live:active { cursor: grabbing; }
-.gx-dial:focus-visible { outline: 2px solid #ffcf6a; outline-offset: 3px; }
-.gx-dial-face { position: absolute; inset: 11px; border-radius: 50%;
-    background: repeating-conic-gradient(rgba(255,255,255,0.07) 0 8deg, transparent 8deg 16deg); }
-/* The handle, which is the part that turns. Rotated off --turn so the angle IS the state — no second source
-   of truth to drift from the number the drag is accumulating. */
-.gx-handle { position: absolute; left: 50%; top: 50%; width: 11px; height: 38px; border-radius: 6px;
-    background: linear-gradient(180deg, #ffe9b0, #c9922a); transform-origin: 50% 100%;
+   Invisible, laid over the painted brass handle. touch-action: none is load-bearing, not tidiness: without
+   it the browser claims the drag as a page scroll on the first vertical pixel and the handle stops following
+   your thumb halfway round. */
+.gx-crank { position: absolute; z-index: 3; left: 62%; top: 62%; width: 30%; aspect-ratio: 1;
+    transform: translate(-50%, -50%); border-radius: 50%; touch-action: none; cursor: grab;
+    -webkit-appearance: none; appearance: none; border: 0; background: none; padding: 0; }
+.gx-crank.is-live { cursor: grab; box-shadow: 0 0 0 2px rgba(255,207,106,0.75), 0 0 20px rgba(255,200,80,0.6); }
+.gx-crank.is-live:active { cursor: grabbing; }
+.gx-crank:focus-visible { outline: 2px solid #ffcf6a; outline-offset: 3px; }
+/* The arm that turns. The sprite's own handle is painted at rest; this rides over it so the player can see
+   how far round they are, which is the only feedback the gesture has. */
+.gx-crank-arm { position: absolute; left: 50%; top: 50%; width: 13%; height: 46%; border-radius: 99px;
+    background: linear-gradient(180deg, #ffe9b0, #b8841f); transform-origin: 50% 100%;
     transform: translate(-50%, -100%) rotate(var(--turn, 0deg)); transition: transform .06s linear;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.6); }
-.gx-dial.is-live .gx-handle { background: linear-gradient(180deg, #fff3cf, #e8a81c); }
+    opacity: 0; }
+.gx-crank.is-live .gx-crank-arm { opacity: 1; }
 
-.gx-tray { position: relative; width: 108px; height: 74px; border-radius: 8px 8px 12px 12px;
-    background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(255,255,255,0.05));
-    border: 2px solid rgba(255,255,255,0.12); border-top: none; overflow: hidden; }
-.gx-falling { position: absolute; left: 50%; top: -26px; width: 30px; height: 30px; border-radius: 50%;
-    box-shadow: inset -3px -4px 7px rgba(0,0,0,0.45), inset 3px 4px 6px rgba(255,255,255,0.4);
-    animation: gxFall .56s cubic-bezier(.45,0,.7,1) forwards; }
-@keyframes gxFall {
-    0% { transform: translate(-50%, 0) scale(.9); }
-    62% { transform: translate(-50%, 40px) scale(1); }
-    78% { transform: translate(-60%, 28px) scale(1); }
-    100% { transform: translate(-50%, 38px) scale(1); }
+/* ── AND THE BALL COMING OUT ──────────────────────────────────────────────────────────────────────────
+   Down the inside of the body, then a turn at the chute and out of the painted mouth. One keyframe with a
+   bend in it, because a capsule that simply appears in a tray has not come out of anything. */
+.gx-ball-out { position: absolute; z-index: 3; left: 47%; top: 38%; width: 15%; aspect-ratio: 1;
+    border-radius: 50%; pointer-events: none;
+    box-shadow: inset -3px -4px 7px rgba(0,0,0,0.45), inset 3px 4px 6px rgba(255,255,255,0.4),
+        0 2px 6px rgba(0,0,0,0.5);
+    animation: gxOut .56s cubic-bezier(.45,0,.7,1) forwards; }
+@keyframes gxOut {
+    0%   { transform: translate(-50%, -50%) scale(.85); opacity: 0; }
+    15%  { opacity: 1; }
+    58%  { transform: translate(-50%, 150%) scale(1); }      /* down the body */
+    74%  { transform: translate(-50%, 196%) scale(1); }      /* into the chute */
+    100% { transform: translate(-50%, 232%) scale(1); }      /* and out of the mouth */
 }
-/* The capsule sitting in the tray, waiting. It wobbles, because a ball in a plastic tray does, and because
+/* Sitting in the mouth of the chute, waiting. It wobbles, because a ball in a plastic tray does and because
    a thing that moves is a thing you understand you can touch. */
-.gx-prize-cap { position: absolute; left: 50%; bottom: 10px; width: 46px; height: 46px; border-radius: 50%;
-    transform: translateX(-50%); border: none; cursor: pointer; padding: 0;
-    box-shadow: inset -4px -5px 9px rgba(0,0,0,0.45), inset 4px 5px 8px rgba(255,255,255,0.45), 0 0 18px rgba(255,220,140,0.6);
+/* 47%, not 42% — filmed, it was sitting against the left jamb of the painted chute rather than in its
+   mouth. The mouth is the dark rectangle at the foot of the body and its centre is the machine's centre. */
+.gx-prize-cap { position: absolute; z-index: 4; left: 47%; top: 83%; width: 16%; aspect-ratio: 1;
+    border-radius: 50%; border: none; cursor: pointer; padding: 0;
+    box-shadow: inset -4px -5px 9px rgba(0,0,0,0.45), inset 4px 5px 8px rgba(255,255,255,0.45),
+        0 0 18px rgba(255,220,140,0.75);
     animation: gxWobble 1.9s ease-in-out infinite; }
 @keyframes gxWobble {
-    0%, 100% { transform: translateX(-50%) rotate(-5deg); }
-    50% { transform: translateX(-50%) rotate(5deg); }
+    0%, 100% { transform: translate(-50%, -50%) rotate(-7deg); }
+    50% { transform: translate(-50%, -50%) rotate(7deg); }
 }
-.gx-seam { position: absolute; left: 4%; right: 4%; top: 50%; height: 2px; transform: translateY(-50%);
+.gx-seam { position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; transform: translateY(-50%);
     background: rgba(0,0,0,0.35); }
 
 .gx-say { font-size: 0.85rem; color: #d8ccb8; text-align: center; min-height: 2.4em; line-height: 1.4; }

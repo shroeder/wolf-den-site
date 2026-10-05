@@ -257,6 +257,54 @@ const JOBS = {
     // ── THE TWO NUMBERS IN THE HEADER ────────────────────────────────────────────────────────────────
     // Luke: "just show the coin amount with the coin sprite and the chip amount with the chip sprite... that
     // way we can free up that entire row." Two tiny icons buy back a whole strip of the screen.
+    // ── THE GACHAPON ─────────────────────────────────────────────────────────────────────────────────
+    // Luke: "The Gachapon machine has no sprite... It looks like just a shitty circle with a bunch of circles
+    // in it. I was envisioning actually seeing what's in there, like all the different sprites for all the
+    // things bouncing around in there. And I was actually like hoping for actual like interactive sprite of a
+    // gachapon machine and seeing the ball roll out."
+    //
+    // TWO DRAWINGS OF ONE MACHINE, and they are different on purpose:
+    //
+    //   `gacha` is the CABINET on the casino floor. It is seen at about 90px in a row of other cabinets, so
+    //   its globe is packed with capsules — at that size the globe is the only thing that identifies it, and
+    //   an empty one reads as a broken machine.
+    //
+    //   `gacha-rig` is the machine you stand at. Its globe is EMPTY GLASS, and that is the whole point: the
+    //   prizes inside it are the real item, pet and chest sprites, rendered in HTML behind the glass and
+    //   bouncing around. A drawn globe full of drawn capsules would be a picture of a gachapon; this is one
+    //   you can look into and see the thing you are chasing.
+    //
+    // ⚠️ THE RIG'S GLOBE MUST BE A HOLE. The sprite sits ON TOP of the ball pit, so its glass rim and
+    // highlights draw over the edges of the prizes — which is what makes them look like they are INSIDE it
+    // rather than pasted behind it. If the model fills the globe, the layering is invisible and the feature
+    // is a static picture again.
+    "gacha": {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A classic coin-operated GACHAPON CAPSULE MACHINE standing on a short pedestal, seen straight on "
+            + "— a clear glass sphere on top packed full of brightly coloured plastic capsules in orange, "
+            + "blue, purple and gold, a deep red enamelled metal body below it with a big brass crank handle "
+            + "on the front, a chrome coin slot, and an open chute mouth at the bottom with one gold capsule "
+            + "sitting in it",
+            { framing: "sprite", extra: "A TALL machine, roughly 2 wide by 3 high, standing upright and seen "
+                + "straight on at eye level. Rich reds and brass against the clear glass dome. Must read at "
+                + "90 pixels wide — bold shapes, the glass dome of capsules unmistakable. Nothing else in "
+                + "frame, no floor, no background." }),
+    },
+    "gacha-rig": {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A classic coin-operated GACHAPON CAPSULE MACHINE standing on a short pedestal, seen straight on "
+            + "— a large EMPTY clear glass sphere on top with nothing at all inside it, just clean curved "
+            + "glass with a bright highlight on its upper left and a brass ring at its base, a deep red "
+            + "enamelled metal body below it with a big brass crank handle on the front, a chrome coin slot, "
+            + "and a wide open chute mouth at the bottom",
+            { framing: "sprite", extra: "A TALL machine, roughly 2 wide by 3 high, standing upright and seen "
+                + "straight on at eye level, the glass sphere centred horizontally and filling the top half. "
+                + "THE SPHERE IS EMPTY — clear glass with nothing inside it, no capsules, no balls, no toys, "
+                + "you can see straight through it. Rich reds and brass. Nothing else in frame, no floor, no "
+                + "background." }),
+    },
     // ── THE BOARD ON THE WALL ────────────────────────────────────────────────────────────────────────
     // Luke: "lets expose a leaderboard of lifetime winnings for the casino... maybe to get there its a little
     // up leaderboard sprite on the wall of the casino you can click to inspect."
