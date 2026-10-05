@@ -24,68 +24,78 @@
 // bought more than the ladder would give them keeps all of it.
 
 // ── THE INTERVALS, AND WHY THEY ARE THESE NUMBERS ────────────────────────────────────────────────────────
-// Calibrated against the real distribution rather than picked: 28 members have won anything here, the best
-// 241,512 lifetime, the median 21,652, the 25th percentile 3,064.
+// ⚠️ THE FIRST SET WAS WRONG BY A FACTOR OF SIX, AND ONLY THE PRICING SCRIPT CAUGHT IT. They were calibrated
+// against a "top player 241,512" read out of mkt_token_event — which is a DIFFERENT token system, not the
+// casino's ledger. The real figure, from mkt_chip_event and now seeded into mkt_buyer.casino_won, is
+// 1,339,736. At the old intervals the Den's first day would have been 101 Mythic chests and one member
+// taking +44 might. Re-run scripts/casino-ladder.mjs after touching anything here; it is the only thing
+// standing between a ladder and a landslide.
 //
-// The STAT intervals are set so the best player's entitlement lands near the seven levels they already
-// bought — about 30-40k a level. That is the whole calibration: a ladder that handed the top player thirty
-// levels on the first day would be a power injection wearing a reward's clothes, and one that handed them
-// three would be taking something away.
+// The live distribution it is calibrated against: 25 members have won anything, the best 1,339,736, the
+// second 745,368, the third 153,536, and a long tail down to about 19,000.
+//
+// THE STAT INTERVALS are set so the best player's entitlement lands near the SEVEN levels he already bought
+// — about 190,000 a level. That is the whole calibration. A ladder that handed the top player forty-four
+// levels would be a power injection wearing a reward's clothes; one that handed him two would be taking
+// something away.
 export const STAT_EVERY = {
-    might: 30000,
-    vitality: 34000,
-    tenacity: 38000,
-    ferocity: 42000,
+    might: 150000,
+    vitality: 175000,
+    tenacity: 200000,
+    ferocity: 225000,
 };
 
-// The five Counter pets, exactly as asked. Each carries a casinoPerk, so this ladder is also the order in
-// which the floor gets kinder to you.
+// The five Counter pets. Luke: "the pets that are all 50k should be like 10 20 30 40 50k etc if you can get
+// my drift" — the drift is an EVEN LADDER where there used to be one flat price, and this is that ladder at
+// the scale the floor actually plays at. 10/20/30/40/50k against a top player of 1.3M would have handed all
+// five to twelve members on the first day and left the rung with nothing to say afterwards.
+//
+// Each one carries a casinoPerk, so this is also the order in which the floor gets kinder to you.
 export const PET_AT = {
-    copper_paw: 10000,
-    brass_magpie: 20000,
-    jade_tortoise: 30000,
-    ivory_adder: 40000,
-    onyx_hare: 50000,
+    copper_paw: 50000,
+    brass_magpie: 100000,
+    jade_tortoise: 150000,
+    ivory_adder: 200000,
+    onyx_hare: 250000,
 };
 
-// Sable's three, behind the rope. Higher than the Counter's five because the rope is the point of them, and
-// spread rather than flat for the same reason everything else here is.
+// Sable's three, behind the rope. Higher than the Counter's five because the rope is the point of them.
 export const VIP_PET_AT = {
-    house_ferret: 75000,
-    velvet_lynx: 110000,
-    midnight_crane: 150000,
+    house_ferret: 350000,
+    velvet_lynx: 600000,
+    midnight_crane: 900000,
 };
 
 // The one-time unlocks. These were 15k/20k/25k/100k/1M in chips and the order was close to arbitrary; it is
-// an order now. The charts come early because they open a whole tier of fishing and the earliest player
-// should have somewhere to get to; the pass is last because the rope has to go on meaning something.
+// an order now. The charts come first because they open a whole tier of fishing and the newest player should
+// have somewhere to get to; the pass is last because the rope has to go on meaning something — nobody in the
+// Den reaches it today, and the best player is within sight of it.
 export const UNLOCK_AT = {
-    fish_deep: 8000,
-    wheel_gold: 35000,
-    recipe_master: 65000,
-    road_long: 140000,
-    vip_pass: 350000,
+    fish_deep: 40000,
+    wheel_gold: 120000,
+    recipe_master: 250000,
+    road_long: 600000,
+    vip_pass: 1500000,
 };
 
 // ── THE CHESTS, EVERY X ──────────────────────────────────────────────────────────────────────────────────
 // The only rungs that repeat for ever, which is what makes the ladder infinite — past the last pet and the
 // last unlock there has to be a reason to keep playing, and this is it.
 //
-// ⚠️ SIZED BY WHAT THE WHOLE DEN WOULD BE OWED ON DAY ONE, not by what feels right. scripts/casino-ladder.mjs
-// computes that from the live lifetime figures before any of this ships; the first draft of these intervals
-// would have handed one member sixteen Mythic chests in a single claim.
+// ⚠️ SIZED BY WHAT THE WHOLE DEN IS OWED ON DAY ONE, not by what feels right. At 25k a Mythic the first day
+// would have been 101 chests; at 150k it is 17, against a game that already mints about 570 a month.
 export const CHEST_EVERY = {
-    mythic: 25000,
-    ascendant: 70000,
-    eternal: 200000,
-    celestial: 500000,
-    primordial: 2000000,
+    mythic: 150000,
+    ascendant: 400000,
+    eternal: 1000000,
+    celestial: 3000000,
+    primordial: 10000000,
 };
 
 // Sable's repeatables. VIP-gated as they always were, and the only two rungs on the ladder that are.
 export const VIP_EVERY = {
-    gem: 40000,
-    recipe_page: 90000,
+    gem: 200000,
+    recipe_page: 450000,
 };
 
 /** How many of an `every X` rung a lifetime total has earned. */

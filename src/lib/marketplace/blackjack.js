@@ -19,7 +19,12 @@ import { casinoPerks, rollCasinoPrize, tickCasinoQuests } from "@/lib/marketplac
 //
 // The stake is still taken in GOLD, deliberately. That is the mint: gold staked is what chips are made of, and
 // a table that took chips and paid chips would be a closed loop that never touches the economy it belongs to.
-import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
+// ⚠️ COIN IN, COIN OUT. These used to be moveChips — the floor took chips and paid chips, and chips
+// had exactly one sink. That whole layer is gone (the Counter is a ladder now, claimed off lifetime
+// winnings), so a chip would be a currency with nothing to spend it on. Same function shape, same ledger
+// table, gold instead. See casino-bank.js.
+import { coinBalance, moveCoin, recordWon } from "@/lib/marketplace/casino-bank.js";
+import { chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
 import { moveTokens, tokenBalance } from "@/lib/marketplace/tokens.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
@@ -144,14 +149,19 @@ async function settleAll(buyerId, row, dealerCards, hands) {
         // stake does not come back — the chips were spent to sit down. A push therefore pays your
         // stake in tokens rather than refunding chips, which is the same arithmetic for the player
         // and keeps the one rule the whole split rests on: chips only ever go down. See tokens.js.
-        tokens = await moveTokens(buyerId, back, "casino_blackjack_win", {
+        tokens = await moveCoin(buyerId, back, "casino_blackjack_win", {
             ref: String(row.id),
             meta: { bet: results.reduce((n, r) => n + r.bet, 0), outcomes: results.map((r) => r.outcome),
                 goldStaked: row.stake, backGold, wonGold, rate: CHIP_RATE, hands: hands.length },
         });
+        // ⚠️ THE LADDER'S CURRENCY, WRITTEN IN THE SAME BREATH AS THE PAYOUT. casino_won is what every
+        // rung at the Counter is claimed against, and it only ever counts a WIN — a refund or a void hand
+        // is the member's own stake coming back, and counting those would make the ladder climbable by
+        // betting and cancelling.
+        await recordWon(buyerId, back);
     }
-    if (chips == null) chips = await chipBalance(buyerId);
-    if (tokens == null) tokens = await tokenBalance(buyerId);
+    if (chips == null) chips = await coinBalance(buyerId);
+    if (tokens == null) tokens = await coinBalance(buyerId);
     await trackActivity(buyerId, "casino_play", {
         game: "blackjack", bet: row.stake, wonChips: back,
         multiple: row.stake ? Number((backGold / row.stake).toFixed(3)) : 0,
@@ -219,7 +229,7 @@ async function advance(buyerId, row, hands, active) {
  * Called three times per hand at most — the deal, a double, a split — and each one is a separate debit, which
  * is what makes doubling and splitting honest: the extra money is actually taken before it can be won back.
  */
-const takeStake = async (buyerId, stake, meta) => moveChips(buyerId, -stake, "casino_blackjack_bet", { meta });
+const takeStake = async (buyerId, stake, meta) => moveCoin(buyerId, -stake, "casino_blackjack_bet", { meta });
 
 /**
  * DEAL.
@@ -251,7 +261,7 @@ export async function dealBlackjack(buyerId, { bet } = {}) {
     // The stake is already gone if this fails, so it goes straight back. A hand that could not be recorded is
     // a hand that never happened.
     if (!row) {
-        await moveChips(buyerId, stake, "casino_blackjack_void", { meta: { reason: "deal_failed" } });
+        await moveCoin(buyerId, stake, "casino_blackjack_void", { meta: { reason: "deal_failed" } });
         return { ok: false, error: "deal_failed" };
     }
 
@@ -260,7 +270,7 @@ export async function dealBlackjack(buyerId, { bet } = {}) {
         const s = await settleAll(buyerId, row, dealer, hands);
         return { ok: true, natural: true, gold: s.gold, chips: s.chips, tokens: s.tokens, hand: s.hand, bet: stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
     }
-    // `paid` is the chip balance moveChips handed back — no gold moved anywhere in this file.
+    // `paid` is the chip balance moveCoin handed back — no gold moved anywhere in this file.
     return { ok: true, chips: paid, hand: publicView(row), bet: stake };
 }
 

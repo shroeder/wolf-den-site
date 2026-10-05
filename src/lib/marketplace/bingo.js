@@ -9,7 +9,12 @@ import { storeDay, weekdayOf } from "@/lib/marketplace/store-day.js";
 import { casinoPerks, rollCasinoPrize, tickCasinoQuests } from "@/lib/marketplace/casino.js";
 // Chips in, chips out. The stake used to be gold — see the long note in blackjack.js — and the cage now sells
 // the chips instead, so the conversion happens once, in front of you, rather than invisibly at every machine.
-import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
+// ⚠️ COIN IN, COIN OUT. These used to be moveChips — the floor took chips and paid chips, and chips
+// had exactly one sink. That whole layer is gone (the Counter is a ladder now, claimed off lifetime
+// winnings), so a chip would be a currency with nothing to spend it on. Same function shape, same ledger
+// table, gold instead. See casino-bank.js.
+import { coinBalance, moveCoin, recordWon } from "@/lib/marketplace/casino-bank.js";
+import { chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
 import { moveTokens, tokenBalance } from "@/lib/marketplace/tokens.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
@@ -78,11 +83,11 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     const stake = clampBet(bet);
 
     const perks = await casinoPerks(buyerId);
-    // ── THE CARD COSTS CHIPS ─────────────────────────────────────────────────────────────────────────────
-    // moveChips carries its own conditional debit (`AND chips >= n`) and writes its own ledger row, so this is
+    // ── THE CARD COSTS GOLD ─────────────────────────────────────────────────────────────────────────────
+    // moveCoin carries its own conditional debit (`AND gold >= n`) and writes its own ledger row, so this is
     // the whole of taking a stake now — the gold guard, the balance read and the logCoin it replaced were
     // three statements doing what one does.
-    let chips = await moveChips(buyerId, -stake, "casino_bingo_bet", { meta: { bet: stake } });
+    let chips = await moveCoin(buyerId, -stake, "casino_bingo_bet", { meta: { bet: stake } });
     if (chips == null) return { ok: false, error: "no_chips" };
     // ── THE BALANCE THE MOMENT THE STAKE LEAVES ──────────────────────────────────────────────────────
     // Sent alongside the final figure so the purse can drop by the bet immediately and only climb back when
@@ -95,7 +100,7 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
 
     let onHouse = false;
     if ((perks.freePlay || 0) > 0 && Math.random() < perks.freePlay) {
-        const back = await moveChips(buyerId, stake, "casino_on_the_house", { meta: { game: "bingo" } });
+        const back = await moveCoin(buyerId, stake, "casino_on_the_house", { meta: { game: "bingo" } });
         if (back != null) { onHouse = true; chips = back; }
     }
 
@@ -134,13 +139,18 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
         // paying me in chips when I won, not tokens". moveTokens returns the TOKEN balance, and
         // assigning it to `chips` handed the screen a chip figure that was really a token count,
         // which is the one thing the split exists to make impossible. Two purses, two variables.
-        tokens = await moveTokens(buyerId, won, "casino_bingo_win", {
+        tokens = await moveCoin(buyerId, won, "casino_bingo_win", {
             meta: { bet: stake, tier: score.tier, lines: score.lines.length, dragon: burnt.length,
             pattern: patternHit.hit ? today.id : null, patternMult: patternHit.mult, wonGold, rate: CHIP_RATE },
         });
+        // ⚠️ THE LADDER'S CURRENCY, WRITTEN IN THE SAME BREATH AS THE PAYOUT. casino_won is what every
+        // rung at the Counter is claimed against, and it only ever counts a WIN — a refund or a void hand
+        // is the member's own stake coming back, and counting those would make the ladder climbable by
+        // betting and cancelling.
+        await recordWon(buyerId, won);
     }
-    if (chips == null) chips = await chipBalance(buyerId);
-    if (tokens == null) tokens = await tokenBalance(buyerId);
+    if (chips == null) chips = await coinBalance(buyerId);
+    if (tokens == null) tokens = await coinBalance(buyerId);
     await trackActivity(buyerId, "casino_play", {
         game: "bingo", bet: stake, wonChips: won,
         multiple: Number((score.mult || 0).toFixed(3)),

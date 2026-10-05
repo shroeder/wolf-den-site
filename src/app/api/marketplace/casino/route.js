@@ -4,8 +4,9 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { gambleWin, getCasinoState, moveCasino, playKeno, spinSlot } from "@/lib/marketplace/casino.js";
 import { gachaView, pull as gachaPull } from "@/lib/marketplace/gachapon.js";
+import { ladder, claim as claimRung } from "@/lib/marketplace/casino-claim.js";
 import { spinSlot5 } from "@/lib/marketplace/casino-slot5-play.js";
-import { chipShelf, buyChips, claimDailyChips } from "@/lib/marketplace/chips.js";
+import { chipShelf, buyChips } from "@/lib/marketplace/chips.js";
 import { buyWithChips } from "@/lib/marketplace/chip-store.js";
 // Composed HERE rather than inside getCasinoState: casino.js must not import blackjack.js, because
 // blackjack.js imports casino.js for the floor's shared furniture (perks, prizes, bounties) and a cycle
@@ -96,7 +97,10 @@ export async function POST(request) {
                 // ── THE CAGE ── gold for chips, one for one, and the free thousand a day. `chip_buy` above is
                 // the COUNTER (spending chips on goods); these two are the window that fills the purse.
                 case "chips_buy": return noStore(await buyChips(buyer.id, Number(b?.gold) || 0));
-                case "chips_daily": return noStore(await claimDailyChips(buyer.id));
+                // ── AND THE FREE THOUSAND A DAY IS GONE ──────────────────────────────────────────────
+                // `chips_daily` lived here. 559 claims over 34 days, 16,441 a day minted for turning up —
+                // the second largest faucet on the floor. A removed action falls through to `bad_action`,
+                // which is the right answer for a stale tab still holding the button.
                 // ── DOUBLE OR NOTHING ── the amount is read from the meter, never from the body. What is
                 // being gambled is what the last paid pull actually won, which is not a thing a POST gets
                 // an opinion about.
@@ -145,6 +149,14 @@ export async function POST(request) {
                 // ticket and rolls one prize entirely server-side; there is nothing in the body for a
                 // client to influence, which matters more here than anywhere else in this file because this
                 // is the one action in the game that can mint real store credit.
+                // ── THE LADDER ──────────────────────────────────────────────────────────────────────
+                // ⚠️ `claim` TAKES A RUNG'S NAME AND NOTHING ELSE. What it is worth, whether it has been
+                // earned and whether it has already been taken are all recomputed server-side from one
+                // stored number — so there is nothing in this body that can move a payout. That matters more
+                // here than on the old shelf: the shelf charged for what it handed over and this does not.
+                case "ladder": return noStore({ ok: true, ...(await ladder(buyer.id)) });
+                case "ladder_claim":
+                    return noStore(await claimRung(buyer.id, String(b?.kind || ""), String(b?.ref || "")));
                 case "gacha_view": return noStore({ ok: true, ...(await gachaView(buyer.id)) });
                 case "gacha_pull": return noStore(await gachaPull(buyer.id));
                 default: return noStore({ ok: false, error: "bad_action" }, { status: 400 });

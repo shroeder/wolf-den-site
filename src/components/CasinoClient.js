@@ -11,7 +11,7 @@ import Burst from "@/components/casino/Burst";
 import { Cas } from "@/components/casino/casino-audio.js";
 import Slot5 from "@/components/casino/Slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
-import ChipStore from "@/components/casino/ChipStore.js";
+import Ladder from "@/components/casino/Ladder.js";
 import Gachapon from "@/components/casino/Gachapon.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
 import { callFor, letterFor, lineName, nearLinesOf } from "@/lib/marketplace/bingo-kit.js";
@@ -1004,22 +1004,15 @@ export default function CasinoClient({ initial, halloween = false }) {
         return r;
     }, [bet, at, stakeNow]);
 
-    // The shelf, and buying off it. Both go straight through to the server: the price is read from the
-    // catalog there and `item` is only a key, so nothing this screen sends can change what anything costs.
-    const shelf = useCallback(async (which = null) => {
-        const r = await casPost({ action: "chip_shelf", shelf: which });
-        // `failed` rather than an empty shelf: "the counter has nothing on this tab" and "the counter did not
-        // answer" are different things, and only one of them is worth offering a retry for.
-        return r?.ok ? r : { items: [], failed: true };
-    }, []);
-
-    const buyChip = useCallback(async (item) => {
-        const r = await casPost({ action: "chip_buy", item });
-        // `balance` off the shelf is the TOKEN balance, because the shelf is priced in tokens — see
-        // chipShelf. `chips` rides along beside it so the header can still say what is left to play with.
-        if (r?.ok) setSt((p) => (p ? { ...p, tokens: r.balance, chips: r.chips ?? p.chips } : p));
-        return r || { ok: false };
-    }, []);
+    // ── TOMBSTONE: THE SHELF AND THE TILL ────────────────────────────────────────────────────────────
+    // `shelf` and `buyChip` lived here — they read the Counter's list and spent tokens off it. Both went
+    // with the shop: the Counter is a ladder now and the only verb it has is `ladder_claim`, which the
+    // Ladder component owns and which takes a rung's name rather than a price.
+    //
+    // Deleted rather than left sitting: lint:undef's no-dead-handler rule caught them the moment the mount
+    // changed, which is the whole reason that rule exists. A handler nothing calls is a feature nobody can
+    // reach, and two of them pointing at API actions that still answered would have been worse than dead —
+    // they would have been a second, unreachable till.
 
     const pull = useCallback(async () => {
         if (busy) return;
@@ -2221,7 +2214,11 @@ export default function CasinoClient({ initial, halloween = false }) {
                         there is no state in which the screen and the paytable disagree about which game
                         this is. */}
                     {at.live && at.id === "store" ? (
-                        <ChipStore tokens={st?.tokens} onBuy={buyChip} onRefresh={shelf} />
+                        /* ⚠️ THE COUNTER IS NOT A SHOP ANY MORE. ChipStore sold fifteen things for chips, and
+                           chips no longer exist — the floor is staked in gold now and everything the Counter
+                           used to sell is claimed off lifetime winnings instead. Same cabinet, same place on
+                           the floor, completely different verb. */
+                        <Ladder onClose={() => setAt(null)} />
                     ) : at.live && at.id === "gacha" ? (
                         /* ⚠️ IT TAKES NOTHING FROM THIS COMPONENT. Every other cabinet on the floor is handed
                            chips, a bet, a rate and a spin handler, because they are all the same game with

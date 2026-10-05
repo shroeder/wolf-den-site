@@ -2,7 +2,12 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
+// ⚠️ COIN IN, COIN OUT. These used to be moveChips — the floor took chips and paid chips, and chips
+// had exactly one sink. That whole layer is gone (the Counter is a ladder now, claimed off lifetime
+// winnings), so a chip would be a currency with nothing to spend it on. Same function shape, same ledger
+// table, gold instead. See casino-bank.js.
+import { coinBalance, moveCoin, recordWon } from "@/lib/marketplace/casino-bank.js";
+import { chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
 import { moveTokens, tokenBalance } from "@/lib/marketplace/tokens.js";
 import { slot5, playSpin, FREE_SPIN_OFFERS, LINES, COLOSSAL_ROWS, COLOSSAL_TOTAL_LINES } from "@/lib/marketplace/casino-slot5.js";
 import { MIN_BET, MAX_BET, tickCasinoQuests } from "@/lib/marketplace/casino.js";
@@ -188,9 +193,9 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     // three are worth the same to within half a percent, so a lie about it buys nothing.
     const offer = FREE_SPIN_OFFERS.find((o) => o.id === offerId) || FREE_SPIN_OFFERS[1];
 
-    // A spin costs CHIPS. moveChips carries the conditional debit and writes its own ledger row, so this is
+    // A spin costs GOLD. moveCoin carries the conditional debit and writes its own ledger row, so this is
     // the whole of taking a stake — see the note in chips.js about why the cage moved to the front.
-    const bank = await moveChips(buyerId, -stake, "casino_slot5_bet", { meta: { bet: stake, machine: m.id } });
+    const bank = await moveCoin(buyerId, -stake, "casino_slot5_bet", { meta: { bet: stake, machine: m.id } });
     if (bank == null) return { ok: false, error: "no_chips" };
 
     // The force is read from the request but only honoured for the owner — a POST body is something anybody
@@ -233,10 +238,15 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     // rewritten to get out of — read its header before writing anything that puts them in one number.
     let tokens = null;
     if (won > 0) {
-        tokens = await moveTokens(buyerId, won, want ? "slot5_forced" : "slot5", {
+        tokens = await moveCoin(buyerId, won, want ? "slot5_forced" : "slot5", {
             ref: m.id,
             meta: { bet: stake, machine: m.id, forced: Boolean(want), from },
         });
+        // ⚠️ THE LADDER'S CURRENCY, WRITTEN IN THE SAME BREATH AS THE PAYOUT. casino_won is what every
+        // rung at the Counter is claimed against, and it only ever counts a WIN — a refund or a void hand
+        // is the member's own stake coming back, and counting those would make the ladder climbable by
+        // betting and cancelling.
+        await recordWon(buyerId, won);
     }
 
     // WHAT ACTUALLY HAPPENED ON THIS PULL. The features list is the part worth having: a cabinet's tune
@@ -278,7 +288,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         // raise it; a win lands in `tokens`. The screen shows both, and the purse at the top of the floor
         // is the CHIP one — that is the number a player is spending.
         chips: bank ?? await chipsOf(buyerId),
-        tokens: tokens ?? await tokenBalance(buyerId),
+        tokens: tokens ?? await coinBalance(buyerId),
         // The balance the instant the stake left, before a single reel has stopped. Kept even though
         // `chips` is now the same number: the client reads it, and a spin that pays nothing and a spin
         // whose reveal has not finished are still two different states to it.

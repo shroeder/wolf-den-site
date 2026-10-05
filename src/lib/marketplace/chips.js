@@ -339,26 +339,21 @@ export async function buyChips(buyerId, gold) {
 // by the write, so a double tap or two tabs cannot take it twice.
 export const DAILY_CHIPS = 1000;
 
-export async function claimDailyChips(buyerId) {
-    if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const claim = await db.queryOne(
-        `UPDATE mkt_buyer SET chips_day = (NOW() AT TIME ZONE 'America/Chicago')::date
-          WHERE id = $1 AND chips_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date
-          RETURNING id`, [buyerId],
-    ).catch(() => null);
-    if (!claim) return { ok: false, error: "already_claimed" };
-    const after = await moveChips(buyerId, DAILY_CHIPS, "casino_chips_daily", { meta: { n: DAILY_CHIPS } });
-    return { ok: true, chips: DAILY_CHIPS, chipsAfter: after ?? (await chipBalance(buyerId)) };
-}
+// ── TOMBSTONE: THE FREE THOUSAND A DAY ───────────────────────────────────────────────────────────────────
+// Luke: "Also no more claiming 1k per day."
+//
+// claimDailyChips and dailyChipsReady lived here. Measured before they went: 559 claims over 34 days, which
+// is 16,441 chips a day minted for nothing — the second largest faucet on the floor after bingo, and the
+// only one that paid you for turning up rather than for playing.
+//
+// It made sense while the Counter was a SHOP and chips were the price of everything on it: a daily trickle
+// was the on-ramp for somebody who had never pulled a handle. The Counter is a ladder now, climbed by
+// winning, and a currency you are handed for free cannot climb it — there is nothing left for a free
+// thousand to be the on-ramp TO.
+//
+// DAILY_CHIPS is kept below only because getCasinoState still reports it to a screen that no longer draws
+// it; both go the next time that screen is touched.
 
-/** Whether today's free chips are still there to take. One column, read with everything else. */
-export async function dailyChipsReady(buyerId) {
-    if (!buyerId) return false;
-    const r = await db.queryOne(
-        `SELECT (chips_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date) AS ready
-           FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    return Boolean(r?.ready);
-}
 
 /** What this member has already bought that can only be bought once. */
 export async function ownedOnce(buyerId) {

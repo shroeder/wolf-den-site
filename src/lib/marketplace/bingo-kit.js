@@ -300,7 +300,15 @@ export const cornersOf = (card, drawn, burnt = []) => {
 // 200,000 cards — six points, because a feature that did nothing to roughly half the cards it visited now
 // does something to all of them. That was never a payout anybody chose; it was the size of the bug. The dial
 // comes down to hold the game where it already sat, which is what the paragraph above says this dial is for.
-export const BINGO_PAY = 0.82;
+// ⚠️ 0.82 -> 0.578, AND THIS IS THE BIG ONE. Bingo is 64% of everything staked on the floor and the only
+// machine whose generosity had already SHOWN UP in the ledger rather than waiting in the tail: measured over
+// 3,517 real cards it returned 134.6% against the 124.8% its table says, while slot5 sat at 65% and keno at
+// 33% purely because their big wins had not landed yet. See scripts/casino-rtp-audit.mjs.
+//
+// 0.88/1.2482 is the factor that puts the simulated table on the new floor target. It is a 30% cut and there
+// is no way to make it smaller: the game was handing back a quarter more than it took, in a currency that is
+// now gold.
+export const BINGO_PAY = 0.578;
 
 export const BINGO_PAYS = {
     // ⚠️ A WIN MUST NOT COST YOU MONEY. SunflowerJinxx: "A 100 chip bingo bet is paying less than the bet."

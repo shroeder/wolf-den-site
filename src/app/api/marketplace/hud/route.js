@@ -15,7 +15,6 @@ import { fishingUnlocked, sailingNeedsAttention, unusedCasts } from "@/lib/marke
 import { getFeatureClaimCounts } from "@/lib/marketplace/feature-dailies.js";
 import { getTownTodo } from "@/lib/marketplace/town.js";
 import { farmNav } from "@/lib/marketplace/farm.js";
-import { dailyChipsReady } from "@/lib/marketplace/chips.js";
 
 // ── THE WHOLE NAV BAR, IN ONE REQUEST ────────────────────────────────────────────────────────────────────────
 // GameNav is mounted on every page under /marketplace, and it used to ask FOURTEEN separate endpoints what to
@@ -78,7 +77,6 @@ export async function GET(request) {
                 // dailyChipsReady is a single indexed read of one column on mkt_buyer — deliberately NOT
                 // getCasinoState, which builds the whole floor. A nav badge that costs a feature build is
                 // the exact thing check:chrome exists to catch, and this component is in the layout.
-                safe(dailyChipsReady(id), false),
             ]);
 
         const chestList = Array.isArray(chests) ? chests : (chests?.chests || []);

@@ -19,13 +19,15 @@ const env = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/.env", "utf8"
 const sql = neon(env.match(/^DATABASE_URL=["']?([^"'\r\n]+)/m)[1]);
 const OWNER = (await sql`SELECT id FROM mkt_buyer WHERE display_name='The Wolf Den'`)[0].id;
 
-// Lifetime gold won, which for everything before the rework IS the chips they were paid: a chip was minted at
-// CHIP_RATE 1 per gold of a machine's own payout, so the two columns are the same quantity under two names.
+// ⚠️ READ casino_won, NOT A LEDGER SUM. An earlier cut of this totalled mkt_token_event, which is a DIFFERENT
+// token system — it gave a top player of 241k and the ladder was priced against that. The real figure, from
+// the casino's own ledger and now seeded into the column by mig462, is 1,339,736. Every interval below was
+// wrong by a factor of five because of one wrong table name, and the only reason that was caught is that this
+// script exists and was re-run after the migration.
 const rows = await sql`
-  SELECT b.display_name AS who, b.id, SUM(GREATEST(t.delta,0))::bigint AS won
-    FROM mkt_token_event t JOIN mkt_buyer b ON b.id=t.buyer_id
-   WHERE t.buyer_id <> ${OWNER} AND t.delta > 0
-   GROUP BY b.display_name, b.id ORDER BY won DESC`;
+  SELECT display_name AS who, id, COALESCE(casino_won,0)::bigint AS won
+    FROM mkt_buyer WHERE id <> ${OWNER} AND COALESCE(casino_won,0) > 0
+   ORDER BY casino_won DESC`;
 
 // What they already hold, because the ladder is a FLOOR and never takes anything away.
 const held = {};
