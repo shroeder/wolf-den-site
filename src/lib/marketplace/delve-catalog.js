@@ -161,12 +161,18 @@ export const DUNGEONS = [
 // members with any XP are below level 25 and could never enter it at ALL. The gate was never buying the
 // reach it was written for.
 //
-// ⚠️ SO THE GATE MOVES WITH THE DAMAGE, AND IT HAS TO. `dmg` is FLAT — the foe hits for [30,46] whoever walks
-// in, while your health is delveVigour(level, gear), which is not. Every other dungeon's minLevel is the
-// rung its damage is written for; leaving this one at 25 while raising the damage to 30 would mean the only
-// dungeon in the game where the door lets you into a fight the gate was supposed to stop. It costs four
-// people their entry — Rumorleigh (27), Kathryn (26), Alstier1 (25) and Mr.Wakey (25) — and that is worth
-// saying out loud rather than burying, because nobody else in the Den is in that band.
+// ⚠️ AND IT HAS NO LEVEL GATE AT ALL. Luke: "Halloween dungeon shouldn't have a level requirement on it. I
+// told you I wanted the difficulty to resemble a level 30 dungeon, but I didn't tell you to make it have a
+// level requirement." That was the whole of the instruction and I read a door into it.
+//
+// The gate was indefensible on its own numbers, which the note it replaced even recorded: 97 of the 122
+// members with any XP are below level 25. A gate at 30 shut most of the Den out of a dungeon that is open
+// for one month and then gone — for a seasonal event that is not difficulty, it is exclusion.
+//
+// `dmg` IS FLAT — the foe hits for [30,46] whoever walks in, while your health is delveVigour(level, gear),
+// which is not. So a low-level member can walk in here and be killed quickly. That is the intended shape:
+// the Den's line is that PvE is allowed to stop you. A hard room you can enter and lose is a different
+// thing from a door that will not open, and only one of them is a thing you can come back from.
 //
 // ⚠️ AND THE PAY MOVES WITH IT. Across all four rungs, danger and gold/XP rise together; shipping one
 // dungeon as dangerous as the Ember Deep and a third worse paid would make it strictly dominated — the same
@@ -174,7 +180,11 @@ export const DUNGEONS = [
 // payout is the candy, the gift boxes and the Harvest's End set, and that is the part that should not look
 // like anybody else's.
 export const HALLOWEEN_DUNGEON = {
-    id: "lanterncrypt", name: "The Lantern Crypt", minLevel: 30, tint: "#ff8a2c",
+    // ⚠️ minLevel 0 IS THE DOOR; `tier` IS THE PAY. They were one field, and in four places `minLevel >= 30`
+    // decides whether a floor pays a GOLD chest or an iron one. Dropping the gate to 0 without splitting
+    // them would have quietly demoted the crypt's loot to the bottom rung on the same commit that opened
+    // it — the kind of nerf nobody announces because nobody notices they did it. See dungeonTier below.
+    id: "lanterncrypt", name: "The Lantern Crypt", minLevel: 0, tier: 30, tint: "#ff8a2c",
     blurb: "A barrow under the pumpkin field, opened for one month only. Something in it has been counting the nights.",
     bg: "/images/delves/bg-lanterncrypt.webp",
     loot: { parts: [2, 4], chest: "iron", bigChest: "gold", frags: [5, 8], gear: ["rare", "epic"], gearOdds: 0.075 },
@@ -193,6 +203,11 @@ export const HALLOWEEN_DUNGEON = {
 // fish module makes. A run saved in October is read back in November by a member opening their history; a
 // dungeon id that stops resolving would break that screen rather than protect anything. Rolling INTO the
 // crypt is what the flag gates (see delves.js), not naming it.
+// WHICH RUNG'S REWARDS A DUNGEON PAYS, which for every year-round dungeon is the rung its door is set to —
+// danger and pay have always risen together. The crypt is the first one where those come apart: no door, and
+// the Ember Deep's fight and the Ember Deep's chests.
+export const dungeonTier = (d) => Number(d?.tier ?? d?.minLevel ?? 0);
+
 const ALL_DUNGEONS = [...DUNGEONS, HALLOWEEN_DUNGEON];
 export const dungeonById = (id) => ALL_DUNGEONS.find((d) => d.id === id) || null;
 

@@ -13,7 +13,7 @@ import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import {
     BOSS_PAY_MULT, DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, HALLOWEEN_DUNGEON, KIND, MIN_FIGHTS,
-    delveMight, delveVigour, dungeonById, encounterArt, encounterBg, eventsFor, FIGHT_DROPS, foeForFloor,
+    delveMight, delveVigour, dungeonById, dungeonTier, encounterArt, encounterBg, eventsFor, FIGHT_DROPS, foeForFloor,
     potionCount, potionHealFrac, wardCut,
     DELVE_SHARD_DOUBLOONS,
 } from "@/lib/marketplace/delve-catalog.js";
@@ -596,7 +596,7 @@ export async function delveAct(buyerId, action, choice = null) {
             const gold = Math.round(randInt(d.goldPer[0], d.goldPer[1]) * 1.4 * (ev.lootMult || 1));
             const xp = Math.round(randInt(d.xpPer[0], d.xpPer[1]) * (ev.lootMult || 1));
             // A chest sometimes holds a real chest — the tiers a dungeon pays scale with its gate.
-            const tier = ev.lootMult >= 1.5 ? (d.minLevel >= 30 ? "gold" : "iron") : (d.minLevel >= 30 ? "iron" : "wooden");
+            const tier = ev.lootMult >= 1.5 ? (dungeonTier(d) >= 30 ? "gold" : "iron") : (dungeonTier(d) >= 30 ? "iron" : "wooden");
             // 0.35 -> 0.18. A room called "chest" still pays gold and XP every time; the loot CHEST inside
             // it is the rarer half, which is what the room's own art has always implied.
             const gotChest = Math.random() < luckyChance(0.18, await fortuneFor(buyerId).catch(() => 0));

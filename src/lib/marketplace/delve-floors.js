@@ -14,7 +14,7 @@ import { rollTicket } from "@/lib/marketplace/gachapon.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
-import { CLEAR_PURSE_MULT, DELVE_FLOORS, DELVE_SHARD_DOUBLOONS, DUNGEONS, KIND, dungeonById, encounterArt } from "@/lib/marketplace/delve-catalog.js";
+import { CLEAR_PURSE_MULT, DELVE_FLOORS, DELVE_SHARD_DOUBLOONS, DUNGEONS, KIND, dungeonById, dungeonTier, encounterArt } from "@/lib/marketplace/delve-catalog.js";
 import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 
@@ -149,8 +149,9 @@ function buildOffer(run, d, ev) {
     // 0.4. Asking mintRate("delve") is the same question the payout asks, so the two cannot drift again.
     const price = (n) => Math.max(1, Math.round(n * mintRate("delve")));
     const x = (mult) => Math.round(((d.xpPer[0] + d.xpPer[1]) / 2) * mult);
-    const big = d.minLevel >= 30 ? "gold" : "iron";
-    const small = d.minLevel >= 30 ? "iron" : "wooden";
+    // dungeonTier, not minLevel: the Lantern Crypt has no door and still pays the deep rungs' chests.
+    const big = dungeonTier(d) >= 30 ? "gold" : "iron";
+    const small = dungeonTier(d) >= 30 ? "iron" : "wooden";
     const hp = (frac) => Math.round(run.maxHp * frac);
 
     const POOLS = {
