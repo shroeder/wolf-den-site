@@ -160,7 +160,7 @@ export const CONSUMABLES = {
     // shelf — it is spent BY THE MACHINE, in the casino, as part of the pull. Giving it an effect here would
     // put a "Use" button on it that consumed the ticket and did nothing visible, which is the worst possible
     // outcome for the rarest drop in the event. useConsumable refuses it by name; see the guard there.
-    hw_ticket: { name: "Hallowe'en Token", emoji: "🎟️", kind: "ticket", price: null,
+    hw_ticket: { name: "Hallowe'en Ticket", emoji: "🎟️", kind: "ticket", price: null,
         desc: "A brass token stamped with a grinning pumpkin. The gachapon in the casino takes exactly one." },
     hw_soul_cake: { name: "Soul Cake", emoji: "🍰", kind: "treat", price: null,
         desc: "Feed your equipped pet +1,500 pet XP.", effect: { type: "pet_xp", amount: 1500 } },
