@@ -8,7 +8,7 @@
 // ⚠️ ONE LINE TURNS THE EVENT ON. While it is false the four chests cannot be granted, cannot be opened and
 // do not appear in any list — but the art, the items and the pets all exist, which is what makes the whole
 // thing testable on the live site before anybody else can see it.
-export const HALLOWEEN_PUBLIC = false;
+export const HALLOWEEN_PUBLIC = true;   // LIVE 2026-10-05, Luke: "Lets make the halloween event live"
 
 /** `unreleased` for a Halloween-exclusive catalogue row. Kept here so the catalogues cannot drift apart. */
 export const HALLOWEEN_HIDDEN = !HALLOWEEN_PUBLIC;
