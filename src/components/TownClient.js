@@ -748,7 +748,11 @@ const NPC_POSTS = Object.values(NPC_X);
 // see, so the two sets slide past each other every time the street changes and no single number survives it.
 // Hence DOOR_OFFSETS: nearest-first, and the first one that clears everything wins. Same shape as the lamp
 // placement below, for the same reason and after the same bug.
-const DOOR_OFFSETS = [1.5, -1.5, 2.5, -2.5, 3.4, -3.4, 4.4, -4.4];
+// How far a pail may sit from its own door, nearest first. The last pair was ±4.4 and that was the ceiling
+// on how far anything could get from the Gourdfather — a door whose porch happens to be beside him was
+// already at maximum swing and still inside his skirt. Two wider pairs give the crowded end of the street
+// somewhere to go; the scoring stops at the nearest offset that fully clears, so nothing else moves.
+const DOOR_OFFSETS = [1.5, -1.5, 2.5, -2.5, 3.4, -3.4, 4.4, -4.4, 5.8, -5.8, 7.2, -7.2];
 // How far a pail's centre must sit from an NPC's. A pail is 54px wide and an ordinary NPC sprite is 86px, so
 // 3.2% of the street keeps them apart.
 //
@@ -757,7 +761,15 @@ const DOOR_OFFSETS = [1.5, -1.5, 2.5, -2.5, 3.4, -3.4, 4.4, -4.4];
 // Crier left the Forge's pail 58% behind his pumpkin. Measured, not guessed: the first pass used one figure
 // for everyone and that was the one door it could not place.
 const DOOR_CLEAR = 3.2;
-const DOOR_CLEAR_GOURD = 5.4;
+// ⚠️ THE GOURDFATHER NEEDS MORE ROOM THAN ANYBODY, AND IT IS NOT ABOUT HIS WIDTH. He is a pumpkin the size
+// of a cart, so a treat pail — which is a small jack-o-lantern — parked anywhere near his base does not read
+// as a pail on a doorstep. It reads as a second, tiny pumpkin growing out of him. Luke: "Get rid of the
+// pumpkin beneath the pumpkin npc."
+//
+// 5.4 left the door at x14.2 sitting 4.4 away from him, inside his own skirt. The placement is SCORED rather
+// than first-fit, so widening this can only ever move a pail somewhere roomier — never dump it back on the
+// default — which is the property that makes raising it safe. See the note in doorPosts.
+const DOOR_CLEAR_GOURD = 9.5;
 // The four NPC doors, and only these four: the Gourdfather is the one running the night and does not hand out
 // sweets to himself, the auctioneer is a Link into the auction house, and the vote booth and the stockade are
 // not doors anybody lives behind.

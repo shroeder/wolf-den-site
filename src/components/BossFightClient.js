@@ -3,7 +3,7 @@
 import { dispatchStoneFound } from "@/components/PetStoneFound";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AvatarStack from "@/components/AvatarStack";
 import { useVisiblePoll } from "@/lib/use-visible-poll.js";
@@ -27,6 +27,11 @@ export default function BossFightClient({ halloween = false }) {
     const [floaters, setFloaters] = useState([]);
     const [burst, setBurst] = useState(null);
     const [victory, setVictory] = useState(null);
+    // ── THE HALL IS COLLAPSED BY DEFAULT ────────────────────────────────────────────────────────────
+    // Luke: "Have this show top 3 with option to expand collapse, collapse default." The board had grown
+    // past forty chips and pushed the boss — the thing you opened the page to hit — off the bottom of a
+    // phone screen.
+    const [boardOpen, setBoardOpen] = useState(false);
     const [whack, setWhack] = useState(null); // your own "big hit" cinematic on each daily strike (reuses BossFinalBlow)
     const [xpFlash, setXpFlash] = useState(false);
     const [liveHp, setLiveHp] = useState(null);
@@ -199,6 +204,22 @@ export default function BossFightClient({ halloween = false }) {
     if (!data?.boss) return <p className="muted">No active boss right now — check back soon.</p>;
 
     const { boss, roster = [], fighters = [], you } = data;
+
+    // ⚠️ THE TOP THREE **AND YOU**, ALWAYS. A board collapsed to a flat top 3 answers "who is winning" and
+    // loses "where am I", which is the only question most people on it actually have — forty-first out of
+    // forty-two still wants to see their own number. So the viewer's chip rides along when they are not
+    // already up there, which is at most four chips and still fits a phone without scrolling. Same rule as
+    // the casino leaderboard, which pins `me` for the same reason.
+    //
+    // ⚠️ NOT useMemo. `roster` is destructured after this component's loading guard returns early, so a hook
+    // here would be called conditionally — rules-of-hooks, and lint:undef catches it. It is a slice of at
+    // most four items off an already-sorted array; there is nothing worth memoising.
+    const shownRoster = (() => {
+        if (boardOpen) return roster;
+        const top = roster.slice(0, 3);
+        const mine = roster.find((f) => f.you);
+        return mine && !top.includes(mine) ? [...top, mine] : top;
+    })();
     const displayHp = liveHp != null ? liveHp : boss.hp;
     const pct = Math.max(0, Math.min(100, (displayHp / boss.maxHp) * 100));
     // The final-blow MVP = the pack's top damage dealer. Built from whichever source carries the richest data
@@ -433,7 +454,7 @@ export default function BossFightClient({ halloween = false }) {
                 <div className="boss2-board">
                     <h3>🏆 Hall of Heroes</h3>
                     <div className="hero-strip">
-                        {roster.map((f) => {
+                        {shownRoster.map((f) => {
                             // Each member's signature color tints their chip; the avatar carries their equipped
                             // border ring + aura + cosmetic effects (via AvatarStack), and their profile
                             // background dresses the card — so the mini cards read as uniquely theirs.
@@ -459,6 +480,17 @@ export default function BossFightClient({ halloween = false }) {
                             );
                         })}
                     </div>
+                    {/* ── TOP THREE, THEN THE REST ON REQUEST ────────────────────────────────────────
+                        Luke: "Have this show top 3 with option to expand collapse, collapse default."
+                        The board grew past forty chips and pushed the fight itself off the screen on a
+                        phone — the thing you came to the page to do was below a leaderboard. */}
+                    {roster.length > shownRoster.length || boardOpen ? (
+                        <button type="button" className="boss2-board-more"
+                            aria-expanded={boardOpen}
+                            onClick={() => setBoardOpen((v) => !v)}>
+                            {boardOpen ? "Show less" : `Show all ${roster.length}`}
+                        </button>
+                    ) : null}
                     <p className="muted boss2-note">Damage converts to raffle tickets — {boss.ticketDivisor} dmg per 🎟️.</p>
                 </div>
             ) : (

@@ -9923,6 +9923,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss2-auto strong { color: #7cffb2; }
 .boss2-xp { color: #ffd75e; font-weight: 800; }
 .boss2-board h3 { margin: 0 0 8px; }
+/* The expand/collapse under the Hall of Heroes. A quiet full-width row rather than a button that competes
+   with the strike button — it is a disclosure, not an action in the fight. */
+.boss2-board-more { display: block; width: 100%; margin: 8px 0 0; padding: 7px 10px;
+    border-radius: 10px; cursor: pointer; font: inherit; font-size: 0.78rem; font-weight: 600;
+    letter-spacing: .02em; color: #d8cdbb; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.10); transition: background 140ms ease, color 140ms ease; }
+.boss2-board-more:hover { background: rgba(255,255,255,0.09); color: #ffe7ad; }
+.boss2-board-more:focus-visible { outline: 2px solid #ffd75e; outline-offset: 2px; }
 .boss2-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .boss2-rank li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.03); }
 .boss2-rank li.is-you { background: rgba(255, 215, 94, 0.12); }
