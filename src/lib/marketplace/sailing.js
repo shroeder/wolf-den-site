@@ -4393,8 +4393,17 @@ async function buyUpgrade(buyerId, kind) {
     // The Shipwright's Debt settles one upgrade in three for you. Rolled BEFORE the gold is taken, so a free
     // one goes through even when the purse is short — a debt the yard eats is not a discount you have to
     // afford first.
-    const onTheYard = await powerRoll(buyerId, "shipwright_s_debt", 3);
-    const cost = onTheYard ? 0 : upgradeCost(cur);
+    // A free upgrade banked from a Grove boss, spent BEFORE the Shipwright's Debt is rolled — rolling
+    // first would sometimes hand the upgrade over for nothing and still take the credit, which is the player
+    // paying a hyper-rare for a coin flip they had already won.
+    // ⚠️ DEBITED CONDITIONALLY IN ONE STATEMENT. A read-then-write would let two upgrades in the same second
+    // both see the same single credit, and this driver has no transactions.
+    const banked = await db.queryOne(
+        `UPDATE mkt_sailing SET free_upgrades = free_upgrades - 1, updated_at = NOW()
+          WHERE buyer_id = $1 AND free_upgrades > 0 RETURNING free_upgrades`, [buyerId],
+    ).catch(() => null);
+    const onTheYard = banked ? false : await powerRoll(buyerId, "shipwright_s_debt", 3);
+    const cost = (banked || onTheYard) ? 0 : upgradeCost(cur);
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     const paid = cost === 0
         ? { gold: null }
@@ -4414,7 +4423,10 @@ async function buyUpgrade(buyerId, kind) {
         const allMaxed = Object.entries(UPGRADE_COLS).every(([k, c]) => ((row?.[c] || 0) + (c === col ? 1 : 0)) >= UPGRADE_MAX[k]);
         if (allMaxed) await grantEventBadge(buyerId, "sail_sovereign").catch(() => {});
     }
-    return { ok: true, spent: cost, onTheYard, ...(await getSailingState(buyerId)) };
+    // freeUpgrade says WHICH free it was. Note that nothing reads onTheYard either - the Shipwright's Debt
+    // has always eaten a cost without saying so. Both are reported here so the counter can say it when
+    // somebody wires that message; the Grove at least announces the credit at the moment it drops.
+    return { ok: true, spent: cost, onTheYard, freeUpgrade: Boolean(banked), ...(await getSailingState(buyerId)) };
 }
 export const upgradeSpeed = (buyerId) => buyUpgrade(buyerId, "speed");
 export const upgradeFortune = (buyerId) => buyUpgrade(buyerId, "fortune");

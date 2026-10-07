@@ -52,6 +52,25 @@ function deco(id, name, emoji, rarity, source, price, buff, subject, level = nul
 
 // source: "shop" (gold, regular store) · "special" (premium gold, special shop) · "spin" (wheel) · "level" (track)
 export const DECORATIONS = [
+    // ⚠️ AND THE IDS CARRY A grove_ INFIX BECAUSE deco_stump AND deco_lantern WERE ALREADY TAKEN by two
+    // common shop props (Tree Stump, Paper Lantern). The catalogue is a flat 129-row array with no uniqueness
+    // check on it, so the duplicates simply sat there and DECORATIONS.find returned whichever came first —
+    // which meant a crafted Mothlight Lantern would have handed over a 350-gold paper one. check:grove
+    // asserts uniqueness now.
+    // ── THE GROVE (3) · crafted at the workbench, never sold ─────────────────────────────────────────────
+    // Luke: "Could maybe make some craftable decorations for the farm."
+    //
+    // ⚠️ source: "grove" IS THE LOCK, AND price: null IS THE SECOND ONE. Every hand-out path in the game
+    // filters by source, so these are invisible to the wheel, the glint, the level track and both shops until
+    // something is taught about them deliberately — and the only thing taught is groveCraft. See the note
+    // further down this file about source: "halloween", which works the same way for the same reason.
+    //
+    // ⚠️ AND THE IDS MATCH THE RECIPE IDS ON PURPOSE. groveCraft hands over recipe.id directly; a separate
+    // recipe-to-decoration map would be a second place for the pairing to drift out of agreement.
+    deco("deco_grove_stump", "Carved Stump", "\u{1FAB5}", "epic", "grove", null, { stat: "seedLuck", value: 3 }, "weathered tree stump with a seat carved into its top, moss on one side"),
+    deco("deco_grove_lantern", "Mothlight Lantern", "\u{1F3EE}", "epic", "grove", null, { stat: "harvestLuck", value: 3 }, "iron hanging lantern on a hooked post, lit from inside by pale glowing moth dust"),
+    deco("deco_grove_cairn", "Barrow Cairn", "\u{1FAA8}", "epic", "grove", null, { stat: "growSpeed", value: 3 }, "stack of flat grey standing stones balanced into a cairn, lichen in the seams"),
+
     // ── COMMON · cosmetic · mostly regular shop + spin (40) ───────────────────────────────────────────────
     deco("deco_flower_row", "Wildflower Row", "🌼", "common", "shop", 300, null, "row of cheerful mixed wildflowers"),
     deco("deco_tulip_bed", "Tulip Bed", "🌷", "common", "shop", 300, null, "tidy bed of red and yellow tulips"),

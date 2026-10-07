@@ -292,37 +292,123 @@ Three bugs the screenshots caught that a green build did not:
 - **bodies stood below the forest floor.** Anchored at `bottom: 0` when every plate paints its ground about
   an eighth of the way up.
 
-**Still to do:** hero and pet are placeholder discs (no sprite yet) · zone bosses are the zone's own enemy
-rather than a distinct body · the six tool/deco/plot grants spend parts and record the craft but do not yet
-hand the item to the system that owns it · hyper-rare drops (pet food → upgrade stones) are specced, not
-built · maps 2-20.
+**Still to do at that point:** hero and pet were placeholder discs; zone bosses were the zone's own enemy;
+the deco/plot grants spent parts and handed nothing over; hyper-rares were specced, not built. All four are
+closed below.
 
-### 2026-10-07 — the belt, and tools as a ladder
+### 2026-10-07 - the belt, and tools as a ladder
 
-**Food and the belt.** Nothing in the game healed HP — the consumables shelf is XP, strikes, damage
+**Food and the belt.** Nothing in the game healed HP - the consumables shelf is XP, strikes, damage
 multipliers and forge scrolls, and the delve potions are run-scoped charges rather than items. So the Grove
-grows its own: four foods crafted from its own parts (Moss Poultice 25% → Heartwood Draught 100%), each
+grows its own: four foods crafted from its own parts (Moss Poultice 25% to Heartwood Draught 100%), each
 craft making a stack. One belt slot; the scene eats automatically below **60%** of max HP.
 
-⚠️ Food takes a BAG SLOT like a part does, which is the whole tension of it — carrying healing costs you
+⚠️ Food takes a BAG SLOT like a part does, which is the whole tension of it - carrying healing costs you
 carrying loot, and slots are the scarcest thing a player has.
 
 **Tools are a ladder across the maps, not six items.** The first cut was wrong and worth recording: it made
-one Rootwood Rod, one Antler Pick and so on — six terminal items, craft each once and the entire tool idea
+one Rootwood Rod, one Antler Pick and so on - six terminal items, craft each once and the entire tool idea
 is finished inside map one with nineteen maps left. Luke: *"My idea was for you to craft different tiers of
 these utility items as you progress through maps."* So a tool is a RUNG: `mkt_grove_tool` stores a TIER per
 slot, each map contributes recipes that raise it, and the bonus is read from the tier (3%/tier to that
 tool's own system). Adding map two means adding recipes and nothing else.
 
-Proven end to end: craft → 5 poultices → belted → ate 2 → 3 left; rod crafted to tier 1, re-craft refused
-with `already_built`.
+### 2026-10-07 - server authority, and the six tools reaching their systems
+
+Luke: *"we need to strike a balance between cost and server authority on things, since we cant push all of
+it on the client due to exploits and responsiveness. But if we can save cost we should."*
+
+**Where the line landed.** Motion, targeting, telegraph timing, camera and loot spill stay on the client,
+because they are presentation and must be instant. What you GET and HOW FAST you can get it stay on the
+server. Three checks hold that, and **every one of them costs zero extra queries** - arithmetic and table
+lookups against rows the handler already read:
+
+| check | the lie it stops | cost |
+|---|---|---|
+| the loot roll (already server-side) | inventing a drop | none - `grove-roll.js` |
+| zone membership | claiming Elderlings in zone 1 for tier-6 parts | a `Set` from data in memory |
+| a wall-clock rolling window | re-entering to reset the kill budget | folded into the UPDATE settle already ran |
+
+⚠️ **TWO REAL EXPLOITS WERE OPEN.** The zone check did not exist at all, so a settle could report twelve
+Elderlings in Thicket Edge and be handed Elder Heartwood on the first node of the map. And `groveEnter` set
+`kills_settled = 0`, which made the kill ceiling a budget **per entry** rather than per unit of time - enter,
+settle the maximum, leave, re-enter, for ever. The guard existed and was free to walk around.
+
+Both verified by attacking the running server: 3 of 4 cross-zone claims rejected and only the legitimate part
+granted; 4,000 claimed kills trimmed to 180, and 4,000 more after a re-entry capped at zero.
+
+**The six tools now do something.** They stored a tier and affected nothing. rod to the fishing treasure
+roll, pick to ore haul, hoe to the farm double-harvest, shovel to the dig consolation, sextant to merchant
+payout, hammer to the forge double-parts. ⚠️ All **additive**, never multiplied into the result: each of
+these already stacks with ranks, set bonuses, pets and lures, and a tool that scaled the product would, twenty
+maps up, be worth more than the system it was helping. Read through `equipMemo`, which caches the **in-flight
+promise** - these are asked inside `Promise.all` alongside everything else a cast needs, so callers arrive
+before the first answer exists and a value cache would miss on every one of them.
+
+### 2026-10-07 - bosses, hyper-rares, the farm grants, and two silent bugs
+
+**Zone bosses are real bodies now.** Every zone's `boss` field used to name one of its own wanderers, so
+"the boss" was a rootrat you had killed two hundred times with more health on it. Twelve distinct bosses
+(Glutmaw the Burrow King through The Heartwood Elder, 420 to 7,200 hp), each kin to its zone and each with
+its own art, standing at the far end of the zone so you have to walk to it.
+
+Three telegraph **shapes**, cycled in order rather than picked at random - a boss you can learn is the entire
+point of telegraphing:
+
+- `slam` - one point, hard, short tell. Punishes standing still.
+- `sweep` - a wide band, weaker, long tell. Punishes being anywhere near it.
+- `volley` - three points at once, centred so there is always a gap. Punishes having nowhere to stand.
+
+⚠️ **THE BOSS HAS ITS OWN REQUEST** (`action: "boss"`), not a line in the settle batch. That is a
+deliberate spend of one round trip for at most one kill every thirty minutes per zone, and it buys the two
+guards a batched claim could never be held to: the zone must be **cleared** (`kills >= toUnlock`), and the
+cooldown must have elapsed. It is also why the boss id is deliberately **not** in `allowedIn()` - leave it
+there and two hundred claimed boss kills in one settle walk straight around the cooldown.
+
+**A boss is not a gate.** `toUnlock` is a kill count and opens the next area on its own; the boss ENDS a
+zone. Luke was explicit and the two keep wanting to merge.
+
+**Hyper-rares.** Luke: *"hyper rare drops from pet food to upgrade stones/free enchant/free upgrade/free plot
+or sail upgrade."* ⚠️ **EVERY ONE IS AN EXISTING REWARD, NOT A NEW CURRENCY** - a free enchant *is* an
+Enchantment Scroll, a free upgrade *is* a Power Scroll, pet food *is* a treat, and all three treats are
+`price: null`, meaning the shop has never sold them, which is exactly the shape a hyper-rare wants. Only the
+free ship upgrade needed anything new (one counter column; the yard already knew how to charge nothing). The
+free **plot** is deliberately absent: it is a recipe, not a drop - Luke listed both in one breath and only
+one of them should be luck.
+
+Measured rather than reasoned about: the deepest boss pays a hyper-rare **1 in 43 kills** (~22 hours of
+fighting only him), and the rarest of them, an enshrinement stone, **1 in 1,043 boss kills**. The `minZone`
+floor **fails upward**, so a deep boss is eligible for everything below it - a table matching only its own
+rung is the bug this codebase has hit three times.
+
+**The farm grants are wired.** The deco and plot crafts spent parts and handed nothing over. Three
+decorations registered with `source: "grove"` - a source no existing hand-out path can reach, the same lock
+the Halloween set uses - and ⚠️ **authored to the same ids as the recipes**, so `groveCraft` hands
+`recipe.id` straight to `grantDecoration` with no mapping table to drift. Plots ride the farm's own
+`farm_upgrades` jsonb rather than a table of their own, so ⚠️ **they cost the farm zero extra queries** -
+every caller of `plotCount` already has that row in hand.
+
+#### Two bugs that the build was perfectly happy with
+
+⚠️ **EVERY ATTACK IN THE GROVE DEALT A FLAT 5 DAMAGE.** `makeTelegraph` stored `foe.id` - the enemy TYPE,
+`"rootrat"` - and the scene resolved it against `f.uid`, the individual body, `"f17-480213"`. They never
+matched, so every telegraph in twelve zones fell through to a hardcoded fallback of 5. The Elderling's
+`[31, 47]`, every boss number and the whole `dmgPerZone` climb did nothing at all. One wrong property name
+flattened the entire difficulty curve, and nothing anywhere errored.
+
+⚠️ **THE TELEGRAPHS WERE DRAWN BY NOTHING.** The wind-up was simulated from the first version of the
+scene and had no CSS and no JSX. Damage landed after a pause and the player was given no reason why. Luke
+asked for attacks that *"telecast where they will damage"*; an invisible telegraph is just a slow hit. They
+are bands on the ground now, filling left to right over the attack's own wind-up, so what is on screen **is**
+the window you have.
+
+Both are now asserted in `check:grove`, along with a check that every sprite path points at a file that
+actually exists - the one that was missing, and the reason four creatures including the rare spawn shipped
+with `art: null` while their generated files sat on disk unreferenced.
 
 ### Still to build
 
-1. **The combat engine** — the open question in §11, and the biggest. Tap-to-move, tap-to-attack,
-   telegraphed swings, platforms, wandering enemies and loot that spills is not any of the three engines the
-   game already has.
-2. **Server systems** — the run/kill/loot endpoints, the seen-parts set that drives recipe discovery, the
-   backpack and bank, the crafting grant path, emblem counts and equipping.
-3. **The client scene** — map, zones, camera, movement, pickups, inventory, workbench, the stone tablet.
-4. **Art** — 4 enemies and 12 backdrops.
+- **Maps 2-20.** Map one is the pattern: a catalogue of parts, enemies, zones and emblems, recipes that raise
+  the tool tiers, and twelve backdrops. Nothing structural should need to change.
+- **The Crystal Stag's own loot table per map.** It has one; each map wants its own crystal creature.
+- **Opening the door to members.** Still owner-gated by `groveOpen`, on Luke's call.

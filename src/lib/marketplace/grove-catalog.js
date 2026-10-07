@@ -164,7 +164,7 @@ export const GROVE_ENEMIES = {
         emblem: "em_gourdling", emblemChance: 0.0022,
         loot: [{ part: "gourd_rind", n: [1, 2], w: 70 }, { part: "thorn_barb", n: [1, 2], w: 30 }],
     }),
-    husk: E("husk", "Straw Walker", null, {
+    husk: E("husk", "Straw Walker", "/images/grove/foe-husk.webp", {
         passive: false, hp: 145, dmg: [9, 15], telegraph: 750,
         emblem: "em_husk", emblemChance: 0.002,
         loot: [{ part: "bound_straw", n: [1, 3], w: 70 }, { part: "gourd_rind", n: [1, 1], w: 30 }],
@@ -189,12 +189,12 @@ export const GROVE_ENEMIES = {
         emblem: "em_ashwraith", emblemChance: 0.0016,
         loot: [{ part: "ash_ember", n: [1, 2], w: 68 }, { part: "rotwood_knot", n: [1, 2], w: 32 }],
     }),
-    goblin: E("goblin", "Palisade Goblin", null, {
+    goblin: E("goblin", "Palisade Goblin", "/images/grove/foe-goblin.webp", {
         passive: false, hp: 455, dmg: [26, 39], telegraph: 560,
         emblem: "em_goblin", emblemChance: 0.0016,
         loot: [{ part: "goblin_rivet", n: [1, 3], w: 70 }, { part: "ash_ember", n: [1, 1], w: 30 }],
     }),
-    elderling: E("elderling", "Elderling", null, {
+    elderling: E("elderling", "Elderling", "/images/grove/foe-elderling.webp", {
         passive: false, hp: 560, dmg: [31, 47], telegraph: 880,
         emblem: "em_elder", emblemChance: 0.0014,
         loot: [{ part: "elder_heartwood", n: [1, 2], w: 60 }, { part: "rotwood_knot", n: [1, 2], w: 40 }],
@@ -211,7 +211,7 @@ export const GROVE_ENEMIES = {
 export const GROVE_RARE = {
     id: "crystal_stag",
     name: "The Crystal Stag",
-    art: null, // needs drawing — nothing in the catalogue is a crystal forest beast
+    art: "/images/grove/foe-crystal_stag.webp",
     hp: 900,
     dmg: [30, 44],
     telegraph: 900,
@@ -229,6 +229,134 @@ export const GROVE_RARE = {
     ],
 };
 
+// ── THE TWELVE BOSSES ────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "Each zone would end with a boss. Big health bar. Telegraphed attacks."
+//
+// ⚠️ A BOSS IS ITS OWN CREATURE, NOT THE ZONE'S WANDERER WITH MORE HP. Every zone's `boss` field used to name
+// the same enemy that already roamed it, so "the boss" was a rootrat you had already killed two hundred times
+// — no silhouette of its own, no reason to walk to the end of the zone. Each is kin to what lives there, which
+// is why the zone reads as building up to something, but each is a distinct body with its own art and its own
+// way of hitting you.
+//
+// ⚠️ AND A BOSS IS NOT A GATE. `toUnlock` on the zone is a kill count and opens the next area on its own; the
+// boss is the thing that ENDS a zone, which is a different job. You clear the zone to earn the right to fight
+// it, and the area beyond was already open. Luke was explicit about this and the two keep wanting to merge.
+//
+// `attacks` is what makes the fight read: a wanderer has one wind-up, a boss cycles through several with
+// different shapes and different tells.
+//
+//   slam    one point, hard, short tell          — punishes standing still
+//   sweep   a wide band, weaker, long tell       — punishes being anywhere near it
+//   volley  three points at once, medium tell    — punishes having nowhere to stand
+//
+// Every one of them announces itself before it lands. Nothing in this feature hits you without a tell.
+const A = {
+    slam: { kind: "slam", reach: 13, telegraph: 620, mult: 1.45 },
+    sweep: { kind: "sweep", reach: 34, telegraph: 1050, mult: 0.85 },
+    volley: { kind: "volley", reach: 9, telegraph: 820, mult: 0.75, shots: 3, spread: 22 },
+};
+
+// ⚠️ `hp` IS NOT SCALED BY scaledFoe. A boss is authored at the depth it stands at — the climb that turns a
+// zone-1 Thornling into a zone-5 Thornling would compound on a number that was already written for zone 5.
+const B = (id, name, o) => ({ id, name, art: `/images/grove/boss-${id}.webp`, boss: true, ...o });
+
+export const GROVE_BOSSES = {
+    glutmaw: B("glutmaw", "Glutmaw, the Burrow King", {
+        hp: 420, dmg: [6, 10], emblem: "em_rootrat", emblemChance: 0.09,
+        attacks: [A.slam, A.sweep],
+        loot: [{ part: "gnawed_root", n: [4, 7] }, { part: "damp_moss", n: [3, 5] }],
+    }),
+    mossmother: B("mossmother", "The Mossmother", {
+        hp: 640, dmg: [8, 13], emblem: "em_grub", emblemChance: 0.09,
+        attacks: [A.slam, A.volley],
+        loot: [{ part: "grub_fat", n: [4, 7] }, { part: "damp_moss", n: [3, 6] }],
+    }),
+    thistlecrown: B("thistlecrown", "Thistlecrown", {
+        hp: 900, dmg: [11, 17], emblem: "em_thornling", emblemChance: 0.10,
+        attacks: [A.sweep, A.slam, A.volley],
+        loot: [{ part: "thorn_barb", n: [4, 8] }, { part: "gnawed_root", n: [3, 6] }],
+    }),
+    grandfather_bristle: B("grandfather_bristle", "Grandfather Bristle", {
+        hp: 1250, dmg: [14, 21], emblem: "em_badger", emblemChance: 0.10,
+        attacks: [A.slam, A.sweep],
+        loot: [{ part: "bristle_hide", n: [4, 7] }, { part: "split_antler", n: [2, 4] }],
+    }),
+    rattlerind: B("rattlerind", "Rattlerind", {
+        hp: 1650, dmg: [17, 25], emblem: "em_gourdling", emblemChance: 0.10,
+        attacks: [A.volley, A.slam, A.sweep],
+        loot: [{ part: "gourd_rind", n: [4, 8] }, { part: "thorn_barb", n: [3, 6] }],
+    }),
+    harvestman: B("harvestman", "The Harvestman", {
+        hp: 2100, dmg: [20, 30], emblem: "em_husk", emblemChance: 0.11,
+        attacks: [A.sweep, A.slam],
+        loot: [{ part: "bound_straw", n: [5, 9] }, { part: "gourd_rind", n: [3, 6] }],
+    }),
+    barrow_warden: B("barrow_warden", "The Barrow Warden", {
+        hp: 2650, dmg: [24, 35], emblem: "em_barrowhound", emblemChance: 0.11,
+        attacks: [A.slam, A.volley, A.sweep],
+        loot: [{ part: "barrow_tooth", n: [5, 9] }, { part: "bristle_hide", n: [3, 6] }],
+    }),
+    great_weaver: B("great_weaver", "The Great Weaver", {
+        hp: 3300, dmg: [28, 40], emblem: "em_warren", emblemChance: 0.11,
+        attacks: [A.volley, A.sweep],
+        loot: [{ part: "warren_silk", n: [5, 9] }, { part: "barrow_tooth", n: [3, 6] }],
+    }),
+    lanternwing: B("lanternwing", "The Lanternwing", {
+        hp: 4000, dmg: [32, 46], emblem: "em_voidmoth", emblemChance: 0.12,
+        attacks: [A.volley, A.slam, A.sweep],
+        loot: [{ part: "mothlight_dust", n: [5, 9] }, { part: "warren_silk", n: [3, 6] }],
+    }),
+    everburning: B("everburning", "The Everburning", {
+        hp: 4800, dmg: [37, 53], emblem: "em_ashwraith", emblemChance: 0.12,
+        attacks: [A.sweep, A.volley, A.slam],
+        loot: [{ part: "ash_ember", n: [5, 10] }, { part: "rotwood_knot", n: [3, 6] }],
+    }),
+    stakelord: B("stakelord", "Gorrak the Stakelord", {
+        hp: 5700, dmg: [42, 60], emblem: "em_goblin", emblemChance: 0.12,
+        attacks: [A.slam, A.volley, A.sweep],
+        loot: [{ part: "goblin_rivet", n: [6, 10] }, { part: "ash_ember", n: [3, 6] }],
+    }),
+    heartwood_elder: B("heartwood_elder", "The Heartwood Elder", {
+        hp: 7200, dmg: [48, 68], emblem: "em_elder", emblemChance: 0.14,
+        attacks: [A.sweep, A.slam, A.volley],
+        loot: [{ part: "elder_heartwood", n: [4, 8] }, { part: "rotwood_knot", n: [4, 7] }],
+    }),
+};
+
+// How long a boss stays dead. ⚠️ THE ONLY THROTTLE ON THE HYPER-RARE FAUCET, so it is wall-clock and per
+// zone — twelve zones means something is always available to somebody who has cleared the map, which is the
+// point, but no single boss can be farmed in a loop.
+export const BOSS_COOLDOWN_MS = 30 * 60 * 1000;
+
+// ── HYPER-RARE DROPS ─────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "I think there could be hyper rare drops from pet food to upgrade stones/free enchant/free upgrade/free
+// plot or sail upgrade."
+//
+// ⚠️ EVERY ONE OF THESE IS AN EXISTING REWARD, NOT A NEW CURRENCY. A "free enchant" is already an Enchantment
+// Scroll, a "free upgrade" is already a Power Scroll, pet food is already a treat — and all three of those
+// treats are price: null, meaning the shop has never sold them, which is exactly the shape a hyper-rare wants.
+// Inventing a parallel token for any of it would have built a second, worse version of a counter that works.
+//
+// The free PLOT is deliberately absent: it is a recipe (plot_i / plot_ii), not a drop. Luke listed both in one
+// breath and only one of them should be luck.
+//
+// `minZone` is what keeps the ladder honest — ⚠️ AND IT FAILS UPWARD. A reward's floor is the shallowest boss
+// that may pay it, so a deep boss is eligible for everything below it. See rarity-tables-stop-at-eternal: a
+// table that only matches its own rung hands the deepest kill the thinnest prize.
+export const GROVE_HYPER = [
+    { id: "treat_wild", kind: "consumable", ref: "treat_wild", name: "Wild Rations", minZone: 1, w: 30 },
+    { id: "forge_enchant_scroll", kind: "consumable", ref: "forge_enchant_scroll", name: "Enchantment Scroll", minZone: 3, w: 16 },
+    { id: "treat_marrow", kind: "consumable", ref: "treat_marrow", name: "Ancient Marrow", minZone: 4, w: 22 },
+    { id: "forge_power_scroll", kind: "consumable", ref: "forge_power_scroll", name: "Power Scroll", minZone: 5, w: 14 },
+    { id: "ship_upgrade", kind: "ship_upgrade", ref: null, name: "A free ship upgrade", minZone: 6, w: 10 },
+    { id: "treat_mythic", kind: "consumable", ref: "treat_mythic", name: "Mythic Morsel", minZone: 8, w: 7 },
+    { id: "pet_stone", kind: "stone", ref: null, name: "An enshrinement stone", minZone: 10, w: 4 },
+];
+
+// Per boss kill, before the emblem's rarity bonus. Climbs with depth so the deep bosses — the ones that are
+// actually hard — are where this lives, rather than whichever one is cheapest to kill on repeat.
+export const bossHyperChance = (zoneN) => 0.006 + 0.0015 * Math.max(0, (Number(zoneN) || 1) - 1);
+
 // ── THE TWELVE ZONES ─────────────────────────────────────────────────────────────────────────────────────────
 // ⚠️ `toUnlock` IS A KILL COUNT, NOT A BOSS. The area opens on kills, exactly as Luke described it; the boss
 // is what ENDS the zone, not what gates the next one. Two different jobs.
@@ -239,18 +367,18 @@ const Z = (n, id, name, enemies, boss, toUnlock, o = {}) =>
     ({ n, id, name, enemies, boss, toUnlock, bg: `/images/grove/zone-${id}.webp`, ...o });
 
 export const GROVE_ZONES = [
-    Z(1, "thicket", "Thicket Edge", ["rootrat"], "rootrat", 20, { blurb: "Where the trees start. Nothing here has noticed you yet." }),
-    Z(2, "hollow", "Mossy Hollow", ["grub"], "grub", 25, { blurb: "Wet underfoot and quiet. Something is eating the deadfall." }),
-    Z(3, "fernway", "The Fernway", ["rootrat", "thornling"], "thornling", 30, { blurb: "Head-high ferns, and the first thing that hits back." }),
-    Z(4, "oldstand", "The Old Stand", ["badger"], "badger", 35, { blurb: "Big trunks, old roots, and something that lives under them." }),
-    Z(5, "bramble", "Bramblewall", ["thornling", "gourdling"], "gourdling", 40, { blurb: "A wall of thorn somebody planted on purpose." }),
-    Z(6, "stubble", "The Stubble Field", ["husk"], "husk", 45, { blurb: "Cut stalks to the horizon. Some of them walk." }),
-    Z(7, "barrows", "The Barrows", ["barrowhound", "husk"], "barrowhound", 50, { blurb: "Mounds in rows. The rows are deliberate." }),
-    Z(8, "warren", "The Warren", ["warren_mother", "barrowhound"], "warren_mother", 55, { blurb: "Down, and then further down. Something spins in the dark." }),
-    Z(9, "mothlight", "Mothlight", ["voidmoth"], "voidmoth", 60, { blurb: "A clearing lit from the air by wings." }),
-    Z(10, "rotwood", "Rotwood", ["ashwraith", "voidmoth"], "ashwraith", 65, { blurb: "The trees burned a long time ago and never went out." }),
-    Z(11, "palisade", "The Palisade", ["goblin", "ashwraith"], "goblin", 70, { blurb: "Sharpened stakes, facing outward. Somebody is keeping something in." }),
-    Z(12, "heartwood", "Heartwood", ["elderling", "goblin"], "elderling", 80, { blurb: "The middle of the forest, and the oldest thing in it." }),
+    Z(1, "thicket", "Thicket Edge", ["rootrat"], "glutmaw", 20, { blurb: "Where the trees start. Nothing here has noticed you yet." }),
+    Z(2, "hollow", "Mossy Hollow", ["grub"], "mossmother", 25, { blurb: "Wet underfoot and quiet. Something is eating the deadfall." }),
+    Z(3, "fernway", "The Fernway", ["rootrat", "thornling"], "thistlecrown", 30, { blurb: "Head-high ferns, and the first thing that hits back." }),
+    Z(4, "oldstand", "The Old Stand", ["badger"], "grandfather_bristle", 35, { blurb: "Big trunks, old roots, and something that lives under them." }),
+    Z(5, "bramble", "Bramblewall", ["thornling", "gourdling"], "rattlerind", 40, { blurb: "A wall of thorn somebody planted on purpose." }),
+    Z(6, "stubble", "The Stubble Field", ["husk"], "harvestman", 45, { blurb: "Cut stalks to the horizon. Some of them walk." }),
+    Z(7, "barrows", "The Barrows", ["barrowhound", "husk"], "barrow_warden", 50, { blurb: "Mounds in rows. The rows are deliberate." }),
+    Z(8, "warren", "The Warren", ["warren_mother", "barrowhound"], "great_weaver", 55, { blurb: "Down, and then further down. Something spins in the dark." }),
+    Z(9, "mothlight", "Mothlight", ["voidmoth"], "lanternwing", 60, { blurb: "A clearing lit from the air by wings." }),
+    Z(10, "rotwood", "Rotwood", ["ashwraith", "voidmoth"], "everburning", 65, { blurb: "The trees burned a long time ago and never went out." }),
+    Z(11, "palisade", "The Palisade", ["goblin", "ashwraith"], "stakelord", 70, { blurb: "Sharpened stakes, facing outward. Somebody is keeping something in." }),
+    Z(12, "heartwood", "Heartwood", ["elderling", "goblin"], "heartwood_elder", 80, { blurb: "The middle of the forest, and the oldest thing in it." }),
 ];
 
 // ── DIFFICULTY ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -278,4 +406,5 @@ export function scaledFoe(enemyId, zoneN) {
 export const GROVE_POP = { min: 15, max: 30, respawnMs: 45_000 };
 
 export const groveZone = (id) => GROVE_ZONES.find((z) => z.id === id) || null;
+export const groveBoss = (id) => GROVE_BOSSES[id] || null;
 export const grovePart = (id) => GROVE_PARTS[id] || null;

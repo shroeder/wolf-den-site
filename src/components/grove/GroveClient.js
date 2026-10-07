@@ -26,6 +26,7 @@ export default function GroveClient({ initial }) {
     const [session, setSession] = useState(null);
     const [note, setNote] = useState(null);
     const [unlockedNow, setUnlockedNow] = useState(null);
+    const [bossWon, setBossWon] = useState(null);
 
     const refresh = useCallback(async () => {
         const d = await fetch("/api/marketplace/grove").then((r) => r.json()).catch(() => null);
@@ -56,7 +57,24 @@ export default function GroveClient({ initial }) {
         await refresh();
     }, [session, refresh]);
 
-    const leave = useCallback(() => { setSession(null); setView("map"); refresh(); }, [refresh]);
+    // ── THE BOSS ────────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ ITS OWN REQUEST, NOT A LINE IN THE SETTLE BATCH. The server checks the zone was cleared and that
+    // the cooldown elapsed, and neither of those can be held against a batch of two hundred claimed kills.
+    // One request per boss death, at most one every thirty minutes per zone. See groveBoss.
+    const bossKill = useCallback(async () => {
+        if (!session) return;
+        const d = await post({ action: "boss", zone: session.zone.id });
+        if (!d?.ok) {
+            setNote(d?.error === "on_cooldown" ? "That one is still lying where you left it."
+                : d?.error === "not_cleared" ? "Clear the zone first."
+                : "The kill did not land.");
+            return;
+        }
+        setBossWon(d);
+        await refresh();
+    }, [session, refresh]);
+
+    const leave = useCallback(() => { setSession(null); setView("map"); setBossWon(null); refresh(); }, [refresh]);
 
     // Your stats for the scene. Account stats + equipped emblems, which is what Luke described driving
     // damage, attack speed and health.
@@ -103,8 +121,28 @@ export default function GroveClient({ initial }) {
             <div className="gv">
                 <GroveScene
                     zone={session.zone} seed={session.seed} bonuses={session.bonuses}
-                    stats={stats} pet={null} belt={beltNow} onSettle={settle} onLeave={leave}
+                    stats={stats} heroArt={session.heroArt || st?.heroArt || null}
+                    petArt={session.petArt || st?.petArt || null}
+                    belt={beltNow} onSettle={settle} onBoss={bossKill} onLeave={leave}
                 />
+                {bossWon ? (
+                    <div className="gv-unlock gv-won" onClick={() => setBossWon(null)}>
+                        <div>
+                            <span>{bossWon.first ? "First kill" : `Kill ${bossWon.kills}`}</span>
+                            <b>{bossWon.boss?.name}</b>
+                            {bossWon.boss?.art ? <img src={bossWon.boss.art} alt="" /> : null}
+                            <p className="gv-won-loot">
+                                {Object.entries(bossWon.parts || {}).map(([k, n]) => `${n} ${partName(k)}`).join(" · ")}
+                                {bossWon.emblem ? ` · ${GROVE_EMBLEMS[bossWon.emblem]?.name || "an emblem"}` : ""}
+                            </p>
+                            {/* The hyper-rare gets its own line and its own weight. It is roughly one boss in
+                                forty-five at the deepest zone, so when it lands it must not be a word in a
+                                list of roots. */}
+                            {bossWon.hyper ? <strong className="gv-hyper">{bossWon.hyper.name}</strong> : null}
+                            <button type="button" onClick={() => setBossWon(null)}>Good</button>
+                        </div>
+                    </div>
+                ) : null}
                 {unlockedNow ? (
                     <div className="gv-unlock" onClick={() => setUnlockedNow(null)}>
                         <div>

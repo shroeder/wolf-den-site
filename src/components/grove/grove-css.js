@@ -71,10 +71,65 @@ export const GROVE_CSS = `
 .gv-foe.is-rare img { filter: drop-shadow(0 0 14px rgba(170,140,255,0.85)) drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
 /* The shared death animation. Simple on purpose. */
 .gv-foe.is-dead { opacity: 0; pointer-events: none; }
+/* A boss is bigger than the things that wander around it, and lit so you can pick it out at the end of a
+   zone. The glow is per-layer on the sprite rather than an overlay across the scene - a tint over the whole
+   frame flattens every pixel to one colour. See no-overlay-for-lighting. */
+.gv-foe.is-boss { width: 17%; margin-left: -8.5%; }
+.gv-foe.is-boss img { filter: drop-shadow(0 0 18px rgba(255,170,90,0.6)) drop-shadow(0 6px 10px rgba(0,0,0,0.6)); }
+
+/* The hero and the pet. The gradient stays as the BACKGROUND of the box, so it is what shows through when
+   there is no sprite yet - a fallback that is a CSS background cannot itself fail to load. */
 .gv-hero { width: 7%; aspect-ratio: 1; margin-left: -3.5%;
     background: radial-gradient(circle at 50% 40%, #ffe28a, #c8872e 62%, transparent 70%); }
 .gv-pet { width: 4.5%; aspect-ratio: 1; margin-left: -2.25%;
     background: radial-gradient(circle at 50% 40%, #9fe08a, #3f7a35 62%, transparent 70%); }
+/* ⚠️ object-fit: contain, AND A CONTACT SHADOW. Without contain the sprite stretches to the box; without
+   the shadow it reads as pasted onto the plate rather than standing on the ground. See
+   sprite-floats-object-fit-contain. The background is cleared only when a sprite is actually there. */
+.gv-hero:has(img), .gv-pet:has(img) { background: none; }
+.gv-hero img, .gv-pet img { width: 100%; height: 100%; object-fit: contain; display: block;
+    filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
+
+/* A ledge. Earth and moss rather than a UI bar, so it belongs to the painted plate instead of sitting on top
+   of it: a dark soil body, a lit mossy lip along the top, and a soft shadow underneath to give it thickness.
+   Anchored to the same 13% ground line as every body, because a ledge the bodies do not stand ON is worse
+   than no ledge at all. */
+.gv-ledge { position: absolute; left: 0; bottom: 13%; height: 9px; border-radius: 4px 4px 2px 2px;
+    pointer-events: none; will-change: transform;
+    background: linear-gradient(#5f7a3a 0 3px, #4a3a28 3px 100%);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.45), inset 0 -2px 0 rgba(0,0,0,0.3); }
+
+/* The boss reward panel rides the area-unlock panel's shape, with room for the sprite and a line for the
+   hyper-rare. */
+.gv-won div { max-width: 320px; }
+.gv-won img { width: 120px; height: 120px; object-fit: contain; display: block; margin: 6px auto 2px; }
+.gv-won-loot { margin: 2px 0 0; font-size: 0.82rem; color: #d8e6cf; line-height: 1.5; }
+.gv-hyper { display: block; margin-top: 8px; font-size: 1rem; color: #ffd98a;
+    text-shadow: 0 0 14px rgba(255,200,110,0.55); }
+
+/* ── ⚠️ THE TELEGRAPHS ──────────────────────────────────────────────────────────────────────────────
+   These did not exist. The wind-up was simulated from the first version of the scene and drawn by nothing, so
+   damage landed after a pause and the player was given no reason why. Luke asked for attacks that "telecast
+   where they will damage", and a telegraph you cannot see is just a slow hit.
+
+   A band on the ground at the place the attack will land. The fill sweeps left to right over the attack's own
+   wind-up, so what is on screen IS the window you have to leave - the animation duration is set inline from
+   the attack, not guessed at here.
+
+   ⚠️ WIDTH IS SET IN PIXELS BY THE LOOP, NOT scaleX. Scaling a 2r-wide box would stretch its border and
+   its fill with it, so a wide sweep would have a four-pixel edge and a slam a one-pixel one. */
+.gv-tel { position: absolute; left: 0; bottom: 11%; height: 12px; border-radius: 3px;
+    pointer-events: none; overflow: hidden; will-change: transform;
+    border: 1px solid rgba(255,255,255,0.35); background: rgba(0,0,0,0.3); }
+.gv-tel::after { content: ""; position: absolute; inset: 0; transform-origin: 0 50%;
+    animation: gvTel linear forwards; animation-duration: inherit; }
+.gv-tel.is-slam { border-color: rgba(255,120,90,0.75); }
+.gv-tel.is-slam::after { background: linear-gradient(90deg, rgba(255,90,60,0.35), rgba(255,140,80,0.75)); }
+.gv-tel.is-sweep { height: 9px; border-color: rgba(255,210,110,0.7); }
+.gv-tel.is-sweep::after { background: linear-gradient(90deg, rgba(255,180,60,0.3), rgba(255,225,120,0.65)); }
+.gv-tel.is-volley { height: 14px; border-color: rgba(170,140,255,0.8); }
+.gv-tel.is-volley::after { background: linear-gradient(90deg, rgba(140,100,255,0.35), rgba(200,170,255,0.8)); }
+@keyframes gvTel { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 .gv-float { position: absolute; left: 50%; bottom: 40%; font-weight: 800; font-size: 0.95rem;
     pointer-events: none; animation: gvFloat 900ms ease-out forwards; text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
@@ -85,7 +140,9 @@ export const GROVE_CSS = `
 .gv-float.is-loot { color: #cdf5bd; font-size: 0.8rem; }
 @keyframes gvFloat { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-34px); } }
 
-.gv-boss { position: absolute; top: 34px; left: 50%; transform: translateX(-50%); width: 70%;
+/* Below the HUD row rather than tucked against it - the name and the health bar are two lines and they were
+   crowding the hp bar and the kill count. */
+.gv-boss { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); width: 70%;
     text-align: center; pointer-events: none; }
 .gv-boss b { display: block; font-size: 0.8rem; letter-spacing: .1em; text-transform: uppercase;
     color: #e5d2ff; text-shadow: 0 2px 4px rgba(0,0,0,0.9); margin-bottom: 4px; }

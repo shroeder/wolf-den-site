@@ -153,8 +153,43 @@ export function swing({ power, critRate = 0, critDamage = 0, lifeSteal = 0 }, ta
 // A telegraph is a window with a PLACE: the attack announces where it will land, the player has `ms` to not
 // be standing there, and then it resolves against whoever is. That is the whole mechanic — it is what makes
 // standing still wrong without making the fight twitchy.
-export function makeTelegraph(foe, at, now) {
-    return { foeId: foe.id, x: at, r: foe.reach || 10, fires: now + (foe.telegraph || 600), spawned: now };
+// ⚠️ THIS RETURNS A LIST, AND IT KEYS ON foe.uid.
+//
+// Two things were wrong and both were invisible:
+//
+//   1. IT STORED foe.id, WHICH THE RESOLVER LOOKED UP AS f.uid. `id` is the enemy TYPE ("rootrat"); `uid` is
+//      the individual body ("f17-480213"). They never matched, so every telegraph in the game resolved
+//      against a null foe and fell through to a hardcoded 5 damage — which means the Elderling's [31, 47],
+//      every boss number, and the entire dmgPerZone climb did nothing at all. Twelve zones of difficulty
+//      curve, and one wrong property name flattened the lot to five.
+//
+//   2. ONE TELEGRAPH PER ATTACK. A volley lands in three places at once, so the shape has to be a list.
+//
+// `attack` is a row from a boss's `attacks` (see GROVE_BOSSES). Omitted, this falls back to the creature's own
+// single wind-up, which is what every wanderer uses.
+export function makeTelegraph(foe, at, now, attack = null) {
+    const ms = Number(attack?.telegraph) || Number(foe.telegraph) || 600;
+    const reach = Number(attack?.reach) || Number(foe.reach) || 10;
+    const shots = Math.max(1, Number(attack?.shots) || 1);
+    const spread = Number(attack?.spread) || 0;
+    const out = [];
+    for (let i = 0; i < shots; i += 1) {
+        // Centred on the target: an odd volley puts one directly on you and the rest either side, so there
+        // is always somewhere to run to. A volley with no gap is not a telegraph, it is a tax.
+        const off = shots === 1 ? 0 : (i - (shots - 1) / 2) * spread;
+        out.push({
+            uid: `t${Math.round(now)}-${i}-${foe.uid || foe.id}`,
+            foeUid: foe.uid || null,
+            kind: attack?.kind || "slam",
+            mult: Number(attack?.mult) || 1,
+            x: at + off,
+            r: reach,
+            ms,
+            fires: now + ms,
+            spawned: now,
+        });
+    }
+    return out;
 }
 
 export const telegraphHits = (tel, x) => Math.abs(x - tel.x) <= tel.r;

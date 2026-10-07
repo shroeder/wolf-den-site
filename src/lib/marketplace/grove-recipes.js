@@ -118,11 +118,11 @@ export const GROVE_RECIPES = [
     // "Could maybe make some craftable decorations for the farm" and "Maybe you could build up to 2
     // additional plots." ⚠️ TWO PLOTS, EVER. Plots are the farm's core economy and these are deliberately
     // the most expensive things on the list — a third would want a conversation, not a recipe.
-    R("deco_stump", "Carved Stump", "deco", { gnawed_root: 12, rotwood_knot: 4 },
+    R("deco_grove_stump", "Carved Stump", "deco", { gnawed_root: 12, rotwood_knot: 4 },
         { blurb: "Somebody sat on this long enough to carve it." }),
-    R("deco_lantern", "Mothlight Lantern", "deco", { mothlight_dust: 8, grub_fat: 10 },
+    R("deco_grove_lantern", "Mothlight Lantern", "deco", { mothlight_dust: 8, grub_fat: 10 },
         { blurb: "The dust keeps glowing. Nobody is sure for how long." }),
-    R("deco_cairn", "Barrow Cairn", "deco", { barrow_tooth: 12, elder_heartwood: 3 },
+    R("deco_grove_cairn", "Barrow Cairn", "deco", { barrow_tooth: 12, elder_heartwood: 3 },
         { blurb: "Stacked the old way, facing the old direction." }),
     R("plot_i", "Cleared Ground I", "plot", { elder_heartwood: 10, goblin_rivet: 20, crystal_shard: 2 },
         { adds: 1, numeral: "I", blurb: "Enough forest pushed back for one more row." }),

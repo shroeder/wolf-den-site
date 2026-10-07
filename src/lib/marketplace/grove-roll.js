@@ -109,6 +109,71 @@ export function rollKill(foe, seed, index, bonus = {}) {
     return out;
 }
 
+/**
+ * What a BOSS kill produces. A different function rather than a flag on rollKill, because almost nothing about
+ * it is the same shape.
+ *
+ * ⚠️ IT PAYS EVERY LOOT ROW, NOT ONE. That is the whole difference between a boss and the two hundredth
+ * rootrat: a wanderer rolls its table and usually gives you the common row, a boss hands over the lot. It is
+ * also why boss rows carry no `w` — there is nothing to weight.
+ *
+ * ⚠️ AND IT PAYS NO GOLD. Bosses are repeatable on a timer, and gold already has fourteen faucets; the Crystal
+ * Stag stays the one thing in this feature that mints. Luke: "We dont grant gold."
+ *
+ * @param {object} boss   the entry from GROVE_BOSSES
+ * @param {number} zoneN  which zone it stands at — sets the hyper-rare chance
+ * @param {number} seed   the session seed
+ * @param {number} index  the kill index, same stream as every other kill
+ * @param {object} bonus  emblem-derived { rarityFind, emblemFind }
+ */
+export function rollBoss(boss, zoneN, seed, index, bonus = {}, hyperChance = 0, hyperTable = null) {
+    const out = { parts: {}, emblem: null, hyper: null, xp: 0 };
+    if (!boss) return out;
+    const r = killRng(seed, index);
+
+    const rarity = Number(bonus.rarityFind) || 0;
+    for (const row of boss.loot || []) {
+        let n = span(row.n, r());
+        if (rarity > 0 && r() < Math.min(0.75, rarity / 100)) n += 1;
+        out.parts[row.part] = (out.parts[row.part] || 0) + n;
+    }
+
+    // The reliable route to an emblem. A wanderer is a fraction of a percent; a boss is roughly one in nine,
+    // on a thirty-minute timer. "Emblems are rare" stays true and the player has something to aim AT.
+    const em = (Number(boss.emblemChance) || 0) * (1 + (Number(bonus.emblemFind) || 0) / 100);
+    if (boss.emblem && r() < em) out.emblem = boss.emblem;
+
+    // ⚠️ THE HYPER ROLL IS DRAWN LAST AND FROM THE SAME STREAM, so the server lands on the same answer the
+    // client already showed. It is NOT re-rolled server-side off a fresh seed — that would mean the scene can
+    // celebrate a Mythic Morsel the settle then declines to hand over.
+    if (r() < (Number(hyperChance) || 0) * (1 + rarity / 100)) {
+        out.hyper = pickHyper(zoneN, r(), hyperTable);
+    }
+
+    out.xp = Math.max(4, Math.round((boss.hp || 100) / 40));
+    return out;
+}
+
+/**
+ * Which hyper-rare, given the depth it dropped at.
+ *
+ * ⚠️ THE TABLE IS PASSED IN, NOT IMPORTED — same reason settleKills takes a `lookup`. This module
+ * is pure on purpose so the check scripts can run it in bare node, where the "@/" alias does not resolve;
+ * one catalogue import would have taken both of them out.
+ *
+ * ⚠️ THE FLOOR FAILS UPWARD. `minZone` is the shallowest boss allowed to pay a reward, so a deep boss is
+ * eligible for everything at or below it rather than only its own rung. A table that matched the rung exactly
+ * would hand the hardest kill in the map the narrowest table — the bug this codebase has now hit three times.
+ * See ladder-lookups-must-fail-upward.
+ */
+export function pickHyper(zoneN, r, table) {
+    const z = Math.max(1, Number(zoneN) || 1);
+    const open = (table || []).filter((h) => z >= (h.minZone || 1));
+    if (!open.length) return null;
+    const pick = pickWeighted(open, r);
+    return pick ? pick.id : null;
+}
+
 /** Did the crystal spawn in place of an ordinary enemy? Same seed, same answer on both sides. */
 export function rollRareSpawn(baseChance, seed, index, bonus = {}) {
     const r = killRng(seed, index ^ 0x5bf03635);

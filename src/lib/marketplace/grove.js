@@ -10,8 +10,13 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_PARTS, GROVE_EMBLEMS, GROVE_POP,
     GROVE_FOODS, HEAL_AT, emblemStars, groveZone,
+    GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, groveBoss as bossById,
 } from "@/lib/marketplace/grove-catalog.js";
-import { settleKills } from "@/lib/marketplace/grove-roll.js";
+import { settleKills, rollBoss } from "@/lib/marketplace/grove-roll.js";
+import { grantConsumable } from "@/lib/marketplace/consumables.js";
+import { grantStone } from "@/lib/marketplace/pet-ascension.js";
+import { grantDecoration } from "@/lib/marketplace/farm-decorations.js";
+import { GROVE_PLOT_CAP } from "@/lib/marketplace/farm-crops.js";
 import {
     GROVE_RECIPES, recipeById, discoveredRecipes, tabletBonuses, TOOL_SLOTS, toolBonusPct,
 } from "@/lib/marketplace/grove-recipes.js";
@@ -63,7 +68,11 @@ export function killCeiling(elapsedMs) {
 // tier-6 Elder Heartwood on the first node of the map, skipping the entire thing. A Set built from the zone's
 // own enemy list, which is already in memory. No query, no cost.
 function allowedIn(zone) {
-    return new Set([...(zone.enemies || []), zone.boss, GROVE_RARE.id]);
+    // ⚠️ THE BOSS IS DELIBERATELY NOT IN THIS SET. It used to be, back when a zone's "boss" was just one of
+    // its own wanderers. It has its own verb now (groveBoss) with its own thirty-minute cooldown, and that
+    // cooldown is the only throttle on the hyper-rare drops it feeds — so if settle still accepted the id, a
+    // burst of two hundred claimed boss kills would walk straight around it.
+    return new Set([...(zone.enemies || []), GROVE_RARE.id]);
 }
 
 async function playerRow(buyerId) {
@@ -89,17 +98,48 @@ function bonusesFrom(emblemRows) {
     return out;
 }
 
+/**
+ * Who the hero and the pet look like.
+ *
+ * ⚠️ ONE QUERY FOR BOTH, VIA A JOIN. The pet sprite is keyed on the member's featured_collectible, which
+ * lives on the same row, so asking separately would have been two round trips for two strings — and round
+ * trips are the meter that bills. See CLAUDE.md.
+ *
+ * ⚠️ A NULL URL IS RETURNED AS NULL AND MUST STAY THAT WAY. The scene renders no <img> at all rather than
+ * one with a broken src: an SSR 404 fires onError before React hydrates, so an onError fallback never runs and
+ * the player gets the browser's broken-image glyph. See img-onerror-fires-before-hydration.
+ */
+async function heroLook(buyerId) {
+    const row = await db.queryOne(
+        `SELECT b.avatar_sprite_url AS hero, ps.url AS pet
+           FROM mkt_buyer b
+           LEFT JOIN mkt_pet_sprite ps ON ps.pet_id = b.featured_collectible
+          WHERE b.id = $1`, [buyerId],
+    ).catch(() => null);
+    return { heroArt: row?.hero || null, petArt: row?.pet || null };
+}
+
 /** The whole screen: where you are, what you carry, what you have seen, what you can make. */
 export async function groveState(buyerId) {
     if (!buyerId || !groveOpen(buyerId)) return { ok: false, error: "closed" };
 
-    const [p, zones, items, seen, emblems, tools] = await Promise.all([
+    const [p, zones, items, seen, emblems, tools, look] = await Promise.all([
         playerRow(buyerId),
-        db.query(`SELECT zone_id, kills, boss_done FROM mkt_grove_zone WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        // ⚠️ THE COOLDOWN IS COMPUTED IN SQL, ON THE QUERY THIS ALREADY RAN. Two reasons. It costs nothing
+        // — no extra round trip, and round trips are the meter that bills. And the comparison happens where
+        // the timestamps live: the session zone here is UTC, and doing timestamptz arithmetic in Node is how
+        // every date bug in this repo has started. See postgres-landmines.
+        db.query(
+            `SELECT zone_id, kills, boss_done, boss_kills,
+                    GREATEST(0, EXTRACT(EPOCH FROM (boss_at + ($2 || ' milliseconds')::interval - NOW())) * 1000)::bigint AS boss_wait_ms
+               FROM mkt_grove_zone WHERE buyer_id = $1`,
+            [buyerId, String(BOSS_COOLDOWN_MS)],
+        ).catch(() => []),
         db.query(`SELECT place, part_id, qty FROM mkt_grove_item WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT part_id FROM mkt_grove_seen WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT slot, tier FROM mkt_grove_tool WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        heroLook(buyerId),
     ]);
 
     const killsBy = Object.fromEntries((zones || []).map((z) => [z.zone_id, z]));
@@ -118,17 +158,38 @@ export async function groveState(buyerId) {
 
     return {
         ok: true,
+        ...look,
         unlockedN: Number(p?.unlocked_n) || 1,
         packSlots: Number(p?.pack_slots) || 16,
         bankSlots: Number(p?.bank_slots) || 16,
         packsBuilt: p?.packs_built || [],
         banksBuilt: p?.banks_built || [],
-        zones: GROVE_ZONES.map((z) => ({
-            ...z,
-            kills: Number(killsBy[z.id]?.kills) || 0,
-            bossDone: Boolean(killsBy[z.id]?.boss_done),
-            unlocked: z.n <= (Number(p?.unlocked_n) || 1),
-        })),
+        plotsBuilt: p?.plots_built || [],
+        zones: GROVE_ZONES.map((z) => {
+            const row = killsBy[z.id];
+            const kills = Number(row?.kills) || 0;
+            const b = GROVE_BOSSES[z.boss];
+            // bigint comes back as a STRING from the HTTP driver, so Number() is not optional here.
+            const wait = Math.max(0, Number(row?.boss_wait_ms) || 0);
+            return {
+                ...z,
+                kills,
+                bossDone: Boolean(row?.boss_done),
+                unlocked: z.n <= (Number(p?.unlocked_n) || 1),
+                // The boss, and the two things that decide whether you may fight it. Luke: "Each zone would
+                // end with a boss." Clearing the zone earns the fight; the timer spaces it out.
+                // ⚠️ bossDef, NOT boss. The catalogue's zone.boss is the string ID, and overwriting it here
+                // with the resolved object made groveBoss(zone.boss) look up an object and find nothing
+                // — so the boss silently never spawned, while every flag around it said it should.
+                // A field that means a string in one place and an object in another is a bug waiting
+                // for whoever reads the other one.
+                bossDef: b ? { id: b.id, name: b.name, art: b.art, hp: b.hp, attacks: b.attacks } : null,
+                bossCleared: kills >= z.toUnlock,
+                bossWaitMs: wait,
+                bossReady: kills >= z.toUnlock && wait <= 0,
+                bossKills: Number(row?.boss_kills) || 0,
+            };
+        }),
         pack,
         bank,
         food,
@@ -174,8 +235,41 @@ export async function groveEnter(buyerId, zoneId) {
         [buyerId, seed, zoneId],
     ).catch(() => {});
 
-    const emblems = await db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-    return { ok: true, seed, zone, pop: GROVE_POP, bonuses: bonusesFrom(emblems) };
+    // ⚠️ THE SCENE READS zone.bossReady OFF THIS, NOT OFF groveState. The session's zone object comes from
+    // here, so a boss that was only described in the state payload would never appear — the scene is
+    // handed this one. Both have to answer the same question.
+    const [emblems, zrow, look] = await Promise.all([
+        db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.queryOne(
+            `SELECT kills,
+                    GREATEST(0, EXTRACT(EPOCH FROM (boss_at + ($3 || ' milliseconds')::interval - NOW())) * 1000)::bigint AS wait_ms
+               FROM mkt_grove_zone WHERE buyer_id = $1 AND zone_id = $2`,
+            [buyerId, zoneId, String(BOSS_COOLDOWN_MS)],
+        ).catch(() => null),
+        heroLook(buyerId),
+    ]);
+
+    const b = GROVE_BOSSES[zone.boss] || null;
+    const kills = Number(zrow?.kills) || 0;
+    const wait = Math.max(0, Number(zrow?.wait_ms) || 0);
+
+    return {
+        ok: true,
+        seed,
+        zone: {
+            ...zone,
+            kills,
+            // ⚠️ bossDef, NOT boss — see the note in groveState. zone.boss stays the string id the
+            // catalogue gave it, in every payload, so groveBoss() can resolve it on the client.
+            bossDef: b ? { id: b.id, name: b.name, art: b.art, hp: b.hp } : null,
+            bossCleared: kills >= zone.toUnlock,
+            bossWaitMs: wait,
+            bossReady: kills >= zone.toUnlock && wait <= 0,
+        },
+        pop: GROVE_POP,
+        bonuses: bonusesFrom(emblems),
+        ...look,
+    };
 }
 
 /**
@@ -183,6 +277,79 @@ export async function groveEnter(buyerId, zoneId) {
  *
  * ⚠️ TAKES IDS AND INDEXES, NEVER ITEMS. The client says what it killed; the server decides what fell out.
  */
+/**
+ * Parts into the backpack, and into the permanent seen-set.
+ *
+ * ⚠️ THE BAG HAS A CEILING AND IT IS COUNTED IN ROWS. Sixteen "unique slots" means sixteen distinct parts,
+ * not sixteen items — a part you already hold stacks for free, a new one needs a slot. Anything that does not
+ * fit is simply not granted and the client is told, rather than silently vanishing.
+ *
+ * ⚠️ AND DISCOVERY IS SEEING, NOT KEEPING. A part that fell out while the bag was full was still FOUND, and
+ * the recipe it unlocks must unlock. Luke was explicit: "If you get the first item and discard it or bank it,
+ * then find the second part. The recipe unlocks, so its just based on discovery."
+ *
+ * Extracted so the boss and the settle share it rather than carrying two copies — a second copy of a rule
+ * with this many edges in it is a second, slightly different game. See reuse-the-rule-never-restate-it.
+ */
+async function storeParts(buyerId, parts, packSlots) {
+    const held = await db.query(
+        `SELECT part_id FROM mkt_grove_item WHERE buyer_id = $1 AND place = 'pack' AND qty > 0`, [buyerId],
+    ).catch(() => []);
+    const heldSet = new Set((held || []).map((r) => r.part_id));
+
+    const stored = {};
+    const overflow = {};
+    for (const [part, n] of Object.entries(parts || {})) {
+        if (!heldSet.has(part) && heldSet.size >= packSlots) { overflow[part] = n; continue; }
+        heldSet.add(part);
+        stored[part] = n;
+        await db.query(
+            `INSERT INTO mkt_grove_item (buyer_id, place, part_id, qty) VALUES ($1, 'pack', $2, $3)
+             ON CONFLICT (buyer_id, place, part_id) DO UPDATE SET qty = mkt_grove_item.qty + $3`,
+            [buyerId, part, n],
+        ).catch(() => {});
+    }
+
+    const newlySeen = [];
+    for (const part of Object.keys(parts || {})) {
+        const ins = await db.queryOne(
+            `INSERT INTO mkt_grove_seen (buyer_id, part_id) VALUES ($1, $2)
+             ON CONFLICT DO NOTHING RETURNING part_id`, [buyerId, part],
+        ).catch(() => null);
+        if (ins) newlySeen.push(part);
+    }
+    return { stored, overflow, newlySeen };
+}
+
+/**
+ * Hand over one hyper-rare.
+ *
+ * ⚠️ EVERY BRANCH REACHES FOR A GRANT THAT ALREADY EXISTS. Luke listed "pet food to upgrade stones/free
+ * enchant/free upgrade/free plot or sail upgrade" and all but one of those is already a thing this game can
+ * give you — a free enchant IS an Enchantment Scroll, a free upgrade IS a Power Scroll, pet food IS a treat.
+ * Minting a parallel token for any of them would have built a second, worse version of a working counter.
+ *
+ * The free plot is absent on purpose: it is a recipe, not a drop.
+ */
+async function grantHyper(buyerId, hyperId, meta = {}) {
+    const row = GROVE_HYPER.find((h) => h.id === hyperId);
+    if (!row) return null;
+    if (row.kind === "consumable") {
+        await grantConsumable(buyerId, row.ref, 1);
+    } else if (row.kind === "stone") {
+        // Two stones exist and they differ only in which way they change the pet, so neither is the better
+        // prize — the coin flip is honest rather than a hidden downgrade.
+        await grantStone(buyerId, Math.random() < 0.5 ? "light" : "dark", 1, "grove_boss").catch(() => {});
+    } else if (row.kind === "ship_upgrade") {
+        await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+        await db.query(`UPDATE mkt_sailing SET free_upgrades = free_upgrades + 1, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    } else {
+        return null;
+    }
+    await trackActivity(buyerId, "grove_hyper", { reward: row.id, ...meta }).catch(() => {});
+    return { id: row.id, name: row.name, kind: row.kind };
+}
+
 export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const zone = groveZone(zoneId);
@@ -230,38 +397,7 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     const emblemRows = await db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const got = settleKills(list, foeById, Number(p.seed), bonusesFrom(emblemRows));
 
-    // ── PARTS INTO THE BAG ──────────────────────────────────────────────────────────────────────────
-    // ⚠️ THE BAG HAS A CEILING AND IT IS COUNTED IN ROWS. Sixteen "unique slots" means sixteen distinct
-    // parts, not sixteen items — a part you already hold stacks for free, a new one needs a slot. Anything
-    // that does not fit is simply not granted and the client is told, rather than silently vanishing.
-    const held = await db.query(`SELECT part_id FROM mkt_grove_item WHERE buyer_id = $1 AND place = 'pack' AND qty > 0`, [buyerId]).catch(() => []);
-    const heldSet = new Set((held || []).map((r) => r.part_id));
-    const packSlots = Number(p.pack_slots) || 16;
-
-    const stored = {};
-    const overflow = {};
-    for (const [part, n] of Object.entries(got.parts)) {
-        if (!heldSet.has(part) && heldSet.size >= packSlots) { overflow[part] = n; continue; }
-        heldSet.add(part);
-        stored[part] = n;
-        await db.query(
-            `INSERT INTO mkt_grove_item (buyer_id, place, part_id, qty) VALUES ($1, 'pack', $2, $3)
-             ON CONFLICT (buyer_id, place, part_id) DO UPDATE SET qty = mkt_grove_item.qty + $3`,
-            [buyerId, part, n],
-        ).catch(() => {});
-    }
-
-    // ── SEEN — EVEN WHAT OVERFLOWED ─────────────────────────────────────────────────────────────────
-    // ⚠️ DISCOVERY IS SEEING, NOT KEEPING. A part that fell out while the bag was full was still found, and
-    // the recipe it unlocks must unlock. This is the exact case the design calls out.
-    const newlySeen = [];
-    for (const part of [...Object.keys(got.parts)]) {
-        const ins = await db.queryOne(
-            `INSERT INTO mkt_grove_seen (buyer_id, part_id) VALUES ($1, $2)
-             ON CONFLICT DO NOTHING RETURNING part_id`, [buyerId, part],
-        ).catch(() => null);
-        if (ins) newlySeen.push(part);
-    }
+    const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p.pack_slots) || 16);
 
     // ── EMBLEMS ─────────────────────────────────────────────────────────────────────────────────────
     for (const [em, n] of Object.entries(got.emblems)) {
@@ -339,6 +475,104 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
 }
 
 /** Move a part between the bag and the bank. Slots are counted in ROWS at the destination. */
+/**
+ * The boss at the end of a zone.
+ *
+ * Luke: "Each zone would end with a boss. Big health bar. Telegraphed attacks."
+ *
+ * ⚠️ ITS OWN VERB, NOT A KILL IN THE SETTLE BATCH, and that is a deliberate spend of one request. A boss
+ * is at most one kill every thirty minutes per zone, so the traffic is nothing — and in exchange the two
+ * things that guard it are checked against a row the server reads anyway:
+ *
+ *   1. you must have CLEARED the zone  (kills >= toUnlock) — the boss is the end of a zone, not a shortcut
+ *      through it
+ *   2. the cooldown must have elapsed — wall clock, which nothing the client does can reset
+ *
+ * Folding this into settle would have cost nothing extra and bought a hole: a burst of two hundred claimed
+ * kills would have carried two hundred boss payouts through a guard that only looks at the batch total.
+ */
+export async function groveBoss(buyerId, zoneId) {
+    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
+    const zone = groveZone(zoneId);
+    const boss = zone ? bossById(zone.boss) : null;
+    if (!zone || !boss) return { ok: false, error: "no_zone" };
+
+    const p = await playerRow(buyerId);
+    if (!p?.seed || p.seed_zone !== zoneId) return { ok: false, error: "no_session" };
+
+    const z = await db.queryOne(
+        `SELECT kills, boss_at, boss_kills, boss_done FROM mkt_grove_zone WHERE buyer_id = $1 AND zone_id = $2`,
+        [buyerId, zoneId],
+    ).catch(() => null);
+
+    // 1. the zone has to be cleared.
+    if ((Number(z?.kills) || 0) < zone.toUnlock) {
+        return { ok: false, error: "not_cleared", need: zone.toUnlock, have: Number(z?.kills) || 0 };
+    }
+
+    // 2. and the body has to have come back. ⚠️ COMPARED IN THE DATABASE, NOT IN NODE — the session zone
+    // here is UTC and the column is timestamptz, and doing this arithmetic in JS is how the date landmines in
+    // this repo have always started. See postgres-landmines.
+    const ready = await db.queryOne(
+        `SELECT (boss_at IS NULL OR NOW() - boss_at > ($3 || ' milliseconds')::interval) AS ok,
+                GREATEST(0, EXTRACT(EPOCH FROM (boss_at + ($3 || ' milliseconds')::interval - NOW())) * 1000)::bigint AS wait_ms
+           FROM mkt_grove_zone WHERE buyer_id = $1 AND zone_id = $2`,
+        [buyerId, zoneId, String(BOSS_COOLDOWN_MS)],
+    ).catch(() => null);
+    if (ready && ready.ok === false) {
+        // bigint comes back as a STRING from the HTTP driver.
+        return { ok: false, error: "on_cooldown", waitMs: Number(ready.wait_ms) || 0 };
+    }
+
+    // The kill index continues the session stream, so the client and the server land on the same roll.
+    const index = Number(p.kills_settled) || 0;
+    const emblemRows = await db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    const got = rollBoss(boss, zone.n, Number(p.seed), index, bonusesFrom(emblemRows), bossHyperChance(zone.n), GROVE_HYPER);
+
+    const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p.pack_slots) || 16);
+
+    if (got.emblem) {
+        await db.query(
+            `INSERT INTO mkt_grove_emblem (buyer_id, emblem_id, count) VALUES ($1, $2, 1)
+             ON CONFLICT (buyer_id, emblem_id) DO UPDATE SET count = mkt_grove_emblem.count + 1`,
+            [buyerId, got.emblem],
+        ).catch(() => {});
+    }
+
+    // ⚠️ gold: 0 IS LOAD-BEARING, same as in settle — awardXp pays gold 1:1 with points otherwise, and a
+    // boss on a timer is a slower money printer but still a money printer. See awardxp-gold-tracks-xp-landmine.
+    if (got.xp > 0) await awardXp(buyerId, "grove", { points: got.xp, gold: 0 }).catch(() => {});
+
+    const hyper = got.hyper ? await grantHyper(buyerId, got.hyper, { zone: zoneId, boss: boss.id }) : null;
+
+    const after = await db.queryOne(
+        `UPDATE mkt_grove_zone
+            SET boss_at = NOW(),
+                boss_kills = boss_kills + 1,
+                boss_done = TRUE,
+                first_clear_at = COALESCE(first_clear_at, NOW())
+          WHERE buyer_id = $1 AND zone_id = $2
+          RETURNING boss_kills, (first_clear_at >= NOW() - interval '5 seconds') AS was_first`,
+        [buyerId, zoneId],
+    ).catch(() => null);
+
+    await trackActivity(buyerId, "grove_boss", { zone: zoneId, boss: boss.id, hyper: hyper?.id || null }).catch(() => {});
+
+    return {
+        ok: true,
+        boss: { id: boss.id, name: boss.name, art: boss.art },
+        parts: stored,
+        overflow,
+        emblem: got.emblem,
+        xp: got.xp,
+        newlySeen,
+        hyper,
+        kills: Number(after?.boss_kills) || 1,
+        first: Boolean(after?.was_first),
+        cooldownMs: BOSS_COOLDOWN_MS,
+    };
+}
+
 export async function groveMove(buyerId, { partId, from, to, qty = 1 } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     if (!GROVE_PARTS[partId] || !["pack", "bank"].includes(from) || !["pack", "bank"].includes(to) || from === to) {
@@ -385,6 +619,7 @@ export async function groveCraft(buyerId, recipeId) {
     // slots paid for and four slots given once.
     if (recipe.kind === "pack" && (p.packs_built || []).includes(recipe.id)) return { ok: false, error: "already_built" };
     if (recipe.kind === "bank" && (p.banks_built || []).includes(recipe.id)) return { ok: false, error: "already_built" };
+    if (recipe.kind === "plot" && (p.plots_built || []).includes(recipe.id)) return { ok: false, error: "already_built" };
     if (recipe.kind === "tool") {
         const held = await db.queryOne(`SELECT tier FROM mkt_grove_tool WHERE buyer_id = $1 AND slot = $2`,
             [buyerId, recipe.slot]).catch(() => null);
@@ -443,9 +678,29 @@ export async function groveCraft(buyerId, recipeId) {
              ON CONFLICT (buyer_id, slot) DO UPDATE SET tier = GREATEST(mkt_grove_tool.tier, $3), made_at = NOW()`,
             [buyerId, recipe.slot, Math.max(1, Number(recipe.tier) || 1)],
         ).catch(() => {});
+    } else if (recipe.kind === "deco") {
+        // ⚠️ THE RECIPE ID *IS* THE DECORATION ID. Both tables were authored to the same key so there is no
+        // mapping to keep in agreement; grantDecoration refuses anything that is not in the catalogue, so a
+        // typo in either file is a failed craft rather than a part silently eaten.
+        await grantDecoration(buyerId, recipe.id, 1, "grove_craft").catch(() => {});
+    } else if (recipe.kind === "plot") {
+        // Into the farm's own upgrades jsonb, so the farm reads it for free off a row it already loads.
+        // ⚠️ LEAST() AT THE CAP, not a read-then-write: two crafts racing must not reach three plots, and
+        // this driver has no transactions to lean on. plotCount clamps on the way out as well, so a value
+        // that somehow got past this is still only ever worth two.
+        await db.query(
+            `UPDATE mkt_buyer
+                SET farm_upgrades = jsonb_set(
+                        COALESCE(farm_upgrades, '{}'::jsonb), '{grove_plots}',
+                        to_jsonb(LEAST($2::int, COALESCE((farm_upgrades->>'grove_plots')::int, 0) + 1)))
+              WHERE id = $1`,
+            [buyerId, GROVE_PLOT_CAP],
+        ).catch(() => {});
+        await db.query(
+            `UPDATE mkt_grove_player SET plots_built = array_append(plots_built, $2), updated_at = NOW() WHERE buyer_id = $1`,
+            [buyerId, recipe.id],
+        ).catch(() => {});
     }
-    // deco / plot grants hang off the farm and are wired as that lands; the parts are spent and the craft is
-    // recorded either way so nothing is silently free.
 
     await trackActivity(buyerId, "grove_craft", { recipe: recipe.id, kind: recipe.kind }).catch(() => {});
     return { ok: true, made: recipe.id, kind: recipe.kind, name: recipe.name };

@@ -33,6 +33,15 @@ const CUTOUT = "ISOLATED as a clean die-cut sprite on a FULLY TRANSPARENT backgr
 
 const FOE = `A single fantasy forest CREATURE, full body, three-quarter view facing the viewer, menacing but readable at small size. ${STYLE} ${CUTOUT}`;
 
+// The BOSS brief. Deliberately a different prompt from FOE rather than "a big <creature>": asking for a
+// bigger rootrat returns a rootrat. Each of these is kin to what wanders its zone and is its own animal.
+// ⚠️ "FILLING THE FRAME" COST FIVE OF THESE THEIR EXTREMITIES. The first run asked for imposing and got
+// it, and the contact sheet showed the Lanternwing with both wingtips sliced off at the edges, the Barrow
+// Warden with its grave-chain cut, and the Stakelord with the top of his log and banner gone. A sprite is
+// die-cut onto a plate, so an edge-touching draw is an amputated creature with nothing to blame it on. Say
+// LARGE WITHIN THE FRAME and demand the margin explicitly, the same way the decoration prompt already does.
+const BOSS = `A single colossal fantasy forest BOSS CREATURE, full body, three-quarter view facing the viewer, imposing and detailed, clearly far larger and grander than an ordinary monster. Drawn LARGE but ENTIRELY INSIDE the frame with roughly 8% empty space on all four sides: NO part of the subject may touch or run off any edge - not antlers, horns, wings, tails, chains, banners, weapons or outstretched limbs. Fit the WHOLE creature in view, smaller rather than cropped. ${STYLE} ${CUTOUT}`;
+
 // The platformer plate. Flat and layered rather than perspectival, and deliberately empty — the hero, the pet
 // and fifteen to thirty enemies are drawn on top of this, so anything living in the plate would read as a
 // creature you cannot hit.
@@ -61,6 +70,24 @@ const ART = {
     crystal_stag: [`${FOE} THE CRYSTAL STAG: a magnificent rare stag whose antlers and parts of its flank have grown into translucent faceted crystal, light refracting through them in pale violet and cyan, hooves trailing faint motes. Regal, luminous, unmistakably a once-in-a-session sight. Crystal violet, pale cyan, deep forest brown.`, "foe"],
 };
 
+
+// ── THE TWELVE BOSSES ───────────────────────────────────────────────────────────────────────────
+// ⚠️ ONE PER ZONE AND NONE OF THEM REUSED. Every zone's boss used to be the same creature that already
+// wandered it, so "the boss" was a rootrat you had killed two hundred times with more health. Each of these
+// is kin to its zone and its own body.
+ART["boss-glutmaw"] = [`${BOSS} GLUTMAW, THE BURROW KING: unmistakably a GIANT RAT and nothing else - long naked scaly tail, round rat ears, whiskers, a pointed rodent snout with a pair of huge chisel incisors. Grown to the size of a bear and monstrously bloated, matted brown fur packed with soil and chewed roots, a knot of taproots grown into the fur of its scalp. NOT a bear, NOT a boar, NOT a sabretooth. Dirt brown, pale root, yellow teeth.`, "foe"];
+ART["boss-mossmother"] = [`${BOSS} THE MOSSMOTHER: a vast pale grub queen, translucent segmented body swollen with pale eggs visible inside, a thick carpet of living green moss grown over her back, small blind eyes, mandibles ringed with fine hairs. Sickly cream, wet moss green.`, "foe"];
+ART["boss-thistlecrown"] = [`${BOSS} THISTLECROWN: a towering briar giant of woven thornvine in a roughly humanoid shape, no face but a crown of enormous purple thistle blooms where a head would be, long whipping thorn-cane arms. Dark bramble green, thorn black, vivid purple blooms.`, "foe"];
+ART["boss-grandfather_bristle"] = [`${BOSS} GRANDFATHER BRISTLE: an ancient dire badger the size of a cart, silver-grey striped head scarred across one blind eye, a mantle of enormous black quills down its spine, huge digging claws caked in earth. Silver, charcoal, old-blood brown.`, "foe"];
+ART["boss-rattlerind"] = [`${BOSS} RATTLERIND: a hulking creature grown from a swollen autumn SQUASH, its thick ribbed orange rind split open along a natural seam into a wide uneven maw with dried seeds rattling in the cavity, thick twisting vine limbs, a cap of withered leaves and curling tendrils. ABSOLUTELY NOT A HALLOWEEN JACK-O-LANTERN: no carved face, no triangular cut eyes, no candle glow, no grinning carved mouth, nothing carved at all - the opening is a natural split in the rind. Deep squash orange, dried vine brown, dark hollows.`, "foe"];
+ART["boss-harvestman"] = [`${BOSS} THE HARVESTMAN: a towering straw-bound figure on long stilted legs, a burlap sack head with stitched black eye-crosses, a broad scythe of rusted iron held in bound-straw hands, crows perched on its shoulders. Dirty gold straw, rust, dusk violet.`, "foe"];
+ART["boss-barrow_warden"] = [`${BOSS} THE BARROW WARDEN: a huge spectral hound of the burial mounds, body of grey mist over visible bone, eye sockets lit cold blue, a heavy iron grave-chain trailing from its neck. Grave grey, bone white, cold blue light.`, "foe"];
+ART["boss-great_weaver"] = [`${BOSS} THE GREAT WEAVER: an enormous pale cave spider, long translucent legs, abdomen marbled with faint luminous veins, eight small dark eyes in a cluster, strands of silk trailing from her spinnerets. Chalk white, pale sickly green glow, deep shadow.`, "foe"];
+ART["boss-lanternwing"] = [`${BOSS} THE LANTERNWING: a colossal luminous moth, wings spread wide and patterned with glowing eye-spots like paper lanterns, thick furred thorax, feathered antennae, drifting motes of light coming off the wings. Pale gold glow, soft dove grey, deep night blue.`, "foe"];
+ART["boss-everburning"] = [`${BOSS} THE EVERBURNING: a towering wraith of charred wood and living ember, a hollow trunk body cracked open to reveal an orange furnace inside, branch arms tipped with embers, no face but a glowing fissure. Charcoal black, ember orange, ash grey.`, "foe"];
+ART["boss-stakelord"] = [`${BOSS} GORRAK THE STAKELORD: a massive brutish goblin warchief in heavy scavenged plate lashed with rope, a single huge sharpened log hefted over one shoulder as a weapon, tusked underbite, tattered banner on his back. Mossy green skin, rusted iron, rope and firelight.`, "foe"];
+ART["boss-heartwood_elder"] = [`${BOSS} THE HEARTWOOD ELDER: an immense ancient treefolk, trunk-like body seamed with rivers of glowing gold sap, a vast crown of antler branches, moss and small ferns growing on its shoulders, deep-set eyes of warm light. Grave and immensely old rather than monstrous. Rich bark brown, glowing gold, deep forest green.`, "foe"];
+
 const SIZES = { plate: "1536x1024", foe: "1024x1024" };
 
 const keys = Object.keys(ART).filter((k) => !ONLY.length || ONLY.includes(k));
@@ -81,7 +108,15 @@ fs.mkdirSync(OUT, { recursive: true });
 let done = 0;
 for (const key of keys) {
     const [prompt, kind] = ART[key];
-    const file = path.join(OUT, `${kind === "plate" ? "" : "foe-"}${key.replace(/^bg-/, "zone-")}.webp`);
+    // ── ⚠️ THE KEY DECIDES THE FILENAME, AND THE CATALOGUE HAS TO AGREE WITH IT ────────────────────
+    // The rule used to be "plates keep their key, everything else gets foe-", which turned the boss keys into
+    // foe-boss-glutmaw.webp while grove-catalog.js was pointing at boss-glutmaw.webp. Nothing errors: the
+    // file writes, the catalogue path 404s, and the player gets a broken-image glyph where the boss should
+    // be. A prefix that is already explicit in the key must not get a second one bolted on.
+    const name = key.startsWith("bg-") ? key.replace(/^bg-/, "zone-")
+        : key.startsWith("boss-") ? key
+        : `foe-${key}`;
+    const file = path.join(OUT, `${name}.webp`);
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },

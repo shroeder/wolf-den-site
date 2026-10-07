@@ -266,8 +266,20 @@ const lvl = (up, key) => Math.max(0, Math.min(FARM_UPGRADES[key]?.max || 0, Numb
 const growMultiplier = (up) => Math.max(0.4, 1 - 0.08 * lvl(up, "grow")); // Green Thumb
 // Second Sowing buys two more plots. `powers` is optional so every existing synchronous caller keeps working
 // and simply sees the base count — the plots only appear for the reader that knows who is asking.
+//
+// The Grove can clear two more (recipes plot_i and plot_ii). ⚠️ STORED IN THE farm_upgrades JSONB RATHER
+// THAN A COLUMN OF ITS OWN, and that is a cost decision: every caller here already has `up` in hand, so the
+// Grove plots cost the farm exactly zero extra round trips. A new table would have added a query to the farm
+// for a number that is almost always zero. See CLAUDE.md on queries per request being the meter that bills.
+//
+// ⚠️ NOT READ THROUGH lvl(). That helper clamps to FARM_UPGRADES[key].max, and grove_plots is deliberately
+// not a purchasable track, so its max there is undefined — lvl() would return 0 for ever. Clamped to 2 here
+// instead, which is the number Luke named and the number the recipe list stops at.
+export const GROVE_PLOT_CAP = 2;
 export const plotCount = (up, powers = null) =>
-    BASE_PLOTS + lvl(up, "plots") + (powers?.has?.("second_sowing") ? 2 : 0);
+    BASE_PLOTS + lvl(up, "plots")
+    + (powers?.has?.("second_sowing") ? 2 : 0)
+    + Math.min(GROVE_PLOT_CAP, Math.max(0, Number(up?.grove_plots) || 0));
 export const farmPetCapBonus = (up) => lvl(up, "petcap");
 export const seedLuckMult = (up) => 1 + 0.25 * lvl(up, "seedluck");
 const luckyHarvestLevel = (up) => lvl(up, "chest"); // Lucky Harvest: bumps the loot tier (see rollHarvestReward)
