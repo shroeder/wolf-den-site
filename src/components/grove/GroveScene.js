@@ -8,6 +8,7 @@ import {
     UNITS_PER_SCREEN, zoneWidth, platformsFor, floorUnder, stepBody, stepWander,
     swing, makeTelegraph, telegraphHits, HOP, GRAVITY,
 } from "@/lib/marketplace/grove-world.js";
+import { HEAL_AT } from "@/lib/marketplace/grove-catalog.js";
 
 // ── THE ZONE, ON SCREEN ──────────────────────────────────────────────────────────────────────────────────────
 // The whole scene runs here. Nothing about movement, wandering, swinging, dying or looting touches the server
@@ -33,7 +34,7 @@ const PICKUP_RANGE = 7;           // world units — "The player must walk near 
 const ATTACK_RANGE = 9;
 const SWING_MS = 620;
 
-export default function GroveScene({ zone, seed, bonuses, stats, pet, onSettle, onLeave }) {
+export default function GroveScene({ zone, seed, bonuses, stats, pet, belt, onSettle, onLeave }) {
     const hostRef = useRef(null);
     const worldRef = useRef(null);
     const camRef = useRef(0);
@@ -72,6 +73,8 @@ export default function GroveScene({ zone, seed, bonuses, stats, pet, onSettle, 
             moveTo: null,
             lastSwing: 0,
             nextRespawn: 0,
+            eaten: {},
+            foodLeft: Number(belt?.count) || 0,
         };
     }, [zone.n, seed, stats?.moveSpeed]);
 
@@ -186,7 +189,22 @@ export default function GroveScene({ zone, seed, bonuses, stats, pet, onSettle, 
                 const raw = foe ? foe.dmg[0] + Math.round(w.rand() * (foe.dmg[1] - foe.dmg[0])) : 5;
                 const dealt = Math.max(1, Math.round(raw * (60 / (60 + (stats?.armour || 0)))));
                 setHp((h) => {
-                    const next = h - dealt;
+                    let next = h - dealt;
+                    // ── ⚠️ EATING IS DECIDED HERE, INSIDE THE SETTER ────────────────────────────
+                    // Luke: "equip food or potions that auto heal you if you get below 60 percent hp."
+                    //
+                    // It has to read the hp that is actually about to be committed, not the `hp` captured
+                    // when this frame started — two hits landing in one frame against a stale value would
+                    // either eat twice or not at all. React hands the true current value here and nowhere
+                    // else.
+                    const max = stats?.maxHp || 100;
+                    if (next > 0 && next < max * HEAL_AT && w.foodLeft > 0 && belt?.id) {
+                        w.foodLeft -= 1;
+                        w.eaten[belt.id] = (w.eaten[belt.id] || 0) + 1;
+                        const healed = Math.round(max * (Number(belt.heals) || 0));
+                        next = Math.min(max, next + healed);
+                        float(`+${healed}`, "heal", w.hero.x, w.hero.y + 20);
+                    }
                     if (next <= 0) setDead(true);
                     return Math.max(0, next);
                 });
@@ -234,7 +252,8 @@ export default function GroveScene({ zone, seed, bonuses, stats, pet, onSettle, 
             if (now - lastSettle > SETTLE_EVERY_MS && w.killLog.length) {
                 lastSettle = now;
                 const batch = w.killLog.splice(0, w.killLog.length);
-                onSettle?.(batch);
+                const ate = w.eaten; w.eaten = {};
+                onSettle?.(batch, ate);
             }
 
             raf = requestAnimationFrame(step);
@@ -282,7 +301,8 @@ export default function GroveScene({ zone, seed, bonuses, stats, pet, onSettle, 
         const flush = () => {
             const w2 = worldRef.current;
             if (!w2?.killLog?.length || !navigator.sendBeacon) return;
-            const body = JSON.stringify({ action: "settle", zone: zone.id, kills: w2.killLog.splice(0) });
+            const ate = w2.eaten; w2.eaten = {};
+            const body = JSON.stringify({ action: "settle", zone: zone.id, kills: w2.killLog.splice(0), eaten: ate });
             navigator.sendBeacon("/api/marketplace/grove", new Blob([body], { type: "application/json" }));
         };
         window.addEventListener("pagehide", flush);
@@ -293,7 +313,8 @@ export default function GroveScene({ zone, seed, bonuses, stats, pet, onSettle, 
             window.removeEventListener("pagehide", flush);
             // ⚠️ SETTLE ON THE WAY OUT. Walking away must not throw the session's kills away — the same
             // reason the casino releases a held balance when you stand up.
-            if (worldRef.current?.killLog?.length) onSettle?.(worldRef.current.killLog.splice(0));
+            const wEnd = worldRef.current;
+            if (wEnd?.killLog?.length) { const ate = wEnd.eaten; wEnd.eaten = {}; onSettle?.(wEnd.killLog.splice(0), ate); }
         };
     }, [world, spawn, seed, bonuses, stats, float, onSettle, W, zone.id]);
 
@@ -354,6 +375,7 @@ export default function GroveScene({ zone, seed, bonuses, stats, pet, onSettle, 
             <div className="gv-hud">
                 <span className="gv-hp"><i style={{ width: `${Math.max(0, (hp / (stats?.maxHp || 100)) * 100)}%` }} /></span>
                 <b>{kills} killed</b>
+                {belt?.id ? <b className="gv-belt">{belt.name} ×{Math.max(0, (Number(belt.count) || 0) - Object.values(world.eaten || {}).reduce((a, b) => a + b, 0))}</b> : null}
                 <button type="button" className="gv-leave" onClick={onLeave}>Leave</button>
             </div>
         </div>

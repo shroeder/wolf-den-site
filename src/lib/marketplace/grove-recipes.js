@@ -18,15 +18,38 @@
 // a sextant for sailing etc." One new slot per system where a tool applies. ⚠️ A new gear slot needs its own
 // slot id AND its own art — worn-sets-need-distinct-slots is the scar where two sets quietly shared one.
 
-/** The tool slots this map's crafting introduces. Each is a NEW equipment slot, one per system. */
+// ── TOOLS ARE A LADDER ACROSS THE MAPS, NOT SIX ITEMS ────────────────────────────────────────────────────────
+// Luke: "My idea was for you to craft different tiers of these utility items as you progress through maps and
+// get parts and recipes."
+//
+// ⚠️ THE FIRST CUT OF THIS WAS WRONG AND IS WORTH SAYING SO. It made ONE Rootwood Rod, one Antler Pick, and
+// so on — six terminal items, craft each once and the whole tool idea is finished inside map one, with
+// nineteen maps left and nothing to make. A tool is a RUNG, not a trophy: each map yields the next tier of
+// every tool, out of that map's own parts.
+//
+// So what is stored per player is a TIER NUMBER per slot (mkt_grove_tool), and what a map contributes is a
+// recipe that raises it. The bonus is read from the tier, so adding map two means adding recipes and nothing
+// else — no new columns, no migration, no second place that has to agree about what a pickaxe is worth.
 export const TOOL_SLOTS = [
-    { slot: "rod", name: "Fishing Rod", system: "fishing" },
-    { slot: "pick", name: "Pickaxe", system: "mining" },
-    { slot: "shovel", name: "Shovel", system: "digging" },
-    { slot: "hammer", name: "Smith's Hammer", system: "forge" },
-    { slot: "hoe", name: "Hoe", system: "farm" },
-    { slot: "sextant", name: "Sextant", system: "sailing" },
+    { slot: "rod", name: "Fishing Rod", system: "fishing", bonus: "fishing luck" },
+    { slot: "pick", name: "Pickaxe", system: "mining", bonus: "ore yield" },
+    { slot: "shovel", name: "Shovel", system: "digging", bonus: "dig depth" },
+    { slot: "hammer", name: "Smith's Hammer", system: "forge", bonus: "salvage returned" },
+    { slot: "hoe", name: "Hoe", system: "farm", bonus: "harvest yield" },
+    { slot: "sextant", name: "Sextant", system: "sailing", bonus: "sea fortune" },
 ];
+
+export const toolSlot = (slot) => TOOL_SLOTS.find((t) => t.slot === slot) || null;
+
+// ── WHAT A TIER IS WORTH ─────────────────────────────────────────────────────────────────────────────────────
+// A flat percentage per tier, to its own system. Deliberately modest: six tools across twenty maps is a lot of
+// surface area to inflate the whole game through, and every one of these lands on a system that already has
+// its own upgrade ladder. A tier-1 tool should be a nice thing to have, not a reason to re-run the Grove.
+//
+// ⚠️ READ FROM THE TIER, NEVER STORED. A stored bonus is a number that has to be migrated the day the curve
+// changes, and the curve will change.
+export const TOOL_PCT_PER_TIER = 3;
+export const toolBonusPct = (tier) => Math.max(0, Number(tier) || 0) * TOOL_PCT_PER_TIER;
 
 // Roman numerals, because the expansions are numbered that way and there are never going to be many.
 export const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
@@ -43,19 +66,38 @@ const R = (id, name, kind, parts, o = {}) => ({ id, name, kind, parts, ...o });
 // Power and cost climb with the depth the parts come from, so a recipe reads as belonging to where you found
 // it: "Recipes should reflect their parts. And their utility and power should reflect the map and difficulty."
 export const GROVE_RECIPES = [
-    // ── TOOLS — the six new slots, each from the parts of the system it serves where that reads ─────
-    R("rod_grove", "Rootwood Rod", "tool", { gnawed_root: 8, damp_moss: 4, grub_fat: 3 },
-        { slot: "rod", blurb: "Springy, light, and it was never meant to be a fishing rod." }),
-    R("pick_grove", "Antler Pick", "tool", { split_antler: 6, bristle_hide: 4, thorn_barb: 5 },
-        { slot: "pick", blurb: "The crack in the antler is what gives it bite." }),
-    R("shovel_grove", "Barrow Spade", "tool", { barrow_tooth: 5, bound_straw: 6, split_antler: 3 },
-        { slot: "shovel", blurb: "Made from what was already down there." }),
-    R("hammer_grove", "Knotwood Hammer", "tool", { rotwood_knot: 6, ash_ember: 4, goblin_rivet: 6 },
-        { slot: "hammer", blurb: "The knot outlasted the tree. It will outlast the anvil." }),
-    R("hoe_grove", "Thornfield Hoe", "tool", { thorn_barb: 8, gourd_rind: 5, bristle_hide: 3 },
-        { slot: "hoe", blurb: "Turns soil and anything growing in it." }),
-    R("sextant_grove", "Mothlight Sextant", "tool", { mothlight_dust: 6, warren_silk: 5, crystal_shard: 1 },
-        { slot: "sextant", blurb: "Reads a sky it has never been under." }),
+    // ── TOOLS — TIER 1 OF SIX LADDERS. Map two raises each of these to tier 2 from ITS parts. ────────
+    // `tier` is what the craft sets the slot to, and it only ever goes up — crafting a tier you already
+    // have or have passed is refused rather than being a wasted pile of parts.
+    //
+    // The parts are drawn from the DEPTH the tool's power implies, not from the system it serves: the
+    // sextant is the deep one because the sea is the late game, the rod is the shallow one because fishing
+    // is where people start. "their utility and power should reflect the map and difficulty."
+    R("rod_t1", "Rootwood Rod", "tool", { gnawed_root: 8, damp_moss: 4, grub_fat: 3 },
+        { slot: "rod", tier: 1, blurb: "Springy, light, and it was never meant to be a fishing rod." }),
+    R("pick_t1", "Antler Pick", "tool", { split_antler: 6, bristle_hide: 4, thorn_barb: 5 },
+        { slot: "pick", tier: 1, blurb: "The crack in the antler is what gives it bite." }),
+    R("hoe_t1", "Thornfield Hoe", "tool", { thorn_barb: 8, gourd_rind: 5, bristle_hide: 3 },
+        { slot: "hoe", tier: 1, blurb: "Turns soil and anything growing in it." }),
+    R("shovel_t1", "Barrow Spade", "tool", { barrow_tooth: 5, bound_straw: 6, split_antler: 3 },
+        { slot: "shovel", tier: 1, blurb: "Made from what was already down there." }),
+    R("hammer_t1", "Knotwood Hammer", "tool", { rotwood_knot: 6, ash_ember: 4, goblin_rivet: 6 },
+        { slot: "hammer", tier: 1, blurb: "The knot outlasted the tree. It will outlast the anvil." }),
+    R("sextant_t1", "Mothlight Sextant", "tool", { mothlight_dust: 6, warren_silk: 5, crystal_shard: 1 },
+        { slot: "sextant", tier: 1, blurb: "Reads a sky it has never been under." }),
+
+    // ── FOOD — the belt. Luke: "equip food or potions that auto heal you if you get below 60 percent hp" ─
+    // ⚠️ THESE MAKE A STACK, NOT ONE. A recipe that produced a single poultice would be a trip to the
+    // workbench every two minutes, which is not a system, it is an errand. `makes` is how many a craft
+    // yields; the heal fraction lives on the food in grove-catalog.js.
+    R("food_poultice", "Moss Poultice", "food", { damp_moss: 4, grub_fat: 3 },
+        { makes: 5, blurb: "Chewed moss and grub fat, packed into a leaf." }),
+    R("food_flask", "Gourd Flask", "food", { gourd_rind: 4, bound_straw: 4, grub_fat: 2 },
+        { makes: 5, blurb: "A dried gourd of something cloudy." }),
+    R("food_tonic", "Mothlight Tonic", "food", { mothlight_dust: 4, warren_silk: 3 },
+        { makes: 4, blurb: "Faintly luminous, and it works fast." }),
+    R("food_draught", "Heartwood Draught", "food", { elder_heartwood: 3, ash_ember: 4 },
+        { makes: 3, blurb: "There is not much of it in the world." }),
 
     // ── BACKPACK — unique, one-time, Roman-numbered, each its own recipe ─────────────────────────────
     R("pack_i", "Backpack I", "pack", { damp_moss: 6, gnawed_root: 6 }, { adds: 4, numeral: "I" }),

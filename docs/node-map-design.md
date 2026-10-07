@@ -297,6 +297,26 @@ rather than a distinct body · the six tool/deco/plot grants spend parts and rec
 hand the item to the system that owns it · hyper-rare drops (pet food → upgrade stones) are specced, not
 built · maps 2-20.
 
+### 2026-10-07 — the belt, and tools as a ladder
+
+**Food and the belt.** Nothing in the game healed HP — the consumables shelf is XP, strikes, damage
+multipliers and forge scrolls, and the delve potions are run-scoped charges rather than items. So the Grove
+grows its own: four foods crafted from its own parts (Moss Poultice 25% → Heartwood Draught 100%), each
+craft making a stack. One belt slot; the scene eats automatically below **60%** of max HP.
+
+⚠️ Food takes a BAG SLOT like a part does, which is the whole tension of it — carrying healing costs you
+carrying loot, and slots are the scarcest thing a player has.
+
+**Tools are a ladder across the maps, not six items.** The first cut was wrong and worth recording: it made
+one Rootwood Rod, one Antler Pick and so on — six terminal items, craft each once and the entire tool idea
+is finished inside map one with nineteen maps left. Luke: *"My idea was for you to craft different tiers of
+these utility items as you progress through maps."* So a tool is a RUNG: `mkt_grove_tool` stores a TIER per
+slot, each map contributes recipes that raise it, and the bonus is read from the tier (3%/tier to that
+tool's own system). Adding map two means adding recipes and nothing else.
+
+Proven end to end: craft → 5 poultices → belted → ate 2 → 3 left; rod crafted to tier 1, re-craft refused
+with `already_built`.
+
 ### Still to build
 
 1. **The combat engine** — the open question in §11, and the biggest. Tap-to-move, tap-to-attack,

@@ -9,10 +9,12 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_PARTS, GROVE_EMBLEMS, GROVE_POP,
-    emblemStars, groveZone,
+    GROVE_FOODS, HEAL_AT, emblemStars, groveZone,
 } from "@/lib/marketplace/grove-catalog.js";
 import { settleKills } from "@/lib/marketplace/grove-roll.js";
-import { GROVE_RECIPES, recipeById, discoveredRecipes, tabletBonuses } from "@/lib/marketplace/grove-recipes.js";
+import {
+    GROVE_RECIPES, recipeById, discoveredRecipes, tabletBonuses, TOOL_SLOTS, toolBonusPct,
+} from "@/lib/marketplace/grove-recipes.js";
 
 // ── THE GROVE, SERVER SIDE ───────────────────────────────────────────────────────────────────────────────────
 // The client plays the whole scene (see grove-roll.js for why). This file does the four things the client is
@@ -65,19 +67,28 @@ function bonusesFrom(emblemRows) {
 export async function groveState(buyerId) {
     if (!buyerId || !groveOpen(buyerId)) return { ok: false, error: "closed" };
 
-    const [p, zones, items, seen, emblems] = await Promise.all([
+    const [p, zones, items, seen, emblems, tools] = await Promise.all([
         playerRow(buyerId),
         db.query(`SELECT zone_id, kills, boss_done FROM mkt_grove_zone WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT place, part_id, qty FROM mkt_grove_item WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT part_id FROM mkt_grove_seen WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.query(`SELECT slot, tier FROM mkt_grove_tool WHERE buyer_id = $1`, [buyerId]).catch(() => []),
     ]);
 
     const killsBy = Object.fromEntries((zones || []).map((z) => [z.zone_id, z]));
     const seenSet = new Set((seen || []).map((r) => r.part_id));
+    // ⚠️ FOOD SHARES mkt_grove_item WITH PARTS AND IS SPLIT OUT HERE. It occupies a bag slot exactly like a
+    // part does — which is the whole tension of the belt: carrying healing costs you carrying loot — but the
+    // workbench must not offer to craft a poultice OUT OF poultices, so the two are separated by identity
+    // rather than by table.
     const pack = {};
     const bank = {};
-    for (const r of items || []) (r.place === "bank" ? bank : pack)[r.part_id] = Number(r.qty);
+    const food = {};
+    for (const r of items || []) {
+        if (GROVE_FOODS[r.part_id]) { food[r.part_id] = Number(r.qty); continue; }
+        (r.place === "bank" ? bank : pack)[r.part_id] = Number(r.qty);
+    }
 
     return {
         ok: true,
@@ -94,6 +105,18 @@ export async function groveState(buyerId) {
         })),
         pack,
         bank,
+        food,
+        // What auto-eats, and the threshold it fires at. Luke: "if you get below 60 percent hp."
+        belt: p?.belt || null,
+        healAt: HEAL_AT,
+        foods: GROVE_FOODS,
+        // One row per slot holding the best tier reached. Map two raises these; nothing here changes.
+        tools: Object.fromEntries((tools || []).map((t) => [t.slot, Number(t.tier) || 0])),
+        toolMeta: TOOL_SLOTS.map((t) => ({
+            ...t,
+            tier: Number((tools || []).find((x) => x.slot === t.slot)?.tier) || 0,
+            pct: toolBonusPct((tools || []).find((x) => x.slot === t.slot)?.tier || 0),
+        })),
         seen: [...seenSet],
         // The tablet: what you have seen out of everything there is, and what that is worth.
         tablet: { seen: seenSet.size, total: Object.keys(GROVE_PARTS).length, bonuses: tabletBonuses(seenSet.size) },
@@ -131,7 +154,7 @@ export async function groveEnter(buyerId, zoneId) {
  *
  * ⚠️ TAKES IDS AND INDEXES, NEVER ITEMS. The client says what it killed; the server decides what fell out.
  */
-export async function groveSettle(buyerId, { zoneId, kills = [] } = {}) {
+export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const zone = groveZone(zoneId);
     if (!zone) return { ok: false, error: "no_zone" };
@@ -144,6 +167,24 @@ export async function groveSettle(buyerId, { zoneId, kills = [] } = {}) {
     const already = Number(p.kills_settled) || 0;
     const list = (kills || []).slice(0, Math.max(0, ceiling - already));
     if (!list.length) return { ok: true, granted: null, parts: {}, capped: true };
+
+    // ── FOOD EATEN IN THE ZONE ──────────────────────────────────────────────────────────────────────
+    // ⚠️ DEBITED CONDITIONALLY, AND A SHORTFALL IS NOT AN ERROR. The scene eats when you drop below 60% and
+    // reports how many it got through; the server takes what is actually there. It cannot verify the eating
+    // — it does not track HP, because combat is the client's — so the honest guard is simply that you cannot
+    // eat food you do not own. Claiming more than you have takes what you have and stops, which is the same
+    // outcome as running out mid-fight.
+    const ate = {};
+    for (const [foodId, n] of Object.entries(eaten || {})) {
+        if (!GROVE_FOODS[foodId]) continue;
+        const want = Math.max(0, Math.round(Number(n) || 0));
+        if (!want) continue;
+        const row = await db.queryOne(
+            `UPDATE mkt_grove_item SET qty = GREATEST(0, qty - $3) WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2
+             RETURNING qty`, [buyerId, foodId, want],
+        ).catch(() => null);
+        if (row) ate[foodId] = want;
+    }
 
     const emblemRows = await db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const got = settleKills(list, foeById, Number(p.seed), bonusesFrom(emblemRows));
@@ -238,6 +279,7 @@ export async function groveSettle(buyerId, { zoneId, kills = [] } = {}) {
         chests: got.chests,
         xp: got.xp,
         newlySeen,
+        ate,
         zoneKills: Number(z?.kills) || 0,
         unlocked,
         capped: list.length < (kills || []).length,
@@ -291,6 +333,11 @@ export async function groveCraft(buyerId, recipeId) {
     // slots paid for and four slots given once.
     if (recipe.kind === "pack" && (p.packs_built || []).includes(recipe.id)) return { ok: false, error: "already_built" };
     if (recipe.kind === "bank" && (p.banks_built || []).includes(recipe.id)) return { ok: false, error: "already_built" };
+    if (recipe.kind === "tool") {
+        const held = await db.queryOne(`SELECT tier FROM mkt_grove_tool WHERE buyer_id = $1 AND slot = $2`,
+            [buyerId, recipe.slot]).catch(() => null);
+        if (Number(held?.tier) >= Number(recipe.tier)) return { ok: false, error: "already_built" };
+    }
 
     // Discovery gate: you cannot craft what you have not found.
     const seen = await db.query(`SELECT part_id FROM mkt_grove_seen WHERE buyer_id = $1`, [buyerId]).catch(() => []);
@@ -328,12 +375,43 @@ export async function groveCraft(buyerId, recipeId) {
             `UPDATE mkt_grove_player SET bank_slots = LEAST(64, bank_slots + $2), banks_built = array_append(banks_built, $3), updated_at = NOW()
               WHERE buyer_id = $1`, [buyerId, recipe.adds, recipe.id],
         ).catch(() => {});
+    } else if (recipe.kind === "food") {
+        // Into the bag, where it takes a slot like anything else.
+        await db.query(
+            `INSERT INTO mkt_grove_item (buyer_id, place, part_id, qty) VALUES ($1, 'pack', $2, $3)
+             ON CONFLICT (buyer_id, place, part_id) DO UPDATE SET qty = mkt_grove_item.qty + $3`,
+            [buyerId, recipe.id, Math.max(1, Number(recipe.makes) || 1)],
+        ).catch(() => {});
+    } else if (recipe.kind === "tool") {
+        // ⚠️ THE TIER ONLY EVER GOES UP. GREATEST means crafting a tier you already hold, or one below it,
+        // cannot quietly downgrade a tool you climbed twenty maps for — and the guard above refuses the
+        // craft outright so the parts are not spent on nothing.
+        await db.query(
+            `INSERT INTO mkt_grove_tool (buyer_id, slot, tier) VALUES ($1, $2, $3)
+             ON CONFLICT (buyer_id, slot) DO UPDATE SET tier = GREATEST(mkt_grove_tool.tier, $3), made_at = NOW()`,
+            [buyerId, recipe.slot, Math.max(1, Number(recipe.tier) || 1)],
+        ).catch(() => {});
     }
-    // tool / deco / plot grants hang off the systems they belong to and are wired as those land; the parts
-    // are spent and the craft is recorded either way so nothing is silently free.
+    // deco / plot grants hang off the farm and are wired as that lands; the parts are spent and the craft is
+    // recorded either way so nothing is silently free.
 
     await trackActivity(buyerId, "grove_craft", { recipe: recipe.id, kind: recipe.kind }).catch(() => {});
     return { ok: true, made: recipe.id, kind: recipe.kind, name: recipe.name };
+}
+
+/**
+ * Put a food on the belt, or take it off.
+ *
+ * Luke: "a way to equip food or potions that auto heal you if you get below 60 percent hp." One belt, one
+ * food — choosing WHICH is the decision, and a belt that held all four would not be one.
+ */
+export async function groveBelt(buyerId, foodId) {
+    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
+    if (foodId && !GROVE_FOODS[foodId]) return { ok: false, error: "no_food" };
+    await playerRow(buyerId);
+    await db.query(`UPDATE mkt_grove_player SET belt = $2, updated_at = NOW() WHERE buyer_id = $1`,
+        [buyerId, foodId || null]).catch(() => {});
+    return { ok: true, belt: foodId || null };
 }
 
 /** Equip or unequip an emblem. Three slots now; three more exist and stay locked. */

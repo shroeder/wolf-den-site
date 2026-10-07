@@ -52,6 +52,31 @@ export const GROVE_PARTS = {
     crystal_shard: { name: "Crystal Shard", tier: 6, blurb: "Only ever off the crystal-touched. Hums faintly.", rare: true },
 };
 
+// ── FOOD AND POTIONS ─────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "We need a way to equip food or potions that auto heal you if you get below 60 percent hp."
+//
+// ⚠️ NOTHING IN THIS GAME HEALS HP TODAY. The consumables shelf is XP, daily strikes, damage multipliers and
+// forge scrolls; the delves have potions but they are RUN-SCOPED charges, not items you own. So rather than
+// bolt a healing stat onto an existing consumable — which would make it heal in the arena and the boss fight
+// too, places nobody asked for — the Grove grows its own, crafted from its own parts.
+//
+// That also gives the parts another sink, and makes the belt a real decision: food takes a BAG SLOT, and
+// slots are the scarcest thing a player has.
+export const HEAL_AT = 0.60;   // Luke's number: it fires below 60% of max HP
+
+export const GROVE_FOODS = {
+    food_poultice: { name: "Moss Poultice", heals: 0.25, tier: 1,
+        blurb: "Chewed moss and grub fat, packed into a leaf. It works, which is the only nice thing about it." },
+    food_flask: { name: "Gourd Flask", heals: 0.40, tier: 3,
+        blurb: "A dried gourd of something cloudy. Tastes of the field it came out of." },
+    food_tonic: { name: "Mothlight Tonic", heals: 0.60, tier: 5,
+        blurb: "Faintly luminous. Drinking it feels like standing up too fast, and then being fine." },
+    food_draught: { name: "Heartwood Draught", heals: 1.00, tier: 6,
+        blurb: "Pressed from the middle of a very old tree. There is not much of it in the world." },
+};
+
+export const groveFood = (id) => GROVE_FOODS[id] || null;
+
 // ── EMBLEMS ──────────────────────────────────────────────────────────────────────────────────────────────────
 // ⚠️ ALL EMBLEM BONUSES ARE PASSIVE AND ALL OF THEM ARE BREAKPOINTED. An emblem is not a stat stick you equip
 // once — it levels on HOW MANY of it you have collected, from 1 star to 6, and each rung takes far longer than

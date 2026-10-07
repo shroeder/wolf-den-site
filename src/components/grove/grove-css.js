@@ -130,6 +130,11 @@ export const GROVE_CSS = `
 .gv-slot b { font-size: 0.84rem; }
 .gv-slot span { font-size: 1.05rem; font-weight: 800; color: #9fe08a; }
 .gv-slot em { font-style: normal; font-size: 0.68rem; color: #8d8577; }
+.gv-slot.is-on { border-color: rgba(159,224,138,0.6); background: rgba(159,224,138,0.12); }
+.gv-slot.is-on em { color: #9fe08a; }
+/* A tool not yet made: shown so the ladder is visible before you can climb it. */
+.gv-slot.is-dim { opacity: 0.55; }
+.gv-belt { color: #9fe08a !important; }
 .gv-tablet { padding: 14px; border-radius: 12px; background: rgba(255,255,255,0.035);
     border: 1px solid rgba(255,255,255,0.10); }
 .gv-tablet ul { margin: 8px 0 0; padding-left: 18px; font-size: 0.82rem; color: #cfc6b6; }

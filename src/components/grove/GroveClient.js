@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import GroveScene from "@/components/grove/GroveScene.js";
-import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_ZONES, emblemStars } from "@/lib/marketplace/grove-catalog.js";
-import { GROVE_RECIPES, recipeById, canCraft } from "@/lib/marketplace/grove-recipes.js";
+import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars } from "@/lib/marketplace/grove-catalog.js";
+import { GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 
 // ── THE GROVE ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -43,9 +43,9 @@ export default function GroveClient({ initial }) {
     // ── SETTLE ──────────────────────────────────────────────────────────────────────────────────────
     // ⚠️ THE ONLY THING SENT IS WHAT WAS KILLED. The scene already rolled the loot locally to show it; the
     // server re-rolls from the same seed and grants what IT computes. See grove-roll.js.
-    const settle = useCallback(async (kills) => {
+    const settle = useCallback(async (kills, eaten) => {
         if (!kills?.length || !session) return;
-        const d = await post({ action: "settle", zone: session.zone.id, kills });
+        const d = await post({ action: "settle", zone: session.zone.id, kills, eaten: eaten || {} });
         if (!d?.ok) return;
         if (d.unlocked) setUnlockedNow(d.unlocked);
         if (d.newlySeen?.length) {
@@ -79,6 +79,14 @@ export default function GroveClient({ initial }) {
         return e;
     }, [st?.emblems]);
 
+    // What the scene actually eats: the equipped food, its heal fraction, and how many are in the bag.
+    // Resolved here rather than in the scene so the scene never has to know what a recipe is.
+    const beltNow = useMemo(() => {
+        const id = st?.belt;
+        if (!id || !GROVE_FOODS[id]) return null;
+        return { id, ...GROVE_FOODS[id], count: Number(st?.food?.[id]) || 0 };
+    }, [st?.belt, st?.food]);
+
     useEffect(() => {
         if (!note) return undefined;
         const t = setTimeout(() => setNote(null), 3200);
@@ -95,7 +103,7 @@ export default function GroveClient({ initial }) {
             <div className="gv">
                 <GroveScene
                     zone={session.zone} seed={session.seed} bonuses={session.bonuses}
-                    stats={stats} pet={null} onSettle={settle} onLeave={leave}
+                    stats={stats} pet={null} belt={beltNow} onSettle={settle} onLeave={leave}
                 />
                 {unlockedNow ? (
                     <div className="gv-unlock" onClick={() => setUnlockedNow(null)}>
@@ -176,6 +184,44 @@ export default function GroveClient({ initial }) {
                             {!bankRows.length ? <p className="muted">Nothing stored.</p> : null}
                         </div>
                     </section>
+                    {/* ── THE BELT ────────────────────────────────────────────────────────────────
+                        Luke: "a way to equip food or potions that auto heal you if you get below 60
+                        percent hp." One slot: choosing which is the decision. */}
+                    <section>
+                        <h4>The Belt <i>auto-eats below {Math.round((st.healAt || 0.6) * 100)}%</i></h4>
+                        <div className="gv-slots">
+                            {Object.entries(st.food || {}).filter(([, n]) => n > 0).map(([id, n]) => {
+                                const f = GROVE_FOODS[id];
+                                const on = st.belt === id;
+                                return (
+                                    <button key={id} type="button" className={`gv-slot${on ? " is-on" : ""}`}
+                                        onClick={async () => { await post({ action: "belt", food: on ? null : id }); refresh(); }}>
+                                        <b>{f?.name || id}</b>
+                                        <span>{n}</span>
+                                        <em>{on ? "on the belt" : `heals ${Math.round((f?.heals || 0) * 100)}%`}</em>
+                                    </button>
+                                );
+                            })}
+                            {!Object.values(st.food || {}).some((n) => n > 0)
+                                ? <p className="muted">No food. Craft some at the workbench.</p> : null}
+                        </div>
+                    </section>
+
+                    {/* ── THE TOOLS ───────────────────────────────────────────────────────────────
+                        A ladder, not six items: each map raises every tool by a tier. */}
+                    <section>
+                        <h4>Tools</h4>
+                        <div className="gv-slots">
+                            {(st.toolMeta || []).map((t) => (
+                                <span key={t.slot} className={`gv-slot${t.tier ? "" : " is-dim"}`}>
+                                    <b>{t.name}</b>
+                                    <span>{t.tier ? `Tier ${t.tier}` : "—"}</span>
+                                    <em>{t.tier ? `+${t.pct}% ${t.bonus}` : t.bonus}</em>
+                                </span>
+                            ))}
+                        </div>
+                    </section>
+
                     {/* The stone tablet, which is a record of what the Grove has shown you. */}
                     <section className="gv-tablet">
                         <h4>The Tablet</h4>

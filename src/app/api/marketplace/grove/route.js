@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
-    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveEquipEmblem,
+    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveEquipEmblem, groveBelt,
 } from "@/lib/marketplace/grove.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -42,10 +42,11 @@ export async function POST(request) {
             const b = await request.json().catch(() => ({}));
             switch (b?.action) {
                 case "enter": return noStore(await groveEnter(buyer.id, String(b.zone || "")));
-                case "settle": return noStore(await groveSettle(buyer.id, { zoneId: String(b.zone || ""), kills: b.kills }));
+                case "settle": return noStore(await groveSettle(buyer.id, { zoneId: String(b.zone || ""), kills: b.kills, eaten: b.eaten }));
                 case "move": return noStore(await groveMove(buyer.id, b));
                 case "craft": return noStore(await groveCraft(buyer.id, String(b.recipe || "")));
                 case "emblem": return noStore(await groveEquipEmblem(buyer.id, b));
+                case "belt": return noStore(await groveBelt(buyer.id, b.food ? String(b.food) : null));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
         } catch (error) {
