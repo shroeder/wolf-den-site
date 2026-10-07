@@ -2,6 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 
+import { parseTrackingFromScan, trackingUrlFor } from "@/lib/shipping/tracking-scan.js";
 import { STORE_ADDRESS, STORE_NAME } from "@/lib/site";
 
 // Order emails for the online shop — customer confirmation, fulfillment-status updates, and a
@@ -66,13 +67,39 @@ function pickupNameLine(order) {
     return name ? `under the name <strong>${escapeHtml(name)}</strong>` : "under your confirmation number";
 }
 
+// ⚠️ THE CARRIER FIELD IS AN INTERNAL NAME AND MUST NOT GO OUT AS ONE. EasyPost calls UPS "UPSDAP" and
+// FedEx "FedExDefault"; a customer reading "Tracking (UPSDAP)" has been shown a routing code, not a carrier.
+const CARRIER_NAMES = [
+    [/^ups/i, "UPS"],
+    [/^usps|^uspsreturns/i, "USPS"],
+    [/^fedex/i, "FedEx"],
+    [/^dhl/i, "DHL"],
+];
+function carrierName(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    for (const [re, name] of CARRIER_NAMES) if (re.test(s)) return name;
+    return s;
+}
+
+// ── WHAT THE CUSTOMER ACTUALLY NEEDS ─────────────────────────────────────────────────────────────────────────
+// A tracking number on its own is homework: copy it, work out which carrier, find their site, paste it. The
+// number is a link now, so the next thing after "it shipped" is one tap.
+//
+// The carrier is taken from the order when the label was bought here, and DERIVED FROM THE NUMBER'S OWN SHAPE
+// when it was not — a label bought at the post office and scanned in has no EasyPost rate behind it, and a
+// 1Z or a 22-digit IMpb says perfectly well who carries it.
 function trackingHtml(order) {
     const tracking = String(order?.tracking_number || "").trim();
     if (!tracking) return "";
-    const carrier = String(order?.shipping_carrier || "").trim();
+    const fromOrder = carrierName(order?.shipping_carrier);
+    const carrier = fromOrder || parseTrackingFromScan(tracking)?.carrier || "";
+    const url = trackingUrlFor(carrier, tracking);
+    const shown = url
+        ? `<a href="${escapeHtml(url)}">${escapeHtml(tracking)}</a>`
+        : escapeHtml(tracking);
     return (
-        `<p><strong>Tracking${carrier ? ` (${escapeHtml(carrier)})` : ""}:</strong> ` +
-        `${escapeHtml(tracking)}</p>`
+        `<p><strong>Tracking${carrier ? ` (${escapeHtml(carrier)})` : ""}:</strong> ${shown}</p>`
     );
 }
 

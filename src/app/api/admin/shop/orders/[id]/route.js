@@ -3,6 +3,7 @@ import { after, NextResponse } from "next/server";
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { getShopOrderById, setShopOrderFulfillment } from "@/lib/shop-orders";
 import { sendOrderCancelledEmail, sendOrderStatusEmail } from "@/lib/shop-order-email.js";
+import { parseTrackingFromScan } from "@/lib/shipping/tracking-scan.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -19,7 +20,28 @@ export async function PATCH(request, { params }) {
             const { id } = await params;
             const body = await request.json().catch(() => ({}));
             const fulfillmentStatus = FULFILLMENT.has(body.fulfillmentStatus) ? body.fulfillmentStatus : null;
-            const trackingNumber = typeof body.trackingNumber === "string" ? body.trackingNumber.trim() : null;
+
+            // ── A RAW LABEL SCAN, PARSED HERE ───────────────────────────────────────────────────────
+            // Luke: "when we ship it should let us scan or take a picture of the shipping label and email
+            // the tracking info to the customer" — done from the admin/employee app, which scans with ML
+            // Kit on-device and posts what the barcode said.
+            //
+            // ⚠️ THE APP SENDS WHAT IT READ; THE SERVER DECIDES WHAT IT MEANS. The barcode's raw value is
+            // not the tracking number — USPS leads with 420 + the destination ZIP, UPS buries the 1Z in a
+            // structured 2D block. That logic lives in ONE place with its own checks beside it, rather than
+            // being ported into Kotlin where it would drift from this copy the first time a carrier changed
+            // a format. See tracking-scan.js.
+            const scanRaw = typeof body.scanRaw === "string" ? body.scanRaw : "";
+            const scanned = scanRaw ? parseTrackingFromScan(scanRaw) : null;
+            if (scanRaw && !scanned) {
+                // Told plainly rather than saved as-is: a label that will not parse is a thing to look at,
+                // and the alternative is emailing a customer somebody's ZIP code.
+                return NextResponse.json({ error: "Couldn't read a tracking number off that scan." }, { status: 422 });
+            }
+
+            const trackingNumber = scanned
+                ? scanned.tracking
+                : (typeof body.trackingNumber === "string" ? body.trackingNumber.trim() : null);
             if (!fulfillmentStatus && trackingNumber === null) {
                 return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
             }
@@ -35,12 +57,28 @@ export async function PATCH(request, { params }) {
             const statusChanged =
                 Boolean(fulfillmentStatus) && previous?.fulfillment_status !== fulfillmentStatus;
 
-            if (statusChanged) {
+            // ── A TRACKING NUMBER ARRIVING IS ITSELF NEWS ───────────────────────────────────────────
+            // Luke: "when we ship it should ... email the tracking info to the customer."
+            //
+            // The email only ever fired on a STATUS transition, so the common shipping-day order — mark it
+            // shipped, go and print the label, come back and scan the tracking off it — notified the
+            // customer BEFORE there was a number to give them, and then never again. The one email they
+            // got said "it's on its way" with no way to watch it.
+            //
+            // So a tracking number that is new, on an order already shipped, sends too. Guarded on the
+            // value actually CHANGING: saving the same number twice, or re-saving a row untouched, must
+            // not mail somebody the same parcel twice.
+            const trackingChanged = Boolean(trackingNumber)
+                && trackingNumber !== (previous?.tracking_number || "")
+                && (order.fulfillment_status === "shipped" || fulfillmentStatus === "shipped");
+            const notify = statusChanged || trackingChanged;
+
+            if (notify) {
                 // Awaited inside after() so the serverless function doesn't terminate mid-send, and never
                 // allowed to fail the status update — the owner's tap already succeeded.
                 after(async () => {
                     try {
-                        if (fulfillmentStatus === "cancelled") {
+                        if (fulfillmentStatus === "cancelled" && statusChanged) {
                             // Cancelling from the status dropdown carries no refund (that's the /cancel
                             // route's job), so send the notice without a refund amount.
                             await sendOrderCancelledEmail(order, {
@@ -48,7 +86,9 @@ export async function PATCH(request, { params }) {
                                 refundAmountCents: order.refund_amount_cents || 0,
                             });
                         } else {
-                            await sendOrderStatusEmail(order, fulfillmentStatus);
+                            // On a tracking-only save the status is not in the body, so the email is sent
+                            // against the status the order actually HAS.
+                            await sendOrderStatusEmail(order, fulfillmentStatus || order.fulfillment_status);
                         }
                     } catch (emailError) {
                         logger.warn("admin.shop.order.status_email_failed", {
@@ -60,7 +100,9 @@ export async function PATCH(request, { params }) {
                 });
             }
 
-            return NextResponse.json({ order, customerNotified: statusChanged });
+            // `scanned` goes back so the app can show WHICH carrier and number it just sent, and say so to
+            // the person holding the parcel — a scan that silently succeeds is a scan you cannot check.
+            return NextResponse.json({ order, customerNotified: notify, scanned: scanned || null });
         } catch (error) {
             return internalError(error, { event: "admin.shop.order.update.failure" });
         }
