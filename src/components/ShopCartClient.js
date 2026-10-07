@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { taxCentsFor } from "@/lib/shop-tax-base";
+
 import ThemedSelect from "@/components/ThemedSelect";
 
 const SHOP_CART_UPDATED_EVENT = "wolfden-shop-cart-updated";
@@ -293,8 +295,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     // When EasyPost returns live rates, the buyer must pick one and the totals use that rate.
     const selectedRate = shipRates.options.find((rate) => rate.id === selectedRateId) || null;
     const usingCalculatedShipping = shipRates.enabled && fulfillmentMode === "shipping";
-    const baseCents = cartData.subtotalCents + cartData.onlineFeeCents + cartData.taxCents;
-
     // Be honest about shipping: don't show a flat number or "FREE" as if it were final before we've
     // actually priced it from the address. It's "pending" until either a live rate is picked, or (only
     // when EasyPost isn't returning rates at all) the server flat rate legitimately applies.
@@ -322,6 +322,22 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         shippingPending = false;
     }
     const shippingKnown = !shippingPending;
+
+    // ── TAX FOLLOWS THE SHIPPING THE BUYER ACTUALLY PICKED ──────────────────────────────────────────
+    // Luke: "lets make sure we pay and collect tax on shipping going forward."
+    //
+    // Shipping is part of the taxable base now, so the tax the cart quoted — worked out before there was
+    // an address, let alone a chosen rate — is only right until one is picked. It is recomputed here
+    // through the SAME function the server charges with, so the number on this screen is the number on
+    // the card. A checkout that displays $12.54 and takes $12.99 is what chargebacks are made of.
+    //
+    // While shipping is still pending there is nothing honest to add, so the cart's own figure stands and
+    // the total is withheld anyway — see displayTotalCents below.
+    const taxableShippingCents = shippingKnown ? (displayShippingCents || 0) : 0;
+    const liveTaxCents = Number.isFinite(cartData.taxRate)
+        ? taxCentsFor(cartData.subtotalCents, cartData.taxRate, taxableShippingCents)
+        : cartData.taxCents;
+    const baseCents = cartData.subtotalCents + cartData.onlineFeeCents + liveTaxCents;
     const displayTotalCents = shippingKnown ? baseCents + (displayShippingCents || 0) : null;
 
     // Store-credit apply math. When the balance covers the whole known total, the card can be skipped.
@@ -1095,8 +1111,8 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
                         <div className="shop-payment-breakdown">
                             <p><span>Subtotal</span><strong>{formatMoney(cartData.subtotalCents)}</strong></p>
-                            {cartData.taxCents ? (
-                                <p><span>Tax</span><strong>{formatMoney(cartData.taxCents)}</strong></p>
+                            {liveTaxCents ? (
+                                <p><span>Tax</span><strong>{formatMoney(liveTaxCents)}</strong></p>
                             ) : null}
                             {fulfillmentMode === "shipping" ? (
                                 <p>

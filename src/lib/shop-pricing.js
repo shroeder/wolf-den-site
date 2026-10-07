@@ -1,5 +1,7 @@
 import "server-only";
 
+import { taxCentsFor } from "@/lib/shop-tax-base";
+
 // Tax + shipping for the online shop.
 //
 // TAX: the rate is read live from Square (getShopSalesTaxRate in consignment/square.js) so online
@@ -15,9 +17,11 @@ export function shopTaxRate() {
     return Number.isFinite(raw) && raw >= 0 && raw < 0.2 ? raw : 0.06875; // MN state base as fallback
 }
 
-export function shopTaxCents(subtotalCents, rate = shopTaxRate()) {
+// The taxable base (merchandise + shipping) lives in shop-tax-base.js, which is PURE — the buyer's cart screen
+// has to apply the identical rule and cannot import this file, because this one is server-only.
+export function shopTaxCents(subtotalCents, rate = shopTaxRate(), shippingCents = 0) {
     const effectiveRate = Number.isFinite(rate) && rate >= 0 && rate < 0.2 ? rate : shopTaxRate();
-    return Math.round((Number(subtotalCents) || 0) * effectiveRate);
+    return taxCentsFor(subtotalCents, effectiveRate, shippingCents);
 }
 
 export function shopShippingCents(subtotalCents, fulfillmentMode) {

@@ -1627,9 +1627,14 @@ export async function createSquareShopOrder({
 
         const serviceCharges = [];
         if (shippingCents > 0) {
+            // ⚠️ SUBTOTAL_PHASE AND taxable, NOT TOTAL_PHASE. Minnesota taxes delivery on a taxable sale, and
+            // a TOTAL_PHASE charge is applied AFTER tax and cannot be taxed at all — so shipping has to join
+            // the subtotal for Square to tax it, exactly as shopTaxableBaseCents does on our side. The two
+            // must agree: if Square's base differs from ours by so much as a penny the order total stops
+            // matching the card charge and the whole itemisation silently falls back to a lump.
             serviceCharges.push({
                 uid: "sc-ship", name: "Shipping", amount_money: money(shippingCents),
-                calculation_phase: "TOTAL_PHASE", taxable: false,
+                calculation_phase: "SUBTOTAL_PHASE", taxable: true,
             });
         }
         if (onlineFeeCents > 0) {

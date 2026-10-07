@@ -314,8 +314,10 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
 
     const onlineFeeCents = calculateOnlineFeeCents(subtotalCents / 100);
     const taxRate = await getShopSalesTaxRate();
-    const taxCents = shopTaxCents(subtotalCents, taxRate);
+    // ⚠️ ORDER MATTERS NOW. Shipping is part of the taxable base, so it has to be known before the tax is
+    // worked out — these two lines were the other way round and tax was quoted on merchandise alone.
     const shippingCents = shopShippingCents(subtotalCents, fulfillmentMode);
+    const taxCents = shopTaxCents(subtotalCents, taxRate, shippingCents);
 
     return {
         cartId,

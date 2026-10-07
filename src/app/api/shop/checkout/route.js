@@ -25,6 +25,7 @@ import {
     updateShopOrderPaymentResult,
 } from "@/lib/shop-orders";
 import { resolveActiveCartId } from "@/lib/shop-carts";
+import { shopTaxCents } from "@/lib/shop-pricing";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -324,8 +325,18 @@ export async function POST(request) {
                 shippingService = rate.service;
             }
 
+            // ⚠️ THE TAX IS RECOMPUTED, NOT REUSED. cart.taxCents was quoted against the cart's ESTIMATED
+            // shipping; the customer then picked a live EasyPost rate, and shipping is taxable. Carrying the
+            // stale figure would undercharge or overcharge tax by the difference between the two rates on
+            // every shipped order — and would also make the itemised Square order disagree with the card
+            // charge, which silently drops it back to an unitemised lump.
+            const effectiveTaxCents = shopTaxCents(
+                cart.subtotalCents,
+                cart.taxRate,
+                effectiveShippingCents,
+            );
             const effectiveTotalCents =
-                cart.subtotalCents + cart.onlineFeeCents + cart.taxCents + effectiveShippingCents;
+                cart.subtotalCents + cart.onlineFeeCents + effectiveTaxCents + effectiveShippingCents;
 
             // Optional store-credit apply: drain the member's balance to reduce (or fully cover) the card
             // charge. Only for a SIGNED-IN shop customer whose email maps to a marketplace account — never a
@@ -354,7 +365,7 @@ export async function POST(request) {
                 quantity: cart.itemCount,
                 subtotalCents: cart.subtotalCents,
                 onlineFeeCents: cart.onlineFeeCents,
-                taxCents: cart.taxCents,
+                taxCents: effectiveTaxCents,
                 shippingCents: effectiveShippingCents,
                 totalCents: effectiveTotalCents,
                 idempotencyKey,
@@ -416,7 +427,7 @@ export async function POST(request) {
                     const built = await createSquareShopOrder({
                         items: cart.items,
                         subtotalCents: cart.subtotalCents,
-                        taxCents: cart.taxCents,
+                        taxCents: effectiveTaxCents,
                         taxRate: cart.taxRate || 0,
                         shippingCents: effectiveShippingCents,
                         onlineFeeCents: cart.onlineFeeCents,
