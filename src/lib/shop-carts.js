@@ -324,6 +324,9 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
         subtotalCents,
         onlineFeeCents,
         taxCents,
+        // The RATE as well as the amount: checkout hands it to Square so the order carries a real tax
+        // line rather than a number we asserted, and Square's own sales-tax report sees it.
+        taxRate,
         shippingCents,
         totalCents: subtotalCents + onlineFeeCents + taxCents + shippingCents,
         hasUnavailableItems,

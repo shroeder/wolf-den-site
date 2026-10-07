@@ -6,6 +6,7 @@ import { after, NextResponse } from "next/server";
 import {
     adjustInventoryForSale,
     createSquareCardPayment,
+    createSquareShopOrder,
     upsertSquareCustomerProfile,
 } from "@/lib/consignment/square";
 import { getShipmentRate, isEasyPostEnabled } from "@/lib/shipping/easypost";
@@ -400,6 +401,43 @@ export async function POST(request) {
             let payment = null;
 
             if (chargeCents > 0) {
+                // ── ITEMISE IT FOR SQUARE FIRST ─────────────────────────────────────────────────────
+                // Luke: "why is it being billed as a custom amount." Because this charged the Payments API
+                // directly, and a bare payment has no line items — so Square recorded every web order as one
+                // nameless lump with tax_money 0, and its sales-tax report showed nothing for any of them.
+                //
+                // ⚠️ THE TOTAL IS CHECKED TO THE CENT BEFORE THE ORDER IS USED. Square computes the tax
+                // itself from a percentage, and if its rounding ever disagrees with shopTaxCents by a penny
+                // the order would not match the card charge. On ANY disagreement — or any failure at all —
+                // squareOrderId stays null and the payment goes through exactly as it does today. A better
+                // bookkeeping line is never worth a customer who cannot check out.
+                let squareOrderId = null;
+                try {
+                    const built = await createSquareShopOrder({
+                        items: cart.items,
+                        subtotalCents: cart.subtotalCents,
+                        taxCents: cart.taxCents,
+                        taxRate: cart.taxRate || 0,
+                        shippingCents: effectiveShippingCents,
+                        onlineFeeCents: cart.onlineFeeCents,
+                        discountCents: appliedCreditCents,
+                        referenceId: pendingOrder.id,
+                        idempotencyKey,
+                    });
+                    if (built && built.totalCents === chargeCents) {
+                        squareOrderId = built.orderId;
+                    } else if (built) {
+                        logger.warn("shop.checkout.square_order_total_mismatch", {
+                            orderId: pendingOrder.id, built: built.totalCents, expected: chargeCents,
+                        });
+                    }
+                } catch (orderError) {
+                    logger.warn("shop.checkout.square_order_failed", {
+                        orderId: pendingOrder.id,
+                        errorMessage: orderError instanceof Error ? orderError.message : "unknown_error",
+                    });
+                }
+
                 try {
                     payment = await createSquareCardPayment({
                         sourceId,
@@ -407,6 +445,8 @@ export async function POST(request) {
                         idempotencyKey,
                         note: `Shop order ${pendingOrder.id}${appliedCreditCents > 0 ? ` (−$${(appliedCreditCents / 100).toFixed(2)} credit)` : ""}`,
                         referenceId: pendingOrder.id,
+                        // null here is the old behaviour, unchanged.
+                        orderId: squareOrderId,
                     });
                 } catch (error) {
                     // Card failed → hand back any credit we already spent, then fail the order.

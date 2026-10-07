@@ -1560,6 +1560,125 @@ export async function getCreationTokensVariationId() {
     }
 }
 
+// ── AN ONLINE SALE, ITEMISED, SO SQUARE KNOWS WHAT IT WAS ────────────────────────────────────────────────────
+// Luke: "why is it being billed as a custom amount" — and "I just want this fixed."
+//
+// Every web order used to reach Square as a single nameless CUSTOM_AMOUNT: one lump, `tax_money: 0`, no
+// category, no item. The money was always right — the customer was charged the correct tax and it landed in
+// the deposit — but SQUARE'S OWN SALES-TAX REPORT SHOWED ZERO FOR IT. File from Square's numbers and every
+// online order is missing from the return. $27.48 of collected tax was invisible that way.
+//
+// So the order is built properly first and the payment is attached to it:
+//
+//   line_items       the merchandise, with its catalog id so Square recognises the item and its category
+//   taxes            the sales tax AS TAX, order-scoped, so it lands in tax_money where the report reads it
+//   service_charges  shipping and the online fee, TOTAL_PHASE so they sit after tax and are not taxed
+//   discounts        store credit spent, so the order total equals what the card is actually charged
+//
+// ⚠️ IT RETURNS null ON ANY DOUBT, AND THE CALLER FALLS BACK TO THE LUMP. This is the live payment path: the
+// worst outcome here is not a mis-filed tax line, it is a customer who cannot buy. Every failure — Square
+// refusing the order, a rounding disagreement of one cent between our tax maths and Square's, a missing
+// location — returns null and the sale goes through exactly the way it does today. An improvement to the
+// books must never be able to take the till down.
+export async function createSquareShopOrder({
+    items = [],
+    subtotalCents = 0,
+    taxCents = 0,
+    taxRate = 0,
+    shippingCents = 0,
+    onlineFeeCents = 0,
+    discountCents = 0,
+    referenceId = null,
+    idempotencyKey,
+}) {
+    try {
+        const locationId = getSquareLocationId();
+        if (!locationId || !idempotencyKey) return null;
+
+        // ⚠️ STORE CREDIT IS A TENDER, NOT A DISCOUNT, AND SQUARE CANNOT BE TOLD THAT ON AN ORDER. Modelled
+        // as an order discount — the only shape the Orders API offers here — Square applies it to the line
+        // items BEFORE tax, so $20 of credit on this order drops the sales tax from $12.54 to $11.06 and the
+        // total to $173.20. That is not a rounding quibble; it is under-collecting tax because somebody paid
+        // with credit, which is the opposite of what credit is. Spending a gift card does not make a purchase
+        // cheaper, it pays for it.
+        //
+        // Rather than ship a wrong tax line, an order with credit on it falls back to the lump charge — the
+        // behaviour it has today. check-square-order-total.mjs holds Square to this.
+        if (Number(discountCents) > 0) return null;
+
+        const money = (c) => ({ amount: Math.round(Number(c) || 0), currency: "USD" });
+
+        const lineItems = (items || []).map((it, i) => {
+            const qty = Math.max(1, Math.round(Number(it?.quantity) || 1));
+            const unit = Math.round(Number(it?.priceCents) || 0);
+            return {
+                uid: `li-${i}`,
+                name: String(it?.name || "Item").slice(0, 500),
+                quantity: String(qty),
+                // ⚠️ BOTH the catalog id AND an explicit price. The id is what lets Square attribute the sale
+                // to the right item and reporting category — the thing the ledger could never find. The price
+                // is sent anyway because the shop sells at a discount sometimes, and an order priced from the
+                // catalogue instead of from the cart would total something the card was never charged.
+                ...(it?.catalogObjectId ? { catalog_object_id: String(it.catalogObjectId) } : {}),
+                base_price_money: money(unit),
+            };
+        });
+        if (!lineItems.length) return null;
+
+        const serviceCharges = [];
+        if (shippingCents > 0) {
+            serviceCharges.push({
+                uid: "sc-ship", name: "Shipping", amount_money: money(shippingCents),
+                calculation_phase: "TOTAL_PHASE", taxable: false,
+            });
+        }
+        if (onlineFeeCents > 0) {
+            serviceCharges.push({
+                uid: "sc-fee", name: "Online processing fee", amount_money: money(onlineFeeCents),
+                calculation_phase: "TOTAL_PHASE", taxable: false,
+            });
+        }
+
+        const order = {
+            location_id: locationId,
+            reference_id: referenceId ? String(referenceId).slice(0, 40) : undefined,
+            line_items: lineItems,
+            ...(serviceCharges.length ? { service_charges: serviceCharges } : {}),
+            ...(taxCents > 0 && taxRate > 0 ? {
+                taxes: [{
+                    uid: "tax-1",
+                    name: "Sales Tax",
+                    // A percentage, not a fixed amount — Square computes tax on the line items itself, which
+                    // is what makes it a real tax line in its reporting rather than a number we asserted.
+                    percentage: String(Number((taxRate * 100).toFixed(5))),
+                    type: "ADDITIVE",
+                    scope: "ORDER",
+                }],
+            } : {}),
+            // No discounts: see the guard above on store credit.
+        };
+
+        const payload = await squareFetch("/v2/orders", {
+            method: "POST",
+            body: JSON.stringify({ idempotency_key: `${idempotencyKey}-order`, order }),
+        });
+
+        const created = payload?.order;
+        const orderId = created?.id;
+        const totalCents = Number(created?.total_money?.amount);
+        if (!orderId || !Number.isFinite(totalCents)) return null;
+
+        return {
+            orderId,
+            totalCents,
+            taxCents: Number(created?.total_tax_money?.amount) || 0,
+        };
+    } catch {
+        // Deliberately silent to the caller: it checks for null and takes the old path.
+        return null;
+    }
+}
+
 export async function createSquareCardPayment({
     sourceId,
     amountCents,
