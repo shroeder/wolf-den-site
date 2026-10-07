@@ -17,7 +17,7 @@
 //   node --import ./scripts/lib/register-loader.mjs scripts/check-grove.mjs
 import {
     GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, GROVE_RARE,
-    emblemStars, scaledFoe, GROVE_POP,
+    emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS,
 } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS } from "@/lib/marketplace/grove-recipes.js";
 
@@ -70,9 +70,18 @@ for (const z of GROVE_ZONES) {
 
 // ── 5. THE EMBLEM LADDER FAILS UPWARD ────────────────────────────────────────────────────────────────
 // Two of this game's worst bugs were ladders that fell off the end and paid the BOTTOM rung.
+// ⚠️ ASSERTED AS PROPERTIES, NOT AS NUMBERS. The first version checked "10 gives 1 star", which was true of
+// one particular tuning and started failing the moment the ladder was rebalanced — a test that breaks when
+// you tune is a test that teaches you to ignore it. What must hold at ANY tuning: nothing is no stars, the
+// first rung is exactly one star, and a huge count keeps the TOP rung rather than falling off the end.
 ok(emblemStars(0).stars === 0, "emblem ladder: 0 should be no stars");
-ok(emblemStars(10).stars === 1, "emblem ladder: 10 should be 1 star");
+ok(emblemStars(EMBLEM_STARS[0].at).stars === 1, "emblem ladder: the first rung should be 1 star");
+ok(emblemStars(EMBLEM_STARS[0].at - 1).stars === 0, "emblem ladder: just under the first rung is still 0");
 ok(emblemStars(999_999).stars === 6, "emblem ladder: a huge count must keep the TOP rung, not fall to zero");
+// And the rungs must climb, or a later one is unreachable.
+for (let i = 1; i < EMBLEM_STARS.length; i += 1) {
+    ok(EMBLEM_STARS[i].at > EMBLEM_STARS[i - 1].at, `emblem ladder: rung ${i + 1} is not above rung ${i}`);
+}
 
 // ── 6. DISCOVERY IS BY SEEN-SET, NOT INVENTORY ───────────────────────────────────────────────────────
 const seenAll = new Set(Object.keys(GROVE_PARTS));
@@ -95,6 +104,20 @@ console.log(`  population ${GROVE_POP.min}-${GROVE_POP.max}, full respawn every 
 console.log(`  rare spawn: ${GROVE_RARE.name} at ${(GROVE_RARE.spawnChance * 100).toFixed(2)}% per enemy`);
 console.log(`\n  difficulty curve (zone boss hp):`);
 console.log("   ", GROVE_ZONES.map((z) => scaledFoe(z.boss, z.n).hp).join(" → "));
+// ── ⚠️ WHAT "RARE" ACTUALLY COSTS, IN SESSIONS ───────────────────────────────────────────────────────
+// The drop rate and the star ladder are one number living in two places, and either alone looks perfectly
+// reasonable while the PAIR is absurd — 1% a kill against a 1,200 ladder is a hundred thousand kills for six
+// stars. So the timeline is printed rather than reasoned about, and any future tuning change shows its own
+// consequence on the way past.
+const KILLS_PER_SESSION = 500;   // ~20 active minutes against 15-30 enemies refreshing every 45s
+console.log(`\n  emblem pace (at ${KILLS_PER_SESSION} kills/session):`);
+for (const id of ["rootrat", "thornling", "elderling"]) {
+    const e = GROVE_ENEMIES[id];
+    const per = e.emblemChance * KILLS_PER_SESSION;
+    const row = EMBLEM_STARS.map((r) => `${r.star}*${Math.ceil(r.at / per)}`).join("  ");
+    console.log(`    ${e.name.padEnd(13)} ${(e.emblemChance * 100).toFixed(2)}%/kill  ${per.toFixed(2)}/session   sessions to: ${row}`);
+}
+
 console.log(`\n  art still to draw (${needArt.length}): ${needArt.join(", ") || "none"}`);
 console.log(`  backdrops to draw: ${zones} (one per zone)`);
 

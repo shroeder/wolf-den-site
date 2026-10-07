@@ -60,13 +60,18 @@ export const GROVE_PARTS = {
 // ⚠️ crit_rate AND crit_damage FEED GLOBALLY. Luke: "Crit rate and damage feed globally to everything." That
 // makes this feature able to inflate every other system in the game, so those two carry the smallest numbers
 // here by a wide margin and the ceiling is an open question in the design doc, flagged before it ships.
+// ⚠️ THE DROP RATE AND THIS LADDER ARE ONE NUMBER, NOT TWO. Luke: "Emblems are rare." They were ~1.2% a
+// kill, which at a few hundred kills a session is two or three an hour — uncommon, not rare. They are about
+// a fifth of that now, and the ladder had to come down with them or six stars would have needed a hundred
+// thousand kills. Changing either of these alone silently breaks the other; check-grove.mjs prints the
+// resulting timeline in sessions so the cost is visible rather than inferred.
 export const EMBLEM_STARS = [
-    { star: 1, at: 10, color: "#cfd6dd", label: "Worn" },
-    { star: 2, at: 35, color: "#7ed57e", label: "Marked" },
-    { star: 3, at: 90, color: "#5aa6ff", label: "Etched" },
-    { star: 4, at: 220, color: "#a982ff", label: "Sealed" },
-    { star: 5, at: 520, color: "#ffd75e", label: "Crowned" },
-    { star: 6, at: 1200, color: "#ff78b4", label: "Ascendant" },
+    { star: 1, at: 3, color: "#cfd6dd", label: "Worn" },
+    { star: 2, at: 9, color: "#7ed57e", label: "Marked" },
+    { star: 3, at: 22, color: "#5aa6ff", label: "Etched" },
+    { star: 4, at: 50, color: "#a982ff", label: "Sealed" },
+    { star: 5, at: 110, color: "#ffd75e", label: "Crowned" },
+    { star: 6, at: 250, color: "#ff78b4", label: "Ascendant" },
 ];
 
 /**
@@ -111,62 +116,62 @@ const E = (id, name, art, o) => ({ id, name, art, ...o });
 export const GROVE_ENEMIES = {
     rootrat: E("rootrat", "Rootrat", "/images/delves/foe-rootrat.webp", {
         passive: true, hp: 18, dmg: [1, 2], telegraph: 0,
-        emblem: "em_rootrat", emblemChance: 0.012,
+        emblem: "em_rootrat", emblemChance: 0.0026,
         loot: [{ part: "gnawed_root", n: [1, 2], w: 70 }, { part: "damp_moss", n: [1, 1], w: 30 }],
     }),
     grub: E("grub", "Pale Grub", "/images/delves/foe-grub.webp", {
         passive: true, hp: 26, dmg: [1, 3], telegraph: 0,
-        emblem: "em_grub", emblemChance: 0.012,
+        emblem: "em_grub", emblemChance: 0.0026,
         loot: [{ part: "grub_fat", n: [1, 2], w: 75 }, { part: "damp_moss", n: [1, 2], w: 25 }],
     }),
     thornling: E("thornling", "Thornling", "/images/delves/foe-thornling.webp", {
         passive: false, hp: 44, dmg: [3, 6], telegraph: 650,
-        emblem: "em_thornling", emblemChance: 0.011,
+        emblem: "em_thornling", emblemChance: 0.0024,
         loot: [{ part: "thorn_barb", n: [1, 3], w: 65 }, { part: "gnawed_root", n: [1, 2], w: 35 }],
     }),
     badger: E("badger", "Bristleback", "/images/delves/foe-badger.webp", {
         passive: false, hp: 70, dmg: [5, 9], telegraph: 700,
-        emblem: "em_badger", emblemChance: 0.010,
+        emblem: "em_badger", emblemChance: 0.0022,
         loot: [{ part: "bristle_hide", n: [1, 2], w: 60 }, { part: "split_antler", n: [1, 1], w: 40 }],
     }),
     gourdling: E("gourdling", "Gourdling", "/images/delves/foe-gourdling.webp", {
         passive: false, hp: 105, dmg: [7, 12], telegraph: 620,
-        emblem: "em_gourdling", emblemChance: 0.010,
+        emblem: "em_gourdling", emblemChance: 0.0022,
         loot: [{ part: "gourd_rind", n: [1, 2], w: 70 }, { part: "thorn_barb", n: [1, 2], w: 30 }],
     }),
     husk: E("husk", "Straw Walker", null, {
         passive: false, hp: 145, dmg: [9, 15], telegraph: 750,
-        emblem: "em_husk", emblemChance: 0.009,
+        emblem: "em_husk", emblemChance: 0.002,
         loot: [{ part: "bound_straw", n: [1, 3], w: 70 }, { part: "gourd_rind", n: [1, 1], w: 30 }],
     }),
     barrowhound: E("barrowhound", "Barrow Hound", "/images/delves/foe-barrowhound.webp", {
         passive: false, hp: 190, dmg: [12, 19], telegraph: 520,
-        emblem: "em_barrowhound", emblemChance: 0.009,
+        emblem: "em_barrowhound", emblemChance: 0.002,
         loot: [{ part: "barrow_tooth", n: [1, 2], w: 65 }, { part: "bristle_hide", n: [1, 2], w: 35 }],
     }),
     warren_mother: E("warren_mother", "Warren Mother", "/images/delves/foe-warren-mother.webp", {
         passive: false, hp: 250, dmg: [15, 23], telegraph: 820,
-        emblem: "em_warren", emblemChance: 0.008,
+        emblem: "em_warren", emblemChance: 0.0018,
         loot: [{ part: "warren_silk", n: [1, 2], w: 70 }, { part: "barrow_tooth", n: [1, 2], w: 30 }],
     }),
     voidmoth: E("voidmoth", "Mothlight", "/images/delves/foe-voidmoth.webp", {
         passive: false, hp: 310, dmg: [18, 28], telegraph: 600,
-        emblem: "em_voidmoth", emblemChance: 0.008,
+        emblem: "em_voidmoth", emblemChance: 0.0018,
         loot: [{ part: "mothlight_dust", n: [1, 2], w: 72 }, { part: "warren_silk", n: [1, 1], w: 28 }],
     }),
     ashwraith: E("ashwraith", "Ash Wraith", "/images/delves/foe-ashwraith.webp", {
         passive: false, hp: 380, dmg: [22, 33], telegraph: 700,
-        emblem: "em_ashwraith", emblemChance: 0.007,
+        emblem: "em_ashwraith", emblemChance: 0.0016,
         loot: [{ part: "ash_ember", n: [1, 2], w: 68 }, { part: "rotwood_knot", n: [1, 2], w: 32 }],
     }),
     goblin: E("goblin", "Palisade Goblin", null, {
         passive: false, hp: 455, dmg: [26, 39], telegraph: 560,
-        emblem: "em_goblin", emblemChance: 0.007,
+        emblem: "em_goblin", emblemChance: 0.0016,
         loot: [{ part: "goblin_rivet", n: [1, 3], w: 70 }, { part: "ash_ember", n: [1, 1], w: 30 }],
     }),
     elderling: E("elderling", "Elderling", null, {
         passive: false, hp: 560, dmg: [31, 47], telegraph: 880,
-        emblem: "em_elder", emblemChance: 0.006,
+        emblem: "em_elder", emblemChance: 0.0014,
         loot: [{ part: "elder_heartwood", n: [1, 2], w: 60 }, { part: "rotwood_knot", n: [1, 2], w: 40 }],
     }),
 };
