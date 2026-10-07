@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
+import { groveToolPct } from "@/lib/marketplace/grove-tools.js";
 import { shopIsOpenNow } from "@/lib/marketplace/store-hours.js";
 import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
@@ -1017,7 +1018,13 @@ export async function castLine(buyerId, { status = "sailing", angling = 0, bait 
     // getting treasure WITH a fish not instead of. Otherwise people will choose not to level it like Valk and
     // I." A track people deliberately avoid is not a choice, it is a trap. It rolls a SEPARATE bonus below.
     let isTreasure = (dredgeNet && oneIn(4))
-        || Math.random() < luckyChance(TREASURE_CHANCE + seaPets.dredge / 100, await fortuneFor(buyerId).catch(() => 0));
+        // The Grove's rod. ⚠️ ADDED TO THE CHANCE, NOT MULTIPLIED INTO IT — multiplying a 20% base by a
+        // tool that climbs twenty maps would end at a certainty, and a treasure that always comes up is not
+        // treasure. +3% a tier, flat, on top of the pets.
+        || Math.random() < luckyChance(
+            TREASURE_CHANCE + seaPets.dredge / 100 + (await groveToolPct(buyerId, "rod").catch(() => 0)) / 100,
+            await fortuneFor(buyerId).catch(() => 0),
+        );
     // ── ASCENSION POWERS ON A CAST ───────────────────────────────────────────────────────────────────────
     // Every one of these decides WHAT IS ON THE LINE, so they all read at the species roll rather than being
     // scattered through the reel. Cold Bait and The Full Creel are first-cast-of-the-day powers, so they need

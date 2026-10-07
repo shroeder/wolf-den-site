@@ -26,18 +26,44 @@ export const groveOpen = (buyerId) => isOwner(buyerId);
 const ZONE_BY_ID = Object.fromEntries(GROVE_ZONES.map((z) => [z.id, z]));
 const foeById = (id) => (id === GROVE_RARE.id ? GROVE_RARE : GROVE_ENEMIES[id] || null);
 
-// ── THE KILL CEILING ─────────────────────────────────────────────────────────────────────────────────────────
-// ⚠️ THE ENTIRE ANTI-CHEAT BUDGET OF A CLIENT-SIDE GAME. The client cannot invent a drop — the server rolls
-// those — so the only lie available is "I killed more than I did". A zone holds at most GROVE_POP.max and
-// refills every respawnMs, so there is a hard physical ceiling on kills per second, and a generous multiple
-// of it is still orders of magnitude below what a script could claim.
+// ── WHERE THE SERVER KEEPS AUTHORITY ─────────────────────────────────────────────────────────────────────────
+// Luke: "we need to strike a balance between cost and server authority ... since we cant push all of it on the
+// client due to exploits and responsiveness. But if we can save cost we should."
 //
-// Generous on purpose: a laggy phone that settles 90 seconds of play in one burst must never be punished for
-// it. This stops a thousand-kill claim, not a fast player.
+// The three checks below are the balance. Every one of them costs ZERO extra queries — they are arithmetic and
+// table lookups against data already in memory — and between them they close the only lies the client can
+// tell. Motion, targeting, telegraph timing, camera and loot spill stay on the client, because those are
+// presentation and must be instant; what you GET and HOW FAST you can get it stay here.
+//
+//   1. the loot roll        already server-side (grove-roll.js) — the client cannot invent a drop
+//   2. zone membership      you cannot claim a creature that does not live in that zone
+//   3. a rolling window     bounded by wall clock, which nothing the client does can reset
+//
+// ── 1. THE ROLLING WINDOW ────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ THIS USED TO RESET EVERY TIME YOU WALKED IN. groveEnter set kills_settled = 0, so the "session budget"
+// was really a budget per ENTRY: enter, settle the maximum, leave, enter again, repeat for ever. The guard
+// existed and was free to walk around.
+//
+// It is wall-clock now. A zone holds at most GROVE_POP.max and refills every respawnMs, so there is a hard
+// physical roof on kills per minute, and entering more often does not create more enemies.
+//
+// Generous on purpose (3x): a laggy phone settling ninety seconds of play in one burst must never be punished
+// for it. This stops a thousand-kill claim, not a fast player.
 const KILL_CEILING_SLACK = 3;
+export const KILL_WINDOW_MS = 10 * 60 * 1000;
+
 export function killCeiling(elapsedMs) {
     const windows = Math.max(1, Math.ceil((Number(elapsedMs) || 0) / GROVE_POP.respawnMs));
     return (GROVE_POP.max * windows + GROVE_POP.max) * KILL_CEILING_SLACK;
+}
+
+// ── 2. ZONE MEMBERSHIP ───────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ THE WORST EXPLOIT THAT WAS OPEN, AND THE CHEAPEST TO CLOSE. Nothing checked that a claimed kill belonged
+// to the zone it was claimed in — so a settle could report twelve Elderlings in Thicket Edge and be handed
+// tier-6 Elder Heartwood on the first node of the map, skipping the entire thing. A Set built from the zone's
+// own enemy list, which is already in memory. No query, no cost.
+function allowedIn(zone) {
+    return new Set([...(zone.enemies || []), zone.boss, GROVE_RARE.id]);
 }
 
 async function playerRow(buyerId) {
@@ -140,7 +166,10 @@ export async function groveEnter(buyerId, zoneId) {
     // ⚠️ THE SEED IS THE SERVER'S. A client-chosen seed is a client that can shop for one that drops well.
     const seed = Math.floor(Math.random() * 0x7fffffff);
     await db.query(
-        `UPDATE mkt_grove_player SET seed = $2, seed_zone = $3, seed_at = NOW(), kills_settled = 0, updated_at = NOW()
+        // ⚠️ kills_settled IS NO LONGER RESET HERE. It used to be, which made the kill ceiling a budget per
+        // ENTRY rather than per unit of time — enter, settle the maximum, leave, enter again. The bound is
+        // the rolling window now (see killCeiling), and nothing the client does resets a clock.
+        `UPDATE mkt_grove_player SET seed = $2, seed_zone = $3, seed_at = NOW(), updated_at = NOW()
           WHERE buyer_id = $1`,
         [buyerId, seed, zoneId],
     ).catch(() => {});
@@ -162,11 +191,23 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     const p = await playerRow(buyerId);
     if (!p?.seed || p.seed_zone !== zoneId) return { ok: false, error: "no_session" };
 
-    const elapsed = Date.now() - new Date(p.seed_at || Date.now()).getTime();
-    const ceiling = killCeiling(elapsed);
-    const already = Number(p.kills_settled) || 0;
-    const list = (kills || []).slice(0, Math.max(0, ceiling - already));
-    if (!list.length) return { ok: true, granted: null, parts: {}, capped: true };
+    // ── THE THREE CHECKS ────────────────────────────────────────────────────────────────────────────
+    const now = Date.now();
+    const windowAt = new Date(p.kills_window_at || now).getTime();
+    const windowFresh = now - windowAt > KILL_WINDOW_MS;
+    const windowUsed = windowFresh ? 0 : (Number(p.kills_window) || 0);
+    const ceiling = killCeiling(windowFresh ? KILL_WINDOW_MS : now - windowAt);
+
+    // Membership first: a claim for a creature that does not live here is dropped outright rather than
+    // trimmed, because it is not a fast player, it is a wrong one.
+    const allowed = allowedIn(zone);
+    const legal = (kills || []).filter((k) => allowed.has(k?.id));
+    const rejected = (kills || []).length - legal.length;
+
+    // Then the window. Trimmed rather than refused — a burst that overruns is far more likely to be a phone
+    // catching up than an attack, and refusing it outright would lose honest play.
+    const list = legal.slice(0, Math.max(0, ceiling - windowUsed));
+    if (!list.length) return { ok: true, granted: null, parts: {}, capped: true, rejected };
 
     // ── FOOD EATEN IN THE ZONE ──────────────────────────────────────────────────────────────────────
     // ⚠️ DEBITED CONDITIONALLY, AND A SHORTFALL IS NOT AN ERROR. The scene eats when you drop below 60% and
@@ -266,8 +307,18 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         if (Number(up?.unlocked_n) === next.n) unlocked = next;
     }
 
-    await db.query(`UPDATE mkt_grove_player SET kills_settled = kills_settled + $2 WHERE buyer_id = $1`,
-        [buyerId, list.length]).catch(() => {});
+    // One UPDATE, folded into what settle already writes — the window costs no extra round trip. A stale
+    // window is reset here rather than by a cron: the only thing that needs to know is the next settle.
+    await db.query(
+        `UPDATE mkt_grove_player
+            SET kills_settled = kills_settled + $2,
+                kills_window = CASE WHEN NOW() - kills_window_at > ($3 || ' milliseconds')::interval
+                                    THEN $2 ELSE kills_window + $2 END,
+                kills_window_at = CASE WHEN NOW() - kills_window_at > ($3 || ' milliseconds')::interval
+                                       THEN NOW() ELSE kills_window_at END
+          WHERE buyer_id = $1`,
+        [buyerId, list.length, String(KILL_WINDOW_MS)],
+    ).catch(() => {});
     await trackActivity(buyerId, "grove_settle", { zone: zoneId, kills: list.length }).catch(() => {});
 
     return {
@@ -280,6 +331,7 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         xp: got.xp,
         newlySeen,
         ate,
+        rejected,
         zoneKills: Number(z?.kills) || 0,
         unlocked,
         capped: list.length < (kills || []).length,

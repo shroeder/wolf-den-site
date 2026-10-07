@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
+import { groveToolPct } from "@/lib/marketplace/grove-tools.js";
 import { itemById, STAT_META, describeStats, mergeStats, statValue, AFFIX_POOL, affixCeiling, isIntrinsicStat, pickWeightedAffix, FORGE, ascendedIdOf, canAscendItem, isAscendedId } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { rarityRank } from "@/lib/marketplace/rarity.js";
@@ -338,7 +339,10 @@ export async function salvageItem(buyerId, itemId) {
     } catch { /* no companion, no bonus */ }
     // Twice-Struck is a flat one-in-three double on top of Efficient Salvage, the Regalia and the companion.
     const salvagePowers = await equippedPowers(buyerId);
-    if (Math.random() < chance(upg, "efficient", bf) + rb.doubleBonus + forgePet.salvage / 100
+    // The Grove's hammer, on the same additive footing as the Efficient Salvage upgrade, the Regalia set
+    // bonus and the forge pet.
+    const hammerPct = (await groveToolPct(buyerId, "hammer").catch(() => 0)) / 100;
+    if (Math.random() < chance(upg, "efficient", bf) + rb.doubleBonus + forgePet.salvage / 100 + hammerPct
         || (salvagePowers.has("twice_struck") && oneIn(3))) { n *= 2; doubled = true; }
     n += rb.flatParts;
     // Melt-down recovery: ~40% of the parts forged into this item (same tier as its salvage parts).

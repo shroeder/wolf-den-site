@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
+import { groveToolPct } from "@/lib/marketplace/grove-tools.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -1502,7 +1503,11 @@ async function claimNode(buyerId, node, row, run = {}) {
     const dEff = depthEffects(await equippedDepthAffinity(buyerId));
     const dCap = setDepthCapstones(await (await import("@/lib/marketplace/collection-owned.js")).getOwnedSetIds(buyerId).catch(() => []));
     const richSeam = dCap.richSeam > 0 && Math.random() < dCap.richSeam;
-    const ore = Math.max(1, Math.round(baseOre(node.tier) * rank.oreMult * (1 + haulBonus + dEff.oreBonus))) * (richSeam ? 2 : 1);
+    // The Grove's pick joins the additive haul bonuses rather than multiplying the lot, for the same reason
+    // the rod does: these stack with rank and depth already, and a tool that scaled the product would end up
+    // worth more than the mine.
+    const pickPct = (await groveToolPct(buyerId, "pick").catch(() => 0)) / 100;
+    const ore = Math.max(1, Math.round(baseOre(node.tier) * rank.oreMult * (1 + haulBonus + dEff.oreBonus + pickPct))) * (richSeam ? 2 : 1);
     await db.query(
         `INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1,$2,$3)
          ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`,

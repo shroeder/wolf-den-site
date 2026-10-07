@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { groveToolPct } from "@/lib/marketplace/grove-tools.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -510,7 +511,10 @@ export async function harvestPlot(buyerId, slot) {
         petFarm = { yield: y, seed: sd };
     } catch { /* no companion, no bonus */ }
     // Harvester's Garb capstone — same rule: owned, not worn.
-    const dblChance = setFarmDoubleHarvest(await getOwnedSetIds(buyerId).catch(() => [])) + petFarm.yield / 100;
+    // The Grove's hoe, on the same additive footing as the set bonus and the pet perk.
+    const dblChance = setFarmDoubleHarvest(await getOwnedSetIds(buyerId).catch(() => []))
+        + petFarm.yield / 100
+        + (await groveToolPct(buyerId, "hoe").catch(() => 0)) / 100;
     if (dblChance > 0 && Math.random() < dblChance) { gold *= 2; doubled = true; }
     // ── ASCENSION POWERS ON A HARVEST ────────────────────────────────────────────────────────────────────
     // Bumper Season doubles the FIRST harvest of the day, so it is checked before the roll above can make the

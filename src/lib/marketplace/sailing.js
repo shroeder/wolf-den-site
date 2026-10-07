@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
+import { groveToolPct } from "@/lib/marketplace/grove-tools.js";
 import { addChests, CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { DIG_CONSOLATION, shardCoin } from "@/lib/marketplace/dig-values.js";
@@ -3878,7 +3879,9 @@ export async function merchantMinigame(buyerId, collected, perfectFlag) {
     const row = await readRow(buyerId);
     const m = row?.merchant_json;
     if (!m || m.none) return { ok: false, error: "no_merchant", ...(await getSailingState(buyerId)) };
-    const bounty = seaEffects(await equippedSeaAffinity(buyerId)).goldBonus; // Bounty boosts merchant payout too
+    // Bounty boosts merchant payout too — and so does the Grove's sextant, which is this map's "sea fortune".
+    const bounty = seaEffects(await equippedSeaAffinity(buyerId)).goldBonus
+        + (await groveToolPct(buyerId, "sextant").catch(() => 0)) / 100;
     const base = Math.max(MERCHANT_GOLD_FLOOR, Math.min(MERCHANT_GOLD_CEIL, Math.round(Number(collected) || 0)));
     const gold = mint(Math.round(base * (1 + bounty)), "merchant_minigame");
     const perfect = Boolean(perfectFlag);
@@ -4194,8 +4197,11 @@ async function finishDig(buyerId, board) {
     // no shard count any more, so they swell the CONSOLATION instead — the only number a dig still pays by
     // degree. Left on the chest itself they would have had nothing to multiply and would have gone silently
     // dead, which is this codebase's most expensive bug.
+    // The Grove's shovel, additive with Trove for the same reason as every other tool: these already stack
+    // with a lure multiplier, and a tool that scaled the product would outgrow the dig.
+    const shovelPct = (await groveToolPct(buyerId, "shovel").catch(() => 0)) / 100;
     const consolation = fullyUnearthed || exposure <= 0 ? 0 : Math.max(1, Math.round(
-        (DIG_CONSOLATION[chestTier] || 18) * exposure * (1 + digSea.fragBonus) * lureMult
+        (DIG_CONSOLATION[chestTier] || 18) * exposure * (1 + digSea.fragBonus + shovelPct) * lureMult
     ));
     const strikeCoin = (board.bonus || 0) * DIG_DOUBLOONS_PER_STRIKE;
     const mawCoin = (boatPerks(level).voyageFrags || 0) * DIG_DOUBLOONS_PER_STRIKE;
