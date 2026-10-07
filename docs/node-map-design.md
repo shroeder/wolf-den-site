@@ -271,6 +271,32 @@ monotonically, and the emblem ladder fails upward.
 ashwraith from the delve catalogue. Still to draw: **4 enemies** (Straw Walker, Palisade Goblin, Elderling,
 The Crystal Stag) and **12 zone backdrops**.
 
+### 2026-10-07 — map one is playable end to end
+
+Migration 468 (five tables, applied), `grove.js` (state/enter/settle/move/craft/emblem), the API route,
+`GroveScene` (the real-time scene), `GroveClient` (map, bag, bank, workbench, emblems), the page, and all
+16 pieces of art.
+
+**Proven by playing it**, not by the build passing: 25 kills settled → parts granted, 50 XP, **0 gold**,
+the 20-kill gate fired and unlocked Mossy Hollow, both parts recorded as seen, and **Backpack I
+auto-discovered** because it needs exactly those two.
+
+Three bugs the screenshots caught that a green build did not:
+
+- **the population never rendered.** Foes were pushed into the array imperatively and React was never told,
+  so the zone ran thirty enemies and drew zero. Split by FREQUENCY: the list is state (changes a few times a
+  minute), positions stay refs (sixty times a second per body).
+- **the physics were wrong by two orders of magnitude.** WALK 0.019 is 1.1 units/second across a 300-unit
+  zone — ninety seconds to cross one screen — and HOP cleared 0.6 units against platforms at 26. It looked
+  right and was unplayable.
+- **bodies stood below the forest floor.** Anchored at `bottom: 0` when every plate paints its ground about
+  an eighth of the way up.
+
+**Still to do:** hero and pet are placeholder discs (no sprite yet) · zone bosses are the zone's own enemy
+rather than a distinct body · the six tool/deco/plot grants spend parts and record the craft but do not yet
+hand the item to the system that owns it · hyper-rare drops (pet food → upgrade stones) are specced, not
+built · maps 2-20.
+
 ### Still to build
 
 1. **The combat engine** — the open question in §11, and the biggest. Tap-to-move, tap-to-attack,
