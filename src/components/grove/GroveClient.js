@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars } from "@/lib/marketplace/grove-catalog.js";
@@ -27,6 +28,7 @@ export default function GroveClient({ initial }) {
     const [note, setNote] = useState(null);
     const [unlockedNow, setUnlockedNow] = useState(null);
     const [bossWon, setBossWon] = useState(null);
+    const router = useRouter();
 
     const refresh = useCallback(async () => {
         const d = await fetch("/api/marketplace/grove").then((r) => r.json()).catch(() => null);
@@ -124,6 +126,10 @@ export default function GroveClient({ initial }) {
                     stats={stats} heroArt={session.heroArt || st?.heroArt || null}
                     petArt={session.petArt || st?.petArt || null}
                     belt={beltNow} onSettle={settle} onBoss={bossKill} onLeave={leave}
+                    // Luke: "when you die it should send you back to town." ⚠️ router.push, NOT the
+                    // leave handler — leaving drops you on the Grove map, which is the screen inviting you
+                    // straight back into the zone that just killed you. Town is somewhere else.
+                    onDeath={() => router.push("/marketplace/town")}
                 />
                 {bossWon ? (
                     <div className="gv-unlock gv-won" onClick={() => setBossWon(null)}>

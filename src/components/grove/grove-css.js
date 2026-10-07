@@ -50,6 +50,33 @@ export const GROVE_CSS = `
 .gv-scene { position: relative; width: 100%; aspect-ratio: 16/10; border-radius: 14px; overflow: hidden;
     background: #0a0d0a; border: 1px solid rgba(255,255,255,0.12); touch-action: manipulation;
     user-select: none; }
+
+/* ── FULL SCREEN ─────────────────────────────────────────────────────────────────────────────────
+   Luke: "It should be full screen within reason so mobile and tablet horizontal or vertical true full
+   screen for the grove. PC screen also full screen if possible but slightly windowed understandable."
+
+   A fixed overlay rather than the Fullscreen API alone, because the API is the part that is NOT
+   dependable: iOS Safari refuses requestFullscreen on anything that is not a video element, which is
+   most of the phones that will ever open this. The overlay covers the viewport everywhere, and the
+   real API is offered on top of it where it exists (it additionally hides the browser's own chrome).
+
+   100dvh, not 100vh. On mobile 100vh is the LARGEST the viewport ever gets, so with the address bar
+   showing, a 100vh element runs under it and the HUD sits off the bottom of the screen. dvh tracks
+   the viewport as the bar slides away.
+
+   overscroll-behavior stops the pull-to-refresh that a downward drag would otherwise trigger mid-fight. */
+.gv-scene.is-full { position: fixed; inset: 0; z-index: 70;
+    width: 100vw; width: 100dvw; height: 100vh; height: 100dvh;
+    aspect-ratio: auto; border-radius: 0; border: 0;
+    overscroll-behavior: none; }
+/* The page behind it must not scroll while it is up. */
+.gv-full-lock { overflow: hidden; }
+/* ⚠️ AND THE SITE’S OWN FLOATING CHROME HAS TO GO WITH IT. The social bubble and the DM bubble are
+   fixed to the bottom-right corner, which in a full-screen zone is INSIDE the play area and on top of it —
+   so a thumb reaching for an enemy in that corner opens a chat panel instead of attacking. Hidden only while
+   the zone is up; leaving restores them with the body class. */
+.gv-full-lock .social-bubble,
+.gv-full-lock .dm-bubble-wrap { display: none; }
 .gv-plate { position: absolute; inset: 0; background-size: cover; background-position: center bottom; }
 .gv-layer { position: absolute; inset: 0; pointer-events: none; }
 
@@ -60,10 +87,20 @@ export const GROVE_CSS = `
    painted ground sits about an eighth of the way up the frame — anchored at 0 the whole population stood
    below the forest floor with their legs cut off by the bezel. The number is a property of how the plates
    were drawn, which is why it lives next to them rather than in the simulation. */
-.gv-foe, .gv-hero, .gv-pet { position: absolute; left: 0; bottom: 13%; transform-origin: 50% 100%;
-    will-change: transform; }
-.gv-foe { width: 8%; aspect-ratio: 1; background: none; border: 0; padding: 0; cursor: pointer;
-    margin-left: -4%; transition: opacity 380ms ease, transform 380ms ease; }
+/* ⚠️ bottom IS A VARIABLE NOW, NOT 13%. The loop computes it from the plate's RENDERED height every
+   frame (see GROUND_OF_PLATE in GroveScene.js): background-size: cover scales the backdrop to the larger
+   of the two ratios, so on any viewport wider than the plate's own 3:2 it renders taller than the scene and
+   is cropped at the top — and 13% of the scene stops being the line the grass is painted on. The 13%
+   fallback is what a 16/10 box resolves to anyway, so nothing moves before the first frame. */
+.gv-foe, .gv-hero, .gv-pet { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    transform-origin: 50% 100%; will-change: transform; }
+/* ⚠️ SIZED IN WORLD UNITS, NOT IN PERCENT OF THE SCENE. The loop publishes --gv-unit (see
+   GroveScene.js); the 1% fallback is exactly what these used to be, so nothing moves on the first frame
+   before the loop has run. A body expressed in percent keeps its pixel size when the scale zooms and only
+   the gaps between bodies grow, which made a portrait phone look like a wide shot of very small animals. */
+.gv-foe { width: calc(8 * var(--gv-unit, 1%)); aspect-ratio: 1; background: none; border: 0; padding: 0;
+    cursor: pointer; margin-left: calc(-4 * var(--gv-unit, 1%));
+    transition: opacity 380ms ease, transform 380ms ease; }
 .gv-foe img { width: 100%; height: 100%; object-fit: contain; display: block;
     filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
 .gv-foe i { display: block; width: 60%; height: 60%; margin: 20%; border-radius: 50%;
@@ -74,14 +111,14 @@ export const GROVE_CSS = `
 /* A boss is bigger than the things that wander around it, and lit so you can pick it out at the end of a
    zone. The glow is per-layer on the sprite rather than an overlay across the scene - a tint over the whole
    frame flattens every pixel to one colour. See no-overlay-for-lighting. */
-.gv-foe.is-boss { width: 17%; margin-left: -8.5%; }
+.gv-foe.is-boss { width: calc(17 * var(--gv-unit, 1%)); margin-left: calc(-8.5 * var(--gv-unit, 1%)); }
 .gv-foe.is-boss img { filter: drop-shadow(0 0 18px rgba(255,170,90,0.6)) drop-shadow(0 6px 10px rgba(0,0,0,0.6)); }
 
 /* The hero and the pet. The gradient stays as the BACKGROUND of the box, so it is what shows through when
    there is no sprite yet - a fallback that is a CSS background cannot itself fail to load. */
-.gv-hero { width: 7%; aspect-ratio: 1; margin-left: -3.5%;
+.gv-hero { width: calc(7 * var(--gv-unit, 1%)); aspect-ratio: 1; margin-left: calc(-3.5 * var(--gv-unit, 1%));
     background: radial-gradient(circle at 50% 40%, #ffe28a, #c8872e 62%, transparent 70%); }
-.gv-pet { width: 4.5%; aspect-ratio: 1; margin-left: -2.25%;
+.gv-pet { width: calc(4.5 * var(--gv-unit, 1%)); aspect-ratio: 1; margin-left: calc(-2.25 * var(--gv-unit, 1%));
     background: radial-gradient(circle at 50% 40%, #9fe08a, #3f7a35 62%, transparent 70%); }
 /* ⚠️ object-fit: contain, AND A CONTACT SHADOW. Without contain the sprite stretches to the box; without
    the shadow it reads as pasted onto the plate rather than standing on the ground. See
@@ -94,7 +131,7 @@ export const GROVE_CSS = `
    of it: a dark soil body, a lit mossy lip along the top, and a soft shadow underneath to give it thickness.
    Anchored to the same 13% ground line as every body, because a ledge the bodies do not stand ON is worse
    than no ledge at all. */
-.gv-ledge { position: absolute; left: 0; bottom: 13%; height: 9px; border-radius: 4px 4px 2px 2px;
+.gv-ledge { position: absolute; left: 0; bottom: var(--gv-ground, 13%); height: 9px; border-radius: 4px 4px 2px 2px;
     pointer-events: none; will-change: transform;
     background: linear-gradient(#5f7a3a 0 3px, #4a3a28 3px 100%);
     box-shadow: 0 3px 6px rgba(0,0,0,0.45), inset 0 -2px 0 rgba(0,0,0,0.3); }
@@ -118,7 +155,7 @@ export const GROVE_CSS = `
 
    ⚠️ WIDTH IS SET IN PIXELS BY THE LOOP, NOT scaleX. Scaling a 2r-wide box would stretch its border and
    its fill with it, so a wide sweep would have a four-pixel edge and a slam a one-pixel one. */
-.gv-tel { position: absolute; left: 0; bottom: 11%; height: 12px; border-radius: 3px;
+.gv-tel { position: absolute; left: 0; bottom: calc(var(--gv-ground, 13%) - 10px); height: 12px; border-radius: 3px;
     pointer-events: none; overflow: hidden; will-change: transform;
     border: 1px solid rgba(255,255,255,0.35); background: rgba(0,0,0,0.3); }
 .gv-tel::after { content: ""; position: absolute; inset: 0; transform-origin: 0 50%;
@@ -142,7 +179,7 @@ export const GROVE_CSS = `
 
 /* Below the HUD row rather than tucked against it - the name and the health bar are two lines and they were
    crowding the hp bar and the kill count. */
-.gv-boss { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); width: 70%;
+.gv-boss { position: absolute; top: calc(40px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: 70%;
     text-align: center; pointer-events: none; }
 .gv-boss b { display: block; font-size: 0.8rem; letter-spacing: .1em; text-transform: uppercase;
     color: #e5d2ff; text-shadow: 0 2px 4px rgba(0,0,0,0.9); margin-bottom: 4px; }
@@ -151,10 +188,24 @@ export const GROVE_CSS = `
 .gv-boss i { display: block; height: 100%; background: linear-gradient(90deg, #a982ff, #e0c6ff);
     transition: width 220ms ease; }
 
+/* The death screen. Covers the zone outright rather than tinting it: a dimmed but still-moving scene reads
+   as a stutter, and the one thing it must say clearly is that the run is over and you are going somewhere. */
+.gv-dead { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+    background: rgba(6,8,6,0.82); text-align: center; animation: gvDead 320ms ease-out both; }
+.gv-dead b { display: block; font-size: 1.5rem; letter-spacing: .04em; color: #ff8a7a;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
+.gv-dead span { display: block; margin-top: 8px; font-size: 0.88rem; color: #cfc6b6; }
+@keyframes gvDead { from { opacity: 0; } to { opacity: 1; } }
+
 /* Above the ground line rather than across it — the HUD was drawn straight over the row of enemies
    standing on the floor, which is the one row you need to be able to see and tap. */
-.gv-hud { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; align-items: center;
-    gap: 10px; pointer-events: none; }
+/* ⚠️ SAFE-AREA INSETS. Full screen on a phone puts this row under the notch and the rounded corners;
+   Leave is the control you most need when something has gone wrong, so it must never be the thing tucked
+   behind a camera cutout. env() resolves to 0 everywhere that has no cutout, so this costs nothing. */
+.gv-hud { position: absolute; display: flex; align-items: center; gap: 10px; pointer-events: none;
+    left: calc(10px + env(safe-area-inset-left));
+    right: calc(10px + env(safe-area-inset-right));
+    top: calc(10px + env(safe-area-inset-top)); }
 .gv-hp { flex: 0 0 38%; height: 10px; border-radius: 999px; background: rgba(0,0,0,0.6);
     border: 1px solid rgba(255,255,255,0.2); overflow: hidden; }
 .gv-hp i { display: block; height: 100%; background: linear-gradient(90deg, #d8402f, #ff8a6b);
