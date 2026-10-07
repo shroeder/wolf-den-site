@@ -7,6 +7,7 @@ import { MINING_UNLOCKED, miningNav } from "@/lib/marketplace/mining.js";
 import { DELVES_UNLOCKED, getDelveState } from "@/lib/marketplace/delves.js";
 import { COOK_UNLOCKED } from "@/lib/marketplace/cooking.js";
 import { CARDS_UNLOCKED } from "@/lib/marketplace/cards.js";
+import { groveOpen } from "@/lib/marketplace/grove.js";
 import { getChests } from "@/lib/marketplace/chests.js";
 import { getSpinState } from "@/lib/marketplace/spin.js";
 import { getDailyQuests } from "@/lib/marketplace/quests.js";
@@ -52,7 +53,7 @@ export async function GET(request) {
         if (!id) {
             return noStore({
                 signedIn: false, arena: { unlocked: false }, mine: { unlocked: false }, delves: { unlocked: false },
-                jeweller: false, casino: false, kitchen: false, cards: false, chests: 0, spins: 0, bossStrikes: 0, questsReady: 0,
+                jeweller: false, casino: false, kitchen: false, cards: false, grove: false, chests: 0, spins: 0, bossStrikes: 0, questsReady: 0,
                 sailing: { attention: false, casts: 0, forgeable: 0, fishing: false }, featureClaims: {},
                 townTodo: null, farm: { cropsReady: 0, petNudge: 0 },
             });
@@ -93,6 +94,10 @@ export async function GET(request) {
             // on launch day CARDS_UNLOCKED becomes Boolean(buyerId) in one place, and a second copy of the rule
             // in the menu would keep the door shut for everyone after the page had opened.
             cards: await CARDS_UNLOCKED(id),
+            // The Grove, owner-gated. ⚠️ IMPORTED, NOT RE-WRITTEN as isOwner(id) here — the day it opens,
+            // groveOpen changes in one place, and a second copy of the rule in the menu would keep the door
+            // shut for everyone after the page had opened. Same reason as the cards gate above.
+            grove: groveOpen(id),
             arena: { unlocked: Boolean(arena?.unlocked), fightsLeft: Number(arena?.fightsLeft) || 0 },
             // The High Seas prototype. A field on THIS request, never a call of its own — the menu is one
             // request for the whole thing, and a nav entry that fetches its own feature bills that feature on

@@ -43,6 +43,11 @@ export const GAME_EXTRA_PATHS = [
     // The cards prototype, owner-only for now. Listed for the same reason the Casino and the Market are: being
     // gated decides who sees it in the MENU, never whether the shell knows the address.
     "/marketplace/cards",
+    // The Grove — the node map, owner-gated. ⚠️ THE FIFTH PAGE TO FALL INTO THE TRAP THIS FILE DOCUMENTS,
+    // and it fell in on the day it shipped: the page existed, the API worked, and there was no way to reach
+    // it and no shell on it if you did. A new area is not finished when it renders; it is finished when it
+    // is in this list AND in the menu.
+    "/marketplace/grove",
 ];
 
 const ALL = [...GAME_NAV_PATHS, ...GAME_EXTRA_PATHS];

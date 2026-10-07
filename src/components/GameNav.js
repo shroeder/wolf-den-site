@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { isGamePath } from "@/lib/marketplace/game-paths.js";
 import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
-import { GiCardPlay } from "react-icons/gi";
+import { GiCardPlay, GiOakLeaf } from "react-icons/gi";
 
 import FishingLaunch from "@/components/FishingLaunch";
 import MiningLaunch from "@/components/MiningLaunch";
@@ -166,6 +166,7 @@ export default function GameNav() {
     const jeweller = Boolean(hud?.jeweller);
     const casino = Boolean(hud?.casino);
     const cards = Boolean(hud?.cards);
+    const grove = Boolean(hud?.grove);
     const delves = Boolean(hud?.delves?.unlocked);
     const delveRuns = Number(hud?.delves?.runs) || 0;
     const chests = Number(hud?.chests) || 0;
@@ -192,6 +193,7 @@ export default function GameNav() {
         ...(casino ? [{ href: "/marketplace/casino", label: "Casino" }] : []),
         ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "Arena" }] : []),
         ...(cards ? [{ href: "/marketplace/cards", Icon: GiCardPlay, label: "Cards" }] : []),
+        ...(grove ? [{ href: "/marketplace/grove", Icon: GiOakLeaf, label: "The Grove" }] : []),
         ...(signedIn ? [{ href: "/marketplace/market", emoji: "🏪", label: "Market" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || isGamePath(pathname);
 
@@ -348,6 +350,7 @@ export default function GameNav() {
             ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "The Arena", sub: "Fight with your gear" }] : []),
             ...(casino ? [{ href: "/marketplace/casino", label: "The Casino", sub: "Nine machines" }] : []),
             ...(cards ? [{ href: "/marketplace/cards", Icon: GiCardPlay, label: "Cards", sub: "A deck and a road" }] : []),
+            ...(grove ? [{ href: "/marketplace/grove", Icon: GiOakLeaf, label: "The Grove", sub: "Twelve zones of forest" }] : []),
             ...(signedIn ? [{ href: "/marketplace/market", emoji: "🏪", label: "The Market", sub: "Trade crops & fish" }] : []),
         ] },
         { title: "Gear & Pets", items: [
