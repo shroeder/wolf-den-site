@@ -19,6 +19,9 @@ import { isTrustedWriteRequest } from "@/lib/request-security";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
 import { markOrderInventoryAdjusted, recordInventoryRepair } from "@/lib/inventory-feed/repair.js";
 import { sendNewOrderAlertEmail, sendOrderConfirmationEmail } from "@/lib/shop-order-email.js";
+import {
+    checkCartRules, claimCartRules, releaseClaims, identitySignals, clientIpFrom, recordCardSignal,
+} from "@/lib/shop-item-rules.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 import {
     createPendingShopOrder,
@@ -286,6 +289,34 @@ export async function POST(request) {
                 }, { status: 409 });
             }
 
+            // ── SELLING RULES: PICKUP-ONLY, AND THE PER-CUSTOMER LIMIT ──────────────────────────
+            // Luke: "I don't want bots to buy them all out, because I really want to leverage these
+            // competitive prices to get real customers coming in the door."
+            //
+            // ⚠️ CHECKED HERE, BEFORE THE EASYPOST RATE AND BEFORE THE TAX. A refusal this far up costs
+            // nothing and tells the customer the real reason; refusing after the shipping quote would have
+            // burned an EasyPost call and shown them a price for something they were never allowed to ship.
+            const orderIp = clientIpFrom(request);
+            const ruleIdentity = identitySignals({
+                customerId: authenticatedCustomer?.id || null,
+                email: authenticatedCustomer?.email || fulfillment.pickupEmail || fulfillment.shipping?.email,
+                phone: fulfillment.shipping?.phone,
+                addressLine1: fulfillment.shipping?.addressLine1,
+                postalCode: fulfillment.shipping?.postalCode,
+                ip: orderIp,
+            });
+            const ruleCheck = await checkCartRules(cart.items, {
+                fulfillmentMode: fulfillment.fulfillmentMode,
+                customerId: authenticatedCustomer?.id || null,
+                signals: ruleIdentity,
+            });
+            if (!ruleCheck.ok) {
+                return jsonNoStore(
+                    { error: ruleCheck.error, code: ruleCheck.code, items: ruleCheck.items || [], limit: ruleCheck.limit ?? null },
+                    { status: ruleCheck.code === "account_required" ? 401 : 409 },
+                );
+            }
+
             // Shipping cost: with EasyPost configured + a rate chosen at checkout, charge the
             // authoritative EasyPost price (re-read server-side so a tampered client amount can't win);
             // otherwise fall back to the cart's flat shipping.
@@ -385,7 +416,33 @@ export async function POST(request) {
                     (fulfillment.fulfillmentMode === "pickup"
                         ? String(body?.pickupName || "").trim()
                         : fulfillment.shipping?.name) || null,
+                orderIp,
             });
+
+            // ── TAKE THE SLOT, BEFORE THE CARD IS CHARGED ───────────────────────────────────────
+            // ⚠️ THE CHECK ABOVE IS FOR THE MESSAGE; THIS IS THE ENFORCEMENT. Between the two there is a
+            // gap of a few hundred milliseconds, and two orders landing inside that gap would both have read
+            // "none taken" and both gone through. The claim is a single INSERT whose PRIMARY KEY refuses the
+            // duplicate, so there is no gap to land in.
+            //
+            // It happens AFTER the order exists so the claim can be released by order id, and BEFORE the
+            // charge so nobody is ever billed for something they are then refused.
+            const claim = await claimCartRules(cart.items, {
+                orderId: pendingOrder.id,
+                customerId: authenticatedCustomer?.id || null,
+                signals: ruleIdentity,
+            });
+            if (!claim.ok) {
+                await updateShopOrderPaymentResult(pendingOrder.id, {
+                    status: "failed",
+                    paymentErrorCode: claim.code || "purchase_limit",
+                    paymentErrorMessage: claim.error || "Purchase limit reached.",
+                });
+                return jsonNoStore(
+                    { error: claim.error, code: claim.code, items: claim.items || [], limit: claim.limit ?? null },
+                    { status: 409 },
+                );
+            }
 
             // Commit the store-credit spend FIRST (atomic + guarded) so we never charge the reduced amount
             // without securing the credit. If the balance moved underneath us, fall back to charging more.
@@ -401,6 +458,9 @@ export async function POST(request) {
                 if (appliedCreditCents > 0) {
                     await addCredit(creditBuyerId, appliedCreditCents, "refund", pendingOrder.id, { reason: "no_card" }).catch(() => {});
                 }
+                // Hand the limited slot back, or a customer who fumbled the card form is locked out of the
+                // item for the rest of the run with no way to find out why.
+                await releaseClaims(pendingOrder.id);
                 await updateShopOrderPaymentResult(pendingOrder.id, {
                     status: "failed",
                     paymentErrorCode: "payment_source_required",
@@ -464,6 +524,10 @@ export async function POST(request) {
                     if (appliedCreditCents > 0) {
                         await addCredit(creditBuyerId, appliedCreditCents, "refund", pendingOrder.id, { reason: "card_failed" }).catch(() => {});
                     }
+                    // ⚠️ AND THE LIMITED SLOT. A declined card that kept its claim would refuse the
+                    // customer their own retry, which is the worst outcome a feature built to serve real
+                    // customers could produce.
+                    await releaseClaims(pendingOrder.id);
                     await updateShopOrderPaymentResult(pendingOrder.id, {
                         status: "failed",
                         paymentErrorCode: error?.squareCode || "payment_create_failed",
@@ -496,6 +560,17 @@ export async function POST(request) {
                 paymentErrorCode: null,
                 paymentErrorMessage: null,
             });
+
+            // ── THE CARD, WHICH IS ONLY KNOWABLE AFTER THE CHARGE ───────────────────────────────
+            // ⚠️ RECORDED AND FLAGGED, NEVER AUTO-REFUNDED. Square returns a stable per-card hash, and
+            // it is the hardest signal for a bot farm to vary — an inbox is free and a proxy is cheap, but
+            // every order has to be paid for by something. It only exists once the payment has gone through,
+            // though, so it cannot block: cancelling a captured payment on our own say-so would mean refunding
+            // a real customer who happens to share a card with their partner. It marks the order instead, and
+            // the shop orders screen shows it, so the call is Luke's.
+            if (payment) {
+                await recordCardSignal(updatedOrder, payment, cart.items).catch(() => {});
+            }
 
             if (updatedOrder.status === "completed") {
                 await clearCartItems(cartId);

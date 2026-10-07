@@ -1,4 +1,5 @@
 import "server-only";
+import { rollRunsOnRestock } from "@/lib/shop-item-rules.js";
 
 import { db } from "@/lib/db";
 import { productHandle } from "@/lib/inventory-feed/product-url";
@@ -310,6 +311,25 @@ export async function reconcileInventory({ force = false } = {}) {
     await markChanged(newIds, "new");
     await markChanged(restockIds, "restock");
     await markChanged(priceDropIds, "price_drop");
+
+    // ── A RESTOCK ENDS A PER-CUSTOMER LIMIT RUN ─────────────────────────────────────────────────────
+    // Luke, asked how long "one per customer" should last: "For the existing quantity initially stocked."
+    // So the limit belongs to the batch on the shelf, and when more arrives everybody is eligible again
+    // — a customer who bought one in October is not a bot for wanting one in December.
+    //
+    // ⚠️ HUNG OFF THE RESTOCK EVENT, NOT OFF STOCK HITTING ZERO. Quantity dips to zero and back all the
+    // time from ordinary sync timing, and resetting on that would quietly hand a second one to anybody
+    // watching. This function has already decided what a real restock is; it just has to say so.
+    //
+    // Best-effort: a limit that failed to roll over is a small annoyance, a failed reconcile is not.
+    try {
+        const rolled = await rollRunsOnRestock(restockIds);
+        if (rolled.length) logger.info("inventory_feed.limit_runs_rolled", { count: rolled.length, variationIds: rolled });
+    } catch (runError) {
+        logger.warn("inventory_feed.limit_run_roll.failed", {
+            reason: runError instanceof Error ? runError.message : "unknown_error",
+        });
+    }
 
     // 5. Mark sold-out: anything we had in stock that's no longer present drops to 0/out-of-stock, so
     //    a future return reads as a restock again.

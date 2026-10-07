@@ -6,6 +6,7 @@ import { productHandle, variationIdFromHandle } from "@/lib/inventory-feed/produ
 import { SITE_URL } from "@/lib/site";
 import ShopProductBuy from "@/components/ShopProductBuy";
 import { isSingleName } from "@/lib/single-discount";
+import { getItemRule } from "@/lib/shop-item-rules.js";
 
 // Regenerate each product's static HTML at most every 30 min (inventory reconcile runs ~every 15).
 export const revalidate = 1800;
@@ -52,6 +53,9 @@ export default async function ShopProductPage({ params }) {
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
     const { handle } = await params;
     const item = await getInventoryItem(variationIdFromHandle(handle));
+    // One extra query on a page that already reads the catalogue, and only for the product being looked
+    // at. Returns null for the overwhelming majority of items, which carry no rules at all.
+    const rule = await getItemRule(item?.variationId).catch(() => null);
 
     if (!item) {
         notFound();
@@ -120,6 +124,23 @@ export default async function ShopProductPage({ params }) {
                                 representative and minor wear consistent with the listed grade may be present.
                             </p>
                         )}
+                        {/* ── THE SELLING RULES, SAID UP FRONT ────────────────────────────────────
+                            ⚠️ THE PRODUCT PAGE IS WHERE THIS HAS TO BE SAID. The cart forces pickup and
+                            checkout refuses a shipping order, so nothing can get through wrongly — but a
+                            customer who only finds out at the till that the thing they drove a decision
+                            around cannot be posted has been treated badly by a shop that knew all along.
+                            Two short lines, before the Add to cart button rather than after it. */}
+                        {rule?.pickupOnly ? (
+                            <p className="shop-rule-note shop-rule-pickup">
+                                In-store pickup only {"\u2014"} we{"\u2019"}re holding these for people coming into the shop in
+                                Montgomery, so this one can{"\u2019"}t be shipped.
+                            </p>
+                        ) : null}
+                        {rule?.limitPerCustomer ? (
+                            <p className="shop-rule-note shop-rule-limit">
+                                Limit {rule.limitPerCustomer} per customer, and you{"\u2019"}ll need to be signed in to buy it.
+                            </p>
+                        ) : null}
                         <ShopProductBuy
                             catalogObjectId={item.variationId}
                             inStock={Boolean(item.inStock) && Number(item.quantity || 0) > 0}

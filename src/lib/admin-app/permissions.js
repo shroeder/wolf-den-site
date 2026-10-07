@@ -32,6 +32,11 @@ export const ALL_PERMISSIONS = Object.freeze([
     "remediations.run",
     "staff.manage",
     "marketplace.manage",
+    // Marking an online-store product in-store-pickup-only, or limited to N per customer.
+    // ⚠️ STAFF GET THIS BY DEFAULT. Luke asked for employees to be able to set it, and they are the ones
+    // unpacking the distribution box who know what arrived. It is a permission rather than an owner check so
+    // it can be taken from one person without being taken from everybody.
+    "shop.rules",
     // Clocking yourself in and out of Square. Every role that works a shift gets this by default.
     "timeclock.use",
 ]);
@@ -58,12 +63,14 @@ const ROLE_DEFAULTS = Object.freeze({
         "reports.view",
         "banking.view",
         "ai.use",
+        "shop.rules",
         "timeclock.use",
     ]),
     staff: Object.freeze([
         "inventory.scan",
         "labels.print",
         "mystery.report",
+        "shop.rules",
         "timeclock.use",
     ]),
 });

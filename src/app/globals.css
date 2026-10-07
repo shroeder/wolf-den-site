@@ -1582,6 +1582,45 @@ textarea {
     gap: 0.4rem;
 }
 
+/* ── IN-STORE PICKUP ONLY, AND PER-CUSTOMER LIMITS ────────────────────────────────────────────────
+   Two notices that explain a restriction the customer did not choose, so they read as information
+   rather than as an error: the shop telling you how this item works, not the form telling you off. */
+/* The same two restrictions, said on the product page before anything is added to a cart. */
+.shop-rule-note {
+    margin: 0.6rem 0 0;
+    padding: 8px 11px;
+    border-radius: 9px;
+    font-size: 0.84rem;
+    line-height: 1.5;
+}
+.shop-rule-pickup {
+    color: #cfe6ff;
+    background: rgba(70, 130, 200, 0.14);
+    border: 1px solid rgba(110, 170, 235, 0.35);
+}
+.shop-rule-limit {
+    color: #efdcae;
+    background: rgba(190, 150, 60, 0.13);
+    border: 1px solid rgba(215, 180, 90, 0.32);
+}
+
+.cart-pickup-only-note {
+    margin: 0 0 10px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: #cfe6ff;
+    background: rgba(70, 130, 200, 0.14);
+    border: 1px solid rgba(110, 170, 235, 0.35);
+}
+.cart-limit-note {
+    margin: 10px 0 0;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: #e8d6a8;
+}
+
 .cart-fulfillment-label {
     margin: 0;
     font-size: 0.72rem;

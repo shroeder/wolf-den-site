@@ -1,4 +1,5 @@
 import "server-only";
+import { getItemRules } from "@/lib/shop-item-rules.js";
 
 import {
     calculateOnlineFeeCents,
@@ -312,11 +313,37 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
         });
     }
 
+    // ── SELLING RULES, CARRIED ON THE CART ──────────────────────────────────────────────────────────
+    // ⚠️ THE CART HAS TO KNOW, NOT JUST THE CHECKOUT. Checkout refuses a shipping order containing a
+    // pickup-only item, and a refusal is the right backstop — but a customer who filled in an address, picked
+    // a shipping rate and typed a card before being told the item cannot ship has been wasted, and will
+    // reasonably assume the shop is broken. One query, on a summary that already runs several.
+    const itemRules = await getItemRules(items.map((i) => i.catalogObjectId));
+    let pickupOnly = false;
+    for (const item of items) {
+        const rule = itemRules[item.catalogObjectId];
+        if (!rule) continue;
+        item.pickupOnly = rule.pickupOnly;
+        item.limitPerCustomer = rule.limitPerCustomer;
+        if (rule.pickupOnly) pickupOnly = true;
+        // A limit also caps the line: offering a quantity stepper that goes to 5 on a one-per-customer item
+        // is an invitation to a refusal at the till.
+        if (rule.limitPerCustomer != null) {
+            item.maxQuantity = Math.min(item.maxQuantity, rule.limitPerCustomer);
+            if (item.quantity > rule.limitPerCustomer) item.unavailable = true;
+        }
+    }
+    if (pickupOnly) hasUnavailableItems = hasUnavailableItems || items.some((i) => i.unavailable);
+
     const onlineFeeCents = calculateOnlineFeeCents(subtotalCents / 100);
     const taxRate = await getShopSalesTaxRate();
     // ⚠️ ORDER MATTERS NOW. Shipping is part of the taxable base, so it has to be known before the tax is
     // worked out — these two lines were the other way round and tax was quoted on merchandise alone.
-    const shippingCents = shopShippingCents(subtotalCents, fulfillmentMode);
+    // ⚠️ A PICKUP-ONLY CART IS QUOTED AS PICKUP WHATEVER THE CALLER ASKED FOR. Otherwise the cart page
+    // shows a shipping charge and a tax figure computed on top of it for an order that can only ever be
+    // collected, and the totals move the moment they reach checkout.
+    const effectiveMode = pickupOnly ? "pickup" : fulfillmentMode;
+    const shippingCents = shopShippingCents(subtotalCents, effectiveMode);
     const taxCents = shopTaxCents(subtotalCents, taxRate, shippingCents);
 
     return {
@@ -332,5 +359,12 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
         shippingCents,
         totalCents: subtotalCents + onlineFeeCents + taxCents + shippingCents,
         hasUnavailableItems,
+        // True when ANY line is pickup-only, because fulfilment is per ORDER: one pickup-only item makes the
+        // whole order a pickup rather than splitting it into two shipments.
+        pickupOnly,
+        // Named so the cart page can say WHICH item is forcing it.
+        pickupOnlyItems: items.filter((i) => i.pickupOnly).map((i) => i.name),
+        limitedItems: items.filter((i) => i.limitPerCustomer != null)
+            .map((i) => ({ name: i.name, limit: i.limitPerCustomer })),
     };
 }

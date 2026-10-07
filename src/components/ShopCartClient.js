@@ -264,8 +264,20 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const missingSquareConfig = canShowCart && (!squareApplicationId || !squareLocationId);
     const normalizedShipping = useMemo(() => normalizeShippingForm(shippingForm), [shippingForm]);
     const shippingFieldErrors = useMemo(() => validateShippingForm(normalizedShipping), [normalizedShipping]);
+    // ── IN-STORE PICKUP ONLY ────────────────────────────────────────────────────────────────────────
+    // Luke: "mark items as in-store pickup only ... it effectively prevents people from buying them unless
+    // they are going to do in-store pickup."
+    //
+    // ⚠️ THE CHOICE IS REMOVED, NOT JUST REJECTED LATER. Checkout refuses a shipping order containing one
+    // of these and that refusal is the real guard — but letting somebody fill in an address, wait for live
+    // shipping rates and enter a card before telling them the item cannot ship is a customer who concludes
+    // the shop is broken. Fulfilment is per ORDER, so one pickup-only line makes the whole cart a pickup.
+    const cartPickupOnly = Boolean(cartData?.pickupOnly);
+    const pickupOnlyNames = cartData?.pickupOnlyItems || [];
+    const limitedItems = cartData?.limitedItems || [];
+
     const hasFulfillmentChoice = fulfillmentMode === "shipping" || fulfillmentMode === "pickup";
-    const isShippingReady = fulfillmentMode === "shipping" && Object.keys(shippingFieldErrors).length === 0;
+    const isShippingReady = fulfillmentMode === "shipping" && !cartPickupOnly && Object.keys(shippingFieldErrors).length === 0;
     // Live rates only need the destination ADDRESS — not name/email/phone. Gate the rate lookup on just
     // the address so entering it shows real shipping right away; name/email/phone are still required to
     // place the order (they gate the pay button below), just not to price shipping.
@@ -288,17 +300,16 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     // that backspacing the last character doesn't snap the address back and make the box uneditable.
     const pickupEmailValue = pickupEmail.trim();
     const isPickupEmailValid = /^\S+@\S+\.\S+$/.test(pickupEmailValue);
-    const isPickupReady =
-        fulfillmentMode === "pickup" && pickupName.trim().length >= 2 && isPickupEmailValid;
+    const isPickupReady = isPickup && pickupName.trim().length >= 2 && isPickupEmailValid;
     const isFulfillmentReady = isPickupReady || isShippingReady;
 
     // When EasyPost returns live rates, the buyer must pick one and the totals use that rate.
     const selectedRate = shipRates.options.find((rate) => rate.id === selectedRateId) || null;
-    const usingCalculatedShipping = shipRates.enabled && fulfillmentMode === "shipping";
+    const usingCalculatedShipping = shipRates.enabled && fulfillmentMode === "shipping" && !cartPickupOnly;
     // Be honest about shipping: don't show a flat number or "FREE" as if it were final before we've
     // actually priced it from the address. It's "pending" until either a live rate is picked, or (only
     // when EasyPost isn't returning rates at all) the server flat rate legitimately applies.
-    const isPickup = fulfillmentMode === "pickup";
+    const isPickup = fulfillmentMode === "pickup" || cartPickupOnly;
     let displayShippingCents;
     let shippingPending;
     if (isPickup) {
@@ -431,7 +442,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     useEffect(() => {
         let cancelled = false;
         const ready =
-            canShowCart && fulfillmentMode === "shipping" && isShippingAddressReady && cartData.items.length > 0;
+            canShowCart && fulfillmentMode === "shipping" && !cartPickupOnly && isShippingAddressReady && cartData.items.length > 0;
 
         const disable = () => {
             setShipRates({ enabled: false, options: [], shipmentId: null });
@@ -652,7 +663,7 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         setSuccess("");
         setFieldErrors({});
 
-        if (!hasFulfillmentChoice) {
+        if (!hasFulfillmentChoice && !cartPickupOnly) {
             setError("Choose shipping or local pickup before paying.");
             setCheckoutBusy(false);
             return;
@@ -660,17 +671,20 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
         const checkoutPayload = {
             sourceId: null,
-            fulfillmentMode,
+            // ⚠️ THE EFFECTIVE MODE, NOT THE BUTTON STATE. A pickup-only cart may never have had a mode
+            // chosen at all, and sending "" or a stale "shipping" would be rejected by the server for a
+            // reason the customer did nothing to cause.
+            fulfillmentMode: cartPickupOnly ? "pickup" : fulfillmentMode,
             saveCustomerProfile: Boolean(saveCustomerProfile && authCustomer),
             applyStoreCredit: Boolean(applyCredit && creditBalanceCents > 0),
         };
 
-        if (fulfillmentMode === "pickup") {
+        if (isPickup) {
             checkoutPayload.pickupName = pickupName.trim();
             checkoutPayload.pickupEmail = pickupEmailValue;
         }
 
-        if (fulfillmentMode === "shipping") {
+        if (fulfillmentMode === "shipping" && !cartPickupOnly) {
             const localFieldErrors = validateShippingForm(normalizedShipping);
 
             if (Object.keys(localFieldErrors).length > 0) {
@@ -873,31 +887,46 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
                             <section className="cart-fulfillment-section" aria-label="Fulfillment">
                                 <p className="cart-fulfillment-label">Fulfillment</p>
+                                {cartPickupOnly ? (
+                                    <p className="cart-pickup-only-note">
+                                        {pickupOnlyNames.length === 1
+                                            ? `${pickupOnlyNames[0]} is in-store pickup only, so this order is set to pickup.`
+                                            : "Some items in your cart are in-store pickup only, so this order is set to pickup."}
+                                        {" "}Remove {pickupOnlyNames.length === 1 ? "it" : "them"} if you need the rest shipped.
+                                    </p>
+                                ) : null}
                                 <div className="cart-fulfillment-toggle" role="tablist" aria-label="Choose shipping or pickup">
                                     <button
                                         type="button"
                                         role="tab"
-                                        aria-selected={fulfillmentMode === "shipping"}
-                                        className={fulfillmentMode === "shipping" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
+                                        aria-selected={fulfillmentMode === "shipping" && !cartPickupOnly}
+                                        className={fulfillmentMode === "shipping" && !cartPickupOnly ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
                                         onClick={() => setFulfillmentMode("shipping")}
-                                        disabled={checkoutBusy}
+                                        disabled={checkoutBusy || cartPickupOnly}
+                                        title={cartPickupOnly ? "Not available \u2014 this cart has an in-store pickup only item." : undefined}
                                     >
                                         Ship to me
                                     </button>
                                     <button
                                         type="button"
                                         role="tab"
-                                        aria-selected={fulfillmentMode === "pickup"}
-                                        className={fulfillmentMode === "pickup" ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
+                                        aria-selected={isPickup}
+                                        className={isPickup ? "cart-fulfillment-mode cart-fulfillment-mode-active" : "cart-fulfillment-mode"}
                                         onClick={() => setFulfillmentMode("pickup")}
                                         disabled={checkoutBusy}
                                     >
                                         Local pickup
                                     </button>
                                 </div>
-                                {!hasFulfillmentChoice ? <p className="secondary">Choose shipping or pickup to continue.</p> : null}
+                                {!hasFulfillmentChoice && !cartPickupOnly ? <p className="secondary">Choose shipping or pickup to continue.</p> : null}
+                                {limitedItems.length ? (
+                                    <p className="cart-limit-note">
+                                        {limitedItems.map((l) => `${l.name} is limited to ${l.limit} per customer`).join(" \u00b7 ")}
+                                        . You{"\u2019"}ll need to be signed in to buy {limitedItems.length === 1 ? "it" : "them"}.
+                                    </p>
+                                ) : null}
 
-                                {fulfillmentMode === "shipping" ? (
+                                {fulfillmentMode === "shipping" && !cartPickupOnly ? (
                                 <div className="cart-shipping-form">
                                     <div className="cart-saved-profile-row cart-field-full">
                                         {authCustomer ? (

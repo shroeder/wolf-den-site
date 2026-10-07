@@ -84,6 +84,8 @@ export async function createPendingShopOrder({
     customerEmail = null,
     customerName = null,
     squareCustomerId = null,
+    // The caller's IP, for the per-customer purchase limit. Null everywhere a limit is not in play.
+    orderIp = null,
 }) {
     return db.queryOne(
         `INSERT INTO shop_orders (
@@ -117,8 +119,9 @@ export async function createPendingShopOrder({
             customer_email,
             customer_name,
             square_customer_id,
+            order_ip,
             status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, 'pending')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, 'pending')
         RETURNING *`,
         [
             catalogObjectId,
@@ -151,6 +154,7 @@ export async function createPendingShopOrder({
             toNullableText(customerEmail),
             toNullableText(customerName),
             toNullableText(squareCustomerId),
+            toNullableText(orderIp),
         ]
     );
 }
