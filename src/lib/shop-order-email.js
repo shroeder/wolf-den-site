@@ -3,7 +3,7 @@ import "server-only";
 import { Resend } from "resend";
 
 import { parseTrackingFromScan, trackingUrlFor } from "@/lib/shipping/tracking-scan.js";
-import { STORE_ADDRESS, STORE_NAME } from "@/lib/site";
+import { SITE_URL, STORE_ADDRESS, STORE_NAME } from "@/lib/site";
 
 // Order emails for the online shop — customer confirmation, fulfillment-status updates, and a
 // new-order alert to the owner. Reuses the same Resend setup as the auth emails. Takes a raw
@@ -89,18 +89,102 @@ function carrierName(raw) {
 // The carrier is taken from the order when the label was bought here, and DERIVED FROM THE NUMBER'S OWN SHAPE
 // when it was not — a label bought at the post office and scanned in has no EasyPost rate behind it, and a
 // 1Z or a 22-digit IMpb says perfectly well who carries it.
+export function trackingCarrierFor(order) {
+    const tracking = String(order?.tracking_number || "").trim();
+    const quoted = carrierName(order?.shipping_carrier);
+    const parsed = tracking ? parseTrackingFromScan(tracking)?.carrier || "" : "";
+
+    // ⚠️ shipping_carrier IS WHAT WAS QUOTED, NOT WHAT ACTUALLY CARRIED IT. It is written at CHECKOUT from
+    // the rate the customer picked, long before anything is posted. So an order quoted UPS at checkout and then
+    // walked to the post office has shipping_carrier = "UPSDAP" and a USPS tracking number — and the old
+    // precedence (quoted first, always) emailed the customer "Tracking (UPS)" with a link to UPS's site that
+    // their USPS number will never match.
+    //
+    // A label bought through us is the only case where the quoted carrier is also the real one, and
+    // shipping_label_url is exactly that fact. Everywhere else the NUMBER'S OWN SHAPE wins, because a 22-digit
+    // IMpb or a 1Z is evidence and a stale quote is not.
+    if (order?.shipping_label_url && quoted) return quoted;
+    return parsed || quoted || "";
+}
+
 function trackingHtml(order) {
     const tracking = String(order?.tracking_number || "").trim();
     if (!tracking) return "";
-    const fromOrder = carrierName(order?.shipping_carrier);
-    const carrier = fromOrder || parseTrackingFromScan(tracking)?.carrier || "";
+    const carrier = trackingCarrierFor(order);
     const url = trackingUrlFor(carrier, tracking);
-    const shown = url
-        ? `<a href="${escapeHtml(url)}">${escapeHtml(tracking)}</a>`
-        : escapeHtml(tracking);
-    return (
-        `<p><strong>Tracking${carrier ? ` (${escapeHtml(carrier)})` : ""}:</strong> ${shown}</p>`
-    );
+
+    // Luke: "tracking link as a button." The number is still printed under it, because a customer who wants to
+    // paste it into their own carrier app should not have to dig it out of a link.
+    return `
+        <p style="margin:18px 0 0;"><strong>${carrier ? `${escapeHtml(carrier)} tracking` : "Tracking"}</strong></p>
+        ${url ? buttonHtml(url, "Track your package") : ""}
+        <p style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;color:#555;">${escapeHtml(tracking)}</p>
+    `;
+}
+
+// ── THE WOLF DEN SHELL ───────────────────────────────────────────────────────────────────────────────────────
+// Luke: "have it email the customer using our branding and tracking link as a button."
+//
+// Every order email went out as bare <h1> and <p> on default white: no logo, no colour, nothing that said who
+// it was from except the words. For most customers the shipping email is the only thing The Wolf Den ever
+// sends them, so it was the one piece of the shop with no shop on it.
+//
+// ⚠️ EMAIL HTML IS NOT WEB HTML, and everything below is shaped by that:
+//
+//   · TABLES, NOT FLEX OR GRID. Outlook renders through Word, which has no support for either.
+//   · INLINE STYLES. Gmail strips <style> blocks from the head on most clients.
+//   · NO WEBFONTS. A font stack only, so it degrades to something sane rather than to Times.
+//   · THE CARD STAYS LIGHT. Dark-mode clients invert aggressively and inconsistently; a white card with dark
+//     text survives that, while a dark card with light text can come out white-on-white. The brand lives in
+//     the header and footer bands, which are safe to lose.
+//   · ABSOLUTE IMAGE URL with an explicit width, and alt text that reads as the shop name if images are
+//     blocked — which, for a first email from an unknown sender, they usually are.
+const BRAND_GOLD = "#D4AF37";
+const BRAND_DARK = "#141414";
+const LOGO_URL = `${SITE_URL}/logo/wolf-den-full-logo.png`;
+
+function shellHtml(body) {
+    const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="color-scheme" content="light"/><meta name="supported-color-schemes" content="light"/></head>
+<body style="margin:0;padding:0;background:${BRAND_DARK};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${BRAND_DARK};">
+  <tr><td align="center" style="padding:28px 14px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+
+      <tr><td align="center" style="padding:0 0 20px;">
+        <a href="${SITE_URL}" style="text-decoration:none;">
+          <img src="${LOGO_URL}" width="190" alt="The Wolf Den" style="display:block;border:0;width:190px;max-width:70%;height:auto;"/>
+        </a>
+      </td></tr>
+
+      <tr><td style="background:#ffffff;border-radius:14px;padding:30px 28px;font-family:${font};font-size:15px;line-height:1.6;color:#1b1b1b;">
+        ${body}
+      </td></tr>
+
+      <tr><td align="center" style="padding:20px 10px 4px;font-family:${font};font-size:12px;line-height:1.7;color:#8a8a8a;">
+        <strong style="color:${BRAND_GOLD};">The Wolf Den</strong><br/>
+        ${escapeHtml(PICKUP_LOCATION)}<br/>
+        <a href="${SITE_URL}/shop" style="color:#8a8a8a;">wolfdengamingmn.com</a>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+}
+
+// ⚠️ A "BULLETPROOF" BUTTON, which is a table and not a styled <a>. Outlook ignores padding on an inline
+// anchor, so a CSS button collapses to a bare line of text there — the one client where it most needs to
+// look deliberate. The anchor keeps its own padding too, so it stays a big tap target everywhere else.
+function buttonHtml(url, label) {
+    const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+    return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
+  <tr><td align="center" bgcolor="${BRAND_GOLD}" style="border-radius:10px;">
+    <a href="${escapeHtml(url)}" style="display:inline-block;padding:15px 30px;font-family:${font};font-size:16px;font-weight:700;color:${BRAND_DARK};text-decoration:none;border-radius:10px;">${escapeHtml(label)}</a>
+  </td></tr>
+</table>`;
 }
 
 function footerHtml() {
@@ -158,7 +242,7 @@ export async function sendOrderConfirmationEmail(order) {
     }
     const isPickup = order.fulfillment_mode === "pickup";
     const number = confirmationNumber(order);
-    const html = `
+    const html = shellHtml(`
         <h1>Thanks for your order!</h1>
         <p>Your order is confirmed. Your confirmation number is:</p>
         <p style="font-size:24px;font-weight:bold;letter-spacing:2px;margin:12px 0;">#${number}</p>
@@ -172,7 +256,7 @@ export async function sendOrderConfirmationEmail(order) {
         }</p>
         ${order.receipt_url ? `<p><a href="${escapeHtml(order.receipt_url)}">View your payment receipt &rarr;</a></p>` : ""}
         ${footerHtml()}
-    `;
+    `);
     const result = await resend.emails.send({
         from: FROM,
         to,
@@ -235,7 +319,7 @@ export async function sendOrderStatusEmail(order, status) {
         from: FROM,
         to,
         subject,
-        html: `${body}${footerHtml()}`,
+        html: shellHtml(`${body}${footerHtml()}`),
     });
     return !result?.error;
 }
@@ -251,7 +335,7 @@ export async function sendOrderCancelledEmail(order, { reason, refundAmountCents
         return false;
     }
     const refunded = Number(refundAmountCents || 0) > 0;
-    const html = `
+    const html = shellHtml(`
         <h1>Your order was cancelled</h1>
         <p>Order <strong>#${shortId(order.id)}</strong> has been cancelled.</p>
         ${reason ? `<p><strong>Reason:</strong> ${escapeHtml(reason)}</p>` : ""}
@@ -262,7 +346,7 @@ export async function sendOrderCancelledEmail(order, { reason, refundAmountCents
                 : `<p>No charge was captured, so there&rsquo;s nothing to refund.</p>`
         }
         <p style="color:#777;font-size:13px;">Sorry for the inconvenience — questions? Just reply to this email.</p>
-    `;
+    `);
     const result = await resend.emails.send({
         from: FROM,
         to,
@@ -273,6 +357,9 @@ export async function sendOrderCancelledEmail(order, { reason, refundAmountCents
 }
 
 /** Owner alert: a customer requested to cancel an order (owner decides whether to honor it). */
+// ⚠️ THE TWO OWNER ALERTS BELOW ARE DELIBERATELY NOT SHELLED. They go to Luke, not to a customer: a
+// logo and a gold footer on an internal alert is a slower read and a taller phone notification, and there is
+// nobody to reassure about who sent it.
 export async function sendOrderCancelRequestAlertEmail(order, { reason } = {}) {
     const resend = getResendClient();
     if (!resend || !order) {

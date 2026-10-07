@@ -324,15 +324,20 @@ export async function setShopOrderCancelled(orderId, { reason, refundId = null, 
 }
 
 // Admin: update fulfillment (mark ready/shipped/picked up/cancelled) + optional tracking number.
-export async function setShopOrderFulfillment(orderId, { fulfillmentStatus, trackingNumber }) {
+export async function setShopOrderFulfillment(orderId, { fulfillmentStatus, trackingNumber, carrier = null }) {
     return db.queryOne(
         `UPDATE shop_orders
          SET fulfillment_status = COALESCE($2, fulfillment_status),
              tracking_number = COALESCE($3, tracking_number),
+             -- ⚠️ THE CARRIER THAT ACTUALLY CARRIED IT, which is not always the one quoted at checkout.
+             -- shipping_carrier is written when the customer picks a rate, long before anything is posted,
+             -- so an order quoted UPS and then walked to the post office had a UPS carrier against a USPS
+             -- number. Overwritten only when the caller is sure (see the PATCH route).
+             shipping_carrier = COALESCE($4, shipping_carrier),
              fulfilled_at = CASE WHEN $2 IN ('shipped', 'picked_up') THEN NOW() ELSE fulfilled_at END,
              updated_at = NOW()
          WHERE id = $1
          RETURNING *`,
-        [orderId, toNullableText(fulfillmentStatus), toNullableText(trackingNumber)]
+        [orderId, toNullableText(fulfillmentStatus), toNullableText(trackingNumber), toNullableText(carrier)]
     );
 }

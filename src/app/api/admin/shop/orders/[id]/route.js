@@ -49,7 +49,25 @@ export async function PATCH(request, { params }) {
             // "Ready" twice, or saving a tracking number on an already-shipped order, must not re-notify
             // the customer.
             const previous = await getShopOrderById(id);
-            const order = await setShopOrderFulfillment(id, { fulfillmentStatus, trackingNumber });
+
+            // ── WHICH CARRIER ACTUALLY HAS THE PARCEL ───────────────────────────────────────────
+            // Luke, while EasyPost is blocked: "we are manually doing shipping using usps and we gota
+            // account for that flow in the app."
+            //
+            // ⚠️ A MANUALLY POSTED PARCEL CONTRADICTS THE QUOTE. shipping_carrier was set at CHECKOUT from
+            // the rate the customer chose — it says what we INTENDED to ship with, and an order quoted UPS
+            // and then carried to the post office keeps saying UPS against a USPS number. Correct it from the
+            // number's own shape, which is evidence rather than intent.
+            //
+            // Only when no label was bought here: a label bought through us IS the carrier, and the scan of
+            // our own label should never be allowed to argue with it.
+            let learnedCarrier = null;
+            if (trackingNumber && !previous?.shipping_label_url) {
+                const shape = scanned || parseTrackingFromScan(trackingNumber);
+                if (shape?.carrier) learnedCarrier = shape.carrier;
+            }
+
+            const order = await setShopOrderFulfillment(id, { fulfillmentStatus, trackingNumber, carrier: learnedCarrier });
             if (!order) {
                 return NextResponse.json({ error: "Order not found." }, { status: 404 });
             }
