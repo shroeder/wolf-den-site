@@ -201,12 +201,42 @@ Scars already in the codebase, not opinions.
 
 ---
 
+## 10b. Architecture — SETTLED
+
+Luke: *"Its all enemies and as I described. Its also mostly client side except for maybe the drops because we
+can't let costs get out of hand, we are already cost constrained."*
+
+**The engine is purpose-built real time, and it runs in the browser.**
+
+⚠️ **A kill loop is the worst possible shape for server traffic.** A ten-minute session is a couple of hundred
+kills; a request per kill is a couple of hundred round trips, and round trips ARE Active CPU — every `neon()`
+query is its own HTTPS request with its own handshake. That is the meter that bills (CLAUDE.md). Per-kill
+requests would make this the most expensive feature in the game, for a feature whose whole appeal is killing
+a lot of things.
+
+**So: a seed, not a conversation.**
+
+1. **Enter a zone** → the server issues a **session seed**. ~2 queries.
+2. **The client plays the entire scene locally** — movement, platforming, wander, combat, telegraphs, camera,
+   loot spilling and pickup. It rolls each drop itself so it can show you what fell out the instant the enemy
+   dies.
+3. **Settle** → the client sends **only what it killed, and the index of each kill**. The server re-runs the
+   same pure roll from the same seed and grants what *it* computes. ~3-4 queries.
+4. A periodic autosave settle (~90s) so a closed tab never loses a session.
+
+**The client never gets to say what it received.** It can only lie about *kills*, and kills are cheap to
+bound — zone population and the 45s respawn put a hard ceiling on kills per minute, checked at settle.
+
+This is the pattern the card game already uses: the engine runs in the browser and `verifyWin` replays the
+move log through the same pure engine server-side. Same problem, same shape, already proven in this codebase.
+
+**Cost: ~5-8 requests per session** instead of hundreds.
+
+---
+
 ## 11. Open questions
 
-- **Combat engine.** Reuse arena combat (depth, but drags in the parked balance rework,
-  `arena-combat-rework-parked`) or delve-style (simpler, already tuned) or purpose-built for a real-time
-  scene? The tap-to-attack + telegraphed-attack + platforming description reads as **purpose-built real time**,
-  which none of the existing engines are.
+- ~~Combat engine~~ — **SETTLED: purpose-built real time, client-side. See §10b.**
 - **How the 6 tool slots interact with the existing equipment screen** — new slots on the same doll, or
   their own screen?
 - **What the crafting set's badges are for**, given the set is non-wearable.
