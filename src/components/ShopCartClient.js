@@ -273,6 +273,11 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     // shipping rates and enter a card before telling them the item cannot ship is a customer who concludes
     // the shop is broken. Fulfilment is per ORDER, so one pickup-only line makes the whole cart a pickup.
     const cartPickupOnly = Boolean(cartData?.pickupOnly);
+    // ⚠️ DECLARED HERE, BESIDE WHAT IT DEPENDS ON, AND NOT FURTHER DOWN. It used to sit thirty lines
+    // lower, and moving isPickupReady onto it put a const read above its own declaration — a temporal dead
+    // zone that compiles perfectly and then throws "Cannot access before initialization" when Next prerenders
+    // /cart. The local build said "Compiled successfully" and failed at the export step after it.
+    const isPickup = fulfillmentMode === "pickup" || cartPickupOnly;
     const pickupOnlyNames = cartData?.pickupOnlyItems || [];
     const limitedItems = cartData?.limitedItems || [];
 
@@ -309,7 +314,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     // Be honest about shipping: don't show a flat number or "FREE" as if it were final before we've
     // actually priced it from the address. It's "pending" until either a live rate is picked, or (only
     // when EasyPost isn't returning rates at all) the server flat rate legitimately applies.
-    const isPickup = fulfillmentMode === "pickup" || cartPickupOnly;
     let displayShippingCents;
     let shippingPending;
     if (isPickup) {
