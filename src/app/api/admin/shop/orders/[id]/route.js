@@ -42,7 +42,9 @@ export async function PATCH(request, { params }) {
             const trackingNumber = scanned
                 ? scanned.tracking
                 : (typeof body.trackingNumber === "string" ? body.trackingNumber.trim() : null);
-            if (!fulfillmentStatus && trackingNumber === null) {
+            // A resend changes nothing and is still a valid request — without this it would be turned away
+            // as "Nothing to update" before the send below ever came into view.
+            if (!fulfillmentStatus && trackingNumber === null && body.resend !== true) {
                 return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
             }
             // Read the current status BEFORE the write so we only email on an actual transition. Tapping
@@ -89,7 +91,16 @@ export async function PATCH(request, { params }) {
             const trackingChanged = Boolean(trackingNumber)
                 && trackingNumber !== (previous?.tracking_number || "")
                 && (order.fulfillment_status === "shipped" || fulfillmentStatus === "shipped");
-            const notify = statusChanged || trackingChanged;
+
+            // ── ⚠️ SENDING IT AGAIN ON PURPOSE ─────────────────────────────────────────────────────
+            // Every guard above is about NOT mailing somebody twice, which is right by default and leaves no
+            // way to fix an email that went out wrong. One did: an order quoted UPS at checkout and posted by
+            // hand at USPS emailed its customer a ups.com link carrying a USPS number, which resolves to
+            // nothing. The number had not changed, so nothing above would ever send the correction.
+            //
+            // Explicit and off by default: the caller has to ask for it, so it can never happen by accident.
+            const resend = body.resend === true && order.fulfillment_status === "shipped";
+            const notify = statusChanged || trackingChanged || resend;
 
             if (notify) {
                 // Awaited inside after() so the serverless function doesn't terminate mid-send, and never
