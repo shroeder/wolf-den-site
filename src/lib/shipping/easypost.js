@@ -81,9 +81,22 @@ async function easyPostFetch(path, init = {}) {
     }
 
     if (!response.ok) {
-        const message = payload?.error?.message || payload?.error || `EasyPost request failed (${response.status}).`;
-        const error = new Error(typeof message === "string" ? message : "EasyPost request failed.");
+        // ⚠️ EASYPOST NESTS THE USEFUL PART. `error.message` is sometimes a string and sometimes an ARRAY
+        // of field errors, and `error.errors` carries the per-field detail that actually names the problem
+        // ("rate is expired", "payment method required"). Flattening the lot is the difference between
+        // "EasyPost request failed (422)" and a sentence somebody can act on.
+        const err = payload?.error || {};
+        const parts = [];
+        if (typeof err.message === "string") parts.push(err.message);
+        else if (Array.isArray(err.message)) parts.push(err.message.map((m) => m?.message || m).filter(Boolean).join("; "));
+        for (const sub of err.errors || []) {
+            const field = sub?.field ? `${sub.field}: ` : "";
+            if (sub?.message) parts.push(`${field}${sub.message}`);
+        }
+        const message = parts.filter(Boolean).join(" ") || `EasyPost request failed (${response.status}).`;
+        const error = new Error(message);
         error.easyPostStatus = response.status;
+        error.easyPostCode = err.code || null;
         throw error;
     }
 
@@ -221,6 +234,31 @@ export async function getShipmentRate(shipmentId, rateId) {
 
 // Buy the label for a chosen shipment + rate. Returns the label URL + tracking code to store on the
 // order. Throws on failure (admin action, surfaced to the owner).
+/**
+ * A shipment as EasyPost currently sees it. Read-only, costs nothing, buys nothing.
+ *
+ * ⚠️ THIS IS WHAT MAKES A RETRY SAFE. Buying a label is the one irreversible, billable thing this app
+ * does, and the write that records it happens AFTERWARDS — so a database hiccup in between leaves a label
+ * bought, paid for, and unrecorded, and the next tap of the button buys a second one. EasyPost already knows
+ * the answer; asking before buying turns a double charge into a recovery.
+ */
+export async function getShipment(shipmentId) {
+    if (!isEasyPostEnabled() || !shipmentId) return null;
+    const shipment = await easyPostFetch(`/shipments/${encodeURIComponent(shipmentId)}`);
+    if (!shipment) return null;
+    const rate = shipment.selected_rate || null;
+    return {
+        id: shipment.id,
+        labelUrl: shipment.postage_label?.label_url || null,
+        trackingCode: shipment.tracking_code || null,
+        carrier: rate?.carrier || null,
+        service: rate?.service || null,
+        status: shipment.status || null,
+        // Every rate still on the shipment, so the caller can say whether the one we stored is still offered.
+        rateIds: (shipment.rates || []).map((r) => r.id),
+    };
+}
+
 export async function buyShippingLabel({ shipmentId, rateId }) {
     if (!isEasyPostEnabled()) {
         throw new Error("EasyPost is not configured.");
