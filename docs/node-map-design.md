@@ -219,4 +219,34 @@ Scars already in the codebase, not opinions.
 
 ## 12. Build log
 
-Nothing shipped yet. Entries get added here as pieces land.
+### 2026-10-07 — the Grove's content layer
+
+`src/lib/marketplace/grove-catalog.js` and `grove-recipes.js`, both PURE so the scene and the server read the
+same tables and the server never trusts what the client says it killed.
+
+- **12 zones**, 7 of them with two enemy types, each with its own backdrop and a boss
+- **12 enemies**, each with its own loot table, parts, emblem and behaviour (zones 1-2 fully passive)
+- **16 parts**, **22 recipes**, **13 emblems** with the 6-star breakpoint ladder
+- **6 new tool slots** — rod, pick, shovel, hammer, hoe, sextant
+- backpack I-V and vault I-VI, Roman-numbered, one-time, each its own recipe
+- 3 farm decorations and the **two** plot recipes
+- **The Crystal Stag** rare spawn at 0.40% per enemy — the ONLY thing here that pays gold or can drop a chest
+- difficulty curve, boss hp by zone: 18 → 29 → 54 → 93 → 151 → 225 → 315 → 443 → 583 → 756 → 956 → 1238
+
+`scripts/check-grove.mjs` holds the content to its own rules: every reference resolves, **every part is used
+by at least one recipe AND is actually dropped by something**, no ordinary enemy pays gold, difficulty climbs
+monotonically, and the emblem ladder fails upward.
+
+**Art:** reused rootrat, grub, thornling, badger, gourdling, barrowhound, warren-mother, voidmoth and
+ashwraith from the delve catalogue. Still to draw: **4 enemies** (Straw Walker, Palisade Goblin, Elderling,
+The Crystal Stag) and **12 zone backdrops**.
+
+### Still to build
+
+1. **The combat engine** — the open question in §11, and the biggest. Tap-to-move, tap-to-attack,
+   telegraphed swings, platforms, wandering enemies and loot that spills is not any of the three engines the
+   game already has.
+2. **Server systems** — the run/kill/loot endpoints, the seen-parts set that drives recipe discovery, the
+   backpack and bank, the crafting grant path, emblem counts and equipping.
+3. **The client scene** — map, zones, camera, movement, pickups, inventory, workbench, the stone tablet.
+4. **Art** — 4 enemies and 12 backdrops.
