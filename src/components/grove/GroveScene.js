@@ -10,6 +10,16 @@ import {
     swing, makeTelegraph, telegraphHits, mitigate, HOP, GRAVITY,
 } from "@/lib/marketplace/grove-world.js";
 import { HEAL_AT } from "@/lib/marketplace/grove-catalog.js";
+// ── ⚠️ THE GEOMETRY LIVES IN ITS OWN FILE SO IT CAN BE CHECKED ─────────────────────────────────────
+// Every distance that is really a SHARE OF THE FRAME is in grove-view.js, with the long version of why. The
+// short version: three such distances were written here as bare constants tuned for a 100-unit frame, and all
+// three broke silently when the frame became 26 units. scripts/check-grove.mjs now runs these functions across
+// the real viewport sizes and asserts the hero and the pet are on screen, which no amount of reading the
+// component would have told anyone.
+import {
+    HERO_UNITS, SKY_PX, SKY_PY, SKY_TILE_COUNT, PLATE_W, PLATE_H, GROUND_OF_PLATE,
+    viewFor, petFollow, cameraX, cameraY,
+} from "@/lib/marketplace/grove-view.js";
 
 // ── THE ZONE, ON SCREEN ──────────────────────────────────────────────────────────────────────────────────────
 // The whole scene runs here. Nothing about movement, wandering, swinging, dying or looting touches the server
@@ -39,9 +49,7 @@ import { HEAL_AT } from "@/lib/marketplace/grove-catalog.js";
 // viewport wider than 3:2 the plate renders taller than the scene and is cropped at the top — the painted
 // grass ends up above where the bodies are standing. The ground line has to be computed from what the plate
 // actually renders as, not assumed. See grove-css.js, which carried the old 13% and the warning about it.
-const PLATE_W = 1536;
-const PLATE_H = 1024;
-const GROUND_OF_PLATE = 0.13;
+// PLATE_W / PLATE_H / GROUND_OF_PLATE now live in grove-view.js, with the rest of the geometry.
 
 // ── ⚠️ THE SCALE IS SET BY THE CHARACTER NOW, NOT BY FITTING THE WHOLE ZONE ON SCREEN ────────────
 // Luke: "My dude is tiny. My dude and pet are tiny."
@@ -60,59 +68,8 @@ const GROUND_OF_PLATE = 0.13;
 // So: aim for a number of world units across the frame, then hold the hero between a floor and a ceiling as
 // a share of the viewport HEIGHT — which is what stops a tall narrow phone from showing a doll in a
 // cathedral, and a short wide one from filling the screen with a shoulder.
-const HERO_UNITS = 7;             // ⚠️ MUST MATCH .gv-hero's width in grove-css.js
-const SPAN_NARROW = 44;           // units across a phone
-const SPAN_MID = 56;              // ...a large phone or small tablet
-const SPAN_WIDE = 68;             // ...a tablet or desktop
-const HERO_MIN_VH = 0.13;         // the hero is never shorter than this share of the viewport
-// ⚠️ 0.13 RATHER THAN 0.09 BECAUSE OF WHAT A PORTRAIT PHONE LOOKS LIKE. At 0.09 the hero was a
-// perfectly reasonable 76px and the frame was still 90% empty canopy — 65 units of sky over 36 units
-// of width, with the whole zone in a strip along the bottom. Being small in PIXELS and being small in the
-// COMPOSITION are different problems and only the second one is what reads as tiny. This crops the dead
-// canopy instead of displaying it. It binds on portrait only; every landscape screen is held by the
-// ceiling or the span and does not move.
-const HERO_MAX_VH = 0.20;         // ...nor taller
-
-// ── ⚠️ AND THE CAMERA CLIMBS WITH YOU ─────────────────────────────────────────────────────────────
-// The deadzone is the point of this. A camera that tracks y exactly makes the horizon bob on every hop,
-// which is the specific thing Luke ruled out for the horizontal axis ("Not jostle the person") and is worse
-// vertically. So it does not move at all while the hero's head is in the lower two thirds of the sky —
-// ordinary ground fighting has a horizon nailed in place — and only lifts when you actually climb.
-const CAM_Y_DEADZONE = 0.62;
-const CAM_Y_EASE = 0.07;
-
-// ── ⚠️ THE BACKDROP SCROLLS, AND ONE PLATE CANNOT DO IT ───────────────────────────────────────────
-// Luke: "The map bg doesnt scroll which makes it impossible to feel immersed. I was assuming you would make
-// it like other things like town where you walk around in the environment."
-//
-// It did not scroll because it COULD not: .gv-plate was one inset:0 div holding a 3:2 painting, and a zone
-// is up to seven screens wide. There was a .gv-layer div being translated at 0.35 parallax every frame with
-// nothing whatsoever inside it, so the only thing that ever moved was the bodies — and bodies sliding
-// across a nailed-down picture reads as a treadmill, not as walking.
-//
-// ⚠️ MIRROR-TILED RATHER THAN REPEATED, which is the whole trick. A repeat-x backdrop puts a hard
-// vertical seam through the painting every tile; alternate tiles flipped on X meet their own reflection, so
-// every join is continuous and there is no seam to find. It also needs NO NEW ART — twelve wide
-// panoramas would have been twelve more generations.
-const SKY_TILES = [0, 1, 2, 3, 4];
-const SKY_PX = 0.38;              // horizontal parallax: distinctly moving, still clearly far away
-const SKY_PY = 0.22;              // vertical: distant scenery barely drops when you climb
-const SKY_PLATE_AR = PLATE_W / PLATE_H;
-
-// ── ⚠️ AND THE HORIZON HAS A FLOOR, WHICH IS THE OTHER HALF OF "my dude is tiny" ──────────────────
-// The painted ground sits an eighth of the way up every plate, and on a PORTRAIT phone that put the line the
-// hero stands on at 15% of the frame: the entire zone played out in a strip along the bottom under 85% of
-// empty canopy. Making the hero bigger does not fix that — at 104px he was perfectly legible and still
-// looked lost, because what reads as small is the share of the picture the action occupies, not the sprite.
-//
-// So the backdrop is allowed to be scaled up PAST cover until its ground line is at least this far up the
-// frame. It crops dead canopy off the top rather than displaying it, and it moves the horizon WITHOUT
-// touching the world scale, so the hero does not grow to compensate for a composition problem.
-//
-// ⚠️ IT COSTS SHARPNESS, which is why it is a floor and not a multiplier. On a portrait phone this is
-// about a 1.4x upscale of a 1536px painting; on a landscape screen the plate is usually wide enough already
-// and this does nothing at all.
-const GROUND_MIN_VH = 0.24;
+// The scale, the camera deadzone, the backdrop parallax and the horizon floor are all in
+// grove-view.js now. See its header for the bug class that put them there.
 
 const SETTLE_EVERY_MS = 45_000;
 const PICKUP_RANGE = 7;           // world units — "The player must walk near the loot for it to get picked up"
@@ -348,10 +305,9 @@ export default function GroveScene({ zone, seed, bonuses, stats, heroArt, petArt
             // A share of what is visible keeps the same look at any zoom: at 100 units across it is the old
             // nine, and it closes up as the frame tightens. The deadzone scales with it for the same reason
             // — a fixed 3-unit slack against a 3-unit trail is a pet that never bothers to follow.
-            const petTrail = Math.min(9, (w.visibleUnits || UNITS_PER_SCREEN) * 0.12);
-            const petWant = w.hero.x - w.hero.face * petTrail;
-            const petSlack = Math.max(1.2, petTrail * 0.35);
-            stepBody(w.pet, w.platforms, dt, Math.abs(petWant - w.pet.x) > petSlack ? petWant : null);
+            const pf = petFollow(w.visibleUnits || UNITS_PER_SCREEN);
+            const petWant = w.hero.x - w.hero.face * pf.trail;
+            stepBody(w.pet, w.platforms, dt, Math.abs(petWant - w.pet.x) > pf.slack ? petWant : null);
 
             // ── FOES ────────────────────────────────────────────────────────────────────────────
             for (const f of w.foes) {
@@ -446,7 +402,7 @@ export default function GroveScene({ zone, seed, bonuses, stats, heroArt, petArt
             // The strip is taller than the viewport and anchored to its BOTTOM, so panning it down to follow
             // a climb reveals painted sky rather than a hole. The extra height is exactly the furthest the
             // vertical parallax can ever travel, plus a tenth.
-            const maxPanUnits = w.topY + HERO_UNITS;
+            const view = viewFor(vw, vh, w.topY);
 
             // ── THE GROUND LINE, FROM WHAT THE PLATE ACTUALLY RENDERS AS ────────────────────────
             // ⚠️ NOT A FIXED 13%. cover scales by max(w-ratio, h-ratio), so on anything wider than the
@@ -454,13 +410,7 @@ export default function GroveScene({ zone, seed, bonuses, stats, heroArt, petArt
             // the SCENE is then a different line from thirteen percent of the PLATE, and the whole population
             // stands below the painted grass. Written as a CSS variable so one number moves every body, the
             // ledges and the telegraph bands together.
-            // ── THE SCALE ───────────────────────────────────────────────────────────────────────
-            // See HERO_UNITS above for why this is no longer allowed to shrink to fit the ledges.
-            const span = vw < 560 ? SPAN_NARROW : vw < 1000 ? SPAN_MID : SPAN_WIDE;
-            const unit = Math.min(
-                Math.max(vw / span, (HERO_MIN_VH * vh) / HERO_UNITS),
-                (HERO_MAX_VH * vh) / HERO_UNITS,
-            );
+            const { unit } = view;
 
             // ⚠️ THE SPRITES SCALE WITH IT. Every body is sized as a PERCENTAGE OF THE SCENE WIDTH
             // (a foe is 8%) while every distance is in world units — which only agree while unit is exactly
@@ -473,23 +423,12 @@ export default function GroveScene({ zone, seed, bonuses, stats, heroArt, petArt
                 host.style.setProperty("--gv-unit", `${unit}px`);
             }
 
-            // The strip has to be at least: tall enough to pan into without showing a hole, wide-screen
-            // cover, and high enough to put the horizon where GROUND_MIN_VH wants it. One box, so the ground
-            // line and the tiles can never be measured against two different numbers.
-            const skyBoxH = Math.max(
-                vh + maxPanUnits * unit * SKY_PY * 1.1,
-                vw * (PLATE_H / PLATE_W),
-                (GROUND_MIN_VH * vh) / GROUND_OF_PLATE,
-            );
-            const groundPx = GROUND_OF_PLATE * skyBoxH;
+            const { skyBoxH, groundPx, tileW } = view;
             if (groundPx !== w.groundPx) {
                 w.groundPx = groundPx;
                 host.style.setProperty("--gv-ground", `${groundPx}px`);
             }
 
-            // Each tile is the plate's own aspect at the strip's height, so background-size: 100% 100%
-            // is cover with no distortion and the mirrored joins line up exactly.
-            const tileW = skyBoxH * SKY_PLATE_AR;
             if (skyBoxH !== w.skyBoxH) {
                 w.skyBoxH = skyBoxH;
                 host.style.setProperty("--gv-sky-h", `${skyBoxH}px`);
@@ -501,10 +440,8 @@ export default function GroveScene({ zone, seed, bonuses, stats, heroArt, petArt
             // the frame now holds roughly 25 — so the ledges are reached by the camera RISING, exactly as
             // the horizontal one handles a zone seven screens wide. Clamped at 0 because there is nothing
             // below the ground to look at, and held by a deadzone so the horizon never bobs on a hop.
-            const sky = Math.max(40, vh - groundPx);
-            const skyUnits = sky / unit;
-            const wantCamY = Math.max(0, w.hero.y + HERO_UNITS - skyUnits * CAM_Y_DEADZONE);
-            camYRef.current += (wantCamY - camYRef.current) * Math.min(1, CAM_Y_EASE * dt);
+            const wantCamY = cameraY(w.hero.y, view.skyUnits);
+            camYRef.current += (wantCamY - camYRef.current) * Math.min(1, 0.07 * dt);
             const camY = camYRef.current;
 
             // How much of the zone is actually on screen at this scale. ⚠️ THE CAMERA CLAMP USES THIS, NOT
@@ -514,7 +451,7 @@ export default function GroveScene({ zone, seed, bonuses, stats, heroArt, petArt
             // Read by the pet-follow at the top of the NEXT frame, which runs before the camera block.
             // One frame stale by construction and invisible at 60fps; the alternative is computing the
             // viewport twice per frame to save 16ms of lag on a value that only changes when the window does.
-            const visibleUnits = vw / unit;
+            const visibleUnits = view.visibleUnits;
             w.visibleUnits = visibleUnits;
             // ⚠️ THE LOOKAHEAD IS A SHARE OF THE FRAME, NOT A FLAT 14 UNITS. It was a constant tuned
             // when the frame held 100 units, where leading the hero by 14 is a seventh of the width. The
@@ -525,8 +462,7 @@ export default function GroveScene({ zone, seed, bonuses, stats, heroArt, petArt
             // ⚠️ ANY CONSTANT IN UNITS IS THIS BUG WAITING. The zoom made the frame four times smaller
             // in world terms, so every tuned distance that is not expressed against the frame changed
             // meaning. A seventh of what is visible is the thing that was actually meant.
-            const lookahead = w.hero.face * visibleUnits * 0.14;
-            const wantCam = Math.max(0, Math.min(W - visibleUnits, w.hero.x + lookahead - visibleUnits / 2));
+            const wantCam = cameraX(w.hero.x, w.hero.face, visibleUnits, W);
             camRef.current += (wantCam - camRef.current) * Math.min(1, 0.055 * dt);
 
             // ── PAINT ───────────────────────────────────────────────────────────────────────────
@@ -697,11 +633,11 @@ export default function GroveScene({ zone, seed, bonuses, stats, heroArt, petArt
     const scene = (
         <div className="gv-scene is-full" ref={hostRef} onPointerDown={onTapWorld}>
             {/* ── ⚠️ THE BACKDROP, MIRROR-TILED SO IT CAN SCROLL ────────────────────────────
-                See SKY_TILES in this file. Five tiles is enough to cover any viewport plus a full
+                See SKY_TILE_COUNT in grove-view.js. Five is enough to cover any viewport plus a full
                 two-tile wrap; they share one decoded bitmap, so the extra nodes cost nothing. Every
                 second one is flipped on X by the stylesheet, which is what removes the seam. */}
             <div className="gv-sky" ref={(n) => { if (worldRef.current) worldRef.current.skyNode = n; }}>
-                {SKY_TILES.map((i) => (
+                {Array.from({ length: SKY_TILE_COUNT }, (_, i) => i).map((i) => (
                     <div key={i} className="gv-sky-t" style={{ backgroundImage: `url(${zone.bg})` }} />
                 ))}
             </div>

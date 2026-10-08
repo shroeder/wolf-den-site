@@ -27,6 +27,10 @@ import { pickHyper, rollBoss } from "@/lib/marketplace/grove-roll.js";
 import { makeTelegraph } from "@/lib/marketplace/grove-world.js";
 import { CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { DECORATIONS } from "@/lib/marketplace/decorations.js";
+import {
+    HERO_UNITS, PET_UNITS, SKY_TILE_COUNT, GROUND_MIN_VH,
+    viewFor, petFollow, cameraX, cameraY, screenX,
+} from "@/lib/marketplace/grove-view.js";
 
 const fail = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); };
@@ -259,6 +263,68 @@ for (const id of ["rootrat", "thornling", "elderling"]) {
 
 console.log(`\n  art still to draw (${needArt.length}): ${needArt.join(", ") || "none"}`);
 console.log(`  backdrops to draw: ${zones} (one per zone)`);
+
+// ── ⚠️ IS THE HERO ACTUALLY ON THE SCREEN? ─────────────────────────────────────────────────────────
+// The content checks above are about strings that can be wrong without throwing. This one is about NUMBERS
+// that can be wrong without throwing, which turned out to be the more expensive kind.
+//
+// Three distances in the scene were tuned as bare constants against a frame about 100 world units wide —
+// the camera lookahead (14), the pet’s trail (9), and the tap handler’s own copy of the scale. Each one is
+// really a SHARE OF THE FRAME wearing world-space clothes. When the scale changed so the hero would be big
+// enough to see, the frame became 26 units and all three quietly changed meaning: the camera led the hero by
+// more than half the screen and settled with him at x = -65, the pet rode the left bezel until it fell off
+// it, and a tap asked for half the distance it pointed at. Nothing errored. It photographs as an empty
+// forest, which is indistinguishable from a feature that is simply broken.
+//
+// So: run the real geometry at the real viewport sizes and assert the two things a player would notice.
+// Reading the component would never have shown this; only putting numbers through it does.
+const VIEWPORTS = [
+    [360, 640, "small phone"],
+    [390, 844, "phone portrait"],
+    [428, 926, "large phone"],
+    [844, 390, "phone landscape"],
+    [820, 1180, "tablet portrait"],
+    [1180, 820, "tablet landscape"],
+    [1512, 860, "laptop"],
+    [1920, 1080, "desktop full"],
+    [3440, 1440, "ultrawide"],
+];
+
+console.log("\n  the scene, laid out:");
+console.log("    viewport        unit  across  hero px   hero x   pet x  horizon  tiles");
+for (const [vw, vh, label] of VIEWPORTS) {
+    // The deepest zone: three tiers of ledges, the top one 78 units up, seven screens wide.
+    const v = viewFor(vw, vh, 78);
+    const heroX = 40;
+    const cam = cameraX(heroX, 1, v.visibleUnits, 700);
+    const pf = petFollow(v.visibleUnits);
+    // Both bodies are centred on their world x by a negative margin of half their width.
+    const hx = screenX(heroX, cam, v.unit) - (HERO_UNITS / 2) * v.unit;
+    const px = screenX(heroX - pf.trail, cam, v.unit) - (PET_UNITS / 2) * v.unit;
+    const tilesNeeded = 2 + Math.ceil(vw / v.tileW);
+
+    const onScreen = (x, units) => x >= 0 && x + units * v.unit <= vw;
+    if (!onScreen(hx, HERO_UNITS)) fail.push(`${label} ${vw}x${vh}: the HERO renders at x=${hx.toFixed(0)}, off the frame`);
+    if (!onScreen(px, PET_UNITS)) fail.push(`${label} ${vw}x${vh}: the PET renders at x=${px.toFixed(0)}, off the frame`);
+    // The strip wraps on two tiles, so it must cover the frame plus a full two-tile period.
+    if (tilesNeeded > SKY_TILE_COUNT) fail.push(`${label} ${vw}x${vh}: needs ${tilesNeeded} backdrop tiles, only ${SKY_TILE_COUNT} are rendered — the strip runs out and the zone shows bare scene behind it`);
+    // The whole point of the horizon floor: the action must not be a strip along the bottom.
+    if (v.groundPx < GROUND_MIN_VH * vh - 1) fail.push(`${label} ${vw}x${vh}: horizon at ${(v.groundPx / vh * 100).toFixed(0)}% of the frame, below the ${(GROUND_MIN_VH * 100).toFixed(0)}% floor`);
+    // A hero nobody can see is the bug this whole file is about.
+    if (v.heroPx < 60) fail.push(`${label} ${vw}x${vh}: the hero is ${v.heroPx.toFixed(0)}px tall`);
+
+    console.log(`    ${label.padEnd(16)}${v.unit.toFixed(1).padStart(4)}${v.visibleUnits.toFixed(0).padStart(8)}${v.heroPx.toFixed(0).padStart(9)}${hx.toFixed(0).padStart(9)}${px.toFixed(0).padStart(8)}${(v.groundPx / vh * 100).toFixed(0).padStart(8)}%${String(tilesNeeded).padStart(7)}`);
+}
+
+// ⚠️ AND THE VERTICAL CAMERA MUST REACH THE TOP LEDGE. The clamp this replaced guaranteed every ledge
+// was on screen by shrinking everything; the camera has to earn that back by actually climbing. A zone whose
+// top tier cannot be brought into frame is a zone with unreachable-looking platforms.
+for (const [vw, vh, label] of VIEWPORTS) {
+    const v = viewFor(vw, vh, 78);
+    const camY = cameraY(78, v.skyUnits);
+    const headroom = camY + v.skyUnits - (78 + HERO_UNITS);
+    if (headroom < 0) fail.push(`${label} ${vw}x${vh}: standing on the top ledge puts the hero ${(-headroom).toFixed(1)} units above the frame`);
+}
 
 if (fail.length) {
     console.log(`\n── ${fail.length} PROBLEM(S) ───────────────────────────────────────────────────`);

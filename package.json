@@ -28,6 +28,8 @@
     "check:vercel": "node scripts/check-vercel-json.mjs",
     "check:polls": "node scripts/check-polls.mjs",
     "check:chrome": "node scripts/check-chrome-fanout.mjs",
+    "check:grove": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove.mjs",
+    "check:grove-roll": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-roll.mjs",
     "gen:season-art": "node --import ./scripts/lib/register-loader.mjs scripts/gen-season-art.mjs",
     "mine:report": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/mine-report.mjs",
     "sheet:islands": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/island-sheet.mjs"
