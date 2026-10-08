@@ -28,7 +28,7 @@ import { makeTelegraph } from "@/lib/marketplace/grove-world.js";
 import { CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { DECORATIONS } from "@/lib/marketplace/decorations.js";
 import {
-    HERO_UNITS, PET_UNITS, SKY_TILE_COUNT, GROUND_MIN_VH,
+    HERO_UNITS, PET_UNITS, SKY_TILE_COUNT,
     viewFor, petFollow, cameraX, cameraY, screenX,
 } from "@/lib/marketplace/grove-view.js";
 
@@ -291,7 +291,7 @@ const VIEWPORTS = [
 ];
 
 console.log("\n  the scene, laid out:");
-console.log("    viewport        unit  across  hero px   hero x   pet x  horizon  tiles");
+console.log("    viewport        unit  across  hero px  vs grass  upscale  across");
 for (const [vw, vh, label] of VIEWPORTS) {
     // The deepest zone: three tiers of ledges, the top one 78 units up, seven screens wide.
     const v = viewFor(vw, vh, 78);
@@ -308,12 +308,20 @@ for (const [vw, vh, label] of VIEWPORTS) {
     if (!onScreen(px, PET_UNITS)) fail.push(`${label} ${vw}x${vh}: the PET renders at x=${px.toFixed(0)}, off the frame`);
     // The strip wraps on two tiles, so it must cover the frame plus a full two-tile period.
     if (tilesNeeded > SKY_TILE_COUNT) fail.push(`${label} ${vw}x${vh}: needs ${tilesNeeded} backdrop tiles, only ${SKY_TILE_COUNT} are rendered — the strip runs out and the zone shows bare scene behind it`);
-    // The whole point of the horizon floor: the action must not be a strip along the bottom.
-    if (v.groundPx < GROUND_MIN_VH * vh - 1) fail.push(`${label} ${vw}x${vh}: horizon at ${(v.groundPx / vh * 100).toFixed(0)}% of the frame, below the ${(GROUND_MIN_VH * 100).toFixed(0)}% floor`);
+    // ⚠️ THE ANT TEST. Luke: "What am I an ant in a forest of grass". The hero has to stand TALLER
+    // than the painted foreground band, or he is wading through grass drawn for something beetle-sized and
+    // no sprite size rescues him. This is the single number that decides whether he reads as a person.
+    if (v.heroOverGround < 1.15) fail.push(`${label} ${vw}x${vh}: the hero is ${v.heroPx.toFixed(0)}px against a ${v.groundPx.toFixed(0)}px band of painted ground — he is ${v.heroOverGround < 1 ? "SHORTER THAN THE GRASS" : "barely over it"}`);
+    // ⚠️ AND THE BACKDROP MUST NOT BE STRETCHED TO ACHIEVE IT. Scaling the plate up is what made the
+    // grass tall in the first place, and it also turns a 1536px painting to mush beside crisp sprites.
+    // The stretch is now a function of viewport HEIGHT alone (skyBoxH = 1.12 x vh against a 1024px source),
+    // so a screen taller than about 1550px will pass 1.7 no matter what the layout does. That is the art
+    // resolution talking, not a bug — gpt-image-1 caps landscape plates at 1536x1024.
+    if (v.plateUpscale > 1.7) fail.push(`${label} ${vw}x${vh}: the backdrop is stretched ${v.plateUpscale.toFixed(2)}x — it will look soft next to the sprites`);
     // A hero nobody can see is the bug this whole file is about.
     if (v.heroPx < 60) fail.push(`${label} ${vw}x${vh}: the hero is ${v.heroPx.toFixed(0)}px tall`);
 
-    console.log(`    ${label.padEnd(16)}${v.unit.toFixed(1).padStart(4)}${v.visibleUnits.toFixed(0).padStart(8)}${v.heroPx.toFixed(0).padStart(9)}${hx.toFixed(0).padStart(9)}${px.toFixed(0).padStart(8)}${(v.groundPx / vh * 100).toFixed(0).padStart(8)}%${String(tilesNeeded).padStart(7)}`);
+    console.log(`    ${label.padEnd(16)}${v.unit.toFixed(1).padStart(4)}${v.visibleUnits.toFixed(0).padStart(8)}${v.heroPx.toFixed(0).padStart(9)}${v.heroOverGround.toFixed(2).padStart(10)}x${v.plateUpscale.toFixed(2).padStart(9)}x${v.visibleUnits.toFixed(0).padStart(8)}`);
 }
 
 // ⚠️ AND THE VERTICAL CAMERA MUST REACH THE TOP LEDGE. The clamp this replaced guaranteed every ledge

@@ -41,22 +41,41 @@ export const GROUND_OF_PLATE = 0.13;
 export const SPAN_NARROW = 44;
 export const SPAN_MID = 56;
 export const SPAN_WIDE = 68;
-export const HERO_MIN_VH = 0.13;
-export const HERO_MAX_VH = 0.20;
+export const HERO_MIN_VH = 0.19;
+export const HERO_MAX_VH = 0.26;
 
 // ⚠️ 0.13 RATHER THAN 0.09 BECAUSE OF WHAT A PORTRAIT PHONE LOOKS LIKE. At 0.09 the hero was a perfectly
 // reasonable 76px and the frame was still 90% empty canopy, with the whole zone in a strip along the bottom.
 // Being small in PIXELS and being small in the COMPOSITION are different problems and only the second one
 // reads as tiny. It binds on portrait only; every landscape screen is held by the ceiling or the span.
 
-// ── THE HORIZON ─────────────────────────────────────────────────────────────────────────────────────────────
-// The backdrop may be scaled up past cover until its painted ground line is at least this far up the frame,
-// which crops dead canopy off the top rather than displaying it. Moves the composition WITHOUT touching the
-// world scale, so the hero does not have to grow to compensate. Costs sharpness, hence a floor not a factor.
-export const GROUND_MIN_VH = 0.24;
+// ── ⚠️ THE BACKDROP IS NEVER SCALED UP TO LIFT THE HORIZON. THAT IS WHAT MADE HIM AN ANT. ───────────
+// Luke: "Look at the background, it looks like honey I shrunk the kids ... What am I an ant in a forest of
+// grass."
+//
+// There used to be a GROUND_MIN_VH here that scaled the painting up until its ground line sat high in the
+// frame, on the theory that the empty canopy above the action was what read as "tiny". It is not, and the
+// cure was worse than the complaint: scaling a backdrop up scales THE WHOLE FOREST up. At a 1.9x plate the
+// painted grass band was 34% of the screen and the hero was 19% of it — the blades of grass were
+// literally taller than the knight. No sprite size can survive that. He was not small, the world was huge.
+//
+// ⚠️ SO THE RULE IS THE RATIO, NOT THE SPRITE. A character reads as person-sized when he TOWERS OVER THE
+// FOREGROUND FOLIAGE, which is what MapleStory and every side-scroller like it actually do: ankle-high grass,
+// knee-high shrubs, a character who is the tallest thing standing on the floor. The hero must therefore be
+// taller than the painted ground band, and scripts/check-grove.mjs asserts exactly that now.
+//
+// The plate is rendered at COVER plus a little headroom for the vertical camera and nothing more. That keeps
+// the grass band at its painted 13%, under a hero at 19-26%, and it has the second effect of removing the
+// upscale entirely — at cover the 1536px source renders at or below native on every screen but an
+// ultrawide, so the backdrop is sharp instead of the mush a 2x upscale was producing next to crisp sprites.
+export const SKY_HEADROOM = 1.12;
 
 // How far the backdrop can be panned into when the camera climbs, as a share of that climb.
-export const SKY_PY = 0.22;
+// ⚠️ AND THE VERTICAL PARALLAX IS SMALL ON PURPOSE. It was 0.22, and the plate had to grow by the whole
+// of a zone's depth times that to have somewhere to pan into — which is the other thing that was quietly
+// inflating the painting. Distant scenery barely drops when you climb anyway, so 0.08 is both more correct
+// and cheap enough to fit inside SKY_HEADROOM at every zone depth.
+export const SKY_PY = 0.08;
 export const SKY_PX = 0.38;
 export const SKY_TILE_COUNT = 5;
 
@@ -82,14 +101,15 @@ export function viewFor(vw, vh, topY = 0) {
         (HERO_MAX_VH * vh) / HERO_UNITS,
     );
 
-    // The strip has to be at least: tall enough to pan into, wide-screen cover, and high enough to put the
-    // horizon where GROUND_MIN_VH wants it. One box, so the ground line and the tiles can never be measured
-    // against two different numbers.
-    const skyBoxH = Math.max(
-        vh + (topY + HERO_UNITS) * unit * SKY_PY * 1.1,
-        vw * (PLATE_H / PLATE_W),
-        (GROUND_MIN_VH * vh) / GROUND_OF_PLATE,
-    );
+    // ⚠️ COVER, PLUS HEADROOM, AND NOTHING ELSE. Every extra pixel of height here scales the whole
+    // painting up, which makes the grass taller than the hero — see SKY_HEADROOM above. The headroom is a
+    // flat share of the viewport rather than a function of the zone's depth, so a deep zone cannot quietly
+    // inflate the forest; the vertical parallax is clamped to fit it instead.
+    // ⚠️ THE TILE DOES NOT HAVE TO BE AS WIDE AS THE SCREEN. It is a TILED strip, so width is covered
+    // by laying down more tiles; only the HEIGHT has to be covered by one. Carrying a vw-based term here
+    // forced a 3440px screen to render the plate 2293px tall — a 2.24x stretch of a 1536px painting, for
+    // no reason at all. Height alone now, which means the stretch depends only on how tall the viewport is.
+    const skyBoxH = vh * SKY_HEADROOM;
 
     const groundPx = GROUND_OF_PLATE * skyBoxH;
     return {
@@ -101,6 +121,13 @@ export function viewFor(vw, vh, topY = 0) {
         skyBoxH,
         tileW: skyBoxH * PLATE_AR,
         heroPx: HERO_UNITS * unit,
+        // ⚠️ THE NUMBER THAT DECIDES WHETHER HE LOOKS LIKE A PERSON OR AN INSECT. Above 1 the hero
+        // stands taller than the painted foreground; below it he is wading through grass drawn for something
+        // the size of a beetle. Asserted in check-grove.mjs.
+        heroOverGround: (HERO_UNITS * unit) / groundPx,
+        // How far the 1536px source is being stretched. Over about 1.3 and the backdrop goes soft next to
+        // the sprites, which is what scaling the plate up to lift the horizon used to cost.
+        plateUpscale: (skyBoxH * PLATE_AR) / PLATE_W,
     };
 }
 
