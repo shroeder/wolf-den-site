@@ -19,6 +19,38 @@ const post = (body) => fetch("/api/marketplace/grove", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 }).then((r) => r.json()).catch(() => ({ ok: false }));
 
+// ── THE TRAIL ────────────────────────────────────────────────────────────────────────────────────────────────
+// Twelve nodes down a winding path. x is a PERCENTAGE so the route holds its shape on a phone and on a
+// desktop; y is pixels, because the gap between two stops should not stretch with the window.
+//
+// The sine is what stops it looking like a column of buttons: it is one continuous route that leans left and
+// right, so the eye reads a journey rather than a list.
+const TRAIL_GAP = 104;
+const TRAIL_TOP = 54;
+// ⚠️ THE AMPLITUDE IS BOUNDED BY THE LABEL, NOT THE DISC. At 27 the route looked right in the
+// abstract and ran a 76px disc plus a 116px name tag straight off both edges of a 390px phone. 16 keeps
+// the whole pin - marker AND label - inside the narrowest screen the shop actually sees.
+const trailX = (i) => 50 + Math.sin(i * 0.82 + 0.4) * 16;
+
+// Dots between each pair of nodes. Lit as far as you have unlocked, so the path ahead reads as unwalked.
+function trailDots(zones) {
+    const out = [];
+    for (let i = 0; i < zones.length - 1; i += 1) {
+        const x0 = trailX(i), x1 = trailX(i + 1);
+        const y0 = TRAIL_TOP + i * TRAIL_GAP, y1 = y0 + TRAIL_GAP;
+        for (let k = 1; k <= 4; k += 1) {
+            const t = k / 5;
+            out.push({
+                key: `${i}-${k}`,
+                x: x0 + (x1 - x0) * t,
+                y: y0 + (y1 - y0) * t,
+                lit: zones[i + 1]?.unlocked,
+            });
+        }
+    }
+    return out;
+}
+
 const partName = (id) => GROVE_PARTS[id]?.name || id;
 
 export default function GroveClient({ initial }) {
@@ -180,24 +212,52 @@ export default function GroveClient({ initial }) {
 
             {note ? <p className="gv-note">{note}</p> : null}
 
-            {/* ── THE MAP ──────────────────────────────────────────────────────────────────────── */}
+            {/* ── THE MAP ──────────────────────────────────────────────────────────────────────────
+                Luke: "I was thinking of a map with nodes."
+
+                It was a grid of big 3:2 cards, which on a phone is one tall column of pictures —
+                a LIST of places, not a map of them. A map has to show the ROUTE: that these twelve
+                are one path, that you are somewhere along it, and that the far end is a long way off.
+
+                ⚠️ THE TRAIL IS DOTS, NOT A LINE OR AN SVG. The nodes sit at percentage x so they stay
+                on the path at any width, and a stroke drawn between two percentage points needs the
+                container measured in JS (or an SVG scaled non-uniformly, which distorts the curve).
+                Interpolated dots need neither: each one is placed at its own percentage and simply
+                cannot distort. It also happens to look like a trail on a treasure map, which is what
+                this is. */}
             {view === "map" ? (
-                <div className="gv-map">
-                    {st.zones.map((z) => (
-                        <button key={z.id} type="button"
-                            className={`gv-node${z.unlocked ? "" : " is-locked"}${z.kills >= z.toUnlock ? " is-clear" : ""}`}
-                            disabled={!z.unlocked} onClick={() => enter(z)}
-                            style={{ backgroundImage: z.unlocked ? `url(${z.bg})` : undefined }}>
-                            <span className="gv-node-n">{z.n}</span>
-                            <span className="gv-node-name">{z.name}</span>
-                            {z.unlocked ? (
-                                <span className="gv-node-bar">
-                                    <i style={{ width: `${Math.min(100, (z.kills / z.toUnlock) * 100)}%` }} />
-                                    <em>{Math.min(z.kills, z.toUnlock)}/{z.toUnlock}</em>
-                                </span>
-                            ) : <span className="gv-node-lock">Locked</span>}
-                        </button>
+                <div className="gv-trail" style={{ height: `${TRAIL_TOP * 2 + (st.zones.length - 1) * TRAIL_GAP}px` }}>
+                    {trailDots(st.zones).map((d) => (
+                        <i key={d.key} className={`gv-dot${d.lit ? " is-lit" : ""}`}
+                            style={{ left: `${d.x}%`, top: `${d.y}px` }} />
                     ))}
+                    {st.zones.map((z, i) => {
+                        const x = trailX(i);
+                        const y = TRAIL_TOP + i * TRAIL_GAP;
+                        const done = z.kills >= z.toUnlock;
+                        const right = x < 50;   // label goes on whichever side has room
+                        return (
+                            <button key={z.id} type="button"
+                                className={`gv-pin${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}${right ? " to-right" : " to-left"}`}
+                                disabled={!z.unlocked} onClick={() => enter(z)}
+                                style={{ left: `${x}%`, top: `${y}px` }}
+                                aria-label={`${z.name}${z.unlocked ? "" : " (locked)"}`}>
+                                <span className="gv-pin-disc"
+                                    style={{ backgroundImage: z.unlocked ? `url(${z.bg})` : undefined }}>
+                                    <b>{z.n}</b>
+                                </span>
+                                <span className="gv-pin-tag">
+                                    <em>{z.name}</em>
+                                    {z.unlocked ? (
+                                        <span className="gv-pin-meter">
+                                            <i style={{ width: `${Math.min(100, (z.kills / z.toUnlock) * 100)}%` }} />
+                                            <u>{Math.min(z.kills, z.toUnlock)}/{z.toUnlock}</u>
+                                        </span>
+                                    ) : <span className="gv-pin-lock">Locked</span>}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
             ) : null}
 

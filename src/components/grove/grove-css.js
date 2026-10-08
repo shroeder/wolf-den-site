@@ -46,6 +46,61 @@ export const GROVE_CSS = `
 .gv-node-bar em { position: absolute; right: 0; top: 7px; font-style: normal; font-size: 0.66rem; color: #cfc6b6; }
 .gv-node-lock { font-size: 0.72rem; letter-spacing: .1em; text-transform: uppercase; }
 
+/* ── THE MAP: A TRAIL OF NODES ──────────────────────────────────────────────────────────────
+   Luke: "I was thinking of a map with nodes." It was a grid of 3:2 cards, which on a phone is a
+   single column of big pictures - a list of places rather than a route between them. */
+/* ⚠️ CAPPED, NOT FULL WIDTH. The route is positioned in PERCENTAGES, so on a 1700px card a
+   sensible swing still left the whole path stranded in the middle third with empty acres either side.
+   A map is a panel, not a backdrop: constrain it and the same percentages fill it properly at every
+   size, phone included. */
+.gv-trail { position: relative; width: 100%; max-width: 540px; margin: 0 auto; }
+
+/* The path. Dots rather than a stroke, because a line between two PERCENTAGE points needs the
+   container measured in JS or an SVG scaled non-uniformly; a dot placed at its own percentage
+   cannot distort at any width. */
+.gv-dot { position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%;
+    background: rgba(255,255,255,0.13); }
+.gv-dot.is-lit { background: rgba(159,224,138,0.5); box-shadow: 0 0 8px rgba(159,224,138,0.35); }
+
+/* A stop on the route. The disc carries the zone art so the map still shows you where you are
+   going, just at the size a map marker should be rather than a full-bleed card. */
+.gv-pin { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center;
+    gap: 12px; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; color: inherit; }
+.gv-pin.to-left { flex-direction: row-reverse; }
+.gv-pin-disc { position: relative; flex: 0 0 auto; width: 76px; height: 76px; border-radius: 50%;
+    background-size: cover; background-position: center; background-color: rgba(255,255,255,0.05);
+    border: 2px solid rgba(159,224,138,0.55); box-shadow: 0 6px 18px rgba(0,0,0,0.6); }
+.gv-pin-disc b { position: absolute; left: -6px; top: -6px; width: 26px; height: 26px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 0.74rem; font-weight: 800;
+    background: #0d1109; color: #9fe08a; border: 1px solid rgba(159,224,138,0.6); }
+.gv-pin.is-clear .gv-pin-disc { border-color: #d9b44a; box-shadow: 0 0 16px rgba(217,180,74,0.4), 0 6px 18px rgba(0,0,0,0.6); }
+.gv-pin.is-clear .gv-pin-disc b { color: #e8c764; border-color: rgba(217,180,74,0.7); }
+
+/* ⚠️ A LOCKED STOP KEEPS ITS SHAPE AND LOSES ITS PICTURE. Hiding it entirely would break the
+   route; showing it in full would spoil twelve backdrops at a glance. */
+.gv-pin.is-locked { cursor: not-allowed; }
+/* ⚠️ NO !important HERE. The first version set background-image: none !important and then a
+   repeating-linear-gradient on the background shorthand one line later - and the !important beat the
+   shorthand’s own background-image, so every locked stop rendered as an empty ring with a hole in it.
+   The inline style only ever sets background-image on UNLOCKED pins, so there is nothing to override. */
+.gv-pin.is-locked .gv-pin-disc { border-color: rgba(255,255,255,0.16);
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 7px, rgba(255,255,255,0.075) 7px 14px); }
+.gv-pin.is-locked .gv-pin-disc b { color: #6f6a60; border-color: rgba(255,255,255,0.14); }
+
+.gv-pin-tag { text-align: left; max-width: 116px; }
+.gv-pin.to-left .gv-pin-tag { text-align: right; }
+.gv-pin-tag em { display: block; font-style: normal; font-weight: 700; font-size: 0.86rem; line-height: 1.2;
+    color: #efe7d8; text-shadow: 0 1px 4px rgba(0,0,0,0.9); }
+.gv-pin.is-locked .gv-pin-tag em { color: #76716a; }
+.gv-pin-meter { display: block; margin-top: 5px; height: 4px; border-radius: 999px;
+    background: rgba(255,255,255,0.16); position: relative; }
+.gv-pin-meter i { display: block; height: 100%; border-radius: 999px; background: #9fe08a; }
+.gv-pin-meter u { position: absolute; left: 0; top: 6px; text-decoration: none; font-size: 0.62rem;
+    letter-spacing: .06em; color: #9b9487; }
+.gv-pin.to-left .gv-pin-meter u { left: auto; right: 0; }
+.gv-pin-lock { display: block; margin-top: 3px; font-size: 0.64rem; letter-spacing: .12em;
+    text-transform: uppercase; color: #6f6a60; }
+
 /* ── THE SCENE ───────────────────────────────────────────────────────────────────────────────── */
 .gv-scene { position: relative; width: 100%; aspect-ratio: 16/10; border-radius: 14px; overflow: hidden;
     background: #0a0d0a; border: 1px solid rgba(255,255,255,0.12); touch-action: manipulation;
