@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 
 // ── THE GOURDFATHER'S STALL ──────────────────────────────────────────────────────────────────────────────
 // What he sells for candy, and nothing else.
@@ -74,8 +74,26 @@ export default function GourdfatherStall({ art, candyArt = null, lines, onClose 
 
     const speak = (bank) => setSay({ bank, n: Math.floor(Math.random() * 1000) });
 
+    // ── ⚠️ A TAP CANNOT SPEND CANDY ANY MORE; IT CAN ONLY ASK ───────────────────────────────
+    // ValkyrieSylve: "I clicked on the gourdfather and it didnt load properly so I touched the screen then
+    // instantly it loaded and spend candy on a chest I DID NOT WANT ... Can we also just get an are you sure."
+    //
+    // The tap that spent her candy was aimed at a panel that had not painted yet. It landed the instant the
+    // row appeared underneath her finger, and one tap was the whole purchase - irreversible, against a
+    // currency with a daily cap, so the loss is a day of play rather than a number.
+    //
+    // ⚠️ THE CONFIRM IS WHAT FIXES IT, not a check for whether the panel is ready. Nothing can tell a
+    // deliberate tap from an early one; what matters is that the FIRST tap can never be the last word.
+    const [confirming, setConfirming] = useState(null);
+
+    const ask = useCallback((w) => {
+        if (busy || w.owned || candyRef.current < w.candy) return;
+        setConfirming(w);
+    }, [busy]);
+
     const buy = useCallback(async (id) => {
         if (busy) return;
+        setConfirming(null);
         setBusy(id);
         const d = await post({ action: "gourd_buy", id });
         setBusy(null);
@@ -91,9 +109,12 @@ export default function GourdfatherStall({ art, candyArt = null, lines, onClose 
         setTimeout(() => setFlash(null), 3500);
     }, [busy, post, load]);
 
+    // Read through a ref so `ask` does not have to be rebuilt every time the candy total ticks.
+    const candyRef = useRef(0);
     const bank = lines?.[say.bank] || lines?.greet || [];
     const line = bank.length ? bank[say.n % bank.length] : "";
     const candy = stall?.candy ?? 0;
+    candyRef.current = candy;
     const stock = stall?.stock || [];
     const looking = inspect ? stock.find((w) => w.id === inspect) || null : null;
 
@@ -159,7 +180,7 @@ export default function GourdfatherStall({ art, candyArt = null, lines, onClose 
                                                 type="button"
                                                 className="gf-buy"
                                                 disabled={w.owned || !afford || busy === w.id}
-                                                onClick={(e) => { e.stopPropagation(); buy(w.id); }}
+                                                onClick={(e) => { e.stopPropagation(); ask(w); }}
                                             >
                                                 {w.owned ? "Yours" : busy === w.id ? "…" : (
                                                     <><Candy src={candyArt} size={13} /><b>{w.candy.toLocaleString()}</b></>
@@ -213,7 +234,7 @@ export default function GourdfatherStall({ art, candyArt = null, lines, onClose 
                             type="button"
                             className="gf-look-buy"
                             disabled={looking.owned || candy < looking.candy || busy === looking.id}
-                            onClick={() => buy(looking.id)}
+                            onClick={() => ask(looking)}
                         >
                             {looking.owned ? "Already yours"
                                 : busy === looking.id ? "…"
@@ -221,6 +242,21 @@ export default function GourdfatherStall({ art, candyArt = null, lines, onClose 
                                         ? <>Need <Candy src={candyArt} size={14} />{(looking.candy - candy).toLocaleString()} more</>
                                         : <>Buy for <Candy src={candyArt} size={14} />{looking.candy.toLocaleString()}</>}
                         </button>
+                    </div>
+                </div>
+            ) : null}
+            {confirming ? (
+                <div className="gf-sure" onClick={() => setConfirming(null)} role="presentation">
+                    <div className="gf-sure-card" onClick={(e) => e.stopPropagation()}>
+                        <p className="gf-sure-q">Spend <Candy src={candyArt} size={15} />{confirming.candy.toLocaleString()} on</p>
+                        <b className="gf-sure-name">{confirming.name}</b>
+                        <p className="gf-sure-left">
+                            You{"\u2019"}ll have <Candy src={candyArt} size={13} />{Math.max(0, candy - confirming.candy).toLocaleString()} left.
+                        </p>
+                        <div className="gf-sure-row">
+                            <button type="button" className="gf-sure-no" onClick={() => setConfirming(null)}>Not yet</button>
+                            <button type="button" className="gf-sure-yes" onClick={() => buy(confirming.id)}>Buy it</button>
+                        </div>
                     </div>
                 </div>
             ) : null}
@@ -318,6 +354,29 @@ const CSS = `
 .gf-look-stats dd { margin: 0; font-size: 0.92rem; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
 .gf-look-flavor { margin: 0 0 8px; font-size: 0.84rem; font-style: italic; color: #d9cbb4; line-height: 1.42; }
 .gf-look-note { margin: 0 0 12px; font-size: 0.79rem; color: #9b9080; line-height: 1.45; }
+/* ⚠️ THE ARE-YOU-SURE. ValkyrieSylve lost candy to a tap that landed on a row the instant it
+   painted. Deliberately a SHEET over the stall rather than an inline toggle on the button: a tap in
+   flight cannot land on a control that is somewhere else entirely, and the buttons are far enough
+   apart that a second stray tap cannot find Buy either.
+
+   It also states what you will have LEFT, which is the number that actually decides it when the
+   currency is capped per day. */
+.gf-sure { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center;
+    background: rgba(8,5,2,0.78); padding: 20px; }
+.gf-sure-card { max-width: 290px; width: 100%; text-align: center; padding: 22px 22px 18px;
+    border-radius: 18px; background: linear-gradient(rgba(42,24,8,0.99), rgba(22,12,4,0.99));
+    border: 2px solid rgba(240,160,50,0.6); box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+.gf-sure-q { margin: 0; font-size: 0.86rem; color: #e8cfa6; display: flex; align-items: center;
+    justify-content: center; gap: 4px; }
+.gf-sure-name { display: block; margin: 7px 0 10px; font-size: 1.15rem; line-height: 1.2; color: #ffd98a; }
+.gf-sure-left { margin: 0 0 16px; font-size: 0.78rem; color: #b6a184; display: flex; align-items: center;
+    justify-content: center; gap: 4px; }
+.gf-sure-row { display: flex; gap: 10px; }
+.gf-sure-row button { flex: 1; padding: 11px 10px; border-radius: 999px; cursor: pointer; font: inherit;
+    font-weight: 700; font-size: 0.88rem; border: 1px solid transparent; }
+.gf-sure-no { background: rgba(255,255,255,0.08); color: #cfc0a8; border-color: rgba(255,255,255,0.16); }
+.gf-sure-yes { background: linear-gradient(#f5b344, #d98a1e); color: #2a1703; }
+
 .gf-look-buy { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%;
     padding: 12px; border-radius: 13px; font-size: 0.94rem; font-weight: 900; cursor: pointer;
     background: linear-gradient(180deg, #ffcf6a, #e89a1c); border: none; color: #2a1403;
