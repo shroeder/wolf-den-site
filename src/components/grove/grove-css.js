@@ -53,7 +53,26 @@ export const GROVE_CSS = `
    sensible swing still left the whole path stranded in the middle third with empty acres either side.
    A map is a panel, not a backdrop: constrain it and the same percentages fill it properly at every
    size, phone included. */
-.gv-trail { position: relative; width: 100%; max-width: 540px; margin: 0 auto; }
+.gv-trail { position: relative; width: 100%; max-width: 540px; margin: 0 auto;
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(201,162,39,0.22); }
+
+/* ⚠️ THE MAP HAS TO BRING ITS OWN GROUND. Luke: "The fuck is that backdrop. Its supposed to look
+   like a map with points of interest." The trail was drawn onto whatever the page had behind it, which
+   is the member’s EQUIPPED COSMETIC BACKDROP - a red curtain, on a forest map. An opaque surface of its
+   own is the fix, and it has to be opaque rather than tinted or every member gets a different map.
+
+   Darkened with a filter rather than hidden under a flat scrim: brightness keeps the ink linework and
+   the parchment grain readable, where an opaque black overlay would flatten the drawing to one tone.
+   See no-overlay-for-lighting. */
+.gv-trail::before { content: ""; position: absolute; inset: 0; background: #0b0d0a;
+    background-image: url("/images/grove/region-map.webp?v=1");
+    background-size: cover; background-position: center top;
+    filter: brightness(0.52) saturate(0.85) contrast(1.05); }
+/* A vignette so the route and the labels sit clearly on top of the terrain rather than fighting it. */
+.gv-trail::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(130% 80% at 50% 40%, rgba(6,8,6,0) 36%, rgba(6,8,6,0.72) 100%); }
+.gv-trail > * { position: absolute; z-index: 1; }
 
 /* The path. Dots rather than a stroke, because a line between two PERCENTAGE points needs the
    container measured in JS or an SVG scaled non-uniformly; a dot placed at its own percentage
@@ -83,15 +102,20 @@ export const GROVE_CSS = `
    repeating-linear-gradient on the background shorthand one line later - and the !important beat the
    shorthand’s own background-image, so every locked stop rendered as an empty ring with a hole in it.
    The inline style only ever sets background-image on UNLOCKED pins, so there is nothing to override. */
-.gv-pin.is-locked .gv-pin-disc { border-color: rgba(255,255,255,0.16);
-    background: repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0 7px, rgba(255,255,255,0.075) 7px 14px); }
+/* Sunk into the map rather than frosted over it - a pale hatch on parchment read as glass sitting on
+   top, which made the places you cannot reach the brightest things on the page. */
+.gv-pin.is-locked .gv-pin-disc { border-color: rgba(255,255,255,0.18);
+    background: repeating-linear-gradient(45deg, rgba(0,0,0,0.58) 0 7px, rgba(0,0,0,0.44) 7px 14px);
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.7); }
 .gv-pin.is-locked .gv-pin-disc b { color: #6f6a60; border-color: rgba(255,255,255,0.14); }
 
 .gv-pin-tag { text-align: left; max-width: 116px; }
 .gv-pin.to-left .gv-pin-tag { text-align: right; }
+/* Terrain behind type needs more than a soft shadow - a second tight shadow gives the letterforms an
+   edge against the ink linework without a plate behind them. */
 .gv-pin-tag em { display: block; font-style: normal; font-weight: 700; font-size: 0.86rem; line-height: 1.2;
-    color: #efe7d8; text-shadow: 0 1px 4px rgba(0,0,0,0.9); }
-.gv-pin.is-locked .gv-pin-tag em { color: #76716a; }
+    color: #f4ecdc; text-shadow: 0 1px 3px rgba(0,0,0,1), 0 0 10px rgba(0,0,0,0.95); }
+.gv-pin.is-locked .gv-pin-tag em { color: #a49c8d; }
 .gv-pin-meter { display: block; margin-top: 5px; height: 4px; border-radius: 999px;
     background: rgba(255,255,255,0.16); position: relative; }
 .gv-pin-meter i { display: block; height: 100%; border-radius: 999px; background: #9fe08a; }
@@ -99,7 +123,7 @@ export const GROVE_CSS = `
     letter-spacing: .06em; color: #9b9487; }
 .gv-pin.to-left .gv-pin-meter u { left: auto; right: 0; }
 .gv-pin-lock { display: block; margin-top: 3px; font-size: 0.64rem; letter-spacing: .12em;
-    text-transform: uppercase; color: #6f6a60; }
+    text-transform: uppercase; color: #8d8578; text-shadow: 0 1px 3px rgba(0,0,0,1); }
 
 /* ── THE SCENE ───────────────────────────────────────────────────────────────────────────────── */
 .gv-scene { position: relative; width: 100%; aspect-ratio: 16/10; border-radius: 14px; overflow: hidden;

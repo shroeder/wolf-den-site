@@ -88,7 +88,25 @@ ART["boss-everburning"] = [`${BOSS} THE EVERBURNING: a towering wraith of charre
 ART["boss-stakelord"] = [`${BOSS} GORRAK THE STAKELORD: a massive brutish goblin warchief in heavy scavenged plate lashed with rope, a single huge sharpened log hefted over one shoulder as a weapon, tusked underbite, tattered banner on his back. Mossy green skin, rusted iron, rope and firelight.`, "foe"];
 ART["boss-heartwood_elder"] = [`${BOSS} THE HEARTWOOD ELDER: an immense ancient treefolk, trunk-like body seamed with rivers of glowing gold sap, a vast crown of antler branches, moss and small ferns growing on its shoulders, deep-set eyes of warm light. Grave and immensely old rather than monstrous. Rich bark brown, glowing gold, deep forest green.`, "foe"];
 
-const SIZES = { plate: "1536x1024", foe: "1024x1024" };
+// ── THE REGION MAP ─────────────────────────────────────────────────────────────────────────────
+// Luke, on the map screen: "The fuck is that backdrop. Its supposed to look like a map with points
+// of interest." The trail was drawn straight onto whatever the page had behind it, which is the
+// member’s equipped cosmetic backdrop - a red curtain. A map needs its own ground.
+//
+// ⚠️ TERRAIN ONLY. NO PATH, NO MARKERS, NO LABELS. The route and the twelve points of interest are
+// drawn in the DOM on top of this, at coordinates the code controls; a path baked into the art would
+// never line up with them, and any lettering would be AI gibberish at a glance.
+// ── THE REGION MAP ────────────────────────────────────────────────────────────
+// Luke, on the map screen: "The fuck is that backdrop. Its supposed to look like a map with points
+// of interest." The trail was being drawn straight onto whatever the page had behind it, which is the
+// member's equipped cosmetic backdrop — a red curtain. A map needs its own ground.
+//
+// ⚠️ TERRAIN ONLY. NO PATH, NO MARKERS, NO LABELS. The route and the twelve points of interest are
+// drawn in the DOM on top of this at coordinates the code controls; a path baked into the art could
+// never line up with them, and any lettering would be gibberish on inspection.
+ART["region-map"] = [`A hand-drawn FANTASY CARTOGRAPHY MAP of a forest region, vertical portrait orientation, viewed from directly overhead. Aged parchment in warm browns and muted greens, soft ink linework, subtle paper grain, gentle darkening toward the edges. The terrain changes down the length of the map: open birch woodland at one end, a boggy mossy hollow, deep fern thickets, a stand of enormous ancient oaks, a thorn bramble wall, a harvested stubble field, a row of grassy burial mounds, a warren of burrow mouths, a bright clearing, a burnt black forest of charred stumps, a crude stake palisade, and one colossal tree at the far end. Drawn like an old illustrated adventure map. COMPLETELY EMPTY OF ANY PATH, TRAIL, ROAD, DOTTED LINE, ROUTE, MARKER, PIN, FLAG, X, COMPASS ROSE, BORDER FRAME OR LETTERING OF ANY KIND. No text, no words, no letters, no numbers, no labels, no legend, no title, no watermark. Terrain and trees only.`, "map"];
+
+const SIZES = { plate: "1536x1024", foe: "1024x1024", map: "1024x1536" };
 
 const keys = Object.keys(ART).filter((k) => !ONLY.length || ONLY.includes(k));
 const plates = keys.filter((k) => ART[k][1] === "plate").length;
@@ -114,7 +132,7 @@ for (const key of keys) {
     // file writes, the catalogue path 404s, and the player gets a broken-image glyph where the boss should
     // be. A prefix that is already explicit in the key must not get a second one bolted on.
     const name = key.startsWith("bg-") ? key.replace(/^bg-/, "zone-")
-        : key.startsWith("boss-") ? key
+        : (kind !== "foe" || key.startsWith("boss-")) ? key
         : `foe-${key}`;
     const file = path.join(OUT, `${name}.webp`);
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
