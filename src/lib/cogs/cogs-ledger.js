@@ -22,6 +22,7 @@ function mapRow(r) {
         entryId: r.entry_id || null,
         variationId: r.variation_id || null,
         source: r.source,
+        note: r.note || null,
     };
 }
 
@@ -50,13 +51,19 @@ function normalize(input) {
         // lets a ledger row be matched to a catalog item by ID instead of by name — and a naive name match
         // pairs "Pitch Black Sleeved Booster Pack" with a $40 booster BOX and invents a $32 discrepancy.
         variationId: input.variationId ? String(input.variationId).trim() : null,
+        // ── WHY THIS ARRIVAL HAS NO PAYMENT AGAINST IT ───────────────────────────────────────────────
+        // Written by the "Already handled" restock, where the money was booked somewhere else and the app
+        // deliberately creates no ledger entry. ⚠️ WITHOUT IT, THAT ROW IS INDISTINGUISHABLE FROM STOCK
+        // NOBODY PAID FOR — same cost, same quantity, no entry, no cash movement. The sentence is the only
+        // difference, so the app requires one before it will record that kind of restock.
+        note: input.note ? String(input.note).trim().slice(0, 500) : null,
     };
 }
 
-const COLS = `occurred_on, product, quantity, paid_each, paid_total, market_each, market_total, list_each_110, list_total_110, entry_id, source, variation_id`;
+const COLS = `occurred_on, product, quantity, paid_each, paid_total, market_each, market_total, list_each_110, list_total_110, entry_id, source, variation_id, note`;
 
 function params(e, source) {
-    return [e.occurredOn, e.product, e.quantity, e.paidEach, e.paidTotal, e.marketEach, e.marketTotal, e.listEach110, e.listTotal110, e.entryId, source, e.variationId];
+    return [e.occurredOn, e.product, e.quantity, e.paidEach, e.paidTotal, e.marketEach, e.marketTotal, e.listEach110, e.listTotal110, e.entryId, source, e.variationId, e.note];
 }
 
 // Insert an intake row. Rows synced from an Inventory entry carry an entry_id and upsert (dedupe);
@@ -78,7 +85,7 @@ export async function insertCogs(input) {
     }
     if (e.entryId) {
         const rows = await db.query(
-            `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
              -- ⚠️ MUST MATCH idx_cogs_entry_product EXACTLY: UNIQUE (entry_id, product) WHERE entry_id IS NOT
              -- NULL. This said ON CONFLICT (entry_id), which matches no index, so Postgres threw "there is no
              -- unique or exclusion constraint matching the ON CONFLICT specification" on EVERY insert. The app
@@ -91,14 +98,18 @@ export async function insertCogs(input) {
              DO UPDATE SET occurred_on=EXCLUDED.occurred_on, product=EXCLUDED.product, quantity=EXCLUDED.quantity,
                  paid_each=EXCLUDED.paid_each, paid_total=EXCLUDED.paid_total, market_each=EXCLUDED.market_each,
                  market_total=EXCLUDED.market_total, list_each_110=EXCLUDED.list_each_110, list_total_110=EXCLUDED.list_total_110,
-                 variation_id=COALESCE(EXCLUDED.variation_id, cogs_ledger.variation_id)
+                 variation_id=COALESCE(EXCLUDED.variation_id, cogs_ledger.variation_id),
+                 -- ⚠️ LISTED HERE TOO. This SET clause names its columns one by one, so a column added to
+                 -- COLS and forgotten here saves on the FIRST write of a restock and is wiped on every
+                 -- re-send of the same entry_id — the dedupe path, which is the ordinary one.
+                 note=COALESCE(EXCLUDED.note, cogs_ledger.note)
              RETURNING *`,
             params(e, "app"),
         );
         return mapRow(rows[0]);
     }
     const rows = await db.query(
-        `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+        `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
         params(e, "app"),
     );
     return mapRow(rows[0]);

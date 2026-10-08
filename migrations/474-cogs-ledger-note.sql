@@ -1,0 +1,15 @@
+-- ── A NOTE ON AN INTAKE ROW ──────────────────────────────────────────────────────────────────────────────
+-- Luke: "need yiu to make the restock feature in admin and employee app allow us to set payment type as
+-- 'Already Handled' with a note required".
+--
+-- The note is the whole point of that payment type. "Already handled" means the money was booked somewhere
+-- else — a distributor invoice paid last week, stock that arrived with a trade, a card charged before anybody
+-- opened the app — so the restock deliberately writes NO ledger entry and NO cash movement. What it must not
+-- do is lose the reason: a purchase with costs recorded and no payment anywhere against it looks exactly like
+-- stock that was never paid for, and the only thing standing between those two readings is this sentence.
+--
+-- ⚠️ IT LIVES ON cogs_ledger, NOT ON THE LEDGER ENTRY, precisely because there IS no ledger entry for an
+-- already-handled restock. The intake row is the only durable record of that arrival, so it has to carry its
+-- own explanation. It is also where the Intake screen already looks, which means the note shows up next to
+-- the items it is about with no new screen to go and find.
+ALTER TABLE cogs_ledger ADD COLUMN IF NOT EXISTS note TEXT;
