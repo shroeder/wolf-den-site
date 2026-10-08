@@ -827,6 +827,51 @@ export const ASCENSION_EFFECTS = {
         dark: { name: "Straight To The Flame", kind: "graft", key: "forge_spark", scale: 1,
             note: "It was on the other side. It knows what the light is for." },
     },
+    // ── ── THE FOUR THAT WERE NEVER AUTHORED ────────────────────────────────────────
+    // ValkyrieSylve: "The Brass Magpie's lightstone and darkstone abilities are the same except darkstones
+    // ability is much better."
+    //
+    // ⚠️ SHE WAS RIGHT, AND IT WAS FOUR PETS, NOT ONE. 140 of 144 pets had authored stones; these four
+    // fell through to FALLBACK_EFFECT, which is amplify x1 against amplify x1.5 - the same ability both
+    // sides, Dark strictly better, no decision at all. It is the exact shape the header of this file says
+    // was removed, surviving in the pets added after that pass: three casino-ladder pets and a gift.
+    //
+    // Each is now a real choice: Dark doubles what the animal already does, Light gives it a second trade
+    // taken from its own character. Light grafts sit at scale 1.0 against amplifies of 2.0, which is the
+    // rule this file sets - a graft is never worth less than the amplify it is offered against.
+
+    brass_magpie: {
+        // Fortune, and a bird that takes the piece nobody is guarding.
+        light: { name: "The One Nobody Watches", kind: "graft", key: "chest_luck", scale: 1,
+            note: "It has already decided which box, and it was not the shiny one." },
+        dark: { name: "Brass Is Still Metal", kind: "amplify", mult: 2,
+            note: "Nobody was watching that either." },
+    },
+
+    jade_tortoise: {
+        // Gold find, and the one thing in the room that has outlasted every system brought into it.
+        light: { name: "Outlasts The System", kind: "graft", key: "tenacity", scale: 1,
+            note: "It was here before your method and it will be here after." },
+        dark: { name: "Slow Is A Strategy", kind: "amplify", mult: 2,
+            note: "It has never once been in a hurry and has never once been short." },
+    },
+
+    onyx_hare: {
+        // Fortune, and a creature only ever seen leaving, already in front.
+        light: { name: "Gone Before The Bell", kind: "graft", key: "first_blood", scale: 1,
+            note: "Whatever started, it had finished its part of it." },
+        dark: { name: "Always Ahead", kind: "amplify", mult: 2,
+            note: "Not faster. Earlier." },
+    },
+
+    frost_caterpillar: {
+        // Grow speed, and something that eats the frost and leaves the leaf standing.
+        light: { name: "Leaves The Leaf", kind: "graft", key: "farm_yield", scale: 1,
+            note: "It only ever wanted the cold off the top." },
+        dark: { name: "Ahead Of The Thaw", kind: "amplify", mult: 2,
+            note: "The row is already up before the ground admits it is spring." },
+    },
+
 };
 
 /** The two stone effects for a pet, or null if it has none authored. */
