@@ -36,6 +36,7 @@ export function serializeShopOrderForAdmin(o) {
         refundAmountCents: o.refund_amount_cents ?? null,
         cancellationRequested: Boolean(o.cancellation_requested_at) && o.fulfillment_status !== "cancelled",
         cancellationRequestReason: o.cancellation_request_reason || null,
+        archivedAt: o.archived_at ? new Date(o.archived_at).toISOString() : null,
         items: parseItemsJson(o.items_json),
         shipping: {
             name: o.shipping_name,
@@ -282,9 +283,19 @@ export async function getCustomerOrderById(orderId, customerId) {
 }
 
 // Admin: recent orders for the order-management view. Defaults to paid orders (the actionable ones).
-export async function listShopOrders({ limit = 100, paymentStatus = "completed", fulfillmentStatus = null } = {}) {
+/**
+ * Orders for the admin and employee apps.
+ *
+ * ⚠️ ARCHIVED ARE EXCLUDED BY DEFAULT, which is the entire point of the feature: a list that only ever
+ * grows buries the three orders that need working today under every order the shop has ever taken. Pass
+ * archived: true to see the filed ones, or "all" when you genuinely want both.
+ */
+export async function listShopOrders({ limit = 100, paymentStatus = "completed", fulfillmentStatus = null, archived = false } = {}) {
     const params = [];
     const filters = [];
+    if (archived !== "all") {
+        filters.push(archived ? "archived_at IS NOT NULL" : "archived_at IS NULL");
+    }
     if (paymentStatus && paymentStatus !== "all") {
         params.push(paymentStatus);
         filters.push(`status = $${params.length}`);
@@ -298,6 +309,22 @@ export async function listShopOrders({ limit = 100, paymentStatus = "completed",
     return db.query(
         `SELECT * FROM shop_orders ${where} ORDER BY created_at DESC LIMIT $${params.length}`,
         params
+    );
+}
+
+/**
+ * File an order away, or bring it back.
+ *
+ * ⚠️ ALLOWED ON ANY ORDER, INCLUDING AN UNFULFILLED ONE. It is tempting to refuse that, but the shop
+ * has real reasons to clear a row the system still thinks is open — a duplicate, a test, an order settled
+ * at the counter. Hiding work is a risk the owner is allowed to take; losing it is not, which is why nothing
+ * is deleted and the Archived tab always shows exactly what was filed.
+ */
+export async function setShopOrderArchived(orderId, archived) {
+    return db.queryOne(
+        `UPDATE shop_orders SET archived_at = ${archived ? "NOW()" : "NULL"}, updated_at = NOW()
+          WHERE id = $1 RETURNING *`,
+        [orderId],
     );
 }
 

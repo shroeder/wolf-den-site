@@ -18,11 +18,16 @@ export async function GET(request) {
             const url = new URL(request.url);
             const fulfillmentStatus = url.searchParams.get("fulfillment") || null;
             const limit = Number(url.searchParams.get("limit")) || 200;
+            // ?archived=1 for the filed ones, ?archived=all for both. Anything else means the active list,
+            // which is what every screen asks for by default.
+            const archivedParam = url.searchParams.get("archived");
+            const archived = archivedParam === "all" ? "all" : archivedParam === "1" || archivedParam === "true";
 
             const orders = await listShopOrders({
                 limit,
                 paymentStatus: "completed",
                 fulfillmentStatus: fulfillmentStatus && fulfillmentStatus !== "all" ? fulfillmentStatus : null,
+                archived,
             });
 
             return NextResponse.json({ orders: orders.map(serializeShopOrderForAdmin) });

@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { getShopOrderById, setShopOrderFulfillment } from "@/lib/shop-orders";
+import { getShopOrderById, setShopOrderFulfillment, setShopOrderArchived } from "@/lib/shop-orders";
 import { sendOrderCancelledEmail, sendOrderStatusEmail } from "@/lib/shop-order-email.js";
 import { parseTrackingFromScan } from "@/lib/shipping/tracking-scan.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -31,6 +31,16 @@ export async function PATCH(request, { params }) {
             // structured 2D block. That logic lives in ONE place with its own checks beside it, rather than
             // being ported into Kotlin where it would drift from this copy the first time a carrier changed
             // a format. See tracking-scan.js.
+            // ── ARCHIVE / UNARCHIVE ─────────────────────────────────────────────────────────────
+            // Handled before everything below because it is the one change that touches no fulfilment
+            // state and must never email anybody. Filing a row is not news to the customer.
+            if (typeof body.archived === "boolean") {
+                const moved = await setShopOrderArchived(id, body.archived);
+                if (!moved) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+                logger.info("admin.shop.order.archived", { orderId: id, archived: body.archived });
+                return NextResponse.json({ order: moved, archived: Boolean(moved.archived_at) });
+            }
+
             const scanRaw = typeof body.scanRaw === "string" ? body.scanRaw : "";
             const scanned = scanRaw ? parseTrackingFromScan(scanRaw) : null;
             if (scanRaw && !scanned) {
