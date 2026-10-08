@@ -137,6 +137,36 @@ export async function reconcileFifo({ full = false, dryRun = false } = {}) {
     const sales = [];
     let orders = 0;
     let next = null;
+    let recovered = 0;
+
+    // ── ⚠️ ONLINE SALES THAT SQUARE NEVER ITEMISED ──────────────────────────────────────────────────────
+    // Before the online checkout itemised its Square order (2026-10-06), a web order arrived in Square as a
+    // SINGLE line carrying the whole cart total, no catalog_object_id, and a name of literally "undefined".
+    // The loop below skips any line with no catalog id — correctly, since it has nothing to cost against —
+    // so every one of those sales has been reporting its full price at ZERO cost, which is 100% margin on
+    // real merchandise. Eight of them, $385.82, the last being a Journey Together booster box at $194.68
+    // that Luke knew he had sold and no report could see.
+    //
+    // ⚠️ THE ANSWER IS NOT IN SQUARE, IT IS IN OUR OWN ORDER ROW. shop_orders.items_json holds exactly what
+    // was in that cart — name, quantity and catalogObjectId per line — because our checkout wrote it. So the
+    // sale is recoverable without touching Square at all, and a completed Square order cannot be re-itemised
+    // after the fact anyway.
+    //
+    // ⚠️ AND IT JOINS ON THE TENDER, WHICH COSTS NOTHING. A Square order's tender carries payment_id, and
+    // that is byte-for-byte shop_orders.square_payment_id — verified on both an itemised and an un-itemised
+    // order. The order search already returns tenders, so this needs no extra API call per order; resolving
+    // payments one at a time would have been a request per order for the life of the table.
+    const onlineByPayment = new Map();
+    for (const row of await db.query(
+        `SELECT square_payment_id, items_json FROM shop_orders
+          WHERE square_payment_id IS NOT NULL AND items_json IS NOT NULL`
+    ).catch(() => [])) {
+        const items = Array.isArray(row.items_json) ? row.items_json : [];
+        const usable = items
+            .map((i) => ({ variationId: String(i?.catalogObjectId || "").trim(), units: Number(i?.quantity) || 0 }))
+            .filter((i) => i.variationId && i.units > 0);
+        if (usable.length) onlineByPayment.set(String(row.square_payment_id), usable);
+    }
 
     do {
         const page = await squareFetch("/v2/orders/search", {
@@ -159,9 +189,40 @@ export async function reconcileFifo({ full = false, dryRun = false } = {}) {
         for (const order of page.orders || []) {
             orders += 1;
             const soldAt = order.closed_at || order.updated_at || order.created_at;
+            // What this order's own tender says it was paid by — the join back to our checkout's record.
+            const paymentIds = (order.tenders || [])
+                .map((t) => String(t?.payment_id || t?.id || "").trim())
+                .filter(Boolean);
+            let claimedFromOurs = false;
+
             for (const li of order.line_items || []) {
-                if (!li?.catalog_object_id) continue;
                 const units = Number(li.quantity) || 0;
+                if (!li?.catalog_object_id) {
+                    // ⚠️ RECOVERED ONCE PER ORDER, NOT ONCE PER LINE. A pre-itemisation order has ONE
+                    // un-itemised line holding the whole cart, but a later order can have a legitimate
+                    // un-itemised line (the "Online processing fee") ALONGSIDE properly itemised items —
+                    // and expanding our cart for each of those would count every item in the order twice.
+                    if (claimedFromOurs) continue;
+                    const hit = paymentIds.map((p) => onlineByPayment.get(p)).find(Boolean);
+                    if (!hit) continue;
+                    // Only step in when Square itemised NOTHING. If the order already carries catalog
+                    // lines, those are the truth and this line really is just a fee.
+                    if ((order.line_items || []).some((x) => x?.catalog_object_id)) continue;
+                    claimedFromOurs = true;
+                    for (const it of hit) {
+                        sales.push({
+                            orderId: order.id,
+                            // Stable across runs, and distinct from any real Square line uid, so a re-cost
+                            // updates the same row instead of growing a second one beside it.
+                            lineUid: `${order.id}-recovered-${it.variationId}`,
+                            variationId: it.variationId,
+                            soldAt,
+                            units: it.units,
+                        });
+                        recovered += 1;
+                    }
+                    continue;
+                }
                 if (units <= 0) continue;
                 sales.push({
                     orderId: order.id,
@@ -188,8 +249,8 @@ export async function reconcileFifo({ full = false, dryRun = false } = {}) {
     if (dryRun) {
         const planned = await costSales(sales, { write: false, fresh: full });
         const diff = await comparePlanToStored(planned.rows, { full });
-        logger.info("cogs.fifo.dry_run", { orders, lines: sales.length, ...diff.summary });
-        return { ok: true, dryRun: true, scanned: orders, lines: sales.length,
+        logger.info("cogs.fifo.dry_run", { orders, lines: sales.length, recovered, ...diff.summary });
+        return { ok: true, dryRun: true, scanned: orders, lines: sales.length, recovered,
                  costed: planned.costed, short: planned.short, skipped: planned.skipped, ...diff };
     }
 

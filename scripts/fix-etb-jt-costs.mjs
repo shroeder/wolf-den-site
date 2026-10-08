@@ -46,8 +46,10 @@ const LOTS = [
     {
         variationId: "NL3JV2HP2WBAT2BNLOSCSMCE",
         expectName: "Prismatic Evolutions Elite Trainer Box",
+        // Luke: "truth is we have 15 prismatic etbd we already sold 5 and the unit cost is 33 bucks per".
+        // 15 on hand plus 5 sold is a 20-box run; $33, revised down from the $35 of the first pass.
         units: 20,
-        paidEach: 35.0,
+        paidEach: 33.0,
     },
     {
         variationId: "5IBL53WQFXWWEW77VLBK3ILQ",
@@ -166,12 +168,28 @@ for (const p of plan) {
     //    be inserted twice — and two 20-box lots at $35 is a phantom $700 of inventory that FIFO will happily
     //    spend. This script failed half way through on its first run (a wrong cost_sync column), so being
     //    re-runnable is not hypothetical here.
-    const [dupe] = await sql`
-      SELECT id FROM cogs_ledger
-       WHERE variation_id = ${p.variationId} AND source = ${SOURCE}
-         AND quantity = ${p.units} AND paid_each = ${p.paidEach} LIMIT 1`;
-    if (dupe) {
-        console.log(`lot already present: cogs_ledger #${dupe.id}  ${p.units} x ${money(p.paidEach)}  ${p.name} — skipped`);
+    //    ⚠️ KEYED ON (variation, source) AND NOTHING ELSE. The first version of this guard also matched on
+    //    quantity and paid_each, which meant correcting $35 to $33 did not match the row it was correcting
+    //    and inserted a SECOND 20-box lot — the duplicate-inventory bug again, wearing a different number.
+    //    There is exactly one "hand correction for this item", so that is the identity.
+    const [existing] = await sql`
+      SELECT id, quantity, paid_each FROM cogs_ledger
+       WHERE variation_id = ${p.variationId} AND source = ${SOURCE} ORDER BY created_at LIMIT 1`;
+    if (existing) {
+        const sameAlready = Number(existing.quantity) === p.units && Number(existing.paid_each) === p.paidEach;
+        await sql`
+          UPDATE cogs_ledger
+             SET occurred_on = ${p.on}, product = ${p.name}, quantity = ${p.units},
+                 paid_each = ${p.paidEach}, paid_total = ${p.units * p.paidEach}
+           WHERE id = ${existing.id}`;
+        console.log(sameAlready
+            ? `lot unchanged: cogs_ledger #${existing.id}  ${p.units} x ${money(p.paidEach)}  ${p.name}`
+            : `lot corrected: cogs_ledger #${existing.id}  ${existing.quantity} x ${money(existing.paid_each)} → ${p.units} x ${money(p.paidEach)}  ${p.name}`);
+        // Anything else carrying this source for this variation is a duplicate from an earlier run.
+        const extra = await sql`
+          DELETE FROM cogs_ledger
+           WHERE variation_id = ${p.variationId} AND source = ${SOURCE} AND id <> ${existing.id} RETURNING id`;
+        if (extra.length) console.log(`  removed ${extra.length} duplicate lot row(s) for this item`);
     } else {
         const [row] = await sql`
           INSERT INTO cogs_ledger (occurred_on, product, quantity, paid_each, paid_total, variation_id, source)
