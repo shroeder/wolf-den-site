@@ -31,7 +31,12 @@ export const ASCENSION_POWERS = {
     open_gate: { item: "ascendant_aegis", name: "The Open Gate", tier: "ascendant", cls: "B", desc: "Petting and feeding on other people's farms never spends your daily budget." },
     cold_bait: { item: "ascendant_risen_blade", name: "Cold Bait", tier: "ascendant", cls: "B", desc: "Your first cast each day cannot land a common." },
     gaff: { item: "ascendant_risen_bulwark", name: "The Gaff", tier: "ascendant", cls: "B", desc: "A fish that beats your personal best for its species refunds the cast." },
-    quiet_passage: { item: "ascendant_risen_diadem", name: "The Quiet Passage", tier: "ascendant", cls: "B", desc: "One encounter in three lets you pass without a fight and keeps the spoils." },
+    // ⚠️ IT FIRES ON A LOSS. The old wording — "lets you pass without a fight and keeps the spoils" —
+    // described a mechanic that does not exist: nothing skips the fight, and what actually happens is that one
+    // lost SEA encounter in three hands the loot over regardless. ValkyrieSylve read it and asked "what does
+    // that mean lol what encounters?", which is the right question to ask of a sentence about the sea printed
+    // on a helmet. Says where, and says what it really does.
+    quiet_passage: { item: "ascendant_risen_diadem", name: "The Quiet Passage", tier: "ascendant", cls: "B", desc: "Lose a sea encounter and one time in three you keep its loot anyway." },
     standing_recipe: { item: "ascendant_risen_shroud", name: "The Standing Recipe", tier: "ascendant", cls: "B", desc: "Twice a day, a recipe may be cooked with any ingredients you hold." },
     substitution: { item: "ascendant_risen_binding", name: "The Substitution", tier: "ascendant", cls: "B", desc: "Three times a day, one ingredient a recipe asks for may be swapped for any other you hold." },
     chef_s_pick: { item: "ascendant_risen_walkers", name: "Chef's Pick", tier: "ascendant", cls: "B", desc: "One dish a day cooks at perfect timing without playing it." },
@@ -47,7 +52,12 @@ export const ASCENSION_POWERS = {
     quartermaster_s_round: { item: "ascendant_exalted_cape", name: "The Quartermaster's Round", tier: "ascendant", cls: "B", desc: "Every daily quest is issued one step already done." },
     bounty_board_rights: { item: "ascendant_exalted_charm", name: "Bounty Board Rights", tier: "ascendant", cls: "A", desc: "You may take a fourth daily quest." },
     deep_bowl: { item: "ascendant_exalted_coil", name: "The Deep Bowl", tier: "ascendant", cls: "B", desc: "One treat in three feeds your pet without being used up." },
-    long_leash: { item: "ascendant_ascendant_cleaver", name: "The Long Leash", tier: "ascendant", cls: "B", desc: "Your pet's ability keeps working while you are on someone else's farm." },
+    // ⚠️ IT IS YOUR FARM'S BONUS, NOT YOUR PET'S ABILITY. See farm.js: petting an animal on someone else's
+    // land is scaled by THEIR farm upgrades, so your own pet-XP bonus sits idle; this pays that share in on
+    // top. GrayKitsune, reading the old line: "that just leaves me confused because idk what pet ability
+    // would be useful on another players farm." He was right — there isn't one. The sentence was describing
+    // the wrong half of the mechanic.
+    long_leash: { item: "ascendant_ascendant_cleaver", name: "The Long Leash", tier: "ascendant", cls: "B", desc: "Your farm's pet-XP bonus still counts when you tend animals on someone else's farm." },
     breeder_s_eye: { item: "ascendant_ascendant_orb", name: "Breeder's Eye", tier: "ascendant", cls: "B", desc: "You choose which pet a random pet reward gives you." },
     whistle: { item: "ascendant_ascendant_hood", name: "The Whistle", tier: "ascendant", cls: "B", desc: "A pet you swap out keeps its ability for the rest of the day." },
     auctioneer_s_seat: { item: "ascendant_ascendant_scale", name: "The Auctioneer's Seat", tier: "ascendant", cls: "A", desc: "You pay no listing fee, and listing never takes the item out of your bags." },

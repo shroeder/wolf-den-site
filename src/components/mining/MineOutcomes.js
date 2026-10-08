@@ -61,7 +61,17 @@ export function WrapModal({ wrap, tripsLeft, maxTrips, onClose, onToFace, onAgai
                 ) : null}
                 {/* WHAT THE ROOF TOOK. A collapse still leaves you rock to swing at, so the loss is not "nothing
                     at the face" — it's the DIFFERENCE between the vein you'd found and the Coal you crawled out
-                    with. Showing both side by side is the only way that reads as a cost rather than a shrug. */}
+                    with. Showing both side by side is the only way that reads as a cost rather than a shrug.
+
+                    ⚠️ BUT "ALL YOU GOT OUT WITH" IS A LIE WHEN SECOND WIND FIRED, and this card was saying both
+                    things at once: the banner above promises your haul is intact and that you "walked out with
+                    the lot anyway", and then this panel told you a Coal Seam was everything you got. GrayKitsune:
+                    "So uhh.. what emberheart seam collapsed unless it was on the same floor that collapsed on
+                    me?" — he could not tell the HAUL he carried out from the SEAM left at the face, because one
+                    sentence was describing the other one's loss.
+
+                    The vein really is buried either way (cutSeam runs on every collapse), so the panel stays —
+                    what changes is that under Second Wind it is named as what it is: the face, not the haul. */}
                 {wrap.collapsed && wrap.lostTier ? (
                     <div className="mine-lost" style={{ "--had": wrap.lostTier.color }}>
                         <span className="mine-lost-was">
@@ -73,7 +83,7 @@ export function WrapModal({ wrap, tripsLeft, maxTrips, onClose, onToFace, onAgai
                         <span className="mine-lost-got">
                             <Img src={wrap.seam?.art} className="mine-lost-art" fallback="" />
                             <em style={{ color: wrap.seam?.color }}>{wrap.seam?.name}</em>
-                            <i>all you got out with</i>
+                            <i>{wrap.secondWind ? "left at the face" : "all you got out with"}</i>
                         </span>
                     </div>
                 ) : wrap.seam ? (

@@ -4944,18 +4944,36 @@ function Styles() {
             /* A heal flashes the bar so it reads as health coming back rather than a number being different. */
             .ar-bar.is-healing .ar-hp > i { animation: arHealFlash .6s ease-out; }
             @keyframes arHealFlash { 0% { filter: brightness(2.4) saturate(.4) } 100% { filter: none } }
+            /* ── THE HUD SITS ON TOP OF WHATEVER THE ARENA IS WEARING ────────────────────────────────
+               GrayKitsune: "Opponent stat info in arena isn't readable due to text color." He photographed it
+               and he is right, but the cause is not the colour on its own and it is not the foe side: BOTH
+               fighters' readouts are this same pale cream, and the Hallowe'en backdrop put an enormous bright
+               MOON directly behind the right-hand one. Pale cream at 72% over a white moon is nothing at all.
+
+               ⚠️ SO THE FIX IS A FLOOR UNDER THE TEXT, NOT A DIFFERENT SHADE OF IT. A colour picked to read
+               against a dark arena is a colour that stays legible only as long as nobody repaints the arena,
+               and the arena gets repainted every season. A dark shadow is carried by the text itself, so it
+               works over the moon, over the sand and over whatever is behind it in December.
+
+               Deliberately not a scrim panel behind the HUD: that would read as a UI bar laid across the
+               stage, and the bars are meant to float on the scene. */
+            .ar-hud-legible { text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 6px rgba(0,0,0,.85); }
             .ar-mycard { display: flex; gap: 10px; flex-wrap: wrap; margin: 3px 0 1px; font-size: 10px;
-                font-weight: 800; color: rgba(255,224,176,.78); }
+                font-weight: 800; color: rgba(255,224,176,.92);
+                text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 6px rgba(0,0,0,.85); }
             .ar-mycard i { font-style: normal; white-space: nowrap; }
             .ar-mycard b { color: #ffe9c2; font-weight: 900; font-size: 12px; }
-            .ar-up-card { font-size: 9.5px; font-weight: 800; color: rgba(255,224,176,.6); white-space: nowrap; }
+            .ar-up-card { font-size: 9.5px; font-weight: 800; color: rgba(255,224,176,.82); white-space: nowrap;
+                text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 6px rgba(0,0,0,.85); }
             .ar-stats { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 2px; font-style: normal;
-                font-size: 8.5px; font-weight: 800; letter-spacing: .02em; color: rgba(255,224,176,.72); }
+                font-size: 8.5px; font-weight: 800; letter-spacing: .02em; color: rgba(255,224,176,.95);
+                text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 6px rgba(0,0,0,.85); }
             .ar-bar.is-foe .ar-stats { justify-content: flex-end; }
             .ar-stats i { font-style: normal; white-space: nowrap; }
             .ar-stats b { color: #ffe9c2; font-weight: 900; }
-            .ar-hpnum { display: block; font-size: 10px; font-style: normal; color: #e8dcc8;
-                text-shadow: 0 1px 4px #000; font-variant-numeric: tabular-nums; font-weight: 800; }
+            .ar-hpnum { display: block; font-size: 10px; font-style: normal; color: #f3ead9;
+                text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 6px rgba(0,0,0,.85);
+                font-variant-numeric: tabular-nums; font-weight: 800; }
             .ar-hpnum span { opacity: .55; font-weight: 600; }
             .ar-hpnum u { text-decoration: none; margin-left: 5px; color: #6fd0ff; }
             /* Whose beat it is, said plainly, between the two bars. */
@@ -6152,17 +6170,12 @@ function Styles() {
                 .ar-bars { padding: 1px 8px 0; gap: 6px; }
                 .ar-fname { font-size: 10px; }
                 .ar-hp { height: 8px; margin: 2px 0 1px; }
-                .ar-mycard { display: flex; gap: 10px; flex-wrap: wrap; margin: 3px 0 1px; font-size: 10px;
-                font-weight: 800; color: rgba(255,224,176,.78); }
-            .ar-mycard i { font-style: normal; white-space: nowrap; }
-            .ar-mycard b { color: #ffe9c2; font-weight: 900; font-size: 12px; }
-            .ar-up-card { font-size: 9.5px; font-weight: 800; color: rgba(255,224,176,.6); white-space: nowrap; }
-            .ar-stats { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 2px; font-style: normal;
-                font-size: 8.5px; font-weight: 800; letter-spacing: .02em; color: rgba(255,224,176,.72); }
-            .ar-bar.is-foe .ar-stats { justify-content: flex-end; }
-            .ar-stats i { font-style: normal; white-space: nowrap; }
-            .ar-stats b { color: #ffe9c2; font-weight: 900; }
-            .ar-hpnum { font-size: 8.5px; }
+                /* ⚠️ THIS WAS A PASTED COPY OF THE DESKTOP RULES, byte for byte, with the indentation still
+                   showing where it came from — and NONE of it was a landscape override: same font sizes, same
+                   colours. Left alone it would have restored the exact washed-out cream the rules above exist
+                   to fix, but only on a phone held sideways, which is the hardest place to notice it. The one
+                   genuine override is the health number's size. */
+                .ar-hpnum { font-size: 8.5px; }
                 .ar-turnmark { font-size: 7.5px; padding: 2px 6px; }
                 .ar-focus { padding: 1px 8px 0; gap: 5px; }
                 .ar-cdchip { width: 26px; height: 26px; }
