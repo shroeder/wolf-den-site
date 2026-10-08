@@ -23,8 +23,22 @@
 // And it enqueues cost_sync, which is the only supported way to get a cost onto a Square item that already
 // exists: Square's native unit cost is write-at-CREATE only and silently ignores updates (200, stores nothing).
 //
-// Run:  node scripts/fix-etb-jt-costs.mjs            dry run, writes nothing
-//       node scripts/fix-etb-jt-costs.mjs --apply
+// ── ⚠️ AND THE QUEUE IS WRITTEN BY ITS OWN FUNCTION, NOT BY SQL FROM HERE ───────────────────────────────────
+// The first version of this script INSERTed into cost_sync by hand and put CENTS in `desired_cost`. That
+// column is DOLLARS — enqueueCostSync stores `toDollars(cents)` and the sweeper reads it back with
+// `toCents(row.desired_cost)`. So 9500 meant nine thousand five hundred dollars, the sweeper pushed it to
+// Square, and the register screen told Luke a Journey Together booster box cost $9,500.00 and the sale lost
+// $9,329.37. The ETB said $3,300.00.
+//
+// Nothing errored. Both rows synced, state 'ok'. The only thing that caught it was a human reading a receipt.
+//
+// The column name did not say dollars, the variable it is built from is called `cents`, and the adapter
+// between them lives inside the function I chose not to call. That is the whole lesson: a unit lives with the
+// code that owns the column, so the caller must not restate it. See reuse-the-rule-never-restate-it.
+//
+// Run (needs the app loader, because it imports the real enqueue):
+//   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/fix-etb-jt-costs.mjs
+//   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/fix-etb-jt-costs.mjs --apply
 import fs from "node:fs";
 import { neon } from "@neondatabase/serverless";
 
@@ -35,6 +49,12 @@ const sql = neon(DB);
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const TOKEN = props.match(/SQUARE_ACCESS_TOKEN=(.+)/)?.[1]?.trim();
+
+// The app's own env, so the real enqueue can reach the database the way the app does.
+process.env.DATABASE_URL ||= DB;
+process.env.SQUARE_ACCESS_TOKEN ||= TOKEN || "";
+process.env.SQUARE_API_VERSION ||= "2025-01-23";
+const { enqueueCostSync } = await import("@/lib/cogs/cost-sync.js");
 
 const APPLY = process.argv.includes("--apply");
 
@@ -209,16 +229,21 @@ for (const p of plan) {
 
     // 3. Queue it for Square. Square's native cost cannot be updated after creation, so this is the
     //    reconciler's job and it reports whether it got there — see cost-sync.
-    //    ⚠️ desired_cost IS IN CENTS and the columns are not the ones you would guess — this script's first
-    //    run died here on `unit_cost_cents`, which is wolfden_item_cost's column name, not this table's. The
-    //    shape mirrors enqueueCostSync in lib/cogs/cost-sync.js, which is the real writer.
-    await sql`
-      INSERT INTO cost_sync (variation_id, item_name, desired_cost, state, attempts, last_error)
-      VALUES (${p.variationId}, ${p.name}, ${Math.round(p.paidEach * 100)}, 'pending', 0, NULL)
-      ON CONFLICT (variation_id) DO UPDATE
-        SET item_name = COALESCE(EXCLUDED.item_name, cost_sync.item_name),
-            desired_cost = EXCLUDED.desired_cost, state = 'pending', attempts = 0, last_error = NULL`;
-    console.log(`queued for Square: ${p.variationId}  (${money(p.paidEach)})`);
+    //    ⚠️ THE REAL ENQUEUE, IN CENTS, WHICH IS THE UNIT ITS OWN SIGNATURE TAKES. It converts to the dollars
+    //    the column actually stores. Writing this INSERT by hand is what put $9,500 on a $95 booster box.
+    await enqueueCostSync([{ variationId: p.variationId, unitCostCents: Math.round(p.paidEach * 100), itemName: p.name }]);
+
+    //    A cheap backstop for the next units slip, here rather than in the library because it is the script
+    //    that has historically got this wrong. A cost far above what the thing SELLS for is not a cost.
+    const [queued] = await sql`SELECT desired_cost FROM cost_sync WHERE variation_id = ${p.variationId}`;
+    const list = Number(feed.get(p.variationId)?.price) || 0;
+    if (list > 0 && Number(queued?.desired_cost) > list * 5) {
+        console.log(`  ⚠️ REFUSING: queued cost $${Number(queued.desired_cost).toFixed(2)} is more than 5x the $${list.toFixed(2)} list price — units look wrong. Reverting.`);
+        await sql`UPDATE cost_sync SET state = 'skipped', last_error = 'implausible cost, not pushed' WHERE variation_id = ${p.variationId}`;
+        process.exitCode = 1;
+    } else {
+        console.log(`queued for Square: ${p.variationId}  desired $${Number(queued?.desired_cost).toFixed(2)}`);
+    }
 }
 
 console.log("\nDone. Run scripts/fifo-plan.mjs next to see what FIFO re-costs, then apply the reconcile.");
