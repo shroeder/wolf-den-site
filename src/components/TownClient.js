@@ -2461,7 +2461,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                                 ) : null}
                                                 +{bark.candy}
                                             </>
-                                        ) : "no candy left here"}
+                                        ) : bark.capped ? "that's your 250 for today" : "no candy left here"}
                                         {bark.sweet ? ` · ${bark.sweet.name}` : ""}
                                         {bark.chest ? " · and a sealed box!" : ""}
                                     </span>

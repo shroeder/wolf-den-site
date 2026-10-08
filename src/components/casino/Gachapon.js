@@ -327,6 +327,17 @@ export default function Gachapon({ onClose }) {
                         ) : <span className="gx-won-cap" />}
                     </span>
                     <b>{won.name}</b>
+                    {/* ⚠️ A CAPSULE CAN READ "120 Candy" AND PAY NOTHING. The daily candy cap trims the
+                        grant to zero and the label is the PRIZE, not what landed - so GrayKitsune opened one,
+                        read the label, got no candy and reported the gachapon as broken. It was not: he was
+                        at 250/250. Said plainly here, where he was already looking. */}
+                    {won.capped ? (
+                        <i className="gx-won-capped">
+                            {won.paid > 0
+                                ? `Only ${won.paid} of it fit — that's your 250 candy for today.`
+                                : "That's your 250 candy for today, so this one keeps until tomorrow's allowance."}
+                        </i>
+                    ) : null}
                     {won.cents ? <i className="gx-won-money">On your shop account, in real dollars.</i> : null}
                     {!won.cents && won.blurb ? <i>{won.blurb}</i> : null}
                     <button type="button" className="gx-go" onClick={again}>
@@ -464,6 +475,7 @@ const CSS = `
 .gx-won b { font-size: 1.14rem; color: #fff; text-wrap: balance; }
 .gx-won i { font-size: 0.84rem; color: #c9bda9; font-style: italic; line-height: 1.4; max-width: 30ch; }
 .gx-won-money { color: #9af5c6 !important; font-style: normal !important; font-weight: 800; }
+.gx-won-capped { display: block; margin-top: 6px; font-size: 0.78rem; color: #e0b36a; font-style: normal; }
 .gx-won-pic { position: relative; display: grid; place-items: center; width: 132px; height: 132px;
     border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--t) 40%, transparent), transparent 68%); }
 .gx-won-pic img { max-width: 118px; max-height: 118px; object-fit: contain;

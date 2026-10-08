@@ -136,6 +136,14 @@ export async function knock(buyerId, door) {
         trick,
         line: trick ? d.trick : d.treat,
         candy: paid,
+        // ⚠️ WHY THE DOOR PAID NOTHING, which the screen had no way to know. grantCandy returns a
+        // NUMBER, so a cap and an empty door were both 0, and the town said "no candy left here" to a member
+        // who had simply earned their 250 for the day. Kaishiern: "Why are the candy bowls telling me NO
+        // CANDY LEFT HERE?" He was at 250/250. Nothing was broken and the game told him it was.
+        //
+        // Inferred rather than re-queried: inside this flow the event is on and the rate exists, so the only
+        // thing that trims a positive request is the ceiling. Costs nothing.
+        capped: paid < candy,
         sweet,
         chest,
     };

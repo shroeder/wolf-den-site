@@ -331,6 +331,11 @@ export async function pull(buyerId) {
         // ⚠️ THROUGH grantCandy, SO THE DAILY CAP STILL APPLIES. A faucet outside the only ceiling the event
         // has is not a faucet, it is a leak — and this one would be the biggest in the game.
         won.paid = await grantCandy(buyerId, "gacha", prize.n).catch(() => 0);
+        // ⚠️ A CAPSULE CAN PROMISE 120 CANDY AND PAY NOTHING, and until now it did so silently.
+        // GrayKitsune: "The gachapon that gives candy for the pumpkin in town isnt giving anything." He was
+        // at 250/250 for the day. The prize rolled, the label said 120 Candy, the cap trimmed it to zero and
+        // the screen reported the label.
+        won.capped = won.paid < prize.n;
     } else if (prize.kind === "sweets") {
         const sweets = Object.keys(CONSUMABLES).filter((id) => CONSUMABLES[id].kind === "candy");
         const picked = [];
