@@ -84,7 +84,16 @@ export async function offerChoice(ctx, run, d, floor, action, choice) {
     let healed = 0; let damage = 0;
     if (res?.heal) { healed = Math.min(run.maxHp - run.hp, Math.round(run.maxHp * res.heal)); run.hp += healed; parts.push(`+${healed} health`); }
     if (res?.damage) { damage = hurt(run, Math.round(run.maxHp * res.damage)); parts.push(`-${damage} health`); }
-    if (res?.gold) { parts.push(`+${bank(run, { gold: res.gold }).gold} gold`); }
+    // ⚠️ THE MINTED FIGURE IS KEPT, because the RESULT below has to report the same number this line
+    // does. This banked and printed the minted gold and then handed the client res.gold - the RAW roll - so an
+    // event floor put "+260 gold" on the reward card while the log said 52 and the player got 52.
+    // Sunflower Jinxx: "Screen said +260 gold. Log says 52, and I only actually got 52."
+    //
+    // delve is a HEAVY FAUCET, so its effective mint rate is GOLD_MINT_RATE x 0.5 = 0.2, and 260 x 0.2 is
+    // exactly 52. The same bug was found and fixed at the three result sites in delves.js; this fourth one
+    // was missed because it mints inline inside a template literal, where the minted value had nowhere to live.
+    let paidGold = 0;
+    if (res?.gold) { paidGold = bank(run, { gold: res.gold }).gold; parts.push(`+${paidGold} gold`); }
     if (res?.xp) { bank(run, { xp: res.xp }); parts.push(`+${res.xp} XP`); }
     if (res?.chest) { bank(run, { chest: res.chest }); parts.push(`a ${res.chest} chest`); }
     if (res?.potion) { run.potions += res.potion; parts.push(`+${res.potion} potion${res.potion === 1 ? "" : "s"}`); }
@@ -102,7 +111,7 @@ export async function offerChoice(ctx, run, d, floor, action, choice) {
         tone, title: res?.title || (parts.length ? "Done" : "Nothing"),
         line: res?.line || "Nothing comes of it.",
         art: encounterArt(d.id, ev),
-        gold: res?.gold || 0, xp: res?.xp || 0, chest: res?.chest || null,
+        gold: paidGold, xp: res?.xp || 0, chest: res?.chest || null,
         healed, damage, potion: res?.potion || 0,
     });
 }
