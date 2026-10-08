@@ -129,8 +129,26 @@ export const GROVE_CSS = `
    the zone is up; leaving restores them with the body class. */
 .gv-full-lock .social-bubble,
 .gv-full-lock .dm-bubble-wrap { display: none; }
-.gv-plate { position: absolute; inset: 0; background-size: cover; background-position: center bottom; }
-.gv-layer { position: absolute; inset: 0; pointer-events: none; }
+/* ── ⚠️ THE BACKDROP IS A STRIP, NOT A PLATE ───────────────────────────────────────────────
+   Luke: "The map bg doesnt scroll which makes it impossible to feel immersed."
+
+   It was one inset:0 div with a 3:2 painting on it, in a zone up to seven screens wide, so it could not
+   scroll at all — and .gv-layer, the div that WAS being translated every frame, was empty. Bodies
+   moving across a fixed picture reads as a treadmill.
+
+   Anchored BOTTOM and taller than the scene, so the vertical camera has painted sky to pan into rather
+   than a hole. Width is left to the flex children so the strip sizes itself to its tiles. The loop writes
+   --gv-sky-h / --gv-sky-w and the transform; see SKY_PX / SKY_PY in GroveScene.js. */
+.gv-sky { position: absolute; left: 0; bottom: 0; height: var(--gv-sky-h, 100%);
+    display: flex; align-items: stretch; pointer-events: none; will-change: transform; }
+/* Each tile is the plate's own aspect ratio at the strip's height, so 100% 100% is cover and stretches
+   nothing. */
+.gv-sky-t { flex: 0 0 auto; width: var(--gv-sky-w, 100%); height: 100%;
+    background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
+/* ⚠️ THIS IS WHAT REMOVES THE SEAM. Every second tile is the painting reflected, so each join meets
+   its own mirror image and is continuous. A plain repeat-x would put a hard vertical cut through the
+   artwork every tile-width. */
+.gv-sky-t:nth-child(even) { transform: scaleX(-1); }
 
 /* Every body is anchored at the scene's GROUND LINE and moved by transform. The loop writes translate3d
    onto these; nothing here animates on its own.
@@ -183,9 +201,24 @@ export const GROVE_CSS = `
    of it: a dark soil body, a lit mossy lip along the top, and a soft shadow underneath to give it thickness.
    Anchored to the same 13% ground line as every body, because a ledge the bodies do not stand ON is worse
    than no ledge at all. */
-.gv-ledge { position: absolute; left: 0; bottom: var(--gv-ground, 13%); height: 9px; border-radius: 4px 4px 2px 2px;
+/* ── ⚠️ A BRANCH, NOT A WIRE, AND ITS TOP IS THE FLOOR ─────────────────────────────────────
+   Two things the zoom exposed rather than caused.
+
+   The height was a flat 9px, which read as a twig when the frame held a hundred units and reads as dental
+   floss now that a hero is 150px tall beside it. In world units it was a fortieth of his height. Sized in
+   units like every other body, it is the same proportion at every zoom.
+
+   ⚠️ AND THICKENING IT ALONE WOULD HAVE PUT IT OVER EVERYONE’S FEET. bottom + the loop’s negative
+   translate place the box‘s BOTTOM edge on the platform’s y, while a body standing on that platform has
+   its FEET on the same y — so the bar has always been drawn in the 9px above the floor it represents,
+   covering the bottom of anything standing there. Invisible at 9px, a shin-deep puddle at 24. The negative
+   margin drops the box by exactly its own height so its TOP is the standing surface, which is both correct
+   and what it already looked like. Nothing in the simulation moves; floorUnder never read this. */
+.gv-ledge { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    height: calc(1.15 * var(--gv-unit, 1%)); margin-bottom: calc(-1.15 * var(--gv-unit, 1%));
+    border-radius: 4px 4px 2px 2px;
     pointer-events: none; will-change: transform;
-    background: linear-gradient(#5f7a3a 0 3px, #4a3a28 3px 100%);
+    background: linear-gradient(#5f7a3a 0 34%, #4a3a28 34% 100%);
     box-shadow: 0 3px 6px rgba(0,0,0,0.45), inset 0 -2px 0 rgba(0,0,0,0.3); }
 
 /* The boss reward panel rides the area-unlock panel's shape, with room for the sprite and a line for the
