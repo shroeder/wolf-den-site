@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
+import { celebrateUnlock } from "@/components/grove/grove-sfx.js";
 
 // ── THE GROVE ────────────────────────────────────────────────────────────────────────────────────────────────
 // Map, zone, bag, bank, workbench and emblems. The scene itself is GroveScene; this is everything around it.
@@ -19,38 +20,6 @@ const post = (body) => fetch("/api/marketplace/grove", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 }).then((r) => r.json()).catch(() => ({ ok: false }));
 
-// ── THE TRAIL ────────────────────────────────────────────────────────────────────────────────────────────────
-// Twelve nodes down a winding path. x is a PERCENTAGE so the route holds its shape on a phone and on a
-// desktop; y is pixels, because the gap between two stops should not stretch with the window.
-//
-// The sine is what stops it looking like a column of buttons: it is one continuous route that leans left and
-// right, so the eye reads a journey rather than a list.
-const TRAIL_GAP = 104;
-const TRAIL_TOP = 54;
-// ⚠️ THE AMPLITUDE IS BOUNDED BY THE LABEL, NOT THE DISC. At 27 the route looked right in the
-// abstract and ran a 76px disc plus a 116px name tag straight off both edges of a 390px phone. 16 keeps
-// the whole pin - marker AND label - inside the narrowest screen the shop actually sees.
-const trailX = (i) => 50 + Math.sin(i * 0.82 + 0.4) * 16;
-
-// Dots between each pair of nodes. Lit as far as you have unlocked, so the path ahead reads as unwalked.
-function trailDots(zones) {
-    const out = [];
-    for (let i = 0; i < zones.length - 1; i += 1) {
-        const x0 = trailX(i), x1 = trailX(i + 1);
-        const y0 = TRAIL_TOP + i * TRAIL_GAP, y1 = y0 + TRAIL_GAP;
-        for (let k = 1; k <= 4; k += 1) {
-            const t = k / 5;
-            out.push({
-                key: `${i}-${k}`,
-                x: x0 + (x1 - x0) * t,
-                y: y0 + (y1 - y0) * t,
-                lit: zones[i + 1]?.unlocked,
-            });
-        }
-    }
-    return out;
-}
-
 const partName = (id) => GROVE_PARTS[id]?.name || id;
 
 export default function GroveClient({ initial }) {
@@ -61,6 +30,7 @@ export default function GroveClient({ initial }) {
     const [unlockedNow, setUnlockedNow] = useState(null);
     const [bossWon, setBossWon] = useState(null);
     const router = useRouter();
+    const stripRef = useRef(null);
 
     const refresh = useCallback(async () => {
         const d = await fetch("/api/marketplace/grove").then((r) => r.json()).catch(() => null);
@@ -139,11 +109,51 @@ export default function GroveClient({ initial }) {
         return { id, ...GROVE_FOODS[id], count: Number(st?.food?.[id]) || 0 };
     }, [st?.belt, st?.food]);
 
+    // ⚠️ OPENS WHERE YOU LEFT OFF, NOT AT ZONE ONE. Twelve panels is wider than any phone, so a
+    // strip that always starts at the left shows a veteran the one place they finished weeks ago and
+    // nothing they are actually doing. Instant rather than smooth: this is where the map IS, not a
+    // journey the player should have to sit through every time they open it.
+    useEffect(() => {
+        const el = stripRef.current;
+        if (view !== "map" || !el) return;
+        const far = el.querySelector(`[data-n="${st?.unlockedN || 1}"]`);
+        if (far) el.scrollLeft = Math.max(0, far.offsetLeft - 24);
+    }, [view, st?.unlockedN]);
+
+    // ── ⚠️ THE UNLOCK POP ─────────────────────────────────────────────────────────────────
+    // Luke: "a dopamine pop middle of the screen for a duration letting you know you unlocked the next
+    // area with vibration and a satisfying noise."
+    //
+    // Sound and buzz fire from HERE rather than from the settle handler, so they are tied to the panel
+    // actually being on screen. Five seconds, then it clears itself — long enough to land, short
+    // enough that nobody taps through it out of impatience. Tapping still dismisses it early.
+    useEffect(() => {
+        if (!unlockedNow) return undefined;
+        celebrateUnlock();
+        const t = setTimeout(() => setUnlockedNow(null), 5000);
+        return () => clearTimeout(t);
+    }, [unlockedNow]);
+
     useEffect(() => {
         if (!note) return undefined;
         const t = setTimeout(() => setNote(null), 3200);
         return () => clearTimeout(t);
     }, [note]);
+
+    // ⚠️ RENDERED IN EVERY VIEW, NOT JUST INSIDE THE ZONE. The unlock usually arrives on the settle
+    // that fires when you LEAVE a zone - which is the exact moment the zone view unmounts. Declared here and
+    // dropped into both returns so the celebration cannot be destroyed by the thing that triggered it.
+    const popNode = unlockedNow ? (
+        <div className="gv-pop" onClick={() => setUnlockedNow(null)}>
+            <div className="gv-pop-card">
+                <span className="gv-pop-rays" aria-hidden="true" />
+                <span className="gv-pop-kicker">New area unlocked</span>
+                <b className="gv-pop-name">{unlockedNow.name}</b>
+                <span className="gv-pop-art" style={{ backgroundImage: `url(${unlockedNow.bg})` }} />
+                <span className="gv-pop-go">Tap to continue</span>
+            </div>
+        </div>
+    ) : null;
 
     if (!st?.ok) {
         return <div className="gv"><p className="muted">The Grove is closed.</p><style>{GROVE_CSS}</style></div>;
@@ -181,15 +191,7 @@ export default function GroveClient({ initial }) {
                         </div>
                     </div>
                 ) : null}
-                {unlockedNow ? (
-                    <div className="gv-unlock" onClick={() => setUnlockedNow(null)}>
-                        <div>
-                            <span>Area unlocked</span>
-                            <b>{unlockedNow.name}</b>
-                            <button type="button" onClick={() => setUnlockedNow(null)}>Good</button>
-                        </div>
-                    </div>
-                ) : null}
+                {popNode}
                 <style>{GROVE_CSS}</style>
             </div>
         );
@@ -210,50 +212,42 @@ export default function GroveClient({ initial }) {
                 </nav>
             </header>
 
+            {popNode}
             {note ? <p className="gv-note">{note}</p> : null}
 
-            {/* ── THE MAP ──────────────────────────────────────────────────────────────────────────
-                Luke: "I was thinking of a map with nodes."
+            {/* ── THE MAP ──────────────────────────────────────────────────────────────────────
+                Luke: "not enough identity, its supposed to have unique areas resembling the node, and
+                the map should be colorful, the nodes are small. The maps are horizontal."
 
-                It was a grid of big 3:2 cards, which on a phone is one tall column of pictures —
-                a LIST of places, not a map of them. A map has to show the ROUTE: that these twelve
-                are one path, that you are somewhere along it, and that the far end is a long way off.
+                ⚠️ THE TWELVE PAINTINGS ALREADY ARE THE IDENTITY. The parchment region map was one
+                drawing standing in for twelve places, which is why none of them looked like anywhere in
+                particular — and it was sepia, so the one colourful thing about each zone was thrown
+                away. Every zone already has its own full-colour backdrop, the same art you walk into. The
+                map is those twelve, laid left to right, which is also the direction you actually travel.
 
-                ⚠️ THE TRAIL IS DOTS, NOT A LINE OR AN SVG. The nodes sit at percentage x so they stay
-                on the path at any width, and a stroke drawn between two percentage points needs the
-                container measured in JS (or an SVG scaled non-uniformly, which distorts the curve).
-                Interpolated dots need neither: each one is placed at its own percentage and simply
-                cannot distort. It also happens to look like a trail on a treasure map, which is what
-                this is. */}
+                Scrolls horizontally and starts you at the furthest place you have reached, so the journey
+                reads as a journey rather than a wall of thumbnails. */}
             {view === "map" ? (
-                <div className="gv-trail" style={{ height: `${TRAIL_TOP * 2 + (st.zones.length - 1) * TRAIL_GAP}px` }}>
-                    {trailDots(st.zones).map((d) => (
-                        <i key={d.key} className={`gv-dot${d.lit ? " is-lit" : ""}`}
-                            style={{ left: `${d.x}%`, top: `${d.y}px` }} />
-                    ))}
-                    {st.zones.map((z, i) => {
-                        const x = trailX(i);
-                        const y = TRAIL_TOP + i * TRAIL_GAP;
+                <div className="gv-strip" ref={stripRef}>
+                    {st.zones.map((z) => {
                         const done = z.kills >= z.toUnlock;
-                        const right = x < 50;   // label goes on whichever side has room
+                        const pct = Math.min(100, (z.kills / Math.max(1, z.toUnlock)) * 100);
                         return (
                             <button key={z.id} type="button"
-                                className={`gv-pin${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}${right ? " to-right" : " to-left"}`}
+                                data-n={z.n}
+                                className={`gv-area${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}`}
                                 disabled={!z.unlocked} onClick={() => enter(z)}
-                                style={{ left: `${x}%`, top: `${y}px` }}
+                                style={{ backgroundImage: `url(${z.bg})` }}
                                 aria-label={`${z.name}${z.unlocked ? "" : " (locked)"}`}>
-                                <span className="gv-pin-disc"
-                                    style={{ backgroundImage: z.unlocked ? `url(${z.bg})` : undefined }}>
-                                    <b>{z.n}</b>
-                                </span>
-                                <span className="gv-pin-tag">
+                                <span className="gv-area-n">{z.n}</span>
+                                <span className="gv-area-foot">
                                     <em>{z.name}</em>
                                     {z.unlocked ? (
-                                        <span className="gv-pin-meter">
-                                            <i style={{ width: `${Math.min(100, (z.kills / z.toUnlock) * 100)}%` }} />
-                                            <u>{Math.min(z.kills, z.toUnlock)}/{z.toUnlock}</u>
+                                        <span className="gv-area-meter">
+                                            <i style={{ width: `${pct}%` }} />
+                                            <u>{done ? "Cleared" : `${z.kills}/${z.toUnlock}`}</u>
                                         </span>
-                                    ) : <span className="gv-pin-lock">Locked</span>}
+                                    ) : <span className="gv-area-lock">Locked</span>}
                                 </span>
                             </button>
                         );

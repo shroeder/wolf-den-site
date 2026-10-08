@@ -46,84 +46,57 @@ export const GROVE_CSS = `
 .gv-node-bar em { position: absolute; right: 0; top: 7px; font-style: normal; font-size: 0.66rem; color: #cfc6b6; }
 .gv-node-lock { font-size: 0.72rem; letter-spacing: .1em; text-transform: uppercase; }
 
-/* ── THE MAP: A TRAIL OF NODES ──────────────────────────────────────────────────────────────
-   Luke: "I was thinking of a map with nodes." It was a grid of 3:2 cards, which on a phone is a
-   single column of big pictures - a list of places rather than a route between them. */
-/* ⚠️ CAPPED, NOT FULL WIDTH. The route is positioned in PERCENTAGES, so on a 1700px card a
-   sensible swing still left the whole path stranded in the middle third with empty acres either side.
-   A map is a panel, not a backdrop: constrain it and the same percentages fill it properly at every
-   size, phone included. */
-.gv-trail { position: relative; width: 100%; max-width: 540px; margin: 0 auto;
-    border-radius: 14px; overflow: hidden;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(201,162,39,0.22); }
+/* ── THE MAP: THE ZONES THEMSELVES, LEFT TO RIGHT ──────────────────────────────
+   Luke: "its supposed to have unique areas resembling the node, and the map should be colorful ...
+   The maps are horizontal."
 
-/* ⚠️ THE MAP HAS TO BRING ITS OWN GROUND. Luke: "The fuck is that backdrop. Its supposed to look
-   like a map with points of interest." The trail was drawn onto whatever the page had behind it, which
-   is the member’s EQUIPPED COSMETIC BACKDROP - a red curtain, on a forest map. An opaque surface of its
-   own is the fix, and it has to be opaque rather than tinted or every member gets a different map.
+   ⚠️ ONE DRAWING CANNOT GIVE TWELVE PLACES AN IDENTITY. The parchment region map was a single
+   sepia illustration standing in for all of them, so no panel looked like anywhere in particular and
+   the one colourful thing each zone owns - its own painted backdrop - was being thrown away. The map
+   is now those twelve paintings in a row, in the direction you actually travel. */
+.gv-strip { display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden; padding: 4px 2px 12px;
+    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin; scrollbar-color: rgba(159,224,138,0.4) transparent; }
+.gv-strip::-webkit-scrollbar { height: 7px; }
+.gv-strip::-webkit-scrollbar-thumb { background: rgba(159,224,138,0.35); border-radius: 999px; }
 
-   Darkened with a filter rather than hidden under a flat scrim: brightness keeps the ink linework and
-   the parchment grain readable, where an opaque black overlay would flatten the drawing to one tone.
-   See no-overlay-for-lighting. */
-.gv-trail::before { content: ""; position: absolute; inset: 0; background: #0b0d0a;
-    background-image: url("/images/grove/region-map.webp?v=1");
-    background-size: cover; background-position: center top;
-    filter: brightness(0.52) saturate(0.85) contrast(1.05); }
-/* A vignette so the route and the labels sit clearly on top of the terrain rather than fighting it. */
-.gv-trail::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(130% 80% at 50% 40%, rgba(6,8,6,0) 36%, rgba(6,8,6,0.72) 100%); }
-.gv-trail > * { position: absolute; z-index: 1; }
+/* A place on the map. Tall rather than wide so several read at once on a phone and the eye runs
+   along the journey instead of down a list. */
+.gv-area { position: relative; flex: 0 0 auto; width: 188px; height: 250px; scroll-snap-align: start;
+    border-radius: 14px; overflow: hidden; cursor: pointer; padding: 0; font: inherit; color: #fff;
+    background-size: cover; background-position: center;
+    border: 2px solid rgba(255,255,255,0.14); text-align: left;
+    transition: transform 160ms ease, border-color 160ms ease; }
+.gv-area:not(.is-locked):hover { transform: translateY(-3px); border-color: rgba(159,224,138,0.75); }
+.gv-area::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(6,9,6,0.08) 34%, rgba(6,9,6,0.92)); }
+.gv-area > * { position: relative; z-index: 1; }
 
-/* The path. Dots rather than a stroke, because a line between two PERCENTAGE points needs the
-   container measured in JS or an SVG scaled non-uniformly; a dot placed at its own percentage
-   cannot distort at any width. */
-.gv-dot { position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%;
-    background: rgba(255,255,255,0.13); }
-.gv-dot.is-lit { background: rgba(159,224,138,0.5); box-shadow: 0 0 8px rgba(159,224,138,0.35); }
+.gv-area-n { position: absolute; top: 9px; left: 9px; width: 30px; height: 30px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 0.82rem; font-weight: 800; z-index: 2;
+    background: rgba(8,12,8,0.82); color: #9fe08a; border: 1px solid rgba(159,224,138,0.6); }
+.gv-area.is-clear { border-color: rgba(217,180,74,0.8); }
+.gv-area.is-clear .gv-area-n { color: #e8c764; border-color: rgba(217,180,74,0.8); }
 
-/* A stop on the route. The disc carries the zone art so the map still shows you where you are
-   going, just at the size a map marker should be rather than a full-bleed card. */
-.gv-pin { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center;
-    gap: 12px; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; color: inherit; }
-.gv-pin.to-left { flex-direction: row-reverse; }
-.gv-pin-disc { position: relative; flex: 0 0 auto; width: 76px; height: 76px; border-radius: 50%;
-    background-size: cover; background-position: center; background-color: rgba(255,255,255,0.05);
-    border: 2px solid rgba(159,224,138,0.55); box-shadow: 0 6px 18px rgba(0,0,0,0.6); }
-.gv-pin-disc b { position: absolute; left: -6px; top: -6px; width: 26px; height: 26px; border-radius: 50%;
-    display: grid; place-items: center; font-size: 0.74rem; font-weight: 800;
-    background: #0d1109; color: #9fe08a; border: 1px solid rgba(159,224,138,0.6); }
-.gv-pin.is-clear .gv-pin-disc { border-color: #d9b44a; box-shadow: 0 0 16px rgba(217,180,74,0.4), 0 6px 18px rgba(0,0,0,0.6); }
-.gv-pin.is-clear .gv-pin-disc b { color: #e8c764; border-color: rgba(217,180,74,0.7); }
+.gv-area-foot { position: absolute; left: 0; right: 0; bottom: 0; padding: 11px 12px 12px; }
+.gv-area-foot em { display: block; font-style: normal; font-weight: 700; font-size: 0.92rem;
+    line-height: 1.2; color: #f2ead9; text-shadow: 0 1px 4px rgba(0,0,0,0.95); }
+.gv-area-meter { display: block; margin-top: 7px; height: 5px; border-radius: 999px;
+    background: rgba(255,255,255,0.2); position: relative; }
+.gv-area-meter i { display: block; height: 100%; border-radius: 999px; background: #9fe08a; }
+.gv-area.is-clear .gv-area-meter i { background: #e8c764; }
+.gv-area-meter u { position: absolute; right: 0; top: 7px; text-decoration: none; font-size: 0.66rem;
+    letter-spacing: .06em; color: #cfc6b6; }
+.gv-area-lock { display: block; margin-top: 6px; font-size: 0.68rem; letter-spacing: .14em;
+    text-transform: uppercase; color: #8d8578; }
 
-/* ⚠️ A LOCKED STOP KEEPS ITS SHAPE AND LOSES ITS PICTURE. Hiding it entirely would break the
-   route; showing it in full would spoil twelve backdrops at a glance. */
-.gv-pin.is-locked { cursor: not-allowed; }
-/* ⚠️ NO !important HERE. The first version set background-image: none !important and then a
-   repeating-linear-gradient on the background shorthand one line later - and the !important beat the
-   shorthand’s own background-image, so every locked stop rendered as an empty ring with a hole in it.
-   The inline style only ever sets background-image on UNLOCKED pins, so there is nothing to override. */
-/* Sunk into the map rather than frosted over it - a pale hatch on parchment read as glass sitting on
-   top, which made the places you cannot reach the brightest things on the page. */
-.gv-pin.is-locked .gv-pin-disc { border-color: rgba(255,255,255,0.18);
-    background: repeating-linear-gradient(45deg, rgba(0,0,0,0.58) 0 7px, rgba(0,0,0,0.44) 7px 14px);
-    box-shadow: inset 0 2px 10px rgba(0,0,0,0.7); }
-.gv-pin.is-locked .gv-pin-disc b { color: #6f6a60; border-color: rgba(255,255,255,0.14); }
-
-.gv-pin-tag { text-align: left; max-width: 116px; }
-.gv-pin.to-left .gv-pin-tag { text-align: right; }
-/* Terrain behind type needs more than a soft shadow - a second tight shadow gives the letterforms an
-   edge against the ink linework without a plate behind them. */
-.gv-pin-tag em { display: block; font-style: normal; font-weight: 700; font-size: 0.86rem; line-height: 1.2;
-    color: #f4ecdc; text-shadow: 0 1px 3px rgba(0,0,0,1), 0 0 10px rgba(0,0,0,0.95); }
-.gv-pin.is-locked .gv-pin-tag em { color: #a49c8d; }
-.gv-pin-meter { display: block; margin-top: 5px; height: 4px; border-radius: 999px;
-    background: rgba(255,255,255,0.16); position: relative; }
-.gv-pin-meter i { display: block; height: 100%; border-radius: 999px; background: #9fe08a; }
-.gv-pin-meter u { position: absolute; left: 0; top: 6px; text-decoration: none; font-size: 0.62rem;
-    letter-spacing: .06em; color: #9b9487; }
-.gv-pin.to-left .gv-pin-meter u { left: auto; right: 0; }
-.gv-pin-lock { display: block; margin-top: 3px; font-size: 0.64rem; letter-spacing: .12em;
-    text-transform: uppercase; color: #8d8578; text-shadow: 0 1px 3px rgba(0,0,0,1); }
+/* ⚠️ A LOCKED PLACE KEEPS ITS PICTURE AND LOSES ITS COLOUR. Blanking it entirely would make the
+   map a row of grey boxes with nothing to walk toward; full colour would spoil twelve backdrops at a
+   glance. Drained and darkened says "not yet" while still showing there is somewhere to go. */
+.gv-area.is-locked { cursor: not-allowed; border-color: rgba(255,255,255,0.09); }
+.gv-area.is-locked::after { background: linear-gradient(180deg, rgba(6,9,6,0.72), rgba(6,9,6,0.95)); }
+.gv-area.is-locked { filter: grayscale(0.82) brightness(0.52); }
+.gv-area.is-locked .gv-area-n { color: #7d776c; border-color: rgba(255,255,255,0.18); }
 
 /* ── THE SCENE ───────────────────────────────────────────────────────────────────────────────── */
 .gv-scene { position: relative; width: 100%; aspect-ratio: 16/10; border-radius: 14px; overflow: hidden;
@@ -293,6 +266,51 @@ export const GROVE_CSS = `
 .gv-leave { margin-left: auto; pointer-events: auto; padding: 6px 14px; border-radius: 999px; cursor: pointer;
     font: inherit; font-size: 0.78rem; font-weight: 700; color: #efe7d8;
     background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.22); }
+
+/* ── ⚠️ THE UNLOCK POP ─────────────────────────────────────────────────────────────────────
+   Luke: "a dopamine pop middle of the screen for a duration."
+
+   FIXED, not absolute. The zone scene is a full-screen portal on <body> and the map is a scrolling
+   strip; an absolutely positioned overlay would land in the middle of whichever of those happened to
+   be its offset parent rather than in the middle of the SCREEN, which is the one thing this has to do.
+
+   The card scales up past its resting size and settles back — an overshoot is what separates a
+   reward from a notification. */
+.gv-pop { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center;
+    background: rgba(4,6,4,0.72); animation: gvPopIn 180ms ease-out both; cursor: pointer; padding: 20px; }
+.gv-pop-card { position: relative; text-align: center; padding: 30px 34px 26px; border-radius: 22px;
+    background: linear-gradient(rgba(22,32,20,0.98), rgba(10,16,10,0.98));
+    border: 2px solid rgba(159,224,138,0.55);
+    box-shadow: 0 26px 70px rgba(0,0,0,0.85), 0 0 80px rgba(159,224,138,0.22);
+    animation: gvPopCard 520ms cubic-bezier(.2,1.5,.4,1) both; max-width: 340px; }
+/* A slow turn of light behind the card. Sits UNDER the content and never takes a tap. */
+.gv-pop-rays { position: absolute; left: 50%; top: 46%; width: 460px; height: 460px; margin: -230px 0 0 -230px;
+    border-radius: 50%; pointer-events: none; z-index: 0; opacity: .5;
+    background: conic-gradient(from 0deg, rgba(159,224,138,0.32) 0 6deg, transparent 6deg 30deg,
+        rgba(159,224,138,0.32) 30deg 36deg, transparent 36deg 60deg, rgba(159,224,138,0.32) 60deg 66deg,
+        transparent 66deg 90deg, rgba(159,224,138,0.32) 90deg 96deg, transparent 96deg 120deg,
+        rgba(159,224,138,0.32) 120deg 126deg, transparent 126deg 150deg, rgba(159,224,138,0.32) 150deg 156deg,
+        transparent 156deg 180deg, rgba(159,224,138,0.32) 180deg 186deg, transparent 186deg 210deg,
+        rgba(159,224,138,0.32) 210deg 216deg, transparent 216deg 240deg, rgba(159,224,138,0.32) 240deg 246deg,
+        transparent 246deg 270deg, rgba(159,224,138,0.32) 270deg 276deg, transparent 276deg 300deg,
+        rgba(159,224,138,0.32) 300deg 306deg, transparent 306deg 330deg, rgba(159,224,138,0.32) 330deg 336deg,
+        transparent 336deg 360deg);
+    mask-image: radial-gradient(circle, #000 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 70%);
+    animation: gvRays 14s linear infinite; }
+.gv-pop-card > *:not(.gv-pop-rays) { position: relative; z-index: 1; }
+.gv-pop-kicker { display: block; font-size: 0.7rem; letter-spacing: .26em; text-transform: uppercase;
+    color: #9fe08a; }
+.gv-pop-name { display: block; margin: 8px 0 16px; font-size: 1.7rem; line-height: 1.1; color: #f2ead9;
+    text-shadow: 0 2px 14px rgba(0,0,0,0.9); }
+.gv-pop-art { display: block; width: 100%; aspect-ratio: 16/10; border-radius: 14px;
+    background-size: cover; background-position: center;
+    border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 10px 28px rgba(0,0,0,0.7); }
+.gv-pop-go { display: block; margin-top: 16px; font-size: 0.72rem; letter-spacing: .16em;
+    text-transform: uppercase; color: #9b9487; }
+@keyframes gvPopIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gvPopCard { from { opacity: 0; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
+@keyframes gvRays { to { transform: rotate(360deg); } }
 
 .gv-unlock { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center;
     background: rgba(6,10,6,0.86); cursor: pointer; }
