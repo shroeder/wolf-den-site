@@ -150,76 +150,305 @@ export const GROVE_CSS = `
    artwork every tile-width. */
 .gv-sky-t:nth-child(even) { transform: scaleX(-1); }
 
+/* ── ⚠️ THE WORLD LAYER ────────────────────────────────────────────────────────────────────────
+   Everything that is IN the zone lives inside this one element so the screen shake can move the world
+   without moving the interface. The HUD, the boss bar, the streak and Leave are deliberately outside it:
+   a shaking interface reads as a broken page rather than as impact, and Leave is the control you most
+   need when something has gone wrong.
+
+   ⚠️ NO FILTER MAY EVER GO ON THIS ELEMENT. It already carries a transform, so it is a containing
+   block; a filter would additionally flatten every layer of the zone to one tint. See
+   filter-creates-containing-block and no-overlay-for-lighting. */
+.gv-world { position: absolute; inset: 0; will-change: transform; }
+
 /* Every body is anchored at the scene's GROUND LINE and moved by transform. The loop writes translate3d
    onto these; nothing here animates on its own.
 
-   ⚠️ bottom IS 13%, NOT 0. World y=0 is the ground the hero walks on, and on every one of these plates the
-   painted ground sits about an eighth of the way up the frame — anchored at 0 the whole population stood
-   below the forest floor with their legs cut off by the bezel. The number is a property of how the plates
-   were drawn, which is why it lives next to them rather than in the simulation. */
-/* ⚠️ bottom IS A VARIABLE NOW, NOT 13%. The loop computes it from the plate's RENDERED height every
-   frame (see GROUND_OF_PLATE in GroveScene.js): background-size: cover scales the backdrop to the larger
-   of the two ratios, so on any viewport wider than the plate's own 3:2 it renders taller than the scene and
-   is cropped at the top — and 13% of the scene stops being the line the grass is painted on. The 13%
-   fallback is what a 16/10 box resolves to anyway, so nothing moves before the first frame. */
+   ⚠️ bottom IS A VARIABLE, NOT 13%. The loop computes it from the plate's RENDERED height every frame:
+   background-size cover scales the backdrop to the larger of the two ratios, so on any viewport wider than
+   the plate's own 3:2 it renders taller than the scene and is cropped at the top — and 13% of the scene
+   stops being the line the grass is painted on. The 13% fallback is what a 16/10 box resolves to anyway,
+   so nothing moves before the first frame. */
 .gv-foe, .gv-hero, .gv-pet { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    transform-origin: 50% 100%; will-change: transform; }
-/* ⚠️ SIZED IN WORLD UNITS, NOT IN PERCENT OF THE SCENE. The loop publishes --gv-unit (see
-   GroveScene.js); the 1% fallback is exactly what these used to be, so nothing moves on the first frame
-   before the loop has run. A body expressed in percent keeps its pixel size when the scale zooms and only
-   the gaps between bodies grow, which made a portrait phone look like a wide shot of very small animals. */
-.gv-foe { width: calc(8 * var(--gv-unit, 1%)); aspect-ratio: 1; background: none; border: 0; padding: 0;
-    cursor: pointer; margin-left: calc(-4 * var(--gv-unit, 1%));
-    transition: opacity 380ms ease, transform 380ms ease; }
-.gv-foe img { width: 100%; height: 100%; object-fit: contain; display: block;
-    filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
-.gv-foe i { display: block; width: 60%; height: 60%; margin: 20%; border-radius: 50%;
-    background: rgba(255,255,255,0.2); }
-.gv-foe.is-rare img { filter: drop-shadow(0 0 14px rgba(170,140,255,0.85)) drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
-/* The shared death animation. Simple on purpose. */
-.gv-foe.is-dead { opacity: 0; pointer-events: none; }
-/* A boss is bigger than the things that wander around it, and lit so you can pick it out at the end of a
-   zone. The glow is per-layer on the sprite rather than an overlay across the scene - a tint over the whole
-   frame flattens every pixel to one colour. See no-overlay-for-lighting. */
-.gv-foe.is-boss { width: calc(17 * var(--gv-unit, 1%)); margin-left: calc(-8.5 * var(--gv-unit, 1%)); }
-.gv-foe.is-boss img { filter: drop-shadow(0 0 18px rgba(255,170,90,0.6)) drop-shadow(0 6px 10px rgba(0,0,0,0.6)); }
+    will-change: transform; }
+
+/* ── ⚠️ A BODY IS SIZED BY ITS HEIGHT, AND IT USED TO BE SIZED BY ONE SHARED WIDTH ──────────────
+   .gv-foe was width 8 units with aspect-ratio 1 for every creature in the game, and these sprites fill
+   their plates — so a rootrat stood in an 8-unit-tall box against a 7-unit hero and was TALLER THAN THE
+   KNIGHT, while an Elderling was exactly the same size as the rat. One number decided the silhouette of a
+   twelve-zone bestiary, and scale is the first thing an eye reads: no amount of animation work reaches a
+   zone where every animal is the same height as every other animal and all of them match the player.
+
+   So the height comes from GROVE_SIZE per creature, published as --gv-h on each body, and the box is
+   square around it because the sprites are square. Vermin come to the knee and the deep forest looms.
+
+   ⚠️ SIZED IN UNITS, NOT PERCENT. The loop publishes --gv-unit; a body expressed in percent of the scene
+   keeps its pixel size when the scale zooms and only the gaps between bodies grow, which made a portrait
+   phone look like a wide shot of very small animals. */
+.gv-foe, .gv-hero, .gv-pet {
+    height: calc(var(--gv-h, 7) * var(--gv-unit, 1%));
+    width: calc(var(--gv-h, 7) * var(--gv-unit, 1%));
+    margin-left: calc(var(--gv-h, 7) * var(--gv-unit, 1%) / -2);
+}
+.gv-foe { background: none; border: 0; padding: 0; cursor: pointer; }
+
+/* ── ⚠️ THE TRANSITION THAT WAS BREAKING EVERYTHING IS GONE, AND CANNOT COME BACK HERE ─────────
+   .gv-foe used to carry transition: opacity 380ms, transform 380ms while the loop writes a transform onto
+   it sixty times a second. Three separate complaints came out of that one line:
+
+     · a freshly spawned body starts at transform:none, which is the scene's bottom-left corner, and EASES
+       to its real position over 380ms. That is the "floating in from a deterministic spot".
+     · every frame's position is interpolated toward instead of set, so all motion is mush.
+     · scaleX flipping from 1 to -1 is INTERPOLATED THROUGH ZERO, so the sprite squashed flat and came back
+       mirrored every single time a creature turned round. That is the "weird spin", and it looked for all
+       the world like a deliberate animation nobody could find.
+
+   ⚠️ SO POSITION AND FACING ARE NOW ON DIFFERENT ELEMENTS. The shell above is translated; .gv-art below
+   carries the mirror and every squash. A transition added to either one later cannot interpolate a mirror
+   through zero, because no element has both. That is the fix — the deletion alone would have left the trap
+   armed for the next person. */
+.gv-art { position: absolute; inset: 0; transform-origin: 50% 100%; will-change: transform; }
+.gv-art img { width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; display: block;
+    filter: drop-shadow(0 3px 5px rgba(0,0,0,0.45)); }
+
+/* ── THE HIT FLASH ────────────────────────────────────────────────────────────────────────────
+   The struck body goes white for about a frame and a half, so the eye is told WHICH thing was hit without
+   having to find the damage number.
+
+   ⚠️ IT IS THE SPRITE'S OWN SILHOUETTE, masked by the art itself. A white box over the sprite reads as a
+   rendering glitch, and a brightness filter on an already-dark creature barely registers at all. The loop
+   writes the opacity; the mask url arrives as a custom property per body. */
+.gv-flash { position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: #fff;
+    -webkit-mask-image: var(--gv-art-url); mask-image: var(--gv-art-url);
+    -webkit-mask-size: contain; mask-size: contain;
+    -webkit-mask-position: 50% 100%; mask-position: 50% 100%;
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+/* ⚠️ AND IT HIDES ITSELF WHERE MASKING IS NOT SUPPORTED. An unmasked white div is a white rectangle over
+   the creature, which is far worse than no flash — this is the one case where the fallback must be nothing. */
+@supports not ((-webkit-mask-image: url(x)) or (mask-image: url(x))) {
+    .gv-flash { display: none; }
+}
+
+/* ── THE CONTACT SHADOW ───────────────────────────────────────────────────────────────────────
+   The only thing on screen that says how high off the floor a body is, which makes it the thing that sells
+   "grounded" — a sprite with no shadow is pasted on, and the Grove had none. The loop plants it at the
+   SURFACE under the body and shrinks it as the body rises, so a hop leaves its shadow behind on the floor. */
+.gv-shadow { position: absolute; left: 50%; bottom: 0; width: 62%; height: 9%;
+    margin-left: -31%; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.6), rgba(0,0,0,0) 72%); }
+
+/* ── THE SWING ARC ────────────────────────────────────────────────────────────────────────────
+   Visible for the 70ms of the strike and nothing else. The strike being the shortest phase of the swing is
+   what makes it look fast, and a smear in front of the blade is what makes it look like it went somewhere. */
+/* ⚠️ A CRESCENT, NOT A PUFF. The first cut was a soft conic wedge and on film it read as a cloud of dust
+   in front of the hero rather than as a blade going through something. The ring mask is tightened to a thin
+   band and the gradient to a short bright sweep with a hard leading edge, which is what makes the eye read
+   it as a single fast motion instead of an effect fading in. */
+.gv-swipe { position: absolute; left: 46%; top: 16%; width: 66%; height: 68%; opacity: 0; pointer-events: none;
+    border-radius: 50%; filter: drop-shadow(0 0 4px rgba(255,235,170,0.7));
+    background: conic-gradient(from -50deg, rgba(255,255,255,0) 0deg, rgba(255,246,214,0.4) 12deg,
+        rgba(255,255,255,0.92) 32deg, rgba(255,255,255,0) 44deg, rgba(255,255,255,0) 360deg);
+    -webkit-mask-image: radial-gradient(closest-side, transparent 76%, #000 82%, #000 96%, transparent 99%);
+    mask-image: radial-gradient(closest-side, transparent 76%, #000 82%, #000 96%, transparent 99%); }
+
+/* A rare spawn and a boss are lit so you can pick them out. The glow is per-layer on the sprite rather
+   than an overlay across the scene — a tint over the whole frame flattens every pixel to one colour.
+   See no-overlay-for-lighting. */
+.gv-foe.is-rare .gv-art img { filter: drop-shadow(0 0 14px rgba(170,140,255,0.9)) drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
+.gv-foe.is-boss .gv-art img { filter: drop-shadow(0 0 20px rgba(255,170,90,0.65)) drop-shadow(0 6px 10px rgba(0,0,0,0.6)); }
+.gv-foe.is-boss .gv-shadow { width: 70%; height: 7%; margin-left: -35%; }
 
 /* The hero and the pet. The gradient stays as the BACKGROUND of the box, so it is what shows through when
-   there is no sprite yet - a fallback that is a CSS background cannot itself fail to load. */
-.gv-hero { width: calc(7 * var(--gv-unit, 1%)); aspect-ratio: 1; margin-left: calc(-3.5 * var(--gv-unit, 1%));
-    background: radial-gradient(circle at 50% 40%, #ffe28a, #c8872e 62%, transparent 70%); }
-.gv-pet { width: calc(4.5 * var(--gv-unit, 1%)); aspect-ratio: 1; margin-left: calc(-2.25 * var(--gv-unit, 1%));
-    background: radial-gradient(circle at 50% 40%, #9fe08a, #3f7a35 62%, transparent 70%); }
-/* ⚠️ object-fit: contain, AND A CONTACT SHADOW. Without contain the sprite stretches to the box; without
-   the shadow it reads as pasted onto the plate rather than standing on the ground. See
-   sprite-floats-object-fit-contain. The background is cleared only when a sprite is actually there. */
+   there is no sprite yet — a fallback that is a CSS background cannot itself fail to load. */
+.gv-hero { background: radial-gradient(circle at 50% 40%, #ffe28a, #c8872e 62%, transparent 70%); }
+.gv-pet { background: radial-gradient(circle at 50% 40%, #9fe08a, #3f7a35 62%, transparent 70%); }
 .gv-hero:has(img), .gv-pet:has(img) { background: none; }
-.gv-hero img, .gv-pet img { width: 100%; height: 100%; object-fit: contain; display: block;
-    filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
 
-/* A ledge. Earth and moss rather than a UI bar, so it belongs to the painted plate instead of sitting on top
-   of it: a dark soil body, a lit mossy lip along the top, and a soft shadow underneath to give it thickness.
-   Anchored to the same 13% ground line as every body, because a ledge the bodies do not stand ON is worse
-   than no ledge at all. */
-/* ── ⚠️ A BRANCH, NOT A WIRE, AND ITS TOP IS THE FLOOR ─────────────────────────────────────
-   Two things the zoom exposed rather than caused.
+/* ── A LEDGE ──────────────────────────────────────────────────────────────────────────────────
+   Earth and moss rather than a UI bar, so it belongs to the painted plate instead of sitting on top of it.
 
-   The height was a flat 9px, which read as a twig when the frame held a hundred units and reads as dental
-   floss now that a hero is 150px tall beside it. In world units it was a fortieth of his height. Sized in
-   units like every other body, it is the same proportion at every zoom.
+   ⚠️ ITS TOP IS THE STANDING SURFACE. bottom plus the loop's negative translate put the box's BOTTOM edge
+   on the platform's y, while a body standing on that platform has its FEET on the same y — so the bar was
+   drawn in the band ABOVE the floor it represents, covering the shins of anything standing there. The
+   negative margin drops the box by its own height. Nothing in the simulation moves. */
+/* ⚠️ A SHELF OF EARTH, NOT A BAR. At 1.15 units it was a 25-pixel strip of two flat colours, which on
+   film read as a plank floating in mid-air — the single most programmer-art thing in the scene. What makes
+   a ledge belong to a painted forest is thickness, a lit mossy lip that OVERHANGS the soil under it, and a
+   shadow it casts on what is behind. It is 2.1 units deep now, which is a third of a hero: enough to read
+   as ground you are standing on top of rather than a line you are balanced on.
 
-   ⚠️ AND THICKENING IT ALONE WOULD HAVE PUT IT OVER EVERYONE’S FEET. bottom + the loop’s negative
-   translate place the box‘s BOTTOM edge on the platform’s y, while a body standing on that platform has
-   its FEET on the same y — so the bar has always been drawn in the 9px above the floor it represents,
-   covering the bottom of anything standing there. Invisible at 9px, a shin-deep puddle at 24. The negative
-   margin drops the box by exactly its own height so its TOP is the standing surface, which is both correct
-   and what it already looked like. Nothing in the simulation moves; floorUnder never read this. */
+   The rounded ends matter as much as the thickness. A ledge is 13 to 29 units wide against an 18-unit
+   frame, so its ends are often the only part on screen, and a square-cut end reads as the strip continuing
+   off-frame — exactly the "is this a platform or is this the floor" confusion the width change was meant to
+   fix. */
 .gv-ledge { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    height: calc(1.15 * var(--gv-unit, 1%)); margin-bottom: calc(-1.15 * var(--gv-unit, 1%));
-    border-radius: 4px 4px 2px 2px;
+    height: calc(2.1 * var(--gv-unit, 1%)); margin-bottom: calc(-2.1 * var(--gv-unit, 1%));
+    /* ⚠️ THE CORNER RADIUS IS IN UNITS, NOT PERCENT. A percentage radius is a share of the element's own
+       WIDTH, and a ledge is 13 to 29 units wide — so 40% drew ends that were 5 to 12 units of ellipse and
+       every ledge came out as a capsule. In units the end is the same small rounded corner whatever the
+       ledge's length, which is the only way a long one and a short one read as the same kind of object. */
+    border-radius: calc(0.7 * var(--gv-unit, 1%)) calc(0.7 * var(--gv-unit, 1%))
+        calc(0.35 * var(--gv-unit, 1%)) calc(0.35 * var(--gv-unit, 1%));
     pointer-events: none; will-change: transform;
-    background: linear-gradient(#5f7a3a 0 34%, #4a3a28 34% 100%);
-    box-shadow: 0 3px 6px rgba(0,0,0,0.45), inset 0 -2px 0 rgba(0,0,0,0.3); }
+    background:
+        linear-gradient(180deg, #4f7030 0 26%, #4a3a26 26% 44%, #35291c 44% 82%, #241b13 82% 100%),
+        #35291c;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.55), inset 0 -3px 6px rgba(0,0,0,0.5); }
+/* ⚠️ THE MOSS IS A LAYER, NOT A HIGHLIGHT. The first pass tried to do the lit top edge with an inset
+   box-shadow and a pale wash, and against a dark bramble backdrop the whole ledge came out as a flat cream
+   lozenge — the lit edge won and ate the earth under it. A ledge needs its top band to be a real colour of
+   its own, which also gives it somewhere for the grass to sit. */
+/* ⚠️ AND THE MOSS IS DESATURATED. #86b94c against the Mothlight's blue night read as lime plastic — a
+   UI element lying in the forest. Ground cover in these plates is olive, not spring green, and a surface
+   the player stands on has to belong to the painting behind it rather than announce itself. */
+.gv-ledge::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 26%;
+    border-radius: inherit;
+    background: linear-gradient(180deg, #6a8f40, #46632a);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+
+/* ── LOOT ON THE FLOOR ────────────────────────────────────────────────────────────────────────
+   Luke: "when they drop loot, it needs to be like a dopamine inducing explosion of like what they drop and
+   it should hang out on the ground for a while. You should actually see the sprite and the name of it
+   before it gets sucked up to your character."
+
+   ⚠️ THERE WAS NO LOOT ON THE FLOOR AT ALL BEFORE THIS. A kill floated one line of text at the corpse
+   and the drop was deleted the moment you walked within seven units of where it had been — nothing fell,
+   nothing rested, nothing was ever collected. The three stages ARE the reward: the throw says you earned
+   something, the rest lets you read what it is, and the draw-in is the collecting of it.
+
+   The token is drawn rather than drafted from art, and coloured by the part's TIER, so a deep part reads
+   as a deep part at a glance and the Grove needs no sixteen new icons to ship this. */
+.gv-drop { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    width: calc(2.2 * var(--gv-unit, 1%)); height: calc(2.2 * var(--gv-unit, 1%));
+    margin-left: calc(-1.1 * var(--gv-unit, 1%));
+    pointer-events: none; will-change: transform; }
+/* ⚠️ A CUT STONE, NOT A ROUNDED RECTANGLE. The first pass was a soft-cornered box in a pale tier colour,
+   which on a brown forest path read as a blank sticky note lying in the grass — the one thing a reward must
+   never look like. A hard-edged gem silhouette with a bright facet and a dark rim reads as an OBJECT at
+   48 pixels, which is all the size there is to work with. See no-pity-progress-bars for the same instinct:
+   the cheap version of a reward is worse than none. */
+.gv-drop i { position: absolute; inset: 0;
+    clip-path: polygon(50% 0%, 100% 34%, 82% 100%, 18% 100%, 0% 34%);
+    background:
+        linear-gradient(150deg, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0) 42%),
+        linear-gradient(160deg, var(--gv-t1, #cfd6dd), var(--gv-t2, #8e9aa6));
+    filter: drop-shadow(0 0 7px var(--gv-glow, rgba(255,255,255,0.3)))
+        drop-shadow(0 2px 3px rgba(0,0,0,0.75));
+    animation: gvBob 1500ms ease-in-out infinite; }
+.gv-drop.t1 { --gv-t1: #cdbfa2; --gv-t2: #8a7a5c; --gv-glow: rgba(205,191,162,0.3); }
+.gv-drop.t2 { --gv-t1: #b6d3a0; --gv-t2: #6b8f57; --gv-glow: rgba(182,211,160,0.32); }
+.gv-drop.t3 { --gv-t1: #a7cbe0; --gv-t2: #577f96; --gv-glow: rgba(167,203,224,0.34); }
+.gv-drop.t4 { --gv-t1: #c3b0e8; --gv-t2: #6e5aa0; --gv-glow: rgba(195,176,232,0.36); }
+.gv-drop.t5 { --gv-t1: #f2cf8a; --gv-t2: #b48a35; --gv-glow: rgba(242,207,138,0.4); }
+.gv-drop.t6 { --gv-t1: #ffd0e2; --gv-t2: #c4588f; --gv-glow: rgba(255,208,226,0.45); }
+/* An emblem is the rare thing in the pile and has to be picked out of it at a glance: a different
+   silhouette entirely (a star, not a stone) and a much louder glow. Luke: "Emblems are rare." */
+.gv-drop.is-emblem i {
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    background: linear-gradient(160deg, #fff6d8, #ffc14a);
+    filter: drop-shadow(0 0 14px rgba(255,200,110,0.95)) drop-shadow(0 2px 3px rgba(0,0,0,0.7)); }
+.gv-drop.is-rare i { animation: gvBob 1500ms ease-in-out infinite, gvSheen 2200ms linear infinite; }
+/* The name, up long enough to read and then gone — a floor full of old loot must not become a wall of
+   text over the fight. The loop writes the opacity, so this is only how it looks. */
+.gv-drop b { position: absolute; left: 50%; bottom: 112%; transform: translateX(-50%);
+    white-space: nowrap; font-size: 0.68rem; font-weight: 700; letter-spacing: .01em;
+    padding: 2px 7px; border-radius: 999px; opacity: 0;
+    color: #f3ead9; background: rgba(6,10,6,0.78); border: 1px solid rgba(255,255,255,0.18);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+@keyframes gvBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14%); } }
+@keyframes gvSheen { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.45); } }
+
+/* ── PARTICLES AND NUMBERS ────────────────────────────────────────────────────────────────────
+   Created and destroyed by hand into this layer rather than rendered by React — they are born and dead
+   inside half a second, several per swing, and nothing ever updates one. */
+.gv-fx { position: absolute; inset: 0; pointer-events: none; }
+
+/* A thrown damage number. ⚠️ NOT .gv-pop — THAT CLASS IS THE UNLOCK CELEBRATION, which is a fixed
+   full-screen scrim; a damage number wearing it would black out the zone once per hit. Two things called
+   pop in one stylesheet is how that happens. */
+.gv-num { position: absolute; left: 0; bottom: var(--gv-ground, 13%); font-weight: 800; font-size: 0.95rem;
+    white-space: nowrap; pointer-events: none; will-change: transform, opacity;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.6); }
+.gv-num.is-hit { color: #ffe9a8; }
+.gv-num.is-crit { color: #ffb14a; font-size: 1.5rem; letter-spacing: -.01em;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.95), 0 0 16px rgba(255,150,40,0.8); }
+.gv-num.is-took { color: #ff6b6b; font-size: 1.1rem; }
+.gv-num.is-heal { color: #7cffb2; }
+.gv-num.is-loot { color: #cdf5bd; font-size: 0.78rem; font-weight: 700; }
+
+.gv-spark { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    width: calc(0.5 * var(--gv-unit, 1%)); height: calc(0.5 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.25 * var(--gv-unit, 1%)) calc(-0.25 * var(--gv-unit, 1%));
+    border-radius: 50%; pointer-events: none; will-change: transform, opacity;
+    background: #fff6cf; box-shadow: 0 0 6px 2px rgba(255,220,130,0.8); }
+.gv-spark.is-crit { background: #fff; box-shadow: 0 0 9px 3px rgba(255,170,60,0.95); }
+/* Dust is bigger, slower and has no light of its own — it is displaced earth, not energy. */
+.gv-spark.is-dust { width: calc(1.1 * var(--gv-unit, 1%)); height: calc(1.1 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.55 * var(--gv-unit, 1%)) calc(-0.55 * var(--gv-unit, 1%));
+    background: rgba(170,152,120,0.55); box-shadow: none; }
+
+/* The ring an attack leaves when it resolves. It is the difference between damage arriving and damage
+   LANDING somewhere — the player needs to see the place the thing they dodged went off. */
+.gv-boom { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    width: calc(9 * var(--gv-unit, 1%)); height: calc(3 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-1.5 * var(--gv-unit, 1%)) calc(-4.5 * var(--gv-unit, 1%));
+    border-radius: 50%; pointer-events: none; will-change: transform, opacity;
+    border: 2px solid rgba(255,150,100,0.9); }
+.gv-boom.is-sweep { border-color: rgba(255,215,120,0.9); }
+.gv-boom.is-volley { border-color: rgba(190,160,255,0.9); }
+
+/* ── ⚠️ THE TELEGRAPHS ────────────────────────────────────────────────────────────────────────
+   Luke asked for attacks that "telecast where they will damage". A band on the ground where the attack
+   will land, filling left to right over the attack's own wind-up, so what is on screen IS the window you
+   have to leave. The duration comes from the attack, set inline, not guessed at here.
+
+   ⚠️ AN ELLIPSE ON THE FLOOR, NOT A BAR. A rectangle at the ground line reads as a progress meter, which
+   is the one thing a danger zone must not read as; a flattened ellipse reads as a patch of ground. And the
+   loop now places it at the y of the creature that made it, so an attack from a ledge is announced on that
+   ledge rather than painted on the floor underneath while hitting you through it.
+
+   ⚠️ WIDTH IS SET IN PIXELS BY THE LOOP, NOT scaleX. Scaling a 2r-wide box would stretch its border with
+   it, so a wide sweep would have a four-pixel edge and a slam a one-pixel one. */
+/* ⚠️ LOUD, BECAUSE THE FIRST VERSION WAS INVISIBLE. A two-pixel 40%-white rim on a painted forest floor
+   is nothing: filmed at 25ms intervals the band under the hero's feet could barely be found in the frame,
+   and a tell the player does not SEE is the same as no tell at all — which is the whole defect this feature
+   was supposed to have fixed. A danger zone has to win against the busiest art in the game, so: a dark
+   ground wash to separate it from the grass, a thick saturated rim, and a glow that spills past the edge.
+
+   The brightness is deliberately uncomfortable. It is on screen for well under a second and it is the only
+   warning the player gets. */
+.gv-tel { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    height: calc(3.6 * var(--gv-unit, 1%)); margin-bottom: calc(-1.8 * var(--gv-unit, 1%));
+    border-radius: 50%; pointer-events: none; overflow: hidden; will-change: transform;
+    border: 3px solid rgba(255,255,255,0.75); background: rgba(8,3,2,0.55);
+    box-shadow: 0 0 14px 3px rgba(255,90,60,0.5), inset 0 0 12px rgba(0,0,0,0.6);
+    animation: gvTelPulse 300ms ease-in-out infinite alternate; }
+.gv-tel::after { content: ""; position: absolute; inset: 0; transform-origin: 0 50%;
+    animation: gvTel linear forwards; animation-duration: inherit; }
+/* The rim pulses so a telegraph that has only just appeared is still caught by peripheral vision — the eye
+   is drawn to change far more reliably than to colour. */
+@keyframes gvTelPulse { from { filter: brightness(0.85); } to { filter: brightness(1.3); } }
+.gv-tel.is-slam { border-color: rgba(255,140,105,0.95); box-shadow: 0 0 16px 4px rgba(255,80,50,0.6), inset 0 0 12px rgba(0,0,0,0.6); }
+.gv-tel.is-slam::after { background: linear-gradient(90deg, rgba(255,90,60,0.75), rgba(255,160,100,0.95)); }
+.gv-tel.is-sweep { height: calc(2.8 * var(--gv-unit, 1%)); margin-bottom: calc(-1.4 * var(--gv-unit, 1%));
+    border-color: rgba(255,225,135,0.95); box-shadow: 0 0 16px 4px rgba(255,190,60,0.55), inset 0 0 12px rgba(0,0,0,0.6); }
+.gv-tel.is-sweep::after { background: linear-gradient(90deg, rgba(255,180,60,0.7), rgba(255,235,140,0.92)); }
+.gv-tel.is-volley { border-color: rgba(200,175,255,0.95); box-shadow: 0 0 16px 4px rgba(150,110,255,0.6), inset 0 0 12px rgba(0,0,0,0.6); }
+.gv-tel.is-volley::after { background: linear-gradient(90deg, rgba(140,100,255,0.72), rgba(210,185,255,0.95)); }
+@keyframes gvTel { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ── THE SCREEN'S OWN REACTION ────────────────────────────────────────────────────────────────
+   A red wash at the edges on being hit, and a slow pulse while nearly dead. The one piece of feedback a
+   player cannot miss while watching their own character instead of the bar — and in a zone where dying
+   sends you back to town, "I did not notice I was low" is the complaint it prevents.
+
+   ⚠️ A VIGNETTE, NOT A TINT. It is clear in the middle on purpose: a full-frame red overlay would flatten
+   the whole zone to one colour, which is the mistake no-overlay-for-lighting is about, and it would hide
+   the telegraph you are trying to step out of. */
+.gv-vign { position: absolute; inset: 0; z-index: 3; opacity: 0; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 50%, rgba(255,0,0,0) 46%, rgba(185,12,12,0.62) 100%);
+    box-shadow: inset 0 0 70px rgba(170,0,0,0.38); }
 
 /* The boss reward panel rides the area-unlock panel's shape, with room for the sprite and a line for the
    hyper-rare. */
@@ -253,14 +482,12 @@ export const GROVE_CSS = `
 .gv-tel.is-volley::after { background: linear-gradient(90deg, rgba(140,100,255,0.35), rgba(200,170,255,0.8)); }
 @keyframes gvTel { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
-.gv-float { position: absolute; left: 50%; bottom: 40%; font-weight: 800; font-size: 0.95rem;
-    pointer-events: none; animation: gvFloat 900ms ease-out forwards; text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
-.gv-float.is-hit { color: #ffe9a8; }
-.gv-float.is-crit { color: #ff9f4a; font-size: 1.3rem; }
-.gv-float.is-took { color: #ff6b6b; }
-.gv-float.is-heal { color: #7cffb2; }
-.gv-float.is-loot { color: #cdf5bd; font-size: 0.8rem; }
-@keyframes gvFloat { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-34px); } }
+/* ⚠️ .gv-float IS GONE. It was the only damage feedback the Grove had: a span appended to the scene
+   at a fixed left: 50%, bottom: 40% with a CSS keyframe moving it 34px up. So every number in the game
+   appeared in the MIDDLE OF THE SCREEN regardless of what had been hit or where it was standing, four at
+   a time during a volley, stacked on top of each other. A damage number has to be at the thing it
+   describes or it is a HUD element pretending to be feedback. See .gv-num above, which is thrown as a
+   physics body from the point of contact. */
 
 /* Below the HUD row rather than tucked against it - the name and the health bar are two lines and they were
    crowding the hp bar and the kill count. */
@@ -268,10 +495,13 @@ export const GROVE_CSS = `
     text-align: center; pointer-events: none; }
 .gv-boss b { display: block; font-size: 0.8rem; letter-spacing: .1em; text-transform: uppercase;
     color: #e5d2ff; text-shadow: 0 2px 4px rgba(0,0,0,0.9); margin-bottom: 4px; }
-.gv-boss span { display: block; height: 11px; border-radius: 999px; background: rgba(0,0,0,0.6);
-    border: 1px solid rgba(197,160,255,0.55); overflow: hidden; }
-.gv-boss i { display: block; height: 100%; background: linear-gradient(90deg, #a982ff, #e0c6ff);
-    transition: width 220ms ease; }
+.gv-boss span { position: relative; display: block; height: 13px; border-radius: 999px;
+    background: rgba(0,0,0,0.6); border: 1px solid rgba(197,160,255,0.55); overflow: hidden; }
+.gv-boss u, .gv-boss i { position: absolute; left: 0; top: 0; height: 100%; display: block; }
+/* Same chase pair as the player's bar, and for the same reason — against 7,200 hit points a boss bar with
+   no ghost layer barely appears to move at all, which makes a good hit feel like a bad one. */
+.gv-boss u { background: linear-gradient(90deg, #f0e2ff, #fff); }
+.gv-boss i { background: linear-gradient(90deg, #a982ff, #e0c6ff); }
 
 /* The death screen. Covers the zone outright rather than tinting it: a dimmed but still-moving scene reads
    as a stutter, and the one thing it must say clearly is that the run is over and you are going somewhere. */
@@ -291,14 +521,43 @@ export const GROVE_CSS = `
     left: calc(10px + env(safe-area-inset-left));
     right: calc(10px + env(safe-area-inset-right));
     top: calc(10px + env(safe-area-inset-top)); }
-.gv-hp { flex: 0 0 38%; height: 10px; border-radius: 999px; background: rgba(0,0,0,0.6);
+/* ── THE CHASE BAR ────────────────────────────────────────────────────────────────────────────
+   Luke: "how it shows their health plummeting with their like intermediate red lerp bar."
+
+   Two layers. The front one IS the health and moves instantly; the one behind holds where the health used
+   to be and catches up after a beat, so the bright strip between them is the SIZE of the chunk just taken
+   off rather than something inferred from two numbers.
+
+   ⚠️ NO CSS TRANSITION ON EITHER OF THEM. The loop writes both widths every frame (see stepChase), and a
+   transition on top of a per-frame write is the .gv-foe bug again in a different place: the easing fights
+   the simulation and the result is mush with a lag on it. The 180ms transition that used to be on the fill
+   is exactly why a big hit read as the bar sliding rather than as a bite being taken out of it. */
+.gv-hp { position: relative; flex: 0 0 38%; height: 11px; border-radius: 999px; background: rgba(0,0,0,0.62);
     border: 1px solid rgba(255,255,255,0.2); overflow: hidden; }
-.gv-hp i { display: block; height: 100%; background: linear-gradient(90deg, #d8402f, #ff8a6b);
-    transition: width 180ms ease; }
+.gv-hp u, .gv-hp i { position: absolute; left: 0; top: 0; height: 100%; display: block; }
+.gv-hp u { background: linear-gradient(90deg, #ffd0c0, #fff1e6); }
+.gv-hp i { background: linear-gradient(90deg, #d8402f, #ff8a6b); }
 .gv-hud b { font-size: 0.78rem; color: #efe7d8; text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
 .gv-leave { margin-left: auto; pointer-events: auto; padding: 6px 14px; border-radius: 999px; cursor: pointer;
     font: inherit; font-size: 0.78rem; font-weight: 700; color: #efe7d8;
     background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.22); }
+
+/* ── THE STREAK ───────────────────────────────────────────────────────────────────────────────
+   ⚠️ IT PAYS NOTHING, DELIBERATELY. The Grove is a kill loop with no daily cap, so a reward multiplier
+   for killing faster would be a faucet with a pedal on it — see COMBO_WINDOW_MS in grove-juice.js. What a
+   streak is FOR here is the rhythm: a number that climbs, a hit sound that rises in pitch with it, and a
+   word at the rungs. That is most of where a grinder's dopamine actually comes from and it costs the
+   economy nothing at all.
+
+   Top right, under the HUD row, out of the thumb's way on a phone. Empty until there is a streak, so it
+   is not one more permanent number on the screen. */
+.gv-combo { position: absolute; z-index: 4; pointer-events: none;
+    right: calc(14px + env(safe-area-inset-right)); top: calc(44px + env(safe-area-inset-top));
+    font-size: 1.05rem; font-weight: 800; letter-spacing: .02em; color: #ffe9a8;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.95); opacity: 0; transform: scale(.8);
+    transition: opacity 140ms ease, transform 140ms cubic-bezier(.2,1.7,.4,1); }
+.gv-combo.is-on { opacity: 1; transform: scale(1); }
+.gv-combo.is-hot { color: #ffb14a; text-shadow: 0 2px 5px rgba(0,0,0,0.95), 0 0 18px rgba(255,150,40,0.75); }
 
 /* ── ⚠️ THE UNLOCK POP ─────────────────────────────────────────────────────────────────────
    Luke: "a dopamine pop middle of the screen for a duration."

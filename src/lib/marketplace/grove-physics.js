@@ -47,6 +47,15 @@ export const MAX_STEP_Y = 2.0;
 // Still-grounded for this many frames after walking off an edge, which is what stops a hop at the lip of a
 // ledge silently doing nothing. Every platformer has this and it is invisible when it works.
 export const COYOTE_FRAMES = 6;
+// ── ⚠️ HOP LIVES HERE NOW, NOT IN grove-world.js, BECAUSE IT IS MEANINGLESS AWAY FROM GRAVITY ──────────
+// A jump height is the PAIR (power, gravity) and nothing else: 2.0 against 0.055 apexes at v2/2g = 36 units,
+// which clears the 26-unit first tier with room to misjudge and takes about 0.6s to get there. Written in two
+// different files those two numbers drift apart, and the symptom is a hero who can no longer reach a ledge —
+// which reads as a level-design problem rather than as a constant having moved. grove-world.js carried its own
+// GRAVITY alongside this repo's other scar about exactly that (balance-constants-never-copied).
+export const HOP = 1.35;
+// How high a body can get from a standing hop, which is what any pathing has to be allowed to assume.
+export const HOP_RISE = (HOP * HOP) / (2 * GRAVITY);
 
 /** A body. `h` is its height and `halfW` its half-width — both used for landing and for being hit. */
 export function makeBody({ x = 0, y = 0, h = 7, halfW = 2.2, speed = 1, face = 1, ...rest } = {}) {
@@ -80,7 +89,10 @@ export const hasFloorAt = (platforms, x, y) =>
  * `dir` is -1, 0 or 1. The body's own `speed` scales its ceiling, so a slow wanderer and the hero share this
  * function and differ by a number — see reuse-the-rule-never-restate-it.
  */
-export function drive(body, dir, { accel = 0.09, max = 0.26 } = {}) {
+// ⚠️ TOP SPEED AGAINST THE FRAME, NOT AGAINST NOTHING. 0.26 a frame is 15.6 units a second, which
+// crosses an eighteen-unit phone frame in 1.15 seconds — a sprint, and fast enough that the hero outruns the
+// camera's own easing. 0.22 crosses it in 1.4s, which still feels brisk and keeps him inside the deadzone.
+export function drive(body, dir, { accel = 0.08, max = 0.22 } = {}) {
     const b = body;
     if (!dir) return b;
     const ceiling = max * (b.speed || 1);
@@ -159,6 +171,29 @@ export function integrate(body, platforms, dt, { bounce = 0, friction = null, cl
         if (!b.grounded && b.coyote > 0) b.coyote -= h;
     }
 
+    // ── ⚠️ THE BACKSTOP: NOTHING IS EVER BELOW THE GROUND ───────────────────────────────────────────
+    // The landing test above is deliberately one-way — it only catches a body that was ABOVE a surface when
+    // the step began — and that is what makes platforms passable from underneath. The cost is that a body
+    // which somehow ends up UNDER a floor can never land again: it falls at terminal velocity for ever with
+    // grounded stuck at whatever it was. That is not a theoretical hole; it is exactly what a single
+    // negative-dt frame did to every body in the Grove at once (see makeClock in grove-juice.js).
+    //
+    // The ground is y = 0 and platformsFor guarantees it is continuous across the whole zone, so "below
+    // zero" is never a legal position for anything. Catching it here rather than only fixing the clock is
+    // the difference between fixing one bug and closing the trapdoor: a future tunnelling cause — a resumed
+    // tab, a huge knockback, a dt that is NaN — lands a body back on the floor instead of deleting the
+    // entire population of the zone in a way that reads as the sprites having failed to load.
+    if (b.y < 0) {
+        b.y = 0;
+        if (b.vy < 0) b.vy = 0;
+        b.grounded = true;
+        b.recovered = (b.recovered || 0) + 1;
+    }
+    if (!Number.isFinite(b.y) || !Number.isFinite(b.vy)) {
+        b.y = 0; b.vy = 0; b.vx = 0; b.grounded = true;
+        b.recovered = (b.recovered || 0) + 1;
+    }
+
     // ── FRICTION ────────────────────────────────────────────────────────────────────────────────────
     // Applied once per frame rather than per substep: it is a feel number, and compounding it by the
     // substep count would make a fast-moving body stickier than a slow one for no reason a player could
@@ -204,4 +239,115 @@ export function edgeAhead(platforms, body, dir, look = 6) {
         if (!hasFloorAt(platforms, body.x + dir * d, body.y)) return d;
     }
     return Infinity;
+}
+
+/**
+ * The ledge the body should get onto NEXT on its way to a goal, or null if there is no climbing left to do.
+ *
+ * ⚠️ IT WALKS THE PARENT CHAIN THE GENERATOR RECORDED, rather than looking for the nearest ledge above.
+ * Nearest-above is the obvious implementation and it does not work: tier two sits above ONE tier-one ledge,
+ * so a hero who walks to the tier-one ledge closest to the goal and then looks up finds a ledge it cannot
+ * reach from where it is standing, walks at it, falls off the lip, lands, and repeats — a creature visibly
+ * trying and visibly failing, for ever. The chain is the only thing that knows which ledge leads where.
+ */
+export function routeTo(platforms, body, goalX, goalY) {
+    const goal = surfaceUnder(platforms, goalX, goalY + 0.5);
+    const at = surfaceUnder(platforms, body.x, body.y + 0.5);
+    // Goal down to the ground. Bounded — a malformed chain must not spin the frame.
+    const chain = [];
+    let p = goal;
+    while (p && chain.length < 8) {
+        chain.push(p);
+        p = p.parent >= 0 ? platforms[p.parent] : null;
+    }
+    const idx = chain.indexOf(at);
+    if (idx === 0) return null;                  // already on the goal's own ledge
+    if (idx > 0) return chain[idx - 1];          // the next rung up
+    // Not on the route at all: the thing to do is get back to its foot, which for anything standing on a
+    // ledge means walking at it and coming off the lip. Returning the chain's lowest LEDGE (not the ground)
+    // is what points the walk the right way along the zone.
+    return chain.length > 1 ? { ...chain[chain.length - 2], descend: true } : null;
+}
+
+/**
+ * Which way to walk, and whether to hop, to get from a body to a point — INCLUDING a point on a ledge above it.
+ *
+ * ⚠️ NOTHING IN THE GROVE COULD CLIMB BEFORE THIS, AND THE LEDGES HAVE EXISTED SINCE THE FIRST VERSION.
+ * Luke asked for zones where "the hero and pet can navigate left and right and hop platforms making the zone
+ * vertical", the platform ladder was built, the ledges were drawn, enemies were spawned onto them — and the
+ * only mover in the scene walked toward a target x and never jumped. So every creature standing on a ledge
+ * was unreachable, every ledge was scenery, and the vertical half of the zone was decoration. A thing the
+ * player can see, can tap, and cannot get to is worse than one that is not there.
+ *
+ * Returns { dir, hop } — an intent, never a position. The caller passes dir to drive() and hop to hop(), so
+ * the result still goes through the solver and a climbing body keeps its weight, friction and knockback. A
+ * body knocked off mid-climb simply re-plans from wherever it landed; no path is stored and none goes stale.
+ */
+export function navigate(platforms, body, goalX, goalY, { arrive = 1.6 } = {}) {
+    const b = body;
+    const walk = (toX) => {
+        const dx = toX - b.x;
+        return { dir: Math.abs(dx) > arrive ? Math.sign(dx) : 0, hop: false };
+    };
+    // Level with us, or below: walk at it. Falling needs no decision — the lip of the ledge makes it.
+    if (goalY - b.y < 4) return walk(goalX);
+
+    const next = routeTo(platforms, b, goalX, goalY);
+    if (!next) return walk(goalX);
+    if (next.descend) return walk(next.x + next.w / 2);
+
+    const at = surfaceUnder(platforms, b.x, b.y + 0.5);
+    // ⚠️ AIM INSIDE THE OVERLAP OF WHAT WE ARE ON AND WHAT WE ARE CLIMBING ONTO. That intersection IS the
+    // launch pad — the only stretch of floor from which a straight-up hop lands on the next rung. The
+    // generator guarantees it is at least TIER_OVERLAP wide.
+    const lo = Math.max(next.x + 1, at.x + 1);
+    const hi = Math.min(next.x + next.w - 1, at.x + at.w - 1);
+    const pad = hi > lo;
+    const over = pad && b.x >= lo && b.x <= hi;
+    if (!pad) return walk(next.x + next.w / 2);
+    // Aim at the middle of the pad rather than its lip, biased toward the goal — hopping off the very edge of
+    // the launch pad lands on the very edge of the ledge above, which is where a body then slides off.
+    const aim = Math.max(Math.min(lo + 2, hi), Math.min(Math.max(hi - 2, lo), goalX));
+    // ⚠️ NO ARRIVAL TOLERANCE WHILE CLIMBING, AND THAT IS NOT A DETAIL — IT WAS A DEADLOCK. walk()
+    // stops pushing once it is within 1.6 units of its aim, which is fine for a destination and fatal for a
+    // launch pad: a body standing 0.3 units SHORT of the pad was "arrived", so dir went to 0 while over
+    // stayed false, and it stood there not climbing for ever. Four ledges across five zones were unreachable
+    // for exactly that reason and the symptom was a hero who simply would not jump. Pushing until over is
+    // true always terminates, because aim is strictly inside the pad.
+    return { dir: over ? 0 : Math.sign(aim - b.x) || 1, hop: over && (b.grounded || b.coyote > 0) };
+}
+
+/**
+ * A wandering body's next intent: amble, pause, turn at a lip, occasionally hop.
+ *
+ * ⚠️ IT TURNS AROUND AT AN EDGE RATHER THAN WALKING OFF IT. The old wanderer authored a target x and let
+ * gravity sort out the rest, so a zone's whole population drained off its ledges onto the floor within about
+ * twenty seconds and every ledge was permanently empty — which is the same bug as the ledges being
+ * unreachable, seen from the other side. edgeAhead is what a creature uses to notice the floor ends.
+ */
+export const WANDER_HOP_CHANCE = 0.18;
+export function wanderIntent(body, platforms, rand, dt) {
+    const f = body;
+    f.wait = (f.wait || 0) - dt;
+    if (f.wait <= 0) {
+        const roll = rand();
+        f.wdir = roll < 0.3 ? 0 : roll < 0.65 ? -1 : 1;
+        f.wait = 30 + rand() * 110;
+        f.wantHop = f.grounded && rand() < WANDER_HOP_CHANCE;
+    }
+    let dir = f.wdir || 0;
+    // The floor runs out ahead: turn now and commit to the new direction, so it does not jitter on the lip.
+    if (dir && edgeAhead(platforms, f, dir, 4) < 4) { dir = -dir; f.wdir = dir; f.wait = 30 + rand() * 60; }
+
+    // ── ⚠️ A HOP IS IN PLACE, AND NEVER NEAR A LIP ──────────────────────────────────────────────────
+    // Turning round at an edge is not enough on its own. A hop carries about eighteen units of horizontal
+    // drift, and air friction barely touches it, so a creature that hopped anywhere near the end of its
+    // ledge sailed off it — 28 of 40 wanderers were on the floor within fifteen seconds of a test that only
+    // ever asked them to amble. Every ledge in the zone emptying itself looks exactly like enemies never
+    // having been put there.
+    let hop = Boolean(f.wantHop);
+    f.wantHop = false;
+    if (hop && f.y > 0.5 && Math.min(edgeAhead(platforms, f, 1, 5), edgeAhead(platforms, f, -1, 5)) < 5) hop = false;
+    // Up, not along: the hop is a bit of life, not travel.
+    return { dir: hop ? 0 : dir, hop };
 }

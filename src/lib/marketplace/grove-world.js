@@ -14,117 +14,147 @@
 
 export const UNITS_PER_SCREEN = 100;
 
-// ── ⚠️ THESE ARE PER-FRAME AT 60fps, AND THE FIRST SET WAS WRONG BY TWO ORDERS OF MAGNITUDE ──────────────────
-// WALK was 0.019, which is 1.1 units a second — ninety seconds to cross ONE screen of a zone that is three to
-// seven screens wide. HOP was 0.072 against GRAVITY 0.0042, which clears 0.6 units when the lowest platform
-// is at 26. The scene looked right and was unplayable: enemies spawned, the hero took a step, and nothing
-// could ever be reached.
+// ── ⚠️ GRAVITY, WALK AND HOP USED TO LIVE HERE, AND THAT WAS A SECOND COPY OF THE GAME ─────────────────────
+// They are gone to grove-physics.js, where the solver that reads them is. Two reasons, both already paid for
+// in this repo:
 //
-// Set from the feel wanted instead. WALK crosses a screen in about six and a half seconds. HOP against
-// GRAVITY clears 36 units — comfortably over the 26-unit first tier with room to misjudge — and reaches the
-// top in about 0.6s, which is a hop rather than a float.
-export const GRAVITY = 0.055;
-export const WALK = 0.26;
-export const HOP = 2.0;
+//   1. GRAVITY was declared HERE and again in grove-physics.js — the same fact in two files, which is how a
+//      balance number ends up running a second, different game (balance-constants-never-copied). A jump
+//      height is the pair (HOP, GRAVITY); separate them and the hero silently stops being able to reach the
+//      first ledge, which reads as a level problem rather than as a constant having drifted.
+//   2. WALK is not a speed any more. The solver ACCELERATES toward a direction (see drive()), so a top speed
+//      is a ceiling rather than an assignment — that is the whole difference between a body with weight and
+//      one whose position is authored frame by frame.
+//
+// The history is worth keeping, because the first set of these was wrong by two orders of magnitude and the
+// scene looked perfectly fine while being unplayable: WALK 0.019 is 1.1 units a second, which is ninety
+// seconds to cross one screen of a zone that is three to seven screens wide, and HOP 0.072 against GRAVITY
+// 0.0042 clears 0.6 units when the lowest ledge is at 26. Enemies spawned, the hero took a step, and nothing
+// in the zone could ever be reached by anybody.
 
 // A zone is this many screens wide. Zone 1 is small and they open out.
 export const zoneWidth = (n) => 3 + Math.min(4, Math.floor((n - 1) / 3));
+
+// How far apart the tiers are. ⚠️ ONE NUMBER, AND grove-physics.js HOP IS CHOSEN AGAINST IT — a standing
+// hop rises 36 units, so a 26-unit tier is clearable with room to misjudge. Raise this past HOP_RISE and
+// the entire vertical half of every zone silently becomes scenery again.
+// ⚠️ 11, NOT 26 — see the long note on HOP in grove-physics.js. A tier at 26 units sat off the top of
+// an eighteen-unit frame, so the only way to see the ledge you were climbing to was for the camera to crane
+// up and lose the ground. At 11 it is about one and a half hero-heights: visible from the floor, reachable
+// in one hop, and it finally puts something in the empty canopy that was four-fifths of every phone frame.
+export const TIER_RISE = 11;
+// How much of its parent a ledge must sit over. This is the landing window: a body standing on the ledge
+// below has to be underneath the one above for a straight-up hop to put it there.
+const TIER_OVERLAP = 7;
 
 /**
  * The platform ladder for a zone. Deterministic from the zone number, so the server and the client agree
  * about the shape of the place and a player cannot claim to have stood somewhere there is no floor.
  *
- * Ground is always y=0 and always continuous — you can never be stranded. Everything above it is optional
- * and is what makes the zone vertical.
+ * Ground is always y=0 and always continuous — you can never be stranded. Everything above it is what makes
+ * the zone vertical.
+ *
+ * ── ⚠️ IT IS A STAIRCASE NOW, AND IT USED TO BE THREE INDEPENDENT ROWS OF FLOATING SLABS ─────────────
+ * Each tier was laid out across the whole zone with its own random x, which meant a tier-2 ledge had no
+ * reason to have a tier-1 ledge anywhere beneath it — and a ledge with nothing under it is, with a 36-unit
+ * hop and a 52-unit height, UNREACHABLE FOR EVER. scripts/check-grove-physics.mjs caught it the moment the
+ * hero could climb at all: of 36 ledges across five zones, four were stranded, every one of them on a tier
+ * above the first.
+ *
+ * ⚠️ AND THINGS WERE BEING SPAWNED ONTO THEM. spawnOnPlatform weights by width, so a stranded ledge got its
+ * fair share of the zone's fifteen-to-thirty creatures — a tappable enemy, holding loot, that no player could
+ * ever walk to, in a zone that is cleared by a kill count. That is the worst shape a bug can have: it costs
+ * the player progress and reads as them being bad at it.
+ *
+ * So a ledge is now the child of a ledge below it and must overlap its parent. Which fixes the geometry and,
+ * incidentally, the composition — a built staircase reads as somewhere to go, where scattered slabs at three
+ * heights read as debris.
  */
 export function platformsFor(zoneN, rand) {
     const w = zoneWidth(zoneN) * UNITS_PER_SCREEN;
-    const out = [{ x: 0, w, y: 0 }];
-    // Later zones get more and higher ledges — the Warren and the Palisade are meant to be climbed.
+    // ⚠️ EACH LEDGE RECORDS THE ONE IT WAS BUILT ON TOP OF, and that is not bookkeeping — it is the route.
+    // The generator is the only thing that ever KNOWS which ledge is reachable from which; rediscovering it
+    // at run time from positions alone is guesswork, and guessing is what left the hero walking to the
+    // nearest ledge, finding the next tier was above a DIFFERENT one, stepping off, falling, and starting
+    // again for ever. A climb is a walk up this chain.
+    const ground = { x: 0, w, y: 0, i: 0, parent: -1 };
+    const out = [ground];
+    // Later zones get more tiers — the Warren and the Palisade are meant to be climbed.
     const tiers = Math.min(3, Math.floor((zoneN - 1) / 4) + 1);
+
+    let below = [ground];
     for (let t = 1; t <= tiers; t += 1) {
-        const y = t * 26;
-        let x = 14 + rand() * 30;
-        while (x < w - 40) {
-            const pw = 26 + rand() * 40;
-            out.push({ x, w: pw, y });
-            x += pw + 34 + rand() * 60;
+        const y = t * TIER_RISE;
+        const row = [];
+        // ── ⚠️ A TIER THAT CAN ROLL ITSELF OUT OF EXISTENCE IS NOT A TIER ────────────────────────
+        // The first cut gave each parent a child on a dice roll, and across a handful of parents the whole
+        // row could come up empty — zones ELEVEN and TWELVE, the two deepest in the map and the ones Luke
+        // wanted climbed ("the Warren and the Palisade are meant to be climbed"), generated as FLAT: one
+        // ground plank, three ledges, and nothing above them. A zone's shape is content, and content does
+        // not get decided by an unguarded coin flip.
+        //
+        // So the dice choose WHERE and HOW MANY, never WHETHER. If a row comes up empty it is forced onto
+        // the widest parent available, which is also the one most likely to have room for the overlap.
+        for (const parent of below) {
+            const want = parent.y === 0
+                ? Math.max(2, Math.round(parent.w / 70))
+                : (parent.w > 24 && rand() < 0.34 ? 2 : rand() < 0.78 ? 1 : 0);
+            for (let i = 0; i < want; i += 1) addLedge(parent);
+        }
+        if (!row.length) addLedge([...below].sort((a, b) => b.w - a.w)[0], true);
+        if (!row.length) break;
+        for (const r of row) { r.i = out.length; out.push(r); }
+        below = row;
+
+        // Placing one ledge on a parent: inside the zone, overlapping its parent by at least TIER_OVERLAP,
+        // and not shoulder to shoulder with a sibling. ⚠️ IT RETRIES RATHER THAN GIVING UP — a single
+        // unlucky x used to drop the ledge entirely and silently, which is how a six-screen zone ended up
+        // with three places to stand.
+        function addLedge(parent, forced = false) {
+            if (!parent) return;
+            for (let attempt = 0; attempt < 8; attempt += 1) {
+                // ⚠️ 13 TO 29 UNITS, WHICH IS HALF A SCREEN TO ONE AND A HALF. At 30-72 a ledge was
+                // two to four screens wide: you could not see either end of it, so it read as another floor
+                // rather than as a platform, and a platformer whose platforms have no visible edges is just
+                // a corridor at a different height.
+                const pw = 13 + rand() * 16;
+                const lo = Math.max(2, parent.x - pw + TIER_OVERLAP);
+                const hi = Math.min(w - pw - 2, parent.x + parent.w - TIER_OVERLAP);
+                if (hi <= lo) return;
+                const x = lo + rand() * (hi - lo);
+                // Two ledges a few units apart on the same tier read as one broken ledge, and the gap
+                // between them is a hole you fall down by accident.
+                const crowded = row.some((r) => x < r.x + r.w + 8 && r.x < x + pw + 8);
+                if (crowded && !(forced && attempt === 7)) continue;
+                row.push({ x, w: pw, y, i: -1, parent: parent.i });
+                return;
+            }
         }
     }
     return out;
 }
 
-/** The platform directly under a point, or the ground. Used for landing and for where loot settles. */
-export function floorUnder(platforms, x, y) {
-    let best = platforms[0];
-    for (const p of platforms) {
-        if (x < p.x || x > p.x + p.w) continue;
-        if (p.y <= y + 0.5 && p.y >= best.y) best = p;
-    }
-    return best;
-}
-
-/** A platform you could hop UP onto from here — what the auto-walker aims at when the target is above. */
-export function stepUpFrom(platforms, x, y) {
-    let best = null;
-    for (const p of platforms) {
-        if (p.y <= y || p.y > y + 30) continue;
-        const near = x >= p.x - 12 && x <= p.x + p.w + 12;
-        if (!near) continue;
-        if (!best || p.y < best.y) best = p;
-    }
-    return best;
-}
-
-// ── THE SIM ──────────────────────────────────────────────────────────────────────────────────────────────────
-// One step of the world. Called from the scene's rAF at a clamped dt.
+// ── ⚠️ floorUnder IS GONE, AND IT WAS THE ROOT OF WHAT LUKE NOTICED ────────────────────────────────────────
+// It answered "what is under me" from a position alone, which is not an answerable question: a body inside a
+// ledge's x-span is either standing on top of that ledge or walking along underneath it, and only where it
+// came FROM distinguishes those two. So nothing in the Grove was ever grounded on a ledge it had not been
+// placed on, walking off a lip kept your height until your x left the span and then teleported you down, and
+// a big frame could pass a body straight through a floor.
 //
-// ⚠️ dt IS CLAMPED BY THE CALLER, NOT HERE. A backgrounded tab resumes with a four-second frame, and a
-// four-second step would fire every enemy through the floor. Same scar as the gachapon's physics.
+// surfaceUnder(platforms, x, fromY) in grove-physics.js replaces it and takes the height being fallen from,
+// which is the entire difference. It is also what makes a platform ONE-WAY — landed on from above, passed
+// through from below — without anybody writing a special case.
 
-/** Walk a body toward a target x, hopping up when the way is blocked by height. */
-export function stepBody(body, platforms, dt, target) {
-    const b = body;
-    if (target != null) {
-        const dx = target - b.x;
-        if (Math.abs(dx) > 1.2) {
-            b.vx = Math.sign(dx) * WALK * (b.speed || 1);
-            b.face = Math.sign(dx);
-        } else {
-            b.vx = 0;
-        }
-    } else {
-        b.vx = 0;
-    }
-
-    b.x += b.vx * dt;
-    b.vy -= GRAVITY * dt;
-    b.y += b.vy * dt;
-
-    const floor = floorUnder(platforms, b.x, b.y);
-    if (b.y <= floor.y) {
-        b.y = floor.y;
-        b.vy = 0;
-        b.grounded = true;
-    } else {
-        b.grounded = false;
-    }
-    return b;
-}
-
-/** A wandering enemy: drifts, pauses, and hops occasionally. Luke: "The enemies would hop around and wander." */
-export function stepWander(foe, platforms, dt, rand) {
-    const f = foe;
-    f.t = (f.t || 0) - dt;
-    if (f.t <= 0) {
-        // Re-decide: stand still, amble left, or amble right — and sometimes hop.
-        const roll = rand();
-        f.goal = roll < 0.34 ? null : f.x + (roll < 0.67 ? -1 : 1) * (8 + rand() * 22);
-        f.t = 40 + rand() * 120;
-        if (f.grounded && rand() < 0.25) f.vy = HOP * (0.6 + rand() * 0.5);
-    }
-    return stepBody(f, platforms, dt, f.goal);
-}
+// ── ⚠️ THE SIM MOVED TO grove-physics.js ───────────────────────────────────────────────────────────────────
+// stepBody and stepWander used to be here. They did not simulate movement, they AUTHORED it: vx was assigned
+// from the sign of the distance to a target and zeroed on arrival, and y was snapped to whatever floorUnder
+// returned. Everything therefore started and stopped instantly at exactly one speed, nothing had weight,
+// nothing could be knocked back, nothing could be interrupted by a hit, and a wanderer strolled off every
+// ledge in the zone because nothing ever looked ahead for the edge of the floor.
+//
+// What replaces them: integrate() + drive() + hop() + navigate() + wanderIntent(). The split is on purpose —
+// an INTENT (which way, and whether to jump) is decided per creature, and the solver turns intents into
+// positions. One solver, one set of rules, and a rootrat and the hero differ by a number.
 
 // ── COMBAT ───────────────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "Armor mitigated damage. Life steal applies for the character."
@@ -167,9 +197,33 @@ export function swing({ power, critRate = 0, critDamage = 0, lifeSteal = 0 }, ta
 //
 // `attack` is a row from a boss's `attacks` (see GROVE_BOSSES). Omitted, this falls back to the creature's own
 // single wind-up, which is what every wanderer uses.
+// ── ⚠️ A TELEGRAPH HAS TO BE DODGEABLE, AND NOT ONE OF THEM WAS ────────────────────────────────────────
+// A band is centred on where you were standing when the attack was cast, so dodging means covering more than
+// its reach before it fires. The hero moves 0.26 units a frame, which is 15.6 units a second. So:
+//
+//   attack   tell     you can cover   old reach   could you dodge it?
+//   slam     620ms    9.7 units       13          no
+//   sweep    1050ms   16.4 units      34          not even close
+//   wanderer 650ms    10.1 units      10          only by standing exactly on the edge
+//
+// Every wind-up in the feature was a slow hit with a light show on it, which is the exact thing Luke asked
+// for the OPPOSITE of. Worse, at the scale the scene actually renders at, a 10-unit reach is a band TWENTY
+// UNITS WIDE on an eighteen-unit frame: the tell covered more than the whole screen, so there was visibly
+// nowhere to go even if you were fast enough to get there.
+//
+// ⚠️ THE DEFAULT IS NOW THE CREATURE'S OWN SIZE. A band that matches the body making it reads as that
+// creature's reach rather than as an arbitrary rectangle, which is the other half of a telegraph working:
+// you learn that the big thing hits further because you can see that it does.
+// Against the slower walk: a 650ms wind-up gives the hero 8.6 units of travel, so a band wider than about
+// six units either way cannot be left. And six units is already a third of the visible frame.
+export const REACH_MIN = 2.5;
+export const REACH_MAX = 6;
+export const reachOf = (foe) => Number(foe?.reach)
+    || Math.max(REACH_MIN, Math.min(REACH_MAX, (Number(foe?.h) || 5) * 0.9));
+
 export function makeTelegraph(foe, at, now, attack = null) {
     const ms = Number(attack?.telegraph) || Number(foe.telegraph) || 600;
-    const reach = Number(attack?.reach) || Number(foe.reach) || 10;
+    const reach = Number(attack?.reach) || reachOf(foe);
     const shots = Math.max(1, Number(attack?.shots) || 1);
     const spread = Number(attack?.spread) || 0;
     const out = [];
@@ -183,6 +237,12 @@ export function makeTelegraph(foe, at, now, attack = null) {
             kind: attack?.kind || "slam",
             mult: Number(attack?.mult) || 1,
             x: at + off,
+            // ⚠️ A TELEGRAPH HAS A FLOOR, AND IT USED NOT TO. Every band was drawn at the zone's ground line
+            // and resolved on x alone, so a creature standing on a ledge 26 units above you could hit you
+            // through the floor it was standing on, and its tell was painted somewhere you were not looking.
+            // Attacks belong to the surface they are made on — that is also what makes a ledge worth climbing
+            // onto, and worth hopping off.
+            y: Number(foe.y) || 0,
             r: reach,
             ms,
             fires: now + ms,
@@ -192,4 +252,9 @@ export function makeTelegraph(foe, at, now, attack = null) {
     return out;
 }
 
-export const telegraphHits = (tel, x) => Math.abs(x - tel.x) <= tel.r;
+// ⚠️ AND IT TAKES A y. The vertical window is generous (one body height) rather than exact, because a
+// telegraph is a danger ZONE and clipping it to a hairline would mean a hop over a slam that visibly
+// connected. Standing one tier up is safe; standing on the lip of the same ledge is not.
+export const TEL_V_REACH = 7;
+export const telegraphHits = (tel, x, y = 0) =>
+    Math.abs(x - tel.x) <= tel.r && Math.abs((Number(y) || 0) - (Number(tel.y) || 0)) <= TEL_V_REACH;

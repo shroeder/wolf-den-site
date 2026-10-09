@@ -44,7 +44,25 @@ export function makeClock() {
         stopped(now) { return now < this.stopUntil; },
         /** dt in 60fps frames, clamped for a resumed tab, scaled to near-zero during hit-stop. */
         dt(now, last) {
-            const raw = Math.min(34, now - last) / 16.67;
+            // ── ⚠️ CLAMPED AT BOTH ENDS, AND THE BOTTOM ONE IS NOT PARANOIA ────────────────────────
+            // THE FIRST FRAME OF THE GROVE PRODUCED A NEGATIVE dt, AND IT EMPTIED THE ENTIRE ZONE.
+            //
+            // A requestAnimationFrame callback is handed the timestamp of the START of the frame, which can
+            // be EARLIER than a performance.now() taken inside the same frame — and the loop seeds `last`
+            // with performance.now() when the effect runs. So frame one routinely arrived with
+            // now - last = -11ms, i.e. dt = -0.66.
+            //
+            // Run a physics solver backwards for one frame and gravity becomes lift: velocity goes POSITIVE
+            // while position goes DOWN. Every body in the zone ended up a few hundredths of a unit below the
+            // floor while rising, which fails the landing test (it requires vy <= 0) — and a body below its
+            // own floor can never satisfy that test again. The whole population fell at terminal velocity
+            // for ever, grounded stuck true, and the scene photographed as an empty forest with the
+            // backdrop scrolling behind nothing.
+            //
+            // ⚠️ IT WAS NOT A LAB ARTEFACT. It would have happened on the first frame of every real zone
+            // entry, on every device. Nothing threw, every gate passed, and the physics harness could not
+            // see it because a harness steps with dt = 1.
+            const raw = Math.max(0, Math.min(34, now - last)) / 16.67;
             return this.stopped(now) ? raw * HITSTOP_SCALE : raw;
         },
     };
@@ -148,15 +166,37 @@ export const makeChase = (v = 1) => ({ shown: v, ghost: v, holdUntil: 0 });
 
 // ── NUMBERS THAT ARE THROWN ─────────────────────────────────────────────────────────────────────────────────
 // A damage number is a tiny physics body with a lifetime, so it arcs. Crits are thrown harder and live longer.
-export const POP_MS = { hit: 700, crit: 980, heal: 820, took: 900, loot: 1500 };
-export const POP_GRAVITY = 0.019;
+//
+// ⚠️ A COLLECTED-LOOT LABEL IS NOT ONE OF THESE, AND TREATING IT LIKE ONE PUT TEXT IN THE TREES. Thrown
+// at a damage number's 0.52 against this gravity it apexes SEVEN UNITS up, which on top of the hero's head
+// is fifteen units off the floor — better than halfway up a phone screen — and at a 1.5 second life several
+// of them hang there at once. On film it read as floating words in the canopy with no relationship to
+// anything. A damage number wants to be thrown because it is an IMPACT; a pickup wants to drift off the
+// hero's shoulder, because it is a receipt.
+// ⚠️ AND THE THROW IS MEASURED AGAINST THE CREATURE, NOT PICKED BY FEEL. apex = vy squared over twice
+// gravity, so the old 0.52 against 0.019 threw every number SEVEN UNITS up — two and a half times the
+// height of the rootrat it came off, which put it better than halfway up a phone screen. On film there were
+// five numbers hanging in the canopy at once with nothing under them. A damage number has to stay near the
+// body it describes or it stops being feedback and becomes weather.
+//
+//   hit   apex 2.6 units — about the height of a rootrat, so it clears the body and no more
+//   crit  apex 4.5       — higher on purpose: the arc itself is part of what says this one was bigger
+export const POP_MS = { hit: 620, crit: 820, heal: 700, took: 760, loot: 850 };
+export const POP_GRAVITY = 0.028;
+const POP_THROW = {
+    hit: { vy: 0.38, vx: 0.17 },
+    crit: { vy: 0.50, vx: 0.30 },
+    heal: { vy: 0.32, vx: 0.14 },
+    took: { vy: 0.42, vx: 0.22 },
+    loot: { vy: 0.20, vx: 0.07 },
+};
 
 export function makePop(kind, x, y, rand) {
-    const crit = kind === "crit";
+    const throwing = POP_THROW[kind] || POP_THROW.hit;
     return {
         kind, x, y,
-        vx: (rand() * 2 - 1) * (crit ? 0.34 : 0.20),
-        vy: crit ? 0.70 : 0.52,
+        vx: (rand() * 2 - 1) * throwing.vx,
+        vy: throwing.vy,
         born: 0,
         life: POP_MS[kind] || 700,
         node: null,
@@ -236,3 +276,57 @@ export function shadowFor(heightAboveFloor, bodyH) {
     const k = Math.max(0, Math.min(1, heightAboveFloor / Math.max(1, bodyH * 1.6)));
     return { scale: 1 - k * 0.55, opacity: 0.42 * (1 - k * 0.72) };
 }
+
+// ── SPARKS AND DUST ─────────────────────────────────────────────────────────────────────────────────────────
+// Particles are the cheapest thing on this list and they do a specific job: they put the moment of contact in
+// a PLACE. A damage number tells you how much; a burst of sparks at the point of impact tells you where, and
+// the eye needs the where first. Dust does the same for weight — a body that lands without disturbing
+// anything has no mass.
+//
+// ⚠️ THEY ARE DELIBERATELY FEW. Eight sparks a hit at thirty bodies is still nothing, but two hundred is a
+// phone dropping frames in the middle of a fight, which costs more feel than the sparks add.
+export const SPARK = { n: 8, nCrit: 14, speed: 0.55, speedCrit: 0.95, life: 320, lifeCrit: 440, gravity: 0.028 };
+export const DUST = { n: 5, speed: 0.22, life: 380, gravity: 0.006 };
+
+/** One particle, thrown from a point. Angles are fanned deterministically so a burst reads as a burst. */
+export function makeSpark(i, n, x, y, { speed, life, dir = 0, rand }) {
+    // Biased into the half-plane the blow came from, so a burst leans away from the hit rather than being a
+    // symmetrical firework. A symmetrical burst reads as an explosion; a leaning one reads as an impact.
+    const spread = (i / Math.max(1, n - 1)) * Math.PI - Math.PI / 2;
+    const a = spread + (dir ? dir * 0.5 : 0) + (rand() - 0.5) * 0.4;
+    const v = speed * (0.55 + rand() * 0.75);
+    return { x, y, vx: Math.cos(a) * v, vy: Math.abs(Math.sin(a)) * v * 0.9 + 0.1, born: 0, life, node: null };
+}
+
+// ── THE SCREEN ITSELF REACTS ────────────────────────────────────────────────────────────────────────────────
+// A red wash at the edges when you are hit, and a slow pulse while you are nearly dead. This is the one piece
+// of feedback a player cannot miss while looking at their own character instead of the health bar — and in a
+// game where death sends you back to town, "I did not notice I was low" is the complaint it prevents.
+export const VIGNETTE = { hurtMs: 420, lowAt: 0.3, pulseMs: 1100 };
+
+// ── THE COMBO ───────────────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ PRESENTATION ONLY — IT PAYS NOTHING, AND THAT IS DELIBERATE. The Grove is a kill loop with no daily
+// cap, so anything that multiplies rewards for killing faster is a faucet with a pedal on it (see
+// economy-nerf-measure-daily-total and gold-mint-rate-lever). What a streak is FOR here is the rhythm: a
+// number that climbs, a sound that rises with it, and a word at the rungs. That is most of what a grinder's
+// dopamine actually comes from, and it costs the economy nothing at all.
+//
+// The window is short on purpose. Long enough to survive walking to the next creature, not long enough that
+// it is simply always on — a counter that never drops is a label, not a streak.
+export const COMBO_WINDOW_MS = 3400;
+export const COMBO_RUNGS = [
+    { at: 5, label: "Nice" },
+    { at: 12, label: "Rolling" },
+    { at: 25, label: "Relentless" },
+    { at: 45, label: "Unstoppable" },
+    { at: 80, label: "The Grove Remembers" },
+];
+/** ⚠️ FAILS UPWARD — a streak past the last rung keeps the last rung. See ladder-lookups-must-fail-upward. */
+export function comboRung(n) {
+    let out = null;
+    for (const r of COMBO_RUNGS) if (n >= r.at) out = r;
+    return out;
+}
+// How far up the hit sound walks as a streak builds. Capped, because a pitch that keeps rising becomes a
+// whistle, and because the ceiling is what makes reaching it feel like something.
+export const COMBO_PITCH_STEPS = 12;

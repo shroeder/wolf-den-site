@@ -30,6 +30,8 @@
     "check:chrome": "node scripts/check-chrome-fanout.mjs",
     "check:grove": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove.mjs",
     "check:grove-roll": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-roll.mjs",
+    "check:grove-physics": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-physics.mjs",
+    "grove:sprites": "node --import ./scripts/lib/register-loader.mjs scripts/grove-sprite-bounds.mjs",
     "gen:season-art": "node --import ./scripts/lib/register-loader.mjs scripts/gen-season-art.mjs",
     "mine:report": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/mine-report.mjs",
     "sheet:islands": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/island-sheet.mjs"

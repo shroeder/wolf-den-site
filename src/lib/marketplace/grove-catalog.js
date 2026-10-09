@@ -208,6 +208,67 @@ export const GROVE_ENEMIES = {
 // ⚠️ THE ONLY THING IN THIS FEATURE THAT PAYS GOLD, and the only one that can drop a chest. The chest is
 // granted through addChests rather than by touching the chest ROLL — the roll is a chain where the first match
 // wins, so reaching into it steals from gear. See chest-chain-compounds.
+// ── SILHOUETTE: HOW TALL EACH CREATURE IS ────────────────────────────────────────────────────────────────────
+// ⚠️ EVERY BODY IN THE GROVE USED TO BE THE SAME SIZE, AND THAT SIZE WAS BIGGER THAN THE HERO. The
+// stylesheet gave .gv-foe a width of 8 units with aspect-ratio: 1, so every creature rendered in an 8x8 box
+// against a 7-unit hero — and the sprites are square images drawn nearly edge to edge (measured: the rootrat
+// fills 416x385 of a 448x448 plate), so a rootrat stood a head TALLER than the knight. A rat, a scarecrow and
+// an Elderling were all exactly one size, and that one size won.
+//
+// Nothing about tuning the animation could have fixed that. Scale is read before motion is: a zone where
+// every animal is the same height as every other animal and all of them match the player reads as programmer
+// art no matter how well it moves.
+//
+// ⚠️ SO THE NUMBER HERE IS A HEIGHT IN WORLD UNITS, AGAINST A 7-UNIT HERO (see HERO_UNITS in grove-view.js),
+// and the box is sized from it rather than from a width. Vermin come to the knee, the mid-forest stands
+// shoulder to shoulder with him, and the deep forest looms. That spread is what makes walking deeper
+// LOOK like walking deeper, which is the whole promise of a twelve-zone map.
+//
+// `foot` is how much dead transparent space the sprite carries under the creature's feet, as a share of its
+// own height — measured with scripts/grove-sprite-bounds.mjs, not guessed. The scene nudges the drawing down
+// by it so the feet, not the padding, land on the floor. Most are 0; the reused delve sprites are the ones
+// that were drawn with air underneath.
+export const GROVE_SIZE = {
+    //              h     foot   why
+    rootrat:      { h: 2.8, foot: 0.08 },   // knee-high vermin. The first thing you ever see, and it must read as beneath you.
+    grub:         { h: 2.3, foot: 0.01 },   // lower than the rat, wider than it. A thing on the ground.
+    thornling:    { h: 4.2, foot: 0.02 },   // waist-high and spiky — the first one that hits back should be the first one you look up at.
+    badger:       { h: 3.6, foot: 0.05 },
+    gourdling:    { h: 5.0, foot: 0.03 },
+    husk:         { h: 7.8, foot: 0 },      // a scarecrow. Taller than you by design: the Stubble Field is where the forest stops being small.
+    barrowhound:  { h: 4.6, foot: 0.06 },
+    warren_mother:{ h: 6.6, foot: 0.04 },
+    voidmoth:     { h: 5.6, foot: 0.04 },
+    ashwraith:    { h: 8.2, foot: 0 },
+    goblin:       { h: 6.2, foot: 0.02 },
+    elderling:    { h: 9.6, foot: 0 },      // the deepest wanderer, and it should tower.
+    crystal_stag: { h: 9.0, foot: 0 },      // the rare spawn reads as rare partly by being the biggest thing that is not a boss.
+};
+
+// A boss is the biggest body in its zone and gets bigger as the map goes down. ⚠️ A LADDER, AND IT FAILS
+// UPWARD — an unknown boss gets the deepest size rather than falling through to nothing and rendering in a
+// zero-height box. See ladder-lookups-must-fail-upward.
+export const BOSS_SIZE = {
+    glutmaw: { h: 13, foot: 0 },
+    mossmother: { h: 13.5, foot: 0.05 },
+    thistlecrown: { h: 14, foot: 0 },
+    grandfather_bristle: { h: 14.5, foot: 0.02 },
+    rattlerind: { h: 15, foot: 0 },
+    harvestman: { h: 16, foot: 0 },
+    barrow_warden: { h: 16.5, foot: 0.02 },
+    great_weaver: { h: 17, foot: 0.01 },
+    lanternwing: { h: 17.5, foot: 0.05 },
+    everburning: { h: 18, foot: 0 },
+    stakelord: { h: 19, foot: 0 },
+    heartwood_elder: { h: 21, foot: 0 },
+};
+
+/** The drawn height and foot padding for any body in the Grove. Never returns null — a body with no size is a body in a 0px box. */
+export function groveSize(id, { boss = false } = {}) {
+    if (boss) return BOSS_SIZE[id] || { h: 21, foot: 0 };
+    return GROVE_SIZE[id] || { h: 5, foot: 0 };
+}
+
 export const GROVE_RARE = {
     id: "crystal_stag",
     name: "The Crystal Stag",
@@ -250,10 +311,26 @@ export const GROVE_RARE = {
 //   volley  three points at once, medium tell    — punishes having nowhere to stand
 //
 // Every one of them announces itself before it lands. Nothing in this feature hits you without a tell.
+// ⚠️ EVERY REACH HERE IS SET AGAINST ITS OWN TELL, BECAUSE NONE OF THEM USED TO BE. The hero covers
+// 15.6 units a second, so an attack is dodgeable only if reach < 0.0156 * telegraph. The old numbers were
+// 13 against 620ms (you can cover 9.7) and 34 against 1050ms (16.4) — so a boss fight was a wind-up, a
+// light show, and then damage you were never able to avoid, which is a slow hit wearing a telegraph's
+// clothes. The damage multipliers are untouched: a slam still hits for 1.45x, it is just now possible to
+// not be there. See reachOf() in grove-world.js for the same correction on the wanderers.
+//
+// ⚠️ RE-REACHED AGAINST THE SLOWER WALK AND THE SMALLER WORLD. The hero covers 13.2 units a second now
+// (0.22 a frame), and every one of these also has to FIT on an eighteen-unit frame — a fourteen-unit sweep
+// is a band twenty-eight units wide, which is the whole screen and then some, so even a dodgeable one would
+// have looked like an unavoidable one.
+//
+//   slam    5  vs 8.2 covered in 620ms   — tight. The one that punishes standing still.
+//   sweep   10 vs 13.9 covered in 1050ms — wide and slow. You commit to leaving, you do not sidestep.
+//   volley  4 each, 13 apart             — bands at [-17,-9] [-4,4] [9,17], gaps at 4-9 units out against
+//                                          10.8 covered. Always somewhere to stand, and you have to move.
 const A = {
-    slam: { kind: "slam", reach: 13, telegraph: 620, mult: 1.45 },
-    sweep: { kind: "sweep", reach: 34, telegraph: 1050, mult: 0.85 },
-    volley: { kind: "volley", reach: 9, telegraph: 820, mult: 0.75, shots: 3, spread: 22 },
+    slam: { kind: "slam", reach: 5, telegraph: 620, mult: 1.45 },
+    sweep: { kind: "sweep", reach: 10, telegraph: 1050, mult: 0.85 },
+    volley: { kind: "volley", reach: 4, telegraph: 820, mult: 0.75, shots: 3, spread: 13 },
 };
 
 // ⚠️ `hp` IS NOT SCALED BY scaledFoe. A boss is authored at the depth it stands at — the climb that turns a

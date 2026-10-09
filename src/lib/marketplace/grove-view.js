@@ -82,9 +82,32 @@ export const SKY_TILE_COUNT = 5;
 // ── SHARES OF THE FRAME ─────────────────────────────────────────────────────────────────────────────────────
 // Both of these were the bug. Expressed against what is visible, they hold their look at any zoom, and at the
 // old 100-unit frame they are exactly the constants they replace (14 and 9).
-export const LOOKAHEAD_OF_FRAME = 0.14;
-export const PET_TRAIL_OF_FRAME = 0.12;
-export const PET_TRAIL_MAX = 9;
+// ⚠️ 0.11, NOT 0.14. The lookahead decides where the hero SITS in the frame — at 0.14 he stands 36% of
+// the way in from the left edge, and everything that follows him has to fit in that 36%. The pet did not.
+// Leading less keeps the camera's job (you see where you are going) while leaving the hero room behind him.
+export const LOOKAHEAD_OF_FRAME = 0.11;
+
+// ── ⚠️ A FOLLOWER'S DISTANCE IS A BODY DISTANCE, NOT A SHARE OF THE FRAME ──────────────────────────────
+// This was the correction to a real bug and it over-corrected. A flat 9 units was 9% of the old 100-unit
+// frame and 35% of a 26-unit one, so the pet rode the left bezel and then fell off it — and the fix was to
+// express it as a share of what is visible. That is right for a CAMERA LOOKAHEAD, which is genuinely a
+// fraction of the frame, and wrong for a pet: 12% of an 18-unit phone frame is 2.1 units, and the hero is
+// SEVEN UNITS WIDE. The pet was standing inside him, in every frame of film, at every phone size.
+//
+// What the number actually wants to be is "just clear of his shoulder" — a distance in bodies. The share of
+// the frame survives as the thing that makes a wide desktop frame look right rather than leaving the pet
+// glued to the hero's hip, and PET_TRAIL_MIN is the floor that stops it ever overlapping again. That floor
+// wins over the cap on purpose: a pet near the edge of the frame is a worse look than a pet in the middle
+// of the hero is a bug.
+export const PET_TRAIL_OF_FRAME = 0.13;
+// ⚠️ 0.62, AND THE CEILING IS THE FRAME ITSELF, NOT TASTE. Their boxes do still overlap slightly at this
+// value — but 0.78 put the pet at x = -25 on a 390px phone and check-grove.mjs failed it by name at two
+// viewport sizes, which is the whole reason that gate exists. The arithmetic is forced: the camera settles
+// the hero about seven units from the left edge, and the pet's box is 4.5 units wide, so anything over a
+// 4.75-unit trail hangs it off the screen. The overlap is a symptom of how tight the zoom is, and the fix
+// for it is the pet painting BEHIND the hero (see GroveScene) rather than a number that cannot fit.
+export const PET_TRAIL_MIN_BODIES = 0.62;
+export const PET_TRAIL_MAX_BODIES = 1.1;
 export const CAM_Y_DEADZONE = 0.62;
 
 /**
@@ -136,7 +159,10 @@ export const lookaheadFor = (visibleUnits) => visibleUnits * LOOKAHEAD_OF_FRAME;
 
 /** Where the pet wants to stand, and how much slack before it bothers moving. */
 export function petFollow(visibleUnits) {
-    const trail = Math.min(PET_TRAIL_MAX, visibleUnits * PET_TRAIL_OF_FRAME);
+    const trail = Math.min(
+        HERO_UNITS * PET_TRAIL_MAX_BODIES,
+        Math.max(HERO_UNITS * PET_TRAIL_MIN_BODIES, visibleUnits * PET_TRAIL_OF_FRAME),
+    );
     return { trail, slack: Math.max(1.2, trail * 0.35) };
 }
 
