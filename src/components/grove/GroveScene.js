@@ -101,10 +101,17 @@ const SETTLE_EVERY_MS = 45_000;
 // ⚠️ HALVED WITH THE REST OF THE WORLD. Nine units is half a phone frame: the hero stopped a whole
 // screen-width short of what he was attacking and the two of them were never in the same picture.
 const ATTACK_RANGE = 4.5;
-// ⚠️ A BOSS IS TWICE AS WIDE AS THE THING THE REACH WAS WRITTEN FOR, so the same number walked the hero into
-// the middle of the sprite and the fight read as the two of them standing in the same place.
-const BOSS_STANDOFF = 6;
-const reachTo = (foe) => ATTACK_RANGE + (foe?.isBoss ? BOSS_STANDOFF : 0);
+// ── ⚠️ REACH IS MEASURED TO THE EDGE OF THE BODY, NOT TO ITS CENTRE ────────────────────────────────────
+// Every body in the Grove is a point with a half-width, and a flat reach to the point means the hero walks
+// a fixed distance from the MIDDLE of whatever he is hitting. That was survivable when every creature was
+// the same size; now that a grub is 2.3 units and the Heartwood Elder is 21, the same number either stops
+// him a body's length short of a rat or walks him into the middle of a boss.
+//
+// This used to be a special case — a constant added only for bosses — which is the shape of a rule that has
+// not been noticed yet. The Elderling and the Crystal Stag are not bosses and are both nearly ten units
+// tall; they were getting the rootrat's number. Adding the target's own half-width covers all of them and
+// deletes the special case, which is the version that cannot drift.
+const reachTo = (foe) => ATTACK_RANGE + (Number(foe?.halfW) || 0);
 // Luke: "The player must walk near the loot for it to get picked up." Rest is where it lands; this is how
 // close you have to come before it commits to you.
 const LOOT_DRAW_RANGE = 6;
@@ -525,7 +532,8 @@ export default function GroveScene({
             if (now >= w.nextRespawn) spawn(w, now);
 
             const plats = w.platforms;
-            const bounds = [2, W - 2];
+            // Walkable bounds, inset by a body so nothing can stand with half of itself outside the zone.
+            const bounds = [HERO_UNITS * 0.6, W - HERO_UNITS * 0.6];
 
             // ── HERO ────────────────────────────────────────────────────────────────────────────
             const tgt = w.target && w.target.hp > 0 && !w.target.dying ? w.target : null;
@@ -1259,7 +1267,9 @@ export default function GroveScene({
 function setUpLabScene(w, scene) {
     const near = (foe, gap) => {
         const f = foe;
-        f.x = w.hero.x + gap;
+        // Clamped into the zone: a scene that places a creature at a negative x has it shoved back to the
+        // wall by the solver, which is how three rootrats ended up standing inside the hero.
+        f.x = Math.max(6, w.hero.x + gap);
         f.y = w.hero.y;
         f.vx = 0; f.vy = 0;
         f.grounded = true;
@@ -1282,9 +1292,17 @@ function setUpLabScene(w, scene) {
     } else if (scene === "loot") {
         // One hit point, so the first swing kills and the spill, the rest and the draw-in all land inside
         // three seconds of film.
-        const weak = w.foes.filter((x) => !x.isBoss).slice(0, 4);
-        weak.forEach((f, i) => { near(f, 7 + f.h + i * 3); f.hp = 1; f.hit = true; });
-        // Auto-retarget carries him through the rest, which is also the thing being filmed.
+        // ⚠️ THE WHOLE POPULATION, NOT FOUR OF THEM. Four creatures at one hit point die inside the first
+        // second and every sheet of this scene was a picture of the aftermath — loot already resting, hero
+        // already idle, and not one frame of the kill itself. A scene for filming a kill has to be able to
+        // produce a kill for as long as the camera is running.
+        const weak = w.foes.filter((x) => !x.isBoss);
+        weak.forEach((f, i) => {
+            f.hp = 1;
+            f.hit = true;
+            f.passive = false;
+            if (i < 6) near(f, (i % 2 ? 1 : -1) * (6 + f.h + i * 2));
+        });
         if (weak[0]) w.target = weak[0];
     } else if (scene === "boss") {
         const boss = w.foes.find((f) => f.isBoss);

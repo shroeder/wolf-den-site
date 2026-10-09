@@ -328,15 +328,20 @@ export const GROVE_CSS = `
    never look like. A hard-edged gem silhouette with a bright facet and a dark rim reads as an OBJECT at
    48 pixels, which is all the size there is to work with. See no-pity-progress-bars for the same instinct:
    the cheap version of a reward is worse than none. */
+/* ⚠️ A DIAMOND, AND THE HIGHLIGHT IS A FACET NOT A WASH. The pentagon read as a blank house-shaped
+   sticker, and a 75%-white sheet over the top half of a 48-pixel object leaves no room for the tier colour
+   to say anything at all — every tier came out the same pale grey. The diamond is the one silhouette every
+   player already reads as "pick this up", and keeping the highlight to one hard-edged facet is what makes
+   it look faceted rather than lit. */
 .gv-drop i { position: absolute; inset: 0;
-    clip-path: polygon(50% 0%, 100% 34%, 82% 100%, 18% 100%, 0% 34%);
+    clip-path: polygon(50% 0%, 88% 44%, 50% 100%, 12% 44%);
     background:
-        linear-gradient(150deg, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0) 42%),
+        linear-gradient(118deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.5) 26%, rgba(255,255,255,0) 27%),
         linear-gradient(160deg, var(--gv-t1, #cfd6dd), var(--gv-t2, #8e9aa6));
-    filter: drop-shadow(0 0 7px var(--gv-glow, rgba(255,255,255,0.3)))
-        drop-shadow(0 2px 3px rgba(0,0,0,0.75));
+    filter: drop-shadow(0 0 8px var(--gv-glow, rgba(255,255,255,0.35)))
+        drop-shadow(0 2px 3px rgba(0,0,0,0.8));
     animation: gvBob 1500ms ease-in-out infinite; }
-.gv-drop.t1 { --gv-t1: #cdbfa2; --gv-t2: #8a7a5c; --gv-glow: rgba(205,191,162,0.3); }
+.gv-drop.t1 { --gv-t1: #c9b188; --gv-t2: #7a6540; --gv-glow: rgba(201,177,136,0.35); }
 .gv-drop.t2 { --gv-t1: #b6d3a0; --gv-t2: #6b8f57; --gv-glow: rgba(182,211,160,0.32); }
 .gv-drop.t3 { --gv-t1: #a7cbe0; --gv-t2: #577f96; --gv-glow: rgba(167,203,224,0.34); }
 .gv-drop.t4 { --gv-t1: #c3b0e8; --gv-t2: #6e5aa0; --gv-glow: rgba(195,176,232,0.36); }

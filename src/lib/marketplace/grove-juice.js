@@ -225,7 +225,7 @@ export function stepPop(pop, dt) {
 export const LOOT_SPILL = { up: 0.62, upVar: 0.34, out: 0.42, spin: 0 };
 export const LOOT_BOUNCE = 0.42;
 export const LOOT_REST_MS = 900;      // how long before it is even willing to be drawn in
-export const LOOT_LABEL_MS = 4200;    // how long the name stays up
+export const LOOT_LABEL_MS = 2800;    // how long the name stays up — 4.2s put four names on screen at once
 export const LOOT_DRAW_ACCEL = 0.055;
 export const LOOT_DRAW_MAX = 1.5;
 export const LOOT_EAT_DIST = 2.2;

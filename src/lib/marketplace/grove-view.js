@@ -166,9 +166,22 @@ export function petFollow(visibleUnits) {
     return { trail, slack: Math.max(1.2, trail * 0.35) };
 }
 
-/** The camera's resting x, clamped so the zone's own edges never scroll into frame. */
-export const cameraX = (heroX, face, visibleUnits, zoneW) =>
-    Math.max(0, Math.min(zoneW - visibleUnits, heroX + face * lookaheadFor(visibleUnits) - visibleUnits / 2));
+// ── ⚠️ THE CAMERA MAY LOOK A LITTLE PAST THE ZONE'S EDGE ───────────────────────────────────────────────
+// Clamped hard at 0, the camera stops dead the moment the hero is within half a frame of the start of the
+// zone — so he keeps walking while the view does not, and at the far left he renders HALF OFF THE SCREEN.
+// Filmed at the edge of Thicket Edge he was a sliver of shoulder and the pet was gone entirely. A player
+// fighting anything near either end of a zone hits this, which in a zone whose boss stands at the far end
+// is most of the fight that matters.
+//
+// Letting it overscan a few units costs nothing visually: the backdrop is a tiled strip with no edge, and
+// the ground plank is painted by the plate rather than drawn, so there is nothing out there to reveal.
+export const CAM_OVERSCAN = 5;
+
+/** The camera's resting x, clamped so the zone's own edges barely scroll into frame. */
+export const cameraX = (heroX, face, visibleUnits, zoneW) => Math.max(
+    -CAM_OVERSCAN,
+    Math.min(zoneW - visibleUnits + CAM_OVERSCAN, heroX + face * lookaheadFor(visibleUnits) - visibleUnits / 2),
+);
 
 /**
  * The camera's resting y. Zero while the hero is in the lower part of the sky, so the horizon does not bob
