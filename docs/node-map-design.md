@@ -406,9 +406,65 @@ Both are now asserted in `check:grove`, along with a check that every sprite pat
 actually exists - the one that was missing, and the reason four creatures including the rare spawn shipped
 with `art: null` while their generated files sat on disk unreferenced.
 
+### 2026-10-08 - the overhaul: a world the size of the frame it is drawn in
+
+Luke: *"The Grove looks so ghetto. I need it to look like an actual video game ... some kind of minimalistic
+kind of physics engine so that we don't have to try and pre-calculate where platforms are ... apply design
+principles and do a complete overhaul."* And: *"when you attack enemies there's like no attack animation ...
+it doesn't feel like you're hitting them."*
+
+**The single biggest finding is not a feel problem at all.** ⚠️ **THE SIMULATION WAS BUILT FOR A CAMERA FIVE
+TIMES WIDER THAN THE ONE IT RENDERS IN.** The world constants were written when the scene showed ~100 units
+across; after the zoom pass it shows about **eighteen** on a phone, and nothing below the view layer was ever
+re-tuned. So a hop rose 36 units (twice the height of the screen), a ledge was 30-72 units wide (two to four
+screens, which is why "platforms" read as floors), and a tier sat 26 units up, off the top of the frame —
+which is the real reason the composition was a strip of action under four-fifths of empty canopy. Everything
+is set against the real frame now: **tier 11, hop 1.35, ledges 13-29, walk 0.22, reaches roughly halved.**
+
+This is the same class as the scar that put grove-view.js into its own file, one layer down. There, VIEW
+distances had been written in world units. Here, WORLD distances had been sized against a view.
+
+**Decisions made in this pass, all open to being overruled:**
+
+| decision | why |
+|---|---|
+| **A telegraph must be dodgeable, and the rule is arithmetic** — reach < speed x tell | Not one of them was. Slam: 620ms tell, 9.7 units of travel, 13 units of reach. Sweep: 34 against 16.4. Every wind-up was a slow hit with a light show on it, which is the opposite of what was asked for. Damage multipliers untouched — a slam still hits for 1.45x, it is now possible to not be there. |
+| **A wanderer's reach defaults to its own body size** | The band then reads as THAT creature's reach, so you learn that the big thing hits further by seeing that it does. |
+| **The kill streak pays nothing** | The Grove is a kill loop with no daily cap, so a reward multiplier for killing faster is a faucet with a pedal on it. What a streak is for here is rhythm: a number that climbs, a hit sound that rises in pitch with it, a word at the rungs. That is most of a grinder's dopamine and it costs the economy nothing. |
+| **The hero re-acquires after a kill, but only what is already next to him and already angry** | Taken literally, "auto attack until the enemy perishes" is a tap per rat in a zone holding thirty. Re-acquiring anything anywhere would make him an autoplayer; re-acquiring a PASSIVE creature would break the rule that early enemies can be walked past. |
+| **Life steal gets no damage number** | It fires on every swing, so a pop for it is a "+1" sixty times a minute competing with the number that matters. The health bar already says it. |
+| **A ledge is the child of a ledge below it** | Each tier used to be laid out with its own random x, so a tier-2 ledge often had nothing beneath it: **4 of 36 ledges across five zones were unreachable for ever, with creatures spawned onto them**, in a zone that is cleared by a kill count. And a tier could roll itself out of existence — **zones 11 and 12 generated FLAT.** |
+
+**Still open, and it is an art question, not a code one.** ⚠️ **THE TWELVE BACKDROPS ARE WHAT PINS THE ZOOM.**
+Each is painted with its ground band about an eighth of the way up a landscape plate, so on a portrait phone
+the playfield is the bottom fifth of the screen and the camera cannot zoom out without the painted grass
+growing taller than the hero (the "ant in a forest of grass" failure, which has its own assertion in
+check-grove.mjs). The vertical tiers now fill some of that canopy, which was the cheap half of the fix. The
+expensive half is repainting the twelve plates with a higher horizon for portrait.
+
+**What the feel kit actually consists of**, now wired: hit-stop, trauma shake on the world layer (never the
+HUD), hit flash as the sprite's own masked silhouette, knockback as a real impulse scaled by the target's
+height, a three-beat swing whose damage lands ON THE STRIKE, contact shadows planted on the surface under the
+body, breathing and landing squash, chase bars on both health bars, a hurt vignette, thrown damage numbers,
+sparks and dust, loot in three stages (spill, rest with its name, draw in), and synthesised combat audio whose
+hit pitch walks up with the streak.
+
+**And one bug worth remembering, because it had no symptom that pointed at it.** The first frame of every
+zone produced a **negative dt** — requestAnimationFrame hands a callback the timestamp of the start of the
+frame, which can predate a performance.now() taken inside that same frame. Gravity ran backwards once, every
+body ended up a hundredth of a unit below the floor while moving UP, and the landing test requires vy <= 0 —
+so nothing ever landed again. The entire population fell at terminal velocity for ever and it photographed as
+an empty forest with the backdrop scrolling behind nothing.
+
 ### Still to build
 
 - **Maps 2-20.** Map one is the pattern: a catalogue of parts, enemies, zones and emblems, recipes that raise
   the tool tiers, and twelve backdrops. Nothing structural should need to change.
 - **The Crystal Stag's own loot table per map.** It has one; each map wants its own crystal creature.
 - **Opening the door to members.** Still owner-gated by `groveOpen`, on Luke's call.
+- **Repainting the twelve backdrops with a higher horizon**, which is the only thing that would let the
+  camera pull back on a portrait phone. See the 2026-10-08 entry.
+- **Art for the sixteen parts.** Loot on the floor is a tier-coloured faceted diamond, which reads as an
+  object and costs nothing, but Luke asked to "actually see the sprite" of what dropped.
+- **A reason to be in the canopy.** The tiers are reachable and populated now; nothing up there is worth
+  more than what is on the floor, so there is no reason to climb except to reach a creature standing on it.
