@@ -575,13 +575,43 @@ export async function POST(request) {
             if (updatedOrder.status === "completed") {
                 await clearCartItems(cartId);
 
-                // Decrement Square inventory (IN_STOCK -> SOLD) so an online-purchased card can't be sold
-                // again at the counter. Payment is already captured, so a failure must not fail the order —
-                // but instead of swallowing it, we record each line to the durable repair queue (so it's
-                // never silently lost) and leave inventory_adjusted_at null so the webhook/retry can finish
-                // it. The key is stable per ORDER so a retry can't double-decrement.
+                // ── ⚠️ SQUARE ALREADY DID THIS IF THE PAYMENT WAS ATTACHED TO AN ORDER ──────────────
+                // Decrementing inventory (IN_STOCK -> SOLD) stops an online-purchased card being sold again
+                // at the counter, and for most of this feature's life THIS CALL WAS THE ONLY THING DOING IT:
+                // the checkout charged a bare payment, Square had no order to attribute the sale to, and so
+                // Square never touched stock on its own.
+                //
+                // That stopped being true on 2026-10-06, when the checkout began building an ITEMISED Square
+                // order so online sales tax would be recorded as tax. An itemised order carries the catalog
+                // line items, and when its payment captures SQUARE DECREMENTS INVENTORY FOR THEM ITSELF,
+                // exactly as it does for a sale rung up at the counter. So from that day every online card
+                // order took TWO units out of stock for every one unit sold.
+                //
+                // ⚠️ THE IDEMPOTENCY KEY CANNOT SEE THIS, which is why it ran for three days unnoticed. The
+                // key is scoped to our own batch-create call: it stops US doubling on a retry and has no
+                // opinion about a decrement Square performed on its own behalf. Nothing threw, nothing
+                // reached the repair queue, and the only symptom was stock draining twice as fast as it
+                // sold — which reads as theft or a miscount long before it reads as a bug.
+                //
+                // So when Square owns the order, Square owns the decrement. We still own it on the paths
+                // where no Square order exists: a store-credit-only checkout, or one where building the
+                // order failed or its total did not reconcile (see square_order_total_mismatch above).
+                //
+                // ⚠️ KEYED ON THE PAYMENT'S OWN order_id, NOT ON OURS. squareOrderId is scoped to the card
+                // branch and is out of scope here, but more to the point the payment is SQUARE'S statement
+                // about what it actually attached the charge to — and that is the thing that decides whether
+                // Square decrements. Asking the source of truth beats hoisting a local and hoping it still
+                // means the same thing.
+                const squareOwnsDecrement = Boolean(payment?.order_id);
+
+                // Payment is already captured, so a failure must not fail the order — but instead of
+                // swallowing it, we record each line to the durable repair queue (so it is never silently
+                // lost) and leave inventory_adjusted_at null so the webhook/retry can finish it. The key is
+                // stable per ORDER so a retry can't double-decrement.
                 try {
-                    await adjustInventoryForSale(cart.items, { idempotencyKey: `order-${updatedOrder.id}` });
+                    if (!squareOwnsDecrement) {
+                        await adjustInventoryForSale(cart.items, { idempotencyKey: `order-${updatedOrder.id}` });
+                    }
                     await markOrderInventoryAdjusted(updatedOrder.id);
                 } catch (inventoryError) {
                     const msg = inventoryError instanceof Error ? inventoryError.message : "unknown_error";
