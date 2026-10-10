@@ -317,12 +317,26 @@ export const GROVE_CSS = `
    nothing rested, nothing was ever collected. The three stages ARE the reward: the throw says you earned
    something, the rest lets you read what it is, and the draw-in is the collecting of it.
 
-   The token is drawn rather than drafted from art, and coloured by the part's TIER, so a deep part reads
-   as a deep part at a glance and the Grove needs no sixteen new icons to ship this. */
+   Luke: the items should use the sprites for the items. So each drop is now its own painted object and the
+   tier survives as the COLOUR OF ITS GLOW — a deep part still reads as a deep part across a dark floor,
+   which is the whole job the drawn stone was doing. The stone itself stays below as the fallback. */
+/* ⚠️ 3.2 UNITS, NOT 2.2. A hero is 7, so the drawn stone was about 3% of the frame on a phone — fine for a
+   shape that was nothing but a silhouette, and far too small for a painted object with a form to read. The
+   sprites are alpha-trimmed at generation precisely so this number buys painted pixels rather than margin. */
 .gv-drop { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    width: calc(2.2 * var(--gv-unit, 1%)); height: calc(2.2 * var(--gv-unit, 1%));
-    margin-left: calc(-1.1 * var(--gv-unit, 1%));
+    width: calc(3.2 * var(--gv-unit, 1%)); height: calc(3.2 * var(--gv-unit, 1%));
+    margin-left: calc(-1.6 * var(--gv-unit, 1%));
     pointer-events: none; will-change: transform; }
+/* ⚠️ object-position: bottom, OR EVERY DROP FLOATS. contain centres the image inside the box, so a wide
+   flat thing like the moss mat would hang half a unit above the ground it is supposed to be lying on while
+   a tall thing like the antler sat correctly — the bug would have looked like a physics bug and been in the
+   stylesheet. The box bottom IS the item's y, so seating the art there puts it on the floor. See
+   sprite-floats-object-fit-contain. */
+.gv-drop img { position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: contain; object-position: bottom;
+    filter: drop-shadow(0 0 8px var(--gv-glow, rgba(255,255,255,0.35)))
+        drop-shadow(0 2px 3px rgba(0,0,0,0.8));
+    animation: gvBob 1500ms ease-in-out infinite; }
 /* ⚠️ A CUT STONE, NOT A ROUNDED RECTANGLE. The first pass was a soft-cornered box in a pale tier colour,
    which on a brown forest path read as a blank sticky note lying in the grass — the one thing a reward must
    never look like. A hard-edged gem silhouette with a bright facet and a dark rim reads as an OBJECT at
@@ -354,6 +368,13 @@ export const GROVE_CSS = `
     background: linear-gradient(160deg, #fff6d8, #ffc14a);
     filter: drop-shadow(0 0 14px rgba(255,200,110,0.95)) drop-shadow(0 2px 3px rgba(0,0,0,0.7)); }
 .gv-drop.is-rare i { animation: gvBob 1500ms ease-in-out infinite, gvSheen 2200ms linear infinite; }
+/* The painted emblem keeps the loud halo the gold star had. The silhouette is the sprite's job now, so
+   this is only the glow that picks it out of a pile of six ordinary parts. */
+.gv-drop.is-emblem img {
+    filter: drop-shadow(0 0 14px rgba(255,200,110,0.95)) drop-shadow(0 2px 3px rgba(0,0,0,0.7)); }
+.gv-drop.is-rare img { animation: gvBob 1500ms ease-in-out infinite, gvSheen 2200ms linear infinite; }
+/* An emblem's name is longer than a part's and it lands in the same place, so it gets the room to say it. */
+.gv-drop.is-emblem b { color: #ffe9b0; border-color: rgba(255,208,120,0.45); }
 /* The name, up long enough to read and then gone — a floor full of old loot must not become a wall of
    text over the fight. The loop writes the opacity, so this is only how it looks. */
 .gv-drop b { position: absolute; left: 50%; bottom: 112%; transform: translateX(-50%);

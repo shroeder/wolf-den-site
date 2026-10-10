@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 import {
     GROVE_ENEMIES, GROVE_RARE, GROVE_POP, HEAL_AT, scaledFoe, groveBoss, groveSize, grovePart,
+    groveArt, groveEmblem,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
 import {
@@ -500,7 +501,7 @@ export default function GroveScene({
                 n += 1;
                 wd.drops.push({
                     ...makeBody({ x: foe.x, y: foe.y + foe.h * 0.4, h: 2.4, halfW: 1.2 }),
-                    uid, part, label, state: "spill", restAt: 0, born: now, node: null,
+                    uid, part, label, art: groveArt(part), state: "spill", restAt: 0, born: now, node: null,
                     // ⚠️ BORN IN THE AIR, BECAUSE makeBody BORNS THINGS GROUNDED. The spill stage ends
                     // when the piece touches down, and a drop that starts life claiming to be grounded ends
                     // its spill on frame one: it still flew, but it skipped the bounce, started its rest
@@ -517,7 +518,10 @@ export default function GroveScene({
                     { tier: meta?.tier || 1, rare: Boolean(meta?.rare) });
             }
             // Luke: "Emblems are rare." So when one does fall it is not a line of text among four others.
-            if (got.emblem) spill(`e${i}`, got.emblem, "Emblem", { emblem: true, tier: 6, rare: true });
+            if (got.emblem) {
+                spill(`e${i}`, got.emblem, groveEmblem(got.emblem)?.name || "Emblem",
+                    { emblem: true, tier: 6, rare: true });
+            }
             rerender();
         };
 
@@ -1170,12 +1174,14 @@ export default function GroveScene({
                         style={{ animationDuration: `${t.ms}ms` }} aria-hidden="true" />
                 ))}
 
-                {/* Loot on the floor: a token you can see and a name you can read, per Luke's note. */}
+                {/* Loot on the floor: the item's own sprite and a name you can read, per Luke's note.
+                    The drawn tier-stone stays as the fallback for anything with no art yet — a new part
+                    added without a sprite should land on the floor looking like loot, not like a hole. */}
                 {world.drops.map((d) => (
                     <span key={d.uid} className={`gv-drop t${d.tier || 1}${d.emblem ? " is-emblem" : ""}${d.rare ? " is-rare" : ""}`}
                         ref={(n) => { const dd = d; dd.node = n; dd.labelNode = n?.querySelector("b") || null; }}
                         aria-hidden="true">
-                        <i />
+                        {d.art ? <img src={d.art} alt="" /> : <i />}
                         <b>{d.label}</b>
                     </span>
                 ))}

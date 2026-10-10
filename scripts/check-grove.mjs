@@ -21,6 +21,7 @@ import {
     GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, GROVE_RARE,
     emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS,
     GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance,
+    GROVE_FOODS, groveArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS } from "@/lib/marketplace/grove-recipes.js";
 import { pickHyper, rollBoss } from "@/lib/marketplace/grove-roll.js";
@@ -116,6 +117,13 @@ for (const [id, e] of Object.entries(GROVE_ENEMIES)) checkArt(`enemy ${id}`, e.a
 for (const [id, b] of Object.entries(GROVE_BOSSES)) checkArt(`boss ${id}`, b.art);
 checkArt("rare spawn", GROVE_RARE.art);
 for (const z of GROVE_ZONES) checkArt(`zone ${z.id}`, z.bg);
+// ⚠️ AND EVERY LOOSE ITEM, BECAUSE ITS PATH IS DERIVED. groveArt builds the path from the id rather than
+// reading an authored field, which means adding a part to the catalogue silently promises a sprite that
+// nobody has drawn — and the first time anyone sees that promise broken is a broken-image glyph on the
+// floor of a live zone. The derivation is only safe with this loop behind it.
+for (const id of Object.keys(GROVE_PARTS)) checkArt(`part ${id}`, groveArt(id));
+for (const id of Object.keys(GROVE_EMBLEMS)) checkArt(`emblem ${id}`, groveArt(id));
+for (const id of Object.keys(GROVE_FOODS)) checkArt(`food ${id}`, groveArt(id));
 for (const m of artMissing) ok(false, m);
 
 // ── 4d. ⚠️ THE TELEGRAPH MUST KEY ON THE BODY, NOT THE TYPE ─────────────────────────────────────────

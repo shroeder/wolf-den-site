@@ -485,3 +485,17 @@ export const GROVE_POP = { min: 15, max: 30, respawnMs: 45_000 };
 export const groveZone = (id) => GROVE_ZONES.find((z) => z.id === id) || null;
 export const groveBoss = (id) => GROVE_BOSSES[id] || null;
 export const grovePart = (id) => GROVE_PARTS[id] || null;
+export const groveEmblem = (id) => GROVE_EMBLEMS[id] || null;
+
+// ── WHAT A LOOSE ITEM LOOKS LIKE ─────────────────────────────────────────────────────────────────────────────
+// ⚠️ DERIVED, NOT AUTHORED. Thirty-three literal paths spread across three tables is thirty-three chances for
+// one of them to disagree with the file on disk, and a path that points at nothing is not a build error — it
+// is a broken-image glyph in the player's zone (img-onerror-fires-before-hydration). gen-grove-art.mjs names
+// every file by family and id, so the id IS the path; check-grove.mjs then asserts each one exists, which is
+// the half that makes deriving it safe rather than merely shorter.
+export const groveArt = (id) => {
+    if (GROVE_PARTS[id]) return `/images/grove/part-${id}.webp`;
+    if (GROVE_EMBLEMS[id]) return `/images/grove/emblem-${id}.webp`;
+    if (GROVE_FOODS[id]) return `/images/grove/food-${id}.webp`;
+    return null;
+};

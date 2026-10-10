@@ -18,6 +18,8 @@
 //   node scripts/gen-grove-art.mjs --apply --only bg-thicket,crystal_stag
 import fs from "node:fs";
 import path from "node:path";
+
+import sharp from "sharp";
 import { quality, priceRun } from "./lib/gen-guard.mjs";
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
@@ -106,16 +108,112 @@ ART["boss-heartwood_elder"] = [`${BOSS} THE HEARTWOOD ELDER: an immense ancient 
 // never line up with them, and any lettering would be gibberish on inspection.
 ART["region-map"] = [`A hand-drawn FANTASY CARTOGRAPHY MAP of a forest region, vertical portrait orientation, viewed from directly overhead. Aged parchment in warm browns and muted greens, soft ink linework, subtle paper grain, gentle darkening toward the edges. The terrain changes down the length of the map: open birch woodland at one end, a boggy mossy hollow, deep fern thickets, a stand of enormous ancient oaks, a thorn bramble wall, a harvested stubble field, a row of grassy burial mounds, a warren of burrow mouths, a bright clearing, a burnt black forest of charred stumps, a crude stake palisade, and one colossal tree at the far end. Drawn like an old illustrated adventure map. COMPLETELY EMPTY OF ANY PATH, TRAIL, ROAD, DOTTED LINE, ROUTE, MARKER, PIN, FLAG, X, COMPASS ROSE, BORDER FRAME OR LETTERING OF ANY KIND. No text, no words, no letters, no numbers, no labels, no legend, no title, no watermark. Terrain and trees only.`, "map"];
 
-const SIZES = { plate: "1536x1024", foe: "1024x1024", map: "1024x1536" };
+
+// ── THE LOOSE-ITEM BRIEF ────────────────────────────────────────────────────────────────────────
+// What a kill throws on the floor. These are drawn to a harder constraint than anything else in this file:
+// a drop is about three units tall against a hero of seven, so roughly 3% of the frame's height on a
+// phone. At that size a painting loses to a SILHOUETTE every time.
+//
+// ⚠️ SO THE OBJECT MUST FILL ITS OWN FRAME, EDGE TO EDGE. Every other prompt here begs for empty margin
+// because a creature that touches the edge comes back amputated — see the BOSS note above. An item is the
+// opposite problem: the margin is dead pixels, and 20% of air on each side turns a 3-unit drop into a
+// 2-unit one that reads as a smudge. The script TRIMS the alpha afterwards, so a tight draw and a loose
+// draw both end up flush; asking for tight just means more of the 1024px actually carries detail.
+//
+// ⚠️ A DARK OBJECT MUST STILL BE A LIGHT ONE. The first six came back and three were unreadable at the
+// size they are actually drawn: the thorn and the rivet were dark shapes on a dark forest, and the moss
+// clump grew a trunk and read as a small tree. This is gen-guard's warning about dark forms collapsing
+// into one black mass, except here it collapses into the BACKGROUND. So the brief now asks for a high
+// overall value and a rim-light by name, and grove-item-sheet.mjs exists to show it at 30px before
+// another thirty are paid for.
+//
+// ⚠️ AND NO CAST SHADOW, EVER. These get a drop-shadow glow in CSS, and the sprite alpha floor
+// (sprite-alpha-floor-drop-shadow-box) means a "transparent" pixel comes back at alpha 1-2 — a baked
+// shadow plus that fringe is how a sprite ends up wearing a visible box in-game.
+const ITEM = `A single fantasy RPG INVENTORY OBJECT, one object only, shown straight on at a slight three-quarter tilt, FILLING THE FRAME from edge to edge with no empty margin, chunky unmistakable silhouette that still reads at thumbnail size, strong single light from the upper left. LIT TO BE SEEN AGAINST A DARK FOREST: keep the object bright and richly saturated overall, with a crisp light rim running along its upper-left edge and bright specular highlights picking out its form. Even a black or brown object must carry a clearly LIGHT-TONED face - nothing may read as a dark silhouette or a dull smudge. Bold simple shapes only; fine detail that vanishes at thumbnail size is wasted. ${STYLE} ${CUTOUT} NO cast shadow, NO ground shadow, NO contact shadow, NO plinth, NO pedestal, NO base, NO inventory slot, NO frame, NO card, NO hand holding it, NO second object. NO outline, rim, stroke, halo or glowing edge of ANY colour traced around the object's silhouette - not white, not gold, not black.`;
+
+// ── THE SIXTEEN PARTS ───────────────────────────────────────────────────────────────────────────
+// Drawn from the blurb in grove-catalog.js, because the blurb is the only place the thing has ever been
+// described — "Chewed through and spat out. Still springy." is a brief, and it is better than one I would
+// write from the id. The tier's own colour is named so the floor still sorts by depth at a glance, the
+// way the CSS stones it replaces did.
+const PARTS = {
+    gnawed_root: "A short length of pale tree ROOT gnawed clean through at both ends, bark stripped away in strips, the splintered ends frayed and still springy, deep tooth-marks pressed along its length, bent in a slight curve. Pale sapwood cream, bark tan, dark earth in the crevices.",
+    damp_moss: "A ragged TORN-OFF MAT of soaking wet MOSS lying loose, wider than it is tall, a shaggy carpet of bright emerald fronds on top with a ragged crumbling underside of dark wet soil and a few torn pale rootlets trailing from it, beads of water catching the light across the pile. Bright wet green, almost luminous where the light hits. NOT a bush, NOT a shrub, NOT a tree, NO trunk, NO stem, NO branches, NO pot - a flat torn-up piece of ground cover and nothing else.",
+    grub_fat: "A glistening lump of rendered GRUB FAT, a soft translucent waxy blob of pale cream tallow slumped under its own weight, a wet sheen across the top, the surface faintly marbled. Buttery off-white, warm amber in the thin edges.",
+    thorn_barb: "A single enormous curved THORN pulled out of the wood, thick and heavy at the base and sweeping to a needle point. PALE AND BRIGHT, not dark: polished bone-ivory along most of its length with a hot crimson flush soaking up from the torn woody base, a hard white specular glint along the whole outer curve and a wet red bead at the very tip. Ivory white, bright crimson, warm shadow. The body of it must read as a LIGHT object.",
+    bristle_hide: "A folded scrap of coarse BRISTLE HIDE, a thick pelt doubled over once so the PALE RAW SUEDE underside shows as a broad bright cream band across the lower half, with stiff silver-tipped guard hairs standing up along the top fold and catching a hard white highlight on every tip. Warm tan leather, bright cream suede, frosted silver bristle tips. The object must read as a LIGHT, pale thing with dark accents - not a dark pelt.",
+    split_antler: "A short shed ANTLER fork of two tines, bone-cream and weathered, a long dark crack running the length of the beam, the burr at the base rough and knobbled. Old bone cream, grey weathering, brown in the crack.",
+    gourd_rind: "A curved shard of dried GOURD RIND, like a piece of a broken bowl, thick ribbed shell burnt-orange on the outside and pale dry pith on the inside face, a hard rolled edge where it cracked. Deep squash orange, cream pith.",
+    bound_straw: "A short bundle of cut field STRAW bound tightly around the middle with rough twine, the stalks splayed out at both ends, hollow and dry, a few broken stems sticking out at angles. Dry gold, pale bleached cream, hemp brown twine.",
+    barrow_tooth: "A single long yellowed FANG, tapering to a worn point, the broad root end exposed and porous where it was set in nothing any more, hairline age cracks along the enamel. Old ivory yellow, brown stain at the root, grey in the cracks.",
+    warren_silk: "A loose gathered hank of SPIDER SILK, a skein of fine pale thread wound into a soft figure-of-eight, individual strands escaping and catching the light, faintly iridescent. Pale lilac grey, cool white highlights, violet sheen.",
+    rotwood_knot: "A gnarled hardwood KNOT prised out of a dead tree, a dense whorled lump of grain spiralling in on itself, the surface silvered and checked with splits, far harder-looking than the wood around it ever was. Dark walnut brown, silvered grey, black splits.",
+    mothlight_dust: "A small conical heap of glowing MOTH DUST, a pinch of luminous powder, a dozen loose motes lifting off the top and hanging in the air just above it, the heap lit softly from within. Pale glowing cyan, cool white core, faint gold at the edge.",
+    ash_ember: "A fist-sized chunk of charred wood EMBER, crusted all over in grey ash, broken open along one side where a deep crack burns furnace orange from inside, one thin wisp of smoke lifting off it. Charcoal black, ash grey, molten orange in the crack.",
+    goblin_rivet: "A crude heavy IRON RIVET hammered flat by someone in a hurry, a short thick shank under a badly misshapen beaten head, hammer dents all over it. BRIGHT STRUCK METAL, not a dull dark nail: most of the surface is freshly beaten steel catching hard white highlights, with hot orange rust blooming only in the dents and around the rim. Bright silver steel, vivid orange rust, warm grey shadow.",
+    elder_heartwood: "A split billet of ELDER HEARTWOOD, a short wedge cut from the middle of something very old, standing on end. The end grain shows dense concentric growth rings, and warm gold sap glows from WITHIN one or two of those rings and from the split down its face - the light comes from INSIDE the wood only. Deep red-brown timber, pale sapwood at the outer rings, dark rough bark on the back face. The glow must stay inside the grain; the outer silhouette of the billet is plain unlit wood.",
+    crystal_shard: "A raw hexagonal CRYSTAL SHARD, uncut and natural with broad clean facets and a chisel-point tip, light refracting through it into pale violet and cyan bands, a faint inner glow, three tiny chips of the same crystal floating just off its surface. Violet white, pale cyan, bright specular edges. Not a jeweller's cut gemstone, no setting, no metal.",
+};
+
+// ── THE THIRTEEN EMBLEMS ────────────────────────────────────────────────────────────────────────
+// ⚠️ ONE OBJECT CLASS, THIRTEEN DISTINCT FACES. An emblem has to say "emblem" before it says which one —
+// it is the rare thing in a pile of six drops, and the player's eye needs to find it without reading.
+// So every one of these is the same KIND of thing, a carved token on a thong, and they differ by motif,
+// material and colour rather than by shape.
+//
+// ⚠️ A MOTIF IN RELIEF, NEVER A LITTLE PICTURE OF THE ANIMAL. Asking for "a token with a rat on it"
+// returns a rat standing on a coin. Said as carved relief it comes back as a sign, which is what an
+// emblem is.
+const EMBLEMS = {
+    em_rootrat: "A TOKEN of dark umber wood strung on a leather thong, SQUARE with clipped corners rather than round, two crossed gnawed roots carved deep into its face in sharp relief with a pair of chisel teeth-marks bitten out of one edge of the token itself. Dark walnut brown, pale raw sapwood bright in the carved cuts, black thong. NOT a spiral, NOT a coil, NOT a ring - two straight crossed roots.",
+    em_grub: "A pale waxy TOKEN strung on a leather thong, a fat curled grub coiled nose to tail carved into its face in soft relief, the material translucent like tallow. Milky cream, faint pink translucence, dark thong.",
+    em_thornling: "A dark lacquered wooden TOKEN strung on a leather thong, three curved thorns arranged in a radiating spiral carved into its face in sharp relief. Bramble black, blood-red in the recesses, dry green thong.",
+    em_badger: "A hammered pewter TOKEN strung on a leather thong, a striped badger mask with a blind eye carved into its face in bold relief, the metal dented and scuffed from use. Silver grey, charcoal stripes, bright scuffs.",
+    em_gourdling: "A polished gourd-shell TOKEN strung on a twine cord, a split squash with seeds spilling from the seam carved into its face in relief, the shell warm and faintly waxed. Deep squash orange, cream seeds, dry vine cord.",
+    em_husk: "A woven straw TOKEN bound on a twine cord, a sackcloth head with two stitched crosses for eyes worked into its face, the straw plaited flat and tight. Dirty gold straw, dark stitching, hemp cord.",
+    em_ashwraith: "A charred black TOKEN strung on a blackened wire, a hollow cracked trunk with a burning fissure down it carved into its face in relief, ember orange light burning in the carved lines themselves. Charcoal black, molten orange, grey ash dust.",
+    em_barrowhound: "A grave-grey stone TOKEN strung on a rusted iron chain, a running hound in profile carved into its face in worn relief, cold blue light caught in the hollows of the carving. Slate grey, bone white, cold blue glow, rusted iron.",
+    em_warren: "A silk-wrapped TOKEN hung on a pale thread, a broad spider seen from above with its legs folded in carved into its face in fine relief, a gauze of fine silk half covering it. Chalk white, pale lilac, sickly green glow.",
+    em_voidmoth: "A luminous pale TOKEN strung on a silver thread, a moth with wings spread and a glowing eye-spot on each one carved into its face in relief, the whole token lit faintly from inside, a few motes drifting off it. Glowing pale gold, dove grey, deep night blue, silver thread.",
+    em_goblin: "A crude iron TOKEN lashed to a rope cord, a row of sharpened log stakes driven in a line punched into its face, the plate cut by hand with uneven edges and rivets at two corners. Rusted iron, rope brown, firelight orange.",
+    em_elder: "A heartwood TOKEN strung on a woven grass cord, a crown of antler-like branches over a deep root carved into its face in relief, warm gold sap glowing along every carved line, a little moss grown into one edge. Rich red-brown wood, glowing gold sap, forest green moss.",
+    em_crystal: "A TOKEN of raw faceted crystal hung on a fine silver chain, a stag's head with crystalline antlers carved into its translucent face in relief, light refracting through the whole token into violet and cyan, visibly the rarest object of its kind. Violet white, pale cyan, bright silver chain.",
+};
+
+// ── THE FOUR FOODS ──────────────────────────────────────────────────────────────────────────────
+// ⚠️ NOTHING WITH A LABEL ON IT. A corked bottle comes back with misspelled words printed across the
+// glass every time — the consumable generator paid for that lesson already. These are a leaf packet, a
+// gourd, a horn and a phial: four different silhouettes, none of them a labelled apothecary bottle.
+const FOODS = {
+    food_poultice: "A MOSS POULTICE: a broad green leaf folded into a packet around a lump of chewed green moss and pale fat, bound shut with a single wrap of grass stem, the filling bulging out at one open corner. Deep leaf green, moss green, cream filling.",
+    food_flask: "A GOURD FLASK: a small dried gourd with a narrow neck used as a bottle, plugged with a whittled wooden stopper, a leather carry-cord knotted round the neck, the rind mottled and waxed. Warm ochre, brown mottling, pale wood stopper.",
+    food_tonic: "A MOTHLIGHT TONIC: a stubby curved HORN cup sealed with wax, filled with a faintly luminous pale liquid that glows through the thin walls of the horn, a few motes of light drifting off the top. Cream horn, glowing pale cyan, dark wax seal.",
+    food_draught: "A HEARTWOOD DRAUGHT: a tiny thick-walled PHIAL carved from red heartwood with a stopper of the same wood, barely more than a mouthful of glowing gold sap inside, warm light leaking from the seam. Deep red-brown wood, glowing gold, almost nothing of it.",
+};
+
+for (const [id, subject] of Object.entries(PARTS)) ART[`part-${id}`] = [`${ITEM} ${subject}`, "item"];
+for (const [id, subject] of Object.entries(EMBLEMS)) ART[`emblem-${id}`] = [`${ITEM} ${subject}`, "item"];
+for (const [id, subject] of Object.entries(FOODS)) ART[`food-${id}`] = [`${ITEM} ${subject}`, "item"];
+
+const SIZES = { plate: "1536x1024", foe: "1024x1024", map: "1024x1536", item: "1024x1024" };
+
+// A plate is a full-bleed backdrop; everything else is a die-cut sprite.
+const OPAQUE = new Set(["plate", "map"]);
 
 const keys = Object.keys(ART).filter((k) => !ONLY.length || ONLY.includes(k));
-const plates = keys.filter((k) => ART[k][1] === "plate").length;
-const foes = keys.length - plates;
+// ⚠️ PRICED BY KIND, NOT "plates and everything else". The old sum called every non-plate a creature at
+// the square rate, which was true until the map arrived at 1024x1536 and silently under-quoted itself.
+const byKind = {};
+for (const k of keys) { const kind = ART[k][1]; byKind[kind] = (byKind[kind] || 0) + 1; }
 
-const bill = priceRun({ count: plates, size: SIZES.plate, quality: Q })
-    + priceRun({ count: foes, size: SIZES.foe, quality: Q });
+let bill = 0;
+for (const [kind, count] of Object.entries(byKind)) {
+    console.log(`  ${kind}:`);
+    bill += priceRun({ count, size: SIZES[kind], quality: Q });
+}
 
-console.log(`The Grove — ${keys.length} image(s): ${plates} zone plate(s), ${foes} creature(s)`);
+console.log(`The Grove — ${keys.length} image(s): ${Object.entries(byKind).map(([k, n]) => `${n} ${k}`).join(", ")}`);
 console.log(`  quality ${Q}   estimated $${Number(bill).toFixed(2)}`);
 console.log(`  reusing 9 existing sprites: rootrat, grub, thornling, badger, gourdling, barrowhound, warren-mother, voidmoth, ashwraith`);
 if (!APPLY) { console.log("\ndry run — pass --apply to draw it"); process.exit(0); }
@@ -143,8 +241,7 @@ for (const key of keys) {
             prompt,
             size: SIZES[kind],
             quality: Q,
-            // A plate is a full-bleed background; a creature is a cutout.
-            background: kind === "foe" ? "transparent" : "opaque",
+            background: OPAQUE.has(kind) ? "opaque" : "transparent",
             output_format: "webp",
             n: 1,
         }),
@@ -156,7 +253,19 @@ for (const key of keys) {
     const data = await resp.json();
     const b64 = data?.data?.[0]?.b64_json;
     if (!b64) { console.log(`  FAILED ${key}: no image back`); continue; }
-    fs.writeFileSync(file, Buffer.from(b64, "base64"));
+    let bytes = Buffer.from(b64, "base64");
+    // ── ⚠️ AN ITEM IS TRIMMED, AND THAT IS NOT COSMETIC ────────────────────────────────────────────
+    // Two separate bugs are paid off by this one call. The air the model leaves around a small object is
+    // dead weight at 3 units tall — trimming it is what lets the drop be drawn big enough to recognise.
+    // And "transparent" comes back at alpha 1-2 rather than 0, so an untrimmed cutout carries a full-frame
+    // fringe that CSS drop-shadow renders as a visible BOX: see sprite-alpha-floor-drop-shadow-box. A
+    // threshold of 6 is above that floor, so it cuts the fringe as well as the air.
+    if (kind === "item") {
+        bytes = await sharp(bytes).trim({ threshold: 6 })
+            .resize(256, 256, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+            .webp({ quality: 92 }).toBuffer();
+    }
+    fs.writeFileSync(file, bytes);
     done += 1;
     console.log(`  ${done}/${keys.length}  ${file}`);
 }
