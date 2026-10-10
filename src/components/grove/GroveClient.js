@@ -45,6 +45,16 @@ export default function GroveClient({ initial }) {
         setView("zone");
     }, []);
 
+    // ── THE DOORS ───────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ RESOLVED FROM THE CATALOGUE, NOT FROM st. A door is walked through immediately after a settle that
+    // may have just unlocked the destination, and st is a snapshot taken before it. Reading the zone id from
+    // the static list keeps this correct regardless of how stale the state is, and the server is the thing
+    // that decides whether the door opens — enter() already reports "locked".
+    const travel = useCallback(async (n) => {
+        const z = GROVE_ZONES.find((x) => x.n === n);
+        if (z) await enter(z);
+    }, [enter]);
+
     // ── SETTLE ──────────────────────────────────────────────────────────────────────────────────────
     // ⚠️ THE ONLY THING SENT IS WHAT WAS KILLED. The scene already rolled the loot locally to show it; the
     // server re-rolls from the same seed and grants what IT computes. See grove-roll.js.
@@ -168,6 +178,7 @@ export default function GroveClient({ initial }) {
                     stats={stats} heroArt={session.heroArt || st?.heroArt || null}
                     petArt={session.petArt || st?.petArt || null}
                     belt={beltNow} onSettle={settle} onBoss={bossKill} onLeave={leave}
+                    onTravel={travel}
                     // Luke: "when you die it should send you back to town." ⚠️ router.push, NOT the
                     // leave handler — leaving drops you on the Grove map, which is the screen inviting you
                     // straight back into the zone that just killed you. Town is somewhere else.

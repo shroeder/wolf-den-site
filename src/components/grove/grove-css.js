@@ -375,6 +375,40 @@ export const GROVE_CSS = `
 .gv-drop.is-rare img { animation: gvBob 1500ms ease-in-out infinite, gvSheen 2200ms linear infinite; }
 /* An emblem's name is longer than a part's and it lands in the same place, so it gets the room to say it. */
 .gv-drop.is-emblem b { color: #ffe9b0; border-color: rgba(255,208,120,0.45); }
+/* ── THE DOORS AT EACH END OF THE ZONE ─────────────────────────────────────────────────────────
+   Standing on the ground at the far walls, so you reach them by walking. Sized against the hero rather
+   than the screen: 11 units to his 7, which is the proportion that reads as a thing you go THROUGH.
+   ⚠️ SIZED IN UNITS LIKE EVERY OTHER BODY. A door expressed in percent of the scene is a door that
+   changes size when the phone rotates, while the hero beside it does not. See
+   view-space-constants-break-on-zoom. */
+/* ⚠️ A SQUARE BOX, BECAUSE THE SPRITE IS SQUARE. This was 8 wide by 11 tall, and object-fit: contain
+   resolves against the SMALLER dimension — so the 1:1 art was capped at 8 units and the doorway came out
+   SHORTER than the 7-unit hero standing beside it. A door you walk through cannot be shorter than you; it
+   read as a headstone. 12 square puts the arch at 1.7x his height, which is what makes it a doorway. */
+.gv-door { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    width: calc(12 * var(--gv-unit, 1%)); height: calc(12 * var(--gv-unit, 1%));
+    margin-left: calc(-6 * var(--gv-unit, 1%));
+    padding: 0; border: 0; background: none; cursor: pointer;
+    will-change: transform; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; }
+.gv-door img { width: 100%; height: 100%; object-fit: contain; object-position: bottom;
+    filter: drop-shadow(0 0 16px rgba(90,230,210,0.45)) drop-shadow(0 4px 6px rgba(0,0,0,0.7)); }
+/* A locked door is not a dimmed open one — it is its own sprite, so it only needs its glow taken away.
+   Tapping it does nothing by design: there is no handler, so it cannot report a failure nobody asked for. */
+.gv-door.is-locked { cursor: default; }
+.gv-door.is-locked img { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.75)); }
+/* The toll, written on the door itself. A skull and a number, because "14" beside a skull needs no label
+   and survives being read at a glance from across the zone. */
+.gv-door-need { position: absolute; left: 50%; bottom: 66%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: calc(0.5 * var(--gv-unit, 1%));
+    padding: calc(0.4 * var(--gv-unit, 1%)) calc(0.9 * var(--gv-unit, 1%));
+    border-radius: 999px; background: rgba(6,10,6,0.82);
+    border: 1px solid rgba(255,255,255,0.18); pointer-events: none; }
+.gv-door-need img { width: calc(2.2 * var(--gv-unit, 1%)); height: calc(2.2 * var(--gv-unit, 1%));
+    filter: none; }
+.gv-door-need b { font-size: calc(2 * var(--gv-unit, 1%)); font-weight: 800; color: #f3ead9;
+    line-height: 1; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+
 /* The name, up long enough to read and then gone — a floor full of old loot must not become a wall of
    text over the fight. The loop writes the opacity, so this is only how it looks. */
 .gv-drop b { position: absolute; left: 50%; bottom: 112%; transform: translateX(-50%);
@@ -558,11 +592,11 @@ export const GROVE_CSS = `
    transition on top of a per-frame write is the .gv-foe bug again in a different place: the easing fights
    the simulation and the result is mush with a lag on it. The 180ms transition that used to be on the fill
    is exactly why a big hit read as the bar sliding rather than as a bite being taken out of it. */
-.gv-hp { position: relative; flex: 0 0 38%; height: 11px; border-radius: 999px; background: rgba(0,0,0,0.62);
-    border: 1px solid rgba(255,255,255,0.2); overflow: hidden; }
-.gv-hp u, .gv-hp i { position: absolute; left: 0; top: 0; height: 100%; display: block; }
-.gv-hp u { background: linear-gradient(90deg, #ffd0c0, #fff1e6); }
-.gv-hp i { background: linear-gradient(90deg, #d8402f, #ff8a6b); }
+/* ⚠️ .gv-hp IS GONE FROM THE SCREEN AND ITS RULES WITH IT. Luke: "I hate the kill display and red bar."
+   The refs and the chase maths stay in the loop because the hurt flash, the vignette and the food trigger
+   all read the same number — what was removed is the strip, not the health. Deleting the rule along with
+   the element is deliberate: a stale rule for a shape that no longer exists is how a later element with a
+   reused class name inherits a background nobody meant it to have. See stale-css-rule-on-reshape. */
 .gv-hud b { font-size: 0.78rem; color: #efe7d8; text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
 .gv-leave { margin-left: auto; pointer-events: auto; padding: 6px 14px; border-radius: 999px; cursor: pointer;
     font: inherit; font-size: 0.78rem; font-weight: 700; color: #efe7d8;

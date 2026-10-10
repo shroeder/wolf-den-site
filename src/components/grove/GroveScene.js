@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 
 import {
     GROVE_ENEMIES, GROVE_RARE, GROVE_POP, HEAL_AT, scaledFoe, groveBoss, groveSize, grovePart,
-    groveArt, groveEmblem,
+    groveArt, groveEmblem, GROVE_ZONES,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
 import {
@@ -116,6 +116,17 @@ const reachTo = (foe) => ATTACK_RANGE + (Number(foe?.halfW) || 0);
 // Luke: "The player must walk near the loot for it to get picked up." Rest is where it lands; this is how
 // close you have to come before it commits to you.
 const LOOT_DRAW_RANGE = 6;
+
+// ── THE DOORS ────────────────────────────────────────────────────────────────────────────────────────────
+// How far in from the wall a door stands. Far enough that the hero can get fully past it and turn round —
+// flush against the wall he would be standing inside it with nowhere to step back to.
+const DOOR_INSET = 9;
+const ZONE_COUNT = GROVE_ZONES.length;
+const DOOR_ART = {
+    open: "/images/grove/portal-open.webp",
+    locked: "/images/grove/portal-locked.webp",
+    skull: "/images/grove/portal-skull.webp",
+};
 // How far above or below a creature the hero will still swing at it. A body one tier up is not in reach.
 const SWING_V_REACH = 6;
 // A pet that falls this far behind has lost the plot — see the rescue in the loop.
@@ -123,7 +134,7 @@ const PET_LOST = 30;
 
 export default function GroveScene({
     zone, seed, bonuses, stats, heroArt, petArt, belt, labScene,
-    onSettle, onBoss, onLeave, onDeath,
+    onSettle, onBoss, onLeave, onDeath, onTravel,
 }) {
     const hostRef = useRef(null);
     const worldLayerRef = useRef(null);
@@ -140,6 +151,14 @@ export default function GroveScene({
 
     // What a human reads, and only what changes a few times a minute.
     const [kills, setKills] = useState(0);
+    // One door at a time: two taps while the first request is in flight would enter twice.
+    const travelRef = useRef(false);
+    // ⚠️ THE RUNNING TOTAL, NOT THIS VISIT'S. zone.kills is what the server has banked across every session
+    // in this zone; `kills` is only what has died since this one started. Luke: "Ensure the kill count
+    // persists, we don't want it to get reset if you leave." The door reads the sum, so walking out at 19
+    // of 20 and coming back needs one more kill — not twenty. Adding the live count on top is what makes
+    // the door open on the kill that earns it rather than on the next settle.
+    const killsHere = (Number(zone.kills) || 0) + kills;
     const [dead, setDead] = useState(false);
     const [bossName, setBossName] = useState(null);
     const [beltLeft, setBeltLeft] = useState(Number(belt?.count) || 0);
@@ -225,6 +244,20 @@ export default function GroveScene({
             // follow reads on frame one, before anything has been measured.
             visibleUnits: UNITS_PER_SCREEN,
             foes: [],
+            // ── THE DOORS ───────────────────────────────────────────────────────────────────────
+            // One at each end of the zone. Luke: "Add portals to each side. Since one takes you back a
+            // level and the other goes forward a level."
+            //
+            // ⚠️ WORLD OBJECTS, NOT BUTTONS ON THE HUD. A zone is 300 to 700 units wide and about 20 of
+            // them are on screen, so a door at the far end is something you WALK to — which is the whole
+            // reason it reads as a door rather than as a menu item. It also means the way on is in the
+            // same place every time: the right-hand wall.
+            doors: [
+                ...(zone.n > 1 ? [{ side: "back", to: zone.n - 1, x: DOOR_INSET, node: null }] : []),
+                ...(zone.n < ZONE_COUNT
+                    ? [{ side: "on", to: zone.n + 1, x: zoneWidth(zone.n) * UNITS_PER_SCREEN - DOOR_INSET, node: null }]
+                    : []),
+            ],
             drops: [],
             tels: [],
             sparks: [],
@@ -919,6 +952,11 @@ export default function GroveScene({
                 t.node.style.width = `${t.r * 2 * unit}px`;
             }
 
+            for (const dr of w.doors) {
+                if (!dr.node) continue;
+                dr.node.style.transform = `translate3d(${(dr.x - cam) * unit}px, ${camY * unit}px, 0)`;
+            }
+
             for (const d of w.drops) {
                 if (!d.node) continue;
                 d.node.style.transform = `translate3d(${(d.x - cam) * unit}px, ${-(d.y - camY) * unit}px, 0)`;
@@ -1057,6 +1095,26 @@ export default function GroveScene({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mounted, world, spawn, seed, bonuses, stats, onSettle, W, zone.id, zone.boss, labScene, maxHp, belt?.id, belt?.heals, onBoss, rerender]);
 
+    // ── WALKING THROUGH A DOOR ──────────────────────────────────────────────────────────────────────
+    // ⚠️ SETTLE BEFORE TRAVELLING, AND AWAIT IT. The kills that open the right-hand door are the same ones
+    // the server has not been told about yet, so entering first means the server checks a lock that this
+    // session's own kills were about to open — you would be refused at the door you just earned. The
+    // unmount cleanup settles too, but that fires AFTER the new zone has been asked for, which is too late.
+    const travel = useCallback(async (to) => {
+        if (travelRef.current) return;
+        travelRef.current = true;
+        try {
+            const w = worldRef.current;
+            if (w?.killLog?.length) {
+                const ate = w.eaten; w.eaten = {};
+                await onSettle?.(w.killLog.splice(0), ate);
+            }
+            await onTravel?.(to);
+        } finally {
+            travelRef.current = false;
+        }
+    }, [onSettle, onTravel]);
+
     // ── INPUT ───────────────────────────────────────────────────────────────────────────────────────
     const onTapWorld = useCallback((e) => {
         const w = worldRef.current;
@@ -1186,6 +1244,30 @@ export default function GroveScene({
                     </span>
                 ))}
 
+                {/* ⚠️ BEFORE THE CREATURES AND THE HERO, so a door never paints over something you need
+                    to hit. Document order is the whole stacking rule in this layer. */}
+                {world.doors.map((dr) => {
+                    const locked = dr.side === "on" && killsHere < zone.toUnlock;
+                    const need = Math.max(0, zone.toUnlock - killsHere);
+                    return (
+                        <button key={dr.side} type="button"
+                            className={`gv-door${locked ? " is-locked" : ""}`}
+                            ref={(n) => { const d = dr; d.node = n; }}
+                            onPointerDown={locked ? undefined : () => travel(dr.to)}
+                            aria-label={locked
+                                ? `Locked — ${need} more kills to open the way on`
+                                : dr.side === "back" ? "Back a zone" : "On to the next zone"}>
+                            <img src={locked ? DOOR_ART.locked : DOOR_ART.open} alt="" />
+                            {locked ? (
+                                <span className="gv-door-need">
+                                    <img src={DOOR_ART.skull} alt="" />
+                                    <b>{need}</b>
+                                </span>
+                            ) : null}
+                        </button>
+                    );
+                })}
+
                 {world.foes.map((f) => (
                     <button key={f.uid} type="button"
                         className={`gv-foe${f.rare ? " is-rare" : ""}${f.isBoss ? " is-boss" : ""}`}
@@ -1225,14 +1307,12 @@ export default function GroveScene({
                 </div>
             ) : null}
 
+            {/* ⚠️ THE HEALTH BAR AND THE KILL COUNT ARE GONE, ON LUKE'S CALL: "I hate the kill display
+                and red bar. Remove it." The count was the weaker of the two anyway — it counted THIS visit,
+                starting at zero every time you walked in, while the number that actually matters is the
+                running total the server has kept all along. That total is what the right-hand door shows,
+                in the place where it changes what you do. */}
             <div className="gv-hud">
-                <span className="gv-hp">
-                    {/* The ghost sits behind the fill and catches up, so the chunk just taken off is a
-                        visible SHAPE rather than something inferred from two numbers. */}
-                    <u ref={hpGhostRef} />
-                    <i ref={hpRef} />
-                </span>
-                <b>{kills} killed</b>
                 {belt?.id ? <b className="gv-belt">{belt.name} x{Math.max(0, beltLeft)}</b> : null}
                 {canNative ? (
                     <button type="button" className="gv-leave" onClick={toggleNative}
@@ -1318,6 +1398,15 @@ function setUpLabScene(w, scene) {
             w.bossBar = { hp: boss.hp, maxHp: boss.maxHp };
             return boss.name;
         }
+    } else if (scene === "door") {
+        // ⚠️ THE FAR WALL, WHICH NO AMOUNT OF ORDINARY PLAY REACHES INSIDE A FILM. The way on stands at
+        // the right-hand end of a zone three to seven hundred units wide, so without this the only door
+        // anyone could ever photograph was the one you spawn beside. Stand him where the toll is readable.
+        const wall = w.platforms[0] ? w.platforms[0].x + w.platforms[0].w : w.hero.x;
+        w.hero.x = Math.max(6, wall - 13);
+        w.hero.y = 0;
+        w.pet.x = w.hero.x - 5;
+        w.pet.y = 0;
     } else if (scene === "climb") {
         // Point the hero at the highest ledge in the zone — the one thing no amount of ordinary play
         // reliably produces inside a few seconds of film, and the half of the zone that until now did not

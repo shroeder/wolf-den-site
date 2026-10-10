@@ -192,6 +192,22 @@ const FOODS = {
     food_draught: "A HEARTWOOD DRAUGHT: a tiny thick-walled PHIAL carved from red heartwood with a stopper of the same wood, barely more than a mouthful of glowing gold sap inside, warm light leaking from the seam. Deep red-brown wood, glowing gold, almost nothing of it.",
 };
 
+// ── THE ZONE DOORS ──────────────────────────────────────────────────────────────────────────────
+// One at each end of every zone: left goes back a node, right goes on to the next. They stand ON the
+// ground at the far edges of a 300-to-700 unit world, so you reach them by walking rather than by
+// finding a button — which is the whole reason they are world objects and not HUD.
+//
+// ⚠️ TALLER THAN THEY ARE WIDE, AND LIT FROM INSIDE. These are drawn at about 11 units against a 7-unit
+// hero, so unlike the loot they do not need to survive 30 pixels — they need to read as a DOOR from
+// across a zone, which is a silhouette job: an arch, standing upright, with its own light. The ITEM brief
+// below asks for a frame-filling object, which is right here too.
+const DOORS = {
+    "portal-open": "A standing stone ARCHWAY grown through with living wood, tall and narrow, its opening filled with a swirling sheet of soft turquoise light that throws a glow onto the stones around it. Moss and small ferns growing in the joints, a few motes of light drifting up out of the surface. Ancient, welcoming, clearly a WAY THROUGH. Weathered grey stone, deep forest green, luminous turquoise.",
+    "portal-locked": "A standing stone ARCHWAY grown through with living wood, tall and narrow, exactly the same shape as a working gate but DEAD: the opening sealed with a slab of rough grey stone, heavy iron chains drawn across it and fixed with a thick padlock, no light of any kind coming through. Dry and lifeless, cold grey, rusted iron, dead brown wood. No glow, no magic, no turquoise.",
+    "portal-skull": "A single bleached animal SKULL, front-on, hollow eye sockets, a few teeth missing, hairline cracks across the crown. Clean and graphic, the sort of mark that counts something. Bone white, warm grey shadow, deep black in the sockets.",
+};
+for (const [id, subject] of Object.entries(DOORS)) ART[id] = [`${ITEM} ${subject}`, "item"];
+
 for (const [id, subject] of Object.entries(PARTS)) ART[`part-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(EMBLEMS)) ART[`emblem-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(FOODS)) ART[`food-${id}`] = [`${ITEM} ${subject}`, "item"];
