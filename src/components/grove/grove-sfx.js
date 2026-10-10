@@ -80,6 +80,25 @@ export function celebrateUnlock() {
 }
 
 /**
+ * The run ending. Falls further and lands harder than the boss notice, and holds — the boss sound is a
+ * warning and has to leave room for a fight to start over it, while this one has nothing after it.
+ */
+export function playDeath() {
+    const a = audio();
+    if (!a) return;
+    try {
+        note(a, 146.83, 0.00, 0.30, 0.24);              // D3, the blow
+        note(a, 73.42, 0.10, 1.60, 0.26);               // D2 under it, long
+        note(a, 49.00, 0.22, 2.00, 0.20);               // G1, the floor dropping out
+    } catch { /* a missing chime must never break the screen */ }
+    try {
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+            navigator.vibrate(320);
+        }
+    } catch { /* ignore */ }
+}
+
+/**
  * Something very large noticing you. A low pair of notes falling rather than rising, which is the whole
  * trick: every reward sound in this file climbs, so a sound that DESCENDS reads as a threat before the
  * player has worked out what made it. Long and quiet enough to sit under a fight that is about to start.

@@ -65,7 +65,11 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
     // seconds of nothing, and a hero who one-shots everything never shows a health bar draining.
     const stats = useMemo(() => ({
         maxHp: 600, power: scene === "loot" ? 9999 : 34, critRate: scene === "fight" ? 50 : 22,
-        critDamage: 70, lifeSteal: 4, attackSpeed: 10, armour: 20,
+        critDamage: 70, attackSpeed: 10, armour: 20,
+        // ⚠️ NO LIFESTEAL AND NO ARMOUR IN THE DEATH SCENE. Four percent of a 34-power swing every 400ms
+        // out-heals anything a zone-three creature does to you, so the hero stood among three of them
+        // getting healthier. The one scene about dying has to be the one scene that cannot win.
+        lifeSteal: scene === "death" ? 0 : 4,
     }), [scene]);
 
     return (

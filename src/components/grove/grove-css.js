@@ -661,9 +661,24 @@ export const GROVE_CSS = `
    as a stutter, and the one thing it must say clearly is that the run is over and you are going somewhere. */
 .gv-dead { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
     background: rgba(6,8,6,0.82); text-align: center; animation: gvDead 320ms ease-out both; }
+/* ⚠️ THE WORDS ARRIVE AFTER THE DARK, NOT WITH IT. Both at once reads as a page navigating. Letting the
+   zone go out first and then saying what happened is the order the player experiences it in, and the 180ms
+   gap is most of why it lands — it is the same reason the loot rests before it can be collected. */
+.gv-dead > div { animation: gvDeadWord 520ms cubic-bezier(.16,1,.3,1) 180ms both; }
+@keyframes gvDeadWord {
+    0% { opacity: 0; transform: scale(1.22); filter: blur(6px); }
+    100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
 .gv-dead b { display: block; font-size: 1.5rem; letter-spacing: .04em; color: #ff8a7a;
     text-shadow: 0 2px 10px rgba(0,0,0,0.9); }
 .gv-dead span { display: block; margin-top: 8px; font-size: 0.88rem; color: #cfc6b6; }
+/* Where you are going, counting down in the open rather than leaving 2.6 seconds of nothing. Not a progress
+   bar standing in for progress — the wait is real, fixed, and already decided; this only says so. */
+.gv-dead u { display: block; margin: 16px auto 0; width: 92px; height: 3px; border-radius: 999px;
+    background: rgba(255,255,255,0.18); overflow: hidden; }
+.gv-dead u i { display: block; height: 100%; width: 100%; background: #ff8a7a; transform-origin: left;
+    animation: gvDeadWait 2600ms linear both; }
+@keyframes gvDeadWait { 0% { transform: scaleX(1); } 100% { transform: scaleX(0); } }
 @keyframes gvDead { from { opacity: 0; } to { opacity: 1; } }
 
 /* Above the ground line rather than across it — the HUD was drawn straight over the row of enemies

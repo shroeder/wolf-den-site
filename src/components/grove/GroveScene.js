@@ -35,7 +35,7 @@ import {
     LOOT_LABEL_MS, LOOT_DRAW_ACCEL, LOOT_DRAW_MAX, LOOT_EAT_DIST,
 } from "@/lib/marketplace/grove-juice.js";
 import {
-    playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice,
+    playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice, playDeath,
 } from "@/components/grove/grove-sfx.js";
 // ── ⚠️ THE GEOMETRY LIVES IN ITS OWN FILE SO IT CAN BE CHECKED ─────────────────────────────────────
 // Every distance that is really a SHARE OF THE FRAME is in grove-view.js, with the long version of why. The
@@ -139,6 +139,12 @@ const EMBLEM_THROW = 1.15;
 // not once you are already inside the fight.
 const BOSS_NOTICE = 34;
 const BOSS_INTRO_MS = 2000;
+
+// ── DYING ────────────────────────────────────────────────────────────────────────────────────────────────────
+// The longest hold in the feature, because it is the only one with nothing after it. A boss kill stops for
+// 130ms and an emblem for 190; this is allowed to sit, because the next thing the player sees is a panel
+// telling them the run is over and the screen should already feel like it has stopped before it arrives.
+const DEATH_STOP_MS = 420;
 // How long the flare covers the screen before the zone is allowed to change under it, and how long the
 // arrival takes to clear. Short on purpose: this is a transition, not a loading screen.
 const WARP_OUT_MS = 260;
@@ -897,7 +903,23 @@ export default function GroveScene({
                     addPop("heal", `+${healed}`, w.hero.x, w.hero.y + HERO_UNITS * 1.1);
                     setBeltLeft(w.foodLeft);
                 }
-                if (w.hp <= 0) { w.hp = 0; setDead(true); }
+                // ── ⚠️ DYING HAD NO MOMENT, ONLY A CONSEQUENCE ─────────────────────────────────
+                // Hitting zero flipped a flag and a dark panel appeared over a zone that was still
+                // cheerfully simulating underneath it. Every other beat in here — a crit, a kill, an
+                // emblem, a boss noticing you — stops the world for a fraction of a second, and the one
+                // moment that actually ends the run did not. So the hit that kills you lands like a hit
+                // that kills you: the longest stop in the feature, the heaviest shake, and a sound that
+                // falls further than the boss's.
+                if (w.hp <= 0 && !w.died) {
+                    w.died = true;
+                    w.hp = 0;
+                    w.clock.stop(now, DEATH_STOP_MS);
+                    w.shake.add(1);
+                    burst(w.hero.x, w.hero.y + HERO_UNITS * 0.5, { crit: true });
+                    shockwave(w.hero.x, w.hero.y + HERO_UNITS * 0.4, "hurt");
+                    playDeath();
+                    setDead(true);
+                }
             }
 
             // ── LOOT: SPILL, REST, DRAW IN ──────────────────────────────────────────────────────
@@ -1474,6 +1496,9 @@ export default function GroveScene({
                     <div>
                         <b>You were overcome</b>
                         <span>Patched up back in town. The Grove keeps what you carried out.</span>
+                        {/* The 2.6s before onDeath fires, said out loud. Two and a half seconds of a
+                            motionless panel reads as the game having hung. */}
+                        <u aria-hidden="true"><i /></u>
                     </div>
                 </div>
             ) : null}
@@ -1557,6 +1582,30 @@ function setUpLabScene(w, scene) {
             boss.vx = 0; boss.vy = 0; boss.grounded = true; boss.face = -1;
             w.moveTo = { x: boss.x - 12, y: 0 };
         }
+    } else if (scene === "death") {
+        // ⚠️ THE ONE MOMENT THAT CANNOT BE REACHED BY PLAYING WELL. Dying on the bench means standing a
+        // hero with almost no health next to something already angry — and using a zone whose creatures
+        // retaliate, because a passive rootrat will watch you stand there for ever.
+        // ⚠️ AND NO FOOD. The belt auto-eats below 60% of max, and the lab kit carries five poultices —
+        // so a hero dropped to 14 hit points healed himself back up on the very next frame and the scene
+        // filmed a man strolling away from three creatures. The one scene about dying has to be the one
+        // scene that cannot heal.
+        w.hp = 14;
+        w.foodLeft = 0;
+        const biters = w.foes.filter((f) => !f.isBoss).slice(0, 3);
+        biters.forEach((f, i) => {
+            f.x = w.hero.x + (i % 2 ? 3.5 : -3.5);
+            f.y = 0;
+            f.vx = 0; f.vy = 0; f.grounded = true;
+            f.hp = 9999; f.maxHp = 9999;
+            f.passive = false;
+            f.hit = true;
+            f.dmg = [14, 20];
+            f.nextAttack = 0;
+        });
+        // Hold him there: a hero with no target wanders, and he wandered out of their reach.
+        if (biters[0]) w.target = biters[0];
+        w.moveTo = null;
     } else if (scene === "emblem") {
         // One creature at the hero's elbow with enough health to still be dying when the camera starts.
         const victim = w.foes.filter((f) => !f.isBoss)[0];
