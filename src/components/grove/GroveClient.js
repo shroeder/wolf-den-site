@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import GroveScene from "@/components/grove/GroveScene.js";
-import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars } from "@/lib/marketplace/grove-catalog.js";
+import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { celebrateUnlock } from "@/components/grove/grove-sfx.js";
@@ -21,6 +21,21 @@ const post = (body) => fetch("/api/marketplace/grove", {
 }).then((r) => r.json()).catch(() => ({ ok: false }));
 
 const partName = (id) => GROVE_PARTS[id]?.name || id;
+
+// ── ⚠️ THE PARTS HAVE PICTURES AND THESE LISTS WERE NOT USING THEM ───────────────────────────────────────────
+// Thirty-three painted items shipped for the floor of the zone, where a drop is on screen for a couple of
+// seconds. The bag, the bank and the workbench — where a player spends far longer, deciding what to keep and
+// what a recipe still needs — were rows of names. Reading "Gnawed Root, Damp Moss, Grub Fat" is work; seeing
+// three objects is not, and it is the same art either way.
+//
+// Sized by role rather than one shared number: a slot is something you pick out of a grid at arm's length, a
+// recipe cost is read inside a sentence. fail-silent on purpose — a part added later with no sprite yet gets
+// its name and nothing else, which is a smaller fault than a broken-image glyph.
+const PartIcon = ({ id, size = 34 }) => {
+    const art = groveArt(id);
+    if (!art) return null;
+    return <img className="gv-ico" src={art} alt="" width={size} height={size} />;
+};
 
 export default function GroveClient({ initial }) {
     const [st, setSt] = useState(initial);
@@ -275,6 +290,7 @@ export default function GroveClient({ initial }) {
                             {bagRows.map(([p, n]) => (
                                 <button key={p} type="button" className="gv-slot"
                                     onClick={async () => { await post({ action: "move", partId: p, from: "pack", to: "bank", qty: n }); refresh(); }}>
+                                    <PartIcon id={p} />
                                     <b>{partName(p)}</b><span>{n}</span><em>to bank →</em>
                                 </button>
                             ))}
@@ -287,6 +303,7 @@ export default function GroveClient({ initial }) {
                             {bankRows.map(([p, n]) => (
                                 <button key={p} type="button" className="gv-slot"
                                     onClick={async () => { await post({ action: "move", partId: p, from: "bank", to: "pack", qty: n }); refresh(); }}>
+                                    <PartIcon id={p} />
                                     <b>{partName(p)}</b><span>{n}</span><em>← to bag</em>
                                 </button>
                             ))}
@@ -355,6 +372,7 @@ export default function GroveClient({ initial }) {
                                     <ul>
                                         {Object.entries(r.parts).map(([p, n]) => (
                                             <li key={p} className={(st.pack?.[p] || 0) >= n ? "is-have" : ""}>
+                                                <PartIcon id={p} size={20} />
                                                 {partName(p)} <span>{st.pack?.[p] || 0}/{n}</span>
                                             </li>
                                         ))}

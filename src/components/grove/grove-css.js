@@ -759,6 +759,17 @@ export const GROVE_CSS = `
 .gv-slot b { font-size: 0.84rem; }
 .gv-slot span { font-size: 1.05rem; font-weight: 800; color: #9fe08a; }
 .gv-slot em { font-style: normal; font-size: 0.68rem; color: #8d8577; }
+/* ── THE PART, AS ITSELF ──────────────────────────────────────────────────────────────────────
+   A slot is picked out of a grid at a glance, so the picture leads and the name confirms it. The
+   sprites are drawn on a dark forest and these panels are dark too, so they need no plate behind them —
+   just the shadow that keeps them from floating off the row. */
+.gv-slot .gv-ico { display: block; width: 34px; height: 34px; object-fit: contain;
+    object-position: 50% 100%; margin-bottom: 2px;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
+/* Inside a sentence rather than above one, so it sits on the text baseline instead of on the line box. */
+.gv-recipe .gv-ico { display: inline-block; width: 20px; height: 20px; object-fit: contain;
+    vertical-align: -0.35em; margin-right: 3px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
 .gv-slot.is-on { border-color: rgba(159,224,138,0.6); background: rgba(159,224,138,0.12); }
 .gv-slot.is-on em { color: #9fe08a; }
 /* A tool not yet made: shown so the ladder is visible before you can climb it. */
