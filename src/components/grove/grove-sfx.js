@@ -79,6 +79,33 @@ export function celebrateUnlock() {
     buzzUnlock();
 }
 
+/**
+ * An emblem falling. ⚠️ DELIBERATELY NOT THE UNLOCK TRIAD. An emblem is about one kill in four hundred and
+ * the way on opens twelve times in the whole map, so they are both "you got it" — and giving them the same
+ * chime means the rarest thing in the Grove announces itself with a sound the player already associates with
+ * a door. Two rare events that sound identical are one event as far as memory is concerned.
+ *
+ * So: a low struck note with a long tail and a shimmer climbing out of it, rather than a rising triad. It
+ * reads as something LANDING and then ringing, which is what an emblem does — it is an object that fell, not
+ * a gate that opened.
+ */
+export function playEmblemDrop() {
+    const a = audio();
+    if (!a) return;
+    try {
+        note(a, 196.00, 0.00, 0.55, 0.20);              // G3, the weight of it hitting
+        note(a, 392.00, 0.04, 0.80, 0.10, "sine");      // G4 ringing under
+        note(a, 1174.66, 0.14, 0.95, 0.07, "sine");     // D6 shimmer
+        note(a, 1760.00, 0.24, 1.10, 0.05, "sine");     // A6, the tail nobody consciously hears
+    } catch { /* a missing chime must never break the screen */ }
+    try {
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+            // One long pulse rather than the unlock's double tap, so even the phone says something different.
+            navigator.vibrate(150);
+        }
+    } catch { /* ignore */ }
+}
+
 // ── THE FIGHT, AS SOUND ──────────────────────────────────────────────────────────────────────────────────────
 // Luke: "it doesn't feel like you're hitting them."
 //

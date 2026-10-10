@@ -35,7 +35,7 @@ import {
     LOOT_LABEL_MS, LOOT_DRAW_ACCEL, LOOT_DRAW_MAX, LOOT_EAT_DIST,
 } from "@/lib/marketplace/grove-juice.js";
 import {
-    playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock,
+    playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop,
 } from "@/components/grove/grove-sfx.js";
 // ── ⚠️ THE GEOMETRY LIVES IN ITS OWN FILE SO IT CAN BE CHECKED ─────────────────────────────────────
 // Every distance that is really a SHARE OF THE FRAME is in grove-view.js, with the long version of why. The
@@ -124,6 +124,15 @@ const DOOR_INSET = 9;
 // How close the hero has to be for a working door to notice him. Wide enough that it wakes up while he is
 // still walking toward it — a reaction that only fires once you are standing inside the thing reads as a bug.
 const DOOR_NEAR = 11;
+
+// ── AN EMBLEM ARRIVING ───────────────────────────────────────────────────────────────────────────────────────
+// Longer than a boss kill stop (130ms), because this is rarer than any boss: twelve bosses exist and an
+// emblem is roughly one kill in four hundred. Long enough to register as the world pausing, short enough
+// that it never reads as a stutter.
+const EMBLEM_STOP_MS = 190;
+// Thrown harder than ordinary loot so it hangs at the top of its arc while the ring and the sparks resolve
+// underneath it. LOOT_SPILL.up is 0.62; this is the one drop allowed to upstage the rest of the pile.
+const EMBLEM_THROW = 1.15;
 // How long the flare covers the screen before the zone is allowed to change under it, and how long the
 // arrival takes to clear. Short on purpose: this is a transition, not a loading screen.
 const WARP_OUT_MS = 260;
@@ -569,6 +578,14 @@ export default function GroveScene({
 
             // The client rolls the SAME answer the server will, so the loot can spill immediately.
             const got = rollKill(foe.rare ? GROVE_RARE : GROVE_ENEMIES[foe.id], seed, i, bonuses);
+            // ⚠️ LAB ONLY, AND ONCE. An emblem is roughly one kill in four hundred, so the rarest moment in
+            // the Grove could otherwise only be reviewed by killing four hundred things and hoping — which
+            // is the same reason the boss and the climb have scenes. Guarded by labScene, which is null in
+            // every build but development.
+            if (labScene === "emblem" && !wd.emblemForced) {
+                wd.emblemForced = true;
+                got.emblem = GROVE_ENEMIES[foe.id]?.emblem || "em_grub";
+            }
             const rows = Object.entries(got.parts);
             const total = rows.length + (got.emblem ? 1 : 0);
             let n = 0;
@@ -593,10 +610,26 @@ export default function GroveScene({
                 spill(`d${i}-${part}`, part, `${count}x ${meta?.name || part.replace(/_/g, " ")}`,
                     { tier: meta?.tier || 1, rare: Boolean(meta?.rare) });
             }
-            // Luke: "Emblems are rare." So when one does fall it is not a line of text among four others.
+            // ── ⚠️ AN EMBLEM IS ABOUT ONE KILL IN FOUR HUNDRED AND IT LANDED LIKE A TWIG ───────────
+            // Luke: "Emblems are rare." The drop itself knew that — gold glow, a sheen, its own silhouette —
+            // but the MOMENT did not: same kill sound, same spill arc, no pause, nothing on the screen to
+            // say that the thing which just happened almost never happens. Rarity the player cannot feel is
+            // a number in a table.
+            //
+            // So the world stops for a beat, the corpse throws a gold ring and a crit burst, the screen
+            // takes a boss-weight knock, and the emblem is thrown HIGHER than ordinary loot so it hangs at
+            // the top of its arc while all that resolves. The hit-stop is what sells it: 190ms of everything
+            // else holding still is the difference between a drop and an event.
             if (got.emblem) {
-                spill(`e${i}`, got.emblem, groveEmblem(got.emblem)?.name || "Emblem",
-                    { emblem: true, tier: 6, rare: true });
+                const em = groveEmblem(got.emblem);
+                wd.clock.stop(now, EMBLEM_STOP_MS);
+                wd.shake.add(TRAUMA.boss);
+                shockwave(foe.x, foe.y + foe.h * 0.4, "crit");
+                burst(foe.x, foe.y + foe.h * 0.4, { crit: true });
+                playEmblemDrop();
+                addPop("loot", em?.name || "Emblem", foe.x, foe.y + foe.h + 4);
+                spill(`e${i}`, got.emblem, em?.name || "Emblem",
+                    { emblem: true, tier: 6, rare: true, vy: EMBLEM_THROW, vx: 0 });
             }
             rerender();
         };
@@ -1478,6 +1511,17 @@ function setUpLabScene(w, scene) {
             w.target = boss;
             w.bossBar = { hp: boss.hp, maxHp: boss.maxHp };
             return boss.name;
+        }
+    } else if (scene === "emblem") {
+        // One creature at the hero's elbow with enough health to still be dying when the camera starts.
+        const victim = w.foes.filter((f) => !f.isBoss)[0];
+        if (victim) {
+            victim.x = w.hero.x + 2.5;
+            victim.y = 0;
+            victim.vx = 0; victim.vy = 0; victim.grounded = true; victim.face = -1;
+            victim.hp = 420; victim.maxHp = 420;
+            victim.hit = true; victim.passive = false;
+            w.target = victim;
         }
     } else if (scene === "door" || scene === "unlock" || scene === "travel") {
         // ⚠️ THE FAR WALL, WHICH NO AMOUNT OF ORDINARY PLAY REACHES INSIDE A FILM. The way on stands at
