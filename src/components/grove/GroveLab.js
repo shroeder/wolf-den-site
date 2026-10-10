@@ -42,8 +42,15 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
     // boss scene films a rootrat.
     const zone = useMemo(() => {
         const z = GROVE_ZONES.find((x) => x.n === zoneN) || GROVE_ZONES[0];
-        return { ...z, bossReady: true };
-    }, [zoneN]);
+        // ⚠️ AND A BANKED KILL COUNT FOR THE DOOR SCENES, or the best beat in the zone is unfilmable.
+        // The way on opens at toUnlock, which is 25 kills in zone two — forty seconds of film in which
+        // nothing happens and then one thing does. "door" stands at the threshold so the gate is sealed
+        // with its toll showing; "unlock" is one kill short, so the very next thing that dies opens it.
+        const banked = scene === "unlock" ? Math.max(0, z.toUnlock - 1)
+            : scene === "door" ? Math.max(0, z.toUnlock - 7)
+            : 0;
+        return { ...z, bossReady: true, kills: banked };
+    }, [zoneN, scene]);
 
     // A fixed seed so two runs of the film rig produce the same zone and a diff means a real change.
     const seed = 424242;

@@ -397,6 +397,46 @@ export const GROVE_CSS = `
    Tapping it does nothing by design: there is no handler, so it cannot report a failure nobody asked for. */
 .gv-door.is-locked { cursor: default; }
 .gv-door.is-locked img { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.75)); }
+
+/* ── A WORKING DOOR IS NEVER QUITE STILL ──────────────────────────────────────────────────────
+   The light in the arch drifts whether or not anyone is looking at it, which is the difference between
+   a gate and a photograph of a gate. Slow and small — a portal that throbs is a hazard, not a door. */
+.gv-door:not(.is-locked) img { animation: gvDoorBreathe 3400ms ease-in-out infinite; }
+@keyframes gvDoorBreathe {
+    0%, 100% { filter: drop-shadow(0 0 14px rgba(90,230,210,0.38)) drop-shadow(0 4px 6px rgba(0,0,0,0.7)); }
+    50% { filter: drop-shadow(0 0 22px rgba(120,245,225,0.62)) drop-shadow(0 4px 6px rgba(0,0,0,0.7)); }
+}
+/* ⚠️ AND IT NOTICES YOU. Walking up to a thing that does not acknowledge you is the single cheapest way
+   for a world to feel dead. The loop toggles .is-near; this is only what that looks like. Scaled from the
+   BOTTOM, because a door growing from its middle lifts off the ground it is standing on. */
+.gv-door.is-near img { animation: gvDoorNear 1500ms ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes gvDoorNear {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(120,245,225,0.6)) drop-shadow(0 4px 6px rgba(0,0,0,0.7)); }
+    50% { transform: scale(1.035); filter: drop-shadow(0 0 30px rgba(150,255,235,0.85)) drop-shadow(0 4px 6px rgba(0,0,0,0.7)); }
+}
+
+/* ── THE KILL THAT OPENS IT ───────────────────────────────────────────────────────────────────
+   The gate arrives: a hard white flash, a kick of scale, and then it settles into its breathing. The
+   sparks, the shockwave, the shake and the sound are fired from the loop at the same instant — this is
+   only the door's own part of it. Luke asked for juice; a progression beat with no beat is where to spend it. */
+.gv-door.is-opening img {
+    animation: gvDoorOpen 820ms cubic-bezier(.2, 1.5, .4, 1) both,
+        gvDoorBreathe 3400ms ease-in-out 820ms infinite;
+    transform-origin: 50% 100%;
+}
+@keyframes gvDoorOpen {
+    0% { transform: scale(0.72); filter: brightness(4) drop-shadow(0 0 46px rgba(190,255,245,1)); }
+    45% { transform: scale(1.14); filter: brightness(1.7) drop-shadow(0 0 40px rgba(150,255,235,0.95)); }
+    100% { transform: scale(1); filter: drop-shadow(0 0 18px rgba(90,230,210,0.45)) drop-shadow(0 4px 6px rgba(0,0,0,0.7)); }
+}
+/* The toll leaves rather than simply stopping being rendered — a number that vanishes between frames reads
+   as a glitch, and this one is the thing the player has been counting down for. */
+.gv-door.is-opening .gv-door-need { animation: gvTollGone 420ms ease-in both; }
+@keyframes gvTollGone {
+    0% { transform: translateX(-50%) scale(1); opacity: 1; }
+    40% { transform: translateX(-50%) scale(1.3); opacity: 1; }
+    100% { transform: translateX(-50%) scale(0.4); opacity: 0; }
+}
 /* The toll, written on the door itself. A skull and a number, because "14" beside a skull needs no label
    and survives being read at a glance from across the zone. */
 .gv-door-need { position: absolute; left: 50%; bottom: 66%; transform: translateX(-50%);

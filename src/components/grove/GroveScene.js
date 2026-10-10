@@ -35,7 +35,7 @@ import {
     LOOT_LABEL_MS, LOOT_DRAW_ACCEL, LOOT_DRAW_MAX, LOOT_EAT_DIST,
 } from "@/lib/marketplace/grove-juice.js";
 import {
-    playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell,
+    playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock,
 } from "@/components/grove/grove-sfx.js";
 // ── ⚠️ THE GEOMETRY LIVES IN ITS OWN FILE SO IT CAN BE CHECKED ─────────────────────────────────────
 // Every distance that is really a SHARE OF THE FRAME is in grove-view.js, with the long version of why. The
@@ -121,6 +121,9 @@ const LOOT_DRAW_RANGE = 6;
 // How far in from the wall a door stands. Far enough that the hero can get fully past it and turn round —
 // flush against the wall he would be standing inside it with nowhere to step back to.
 const DOOR_INSET = 9;
+// How close the hero has to be for a working door to notice him. Wide enough that it wakes up while he is
+// still walking toward it — a reaction that only fires once you are standing inside the thing reads as a bug.
+const DOOR_NEAR = 11;
 const ZONE_COUNT = GROVE_ZONES.length;
 const DOOR_ART = {
     open: "/images/grove/portal-open.webp",
@@ -375,6 +378,17 @@ export default function GroveScene({
             if (labScene !== "wander") {
                 const named = setUpLabScene(w, labScene);
                 if (named) setBossName(named);
+                // ⚠️ AND THE CAMERA GOES WITH HIM, OR THE SCENE FILMS ITS OWN PAN. camRef eases toward the
+                // hero at about 5.5% a frame from wherever it was, and a lab scene teleports him — so
+                // "door" and "unlock" put him at the far wall and then spent two and a half seconds
+                // travelling there. The world was right the whole time: the probe showed the hero at 287
+                // and the gate at 291 while the DOM had it 2,285px off the right of frame, and the unlock
+                // happened out of shot. Nothing in real play teleports, which is why this never bit the
+                // game — only the bench that exists to look at it.
+                // ⚠️ FLAGGED, NOT SNAPPED HERE. visibleUnits is still the 100-unit placeholder until the
+                // first camera pass measures the element, so snapping now lands eighty units short and the
+                // pan is merely shorter. The loop does it on frame one, when the number is real.
+                w.snapCam = true;
             }
         }
 
@@ -520,6 +534,27 @@ export default function GroveScene({
             // ── THE STREAK ──────────────────────────────────────────────────────────────────────
             // ⚠️ PRESENTATION ONLY. It pays nothing — see COMBO_WINDOW_MS in grove-juice.js for why a kill
             // loop with no daily cap must never have a reward multiplier bolted to how fast you clear it.
+            // ── ⚠️ THE KILL THAT OPENS THE WAY IS THE BIGGEST BEAT IN THE ZONE, AND IT WAS SILENT ──
+            // Crossing toUnlock is the whole reason the grind has a shape, and until now it did nothing on
+            // screen: the locked sprite was simply a different sprite on the next render, with no sound, no
+            // shake and nothing to look at. The map already celebrates it — but that happens on a DIFFERENT
+            // SCREEN, minutes later, after a settle. The moment belongs where it is earned, on the door, on
+            // the kill that earns it.
+            //
+            // Fired from here rather than from an effect because burst, shockwave and the shaker all live in
+            // this closure, and because this is the one place that knows a kill just happened.
+            const way = wd.doors.find((d) => d.side === "on");
+            if (way && !way.openedAt && (Number(zone.kills) || 0) + wd.killIndex >= zone.toUnlock) {
+                way.openedAt = now;
+                const y = 6;
+                burst(way.x, y, { crit: true });
+                burst(way.x, y, { kind: "dust" });
+                shockwave(way.x, y, "kill");
+                wd.shake.add(TRAUMA.boss);
+                celebrateUnlock();
+                addPop("loot", "The way is open", way.x, 13);
+            }
+
             wd.combo = now < wd.comboUntil ? wd.combo + 1 : 1;
             wd.comboUntil = now + COMBO_WINDOW_MS;
             playKill(Math.min(COMBO_PITCH_STEPS, wd.combo));
@@ -871,6 +906,9 @@ export default function GroveScene({
             const visibleUnits = view.visibleUnits;
             w.visibleUnits = visibleUnits;
             const wantCam = cameraX(w.hero.x, w.hero.face, visibleUnits, W);
+            // A lab scene that teleports the hero asks the camera to be there already, rather than to
+            // travel. Real play never teleports, so this only ever fires on the bench.
+            if (w.snapCam) { camRef.current = wantCam; w.snapCam = false; }
             camRef.current += (wantCam - camRef.current) * Math.min(1, 0.055 * dt);
             const cam = camRef.current;
 
@@ -955,6 +993,11 @@ export default function GroveScene({
             for (const dr of w.doors) {
                 if (!dr.node) continue;
                 dr.node.style.transform = `translate3d(${(dr.x - cam) * unit}px, ${camY * unit}px, 0)`;
+                // ⚠️ THE CLASS IS TOGGLED, NOT REWRITTEN. className = ... here would wipe is-locked and
+                // is-opening every frame, which is sixty times a second of the open sprite fighting the
+                // unlock animation for the same element.
+                const near = Math.abs(w.hero.x - dr.x) < DOOR_NEAR && !dr.node.classList.contains("is-locked");
+                dr.node.classList.toggle("is-near", near);
             }
 
             for (const d of w.drops) {
@@ -1251,13 +1294,19 @@ export default function GroveScene({
                     const need = Math.max(0, zone.toUnlock - killsHere);
                     return (
                         <button key={dr.side} type="button"
-                            className={`gv-door${locked ? " is-locked" : ""}`}
+                            className={`gv-door${locked ? " is-locked" : ""}${
+                                dr.openedAt && Date.now() - dr.openedAt < 1400 ? " is-opening" : ""}`}
                             ref={(n) => { const d = dr; d.node = n; }}
                             onPointerDown={locked ? undefined : () => travel(dr.to)}
                             aria-label={locked
                                 ? `Locked — ${need} more kills to open the way on`
                                 : dr.side === "back" ? "Back a zone" : "On to the next zone"}>
-                            <img src={locked ? DOOR_ART.locked : DOOR_ART.open} alt="" />
+                            {/* ⚠️ KEYED, SO REACT REPLACES THE ELEMENT RATHER THAN SWAPPING ITS src.
+                                A CSS animation on an element that merely changed attribute does not run
+                                again — the chains would vanish and the gate would light up with no beat
+                                between them. A new element animates from nothing, which is the point. */}
+                            <img key={locked ? "locked" : "open"}
+                                src={locked ? DOOR_ART.locked : DOOR_ART.open} alt="" />
                             {locked ? (
                                 <span className="gv-door-need">
                                     <img src={DOOR_ART.skull} alt="" />
@@ -1398,15 +1447,47 @@ function setUpLabScene(w, scene) {
             w.bossBar = { hp: boss.hp, maxHp: boss.maxHp };
             return boss.name;
         }
-    } else if (scene === "door") {
+    } else if (scene === "door" || scene === "unlock") {
         // ⚠️ THE FAR WALL, WHICH NO AMOUNT OF ORDINARY PLAY REACHES INSIDE A FILM. The way on stands at
         // the right-hand end of a zone three to seven hundred units wide, so without this the only door
         // anyone could ever photograph was the one you spawn beside. Stand him where the toll is readable.
-        const wall = w.platforms[0] ? w.platforms[0].x + w.platforms[0].w : w.hero.x;
+        // ⚠️ THE WIDEST RIGHT EDGE, NOT platforms[0]. The first platform is not the ground — reading
+        // its end gave a wall a few units from the origin, so Math.max(6, wall - 13) pinned the hero at 6
+        // and the gate stayed three thousand pixels off the right of frame while he walked to it. The
+        // probe found that in one line; two contact sheets had not.
+        const wall = w.platforms.reduce((m, pf) => Math.max(m, pf.x + pf.w), 0) || w.hero.x;
         w.hero.x = Math.max(6, wall - 13);
         w.hero.y = 0;
         w.pet.x = w.hero.x - 5;
         w.pet.y = 0;
+
+        // ⚠️ AND THE VICTIM COMES AFTER HIM, NOT BEFORE. The fixture banks toUnlock - 1 for this scene, so
+        // the beat is one swing away — but the camera follows the HERO, so a creature left wherever it
+        // spawned drags him away down the zone and the gate opens off screen. Placed at his elbow, the
+        // door, the kill and the moment are all in the same frame.
+        if (scene === "unlock") {
+            const victim = w.foes.filter((f) => !f.isBoss)[0];
+            if (victim) {
+                // ⚠️ BETWEEN HIM AND THE GATE, not behind him. The camera follows the hero, so a victim
+                // placed on his left turns him left and carries the door off the right edge at the exact
+                // instant it opens — the first film of this beat was of an empty wall.
+                victim.x = w.hero.x + 2.5;
+                victim.y = 0;
+                victim.vx = 0; victim.vy = 0; victim.grounded = true; victim.face = -1;
+                // ⚠️ NOT 1 HP. At one hit point it died inside the first thirty milliseconds and every
+                // frame of the film was of a door that had ALREADY opened — the same mistake the fight
+                // scene made before it. Enough health for two or three swings puts the break on camera.
+                // ⚠️ 420, NOT 70. The film rig only starts capturing once the page has settled, which is
+                // well over a second after the simulation begins — at seventy hit points the gate had
+                // already opened before frame zero, three sheets running. It has to still be dying when
+                // the camera starts rolling, so the beat lands in the middle of the window.
+                victim.hp = 420;
+                victim.maxHp = 420;
+                victim.hit = true;
+                victim.passive = false;
+                w.target = victim;
+            }
+        }
     } else if (scene === "climb") {
         // Point the hero at the highest ledge in the zone — the one thing no amount of ordinary play
         // reliably produces inside a few seconds of film, and the half of the zone that until now did not
