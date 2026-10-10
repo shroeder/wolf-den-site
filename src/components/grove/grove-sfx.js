@@ -80,6 +80,26 @@ export function celebrateUnlock() {
 }
 
 /**
+ * Something very large noticing you. A low pair of notes falling rather than rising, which is the whole
+ * trick: every reward sound in this file climbs, so a sound that DESCENDS reads as a threat before the
+ * player has worked out what made it. Long and quiet enough to sit under a fight that is about to start.
+ */
+export function playBossNotice() {
+    const a = audio();
+    if (!a) return;
+    try {
+        note(a, 110.00, 0.00, 1.10, 0.22);              // A2
+        note(a, 82.41, 0.16, 1.30, 0.20);               // E2, under it
+        note(a, 164.81, 0.06, 0.90, 0.09, "sine");      // E3 body
+    } catch { /* a missing chime must never break the screen */ }
+    try {
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+            navigator.vibrate([40, 50, 40, 50, 120]);
+        }
+    } catch { /* ignore */ }
+}
+
+/**
  * An emblem falling. ⚠️ DELIBERATELY NOT THE UNLOCK TRIAD. An emblem is about one kill in four hundred and
  * the way on opens twelve times in the whole map, so they are both "you got it" — and giving them the same
  * chime means the rarest thing in the Grove announces itself with a sound the player already associates with

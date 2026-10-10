@@ -35,7 +35,7 @@ import {
     LOOT_LABEL_MS, LOOT_DRAW_ACCEL, LOOT_DRAW_MAX, LOOT_EAT_DIST,
 } from "@/lib/marketplace/grove-juice.js";
 import {
-    playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop,
+    playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice,
 } from "@/components/grove/grove-sfx.js";
 // ── ⚠️ THE GEOMETRY LIVES IN ITS OWN FILE SO IT CAN BE CHECKED ─────────────────────────────────────
 // Every distance that is really a SHARE OF THE FRAME is in grove-view.js, with the long version of why. The
@@ -133,6 +133,12 @@ const EMBLEM_STOP_MS = 190;
 // Thrown harder than ordinary loot so it hangs at the top of its arc while the ring and the sparks resolve
 // underneath it. LOOT_SPILL.up is 0.62; this is the one drop allowed to upstage the rest of the pile.
 const EMBLEM_THROW = 1.15;
+
+// ── A BOSS NOTICING YOU ──────────────────────────────────────────────────────────────────────────────────────
+// Further out than its own reach (26) so the announcement lands while you are still deciding to approach,
+// not once you are already inside the fight.
+const BOSS_NOTICE = 34;
+const BOSS_INTRO_MS = 2000;
 // How long the flare covers the screen before the zone is allowed to change under it, and how long the
 // arrival takes to clear. Short on purpose: this is a transition, not a loading screen.
 const WARP_OUT_MS = 260;
@@ -181,6 +187,8 @@ export default function GroveScene({
     const killsHere = (Number(zone.kills) || 0) + kills;
     const [dead, setDead] = useState(false);
     const [bossName, setBossName] = useState(null);
+    // The one-shot banner across the middle when a boss first notices you, distinct from the bar it leaves.
+    const [bossIntro, setBossIntro] = useState(null);
     const [beltLeft, setBeltLeft] = useState(Number(belt?.count) || 0);
     // ── ⚠️ THE LIST IS STATE; THE POSITIONS ARE NOT ─────────────────────────────────────────────────
     // The first version pushed foes into world.foes imperatively and React was never told, so the zone
@@ -775,6 +783,24 @@ export default function GroveScene({
                 // Passive early enemies never initiate — Luke: "the ones earlier in the game being fully
                 // passive. And later in the game attacking when they are attacked." A boss is passive until
                 // you reach it and then never stops.
+                // ── ⚠️ THE BOSS ARRIVES, RATHER THAN BEING DISCOVERED STANDING THERE ───────────
+                // It is spawned at the far wall on zone entry and stays passive, and its bar and its name
+                // only ever appeared when you TAPPED it. So the climax of a zone was a large animal you
+                // walked into, and the only thing that marked it was a health bar you had to start the
+                // fight to see. A boss that does not announce itself is scenery with a lot of hit points.
+                if (f.isBoss && !f.noticed && Math.abs(f.x - w.hero.x) < BOSS_NOTICE) {
+                    f.noticed = true;
+                    w.bossBar = { hp: f.hp, maxHp: f.maxHp };
+                    w.bossChase = makeChase(1);
+                    w.shake.add(TRAUMA.boss);
+                    playBossNotice();
+                    setBossName(f.name);
+                    setBossIntro(f.name);
+                    // ⚠️ CLEARED ON A TIMER rather than an animation event, for the same reason the warp is:
+                    // animationend never fires if the element is not painted, and a banner that never
+                    // clears is a name sitting across the middle of a boss fight.
+                    setTimeout(() => setBossIntro(null), BOSS_INTRO_MS);
+                }
                 const angry = f.isBoss ? (f === tgt || f.hit) : (!f.passive && (f === tgt || f.hit));
                 const near = Math.abs(f.x - w.hero.x) < (f.isBoss ? 26 : 15)
                     && Math.abs(f.y - w.hero.y) < SWING_V_REACH + 4;
@@ -1411,6 +1437,10 @@ export default function GroveScene({
                 the zone can be rebuilt underneath it unseen. */}
             {warp ? <div className={`gv-warp is-${warp}`} aria-hidden="true" /> : null}
 
+            {bossIntro ? (
+                <div className="gv-boss-intro" aria-hidden="true"><b>{bossIntro}</b></div>
+            ) : null}
+
             {bossName ? (
                 <div className="gv-boss">
                     <b>{bossName}</b>
@@ -1511,6 +1541,21 @@ function setUpLabScene(w, scene) {
             w.target = boss;
             w.bossBar = { hp: boss.hp, maxHp: boss.maxHp };
             return boss.name;
+        }
+    } else if (scene === "bossin") {
+        // ⚠️ OUTSIDE NOTICE RANGE, WALKING IN. The "boss" scene stands the hero at reach so telegraphs can
+        // be filmed, which means the arrival has already happened before the first frame — the bar and the
+        // name are up and the banner has been and gone. This one puts the boss well beyond BOSS_NOTICE and
+        // sends him at it, so the moment it notices him is on camera.
+        const boss = w.foes.find((f) => f.isBoss);
+        if (boss) {
+            // ⚠️ 120 UNITS, NOT 52. The film rig settles for over four seconds before it starts capturing,
+            // and the hero covers about thirteen units a second — so at 52 he had already noticed the boss
+            // and the banner had been and gone before frame zero, twice. The walk has to outlast the settle.
+            boss.x = w.hero.x + 120;
+            boss.y = 0;
+            boss.vx = 0; boss.vy = 0; boss.grounded = true; boss.face = -1;
+            w.moveTo = { x: boss.x - 12, y: 0 };
         }
     } else if (scene === "emblem") {
         // One creature at the hero's elbow with enough health to still be dying when the camera starts.

@@ -635,6 +635,28 @@ export const GROVE_CSS = `
 .gv-boss u { background: linear-gradient(90deg, #f0e2ff, #fff); }
 .gv-boss i { background: linear-gradient(90deg, #a982ff, #e0c6ff); }
 
+/* ── A BOSS NOTICING YOU ──────────────────────────────────────────────────────────────────────
+   The name arrives across the middle of the screen once, then gets out of the way and leaves the bar
+   behind. It is deliberately the only thing in the zone that uses the middle of the frame: everything
+   else is corners and ground line, so the centre still means something when it is finally used.
+
+   ⚠️ pointer-events: none, OR IT EATS THE FIRST TAP OF THE FIGHT. It covers the whole width for two
+   seconds, which is exactly the two seconds in which the player is reaching for the boss. */
+.gv-boss-intro { position: absolute; inset: 0; z-index: 4; display: flex;
+    align-items: center; justify-content: center; pointer-events: none; }
+.gv-boss-intro b { font-size: clamp(1.3rem, 7vw, 2.4rem); font-weight: 800; letter-spacing: .06em;
+    text-transform: uppercase; text-align: center; color: #f3e6ff; padding: 0 6%;
+    text-shadow: 0 0 22px rgba(169,130,255,0.9), 0 3px 10px rgba(0,0,0,0.95);
+    animation: gvBossIntro 2000ms cubic-bezier(.16,1,.3,1) both; }
+/* Arrives big and slightly wide, settles, holds while it is read, then lifts away — rather than simply
+   fading, which reads as the page loading something. */
+@keyframes gvBossIntro {
+    0% { opacity: 0; transform: scale(1.5); letter-spacing: .3em; }
+    18% { opacity: 1; transform: scale(1); letter-spacing: .06em; }
+    72% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.94) translateY(-14%); }
+}
+
 /* The death screen. Covers the zone outright rather than tinting it: a dimmed but still-moving scene reads
    as a stutter, and the one thing it must say clearly is that the run is over and you are going somewhere. */
 .gv-dead { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
