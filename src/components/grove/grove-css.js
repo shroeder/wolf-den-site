@@ -429,6 +429,38 @@ export const GROVE_CSS = `
     45% { transform: scale(1.14); filter: brightness(1.7) drop-shadow(0 0 40px rgba(150,255,235,0.95)); }
     100% { transform: scale(1); filter: drop-shadow(0 0 18px rgba(90,230,210,0.45)) drop-shadow(0 4px 6px rgba(0,0,0,0.7)); }
 }
+/* ── GOING THROUGH ────────────────────────────────────────────────────────────────────────────
+   The zone is rebuilt behind this, so the swap is never seen: new backdrop, new creatures, the hero
+   somewhere else. Without it, travelling is a jump cut — the cheapest-looking moment in the feature and
+   the one the whole door exists to deliver.
+
+   ⚠️ IT IS THE GATE'S OWN COLOUR, not a white flash or a black fade. A white flash on a dark forest is a
+   camera bulb; black is a loading screen. Turquoise says the thing you walked into is what took you.
+   ⚠️ AND IT COVERS EVERYTHING — z-index above the vignette and the HUD, because a Leave button sitting
+   crisply on top of a transition is what makes it read as an overlay rather than as travel. */
+.gv-warp { position: absolute; inset: 0; z-index: 9; pointer-events: none;
+    background: radial-gradient(circle at 50% 58%, #9ffff0 0%, #35d6c4 32%, #0b5c57 72%, #061a1a 100%); }
+.gv-warp.is-out { animation: gvWarpOut 260ms ease-in both; }
+.gv-warp.is-in { animation: gvWarpIn 420ms ease-out both; }
+/* Out rushes in from the edges and closes over; in opens back up from the middle, which reads as
+   arriving somewhere rather than as the same curtain being pulled twice. */
+@keyframes gvWarpOut {
+    0% { opacity: 0; transform: scale(1.35); }
+    100% { opacity: 1; transform: scale(1); }
+}
+@keyframes gvWarpIn {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.45); }
+}
+
+/* The gate reacts to being used, under the flare — so the last thing seen before the screen floods is
+   the thing that caused it. */
+.gv-door.is-entering img { animation: gvDoorEnter 260ms ease-in both; transform-origin: 50% 100%; }
+@keyframes gvDoorEnter {
+    0% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(120,245,225,0.6)); }
+    100% { transform: scale(1.5); filter: brightness(3) drop-shadow(0 0 60px rgba(190,255,245,1)); }
+}
+
 /* The toll leaves rather than simply stopping being rendered — a number that vanishes between frames reads
    as a glitch, and this one is the thing the player has been counting down for. */
 .gv-door.is-opening .gv-door-need { animation: gvTollGone 420ms ease-in both; }

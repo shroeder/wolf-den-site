@@ -124,6 +124,10 @@ const DOOR_INSET = 9;
 // How close the hero has to be for a working door to notice him. Wide enough that it wakes up while he is
 // still walking toward it — a reaction that only fires once you are standing inside the thing reads as a bug.
 const DOOR_NEAR = 11;
+// How long the flare covers the screen before the zone is allowed to change under it, and how long the
+// arrival takes to clear. Short on purpose: this is a transition, not a loading screen.
+const WARP_OUT_MS = 260;
+const WARP_IN_MS = 420;
 const ZONE_COUNT = GROVE_ZONES.length;
 const DOOR_ART = {
     open: "/images/grove/portal-open.webp",
@@ -156,6 +160,10 @@ export default function GroveScene({
     const [kills, setKills] = useState(0);
     // One door at a time: two taps while the first request is in flight would enter twice.
     const travelRef = useRef(false);
+    // null while standing still; "out" while the gate floods the screen, "in" while the new zone arrives.
+    const [warp, setWarp] = useState(null);
+    // Which gate is being walked through, so it can flare under the screen flood.
+    const [entering, setEntering] = useState(null);
     // ⚠️ THE RUNNING TOTAL, NOT THIS VISIT'S. zone.kills is what the server has banked across every session
     // in this zone; `kills` is only what has died since this one started. Luke: "Ensure the kill count
     // persists, we don't want it to get reset if you leave." The door reads the sum, so walking out at 19
@@ -1146,13 +1154,32 @@ export default function GroveScene({
     const travel = useCallback(async (to) => {
         if (travelRef.current) return;
         travelRef.current = true;
+        // ── ⚠️ THE SWAP NEEDS COVERING, OR GOING THROUGH A PORTAL IS A JUMP CUT ────────────────────
+        // Without this the zone simply becomes a different zone between two frames: new backdrop, new
+        // creatures, hero somewhere else, no sense of having gone anywhere. It is the cheapest-looking
+        // moment in the feature and it is the one the whole door exists to deliver.
+        //
+        // Two halves either side of the await. "out" floods the screen from the gate's own colour while
+        // the settle and the enter are in flight — which also means the request latency stops being dead
+        // air and becomes the travel. "in" clears once the new zone is standing.
+        setWarp("out");
         try {
             const w = worldRef.current;
             if (w?.killLog?.length) {
                 const ate = w.eaten; w.eaten = {};
                 await onSettle?.(w.killLog.splice(0), ate);
             }
+            // The flare has to be covering the screen before the swap, not racing it.
+            await new Promise((r) => setTimeout(r, WARP_OUT_MS));
             await onTravel?.(to);
+            setWarp("in");
+            // ⚠️ CLEARED ON A TIMER, NOT ON AN ANIMATION EVENT. animationend does not fire if the element
+            // is never painted — a backgrounded tab, a slow first frame of the new zone — and a warp that
+            // never clears is a white screen with a game running invisibly behind it.
+            setTimeout(() => { setWarp(null); setEntering(null); }, WARP_IN_MS);
+        } catch {
+            setWarp(null);
+            setEntering(null);
         } finally {
             travelRef.current = false;
         }
@@ -1295,9 +1322,10 @@ export default function GroveScene({
                     return (
                         <button key={dr.side} type="button"
                             className={`gv-door${locked ? " is-locked" : ""}${
-                                dr.openedAt && Date.now() - dr.openedAt < 1400 ? " is-opening" : ""}`}
+                                dr.openedAt && Date.now() - dr.openedAt < 1400 ? " is-opening" : ""}${
+                                entering === dr.side ? " is-entering" : ""}`}
                             ref={(n) => { const d = dr; d.node = n; }}
-                            onPointerDown={locked ? undefined : () => travel(dr.to)}
+                            onPointerDown={locked ? undefined : () => { setEntering(dr.side); travel(dr.to); }}
                             aria-label={locked
                                 ? `Locked — ${need} more kills to open the way on`
                                 : dr.side === "back" ? "Back a zone" : "On to the next zone"}>
@@ -1345,6 +1373,10 @@ export default function GroveScene({
 
             {/* The screen's own reaction. Outside the world layer so it does not shake with it. */}
             <div className="gv-vign" ref={vignRef} aria-hidden="true" />
+
+            {/* The journey itself. Outside the world layer so it does not shake, and above everything so
+                the zone can be rebuilt underneath it unseen. */}
+            {warp ? <div className={`gv-warp is-${warp}`} aria-hidden="true" /> : null}
 
             {bossName ? (
                 <div className="gv-boss">
@@ -1447,7 +1479,7 @@ function setUpLabScene(w, scene) {
             w.bossBar = { hp: boss.hp, maxHp: boss.maxHp };
             return boss.name;
         }
-    } else if (scene === "door" || scene === "unlock") {
+    } else if (scene === "door" || scene === "unlock" || scene === "travel") {
         // ⚠️ THE FAR WALL, WHICH NO AMOUNT OF ORDINARY PLAY REACHES INSIDE A FILM. The way on stands at
         // the right-hand end of a zone three to seven hundred units wide, so without this the only door
         // anyone could ever photograph was the one you spawn beside. Stand him where the toll is readable.

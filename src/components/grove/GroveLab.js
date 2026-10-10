@@ -37,20 +37,26 @@ const PET = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace
 
 export default function GroveLab({ scene = "wander", zoneN = 1 }) {
     const [log, setLog] = useState([]);
+    // Where a gate has taken us, overriding the zone in the URL once one is walked through.
+    const [travelled, setTravelled] = useState(null);
     // ⚠️ bossReady, OR THE BOSS SCENE IS EMPTY. The real client sets that flag from the server (the zone
     // must be cleared and the cooldown elapsed); without it the spawn pass skips the boss entirely and the
     // boss scene films a rootrat.
     const zone = useMemo(() => {
-        const z = GROVE_ZONES.find((x) => x.n === zoneN) || GROVE_ZONES[0];
+        const n = travelled || zoneN;
+        const z = GROVE_ZONES.find((x) => x.n === n) || GROVE_ZONES[0];
         // ⚠️ AND A BANKED KILL COUNT FOR THE DOOR SCENES, or the best beat in the zone is unfilmable.
         // The way on opens at toUnlock, which is 25 kills in zone two — forty seconds of film in which
         // nothing happens and then one thing does. "door" stands at the threshold so the gate is sealed
         // with its toll showing; "unlock" is one kill short, so the very next thing that dies opens it.
-        const banked = scene === "unlock" ? Math.max(0, z.toUnlock - 1)
+        // "travel" banks the full toll, so the gate is already open and the only thing left to film is
+        // what walking through one looks like.
+        const banked = scene === "travel" ? z.toUnlock
+            : scene === "unlock" ? Math.max(0, z.toUnlock - 1)
             : scene === "door" ? Math.max(0, z.toUnlock - 7)
             : 0;
         return { ...z, bossReady: true, kills: banked };
-    }, [zoneN, scene]);
+    }, [zoneN, scene, travelled]);
 
     // A fixed seed so two runs of the film rig produce the same zone and a diff means a real change.
     const seed = 424242;
@@ -75,6 +81,11 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
                 petArt={PET}
                 belt={{ id: "food_poultice", name: "Moss Poultice", count: 5, heals: 0.25 }}
                 labScene={scene}
+                // ⚠️ THE LAB TRAVELS FOR REAL, or the transition cannot be filmed at all. onTravel was
+                // simply absent here, so tapping a gate on the bench did nothing and the one moment the
+                // door exists to deliver was the one moment unreviewable. No server: it swaps the zone
+                // prop, which is exactly what the client does with the response.
+                onTravel={(n) => { setLog((l) => [...l, `travel ${n}`]); setTravelled(n); }}
                 onSettle={(batch) => setLog((l) => [...l, `settle ${batch.length}`])}
                 onBoss={() => setLog((l) => [...l, "boss"])}
                 onLeave={() => setLog((l) => [...l, "leave"])}
