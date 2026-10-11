@@ -22,6 +22,23 @@ const post = (body) => fetch("/api/marketplace/grove", {
 
 const partName = (id) => GROVE_PARTS[id]?.name || id;
 
+// ── ⚠️ THE MAIN SCREEN IS THE MAP, AND EVERYTHING ELSE FLOATS ────────────────────────────────────────────────
+// Luke: "The main screen for the grove. It should only have a map. The backpack and other stuff should be
+// sprite buttons floating on top of content at the bottom right of the screen, and the entire grove feature
+// is full screen."
+//
+// The tab row this replaces was four words in a scrolling strip above the map, which cost a line of a phone
+// to say what four objects say without one. Bottom-right because that is where a right thumb already is, and
+// because the zone's own full-screen lock already clears that corner of the site's chat bubbles — see
+// gv-full-lock in grove-css.js, which exists because a thumb reaching into that corner was opening a chat
+// panel instead of hitting things.
+const DOCK = [
+    { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
+    { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
+    { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp" },
+    { k: "emblems", label: "Emblems", art: "/images/grove/ui-emblems.webp" },
+];
+
 // ── ⚠️ THE PARTS HAVE PICTURES AND THESE LISTS WERE NOT USING THEM ───────────────────────────────────────────
 // Thirty-three painted items shipped for the floor of the zone, where a drop is on screen for a couple of
 // seconds. The bag, the bank and the workbench — where a player spends far longer, deciding what to keep and
@@ -40,6 +57,14 @@ const PartIcon = ({ id, size = 34 }) => {
 export default function GroveClient({ initial }) {
     const [st, setSt] = useState(initial);
     const [view, setView] = useState("map");     // map | zone | bag | bench | emblems
+    // ⚠️ THE SAME BODY CLASS THE ZONE ALREADY USES, not a second mechanism. It stops the page behind
+    // scrolling and hides the site's own fixed chat bubbles, which sit in exactly the corner the dock now
+    // occupies. Added for the WHOLE feature rather than only the zone, because the whole feature is full
+    // screen now — and removed on unmount, or leaving the Grove leaves the site with no chat.
+    useEffect(() => {
+        document.body.classList.add("gv-full-lock");
+        return () => document.body.classList.remove("gv-full-lock");
+    }, []);
     const [session, setSession] = useState(null);
     const [note, setNote] = useState(null);
     const [unlockedNow, setUnlockedNow] = useState(null);
@@ -228,18 +253,22 @@ export default function GroveClient({ initial }) {
     const known = new Set(st.recipes || []);
 
     return (
-        <div className="gv">
-            <header className="gv-head">
-                <b>The Grove</b>
-                <nav>
-                    {[["map", "Map"], ["bag", "Bag"], ["bench", "Workbench"], ["emblems", "Emblems"]].map(([k, label]) => (
-                        <button key={k} type="button" className={view === k ? "is-on" : ""} onClick={() => setView(k)}>{label}</button>
-                    ))}
-                </nav>
-            </header>
+        <div className="gv is-full">
+            {/* ⚠️ THE WAY OUT, BECAUSE THE SITE'S OWN NAV IS UNDERNEATH THIS. Covering the whole viewport
+                without putting a door in it is how a player ends up using the browser's back button to
+                escape a game screen. Top-left, which is where a back control is looked for. */}
+            <button type="button" className="gv-exit" aria-label="Leave the Grove"
+                onClick={() => router.push("/marketplace")}>
+                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                    <path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="2.2"
+                        strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            </button>
 
             {popNode}
             {note ? <p className="gv-note">{note}</p> : null}
+
+            <div className="gv-sheet">
 
             {/* ── THE MAP ──────────────────────────────────────────────────────────────────────
                 Luke: "not enough identity, its supposed to have unique areas resembling the node, and
@@ -442,6 +471,23 @@ export default function GroveClient({ initial }) {
                     </div>
                 </div>
             ) : null}
+
+            </div>
+
+            {/* ── THE DOCK ──────────────────────────────────────────────────────────────────────
+                Objects rather than words, over the content rather than above it. The current one is lit
+                rather than merely outlined: at 46px an outline is a rounding error, and the question it
+                has to answer at a glance is "where am I". */}
+            <nav className="gv-dock" aria-label="The Grove">
+                {DOCK.map((d) => (
+                    <button key={d.k} type="button" title={d.label} aria-label={d.label}
+                        aria-current={view === d.k ? "page" : undefined}
+                        className={view === d.k ? "is-on" : undefined}
+                        onClick={() => setView(d.k)}>
+                        <img src={d.art} alt="" />
+                    </button>
+                ))}
+            </nav>
 
             <style>{GROVE_CSS}</style>
         </div>

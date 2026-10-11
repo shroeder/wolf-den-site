@@ -208,6 +208,25 @@ const DOORS = {
 };
 for (const [id, subject] of Object.entries(DOORS)) ART[id] = [`${ITEM} ${subject}`, "item"];
 
+// ── THE DOCK ────────────────────────────────────────────────────────────────────────────────────
+// Luke: "The backpack and other stuff should be sprite buttons floating on top of content at the bottom
+// right of the screen." So the four places the Grove can take you are OBJECTS, not labels in a tab row.
+//
+// ⚠️ THEY HAVE TO BE TELLABLE APART AS SILHOUETTES, which is a harder job than the loot had. Loot is
+// read once, leisurely, lying on the ground; these are hit with a thumb, at about 46px, while something
+// is walking at you. So: four different outlines on purpose — a slung bag, a flat bench seen from above,
+// a hanging medallion, a rolled scroll — rather than four things on four plaques. Nothing square.
+//
+// ⚠️ AND NO LETTERING. A map with place names and a bench with a maker's mark both come back covered in
+// misspelled words, and at 46px a word is a smudge that looks like damage.
+const DOCK = {
+    "ui-map": "A rolled paper MAP tied with a leather cord, partly unrolled so one curled edge shows a hand-inked coastline and a few tiny hills, warm aged parchment catching the light. Nothing written on it: no words, no letters, no labels, no compass rose, no X - only terrain lines. Warm cream parchment, umber ink, tan cord.",
+    "ui-bag": "A sturdy forager's BACKPACK of worn brown leather seen from the front, the flap buckled down with two brass buckles, a bedroll strapped across the top and a small pouch on one side, straps hanging loose. Scuffed and well-used. Warm saddle brown, brass, cream canvas.",
+    "ui-bench": "A heavy wooden WORKBENCH seen from the front at a slight angle, one thick plank top on stout legs, with a small anvil, a hammer lying on its side and a hand-plane resting on it, wood shavings at the base. Dark oak, blackened iron, pale shavings.",
+    "ui-emblems": "A single ornate MEDALLION hanging from a short leather thong, a thick gold disc with a raised scalloped rim and a smooth polished centre catching a bright highlight, one small green gem set at the top of the rim. Rich warm gold, deep shadow in the relief, green gem. No markings or letters on the face.",
+};
+for (const [id, subject] of Object.entries(DOCK)) ART[id] = [`${ITEM} ${subject}`, "item"];
+
 for (const [id, subject] of Object.entries(PARTS)) ART[`part-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(EMBLEMS)) ART[`emblem-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(FOODS)) ART[`food-${id}`] = [`${ITEM} ${subject}`, "item"];

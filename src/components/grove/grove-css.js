@@ -10,17 +10,74 @@ export const GROVE_CSS = `
 .gv { position: relative; color: #efe7d8; }
 
 /* ── CHROME ──────────────────────────────────────────────────────────────────────────────────── */
-.gv-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
-.gv-head > b { font-size: 1.05rem; color: #9fe08a; letter-spacing: .02em; }
-/* Scrolls rather than wraps: four pills and a title wrapped onto three lines on a phone, which pushed the
-   map itself below the fold on the screen whose whole job is the map. */
-.gv-head nav { display: flex; gap: 6px; flex: 1; overflow-x: auto; scrollbar-width: none; }
-.gv-head nav::-webkit-scrollbar { display: none; }
-.gv-head nav button { flex: 0 0 auto; }
-.gv-head nav button { padding: 7px 13px; border-radius: 999px; cursor: pointer; font: inherit;
-    font-size: 0.82rem; font-weight: 600; color: #cfc6b6; background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.10); }
-.gv-head nav button.is-on { background: rgba(159,224,138,0.16); border-color: rgba(159,224,138,0.5); color: #cdf5bd; }
+/* ⚠️ .gv-head IS GONE AND SO ARE ITS RULES. Luke: "The main screen for the grove. It should only have a
+   map." It was a title and four word-pills in a scrolling strip above the map, which spent a line of a
+   phone saying what four objects now say without one — and a horizontally scrolling tab row had already
+   hidden its last item once, on the back office, for exactly the same reason. Deleting the rules with the
+   element is deliberate: a stale rule for a shape that no longer exists is how a later element with a
+   reused class name inherits a background nobody meant it to have. See stale-css-rule-on-reshape. */
+
+/* ── THE WHOLE FEATURE, FULL SCREEN ──────────────────────────────────────────────────────────
+   Luke: "the entire grove feature is full screen". The ZONE already was — see .gv-scene.is-full below,
+   which came from the same instruction about the zone. The map, the bag, the workbench and the emblems
+   were still a card in the middle of the marketplace page, so walking out of a zone dropped you from a
+   full-screen game back into a web page.
+
+   ⚠️ z-index 60, UNDER THE ZONE'S 70. The scene mounts its own full-screen layer on top of this one and
+   has to stay there; equal values would leave which one wins to document order, and the zone is portalled
+   to the end of body by a different component. */
+.gv.is-full { position: fixed; inset: 0; z-index: 60;
+    width: 100vw; width: 100dvw; height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column;
+    background: radial-gradient(120% 80% at 50% 0%, #16251a 0%, #0a120d 60%, #060a07 100%);
+    overscroll-behavior: none; }
+/* Everything that is not the dock scrolls in here, so the dock never travels with the content.
+   ⚠️ min-height: 0, OR A FLEX CHILD WILL NOT SCROLL. Its default min-height is auto, which means it grows
+   to its content instead of overflowing it, and the panel simply runs off the bottom of the screen. */
+.gv-sheet { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    display: flex; flex-direction: column;
+    padding: calc(52px + env(safe-area-inset-top)) 14px calc(104px + env(safe-area-inset-bottom)); }
+/* ⚠️ THE MAP SITS IN THE MIDDLE OF THE SCREEN IT WAS JUST GIVEN. Going full screen made the strip a band
+   across the top of nine hundred pixels with five hundred of black under it — more room is not the same
+   thing as using it. Auto margins centre it when there is space and collapse when there is not, which a
+   fixed justify-content would not; and the strip is a single row of fixed height, so it can never overflow
+   vertically and be pushed out of reach by them. */
+.gv.is-full .gv-strip { margin-block: auto; }
+
+/* The way out. Top-left, where a back control is looked for, and clear of the dock. */
+.gv-exit { position: fixed; z-index: 66;
+    top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left));
+    width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+    color: #efe7d8; background: rgba(8,12,8,0.62); border: 1px solid rgba(255,255,255,0.20);
+    padding: 0; font: inherit; }
+
+/* ── THE DOCK ────────────────────────────────────────────────────────────────────────────────
+   Four objects floating over the content at the bottom right, which is where a right thumb already rests.
+   That corner is only free because .gv-full-lock hides the site's own chat bubbles, which live there and
+   were already stealing taps inside a full-screen zone.
+
+   ⚠️ SIZED FOR A THUMB, NOT FOR THE ART. 56px is about the smallest a reliable touch target gets; the
+   sprite inside is 40 and is allowed to overflow its button slightly, because a painted object cropped to
+   a circle stops reading as an object. */
+.gv-dock { position: fixed; z-index: 65;
+    right: calc(12px + env(safe-area-inset-right));
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 10px; }
+.gv-dock button { width: 56px; height: 56px; border-radius: 50%; cursor: pointer; padding: 0;
+    display: grid; place-items: center; font: inherit;
+    background: rgba(8,12,8,0.68); border: 1px solid rgba(255,255,255,0.16);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    transition: transform 140ms ease, border-color 140ms ease, background 140ms ease; }
+.gv-dock button img { width: 40px; height: 40px; object-fit: contain; display: block;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+/* ⚠️ THE CURRENT ONE IS LIT, NOT OUTLINED. At this size an outline is a rounding error, and the only
+   question the dock has to answer at a glance is "where am I". */
+.gv-dock button.is-on { background: rgba(159,224,138,0.20); border-color: rgba(159,224,138,0.75);
+    transform: scale(1.06); box-shadow: 0 0 18px rgba(159,224,138,0.35), 0 4px 14px rgba(0,0,0,0.5); }
+.gv-dock button:not(.is-on):hover { border-color: rgba(255,255,255,0.34); }
+
+/* The map gets the room it just gained. */
+.gv.is-full .gv-area { width: min(62vw, 270px); height: min(64vh, 420px); }
 .gv-note { margin: 0 0 10px; padding: 9px 13px; border-radius: 10px; font-size: 0.85rem;
     background: rgba(159,224,138,0.12); border: 1px solid rgba(159,224,138,0.35); color: #d8f5cc; }
 
@@ -127,7 +184,14 @@ export const GROVE_CSS = `
    fixed to the bottom-right corner, which in a full-screen zone is INSIDE the play area and on top of it —
    so a thumb reaching for an enemy in that corner opens a chat panel instead of attacking. Hidden only while
    the zone is up; leaving restores them with the body class. */
+/* ⚠️ AND .social-fab, WHICH THIS RULE HAS BEEN MISSING SINCE IT WAS WRITTEN. .social-bubble is the toast
+   that appears when something happens; .social-fab is the button that is ALWAYS there — bottom right, at
+   z-index 900, which beats the full-screen zone's 70 outright. So the one element this rule exists to get
+   out of the play area was the one element it did not name, and it has been sitting in the corner of every
+   full-screen zone since. It turned up because the new dock wants that same corner and only three of its
+   four buttons were reachable. */
 .gv-full-lock .social-bubble,
+.gv-full-lock .social-fab,
 .gv-full-lock .dm-bubble-wrap { display: none; }
 /* ── ⚠️ THE BACKDROP IS A STRIP, NOT A PLATE ───────────────────────────────────────────────
    Luke: "The map bg doesnt scroll which makes it impossible to feel immersed."

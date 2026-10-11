@@ -72,17 +72,42 @@ await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 900, devi
 await send("Page.navigate", { url: "http://localhost:3000/marketplace/grove" });
 await new Promise((r) => setTimeout(r, 11000));
 
-// The bag is behind a tab in the Grove's own nav; press it like a finger would.
+// ⚠️ THE MAP FIRST. It is the main screen now, so a rig that only ever photographs the bag can tell you
+// nothing about the screen the player actually lands on.
+{
+    // ⚠️ MEASURED HERE, NOT AT THE END. The map is gone the moment the bag is opened, so a measurement
+    // taken after the click reports null for every element of the screen it was supposed to be checking.
+    const am = await send("Runtime.evaluate", { expression: `(() => {
+        const a = document.querySelector(".gv-area");
+        const sh = document.querySelector(".gv-sheet");
+        const st = document.querySelector(".gv-strip");
+        const r = a?.getBoundingClientRect();
+        return {
+            vh: window.innerHeight,
+            card: r ? [Math.round(r.width), Math.round(r.height), Math.round(r.top)] : null,
+            cardCss: a ? getComputedStyle(a).height : null,
+            sheet: sh ? Math.round(sh.getBoundingClientRect().height) : null,
+            strip: st ? Math.round(st.getBoundingClientRect().height) : null,
+        };
+    })()`, returnByValue: true });
+    console.log("map:", JSON.stringify(am.result.value));
+
+    const m = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, clip: { x: 0, y: 0, width: 390, height: 900, scale: 2 } });
+    fs.writeFileSync(`${OUT}/grove-map.png`, Buffer.from(m.data, "base64"));
+    console.log(`${OUT}/grove-map.png`);
+}
+
+// The bag is behind a button on the dock's own nav; press it like a finger would.
 const found = await send("Runtime.evaluate", {
     expression: `(() => {
-        const b = [...document.querySelectorAll(".gv-head nav button")].find((x) => /bag|pack/i.test(x.textContent));
-        if (!b) return { ok: false, tabs: [...document.querySelectorAll(".gv-head nav button")].map((x) => x.textContent.trim()) };
+        const b = [...document.querySelectorAll(".gv-dock button")].find((x) => /bag|pack/i.test(x.getAttribute("aria-label") || ""));
+        if (!b) return { ok: false, tabs: [...document.querySelectorAll(".gv-dock button")].map((x) => x.getAttribute("aria-label")) };
         // ⚠️ SCROLL FIRST, THEN MEASURE. The rect was read before the page had finished settling and the
         // click landed on whatever had moved into that spot — two runs reported zero slots and looked
         // exactly like the icons having failed.
         b.scrollIntoView({ block: "center" });
         const r = b.getBoundingClientRect();
-        return { ok: true, label: b.textContent.trim(), x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+        return { ok: true, label: b.getAttribute("aria-label"), x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
     })()`,
     returnByValue: true,
 });
@@ -101,6 +126,32 @@ if (found.result.value?.ok) {
     // a missing image and a broken one identically.
     await new Promise((r) => setTimeout(r, 4000));
 }
+
+const corner = await send("Runtime.evaluate", { expression: `(() => {
+    const out = [];
+    for (const e of document.querySelectorAll("body *")) {
+        const cs = getComputedStyle(e);
+        if (cs.position !== "fixed" || cs.display === "none" || cs.visibility === "hidden") continue;
+        const r = e.getBoundingClientRect();
+        if (r.width < 8 || r.height < 8) continue;
+        if (r.right < window.innerWidth - 140 || r.bottom < window.innerHeight - 220) continue;
+        out.push({ tag: e.tagName, cls: (e.className || "").toString().slice(0, 60), z: cs.zIndex, box: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)] });
+    }
+    return { lock: document.body.classList.contains("gv-full-lock"), dock: document.querySelectorAll(".gv-dock button").length, inCorner: out.slice(0, 8) };
+})()`, returnByValue: true });
+console.log("corner:", JSON.stringify(corner.result.value, null, 1));
+
+const am = await send("Runtime.evaluate", { expression: `(() => { /* AREA MEASURE */
+    const a = document.querySelector(".gv-area");
+    const sh = document.querySelector(".gv-sheet");
+    const st = document.querySelector(".gv-strip");
+    const r = a?.getBoundingClientRect();
+    return { vh: window.innerHeight, area: r ? [Math.round(r.width), Math.round(r.height), Math.round(r.top)] : null,
+             areaCss: a ? getComputedStyle(a).height : null,
+             sheet: sh ? Math.round(sh.getBoundingClientRect().height) : null,
+             strip: st ? Math.round(st.getBoundingClientRect().height) : null };
+})()`, returnByValue: true });
+console.log("area:", JSON.stringify(am.result.value));
 
 const check = await send("Runtime.evaluate", {
     expression: `(() => {
