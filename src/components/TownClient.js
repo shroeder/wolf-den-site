@@ -1890,6 +1890,10 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     useEffect(() => {
         const rc = state?.raidRecap;
         if (!rc) return;
+        // A "you just missed it" notice is not a recap — no board, no payout, nothing to mark seen. It is
+        // rendered as a plain line in the plaza (see below) and must not go anywhere near the podium, which
+        // would otherwise sit waiting for a `settled` flag that will never arrive.
+        if (rc.missed) return;
         // Belt and braces on the payout race (the server now withholds the recap until rewards are settled):
         // if a recap somehow arrives with nothing itemised, don't burn the "seen" marker on it — let a later
         // poll replace it. Freezing on the first payload is what made an empty recap permanent.
@@ -2696,6 +2700,25 @@ export default function TownClient({ initial, frozen = false, halloween = false,
 
                 {/* Raid HUD (corner) + weapon-skill callout */}
                 {state?.event && !state.event.defeated ? <RaidHUD ev={state.event} kills={raidKills} onExpire={load} /> : null}
+                {/* ── ⚠️ "I WENT TO TOWN THE SECOND IT POPPED UP AND NOTHING" ──────────────────────────────
+                    Sunflower Jinxx, who had fought the previous eight raids in a row, read an empty plaza as
+                    a broken notification. It wasn't: the Candle Wake was summoned at 01:00 and the pack felled
+                    it at 01:08, and she arrived at 01:12. But an empty plaza is what a late arrival and a
+                    failed push both look like, and only this line tells them apart. No board and no payout —
+                    she wasn't in the fight — just where the fight went. */}
+                {!state?.event && state?.raidRecap?.missed ? (
+                    <div className="tw-missed">
+                        <span className="tw-missed-em">{state.raidRecap.emoji}</span>
+                        <span>
+                            <b>{state.raidRecap.name}</b>{" "}
+                            {state.raidRecap.killed ? "was felled" : "moved on"}{" "}
+                            {state.raidRecap.agoSecs < 90
+                                ? "moments ago"
+                                : `${Math.round(state.raidRecap.agoSecs / 60)} minutes ago`}
+                            {" — you just missed this one."}
+                        </span>
+                    </div>
+                ) : null}
                 {raidProc ? (
                     <div className="tw-proc" style={{ "--pc": raidProc.color || "#ffb347" }} key={raidProc.key}>
                         <span className="tw-proc-emoji">{raidProc.emoji}</span> {raidProc.name}!
@@ -3737,6 +3760,12 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-strike-grade.is-great { color: #8fe39a; }
 .tw-strike-grade.is-good { color: #d7c48a; }
 .tw-strike-grade.is-miss { color: #ff8f9a; }
+/* The plaza telling a late arrival they were late rather than showing them nothing. Quiet on purpose — it
+   is orientation, not an event. */
+.tw-missed { display: flex; align-items: center; gap: 9px; margin: 8px 0 2px; padding: 9px 12px;
+    border: 1px solid rgba(255,215,110,0.3); border-radius: 12px; background: rgba(255,215,110,0.08);
+    color: #e8d9b4; font-size: 0.86rem; line-height: 1.35; }
+.tw-missed-em { font-size: 1.2rem; line-height: 1; }
 /* Why a swing didn't land. Sits where the grade would, deliberately quieter than a real hit. */
 .tw-strike-notice { text-align: center; margin-top: 6px; font-weight: 700; font-size: 0.82rem; color: #b9a98f; animation: twStrikePop 0.35s ease-out; }
 @keyframes twStrikePop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }

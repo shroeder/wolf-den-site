@@ -468,7 +468,27 @@ export async function lastRaidRecap(buyerId) {
            FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`,
         [ev.id, buyerId]
     ).catch(() => null);
-    if (!mine) return null;
+    // ── ⚠️ YOU WERE LATE, AND THE PLAZA USED TO SAY NOTHING AT ALL ───────────────────────────────────────
+    // Sunflower Jinxx: "I think the raid notifs are busted, I was on the site, went to town the SECOND it
+    // popped up and nothing."
+    //
+    // The notification was not busted. Candle Wake #129 was summoned at 01:00 and the pack felled it at
+    // 01:08; she posted at 01:12. Nothing had failed — she was four minutes late to a fight that is MEANT to
+    // be killable in eight. But the only thing that distinguishes "you missed it" from "the push lied to you"
+    // is a plaza that says so, and this returned null to everyone who had not swung, so an arrival one minute
+    // late and a broken notification look exactly alike. She had fought the previous eight raids in a row;
+    // this is the reading anyone would make.
+    //
+    // A `missed` recap carries no board, no payout and nothing to dismiss — it is one sentence of orientation.
+    // Only for someone who was not in the fight, because a fighter already gets the real recap below.
+    if (!mine) {
+        const secs = Math.max(0, Math.round((Date.now() - new Date(ev.defeated_at).getTime()) / 1000));
+        return {
+            missed: true, id: Number(ev.id), name: ev.name,
+            emoji: (TOWN_EVENT_TYPES[ev.kind] || {}).emoji || "⚔️",
+            killed: ev.status === "defeated", agoSecs: secs,
+        };
+    }
     // Already closed it once — don't hand it back. The dismissal used to live in a client-side ref, which meant
     // every remount inside this 10-minute window (a refresh, or just walking back into the Town) popped the
     // recap again with no way to make it stop.

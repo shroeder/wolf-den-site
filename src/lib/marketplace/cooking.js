@@ -21,7 +21,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { grantCandy } from "@/lib/marketplace/candy.js";
 import { rollTicket } from "@/lib/marketplace/gachapon.js";
-import { equippedPowers, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
+import { equippedPowers, oneIn, claimPowerUse, powerUsesLeft, ASCENSION_POWERS } from "@/lib/marketplace/ascension-powers.js";
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // What the member's OWNED kitchen pets add, as flat percentage points on each odds key. Owned, not equipped —
@@ -1084,7 +1084,8 @@ async function grantStarterBait(buyerId) {
 export async function getKitchenState(buyerId) {
     if (!COOK_UNLOCKED(buyerId)) return { unlocked: false };
     await grantStarterBait(buyerId);
-    const [row, pantryRows, knownRows, goldRow, sprites, art, conRows, chestArt, seedRows] = await Promise.all([
+    const [row, pantryRows, knownRows, goldRow, sprites, art, conRows, chestArt, seedRows,
+        subLeft, standingLeft] = await Promise.all([
         kitchenRow(buyerId),
         db.query(`SELECT kind, ref, qty FROM mkt_pantry WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT recipe_id, times_cooked FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []),
@@ -1098,6 +1099,20 @@ export async function getKitchenState(buyerId) {
         // seed. So "I need a carrot but the farm says I have 7" is the obvious reading, and the Kitchen was
         // silent about it. It can now say "plant one" instead of the generic "grow it on the farm".
         db.query(`SELECT seed_id, count FROM mkt_farm_seed WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
+        // ── ⚠️ THE TWO POWERS THAT COVER A SHORT LINE, READ WHERE THE BOARD IS BUILT ─────────────────────
+        // ValkyrieSylve: "My ascendant belt says i can substitute one ingredient i dont have for one i do
+        // have, however, theres is no way for me to use the ability when cooking. Nothing shows up for it."
+        //
+        // She is exactly right, and it is not a cosmetic gap — the ability was UNREACHABLE. The cook button
+        // is disabled unless `canCook`, and `canCook` demanded every line be in the pantry. The Substitution
+        // only fires when a line comes up SHORT, so the one state that triggers it was the one state the
+        // button refused to let her reach. Both powers have worked in cook() since the day they shipped and
+        // neither could ever be invoked from the screen.
+        //
+        // Read here rather than inside the recipe loop: one call per power per request, not one per recipe,
+        // and powerUsesLeft returns 0 without a query at all when the power isn't worn.
+        powerUsesLeft(buyerId, "substitution", SUBSTITUTION_PER_DAY).catch(() => 0),
+        powerUsesLeft(buyerId, "standing_recipe", STANDING_RECIPE_PER_DAY).catch(() => 0),
     ]);
     // One bundle of art for every reward kind, built once per request rather than per recipe row.
     const rewardArt = {
@@ -1178,6 +1193,32 @@ export async function getKitchenState(buyerId) {
             } : null,
             need,   // shown whether known or not — what a recipe wants is the useful half of the hint
             canCook: known && need.every((n) => n.enough),
+            // ── WHAT A POWER WOULD COVER, SAID BEFORE THE BUTTON IS PRESSED ──────────────────────────
+            // Mirrors cook()'s loop exactly, because a promise the card makes and the kitchen then breaks is
+            // worse than no promise. In that loop a short line is paid for with the FULL line quantity taken
+            // from anything else on the shelf, never the shortfall — the pantry UPDATE failed, so nothing was
+            // deducted for that line — and `takeAnyFromPantry` skips every ref the recipe itself asked for so
+            // a dish cannot eat the ingredients it had already set aside.
+            //
+            // The Standing Recipe is claimed once and then covers every short line; The Substitution is
+            // claimed once and covers exactly ONE. So standing is tried first and only falls through to the
+            // substitution when a single line is short.
+            cover: (() => {
+                if (!known || need.every((n) => n.enough)) return null;
+                const short = need.filter((n) => !n.enough);
+                let spare = 0;
+                for (const [ref, qty] of have) { if (r.need[ref] == null) spare += Number(qty) || 0; }
+                const want = short.reduce((a, n) => a + n.qty, 0);
+                if (standingLeft > 0 && spare >= want) {
+                    return { power: "standing_recipe", name: ASCENSION_POWERS.standing_recipe.name,
+                        uses: standingLeft, lines: short.map((n) => n.name) };
+                }
+                if (subLeft > 0 && short.length === 1 && spare >= short[0].qty) {
+                    return { power: "substitution", name: ASCENSION_POWERS.substitution.name,
+                        uses: subLeft, lines: [short[0].name] };
+                }
+                return null;
+            })(),
             // ── COULD IT COOK IF IT MADE ITS OWN PREPS FIRST? ────────────────────────────────────────
             // Named on the recipe so the card can offer the chain without a second round trip, and so the
             // button can say what it will actually do — "makes 2 Risen Dough first" rather than a bare
@@ -1411,6 +1452,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     const bankedFire = cookPowers.has("banked_fire") && ((Number(row?.cooks_total) || 0) + 1) % 3 === 0;
     const freeCook = bankedFire
         || Math.random() < trackValue("larder", row?.larder_level) + (petBonus.thrifty || 0) + equippedKitchen.larder / 100;
+    const substituted = [];
     if (!freeCook) {
         const taken = [];
         // The Standing Recipe (twice a day, the whole dish) and The Substitution (three times a day, ONE
@@ -1431,12 +1473,24 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                 standing = await claimPowerUse(buyerId, "standing_recipe", STANDING_RECIPE_PER_DAY);
             }
             let subbed = standing ? await takeAnyFromPantry(buyerId, qty, rec.need) : null;
+            let by = subbed ? "standing_recipe" : null;
             if (!subbed && !subUsed && cookPowers.has("substitution")
                 && (await claimPowerUse(buyerId, "substitution", SUBSTITUTION_PER_DAY))) {
                 subUsed = true;
                 subbed = await takeAnyFromPantry(buyerId, qty, rec.need);
+                if (subbed) by = "substitution";
             }
-            if (subbed) { taken.push(...subbed); continue; }
+            if (subbed) {
+                taken.push(...subbed);
+                // ⚠️ SAY IT HAPPENED. An ability whose only evidence is a line item NOT appearing is an
+                // ability nobody believes they have — which is the complaint that reopened this code.
+                // Named with what it covered and what it ate, so the trade is legible after the fact.
+                substituted.push({
+                    power: by, name: ASCENSION_POWERS[by].name, need: meta.name,
+                    used: subbed.map((t) => `${t.qty}× ${ingredientMeta(t.ref).name}`),
+                });
+                continue;
+            }
 
             // Put back whatever we already took — a half-consumed cook is worse than a failed one.
             for (const t of taken) await addToPantry(buyerId, t.kind, t.ref, t.qty);
@@ -1672,6 +1726,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         ok: true,
         made: { ...made, tier, tierName: tierMeta(tier).name, tierColor: tierMeta(tier).color },
         portions, bumped, freeCook, xp, quality: q, chain: chainN, goldPaid, alsoMade,
+        substituted: substituted.length ? substituted : null,
         grade: q >= 0.92 ? "flawless" : q >= 0.72 ? "perfect" : q >= 0.45 ? "good" : "rough",
         ...(await getKitchenState(buyerId)),
     };

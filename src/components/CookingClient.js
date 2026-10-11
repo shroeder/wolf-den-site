@@ -261,7 +261,9 @@ export default function CookingClient({ initial }) {
     const shown = useMemo(() => {
         // Independent of the tabs: "Ready" already implies known, but Prep, Dishes and All do not.
         const all = (s.recipes || []).filter((r) => (hideLocked ? r.known : true));
-        if (tab === "ready") return all.filter((r) => r.canCook);
+        // A recipe a worn power will carry belongs under "Ready" too — it is cookable right now, which is the
+        // only question this tab asks.
+        if (tab === "ready") return all.filter((r) => r.canCook || r.cover);
         if (tab === "prep") return all.filter((r) => r.kind === "prep");
         if (tab === "dish") return all.filter((r) => r.kind === "dish");
         return all;
@@ -418,7 +420,7 @@ export default function CookingClient({ initial }) {
                                         </span>
                                     </span>
                                     {r.known
-                                        ? <span className={`ck-recipe-go${r.canCook ? " is-on" : ""}`}>{r.canCook ? "Ready" : "Short"}</span>
+                                        ? <span className={`ck-recipe-go${r.canCook ? " is-on" : r.cover ? " is-power" : ""}`}>{r.canCook ? "Ready" : r.cover ? "Covered" : "Short"}</span>
                                         : <span className="ck-recipe-go is-locked-tag">Not found</span>}
                                 </button>
                                 {isOpen ? (
@@ -579,9 +581,30 @@ export default function CookingClient({ initial }) {
                                                 did. Dishes are untouched. */}
                                         {r.known ? (
                                             <>
-                                            <button type="button" className="btn ck-cook" disabled={busy || !r.canCook}
+                                            {/* ── ⚠️ A POWER THAT COULD NEVER BE REACHED FROM THIS BUTTON ──────
+                                                ValkyrieSylve, of the ascendant belt: "theres is no way for me
+                                                to use the ability when cooking. Nothing shows up for it."
+
+                                                The ability was not quiet, it was UNREACHABLE. The Substitution
+                                                and The Standing Recipe only fire when a line comes up short,
+                                                and this button was disabled on exactly that state — so the one
+                                                situation that triggers them was the one situation it refused
+                                                to let her into. Both have worked inside cook() since they
+                                                shipped and neither could be invoked from the screen.
+
+                                                It says WHICH ingredient and how many uses are left, because a
+                                                button that spends a rationed daily power without naming it is
+                                                how the Gourdfather took candy nobody meant to spend. */}
+                                            <button type="button" className={`btn ck-cook${r.cover ? " is-power" : ""}`}
+                                                disabled={busy || !(r.canCook || r.cover)}
                                                 onClick={() => (INSTANT_KINDS.has(r.kind) ? finishCook({ quality: 1, chain: 0, recipe: r }) : setPlaying(r))}>
                                                 {busy ? "Working…" : r.kind === "prep" ? "Prep it" : r.kind === "bait" ? "Make the bait" : "Start cooking"}
+                                                {r.cover && !busy ? (
+                                                    <em>
+                                                        {r.cover.name} covers {r.cover.lines.join(", ")} &mdash;{" "}
+                                                        {r.cover.uses} left today
+                                                    </em>
+                                                ) : null}
                                             </button>
                                             {/* ── COOK THE THINGS THE THING NEEDS ─────────────────────────────
                                                 Short of a prep but holding everything that prep is made of was
@@ -589,7 +612,7 @@ export default function CookingClient({ initial }) {
                                                 find your place. The card offers to do it instead — and says
                                                 exactly what it will make first, because it spends ingredients
                                                 and a button that quietly does that is worse than the trip. */}
-                                            {!r.canCook && r.chainable ? (
+                                            {!r.canCook && !r.cover && r.chainable ? (
                                                 <button type="button" className="btn ck-chain" disabled={busy}
                                                     onClick={() => (INSTANT_KINDS.has(r.kind)
                                                         ? finishCook({ quality: 1, chain: 0, recipe: r, withPreps: true })
@@ -741,6 +764,13 @@ export default function CookingClient({ initial }) {
                             {result.bumped ? <span className="ck-tag heat">The heat caught it — a tier better</span> : null}
                             {result.portions > 1 ? <span className="ck-tag season">Second helping — the spoils paid ×{result.portions}</span> : null}
                             {result.freeCook ? <span className="ck-tag larder">The larder covered it — no ingredients used</span> : null}
+                            {/* The ascendant power that carried a line, named afterwards with what it ate. It
+                                spends one of a few daily uses, so it is a receipt, not a flourish. */}
+                            {(result.substituted || []).map((sb, i) => (
+                                <span key={i} className="ck-tag power">
+                                    {sb.name} covered {sb.need} — used {sb.used.join(", ")}
+                                </span>
+                            ))}
                             <span className="ck-tag run">Timing {pctText(result.quality)} · best chain ×{result.chain} · +{result.xp} XP</span>
                         </div>
                         <button type="button" className="btn ck-reveal-btn" onClick={() => setResult(null)}>
@@ -953,6 +983,12 @@ const CK_CSS = `
     background: rgba(126,214,162,0.10); border: 1px solid rgba(126,214,162,0.36); }
 .ck-chain:hover:not(:disabled) { background: rgba(126,214,162,0.18); }
 .ck-chain:disabled { opacity: .5; cursor: default; }
+/* A cook a worn power is carrying. Gold rather than green: it is going somewhere Ready would not, and it
+   spends a limited daily use, so it should not look like the ordinary path. */
+.ck-cook.is-power { border-color: rgba(226,183,96,0.55); background: rgba(226,183,96,0.14); }
+.ck-cook.is-power em { display: block; margin-top: 3px; font-style: normal; font-size: .72rem; opacity: .85; }
+.ck-recipe-go.is-power { border-color: rgba(226,183,96,0.5); color: #e2b760; }
+.ck-tag.power { border-color: rgba(226,183,96,0.5); color: #e2b760; background: rgba(226,183,96,0.12); }
 .ck-chain em { display: block; margin-top: 2px; font-style: normal; font-size: 0.68rem; font-weight: 700; color: #93b7a3; }
 .ck-need-go { font-style: normal; font-size: 0.68rem; font-weight: 900; color: #ffb86b; margin-left: 2px; }
 
