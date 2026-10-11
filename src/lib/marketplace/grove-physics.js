@@ -329,6 +329,22 @@ export const WANDER_HOP_CHANCE = 0.18;
 export function wanderIntent(body, platforms, rand, dt) {
     const f = body;
     f.wait = (f.wait || 0) - dt;
+
+    // ── ⚠️ A BODY IN THE AIR DOES NOT STEER, AND ASKING IT TO IS WHAT MADE THE SPRITES STROBE ───────
+    // Luke: "When the enemies jump they flip sprite face direction rapidly."
+    //
+    // hasFloorAt is a question about a body that is STANDING on something — it only answers yes within a
+    // third of a unit of the platform's own y. So the moment a wanderer leaves the ground there is no floor
+    // in ANY direction, edgeAhead returns 1 both ways, and the lip-turn below fires every single frame:
+    // dir goes -1, 1, -1, 1 at sixty hertz, drive() writes face = dir, and the creature mirrors itself on
+    // every frame of its hop. Nothing errors, the hop lands exactly where it should, and the whole defect
+    // is in a sprite's facing.
+    //
+    // The fix is also the right behaviour: a hop COMMITS. A wanderer with no plan has no business steering
+    // in mid-air, and returning no intent leaves it flying on the velocity it launched with and leaves its
+    // facing alone, because drive() returns early on a dir of 0.
+    if (!f.grounded) return { dir: 0, hop: false };
+
     if (f.wait <= 0) {
         const roll = rand();
         f.wdir = roll < 0.3 ? 0 : roll < 0.65 ? -1 : 1;
@@ -337,7 +353,15 @@ export function wanderIntent(body, platforms, rand, dt) {
     }
     let dir = f.wdir || 0;
     // The floor runs out ahead: turn now and commit to the new direction, so it does not jitter on the lip.
-    if (dir && edgeAhead(platforms, f, dir, 4) < 4) { dir = -dir; f.wdir = dir; f.wait = 30 + rand() * 60; }
+    // ⚠️ AND IF THERE IS NO FLOOR THE OTHER WAY EITHER, STAND STILL RATHER THAN TURN. Flipping into a
+    // second cliff is the same one-frame oscillation as the airborne case, reachable on the ground by any
+    // perch narrower than the eight units this looks across — and a creature that alternates between two
+    // edges it cannot cross is not deciding anything, so it should look like it is not deciding anything.
+    if (dir && edgeAhead(platforms, f, dir, 4) < 4) {
+        dir = edgeAhead(platforms, f, -dir, 4) < 4 ? 0 : -dir;
+        f.wdir = dir;
+        f.wait = 30 + rand() * 60;
+    }
 
     // ── ⚠️ A HOP IS IN PLACE, AND NEVER NEAR A LIP ──────────────────────────────────────────────────
     // Turning round at an edge is not enough on its own. A hop carries about eighteen units of horizontal

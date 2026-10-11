@@ -235,5 +235,50 @@ ok("and does not overshoot the tier above it", HOP_RISE < TIER_RISE * 2, `rise=$
     ok("and so is one whose position has gone to NaN", Number.isFinite(n.y) && n.grounded, `y=${n.y}`);
 }
 
+// 15. ── ⚠️ A WANDERER MUST NOT CHANGE ITS MIND EVERY FRAME ─────────────────────────────────────────
+// Luke: "When the enemies jump they flip sprite face direction rapidly."
+//
+// hasFloorAt only answers yes within a third of a unit of the platform's own y, so a body IN THE AIR has no
+// floor in any direction — edgeAhead returned 1 both ways and the lip-turn fired on every frame, walking
+// dir -1, 1, -1, 1 at sixty hertz. drive() writes face = dir, so the sprite mirrored itself for the whole
+// length of the hop. The hop landed exactly where it should and nothing threw; the entire defect was a
+// facing. The same one-frame flip is reachable on the GROUND from any perch too narrow to walk across.
+//
+// So this asserts the INTENT IS STABLE, which is the property that was missing, rather than asserting the
+// particular numbers that happen to produce it today.
+{
+    const ground = [{ x: 0, w: 200, y: 0, i: 0, parent: -1 }, { x: 40, w: 20, y: TIER_RISE, i: 1, parent: 0 }];
+    const perch = [{ x: 0, w: 200, y: 0, i: 0, parent: -1 }, { x: 49, w: 3, y: TIER_RISE, i: 1, parent: 0 }];
+    let seed = 1;
+    const rng = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const flips = (body, pf) => {
+        let last = null;
+        let n = 0;
+        for (let f = 0; f < 40; f += 1) {
+            const { dir } = wanderIntent(body, pf, rng, 1);
+            if (last !== null && dir !== 0 && last !== 0 && dir !== last) n += 1;
+            last = dir;
+        }
+        return n;
+    };
+    const air = { x: 50, y: TIER_RISE + 2.5, vx: 0.1, vy: 0.3, h: 3, halfW: 1, speed: 1,
+        face: 1, grounded: false, coyote: 0, wdir: 1, wait: 400 };
+    ok("a wanderer in mid-hop does not reverse its facing", flips(air, ground) === 0, `${flips(air, ground)} reversals`);
+    ok("and it holds the facing it launched with", air.face === 1, `face=${air.face}`);
+
+    const stuck = { x: 50.5, y: TIER_RISE, vx: 0, vy: 0, h: 3, halfW: 1, speed: 1,
+        face: 1, grounded: true, coyote: 0, wdir: 1, wait: 400 };
+    ok("a wanderer with a cliff on both sides stands still rather than flipping between them",
+        flips(stuck, perch) === 0, `${flips(stuck, perch)} reversals`);
+
+    // And the thing all of that must not have broken: on a real ledge it still turns at the lip exactly once.
+    // x = 58 on a ledge that ends at 60: the lip is three units ahead, inside the four this looks across.
+    // At 56 it is four away and the turn correctly does not fire, which is how this assertion first failed.
+    const walker = { x: 58, y: TIER_RISE, vx: 0, vy: 0, h: 3, halfW: 1, speed: 1,
+        face: 1, grounded: true, coyote: 0, wdir: 1, wait: 400 };
+    const first = wanderIntent(walker, ground, rng, 1).dir;
+    ok("a wanderer still turns around at the lip of a ledge it can walk", first === -1, `dir=${first}`);
+}
+
 console.log(fails ? `\n${fails} FAILED` : "\nall physics checks passed");
 process.exit(fails ? 1 : 0);
