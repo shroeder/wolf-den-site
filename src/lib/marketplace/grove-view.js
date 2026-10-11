@@ -75,8 +75,33 @@ export const SKY_HEADROOM = 1.12;
 // of a zone's depth times that to have somewhere to pan into — which is the other thing that was quietly
 // inflating the painting. Distant scenery barely drops when you climb anyway, so 0.08 is both more correct
 // and cheap enough to fit inside SKY_HEADROOM at every zone depth.
+//
+// ⚠️ IT IS DELIBERATELY NOT 1:1 LIKE SKY_PX IS, AND THE REASON IS ARITHMETIC RATHER THAN TASTE. The strip
+// is infinitely wide, so matching the camera horizontally costs nothing; vertically it is ONE plate with
+// SKY_HEADROOM = 1.12, which is 0.12vh of painted sky above the frame to pan into. A three-tier zone puts
+// the hero 33 units up and the camera climbs about 0.95vh to follow him — eight times the headroom there
+// is. Paying for a 1:1 vertical means roughly SKY_HEADROOM = 2.1, and a plate at twice the height is the
+// grass-taller-than-the-knight bug written out in full (see the block above). So the floor is locked to
+// the world and the climb is the one axis that floats. Fixing it properly is a second plate or a painted
+// sky band, not a bigger number here.
 export const SKY_PY = 0.08;
-export const SKY_PX = 0.38;
+
+// ── ⚠️ HORIZONTALLY THE BACKDROP IS NOT PARALLAX. IT IS THE GROUND. ────────────────────────────────────
+// Luke: "background scroll is not right. It should be 1:1 with enemy scroll and player scroll. Right now
+// it makes a slidey effect."
+//
+// This was 0.38, which is the right number for a DISTANT band and the wrong one for this plate, because
+// the plate paints the floor everybody is standing on — GROUND_OF_PLATE, the bottom 13% of it, is the
+// surface the hero's feet are anchored to. Moving that surface at 38% of the camera means every step the
+// hero takes slides him 62% of its length across the grass he is supposedly walking on, and that is read
+// instantly as weightlessness even by someone who could not say which layer was wrong. Depth that costs
+// the floor its traction is not worth having.
+//
+// 1:1 is free here and nothing else had to change for it: the strip is mirror-tiled, so it has no edge to
+// run out of no matter how far the camera travels, and the wrap already covered a full two-tile period.
+// If the Grove ever wants real depth it has to come from a SECOND, further strip behind this one with its
+// own factor — never from sliding the floor.
+export const SKY_PX = 1;
 export const SKY_TILE_COUNT = 5;
 
 // ── SHARES OF THE FRAME ─────────────────────────────────────────────────────────────────────────────────────

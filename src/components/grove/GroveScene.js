@@ -1134,9 +1134,18 @@ export default function GroveScene({
             // ── THE BACKDROP ────────────────────────────────────────────────────────────────────
             // Wrapped on TWO tiles rather than one, because the mirroring has a period of two: tile 0 is
             // the painting, tile 1 is its reflection, and only after both has the pattern repeated.
+            //
+            // ⚠️ AND THE WRAP HAS TO BE A POSITIVE MODULO, WHICH JS'S % IS NOT. cam is clamped at
+            // -CAM_OVERSCAN, not at 0 — so on entering a zone, where the hero spawns at the far left and
+            // the camera is pinned to its overscan, `cam * unit % period` came out NEGATIVE and the strip
+            // translated the wrong way: it slid right off its own left edge and showed bare scene down the
+            // side of the frame. It was about 38px of it at the old 0.38 and would be ~100px at 1:1, on
+            // every single zone entry. Floor the offset into [0, period) and the strip always starts at or
+            // left of the frame, which is what the five-tile budget in check-grove.mjs assumes.
             if (w.skyNode) {
                 const period = tileW * 2;
-                const offX = period > 0 ? (cam * unit * SKY_PX) % period : 0;
+                const raw = cam * unit * SKY_PX;
+                const offX = period > 0 ? ((raw % period) + period) % period : 0;
                 w.skyNode.style.transform = `translate3d(${-offX}px, ${camY * unit * SKY_PY}px, 0)`;
             }
 
