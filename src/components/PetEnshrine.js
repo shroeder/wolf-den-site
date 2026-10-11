@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import PetArt from "@/components/PetArt";
 import { ascensionChoice } from "@/lib/marketplace/pet-perks.js";
+import { compareStones } from "@/lib/marketplace/pet-stone-preview.js";
 import { STONES } from "@/lib/marketplace/pet-stones.js";
 
 // ── THE ENSHRINING ───────────────────────────────────────────────────────────────────────────────────────────
@@ -17,7 +18,8 @@ import { STONES } from "@/lib/marketplace/pet-stones.js";
 // It also draws the state where you have NEITHER stone, which is the common one: a level-6 pet standing there
 // waiting is the whole reason to go and dig. That case says where stones come from rather than just greying
 // out, because a locked button that will not say what unlocks it is the worst thing on any screen.
-export default function PetEnshrine({ pet, level, sprites, stones, enshrined, prices, onEnshrine, busy = false }) {
+export default function PetEnshrine({ pet, level, sprites, stones, enshrined, prices, onEnshrine, busy = false,
+    ownedIds = null, levelByPet = null, allEnshrined = null, equippedId = null }) {
     const [picked, setPicked] = useState(null);
     const [confirming, setConfirming] = useState(false);
 
@@ -27,6 +29,13 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
     // own name, the exact mechanical sentence the engine will pay, and whether it is a second ability the pet
     // is learning or the one it already had, harder.
     const choice = ascensionChoice(pet);
+    // Only computed when the page hands over the collection; the lab and any older caller simply get the
+    // card as it was, rather than a wrong number.
+    const preview = useMemo(() => (
+        ownedIds
+            ? compareStones({ petId: pet.id, ownedIds, levelByPet: levelByPet || {}, enshrined: allEnshrined || [], equippedId })
+            : null
+    ), [pet.id, ownedIds, levelByPet, allEnshrined, equippedId]);
     const STONE_META = {
         light: { name: STONES.light.name, color: STONES.light.color, eff: choice.light },
         dark: { name: STONES.dark.name, color: STONES.dark.color, eff: choice.dark },
@@ -96,6 +105,16 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
                                     spent once and cannot be taken back, and a graft whose ability you
                                     already have from your signature pet does nothing at all — the stronger
                                     source simply wins. GrayKitsune found that out by spending one. */}
+                                {/* And the same honest number here, where the saving-up decision is actually
+                                    made — a stone costs 4,000 doubloons and you choose which to buy long
+                                    before the pet reaches six. */}
+                                {preview?.ok ? (
+                                    <span className={`pens-stone-gain${preview[id].length ? "" : " is-none"}`}>
+                                        {preview[id].length
+                                            ? `For you: ${preview[id].slice(0, 2).map((g) => `${g.label} +${g.delta}`).join(", ")}`
+                                            : "For you: changes nothing — you already have this, stronger"}
+                                    </span>
+                                ) : null}
                                 {m.eff?.adds && m.eff?.stacks === false ? (
                                     <span className="pens-stone-note">
                                         Does not stack. If another pet already gives you this, the stronger one applies.
@@ -153,6 +172,26 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
                             <em className="pens-stone-best">
                                 {m.eff?.adds ? "A second ability, on top of its own." : "Its own ability, harder."}
                             </em>
+                            {/* ── ⚠️ WHAT THIS ONE ACTUALLY BUYS *YOU*, BEFORE YOU SPEND IT ──────────────
+                                GrayKitsune has now lost two stones to the same thing. An ability takes the
+                                STRONGEST source you have and never the sum — deliberate, and what stops a
+                                duplicate pet being a penalty — but it means a permanent purchase can change
+                                no number in the game while every word on this card is true. His Lion Cub's
+                                Darkstone grafts Might; Ironback, Bear Cub and Deep Golem were already giving
+                                him Might and all three beat it. The Lightstone would have given him First
+                                Blood, which nothing else of his had.
+
+                                A hedge ("this may be covered") would be guesswork. The engine is asked
+                                instead: combinePetBonuses, the same function the boss fight pays out of, run
+                                once per stone against this member's own pets. It cannot drift from the
+                                payout because it IS the payout. */}
+                            {preview?.ok ? (
+                                <span className={`pens-stone-gain${preview[id].length ? "" : " is-none"}`}>
+                                    {preview[id].length
+                                        ? `For you: ${preview[id].slice(0, 2).map((g) => `${g.label} +${g.delta}`).join(", ")}`
+                                        : "For you: changes nothing — you already have this, stronger"}
+                                </span>
+                            ) : null}
                             {m.eff?.note ? <span className="pens-stone-note">{m.eff.note}</span> : null}
                             <span className={`pens-stone-have${have ? "" : " is-none"}`}>
                                 {have ? `${have} in hand` : "none in hand"}

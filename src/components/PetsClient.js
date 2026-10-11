@@ -364,6 +364,10 @@ export default function PetsClient() {
     }, [filter, ownedSet, sort, state?.petLevels]);
 
     const featured = state?.featured ? collectibleById(state.featured) : null;
+    // petLevels is keyed by pet with a {level, into, span} object; combinePetBonuses wants id -> number.
+    const levelByPet = useMemo(() => Object.fromEntries(
+        Object.entries(state?.petLevels || {}).map(([id, l]) => [id, Number(l?.level) || 1]),
+    ), [state?.petLevels]);
     const ownedCount = state?.ownedIds?.length || 0;
     const passiveEntries = Object.entries(state?.passiveTotals || {}).sort((a, b) => b[1] - a[1]);
     // The pet's sprite at its CURRENT level (leveled/evolved art), so cards + detail show the right form —
@@ -484,6 +488,12 @@ export default function PetsClient() {
                             stones={state?.ascension?.stones}
                             prices={state?.ascension?.prices}
                             enshrined={(state?.ascension?.enshrined || []).find((e) => e.petId === p.id)?.stone || null}
+                            // The collection itself, so the panel can say what each stone buys THIS member
+                            // rather than what it buys in principle. See pet-stone-preview.js.
+                            ownedIds={state?.ownedIds || null}
+                            levelByPet={levelByPet}
+                            allEnshrined={state?.ascension?.enshrined || []}
+                            equippedId={state?.featured || null}
                             busy={busy === p.id}
                             onEnshrine={async (stone) => {
                                 // The reveal is armed BEFORE the reload, with the sprites captured as they

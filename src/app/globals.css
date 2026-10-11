@@ -17193,6 +17193,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .pens-stone-best { font-size: 0.66rem; font-style: normal; color: rgba(255,255,255,0.5); }
 /* The flavour line under an effect. Quieter than the mechanic above it on purpose — it is the reason the
    effect is called what it is, not something you need in order to choose. */
+
+/* ── WHAT THIS STONE BUYS *YOU* ──────────────────────────────────────────────────────────────────
+   The one line on this card computed from the member own collection rather than from the pet. It is
+   deliberately louder than the flavour note above it: it is the only sentence here that can tell you the
+   purchase is worthless, and that is the sentence worth reading. Green when it buys something, amber when
+   it buys nothing, because "nothing" is a warning and not an error. */
+.pens-stone-gain { display: block; margin-top: 6px; font-size: 0.78rem; font-weight: 700;
+    color: #9fe08a; letter-spacing: .01em; }
+.pens-stone-gain.is-none { color: #e8c764; }
+
 .pens-stone-note { font-size: 0.64rem; line-height: 1.35; font-style: italic; color: rgba(255,255,255,0.42); }
 .pens-stone-have { margin-top: 2px; font-size: 0.66rem; font-weight: 800; color: var(--stone); }
 .pens-stone-have.is-none { color: rgba(255,255,255,0.38); }
