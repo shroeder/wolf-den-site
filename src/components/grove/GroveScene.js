@@ -410,6 +410,51 @@ export default function GroveScene({
         return () => { live = false; };
     }, [heroArt, petArt, world]);
 
+    // ── ⚠️ ONE COPY OF SCREEN-TO-WORLD, BECAUSE THE LOOP NOW ASKS THE SAME QUESTION ────────────────
+    // A held finger is re-resolved every frame (see the hold block in the loop), so this conversion has two
+    // callers. Written out twice it is two ideas of where a tap landed, which is the bug the scale note
+    // below already records once.
+    const worldAt = useCallback((clientX, clientY) => {
+        const w = worldRef.current;
+        const host = hostRef.current;
+        if (!w || !host) return null;
+        const rect = host.getBoundingClientRect();
+        // ── ⚠️ THE SAME SCALE THE LOOP IS DRAWING AT, WHICH THIS WAS NEVER USING ────────────
+        // This read rect.width / UNITS_PER_SCREEN — a SECOND, independent idea of how big a world unit is,
+        // which never agreed with the one on screen: a tap at the right-hand edge asked the hero to walk
+        // about half as far as the spot that was tapped, and he stopped short of it with no indication why.
+        // A scale must be PUBLISHED, never recomputed.
+        const unit = w.unitPx || rect.width / UNITS_PER_SCREEN;
+        const ground = w.groundPx || rect.height * 0.13;
+        const x = camRef.current + (clientX - rect.left) / unit;
+        // ── ⚠️ AND THE TAP HAS A HEIGHT NOW ────────────────────────────────────────────────
+        // It only ever read clientX, so every tap meant "walk along the floor" and there was no way to ask
+        // to go UP. The zones have had three tiers of ledges since the first version and no input that
+        // could reach them. Snapped to the surface under the point, so tapping the air over a ledge means
+        // that ledge rather than a spot in mid-air the hero can never stand on.
+        const yRaw = camYRef.current + (rect.height - (clientY - rect.top) - ground) / unit;
+        const surf = w.platforms.reduce((best, p) => {
+            if (x < p.x || x > p.x + p.w) return best;
+            if (p.y > yRaw + 6) return best;
+            return !best || p.y > best.y ? p : best;
+        }, null);
+        return { x: Math.max(2, Math.min(W - 2, x)), y: surf ? surf.y : 0 };
+    }, [W]);
+
+    // ── ⚠️ A HELD FINGER IS A SCREEN POSITION, NOT A WORLD ONE ─────────────────────────────────────
+    // Luke: "If i hold down my finger it should continue to pursue where im clicking."
+    //
+    // A tap resolved to a WORLD point once and the hero walked to it and stopped — which is right for a tap
+    // and wrong for a hold, because the thing the player is pointing at is a place on the GLASS. Hold near
+    // the right edge and the camera follows him, so the world point under that finger slides right with it;
+    // resolving it once freezes it at wherever the camera happened to be on the first frame, and he stops
+    // dead in the middle of the screen with a finger still pressed on the edge of it.
+    //
+    // So the hold stores client coordinates and the loop re-resolves them against the camera as it is NOW.
+    // Hold still and he keeps walking; drag and he turns to follow; let go and he finishes the walk to the
+    // last place you pointed, which is the tap behaviour unchanged.
+    const holdRef = useRef(null);
+
     // ── THE LOOP ────────────────────────────────────────────────────────────────────────────────────
     useEffect(() => {
         const host = hostRef.current;
@@ -731,6 +776,22 @@ export default function GroveScene({
             const plats = w.platforms;
             // Walkable bounds, inset by a body so nothing can stand with half of itself outside the zone.
             const bounds = [HERO_UNITS * 0.6, W - HERO_UNITS * 0.6];
+
+            // ── ⚠️ A HELD FINGER IS RE-RESOLVED EVERY FRAME ─────────────────────────────────────
+            // Luke: "If i hold down my finger it should continue to pursue where im clicking." The hold is
+            // stored in CLIENT coordinates and turned into a world point here, against the camera as it is
+            // now — so holding near an edge keeps him walking as the view travels, instead of stopping at
+            // whatever world point happened to be under the finger on the first frame. See worldAt.
+            //
+            // Resolved against LAST frame's camera, which is one frame of lag and invisible: this runs
+            // before the hero moves and the camera is eased after he does. Doing it the other way round
+            // would mean moving him on a point computed from where he had not gone yet.
+            if (holdRef.current) {
+                const at = worldAt(holdRef.current.cx, holdRef.current.cy);
+                // A hold never steals an attack: tapping a creature targets it, and a finger resting on the
+                // glass afterwards must not quietly turn that into a walk somewhere.
+                if (at && !w.target) w.moveTo = at;
+            }
 
             // ── HERO ────────────────────────────────────────────────────────────────────────────
             const tgt = w.target && w.target.hp > 0 && !w.target.dying ? w.target : null;
@@ -1329,7 +1390,7 @@ export default function GroveScene({
     // mounted here, never runs again. The zone came up with the backdrop painted, the hero standing in his
     // start position and absolutely nothing happening: no spawn, no simulation, no camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mounted, world, spawn, seed, bonuses, stats, onSettle, W, zone.id, zone.boss, labScene, maxHp, belt?.id, belt?.heals, onBoss, rerender]);
+    }, [mounted, world, spawn, seed, bonuses, stats, onSettle, W, zone.id, zone.boss, labScene, maxHp, belt?.id, belt?.heals, onBoss, rerender, worldAt]);
 
     // ── WALKING THROUGH A DOOR ──────────────────────────────────────────────────────────────────────
     // ⚠️ SETTLE BEFORE TRAVELLING, AND AWAIT IT. The kills that open the right-hand door are the same ones
@@ -1373,32 +1434,44 @@ export default function GroveScene({
     // ── INPUT ───────────────────────────────────────────────────────────────────────────────────────
     const onTapWorld = useCallback((e) => {
         const w = worldRef.current;
-        const host = hostRef.current;
-        if (!w || !host || dead) return;
-        const rect = host.getBoundingClientRect();
-        // ── ⚠️ THE SAME SCALE THE LOOP IS DRAWING AT, WHICH THIS WAS NEVER USING ────────────
-        // This read rect.width / UNITS_PER_SCREEN — a SECOND, independent idea of how big a world unit is,
-        // which never agreed with the one on screen: a tap at the right-hand edge asked the hero to walk
-        // about half as far as the spot that was tapped, and he stopped short of it with no indication why.
-        // A scale must be PUBLISHED, never recomputed.
-        const unit = w.unitPx || rect.width / UNITS_PER_SCREEN;
-        const ground = w.groundPx || rect.height * 0.13;
-        const x = camRef.current + (e.clientX - rect.left) / unit;
-        // ── ⚠️ AND THE TAP HAS A HEIGHT NOW ────────────────────────────────────────────────
-        // It only ever read clientX, so every tap meant "walk along the floor" and there was no way to ask
-        // to go UP. The zones have had three tiers of ledges since the first version and no input that
-        // could reach them. Snapped to the surface under the point, so tapping the air over a ledge means
-        // that ledge rather than a spot in mid-air the hero can never stand on.
-        const yRaw = camYRef.current + (rect.height - (e.clientY - rect.top) - ground) / unit;
-        const surf = w.platforms.reduce((best, p) => {
-            if (x < p.x || x > p.x + p.w) return best;
-            if (p.y > yRaw + 6) return best;
-            return !best || p.y > best.y ? p : best;
-        }, null);
+        if (!w || dead) return;
+        const at = worldAt(e.clientX, e.clientY);
+        if (!at) return;
         // Tapping the ground clears the target — "until you tap away".
         w.target = null;
-        w.moveTo = { x: Math.max(2, Math.min(W - 2, x)), y: surf ? surf.y : 0 };
-    }, [dead, W]);
+        w.moveTo = at;
+        holdRef.current = { cx: e.clientX, cy: e.clientY, id: e.pointerId };
+    }, [dead, worldAt]);
+
+    // ⚠️ WINDOW LISTENERS, NOT setPointerCapture. Capture is the obvious tool and it BREAKS MOUSE CLICKS
+    // in this codebase — see pointer-capture-kills-desktop-clicks, which cost a working desktop control the
+    // last time. Mounted once and gated on holdRef instead, so there is no add/remove churn per tap and
+    // nothing to leak if a pointerup never arrives.
+    useEffect(() => {
+        const move = (e) => {
+            const h = holdRef.current;
+            if (!h || (h.id != null && e.pointerId !== h.id)) return;
+            h.cx = e.clientX;
+            h.cy = e.clientY;
+        };
+        // blur as well as up and cancel: a finger that leaves the window, an alt-tab, or a notification
+        // taking focus all end the hold without a pointerup, and a hold that never ends is a hero walking
+        // at a wall for ever.
+        const end = () => { holdRef.current = null; };
+        window.addEventListener("pointermove", move, { passive: true });
+        window.addEventListener("pointerup", end, { passive: true });
+        window.addEventListener("pointercancel", end, { passive: true });
+        window.addEventListener("blur", end);
+        return () => {
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerup", end);
+            window.removeEventListener("pointercancel", end);
+            window.removeEventListener("blur", end);
+        };
+    }, []);
+
+    // Dying mid-hold must not leave him walking into the death screen.
+    useEffect(() => { if (dead) holdRef.current = null; }, [dead]);
 
     const onTapFoe = useCallback((uid) => (e) => {
         e.stopPropagation();
