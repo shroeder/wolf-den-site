@@ -7,6 +7,7 @@ import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
+import { MAP_LAYOUT, mapSpot, nodeArt, trailPath } from "@/lib/marketplace/grove-map.js";
 import { celebrateUnlock } from "@/components/grove/grove-sfx.js";
 
 // ── THE GROVE ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -167,7 +168,11 @@ export default function GroveClient({ initial }) {
         const el = stripRef.current;
         if (view !== "map" || !el) return;
         const far = el.querySelector(`[data-n="${st?.unlockedN || 1}"]`);
-        if (far) el.scrollLeft = Math.max(0, far.offsetLeft - 24);
+        // ⚠️ CENTRED, NOT PINNED 24px FROM THE LEFT EDGE. That was right for a strip of cards whose
+        // left edge was its start; a place on a chart has a trail arriving at it from behind, and shoving
+        // it against the left wall throws away the half of the journey you have already walked. Centring
+        // shows where you came from as well as where you are.
+        if (far) el.scrollLeft = Math.max(0, far.offsetLeft + far.offsetWidth / 2 - el.clientWidth / 2);
     }, [view, st?.unlockedN]);
 
     // ── ⚠️ THE UNLOCK POP ─────────────────────────────────────────────────────────────────
@@ -251,6 +256,10 @@ export default function GroveClient({ initial }) {
     const bagRows = Object.entries(st.pack || {});
     const bankRows = Object.entries(st.bank || {});
     const known = new Set(st.recipes || []);
+    // ⚠️ THE TRAIL STOPS WHERE YOU DID. Drawing the whole route in confident ink would tell a new player
+    // the shape of a map they have not earned; drawing none of it loses the one thing the chart is for.
+    // Faint for the whole journey, inked as far as you have actually walked.
+    const walkedSpots = MAP_LAYOUT.filter((m) => (st.zones || []).some((z) => z.id === m.id && z.unlocked));
 
     return (
         <div className="gv is-full">
@@ -271,42 +280,60 @@ export default function GroveClient({ initial }) {
             <div className="gv-sheet">
 
             {/* ── THE MAP ──────────────────────────────────────────────────────────────────────
-                Luke: "not enough identity, its supposed to have unique areas resembling the node, and
-                the map should be colorful, the nodes are small. The maps are horizontal."
+                Luke: "The map should be nodes on a paper map. The paper map should have color, as if a
+                skilled scribe actually drew the map, with families point of interest nodes on it ... If a
+                forest then leads to a cave or something, it should look like the trail leads from one
+                thing to another on the map. A forest should look like a grouping of trees on the map. A
+                cave should look like a cave."
 
-                ⚠️ THE TWELVE PAINTINGS ALREADY ARE THE IDENTITY. The parchment region map was one
-                drawing standing in for twelve places, which is why none of them looked like anywhere in
-                particular — and it was sepia, so the one colourful thing about each zone was thrown
-                away. Every zone already has its own full-colour backdrop, the same art you walk into. The
-                map is those twelve, laid left to right, which is also the direction you actually travel.
+                ⚠️ THIS IS THE THIRD MAP AND THE FIRST TWO ARE WHY IT IS SHAPED LIKE THIS. The first was
+                one sepia parchment illustration standing in for twelve places, so none of them looked
+                like anywhere in particular. The second threw the paper away entirely and laid the twelve
+                zone BACKDROPS out as cards — which gave every place an identity and lost the thing a map
+                is for: where they are in relation to each other, and what leads to what. A chart with a
+                drawn symbol per place and a trail between them is both at once.
 
-                Scrolls horizontally and starts you at the furthest place you have reached, so the journey
-                reads as a journey rather than a wall of thumbnails. */}
+                ⚠️ THE PLATE IS TERRAIN ONLY. The route and the twelve places are drawn here, over it, at
+                coordinates grove-map.js owns — a path painted into the art could never line up with nodes
+                positioned by code, and generated lettering is gibberish on inspection. */}
             {view === "map" ? (
-                <div className="gv-strip" ref={stripRef}>
-                    {st.zones.map((z) => {
-                        const done = z.kills >= z.toUnlock;
-                        const pct = Math.min(100, (z.kills / Math.max(1, z.toUnlock)) * 100);
-                        return (
-                            <button key={z.id} type="button"
-                                data-n={z.n}
-                                className={`gv-area${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}`}
-                                disabled={!z.unlocked} onClick={() => enter(z)}
-                                style={{ backgroundImage: `url(${z.bg})` }}
-                                aria-label={`${z.name}${z.unlocked ? "" : " (locked)"}`}>
-                                <span className="gv-area-n">{z.n}</span>
-                                <span className="gv-area-foot">
-                                    <em>{z.name}</em>
-                                    {z.unlocked ? (
-                                        <span className="gv-area-meter">
-                                            <i style={{ width: `${pct}%` }} />
-                                            <u>{done ? "Cleared" : `${z.kills}/${z.toUnlock}`}</u>
-                                        </span>
-                                    ) : <span className="gv-area-lock">Locked</span>}
-                                </span>
-                            </button>
-                        );
-                    })}
+                <div className="gv-paper" ref={stripRef}>
+                    <div className="gv-paper-in">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="gv-paper-plate" src="/images/grove/map-plate.webp" alt="" />
+
+                        {/* The trail, under the places so it runs behind them rather than across them.
+                            Two passes: the whole route faint, then the part you have actually opened
+                            drawn over it in confident ink. preserveAspectRatio none because the viewBox is
+                            in percent and has to stretch with the paper. */}
+                        <svg className="gv-paper-trail" viewBox="0 0 100 100"
+                            preserveAspectRatio="none" aria-hidden="true">
+                            <path className="is-ghost" d={trailPath()} />
+                            <path className="is-walked" d={trailPath(walkedSpots)} />
+                        </svg>
+
+                        {st.zones.map((z) => {
+                            const spot = mapSpot(z.id);
+                            if (!spot) return null;
+                            const done = z.kills >= z.toUnlock;
+                            return (
+                                <button key={z.id} type="button" data-n={z.n}
+                                    className={`gv-node${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}`}
+                                    style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
+                                    disabled={!z.unlocked} onClick={() => enter(z)}
+                                    aria-label={`${z.name}${z.unlocked ? "" : " (locked)"}`}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={nodeArt(z.id)} alt="" />
+                                    <span className="gv-node-label">
+                                        <em>{z.name}</em>
+                                        {z.unlocked
+                                            ? <u>{done ? "Cleared" : `${z.kills}/${z.toUnlock}`}</u>
+                                            : <u>Locked</u>}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             ) : null}
 

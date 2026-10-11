@@ -468,3 +468,44 @@ an empty forest with the backdrop scrolling behind nothing.
   object and costs nothing, but Luke asked to "actually see the sprite" of what dropped.
 - **A reason to be in the canopy.** The tiers are reachable and populated now; nothing up there is worth
   more than what is on the floor, so there is no reason to climb except to reach a creature standing on it.
+
+### 2026-10-10 — the map is a drawn chart, third time
+
+Luke: *"The map should be nodes on a paper map. The paper map should have color, as if a skilled scribe
+actually drew the map, with families point of interest nodes on it ... If a forest then leads to a cave or
+something, it should look like the trail leads from one thing to another on the map. A forest should look
+like a grouping of trees on the map. A cave should look like a cave."*
+
+**This is the third map, and the first two are why it is shaped like this.** The first was one sepia
+parchment illustration standing in for twelve places, so none of them looked like anywhere in particular —
+Luke, at the time: *"The fuck is that backdrop."* The second threw the paper away and laid the twelve zone
+BACKDROPS out as cards, which gave every place an identity and lost the only thing a map is actually for:
+where the places are in relation to each other, and what leads to what. A chart with a drawn symbol per
+place and a trail between them is both at once.
+
+**The plate is terrain only and mostly bare paper.** `map-plate.webp` is a sparse watercolour chart — a
+river, some hill hatching, a scatter of tree marks, and large areas of untouched parchment. The first
+attempt was a dense landscape edge to edge, which is noise under the only thing the player is reading. A
+scribe leaves most of the page alone.
+
+⚠️ **No path, no markers and no lettering are painted into it.** The route and the twelve places are drawn
+over it from `grove-map.js` at coordinates the code owns. A path baked into the art can never line up with
+nodes positioned by code, and generated lettering is gibberish the moment anyone looks closely.
+
+**`MAP_LAYOUT` is authored against one specific painting.** The percentages follow that river. Regenerate
+the plate and they stop meaning anything — the water moves and the places end up standing in it.
+
+**The route swings between high and low ground on purpose.** A phone shows about a quarter of the chart's
+width, roughly three places, so a gently climbing line puts all three in the same band and leaves the rest
+of the screen blank. Alternating up and down means any window has something near the top and something near
+the bottom.
+
+**The trail inks only as far as you have walked.** The whole route is faint; the part you have opened is
+drawn over it in confident ink. Showing all of it would hand a new player the shape of a map they have not
+earned; showing none loses what the chart is for.
+
+⚠️ **The first map's CSS outlived it by two redesigns and broke this one.** `.gv-node` still carried
+`aspect-ratio: 3/2`, `overflow: hidden`, a border and an `::after` dark gradient from the original grid of
+tiles. The new places reuse that class name, so every one of them rendered as a dark rounded tile with its
+drawing clipped away inside it — the new rule won every property it set and lost every property it did not
+think to set. Change an element's shape and delete its old rule.

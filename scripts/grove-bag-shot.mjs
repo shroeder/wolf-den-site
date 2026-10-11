@@ -78,16 +78,47 @@ await new Promise((r) => setTimeout(r, 11000));
     // ⚠️ MEASURED HERE, NOT AT THE END. The map is gone the moment the bag is opened, so a measurement
     // taken after the click reports null for every element of the screen it was supposed to be checking.
     const am = await send("Runtime.evaluate", { expression: `(() => {
-        const a = document.querySelector(".gv-area");
-        const sh = document.querySelector(".gv-sheet");
-        const st = document.querySelector(".gv-strip");
-        const r = a?.getBoundingClientRect();
+        const box = (sel) => {
+            const e = document.querySelector(sel);
+            if (!e) return null;
+            const r = e.getBoundingClientRect();
+            return [Math.round(r.width), Math.round(r.height), Math.round(r.left), Math.round(r.top)];
+        };
+        const nodes = [...document.querySelectorAll(".gv-node")].map((n) => {
+            const r = n.getBoundingClientRect();
+            return [n.dataset.n, Math.round(r.left), Math.round(r.top), Math.round(r.width)];
+        });
         return {
-            vh: window.innerHeight,
-            card: r ? [Math.round(r.width), Math.round(r.height), Math.round(r.top)] : null,
-            cardCss: a ? getComputedStyle(a).height : null,
-            sheet: sh ? Math.round(sh.getBoundingClientRect().height) : null,
-            strip: st ? Math.round(st.getBoundingClientRect().height) : null,
+            vw: window.innerWidth, vh: window.innerHeight,
+            sheet: box(".gv-sheet"), paper: box(".gv-paper"), inner: box(".gv-paper-in"),
+            plate: box(".gv-paper-plate"),
+            scrollW: document.querySelector(".gv-paper")?.scrollWidth ?? null,
+            nodes: nodes.slice(0, 4), nodeCount: nodes.length,
+            matched: (() => {
+                const n = document.querySelector(".gv-node");
+                const img = n && n.querySelector("img");
+                const hits = [];
+                for (const sheet of document.styleSheets) {
+                    let rules; try { rules = sheet.cssRules; } catch (e) { continue; }
+                    for (const r of rules) {
+                        if (!r.selectorText) continue;
+                        try {
+                            if (n.matches(r.selectorText) || (img && img.matches(r.selectorText))) {
+                                const t = r.cssText;
+                                if (/background|border|filter|opacity|width/.test(t)) hits.push(t.slice(0, 150));
+                            }
+                        } catch (e) { /* bad selector */ }
+                    }
+                }
+                return hits.slice(0, 14);
+            })(),
+            nodeStyle: (() => { const n = document.querySelector(".gv-node"); if (!n) return null; const c = getComputedStyle(n); const i = getComputedStyle(n.querySelector("img")); return { btnBg: c.backgroundColor, btnImg: c.backgroundImage.slice(0, 40), btnBorder: c.borderTopWidth, imgOpacity: i.opacity, imgFilter: i.filter.slice(0, 50), imgDisplay: i.display }; })(),
+            imgs: [...document.querySelectorAll(".gv-node img")].slice(0, 3).map((i) => ({
+                src: (i.getAttribute("src") || "").split("/").pop(),
+                ok: i.complete && i.naturalWidth > 0,
+                nat: i.naturalWidth + "x" + i.naturalHeight,
+                box: [Math.round(i.getBoundingClientRect().width), Math.round(i.getBoundingClientRect().height)],
+            })),
         };
     })()`, returnByValue: true });
     console.log("map:", JSON.stringify(am.result.value));

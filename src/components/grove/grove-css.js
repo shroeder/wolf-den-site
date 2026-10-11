@@ -43,6 +43,8 @@ export const GROVE_CSS = `
    fixed justify-content would not; and the strip is a single row of fixed height, so it can never overflow
    vertically and be pushed out of reach by them. */
 .gv.is-full .gv-strip { margin-block: auto; }
+/* The paper takes the whole sheet rather than being centred in it — a chart is the screen, not an item on it. */
+.gv.is-full .gv-paper { flex: 1; min-height: 0; }
 
 /* The way out. Top-left, where a back control is looked for, and clear of the dock. */
 .gv-exit { position: fixed; z-index: 66;
@@ -76,32 +78,80 @@ export const GROVE_CSS = `
     transform: scale(1.06); box-shadow: 0 0 18px rgba(159,224,138,0.35), 0 4px 14px rgba(0,0,0,0.5); }
 .gv-dock button:not(.is-on):hover { border-color: rgba(255,255,255,0.34); }
 
-/* The map gets the room it just gained. */
-.gv.is-full .gv-area { width: min(62vw, 270px); height: min(64vh, 420px); }
+/* ── THE PAPER MAP ───────────────────────────────────────────────────────────────────────────
+   A drawn chart with the twelve places on it and a trail between them. The plate is terrain only; the
+   route and the places are drawn over it from grove-map.js.
+
+   ⚠️ THE PAPER IS TALLER THAN THE SCREEN IS WIDE, ON PURPOSE. Fitting a 3:2 chart into a 390px phone
+   gives you a 260px-tall map with twelve symbols on it about thirty pixels across, which is a picture of
+   a map rather than a map. It fills the height instead and scrolls sideways, which is also the direction
+   the journey runs. */
+.gv-paper { width: 100%; height: 100%; overflow: auto hidden; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; border-radius: 12px; }
+.gv-paper::-webkit-scrollbar { display: none; }
+/* ⚠️ 2:1, WIDER THAN THE PLATE IS. Twelve places across a 3:2 chart sit 88px apart, which is barely
+   wider than the symbols themselves; at 2:1 they get 109 and stop crowding. The plate covers the box and
+   crops, which costs nothing because its top band is bare parchment by design. */
+.gv-paper-in { position: relative; height: 100%; aspect-ratio: 2 / 1; min-width: 100%; }
+.gv-paper-plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    border-radius: 12px; }
+
+/* The trail. Dashed brown ink, drawn in percentage space so it stretches with the paper.
+   ⚠️ vector-effect: non-scaling-stroke, OR THE LINE IS A WEDGE. preserveAspectRatio: none stretches the
+   viewBox unevenly, and a stroke stretches with it — the route came out thick where the map is wide and
+   thin where it is tall, which reads as a smudge rather than a drawn line. */
+.gv-paper-trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.gv-paper-trail path { fill: none; stroke-linecap: round; stroke-linejoin: round;
+    vector-effect: non-scaling-stroke; }
+.gv-paper-trail .is-ghost { stroke: rgba(94, 70, 38, 0.30); stroke-width: 2; stroke-dasharray: 5 7; }
+.gv-paper-trail .is-walked { stroke: rgba(94, 70, 38, 0.80); stroke-width: 3; stroke-dasharray: 7 6; }
+
+/* A place. The symbol is the button; the label sits under it and only appears when there is room.
+   ⚠️ TRANSLATED BY HALF ITSELF, because left/top are the point the trail passes through — anchoring by
+   the corner would hang every symbol down and right of its own position on the route. */
+.gv-node { position: absolute; transform: translate(-50%, -50%);
+    /* ⚠️ 7%, NOT 13%. At thirteen a symbol came out 138px wide on a 1062px chart whose places are 88px
+       apart — every one of them overlapped its neighbours and two of them filled a phone. The spacing
+       between places is what sets this, not how nice the drawing looks on its own. */
+    width: 7%; min-width: 58px; padding: 0; border: 0; background: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; font: inherit;
+    -webkit-tap-highlight-color: transparent; transition: transform 160ms ease; }
+.gv-node img { width: 100%; height: auto; display: block;
+    filter: drop-shadow(0 2px 3px rgba(60, 44, 20, 0.35)); }
+.gv-node:not(.is-locked):hover { transform: translate(-50%, -50%) scale(1.07); }
+/* ⚠️ IT WRAPS TO THE SYMBOL, rather than running as wide as the name happens to be. nowrap made every
+   label wider than the place it belonged to, so neighbouring names overlapped each other across the
+   trail and it was no longer clear which name went with which drawing. */
+.gv-node-label { display: flex; flex-direction: column; align-items: center; line-height: 1.12;
+    max-width: 124%; padding: 2px 5px; border-radius: 7px; background: rgba(247, 238, 214, 0.88);
+    border: 1px solid rgba(94, 70, 38, 0.28); text-align: center; }
+.gv-node-label em { font-style: normal; font-weight: 700; font-size: 0.58rem; color: #4a3720; }
+.gv-node-label u { text-decoration: none; font-size: 0.54rem; color: #7b6442; }
+/* Cleared is a gold seal on the label rather than a tick somewhere else — a scribe stamps the page. */
+.gv-node.is-clear .gv-node-label { background: rgba(250, 236, 196, 0.94); border-color: rgba(186, 142, 46, 0.75); }
+.gv-node.is-clear .gv-node-label u { color: #8a6514; font-weight: 700; }
+/* ⚠️ A LOCKED PLACE KEEPS ITS DRAWING AND LOSES ITS COLOUR. Blanking it would make most of the chart
+   empty paper with nothing to walk toward; full colour would spoil twelve places at a glance. */
+.gv-node.is-locked { cursor: not-allowed; }
+.gv-node.is-locked img { filter: grayscale(0.9) opacity(0.45); }
+.gv-node.is-locked .gv-node-label { background: rgba(236, 228, 208, 0.62); border-color: rgba(94, 70, 38, 0.18); }
+.gv-node.is-locked .gv-node-label em, .gv-node.is-locked .gv-node-label u { color: #8d7f66; }
 .gv-note { margin: 0 0 10px; padding: 9px 13px; border-radius: 10px; font-size: 0.85rem;
     background: rgba(159,224,138,0.12); border: 1px solid rgba(159,224,138,0.35); color: #d8f5cc; }
 
-/* ── THE MAP ─────────────────────────────────────────────────────────────────────────────────── */
-.gv-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.gv-node { position: relative; aspect-ratio: 3/2; border-radius: 14px; overflow: hidden; cursor: pointer;
-    border: 1px solid rgba(255,255,255,0.12); background-size: cover; background-position: center;
-    display: flex; flex-direction: column; justify-content: flex-end; padding: 10px; text-align: left;
-    font: inherit; color: #fff; }
-.gv-node::after { content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(8,10,8,0.10), rgba(8,10,8,0.86)); }
-.gv-node > * { position: relative; z-index: 1; }
-.gv-node.is-locked { background: rgba(255,255,255,0.03); cursor: not-allowed; color: #6f6a60; }
-.gv-node.is-clear { border-color: rgba(159,224,138,0.55); }
-/* ⚠️ INSIDE THE PADDING, NOT ABOVE IT. This sat at top:-2px in a box with overflow:hidden, so every zone
-   number was sliced in half — the node is the positioning context and anything negative is simply cut. */
-.gv-node-n { position: absolute; top: 8px; left: 10px; font-size: 0.72rem; font-weight: 800;
-    letter-spacing: .14em; color: #9fe08a; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
-.gv-node-name { font-weight: 700; font-size: 0.92rem; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
-.gv-node-bar { display: block; margin-top: 6px; height: 5px; border-radius: 999px;
-    background: rgba(255,255,255,0.18); position: relative; }
-.gv-node-bar i { display: block; height: 100%; border-radius: 999px; background: #9fe08a; }
-.gv-node-bar em { position: absolute; right: 0; top: 7px; font-style: normal; font-size: 0.66rem; color: #cfc6b6; }
-.gv-node-lock { font-size: 0.72rem; letter-spacing: .1em; text-transform: uppercase; }
+/* ── ⚠️ THE FIRST MAP'S RULES LIVED HERE AND OUTLIVED THE FIRST MAP BY TWO REDESIGNS ─────────────
+   .gv-map, .gv-node, .gv-node-n, .gv-node-name, .gv-node-bar and .gv-node-lock styled a grid of
+   backdrop tiles that was replaced by .gv-strip / .gv-area, and then by the paper chart. Nothing has
+   rendered any of those class names in a long time — except that the chart's places are also called
+   .gv-node, and a second .gv-node rule was still sitting here carrying aspect-ratio: 3/2, overflow:
+   hidden, a border, and an ::after that paints a dark gradient over the whole element.
+
+   So every place on the new map came out as a dark rounded tile with its drawing clipped away inside
+   it. Mine won every property it set and lost every property it did not think to set, which is exactly
+   the failure mode: a stale rule does not announce itself, it just quietly keeps being true.
+
+   This is the third time this repo has paid for it and it is in the memory as stale-css-rule-on-reshape:
+   change an element's shape and DELETE its old rule, or the old background and transform still win. */
 
 /* ── THE MAP: THE ZONES THEMSELVES, LEFT TO RIGHT ──────────────────────────────
    Luke: "its supposed to have unique areas resembling the node, and the map should be colorful ...

@@ -24,6 +24,7 @@ import {
     GROVE_FOODS, groveArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS } from "@/lib/marketplace/grove-recipes.js";
+import { MAP_LAYOUT, mapSpot, nodeArt } from "@/lib/marketplace/grove-map.js";
 import { pickHyper, rollBoss } from "@/lib/marketplace/grove-roll.js";
 import { makeTelegraph } from "@/lib/marketplace/grove-world.js";
 import { CONSUMABLES } from "@/lib/marketplace/consumables.js";
@@ -124,6 +125,29 @@ for (const z of GROVE_ZONES) checkArt(`zone ${z.id}`, z.bg);
 for (const id of Object.keys(GROVE_PARTS)) checkArt(`part ${id}`, groveArt(id));
 for (const id of Object.keys(GROVE_EMBLEMS)) checkArt(`emblem ${id}`, groveArt(id));
 for (const id of Object.keys(GROVE_FOODS)) checkArt(`food ${id}`, groveArt(id));
+// ── ⚠️ AND EVERY PLACE IS ON THE CHART ────────────────────────────────────────────────────────────
+// The map draws a symbol per zone at coordinates grove-map.js owns, so a zone added to the catalogue
+// without a spot simply does not appear on the map — no error, no gap, it is just missing, and the
+// trail quietly routes around where it should have been.
+for (const z of GROVE_ZONES) {
+    const spot = mapSpot(z.id);
+    ok(spot, `zone ${z.id}: no place on the map (add it to MAP_LAYOUT)`);
+    if (spot) checkArt(`map symbol ${z.id}`, nodeArt(z.id));
+}
+for (const m of MAP_LAYOUT) {
+    ok(GROVE_ZONES.some((z) => z.id === m.id), `map has a place for unknown zone "${m.id}"`);
+}
+// Two places drawn on top of each other read as one place with a strange shape. A symbol is 7% of the
+// chart wide, so anything inside 6% horizontally AND 10% vertically of another is overlapping it.
+for (let i = 0; i < MAP_LAYOUT.length; i += 1) {
+    for (let j = i + 1; j < MAP_LAYOUT.length; j += 1) {
+        const a2 = MAP_LAYOUT[i];
+        const b2 = MAP_LAYOUT[j];
+        ok(Math.abs(a2.x - b2.x) >= 6 || Math.abs(a2.y - b2.y) >= 10,
+            `map: ${a2.id} and ${b2.id} are drawn on top of each other`);
+    }
+}
+
 for (const m of artMissing) ok(false, m);
 
 // ── 4d. ⚠️ THE TELEGRAPH MUST KEY ON THE BODY, NOT THE TYPE ─────────────────────────────────────────

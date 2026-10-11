@@ -227,6 +227,57 @@ const DOCK = {
 };
 for (const [id, subject] of Object.entries(DOCK)) ART[id] = [`${ITEM} ${subject}`, "item"];
 
+// ── THE MAP ITSELF ──────────────────────────────────────────────────────────────────────────────
+// Luke: "The map should be nodes on a paper map. The paper map should have color, as if a skilled scribe
+// actually drew the map, with families point of interest nodes on it ... A forest should look like a
+// grouping of trees on the map. A cave should look like a cave."
+//
+// ⚠️ THE PLATE IS TERRAIN ONLY — NO PATH, NO MARKERS, NO LETTERING. This rule already cost one map: the
+// route and the twelve places are drawn in the DOM at coordinates the code controls, so anything baked
+// into the painting could never line up with them, and any lettering comes back as gibberish under
+// inspection. The plate's whole job is to be somewhere the nodes can sit.
+//
+// ⚠️ AND IT IS IN COLOUR. The first one was sepia parchment, which threw away the one thing each of the
+// twelve places actually owns. Luke, on that version: "The fuck is that backdrop." Washed ink and
+// watercolour, not a monochrome antique.
+// ⚠️ MOSTLY EMPTY PARCHMENT. The first plate was a dense landscape painting edge to edge, and the
+// twelve symbols are the content of this screen - a full canopy under them is noise competing with the
+// only thing the player is reading. A real scribe leaves most of the paper alone and lets the marks
+// carry it.
+const MAP_PLATE = `A hand-drawn FANTASY CARTOGRAPHY MAP of one forest region, wide landscape orientation. MOSTLY EMPTY AGED PARCHMENT: warm cream paper with soft grain, faint foxing and gently darkened edges, with large areas of completely blank paper. Sparse and restrained, the work of a careful scribe who leaves most of the page alone.
+
+Only LIGHT, SPARSE terrain marks in fine brown ink with thin watercolour wash: one blue-green river winding across it, a scattering of small hatched hill shapes, a handful of tiny individual tree marks in loose groups, a few patches of pale green and ochre wash, some stippled scree near the right. Nothing dense. No solid canopy, no filled forest, no full-colour landscape painting - the paper must show through almost everywhere.
+
+⚠️ CRITICAL: at least two thirds of the image must be plain empty parchment with nothing drawn on it, and a broad clear band of bare paper must wind from the left edge to the right edge - twelve drawn symbols and a route are placed on top of this later and need somewhere to sit.
+
+COMPLETELY EMPTY OF: any path, trail, road, dotted line, route, footprints, marker, pin, flag, X, circle, numbered point, compass rose, scale bar, border frame, cartouche, or LETTERING OF ANY KIND. No text, no words, no letters, no numbers, no labels, no legend, no title, no watermark. Terrain, water and trees only.`;
+ART["map-plate"] = [MAP_PLATE, "plate"];
+
+// ── THE TWELVE PLACES, AS MAP SYMBOLS ───────────────────────────────────────────────────────────
+// ⚠️ MAP SYMBOLS, NOT SPRITES. The zone backdrops already exist and are paintings you walk INTO; these
+// are the same places seen from above and outside, drawn in the plate's own hand so they look like part
+// of the map rather than stickers on it. Same ink, same wash, same oblique angle.
+//
+// ⚠️ AND EACH ONE HAS TO BE ITS OWN THING AT ABOUT 60 PIXELS. Luke: "A forest should look like a grouping
+// of trees on the map. A cave should look like a cave." Twelve green blobs would be twelve nowheres.
+const MAPNODE = `A single MAP SYMBOL for an illustrated fantasy map, drawn from a high oblique angle in fine brown ink with soft watercolour wash, the way a skilled scribe draws a place on a chart. Confident linework, light stippled shading, a small amount of real colour. Compact and self-contained, filling the frame, reading clearly as its own kind of place at thumbnail size. ISOLATED on a FULLY TRANSPARENT background - no parchment, no paper, no ground patch, no circle, no frame, no border, no shadow. No text, no letters, no numbers, no labels of any kind.`;
+
+const MAP_NODES = {
+    thicket: "The edge of a wood: a loose GROUP OF SLIM BIRCH AND HAZEL TREES, seven or eight of them, pale trunks and light green canopies, with a few tufts of long grass between them. Open and airy - the friendly edge of a forest.",
+    hollow: "A damp mossy HOLLOW: a shallow green dell ringed with mossed-over fallen logs, a small still pool of blue-green water at the bottom, clusters of little mushrooms on the rim.",
+    fernway: "A stand of ENORMOUS FERNS: six or seven big arching fern fronds crowded together, deep lush green, with a narrow gap of bare ground showing between them.",
+    oldstand: "THREE COLOSSAL ANCIENT OAKS standing together, far thicker than ordinary trees, with heavy gnarled surface roots spreading out around their bases and broad dark canopies.",
+    bramble: "A THORN WALL: a dense tangled hedge of interlocking bramble canes drawn as a low thicket barrier, dark green with sharp thorns and small dark red berries.",
+    stubble: "A HARVESTED FIELD: rows of cut golden stubble with four or five bound sheaves of straw standing in it, and a short crooked length of wooden fence along one side.",
+    barrows: "BURIAL MOUNDS: three smooth grassy turf mounds in a row, the nearest with a dark stone-lintel doorway set into its side, and two leaning standing stones beside them.",
+    warren: "A CAVE-POCKED HILLSIDE: a rocky grey bluff with three dark round BURROW MOUTHS opening into it at different heights, loose scree and a few pale roots hanging over the openings. Unmistakably caves in a hill.",
+    mothlight: "A NIGHT CLEARING: a small ring of slender silver birches with a dozen pale glowing moths drifting above and between them, the grass beneath washed cool blue, everything else lit soft gold.",
+    rotwood: "BURNT FOREST: five or six blackened broken tree stumps and snapped trunks with no leaves at all, grey ash drifted around their bases and one thin wisp of smoke still rising.",
+    palisade: "A CRUDE STAKE PALISADE: a curved fence of sharpened log stakes driven into the ground facing outward, with a rough plank watch-platform behind it and two small tattered banners on poles.",
+    heartwood: "ONE ENORMOUS ANCIENT TREE alone, far larger than any other tree on the map, with a massive buttressed trunk, immense spreading roots, a vast golden-green canopy and a soft warm glow from a hollow in its base.",
+};
+for (const [id, subject] of Object.entries(MAP_NODES)) ART[`node-${id}`] = [`${MAPNODE} ${subject}`, "item"];
+
 for (const [id, subject] of Object.entries(PARTS)) ART[`part-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(EMBLEMS)) ART[`emblem-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(FOODS)) ART[`food-${id}`] = [`${ITEM} ${subject}`, "item"];
