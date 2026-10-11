@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
@@ -34,11 +34,31 @@ import { GROVE_ZONES } from "@/lib/marketplace/grove-catalog.js";
 //           now did not work at all.
 const HERO = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/sprite/1789189247101-37705.webp";
 const PET = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/sprite/1788751846210-628644.webp";
+// ⚠️ ONE OBJECT, NOT A FRESH LITERAL PER RENDER. It is a dependency of the scene's world useMemo, so an
+// inline {} rebuilds the entire zone on every render of this component.
+const NO_BONUSES = {};
+const LAB_BELT = { id: "food_poultice", name: "Moss Poultice", count: 5, heals: 0.25 };
 
 export default function GroveLab({ scene = "wander", zoneN = 1 }) {
-    const [log, setLog] = useState([]);
+    // ── ⚠️ THE LOG IS A REF, AND EVERY HANDLER BELOW IS STABLE. THIS WAS TEARING THE LOOP DOWN ─────
+    // The bench used to pass `bonuses={{}}` and a fresh inline arrow for every callback, so each render
+    // handed GroveScene new identities — and the scene's loop effect lists onSettle among its
+    // dependencies while its world useMemo lists bonuses. So a single setLog, fired by any event worth
+    // logging, rebuilt the world and restarted the loop: the hero snapped back, the population respawned,
+    // and anything the loop was accumulating went to zero.
+    //
+    // It is the bench rather than the game, and it still matters: it hid a genuine pause/resume result
+    // behind a world that was being replaced underneath the test. The log is written to a ref and painted
+    // into a node by hand, so nothing here re-renders at all.
+    const logRef = useRef([]);
+    const logNode = useRef(null);
+    const say = useCallback((line) => {
+        logRef.current = [...logRef.current, line];
+        if (logNode.current) logNode.current.textContent = logRef.current.join(" | ");
+    }, []);
     // Where a gate has taken us, overriding the zone in the URL once one is walked through.
     const [travelled, setTravelled] = useState(null);
+    const [panel, setPanel] = useState(null);
     // ⚠️ bossReady, OR THE BOSS SCENE IS EMPTY. The real client sets that flag from the server (the zone
     // must be cleared and the cooldown elapsed); without it the spawn pass skips the boss entirely and the
     // boss scene films a rootrat.
@@ -72,31 +92,51 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
         lifeSteal: scene === "death" ? 0 : 4,
     }), [scene]);
 
+    const onTravelLab = useCallback((n) => { say(`travel ${n}`); setTravelled(n); }, [say]);
+    const onSettleLab = useCallback((batch) => say(`settle ${batch.length}`), [say]);
+    const onPanelLab = useCallback((k) => { say(`panel ${k}`); setPanel(k); }, [say]);
+    const onBossLab = useCallback(() => say("boss"), [say]);
+    const onLeaveLab = useCallback(() => say("leave"), [say]);
+    const onDeathLab = useCallback(() => say("death"), [say]);
+
     return (
         <>
             <style jsx global>{GROVE_CSS}</style>
+            {panel ? (
+                <div className="gv-zsheet">
+                    <button type="button" className="gv-zsheet-x" aria-label="Back to the zone"
+                        onClick={() => setPanel(null)}>x</button>
+                    <p className="muted" style={{ textAlign: "center" }}>bench stand-in for the {panel} panel</p>
+                </div>
+            ) : null}
             <GroveScene
                 key={scene + zoneN}
                 zone={zone}
                 seed={seed}
-                bonuses={{}}
+                bonuses={NO_BONUSES}
                 stats={stats}
                 heroArt={HERO}
                 petArt={PET}
-                belt={{ id: "food_poultice", name: "Moss Poultice", count: 5, heals: 0.25 }}
+                belt={LAB_BELT}
                 labScene={scene}
                 // ⚠️ THE LAB TRAVELS FOR REAL, or the transition cannot be filmed at all. onTravel was
                 // simply absent here, so tapping a gate on the bench did nothing and the one moment the
                 // door exists to deliver was the one moment unreviewable. No server: it swaps the zone
                 // prop, which is exactly what the client does with the response.
-                onTravel={(n) => { setLog((l) => [...l, `travel ${n}`]); setTravelled(n); }}
-                onSettle={(batch) => setLog((l) => [...l, `settle ${batch.length}`])}
-                onBoss={() => setLog((l) => [...l, "boss"])}
-                onLeave={() => setLog((l) => [...l, "leave"])}
-                onDeath={() => setLog((l) => [...l, "death"])}
+                onTravel={onTravelLab}
+                onSettle={onSettleLab}
+                // ⚠️ THE DOCK ONLY RENDERS IF SOMETHING IS LISTENING, so the bench has to listen or the
+                // one in-zone control added since the lab was written is the one that cannot be filmed.
+                // The panel itself belongs to GroveClient; what this stands in for is the HANDOFF — the
+                // button opens, the zone freezes, the close button puts it back.
+                onPanel={onPanelLab}
+                paused={panel !== null}
+                onBoss={onBossLab}
+                onLeave={onLeaveLab}
+                onDeath={onDeathLab}
             />
             {/* Off-screen, so it never lands in a frame of film but is still readable with --eval. */}
-            <b data-lab-log style={{ position: "fixed", left: -9999, top: -9999 }}>{log.join(" | ")}</b>
+            <b data-lab-log ref={logNode} style={{ position: "fixed", left: -9999, top: -9999 }} />
         </>
     );
 }

@@ -97,6 +97,19 @@ import {
 // the browser promises to deliver after the page is gone.
 const SETTLE_EVERY_MS = 45_000;
 
+// ── THE IN-ZONE DOCK ─────────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ THE SAME FOUR OBJECTS AS THE HUB'S DOCK, DELIBERATELY. They are the same four places and a player
+// should not have to learn a second set of icons for them; what changes in a zone is the ARRANGEMENT —
+// a row across the bottom rather than a column up the right, because the right-hand column is where Leave
+// and the full-screen toggle already live and because a thumb crossing the middle of a fight to reach a
+// menu is a thumb over the thing it is fighting.
+const ZONE_DOCK = [
+    { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
+    { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
+    { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp" },
+    { k: "emblems", label: "Emblems", art: "/images/grove/ui-emblems.webp" },
+];
+
 // ── REACH, IN WORLD UNITS ───────────────────────────────────────────────────────────────────────────────────
 // ⚠️ GENUINE WORLD DISTANCES, WHICH IS WHY THEY ARE ALLOWED TO BE CONSTANTS HERE. A reach does not change
 // meaning when the camera zooms; a lookahead does. Anything that is really a share of the frame belongs in
@@ -164,7 +177,7 @@ const PET_LOST = 30;
 
 export default function GroveScene({
     zone, seed, bonuses, stats, heroArt, petArt, belt, labScene,
-    onSettle, onBoss, onLeave, onDeath, onTravel,
+    onSettle, onBoss, onLeave, onDeath, onTravel, onPanel, paused = false,
 }) {
     const hostRef = useRef(null);
     const worldLayerRef = useRef(null);
@@ -186,6 +199,12 @@ export default function GroveScene({
     const [kills, setKills] = useState(0);
     // One door at a time: two taps while the first request is in flight would enter twice.
     const travelRef = useRef(false);
+    // ⚠️ A REF, NOT A DEPENDENCY. Pausing through the effect's dep array would TEAR THE LOOP DOWN AND
+    // REBUILD IT every time a panel opens — and this effect's cleanup banks the unsettled kill log, so
+    // every open and close would fire a settle request. A ref the running frame reads costs nothing and
+    // changes nothing else.
+    const pausedRef = useRef(paused);
+    pausedRef.current = paused;
     // null while standing still; "out" while the gate floods the screen, "in" while the new zone arrives.
     const [warp, setWarp] = useState(null);
     // Which gate is being walked through, so it can flare under the screen flood.
@@ -462,8 +481,23 @@ export default function GroveScene({
         if (!host || !w) return undefined;
 
         let raf = 0;
-        let last = performance.now();
-        let lastSettle = performance.now();
+        // ── ⚠️ THE SCENE RUNS ON ITS OWN CLOCK, WHICH STOPS WHEN THE SCENE DOES ─────────────────
+        // Nearly every deadline in here is an ABSOLUTE timestamp — when the next wave respawns, when a
+        // creature may attack again, when a flash ends, when the combo window closes, when the next settle
+        // is due. Freezing the loop does not freeze performance.now(), so coming back from thirty seconds
+        // in the workbench with the raw clock would fire every one of those on the same frame: a full
+        // respawn, every wind-up resolving at once, every timer expired. Clamping dt does not help, because
+        // the fault is in the deadlines, not in the step.
+        //
+        // So the whole scene reads sceneNow() instead, which is real time minus every millisecond spent
+        // paused. Nothing else has to know: a deadline set before the pause and a comparison made after it
+        // are both in the same clock, so they simply resume.
+        w.pauseMs = 0;
+        w.pauseAt = 0;
+        const sceneNow = () => performance.now() - (w.pauseMs || 0);
+        w.sceneNow = sceneNow;
+        let last = sceneNow();
+        let lastSettle = sceneNow();
         spawn(w, last);
         // ⚠️ THE LAB'S SCENES ARE SET UP HERE, NOT IN THE LAB. The lab can only hand over props; what makes
         // a fight happen in the first second of film is the hero standing NEXT TO something, which is a fact
@@ -577,7 +611,7 @@ export default function GroveScene({
             const layer = fxRef.current;
             if (!layer) return;
             const p = makePop(kind, x, y, w.rand);
-            p.born = performance.now();
+            p.born = w.sceneNow ? w.sceneNow() : performance.now();
             // How large this number ends up, before the arrival punch is multiplied on top of it by the
             // loop. One for everything that is not a hit — a pickup label has no magnitude to report.
             p.weight = weight?.scale || 1;
@@ -604,7 +638,7 @@ export default function GroveScene({
                     life: dust ? DUST.life : crit ? SPARK.lifeCrit : SPARK.life,
                     dir, rand: w.rand,
                 });
-                s.born = performance.now();
+                s.born = w.sceneNow ? w.sceneNow() : performance.now();
                 s.g = dust ? DUST.gravity : SPARK.gravity;
                 const el = document.createElement("i");
                 el.className = `gv-spark is-${kind}${crit ? " is-crit" : ""}`;
@@ -619,7 +653,7 @@ export default function GroveScene({
             const el = document.createElement("i");
             el.className = `gv-boom is-${kind}`;
             layer.appendChild(el);
-            w.sparks.push({ x, y, vx: 0, vy: 0, g: 0, born: performance.now(), life: 380, node: el, ring: true });
+            w.sparks.push({ x, y, vx: 0, vy: 0, g: 0, born: w.sceneNow ? w.sceneNow() : performance.now(), life: 380, node: el, ring: true });
         };
 
         // ── ⚠️ ONE FUNCTION PAYS A KILL, AND BOTH CALLERS GO THROUGH IT ───────────────────────────
@@ -763,7 +797,23 @@ export default function GroveScene({
             rerender();
         };
 
-        const step = (now) => {
+        const step = (raw) => {
+            // ── ⚠️ FROZEN WHILE A PANEL IS OPEN, AND THE PAUSED TIME IS BANKED ──────────────────
+            // The frame does nothing while a sheet is up, and every millisecond it skips is added to
+            // w.pauseMs so that sceneNow() simply does not advance. That is what lets a thirty-second
+            // visit to the workbench resume into the fight it left rather than into a full respawn with
+            // every wind-up firing at once — see the clock note above.
+            //
+            // The rAF keeps running rather than being cancelled, because stopping it means restarting it,
+            // and the only place to restart it from is the effect whose cleanup banks the kill log.
+            if (pausedRef.current) {
+                if (!w.pauseAt) w.pauseAt = raw;
+                raf = requestAnimationFrame(step);
+                return;
+            }
+            if (w.pauseAt) { w.pauseMs += raw - w.pauseAt; w.pauseAt = 0; }
+            const now = raw - (w.pauseMs || 0);
+
             // ⚠️ REAL MILLISECONDS AND SIMULATION dt ARE DIFFERENT CLOCKS, AND MIXING THEM DEADLOCKS.
             // Hit-stop scales dt toward zero; anything measured in simulation frames would itself be frozen
             // by the hit-stop and never end. So: dt drives the world, realMs drives every timer.
@@ -1361,7 +1411,11 @@ export default function GroveScene({
         raf = requestAnimationFrame(step);
         const onVis = () => {
             if (document.hidden) { cancelAnimationFrame(raf); raf = 0; }
-            else if (!raf) { last = performance.now(); raf = requestAnimationFrame(step); }
+            // ⚠️ A HIDDEN TAB IS A PAUSE TOO, AND IT WAS NOT BEING BANKED. The loop was cancelled and
+            // restarted with a fresh `last`, which fixed dt and left every absolute deadline in the past —
+            // so coming back to a backgrounded Grove fired the whole respawn and every pending timer on
+            // one frame. It goes through the same accumulator now.
+            else if (!raf) { if (!w.pauseAt) w.pauseAt = performance.now(); raf = requestAnimationFrame(step); }
         };
         document.addEventListener("visibilitychange", onVis);
 
@@ -1397,6 +1451,19 @@ export default function GroveScene({
     // the server has not been told about yet, so entering first means the server checks a lock that this
     // session's own kills were about to open — you would be refused at the door you just earned. The
     // unmount cleanup settles too, but that fires AFTER the new zone has been asked for, which is too late.
+    // ⚠️ THE SAME FLUSH THE DOOR DOES, FOR THE SAME REASON. Walking through a gate banks the kill log
+    // before the zone is swapped; opening the backpack has to bank it before the bag is read, or the panel
+    // shows a snapshot from up to forty-five seconds ago. Awaited, so the panel opens onto fresh state
+    // rather than refreshing underneath the player a moment after it is on screen.
+    const openPanel = useCallback(async (kind) => {
+        const w = worldRef.current;
+        if (w?.killLog?.length) {
+            const ate = w.eaten; w.eaten = {};
+            await onSettle?.(w.killLog.splice(0), ate);
+        }
+        onPanel?.(kind);
+    }, [onSettle, onPanel]);
+
     const travel = useCallback(async (to) => {
         if (travelRef.current) return;
         travelRef.current = true;
@@ -1695,7 +1762,14 @@ export default function GroveScene({
                 starting at zero every time you walked in, while the number that actually matters is the
                 running total the server has kept all along. That total is what the right-hand door shows,
                 in the place where it changes what you do. */}
-            <div className="gv-hud">
+            {/* ── ⚠️ A CONTROL INSIDE THE SCENE MUST SWALLOW ITS OWN POINTERDOWN ────────────────
+                The scene's root carries onPointerDown={onTapWorld} — tap the world, walk there — and every
+                floating control is a child of it. So pressing the backpack also told the hero to walk to
+                the bottom of the screen: he set off for the dock the moment the panel closed, which read
+                as the pause failing to resume properly rather than as a stray walk order. onTapFoe already
+                stopped propagation for exactly this reason; the HUD and the dock never did, which also
+                quietly made the full-screen toggle a move command. */}
+            <div className="gv-hud" onPointerDown={(e) => e.stopPropagation()}>
                 {belt?.id ? <b className="gv-belt">{belt.name} x{Math.max(0, beltLeft)}</b> : null}
                 {canNative ? (
                     <button type="button" className="gv-leave" onClick={toggleNative}
@@ -1705,6 +1779,27 @@ export default function GroveScene({
                 ) : null}
                 <button type="button" className="gv-leave" onClick={onLeave}>Leave</button>
             </div>
+
+            {/* ── ⚠️ THE DOCK, AND IT BANKS THE KILLS BEFORE IT OPENS ANYTHING ───────────────────
+                Luke: "The buttons to access crafting and backpack and map should be available when in a
+                node on the Grove. Across the bottom, perhaps slightly smaller. Floating."
+
+                It lives in the SCENE rather than in GroveClient for one reason: kills are settled in
+                batches every 45 seconds, so at any moment there can be most of a minute of drops that the
+                server has never heard about. Opening a backpack that is missing the last forty creatures
+                you killed is worse than not having the button — and crafting off that stale bag would ask
+                the workbench to spend parts the server does not yet know you own. The scene is the only
+                thing holding that list, so it is the thing that flushes it. */}
+            {onPanel ? (
+                <nav className="gv-zdock" aria-label="The Grove" onPointerDown={(e) => e.stopPropagation()}>
+                    {ZONE_DOCK.map((d) => (
+                        <button key={d.k} type="button" title={d.label} aria-label={d.label}
+                            onClick={() => openPanel(d.k)}>
+                            <img src={d.art} alt="" draggable={false} />
+                        </button>
+                    ))}
+                </nav>
+            ) : null}
 
             <b className="gv-combo" ref={comboRef} aria-hidden="true" />
 

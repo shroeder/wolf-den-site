@@ -78,6 +78,62 @@ export const GROVE_CSS = `
     transform: scale(1.06); box-shadow: 0 0 18px rgba(159,224,138,0.35), 0 4px 14px rgba(0,0,0,0.5); }
 .gv-dock button:not(.is-on):hover { border-color: rgba(255,255,255,0.34); }
 
+/* ── THE SAME DOCK, INSIDE A ZONE ─────────────────────────────────────────────────────────────
+   Luke: "The buttons to access crafting and backpack and map should be available when in a node on the
+   Grove. Across the bottom, perhaps slightly smaller. Floating."
+
+   ⚠️ A ROW, NOT THE COLUMN, AND THAT IS NOT A STYLE CHOICE. The hub's dock runs up the right-hand edge;
+   in a zone that edge already carries Leave and the full-screen toggle at the top, and the right side of
+   the floor is where the hero is walking. A row centred along the bottom keeps a thumb off the fight.
+
+   46px rather than 56. Still above the ~44px a touch target needs, and it has to give up less of a phone
+   screen than the hub's does, because here the thing underneath it is the game.
+
+   ⚠️ AND IT CLEARS THE HOME INDICATOR. bottom is safe-area-inset plus a margin: on a gesture-bar phone a
+   control flush to the bottom edge is a control that swipes the browser away instead of pressing. */
+.gv-zdock { position: absolute; z-index: 6;
+    left: 50%; transform: translateX(-50%);
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: row; gap: 12px; pointer-events: auto; }
+.gv-zdock button { width: 46px; height: 46px; border-radius: 50%; cursor: pointer; padding: 0;
+    display: grid; place-items: center; font: inherit;
+    background: rgba(8,12,8,0.62); border: 1px solid rgba(255,255,255,0.16);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    transition: transform 140ms ease, border-color 140ms ease; }
+.gv-zdock button img { width: 34px; height: 34px; object-fit: contain; display: block;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+.gv-zdock button:active { transform: scale(0.92); }
+.gv-zdock button:hover { border-color: rgba(255,255,255,0.34); }
+
+/* ── A PANEL OVER A PAUSED ZONE ───────────────────────────────────────────────────────────────
+   Opaque rather than tinted. A dimmed-but-visible zone behind a backpack reads as the game still running
+   and the menu being in the way of it — and the zone IS frozen, so a half-seen still frame of it would be
+   actively misleading. The scene stays mounted underneath because unmounting it rebuilds the world: full
+   health, full population, every creature you killed back on its feet.
+
+   ⚠️ overflow-y: auto HERE, NOT ON THE BODY. The body carries gv-full-lock, which is what stops the page
+   behind the Grove scrolling; the sheet has to do its own scrolling or the workbench is unreachable past
+   the fold on a phone. */
+/* ⚠️ FIXED AND ABOVE 70, WHICH IS THE ZONE'S OWN LAYER. The ladder is .gv.is-full at 60, the scene's
+   full-screen layer at 70, and this at 80 — and it has to be stated, because the scene is PORTALLED to the
+   end of body, so document order says nothing about which of the two wins. At z-index 8 the sheet rendered,
+   paused the zone, and was painted underneath it: the backpack was invisible, the close button unreachable,
+   and the only way out was to reload. elementFromPoint over the close button was the thing that said so. */
+.gv-zsheet { position: fixed; inset: 0; z-index: 80;
+    background: #0c120d; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: calc(58px + env(safe-area-inset-top)) 0 calc(24px + env(safe-area-inset-bottom));
+    animation: gvSheetIn 180ms ease-out both; }
+@keyframes gvSheetIn { from { opacity: 0; transform: translateY(2%); } to { opacity: 1; transform: none; } }
+/* Top-LEFT, where the zone's own way out already is, so the control that closes a layer is always in the
+   same corner whichever layer you are on. */
+.gv-zsheet-x { position: fixed; z-index: 81;
+    top: calc(12px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left));
+    width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+    color: #efe7d8; background: rgba(8,12,8,0.78); border: 1px solid rgba(255,255,255,0.18);
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.gv-zsheet-x:hover { border-color: rgba(255,255,255,0.36); }
+
 /* ── THE PAPER MAP ───────────────────────────────────────────────────────────────────────────
    A drawn chart with the twelve places on it and a trail between them. The plate is terrain only; the
    route and the places are drawn over it from grove-map.js.

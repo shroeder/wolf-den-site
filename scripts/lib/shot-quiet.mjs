@@ -67,6 +67,11 @@ export const QUIET_HIDE = [
     // scrim removed the dimming and left the card sitting in the middle of the shot — which cost a whole
     // capture of the casino's bonus screen. Hide the wrap and both halves go.
     ".poll-wrap", ".svy-wrap",
+    // ⚠️ AND THE MARKETPLACE LAUNCH CARD IS THE SAME SHAPE, which this list had half of. ".mkl-scrim"
+    // was here and ".mkl-wrap" was not, so the dimming went and the card stayed — sitting over the whole
+    // right-hand edge of the Grove, where the dock lives. elementFromPoint reported every dock button as
+    // covered and the dock read as broken; it was a launch card this profile had never dismissed.
+    ".mkl-wrap", ".mkl",
     // ── THE ARENA'S AWAY REPORT ──────────────────────────────────────────────────────────────────────
     // Dismissed by TAPPING it, and it reappears the moment anybody challenges you while you are logged
     // out — so on the owner's account, which the whole Den challenges, it is over the arena on nearly

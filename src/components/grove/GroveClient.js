@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
 import GroveScene from "@/components/grove/GroveScene.js";
@@ -70,6 +71,20 @@ export default function GroveClient({ initial }) {
     const [note, setNote] = useState(null);
     const [unlockedNow, setUnlockedNow] = useState(null);
     const [bossWon, setBossWon] = useState(null);
+    // Which panel is open OVER the zone, or null for none. Separate from `view`, which stays "zone" the
+    // whole time you are in one — see the hoist note above the panels.
+    const [zonePanel, setZonePanel] = useState(null);
+    // ⚠️ THE SHEET IS PORTALLED, AND A z-index WAS NOT ENOUGH. GroveScene portals its full-screen layer to
+    // document.body; the sheet was rendered inside the page tree, where ANY ancestor with a transform,
+    // a filter or an opacity makes a stacking context and turns its z-index into a local number. It then
+    // paints under the zone however high you set it — the panel was there, the zone was paused, and the
+    // close button could not be pressed, so the only way out was a reload. elementFromPoint over that
+    // button is what said so; the z-index looked right in the stylesheet the whole time.
+    //
+    // Portalled to body it is a sibling of the scene, which is the only place the 70-vs-80 comparison the
+    // stylesheet is written around actually holds.
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
     const router = useRouter();
     const stripRef = useRef(null);
 
@@ -83,6 +98,10 @@ export default function GroveClient({ initial }) {
         const d = await post({ action: "enter", zone: zone.id });
         if (!d?.ok) { setNote(d?.error === "locked" ? "That one is still closed." : "Couldn't go in."); return; }
         setSession({ zone: d.zone, seed: d.seed, bonuses: d.bonuses });
+        // ⚠️ AND THE SHEET COMES DOWN WITH IT. The map is one of the panels openable from inside a zone,
+        // so tapping a place on it is now a way to travel WITHOUT leaving — and leaving the panel up over
+        // the zone you just walked into means arriving somewhere new behind a backpack.
+        setZonePanel(null);
         setView("zone");
     }, []);
 
@@ -213,6 +232,255 @@ export default function GroveClient({ initial }) {
     if (!st?.ok) {
         return <div className="gv"><p className="muted">The Grove is closed.</p><style>{GROVE_CSS}</style></div>;
     }
+    // ── ⚠️ THE PANELS ARE BUILT BEFORE THE ZONE RETURNS, BECAUSE BOTH SCREENS NEED THEM ─────────
+    // Luke: "The buttons to access crafting and backpack and map should be available when in a node
+    // on the Grove."
+    //
+    // They used to live inside the hub return, below an early return for the zone, so there was no way
+    // to put the backpack on screen without leaving the zone — and LEAVING IS NOT A FREE ACTION. The
+    // scene would unmount and remount on the same seed, which rebuilds the world: full health, full
+    // population, every creature you had already killed back on its feet. Opening your bag at 12 hit
+    // points would have been a heal, which is the kind of exploit that arrives dressed as a convenience.
+    //
+    // So the panels are computed here, once, and rendered either as the hub body or as a sheet over a
+    // PAUSED zone. `panel` is what decides which one shows: the dock view on the hub, and the zone's own
+    // separate selection while in a node, because `view` is "zone" the whole time you are in one.
+    const bagRows = Object.entries(st.pack || {});
+    const bankRows = Object.entries(st.bank || {});
+    const known = new Set(st.recipes || []);
+    // ⚠️ THE TRAIL STOPS WHERE YOU DID. Drawing the whole route in confident ink would tell a new player
+    // the shape of a map they have not earned; drawing none of it loses the one thing the chart is for.
+    // Faint for the whole journey, inked as far as you have actually walked.
+    const walkedSpots = MAP_LAYOUT.filter((m) => (st.zones || []).some((z) => z.id === m.id && z.unlocked));
+
+
+    const panel = view === "zone" ? zonePanel : view;
+    const sheetNode = (
+                <div className="gv-sheet">
+
+                {/* ── THE MAP ──────────────────────────────────────────────────────────────────────
+                    Luke: "The map should be nodes on a paper map. The paper map should have color, as if a
+                    skilled scribe actually drew the map, with families point of interest nodes on it ... If a
+                    forest then leads to a cave or something, it should look like the trail leads from one
+                    thing to another on the map. A forest should look like a grouping of trees on the map. A
+                    cave should look like a cave."
+
+                    ⚠️ THIS IS THE THIRD MAP AND THE FIRST TWO ARE WHY IT IS SHAPED LIKE THIS. The first was
+                    one sepia parchment illustration standing in for twelve places, so none of them looked
+                    like anywhere in particular. The second threw the paper away entirely and laid the twelve
+                    zone BACKDROPS out as cards — which gave every place an identity and lost the thing a map
+                    is for: where they are in relation to each other, and what leads to what. A chart with a
+                    drawn symbol per place and a trail between them is both at once.
+
+                    ⚠️ THE PLATE IS TERRAIN ONLY. The route and the twelve places are drawn here, over it, at
+                    coordinates grove-map.js owns — a path painted into the art could never line up with nodes
+                    positioned by code, and generated lettering is gibberish on inspection. */}
+                {panel === "map" ? (
+                    <div className="gv-paper" ref={stripRef}>
+                        <div className="gv-paper-in">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="gv-paper-plate" src="/images/grove/map-plate.webp" alt="" />
+
+                            {/* The trail, under the places so it runs behind them rather than across them.
+                                Two passes: the whole route faint, then the part you have actually opened
+                                drawn over it in confident ink. preserveAspectRatio none because the viewBox is
+                                in percent and has to stretch with the paper. */}
+                            <svg className="gv-paper-trail" viewBox="0 0 100 100"
+                                preserveAspectRatio="none" aria-hidden="true">
+                                <path className="is-ghost" d={trailPath()} />
+                                <path className="is-walked" d={trailPath(walkedSpots)} />
+                            </svg>
+
+                            {st.zones.map((z) => {
+                                const spot = mapSpot(z.id);
+                                if (!spot) return null;
+                                const done = z.kills >= z.toUnlock;
+                                return (
+                                    <button key={z.id} type="button" data-n={z.n}
+                                        className={`gv-node${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}`}
+                                        style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
+                                        disabled={!z.unlocked} onClick={() => enter(z)}
+                                        aria-label={`${z.name}${z.unlocked ? "" : " (locked)"}`}>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={nodeArt(z.id)} alt="" />
+                                        <span className="gv-node-label">
+                                            <em>{z.name}</em>
+                                            {z.unlocked
+                                                ? <u>{done ? "Cleared" : `${z.kills}/${z.toUnlock}`}</u>
+                                                : <u>Locked</u>}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : null}
+
+                {/* ── BAG AND BANK ─────────────────────────────────────────────────────────────────── */}
+                {panel === "bag" ? (
+                    <div className="gv-bag">
+                        <section>
+                            <h4>Backpack <i>{bagRows.length}/{st.packSlots}</i></h4>
+                            <div className="gv-slots">
+                                {bagRows.map(([p, n]) => (
+                                    <button key={p} type="button" className="gv-slot"
+                                        onClick={async () => { await post({ action: "move", partId: p, from: "pack", to: "bank", qty: n }); refresh(); }}>
+                                        <PartIcon id={p} />
+                                        <b>{partName(p)}</b><span>{n}</span><em>to bank →</em>
+                                    </button>
+                                ))}
+                                {!bagRows.length ? <p className="muted">Empty. Go and kill something.</p> : null}
+                            </div>
+                        </section>
+                        <section>
+                            <h4>Bank <i>{bankRows.length}/{st.bankSlots}</i></h4>
+                            <div className="gv-slots">
+                                {bankRows.map(([p, n]) => (
+                                    <button key={p} type="button" className="gv-slot"
+                                        onClick={async () => { await post({ action: "move", partId: p, from: "bank", to: "pack", qty: n }); refresh(); }}>
+                                        <PartIcon id={p} />
+                                        <b>{partName(p)}</b><span>{n}</span><em>← to bag</em>
+                                    </button>
+                                ))}
+                                {!bankRows.length ? <p className="muted">Nothing stored.</p> : null}
+                            </div>
+                        </section>
+                        {/* ── THE BELT ────────────────────────────────────────────────────────────────
+                            Luke: "a way to equip food or potions that auto heal you if you get below 60
+                            percent hp." One slot: choosing which is the decision. */}
+                        <section>
+                            <h4>The Belt <i>auto-eats below {Math.round((st.healAt || 0.6) * 100)}%</i></h4>
+                            <div className="gv-slots">
+                                {Object.entries(st.food || {}).filter(([, n]) => n > 0).map(([id, n]) => {
+                                    const f = GROVE_FOODS[id];
+                                    const on = st.belt === id;
+                                    return (
+                                        <button key={id} type="button" className={`gv-slot${on ? " is-on" : ""}`}
+                                            onClick={async () => { await post({ action: "belt", food: on ? null : id }); refresh(); }}>
+                                            <b>{f?.name || id}</b>
+                                            <span>{n}</span>
+                                            <em>{on ? "on the belt" : `heals ${Math.round((f?.heals || 0) * 100)}%`}</em>
+                                        </button>
+                                    );
+                                })}
+                                {!Object.values(st.food || {}).some((n) => n > 0)
+                                    ? <p className="muted">No food. Craft some at the workbench.</p> : null}
+                            </div>
+                        </section>
+
+                        {/* ── THE TOOLS ───────────────────────────────────────────────────────────────
+                            A ladder, not six items: each map raises every tool by a tier. */}
+                        <section>
+                            <h4>Tools</h4>
+                            <div className="gv-slots">
+                                {(st.toolMeta || []).map((t) => (
+                                    <span key={t.slot} className={`gv-slot${t.tier ? "" : " is-dim"}`}>
+                                        <b>{t.name}</b>
+                                        <span>{t.tier ? `Tier ${t.tier}` : "—"}</span>
+                                        <em>{t.tier ? `+${t.pct}% ${t.bonus}` : t.bonus}</em>
+                                    </span>
+                                ))}
+                            </div>
+                        </section>
+
+                        {/* The stone tablet, which is a record of what the Grove has shown you. */}
+                        <section className="gv-tablet">
+                            <h4>The Tablet</h4>
+                            <p><b>{st.tablet.seen}</b> of <b>{st.tablet.total}</b> parts discovered</p>
+                            <ul>{st.tablet.bonuses.map((b) => <li key={b.at}>{b.label} — +{b.value}{b.kind === "pct" ? "%" : ""} {b.stat.replace(/_/g, " ")}</li>)}</ul>
+                        </section>
+                    </div>
+                ) : null}
+
+                {/* ── THE WORKBENCH ────────────────────────────────────────────────────────────────── */}
+                {panel === "bench" ? (
+                    <div className="gv-bench">
+                        <p className="muted">A recipe appears once you have found every part it needs — even if you dropped them.</p>
+                        {GROVE_RECIPES.filter((r) => known.has(r.id)).map((r) => {
+                            const ready = canCraft(r, st.pack);
+                            const built = (st.packsBuilt || []).includes(r.id) || (st.banksBuilt || []).includes(r.id);
+                            return (
+                                <div key={r.id} className={`gv-recipe${ready && !built ? " is-ready" : ""}`}>
+                                    <div>
+                                        <b>{r.name}</b>
+                                        {r.blurb ? <p>{r.blurb}</p> : null}
+                                        <ul>
+                                            {Object.entries(r.parts).map(([p, n]) => (
+                                                <li key={p} className={(st.pack?.[p] || 0) >= n ? "is-have" : ""}>
+                                                    <PartIcon id={p} size={20} />
+                                                    {partName(p)} <span>{st.pack?.[p] || 0}/{n}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <button type="button" disabled={!ready || built}
+                                        onClick={async () => {
+                                            const d = await post({ action: "craft", recipe: r.id });
+                                            setNote(d?.ok ? `Made ${d.name}` : "Couldn't make that.");
+                                            refresh();
+                                        }}>
+                                        {built ? "Built" : ready ? "Craft" : "Not yet"}
+                                    </button>
+                                </div>
+                            );
+                        })}
+                        {!known.size ? <p className="muted">Nothing discovered yet.</p> : null}
+                    </div>
+                ) : null}
+
+                {/* ── EMBLEMS ──────────────────────────────────────────────────────────────────────── */}
+                {panel === "emblems" ? (
+                    <div className="gv-emblems">
+                        <p className="muted">Three may be worn. Three more are sealed.</p>
+                        <div className="gv-eslots">
+                            {[0, 1, 2].map((s) => {
+                                const on = (st.emblems || []).find((e) => e.slot === s);
+                                return (
+                                    <div key={s} className="gv-eslot">
+                                        {on ? (
+                                            <button type="button" onClick={async () => { await post({ action: "emblem", emblemId: on.id, slot: null }); refresh(); }}>
+                                                <b style={{ color: on.rung?.color }}>{"★".repeat(on.stars)}</b>
+                                                <span>{GROVE_EMBLEMS[on.id]?.name}</span>
+                                                <em>take off</em>
+                                            </button>
+                                        ) : <span className="gv-eempty">empty</span>}
+                                    </div>
+                                );
+                            })}
+                            {[3, 4, 5].map((s) => <div key={s} className="gv-eslot is-sealed"><span>sealed</span></div>)}
+                        </div>
+                        <div className="gv-elist">
+                            {(st.emblems || []).filter((e) => e.count > 0).map((e) => {
+                                const meta = GROVE_EMBLEMS[e.id];
+                                const next = e.next;
+                                return (
+                                    <div key={e.id} className="gv-em">
+                                        <b style={{ color: e.rung?.color || "#8d8577" }}>{e.stars ? "★".repeat(e.stars) : "—"}</b>
+                                        <div>
+                                            <b>{meta?.name || e.id}</b>
+                                            <p>+{(meta?.per || 0) * (e.stars || 0)}{meta?.kind === "pct" ? "%" : ""} {String(meta?.stat || "").replace(/_/g, " ")}
+                                                {meta?.global ? <em> · everywhere</em> : null}</p>
+                                            <small>{e.count} collected{next ? ` · ${next.at - e.count} to ${next.label}` : " · maxed"}</small>
+                                        </div>
+                                        <button type="button" disabled={e.slot !== null && e.slot !== undefined}
+                                            onClick={async () => {
+                                                const free = [0, 1, 2].find((s) => !(st.emblems || []).some((x) => x.slot === s));
+                                                await post({ action: "emblem", emblemId: e.id, slot: free ?? 0 });
+                                                refresh();
+                                            }}>
+                                            {e.slot !== null && e.slot !== undefined ? "Worn" : "Wear"}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                            {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">No emblems yet. They fall rarely.</p> : null}
+                        </div>
+                    </div>
+                ) : null}
+
+                </div>
+    );
+
 
     // ── THE ZONE ────────────────────────────────────────────────────────────────────────────────────
     if (view === "zone" && session) {
@@ -224,6 +492,13 @@ export default function GroveClient({ initial }) {
                     petArt={session.petArt || st?.petArt || null}
                     belt={beltNow} onSettle={settle} onBoss={bossKill} onLeave={leave}
                     onTravel={travel}
+                    // ⚠️ THE ZONE IS FROZEN WHILE A PANEL IS OPEN, AND IT HAS TO BE. Crafting in front of
+                    // a live fight means being eaten while reading a recipe, and the belt auto-eats below
+                    // 60% — so an unpaused sheet would quietly spend your food while you were not looking
+                    // at the screen. It also makes the scene's own clock honest: nothing ages, nothing
+                    // respawns, and the fight you come back to is the fight you left.
+                    paused={zonePanel !== null}
+                    onPanel={setZonePanel}
                     // Luke: "when you die it should send you back to town." ⚠️ router.push, NOT the
                     // leave handler — leaving drops you on the Grove map, which is the screen inviting you
                     // straight back into the zone that just killed you. Town is somewhere else.
@@ -247,19 +522,31 @@ export default function GroveClient({ initial }) {
                         </div>
                     </div>
                 ) : null}
+                {/* ── ⚠️ THE PANEL IS A SHEET OVER THE ZONE, NOT A SCREEN INSTEAD OF IT ────────────
+                    Luke: "The buttons to access crafting and backpack and map should be available when in
+                    a node on the Grove." The scene stays mounted underneath — see the hoist note for why
+                    unmounting it would hand out a free full heal — and the dock that opens this lives in
+                    GroveScene, because the scene owns the unsettled kill log and has to bank it before a
+                    backpack is worth looking at. */}
+                {zonePanel && mounted ? createPortal((
+                    <div className="gv-zsheet">
+                        <button type="button" className="gv-zsheet-x" aria-label="Back to the zone"
+                            onClick={() => setZonePanel(null)}>
+                            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                <path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor"
+                                    strokeWidth="2.2" strokeLinecap="round" />
+                            </svg>
+                        </button>
+                        {note ? <p className="gv-note">{note}</p> : null}
+                        {sheetNode}
+                        <style>{GROVE_CSS}</style>
+                    </div>
+                ), document.body) : null}
                 {popNode}
                 <style>{GROVE_CSS}</style>
             </div>
         );
     }
-
-    const bagRows = Object.entries(st.pack || {});
-    const bankRows = Object.entries(st.bank || {});
-    const known = new Set(st.recipes || []);
-    // ⚠️ THE TRAIL STOPS WHERE YOU DID. Drawing the whole route in confident ink would tell a new player
-    // the shape of a map they have not earned; drawing none of it loses the one thing the chart is for.
-    // Faint for the whole journey, inked as far as you have actually walked.
-    const walkedSpots = MAP_LAYOUT.filter((m) => (st.zones || []).some((z) => z.id === m.id && z.unlocked));
 
     return (
         <div className="gv is-full">
@@ -277,229 +564,7 @@ export default function GroveClient({ initial }) {
             {popNode}
             {note ? <p className="gv-note">{note}</p> : null}
 
-            <div className="gv-sheet">
-
-            {/* ── THE MAP ──────────────────────────────────────────────────────────────────────
-                Luke: "The map should be nodes on a paper map. The paper map should have color, as if a
-                skilled scribe actually drew the map, with families point of interest nodes on it ... If a
-                forest then leads to a cave or something, it should look like the trail leads from one
-                thing to another on the map. A forest should look like a grouping of trees on the map. A
-                cave should look like a cave."
-
-                ⚠️ THIS IS THE THIRD MAP AND THE FIRST TWO ARE WHY IT IS SHAPED LIKE THIS. The first was
-                one sepia parchment illustration standing in for twelve places, so none of them looked
-                like anywhere in particular. The second threw the paper away entirely and laid the twelve
-                zone BACKDROPS out as cards — which gave every place an identity and lost the thing a map
-                is for: where they are in relation to each other, and what leads to what. A chart with a
-                drawn symbol per place and a trail between them is both at once.
-
-                ⚠️ THE PLATE IS TERRAIN ONLY. The route and the twelve places are drawn here, over it, at
-                coordinates grove-map.js owns — a path painted into the art could never line up with nodes
-                positioned by code, and generated lettering is gibberish on inspection. */}
-            {view === "map" ? (
-                <div className="gv-paper" ref={stripRef}>
-                    <div className="gv-paper-in">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img className="gv-paper-plate" src="/images/grove/map-plate.webp" alt="" />
-
-                        {/* The trail, under the places so it runs behind them rather than across them.
-                            Two passes: the whole route faint, then the part you have actually opened
-                            drawn over it in confident ink. preserveAspectRatio none because the viewBox is
-                            in percent and has to stretch with the paper. */}
-                        <svg className="gv-paper-trail" viewBox="0 0 100 100"
-                            preserveAspectRatio="none" aria-hidden="true">
-                            <path className="is-ghost" d={trailPath()} />
-                            <path className="is-walked" d={trailPath(walkedSpots)} />
-                        </svg>
-
-                        {st.zones.map((z) => {
-                            const spot = mapSpot(z.id);
-                            if (!spot) return null;
-                            const done = z.kills >= z.toUnlock;
-                            return (
-                                <button key={z.id} type="button" data-n={z.n}
-                                    className={`gv-node${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}`}
-                                    style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
-                                    disabled={!z.unlocked} onClick={() => enter(z)}
-                                    aria-label={`${z.name}${z.unlocked ? "" : " (locked)"}`}>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={nodeArt(z.id)} alt="" />
-                                    <span className="gv-node-label">
-                                        <em>{z.name}</em>
-                                        {z.unlocked
-                                            ? <u>{done ? "Cleared" : `${z.kills}/${z.toUnlock}`}</u>
-                                            : <u>Locked</u>}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-            ) : null}
-
-            {/* ── BAG AND BANK ─────────────────────────────────────────────────────────────────── */}
-            {view === "bag" ? (
-                <div className="gv-bag">
-                    <section>
-                        <h4>Backpack <i>{bagRows.length}/{st.packSlots}</i></h4>
-                        <div className="gv-slots">
-                            {bagRows.map(([p, n]) => (
-                                <button key={p} type="button" className="gv-slot"
-                                    onClick={async () => { await post({ action: "move", partId: p, from: "pack", to: "bank", qty: n }); refresh(); }}>
-                                    <PartIcon id={p} />
-                                    <b>{partName(p)}</b><span>{n}</span><em>to bank →</em>
-                                </button>
-                            ))}
-                            {!bagRows.length ? <p className="muted">Empty. Go and kill something.</p> : null}
-                        </div>
-                    </section>
-                    <section>
-                        <h4>Bank <i>{bankRows.length}/{st.bankSlots}</i></h4>
-                        <div className="gv-slots">
-                            {bankRows.map(([p, n]) => (
-                                <button key={p} type="button" className="gv-slot"
-                                    onClick={async () => { await post({ action: "move", partId: p, from: "bank", to: "pack", qty: n }); refresh(); }}>
-                                    <PartIcon id={p} />
-                                    <b>{partName(p)}</b><span>{n}</span><em>← to bag</em>
-                                </button>
-                            ))}
-                            {!bankRows.length ? <p className="muted">Nothing stored.</p> : null}
-                        </div>
-                    </section>
-                    {/* ── THE BELT ────────────────────────────────────────────────────────────────
-                        Luke: "a way to equip food or potions that auto heal you if you get below 60
-                        percent hp." One slot: choosing which is the decision. */}
-                    <section>
-                        <h4>The Belt <i>auto-eats below {Math.round((st.healAt || 0.6) * 100)}%</i></h4>
-                        <div className="gv-slots">
-                            {Object.entries(st.food || {}).filter(([, n]) => n > 0).map(([id, n]) => {
-                                const f = GROVE_FOODS[id];
-                                const on = st.belt === id;
-                                return (
-                                    <button key={id} type="button" className={`gv-slot${on ? " is-on" : ""}`}
-                                        onClick={async () => { await post({ action: "belt", food: on ? null : id }); refresh(); }}>
-                                        <b>{f?.name || id}</b>
-                                        <span>{n}</span>
-                                        <em>{on ? "on the belt" : `heals ${Math.round((f?.heals || 0) * 100)}%`}</em>
-                                    </button>
-                                );
-                            })}
-                            {!Object.values(st.food || {}).some((n) => n > 0)
-                                ? <p className="muted">No food. Craft some at the workbench.</p> : null}
-                        </div>
-                    </section>
-
-                    {/* ── THE TOOLS ───────────────────────────────────────────────────────────────
-                        A ladder, not six items: each map raises every tool by a tier. */}
-                    <section>
-                        <h4>Tools</h4>
-                        <div className="gv-slots">
-                            {(st.toolMeta || []).map((t) => (
-                                <span key={t.slot} className={`gv-slot${t.tier ? "" : " is-dim"}`}>
-                                    <b>{t.name}</b>
-                                    <span>{t.tier ? `Tier ${t.tier}` : "—"}</span>
-                                    <em>{t.tier ? `+${t.pct}% ${t.bonus}` : t.bonus}</em>
-                                </span>
-                            ))}
-                        </div>
-                    </section>
-
-                    {/* The stone tablet, which is a record of what the Grove has shown you. */}
-                    <section className="gv-tablet">
-                        <h4>The Tablet</h4>
-                        <p><b>{st.tablet.seen}</b> of <b>{st.tablet.total}</b> parts discovered</p>
-                        <ul>{st.tablet.bonuses.map((b) => <li key={b.at}>{b.label} — +{b.value}{b.kind === "pct" ? "%" : ""} {b.stat.replace(/_/g, " ")}</li>)}</ul>
-                    </section>
-                </div>
-            ) : null}
-
-            {/* ── THE WORKBENCH ────────────────────────────────────────────────────────────────── */}
-            {view === "bench" ? (
-                <div className="gv-bench">
-                    <p className="muted">A recipe appears once you have found every part it needs — even if you dropped them.</p>
-                    {GROVE_RECIPES.filter((r) => known.has(r.id)).map((r) => {
-                        const ready = canCraft(r, st.pack);
-                        const built = (st.packsBuilt || []).includes(r.id) || (st.banksBuilt || []).includes(r.id);
-                        return (
-                            <div key={r.id} className={`gv-recipe${ready && !built ? " is-ready" : ""}`}>
-                                <div>
-                                    <b>{r.name}</b>
-                                    {r.blurb ? <p>{r.blurb}</p> : null}
-                                    <ul>
-                                        {Object.entries(r.parts).map(([p, n]) => (
-                                            <li key={p} className={(st.pack?.[p] || 0) >= n ? "is-have" : ""}>
-                                                <PartIcon id={p} size={20} />
-                                                {partName(p)} <span>{st.pack?.[p] || 0}/{n}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                                <button type="button" disabled={!ready || built}
-                                    onClick={async () => {
-                                        const d = await post({ action: "craft", recipe: r.id });
-                                        setNote(d?.ok ? `Made ${d.name}` : "Couldn't make that.");
-                                        refresh();
-                                    }}>
-                                    {built ? "Built" : ready ? "Craft" : "Not yet"}
-                                </button>
-                            </div>
-                        );
-                    })}
-                    {!known.size ? <p className="muted">Nothing discovered yet.</p> : null}
-                </div>
-            ) : null}
-
-            {/* ── EMBLEMS ──────────────────────────────────────────────────────────────────────── */}
-            {view === "emblems" ? (
-                <div className="gv-emblems">
-                    <p className="muted">Three may be worn. Three more are sealed.</p>
-                    <div className="gv-eslots">
-                        {[0, 1, 2].map((s) => {
-                            const on = (st.emblems || []).find((e) => e.slot === s);
-                            return (
-                                <div key={s} className="gv-eslot">
-                                    {on ? (
-                                        <button type="button" onClick={async () => { await post({ action: "emblem", emblemId: on.id, slot: null }); refresh(); }}>
-                                            <b style={{ color: on.rung?.color }}>{"★".repeat(on.stars)}</b>
-                                            <span>{GROVE_EMBLEMS[on.id]?.name}</span>
-                                            <em>take off</em>
-                                        </button>
-                                    ) : <span className="gv-eempty">empty</span>}
-                                </div>
-                            );
-                        })}
-                        {[3, 4, 5].map((s) => <div key={s} className="gv-eslot is-sealed"><span>sealed</span></div>)}
-                    </div>
-                    <div className="gv-elist">
-                        {(st.emblems || []).filter((e) => e.count > 0).map((e) => {
-                            const meta = GROVE_EMBLEMS[e.id];
-                            const next = e.next;
-                            return (
-                                <div key={e.id} className="gv-em">
-                                    <b style={{ color: e.rung?.color || "#8d8577" }}>{e.stars ? "★".repeat(e.stars) : "—"}</b>
-                                    <div>
-                                        <b>{meta?.name || e.id}</b>
-                                        <p>+{(meta?.per || 0) * (e.stars || 0)}{meta?.kind === "pct" ? "%" : ""} {String(meta?.stat || "").replace(/_/g, " ")}
-                                            {meta?.global ? <em> · everywhere</em> : null}</p>
-                                        <small>{e.count} collected{next ? ` · ${next.at - e.count} to ${next.label}` : " · maxed"}</small>
-                                    </div>
-                                    <button type="button" disabled={e.slot !== null && e.slot !== undefined}
-                                        onClick={async () => {
-                                            const free = [0, 1, 2].find((s) => !(st.emblems || []).some((x) => x.slot === s));
-                                            await post({ action: "emblem", emblemId: e.id, slot: free ?? 0 });
-                                            refresh();
-                                        }}>
-                                        {e.slot !== null && e.slot !== undefined ? "Worn" : "Wear"}
-                                    </button>
-                                </div>
-                            );
-                        })}
-                        {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">No emblems yet. They fall rarely.</p> : null}
-                    </div>
-                </div>
-            ) : null}
-
-            </div>
+            {sheetNode}
 
             {/* ── THE DOCK ──────────────────────────────────────────────────────────────────────
                 Objects rather than words, over the content rather than above it. The current one is lit
