@@ -134,6 +134,72 @@ export function platformsFor(zoneN, rand) {
     return out;
 }
 
+// ── WHAT GROWS ON A LEDGE ────────────────────────────────────────────────────────────────────────────────────
+// Luke: "add sprite decorations like vines hanging from platforms where biome permits, the platforms are just
+// way too plain."
+//
+// The biome (GROVE_BIOMES in grove-catalog.js) decides WHAT may grow; this decides WHERE. It is handed the
+// resolved biome object rather than importing the table, because this file is import-free on purpose.
+//
+// ⚠️ ROLLED ONCE, AT ZONE BUILD, AND STORED ON THE LEDGE. The ledges are React-rendered, so anything decided
+// during a render is re-decided on every re-render — and the scene re-renders whenever a telegraph appears.
+// Vines that pick a new x sixty times a fight are not decoration, they are a flicker. The roll happens here,
+// off the zone's own seeded rand, and the result is data like everything else in this file.
+//
+// ⚠️ AND NOTHING GOES ON THE GROUND PLANK. y === 0 is the floor, which the BACKDROP paints — the plank is not
+// drawn at all (see the ledge list in GroveScene), so a vine hung on it would hang in mid-air over the grass.
+const DEC_EDGE = 1.6;        // units of bare slab kept at each end, so nothing grows out of the rounded cap
+const DEC_MIN_GAP = 2.4;     // units between two things on the same ledge, or they read as one lump
+
+/**
+ * Dress every ledge in a zone. Mutates each platform with a `dec` array and returns the platforms.
+ *
+ * Each entry is `{ t: "h" | "s", art, at, s, f, d }` — hanging or sitting, which sprite, the fraction along
+ * the ledge it grows at, a scale, a horizontal flip, and an animation delay so no two sway in step.
+ */
+export function decorateLedges(platforms, biome, rand) {
+    const hangs = biome?.hang || [];
+    const sits = biome?.sit || [];
+    for (const pf of platforms) {
+        pf.dec = [];
+        if (pf.y <= 0) continue;
+        const usable = pf.w - DEC_EDGE * 2;
+        if (usable < DEC_MIN_GAP) continue;
+        // ⚠️ A COUNT PER TEN UNITS, NOT A COUNT PER LEDGE. A ledge is 13 to 29 units wide, so a flat "two
+        // vines each" dresses the short one as a jungle and the long one as a bare plank — the same bug class
+        // as a view-space constant, one number meaning two different densities.
+        const want = (list, density) =>
+            (list.length ? Math.max(1, Math.round((pf.w / 10) * density)) : 0);
+        const place = (list, density, t) => {
+            const n = want(list, density);
+            const taken = pf.dec.filter((d) => d.t === t).map((d) => d.at * pf.w);
+            for (let i = 0; i < n; i += 1) {
+                // Spread across the usable span with jitter, then rejected if it lands on a sibling. Eight
+                // tries and then give up: a ledge with one fewer vine on it is invisible, and a loop that
+                // insists reads as a hang on a narrow ledge.
+                for (let attempt = 0; attempt < 8; attempt += 1) {
+                    const slot = n === 1 ? 0.5 : (i + 0.5) / n;
+                    const x = DEC_EDGE + usable * Math.min(1, Math.max(0, slot + (rand() - 0.5) * 0.5));
+                    if (taken.some((o) => Math.abs(o - x) < DEC_MIN_GAP)) continue;
+                    taken.push(x);
+                    pf.dec.push({
+                        t,
+                        art: list[Math.floor(rand() * list.length) % list.length],
+                        at: x / pf.w,
+                        s: 0.82 + rand() * 0.5,
+                        f: rand() < 0.5 ? -1 : 1,
+                        d: Math.round(rand() * 2600),
+                    });
+                    break;
+                }
+            }
+        };
+        place(hangs, biome?.density || 0, "h");
+        place(sits, biome?.sitDensity || 0, "s");
+    }
+    return platforms;
+}
+
 // ── ⚠️ floorUnder IS GONE, AND IT WAS THE ROOT OF WHAT LUKE NOTICED ────────────────────────────────────────
 // It answered "what is under me" from a position alone, which is not an answerable question: a body inside a
 // ledge's x-span is either standing on top of that ledge or walking along underneath it, and only where it

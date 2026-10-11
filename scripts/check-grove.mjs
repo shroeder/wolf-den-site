@@ -22,6 +22,7 @@ import {
     emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS,
     GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance,
     GROVE_FOODS, groveArt,
+    GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS } from "@/lib/marketplace/grove-recipes.js";
 import { MAP_LAYOUT, mapSpot, nodeArt } from "@/lib/marketplace/grove-map.js";
@@ -118,6 +119,40 @@ for (const [id, e] of Object.entries(GROVE_ENEMIES)) checkArt(`enemy ${id}`, e.a
 for (const [id, b] of Object.entries(GROVE_BOSSES)) checkArt(`boss ${id}`, b.art);
 checkArt("rare spawn", GROVE_RARE.art);
 for (const z of GROVE_ZONES) checkArt(`zone ${z.id}`, z.bg);
+// ── ⚠️ AND EVERY ZONE IS MADE OF SOMETHING THAT EXISTS ───────────────────────────────────────────
+// A zone with no biome, or one naming a biome that is not in the table, falls back to `wood` — so the
+// Rotwood would quietly grow leafy vines out of its burnt ledges and nothing anywhere would say so. The
+// fallback is there to stop a crash, not to be relied on, and this is what stops it being relied on.
+for (const z of GROVE_ZONES) {
+    ok(z.biome, `zone ${z.id}: names no biome`);
+    ok(!z.biome || GROVE_BIOMES[z.biome], `zone ${z.id}: unknown biome "${z.biome}"`);
+    checkArt(`zone ${z.id} ledge`, slabArt(z.biome));
+}
+// Every sprite a biome is allowed to grow. These paths are derived from the id exactly like the loose
+// items are, which means adding a name to a biome's list silently promises a sprite nobody has drawn.
+for (const [id, b] of Object.entries(GROVE_BIOMES)) {
+    checkArt(`biome ${id} slab`, `/images/grove/slab-${b.slab}.webp`);
+    for (const h of b.hang) checkArt(`biome ${id} hang ${h}`, hangArt(h));
+    for (const t of b.sit) checkArt(`biome ${id} sit ${t}`, sitArt(t));
+    // A biome with nothing to hang is a deliberate statement about the place (the Rotwood is burnt), but
+    // one with nothing at all is a ledge as plain as the ones this feature replaced.
+    ok(b.hang.length + b.sit.length > 0, `biome ${id}: nothing grows on it at all`);
+    ok(b.density > 0 || b.sitDensity > 0, `biome ${id}: zero density, so nothing is ever placed`);
+}
+// Nothing drawn should be unreachable: a sprite in the folder that no biome names is art nobody sees.
+{
+    const named = new Set();
+    for (const b of Object.values(GROVE_BIOMES)) {
+        for (const h of b.hang) named.add(`hang-${h}`);
+        for (const t of b.sit) named.add(`sit-${t}`);
+        named.add(`slab-${b.slab}`);
+    }
+    for (const f of fs.readdirSync("public/images/grove")) {
+        const key = f.replace(/\.webp$/, "");
+        if (!/^(slab|hang|sit)-/.test(key)) continue;
+        ok(named.has(key), `${f} is drawn but no biome names it — art nobody will ever see`);
+    }
+}
 // ⚠️ AND EVERY LOOSE ITEM, BECAUSE ITS PATH IS DERIVED. groveArt builds the path from the id rather than
 // reading an authored field, which means adding a part to the catalogue silently promises a sprite that
 // nobody has drawn — and the first time anyone sees that promise broken is a broken-image glyph on the

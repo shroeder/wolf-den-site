@@ -434,28 +434,81 @@ export const GROVE_HYPER = [
 // actually hard — are where this lives, rather than whichever one is cheapest to kill on repeat.
 export const bossHyperChance = (zoneN) => 0.006 + 0.0015 * Math.max(0, (Number(zoneN) || 1) - 1);
 
+// ── WHAT A LEDGE IS MADE OF, AND WHAT GROWS ON IT ────────────────────────────────────────────────────────────
+// Luke: "Lets make the platforms more detailed. And add sprite decorations like vines hanging from platforms
+// where biome permits, the platforms are just way too plain."
+//
+// ⚠️ "WHERE BIOME PERMITS" IS THE WHOLE TABLE. A hanging vine in the Rotwood — a forest that burned and never
+// cooled — is not a decoration, it is a continuity error, and the same is true of a fern in the Stubble Field
+// or a flowering creeper in a burrow. So a biome does not get "vines on/off": it names the handful of things
+// that are allowed to grow there, and a zone can only ever be dressed out of its own list.
+//
+// `slab` is the painted ledge itself (three-sliced — see grove-css.js). `hang` is what trails off the
+// underside, `sit` is what rests on top. `density` is hangs per 10 units of ledge; `sitDensity` likewise.
+//
+// ⚠️ A BIOME IS NOT A ZONE. Seven slabs dress twelve zones, because the Thicket, the Fernway and the Old Stand
+// genuinely are the same mossy forest floor at different depths — and a zone that reuses a slab still gets its
+// own growth list, which is what keeps Mothlight from looking like Thicket Edge with the lights off.
+export const GROVE_BIOMES = {
+    wood: { slab: "wood", density: 1.5, sitDensity: 1.1,
+        hang: ["vine_leafy", "vine_flower", "moss_beard"], sit: ["fern_tuft", "grass_tuft", "mushroom_cluster"] },
+    moss: { slab: "moss", density: 2.0, sitDensity: 1.2,
+        hang: ["moss_beard", "vine_leafy"], sit: ["mushroom_cluster", "fern_tuft"] },
+    bramble: { slab: "bramble", density: 1.6, sitDensity: 0.7,
+        hang: ["thorn_cane", "vine_leafy"], sit: ["grass_tuft"] },
+    // Cut stubble to the horizon. Nothing climbs out here, so the only thing that hangs is the crop itself.
+    field: { slab: "field", density: 1.1, sitDensity: 0.9,
+        hang: ["straw_fringe"], sit: ["grass_tuft"] },
+    stone: { slab: "stone", density: 1.3, sitDensity: 0.7,
+        hang: ["root_pale", "moss_beard"], sit: ["grass_tuft", "mushroom_cluster"] },
+    // Underground. No grass, no flowers, no sun — roots through the roof and what spins in the dark.
+    burrow: { slab: "earth", density: 2.1, sitDensity: 0.5,
+        hang: ["root_pale", "cobweb"], sit: ["mushroom_cluster"] },
+    // ⚠️ THE ONE THAT PROVES THE TABLE IS DOING SOMETHING. Burnt forest gets dead twigs and nothing else —
+    // no vine, no moss, no fern, nothing that is alive.
+    char: { slab: "char", density: 1.0, sitDensity: 0.3,
+        hang: ["char_twig"], sit: [] },
+    plank: { slab: "plank", density: 1.2, sitDensity: 0.4,
+        hang: ["rope_coil", "cobweb"], sit: ["grass_tuft"] },
+    // Lit from the air. The glow is the zone's whole identity, so it is the thing that hangs.
+    glow: { slab: "wood", density: 1.7, sitDensity: 1.0,
+        hang: ["glow_strand", "moss_beard", "vine_leafy"], sit: ["fern_tuft", "mushroom_cluster"] },
+    // The oldest thing in the forest, and the most overgrown.
+    heart: { slab: "wood", density: 2.2, sitDensity: 1.4,
+        hang: ["vine_flower", "vine_leafy", "moss_beard"], sit: ["fern_tuft", "mushroom_cluster", "grass_tuft"] },
+};
+
+export const groveBiome = (id) => GROVE_BIOMES[id] || GROVE_BIOMES.wood;
+export const slabArt = (biomeId) => `/images/grove/slab-${groveBiome(biomeId).slab}.webp`;
+export const hangArt = (id) => `/images/grove/hang-${id}.webp`;
+export const sitArt = (id) => `/images/grove/sit-${id}.webp`;
+
 // ── THE TWELVE ZONES ─────────────────────────────────────────────────────────────────────────────────────────
 // ⚠️ `toUnlock` IS A KILL COUNT, NOT A BOSS. The area opens on kills, exactly as Luke described it; the boss
 // is what ENDS the zone, not what gates the next one. Two different jobs.
 //
 // `enemies` is the mix that wanders the zone — some zones carry two types, which is what stops the middle of
 // the map feeling like one long corridor.
-const Z = (n, id, name, enemies, boss, toUnlock, o = {}) =>
-    ({ n, id, name, enemies, boss, toUnlock, bg: `/images/grove/zone-${id}.webp`, ...o });
+//
+// `biome` is what the ledges in it are made of and what is allowed to grow on them. It is a required argument
+// rather than an option with a default, because a default here is a zone quietly dressed as the wrong place —
+// check-grove.mjs asserts every one of them names a biome that exists.
+const Z = (n, id, name, enemies, boss, toUnlock, biome, o = {}) =>
+    ({ n, id, name, enemies, boss, toUnlock, biome, bg: `/images/grove/zone-${id}.webp`, ...o });
 
 export const GROVE_ZONES = [
-    Z(1, "thicket", "Thicket Edge", ["rootrat"], "glutmaw", 20, { blurb: "Where the trees start. Nothing here has noticed you yet." }),
-    Z(2, "hollow", "Mossy Hollow", ["grub"], "mossmother", 25, { blurb: "Wet underfoot and quiet. Something is eating the deadfall." }),
-    Z(3, "fernway", "The Fernway", ["rootrat", "thornling"], "thistlecrown", 30, { blurb: "Head-high ferns, and the first thing that hits back." }),
-    Z(4, "oldstand", "The Old Stand", ["badger"], "grandfather_bristle", 35, { blurb: "Big trunks, old roots, and something that lives under them." }),
-    Z(5, "bramble", "Bramblewall", ["thornling", "gourdling"], "rattlerind", 40, { blurb: "A wall of thorn somebody planted on purpose." }),
-    Z(6, "stubble", "The Stubble Field", ["husk"], "harvestman", 45, { blurb: "Cut stalks to the horizon. Some of them walk." }),
-    Z(7, "barrows", "The Barrows", ["barrowhound", "husk"], "barrow_warden", 50, { blurb: "Mounds in rows. The rows are deliberate." }),
-    Z(8, "warren", "The Warren", ["warren_mother", "barrowhound"], "great_weaver", 55, { blurb: "Down, and then further down. Something spins in the dark." }),
-    Z(9, "mothlight", "Mothlight", ["voidmoth"], "lanternwing", 60, { blurb: "A clearing lit from the air by wings." }),
-    Z(10, "rotwood", "Rotwood", ["ashwraith", "voidmoth"], "everburning", 65, { blurb: "The trees burned a long time ago and never went out." }),
-    Z(11, "palisade", "The Palisade", ["goblin", "ashwraith"], "stakelord", 70, { blurb: "Sharpened stakes, facing outward. Somebody is keeping something in." }),
-    Z(12, "heartwood", "Heartwood", ["elderling", "goblin"], "heartwood_elder", 80, { blurb: "The middle of the forest, and the oldest thing in it." }),
+    Z(1, "thicket", "Thicket Edge", ["rootrat"], "glutmaw", 20, "wood", { blurb: "Where the trees start. Nothing here has noticed you yet." }),
+    Z(2, "hollow", "Mossy Hollow", ["grub"], "mossmother", 25, "moss", { blurb: "Wet underfoot and quiet. Something is eating the deadfall." }),
+    Z(3, "fernway", "The Fernway", ["rootrat", "thornling"], "thistlecrown", 30, "wood", { blurb: "Head-high ferns, and the first thing that hits back." }),
+    Z(4, "oldstand", "The Old Stand", ["badger"], "grandfather_bristle", 35, "wood", { blurb: "Big trunks, old roots, and something that lives under them." }),
+    Z(5, "bramble", "Bramblewall", ["thornling", "gourdling"], "rattlerind", 40, "bramble", { blurb: "A wall of thorn somebody planted on purpose." }),
+    Z(6, "stubble", "The Stubble Field", ["husk"], "harvestman", 45, "field", { blurb: "Cut stalks to the horizon. Some of them walk." }),
+    Z(7, "barrows", "The Barrows", ["barrowhound", "husk"], "barrow_warden", 50, "stone", { blurb: "Mounds in rows. The rows are deliberate." }),
+    Z(8, "warren", "The Warren", ["warren_mother", "barrowhound"], "great_weaver", 55, "burrow", { blurb: "Down, and then further down. Something spins in the dark." }),
+    Z(9, "mothlight", "Mothlight", ["voidmoth"], "lanternwing", 60, "glow", { blurb: "A clearing lit from the air by wings." }),
+    Z(10, "rotwood", "Rotwood", ["ashwraith", "voidmoth"], "everburning", 65, "char", { blurb: "The trees burned a long time ago and never went out." }),
+    Z(11, "palisade", "The Palisade", ["goblin", "ashwraith"], "stakelord", 70, "plank", { blurb: "Sharpened stakes, facing outward. Somebody is keeping something in." }),
+    Z(12, "heartwood", "Heartwood", ["elderling", "goblin"], "heartwood_elder", 80, "heart", { blurb: "The middle of the forest, and the oldest thing in it." }),
 ];
 
 // ── DIFFICULTY ───────────────────────────────────────────────────────────────────────────────────────────────

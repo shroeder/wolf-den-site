@@ -278,11 +278,102 @@ const MAP_NODES = {
 };
 for (const [id, subject] of Object.entries(MAP_NODES)) ART[`node-${id}`] = [`${MAPNODE} ${subject}`, "item"];
 
+// ── THE LEDGES, AND WHAT GROWS ON THEM ──────────────────────────────────────────────────────────
+// Luke: "Lets make the platforms more detailed. And add sprite decorations like vines hanging from
+// platforms where biome permits, the platforms are just way too plain."
+//
+// They were a CSS bar: a three-stop gradient with a green band on top. That is the right tool for a
+// prototype and the wrong one next to a painted backdrop — the one object the player actually stands on
+// was the only thing in the zone that was not painted.
+//
+// ── ⚠️ A LEDGE IS 13 TO 29 UNITS WIDE, SO ONE SPRITE CANNOT JUST BE STRETCHED ACROSS IT ──────────
+// That is a 2.2x spread, and a stretched sprite puts the ends at two different aspect ratios — a round
+// cap on a short ledge and an ellipse on a long one, in the same zone, in the same frame. So the slab is
+// drawn as a THREE-SLICE: CSS border-image keeps the two ends at their painted size and stretches only
+// the middle. Which is a constraint on the PROMPT, not just on the stylesheet: the middle has to be a
+// plain horizontal band with nothing in it, or whatever is in there smears as the ledge gets longer.
+const SLAB = `A SINGLE PLATFORM LEDGE for a 2D side-scrolling game, drawn STRAIGHT FROM THE SIDE at eye level — flat orthographic side elevation, NO perspective, NO three-quarter view, NO top surface visible, NO ground below it. ONE long horizontal slab running the FULL WIDTH of the frame, touching both the extreme left and the extreme right edge, with its two ends finished and rounded off. About five times as wide as it is tall, sitting in the vertical middle of the frame with empty transparent space above and below.
+
+⚠️ THE MIDDLE OF THE SLAB MUST BE PLAIN AND UNIFORM. The central two thirds is nothing but even horizontal strata of the same material running straight across — no object, no feature, no knot, no break, no change of colour along its length, and a perfectly straight unbroken top edge and bottom edge. Only the left and right thirds may carry character. The middle gets stretched, so anything drawn in it smears.
+
+${STYLE} ${CUTOUT}`;
+
+// ⚠️ DRAWN HANGING FROM THE TOP EDGE, because that is where the code nails it. Each of these is pinned to
+// the underside of a ledge at a seeded x and allowed to swing a few degrees from that point; art that is
+// centred in its frame, or that tapers at the top, detaches visibly from the thing it is supposed to be
+// growing out of.
+//
+// ⚠️ AND THE FIRST RUN OF ALL THIRTEEN CAME BACK CROPPED, WHICH IS THE LESSON THE BOSS PROMPT ABOVE
+// ALREADY PAID FOR. "Nothing in the bottom third of the frame" was read as a composition note and ignored:
+// every vine, every beard of moss and every fern filled its square edge to edge and ran off three sides, so
+// what arrived was a zoomed-in DETAIL of a leaf rather than a whole object. A sprite that is cut off at the
+// bottom does not hang, it stops — there is no tip, no taper, nothing for the eye to finish.
+//
+// Two fixes, and they only work together. Say the margin as a hard rule with a number and name the edges it
+// applies to, exactly as BOSS does. And ASK IN THE OBJECT'S OWN SHAPE: a hanging thing is tall, so it is
+// drawn on a tall canvas, and a clump is wide, so it is drawn on a wide one. A square frame around a 1:3
+// object is an invitation to crop, because filling the frame and keeping the proportions cannot both happen.
+const HANG = `A single small decorative natural object HANGING DOWN, drawn STRAIGHT FROM THE SIDE for a 2D side-scrolling forest game, flat side elevation with NO perspective. It GROWS OUT OF THE TOP EDGE of the frame and hangs straight down from there under its own weight: the top of the object is WIDE and cut flat, flush with the top edge of the image, and it narrows and frays as it falls to a clear visible TIP.
+
+⚠️ FRAMING, AND IT IS A HARD RULE: the TOP edge is the ONLY edge the object may touch. It must keep at least 15% completely empty space down the LEFT side, 15% down the RIGHT side and 15% across the BOTTOM — the lower tip of the object must be clearly visible with empty space beneath it. NO part of it may touch or run off the left, right or bottom edge. Draw the WHOLE object, smaller rather than cropped. Do NOT zoom in on a detail of it.
+
+${STYLE} ${CUTOUT}`;
+
+// The same job the other way up: something RESTING on the ledge's top surface.
+const SIT = `A single small decorative natural clump RESTING ON FLAT GROUND, drawn STRAIGHT FROM THE SIDE for a 2D side-scrolling forest game, flat side elevation with NO perspective and NO ground, soil, rock or surface drawn under it. Its base is FLAT and sits flush along the BOTTOM EDGE of the frame; it grows upward and spreads outward from there. Low and wide.
+
+⚠️ FRAMING, AND IT IS A HARD RULE: the BOTTOM edge is the ONLY edge the object may touch. It must keep at least 15% completely empty space down the LEFT side, 15% down the RIGHT side and 20% across the TOP — every leaf, blade and tip must be clearly inside the frame with empty space above it. NO part of it may touch or run off the left, right or top edge. Draw the WHOLE clump, smaller rather than cropped. Do NOT zoom in on a detail of it.
+
+${STYLE} ${CUTOUT}`;
+
+const SLABS = {
+    wood: "A mossy forest ledge of packed dark earth and old timber: a thick cushion of deep olive moss along the top edge, a band of root-threaded brown soil under it, and a seam of weathered grey-brown wood grain along the bottom. The two ends break off into exposed torn soil with a few pale severed rootlets poking out.",
+    moss: "A sodden hollow ledge, drowned in moss: a deep shaggy pad of wet emerald moss covering the whole top half and rolling over both ends, dark waterlogged peat beneath it, beads of water along the lower edge. The ends are soft and rounded where the moss swallows them.",
+    bramble: "A bramble-grown ledge: a dense mat of dark interlocking thorn canes over a bar of dry grey deadwood, small hard crimson berries caught in the tangle, short black thorns standing up along the top. The ends are a knot of snapped canes.",
+    field: "A field-edge ledge of dry packed earth capped with cut stubble: a fringe of short dry golden straw along the top, pale cracked clay soil beneath, a line of flint pebbles through the middle. The ends crumble into loose dry soil.",
+    // ⚠️ THE WARREN IS NOT THE BARROWS, AND SHARING A SLAB SAID IT WAS. Both were "stone", which put a
+    // pale cold limestone shelf into a tunnel of packed brown earth — the one place in the map where the
+    // ledge went back to reading as a bar laid over the painting rather than a thing cut out of it. A
+    // biome may share a slab only where the two places are genuinely the same material.
+    earth: "A burrow ledge of packed dark earth: a bar of dense root-threaded brown soil, its top edge trodden smooth and dusted paler, pale severed rootlets and small stones embedded through the face, a crumbling darker underside. The ends break off into torn soil with roots trailing out of them.",
+    stone: "A barrow ledge of old grey stone: a single weathered limestone slab, its top edge worn smooth and dusted with thin dry turf, hairline cracks and lichen blotches of pale green and rust across the face, a chipped lower edge. The ends are rough broken stone.",
+    char: "A burnt ledge of charred timber: a blackened beam, its top crusted in grey ash, deep carbon fissures across the face glowing the faintest dull ember orange from inside, the grain burnt to charcoal. The ends are broken and jagged where the wood snapped in the fire.",
+    plank: "A crude goblin platform of lashed planks: three rough sawn boards nailed side by side with bent iron nails, grey weathered timber, a wrap of tarred rope binding at each end and one short length of rope tail. The ends are sawn square and splintered.",
+};
+
+const HANGS = {
+    vine_leafy: "A LEAFY VINE: a single ropy green creeper hanging down in a loose curve, broad heart-shaped leaves alternating down its length, a curling tendril at the tip. Fresh forest green, warm yellow-green where the light catches.",
+    vine_flower: "A FLOWERING VINE: a slender trailing creeper hanging down, small round leaves along it and three or four clusters of pale cream-and-pink blossom, one tendril curling off to the side. Soft green, cream, blush pink.",
+    moss_beard: "A BEARD OF HANGING MOSS: a thick curtain of fine pale-green lichen strands hanging straight down in a ragged soft mass, thinning into loose threads at the bottom. Dusty sage green, silver-grey highlights.",
+    thorn_cane: "A HANGING THORN CANE: one long woody bramble cane trailing down, bare and dark with hard black thorns at intervals, two small dark red berries near the tip, a few dried leaves still clinging. Bramble black-green, dried brown, deep crimson.",
+    root_pale: "HANGING ROOTS: a fall of pale blind tree roots, a dozen thin ivory tendrils of different lengths hanging straight down and tangling into each other, dusted with dry earth. Bone cream, pale tan, shadowed grey.",
+    cobweb: "A HANGING COBWEB: a ragged sheet of old spider silk drooping in a shallow swag, torn open in places, heavy with pale dust, a couple of loose threads trailing below it. Chalk white, cool grey, faint lilac.",
+    straw_fringe: "A FRINGE OF STRAW: a loose hanging bundle of dry cut field-straw stalks of uneven length, a single twist of twine holding them near the top, a few stems broken and bent. Dry gold, bleached cream, hemp brown.",
+    char_twig: "BURNT TWIGS: a small bunch of blackened leafless twigs hanging down, brittle and sharply angular, crusted with grey ash, one tip still glowing a faint dull ember. Charcoal black, ash grey, dull ember orange.",
+    rope_coil: "A HANGING ROPE: a length of thick tarred hemp rope hanging straight down with a loose loop in it and a frayed whipped end, one crude iron ring threaded on near the top. Rope brown, tar black, rusted iron.",
+    glow_strand: "GLOWING STRANDS: a hanging curtain of fine luminous filaments, each tipped with a tiny bead of soft cyan light, drifting slightly apart from one another, a few motes coming off them. Pale glowing cyan, cool white cores, deep blue shadow.",
+};
+
+const SITS = {
+    fern_tuft: "A TUFT OF FERNS: a low spreading clump of five or six arching fern fronds growing from one base, splaying out to both sides. Deep lush green, pale new growth at the curled tips.",
+    mushroom_cluster: "A CLUSTER OF MUSHROOMS: a tight group of seven small forest toadstools of different heights growing from one patch, domed caps, pale gills visible under the nearest. Warm tan caps, cream stems, a touch of dull red on the largest.",
+    grass_tuft: "A TUFT OF LONG GRASS: a spray of tall thin grass blades growing from one base and arching outward on both sides, a few blades bent over, two slender seed heads standing above the rest. Olive green, dry gold at the tips.",
+};
+
+for (const [id, subject] of Object.entries(SLABS)) ART[`slab-${id}`] = [`${SLAB} THE MATERIAL: ${subject}`, "slab"];
+for (const [id, subject] of Object.entries(HANGS)) ART[`hang-${id}`] = [`${HANG} THE OBJECT: ${subject}`, "hang"];
+for (const [id, subject] of Object.entries(SITS)) ART[`sit-${id}`] = [`${SIT} THE OBJECT: ${subject}`, "sit"];
+
 for (const [id, subject] of Object.entries(PARTS)) ART[`part-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(EMBLEMS)) ART[`emblem-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(FOODS)) ART[`food-${id}`] = [`${ITEM} ${subject}`, "item"];
 
-const SIZES = { plate: "1536x1024", foe: "1024x1024", map: "1024x1536", item: "1024x1024" };
+// ⚠️ A SLAB IS DRAWN WIDE. It is a 5:1 object, and asking for one in a square frame returns a short fat
+// brick with air on both sides — which the three-slice then cuts its end caps out of, so the caps come out
+// as empty transparent strips and the ledge loses both ends. The widest size on the menu is the nearest
+// thing to its real shape.
+const SIZES = { plate: "1536x1024", foe: "1024x1024", map: "1024x1536", item: "1024x1024",
+    slab: "1536x1024", hang: "1024x1536", sit: "1536x1024" };
 
 // A plate is a full-bleed backdrop; everything else is a die-cut sprite.
 const OPAQUE = new Set(["plate", "map"]);
@@ -357,6 +448,37 @@ for (const key of keys) {
         bytes = await sharp(bytes).trim({ threshold: 6 })
             .resize(256, 256, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
             .webp({ quality: 92 }).toBuffer();
+    }
+    // ── ⚠️ A SLAB AND A DECORATION ARE TRIMMED BUT NOT SQUARED ────────────────────────────────────
+    // The `item` branch above pads everything back out to 256x256, which is right for a drop sitting in a
+    // square box and wrong for both of these. A 5:1 slab padded into a square spends four fifths of its
+    // pixels on air AND, far worse, moves its painted ends away from the image edges — border-image slices
+    // from the EDGE, so the end caps would be cut out of the padding and the ledge would render with two
+    // transparent stubs. A hanging vine has the same problem at the top: it must stay flush with the edge
+    // it hangs from. So: trim to the paint, then scale on the long side only.
+    if (kind === "slab") {
+        // ⚠️ FORCED TO EXACTLY 1024x320, WHICH IS A SQUASH AND IS MEANT TO BE. The seven slabs come back
+        // between 268 and 378 pixels tall, and the stylesheet derives its end-cap width from the slice
+        // against the slab height — one constant, seven files. At their natural heights that constant is
+        // right for one of them and stretches the caps on the other six. The slab is an abstract band of
+        // material, so a few percent of vertical scale is invisible; a cap at the wrong aspect is not.
+        bytes = await sharp(bytes).trim({ threshold: 6 })
+            .resize(1024, 320, { fit: "fill" }).webp({ quality: 92 }).toBuffer();
+    }
+    // ⚠️ AND BOTH OF THOSE BRANCHES NEED THE ALPHA FLOOR CUT FIRST, WHICH THEY DO NOT DO HERE.
+    // "Transparent" comes back at alpha 1-3, so trim() finds no border to cut and these came back at their
+    // full canvas size with a fringe that CSS drop-shadow renders as a hard box around the sprite. Run
+    // scripts/grove-decor-clean.mjs after any --apply that touches a slab, hang or sit; it zeroes the floor,
+    // re-trims, and re-pins the slab geometry the stylesheet depends on.
+    if (kind === "hang" || kind === "sit") {
+        const img = sharp(bytes).trim({ threshold: 6 });
+        const meta = await img.metadata();
+        const long = Math.max(meta.width || 1, meta.height || 1);
+        const k = Math.min(1, 384 / long);
+        bytes = await img.resize({
+            width: Math.max(1, Math.round((meta.width || 1) * k)),
+            height: Math.max(1, Math.round((meta.height || 1) * k)),
+        }).webp({ quality: 92 }).toBuffer();
     }
     fs.writeFileSync(file, bytes);
     done += 1;

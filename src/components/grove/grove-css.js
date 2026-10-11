@@ -396,30 +396,86 @@ export const GROVE_CSS = `
    frame, so its ends are often the only part on screen, and a square-cut end reads as the strip continuing
    off-frame — exactly the "is this a platform or is this the floor" confusion the width change was meant to
    fix. */
-.gv-ledge { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    height: calc(2.1 * var(--gv-unit, 1%)); margin-bottom: calc(-2.1 * var(--gv-unit, 1%));
-    /* ⚠️ THE CORNER RADIUS IS IN UNITS, NOT PERCENT. A percentage radius is a share of the element's own
-       WIDTH, and a ledge is 13 to 29 units wide — so 40% drew ends that were 5 to 12 units of ellipse and
-       every ledge came out as a capsule. In units the end is the same small rounded corner whatever the
-       ledge's length, which is the only way a long one and a short one read as the same kind of object. */
-    border-radius: calc(0.7 * var(--gv-unit, 1%)) calc(0.7 * var(--gv-unit, 1%))
-        calc(0.35 * var(--gv-unit, 1%)) calc(0.35 * var(--gv-unit, 1%));
-    pointer-events: none; will-change: transform;
-    background:
-        linear-gradient(180deg, #4f7030 0 26%, #4a3a26 26% 44%, #35291c 44% 82%, #241b13 82% 100%),
-        #35291c;
-    box-shadow: 0 6px 12px rgba(0,0,0,0.55), inset 0 -3px 6px rgba(0,0,0,0.5); }
-/* ⚠️ THE MOSS IS A LAYER, NOT A HIGHLIGHT. The first pass tried to do the lit top edge with an inset
-   box-shadow and a pale wash, and against a dark bramble backdrop the whole ledge came out as a flat cream
-   lozenge — the lit edge won and ate the earth under it. A ledge needs its top band to be a real colour of
-   its own, which also gives it somewhere for the grass to sit. */
-/* ⚠️ AND THE MOSS IS DESATURATED. #86b94c against the Mothlight's blue night read as lime plastic — a
-   UI element lying in the forest. Ground cover in these plates is olive, not spring green, and a surface
-   the player stands on has to belong to the painting behind it rather than announce itself. */
-.gv-ledge::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 26%;
-    border-radius: inherit;
-    background: linear-gradient(180deg, #6a8f40, #46632a);
-    box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+/* ── ⚠️ THE LEDGE IS PAINTED NOW, AND THE GRADIENT IS GONE ─────────────────────────────────────
+   Luke: "Lets make the platforms more detailed ... the platforms are just way too plain."
+
+   It was four stops of linear-gradient with a green band on top, which is the right tool for a prototype
+   and the wrong one for the ONE OBJECT THE PLAYER ACTUALLY STANDS ON sitting in front of a painted plate.
+   Everything else in the zone is a painting; the ledge was the only thing that was not, and that is the
+   whole of what read as plain.
+
+   ── ⚠️ AND IT IS A THREE-SLICE, BECAUSE A LEDGE IS 13 TO 29 UNITS WIDE ───────────────────────
+   One sprite stretched across that range puts its two ends at two different aspect ratios: a round cap on
+   a short ledge and a flat ellipse on a long one, in the same frame, cut from the same drawing. So the
+   slab is a border-image — the left and right thirds of the painting are pinned at their painted size and
+   only the middle is stretched, which is exactly what the prompt in gen-grove-art.mjs makes empty.
+
+   ⚠️ THE CAP WIDTH IS TIED TO THE SLICE, AND BOTH ARE TIED TO THE FILE. The source is normalised to
+   1024x320 at generation and sliced 150px in from each side, so a cap is 150/320 = 0.469 of the slab's
+   height. Change either number without the other and the caps come out stretched or clipped, with
+   nothing to say so. */
+/* ⚠️ THE DEPTH AND THE CAP WIDTH ARE ONE NUMBER, NOT TWO. The cap is 150 of the slab's 320 pixels of
+   height, so its width on screen is 0.469 of however deep the ledge is drawn — and the two were written
+   out separately at first, which is the balance-constants-never-copied shape: change the depth, forget the
+   cap, and every ledge in the game renders with stretched ends and nothing says so. One variable, and the
+   border-width is derived from it.
+
+   2.9 units deep, not 2.4. At 2.4 the painted slab came out as a thin plank floating in front of the plate
+   in every zone — the moss cap was a few pixels of green and the earth under it had no body at all. The
+   source art is a chunky three-band shelf and it needs the depth to show it: 2.9 against a 7-unit hero is
+   a shelf you are standing on top of. */
+.gv-ledge { --gv-ledge-h: 2.9; position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    height: calc(var(--gv-ledge-h) * var(--gv-unit, 1%));
+    margin-bottom: calc(-1 * var(--gv-ledge-h) * var(--gv-unit, 1%));
+    pointer-events: none; will-change: transform; }
+.gv-slab { position: absolute; inset: 0;
+    border-style: solid; border-width: 0 calc(0.469 * var(--gv-ledge-h) * var(--gv-unit, 1%));
+    border-image-source: var(--gv-slab);
+    border-image-slice: 0 150 fill;
+    border-image-repeat: stretch;
+    /* The ledge has to sit IN FRONT OF the plate rather than on it, and a painted cutout gets that from a
+       cast shadow the same way every body in the zone does. drop-shadow follows the alpha, so it traces
+       the slab's actual silhouette instead of boxing it. */
+    filter: drop-shadow(0 calc(0.3 * var(--gv-unit, 1%)) calc(0.5 * var(--gv-unit, 1%)) rgba(0,0,0,0.6)); }
+
+/* ── WHAT GROWS ON A LEDGE ─────────────────────────────────────────────────────────────────────
+   Luke: "add sprite decorations like vines hanging from platforms where biome permits".
+
+   Which sprite is allowed where is GROVE_BIOMES in grove-catalog.js; where it sits on a given ledge is
+   decorateLedges() in grove-world.js, rolled once off the zone seed. This is only the drawing.
+
+   ⚠️ POSITIONED IN PERCENT OF THE LEDGE, SIZED IN UNITS. The percent is what makes a vine ride its own
+   ledge for free when the loop rewrites that ledge's width every frame — no second per-frame write, no
+   list of decorations for the loop to walk. The SIZE has to be in units for the same reason every body
+   is: a vine in percent keeps its pixel size when the scale zooms while the hero beside it does not. See
+   view-space-constants-break-on-zoom. */
+.gv-dec { position: absolute; pointer-events: none; }
+.gv-dec img { display: block; width: auto; }
+/* Hanging: pinned just inside the slab's underside so the top of the sprite is swallowed by the earth it
+   is growing out of. A vine that starts exactly at the edge reads as hung ON the ledge, not grown from it. */
+.gv-dec.is-h { top: calc(100% - 0.5 * var(--gv-unit, 1%)); transform: translateX(-50%); z-index: 0; }
+.gv-dec.is-h img { height: calc(4.4 * var(--gv-ds, 1) * var(--gv-unit, 1%));
+    transform-origin: 50% 0;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+    animation: gvHangSway var(--gv-dt, 4200ms) ease-in-out infinite; }
+/* Sitting: its base tucked a little BELOW the top edge, into the moss, for the same reason. */
+.gv-dec.is-s { bottom: calc(100% - 0.45 * var(--gv-unit, 1%)); transform: translateX(-50%); z-index: 0; }
+.gv-dec.is-s img { height: calc(2.1 * var(--gv-ds, 1) * var(--gv-unit, 1%));
+    transform-origin: 50% 100%;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+    animation: gvSitSway var(--gv-dt, 5200ms) ease-in-out infinite; }
+/* ⚠️ THE MIRROR LIVES INSIDE THE KEYFRAMES. scaleX is on the same element as the sway, so a transform
+   set outside the animation would simply be overwritten by it the moment it starts — the flip would apply
+   for one frame and then silently stop, which is the kind of thing that looks like the random seed being
+   broken. Both halves are in every keyframe instead. */
+@keyframes gvHangSway {
+    0%, 100% { transform: scaleX(var(--gv-df, 1)) rotate(-2.4deg); }
+    50% { transform: scaleX(var(--gv-df, 1)) rotate(2.4deg); }
+}
+@keyframes gvSitSway {
+    0%, 100% { transform: scaleX(var(--gv-df, 1)) rotate(-1.4deg); }
+    50% { transform: scaleX(var(--gv-df, 1)) rotate(1.4deg); }
+}
 
 /* ── LOOT ON THE FLOOR ────────────────────────────────────────────────────────────────────────
    Luke: "when they drop loot, it needs to be like a dopamine inducing explosion of like what they drop and
@@ -613,15 +669,91 @@ export const GROVE_CSS = `
 /* A thrown damage number. ⚠️ NOT .gv-pop — THAT CLASS IS THE UNLOCK CELEBRATION, which is a fixed
    full-screen scrim; a damage number wearing it would black out the zone once per hit. Two things called
    pop in one stylesheet is how that happens. */
-.gv-num { position: absolute; left: 0; bottom: var(--gv-ground, 13%); font-weight: 800; font-size: 0.95rem;
+/* ── ⚠️ THE NUMBER IS DRAWN AT A SCALE THE LOOP OWNS ───────────────────────────────────────────
+   Luke: "damage numbers and hp bar effects should be way more juicy."
+
+   Two separate things were missing and both are multiplied into --gv-ns by the loop rather than set here:
+
+     THE PUNCH   it arrives at 1.85x and snaps to 1 in 150ms (popScale in grove-juice.js). A number that
+                 simply appears at its final size reads as a label that was always going to be there; the
+                 snap is the same anticipation-then-strike the swing is built from, at a tenth of the length.
+     THE WEIGHT  a hit is sized by the SHARE of the target it took off (popWeight), so 4 off a rootrat and
+                 400 off the Elder no longer arrive identical. A flat damage threshold cannot do this —
+                 400 is enormous on a rat and a scratch on a boss.
+
+   ⚠️ SO font-size HERE IS THE BASE AND NOTHING MAY SET IT PER KIND ANY MORE. A per-kind font-size would
+   be multiplied by the same --gv-ns and the two scales would fight; the kinds differ by colour, weight and
+   their own --gv-nb base instead. */
+.gv-num { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    font-weight: 900; font-size: calc(1.05rem * var(--gv-nb, 1));
     white-space: nowrap; pointer-events: none; will-change: transform, opacity;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.6); }
+    transform-origin: 50% 100%;
+    /* A hard dark edge, not a blur. These land on a painted forest of every value from black bark to lit
+       moss, and a soft shadow disappears against the light half of it — the number has to carry its own
+       contrast rather than borrow it from whatever is behind. */
+    -webkit-text-stroke: calc(0.1em) rgba(12,10,8,0.92);
+    paint-order: stroke fill;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.9); }
 .gv-num.is-hit { color: #ffe9a8; }
-.gv-num.is-crit { color: #ffb14a; font-size: 1.5rem; letter-spacing: -.01em;
-    text-shadow: 0 2px 5px rgba(0,0,0,0.95), 0 0 16px rgba(255,150,40,0.8); }
-.gv-num.is-took { color: #ff6b6b; font-size: 1.1rem; }
+/* ⚠️ A CRIT IS A DIFFERENT EVENT, NOT A BIGGER NUMBER. Bigger alone reads as more damage; what says CRIT
+   is that it is a different colour, it is lit from inside, and it arrives at an angle nothing else does. */
+.gv-num.is-crit { color: #ffcf5a; --gv-nb: 1.58; letter-spacing: -.02em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 18px rgba(255,150,40,0.95), 0 0 34px rgba(255,110,20,0.6); }
+/* The loudest a hit gets without being a crit: a hit worth a seventh of the target. Same colour family as
+   an ordinary hit, so the ladder still reads as one scale rather than as a third kind of event. */
+.gv-num.is-big { color: #fff3c4; text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,205,110,0.7); }
+.gv-num.is-took { color: #ff6b6b; --gv-nb: 1.08; }
 .gv-num.is-heal { color: #7cffb2; }
-.gv-num.is-loot { color: #cdf5bd; font-size: 0.78rem; font-weight: 700; }
+.gv-num.is-loot { color: #cdf5bd; --gv-nb: 0.74; font-weight: 700; -webkit-text-stroke: 0.07em rgba(12,10,8,0.9); }
+
+/* ── ⚠️ THE ENEMY'S OWN BAR ────────────────────────────────────────────────────────────────────
+   Luke: "Enemies should have hp bars."
+
+   ⚠️ IT IS NOT ON ALL THIRTY OF THEM AT ONCE, AND THAT IS THE WHOLE DESIGN. A zone carries 15 to 30
+   wandering creatures; a permanent bar over every one of them is a row of interface strung across a
+   painted forest, and it would undo the work that made these read as animals in a place rather than
+   targets on a screen. The loop puts is-on only on a creature that is HURT or is the one being fought,
+   and takes it off again a couple of seconds later — which is also what keeps it cheap, because only the
+   handful that are showing one have their chase bar stepped.
+
+   Sized in units like every other thing in the world, so it holds its proportion against the creature at
+   any zoom; a bar in pixels is a tag that grows relative to a shrinking rootrat. */
+/* ⚠️ THE WIDTH TRACKS THE CREATURE BUT IS CLAMPED AT BOTH ENDS. Sized purely off --gv-h, an Elderling at
+   twelve units got a bar eleven units wide — a third of a phone screen, floating over a sprite half hidden
+   behind the hero, reading as a loading bar rather than as that animal's health. And a grub at three units
+   got a bar too short to show a chase chunk in. The creature's size still decides it, between a floor and
+   a ceiling, which is the same shape as the hero scale in grove-view.js and for the same reason. */
+.gv-ehp { position: absolute; left: 50%; bottom: 100%; z-index: 2;
+    width: clamp(calc(3.6 * var(--gv-unit, 1%)),
+        calc(var(--gv-h, 7) * 0.9 * var(--gv-unit, 1%)),
+        calc(7.5 * var(--gv-unit, 1%)));
+    height: calc(0.52 * var(--gv-unit, 1%));
+    min-height: 3px;
+    margin: 0 0 calc(0.5 * var(--gv-unit, 1%)) 0;
+    transform: translateX(calc(-50% + var(--gv-bj, 0px))) scaleY(var(--gv-bs, 1));
+    transform-origin: 50% 100%;
+    border-radius: 999px; overflow: hidden;
+    background: rgba(8,10,8,0.72);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.6);
+    opacity: 0; transition: opacity 180ms linear; pointer-events: none; }
+.gv-ehp.is-on { opacity: 1; }
+.gv-ehp u, .gv-ehp i, .gv-ehp s { position: absolute; left: 0; top: 0; height: 100%; display: block;
+    border-radius: inherit; }
+/* The ghost: where the health WAS, catching up, so the chunk just taken off is a shape rather than a
+   difference between two numbers you never read. Same pair as the boss bar. */
+.gv-ehp u { background: linear-gradient(180deg, #ffd9d0, #ff6a4a); }
+.gv-ehp i { background: linear-gradient(180deg, var(--gv-bar1, #9be36a), var(--gv-bar2, #5aa833)); }
+/* The strike: a white wash over the WHOLE strip for a fifth of a second. This is the part that makes a bar
+   feel hit rather than merely shorter, and it has to cover the whole bar — a flash only on the lost
+   segment is invisible on the hit that takes two percent. */
+.gv-ehp s { width: 100%; background: #fff; opacity: var(--gv-bf, 0); }
+
+/* ── AND THE BOSS BAR TAKES THE SAME TREATMENT ─────────────────────────────────────────────────
+   It had the chase pair and nothing else, which against seven thousand hit points meant a good hit moved
+   it by a pixel and a half and felt like a bad one. */
+.gv-boss span { transform: translateX(var(--gv-bj, 0px)) scaleY(var(--gv-bs, 1)); transform-origin: 50% 50%; }
+.gv-boss s { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block;
+    border-radius: inherit; background: #fff; opacity: var(--gv-bf, 0); }
 
 .gv-spark { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
     width: calc(0.5 * var(--gv-unit, 1%)); height: calc(0.5 * var(--gv-unit, 1%));

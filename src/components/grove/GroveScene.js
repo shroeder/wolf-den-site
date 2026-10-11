@@ -5,11 +5,11 @@ import { createPortal } from "react-dom";
 
 import {
     GROVE_ENEMIES, GROVE_RARE, GROVE_POP, HEAL_AT, scaledFoe, groveBoss, groveSize, grovePart,
-    groveArt, groveEmblem, GROVE_ZONES,
+    groveArt, groveEmblem, GROVE_ZONES, groveBiome, slabArt, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
 import {
-    UNITS_PER_SCREEN, zoneWidth, platformsFor, swing, makeTelegraph, telegraphHits, mitigate,
+    UNITS_PER_SCREEN, zoneWidth, platformsFor, decorateLedges, swing, makeTelegraph, telegraphHits, mitigate,
 } from "@/lib/marketplace/grove-world.js";
 // ── ⚠️ THE SIMULATION LIVES IN A SOLVER NOW, NOT IN THIS FILE ───────────────────────────────────────
 // Luke: "some kind of minimalistic kind of physics engine so that we don't have to try and pre-calculate
@@ -30,6 +30,7 @@ import {
 import {
     makeClock, makeShaker, makeChase, stepChase, swingPose, breathe, landSquash, shadowFor,
     makePop, stepPop, makeSpark, spillVelocity, comboRung,
+    popScale, popWeight, barHit, barColor, FOE_BAR_LINGER_MS,
     HITSTOP_MS, TRAUMA, SWING, SWING_TOTAL_MS, KNOCK, RECOIL, FLASH_MS, DEATH_MS, SPAWN_FADE_MS,
     SPARK, DUST, VIGNETTE, COMBO_WINDOW_MS, COMBO_PITCH_STEPS, LOOT_BOUNCE, LOOT_REST_MS,
     LOOT_LABEL_MS, LOOT_DRAW_ACCEL, LOOT_DRAW_MAX, LOOT_EAT_DIST,
@@ -167,8 +168,11 @@ export default function GroveScene({
     const hostRef = useRef(null);
     const worldLayerRef = useRef(null);
     const fxRef = useRef(null);
-    const hpRef = useRef(null);
-    const hpGhostRef = useRef(null);
+    // ⚠️ hpRef / hpGhostRef ARE GONE WITH THE ELEMENT THEY POINTED AT. The player's own bar was removed
+    // on Luke's call ("I hate the kill display and red bar. Remove it.") and these two refs stayed behind,
+    // written to by the loop every frame against null for ever after. Declared but never mounted: see the
+    // lint gate of the same name. The screen's own red wash is the hero's health readout now.
+    const bossStripRef = useRef(null);
     const bossFillRef = useRef(null);
     const bossGhostRef = useRef(null);
     const comboRef = useRef(null);
@@ -260,7 +264,10 @@ export default function GroveScene({
     // ── THE WORLD ───────────────────────────────────────────────────────────────────────────────────
     const world = useMemo(() => {
         const rand = rngFrom(seed);
-        const platforms = platformsFor(zone.n, rand);
+        // ⚠️ DRESSED AT BUILD, NOT AT RENDER. Which vine hangs where is rolled here, once, off the zone's
+        // own seed, and stored on the ledge — see decorateLedges. Rolling it inside the render would
+        // re-roll it on every re-render, and the scene re-renders whenever a telegraph appears.
+        const platforms = decorateLedges(platformsFor(zone.n, rand), groveBiome(zone.biome), rand);
         const mk = (x, h, speed, art) => ({
             ...makeBody({ x, y: 0, h, halfW: h * 0.3, speed }),
             art, phase: rand(), landedAt: 0, flash: 0, node: null,
@@ -461,18 +468,62 @@ export default function GroveScene({
             }
         };
 
+        // ── ⚠️ THE CREATURE'S OWN HEALTH BAR, AND WHEN IT IS ALLOWED TO EXIST ───────────────────────
+        // Luke: "Enemies should have hp bars."
+        //
+        // A bar over all thirty wanderers at once is a row of interface laid across a painted forest, so
+        // the rule is: the one you are FIGHTING always, anything that has been HIT for a couple of seconds
+        // after, and nothing else. Which is also what makes it cheap — a chase bar is only stepped for the
+        // two or three that are actually showing one, not for the whole population.
+        const drawFoeBar = (f, now) => {
+            const bar = f.barNode;
+            if (!bar) return;
+            const want = (f === w.target && f.hp > 0 && !f.dying)
+                || (f.hurtAt && now - f.hurtAt < FOE_BAR_LINGER_MS);
+            if (!want) {
+                if (f.barOn) { f.barOn = false; bar.classList.remove("is-on"); }
+                return;
+            }
+            if (!f.barOn) { f.barOn = true; bar.classList.add("is-on"); }
+            if (!f.chase) f.chase = makeChase(1);
+            const frac = Math.max(0, f.hp) / Math.max(1, f.maxHp);
+            stepChase(f.chase, now, frac);
+            // ⚠️ THE COLOUR IS OFF THE REAL FRACTION, NOT THE CHASE BAR. The chase lags by design, so a
+            // creature taken to a sliver would spend that moment still painted green — which is the one
+            // moment the colour exists to report.
+            const c = barColor(frac);
+            const jolt = barHit(f.hurtAt ? now - f.hurtAt : null);
+            if (f.barFill) {
+                f.barFill.style.width = `${f.chase.shown * 100}%`;
+                f.barFill.style.setProperty("--gv-bar1", c.from);
+                f.barFill.style.setProperty("--gv-bar2", c.to);
+            }
+            if (f.barGhost) f.barGhost.style.width = `${f.chase.ghost * 100}%`;
+            bar.style.setProperty("--gv-bf", jolt.flash.toFixed(3));
+            bar.style.setProperty("--gv-bs", jolt.swell.toFixed(3));
+            bar.style.setProperty("--gv-bj", `${jolt.jolt.toFixed(2)}px`);
+        };
+
         // ── POPS AND PARTICLES ARE BUILT BY HAND, NOT BY REACT ──────────────────────────────────────
         // ⚠️ AND THAT IS THE EXCEPTION TO THE RULE AT THE TOP OF THIS FILE, ON PURPOSE. A damage number, a
         // spark and a dust mote are born and dead inside half a second, several per swing — rendering them
         // through state would re-render the entire zone a few times a second to draw things that never need
         // reconciling, because nothing ever updates one: it is created, it moves, it is removed.
-        const addPop = (kind, text, x, y) => {
+        const addPop = (kind, text, x, y, weight = null) => {
             const layer = fxRef.current;
             if (!layer) return;
             const p = makePop(kind, x, y, w.rand);
             p.born = performance.now();
+            // How large this number ends up, before the arrival punch is multiplied on top of it by the
+            // loop. One for everything that is not a hit — a pickup label has no magnitude to report.
+            p.weight = weight?.scale || 1;
+            // ⚠️ A FIXED TILT PER NUMBER, ROLLED ONCE. Thrown dead straight, four numbers off four fast
+            // hits stack into a column that reads as one object; a couple of degrees either way and the
+            // same four read as four separate impacts. Rolled here because a tilt recomputed per frame is
+            // a vibration, which is a different and much worse effect.
+            p.tilt = (w.rand() * 2 - 1) * (kind === "crit" ? 9 : 5);
             const el = document.createElement("span");
-            el.className = `gv-num is-${kind}`;
+            el.className = `gv-num is-${kind}${weight?.big && kind !== "crit" ? " is-big" : ""}`;
             el.textContent = text;
             layer.appendChild(el);
             p.node = el;
@@ -718,6 +769,9 @@ export default function GroveScene({
                     foe.hp -= hit.dealt;
                     foe.hit = true;
                     foe.lastCrit = hit.crit;
+                    // When its bar was last struck. Drives whether the bar is up at all, and the flash,
+                    // jolt and swell on it while it is. See drawFoeBar.
+                    foe.hurtAt = now;
                     foe.flash = 1;
                     foe.flashUntil = now + (hit.crit ? FLASH_MS * 1.6 : FLASH_MS);
                     const dir = Math.sign(foe.x - w.hero.x) || 1;
@@ -735,7 +789,11 @@ export default function GroveScene({
                     const px = foe.x - dir * foe.halfW * 0.6;
                     const py = foe.y + foe.h * 0.5;
                     burst(px, py, { crit: hit.crit, dir: -dir });
-                    addPop(hit.crit ? "crit" : "hit", `${hit.dealt}${hit.crit ? "!" : ""}`, px, py);
+                    // ⚠️ SIZED BY THE SHARE IT TOOK OFF, NOT BY THE RAW NUMBER. 400 is a huge hit on a
+                    // rootrat and a scratch on the Heartwood Elder, so a flat threshold would call the
+                    // scratch the big one. See popWeight.
+                    addPop(hit.crit ? "crit" : "hit", `${hit.dealt}${hit.crit ? "!" : ""}`, px, py,
+                        popWeight(hit.dealt, foe.maxHp));
                     playHit(Math.min(COMBO_PITCH_STEPS, w.combo), hit.crit);
                     if (hit.healed > 0) {
                         w.hp = Math.min(maxHp, w.hp + hit.healed);
@@ -750,6 +808,7 @@ export default function GroveScene({
                         // a few times a zone and is something you want to notice.
                     }
                     if (foe.big || foe.rare) w.bossBar = { hp: Math.max(0, foe.hp), maxHp: foe.maxHp };
+                    if (foe.isBoss || foe.big || foe.rare) w.bossHurtAt = now;
                     if (foe.hp <= 0) killFoe(w, foe, now);
                 }
             }
@@ -1061,6 +1120,7 @@ export default function GroveScene({
                     sx: wind ? 1.07 : 1, sy: wind ? 0.93 : 1,
                     moving: Math.abs(f.vx) > 0.03,
                 });
+                drawFoeBar(f, now);
             }
 
             for (const pf2 of plats) {
@@ -1109,7 +1169,14 @@ export default function GroveScene({
                 if (age > p.life) { p.node?.remove(); w.pops.splice(i, 1); continue; }
                 stepPop(p, dt);
                 const k = age / p.life;
-                p.node.style.transform = `translate3d(${(p.x - cam) * unit}px, ${-(p.y - camY) * unit}px, 0)`;
+                // ⚠️ THE PUNCH IS A SCALE ON THE SAME TRANSFORM AS THE ARC, NOT A CSS ANIMATION. The loop
+                // writes this element's transform every frame, so a keyframe animation on it would be
+                // overwritten sixty times a second and never be seen — the same trap as the mirror inside
+                // the sway keyframes. Both the arrival punch and the hit's weight multiply into one scale.
+                const sc = (popScale(age) * (p.weight || 1)).toFixed(3);
+                p.node.style.transform =
+                    `translate3d(${(p.x - cam) * unit}px, ${-(p.y - camY) * unit}px, 0)`
+                    + ` scale(${sc}) rotate(${p.tilt || 0}deg)`;
                 // Held bright, then dropped — a number that fades from frame one is never read.
                 p.node.style.opacity = String(k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4);
             }
@@ -1154,12 +1221,21 @@ export default function GroveScene({
             // ⚠️ WRITTEN STRAIGHT ONTO THE NODES. A chase bar moves every frame; through state it would be
             // sixty re-renders a second of the whole zone to animate a strip of colour.
             stepChase(w.hpBar, now, Math.max(0, w.hp) / maxHp);
-            if (hpRef.current) hpRef.current.style.width = `${w.hpBar.shown * 100}%`;
-            if (hpGhostRef.current) hpGhostRef.current.style.width = `${w.hpBar.ghost * 100}%`;
             if (w.bossBar && bossFillRef.current) {
-                stepChase(w.bossChase, now, Math.max(0, w.bossBar.hp) / w.bossBar.maxHp);
+                const bfrac = Math.max(0, w.bossBar.hp) / w.bossBar.maxHp;
+                stepChase(w.bossChase, now, bfrac);
                 bossFillRef.current.style.width = `${w.bossChase.shown * 100}%`;
                 if (bossGhostRef.current) bossGhostRef.current.style.width = `${w.bossChase.ghost * 100}%`;
+                // ⚠️ AND THE BOSS BAR IS STRUCK, NOT JUST SHORTENED. Against seven thousand hit points a
+                // good hit moves this bar by about a pixel and a half, so the chase pair on its own made
+                // the best swing in the zone feel like the worst one. The flash, the jolt and the swell
+                // are the same three the creature bars get, and they do not care how big the number was.
+                if (bossStripRef.current) {
+                    const bj = barHit(w.bossHurtAt ? now - w.bossHurtAt : null);
+                    bossStripRef.current.style.setProperty("--gv-bf", bj.flash.toFixed(3));
+                    bossStripRef.current.style.setProperty("--gv-bs", bj.swell.toFixed(3));
+                    bossStripRef.current.style.setProperty("--gv-bj", `${bj.jolt.toFixed(2)}px`);
+                }
             }
 
             // The streak. Only touched when the number actually changes, so this is not a DOM write a frame.
@@ -1333,6 +1409,11 @@ export default function GroveScene({
         body.flashNode = n?.querySelector(".gv-flash") || null;
         body.shadowNode = n?.querySelector(".gv-shadow") || null;
         body.swipeNode = n?.querySelector(".gv-swipe") || null;
+        // The creature's own health bar: the strip, the ghost behind it, the fill, and the white strike.
+        // Looked up once here rather than queried in the loop, like everything else on a body.
+        body.barNode = n?.querySelector(".gv-ehp") || null;
+        body.barGhost = body.barNode?.querySelector("u") || null;
+        body.barFill = body.barNode?.querySelector("i") || null;
     }, []);
 
     // A body: shell (position) > shadow + art (facing, squash) > sprite + flash.
@@ -1358,7 +1439,11 @@ export default function GroveScene({
     );
 
     const scene = (
-        <div className="gv-scene is-full" ref={hostRef} onPointerDown={onTapWorld}>
+        // ⚠️ THE SLAB IS A VARIABLE ON THE SCENE, NOT A src ON EACH LEDGE. A zone has up to a dozen ledges
+        // and they are all made of the same thing, so one custom property inherited down is one declaration
+        // and one decoded bitmap — and border-image has no src attribute to set anyway.
+        <div className="gv-scene is-full" ref={hostRef} onPointerDown={onTapWorld}
+            style={{ "--gv-slab": `url(${slabArt(zone.biome)})` }}>
             {/* ── ⚠️ EVERYTHING THAT IS IN THE WORLD IS INSIDE THIS ONE LAYER ────────────────────
                 So the screen shake can move the world without moving the interface. The HUD, the boss bar
                 and Leave are deliberately outside it: a shaking interface reads as a broken page rather
@@ -1380,7 +1465,23 @@ export default function GroveScene({
                     The ground plank (y === 0) is skipped: the plate already paints a floor, and a bar drawn
                     over the whole width of it would hide it. */}
                 {world.platforms.filter((pf) => pf.y > 0).map((pf) => (
-                    <span key={`pf${pf.i}`} className="gv-ledge" ref={(n) => { pf.node = n; }} aria-hidden="true" />
+                    <span key={`pf${pf.i}`} className="gv-ledge" ref={(n) => { pf.node = n; }} aria-hidden="true">
+                        {/* The painted slab, three-sliced so the ends keep their shape at any ledge width.
+                            A separate element from the ledge box on purpose: border-image needs a real
+                            border, and a border would inset the padding box that the decorations below
+                            position their percentages against. */}
+                        <i className="gv-slab" />
+                        {/* ⚠️ left IS A PERCENT OF THE LEDGE, WHICH IS WHY THE LOOP NEVER TOUCHES THESE.
+                            The loop rewrites a ledge's pixel width every frame; anything positioned in
+                            percent of it rides along for free. In pixels this would be a second list for
+                            the loop to walk, sixty times a second, to say something it already knows. */}
+                        {(pf.dec || []).map((d, i) => (
+                            <span key={`d${i}`} className={`gv-dec is-${d.t}`} style={{ left: `${d.at * 100}%` }}>
+                                <img src={d.t === "h" ? hangArt(d.art) : sitArt(d.art)} alt="" draggable={false}
+                                    style={{ "--gv-ds": d.s, "--gv-df": d.f, animationDelay: `-${d.d}ms` }} />
+                            </span>
+                        ))}
+                    </span>
                 ))}
 
                 {/* ── THE TELEGRAPHS ───────────────────────────────────────────────────────────
@@ -1442,6 +1543,20 @@ export default function GroveScene({
                         ref={wire(f)}
                         onPointerDown={onTapFoe(f.uid)} aria-label={f.name}>
                         {bodyArt(f.art)}
+                        {/* ⚠️ THE BAR IS RENDERED FOR EVERY CREATURE AND SHOWN FOR ALMOST NONE OF THEM.
+                            It is one hidden strip per body, which costs nothing, and it means the loop can
+                            reveal one the instant a hit lands — building the element at that moment would
+                            mean a re-render of the whole zone per hit. Visibility is a class the loop
+                            toggles; see the bar block in the loop for when.
+
+                            Not on anything that drives the banner at the top of the screen: a boss and the
+                            rare spawn already have a named bar up there, and two bars for one creature is
+                            the player reading the same number twice. */}
+                        {f.isBoss || f.big || f.rare ? null : (
+                            <span className="gv-ehp" aria-hidden="true">
+                                <u /><i /><s />
+                            </span>
+                        )}
                     </button>
                 ))}
 
@@ -1475,9 +1590,10 @@ export default function GroveScene({
             {bossName ? (
                 <div className="gv-boss">
                     <b>{bossName}</b>
-                    <span>
+                    <span ref={bossStripRef}>
                         <u ref={bossGhostRef} />
                         <i ref={bossFillRef} />
+                        <s />
                     </span>
                 </div>
             ) : null}

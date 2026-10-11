@@ -164,6 +164,91 @@ export function stepChase(bar, now, target) {
 
 export const makeChase = (v = 1) => ({ shown: v, ghost: v, holdUntil: 0 });
 
+// ── ⚠️ AND THE BAR ITSELF REACTS, NOT JUST ITS WIDTH ────────────────────────────────────────────────────────
+// Luke: "damage numbers and hp bar effects should be way more juicy."
+//
+// A width that changes is INFORMATION; what makes it feel like a hit is the bar being struck. Three things,
+// all keyed off the same moment: a white wash over the whole strip, a sideways jolt, and a swell in height.
+// They are short — the point is that the eye catches movement at the bar without being asked to look at it.
+export const BAR_HIT_MS = 190;
+export const BAR_JOLT_PX = 2.6;
+export const BAR_SWELL = 0.3;        // extra height, as a share, at the moment of the hit
+
+/** The bar's reaction `ms` after it was struck: a flash, a jolt and a swell, all decaying together. */
+export function barHit(sinceMs) {
+    if (sinceMs == null || sinceMs < 0 || sinceMs > BAR_HIT_MS) return { flash: 0, jolt: 0, swell: 1 };
+    const k = 1 - sinceMs / BAR_HIT_MS;
+    const e = k * k;
+    return {
+        flash: e,
+        // Alternating rather than decaying in one direction: a jolt that only goes one way is a nudge.
+        jolt: Math.sin(sinceMs / BAR_HIT_MS * Math.PI * 3) * BAR_JOLT_PX * e,
+        swell: 1 + BAR_SWELL * e,
+    };
+}
+
+// ── WHAT COLOUR A BAR IS ────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ THREE BANDS, NOT A HUE RAMP. A continuous green-to-red interpolation spends most of its range in the
+// muddy olive-to-ochre middle, where nothing reads as either healthy or in trouble — and "in trouble" is the
+// only thing this colour is for. Hard bands at a third and a sixth say it in one glance.
+export const BAR_BANDS = [
+    { at: 0.34, from: "#ffd35e", to: "#ffb01f" },
+    { at: 0.16, from: "#ff7a5e", to: "#e8361f" },
+];
+export const BAR_FULL = { from: "#9be36a", to: "#5aa833" };
+export function barColor(frac) {
+    let out = BAR_FULL;
+    for (const b of BAR_BANDS) if (frac <= b.at) out = b;
+    return out;
+}
+
+// ── A DAMAGE NUMBER ARRIVES, IT DOES NOT APPEAR ─────────────────────────────────────────────────────────────
+// ⚠️ THE ARC WAS THE ONLY THING THESE EVER DID, AND AN ARC IS NOT AN IMPACT. A number that fades in at its
+// final size reads as a label that was always going to be there. Punched in over-sized and snapped down to
+// its real size in a seventh of a second is the whole difference between a notification and a hit — it is
+// the same anticipation-then-snap the swing itself is built out of, at a tenth of the duration.
+export const POP_PUNCH_MS = 150;
+export const POP_PUNCH_FROM = 1.85;   // how much bigger it lands than it ends
+export const POP_PUNCH_OVER = 0.08;   // the overshoot under the settle, so it has somewhere to come back from
+
+/** The scale of a damage number `ms` after it was thrown. Punches in, undershoots, settles at 1. */
+export function popScale(ageMs) {
+    if (ageMs == null || ageMs < 0) return POP_PUNCH_FROM;
+    if (ageMs >= POP_PUNCH_MS) return 1;
+    const k = ageMs / POP_PUNCH_MS;
+    // Two beats inside the punch: the collapse from oversized, then the small bounce back up to 1.
+    if (k < 0.62) return POP_PUNCH_FROM + (1 - POP_PUNCH_OVER - POP_PUNCH_FROM) * (k / 0.62);
+    return (1 - POP_PUNCH_OVER) + POP_PUNCH_OVER * ((k - 0.62) / 0.38);
+}
+
+// ── ⚠️ A BIG HIT HAS TO LOOK BIG, AND "BIG" IS A SHARE OF THE TARGET ────────────────────────────────────────
+// Every damage number in the Grove was the same size, so 4 off a rootrat and 400 off the Heartwood Elder
+// arrived with identical weight — the one piece of feedback that could say "that was a good hit" was saying
+// nothing at all. A flat damage threshold cannot work either: 400 is a huge hit on a rootrat and a scratch
+// on a boss. What makes a hit feel big is the CHUNK it took out, which is damage over the target's max.
+export const POP_SIZE_MIN = 0.86;
+export const POP_SIZE_MAX = 1.7;
+export const POP_BIG_AT = 0.14;       // a hit worth this share of the target is "big" and gets the loud class
+
+/** How large a hit's number should be drawn, from the share of the target's health it removed. */
+export function popWeight(dealt, maxHp) {
+    const share = Math.max(0, Math.min(1, (Number(dealt) || 0) / Math.max(1, Number(maxHp) || 1)));
+    // Square-rooted: the first few percent is where the interesting range is, and a linear map leaves every
+    // ordinary hit identical at the bottom of the scale.
+    const k = Math.sqrt(Math.min(1, share / 0.35));
+    return { scale: POP_SIZE_MIN + (POP_SIZE_MAX - POP_SIZE_MIN) * k, big: share >= POP_BIG_AT };
+}
+
+// ── THE FLOATING ENEMY BAR ──────────────────────────────────────────────────────────────────────────────────
+// Luke: "Enemies should have hp bars."
+//
+// ⚠️ NOT ON ALL THIRTY OF THEM AT ONCE. A zone holds 15 to 30 wandering creatures and a permanent bar over
+// every one is a row of UI across the forest — it would undo the work that made these read as animals in a
+// place rather than targets on a screen. A bar appears when the creature is HURT or is the one you are
+// fighting, and fades out again when neither is true. Which is also why it is cheap: the loop only steps a
+// chase bar for the handful that are actually showing one.
+export const FOE_BAR_LINGER_MS = 2600;
+
 // ── NUMBERS THAT ARE THROWN ─────────────────────────────────────────────────────────────────────────────────
 // A damage number is a tiny physics body with a lifetime, so it arcs. Crits are thrown harder and live longer.
 //
