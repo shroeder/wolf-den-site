@@ -522,8 +522,25 @@ export async function getFarm(ownerId, viewerId) {
         db.query(`SELECT pet_id FROM mkt_pet_level WHERE buyer_id = $1::text AND petted_day = ${DAY}`, [ownerId]).catch(() => []),
     ]);
     if (!owner || !state) return null;
-    const pettedToday = new Set(pettedRows.map((r) => r.pet_id));
-    const mine = String(viewerId) === String(ownerId);
+    const mineFarm = String(viewerId) === String(ownerId);
+    // ── ⚠️ ON A FRIEND'S FARM, "PETTED" MEANS *YOU* PETTED IT ───────────────────────────────────────
+    // This was always the OWNER's petted-today set, which is the right answer on your own farm and the
+    // wrong one on anybody else's: it greyed out the animals THEY had already fussed over and left the
+    // ones you had just petted looking untouched. Harmless while a visitor could only pet three a day and
+    // actively confusing now there is a once-per-pet rule to show — a visitor needs to see which ones they
+    // have already done, which is a fact about the visitor.
+    const visitorPetted = !mineFarm && viewerId
+        ? await db.query(
+            `SELECT DISTINCT pet_id FROM mkt_pet_visit
+              WHERE petter_id = $1
+                AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date`,
+            [viewerId],
+        ).catch(() => [])
+        : [];
+    const pettedToday = new Set(
+        (mineFarm ? pettedRows : visitorPetted).map((r) => r.pet_id),
+    );
+    const mine = mineFarm;
     // Whose farm this is — a visitor sees the OWNER's enshrined forms, not their own.
     const { stoneMapFor } = await import("@/lib/marketplace/pet-ascension.js");
     const farmStones = await stoneMapFor(ownerId).catch(() => ({}));
@@ -872,6 +889,33 @@ export async function petPet(petterId, petId, ownerId = null) {
         return { ok: false, error: "pet_maxed" };
     }
 
+    // ── ⚠️ ONCE A DAY PER PET, ON SOMEBODY ELSE'S FARM TOO ──────────────────────────────────────────
+    // GrayKitsune, on a visit to ValkyrieSylve's farm: "I think its letting me pet every single one of your
+    // pets?" ... "I stopped because that seems like a bug lol." Valkyrie: "you petted 13 of my pets and each
+    // got 45xp."
+    //
+    // He was right, and it was worse than every pet once. A friend's pet had NO per-pet guard at all — the
+    // comment below says so in as many words, and it was true while the 3-a-day budget was the only limiter.
+    // Two ascension powers have since removed that limiter: the Open Gate lifts the allowance to 999, and
+    // Standing Invitation refunds the charge outright. With either one on, the SAME pet could be petted
+    // hundreds of times a day for 45 XP a tap, and two members with the Open Gate could level each other's
+    // whole stable overnight.
+    //
+    // ⚠️ THE GUARD IS THE RULE THAT ALREADY EXISTED FOR YOUR OWN PETS — once a day, spread the love — and
+    // neither power loses anything real: you may still pet every animal on every farm you visit, free and
+    // without limit. What you may not do is pet one animal twice. mkt_pet_visit already records exactly
+    // (petter, pet, when), so the guard is a read of the log the owner's recap is already built from.
+    if (!own) {
+        const again = await db.queryOne(
+            `SELECT 1 FROM mkt_pet_visit
+              WHERE petter_id = $1 AND pet_id = $2
+                AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
+              LIMIT 1`,
+            [petterId, petId],
+        ).catch(() => null);
+        if (again) return { ok: false, error: "already_petted", petting: flatBudget(await pettingBudget(petterId), own) };
+    }
+
     const budget = await pettingBudget(petterId);
     // Separate pools: your OWN pets vs OTHER members' pets (3 each per day).
     const col = own ? "pet_farm_used" : "pet_farm_used_others";
@@ -924,7 +968,9 @@ export async function petPet(petterId, petId, ownerId = null) {
         }
         newXp = row.xp;
     } else {
-        // A FRIEND'S pet: no per-pet guard (your 3/day budget is the cap), XP lands on the owner's pet.
+        // A FRIEND'S pet: XP lands on the owner's pet. The once-a-day-per-pet guard is above, before the
+        // slot is reserved — it used to be absent here entirely, which the Open Gate turned into an
+        // unbounded pet-XP faucet.
         const res = await addPetXp(petOwner, petId, petXpAmt).catch(() => null);
         if (!res) {
             await db.query(`UPDATE mkt_buyer SET ${col} = GREATEST(0, ${col} - 1) WHERE id = $1 AND pet_farm_day = ${DAY}`, [petterId]).catch(() => {});

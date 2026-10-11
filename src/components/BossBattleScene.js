@@ -150,6 +150,18 @@ export default function BossBattleScene({ boss, fighters = [], defaultSprite = n
                 <div className="battle-name">{boss.name}</div>
                 <div className="battle-hpbar"><span style={{ width: `${pct}%` }} /></div>
                 <div className="battle-hp">{boss.hp.toLocaleString()} / {boss.maxHp.toLocaleString()} HP</div>
+                {/* ── ⚠️ DAMAGE ON THE BAR THAT IS NOT ON THE LEADERBOARD ────────────────────────────
+                    GrayKitsune: "theres no way we've done 1b damage when myself and Eric have only done
+                    38m damage combined." He was right, and it is not the leaderboard that is wrong.
+                    Scaling a live boss x10 multiplies hp and max_hp together — which preserves the
+                    fraction remaining, and therefore multiplies the damage already dealt by ten too.
+                    Said out loud here, because the alternative is two numbers on one screen that nobody
+                    can make add up. See migration 476. */}
+                {boss.hpCarried > 0 ? (
+                    <div className="battle-hp-carried" title="Carried over when this boss's health was rescaled">
+                        {Number(boss.hpCarried).toLocaleString()} of that was carried over from the HP rescale
+                    </div>
+                ) : null}
                 {boss.buff ? (
                     <div className="battle-buff" title={`All damage ×${boss.buff.damageMult} while active`}>
                         <span className="battle-buff-emoji">{boss.buff.emoji}</span>

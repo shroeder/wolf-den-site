@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
+import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantConsumable, CONSUMABLES, dishPetXp } from "@/lib/marketplace/consumables.js";
@@ -391,6 +392,11 @@ export const PREPS = {
     // They were missing entirely at first, which made every tier-6 dish uncookable in practice.
     p_emberash:  { name: "Ember Ash",         rarity: "mythic" },
     p_goldleaf:  { name: "Beaten Gold Leaf",  rarity: "mythic" },
+    // The deep kitchen's one prep. Same reasoning as the Master's two directly above: the gate belongs on
+    // the recipe that makes it, never on the pantry's ability to say its name — an ingredient the kitchen
+    // cannot name is a blank line in your own stores, and that is how every tier-6 dish was uncookable
+    // before those two were added.
+    p_abyssoil:  { name: "Abyss Oil",         rarity: "legendary" },
 };
 export const prepMeta = (id) => PREPS[id] || null;
 
@@ -582,13 +588,26 @@ export async function grantRecipeReward(buyerId, band, { strict = false, favour 
  *
  * One query, counted in JS against the authored list, so the tier split cannot drift from RECIPES.
  */
+// ── ⚠️ WHICH SHELVES THIS MEMBER MAY BE TAUGHT FROM ─────────────────────────────────────────────────────────
+// Three unlocks, one question, asked in one place. Written out at each call site it would be three chances
+// for a roll to quietly include a page whose ingredients the member cannot obtain — which is the exact
+// failure the note above MASTER_RECIPES exists to prevent.
+async function booksFor(buyerId) {
+    if (!buyerId) return { master: false, charts: false, halloween: false };
+    const [master, charts] = await Promise.all([
+        hasUnlock(buyerId, "recipe_master").catch(() => false),
+        hasUnlock(buyerId, "fish_deep").catch(() => false),
+    ]);
+    return { master, charts, halloween: halloweenOn(buyerId) };
+}
+
 export async function recipeProgress(buyerId) {
     // BUILT FROM THE MEMBER'S OWN BOOK. Tier 6 is not in anybody's denominator until they have bought it,
     // so "34 of 34" stays a real completion instead of quietly becoming 34 of 42.
-    const master = buyerId ? await hasUnlock(buyerId, "recipe_master").catch(() => false) : false;
-    const book = recipeBookFor(master);
+    const books = await booksFor(buyerId);
+    const book = recipeBookFor(books);
     const total = book.length;
-    const tiers = TIERS.filter((t) => t.tier <= 5 || master).map((t) => ({
+    const tiers = TIERS.filter((t) => t.tier <= 5 || books.master).map((t) => ({
         tier: t.tier, name: t.name, color: t.color,
         total: book.filter((r) => r.tier === t.tier).length, known: 0,
     }));
@@ -617,8 +636,7 @@ export async function hasUnknownRecipe(buyerId, band = null) {
     const known = await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     // Against the member's OWN book, for the same reason the roll is: an owner who knows every ordinary page
     // in a band still has master pages to find in it, and this answering "no" would close the shop on them.
-    const master = await hasUnlock(buyerId, "recipe_master").catch(() => false);
-    const BOOK_FOR = recipeBookFor(master);
+    const BOOK_FOR = recipeBookFor(await booksFor(buyerId));
     // ── ASK ABOUT THE TIERS THE SOURCE CAN ACTUALLY TEACH ────────────────────────────────────────────────
     // Counting the WHOLE book meant the shop stayed open, and charging, long after it had run out of anything
     // it was allowed to hand over — you would pay 2,500 laurels for a roll that could only fail.
@@ -963,8 +981,7 @@ export async function learnRecipe(buyerId, recipeId = null, band = undefined, so
     // Which book this member is rolling out of, read at the moment of the roll rather than passed in by the
     // caller — every source in the game learns recipes through here, and a gate each of them had to remember
     // to apply is a gate one of them would forget.
-    const master = await hasUnlock(buyerId, "recipe_master").catch(() => false);
-    const rec = recipeId ? recipeById(recipeId) : rollRecipe(known, { ...(band || {}), book: recipeBookFor(master) });
+    const rec = recipeId ? recipeById(recipeId) : rollRecipe(known, { ...(band || {}), book: recipeBookFor(await booksFor(buyerId)) });
     if (!rec || known.includes(rec.id)) return null;
     // ── AND WHERE IT CAME FROM ───────────────────────────────────────────────────────────────────────────
     // The reveal is site-wide and fires off a poll, so it can land a beat after the thing that dropped it —

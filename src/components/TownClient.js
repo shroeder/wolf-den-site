@@ -3354,7 +3354,19 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         ) : (
                             <>
                                 <div className="tw-shiny-burst" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <span key={i} style={{ "--i": i }} />)}</div>
-                                <div style={{ fontSize: "2.8rem", position: "relative", zIndex: 2 }}>{shinyReward.deco?.emoji || "✨"}</div>
+                                {/* ⚠️ THE SPRITE, NOT THE EMOJI. This drew deco.emoji, so the Aurora Orb's
+                                    🔮 came up as a purple-pink crystal ball while the actual decoration is
+                                    a blue-and-green aurora — Kaishiern reported being given two different
+                                    objects. The emoji survives only as the fallback for a decoration whose
+                                    art has not been generated yet. See no-emoji-in-ui. */}
+                                <div style={{ fontSize: "2.8rem", position: "relative", zIndex: 2 }}>
+                                    {shinyReward.deco?.sprite
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        ? <img src={shinyReward.deco.sprite} alt="" draggable={false}
+                                            style={{ width: 96, height: 96, objectFit: "contain", display: "block", margin: "0 auto",
+                                                filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.6))" }} />
+                                        : (shinyReward.deco?.emoji || "✨")}
+                                </div>
                                 <div className="tw-duel-verdict win" style={{ fontSize: "1.25rem", position: "relative", zIndex: 2 }}>✨ You caught the glimmer!</div>
                                 <div style={{ fontWeight: 900, fontSize: "1.05rem", margin: "2px 0", position: "relative", zIndex: 2 }}>{shinyReward.deco?.name || "A rare decoration"}</div>
                                 <div className="muted" style={{ margin: "2px 0 8px", fontSize: "0.82rem", position: "relative", zIndex: 2 }}>A {shinyReward.deco?.rarity || "rare"} decoration only ever found this way — it&apos;s in your Farm decorations.</div>

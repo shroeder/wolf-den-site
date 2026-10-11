@@ -139,9 +139,21 @@ export async function claimShiny(buyerId, shinyId) {
     await trackActivity(buyerId, "shiny_claim", { decoId: reward, gold: SHINY_GOLD, xp: SHINY_XP }).catch(() => {});
     await checkGlimmerBadges(buyerId).catch(() => {});
     const d = decorationById(reward);
+    // ── ⚠️ THE PRIZE CARD HAS TO SHOW THE THING YOU GET ─────────────────────────────────────────────
+    // Kaishiern: "I clicked on the glimmer this morning and it said it gave me an Aura Orb which looked
+    // like a purple/pink crystal ball. The Aurora Orb is a circle with blue and green swirls."
+    //
+    // Both of those are the same decoration. The card was drawing the EMOJI — for this one 🔮, which the
+    // phone renders as a purple-pink crystal ball — while the farm draws the painted sprite, which is the
+    // blue-and-green aurora he already owned. So the reward screen advertised an object that does not
+    // exist and the thing that arrived looked like something else. Every one of these has real art; see
+    // no-emoji-in-ui, which this card predates.
+    const sprite = d
+        ? (await db.queryOne(`SELECT url FROM mkt_deco_sprite WHERE deco_id = $1`, [d.id]).catch(() => null))?.url || null
+        : null;
     return {
         ok: true,
-        deco: d ? { id: d.id, name: d.name, emoji: d.emoji, rarity: d.rarity, buff: d.buff } : { id: reward },
+        deco: d ? { id: d.id, name: d.name, emoji: d.emoji, sprite, rarity: d.rarity, buff: d.buff } : { id: reward },
         gold: SHINY_GOLD, xp: SHINY_XP, chest: SHINY_CHEST,
     };
 }

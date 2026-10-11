@@ -733,6 +733,14 @@ export async function getBossState(buyerId = null) {
             hp: accrual.effectiveHp,
             autoDps: accrual.autoDps,
             maxHp: boss.max_hp,
+            // ── ⚠️ DAMAGE ON THE BAR THAT IS NOT IN THE LEDGER ──────────────────────────────────
+            // GrayKitsune: "theres no way we've done 1b damage when myself and Eric have only done 38m
+            // damage combined." Correct. Scaling a LIVE boss x10 multiplies hp and max_hp together, which
+            // preserves the fraction remaining and therefore multiplies the damage already dealt by ten.
+            // The bar and the damage leaderboard have disagreed by that amount ever since, and no member
+            // could reconcile them. Carried here so the screen can say where it came from rather than
+            // leaving it as a number that does not add up. See migration 476.
+            hpCarried: Number(boss.hp_carried) || 0,
             imageUrl: boss.image_url || null,
             backgroundUrl: boss.background_url || null,
             rewards: boss.rewards_text || null,

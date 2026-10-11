@@ -73,6 +73,13 @@ export const CANDY_RATES = {
 // day whatever anybody does.
 export const DAILY_CANDY_CAP = 250;
 
+// ── ⚠️ ONLY WHAT WAS PAID FOR IS BANKED ──────────────────────────────────────────────────────────────────
+// A capsule and a door both cost the member something to open, and both SAY the overflow keeps. A cast, a
+// harvest and a swing of the pick cost nothing and are repeatable all night — those are the exact things the
+// ceiling exists to stop, and banking them would hand a grinder back every candy it just refused. So the
+// deferral is a property of the faucet, not of the cap.
+export const BANKABLE_SOURCES = new Set(["gacha", "trick_or_treat_door"]);
+
 /** What this member has EARNED today (spends do not refund cap room — see the note in grantCandy). */
 export async function candyEarnedToday(buyerId) {
     if (!buyerId) return 0;
@@ -85,9 +92,68 @@ export async function candyEarnedToday(buyerId) {
     return Number(r?.n) || 0;
 }
 
+// ── ⚠️ WHAT THE CAP TRIMMED, HELD FOR TOMORROW ───────────────────────────────────────────────────────────
+// Eric D: "any candy we get from the gachapon after our daily 250 limit is hit is not carrying over to the
+// next day like the text says it will."
+//
+// He was reading the screen correctly. The capsule says, in as many words, "that's your 250 candy for today,
+// so this one keeps until tomorrow's allowance" — and nothing kept it. The cap trimmed the grant to zero and
+// the candy was gone, after a ticket had been spent on it.
+//
+// ⚠️ THE TEXT IS THE PROMISE AND THE PROMISE IS THE RIGHT ONE, so the code moves rather than the words. A
+// capsule is PAID FOR; paying nothing for it is the actual harm, and deleting the sentence would have left
+// that harm in place and merely stopped admitting to it. This banks the untrimmed remainder and pays it down
+// out of the next day's allowance.
+//
+// ⚠️ AND IT IS BOUNDED AT ONE DAY'S CAP, which is what keeps it a deferral rather than a second faucet. A
+// member who spends a fortnight capped cannot bank 3,000 candy and dump it — the owed pile stops at 250, the
+// same ceiling as a day. The event's mint is still DAILY_CANDY_CAP a member a day, every day, which is the
+// only property the cap was ever defending.
+export const MAX_OWED_CANDY = DAILY_CANDY_CAP;
+
+/**
+ * Pay down anything the cap held back on earlier days, out of today's room. Returns what it settled.
+ *
+ * ⚠️ CALLED BEFORE THE CAP MATH IN grantCandy AND ON READING THE BALANCE, so owed candy arrives whether or
+ * not the member earns anything new. Without the read path a member who banked some and then stopped playing
+ * would never see it — "tomorrow's allowance" has to arrive on its own.
+ */
+export async function settleOwedCandy(buyerId) {
+    if (!buyerId || !halloweenOn(buyerId)) return 0;
+    const row = await db.queryOne(`SELECT COALESCE(candy_owed, 0)::int AS owed FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const owed = Number(row?.owed) || 0;
+    if (owed <= 0) return 0;
+    const room = DAILY_CANDY_CAP - (await candyEarnedToday(buyerId));
+    const pay = Math.min(owed, Math.max(0, room));
+    if (pay <= 0) return 0;
+    // ⚠️ ONE CONDITIONAL UPDATE, LIKE THE SPEND. Two tabs settling at once must not both read the same owed
+    // pile and both pay it — the WHERE clause is what makes the second one a no-op instead of a duplicate.
+    const done = await db.queryOne(
+        `UPDATE mkt_buyer SET candy = COALESCE(candy, 0) + $2, candy_owed = COALESCE(candy_owed, 0) - $2
+          WHERE id = $1 AND COALESCE(candy_owed, 0) >= $2 RETURNING id`,
+        [buyerId, pay],
+    ).catch(() => null);
+    if (!done) return 0;
+    await db.query(
+        `INSERT INTO mkt_candy_event (buyer_id, delta, source, meta) VALUES ($1, $2, 'carried', '{"carried":true}'::jsonb)`,
+        [buyerId, pay],
+    ).catch(() => {});
+    return pay;
+}
+
 export async function candyBalance(buyerId) {
     if (!buyerId) return 0;
+    // Settle first, so the balance a member reads the morning after being capped is the one they were
+    // promised rather than the one they went to bed with.
+    await settleOwedCandy(buyerId).catch(() => {});
     const r = await db.queryOne(`SELECT COALESCE(candy, 0)::int AS n FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    return Number(r?.n) || 0;
+}
+
+/** What the cap is still holding for this member. Shown at the stall so the promise is visible, not implied. */
+export async function candyOwed(buyerId) {
+    if (!buyerId) return 0;
+    const r = await db.queryOne(`SELECT COALESCE(candy_owed, 0)::int AS n FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     return Number(r?.n) || 0;
 }
 
@@ -106,10 +172,26 @@ export async function grantCandy(buyerId, source, times = 1) {
     if (!rate || times <= 0) return 0;
 
     const want = Math.round(rate * times);
+    // Yesterday's held-back candy is paid out of today's room BEFORE anything new is earned, so a member
+    // who was capped gets what they were owed first rather than having it pushed back another day.
+    await settleOwedCandy(buyerId).catch(() => {});
     const earned = await candyEarnedToday(buyerId);
     // ⚠️ THE CAP TRIMS, IT DOES NOT REJECT. A member one candy short of the ceiling who clears a dungeon
     // should get that one candy, not nothing — a cap that refuses whole payouts reads as a broken reward.
     const give = Math.max(0, Math.min(want, DAILY_CANDY_CAP - earned));
+
+    // ── ⚠️ WHAT THE CAP TOOK IS HELD, NOT DESTROYED, FOR THE SOURCES THAT WERE PAID FOR ──────────────
+    // A gachapon capsule and a trick-or-treat door both cost something to open, and the screen tells the
+    // member the remainder keeps until tomorrow. The freely repeatable faucets — a cast, a harvest, a swing
+    // of the pick — do NOT bank, because the cap exists precisely to stop those running all night, and
+    // banking them would hand the grinder back every candy the ceiling just refused.
+    const held = want - give;
+    if (held > 0 && BANKABLE_SOURCES.has(source)) {
+        await db.query(
+            `UPDATE mkt_buyer SET candy_owed = LEAST($3, COALESCE(candy_owed, 0) + $2) WHERE id = $1`,
+            [buyerId, held, MAX_OWED_CANDY],
+        ).catch(() => {});
+    }
     if (give <= 0) return 0;
 
     await db.query(`UPDATE mkt_buyer SET candy = COALESCE(candy, 0) + $2 WHERE id = $1`, [buyerId, give]).catch(() => {});

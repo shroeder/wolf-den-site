@@ -213,11 +213,93 @@ export const SEASON_RECIPES = [
 //
 // Use it only where the question is "what IS this id" or "what does this member already know". Handing it to
 // rollRecipe would put both gated tiers into every wheel, chest and quest in the game.
-export const FULL_BOOK = [...RECIPES, ...MASTER_RECIPES, ...SEASON_RECIPES];
+// ── THE DEEP WATER KITCHEN · SIX PAGES FOR SIX SPECIES ───────────────────────────────────────────────────────
+// Luke: "six new recipes that include the deep chart fish since those are kind of sitting there useless
+// without anything to use them."
+//
+// He is right that they were. The charts cost 15,000 chips and bought you six species that could be logged,
+// weighed, and sold — and that was the whole of it. Nothing in the kitchen had ever heard of them, so the most
+// expensive fish in the game were worth less at the stove than a sardine.
+//
+// ⚠️ GATED ON THE CHARTS, FOR THE EXACT REASON MASTER_RECIPES IS NOT BUILT ON THEM. That note says it
+// plainly: "a recipe you can never cook is worse than no recipe at all." A member without the charts can
+// never land a Lanternjaw, so handing them a Lanternjaw page by a chest roll would be a permanent dead card
+// in their book. The gate is the same mechanism the Master's book uses — absent from RECIPES, so the
+// denominator, the badge and the per-tier split never move for somebody who does not own them, and absent
+// from the roll unless recipeBookFor is told they hold the charts.
+//
+// ⚠️ AND THEY ARE FOUND, NOT BOUGHT. The Master's eight arrive all at once because the book itself is the
+// 25,000-chip purchase. The charts are not a recipe book — they are permission to fish somewhere — so these
+// are learned the way every sea page is: by fishing. Once you hold the charts they enter your roll, and the
+// deep starts teaching you what to do with what it gives you.
+//
+// Tiers 3 to 5, climbing with the species: the two rare fish make tier 3, the epics tier 4, and the
+// legendary and the mythic carry the two tier 5s. Each page names its own fish, so there is a reason to keep
+// one of each rather than selling the lot.
+export const DEEP_RECIPES = [
+    P("k_abyssoil", "Render the Abyss Oil", 4, { fish_gulper: 1, fish_lanternjaw: 2 }, "p_abyssoil",
+      "It burns colder than it should, and twice as long."),
+    R("r_lanternjaw_broth", "Lanternjaw Broth", 3, { fish_lanternjaw: 2, p_stock: 1, potato: 2 },
+      "The light goes out of them the moment the pot does."),
+    R("r_glassfin_crudo", "Glass Fin Crudo", 3, { fish_glassfin: 2, p_chilli: 1, carrot: 2 },
+      "Sliced so thin you can read the plate through it."),
+    R("r_bonecrab_boil", "Bone Crab Boil", 4, { fish_bonecrab: 2, p_brine: 2, corn: 3 },
+      "Everyone gets a hammer. Nobody leaves clean."),
+    R("r_gulper_pie", "Black Gulper Pie", 4, { fish_gulper: 1, p_abyssoil: 1, p_dough: 2 },
+      "Whatever it swallowed last is in there too."),
+    R("r_hadal_eight", "The Hadal Eight", 5, { fish_hadaloctopus: 1, p_abyssoil: 1, p_wine: 2, p_roe: 1 },
+      "Eight arms, eight courses, one plate."),
+    R("r_lightless_table", "The Lightless Table", 5, { fish_lightless: 1, p_abyssoil: 2, p_leviathan: 1, starfruit: 2 },
+      "Served in the dark. That is not for atmosphere."),
+];
+
+// ── THE GOURDFATHER'S CATCH · THREE PAGES FOR OCTOBER ────────────────────────────────────────────────────────
+// Luke: "maybe you throw in like three more for Halloween as well for the Halloween fish."
+//
+// Same hole, smaller: four species swim for one month a year and the kitchen had nothing to do with any of
+// them, so a Wickfish was a log entry and a coin. These give the event's own fish somewhere to go.
+//
+// ⚠️ SEASONAL THE SAME WAY THE FISH ARE — in BOOK so a page you learned in October still cooks in March (you
+// will just have nothing to cook it with), out of RECIPES so a member who never fished the event does not
+// carry three permanent gaps in a completion they cannot ever fill. That is the rule HALLOWEEN_FISH is
+// written to in fishing.js, restated here because breaking either half is a mistake that cannot be undone.
+//
+// Tier 4 and 5, not 6: tier 6 needs the Master's book, and a seasonal prize gated behind a 25,000-chip
+// purchase is a prize for one person.
+export const HALLOWEEN_RECIPES = [
+    R("r_hw_wick_fry", "Wickfish Fry", 4, { fish_hw_wickfish: 3, p_butter: 1, potato: 2 },
+      "They spit and gutter in the pan like the candles they are named for."),
+    R("r_hw_bonepike_board", "Bone Pike Board", 4, { fish_hw_bonepike: 2, p_smoked: 1, pumpkin: 2 },
+      "Laid out whole. The children dare each other."),
+    R("r_hw_drowned_feast", "Feast of the Drowned Crown", 5, { fish_hw_drownedcrown: 1, fish_hw_gourdfin: 2, p_puree: 2, p_wine: 1 },
+      "One night a year, the thing that was pulled up gets the head of the table."),
+];
+
+export const FULL_BOOK = [...RECIPES, ...MASTER_RECIPES, ...SEASON_RECIPES, ...DEEP_RECIPES, ...HALLOWEEN_RECIPES];
 const BOOK = FULL_BOOK;
 // Resolves BOTH books. A member who owns a master page has it in mkt_recipe_known and needs it to render,
 // and a page nobody can cook is not protected by refusing to name it.
 export const recipeById = (id) => BOOK.find((r) => r.id === id) || null;
 
 /** The book this member can read. Owners see tier 6; nobody else can tell it exists. */
-export const recipeBookFor = (master) => (master ? BOOK : RECIPES);
+/**
+ * The book this member can read — and therefore the book every ROLL draws from.
+ *
+ * ⚠️ IT TAKES AN OBJECT NOW, AND THE OLD BOOLEAN STILL WORKS. Every caller passed `master` positionally, so
+ * changing the shape outright would have silently handed `{master:true}` to a truthiness check somewhere and
+ * put tier 6 into everybody's roll. Both forms are accepted and the callers are migrated one at a time.
+ *
+ * ⚠️ AND A GATE HERE IS THE WHOLE GATE. Absent from the returned book means no chest, seam, dig, cast,
+ * wheel, raid or boss can teach the page — see the note above MASTER_RECIPES. The deep pages are reachable
+ * only by somebody holding the charts, because the fish they are built on are; the Halloween pages only
+ * while the event is live, because the fish only exist then.
+ */
+export const recipeBookFor = (opts) => {
+    const o = (opts && typeof opts === "object") ? opts : { master: Boolean(opts) };
+    return [
+        ...RECIPES,
+        ...(o.master ? MASTER_RECIPES : []),
+        ...(o.charts ? DEEP_RECIPES : []),
+        ...(o.halloween ? HALLOWEEN_RECIPES : []),
+    ];
+};
