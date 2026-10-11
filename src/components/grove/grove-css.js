@@ -424,9 +424,26 @@ export const GROVE_CSS = `
    in every zone — the moss cap was a few pixels of green and the earth under it had no body at all. The
    source art is a chunky three-band shelf and it needs the depth to show it: 2.9 against a 7-unit hero is
    a shelf you are standing on top of. */
+/* ── ⚠️ AND THE BOX IS DROPPED SO ITS PAINTED SURFACE LANDS ON THE FEET LINE ───────────────────
+   Luke: "the enemies and player and pet are floating, maybe we can fix that for all platforms?"
+
+   A body's feet sit at this element's TOP EDGE, and the top edge is the top ROW OF THE PAINTING — the tip
+   of the tallest moss tuft, not the surface. A knight standing on the apex of the cushion is exactly what
+   reads as hovering. --gv-slab-surface is the MEASURED median of that slab's top edge (SLAB_SURFACE in
+   grove-catalog.js), so dropping the box by that much puts the feet where half the tufts stand above the
+   boot and half below, which is what standing in moss looks like.
+
+   ⚠️ IT IS A DIFFERENT NUMBER PER SLAB AND THAT IS THE POINT. The char slab's top edge wanders over 1.6%
+   of its height and the bramble's over 13%, so one shared nudge fixes one platform and breaks another —
+   which is why this read as a single bug and was a different amount of wrong in every zone.
+
+   ⚠️ AND THE SIGN IS THE WHOLE THING. The bottom property positions the MARGIN edge, so a MORE negative
+   margin-bottom raises the box and carries the surface further ABOVE the feet. It wants to be LESS
+   negative. Written the other way round first, it made the float worse by exactly the amount it was meant
+   to remove, and the screenshot was the only thing that said so. */
 .gv-ledge { --gv-ledge-h: 2.9; position: absolute; left: 0; bottom: var(--gv-ground, 13%);
     height: calc(var(--gv-ledge-h) * var(--gv-unit, 1%));
-    margin-bottom: calc(-1 * var(--gv-ledge-h) * var(--gv-unit, 1%));
+    margin-bottom: calc(-1 * var(--gv-ledge-h) * (1 - var(--gv-slab-surface, 0)) * var(--gv-unit, 1%));
     pointer-events: none; will-change: transform; }
 .gv-slab { position: absolute; inset: 0;
     border-style: solid; border-width: 0 calc(0.469 * var(--gv-ledge-h) * var(--gv-unit, 1%));
@@ -459,7 +476,12 @@ export const GROVE_CSS = `
     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
     animation: gvHangSway var(--gv-dt, 4200ms) ease-in-out infinite; }
 /* Sitting: its base tucked a little BELOW the top edge, into the moss, for the same reason. */
-.gv-dec.is-s { bottom: calc(100% - 0.45 * var(--gv-unit, 1%)); transform: translateX(-50%); z-index: 0; }
+/* ⚠️ ON THE SAME SURFACE LINE THE BODIES STAND ON, plus a touch so the base tucks into the cushion
+   rather than balancing on it. This was a flat 0.45 units, which is why the mushrooms read as seated
+   while the knight standing beside them did not — they were the only thing on the ledge sunk into it. */
+.gv-dec.is-s {
+    bottom: calc(100% - (var(--gv-ledge-h) * var(--gv-slab-surface, 0) + 0.3) * var(--gv-unit, 1%));
+    transform: translateX(-50%); z-index: 0; }
 .gv-dec.is-s img { height: calc(2.1 * var(--gv-ds, 1) * var(--gv-unit, 1%));
     transform-origin: 50% 100%;
     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));

@@ -22,7 +22,7 @@ import {
     emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS,
     GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance,
     GROVE_FOODS, groveArt,
-    GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt,
+    GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE,
 } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS } from "@/lib/marketplace/grove-recipes.js";
 import { MAP_LAYOUT, mapSpot, nodeArt } from "@/lib/marketplace/grove-map.js";
@@ -138,6 +138,11 @@ for (const [id, b] of Object.entries(GROVE_BIOMES)) {
     // one with nothing at all is a ledge as plain as the ones this feature replaced.
     ok(b.hang.length + b.sit.length > 0, `biome ${id}: nothing grows on it at all`);
     ok(b.density > 0 || b.sitDensity > 0, `biome ${id}: zero density, so nothing is ever placed`);
+    // ⚠️ AND THE SLAB KNOWS WHERE ITS OWN SURFACE IS. Without an entry the surface falls back to 0, which
+    // puts the feet back on the tip of the moss crown — the float Luke reported, silently, for that one
+    // biome only. Regenerate the table with scripts/grove-decor-clean.mjs after any slab is redrawn.
+    ok(SLAB_SURFACE[b.slab] != null, `biome ${id}: slab "${b.slab}" has no SLAB_SURFACE entry, so bodies float on it`);
+    ok(!(SLAB_SURFACE[b.slab] > 0.3), `biome ${id}: slab "${b.slab}" surface ${SLAB_SURFACE[b.slab]} is implausibly deep — remeasure it`);
 }
 // Nothing drawn should be unreachable: a sprite in the folder that no biome names is art nobody sees.
 {

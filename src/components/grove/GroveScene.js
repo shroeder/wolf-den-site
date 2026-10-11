@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 
 import {
     GROVE_ENEMIES, GROVE_RARE, GROVE_POP, HEAL_AT, scaledFoe, groveBoss, groveSize, grovePart,
-    groveArt, groveEmblem, GROVE_ZONES, groveBiome, slabArt, hangArt, sitArt,
+    groveArt, groveEmblem, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
 import {
@@ -35,6 +35,7 @@ import {
     SPARK, DUST, VIGNETTE, COMBO_WINDOW_MS, COMBO_PITCH_STEPS, LOOT_BOUNCE, LOOT_REST_MS,
     LOOT_LABEL_MS, LOOT_DRAW_ACCEL, LOOT_DRAW_MAX, LOOT_EAT_DIST,
 } from "@/lib/marketplace/grove-juice.js";
+import { footOf } from "@/components/grove/grove-foot.js";
 import {
     playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice, playDeath,
 } from "@/components/grove/grove-sfx.js";
@@ -390,6 +391,24 @@ export default function GroveScene({
         w.nextRespawn = now + GROVE_POP.respawnMs;
         rerender();
     }, [zone, seed, bonuses, W, rerender]);
+
+    // ── ⚠️ THE HERO AND THE PET HAVE THEIR FEET MEASURED, BECAUSE NOTHING CAN AUTHOR THEM ───────────
+    // Every creature carries a `foot` from GROVE_SIZE — the transparent air under its body, measured
+    // offline — and without it the drawing hovers inside a correctly placed box. The hero and the pet are
+    // the member's own equipped sprites, so there is no table that could hold a number for a picture
+    // nobody has seen; they were running at foot 0 and were the two bodies on screen most of the time.
+    //
+    // ⚠️ WRITTEN ONTO THE BODY, NOT INTO STATE. The loop reads b.foot every frame; a state round trip
+    // would re-render the whole zone to deliver one constant. Cancelled on unmount so a slow decode cannot
+    // write into a world that has been replaced.
+    useEffect(() => {
+        let live = true;
+        const w = worldRef.current;
+        if (!w) return undefined;
+        footOf(heroArt).then((v) => { if (live && w.hero) w.hero.foot = v; });
+        footOf(petArt).then((v) => { if (live && w.pet) w.pet.foot = v; });
+        return () => { live = false; };
+    }, [heroArt, petArt, world]);
 
     // ── THE LOOP ────────────────────────────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -1443,7 +1462,7 @@ export default function GroveScene({
         // and they are all made of the same thing, so one custom property inherited down is one declaration
         // and one decoded bitmap — and border-image has no src attribute to set anyway.
         <div className="gv-scene is-full" ref={hostRef} onPointerDown={onTapWorld}
-            style={{ "--gv-slab": `url(${slabArt(zone.biome)})` }}>
+            style={{ "--gv-slab": `url(${slabArt(zone.biome)})`, "--gv-slab-surface": slabSurface(zone.biome) }}>
             {/* ── ⚠️ EVERYTHING THAT IS IN THE WORLD IS INSIDE THIS ONE LAYER ────────────────────
                 So the screen shake can move the world without moving the interface. The HUD, the boss bar
                 and Leave are deliberately outside it: a shaking interface reads as a broken page rather

@@ -38,3 +38,35 @@ for (const file of fs.readdirSync(DIR).filter((f) => /^(slab|hang|sit)-.*\.webp$
     changed += 1;
 }
 console.log(`\n${changed} file(s) cleaned.`);
+
+// ── ⚠️ AND WHERE EACH SLAB'S STANDING SURFACE ACTUALLY IS ────────────────────────────────────────────────────
+// Luke: "the enemies and player and pet are floating".
+//
+// A body's feet are placed at the ledge element's TOP EDGE, which is the top row of the painting — and on a
+// mossy slab that row is the tip of the tallest tuft, not the surface. Standing a knight on the apex of a
+// cushion of moss is exactly what reads as hovering, and it gets worse the shaggier the slab: the bramble's
+// top edge wanders over 13% of its height.
+//
+// So the surface is MEASURED, not guessed, the same way the `foot` column in GROVE_SIZE was. For every
+// column across the slab's middle, find the first opaque row; the MEDIAN of those is the line the eye reads
+// as the surface, because half the tufts stand above it and half below. Paste the result into SLAB_SURFACE
+// in grove-catalog.js; check-grove.mjs asserts every slab has an entry.
+console.log("\n── surface line per slab (paste into SLAB_SURFACE in grove-catalog.js) ──");
+for (const file of fs.readdirSync(DIR).filter((f) => /^slab-.*\.webp$/.test(f)).sort()) {
+    const { data, info } = await sharp(fs.readFileSync(`${DIR}/${file}`)).ensureAlpha()
+        .raw().toBuffer({ resolveWithObject: true });
+    const { width: w, height: h, channels: c } = info;
+    const x0 = Math.round(w * 0.16);
+    const x1 = Math.round(w * 0.84);
+    const tops = [];
+    for (let x = x0; x < x1; x += 1) {
+        for (let y = 0; y < h; y += 1) {
+            if (data[(y * w + x) * c + 3] > 128) { tops.push(y); break; }
+        }
+    }
+    tops.sort((p, q) => p - q);
+    const median = tops[Math.floor(tops.length / 2)] || 0;
+    const id = file.replace(/^slab-|\.webp$/g, "");
+    console.log(`    ${id}:`.padEnd(14) + `${(median / h).toFixed(3)},`.padEnd(9)
+        + `// top edge median row ${median} of ${h}`);
+}

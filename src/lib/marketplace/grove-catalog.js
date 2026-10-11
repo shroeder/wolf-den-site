@@ -478,7 +478,32 @@ export const GROVE_BIOMES = {
         hang: ["vine_flower", "vine_leafy", "moss_beard"], sit: ["fern_tuft", "mushroom_cluster", "grass_tuft"] },
 };
 
+// ── ⚠️ WHERE EACH SLAB'S STANDING SURFACE IS, AS A SHARE OF ITS HEIGHT ───────────────────────────────────────
+// Luke: "the enemies and player and pet are floating, maybe we can fix that for all platforms?"
+//
+// A body's feet go at the ledge element's TOP EDGE, and until this the top edge was the top ROW OF THE
+// PAINTING — which on a mossy slab is the tip of the tallest tuft, not the surface. Standing a knight on the
+// apex of the cushion is precisely what reads as hovering, and the shaggier the slab the worse it got: the
+// bramble's top edge wanders over 13% of its own height, the char's over 1.6%. Which is also why it looked
+// like one bug with one cause and was actually a different amount of wrong on every platform in the game.
+//
+// MEASURED, NOT AUTHORED, exactly like the `foot` column in GROVE_SIZE: for each column across the slab's
+// middle, the first opaque row; the MEDIAN of those is the line the eye reads as the surface, because half
+// the tufts stand above it and half below. Regenerate with scripts/grove-decor-clean.mjs after any art pass
+// that touches a slab — a redrawn slab with a different cushion silently moves this line.
+export const SLAB_SURFACE = {
+    bramble: 0.131,   // top edge median row 42 of 320
+    char: 0.016,      // 5 of 320
+    earth: 0.013,     // 4 of 320
+    field: 0.059,     // 19 of 320
+    moss: 0.053,      // 17 of 320
+    plank: 0.078,     // 25 of 320
+    stone: 0.053,     // 17 of 320
+    wood: 0.016,      // 5 of 320
+};
+
 export const groveBiome = (id) => GROVE_BIOMES[id] || GROVE_BIOMES.wood;
+export const slabSurface = (biomeId) => SLAB_SURFACE[groveBiome(biomeId).slab] ?? 0;
 export const slabArt = (biomeId) => `/images/grove/slab-${groveBiome(biomeId).slab}.webp`;
 export const hangArt = (id) => `/images/grove/hang-${id}.webp`;
 export const sitArt = (id) => `/images/grove/sit-${id}.webp`;
