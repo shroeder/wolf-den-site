@@ -3,7 +3,7 @@
 // people dont win that much but u can audit history to see if your simulation matches telemetry."
 //
 // He was right to ask. The simulation in check:slots validates the PAYTABLE — what the maths says a machine
-// returns over infinite play — and the tables are tuned to RTP_TARGET 0.88. This reads what the floor has
+// returns over infinite play — and the tables are tuned to TARGET_RTP. This reads what the floor has
 // actually done, and the two do not agree.
 //
 // ⚠️ SAME CURRENCY ON BOTH SIDES, WHICH IS THE WHOLE POINT. The floor is staked in CHIPS and pays CHIPS, both
@@ -15,11 +15,16 @@
 import fs from "node:fs";
 import { neon } from "@neondatabase/serverless";
 
+import { TARGET_RTP } from "@/lib/marketplace/casino-slot5.js";
+
 const env = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/.env", "utf8");
 const sql = neon(env.match(/^DATABASE_URL=["']?([^"'\r\n]+)/m)[1]);
 // The owner is not a customer of this casino, he is the person testing it — see casino-report.js.
 const OWNER = (await sql`SELECT id FROM mkt_buyer WHERE display_name='The Wolf Den'`)[0].id;
-const TARGET = 0.88;
+// ⚠️ IMPORTED, NOT TYPED. This was a hardcoded 0.88 long after the floor had moved to 1.05, so every run
+// printed its gap against a target that had not existed for weeks. A number nobody checks is worse than no
+// number — it gets quoted. It reads the real one now.
+const TARGET = TARGET_RTP;
 
 const PAIRS = [
     ["slot (3-reel)", "casino_slot_bet", ["casino_slot_win"]],
@@ -29,7 +34,7 @@ const PAIRS = [
     ["keno", "casino_keno_bet", ["casino_keno_win"]],
 ];
 
-console.log("machine         chips in     chips out      RTP     vs the 88% the tables are tuned to");
+console.log(`machine         chips in     chips out      RTP     vs the ${(TARGET * 100).toFixed(0)}% the tables are tuned to`);
 let ti = 0; let to = 0;
 for (const [name, bet, wins] of PAIRS) {
     const i = Number((await sql`SELECT COALESCE(-SUM(delta),0)::bigint d FROM mkt_chip_event

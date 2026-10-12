@@ -665,64 +665,52 @@ const VAULT = {
 // RTP is different on every cabinet AND changes with the size of the dial. The Vault took three passes to
 // converge and needed 1.469 where The Menagerie needed 1.268 for the same return.
 //
-// ── ⚠️ THE FLOOR IS ABOVE 100% ON PURPOSE, AND THAT MAKES IT A FAUCET ─────────────────────
-// The first pass of this dial brought every cabinet to 99%, which took the bust rate from 89% to 85% —
-// true, measured, and not what anybody would notice. Luke picked the number off the table it was priced
-// against: "50 percent went broke."
+// ── ⚠️ 1.05 -> 0.95: THE FLOOR IS A SINK AGAIN ───────────────────────────────────────────
+// Luke: "Casino win rate is too high, what is a good rate where its fun but not farmable?" Then: "Fix it,
+// u decide balance."
 //
-// Half is a different machine, not a kinder one. It needs about 121% to pay, so EVERY SPIN IS NOW +EV: a
-// player who keeps pressing trends upward with no ceiling, and the only thing bounding a chip balance is
-// how long somebody is willing to sit there. The cabinets have stopped being the casino's sink.
+// ⚠️ ABOVE 100% IS NOT A DEGREE OF GENEROUS, IT IS A DIFFERENT KIND OF THING. At 1.05 the only bound on
+// what one person extracts is how long they are willing to press the button, and the previous note here
+// said so in as many words and shipped it anyway on the strength of the volume at the time. The volume is
+// what moved: that note priced the floor against ~75,000 gold a day staked. Measured the day this changed,
+// the floor was taking 446,000 a day and minting 493,000 a day on a three-day window, against 1,166,000
+// held by all 159 members put together. A faucet bounded by volume stops being bounded when the volume
+// goes up six times.
 //
-// THAT IS A DECISION AND NOT AN ACCIDENT, and the note in casino-dont-balance-to-a-number already said
-// where the real sink belongs: "the real sink is what chips COST at the Counter, priced by hand. That is
-// the lever, not RTP." The floor's height is what makes the room worth walking into; the Counter is what
-// makes the chips worth winning. This file now only does the first job.
+// 0.95 is the same five points from break-even that 1.05 was, on the other side. At the stake the floor is
+// actually seeing that is about 22,000 gold a day burned rather than 22,000 minted — a real sink, and a
+// 5% house edge is generous by the standard of any machine anybody has played. 0.88 was the textbook
+// answer and is still wrong here for the reason the old note gave: at this volume it would burn 54,000 a
+// day, which is a confiscation rather than a retune.
 //
-// ⚠️ SO THE THING TO WATCH IS THE COUNTER, NOT THIS NUMBER. If prizes start falling out of the shop
-// faster than they should, the answer is the price list — not walking these dials back down, which is the
-// move Luke has asked me twice not to make.
-// ── 1.215 -> 0.88, BECAUSE THE FLOOR PAYS GOLD NOW ───────────────────────────────────────────────────────────
-// Luke: "The casino will now just be pure coin in coin out. And the win rates will need a slight nerf."
+// ── ⚠️ AND NOTHING WAS BROKEN, WHICH IS WHY ONLY THE DIAL MOVED ──────────────────────────
+// The Vault had realised 170.8% over 1,924 live spins and that looked exactly like a bug. It was not. The
+// engine returns 101.3% at every bet size, every session length, and under deliberate bet-switching
+// against the meter; run in 3,000 blocks the SIZE of the real sample and at the real mix of stakes, 170.8%
+// comes up in 9 blocks out of 3,000. The Den hit the 99.7th percentile on the cabinet it plays most, and
+// four spins accounted for 36% of everything that cabinet paid.
 //
-// ⚠️ IT IS NOT SLIGHT, AND THE CURRENCY CHANGE IS WHY. 1.215 was a defensible number while the floor was
-// staked in CHIPS: a chip was a loyalty token with exactly one sink (the Counter), so a machine returning
-// 121% was a generous way of handing out chips and could not touch the gold economy. Paying GOLD at 121% is
-// not a generous machine, it is an unbounded gold printer — put a thousand in, take 1,210 out, repeat.
+// That is worth writing down because the obvious reaction — hunt the bug, then nerf the feature that
+// "must" be leaking — would have cut a machine that was doing what it says on the tin. What is actually
+// true is duller: the target was above 100%, and over enough spins that is all it takes. The hit rate,
+// the reel strips and the bonus triggers are untouched; the rhythm of each cabinet is exactly the rhythm
+// that was tuned, and only what a win is WORTH has moved.
 //
-// Every cabinet, keno and bingo were all above 100% by design. The dials below were re-solved by
-// scripts/casino-solve-dials.mjs at this target; do not eyeball them, the relationship between a dial and
-// its cabinet's RTP is different on every machine (The Vault needs 1.074 where The Menagerie needs 0.918
-// for the same return).
+// The other four cabinets reading 74-82% in the same window is the same coin landing the other way: they
+// have had 165 to 1,420 spins each. Do not tune off a window that small — scratch/vault-variance.mjs is
+// what says how small is too small.
 //
-// ── AND THE TARGET IS 1.05, WHICH IS LUKE'S CALL AND IS BACKED BY TWO MONTHS OF LEDGER ───────────────────────
-// Luke: "I think 105 should be the target."
-//
-// ⚠️ THAT IS ABOVE 100%, AND IT IS DELIBERATE. The floor is a net FAUCET: it hands back five per cent more
-// than it takes, for ever, and the only limit on how much somebody can farm out of it is how long they are
-// willing to sit there. That is the thing to have eyes open about, so here is the size of it, measured
-// rather than feared:
-//
-//   the Den stakes ~75,000 gold a day on this floor
-//   at 105% the floor mints ~113,000 gold a MONTH
-//   the Den is holding ~974,000 gold in total
-//
-// ⚠️ AND IT IS A CUT, NOT A RAISE. The tables were designed at 121.5% and REALISED 107.6% over 2.5 million
-// gold of actual play — so the floor has been minting about 172,000 a month already and the economy carried
-// it without anybody noticing. 105% is tighter than the status quo and a great deal tighter than the design.
-//
-// 88% was the textbook answer and it was briefly the shipped one. It would have made the floor BURN 271,000 a
-// month — a 440,000-a-month swing against a 974,000 stock, which is not a retune, it is a confiscation.
-//
-// If this ever needs bounding, this is the dial, and the thing to watch is the daily STAKE rather than the
-// RTP: a faucet above 100% is bounded by volume, so the question is never "what does it pay" but "how much
-// can one person put through it in an evening".
-export const TARGET_RTP = 1.05;
-HUNT.pay = 1.113;
-HARVEST.pay = 1.092;
-DEEP.pay = 1.099;
-MENAGERIE.pay = 1.096;
-VAULT.pay = 1.113;   // THREE passes to converge, exactly as the note above warns
+// ⚠️ THE WHOLE FLOOR MOVED, NOT JUST THE CABINETS. Keno and bingo are solved to the same 0.95 and
+// carry their own dials (KENO_PAY in casino.js, BINGO_PAY in bingo-kit.js). Blackjack is deliberately
+// left alone: it has no dial, it is a published ruleset rather than a paytable anybody chose, and it
+// simulates at 98.8% on perfect basic strategy while the ledger has it realising 81.8%. It is not the
+// thing that was farmable.
+export const TARGET_RTP = 0.95;
+HUNT.pay = 0.996;
+HARVEST.pay = 0.989;
+DEEP.pay = 0.996;
+MENAGERIE.pay = 0.991;
+VAULT.pay = 0.998;   // THREE passes to converge, exactly as the note above warns
 
 // Multiplies every paying number a cabinet owns. `pays` is symbol -> count -> multiple of the line bet and
 // `scatterPays` is count -> multiple of the total bet; both are payouts and nothing else in the machine is.

@@ -308,7 +308,11 @@ export const cornersOf = (card, drawn, burnt = []) => {
 // 1.05/1.2482 is the factor that puts the simulated table on the floor's target. It is still the deepest cut
 // on the floor, but at 0.690 it lands bingo LEVEL with every other cabinet rather than below them — which is
 // the right outcome for the machine two thirds of the Den plays.
-export const BINGO_PAY = 0.690;
+// ⚠️ 0.690 -> 0.6229. The floor's target moved from 1.05 to 0.95 — a casino above 100% is farmable by
+// definition and the only thing bounding it is how long somebody will sit there. See TARGET_RTP in
+// casino-slot5.js for the whole argument and the ledger behind it. The dial is linear in the sim's
+// measured return (105.23% at 0.690; one correcting pass after that, the same as the cabinets need), so this is one multiplication rather than the solver's passes.
+export const BINGO_PAY = 0.625;
 
 export const BINGO_PAYS = {
     // ⚠️ A WIN MUST NOT COST YOU MONEY. SunflowerJinxx: "A 100 chip bingo bet is paying less than the bet."

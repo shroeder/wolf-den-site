@@ -1018,11 +1018,20 @@ export const KENO_DRAWN = 10;
 // instruction points — bring the LOW one up, never level the others down. The dial multiplies the whole
 // ladder so the SHAPE is untouched: two hits still returns your stake, five hits is still the thing you are
 // there for, and the golden ball still doubles whatever landed. Exactly the same treatment the cabinets got.
+// ⚠️ 1.108 -> 1.0023, BECAUSE THE FLOOR IS A SINK NOW. The target moved from 1.05 to 0.95 — see TARGET_RTP
+// in casino-slot5.js for the whole argument.
+//
+// ⚠️ AND IT IS SOLVED AGAINST kenoRtp(), NOT AGAINST THE 1.2102 IN THE NOTE BELOW. That figure is the LINE
+// table alone; kenoRtp() also counts the golden ball, which is a third of a point shy of nine. Scaling by
+// 0.95/1.2102 landed the game on 74.4% — twenty points under target — and the only reason that was caught
+// is that the function was called afterwards instead of trusted. The dial is linear in the function, so
+// one measurement solves it exactly.
+//
 // ⚠️ 1.277 -> 1.108. Keno's exact RTP was 121.02% — it is a solved table rather than a sampled one, so that
 // figure is not an estimate — and 1.05/1.2102 is the factor that puts it on the floor's target. Same
 // reason as the slot dials, and exact rather than sampled: five picks from forty is a closed-form sum, which
 // is why keno never needs the second solver pass the slot cabinets do.
-export const KENO_PAY = 1.108;
+export const KENO_PAY = 1.0024;
 export const KENO_PAYS = Object.fromEntries(
     Object.entries({ 0: 0, 1: 0, 2: 1, 3: 2.7, 4: 22, 5: 540 })
         .map(([k, v]) => [k, Number((v * KENO_PAY).toPrecision(6))]),
