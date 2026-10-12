@@ -6,7 +6,7 @@ import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantConsumable, CONSUMABLES, dishPetXp } from "@/lib/marketplace/consumables.js";
-import { RECIPES, MASTER_RECIPES, SEASON_RECIPES, FULL_BOOK, recipeById, recipeBookFor } from "@/lib/marketplace/cooking-recipes.js";
+import { RECIPES, MASTER_RECIPES, FULL_BOOK, recipeById, recipeBookFor } from "@/lib/marketplace/cooking-recipes.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { SEEDS } from "@/lib/marketplace/farm-crops.js";
@@ -144,6 +144,11 @@ export const trackCost = (lvl) => 400 * (Number(lvl) + 1) * (Number(lvl) + 1);
 //
 // Now the only seed the kitchen pays is a Star Fruit, on the Master's ladder, at the very top — which needs
 // the Master's Book to reach at all, a flawless cook to climb, and the jackpot roll on top of that.
+// Every page in the base book, by id. The kitchen board starts from RECIPES and then adds back the GATED
+// pages this member has actually learned — see getKitchenState — so it needs to know which ids are base ones
+// without naming the gated books one at a time. Built once at import, not per request.
+const BASE_RECIPE_IDS = new Set(RECIPES.map((r) => r.id));
+
 export const TIERS = [
     {
         tier: 1, name: "Simple", color: "#cfd8e3",
@@ -1151,7 +1156,19 @@ export async function getKitchenState(buyerId) {
     // which is the same known-set the rest of this function reads.
     //
     // Without this a recipe you own was not in your kitchen: learnable, cookable by id, and invisible.
-    const alsoKnown = [...MASTER_RECIPES, ...SEASON_RECIPES].filter((r) => cookedMap.has(r.id));
+    //
+    // ── ⚠️ DERIVED FROM FULL_BOOK, NOT A LIST OF THE GATED BOOKS ────────────────────────────────────────
+    // It WAS that list — `[...MASTER_RECIPES, ...SEASON_RECIPES]` — and it went stale the same night two more
+    // gated books were added. The deep-water kitchen's seven pages and October's three went into FULL_BOOK,
+    // into recipeBookFor and into every roll, and nobody thought to add them here, so a member could be
+    // taught one, have it counted, and never find it at the stove. GrayKitsune, the morning after:
+    //
+    //   "I've obtained some of the new recipes but cannot find them in list when I go to cook things."
+    //
+    // Anything in the resolution book that is not in the base list is a gated page, whichever book it came
+    // from — so a new one is covered the day it is authored and this line never needs editing again. The
+    // `cookedMap.has` filter is still the gate: an unlearned page stays invisible.
+    const alsoKnown = FULL_BOOK.filter((r) => !BASE_RECIPE_IDS.has(r.id) && cookedMap.has(r.id));
     const recipes = [...RECIPES, ...alsoKnown].map((r) => {
         const known = cookedMap.has(r.id);
         const need = Object.entries(r.need).map(([ref, qty]) => {

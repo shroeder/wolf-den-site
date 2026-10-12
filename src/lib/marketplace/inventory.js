@@ -10,7 +10,7 @@ import { getElementOverrides, describeItemElements } from "@/lib/marketplace/ite
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { powerFor } from "@/lib/marketplace/ascension-powers.js";
 import { previewShopPrice, previewShopCoupon, consumeShopCoupon, getShopCoupon, couponedPrice, shelfPrice, petHaggle, haggleCut } from "@/lib/marketplace/shop-coupon.js";
-import { setBonusStats, activeSetBonuses, setForItem, getSetsOverview } from "@/lib/marketplace/sets.js";
+import { setBonusStats, activeSetBonuses, setForItem, getSetsOverview, isCollectionSetItem } from "@/lib/marketplace/sets.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { voidPendingTradesForItem } from "@/lib/marketplace/trade.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
@@ -593,6 +593,9 @@ export async function sellItem(buyerId, itemId) {
     if (item.charged) return { ok: false, error: "not_sellable" };
     // Selling a collection piece would silently delete a permanent bonus for a handful of gold. There is no
     // version of that trade anybody takes on purpose.
+    // ⚠️ AND THIS, TOO, WAS A COMMENT WITH NO CHECK UNDER IT — same as salvageItem. The migrated collections
+    // are protected by not resolving as items; the three Hallowe'en ones are real items and were sellable.
+    if (isCollectionSetItem(itemId)) return { ok: false, error: "collection_piece" };
     // The Standing Offer: once a day, the shop pays what it SELLS for rather than the sell-back value. The
     // gap is the whole point — sell-back is deliberately a fraction of the shelf price.
     // ⚠️ THIS POWER HAS NEVER ONCE FIRED. It was gated on `item.price`, and NO item in the game carries a

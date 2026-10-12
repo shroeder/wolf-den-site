@@ -20,7 +20,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
-         gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
+         gunsFor, accuracyFor, rakeFor, hullHitsFor, hullBonusForBoat, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, foePlanks, BATTLE_STATE_V,
          GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning, gunArt, gunStage, gunArtFlip, gunStageFromLevel, GUN_ART_FACES_LEFT_STAGES,
          gunAmmoUnlocked, GUN_MARK_AMMO, GUN_ART_STAGES,
@@ -2592,10 +2592,13 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
         // whose whole job is to let you decide what to buy next.
         ship: {
             guns: gunsFor(gun),
-            hullGrade: hullGrade(hullHitsFor(hull)),
+            hullGrade: hullGrade(hullHitsFor(hull, boatLevel)),
             accuracy: Math.round(accuracyFor(gunnery, boatLevel) * 100),
-            hp: hullHitsFor(hull),
+            hp: hullHitsFor(hull, boatLevel),
             boatLevel,
+            // The free planks, named so the yard can show what the boat itself is giving you. A reward
+            // nobody can point at is not one -- see hullBonusForBoat.
+            hullFromBoat: hullBonusForBoat(boatLevel),
         },
         // Every barrel you own, priced — the yard draws these ON the ship.
         gunDeck,
@@ -2629,7 +2632,7 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
                             const acc = Math.round(accuracyFor(level, boatLevel) * 100);
                             return `${acc}% to hit${raw >= 0.96 ? " (maxed)" : ""} · ${Math.round(rakeFor(level) * 100)}% rake`;
                         })()
-                        : `${hullHitsFor(level)} planks to shoot away`,
+                        : `${hullHitsFor(level, boatLevel)} planks to shoot away` + (hullBonusForBoat(boatLevel) ? ` (incl. +${hullBonusForBoat(boatLevel)} from boat level)` : ""),
                 };
             }),
             // Cunning is a combat lever too — it decides whether a battle costs you your daily sortie — so it
@@ -3215,7 +3218,7 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy, myDepth = 0) {
     }));
     for (const r of rivals) {
         const level = boatLevelFromUpgrades(r.speed_level, r.luck_level, r.rarity_level, r.find_level, r.raid_level);
-        const guns = gunsFor(r.gun_level || 0), hull = hullHitsFor(r.hull_level || 0);
+        const guns = gunsFor(r.gun_level || 0), hull = hullHitsFor(r.hull_level || 0, level);
         all.push({
             kind: "rival", id: r.id, boost: RIVAL_WEIGHT,
             d: dist(matchupOdds({ ...mine, guns, hull, acc: accuracyFor(r.gunnery_level || 0, level) })),
@@ -3284,7 +3287,7 @@ export async function doBattle(buyerId) {
     const extras = await equippedRaidExtras(buyerId);
     if (raidsUsedToday(row) >= raidsPerDay(myLevel, extras.bonusRaids)) return { ok: false, error: "no_battles", ...(await getSailingState(buyerId)) };
 
-    const myGuns = gunsFor(row?.gun_level || 0), myHull = hullHitsFor(row?.hull_level || 0);
+    const myGuns = gunsFor(row?.gun_level || 0), myHull = hullHitsFor(row?.hull_level || 0, myLevel);
     const match = await matchOpponent(buyerId, myGuns, myHull,
         accuracyFor(row?.gunnery_level || 0, myLevel), row?.fleet_depth || 0);
     return match.kind === "rival" ? doRaid(buyerId, match.id) : doFleetBattle(buyerId, match.rank);

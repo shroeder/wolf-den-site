@@ -7,7 +7,7 @@ import { groveToolPct } from "@/lib/marketplace/grove-tools.js";
 import { itemById, STAT_META, describeStats, mergeStats, statValue, AFFIX_POOL, affixCeiling, isIntrinsicStat, pickWeightedAffix, FORGE, ascendedIdOf, canAscendItem, isAscendedId } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { rarityRank } from "@/lib/marketplace/rarity.js";
-import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
+import { itemsOfSet, setOfItem, isCollectionSetItem } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { pieceById } from "@/lib/marketplace/collection-pieces.js";
 import { getOwnedPieceIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
@@ -300,6 +300,10 @@ export async function salvageItem(buyerId, itemId) {
     if (equippedSet.has(itemId)) return { ok: false, error: "equipped" };
     // A collection piece is a permanent bonus wearing an item's clothes. Melting one down for 40% of its parts
     // would quietly delete that bonus, and nobody makes that trade knowingly.
+    // ⚠️ THIS WAS A COMMENT WITH NO CHECK UNDER IT. See isCollectionSetItem — the eight migrated collections
+    // are protected by not resolving as items at all, and the three Hallowe'en ones are real items that fell
+    // straight through to the DELETE on the next line.
+    if (isCollectionSetItem(itemId)) return { ok: false, error: "collection_piece" };
     const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING item_id`, [buyerId, itemId]).catch(() => null);
     if (!del) return { ok: false, error: "not_owned" };
     // The jewel is yours, not the item's — it comes back to the bag rather than leaving with the piece.
@@ -416,6 +420,10 @@ export async function salvageAllOfRarity(buyerId, rarity) {
         .map((r) => r.item_id)
         .filter((id) => {
             const it = itemById(id);
+            // ⚠️ AND NEVER A COLLECTION PIECE. salvageItem refuses one now, but filtering here as well keeps
+            // it out of `targets` — otherwise a "salvage all legendary" counts ten refusals as a silent skip
+            // and reports a batch that quietly did less than it offered to.
+            if (isCollectionSetItem(id)) return false;
             return it && it.rarity === rarity && !equippedSet.has(id) && !enhanced.has(id) && !it.charged;
         });
     if (!targets.length) return { ok: false, error: "nothing_to_salvage", ...(await getForgeState(buyerId)) };

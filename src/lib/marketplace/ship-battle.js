@@ -164,7 +164,31 @@ export const rakeFor = (gunneryLevel = 0) => Math.min(0.35, 0.06 + Math.max(0, g
 export const BATTLE_STATE_V = 4;
 
 export const HULL_BASE_HITS = 10;
-export const hullHitsFor = (hullLevel = 0) => HULL_BASE_HITS + Math.max(0, hullLevel);
+
+// ── ONE FREE PLANK EVERY TEN BOAT LEVELS ─────────────────────────────────────────────────────────────────────
+// Luke: "I also like the idea of every 10 levels of a ship earns you one free hull."
+//
+// It answers ValkyrieSylve, who had run out of things to buy and was still losing: "I think we should be able
+// to upgrade our ships more. At least 2 more hull and 1 more cannon. Some of these fights are just straight
+// impossible with the current odds to hit." Eric D, at boat level 50, had the same answer from the yard —
+// "everything is still the same for my ship" — because both of them had maxed an 8-level track.
+//
+// ⚠️ IT IS PLANKS, NOT TRACK LEVELS, AND THE DIFFERENCE IS THE WHOLE DESIGN. pickEncounterFor reads the
+// hull_level COLUMN against COMBAT_TRACKS.hull.max to decide how hard an encounter to send you, so granting
+// these as track levels would make every fight harder in exact step with the help — a treadmill that hands you
+// a reward and takes it back in the same tick. Granted as planks, the encounter table never sees them and the
+// only thing that changes is how long you stay afloat, which is what she was asking for.
+//
+// ⚠️ AND IT REVERSES A DELIBERATE REMOVAL, which is Luke's call to make and worth stating plainly: the note
+// above this one records that level driving hull "made hull the only stat that scaled and quietly turned late
+// fights into slugging matches." This is a tenth of the old slope — five planks at boat level 50, against a
+// bare hull of ten and a fully-plated one of eighteen — so it is a late-game top-up rather than the curve that
+// was pulled. The HULL_GRADES bands are only two planks wide, so a level-50 captain does read two grades
+// heavier on the rivals list than they did yesterday.
+export const hullBonusForBoat = (boatLevel = 0) => Math.floor(Math.max(0, Number(boatLevel) || 0) / 10);
+
+export const hullHitsFor = (hullLevel = 0, boatLevel = 0) =>
+    HULL_BASE_HITS + Math.max(0, hullLevel) + hullBonusForBoat(boatLevel);
 
 // ── HOW HEAVY A SHIP IS, AT A GLANCE ─────────────────────────────────────────────────────────────────────────
 // Five grades with their own art, so a ship's hull is something you SEE on the row rather than a number you
@@ -387,7 +411,7 @@ export function shipProfile({ name, boatLevel = 1, gunLevel = 0, gunneryLevel = 
         gunStats: Array.isArray(gunStats) ? gunStats : null,
         accuracy: accuracyFor(gunneryLevel, boatLevel),
         rake: rakeFor(gunneryLevel),
-        hp: hullHitsFor(hullLevel),
+        hp: hullHitsFor(hullLevel, boatLevel),
         ammo: ammoById(ammo),
         // Broadside adds damage, Ironclad takes it off what lands. Both are sea affinity, unchanged.
         dmgMult: 1 + (Number(sea?.broadside) || 0) / 100,
@@ -753,6 +777,20 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
         const after = [];
         for (const order of orders) {
             const gun = order.gun;
+            // ── ⚠️ A GUN THAT IS NO LONGER THERE DOES NOT FIRE ───────────────────────────────────────────
+            // ValkyrieSylve: "cannons are shooting after they have been destroyed, being used in reckoning
+            // and normal shots."
+            //
+            // She is right, and the reason is that a volley is resolved from ORDERS rather than from the
+            // deck. Hers come off the aiming screen and the foe's come from `theirNext`, planned at the END
+            // of the previous round so the fight can telegraph what she is going for — which means a gun you
+            // dismount during this round is still named in a plan made before you dismounted it. The
+            // Reckoning broadside reads the deck directly and has always been right; this loop trusted the
+            // paperwork. Worse after a Reckoning, which deliberately KEEPS the old plan rather than
+            // re-planning, so a gun the Reckoning itself blew off the deck still answered.
+            //
+            // Checked here and not in the planners because this is the one place both decks pass through.
+            if ((mySide.guns[gun] ?? 0) <= 0) continue;
             const zone = zoneById(order.zone);
             const ammo = ammoById(order.ammo);
             // EVERY SHOT CARRIES ITS OWN ODDS, hit or miss. Without this a miss is just a miss, and the

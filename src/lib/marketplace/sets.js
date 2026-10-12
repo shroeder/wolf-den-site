@@ -382,6 +382,26 @@ export function itemsOfSet(setId) {
     return SET_BY_ID[setId]?.items || [];
 }
 
+// ── ⚠️ A COLLECTION PIECE THAT IS ALSO A REAL ITEM ──────────────────────────────────────────────────────────
+// Eight of the nine collection sets were moved OUT of items.js into collection-pieces.js, and that move was
+// the guard: a trophy id does not resolve through itemById, so sell / salvage / auction / trade all bail with
+// "unknown item" before they can reach it. The comments in those functions say a collection piece must never
+// be melted or sold — and they describe a CATEGORY ERROR, not a check, because none was needed any more.
+//
+// The three Hallowe'en collections are the exception. Hollowed Harvest, Gravebound and The Unquiet are built
+// from real ITEMS in items.js (they drop from chests into mkt_user_item), so they walk straight through every
+// one of those paths. GrayKitsune found it from the outside and was right to stop:
+//
+//   "I don't want to accidentally scrap a set piece for parts that the only way to obtain is Halloween chests,
+//    and I also don't want to have to spend parts enhancing all of those pieces once to lock them."
+//
+// Enhancing one was the only defence available to him, because salvageAllOfRarity skips enhanced items — so a
+// single "salvage all legendary" would have taken ten of the fifteen at once, and the permanent set bonus with
+// them, for a handful of parts. This is the check those comments always meant.
+export function isCollectionSetItem(itemId) {
+    return Boolean(setOfItem(itemId)?.collection);
+}
+
 // The set an item belongs to (for display on item cards), or null.
 export function setForItem(itemId) {
     return SET_BY_ITEM[itemId] || null;
