@@ -29,6 +29,10 @@ import { useEffect, useRef, useState } from "react";
 // Where the rod ends and the line begins — ONE point, named once, used by both halves of the tackle. See the
 // note by .fw-tackle: the whole defect was that these were two sets of numbers nobody kept in step.
 const ROD_TIP = [50, 38];
+// And where it is HELD. Measured off a filmed frame rather than guessed: the crew sits at 50% of .fw-boat,
+// which lands at 22.4% of the scene, and their hands are a little above the deck line at 56%. The first cut
+// of this put the butt at (28, 61) — on the rail, a clear hand's width to the right of the figure holding it.
+const ROD_BUTT = [23, 56];
 
 export default function FishingWater({
     phase,          // "idle" | "waiting" | "tell" | "bite" | "hauling" | "done"
@@ -121,7 +125,7 @@ export default function FishingWater({
                 hero's hands on the deck and the far end meets the float's centre, which is pinned by margin
                 rather than transform (the float has its own bob animation on transform and would fight it). */}
             <svg className="fw-tackle" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                <line className="fw-rodline" x1="28" y1="61" x2={ROD_TIP[0]} y2={ROD_TIP[1]} />
+                <line className="fw-rodline" x1={ROD_BUTT[0]} y1={ROD_BUTT[1]} x2={ROD_TIP[0]} y2={ROD_TIP[1]} />
                 <line className="fw-fishline" x1={ROD_TIP[0]} y1={ROD_TIP[1]} x2="76" y2="64" />
             </svg>
             {/* The float is a painted object now, not two rounded divs — it sits in the middle of a scene

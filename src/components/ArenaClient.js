@@ -3404,12 +3404,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null,
                             );
                         })}
                     </div>
-                    {/* A PAGE FROM THE RECIPE BOOK, for laurels. The twin of the Quartermaster's, at the same
-                        odds and the matching price — so neither counter is the obviously correct one to walk
-                        up to, which is the whole point of selling it in both. What you get is a roll, weighted
-                        hard toward the everyday recipes, and it opens the ordinary recipe-found card. */}
+                    {/* A PAGE FROM THE RECIPE BOOK. The twin of the Quartermaster's, at the same odds and the
+                        same price — so neither counter is the obviously correct one to walk up to, which is
+                        the whole point of selling it in both. What you get is a roll, weighted hard toward the
+                        everyday recipes, and it opens the ordinary recipe-found card.
+                        ⚠️ IT COSTS GOLD NOW, not laurels, so the affordability test reads the purse that is
+                        actually charged — see RECIPE_PRICE_GOLD. */}
                     {st.recipeShop ? <RecipeShelf shop={st.recipeShop} busy={busy}
-                        canAfford={(st.laurels || 0) >= st.recipeShop.price}
+                        canAfford={(st.gold || 0) >= st.recipeShop.price}
                         price={st.recipeShop.price}
                         onBuy={() => { Sfx.ui(); act("buy_recipe"); }} /> : null}
                     <PurserPanel st={st} busy={busy} act={act} />

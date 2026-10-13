@@ -8,6 +8,7 @@ import { useState } from "react";
 import * as Gi from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
+import { COIN_ICON } from "@/lib/coin-icon";
 
 // ── THE QUARTERMASTER ────────────────────────────────────────────────────────────────────────────────────────
 // Everything doubloons buy, in one place.
@@ -57,7 +58,7 @@ const PieceArt = ({ piece, className }) => (
     ) : <Icon name={piece.icon} className={className} />
 );
 
-export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, onBuyPiece, onGamble, stoneShop, onBuyStone, recipe = null, onBuyRecipe }) {
+export default function Quartermaster({ shop, locker, purse, gold = 0, busy, onBuyLocker, onBuyPiece, onGamble, stoneShop, onBuyStone, recipe = null, onBuyRecipe }) {
     const [tab, setTab] = useState("locker");
     const [opening, setOpening] = useState(null); // the gamble's chest, handed to the real chest opener
     const [got, setGot] = useState(null);         // the piece a crate turned out to hold
@@ -138,9 +139,14 @@ export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, 
                         back. Sold beside the scrolls because it is the same kind of purchase: a permanent
                         thing you cannot otherwise go and get on purpose. The card it opens is the ordinary
                         recipe-found card; buying one is not a different celebration from finding one. */}
+                    {/* ⚠️ GOLD, NOT THE DOUBLOON PURSE THIS SCREEN IS OTHERWISE ABOUT. A page costs the same
+                        60,000 everywhere it is sold now (see RECIPE_PRICE_GOLD), so the affordability test has
+                        to read the purse that is actually charged — checking `purse` here would grey the
+                        button out for somebody who can afford it and offer it to somebody who cannot, which is
+                        the worst way for a shop to be wrong. */}
                     {recipe ? (
-                        <RecipeShelf shop={recipe} busy={busy} canAfford={purse >= recipe.price}
-                            priceLabel={<><Dbl />{recipe.price}</>}
+                        <RecipeShelf shop={recipe} busy={busy} canAfford={gold >= recipe.price}
+                            priceLabel={<><img className="qm-dbl" src={COIN_ICON} alt="gold" draggable="false" />{recipe.price.toLocaleString()}</>}
                             onBuy={() => onBuyRecipe?.()} />
                     ) : null}
                 </div>

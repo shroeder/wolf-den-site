@@ -550,6 +550,24 @@ export const RECIPE_BANDS = {
 // against 7,500 laurels), so neither counter is the obviously correct one to use — and the laurel price lands
 // exactly on the Armoury's middle crate, which is the tier a permanent unlock belongs beside.
 export const RECIPE_PRICE_DOUBLOONS = 400;
+
+// ── ⚠️ ONE PAGE, SIXTY THOUSAND GOLD, WHEREVER YOU BUY IT ───────────────────────────────────────────────────
+// Luke: "recipes are way too easy to buy all of them ... I watched eric buy every one. Should be one every 60k."
+//
+// He is right about the outcome. Two vendors sold a page out of the `shop` band for a side currency — the
+// Quartermaster for 400 doubloons and the Armoury for 2,500 laurels — and between them they taught 183 pages,
+// 27 of them to one member. Tiers 1 and 2 are 44 of the 118 pages in the book, so for the price of a few
+// voyages the bottom third of the kitchen was a button you held down until it stopped giving.
+//
+// GOLD, AND THE SAME NUMBER SABLE CHARGES. Her page behind the rope is 60,000, and a page is a page: two
+// prices for the same kind of thing is what let the cheap door decide how fast the book filled. Side
+// currencies could never price this honestly either — nobody has ever held 60,000 doubloons or laurels, so
+// any number large enough to matter in those would have read as "never".
+//
+// The BAND is untouched. These two still sell tiers 1-2 only, which was Luke's earlier call ("a shop is the
+// ON-RAMP, not a lottery ticket for Legendary pages"), and Sable still has the only door to the top of the
+// book. What changed is the price of walking through either one.
+export const RECIPE_PRICE_GOLD = 60000;
 // 750 -> 2,500. Recipes were far and away the biggest laurel sink and priced like the smallest: 71 bought in
 // three days against 24 Armoury crates in the same window, which is not a choice between two counters, it is one
 // counter with a queue. At 750 a page cost less than a third of the cheapest crate while being the thing

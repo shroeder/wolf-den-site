@@ -1869,11 +1869,11 @@ export async function getSailingState(buyerId, skyKey = null) {
     // `undefined` at call time rather than failing the build, which is how the Kitchen page went down once
     // already. Same rule as the pantry hook in farm-crops.js and fishing.js.
     const recipeShop = await (async () => {
-        const { RECIPE_PRICE_DOUBLOONS, recipeProgress } = await import("@/lib/marketplace/cooking.js");
+        const { RECIPE_PRICE_GOLD, recipeProgress } = await import("@/lib/marketplace/cooking.js");
         // knowsAll is derived from the progress rather than asked for separately — two queries answering the
         // same question is how two counters end up disagreeing on the same screen.
         const p = await recipeProgress(buyerId);
-        return { price: RECIPE_PRICE_DOUBLOONS, knowsAll: p.shopKnown >= p.shopTotal, knowsBook: p.known >= p.total, ...p };
+        return { price: RECIPE_PRICE_GOLD, currency: "gold", knowsAll: p.shopKnown >= p.shopTotal, knowsBook: p.known >= p.total, ...p };
     })().catch(() => null);
     // LAZY, like every other reach into cooking.js from this file — the note on the recipe shelf above spells
     // out why: cooking imports SEEDS and grantSeed from farm-crops, and a static edge back would be a cycle.
@@ -3807,24 +3807,23 @@ export async function buyLocker(buyerId, id) {
  * keeps the money.
  */
 export async function buyRecipe(buyerId) {
-    const { hasUnknownRecipe, grantBoughtRecipe, RECIPE_PRICE_DOUBLOONS } = await import("@/lib/marketplace/cooking.js");
+    const { hasUnknownRecipe, grantBoughtRecipe, RECIPE_PRICE_GOLD } = await import("@/lib/marketplace/cooking.js");
     if (!(await hasUnknownRecipe(buyerId, "shop"))) {
         return { ok: false, error: "knows_them_all", ...(await getSailingState(buyerId)) };
     }
-    const paid = await db.queryOne(
-        `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2, updated_at = NOW()
-          WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2 RETURNING doubloons`,
-        [buyerId, RECIPE_PRICE_DOUBLOONS]
-    ).catch(() => null);
-    if (!paid) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };
+    // GOLD NOW, NOT DOUBLOONS — see RECIPE_PRICE_GOLD. moveCoin guards the balance inside its own UPDATE and
+    // answers null when it could not be paid, so there is no read-then-write for two taps to slip between.
+    const { moveCoin } = await import("@/lib/marketplace/casino-bank.js");
+    const after = await moveCoin(buyerId, -RECIPE_PRICE_GOLD, "buy_recipe", { meta: { at: "quartermaster" } });
+    if (after === null) return { ok: false, error: "not_enough_gold", cost: RECIPE_PRICE_GOLD, ...(await getSailingState(buyerId)) };
 
     const got = await grantBoughtRecipe(buyerId).catch(() => null);
     if (!got) {
         // The only way here is a race with another source teaching them the last one. Put it back.
-        await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, RECIPE_PRICE_DOUBLOONS]).catch(() => {});
+        await moveCoin(buyerId, RECIPE_PRICE_GOLD, "buy_recipe_refund", { meta: { at: "quartermaster" } });
         return { ok: false, error: "knows_them_all", ...(await getSailingState(buyerId)) };
     }
-    await trackActivity(buyerId, "buy_recipe", { currency: "doubloons", cost: RECIPE_PRICE_DOUBLOONS, recipe: got.id }).catch(() => {});
+    await trackActivity(buyerId, "buy_recipe", { currency: "gold", cost: RECIPE_PRICE_GOLD, recipe: got.id }).catch(() => {});
     return { ok: true, bought: got.name, ...(await getSailingState(buyerId)) };
 }
 
