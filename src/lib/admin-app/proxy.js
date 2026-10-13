@@ -50,7 +50,9 @@ const P = {
  *  - resolveBaseUrl(): the upstream origin
  *  - rules: [{ prefix, anyOf }] — first matching prefix wins; caller needs ANY
  *    of `anyOf`. A path that matches no rule is rejected (not allowlisted).
- *  - applyAuth({ headers, bodyText }) -> { headers, bodyText }: inject the secret.
+ *  - applyAuth({ headers, bodyText }) -> { headers, bodyText, capture? }: inject the secret.
+ *    `capture` is an optional async fn run ONLY if the upstream answers 2xx — for work that must not
+ *    happen on a rejected call (Plaid's token capture).
  */
 const UPSTREAMS = {
     square: {
@@ -106,6 +108,8 @@ const UPSTREAMS = {
             const secret = process.env.PLAID_SECRET || "";
             if (!clientId || !secret) throw new ProxyConfigError("plaid_not_configured");
 
+            // Set below if there is a token worth saving; handleProxy runs it only on a 2xx.
+            let capture = null;
             let payload = {};
             if (bodyText) {
                 try {
@@ -144,21 +148,34 @@ const UPSTREAMS = {
                 // captured before it — the app would hold a good token and be unable to use it.
                 if (fromApp) {
                     if (storeId && fromApp !== stored) {
-                        try {
-                            await upsertIntegration(storeId, "plaid", {
-                                credentialObject: { access_token: fromApp },
-                                // Preserve a known item_id; the body never carries one.
-                                metadata: plaidCred?.metadata || {},
-                            });
-                            proxyLogger.info("admin_app.proxy.plaid.token_captured", {
-                                storeId,
-                                replaced: Boolean(stored),
-                            });
-                        } catch (error) {
-                            // Capturing the token is a convenience for everything OTHER than this
-                            // request. It must never be the reason the banking screen goes blank.
-                            proxyLogger.error("admin_app.proxy.plaid.token_capture_failed", error, { storeId });
-                        }
+                        // ⚠️ ONLY A TOKEN PLAID HAS JUST ACCEPTED IS WORTH KEEPING. Persisting here —
+                        // before the upstream call — stored whatever arrived, and the first thing that
+                        // reached this code was a deliberately fake token used to prove the capture was
+                        // live: Plaid answered INVALID_ACCESS_TOKEN and the junk was saved anyway.
+                        //
+                        // The phone is unharmed either way (its own token wins, above), but every
+                        // server-side reader — script, report, cron — would take the dead token and get
+                        // nothing, which reads as "the bank link is broken" rather than "we saved
+                        // garbage". So the write is handed back as a closure and run by handleProxy only
+                        // after a 2xx. The closure keeps `fromApp`/`stored` in scope, so confirming the
+                        // token costs no second read.
+                        capture = async () => {
+                            try {
+                                await upsertIntegration(storeId, "plaid", {
+                                    credentialObject: { access_token: fromApp },
+                                    // Preserve a known item_id; the body never carries one.
+                                    metadata: plaidCred?.metadata || {},
+                                });
+                                proxyLogger.info("admin_app.proxy.plaid.token_captured", {
+                                    storeId,
+                                    replaced: Boolean(stored),
+                                });
+                            } catch (error) {
+                                // Capturing the token is a convenience for everything OTHER than this
+                                // request. It must never be the reason the banking screen goes blank.
+                                proxyLogger.error("admin_app.proxy.plaid.token_capture_failed", error, { storeId });
+                            }
+                        };
                     }
                 } else if (stored) {
                     payload.access_token = stored;
@@ -166,7 +183,7 @@ const UPSTREAMS = {
             }
 
             headers.set("Content-Type", "application/json");
-            return { headers, bodyText: JSON.stringify(payload) };
+            return { headers, bodyText: JSON.stringify(payload), capture };
         },
     },
 };
@@ -290,8 +307,12 @@ export async function handleProxy(request, upstreamKey, context) {
         if (value) headers.set(name, value);
     }
 
+    // Work an upstream wants done only if its call SUCCEEDS (see the Plaid token capture). Optional —
+    // most upstreams return nothing here.
+    let capture = null;
+
     try {
-        ({ headers, bodyText } = await upstream.applyAuth({
+        ({ headers, bodyText, capture = null } = await upstream.applyAuth({
             headers,
             bodyText,
             storeId: session.user.storeId,
@@ -321,6 +342,14 @@ export async function handleProxy(request, upstreamKey, context) {
     }
 
     let responseBody = await upstreamResponse.text();
+
+    // The upstream accepted the call, so anything applyAuth wanted to keep is now known-good — the Plaid
+    // item access_token being the one case. Deliberately after the response and never before it: a
+    // credential the vendor has just rejected is worse than none, because every later reader takes the
+    // dead one and reports a broken bank link instead of a missing one.
+    if (capture && upstreamResponse.ok) {
+        await capture();
+    }
 
     // ── ONLINE ORDERS ARRIVE AS ONE ANONYMOUS LUMP, AND THIS IS WHERE THEY ARE PUT BACK TOGETHER ─────────
     // The website charges a single payment per basket without creating an itemised Square order, so Square
