@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
 import { requireAdminAppAuth } from "@/lib/admin-app/auth";
 import { hasPermission } from "@/lib/admin-app/permissions";
-import { getDecryptedCredential, resolveOpenAiKey, resolveSquareAccessToken } from "@/lib/admin-app/integrations";
+import { getDecryptedCredential, resolveOpenAiKey, resolveSquareAccessToken, upsertIntegration } from "@/lib/admin-app/integrations";
 import { db } from "@/lib/db";
 import { logGeneration, logText } from "@/lib/marketplace/ai-ledger.js";
 import { createServerLogger } from "@/lib/server-logger";
@@ -119,8 +119,49 @@ const UPSTREAMS = {
 
             if (!path.startsWith("/link")) {
                 const plaidCred = await getDecryptedCredential(storeId, "plaid");
-                if (plaidCred?.credential?.access_token) {
-                    payload.access_token = plaidCred.credential.access_token;
+                const stored = plaidCred?.credential?.access_token || null;
+                // ── THE TOKEN WAS PASSING THROUGH HERE AND BEING THROWN AWAY ────────────────────────
+                // The ledger app predates this proxy: it exchanged its own public_token and keeps the
+                // item access_token in the phone's `plaid_prefs`, sending it in the body of every
+                // /transactions and /accounts call. store_integrations — the table built to hold exactly
+                // this — stayed EMPTY, because the only writer is the /integrations/plaid/exchange
+                // endpoint and the app never calls it.
+                //
+                // So the bank was reachable from one phone and from nowhere else. Nothing server-side
+                // could read an account: no script, no report, no cron. Luke's personal checking (…041)
+                // sits on this same item next to the business checking, and asking "what did I pay
+                // Anthropic from personal?" had no answer anywhere but that handset.
+                //
+                // The token is already in our hands on every call, already going to Plaid, and
+                // store_integrations already encrypts it at rest (AES-256-GCM, same scheme the exchange
+                // endpoint uses). So capture it in passing. Nothing is forwarded that wasn't before.
+                const fromApp = typeof payload.access_token === "string" && payload.access_token
+                    ? payload.access_token
+                    : null;
+
+                // The CLIENT'S token wins when it sends one. Injecting the stored copy over the top
+                // would mean a re-link on the phone gets silently overridden by the stale token we
+                // captured before it — the app would hold a good token and be unable to use it.
+                if (fromApp) {
+                    if (storeId && fromApp !== stored) {
+                        try {
+                            await upsertIntegration(storeId, "plaid", {
+                                credentialObject: { access_token: fromApp },
+                                // Preserve a known item_id; the body never carries one.
+                                metadata: plaidCred?.metadata || {},
+                            });
+                            proxyLogger.info("admin_app.proxy.plaid.token_captured", {
+                                storeId,
+                                replaced: Boolean(stored),
+                            });
+                        } catch (error) {
+                            // Capturing the token is a convenience for everything OTHER than this
+                            // request. It must never be the reason the banking screen goes blank.
+                            proxyLogger.error("admin_app.proxy.plaid.token_capture_failed", error, { storeId });
+                        }
+                    }
+                } else if (stored) {
+                    payload.access_token = stored;
                 }
             }
 
