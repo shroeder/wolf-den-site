@@ -158,7 +158,7 @@ export const VIP_STORE = [
     // gem table moves the case with it and a sixth kind cannot be quietly missed off the shelf.
     ...VIP_GEMS,
 
-    { id: "vip_page", kind: "recipe", ref: "chest_high", name: "A Page From The Back", price: 60000, vip: true,
+    { id: "vip_page", kind: "recipe", ref: "claimed_high", name: "A Page From The Back", price: 60000, vip: true,
         blurb: "Sable will not say where she gets them. She will say they are not from the kitchen." },
 ];
 

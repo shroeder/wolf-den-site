@@ -181,12 +181,13 @@ export async function claim(buyerId, kind, ref) {
         // ⚠️ AND THE TILL REFUSED TO SELL A BOOK SOMEBODY HAD FINISHED. The ladder has to refuse too, or the
         // rung quietly pays nothing to the one member who has earned it most.
         const { grantRecipeReward, hasUnknownRecipe } = await import("@/lib/marketplace/cooking.js");
-        const left = await hasUnknownRecipe(buyerId, "chest_high").catch(() => false);
+        // `claimed_high`, not `chest_high` — a rung is not a find. See the band's note in cooking.js.
+        const left = await hasUnknownRecipe(buyerId, "claimed_high").catch(() => false);
         if (!left) {
             await db.query(`DELETE FROM mkt_casino_claim WHERE id = $1`, [row.id]).catch(() => {});
             return { ok: false, error: "nothing_left" };
         }
-        await grantRecipeReward(buyerId, "chest_high").catch(() => {});
+        await grantRecipeReward(buyerId, "claimed_high").catch(() => {});
     }
 
     await trackActivity(buyerId, "casino_claim", { kind, ref, won: state.won }).catch(() => {});

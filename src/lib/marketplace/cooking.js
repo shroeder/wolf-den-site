@@ -509,6 +509,21 @@ export const RECIPE_BANDS = {
     // exactly as 3-5 always did. For an owner it is the one place master pages come from — the top chest,
     // and Sable's page behind the rope, which draws from this same band.
     chest_high:   { min: 3, max: 6 },   // mythic and above
+    // ── ⚠️ THE TOP TWO TIERS ARE FOUND, NEVER FARMED ────────────────────────────────────────────────
+    // Luke: "it should not give you the best tiers ... the top two tiers, you cannot get them unless you
+    // find them naturally. You shouldn't be able to farm those. They're meant to be pretty rare."
+    //
+    // The casino's winnings ladder and Sable's page both drew `chest_high`, which reaches tier 6 — so the
+    // rarest pages in the game, the eight Master ones included, were on a rung that pays out again every
+    // time a number goes up. Eric won 5,693,534 and that entitled him to twelve of them; the complete book
+    // arrived without him finding anything.
+    //
+    // This is the same shelf one tier short of the top. Tiers 5 and 6 now come only from a mythic-or-better
+    // CHEST and from the weekly boss — things you open or beat, not things a total unlocks.
+    //
+    // ⚠️ IT IS A SEPARATE BAND ON PURPOSE. Lowering chest_high itself would have taken the top of the book
+    // away from the chests as well, and a chest is exactly the "found naturally" case this is protecting.
+    claimed_high: { min: 3, max: 4 },
     seam:         { min: 1, max: 3 },   // the mine's bag — a page pressed in the rock
     seam_deep:    { min: 3, max: 4 },   // a rich seam
     dig:          { min: 2, max: 3 },

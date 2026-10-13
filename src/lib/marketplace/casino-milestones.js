@@ -95,7 +95,12 @@ export const CHEST_EVERY = {
 // Sable's repeatables. VIP-gated as they always were, and the only two rungs on the ladder that are.
 export const VIP_EVERY = {
     gem: 200000,
-    recipe_page: 450000,
+    // ⚠️ 50,000 AND CAPPED, WHICH ONLY READS AS GENEROUS UNTIL YOU SEE THE BAND. Luke: "I think it should be
+    // every 50,000 ... it should not give you the best tiers." Nine times as often as the 450,000 it was, out
+    // of a shelf that stops one tier short of the top — see `claimed_high` in cooking.js. The rung fills the
+    // middle of a book quickly and can never finish one, which is the trade: the pages a winning streak buys
+    // are the ones you would have found anyway, and the rare ones stay rare.
+    recipe_page: 50000,
 };
 
 /** How many of an `every X` rung a lifetime total has earned. */
