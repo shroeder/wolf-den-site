@@ -239,13 +239,20 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
     const BAND = bandFor(gaff);
     const HOLD = holdFor(baitRarity);
     const runCount = RUNS[fight] || 1;
-    // A repaint pulse and nothing more — the value is never read, the frame loop just bumps it to force a
-    // render. It used to be stamped onto the root as `data-tick`, which dirtied an attribute sixty times a
-    // second right beside the class flip that was making the scene shimmer, and no CSS or JS ever read it.
-    const [, setTick] = useState(0);
-    // Which rings were lit on the previous frame, for the hysteresis below. A ref rather than state: it must
-    // not itself cause a render, and it is read during the same render it is written in.
+    // ⚠️ `setTick` IS GONE. It was a counter nothing read, bumped once a frame purely to force a render so
+    // the fish, bar, meter and clock could be repositioned from inline styles — four LAYOUT properties
+    // rewritten sixty times a second. The loop writes custom properties onto the root itself now and the
+    // stylesheet moves everything with transforms, so there is nothing left to force.
+    //
+    // What survives as state is only what changes a handful of times in a whole fight: the mood, and which
+    // of the three rings are lit.
+    const pctRef = useRef(-1);          // last whole percentage written to the meter's label
+    const pctElRef = useRef(null);      // ...and the span it is written into
+    // Which rings were lit on the previous frame, for the hysteresis in the loop. The ref is what the loop
+    // compares against (it must not cause a render to read it); `rings` is the copy the render draws from,
+    // written only when one of the three actually flips.
     const ringRef = useRef({ inside: false, inner: false, core: false });
+    const [rings, setRings] = useState({ inside: false, inner: false, core: false });
     const holdRef = useRef(false);
     const posRef = useRef(0.5);                   // THE FISH, 0 (bottom) .. 1 (top). Swims itself.
     const velRef = useRef(0);
@@ -373,7 +380,9 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
             // you had seen where it was.
             const scoring = elapsed >= REEL_WARMUP_MS;
             const off = Math.abs(posRef.current - bandRef.current);
-            const inside = off <= half;
+            // BAND / 2 spelled out: `half` was a const in the RENDER scope that this loop closed over, which
+            // only worked while the render ran on every frame. The loop owns its own arithmetic now.
+            const inside = off <= BAND / 2;
             const inInner = off <= (BAND * INNER_SHARE) / 2;
             const inCore = off <= (BAND * CORE_SHARE) / 2;
             if (scoring) {
@@ -392,7 +401,50 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
             // mood drives a data-attribute with a transition behind it. It changes a handful of times in a
             // whole fight.
             if (moodRef.current !== phase) { moodRef.current = phase; setMood(phase); }
-            setTick((n) => (n + 1) % 100000);
+
+            // ── ⚠️ THE FOUR MOVING NUMBERS GO STRAIGHT TO THE DOM, NOT THROUGH REACT ─────────────────
+            // This loop used to end with `setTick`, a counter nothing ever read, whose only job was to force
+            // a render sixty times a second so the fish, the bar, the meter and the clock could be redrawn
+            // from inline styles. Luke: "the fishing mini game bar is kinda laggy."
+            //
+            // Two costs, and the second is the expensive one. React re-rendered the whole reel every frame —
+            // and the four styles it wrote were `bottom`, `bottom`, `width` and `width`, every one of which
+            // is a LAYOUT property. Sixty layouts a second on a phone, to move things that never change size.
+            //
+            // They are custom properties now, written onto the root element here, and the stylesheet turns
+            // them into `transform: translateY()` and `transform: scaleX()` — which the compositor does
+            // without laying anything out. The render below no longer depends on any of them, so a frame
+            // costs four style writes instead of a reconcile.
+            const root = rootRef.current;
+            if (root) {
+                root.style.setProperty("--pos", posRef.current.toFixed(4));
+                root.style.setProperty("--band", (bandRef.current - BAND / 2).toFixed(4));
+                root.style.setProperty("--score", scoreOf(bankRef.current, totalRef.current).toFixed(4));
+                root.style.setProperty("--left", Math.max(0, 1 - elapsed / REEL_MS).toFixed(4));
+            }
+            // The percentage beside the meter is TEXT, so it cannot ride a custom property. Written by hand
+            // and only when the whole number moves — about forty times in a fight rather than sixty a second.
+            const pctNow = Math.round(scoreOf(bankRef.current, totalRef.current) * 100);
+            if (pctNow !== pctRef.current) {
+                pctRef.current = pctNow;
+                if (pctElRef.current) pctElRef.current.textContent = `${pctNow}%`;
+            }
+
+            // ── THE RINGS, DECIDED HERE AND NOT IN THE RENDER ────────────────────────────────────────
+            // They used to be computed during render off `ringRef`, which only worked because the render ran
+            // every frame. With the render gone they move up here, and they are the ONE thing in the loop
+            // still allowed to call setState — because they drive classes, they change a handful of times a
+            // fight, and the hysteresis below is what keeps that true.
+            const offRing = Math.abs(posRef.current - bandRef.current);
+            const was = ringRef.current;
+            const edgeOf = (limit, prev) => (prev ? offRing <= limit + RING_HYST : offRing <= Math.max(0, limit - RING_HYST));
+            const nowInside = edgeOf(BAND / 2, was.inside);
+            const nowInner = edgeOf((BAND * INNER_SHARE) / 2, was.inner);
+            const nowCore = edgeOf((BAND * CORE_SHARE) / 2, was.core);
+            if (nowInside !== was.inside || nowInner !== was.inner || nowCore !== was.core) {
+                ringRef.current = { inside: nowInside, inner: nowInner, core: nowCore };
+                setRings({ inside: nowInside, inner: nowInner, core: nowCore });
+            }
 
             if (elapsed >= REEL_MS) {
                 if (!doneRef.current) {
@@ -422,27 +474,22 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
         holdRef.current = false;
     }, []);
 
-    const elapsed = startRef.current ? Math.min(REEL_MS, performance.now() - startRef.current) : 0;
-    const left = Math.max(0, 1 - elapsed / REEL_MS);
-    const pos = posRef.current, band = bandRef.current;
-    const half = BAND / 2;
     // ── HYSTERESIS, SO A BOUNDARY DOES NOT STROBE ────────────────────────────────────────────────────────
-    // This scene re-renders on EVERY animation frame (setTick, ~60/s), and each of these three booleans drives
-    // a class with a 90ms background transition behind it. A fish drifting along a threshold therefore flips
-    // its class sixty times a second while the transition never settles, and the whole gauge shimmers.
-    // Luke: "when fishing it flickers the bar a lot when the reel is midway."
+    // Each of these three drives a class with a 90ms background transition behind it, so a fish drifting
+    // along a threshold used to flip its class sixty times a second while the transition never settled, and
+    // the whole gauge shimmered. Luke: "when fishing it flickers the bar a lot when the reel is midway."
     //
-    // Each edge now has a small dead zone: you must be a little further in to light up and a little further
-    // out to go dark. Scoring is untouched — that is computed in the loop above off the raw offset, and it
-    // should stay exact. This is only what the eye is told.
-    const offNow = Math.abs(pos - band);
-    const edge = (limit, was) => (was ? offNow <= limit + RING_HYST : offNow <= Math.max(0, limit - RING_HYST));
-    const inside = edge(half, ringRef.current.inside);
-    const inInner = edge((BAND * INNER_SHARE) / 2, ringRef.current.inner);
-    const inCore = edge((BAND * CORE_SHARE) / 2, ringRef.current.core);
-    ringRef.current = { inside, inner: inInner, core: inCore };
-    const scoreNow = scoreOf(bankRef.current, totalRef.current);
-    const warming = elapsed < REEL_WARMUP_MS;
+    // Each edge has a small dead zone: you must be a little further in to light up and a little further out
+    // to go dark. Scoring is untouched — that is computed in the loop off the raw offset and stays exact.
+    // This is only what the eye is told.
+    //
+    // ⚠️ THE TEST ITSELF NOW LIVES IN THE FRAME LOOP, which is the only place that can see every frame since
+    // the render stopped running on all of them. What arrives here is the result, and it arrives only when
+    // one of the three has actually flipped.
+    const { inside, inner: inInner, core: inCore } = rings;
+    // `warming` is read once at mount rather than per frame: the loop owns the clock now, and GET READY is a
+    // one-and-a-half second state at the very start that the mood change out of "hold" already follows.
+    const warming = !startRef.current;
     const title = warming ? "GET READY…"
         : mood === "run" ? "IT'S RUNNING!"
         : mood === "tired" ? "IT'S TIRING — NOW!"
@@ -464,19 +511,29 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
                 can't be the reel, otherwise you can't see what you're doing." So the rod is inert now and
                 the hold lives on its own control, bottom-left, where a hand rests anyway. */}
             <div className="fwreel-rod" role="presentation">
-                <div className="fwreel-band" style={{ bottom: `${(band - half) * 100}%`, height: `${BAND * 100}%` }}>
-                    {/* THE CORE. Drawn as a child of the bar so it tracks it for free and scales with Gaff. */}
-                    {/* Drawn as children of the bar so both track it for free and scale with Gaff. */}
-                    <div className="fwreel-inner" style={{ height: `${INNER_SHARE * 100}%` }} />
-                    <div className="fwreel-core" style={{ height: `${CORE_SHARE * 100}%` }} />
+                {/* ── THE CARRIERS ────────────────────────────────────────────────────────────────────────
+                    Each is the full height of the rod, with the thing it carries sitting on its bottom edge,
+                    so translateY(-N%) of the CARRIER moves its passenger N% up the rod — a percentage
+                    transform resolves against the element's own height, and the carrier's height IS the
+                    track. That is what lets the bar and the fish move on the compositor instead of being
+                    re-laid-out from a `bottom` sixty times a second. --pos and --band come from the frame
+                    loop, which writes them straight onto the root. */}
+                <div className="fwreel-bandcar">
+                    <div className="fwreel-band" style={{ height: `${BAND * 100}%` }}>
+                        {/* Drawn as children of the bar so both track it for free and scale with Gaff. */}
+                        <div className="fwreel-inner" style={{ height: `${INNER_SHARE * 100}%` }} />
+                        <div className="fwreel-core" style={{ height: `${CORE_SHARE * 100}%` }} />
+                    </div>
                 </div>
                 {/* THE FISH. It swims itself; your thumb drives the BAR. It was a glowing ball, which is
                     what you draw when you are drawing a position rather than a fish — this is the sprite
                     the old reel had. One species for every fight, deliberately: what is on the line is not
                     revealed until the haul, and a sprite that changed with the tier would give it away. */}
-                <div className={`fwreel-fish${inCore ? " is-core" : inside ? " is-caught" : ""}`} style={{ bottom: `${pos * 100}%` }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/images/fish/fish_mackerel.png" alt="" draggable="false" aria-hidden="true" />
+                <div className="fwreel-fishcar">
+                    <div className={`fwreel-fish${inCore ? " is-core" : inside ? " is-caught" : ""}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/fish/fish_mackerel.png" alt="" draggable="false" aria-hidden="true" />
+                    </div>
                 </div>
             </div>
             {/* ── THE HOLD, ACROSS THE WATER ──────────────────────────────────────────────────────────────
@@ -493,12 +550,14 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
                 {/* Live, and the same number the server receives. What is hidden is the RELATIONSHIP: a good
                     reel floors the bad end of the size roll rather than setting the size, so this reads as
                     "how am I handling it" and never spoils the reveal. */}
+                {/* Both fills are full width and SCALED by a custom property. Animating `width` lays the bar
+                    out again on every frame; scaleX is a compositor transform and costs nothing. */}
                 <div className="fwreel-meter">
-                    <div className="fwreel-meter-fill" style={{ width: `${scoreNow * 100}%` }} />
+                    <div className="fwreel-meter-fill" />
                 </div>
-                <span className="fwreel-pct">{Math.round(scoreNow * 100)}%</span>
+                <span className="fwreel-pct" ref={pctElRef}>0%</span>
             </div>
-            <div className="fwreel-timer"><div className="fwreel-timer-fill" style={{ width: `${left * 100}%` }} /></div>
+            <div className="fwreel-timer"><div className="fwreel-timer-fill" /></div>
         </div>
     );
 }

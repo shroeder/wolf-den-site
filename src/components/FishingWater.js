@@ -26,6 +26,10 @@ import { useEffect, useRef, useState } from "react";
 // swell, the line and the rings are keyframes that run on their own, and a phase change is one attribute
 // write. A scene that re-renders sixty times a second to move a bobber is how the farm's pet-walk once cost a
 // whole frame budget.
+// Where the rod ends and the line begins — ONE point, named once, used by both halves of the tackle. See the
+// note by .fw-tackle: the whole defect was that these were two sets of numbers nobody kept in step.
+const ROD_TIP = [50, 38];
+
 export default function FishingWater({
     phase,          // "idle" | "waiting" | "tell" | "bite" | "hauling" | "done"
     sky,            // scrolling seascape behind the boat
@@ -100,15 +104,25 @@ export default function FishingWater({
                             style={{ transform: hero.flip ? "scaleX(-1)" : undefined }} />
                     ) : null}
                 </span>
-                <span className="fw-rod" />
             </div>
 
-            {/* THE LINE. An SVG with explicit endpoints rather than a rotated div: a rotated bar has to have
-                its angle and length solved by hand for every viewport, and the first cut of this drew a stick
-                floating in the sky beside the boat because that arithmetic was wrong. The viewBox is in
-                percent, so both ends stay pinned wherever the scene is sized. */}
-            <svg className="fw-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                <line x1="47" y1="34" x2="74" y2="62" />
+            {/* ── ⚠️ THE ROD AND THE LINE ARE ONE DRAWING, IN ONE COORDINATE SYSTEM ───────────────────────
+                Luke: "the fishing line and rod looks janky and floating."
+
+                They were in two unrelated spaces. The rod was a rotated 2px div placed at 74% across and 74%
+                up THE BOAT — while the hero stands at 50% of the boat, so it was never in anybody's hands —
+                and the line was an SVG in SCENE percentages starting at a hard-coded (47, 34) that
+                corresponded to nothing. Neither end of the line met the rod, and the rod met nothing at all,
+                so it read as a stick floating in the sky. The note that used to sit here warned about exactly
+                that failure and then described the line only; the rod kept its own broken arithmetic.
+
+                One SVG now, in scene percent, and the rod's tip and the line's first point are THE SAME
+                NUMBERS — they cannot drift apart, because there is only one of them. The butt sits in the
+                hero's hands on the deck and the far end meets the float's centre, which is pinned by margin
+                rather than transform (the float has its own bob animation on transform and would fight it). */}
+            <svg className="fw-tackle" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <line className="fw-rodline" x1="28" y1="61" x2={ROD_TIP[0]} y2={ROD_TIP[1]} />
+                <line className="fw-fishline" x1={ROD_TIP[0]} y1={ROD_TIP[1]} x2="76" y2="64" />
             </svg>
             {/* The float is a painted object now, not two rounded divs — it sits in the middle of a scene
                 where the hull, the hero, the fish and the monsters are all art, and it was the one thing on
