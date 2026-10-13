@@ -426,24 +426,23 @@ export async function purserExchange(buyerId, from, amount) {
 // otherwise spent only on crates and stones, and a permanent unlock is a better sink than a fourth gamble.
 export async function buyArmouryRecipe(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const { hasUnknownRecipe, grantBoughtRecipe, RECIPE_PRICE_GOLD } = await import("@/lib/marketplace/cooking.js");
+    const { hasUnknownRecipe, grantBoughtRecipe, RECIPE_PRICE_LAURELS } = await import("@/lib/marketplace/cooking.js");
     if (!(await hasUnknownRecipe(buyerId, "shop"))) return { ok: false, error: "knows_them_all" };
 
-    // GOLD NOW, NOT LAURELS — see RECIPE_PRICE_GOLD. The same page at the same price wherever it is sold.
-    const { moveCoin } = await import("@/lib/marketplace/casino-bank.js");
-    const after = await moveCoin(buyerId, -RECIPE_PRICE_GOLD, "buy_recipe", { meta: { at: "armoury" } });
-    if (after === null) return { ok: false, error: "not_enough_gold", cost: RECIPE_PRICE_GOLD };
+    const paid = await db.queryOne(
+        `UPDATE mkt_arena SET laurels = laurels - $2 WHERE buyer_id = $1 AND laurels >= $2 RETURNING laurels`,
+        [buyerId, RECIPE_PRICE_LAURELS]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_laurels", cost: RECIPE_PRICE_LAURELS };
 
     const got = await grantBoughtRecipe(buyerId).catch(() => null);
     if (!got) {
-        await moveCoin(buyerId, RECIPE_PRICE_GOLD, "buy_recipe_refund", { meta: { at: "armoury" } });
+        await db.query(`UPDATE mkt_arena SET laurels = laurels + $2 WHERE buyer_id = $1`, [buyerId, RECIPE_PRICE_LAURELS]).catch(() => {});
         return { ok: false, error: "knows_them_all" };
     }
-    await trackActivity(buyerId, "buy_recipe", { currency: "gold", cost: RECIPE_PRICE_GOLD, recipe: got.id }).catch(() => {});
+    await trackActivity(buyerId, "buy_recipe", { currency: "laurels", cost: RECIPE_PRICE_LAURELS, recipe: got.id }).catch(() => {});
     // No reveal payload on purpose — the site-wide watcher shows the same card a found recipe gets.
-    // `gold` rather than `laurels`: the purse this spends from moved, and the screen reads whichever balance
-    // the call hands back. Returning a laurel figure a laurel no longer bought is how a counter starts lying.
-    return { ok: true, bought: got.name, gold: Number(after) || 0 };
+    return { ok: true, bought: got.name, laurels: Number(paid.laurels) || 0 };
 }
 
 

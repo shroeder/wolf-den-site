@@ -1304,7 +1304,6 @@ export default function SailingClient({ initial, hero, pet, captain, halloween =
                         shop={state.combat.shop}
                         locker={state.combat.locker}
                         purse={state.combat.doubloons || 0}
-                        gold={state.gold || 0}
                         busy={busy}
                         onBuyLocker={(id) => act("buy_locker", { id })}
                         recipe={state.combat.recipe}

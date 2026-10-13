@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { GiSpellBook } from "react-icons/gi";
 
 // ── A PAGE FROM THE BOOK ─────────────────────────────────────────────────────────────────────────────────────
-// Sold in two places at the same price, in GOLD at both since 2026-10-13 — see RECIPE_PRICE_GOLD for why the
-// side currencies went. ONE component for both, because they had drifted into two
+// Sold in two places at matching prices — the Armoury for laurels, the Quartermaster for doubloons — so neither
+// counter is the obviously correct one to walk up to. ONE component for both, because they had drifted into two
 // near-identical blocks of markup and the next change would have landed on one of them.
 //
 // WHAT WAS WRONG WITH IT. A heading, a sentence and a price. Sixty-four pages exist, and a member had no way to
