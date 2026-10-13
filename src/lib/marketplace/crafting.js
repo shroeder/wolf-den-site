@@ -871,9 +871,21 @@ export async function getForgeState(buyerId) {
             })(),
         };
     };
-    // No trophy filter: mkt_user_item holds gear only now, so a Forgeplate cannot appear in this list at all.
+    // ── ⚠️ AND NOT A COLLECTION PIECE ───────────────────────────────────────────────────────────────────
+    // This said "no trophy filter: mkt_user_item holds gear only now, so a Forgeplate cannot appear in this
+    // list at all" — true of the eight migrated collections and false of the three Hallowe'en ones, which are
+    // real items and sit in that table alongside ordinary gear.
+    //
+    // So the Forge offered them as scrap, promised the Mythril Dust they would yield, and the server then
+    // refused — Luke, holding two of them: "I can't salvage these." That is precisely the failure the note at
+    // the top of collection-pieces.js was written about ("the Forge spent months offering a Forgeplate as
+    // scrap that the server then refused"), returning because the assumption that made it impossible stopped
+    // being true. A list that offers what the till will not take is worse than one that is simply short.
+    //
+    // Filtered here rather than only guarded in salvageItem, which is what I shipped first: the guard stops
+    // the loss, it does not stop the lie.
     const salvage = (ownedRows || []).map((r) => r.item_id)
-        .filter((id) => !equippedIds.has(id))
+        .filter((id) => !equippedIds.has(id) && !isCollectionSetItem(id))
         .map(dress).filter(Boolean)
         .map((d) => { const cfg = SALVAGE[d.rarity] || SALVAGE.common; return { ...d, salvageMin: cfg.min, salvageMax: cfg.max }; })
         .sort((a, b) => b.salvageTier - a.salvageTier || a.name.localeCompare(b.name));
