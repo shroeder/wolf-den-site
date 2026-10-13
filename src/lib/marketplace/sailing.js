@@ -729,6 +729,29 @@ export function voyageDurationMs(speedLevel = 0, level = 1) {
 }
 // Progressive cost — each level costs quadratically more than the last.
 function upgradeCost(nextLevel) { return 100 * (nextLevel + 1) * (nextLevel + 1); }
+
+// ── ⚠️ THE BOAT'S FIVE TRACKS ARE HALF PRICE, AND ONLY THE BOAT'S ───────────────────────────────────────────
+// Luke: "Ship upgrades are a bit too expensive, it's the most expensive upgrade track by far."
+//
+// He is right, and the arithmetic is worse than "a bit". The boat is the only thing in the game with FIVE
+// tracks that each run to twenty, so the same curve that is a modest sink on a five-level dig track becomes
+// the biggest gold sink there is. Measured against what the Den actually holds:
+//
+//     boat level 60 ... 310,600 gold      (a third of every coin in the game, for one person)
+//     boat level 90 ... 1,022,100 gold
+//     every coin held by all 161 members ... 940,749
+//
+// So the rung at ninety cost more than the entire money supply, and the top sailor — Eric D, boat 51 — had
+// spent 192,500 getting a little past half way. That became acute the moment the ability ladder landed on
+// boat levels 30/60/90: two of the three rungs were priced out of existence.
+//
+// ⚠️ THE BOAT TRACKS ONLY. Digging and fishing come down the SAME buy path and shared this function, and
+// their tracks stop at five or ten levels, so the curve was never the problem there — cutting them too would
+// be repricing two features nobody complained about. They keep upgradeCost; the five boat tracks get this.
+function boatUpgradeCost(nextLevel) { return 50 * (nextLevel + 1) * (nextLevel + 1); }
+const BOAT_TRACKS = new Set(["speed", "fortune", "rarity", "luck", "raid"]);
+const costForTrack = (kind, nextLevel) =>
+    (BOAT_TRACKS.has(String(kind)) ? boatUpgradeCost : upgradeCost)(nextLevel);
 // Dig count is a DIGGING upgrade (not a boat lever): base budget + the Stamina track.
 function digStamina(staminaLevel = 0) { return BASE_STAMINA + Math.round(digTrackValue("stamina", staminaLevel)); }
 // The boat's level is EARNED BY UPGRADING, not by digging: one level per upgrade level bought across 5 tracks.
@@ -1236,15 +1259,15 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         digRefill: { amount: DIG_REFILL, cost: digRefillCost(row?.dig_state?.refills || 0) },
         // The boat's FOUR travel/loot levers — all boat-exclusive. Each carries its per-level effect + current/next value.
         speed: {
-            level: speedLevel, max: MAX_SPEED_LEVEL, cost: upgradeCost(speedLevel), maxed: speedLevel >= MAX_SPEED_LEVEL,
+            level: speedLevel, max: MAX_SPEED_LEVEL, cost: boatUpgradeCost(speedLevel), maxed: speedLevel >= MAX_SPEED_LEVEL,
             minPerLevel: SPEED_MIN_PER_LEVEL, voyageNow: voyageDurationMs(speedLevel, level), voyageNext: voyageDurationMs(speedLevel + 1, level),
         },
         fortune: {
-            level: fortuneLevel, max: MAX_FORTUNE_LEVEL, cost: upgradeCost(fortuneLevel), maxed: fortuneLevel >= MAX_FORTUNE_LEVEL,
+            level: fortuneLevel, max: MAX_FORTUNE_LEVEL, cost: boatUpgradeCost(fortuneLevel), maxed: fortuneLevel >= MAX_FORTUNE_LEVEL,
             encounterNow: Math.round(encounterChance(fortuneLevel) * 100), encounterNext: Math.round(encounterChance(fortuneLevel + 1) * 100),
         },
         rarity: {
-            level: rarityLevel, max: MAX_RARITY_LEVEL, cost: upgradeCost(rarityLevel), maxed: rarityLevel >= MAX_RARITY_LEVEL,
+            level: rarityLevel, max: MAX_RARITY_LEVEL, cost: boatUpgradeCost(rarityLevel), maxed: rarityLevel >= MAX_RARITY_LEVEL,
             pctNow: rarityPct(rarityLevel), pctNext: rarityPct(rarityLevel + 1),
         },
         // ── LUCK BUYS A WAVE EVERY FOUR LEVELS, NOT EVERY LEVEL ─────────────────────────────────────────
@@ -1258,13 +1281,13 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // `wavesAt` is the level the NEXT wave actually arrives at, so the client can name the real price of one
         // instead of drawing an arrow between two identical numbers.
         luck: {
-            level: luckLevel, max: MAX_LUCK_LEVEL, cost: upgradeCost(luckLevel), maxed: luckLevel >= MAX_LUCK_LEVEL,
+            level: luckLevel, max: MAX_LUCK_LEVEL, cost: boatUpgradeCost(luckLevel), maxed: luckLevel >= MAX_LUCK_LEVEL,
             wavesNow: wavesPerDay(luckLevel) + bonusWaves, wavesNext: wavesPerDay(luckLevel + 1) + bonusWaves,
             perLevels: WAVE_LUCK_PER,
             wavesAt: Math.min(MAX_LUCK_LEVEL, (Math.floor(luckLevel / WAVE_LUCK_PER) + 1) * WAVE_LUCK_PER),
         },
         raiding: {
-            level: raidLevel, max: MAX_RAID_LEVEL, cost: upgradeCost(raidLevel), maxed: raidLevel >= MAX_RAID_LEVEL,
+            level: raidLevel, max: MAX_RAID_LEVEL, cost: boatUpgradeCost(raidLevel), maxed: raidLevel >= MAX_RAID_LEVEL,
             pctNow: raidDodgePct(raidLevel), pctNext: raidDodgePct(raidLevel + 1),
         },
         // Daily raids (count-based so the Celestial Sovereign / set perks can grant more than one).
@@ -2645,7 +2668,7 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
                     key: "cunning", name: "Cunning", icon: "GiSpyglass", action: "upgrade_raid", currency: "gold",
                     desc: "Sea-dog nerve — a chance a raid does not use up your daily raid.",
                     level, max: MAX_RAID_LEVEL, maxed: level >= MAX_RAID_LEVEL,
-                    cost: level >= MAX_RAID_LEVEL ? null : upgradeCost(level),
+                    cost: level >= MAX_RAID_LEVEL ? null : boatUpgradeCost(level),
                     effect: `${raidDodgePct(level)}% free`,
                 };
             })(),
@@ -4478,7 +4501,7 @@ async function buyUpgrade(buyerId, kind) {
           WHERE buyer_id = $1 AND free_upgrades > 0 RETURNING free_upgrades`, [buyerId],
     ).catch(() => null);
     const onTheYard = banked ? false : await powerRoll(buyerId, "shipwright_s_debt", 3);
-    const cost = (banked || onTheYard) ? 0 : upgradeCost(cur);
+    const cost = (banked || onTheYard) ? 0 : costForTrack(kind, cur);
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     const paid = cost === 0
         ? { gold: null }
