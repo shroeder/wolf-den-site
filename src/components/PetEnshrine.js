@@ -18,8 +18,8 @@ import { STONES } from "@/lib/marketplace/pet-stones.js";
 // It also draws the state where you have NEITHER stone, which is the common one: a level-6 pet standing there
 // waiting is the whole reason to go and dig. That case says where stones come from rather than just greying
 // out, because a locked button that will not say what unlocks it is the worst thing on any screen.
-export default function PetEnshrine({ pet, level, sprites, stones, enshrined, prices, onEnshrine, busy = false,
-    ownedIds = null, levelByPet = null, allEnshrined = null, equippedId = null }) {
+export default function PetEnshrine({ pet, level, sprites, stones, enshrined, prices, onEnshrine, onReStone = null,
+    busy = false, ownedIds = null, levelByPet = null, allEnshrined = null, equippedId = null }) {
     const [picked, setPicked] = useState(null);
     const [confirming, setConfirming] = useState(false);
 
@@ -44,6 +44,13 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
     // ── ALREADY DONE ── the pet wears its stone, and the ability is running whether it is equipped or not.
     if (enshrined) {
         const m = STONE_META[enshrined] || STONE_META.light;
+        // The one you did NOT spend. compareStones already answers "what does each stone give that the other
+        // does not" for THIS collection, so the swap card reads straight off it rather than computing a second
+        // opinion that could drift from the one on the choice screen.
+        const other = enshrined === "dark" ? "light" : "dark";
+        const otherMeta = STONE_META[other];
+        const otherGain = preview?.[other] || [];
+        const heldOther = Number(stones?.[other]) || 0;
         return (
             <div className="pens pens-done" style={{ "--stone": m.color }}>
                 <div className="pens-done-art">
@@ -59,6 +66,43 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
                     {/* What the stone chose, kept on screen afterwards. A permanent decision whose result you
                         can no longer read is a decision you cannot learn from. */}
                     <p className="pens-done-eff">{m.eff?.desc}</p>
+                    {/* ── ⚠️ THE OTHER STONE, AND WHAT IT WOULD BUY ───────────────────────────────────────
+                        GrayKitsune asked for exactly this: "If I could use another stone of the opposite type
+                        to swap it, could allow showing both abilities after enshrining and show if the current
+                        ability isn't doing anything because a different pet has it/stronger."
+
+                        The panel used to stop at the line above, which is where it hurt most — the ONE place a
+                        member learns a spent stone is doing nothing is the pet that already wears it. Now the
+                        road back is on the same card as the bad news, read off the same compareStones the
+                        choice screen uses, so the two can never disagree. */}
+                    {other && otherMeta?.eff ? (
+                        <div className="pens-swap">
+                            <span className="pens-swap-kick">The other stone · {otherMeta.name}</span>
+                            <b className="pens-swap-name">{otherMeta.eff.icon} {otherMeta.eff.name}</b>
+                            <span className="pens-swap-line">{otherMeta.eff.desc}</span>
+                            {preview ? (
+                                <span className={`pens-stone-gain${otherGain.length ? "" : " is-none"}`}>
+                                    {otherGain.length
+                                        ? `Would add: ${otherGain.map((g) => `${g.label} +${g.delta}`).join(" · ")}`
+                                        : "Adds nothing you do not already have, stronger."}
+                                </span>
+                            ) : null}
+                            {/* The stone you are SPENDING is the other kind, so that is the count that matters.
+                                Saying "you have none" is the useful half — it is why the button is not there. */}
+                            {onReStone ? (
+                                heldOther > 0 ? (
+                                    <button type="button" className="button gold pens-swap-go" disabled={busy}
+                                        onClick={() => onReStone(other)}>
+                                        {busy ? "…" : `Spend a ${otherMeta.name} to switch`}
+                                    </button>
+                                ) : (
+                                    <span className="pens-stone-note">
+                                        Switching costs one {otherMeta.name}, and you are not holding one.
+                                    </span>
+                                )
+                            ) : null}
+                        </div>
+                    ) : null}
                 </div>
             </div>
         );

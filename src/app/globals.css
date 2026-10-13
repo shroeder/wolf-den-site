@@ -17227,6 +17227,17 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* What the stone actually bought, kept on screen for good. The choice cannot be revisited, so the least the
    panel can do is never stop telling you what it was. */
 .pens-done-eff { margin: 6px 0 0; font-size: 0.74rem; line-height: 1.4; color: var(--stone); }
+/* ── THE OTHER STONE, ON A PET THAT ALREADY WEARS ONE ──────────────────────────────────────────────────────
+   The choice CAN be revisited now (a second stone buys the switch), so the done-panel carries the road back
+   on the same card as the result. Fenced off from the lines above it, because it is a new decision rather
+   than more detail about the old one. */
+.pens-swap { margin-top: 10px; padding-top: 9px; border-top: 1px dashed rgba(255,255,255,0.14); }
+.pens-swap-kick { display: block; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.06em;
+    text-transform: uppercase; color: rgba(255,255,255,0.4); }
+.pens-swap-name { display: block; font-size: 0.86rem; color: #fff; margin: 2px 0 2px; }
+.pens-swap-line { display: block; font-size: 0.73rem; line-height: 1.4; color: rgba(255,255,255,0.6); }
+.pens-swap-go { margin-top: 8px; width: 100%; }
+
 @media (max-width: 380px) { .pens-form { width: 78px; height: 78px; } }
 
 /* ── ENSHRINE LAB (dev only) ── */

@@ -73,6 +73,13 @@ export async function POST(request) {
                 const { enshrinePet } = await import("@/lib/marketplace/pet-ascension.js");
                 res = await enshrinePet(buyer.id, String(b?.petId || ""), String(b?.stone || ""));
             }
+            // Pay a second stone to switch an enshrined pet to the OTHER one. Same guards, in the same place
+            // and for the same reason — see reStonePet; it refuses a pet that is not enshrined, refuses the
+            // stone already on it, and spends conditionally so two taps cannot both win.
+            else if (b?.action === "restone") {
+                const { reStonePet } = await import("@/lib/marketplace/pet-ascension.js");
+                res = await reStonePet(buyer.id, String(b?.petId || ""), String(b?.stone || ""));
+            }
             // ⚠️ ABOVE THE FALL-THROUGH. The last branch is a bare `else` that EQUIPS, so an action added
             // below it would not be an unknown action — it would silently equip whatever petId came with it.
             else if (b?.action === "appearance") res = await setPetAppearance(buyer.id, String(b?.petId || ""), Number(b?.level) || 0);

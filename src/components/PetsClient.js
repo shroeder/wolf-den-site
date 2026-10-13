@@ -480,14 +480,18 @@ export default function PetsClient() {
                     {/* ── LEVEL SIX ── the panel only exists once the climb is done, and it draws BOTH forms
                         before you choose, because the choice is permanent and two lines of text is not enough
                         to make one on. */}
-                    {lvl ? (
+                    {lvl ? (() => {
+                        // Read once: the done-panel needs it, and so does the re-stone reveal, which has to
+                        // capture the form the animal is wearing RIGHT NOW as its "before".
+                        const enshrinedStone = (state?.ascension?.enshrined || []).find((e) => e.petId === p.id)?.stone || null;
+                        return (
                         <PetEnshrine
                             pet={p}
                             level={lvl.level}
                             sprites={state?.petSprites?.[p.id] || null}
                             stones={state?.ascension?.stones}
                             prices={state?.ascension?.prices}
-                            enshrined={(state?.ascension?.enshrined || []).find((e) => e.petId === p.id)?.stone || null}
+                            enshrined={enshrinedStone}
                             // The collection itself, so the panel can say what each stone buys THIS member
                             // rather than what it buys in principle. See pet-stone-preview.js.
                             ownedIds={state?.ownedIds || null}
@@ -503,8 +507,18 @@ export default function PetsClient() {
                                 const ok = await action(p.id, "enshrine", { stone });
                                 if (ok) setReveal({ pet: p, stone, before: was, after: will });
                             }}
+                            // Paying a second stone to switch to the other ability. Same reveal as the first
+                            // enshrinement — the animal genuinely changes form, and that is the thing worth
+                            // showing. `before` is the form it is wearing NOW, not its level-6 plain art.
+                            onReStone={async (stone) => {
+                                const was = state?.petSprites?.[p.id]?.[enshrinedStone] || null;
+                                const will = state?.petSprites?.[p.id]?.[stone] || null;
+                                const ok = await action(p.id, "restone", { stone });
+                                if (ok) setReveal({ pet: p, stone, before: was, after: will });
+                            }}
                         />
-                    ) : null}
+                        );
+                    })() : null}
 
                     <div className="petx-abilities">
                         <div className="petx-ability petx-passive">

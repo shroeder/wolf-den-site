@@ -142,6 +142,76 @@ export async function enshrinePet(buyerId, petId, stone) {
     };
 }
 
+// ── SWITCHING THE STONE ON A PET THAT ALREADY CARRIES ONE ────────────────────────────────────────────────────
+// GrayKitsune: "Is there a specific reason we can't use another enshrining stone to swap a pet from Dark to
+// Light/vice versa? If I could use another stone of the opposite type to swap it, could allow showing both
+// abilities after enshrining and show if the current ability isn't doing anything because a different pet has
+// it/stronger."
+//
+// There WAS a reason, and it is written into 356-pet-ascension.sql: "no re-stone path — the choice between
+// breadth and depth is only a choice if it sticks." That held while the choice was legible. It stopped holding
+// the moment we admitted a stone can be spent, permanent, and move no number you own — eighteen of them had,
+// across four members, before the card started saying so. A choice you were not given the information to make
+// is not a choice that earns the right to stick.
+//
+// Luke's call: "Should be able to use a stone to switch."
+//
+// IT COSTS A FULL STONE, which is what keeps it a decision rather than a respec button. You are not undoing
+// the first one — that stone is spent and stays spent — you are paying again for the other ability. And it
+// only goes to the OPPOSITE stone: paying a Darkstone to put a Darkstone on a pet that already wears one buys
+// nothing, and silently taking the stone for it is the exact shape of harm this whole feature just apologised
+// for.
+//
+// The count never changes, so the enshrinement badges are untouched. The level-6 art does change, and already
+// supports it — mkt_pet_sprite_level carries a `variant` per stone for exactly this reason.
+export async function reStonePet(buyerId, petId, stone) {
+    const def = stoneById(stone);
+    const pet = collectibleById(petId);
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    if (!pet || !def) return { ok: false, error: "bad_request" };
+
+    const already = await db.queryOne(
+        `SELECT stone FROM mkt_pet_enshrined WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]
+    ).catch(() => null);
+    if (!already) return { ok: false, error: "not_enshrined" };
+    if (already.stone === def.id) return { ok: false, error: "same_stone", stone: def.id };
+
+    // Spend conditionally inside the UPDATE — neon() has no transactions, so a read-then-write would let two
+    // taps both pass a check only one of them can afford. Same shape as enshrinePet, for the same reason.
+    const paid = await db.queryOne(
+        `UPDATE mkt_pet_stone SET count = count - 1, updated_at = NOW()
+          WHERE buyer_id = $1 AND stone = $2 AND count >= 1 RETURNING count`,
+        [buyerId, def.id]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "no_stone", stone: def.id };
+
+    // Guarded on the stone we READ, so two taps cannot both switch — the loser gets its stone straight back.
+    // The one outcome worth avoiding above all others is a member paying a chase item and receiving nothing.
+    const done = await db.queryOne(
+        `UPDATE mkt_pet_enshrined SET stone = $3, enshrined_at = NOW()
+          WHERE buyer_id = $1 AND pet_id = $2 AND stone = $4 RETURNING pet_id`,
+        [buyerId, petId, def.id, already.stone]
+    ).catch(() => null);
+    if (!done) {
+        await db.query(
+            `UPDATE mkt_pet_stone SET count = count + 1 WHERE buyer_id = $1 AND stone = $2`, [buyerId, def.id]
+        ).catch(() => {});
+        return { ok: false, error: "race" };
+    }
+
+    const { trackActivity } = await import("@/lib/marketplace/activity.js").catch(() => ({ trackActivity: null }));
+    if (trackActivity) {
+        await trackActivity(buyerId, "pet_restoned", { petId, from: already.stone, to: def.id, rarity: pet.rarity }).catch(() => {});
+    }
+
+    return {
+        ok: true,
+        petId, stone: def.id, from: already.stone, stoneName: def.name, color: def.color,
+        pet: { id: pet.id, name: pet.name, rarity: pet.rarity },
+        stonesLeft: Math.max(0, Number(paid.count) || 0),
+    };
+}
+
 // ── BUYING ONE ───────────────────────────────────────────────────────────────────────────────────────────────
 // The floor under the randomness. Same conditional-spend shape as everything else that takes a currency.
 export async function buyStone(buyerId, stone, currency) {
