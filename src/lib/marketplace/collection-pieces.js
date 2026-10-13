@@ -90,6 +90,49 @@ export const COLLECTION_PIECES = [
     { id: "gc_marque", set: "commission", name: "Letter of Marque", rarity: "epic", icon: "GiScrollUnfurled", art: "sealed parchment letter of marque with a red wax seal and ribbon", flavor: "It makes the same act legal. Nothing else about it changes.", sea: { plunder: 6 }, source: "sea_fight", sort: 995 },
     { id: "gc_horn", set: "commission", name: "Powder Horn", rarity: "rare", icon: "GiPowderBag", art: "scrimshawed powder horn on a leather strap", flavor: "Scratched with the names of eleven ships and one date.", sea: { ironclad: 4 }, source: "sea_fight", sort: 996 },
     { id: "gc_colours", set: "commission", name: "The Black Colours", rarity: "mythic", icon: "GiPirateFlag", art: "tattered JET-BLACK pirate flag with a white skull-and-crossbones, flying from a short staff", flavor: "Run these up and the negotiating is finished.", sea: { broadside: 6, plunder: 4 }, source: "sea_fight", sort: 997 },
+
+    // ── THE THREE HALLOWE'EN COLLECTIONS, MIGRATED 2026-10-13 ────────────────────────────────────────────
+    // Hollowed Harvest, Gravebound and The Unquiet were authored as real ITEMS in items.js — the only three
+    // collections ever built that way. Everything that has gone wrong with them since comes from that one
+    // decision, and all of it is the same shape: a thing that is not gear, wearing gear's clothes.
+    //
+    //   the Forge offered them as scrap and the server refused     (Luke: "I can't salvage these")
+    //   they could be SOLD, deleting a permanent set bonus for coins
+    //   "Borrow this one" did nothing, because isPieceId said no
+    //   Gravebound never appeared on the Depths collection panel
+    //   the generator gave them full combat stats and the panel hid them, so members were avoiding
+    //     some of the best gear in the game because the screen said it was worthless
+    //
+    // Luke, after the fourth of those: "make them consistent with the other ones ... I honestly wish
+    // collectibles were just not mistakable for equipment because they're just not the same thing at all.
+    // And obviously it's led you to a place where you made this mistake again."
+    //
+    // So they are trophies now, and the category error is impossible again rather than merely guarded — a
+    // piece id does not resolve through itemById, so sell, salvage, equip, auction and trade all bail before
+    // they can reach it. scripts/check-collections.mjs is what stops a fourth one being authored as gear.
+    //
+    // NO `slot` AND NO COMBAT STATS, by the same contract the other forty pieces are under. Their set
+    // bonuses are untouched — those live in sets.js and pay for being OWNED, and getOwnedSetIds reads the
+    // trophy table and the gear bag both, so the payout never noticed the move.
+    { id: "hw_hollow_crown", set: "hw_harvest", name: "Hollow Crown", rarity: "legendary", icon: "GiPumpkinLantern", flavor: "Someone cut a face in it. The face stayed.", source: "chest", sort: 1300 },
+    { id: "hw_reapers_sickle", set: "hw_harvest", name: "Reaper's Sickle", rarity: "mythic", icon: "GiSickle", flavor: "It is a harvest tool. It was always a harvest tool.", source: "chest", sort: 1302 },
+    { id: "hw_wisp_lantern", set: "hw_harvest", name: "Wisp Lantern", rarity: "legendary", icon: "GiOldLantern", flavor: "Follow it and see.", source: "chest", sort: 1303 },
+    { id: "hw_cord_small_hours", set: "hw_harvest", name: "Cord of Small Hours", rarity: "legendary", icon: "GiBelt", flavor: "Knotted once for every hour nobody was awake.", source: "chest", sort: 1305 },
+    { id: "hw_nine_candles", set: "hw_harvest", name: "Ring of Nine Candles", rarity: "legendary", icon: "GiCandleLight", flavor: "Eight are lit. The ninth is for later.", source: "chest", sort: 1308 },
+
+    { id: "hw_quiet_row_skullcap", set: "hw_gravebound", name: "Skullcap of the Quiet Row", rarity: "legendary", icon: "GiSkullMask", flavor: "Third from the end, under the yew.", source: "chest", sort: 1309 },
+    { id: "hw_gravemould_cuirass", set: "hw_gravebound", name: "Grave-Mould Cuirass", rarity: "legendary", icon: "GiBreastplate", flavor: "Dug up twice. Worn once.", source: "chest", sort: 1301 },
+    { id: "hw_femur_maul", set: "hw_gravebound", name: "Femur Maul", rarity: "mythic", icon: "GiBoneMace", flavor: "It belonged to something that walked upright.", source: "chest", sort: 1310 },
+    { id: "hw_gravewalkers", set: "hw_gravebound", name: "Gravewalkers", rarity: "legendary", icon: "GiBoots", flavor: "Quiet on purpose.", source: "chest", sort: 1304 },
+    { id: "hw_knucklebone_charm", set: "hw_gravebound", name: "Knucklebone Charm", rarity: "legendary", icon: "GiCrossedBones", flavor: "Rattle them and ask again.", source: "chest", sort: 1311 },
+
+    { id: "hw_poltergeist_chain", set: "hw_unquiet", name: "Poltergeist's Chain", rarity: "mythic", icon: "GiChainedHeart", flavor: "You will hear it before the room does.", source: "chest", sort: 1314 },
+    { id: "hw_coldspot_mirror", set: "hw_unquiet", name: "Coldspot Mirror", rarity: "legendary", icon: "GiMirrorMirror", flavor: "Nothing is behind you. Check anyway.", source: "chest", sort: 1312 },
+    { id: "hw_ninth_night_shroud", set: "hw_unquiet", name: "Shroud of the Ninth Night", rarity: "mythic", icon: "GiCape", flavor: "Eight nights it was only a sheet.", source: "chest", sort: 1306 },
+    { id: "hw_trailing_hem", set: "hw_unquiet", name: "Trailing Hem", rarity: "legendary", icon: "GiLegArmor", flavor: "It does not quite reach the floor. It never has.", source: "chest", sort: 1313 },
+    // The chase piece, and the only ascendant of the fifteen — the Ghost chest is the top of the ladder and
+    // has to hold something the other three cannot.
+    { id: "hw_candle_eye", set: "hw_unquiet", name: "Candle-Eye Amulet", rarity: "ascendant", icon: "GiCandleFlame", flavor: "It watches the wick, not you. Mostly.", source: "chest", sort: 1307 },
 ];
 
 export const PIECE_IDS = COLLECTION_PIECES.map((p) => p.id);
