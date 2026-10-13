@@ -501,6 +501,18 @@ export function foeProfile(foe) {
         ammo: ammoById(foe?.ammo || "round"),
         dmgMult: 1,
         dmgTaken: 1,
+        // ── ⚠️ SHE HAS THE LADDER TOO ────────────────────────────────────────────────────────────────────
+        // Luke: "if they have skills, they should use them. Like if they can heal themselves if they're level
+        // 30 plus."
+        //
+        // A designed ship has no boat level, so its RANK is read as one — the field directly above has done
+        // that since the fleet existed. The ladder therefore reaches the top of the fleet and no further:
+        // ranks run to 40, so the heaviest eleven hulls carry the Carpenter and nothing in the catalogue ever
+        // reaches Brace at 60 or Running Fire at 90. A RIVAL is different — they are a member with a real boat
+        // level, and they bring whatever they have actually earned.
+        doubleShot: hasShipAbility(foe?.rank || 1, "doubleShot"),
+        canRepair: hasShipAbility(foe?.rank || 1, "repair"),
+        canBrace: hasShipAbility(foe?.rank || 1, "brace"),
     };
 }
 
@@ -642,6 +654,18 @@ function reckoningBroadside(att, st, who, rng) {
     //
     // Rolled with the same hitChance every other ball uses, through the same evasion — so cutting her sails
     // now protects you from her Reckoning too, which is the decision the mechanic was missing.
+    // ── ⚠️ AND A BRACE STOPS A RECKONING ────────────────────────────────────────────────────────────────
+    // This volley does not come down resolveVolley's fire(), so the brace that absorbs an ordinary broadside
+    // never saw it — and a Reckoning is the one thing anybody braces FOR. "One round where nothing she throws
+    // finds you" has to mean the big one as well, or the ability is a lie on the card.
+    if (theirSide.braced) {
+        theirSide.braced = false;
+        events.push({
+            type: "volley", side: who, braced: true, reckoning: true, dmg: 0, guns: 0, hp: hpPair(st),
+            shots: live.map((gun) => ({ gun, zone: "hull", target: null, ammo: "round", hit: false, braced: true, chance: 0, evasion: 1, dmg: 0, hits: 0 })),
+        });
+        return events;
+    }
     const evasion = evasionOf(theirSide.sails);
     const roundShot = ammoById("round");
     // Running Fire counts here too — a cannon getting a second ball away does not care which volley it is in.
@@ -915,7 +939,9 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
         // broadside next round. Luke caught it while proposing the thing.
         //
         // Spent here, at the moment it does its work, so a brace that is never fired at is never wasted.
-        if (theirSide.braced && who !== "me") {
+        // ⚠️ EITHER DECK. This read `who !== "me"`, so it only ever absorbed HER fire — a braced enemy would
+        // have stood there and taken yours. The side being shot at is the side that braced, whoever is firing.
+        if (theirSide.braced) {
             theirSide.braced = false;
             events.push({
                 type: "volley", side: who, braced: true, dmg: 0, guns: 0, hp: hpPair(st),
@@ -1058,6 +1084,30 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
         // hidden delay nobody could see.
         // The lockout is hers too — see RECKONING_GAP. Without it a big battery refills the meter inside the
         // very round it spent it, which is the fight three people reported.
+        // ── ⚠️ SHE SPENDS HER OWN LADDER ────────────────────────────────────────────────────────────────
+        // Luke: "in the ship fights, if they have skills, they should use them. Like if they can heal
+        // themselves if they're level 30 plus."
+        //
+        // Both are once a battle, same as yours, and both are spent on a plainly readable trigger rather than
+        // a hidden roll — a captain whose decisions you can see is one you can plan against, which is the rule
+        // the rest of this fight is built to (see foeAims: "deliberately readable rather than clever").
+        //
+        // THE CARPENTER when her hull is half gone. Checked before she fires so the planks are back for the
+        // volley you are about to answer, which is what makes it worth watching for.
+        if (foe?.canRepair && !st.foe.repaired && st.foe.hp > 0 && st.foe.hp <= st.foe.max / 2) {
+            st.foe.repaired = true;
+            const before = st.foe.hp;
+            st.foe.hp = Math.min(st.foe.max, st.foe.hp + Math.ceil(st.foe.max / 2));
+            events.push({ type: "repair", side: "foe", healed: st.foe.hp - before, hp: hpPair(st) });
+        }
+        // THE BRACE when your meter is full and off its cooldown — the round a Reckoning can land. She cannot
+        // see your intent and is not given it; a full meter is public on the screen you are both looking at.
+        if (foe?.canBrace && !st.foe.bracedUsed && st.foe.hp > 0
+            && (st.me.reck || 0) >= RECKONING_AT && reckoningReady(st.me, st.round)) {
+            st.foe.bracedUsed = true;
+            st.foe.braced = true;
+            events.push({ type: "brace", side: "foe", hp: hpPair(st) });
+        }
         if (reckoningReady(st.foe, st.round) && st.foe.hp > 0 && st.me.hp > 0) {
             st.foe.reck = 0;
             st.foe.reckLast = st.round;

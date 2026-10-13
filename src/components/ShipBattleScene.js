@@ -609,6 +609,20 @@ function logLine(ev, me, foe) {
     // A round she did not fire has to SAY so. Otherwise the capstone's stun is an enemy volley that silently
     // fails to happen, which reads as a bug rather than as the thing you sailed a hundred ranks for.
     if (ev.type === "stun") return { side: "me", big: true, text: `${nameOf("foe")}'s crew is reeling — she cannot answer` };
+    // ── THE LADDER, SAID OUT LOUD ───────────────────────────────────────────────────────────────────────
+    // Same reasoning as the stun directly above: planks appearing on a hull, or a whole broadside landing on
+    // nothing, is an enemy turn that silently does not do what it should. Unexplained, it reads as a bug.
+    if (ev.type === "repair") {
+        return { side: ev.side === "me" ? "me" : "foe", big: true,
+            text: `${nameOf(ev.side)} ${ev.side === "me" ? "put" : "puts"} ${ev.healed} plank${ev.healed === 1 ? "" : "s"} back on` };
+    }
+    if (ev.type === "brace") {
+        return { side: ev.side === "me" ? "me" : "foe", big: true, text: `${nameOf(ev.side)} braces` };
+    }
+    if (ev.type === "volley" && ev.braced) {
+        const who = ev.side === "me" ? "foe" : "me";   // the side that BRACED is the one being fired at
+        return { side: who === "me" ? "me" : "foe", big: true, text: `${nameOf(who)} took it all — nothing found her` };
+    }
     if (ev.type !== "volley") return null;
     const shots = ev.shots || [];
     const hits = shots.filter((s) => s.hit).length;
@@ -1039,6 +1053,16 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
             sfxWreck();
             setShout({ k: `s${step}`, side: ev.victim === "me" ? "foe" : "me",
                 text: ev.sys === "sails" ? "Her canvas is gone!" : "That gun's dismounted!" });
+        }
+        // The boat's own ladder, on either deck. A heal that happens in silence is the enemy's hull quietly
+        // growing back, which is the one thing a player will read as cheating.
+        if (ev.type === "repair") {
+            setShout({ k: `s${step}`, side: ev.side,
+                text: ev.side === "me" ? `Carpenters below — +${ev.healed} planks!` : `Her carpenters are below — +${ev.healed} planks!` });
+        }
+        if (ev.type === "brace") {
+            setShout({ k: `s${step}`, side: ev.side,
+                text: ev.side === "me" ? "Bracing — nothing touches us!" : "She's bracing!" });
         }
         if (ev.hp) { setMyHp(ev.hp.me); setFoeHp(ev.hp.foe); }
         timers.push(setTimeout(() => { setShake(null); setStep((v) => v + 1); }, 760));
