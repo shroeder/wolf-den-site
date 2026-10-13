@@ -254,41 +254,6 @@ const ICONS = {
 export const itemIcon = (name) => ICONS[name] || GiRing;
 
 export const ITEMS = [
-    // ── THE WORN HALLOWE'EN PIECES — THE OTHER HALF OF THE 2026-10-13 MIGRATION ──────────────────────────
-    // Hollowed Harvest, Gravebound and The Unquiet became trophies, because a collection piece is not gear.
-    // But twenty-seven of them were WORN or ENHANCED — one Candle-Eye Amulet carried +11, four hundred and
-    // forty-eight tier-six parts of somebody's evening — and Luke's rule for that is the whole reason these
-    // exist:
-    //
-    //   "If somebody already built up to +11 and we're about to take it away from them, they're gonna be
-    //    super fucking pissed ... we need to actually just swap it out to an appropriate piece and basically
-    //    manually give it all the upgrades that they did to it. So they'll basically just see that the item
-    //    changed names and the way it looks, but it'll all be the same stats and upgrade level."
-    //
-    // ⚠️ NOTHING ALREADY IN THE CATALOGUE COULD DO THAT JOB, which is the part worth recording. Every
-    // ascendant amulet in the game asks for level 82 and the member holding the +11 is 51; every mythic back
-    // asks for 90 and the member wearing one is 50. The pieces being replaced had NO level gate at all —
-    // that is precisely what made them worth wearing — so any existing piece would have been a swap for
-    // something they could hold and never put on.
-    //
-    // So: a one-for-one mirror. Same slot, same rarity, no requirement, and `source: "halloween"` so they
-    // stay out of every drop pool and are only ever handed over by that migration. Stats come from the
-    // generators below off (id, rarity), the same as everything else here.
-    { id: "hww_hollow_crown", name: "Hollowed Crown", slot: "helmet", rarity: "legendary", icon: "GiPumpkinLantern", flavor: "Someone cut a face in it. The face stayed.", stats: {}, reqLevel: null, source: "halloween", sort: 1320 },
-    { id: "hww_gravemould_cuirass", name: "Grave-Mould Plate", slot: "chest", rarity: "legendary", icon: "GiBreastplate", flavor: "Dug up twice. Worn since.", stats: {}, reqLevel: null, source: "halloween", sort: 1321 },
-    { id: "hww_reapers_sickle", name: "Reaper's Scythe", slot: "main_hand", rarity: "mythic", icon: "GiSickle", flavor: "It is a harvest tool. It was always a harvest tool.", stats: {}, reqLevel: null, source: "halloween", sort: 1322 },
-    { id: "hww_wisp_lantern", name: "Wisp Lamp", slot: "off_hand", rarity: "legendary", icon: "GiOldLantern", flavor: "Follow it and see.", stats: {}, reqLevel: null, source: "halloween", sort: 1323 },
-    { id: "hww_gravewalkers", name: "Gravetreaders", slot: "boots", rarity: "legendary", icon: "GiBoots", flavor: "Quiet on purpose.", stats: {}, reqLevel: null, source: "halloween", sort: 1324 },
-    { id: "hww_cord_small_hours", name: "Belt of Small Hours", slot: "belt", rarity: "legendary", icon: "GiBelt", flavor: "Knotted once for every hour nobody was awake.", stats: {}, reqLevel: null, source: "halloween", sort: 1325 },
-    { id: "hww_ninth_night_shroud", name: "Cloak of the Ninth Night", slot: "back", rarity: "mythic", icon: "GiCape", flavor: "Eight nights it was only a sheet.", stats: {}, reqLevel: null, source: "halloween", sort: 1326 },
-    { id: "hww_candle_eye", name: "Candle-Eye Pendant", slot: "amulet", rarity: "ascendant", icon: "GiCandleFlame", flavor: "It watches the wick, not you. Mostly.", stats: {}, reqLevel: null, source: "halloween", sort: 1327 },
-    { id: "hww_nine_candles", name: "Band of Nine Candles", slot: "ring", rarity: "legendary", icon: "GiCandleLight", flavor: "Eight are lit. The ninth is for later.", stats: {}, reqLevel: null, source: "halloween", sort: 1328 },
-    { id: "hww_quiet_row_skullcap", name: "Helm of the Quiet Row", slot: "helmet", rarity: "legendary", icon: "GiSkullMask", flavor: "Third from the end, under the yew.", stats: {}, reqLevel: null, source: "halloween", sort: 1329 },
-    { id: "hww_femur_maul", name: "Femur Hammer", slot: "main_hand", rarity: "mythic", icon: "GiBoneMace", flavor: "It belonged to something that walked upright.", stats: {}, reqLevel: null, source: "halloween", sort: 1330 },
-    { id: "hww_knucklebone_charm", name: "Knucklebone Talisman", slot: "amulet", rarity: "legendary", icon: "GiCrossedBones", flavor: "Rattle them and ask again.", stats: {}, reqLevel: null, source: "halloween", sort: 1331 },
-    { id: "hww_coldspot_mirror", name: "Coldspot Glass", slot: "off_hand", rarity: "legendary", icon: "GiMirrorMirror", flavor: "Nothing is behind you. Check anyway.", stats: {}, reqLevel: null, source: "halloween", sort: 1332 },
-    { id: "hww_trailing_hem", name: "Trailing Shroudboots", slot: "boots", rarity: "legendary", icon: "GiLegArmor", flavor: "It does not quite reach the floor. It never has.", stats: {}, reqLevel: null, source: "halloween", sort: 1333 },
-    { id: "hww_poltergeist_chain", name: "Poltergeist's Flail", slot: "main_hand", rarity: "mythic", icon: "GiChainedHeart", flavor: "You will hear it before the room does.", stats: {}, reqLevel: null, source: "halloween", sort: 1334 },
 
     // --- Main hand (weapons) ---
     { id: "rusty_sword", name: "Rusty Sword", slot: "main_hand", rarity: "common", icon: "GiBroadsword", flavor: "It's seen better days.", stats: { might: 10 }, reqLevel: 2, source: "level", sort: 10 },
