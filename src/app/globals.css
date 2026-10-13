@@ -13724,7 +13724,20 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fish-ripple { position: absolute; bottom: 12%; width: 70px; height: 70px; margin-left: -35px; border-radius: 50%; border: 1px solid rgba(140,205,255,0.24); animation: fishRipple 4.2s linear infinite; }
 @keyframes fishRipple { from { transform: scale(0.2); opacity: 0; } 25% { opacity: 0.85; } to { transform: scale(1.7); opacity: 0; } }
 
-.fish-card { position: relative; width: min(94vw, 420px); max-height: 92dvh; overflow-y: auto; background: #10141c; border: 1px solid #2a3442; border-radius: 20px; box-shadow: 0 24px 70px rgba(0,0,0,0.6); }
+/* ── ⚠️ overflow-x: clip, BECAUSE A ROTATING SQUARE IS WIDER THAN IT LOOKS ───────────────────────────────
+   Luke, on the catch card: "it flashes and makes a horizontal scroll bar in the modal every second or two."
+
+   .fish-rays is a 240x240 element spinning once every 7s. It is round to look at (border-radius: 50%) but
+   its BORDER BOX is a square, and overflow is computed from the transformed border box — so at 45 degrees it
+   measures 240 x 1.414 = 339px against a content box of about 306px on a phone. It crosses that threshold
+   eight times a revolution, which is once every 0.9 seconds: the scrollbar appears, the content reflows
+   narrower, the scrollbar goes away. That is the flash.
+
+   `clip` rather than `hidden` on purpose — hidden would make this a scroll container on BOTH axes and fight
+   the `overflow-y: auto` the card needs. clip just refuses to scroll. The rays are masked to a ring and sit
+   behind the fish, so the corners being cut off is invisible; the burst ring and the sparks are well inside
+   the width and are untouched. */
+.fish-card { position: relative; width: min(94vw, 420px); max-height: 92dvh; overflow-y: auto; overflow-x: clip; background: #10141c; border: 1px solid #2a3442; border-radius: 20px; box-shadow: 0 24px 70px rgba(0,0,0,0.6); }
 .fish-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid #212a36; }
 .fish-head > strong { font-size: 1.02rem; }
 .fish-casts { margin-left: auto; font-size: 0.76rem; font-weight: 800; color: #8fd8ff; background: rgba(85,211,255,0.12); border: 1px solid rgba(85,211,255,0.3); border-radius: 999px; padding: 3px 9px; }

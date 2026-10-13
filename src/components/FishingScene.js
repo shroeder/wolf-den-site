@@ -260,6 +260,9 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
     const runDirRef = useRef(1);                  // which way it bolted, held for the length of the run
     const runSeenRef = useRef(-1);                // so a run only announces itself once
     const [mood, setMood] = useState("hold");     // hold | run | tired — drives the copy and the glow
+    // What the loop last pushed into `mood`, so the frame loop can skip the write when nothing has moved.
+    // A ref because reading `mood` inside the loop would need it in the effect's deps and restart the fight.
+    const moodRef = useRef("hold");
 
     // WHEN IT RUNS. Spread evenly across the scoring part of the fight, so the last one never lands so late
     // that it cannot be recovered from. Recomputed only when the fish's rarity changes.
@@ -383,7 +386,12 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
             // and brighter in the core, so the best place to be is audible without having to look at it.
             if (inside && holdRef.current && ts - clickRef.current > (inCore ? 80 : 130)) { clickRef.current = ts; sfx.click(); }
 
-            setMood(phase);
+            // ⚠️ ONLY WHEN IT CHANGES. This was an unconditional setMood every frame — sixty state writes a
+            // second to store the same three-letter string, on a scene Luke reports as "kinda laggy". React
+            // can bail out of an identical value but it still has to be handed one and compare it, and the
+            // mood drives a data-attribute with a transition behind it. It changes a handful of times in a
+            // whole fight.
+            if (moodRef.current !== phase) { moodRef.current = phase; setMood(phase); }
             setTick((n) => (n + 1) % 100000);
 
             if (elapsed >= REEL_MS) {
