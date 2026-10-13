@@ -623,7 +623,7 @@ function logLine(ev, me, foe) {
     };
 }
 
-export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, onClose }) {
+export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, onRepair, onBrace, onClose }) {
     const me = battle?.me || {};
     const foe = battle?.foe || {};
     const events = useMemo(() => battle?.events || [], [battle?.events]);
@@ -1089,6 +1089,18 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
         onReckoning?.();
     }, [reckReady, busy, phase, onReckoning]);
 
+    // The boat's ladder — same shape as the Reckoning above, and gated on the SERVER's `canUse` rather than a
+    // rule re-derived here, for the reason the note above gives.
+    const ab = battle?.abilities || null;
+    const doRepair = useCallback(() => {
+        if (!ab?.repair?.canUse || busy || phase !== "aim") return;
+        onRepair?.();
+    }, [ab?.repair?.canUse, busy, phase, onRepair]);
+    const doBrace = useCallback(() => {
+        if (!ab?.brace?.canUse || busy || phase !== "aim") return;
+        onBrace?.();
+    }, [ab?.brace?.canUse, busy, phase, onBrace]);
+
     // A struck ship never goes down, so the sinking cinematic has nothing to play — battle.sunk is null in
     // that case anyway, and this stays keyed to it rather than to "the fight ended".
     const sinkingSide = phase === "sinking" || phase === "result" ? battle?.sunk : null;
@@ -1339,7 +1351,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                             disabled={!reckReady || busy || phase !== "aim"}
                             onClick={reckFire}
                             title={reckReady
-                                ? `${reck.name} — one free volley, every ball lands, targets chosen at random`
+                                ? `${reck.name} — one free volley she does not answer, targets chosen at random`
                                 : reckCooling
                                     ? `${reck.name} is loaded — it cannot follow another, so it comes back next round`
                                     : `${reckAt - reckN} more ${reckAt - reckN === 1 ? "miss" : "misses"}`}>
@@ -1367,6 +1379,45 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                                 </span>
                             )}
                         </button>
+                    ) : null}
+
+                    {/* ── THE BOAT'S OWN LADDER ─────────────────────────────────────────────────────────
+                        Carpenter's Crew at boat level 30, Brace for It at 60. Both sit next to the Reckoning
+                        because they are the same KIND of thing — press it and it has happened — and both are
+                        once a battle, so they read as spent rather than disabled once used. A rung you have
+                        not reached is not drawn at all: a greyed-out button for something twenty levels away
+                        is a nag, not an invitation. */}
+                    {ab?.repair?.unlocked || ab?.brace?.unlocked ? (
+                    <div className="sbt-abils">
+                    {ab?.repair?.unlocked ? (
+                        <button type="button"
+                            className={`sbt-abil sbt-abil-repair${ab.repair.canUse ? " is-ready" : ""}${ab.repair.used ? " is-spent" : ""}`}
+                            disabled={!ab.repair.canUse || busy || phase !== "aim"}
+                            onClick={doRepair}
+                            title={ab.repair.used
+                                ? "The carpenters have already been below this battle"
+                                : ab.repair.canUse
+                                    ? "Carpenter's Crew — half your hull back on, now. Once a battle."
+                                    : "Nothing to plug yet"}>
+                            <b className="sbt-abil-name">Carpenter&rsquo;s Crew</b>
+                            <em className="sbt-abil-cta">{ab.repair.used ? "Spent" : "Half hull back"}</em>
+                        </button>
+                    ) : null}
+                    {ab?.brace?.unlocked ? (
+                        <button type="button"
+                            className={`sbt-abil sbt-abil-brace${ab.brace.canUse ? " is-ready" : ""}${ab.brace.armed ? " is-armed" : ""}${ab.brace.used && !ab.brace.armed ? " is-spent" : ""}`}
+                            disabled={!ab.brace.canUse || busy || phase !== "aim"}
+                            onClick={doBrace}
+                            title={ab.brace.armed
+                                ? "Braced — nothing she throws this round will find you, and the balls that go wide wind nothing"
+                                : ab.brace.used
+                                    ? "You have braced once this battle"
+                                    : "Brace for It — one round where nothing she throws finds you. Once a battle."}>
+                            <b className="sbt-abil-name">Brace for It</b>
+                            <em className="sbt-abil-cta">{ab.brace.armed ? "Standing" : ab.brace.used ? "Spent" : "Take the round"}</em>
+                        </button>
+                    ) : null}
+                    </div>
                     ) : null}
 
                     {/* EVERY GUN, THEN FIRE. Nothing follows anything, so a barrel with no order would simply

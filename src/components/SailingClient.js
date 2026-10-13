@@ -1797,6 +1797,8 @@ export default function SailingClient({ initial, hero, pet, captain, halloween =
                 <ShipBattleScene battle={shipBattle} busy={busy}
                     onVolley={async (aim) => { const d = await act("battle_volley", { aim }); if (d?.battle) setShipBattle(d.battle); }}
                     onReckoning={async () => { const d = await act("battle_reckoning"); if (d?.battle) setShipBattle(d.battle); }}
+                    onRepair={async () => { const d = await act("battle_repair"); if (d?.battle) setShipBattle(d.battle); }}
+                    onBrace={async () => { const d = await act("battle_brace"); if (d?.battle) setShipBattle(d.battle); }}
                     onClose={() => setShipBattle(null)} />
             ) : null}
 

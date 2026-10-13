@@ -214,7 +214,7 @@ export const hullGrade = (hits = 0) => HULL_GRADES.find((g) => hits <= g.max) ||
 // discovers what each round is for by watching the numbers move. Nothing has to say so in words.
 // ── THE RECKONING ────────────────────────────────────────────────────────────────────────────────────────────
 // Every ball of yours that goes wide is counted, and at RECKONING_AT the crew stop taking it. Spending it
-// fires one unanswered volley: every gun still on your deck, every ball lands, each one at a part of her ship
+// fires one unanswered volley: every gun still on your deck, each ball rolled as any other, each one at a part of her ship
 // chosen at random — canvas, timber, or a barrel of hers.
 //
 // It is built out of MISSES on purpose. A run of bad luck is the least interesting thing that can happen in a
@@ -246,6 +246,48 @@ export const RECKONING_NAME = "Reckoning";
 // do reckoning back to back." One full round has to pass between one Reckoning and the next, and it applies to
 // both decks — the mechanic has always read the same from either side and that is the point of it.
 export const RECKONING_GAP = 2;   // rounds between one Reckoning and the next, on either deck
+
+// ── WHAT THE BOAT ITSELF TEACHES YOU ─────────────────────────────────────────────────────────────────────────
+// Luke: "let's add an ability every 25 levels" — then, settling it: "reckoning is level 0, 30 is heal, 60 and
+// 90 not sure, maybe one makes you unhittable for a round without allowing a miss to contribute to enemy
+// reckoning for that turn, and then 90 could be a chance for each cannon to fire twice."
+//
+// ⚠️ THEY ARE IMMEDIATE, AND THAT IS THE RULE THEY WERE CHOSEN BY. Luke, after a first list of buffs and
+// set-ups: "Abilities should be immediate not something that modifies other things." Press it and the thing
+// has happened — planks are back, the round is survived. Nothing here changes how a later roll behaves, and
+// nothing has to be remembered across rounds except that it was spent.
+//
+// A boat level is the five upgrade tracks summed, each capped at 20, so the ladder runs 1 to 101 and the last
+// rung sits near the top of it rather than past it.
+export const SHIP_ABILITIES = {
+    // Rung zero, and it predates the ladder: the free volley you earn by missing.
+    reckoning: { key: "reckoning", level: 0, name: RECKONING_NAME, icon: "GiBroadsword",
+        desc: "Four balls wide and the crew stop taking it — one free broadside she does not answer." },
+    // Once a battle, whenever you choose. The only one that buys back a round you had already lost, which is
+    // why it is the first: a hull of twenty-one planks under fourteen guns is dead in two rounds, and this is
+    // the difference between that and three.
+    repair: { key: "repair", level: 30, name: "Carpenter's Crew", icon: "GiWoodBeam",
+        desc: "Plugs the shot holes where you stand — half your hull back on, once a battle." },
+    // Nothing touches you for a round. ⚠️ AND HER MISSES WIND NOTHING, which is the whole ability rather than
+    // a detail of it: a wide ball normally feeds the firer's Reckoning, so a plain unhittable round would
+    // have filled her meter with fourteen misses and handed you an unanswered broadside for your trouble.
+    // Luke caught that in the same breath as proposing it.
+    brace: { key: "brace", level: 60, name: "Brace for It", icon: "GiShield",
+        desc: "One round where nothing she throws finds you — and the balls that go wide wind nothing." },
+    // The one PASSIVE on the ladder, by design: the top rung should be something you own rather than another
+    // button to remember. 15% a gun over seven barrels is a second ball on 68% of rounds and 97% of fights.
+    doubleShot: { key: "doubleShot", level: 90, name: "Running Fire", icon: "GiCannonShot",
+        desc: "A gun crew quick enough to get a second ball away — 15% on every cannon, every round." },
+};
+export const SHIP_ABILITY_LIST = Object.values(SHIP_ABILITIES);
+export const shipAbilitiesAt = (boatLevel = 1) =>
+    SHIP_ABILITY_LIST.filter((a) => (Number(boatLevel) || 1) >= a.level);
+export const hasShipAbility = (boatLevel, key) =>
+    Boolean(SHIP_ABILITIES[key]) && (Number(boatLevel) || 1) >= SHIP_ABILITIES[key].level;
+
+// Running Fire: the chance ONE cannon gets a second ball away, rolled per gun per volley.
+export const DOUBLE_SHOT_CHANCE = 0.15;
+
 export const reckoningReady = (side, round) =>
     (side?.reck || 0) >= RECKONING_AT && (round - (side?.reckLast ?? -99)) >= RECKONING_GAP;
 
@@ -412,6 +454,11 @@ export function shipProfile({ name, boatLevel = 1, gunLevel = 0, gunneryLevel = 
         accuracy: accuracyFor(gunneryLevel, boatLevel),
         rake: rakeFor(gunneryLevel),
         hp: hullHitsFor(hullLevel, boatLevel),
+        // The boat's own ladder — see SHIP_ABILITIES. Carried on the profile so the engine never has to ask
+        // what level anybody is, and a fleet ship (which has no boat level) simply has none of them.
+        doubleShot: hasShipAbility(boatLevel, "doubleShot"),
+        canRepair: hasShipAbility(boatLevel, "repair"),
+        canBrace: hasShipAbility(boatLevel, "brace"),
         ammo: ammoById(ammo),
         // Broadside adds damage, Ironclad takes it off what lands. Both are sea affinity, unchanged.
         dmgMult: 1 + (Number(sea?.broadside) || 0) / 100,
@@ -556,7 +603,7 @@ export function initBattleState(me, foe) {
 }
 
 // ── SPENDING THE RECKONING ───────────────────────────────────────────────────────────────────────────────────
-// One volley, every gun still standing, every ball lands, each at a part of her ship picked at random. She
+// One volley, every gun still standing, each ball rolled as any other, each at a part of her ship at random. She
 // does not answer it — that is what makes it worth eight misses — and the round counter does not move, so it
 // is genuinely extra rather than a turn you spent.
 //
@@ -582,10 +629,41 @@ function reckoningBroadside(att, st, who, rng) {
     let total = 0;
     const live = mySide.guns.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
 
-    for (const gun of live) {
+    // ── ⚠️ A RECKONING IS UNANSWERED, NOT UNMISSABLE ────────────────────────────────────────────────────
+    // Every ball used to be written `hit: true, chance: 1, evasion: 0` — guaranteed, and blind to the canvas
+    // it was shot through. Luke: "Reckoning shouldn't be 100 percent hit."
+    //
+    // He is right, and the enemy's is why. She throws fourteen guns to your seven, so the free volley she
+    // earns for missing was fourteen certain hits into a twenty-one plank hull — a third of your ship, with
+    // no roll to survive and nothing you had done wrong. Shredding her canvas, dismounting her guns, every
+    // decision the fight is built on, all of it counted for nothing against the one volley that mattered
+    // most. What makes a Reckoning worth four misses is that it is FREE and UNANSWERED; it does not also have
+    // to be certain.
+    //
+    // Rolled with the same hitChance every other ball uses, through the same evasion — so cutting her sails
+    // now protects you from her Reckoning too, which is the decision the mechanic was missing.
+    const evasion = evasionOf(theirSide.sails);
+    const roundShot = ammoById("round");
+    // Running Fire counts here too — a cannon getting a second ball away does not care which volley it is in.
+    const firing = [];
+    for (const g of live) {
+        firing.push(g);
+        if (att?.doubleShot && rng() < DOUBLE_SHOT_CHANCE) firing.push(g);
+    }
+    for (const gun of firing) {
         if (theirSide.hp <= 0) break;
         const aim = reckoningTarget(theirSide, rng);
-        const shot = { gun, zone: aim.zone, target: aim.target, ammo: "round", hit: true, chance: 1, evasion: 0, rake: false, reckoning: true };
+        const chance = hitChance(att, zoneById(aim.zone), roundShot, evasion, gun);
+        const shot = { gun, zone: aim.zone, target: aim.target, ammo: "round", hit: true, chance, evasion, rake: false, reckoning: true };
+
+        // ⚠️ A MISS HERE WINDS NOTHING. The ordinary miss branch feeds the firer's own meter, and this volley
+        // IS the meter being spent — so counting these would let a Reckoning start refilling itself the
+        // instant it was thrown, and a wide shot from a big battery would hand the next one straight back.
+        if (rng() > chance) {
+            shot.hit = false; shot.dmg = 0; shot.hits = 0;
+            shots.push(shot);
+            continue;
+        }
 
         if (aim.zone === "hull") {
             const bore = rng() < gunDmgChance(gunStat(att?.gunStats, gun).dmg);
@@ -618,12 +696,21 @@ function reckoningBroadside(att, st, who, rng) {
     return events;
 }
 
-export function resolveReckoning(me, foe, state, { rng = Math.random } = {}) {
-    const st = {
-        v: BATTLE_STATE_V, round: state.round, gauge: state.gauge,
+// ⚠️ ONE CLONER FOR EVERY RESOLVER THAT IS NOT A VOLLEY. This was written out by hand inside
+// resolveReckoning, naming the fields it kept — which quietly DROPS anything not named. That was survivable
+// while `theirNext` was the only casualty (sailing.js puts it back), and stops being survivable the moment
+// the sides carry `repaired` and `bracedUsed`: spend the Carpenter, then press Reckoning, and the hand-built
+// copy would hand you the Carpenter back.
+function cloneBattleState(state) {
+    return {
+        ...state,
         me: { ...state.me, guns: [...state.me.guns], gunMax: [...(state.me.gunMax || state.me.guns)] },
         foe: { ...state.foe, guns: [...state.foe.guns], gunMax: [...(state.foe.gunMax || state.foe.guns)] },
     };
+}
+
+export function resolveReckoning(me, foe, state, { rng = Math.random } = {}) {
+    const st = cloneBattleState(state);
     // `cooling` is its own error rather than not_ready, because the two are different sentences on screen: one
     // says keep missing, the other says wait a round.
     if ((st.me.reck || 0) < RECKONING_AT) return { ok: false, error: "not_ready", state: st, events: [] };
@@ -641,6 +728,51 @@ export function resolveReckoning(me, foe, state, { rng = Math.random } = {}) {
     const struck = !sunk && struckColours(st);
     const over = Boolean(sunk) || struck;
     return { ok: true, events, state: st, over, win: over, sunk, struck, stalemate: false, mine: [], theirs: [] };
+}
+
+// ── THE CARPENTER'S CREW ─────────────────────────────────────────────────────────────────────────────────────
+// Half your hull back on, once a battle, whenever you choose. Luke: "the heal is once a battle whenever you
+// choose to use it."
+//
+// ⚠️ IT DOES NOT COST THE ROUND, same as a Reckoning — `round` does not move and she does not answer. A heal
+// that cost you a turn against a battery doing eleven planks a round would be a net loss of planks, which is
+// the one thing a heal cannot be. What stops it being free is that there is exactly one.
+//
+// Half of MAX rather than a flat number, because a hull runs from ten planks to twenty-three: a flat five is
+// a lifeline on a sloop and a rounding error on a first-rate.
+export function resolveRepair(me, foe, state) {
+    const st = cloneBattleState(state);
+    if (!me?.canRepair) return { ok: false, error: "not_unlocked", state: st, events: [] };
+    if (st.me.repaired) return { ok: false, error: "spent", state: st, events: [] };
+    if (st.me.hp >= st.me.max) return { ok: false, error: "no_damage", state: st, events: [] };
+    st.me.repaired = true;
+    const before = st.me.hp;
+    st.me.hp = Math.min(st.me.max, st.me.hp + Math.ceil(st.me.max / 2));
+    const healed = st.me.hp - before;
+    return {
+        ok: true, healed,
+        events: [{ type: "repair", side: "me", healed, hp: hpPair(st) }],
+        state: st, over: false, win: false, sunk: null, struck: false, stalemate: false, mine: [], theirs: [],
+    };
+}
+
+// ── BRACE FOR IT ─────────────────────────────────────────────────────────────────────────────────────────────
+// One round where nothing she throws finds you. Armed here and SPENT inside the next volley (see `braced` in
+// resolveVolley), so bracing against a round she never fires is not wasted — and so the absorbing happens in
+// the one place both decks already pass through.
+//
+// Like the Reckoning and the Carpenter, it does not cost the round: you brace AND you fire.
+export function resolveBrace(me, foe, state) {
+    const st = cloneBattleState(state);
+    if (!me?.canBrace) return { ok: false, error: "not_unlocked", state: st, events: [] };
+    if (st.me.bracedUsed) return { ok: false, error: "spent", state: st, events: [] };
+    st.me.bracedUsed = true;
+    st.me.braced = true;
+    return {
+        ok: true,
+        events: [{ type: "brace", side: "me", hp: hpPair(st) }],
+        state: st, over: false, win: false, sunk: null, struck: false, stalemate: false, mine: [], theirs: [],
+    };
 }
 
 // ── WHAT THE CLIENT IS ALLOWED TO HAVE ASKED FOR ─────────────────────────────────────────────────────────────
@@ -775,7 +907,36 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
         const shots = [];
         let total = 0;
         const after = [];
-        for (const order of orders) {
+        // ── ⚠️ BRACE FOR IT — AND HER MISSES WIND NOTHING ────────────────────────────────────────────────
+        // The round is simply survived: every ball she throws goes wide, and none of them feeds her
+        // Reckoning. That second half is the ability rather than a footnote on it — the ordinary miss branch
+        // below hands the firer a point of meter for every wide ball, so a plain unhittable round would have
+        // filled a fourteen-gun battery's meter four times over and paid you back with an unanswered
+        // broadside next round. Luke caught it while proposing the thing.
+        //
+        // Spent here, at the moment it does its work, so a brace that is never fired at is never wasted.
+        if (theirSide.braced && who !== "me") {
+            theirSide.braced = false;
+            events.push({
+                type: "volley", side: who, braced: true, dmg: 0, guns: 0, hp: hpPair(st),
+                shots: orders.filter((o) => (mySide.guns[o.gun] ?? 0) > 0).map((o) => ({
+                    gun: o.gun, zone: o.zone, target: o.target, ammo: o.ammo, hit: false, braced: true,
+                    chance: 0, evasion: 1, dmg: 0, hits: 0,
+                })),
+            });
+            return;
+        }
+        // ── RUNNING FIRE ─────────────────────────────────────────────────────────────────────────────────
+        // A gun crew quick enough to get a second ball away. Rolled per cannon per volley and expanded into
+        // the order list rather than handled inside the loop, so the second ball goes down the SAME path as
+        // the first: it rolls to hit, it can rake, it can bore, and it winds the meter when it goes wide.
+        // A parallel damage path for a bonus shot is how a bonus shot ends up obeying different rules.
+        const volley = [];
+        for (const o of orders) {
+            volley.push(o);
+            if (att?.doubleShot && rng() < DOUBLE_SHOT_CHANCE) volley.push({ ...o, second: true });
+        }
+        for (const order of volley) {
             const gun = order.gun;
             // ── ⚠️ A GUN THAT IS NO LONGER THERE DOES NOT FIRE ───────────────────────────────────────────
             // ValkyrieSylve: "cannons are shooting after they have been destroyed, being used in reckoning

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, waveAtSailor, resetRaid, merchantMinigame, merchantBuy, marketDay, buyRecipe, fishCast, fishLand, fishRecords, fishRecharge, fishingUnlocked, doBattle, shipBattleVolley, buyAmmo, buyLocker, setLoadout, upgradeCombat, upgradeGun, shipBattleReckoning, buyPiece, gambleChest } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, waveAtSailor, resetRaid, merchantMinigame, merchantBuy, marketDay, buyRecipe, fishCast, fishLand, fishRecords, fishRecharge, fishingUnlocked, doBattle, shipBattleVolley, buyAmmo, buyLocker, setLoadout, upgradeCombat, upgradeGun, shipBattleReckoning, shipBattleRepair, shipBattleBrace, buyPiece, gambleChest } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -63,6 +63,10 @@ export async function POST(request) {
                 case "upgrade_combat": return noStore(await upgradeCombat(g.buyer.id, body.track));
                 case "upgrade_gun": return noStore(await upgradeGun(g.buyer.id, body.gun, body.track));
                 case "battle_reckoning": return noStore(await shipBattleReckoning(g.buyer.id));
+                // The boat's own ladder — Carpenter's Crew at level 30, Brace for It at 60. Both are
+                // gated server-side on the profile (see resolveRepair / resolveBrace), not on the button.
+                case "battle_repair": return noStore(await shipBattleRepair(g.buyer.id));
+                case "battle_brace": return noStore(await shipBattleBrace(g.buyer.id));
                 case "buy_piece": return noStore(await buyPiece(g.buyer.id, body.piece));
                 case "buy_stone": {
                     const { buyStone } = await import("@/lib/marketplace/pet-ascension.js");

@@ -22,7 +22,8 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, hullBonusForBoat, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, foePlanks, BATTLE_STATE_V,
-         GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning, gunArt, gunStage, gunArtFlip, gunStageFromLevel, GUN_ART_FACES_LEFT_STAGES,
+         GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning, resolveRepair, resolveBrace, gunArt, gunStage, gunArtFlip, gunStageFromLevel, GUN_ART_FACES_LEFT_STAGES,
+         SHIP_ABILITY_LIST, shipAbilitiesAt, DOUBLE_SHOT_CHANCE,
          gunAmmoUnlocked, GUN_MARK_AMMO, GUN_ART_STAGES,
          RECKONING_AT, RECKONING_NAME, reckoningReady } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
@@ -2931,6 +2932,21 @@ const buildBattleView = (st, meta, { row = null, hulls = null } = {}) => ({
     foeReck: { at: RECKONING_AT, n: Math.max(0, Math.min(RECKONING_AT, st.foe.reck || 0)), name: RECKONING_NAME,
         ready: reckoningReady(st.foe, st.round),
         cooling: (st.foe.reck || 0) >= RECKONING_AT && !reckoningReady(st.foe, st.round) },
+    // ── THE BOAT'S OWN LADDER, AS THE SCENE READS IT ────────────────────────────────────────────────────
+    // Unlocked by boat level and spent once a battle each. `unlocked` comes off the same profile the engine
+    // gates on, so a button can never offer something the resolver will refuse. `braced` is the armed state
+    // rather than the spent one — the scene says "nothing will touch you this round" while it is standing.
+    abilities: {
+        repair: { unlocked: Boolean(meta.meProfile ? shipProfile(meta.meProfile).canRepair : false),
+            used: Boolean(st.me.repaired), level: 30,
+            canUse: Boolean(meta.meProfile ? shipProfile(meta.meProfile).canRepair : false)
+                && !st.me.repaired && st.me.hp < st.me.max },
+        brace: { unlocked: Boolean(meta.meProfile ? shipProfile(meta.meProfile).canBrace : false),
+            used: Boolean(st.me.bracedUsed), armed: Boolean(st.me.braced), level: 60,
+            canUse: Boolean(meta.meProfile ? shipProfile(meta.meProfile).canBrace : false) && !st.me.bracedUsed },
+        doubleShot: { unlocked: Boolean(meta.meProfile ? shipProfile(meta.meProfile).doubleShot : false),
+            chance: DOUBLE_SHOT_CHANCE, level: 90 },
+    },
     // Each gun's own ceiling — a barrel with Iron on it holds more hits than the one beside it, and the
     // scene has to read "1 of 3" against the right number.
     gunMax: { me: st.me.gunMax || null, foe: st.foe.gunMax || null },
@@ -3057,6 +3073,42 @@ export async function shipBattleVolley(buyerId, aim) {
         ...(await getSailingState(buyerId)),
     };
 }
+
+// ── THE TWO THINGS THE BOAT ITSELF LETS YOU DO ───────────────────────────────────────────────────────────────
+// Neither costs the round, for the same reason the Reckoning does not: against a battery doing eleven planks
+// a round, an action that skipped your broadside would cost more than it gave. What limits them is that there
+// is exactly one of each per battle. Her orders survive both — you acted inside the round, you did not skip
+// it — which is the rule shipBattleReckoning already established.
+//
+// One shared body, because the two differ only in which resolver they call and the shape of what they log.
+// Writing them out twice is how the saved-state handling in one of them ends up a line behind the other.
+async function shipBattleAction(buyerId, resolve, flag) {
+    const row = await readRow(buyerId);
+    const open = readBattle(row);
+    if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
+    const { me, foe } = profilesFrom(open.meta);
+
+    const res = resolve(me, foe, open.state);
+    if (!res.ok) return { ok: false, error: res.error || "not_ready", ...(await getSailingState(buyerId)) };
+
+    res.state.theirNext = open.state.theirNext || planFoeRound(res.state, me, foe);
+    await saveBattle(buyerId, res.state, open.meta);
+    const after = await readRow(buyerId);
+    return {
+        ok: true,
+        battle: {
+            ...(await battleView(res.state, open.meta, { row: after })),
+            events: res.events, over: false, [flag]: true, healed: res.healed ?? null,
+        },
+        ...(await getSailingState(buyerId)),
+    };
+}
+
+/** Carpenter's Crew — half the hull back, once a battle. Boat level 30. */
+export const shipBattleRepair = (buyerId) => shipBattleAction(buyerId, resolveRepair, "repaired");
+
+/** Brace for It — one round where nothing she throws finds you. Boat level 60. */
+export const shipBattleBrace = (buyerId) => shipBattleAction(buyerId, resolveBrace, "braced");
 
 // ── SPENDING THE RECKONING ───────────────────────────────────────────────────────────────────────────────────
 // The free volley the miss meter pays for. It does not consume the round and she does not answer it, so it
