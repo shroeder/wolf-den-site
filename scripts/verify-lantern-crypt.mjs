@@ -76,7 +76,9 @@ for (const e of crypt) {
 }
 want.add(`/images/delves/${HALLOWEEN_DUNGEON.bg.split("/").pop()}`);
 for (const f of [...HALLOWEEN_DUNGEON.foes.map((x) => x.sprite), HALLOWEEN_DUNGEON.boss.sprite]) want.add(f);
-for (const u of want) if (!fs.existsSync(`public${u}`)) missing.push(u);
+// A sprite path may carry a `?v=` cache-bust (see CRYPT_ART_V in delve-catalog) — that is part of the URL
+// the browser asks for, not part of the filename on disk. Strip it or every versioned sprite reads missing.
+for (const u of want) if (!fs.existsSync(`public${u.split("?")[0]}`)) missing.push(u);
 check(missing.length === 0, `all ${want.size} pictures exist on disk`, missing.join(", "));
 
 // ── AND IT FIGHTS AT THE RUNG IT IS GATED AT ────────────────────────────────────────────────────────────
@@ -91,9 +93,16 @@ same("foe damage", HALLOWEEN_DUNGEON.dmg, ember.dmg);
 same("boss damage", HALLOWEEN_DUNGEON.boss.dmg, ember.boss.dmg);
 same("gold a floor", HALLOWEEN_DUNGEON.goldPer, ember.goldPer);
 same("xp a floor", HALLOWEEN_DUNGEON.xpPer, ember.xpPer);
-// ⚠️ THE GATE IS PART OF THE DIFFICULTY. `dmg` is flat and your health is not, so a dungeon whose damage is
-// written for level 30 and whose door opens at 25 is a trap with a sign on it saying it is safe.
-check(HALLOWEEN_DUNGEON.minLevel === ember.minLevel, "and the door opens at the same level", `${HALLOWEEN_DUNGEON.minLevel}`);
+// ⚠️ AND IT HAS NO DOOR, WHICH IS THE POINT. This asserted `minLevel === ember.minLevel` on the argument
+// that the gate is part of the difficulty — and it has been failing ever since Luke overruled it: "Halloween
+// dungeon shouldn't have a level requirement on it. I told you I wanted the difficulty to resemble a level 30
+// dungeon, but I didn't tell you to make it have a level requirement." A check that contradicts a shipped
+// decision is worse than no check: it trains you to read a red line as normal.
+//
+// So it now asserts the decision instead. `tier` is what carries the Ember Deep's PAY (see dungeonTier) and
+// is asserted separately below, so dropping the gate cannot quietly demote the crypt's loot.
+check(HALLOWEEN_DUNGEON.minLevel === 0, "and the door has no level on it at all", `${HALLOWEEN_DUNGEON.minLevel}`);
+check(HALLOWEEN_DUNGEON.tier === ember.minLevel, "while the PAY still sits on the Ember Deep's rung", `tier ${HALLOWEEN_DUNGEON.tier} vs ember ${ember.minLevel}`);
 
 // ── AND THE OTHER FOUR STILL DEAL ───────────────────────────────────────────────────────────────────────
 // The deck file is shared, so a change for the crypt that quietly broke the Ember Deep would be exactly the

@@ -179,6 +179,13 @@ export const DUNGEONS = [
 // risk, less money, and nothing on screen explaining why. The LOOT table stays where it is: the crypt's
 // payout is the candy, the gift boxes and the Harvest's End set, and that is the part that should not look
 // like anybody else's.
+// ⚠️ A REDRAWN SPRITE NEEDS A NEW URL OR NOBODY SEES IT. Same path plus new bytes means every member who
+// has already walked the crypt keeps the OLD picture until their cache expires — which for the one person
+// who reported the problem is the one person most likely to have it cached. The Hollow King, the Wick
+// Wraith and the Sheet Shade were redrawn on 2026-10-13 (heads and hems sliced off at the canvas edge);
+// bump this whenever any of those three files change. See [[redrawn-art-must-be-versioned]].
+const CRYPT_ART_V = 2;
+
 export const HALLOWEEN_DUNGEON = {
     // ⚠️ minLevel 0 IS THE DOOR; `tier` IS THE PAY. They were one field, and in four places `minLevel >= 30`
     // decides whether a floor pays a GOLD chest or an iron one. Dropping the gate to 0 without splitting
@@ -189,13 +196,13 @@ export const HALLOWEEN_DUNGEON = {
     bg: "/images/delves/bg-lanterncrypt.webp",
     loot: { parts: [2, 4], chest: "iron", bigChest: "gold", frags: [5, 8], gear: ["rare", "epic"], gearOdds: 0.075 },
     foeX: 2.9, bossX: 7.0, dmg: [30, 46], goldPer: [48, 82], xpPer: [12, 19],
-    boss: { id: "lanterncrypt_boss", name: "The Hollow King", dmg: [41, 62], sprite: "/images/delves/foe-hollow-king.webp",
+    boss: { id: "lanterncrypt_boss", name: "The Hollow King", dmg: [41, 62], sprite: `/images/delves/foe-hollow-king.webp?v=${CRYPT_ART_V}`,
         blurb: "It wears a crown of candle stubs, and every one of them is still lit." },
     foes: [
-        { id: "wickwraith", name: "Wick Wraith", sprite: "/images/delves/foe-wickwraith.webp" },
+        { id: "wickwraith", name: "Wick Wraith", sprite: `/images/delves/foe-wickwraith.webp?v=${CRYPT_ART_V}` },
         { id: "gourdling", name: "Gourdling", sprite: "/images/delves/foe-gourdling.webp" },
         { id: "barrowhound", name: "Barrow Hound", sprite: "/images/delves/foe-barrowhound.webp" },
-        { id: "sheetshade", name: "Sheet Shade", sprite: "/images/delves/foe-sheetshade.webp" },
+        { id: "sheetshade", name: "Sheet Shade", sprite: `/images/delves/foe-sheetshade.webp?v=${CRYPT_ART_V}` },
     ],
 };
 

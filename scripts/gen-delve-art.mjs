@@ -24,7 +24,23 @@ fs.mkdirSync(OUT, { recursive: true });
 // unrelated drawings — the same reason the fish are all described side-on.
 const STYLE = "Painterly cel-shaded 2D video-game art, bold clean dark outlines, chunky readable silhouette, high contrast, vibrant colors, soft inner shading, fantasy action-RPG style.";
 const CUTOUT = "ISOLATED as a clean die-cut sprite on a FULLY TRANSPARENT background (alpha channel) — absolutely NO backdrop, NO scenery, NO ground, NO cast shadow, NO glow halo, NO white sticker rim. Nothing but the subject. No text, no words, no letters, no logo, no watermark, no border.";
-const FOE = `A single fantasy dungeon MONSTER, full body, three-quarter view facing the viewer, menacing but readable at small size. ${STYLE} ${CUTOUT}`;
+// ⚠️ FRAMING IS A HARD RULE, NOT A COMPOSITION NOTE. The Hollow King shipped with the top of his head and
+// the hem of his robe sliced flat off the canvas: opaque pixels ran to y=0 and y=511 with 134 of them on the
+// very first row, which is a figure drawn too big for its own frame rather than a container cropping it
+// (`.dlr-art` is `object-fit: contain` and cannot crop). Luke: "his head is cut off... it makes everybody
+// think, geez, no wonder this is AI."
+//
+// "Full body" alone does not buy a margin — it was already in this prompt. What works is naming the edges,
+// giving a percentage, and saying draw it SMALLER rather than cropped. Lifted verbatim from gen-grove-art's
+// BOSS constant, where the same wording fixed the same failure. See [[ledges-are-painted-and-biome-dressed]].
+const FRAME = "Drawn LARGE but ENTIRELY INSIDE the frame with roughly 12% completely empty space across the TOP, 12% across the BOTTOM and 8% down each side. The highest point of the subject - the tip of its head, crown, horns, hat or candles - must be clearly visible with empty space ABOVE it, and the lowest point - its feet, hem or tail - must be clearly visible with empty space BELOW it. NO part of the subject may touch or run off any edge. Fit the WHOLE creature in view, smaller rather than cropped. Do NOT zoom in on it."
+// ⚠️ SATURATION IS A HOUSE RULE AND THE MODEL DRIFTS OFF IT ON DARK SUBJECTS. The Hollow King came back
+// muddy olive-brown and low contrast beside a roster of vibrant purples and oranges — Luke: "it seems to
+// violate our styles". A grim subject is not a licence for a grey one. And NO GROUND SHADOW: CUTOUT already
+// forbids it, and the model still painted a pale smudge under the robe, which reads as a sticker on the
+// stage because every other sprite floats. Both are restated here as positives the model will act on.
+const VIBRANT = "RICHLY SATURATED, vibrant, punchy colours with strong light and deep shadow - bright luminous highlights against dark areas, NOT muted, NOT washed out, NOT desaturated, NOT a grey or brown-grey palette. The subject must read as colourful even when it is a grim one. NO ground shadow, NO pool of darkness, NO smudge or patch of colour beneath the subject - it floats on pure transparency with nothing under its feet.";
+const FOE = `A single fantasy dungeon MONSTER, full body, three-quarter view facing the viewer, menacing but readable at small size. ${FRAME} ${STYLE} ${VIBRANT} ${CUTOUT}`;
 const OBJ = `A single fantasy dungeon OBJECT game icon, three-quarter view, centered and filling most of the frame. ${STYLE} ${CUTOUT}`;
 const SCENE = `A wide atmospheric fantasy dungeon INTERIOR background plate, empty of characters, deep perspective receding into darkness, dramatic moody lighting, painterly cel-shaded game art with rich color. No characters, no creatures, no text, no words, no logo, no watermark, no UI, no border.`;
 
@@ -56,8 +72,13 @@ const ART = {
     "bg-lanterncrypt-rest": [`${SCENE} A quiet dry alcove in a barrow wall with a worn stone bench, a single steady lantern, a folded blanket and a cold hearth. Calm and safe.`, "scene"],
     "bg-lanterncrypt-puzzle": [`${SCENE} A crypt wall set with three identical sealed stone doors, each carved with a different jack-o-lantern face, orange light seaming their edges.`, "scene"],
 
-    "foe-hollow-king": [`${FOE} A towering gaunt crowned figure in rotted burial robes, a hollow carved pumpkin for a head with fire burning inside it, a crown of melted candle stubs still lit around its brow, long skeletal hands, corn stalks and grave soil clinging to the hem.`, "boss"],
-    "foe-wickwraith": [`${FOE} A hovering tattered shroud with no body inside it, a single tall burning candle where its head should be, pale wax running down the cloth, thin grasping sleeves.`, "foe"],
+    // ⚠️ THE PUMPKIN IS THE WHOLE HEAD, AND SAYING SO IS THE FIX. The first version asked for a "crowned
+    // figure" whose candle crown sat "around its brow" — a brow is a face, so the model drew a human head
+    // AND a pumpkin in front of it, reading as two heads stacked. "Long skeletal hands", unbounded, bought a
+    // third arm reaching in from the lower right. Both are now stated as negatives, which is the only form
+    // the model reliably honours.
+    "foe-hollow-king": [`${FOE} A towering gaunt figure in rotted burial robes. Its head is a single hollow carved jack-o-lantern with fire burning inside it, sitting directly on its shoulders — the pumpkin IS the entire head: there is NO human face, NO skull and NO second head anywhere on this figure. A ring of melted candle stubs, each one still lit, is set around the top of the pumpkin like a crown. It has EXACTLY TWO arms and EXACTLY TWO hands, long and skeletal, one on each side of the body and no others. Corn stalks and grave soil cling to the hem of the robe.`, "boss"],
+    "foe-wickwraith": [`${FOE} A hovering tattered shroud with no body inside it, a single tall burning candle where its head should be, pale wax running down the cloth, thin grasping sleeves.`, "tall"],
     "foe-gourdling": [`${FOE} A squat scurrying creature made of a carved pumpkin on stubby root legs, a jagged grin lit from within, torn vine arms, trailing seeds and pulp.`, "foe"],
     "foe-barrowhound": [`${FOE} A gaunt skeletal hound of a dog with earth-matted fur peeling off exposed ribs, eye sockets burning pale orange, grave soil falling from its jaws.`, "foe"],
     "foe-sheetshade": [`${FOE} A classic draped-sheet ghost with two torn eye holes, the cloth grey and grave-stained, trailing away into mist below with no feet, one arm reaching out.`, "foe"],
@@ -253,9 +274,33 @@ const ART = {
     "track-ward": [`${OBJ} A heavy travelling cloak with a silver clasp, faint blue protective runes glowing along its hem, hanging as if worn.`, "icon"],
 };
 
-const SIZE = { scene: "1536x1024", rare: "1024x1024", boss: "1024x1024", foe: "1024x1024", icon: "1024x1024" };
+// ⚠️ BOSSES ARE ASKED FOR IN PORTRAIT, AND THAT IS THE FRAMING FIX, NOT A STYLE CHOICE. A boss is a tall
+// standing figure; a square canvas around a 2:3 subject is an invitation to crop, and the model took it
+// twice on the Hollow King even with the edges named in the prompt — the candle crown came back sliced flat
+// off the top both times. Asking in the object's own aspect is what finally bought the margin. The same
+// trap, and the same fix, as the Grove's hanging vines. See [[ledges-are-painted-and-biome-dressed]].
+// PX constrains WIDTH only, so a boss lands at 512x768 and `.dlr-art` (object-fit: contain) handles it.
+const SIZE = { scene: "1536x1024", rare: "1024x1024", boss: "1024x1536", tall: "1024x1536", foe: "1024x1024", icon: "1024x1024" };
 // Rare finds are SCENES rather than cutouts — the reward is a whole room, so they get more pixels than an icon.
-const PX = { scene: 1024, rare: 420, boss: 512, foe: 448, icon: 256 };
+// ⚠️ `tall` IS NOT A SIZE, IT IS A SILHOUETTE. A square canvas round a tall thin subject is an invitation
+// to crop, and naming the edges in the prompt does not buy it back — the Wick Wraith is a hovering shroud
+// with a candle on its head and it came back sliced at top AND bottom twice, the same way the Hollow King
+// did. It is generated in portrait and delivered square exactly like a boss, at a foe's pixels and a foe's
+// price. Reach for it whenever a foe is clearly taller than it is wide.
+const PX = { scene: 1024, rare: 420, boss: 512, tall: 448, foe: 448, icon: 256 };
+// ⚠️ A BOSS IS ASKED FOR IN PORTRAIT BUT DELIVERED SQUARE, and both halves matter. Portrait is what buys
+// the margin out of the model. But `.dlr-art` is `width: 46%; max-height: 70%; object-fit: contain`, so a
+// 2:3 sprite is height-limited and renders NARROWER than the 1:1 foes around it — the Hollow King came out
+// visibly smaller on the stage than his own minions, which is backwards. So the figure is trimmed out of
+// the tall plate and re-centred on a square at BOSS_FILL of its height, putting it back at the same scale
+// as every other boss while keeping a margin no model has to be trusted with.
+// 0.94, not 0.88. `.dlr-stage` is 16/10 and `.dlr-art` is capped by `max-height: 70%`, so what the boss
+// fills of its own canvas IS how big it reads on the stage - at 0.88 the Hollow King rendered 12% SHORTER
+// than an ordinary foe, which is backwards. The margin only has to clear the drop-shadow, not frame it.
+const BOSS_FILL = 0.94;
+// Anything at or below this is treated as fully transparent. 8 clears the model's floor without eating the
+// genuine antialias ramp, which climbs past it within a pixel.
+const ALPHA_FLOOR = 8;
 
 async function generate(prompt, kind) {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -267,7 +312,11 @@ async function generate(prompt, kind) {
                     // Backdrops are the one thing on screen at full size for the whole run, and "low" showed:
                     // mushy, muddy plates that read as one zoomed texture. Sprites are 256-512px and low is
                     // genuinely indistinguishable there, so only the scenes pay for the better tier.
-                    model: "gpt-image-1", prompt, size: SIZE[kind], quality: kind === "scene" ? "medium" : "low", n: 1,
+                    // Bosses join the scenes on medium. They render at 512px — the largest sprite in the
+                    // game — and low is where the Hollow King's three hands and doubled head came from.
+                    // Ordinary foes stay low: at 448px it really is indistinguishable, and there are twenty
+                    // of them. $0.042 an image against $0.011. See [[ai-art-spend-discipline]].
+                    model: "gpt-image-1", prompt, size: SIZE[kind], quality: (kind === "scene" || kind === "boss") ? "medium" : "low", n: 1,
                     // Scenes are meant to be opaque plates; everything else must key out cleanly.
                     ...(kind === "scene" || kind === "rare" ? {} : { background: "transparent" }),
                 }),
@@ -298,8 +347,35 @@ await Promise.all(Array.from({ length: 3 }, async () => {
         try {
             const buf = await generate(prompt, kind);
             const out = path.join(OUT, `${k}.webp`);
-            await sharp(buf)
-                .resize({ width: PX[kind], withoutEnlargement: true })
+            let img = sharp(buf).resize({ width: PX[kind], withoutEnlargement: true });
+
+            // ⚠️ ZERO THE ALPHA FLOOR, OR drop-shadow DRAWS A BOX. "Transparent" does not come back at
+            // alpha 0 — the Hollow King returned 5,268 pixels at alpha 1-8 scattered out to the canvas
+            // edge, well past the figure. `.dlr-art` carries `filter: drop-shadow(0 8px 20px ...)`, and a
+            // drop-shadow is cast by ANY pixel with alpha above zero, so a fringe nobody can see in a
+            // viewer renders as a hard rectangle behind the sprite on the stage.
+            // Same landmine as the Grove's decorations. See [[sprite-alpha-floor-drop-shadow-box]].
+            if (kind !== "scene" && kind !== "rare") {
+                const { data, info } = await img.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+                for (let i = 3; i < data.length; i += info.channels) if (data[i] <= ALPHA_FLOOR) data[i] = 0;
+                img = sharp(data, { raw: { width: info.width, height: info.height, channels: info.channels } });
+            }
+
+            // Tall plate in, square sprite out. Trim must come AFTER the floor is zeroed or there is no
+            // border for it to find — see [[sprite-alpha-floor-drop-shadow-box]].
+            if (kind === "boss" || kind === "tall") {
+                const side = PX[kind];
+                // .png() is not decoration: img is a RAW-pixel pipeline here, and toBuffer() on one of
+                // those returns headerless pixels that composite() cannot parse.
+                const body = await img.trim().resize({
+                    height: Math.round(side * BOSS_FILL), width: Math.round(side * BOSS_FILL),
+                    fit: "inside", withoutEnlargement: false,
+                }).png().toBuffer();
+                img = sharp({ create: { width: side, height: side, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+                    .composite([{ input: body, gravity: "centre" }]);
+            }
+
+            await img
                 // Backdrops are opaque and can take a lower quality; sprites need their alpha kept clean.
                 .webp(kind === "scene" ? { quality: 82 } : { quality: 88, alphaQuality: 100 })
                 .toFile(out);
