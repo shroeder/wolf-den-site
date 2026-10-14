@@ -14,6 +14,7 @@ import {
 } from "@/lib/marketplace/grove-catalog.js";
 import { settleKills, rollBoss } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
+import { groveFighter } from "@/lib/marketplace/grove-kit.js";
 import { grantStone } from "@/lib/marketplace/pet-ascension.js";
 import { grantDecoration } from "@/lib/marketplace/farm-decorations.js";
 import { GROVE_PLOT_CAP } from "@/lib/marketplace/farm-crops.js";
@@ -132,7 +133,7 @@ async function heroLook(buyerId) {
 export async function groveState(buyerId) {
     if (!buyerId || !groveOpen(buyerId)) return { ok: false, error: "closed" };
 
-    const [p, zones, items, seen, emblems, tools, look] = await Promise.all([
+    const [p, zones, items, seen, emblems, tools, look, hero] = await Promise.all([
         playerRow(buyerId),
         // ⚠️ THE COOLDOWN IS COMPUTED IN SQL, ON THE QUERY THIS ALREADY RAN. Two reasons. It costs nothing
         // — no extra round trip, and round trips are the meter that bills. And the comparison happens where
@@ -149,6 +150,10 @@ export async function groveState(buyerId) {
         db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT slot, tier FROM mkt_grove_tool WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         heroLook(buyerId),
+        // ⚠️ WHAT THE PLAYER ACTUALLY BUILT. Gear, forge, sets, jewels, compendium, pet, badges, casino
+        // tracks and the class tree, through the Arena's own combatStats + fighterFrom. Before this the
+        // hero was a hardcoded 12 power and none of it reached the Grove. See grove-kit.js.
+        groveFighter(buyerId),
     ]);
 
     const killsBy = Object.fromEntries((zones || []).map((z) => [z.zone_id, z]));
@@ -168,6 +173,7 @@ export async function groveState(buyerId) {
     return {
         ok: true,
         ...look,
+        hero,
         unlockedN: Number(p?.unlocked_n) || 1,
         packSlots: Number(p?.pack_slots) || 16,
         bankSlots: Number(p?.bank_slots) || 16,

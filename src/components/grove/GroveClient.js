@@ -150,26 +150,35 @@ export default function GroveClient({ initial }) {
 
     const leave = useCallback(() => { setSession(null); setView("map"); setBossWon(null); refresh(); }, [refresh]);
 
-    // Your stats for the scene. Account stats + equipped emblems, which is what Luke described driving
-    // damage, attack speed and health.
+    // ── WHAT YOU BUILT, AND IT IS BUILT ON THE SERVER ───────────────────────────────────────────────
+    // Luke: "Every stat should be important that you have on your gear, as well as all the passives that
+    // you get, just like the arena... I do care about honoring all the players' commitments to their gear
+    // and their passives and their pets and everything."
+    //
+    // ⚠️ THIS USED TO BE A HARDCODED `{ power: 12 }` PLUS EMBLEMS, and that one literal was the whole of
+    // the hero. A level-30 member in best-in-slot, with a full badge set, an ascended pet and a maxed class
+    // tree hit for exactly the same 12 as an account made this morning — forge, sets, jewels, compendium,
+    // pets, badges and the casino tracks all worth precisely nothing in this zone.
+    //
+    // It is `st.hero` now: grove-kit.js builds it through the Arena's own combatStats + fighterFrom, with
+    // the Grove's emblems folded into the SAME stat pool so an emblem's Might rides the same curve a
+    // sword's does. Nothing is summed here any more — a second copy of the arithmetic is how the two would
+    // drift. See grove-kit.js.
     const stats = useMemo(() => {
-        const e = { power: 12, maxHp: 120, armour: 8, critRate: 5, critDamage: 50, lifeSteal: 0, attackSpeed: 0, moveSpeed: 0 };
-        for (const em of st?.emblems || []) {
-            if (em.slot === null || em.slot === undefined || !em.stars) continue;
-            const meta = GROVE_EMBLEMS[em.id];
-            if (!meta) continue;
-            const v = meta.per * em.stars;
-            if (meta.stat === "might") e.power += v;
-            else if (meta.stat === "vitality") e.maxHp += v * 4;
-            else if (meta.stat === "armour") e.armour += v;
-            else if (meta.stat === "crit_rate") e.critRate += v;
-            else if (meta.stat === "crit_damage") e.critDamage += v;
-            else if (meta.stat === "life_steal") e.lifeSteal += v;
-            else if (meta.stat === "attack_speed") e.attackSpeed += v;
-            else if (meta.stat === "move_speed") e.moveSpeed += v;
-        }
-        return e;
-    }, [st?.emblems]);
+        const h = st?.hero;
+        // The neutral fighter, for a state that has not loaded yet. Deliberately NOT the old 12/120/8:
+        // a placeholder that looks like a real build is one somebody tunes against.
+        if (!h) return null;
+        return {
+            damage: h.damage, dmgPct: h.dmgPct,
+            critChance: h.critChance, critMult: h.critMult,
+            // Tempo is a RATE, and the scene turns it into a swing interval. See the cadence note there.
+            tempo: h.tempo, haste: h.haste,
+            lifesteal: h.lifesteal, stun: h.stun,
+            bleedChance: h.bleedChance, bleedDamage: h.bleedDamage, bleedLeech: h.bleedLeech,
+            armour: h.armor, maxHp: h.health, moveSpeed: h.moveSpeed || 0,
+        };
+    }, [st?.hero]);
 
     // What the scene actually eats: the equipped food, its heal fraction, and how many are in the bag.
     // Resolved here rather than in the scene so the scene never has to know what a recipe is.

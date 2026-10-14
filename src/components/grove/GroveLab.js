@@ -83,13 +83,20 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
 
     // Deliberately a mid-game kit rather than a fresh one: a hero who cannot kill anything films thirty
     // seconds of nothing, and a hero who one-shots everything never shows a health bar draining.
+    // ⚠️ THE SHAPE IS grove-kit.js's FIGHTER NOW, not the old hand-rolled one. The scene reads `damage`,
+    // `critChance` (a SHARE, not a percent), `critMult`, `tempo` and `armour`, so a fixture written in the
+    // old names silently gives the lab hero zero of everything and films a hero who cannot hurt anything.
     const stats = useMemo(() => ({
-        maxHp: 600, power: scene === "loot" ? 9999 : 34, critRate: scene === "fight" ? 50 : 22,
-        critDamage: 70, attackSpeed: 10, armour: 20,
-        // ⚠️ NO LIFESTEAL AND NO ARMOUR IN THE DEATH SCENE. Four percent of a 34-power swing every 400ms
-        // out-heals anything a zone-three creature does to you, so the hero stood among three of them
-        // getting healthier. The one scene about dying has to be the one scene that cannot win.
-        lifeSteal: scene === "death" ? 0 : 4,
+        maxHp: 600, armour: 20, moveSpeed: 0,
+        damage: scene === "loot" ? 9999 : 34, dmgPct: 0,
+        critChance: scene === "fight" ? 0.5 : 0.22, critMult: 1.7,
+        // Tempo is a multiple of the bare rate, so 1.1 is the old "+10% attack speed".
+        tempo: 1.1, haste: 0,
+        bleedChance: scene === "fight" ? 0.35 : 0, bleedDamage: 0, bleedLeech: 0,
+        // ⚠️ NO LIFESTEAL IN THE DEATH SCENE. A few percent of every swing out-heals anything a zone-three
+        // creature does to you, so the hero stood among three of them getting healthier. The one scene
+        // about dying has to be the one scene that cannot win. These are POINTS, not a share.
+        lifesteal: scene === "death" ? 0 : 16,
     }), [scene]);
 
     const onTravelLab = useCallback((n) => { say(`travel ${n}`); setTravelled(n); }, [say]);

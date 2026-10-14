@@ -10,7 +10,15 @@ import {
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
 import {
     UNITS_PER_SCREEN, zoneWidth, platformsFor, decorateLedges, swing, makeTelegraph, telegraphHits, mitigate,
+    BLEED_TICK_MS, BLEED_TICKS,
 } from "@/lib/marketplace/grove-world.js";
+// Pure files, both of them — no DB and no server-only, which is why a client scene may read them. The
+// alternative was a second haste curve that drifts from the ring's the first time either is touched.
+import { procFrom, HASTE_PER_POINT } from "@/lib/marketplace/arena-kit.js";
+
+/** What a haste proc is worth, and for how long. */
+const HASTE_MULT = 1.6;
+const HASTE_MS = 2200;
 // ── ⚠️ THE SIMULATION LIVES IN A SOLVER NOW, NOT IN THIS FILE ───────────────────────────────────────
 // Luke: "some kind of minimalistic kind of physics engine so that we don't have to try and pre-calculate
 // where platforms are and instead just like spawn them on a platform and have some gravity and like friction".
@@ -836,6 +844,18 @@ export default function GroveScene({
             // Resolved against LAST frame's camera, which is one frame of lag and invisible: this runs
             // before the hero moves and the camera is eased after he does. Doing it the other way round
             // would mean moving him on a point computed from where he had not gone yet.
+            // ── HOW FAST THIS BODY SWINGS, RIGHT NOW ───────────────────────────────────────────
+            // Tempo is the standing rate (Ferocity, weapon speed, the tree's tempoBonus and the Grove's
+            // own attack-speed emblem, all through the ring's one converter). Haste is a PROC on top:
+            // points convert at the ring's HASTE_PER_POINT and, when it fires, the body swings at
+            // HASTE_MULT for HASTE_MS. Two different stats doing two different things, which is what
+            // Luke asked for — "attack speed, chance to haste" named separately.
+            //
+            // ⚠️ DECLARED ABOVE EVERY READER ON PURPOSE. `const` sits in the temporal dead zone until its
+            // line runs, so a reader forty lines earlier throws "Cannot access before initialization" —
+            // the same shape as the prerender crash in [[verify-build-and-migrations]].
+            const swingRate = () => Math.max(0.2, (stats?.tempo || 1)) * (now < (w.hasteUntil || 0) ? HASTE_MULT : 1);
+
             if (holdRef.current) {
                 const at = worldAt(holdRef.current.cx, holdRef.current.cy);
                 // A hold never steals an attack: tapping a creature targets it, and a finger resting on the
@@ -859,7 +879,14 @@ export default function GroveScene({
                     w.hero.face = Math.sign(tgt.x - w.hero.x) || w.hero.face;
                 }
                 // Auto-attack: "makes them auto attack until you tap away or the enemy perishes."
-                const cd = SWING_TOTAL_MS / (1 + (stats?.attackSpeed || 0) / 100);
+                // ── ⚠️ TEMPO SCALES THE WHOLE SWING, NOT JUST THE GAP BETWEEN SWINGS ───────────────
+                // BARE_TEMPO is 1, so tempo IS the multiplier: a member at 4.00 swings four times as
+                // often as an unarmed one. Shortening only the cooldown would have been wrong and
+                // visibly so — at tempo 4 the gap (102ms) is shorter than the wind-up and strike
+                // (220ms), so the next swing would start before the last one had landed and the
+                // animation would never complete. `swingRate` is read by the strike test and by the
+                // pose as well, so the arm actually moves faster. See the pose call.
+                const cd = SWING_TOTAL_MS / swingRate();
                 if (inReach && w.swingDone && now - (w.swingAt || -1e9) > cd) {
                     w.swingAt = now;
                     w.swingFoe = tgt;
@@ -879,7 +906,7 @@ export default function GroveScene({
             // already happened being mimed — which is exactly what "it doesn't feel like you're hitting
             // them" describes. The number, the sparks, the hit-stop and the knockback all arrive together,
             // 150ms after the hero starts to lean back.
-            if (!w.swingDone && w.swingAt != null && now - w.swingAt >= SWING.windMs) {
+            if (!w.swingDone && w.swingAt != null && now - w.swingAt >= SWING.windMs / swingRate()) {
                 w.swingDone = true;
                 const foe = w.swingFoe;
                 w.swingFoe = null;
@@ -890,15 +917,24 @@ export default function GroveScene({
                 if (!still) {
                     playWhiff();
                 } else {
-                    const hit = swing({
-                        power: stats?.power || 10,
-                        critRate: stats?.critRate || 0,
-                        critDamage: stats?.critDamage || 0,
-                        lifeSteal: stats?.lifeSteal || 0,
-                    }, 0, w.rand);
+                    // The whole fighter, not four hand-picked fields. Creatures carry no armour, so the
+                    // 0 is honest rather than a placeholder — mitigation runs on what comes AT you.
+                    const hit = swing(stats, 0, w.rand);
                     foe.hp -= hit.dealt;
                     foe.hit = true;
                     foe.lastCrit = hit.crit;
+                    // ── THE WOUND ───────────────────────────────────────────────────────────────
+                    // ⚠️ A FRESH BLEED REPLACES A WEAKER ONE RATHER THAN STACKING. Stacking turns a high
+                    // attack-speed build into a multiplier on a multiplier — every swing adding a whole
+                    // new wound — and the ring deliberately does not do that either. Refreshing keeps the
+                    // stat worth having without making tempo pay twice.
+                    if (hit.bleed) {
+                        const better = !foe.bleed || hit.bleed.dmg >= foe.bleed.dmg;
+                        if (better) {
+                            foe.bleed = { dmg: hit.bleed.dmg, leech: hit.bleed.leech,
+                                left: BLEED_TICKS, nextAt: now + BLEED_TICK_MS };
+                        }
+                    }
                     // When its bar was last struck. Drives whether the bar is up at all, and the flash,
                     // jolt and swell on it while it is. See drawFoeBar.
                     foe.hurtAt = now;
@@ -925,6 +961,11 @@ export default function GroveScene({
                     addPop(hit.crit ? "crit" : "hit", `${hit.dealt}${hit.crit ? "!" : ""}`, px, py,
                         popWeight(hit.dealt, foe.maxHp));
                     playHit(Math.min(COMBO_PITCH_STEPS, w.combo), hit.crit);
+                    // The haste roll rides the landed blow, the same place the ring rolls it.
+                    if ((stats?.haste || 0) > 0 && w.rand() < procFrom(stats.haste, HASTE_PER_POINT)) {
+                        w.hasteUntil = now + HASTE_MS;
+                        addPop("hit", "HASTE", w.hero.x, w.hero.y + w.hero.h, 0.7);
+                    }
                     if (hit.healed > 0) {
                         w.hp = Math.min(maxHp, w.hp + hit.healed);
                         // ── ⚠️ LIFESTEAL DOES NOT GET A NUMBER, AND THAT IS A DELIBERATE DELETION ────
@@ -975,6 +1016,29 @@ export default function GroveScene({
                     continue;
                 }
                 if (f.hp <= 0) continue;
+
+                // ── THE WOUND KEEPS ARRIVING ────────────────────────────────────────────────────
+                // ⚠️ IT TICKS ON THE CREATURE'S OWN CLOCK, NOT ON YOUR SWINGS. A bleed that only
+                // resolved when you hit again would be a worse version of the hit, and would pay
+                // nothing at all to the player who applies it and backs off — which is the one
+                // playstyle it exists to reward.
+                //
+                // Bleed PIERCES: it is dealt straight off hp without going through mitigate, which
+                // is the whole identity of the stat. See [[bleed-front-load-magnitude]].
+                if (f.bleed && now >= f.bleed.nextAt) {
+                    const tick = Math.max(1, Math.round(f.bleed.dmg));
+                    f.hp -= tick;
+                    f.hurtAt = now;
+                    addPop("hit", `${tick}`, f.x, f.y + f.h * 0.6, popWeight(tick, f.maxHp) * 0.7);
+                    if (f.bleed.leech > 0) {
+                        w.hp = Math.min(maxHp, w.hp + Math.max(1, Math.round(tick * f.bleed.leech)));
+                    }
+                    f.bleed.left -= 1;
+                    f.bleed.nextAt = now + BLEED_TICK_MS;
+                    if (f.bleed.left <= 0) f.bleed = null;
+                    if (f.hp <= 0) { f.hp = 0; }
+                }
+
                 // Passive early enemies never initiate — Luke: "the ones earlier in the game being fully
                 // passive. And later in the game attacking when they are attacked." A boss is passive until
                 // you reach it and then never stops.
@@ -1202,7 +1266,9 @@ export default function GroveScene({
             }
 
             // ── PAINT ───────────────────────────────────────────────────────────────────────────
-            const sp = swingPose(w.swingAt == null ? null : now - w.swingAt, w.hero.face);
+            // Elapsed is SCALED, so a fast fighter's arm moves fast rather than freezing mid-arc
+            // waiting out an animation written for one speed.
+            const sp = swingPose(w.swingAt == null ? null : (now - w.swingAt) * swingRate(), w.hero.face);
             place(w.hero, cam, camY, unit, sp.dx);
             pose(w.hero, now, unit, { sx: sp.sx, sy: sp.sy, moving: Math.abs(w.hero.vx) > 0.04 });
             if (w.hero.swipeNode) {

@@ -1,3 +1,6 @@
+import { critStacks } from "@/lib/marketplace/arena-engine.js";
+import { procFrom, LIFESTEAL_PER_POINT } from "@/lib/marketplace/arena-kit.js";
+
 // ── THE ZONE, AS A PLACE ─────────────────────────────────────────────────────────────────────────────────────
 // Pure geometry and simulation for one zone: the platforms, who is standing on what, where everything is
 // going. No DOM, no React, no db — the scene component owns pixels and this owns the world.
@@ -234,13 +237,68 @@ export function mitigate(raw, armour) {
     return Math.max(1, Math.round(raw * (ARMOUR_K / (ARMOUR_K + a))));
 }
 
-/** A swing. Returns what landed and what it healed, so the caller can float both. */
-export function swing({ power, critRate = 0, critDamage = 0, lifeSteal = 0 }, targetArmour, rand) {
-    const crit = rand() < Math.min(0.75, (Number(critRate) || 0) / 100);
-    const raw = Math.round(power * (crit ? 1 + Math.max(0.5, (Number(critDamage) || 0) / 100) : 1));
+// ── ⚠️ CRIT STACKS, IT DOES NOT JUST ROLL ───────────────────────────────────────────────────────────────────
+// Imported from the ring rather than written again, because this is the rule that makes crit worth stacking
+// past 100% instead of silently wasting every point above it:
+//
+//   below 100%   the ordinary roll — you crit that often, for your crit damage
+//   exactly 100  you crit every time
+//   150%         you crit every time, and half the time that crit lands DOUBLED
+//
+// A Grove that capped crit at 75% would have told a member who built to 150% that half their investment
+// bought nothing — which is the exact complaint this whole change is answering.
+// See [[reuse-the-rule-never-restate-it]].
+
+/**
+ * A swing, with every stat the player built actually paying.
+ *
+ * Luke: "Every stat should be important that you have on your gear, as well as all the passives that you
+ * get, just like the arena. Attack speed should matter... crit chance, crit damage... anything that's a
+ * stat matters."
+ *
+ * `f` is the Grove fighter off grove-kit.js: damage, critChance and critMult already through the Arena's
+ * curves, bleed as shares, lifesteal as raw points. Attack speed is NOT here — it paces the caller's swing
+ * timer, not the arithmetic of one blow.
+ *
+ * ⚠️ THERE IS NO `doublestrike`, AND THAT IS NOT AN OVERSIGHT. The affix was retired in the Arena and its
+ * points were converted to Ferocity (migration 415), because a second roll for a second blow was a second
+ * route to the attack speed Ferocity already buys. Reviving it here would reintroduce exactly the double
+ * payment the ring deleted. A build that wants to swing twice buys Ferocity, and tempo pays it.
+ */
+export function swing(f, targetArmour, rand) {
+    const damage = Math.max(0, Number(f?.damage) || 0);
+    const dmgPct = Math.max(0, Number(f?.dmgPct) || 0);
+    const stacks = critStacks(Number(f?.critChance) || 0, rand);
+    const critMult = Math.max(1, Number(f?.critMult) || 1);
+    // Every whole multiple is one more application of crit damage, so a 150% build hits twice as hard as a
+    // 100% one rather than identically.
+    const mult = stacks > 0 ? Math.pow(critMult, stacks) : 1;
+    const raw = Math.round(damage * (1 + dmgPct) * mult);
     const dealt = mitigate(raw, targetArmour);
-    return { dealt, crit, healed: Math.round(dealt * (Math.max(0, Number(lifeSteal) || 0) / 100)) };
+
+    // LIFESTEAL IS RAW POINTS and the per-point rate lives with the engine, so a point is worth the same
+    // here as it is in the ring.
+    const healed = Math.round(dealt * procFrom(Number(f?.lifesteal) || 0, LIFESTEAL_PER_POINT));
+
+    // ── BLEED: A SHARE OF THE BLOW THAT KEEPS ARRIVING ──────────────────────────────────────────────────
+    // ⚠️ THE MAGNITUDE IS A SHARE OF WHAT LANDED, NOT A FLAT NUMBER. Piercing armour is bleed's identity —
+    // the wound does not care what the target is wearing — but a flat tick would be enormous on a rootrat
+    // and nothing on a boss. bleedDamage scales the share, exactly as it does in the ring.
+    // See [[bleed-front-load-magnitude]].
+    const bleeds = (Number(f?.bleedChance) || 0) > 0 && rand() < Number(f.bleedChance);
+    const bleed = bleeds
+        ? { dmg: Math.max(1, Math.round(dealt * (BLEED_SHARE + (Number(f?.bleedDamage) || 0)))),
+            leech: Math.max(0, Math.min(0.9, Number(f?.bleedLeech) || 0)) }
+        : null;
+
+    return { dealt, crit: stacks > 0, stacks, healed, bleed };
 }
+
+/** What one bleed tick is worth, before bleedDamage deepens it. A share of the blow that applied it. */
+export const BLEED_SHARE = 0.18;
+/** How often a wound ticks, and for how long. Short enough to read as bleeding, long enough to matter. */
+export const BLEED_TICK_MS = 700;
+export const BLEED_TICKS = 5;
 
 // ── TELEGRAPHS ───────────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "He is unique had different attack animations that telecast where they will damage" and enemies
