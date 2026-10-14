@@ -1,5 +1,5 @@
 import { critStacks } from "@/lib/marketplace/arena-engine.js";
-import { procFrom, LIFESTEAL_PER_POINT } from "@/lib/marketplace/arena-kit.js";
+import { procFrom, drFrom, LIFESTEAL_PER_POINT } from "@/lib/marketplace/arena-kit.js";
 
 // ── THE ZONE, AS A PLACE ─────────────────────────────────────────────────────────────────────────────────────
 // Pure geometry and simulation for one zone: the platforms, who is standing on what, where everything is
@@ -231,10 +231,21 @@ export function decorateLedges(platforms, biome, rand) {
 // ⚠️ ARMOUR IS DIMINISHING, NOT SUBTRACTIVE. Flat subtraction means that at enough armour an enemy's hit
 // rounds to zero and the deep zones become free; a ratio keeps every zone dangerous and keeps armour worth
 // stacking without ever reaching immunity. The 60 is the half-point: 60 armour halves incoming damage.
-export const ARMOUR_K = 60;
+// ⚠️ ARMOUR_K = 60 IS GONE, AND IT HAD TO GO FOR THE SAME REASON power: 12 DID. It meant "60 armour halves
+// a hit", which was right for a hero who carried 8 — and the hero carries 4,648 now. Every incoming blow in
+// the game resolved to `Math.max(1, ...)`: a zone-12 creature did 1 damage to Eric, 1 to Littlewolf, 1 to
+// everybody, so armour had stopped being a stat and become a constant, and nobody could die anywhere.
+//
+// The failure was not that the number was too small. It is that at this scale EVERY player compressed onto
+// the floor — five accounts from 955 to 4,648 armour all took exactly the same 1 — which is the thing a
+// defensive stat exists not to do.
+//
+// So mitigation is the ring's own model now, exactly as the swing is: toughnessFrom/drFrom on
+// ARMOUR_TO_DOUBLE, which still separates those same five accounts across 32% to 61%. One armour curve in
+// the game. See [[arena-offence-defence-parity]] and [[balance-constants-never-copied]].
 export function mitigate(raw, armour) {
-    const a = Math.max(0, Number(armour) || 0);
-    return Math.max(1, Math.round(raw * (ARMOUR_K / (ARMOUR_K + a))));
+    const r = Math.max(0, Number(raw) || 0);
+    return Math.max(1, Math.round(r * (1 - drFrom(Number(armour) || 0, 0))));
 }
 
 // ── ⚠️ CRIT STACKS, IT DOES NOT JUST ROLL ───────────────────────────────────────────────────────────────────
