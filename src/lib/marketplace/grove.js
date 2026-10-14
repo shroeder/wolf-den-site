@@ -6,7 +6,7 @@ import { addChests } from "@/lib/marketplace/chests.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
+import { canPreview } from "@/lib/marketplace/owner.js";
 import {
     GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_PARTS, GROVE_EMBLEMS, GROVE_POP,
     GROVE_FOODS, HEAL_AT, emblemStars, groveZone,
@@ -25,8 +25,17 @@ import {
 // The client plays the whole scene (see grove-roll.js for why). This file does the four things the client is
 // not allowed to do: issue the seed, grant what the seed produces, hold the bag and the bank, and craft.
 //
-// ⚠️ OWNER-GATED. Luke: "We will start by owner gating all of this." One door, checked in one place.
-export const groveOpen = (buyerId) => isOwner(buyerId);
+// ⚠️ OWNER-GATED, PLUS INVITED TESTERS. Luke: "We will start by owner gating all of this." One door,
+// checked in one place — the page, the HUD that draws the menu entry, and all eight server actions below
+// every ask THIS, so a name added to the guest list opens the door and the menu together. A second copy of
+// the rule in the nav is how you ship a menu entry that leads to a redirect. See
+// [[feature-gates-come-in-pairs]].
+//
+// `canPreview` already passes owners without them being listed, so this is strictly wider than isOwner was.
+// Guests are named per feature in owner.js and deliberately NOT added to OWNER_BUYER_IDS: that list is
+// checked in 44 files and decides casino controls, credit checkout, the role system and pet drops, none of
+// which an invitation to test a forest minigame should carry. See [[preview-guests-not-owner-list]].
+export const groveOpen = (buyerId) => canPreview("grove", buyerId);
 
 const ZONE_BY_ID = Object.fromEntries(GROVE_ZONES.map((z) => [z.id, z]));
 const foeById = (id) => (id === GROVE_RARE.id ? GROVE_RARE : GROVE_ENEMIES[id] || null);

@@ -25,7 +25,16 @@ const PRIMARY_OWNER_ID = "6857d67e-3dd0-46b6-aad7-b91699155ff6"; // The Wolf Den
 // Keyed by feature, so a guest for the Forest is not automatically a guest for whatever is half-built next.
 // Owners pass everything without being listed here.
 const PREVIEW_GUESTS = {
+    // The Forest was deleted on 2026-09-19 (d0e4995b). Kept because it is the record of the first guest
+    // and costs nothing: canPreview only ever reads the key a live feature asks for.
     forest: new Set([
+        "27da67c2-8548-453f-bda4-4349c0e4ef06", // Littlewolf
+    ]),
+    // Luke: "Can you make the grove accessible to Little Wolf? He's my son in the game. He wants to help
+    // test the grove." A tester for one unreleased minigame, and nothing else — he does not get the casino
+    // controls, credit checkout, changelog authoring or pet drops that OWNER_BUYER_IDS would have handed
+    // him, and revoking this is deleting one line.
+    grove: new Set([
         "27da67c2-8548-453f-bda4-4349c0e4ef06", // Littlewolf
     ]),
 };
