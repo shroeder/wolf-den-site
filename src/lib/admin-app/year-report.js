@@ -3,6 +3,7 @@ import "server-only";
 import { listOverhead, perDayCents } from "@/lib/admin-app/breakeven.js";
 import { listEntries } from "@/lib/ledger/ledger.js";
 import { readReportSeries } from "@/lib/admin-app/report-bundle-store.js";
+import { reconcileSpend } from "@/lib/admin-app/ledger-classify.js";
 
 // ── THE YEAR, ON ONE SCREEN ───────────────────────────────────────────────────────────────────────────────
 // Three questions that each already have an answer somewhere, and no screen that puts them side by side:
@@ -30,32 +31,8 @@ function daysBetween(aKey, bKey) {
     return Math.round((Date.parse(`${bKey}T00:00:00Z`) - Date.parse(`${aKey}T00:00:00Z`)) / 864e5);
 }
 
-// ── CLASSIFIERS ───────────────────────────────────────────────────────────────────────────────────────────
-// 146 of the ledger's expense rows arrived from the bank with no category and sit in "Other" — Southern Hobby
-// invoices, blank-description checks, Venmo payouts. Two of those groups ARE identifiable from the text the
-// bank sent, and both matter enough to pull out by hand:
-const text = (e) => `${e.description || ""} ${e.notes || ""}`.toLowerCase();
-/** Square payroll debits. The real wage bill, and the only wages figure that is a measurement rather than an
- *  estimate off the time clock. */
-const isPayroll = (e) => e.type === "Expense" && text(e).includes("payroll");
-/** Money paid through to a consignor — already netted out of merchandise profit, so it must never be a cost
- *  on the break-even side. */
-const isConsignorPayout = (e) => e.type === "Expense" && text(e).includes("consign");
-
-// Everything left after those two, bucketed by the category the ledger carries. "Uncategorized" is a real
-// row on the report, not a rounding bucket: naming it is the only way the pile ever gets smaller.
-const SPEND_CATEGORIES = new Set([
-    "Rent", "Software", "Marketing", "Supplies", "Fixtures", "Taxes",
-    "Shipping", "Travel", "Utilities", "Startup - Legal", "Startup - Domain",
-]);
-function spendBucket(e) {
-    if (e.type === "Inventory") return "Inventory & stock";
-    if (isConsignorPayout(e)) return "Consignor payouts";
-    if (isPayroll(e)) return "Wages";
-    if (SPEND_CATEGORIES.has(e.category)) return e.category;
-    if (text(e).includes("insurance")) return "Insurance";
-    return "Uncategorized";
-}
+// Classification lives in ledger-classify.js, not here. It is shared with anything else that has to
+// read this ledger, and keeping one copy is the only way two screens cannot reach two answers.
 
 /**
  * The year on one screen. `year` defaults to the current Chicago year.
@@ -102,71 +79,46 @@ export async function yearReport({ year } = {}) {
     const tradingFrom = firstSaleKey && firstSaleKey > yearStart ? firstSaleKey : yearStart;
     const tradingDays = firstSaleKey ? daysBetween(tradingFrom, windowEnd) + 1 : 0;
 
-    // ── COST TO STAY OPEN ─────────────────────────────────────────────────────────────────────────────────
-    // ⚠️ THIS IS TODAY'S RATE APPLIED BACKWARDS, and the screen has to say so. `wolfden_overhead` holds what
-    // the shop's fixed costs ARE, with no history of what they were — so a line added last week (the $283
-    // advertising, the $200 Claude) is charged to May as well. It answers "at today's cost structure, is the
-    // shop ahead?", which is the question worth asking, but it is NOT what the bank saw in May.
-    const activeOverhead = overheadItems.filter((i) => i.active);
-    const dailyOverheadCents = Math.round(activeOverhead.reduce((s, i) => s + perDayCents(i), 0));
-    const overheadTotal = (dailyOverheadCents / 100) * tradingDays;
+    // ── COST TO STAY OPEN — ACTUAL, FROM THE LEDGER ───────────────────────────────────────────────────────
+    // Was today's overhead rate multiplied by trading days, which is a forecast wearing a report's
+    // clothes: it charged May for an advertising line bought in October and it could not see April at
+    // all. It now charges what the ledger says actually left, classified by `ledger-classify.js` so the
+    // bank feed files itself and nobody is asked to categorise 132 rows by hand.
+    //
+    // `operatingCost` deliberately EXCLUDES stock purchases, consignor payouts, card fees, remitted
+    // sales tax and cash moved to the drawer — each is either already inside merchandise profit or was
+    // never the shop's cost. That exclusion is the difference between a real number and a double count.
+    const recon = reconcileSpend(inYear);
 
-    const wagesTotal = -inYear.filter(isPayroll).reduce((a, e) => a + e.amount, 0);
-    const netPosition = merchProfit - overheadTotal - wagesTotal;
+    // The run rate is kept, demoted to what it actually is: a forward-looking daily target, the same
+    // figure the Today page reads. It is no longer what break-even is measured against.
+    const activeOverhead = overheadItems.filter((i) => i.active);
+    const dailyOverheadCents = Math.round(activeOverhead.reduce((s2, i) => s2 + perDayCents(i), 0));
+
+    const netPosition = merchProfit - recon.operatingCost;
 
     // ── THE MONTHLY WALK ──────────────────────────────────────────────────────────────────────────────────
     // The cumulative column is the point of the whole screen: the month the shop stopped losing money.
-    const wagesByMonth = new Map();
-    for (const e of inYear.filter(isPayroll)) {
-        const k = monthKeyOf(dayKey(e.date));
-        wagesByMonth.set(k, (wagesByMonth.get(k) || 0) - e.amount);
+    // Costs are bucketed from the SAME classified rows as the headline, so the two can never disagree.
+    const costByMonth = new Map();
+    for (const r of recon.rows) {
+        if (!r.cost) continue;
+        const k = monthKeyOf(dayKey(r.date));
+        costByMonth.set(k, (costByMonth.get(k) || 0) + r.amount);
     }
-    const monthKeys = [...new Set([...salesByMonth.keys(), ...profitByMonth.keys(), ...wagesByMonth.keys()])].sort();
+    // April has spend and no sales, so it needs a row of its own — the old walk started at the first
+    // sale and silently dropped every pre-opening dollar.
+    const monthKeys = [...new Set([...salesByMonth.keys(), ...profitByMonth.keys(), ...costByMonth.keys()])].sort();
     let cumulative = 0;
     let crossedMonth = null;
     const months = monthKeys.map((k) => {
-        // Only the days of this month that the shop was actually open get charged overhead.
-        const monthStart = `${k}-01`;
-        const [y, m] = k.split("-").map(Number);
-        const nextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
-        const lastOfMonth = dayKey(Date.parse(`${nextMonth}T00:00:00Z`) - 864e5 + 43200000);
-        const lo = monthStart > tradingFrom ? monthStart : tradingFrom;
-        const hi = lastOfMonth < windowEnd ? lastOfMonth : windowEnd;
-        const openDays = hi >= lo ? daysBetween(lo, hi) + 1 : 0;
-
         const profit = profitByMonth.get(k) || 0;
-        const overhead = (dailyOverheadCents / 100) * openDays;
-        const wages = wagesByMonth.get(k) || 0;
-        const net = profit - overhead - wages;
+        const cost = costByMonth.get(k) || 0;
+        const net = profit - cost;
         cumulative += net;
         if (crossedMonth == null && cumulative >= 0) crossedMonth = k;
-        return {
-            month: k,
-            netSales: salesByMonth.get(k) || 0,
-            profit,
-            openDays,
-            overhead,
-            wages,
-            net,
-            cumulative,
-        };
+        return { month: k, netSales: salesByMonth.get(k) || 0, profit, cost, net, cumulative };
     });
-
-    // ── CASH OUT ──────────────────────────────────────────────────────────────────────────────────────────
-    // What actually left, by bucket. A different basis from break-even on purpose: this one includes the
-    // $53k of stock on the shelves, which is money gone but not a cost until it sells.
-    const spendMap = new Map();
-    for (const e of inYear) {
-        if (e.type !== "Expense" && e.type !== "Inventory") continue;
-        const b = spendBucket(e);
-        const cur = spendMap.get(b) || { bucket: b, rows: 0, amount: 0 };
-        cur.rows += 1;
-        cur.amount += -e.amount;
-        spendMap.set(b, cur);
-    }
-    const spend = [...spendMap.values()].sort((a, b) => b.amount - a.amount);
-    const spendTotal = spend.reduce((a, s) => a + s.amount, 0);
-    const uncategorized = spend.find((s) => s.bucket === "Uncategorized") || { rows: 0, amount: 0 };
 
     // ── LUKE'S OWN MONEY ──────────────────────────────────────────────────────────────────────────────────
     const sumType = (...types) => inYear.filter((e) => types.includes(e.type)).reduce((a, e) => a + e.amount, 0);
@@ -185,27 +137,38 @@ export async function yearReport({ year } = {}) {
             builtAt: series?.builtAt || null,
         },
         costToStayOpen: {
-            dailyOverheadCents,
-            overheadTotal,
-            overheadBasis: "current-rate-applied-to-trading-days",
-            overheadLines: activeOverhead.map((i) => ({
+            operatingCost: recon.operatingCost,
+            basis: "actual-ledger-spend",
+            // What was deliberately not charged, and why — so the number can be audited rather than
+            // believed. Each carries the rule's own reason string.
+            excluded: recon.buckets.filter((b) => !b.cost)
+                .map((b) => ({ bucket: b.bucket, amount: b.amount, rows: b.rows, why: b.why })),
+            // The forward-looking daily target (the Today page's figure). NOT what break-even uses.
+            runRatePerDayCents: dailyOverheadCents,
+            runRateLines: activeOverhead.map((i) => ({
                 label: i.label,
                 amountCents: i.amount_cents,
                 cadence: i.cadence,
                 perDayCents: Math.round(perDayCents(i)),
             })),
-            wagesTotal,
-            wagesSource: "ledger-square-payroll",
-            total: overheadTotal + wagesTotal,
         },
         breakEven: {
             netPosition,
             isAbove: netPosition >= 0,
             crossedMonth,
-            perDayNeeded: dailyOverheadCents / 100,
+            runRatePerDay: dailyOverheadCents / 100,
+        },
+        // ⚠️ THE REPORT'S OWN ERROR BAR. Plaid sends no merchant for a transfer or a written cheque, so
+        // these rows cannot be classified by code and are NOT charged. Stating the total is the
+        // difference between an honest figure and a falsely precise one.
+        unidentified: recon.unidentified,
+        mirrored: recon.mirrored,
+        spend: {
+            buckets: recon.buckets,
+            total: recon.buckets.reduce((a, b) => a + b.amount, 0),
+            countedRows: recon.countedRows,
         },
         months,
-        spend: { buckets: spend, total: spendTotal, uncategorizedRows: uncategorized.rows, uncategorizedAmount: uncategorized.amount },
         personalInvestment: { contributions, drawsOut, net: contributions - drawsOut },
         deposits,
         entryCount: inYear.length,
