@@ -4,37 +4,27 @@ import { db } from "@/lib/db";
 import { yearReport } from "@/lib/admin-app/year-report.js";
 import { readReportSeries } from "@/lib/admin-app/report-bundle-store.js";
 
-// ── WHAT THE SHOP WILL OWE ─────────────────────────────────────────────────────────────────────────────────
-// Luke: "my current goal is to create a screen that helps me understand my tax burden for the end of the year."
+// ── THE BUSINESS'S POSITION ────────────────────────────────────────────────────────────────────────────────
+// Luke: "I dont really want to see anything related to myself and my 170k salary... The whole premise is to
+// show the business metrics."
 //
-// The screen answers one question — how much to set aside — and shows the aggregates it got there from, so
-// the figure can be argued with instead of believed.
+// He is right and the first version of this was wrong. A personal income-tax projection needs a W-2, a
+// filing status and a marginal bracket, none of which are facts about the shop — and putting them on a
+// business screen makes the shop's own numbers harder to read, not easier. All of that is gone.
 //
-// ⚠️ THE RATE IS NOT 25%, IT IS 36.5%, AND THE REASON IS THE DAY JOB. Business profit stacks on a $170k W-2,
-// so it is taxed at the top marginal bracket from its first dollar; and because the day job has NOT used up
-// the Social Security wage base, the profit still pays the FULL 15.3% self-employment tax rather than the
-// 2.9% Medicare-only rate it would pay if the W-2 had already crossed the cap. Both effects push the same
-// way, which is why a naive "set aside a quarter" would be badly short.
+// What is left is the business, measured against the goal Luke set: keep the net position under zero by
+// year end. The screen tracks the distance to that line and what each trading pace does to it.
 //
-// Not tax advice, and the module says so to its caller: `disclaimer` travels with the numbers.
+// ⚠️ TWO THINGS THIS SCREEN DELIBERATELY DOES NOT CLAIM.
+//   1. "Under zero" is not the same as "no tax". A return applies different rules for depreciation and
+//      inventory than this does, so the two figures will not agree and this one is not a tax result.
+//   2. A loss is not a win. Giving up a dollar of profit to avoid roughly a third of a dollar of tax
+//      leaves the shop worse off, so `goal` reports the distance WITHOUT implying which side is better.
+//      The screen states the cost of getting under the line next to the line itself.
 
-// ── The taxpayer's own situation ────────────────────────────────────────────────────────────────────────────
-// Luke's figures, overridable per request so the screen can model a change without a deploy. Kept as named
-// constants rather than a config table because they change about once a year, and a migration for two numbers
-// is a worse trade than an obvious constant.
-const DEFAULTS = {
-    w2Income: 170000,        // the day job
-    federalMarginal: 0.22,   // married filing jointly at that income; single would be 0.24
-    stateRate: 0.068,        // Minnesota top marginal
-    filing: "mfj",
-};
-
-// 2026 figures.
-const SS_WAGE_BASE = 184500;     // Social Security wage cap — the W-2 eats into this first
-const SE_BASE_FACTOR = 0.9235;   // net earnings from self-employment = profit x this
-const SS_RATE = 0.124;
-const MEDICARE_RATE = 0.029;
-const QBI_RATE = 0.20;           // §199A, available in full well below the phase-out at this income
+// The goal Luke set: keep the year's net position at or below zero. Held here so the screen and any
+// future caller read the same line rather than each hard-coding their own.
+const GOAL_NET_POSITION = 0;
 
 const ZONE = "America/Chicago";
 const dayKeyFmt = new Intl.DateTimeFormat("en-CA", { timeZone: ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
@@ -105,34 +95,6 @@ export async function endingInventoryAtCost() {
     };
 }
 
-/**
- * Tax on a given amount of business profit. A LOSS returns a negative total: at $170k of other income a
- * business loss is not a nothing, it offsets the W-2 and is worth real money back.
- */
-export function taxOn(profit, cfg = DEFAULTS) {
-    if (profit <= 0) {
-        const benefit = Math.abs(profit) * (cfg.federalMarginal + cfg.stateRate);
-        return {
-            profit, selfEmployment: 0, federal: -Math.abs(profit) * cfg.federalMarginal,
-            state: -Math.abs(profit) * cfg.stateRate, total: -benefit, isRefund: true,
-            effectiveRate: profit === 0 ? 0 : (benefit / Math.abs(profit)) * 100,
-        };
-    }
-    const seBase = profit * SE_BASE_FACTOR;
-    // The day job consumes the Social Security cap first; only what is left of it pays the 12.4%.
-    const ssRoom = Math.max(0, SS_WAGE_BASE - cfg.w2Income);
-    const selfEmployment = Math.min(seBase, ssRoom) * SS_RATE + seBase * MEDICARE_RATE;
-    const qbi = profit * QBI_RATE;
-    const federal = (profit - qbi - selfEmployment / 2) * cfg.federalMarginal;
-    // Minnesota does not follow the federal QBI deduction, so it is not subtracted here.
-    const state = (profit - selfEmployment / 2) * cfg.stateRate;
-    const total = selfEmployment + federal + state;
-    return {
-        profit, selfEmployment, federal, state, total, isRefund: false,
-        effectiveRate: (total / profit) * 100,
-    };
-}
-
 /** Trading days (days the shop actually rang a sale) per calendar day, measured rather than assumed. */
 function tradingRate(dailyBuckets, sinceKey) {
     const recent = dailyBuckets.filter((b) => dayKey(b.startMillis) >= sinceKey);
@@ -141,14 +103,7 @@ function tradingRate(dailyBuckets, sinceKey) {
     return { perTradingDay: profit / recent.length, tradingDays: recent.length, profit };
 }
 
-export async function taxPosition({ year, w2Income, federalMarginal, stateRate } = {}) {
-    const cfg = {
-        ...DEFAULTS,
-        ...(Number.isFinite(w2Income) ? { w2Income } : {}),
-        ...(Number.isFinite(federalMarginal) ? { federalMarginal } : {}),
-        ...(Number.isFinite(stateRate) ? { stateRate } : {}),
-    };
-
+export async function businessPosition({ year } = {}) {
     const [report, inventory, series] = await Promise.all([
         yearReport({ year }),
         endingInventoryAtCost(),
@@ -160,26 +115,30 @@ export async function taxPosition({ year, w2Income, federalMarginal, stateRate }
     const yearEnd = `${theYear}-12-31`;
     const daysLeft = Math.max(0, Math.round((Date.parse(`${yearEnd}T00:00:00Z`) - Date.parse(`${todayKey}T00:00:00Z`)) / 864e5));
 
-    // How many of those remaining days the shop will actually trade, from how often it has traded lately.
+    // How many of those remaining days the shop will actually trade, measured from how often it has traded
+    // rather than assumed. A shop that opens six days a week should not be projected on seven.
     const daily = (series?.profitDaily || []).filter((b) => dayKey(b.startMillis).startsWith(String(theYear)));
     const lastKey = daily.length ? dayKey(daily[daily.length - 1].startMillis) : todayKey;
-    const open = daily.length / Math.max(1, Math.round((Date.parse(`${lastKey}T00:00:00Z`) - Date.parse(`${report.range.tradingFrom || `${theYear}-01-01`}T00:00:00Z`)) / 864e5) + 1);
-    const tradingDaysLeft = Math.round(daysLeft * open);
+    const spanStart = report.range.tradingFrom || `${theYear}-01-01`;
+    const spanDays = Math.max(1, Math.round((Date.parse(`${lastKey}T00:00:00Z`) - Date.parse(`${spanStart}T00:00:00Z`)) / 864e5) + 1);
+    const openRate = daily.length / spanDays;
+    const tradingDaysLeft = Math.round(daysLeft * openRate);
 
-    const ninetyAgo = dayKey(Date.now() - 29 * 864e5);
-    const recent = tradingRate(daily, ninetyAgo);
-    const month = (k) => report.months.find((m) => m.month === k);
+    const recent = tradingRate(daily, dayKey(Date.now() - 29 * 864e5));
     const prevMonthKey = `${theYear}-${String(Number(todayKey.slice(5, 7)) - 1).padStart(2, "0")}`;
-    const prev = month(prevMonthKey);
+    const prevMonth = report.months.find((m) => m.month === prevMonthKey);
     const prevDaily = daily.filter((b) => dayKey(b.startMillis).startsWith(prevMonthKey));
     const thisDaily = daily.filter((b) => dayKey(b.startMillis).startsWith(todayKey.slice(0, 7)));
 
+    // The cost of staying open for the rest of the year, at the run rate the Today page already uses.
     const forwardCost = (report.costToStayOpen.runRatePerDayCents / 100) * daysLeft;
+    const current = report.breakEven.netPosition;
+
     const scenarios = [
         {
-            key: "conservative",
-            label: prev ? "Last full month's pace" : "Conservative",
-            perTradingDay: prevDaily.length ? prev.profit / prevDaily.length : recent.perTradingDay,
+            key: "lastMonth",
+            label: prevMonth ? "Last full month's pace" : "Conservative",
+            perTradingDay: prevDaily.length ? prevMonth.profit / prevDaily.length : recent.perTradingDay,
         },
         { key: "recent", label: "Last 30 days", perTradingDay: recent.perTradingDay },
         {
@@ -187,73 +146,63 @@ export async function taxPosition({ year, w2Income, federalMarginal, stateRate }
             label: "This month's pace",
             perTradingDay: thisDaily.length ? thisDaily.reduce((a, b) => a + b.value, 0) / thisDaily.length : recent.perTradingDay,
         },
-    ].map((s) => {
-        const addedProfit = s.perTradingDay * tradingDaysLeft;
-        const projected = report.breakEven.netPosition + addedProfit - forwardCost;
-        return { ...s, addedProfit, projectedProfit: projected, tax: taxOn(projected, cfg) };
-    }).sort((a, b) => a.projectedProfit - b.projectedProfit);
+    ].map((sc) => {
+        const addedProfit = sc.perTradingDay * tradingDaysLeft;
+        const projected = current + addedProfit - forwardCost;
+        return {
+            ...sc,
+            addedProfit,
+            projectedPosition: projected,
+            // Distance to the line, and which side of it this pace lands on.
+            vsGoal: projected - GOAL_NET_POSITION,
+            underGoal: projected <= GOAL_NET_POSITION,
+        };
+    }).sort((a, b) => a.projectedPosition - b.projectedPosition);
 
-    const mid = scenarios[1] || scenarios[0];
-
-    // ── THE ONE DECISION WORTH MAKING BEFORE 31 DECEMBER ───────────────────────────────────────────────────
-    // Stock on the shelf has been paid for and has produced no deduction: it is an asset, not an expense,
-    // and it only deducts in the year it sells. The small-business exemption can pull that forward.
-    //
-    // It is DEFERRAL, not free money — deducted now, the same stock sells next year with no cost to offset
-    // it — and it is not a checkbox either: only the conform-to-your-books route gives deduction at
-    // purchase. Both caveats travel with the numbers so a screen cannot show the upside alone.
-    const capitalised = taxOn(mid.projectedProfit, cfg);
-    const deducted = taxOn(mid.projectedProfit - inventory.cost, cfg);
-    const inventoryLever = {
-        inventoryAtCost: inventory.cost,
-        capitalised: { profit: mid.projectedProfit, tax: capitalised },
-        deductedWhenBought: { profit: mid.projectedProfit - inventory.cost, tax: deducted },
-        swing: capitalised.total - deducted.total,
-        isDeferralNotSaving: true,
-        firstYearAdvantage: true,
-    };
+    const likely = scenarios[1] || scenarios[0];
 
     return {
         year: theYear,
         asOf: todayKey,
-        config: { ...cfg, ssWageBase: SS_WAGE_BASE, ssRoomLeft: Math.max(0, SS_WAGE_BASE - cfg.w2Income) },
 
-        // Where the year stands now, straight off the Year report so the two screens cannot disagree.
+        // ── THE GOAL ──────────────────────────────────────────────────────────────────────────────────────
+        // Luke's line is zero. The screen reports the distance to it and, deliberately, the COST of getting
+        // there — because a loss is not a win, and a goal reported without its price invites the shop to
+        // chase it. Giving up a dollar of profit avoids roughly a third of a dollar of tax; the other two
+        // thirds are simply gone.
+        goal: {
+            target: GOAL_NET_POSITION,
+            current,
+            isUnder: current <= GOAL_NET_POSITION,
+            distance: current - GOAL_NET_POSITION,
+            projected: likely.projectedPosition,
+            projectedIsUnder: likely.underGoal,
+            // What it would cost to force the likely case under the line.
+            profitToGiveUp: Math.max(0, likely.projectedPosition - GOAL_NET_POSITION),
+            // ⚠️ The lever a shop owner reaches for first does NOT work, and the screen has to say so:
+            // stock is an asset, so buying it moves cash without moving the position at all.
+            stockDoesNotReducePosition: true,
+        },
+
         yearToDate: {
             netSales: report.profit.netSales,
-            // Named honestly: sales minus gross profit is cost of goods AND card fees (net of
-            // consigned commission and refunds). Calling it plain "cost of goods" would be a small lie
-            // that a reader would reconcile against Square and find.
+            // Named honestly: sales minus gross profit is cost of goods AND card fees.
             costAndFees: report.profit.netSales - report.profit.merchProfit,
             grossProfit: report.profit.merchProfit,
             marginPercent: report.profit.marginPercent,
             operatingCost: report.costToStayOpen.operatingCost,
-            netPosition: report.breakEven.netPosition,
+            netPosition: current,
             unclassified: report.unidentified,
         },
 
-        projection: {
-            daysLeft, tradingDaysLeft,
-            forwardCost,
-            scenarios,
-            midKey: mid.key,
-        },
+        projection: { daysLeft, tradingDaysLeft, forwardCost, scenarios, likelyKey: likely.key },
 
-        // The headline: what to put aside.
-        setAside: {
-            amount: Math.max(0, mid.tax.total),
-            onProfit: mid.projectedProfit,
-            marginalRatePercent: mid.tax.isRefund ? 0 : mid.tax.effectiveRate,
-            low: Math.max(0, scenarios[0].tax.total),
-            high: Math.max(0, scenarios[scenarios.length - 1].tax.total),
-        },
-
+        // Money tied up in stock. A business metric in its own right — it is the shop's largest asset and
+        // the cash it is not holding — and the reason the position cannot be steered by buying more.
         inventory,
-        inventoryLever,
 
-        // Obligations that are NOT income tax and must never be added to it. Sales tax is the customers'
-        // money passing through; owner contributions are capital, not income; a draw is not a taxable event.
-        notIncomeTax: {
+        // The taxes the BUSINESS itself pays or holds, as distinct from anything on a personal return.
+        obligations: {
             salesTaxRemitted: (report.spend.buckets.find((b) => b.bucket === "Sales tax remitted") || {}).amount || 0,
             wages: (report.spend.buckets.find((b) => b.bucket === "Wages") || {}).amount || 0,
             payrollTax: (report.spend.buckets.find((b) => b.bucket === "Payroll tax") || {}).amount || 0,
@@ -263,7 +212,10 @@ export async function taxPosition({ year, w2Income, federalMarginal, stateRate }
             ownerDraws: report.personalInvestment.drawsOut,
         },
 
-        disclaimer: "Not tax advice. The inventory method in particular needs a CPA — and 2026 being the "
-            + "first year of business is the one year it can be chosen rather than changed.",
+        note: "This is the business's own position. It is NOT a tax result — a return applies different "
+            + "rules for depreciation and inventory, so the two figures will not agree.",
     };
 }
+
+// Kept so the route name and any existing caller still resolve while the screen is renamed.
+export const taxPosition = businessPosition;
