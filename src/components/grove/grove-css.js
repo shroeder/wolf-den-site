@@ -970,6 +970,66 @@ export const GROVE_CSS = `
 
    ⚠️ pointer-events: none, OR IT EATS THE FIRST TAP OF THE FIGHT. It covers the whole width for two
    seconds, which is exactly the two seconds in which the player is reaching for the boss. */
+/* ── THE HERALD ────────────────────────────────────────────────────────────────────────────────────────────
+   Luke: "nothing pops up in the middle of my screen letting me know ive got a boss encounter or the portal
+   unlocked. Not a modal, but stylized text with dopamine."
+
+   The boss already had one of these. The two moments that did NOT were the two that are EARNED rather than
+   walked into: crossing the kill count that opens the way, and the boss becoming available because of it.
+   Opening the way fired a float at the door -- which is positioned at the DOOR, so if the twentieth rat died
+   anywhere else on the map the one announcement of the zone's biggest beat happened off screen.
+
+   A herald is centred on the VIEWPORT, not on a world position, for exactly that reason. It is not a modal:
+   nothing is dismissed, nothing is blocked, pointer-events stay off, and it leaves on its own.
+
+   Two lines, because the beat has two halves: what happened, and what it means. The kicker is small and
+   tracked out; the word is the size of the screen. */
+.gv-herald { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; pointer-events: none; text-align: center; padding: 0 6%; }
+/* ⚠️ THE KICKER HAS TO SURVIVE THE BACKDROP. Pale gold at a soft shadow vanished into the lit canopy
+   of zone one -- filmed, it read as a faint grey line above the word. The zone art is painted and
+   bright and the herald can land over ANY of it, so the small line needs its own dark bed rather than
+   a drop shadow: a tight ring of shadow carries it over light and dark alike. */
+.gv-herald i { display: block; font-style: normal; font-size: clamp(0.68rem, 3vw, 0.86rem);
+    letter-spacing: .34em; text-transform: uppercase; color: #fff1c4; opacity: 1;
+    text-shadow: 0 0 3px rgba(0,0,0,1), 0 0 10px rgba(0,0,0,0.95), 0 2px 10px rgba(0,0,0,0.95),
+        0 0 22px rgba(255,170,40,0.55);
+    animation: gvHeraldKick 2200ms cubic-bezier(.16,1,.3,1) both; }
+.gv-herald b { display: block; margin-top: 6px; font-size: clamp(1.5rem, 8.5vw, 2.9rem); font-weight: 800;
+    letter-spacing: .04em; text-transform: uppercase; color: #fff6df; line-height: 1.03;
+    text-shadow: 0 0 26px rgba(255,196,74,0.92), 0 0 60px rgba(255,150,30,0.45), 0 4px 12px rgba(0,0,0,0.95);
+    animation: gvHeraldWord 2200ms cubic-bezier(.16,1,.3,1) both; }
+/* A rule under it that draws itself outward, which is the bit that reads as a thing being UNLOCKED rather
+   than a thing being announced. */
+.gv-herald u { display: block; margin-top: 12px; width: min(220px, 46%); height: 2px; border-radius: 999px;
+    background: linear-gradient(90deg, rgba(255,196,74,0), #ffc44a, rgba(255,196,74,0));
+    transform-origin: 50% 50%; animation: gvHeraldRule 2200ms cubic-bezier(.16,1,.3,1) both; }
+/* The boss variant keeps the purple the boss banner already owns, so the two beats stay told apart. */
+.gv-herald.is-boss i { color: #e4d2ff; }
+.gv-herald.is-boss b { color: #f3e6ff;
+    text-shadow: 0 0 26px rgba(169,130,255,0.92), 0 0 60px rgba(120,70,220,0.45), 0 4px 12px rgba(0,0,0,0.95); }
+.gv-herald.is-boss u { background: linear-gradient(90deg, rgba(169,130,255,0), #a982ff, rgba(169,130,255,0)); }
+/* The kicker lands first and alone, then the word arrives under it -- the same order as the death screen,
+   and for the same reason: both at once reads as a page loading rather than as a moment happening. */
+@keyframes gvHeraldKick {
+    0%   { opacity: 0; transform: translateY(8px); letter-spacing: .5em; }
+    14%  { opacity: .92; transform: translateY(0); letter-spacing: .34em; }
+    74%  { opacity: .92; }
+    100% { opacity: 0; transform: translateY(-10px); }
+}
+@keyframes gvHeraldWord {
+    0%   { opacity: 0; transform: scale(1.38); }
+    10%  { opacity: 0; transform: scale(1.38); }
+    26%  { opacity: 1; transform: scale(1); }
+    74%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.95) translateY(-12%); }
+}
+@keyframes gvHeraldRule {
+    0%   { opacity: 0; transform: scaleX(0); }
+    30%  { opacity: 1; transform: scaleX(1); }
+    74%  { opacity: 1; transform: scaleX(1); }
+    100% { opacity: 0; transform: scaleX(1); }
+}
 .gv-boss-intro { position: absolute; inset: 0; z-index: 4; display: flex;
     align-items: center; justify-content: center; pointer-events: none; }
 .gv-boss-intro b { font-size: clamp(1.3rem, 7vw, 2.4rem); font-weight: 800; letter-spacing: .06em;

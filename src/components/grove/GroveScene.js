@@ -163,6 +163,10 @@ const EMBLEM_THROW = 1.15;
 // not once you are already inside the fight.
 const BOSS_NOTICE = 34;
 const BOSS_INTRO_MS = 2000;
+// Matches the herald's CSS animation. A banner cleared on a timer rather than on animationend, for the
+// same reason the boss banner is: animationend never fires if the element is not painted, and a banner
+// that never clears is a word sitting across the middle of a fight.
+const HERALD_MS = 2200;
 
 // ── DYING ────────────────────────────────────────────────────────────────────────────────────────────────────
 // The longest hold in the feature, because it is the only one with nothing after it. A boss kill stops for
@@ -228,6 +232,13 @@ export default function GroveScene({
     const [bossName, setBossName] = useState(null);
     // The one-shot banner across the middle when a boss first notices you, distinct from the bar it leaves.
     const [bossIntro, setBossIntro] = useState(null);
+    // ── THE HERALD ──────────────────────────────────────────────────────────────────────────────
+    // Centred on the VIEWPORT, which is the entire point. The old unlock announcement was a float at
+    // the door's world position, so killing the twentieth creature anywhere else on the map put the
+    // zone's biggest beat off screen entirely. Not a modal: nothing is dismissed and nothing is
+    // blocked -- it says its piece and leaves.
+    const [herald, setHerald] = useState(null);
+    const heraldTimer = useRef(null);
     const [beltLeft, setBeltLeft] = useState(Number(belt?.count) || 0);
     // ── ⚠️ THE LIST IS STATE; THE POSITIONS ARE NOT ─────────────────────────────────────────────────
     // The first version pushed foes into world.foes imperatively and React was never told, so the zone
@@ -286,6 +297,16 @@ export default function GroveScene({
         const t = setTimeout(() => onDeath?.(), 2600);
         return () => clearTimeout(t);
     }, [dead, onDeath]);
+
+    // ⚠️ ONE TIMER, CLEARED ON REPLACE. Two beats can land within a second of each other -- the way
+    // opening and the boss waking are both caused by the SAME kill -- and without clearing, the first
+    // banner's timer would take the second one off the screen early.
+    const fireHerald = useCallback((kicker, word, kind = "way") => {
+        setHerald({ kicker, word, kind });
+        if (heraldTimer.current) clearTimeout(heraldTimer.current);
+        heraldTimer.current = setTimeout(() => setHerald(null), HERALD_MS);
+    }, []);
+    useEffect(() => () => { if (heraldTimer.current) clearTimeout(heraldTimer.current); }, []);
 
     const W = zoneWidth(zone.n) * UNITS_PER_SCREEN;
     const maxHp = stats?.maxHp || 100;
@@ -407,7 +428,18 @@ export default function GroveScene({
         // toward `want` above — otherwise the thirty-body cap would quietly despawn it, or respawn it the
         // instant it died, which is the thirty-minute cooldown walked around on the client.
         const bd = groveBoss(zone.boss);
-        if (bd && zone.bossReady && !w.boss && !w.bossClaimed) {
+        // ── ⚠️ READINESS IS LIVE, NOT WHAT THE SERVER SAID ON THE WAY IN ───────────────────────
+        // `zone.bossReady` is computed once, server-side, at zone open. So a player who walked in on
+        // nineteen kills and then earned the twentieth got nothing: the door opened (that check has
+        // always used a live count) and the boss stayed absent until they left and came back. The
+        // zone's climax was gated on a page navigation.
+        //
+        // Same arithmetic the server does, against the count that is actually running. The cooldown
+        // still comes from the server, because a timer the client computes is a timer the client can
+        // argue with — and `bossClaimed` still stops him standing back up inside one session.
+        const liveKills = (Number(zone.kills) || 0) + w.killIndex;
+        const bossReadyNow = liveKills >= zone.toUnlock && (Number(zone.bossWaitMs) || 0) <= 0;
+        if (bd && bossReadyNow && !w.boss && !w.bossClaimed) {
             const bsz = groveSize(bd.id, { boss: true });
             const spot = { x: W - 20, y: 0 };
             w.boss = {
@@ -757,7 +789,13 @@ export default function GroveScene({
                 shockwave(way.x, y, "kill");
                 wd.shake.add(TRAUMA.boss);
                 celebrateUnlock();
-                addPop("loot", "The way is open", way.x, 13);
+                // The door still gets its own burst and shockwave above, because that is WHERE it
+                // happened. The herald says WHAT happened, in the middle of the screen, because the
+                // player may be nowhere near the door when the kill that opens it lands.
+                // The word is the PLACE it opened, because a name you can now go to is the reward;
+                // "Onward" is only for zone twelve, where there is nowhere further to name.
+                const nextZone = GROVE_ZONES.find((z) => z.n === zone.n + 1);
+                fireHerald("The way is open", nextZone?.name || "Onward", "way");
             }
 
             wd.combo = now < wd.comboUntil ? wd.combo + 1 : 1;
@@ -1085,7 +1123,8 @@ export default function GroveScene({
                     w.shake.add(TRAUMA.boss);
                     playBossNotice();
                     setBossName(f.name);
-                    setBossIntro(f.name);
+                    setBossIntro(null);
+                    fireHerald("The zone stirs", f.name, "boss");
                     // ⚠️ CLEARED ON A TIMER rather than an animation event, for the same reason the warp is:
                     // animationend never fires if the element is not painted, and a banner that never
                     // clears is a name sitting across the middle of a boss fight.
@@ -1893,6 +1932,13 @@ export default function GroveScene({
                 the zone can be rebuilt underneath it unseen. */}
             {warp ? <div className={`gv-warp is-${warp}`} aria-hidden="true" /> : null}
 
+            {herald ? (
+                <div className={`gv-herald is-${herald.kind}`} aria-hidden="true">
+                    <i>{herald.kicker}</i>
+                    <b>{herald.word}</b>
+                    <u />
+                </div>
+            ) : null}
             {bossIntro ? (
                 <div className="gv-boss-intro" aria-hidden="true"><b>{bossIntro}</b></div>
             ) : null}
