@@ -20,6 +20,7 @@
     "sim:road:progress": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-road-progress.mjs",
     "grove:curve": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/grove-curve.mjs",
     "prove:reports": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/prove-reports-v2.mjs",
+    "prove:year": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/prove-year-report.mjs",
     "sim:pvp": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-pvp.mjs",
     "arena:report": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/arena-report.mjs",
     "sim:road": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-played.mjs",
