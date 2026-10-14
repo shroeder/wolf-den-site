@@ -139,6 +139,10 @@
     {
       "path": "/api/jobs/fifo-reconcile",
       "schedule": "15 8 * * *"
+    },
+    {
+      "path": "/api/jobs/ledger-report-bundle",
+      "schedule": "45 8 * * *"
     }
   ]
 }

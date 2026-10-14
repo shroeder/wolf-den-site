@@ -600,3 +600,247 @@ export function summarise({ lines, cashRefunds = [], consignedRateByCategoryId =
         tradeCreditUnits: sum(lines, (l) => l.tradeCreditUnits),
     };
 }
+
+
+// ── THE BUNDLE: ReportsSalesData, BUILT ON THE SERVER ────────────────────────────────────────────────────
+// Shaped to match the Kotlin `ReportsSalesData` field for field, so the v2 screen renders through the SAME
+// composables v1 does and only the data source differs. A second UI would be a second set of rounding and
+// sorting decisions, and those are precisely what the parity check is trying to hold still.
+//
+// ⚠️ THE ZONE IS NAMED, NOT INHERITED. `buildReportsData` buckets with `ZoneId.systemDefault()`, which on the
+// phone is America/Chicago and on Vercel is UTC. Left to the default, every sale after 7pm files under
+// tomorrow and the daily series silently disagrees with the phone by a day. Same trap as the SQL one in
+// [[postgres-landmines]].
+const ZONE = "America/Chicago";
+
+const dayKeyFmt = new Intl.DateTimeFormat("en-CA", { timeZone: ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+const partsFmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: ZONE, weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "numeric", hour12: false,
+});
+
+/** The Chicago calendar date of an instant, as YYYY-MM-DD. */
+const dayKey = (ms) => dayKeyFmt.format(new Date(ms));
+
+/** Midnight Chicago on a YYYY-MM-DD, in epoch millis — the bucket's `startMillis`. */
+function startOfDayMillis(key) {
+    // Chicago is UTC-5 or UTC-6 depending on the date, so the offset is measured rather than assumed.
+    const noonUtc = Date.parse(`${key}T12:00:00Z`);
+    const hourAtNoon = Number(partsFmt.formatToParts(new Date(noonUtc)).find((p) => p.type === "hour").value);
+    const offsetHours = 12 - hourAtNoon;
+    return Date.parse(`${key}T00:00:00Z`) + offsetHours * 3600000;
+}
+
+const MONTHS = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** The parts of a YYYY-MM-DD, with the weekday it falls on. */
+function dateParts(key) {
+    const [y, m, d] = key.split("-").map(Number);
+    const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    return { y, m, d, dow };
+}
+const addDays = (key, n) => {
+    const { y, m, d } = dateParts(key);
+    return dayKeyFmt.format(new Date(Date.UTC(y, m - 1, d + n, 12)));
+};
+
+// The four label formats the phone uses, reproduced exactly: "M/d", "EEE, MMM d, yyyy", "MMM ''yy", "MMMM yyyy".
+const shortDay = (key) => { const { m, d } = dateParts(key); return `${m}/${d}`; };
+const fullDay = (key) => {
+    const { y, m, d, dow } = dateParts(key);
+    return `${DOW[dow]}, ${MONTHS[m - 1].slice(0, 3)} ${d}, ${y}`;
+};
+const shortMonth = (key) => { const { y, m } = dateParts(key); return `${MONTHS[m - 1].slice(0, 3)} '${String(y).slice(2)}`; };
+const fullMonth = (key) => { const { y, m } = dateParts(key); return `${MONTHS[m - 1]} ${y}`; };
+
+// Monday of the week a date falls in — `LocalDate.with(DayOfWeek.MONDAY)`.
+const mondayOf = (key) => { const { dow } = dateParts(key); return addDays(key, dow === 0 ? -6 : 1 - dow); };
+const firstOfMonth = (key) => `${key.slice(0, 7)}-01`;
+
+const hourLabel = (h) => (h === 0 ? "12a" : h < 12 ? `${h}a` : h === 12 ? "12p" : `${h - 12}p`);
+const hourOf = (ms) => Number(partsFmt.formatToParts(new Date(ms)).find((p) => p.type === "hour").value) % 24;
+
+/**
+ * One granularity's series and breakdowns — the port of `buildLevel`.
+ */
+function buildLevel({ lines, cashRefunds, consigned, classifiers: c, bucketOf, labels }) {
+    const grouped = new Map();
+    const labelByStart = new Map();
+    const put = (key, line) => {
+        const bucketKey = bucketOf(key);
+        const start = startOfDayMillis(bucketKey);
+        if (!grouped.has(start)) grouped.set(start, []);
+        if (line) grouped.get(start).push(line);
+        labelByStart.set(start, labels(bucketKey));
+        return start;
+    };
+    for (const line of lines) put(dayKey(line.soldAtMillis), line);
+
+    // A refund on a day with no sales still has to show up, so its bucket is seeded empty rather than
+    // being silently dropped for having no line items.
+    const refundsByStart = new Map();
+    for (const rf of cashRefunds) {
+        const start = put(rf.date, null);
+        if (!refundsByStart.has(start)) refundsByStart.set(start, []);
+        refundsByStart.get(start).push(rf);
+    }
+
+    const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
+    const sales = [], profit = [], units = [];
+    const breakdown = {}, unitsBreakdown = {};
+
+    for (const start of [...grouped.keys()].sort((a, b) => a - b)) {
+        const bucketLines = grouped.get(start);
+        const [short, full] = labelByStart.get(start) || ["", ""];
+
+        const storeLines = bucketLines.filter((l) =>
+            !c.isStoreCredit(l) && !c.isSalesTax(l) && !c.isShipping(l) &&
+            (l.squareCategoryId == null || !consigned.has(l.squareCategoryId)));
+        const storeSales = sum(storeLines, (l) => l.netSales);
+        const storeCost = sum(storeLines, (l) => c.effectiveLineCost(l));
+        const storeFees = sum(storeLines, (l) => l.processingFee);
+
+        // The shop's cut of consigned sales. The gross is rightly excluded above — that money is the
+        // consignor's — but on an 87% rate the shop genuinely keeps 13%, and that was being thrown away
+        // with the gross. Card fees come off it, because the shop pays those on the whole ticket.
+        const consignedCommission = sum(
+            bucketLines.filter((l) => !c.isStoreCredit(l) && l.squareCategoryId != null && consigned.has(l.squareCategoryId)),
+            (l) => l.netSales * (1 - (consigned.get(l.squareCategoryId) || 0)) - l.processingFee);
+
+        const bucketRefunds = refundsByStart.get(start) || [];
+        const refunded = sum(bucketRefunds, (r) => r.amount);
+
+        sales.push({ label: short, fullLabel: full, startMillis: start, value: storeSales - refunded });
+        profit.push({ label: short, fullLabel: full, startMillis: start, value: storeSales - storeCost - storeFees + consignedCommission - refunded });
+
+        const groupBy = (arr, keyOf) => {
+            const m = new Map();
+            for (const x of arr) {
+                const k = keyOf(x);
+                if (!m.has(k)) m.set(k, []);
+                m.get(k).push(x);
+            }
+            return m;
+        };
+
+        const categoryRows = (sourceLines, sortItemsBy) => [...groupBy(sourceLines, c.categoryKeyFor)].map(([catId, catLines]) => {
+            const rate = catId == null ? undefined : consigned.get(catId);
+            // ⚠️ A CONSIGNED ITEM'S COST IS THE CONSIGNOR'S CUT, not whatever catalog price it carries.
+            // Costing it at catalog reported a 33% margin on an 87%-to-consignor item.
+            const costOf = (ls) => rate != null ? sum(ls, (l) => l.netSales * rate) : sum(ls, (l) => c.effectiveLineCost(l));
+            const items = [...groupBy(catLines, (l) => l.productName)].map(([name, prodLines]) => {
+                const qty = sum(prodLines, (l) => l.quantity);
+                const lineCost = costOf(prodLines);
+                return {
+                    productName: name,
+                    quantity: qty,
+                    revenue: sum(prodLines, (l) => l.netSales),
+                    imageUrl: null,
+                    cost: lineCost,
+                    unitCost: qty !== 0 ? lineCost / qty : (prodLines[0]?.unitCost || 0),
+                    processingFee: sum(prodLines, (l) => l.processingFee),
+                };
+            }).sort(sortItemsBy);
+            return {
+                categoryName: categoryNameFor(catId, c.categoryNamesById),
+                total: sum(catLines, (l) => l.netSales),
+                items,
+                isConsigned: rate != null,
+                consignmentRate: rate ?? null,
+                cost: costOf(catLines),
+                processingFee: sum(catLines, (l) => l.processingFee),
+            };
+        });
+
+        // Store categories first (by value), then consigned categories (by value).
+        const cats = categoryRows(bucketLines, (a, b) => b.revenue - a.revenue)
+            .sort((a, b) => (a.isConsigned === b.isConsigned ? b.total - a.total : (a.isConsigned ? 1 : -1)));
+        // Refunds get their own visible row. Netting them out of the headline while leaving nothing to click
+        // makes the categories stop summing to the total — right, and looking wrong, which is worse.
+        if (bucketRefunds.length) {
+            cats.push({
+                categoryName: "Refunds",
+                total: -refunded,
+                items: bucketRefunds.map((rf) => ({
+                    productName: rf.description, quantity: -1, revenue: -rf.amount,
+                    imageUrl: null, cost: 0, unitCost: 0, processingFee: 0,
+                })),
+                isConsigned: false, consignmentRate: null, cost: 0, processingFee: 0,
+            });
+        }
+        breakdown[start] = cats;
+
+        // The same bucket counted in UNITS, sorted by units at both levels — the thing the shop sells most
+        // of is usually a cheap single, which never appears near the top of a revenue-sorted list.
+        const itemLines = bucketLines.filter(c.isMerchandise);
+        units.push({ label: short, fullLabel: full, startMillis: start, value: sum(itemLines, (l) => l.quantity) });
+        unitsBreakdown[start] = categoryRows(itemLines, (a, b) => b.quantity - a.quantity)
+            .sort((a, b) => b.items.reduce((x, i) => x + i.quantity, 0) - a.items.reduce((x, i) => x + i.quantity, 0));
+    }
+    return { sales, profit, units, breakdown, unitsBreakdown };
+}
+
+/**
+ * Everything the Reports screen needs, in the shape the app's `ReportsSalesData` already parses.
+ */
+export async function buildReportBundle({ lookbackDays = 400 } = {}) {
+    const [lines, categoryNamesById] = await Promise.all([
+        fetchSaleLines({ lookbackDays }),
+        fetchCatalogCategories().catch(() => new Map()),
+    ]);
+
+    // ⚠️ A 100% PAYOUT RATE IS THE OWNER'S TEST ACCOUNT, not a consignment arrangement — it points at a real
+    // consignor's Square category on purpose, and left in it reports every sale of theirs at zero profit.
+    // Same filter the phone applies. See [[consignor-luke-is-a-test-category]].
+    const consignorRows = await db.query(
+        `SELECT square_category_id, payout_rate FROM consignors
+          WHERE active = true AND payout_rate > 0 AND payout_rate < 1 AND square_category_id IS NOT NULL`
+    ).catch(() => []);
+    const consigned = new Map(consignorRows.map((r) => [String(r.square_category_id), Number(r.payout_rate)]));
+
+    const refundRows = await db.query(
+        `SELECT occurred_on::text AS on, description, amount FROM cash_ledger WHERE source = 'refund'`
+    ).catch(() => []);
+    const cashRefunds = refundRows.map((r) => ({
+        date: String(r.on).slice(0, 10),
+        description: r.description || "Customer refund",
+        amount: Math.abs(Number(r.amount) || 0),
+    }));
+
+    const classifiers = { ...makeClassifiers(lines), categoryNamesById };
+    const level = (bucketOf, labels) => buildLevel({ lines, cashRefunds, consigned, classifiers, bucketOf, labels });
+
+    const day = level((k) => k, (k) => [shortDay(k), fullDay(k)]);
+    const week = level(mondayOf, (k) => [shortDay(k), `Week of ${fullDay(k)}`]);
+    const month = level(firstOfMonth, (k) => [shortMonth(k), fullMonth(k)]);
+
+    // Hour of day, store sales only, summed across the whole window. `count` is the number of distinct days
+    // that hour saw a sale, which is what stops a single big Tuesday reading as a good hour every week.
+    const storeLinesAll = lines.filter((l) => l.squareCategoryId == null || !consigned.has(l.squareCategoryId));
+    const hourly = Array.from({ length: 24 }, (_, h) => {
+        const hl = storeLinesAll.filter((l) => hourOf(l.soldAtMillis) === h);
+        return {
+            label: hourLabel(h),
+            fullLabel: `${hourLabel(h)}\u2013${hourLabel((h + 1) % 24)}`,
+            startMillis: h,
+            value: hl.reduce((a, l) => a + l.netSales, 0),
+            count: new Set(hl.map((l) => dayKey(l.soldAtMillis))).size,
+        };
+    });
+
+    return {
+        daily: day.sales, weekly: week.sales, monthly: month.sales,
+        dailyBreakdown: day.breakdown, weeklyBreakdown: week.breakdown, monthlyBreakdown: month.breakdown,
+        profitDaily: day.profit, profitWeekly: week.profit, profitMonthly: month.profit,
+        hourly,
+        unitsDaily: day.units, unitsWeekly: week.units, unitsMonthly: month.units,
+        unitsDailyBreakdown: day.unitsBreakdown, unitsWeeklyBreakdown: week.unitsBreakdown,
+        unitsMonthlyBreakdown: month.unitsBreakdown,
+        // Summed over the WHOLE window, not per bucket: it is a footnote saying how much the count is
+        // deliberately leaving out, and a per-day version of that would be noise on every card.
+        tradeCreditUnits: lines.reduce((a, l) => a + l.tradeCreditUnits, 0),
+        lineCount: lines.length,
+        lastUpdatedMillis: Date.now(),
+    };
+}
