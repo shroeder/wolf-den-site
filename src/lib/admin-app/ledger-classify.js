@@ -34,6 +34,11 @@ const t = (e) => `${e?.description || ""} ${e?.notes || ""}`.toLowerCase();
 const PRE_RULES = [
     { re: /dept of reven|department of revenue|mn rev pay|sales tax/, bucket: "Sales tax remitted", cost: false,
       why: "collected from customers and passed through — never the shop's money" },
+    // Both of these carry category "Taxes" too, and both are REAL costs — but a screen that wants to show
+    // "payroll tax" and "workers comp" as their own lines gets $0.00 for each if the category wins, because
+    // they are indistinguishable from the sales-tax remittance sitting beside them.
+    { re: /internal revenue service|\birs\b/, bucket: "Payroll tax", cost: true },
+    { re: /department of labor|dept of labor|labor & industry|labor and industry/, bucket: "Workers comp", cost: true },
 ];
 
 // bucket  — what the report calls it
