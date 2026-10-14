@@ -139,8 +139,67 @@ export const RECOIL = 0.11;
 
 // ── FLASH, SQUASH AND DEATH ─────────────────────────────────────────────────────────────────────────────────
 export const FLASH_MS = 95;
-export const DEATH_MS = 420;
 export const SPAWN_FADE_MS = 220;
+
+// ── DYING ───────────────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "We want death animations for enemies and our character."
+//
+// What was here before was a PINWHEEL: a constant 14 degrees a frame until the sprite had faded out, applied
+// identically to a rat and to a boss. It reads as the creature being deleted rather than killed, and it reads
+// the same whatever just died, which wastes the single most repeated beat in the whole feature.
+//
+// A death is a FALL. The body is launched by the blow, topples away from it, hits the floor, and only then
+// goes. Three things make that land:
+//
+//   1. THE ROTATION EASES OUT. A constant spin has no weight — nothing in the world turns at a fixed rate on
+//      the way down. Fast at the start while the blow still owns it, slowing as it meets the ground.
+//   2. IT TOPPLES AWAY FROM THE BLOW, not in a fixed direction, so the death points back at what caused it.
+//   3. IT IS STILL IN THE SOLVER. Already true and worth keeping: a creature killed on a ledge falls off it,
+//      which no canned animation could do.
+//
+// ⚠️ ANGLES AND DURATIONS ONLY — NO DISTANCES. Everything positional here is either degrees or a share of the
+// body's own height, because a tuned distance in world units is a share of the frame in disguise and breaks
+// the moment the Grove's zoom changes. See [[view-space-constants-break-on-zoom]].
+export const DEATH = {
+    // A rat should be gone before you have finished the swing; a boss should take long enough that you watch.
+    small:  { ms: 380, lean: 88, launch: 0.95, up: 0.85, dust: 0.85 },
+    normal: { ms: 520, lean: 82, launch: 0.75, up: 0.72, dust: 1.00 },
+    big:    { ms: 820, lean: 70, launch: 0.42, up: 0.46, dust: 1.70 },
+};
+/** Which weight class a creature dies in. Bosses and rares get the heavy fall. */
+export const deathKit = (foe) => (foe?.isBoss || foe?.big || foe?.rare)
+    ? DEATH.big
+    : ((foe?.h || 1) <= 0.85 ? DEATH.small : DEATH.normal);
+
+// The body settles INTO the floor as it goes, as a share of its own height. Sinking rather than simply
+// fading is most of what stops it reading as a sprite being switched off.
+export const DEATH_SINK = 0.22;
+// It holds full opacity for this share of the fall, so the topple is watched rather than faded through.
+export const DEATH_OPAQUE_UNTIL = 0.55;
+// The squash when a toppling body hits the floor, and how long it holds.
+export const DEATH_IMPACT = { sx: 1.26, sy: 0.72, ms: 150 };
+
+// ── THE HERO'S DEATH ────────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ THE HERO HAD NO DEATH AT ALL. Hitting zero fired a hitstop, a shake and a sound, and then a dark panel
+// slid over a hero who was still standing up straight underneath it. The one moment that ends the run was the
+// only beat in the feature with nothing on screen.
+//
+// He falls slower than anything he kills — it is the only death the player is meant to feel — and he does NOT
+// vanish. He stays on the floor at a readable opacity while the veil comes over him, because the run ending
+// with the body still there is the picture, and a hero who dissolves reads as a disconnect.
+export const HERO_DEATH = {
+    ms: 820,
+    lean: 74,              // degrees; he keels rather than going fully flat
+    launch: 0.85,          // thrown back by whatever killed him
+    up: 0.55,
+    rest: 0.5,             // the opacity he settles at, never 0
+    knee: 0.38,            // share of the fall spent buckling before he goes over
+};
+// ⚠️ THE DARK WAITS FOR THE FALL. The veil used to arrive in 320ms over a standing hero. It now holds until
+// he is down, because covering the animation that was just built is the one way to waste it. The comment on
+// .gv-dead still stands — a dimmed, still-moving zone reads as a stutter — but a zone whose only remaining
+// motion is the hero going down is not that.
+export const DEATH_VEIL_DELAY_MS = 560;
 
 // ── THE CHASE BAR ───────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "how it shows their health plummeting with their like intermediate red lerp bar."

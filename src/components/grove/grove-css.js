@@ -6,6 +6,10 @@
 // ⚠️ AND NO FILTER ON A SCENE ANCESTOR. A filter or backdrop-filter creates a containing block, and the
 // scene positions everything absolutely inside it; a tint on a wrapper would silently re-anchor every body in
 // the zone. See filter-creates-containing-block, which cost a whole mobile menu.
+// The one interpolation in this file. The veil's delay has to match the hero's fall exactly, and a
+// copied number would drift the first time the fall is retimed.
+import { DEATH_VEIL_DELAY_MS } from "@/lib/marketplace/grove-juice";
+
 export const GROVE_CSS = `
 .gv { position: relative; color: #efe7d8; }
 
@@ -982,9 +986,15 @@ export const GROVE_CSS = `
 }
 
 /* The death screen. Covers the zone outright rather than tinting it: a dimmed but still-moving scene reads
-   as a stutter, and the one thing it must say clearly is that the run is over and you are going somewhere. */
+   as a stutter, and the one thing it must say clearly is that the run is over and you are going somewhere.
+
+   IT NOW WAITS FOR THE HERO TO FALL. The delay is DEATH_VEIL_DELAY_MS, interpolated above so it cannot drift
+   from the fall it is waiting on. Arriving in 320ms over a hero who was still standing was fine when there
+   was no death animation; covering one that exists would be the one way to waste it. The rule in the first
+   paragraph still holds, because the only motion left under the veil is the body going down. */
 .gv-dead { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
-    background: rgba(6,8,6,0.82); text-align: center; animation: gvDead 320ms ease-out both; }
+    background: rgba(6,8,6,0.82); text-align: center;
+    animation: gvDead 320ms ease-out ${DEATH_VEIL_DELAY_MS}ms both; }
 /* ⚠️ THE WORDS ARRIVE AFTER THE DARK, NOT WITH IT. Both at once reads as a page navigating. Letting the
    zone go out first and then saying what happened is the order the player experiences it in, and the 180ms
    gap is most of why it lands — it is the same reason the loot rests before it can be collected. */

@@ -39,7 +39,8 @@ import {
     makeClock, makeShaker, makeChase, stepChase, swingPose, breathe, landSquash, shadowFor,
     makePop, stepPop, makeSpark, spillVelocity, comboRung,
     popScale, popWeight, barHit, barColor, FOE_BAR_LINGER_MS,
-    HITSTOP_MS, TRAUMA, SWING, SWING_TOTAL_MS, KNOCK, RECOIL, FLASH_MS, DEATH_MS, SPAWN_FADE_MS,
+    HITSTOP_MS, TRAUMA, SWING, SWING_TOTAL_MS, KNOCK, RECOIL, FLASH_MS, SPAWN_FADE_MS,
+    deathKit, DEATH_SINK, DEATH_OPAQUE_UNTIL, DEATH_IMPACT, HERO_DEATH, DEATH_VEIL_DELAY_MS,
     SPARK, DUST, VIGNETTE, COMBO_WINDOW_MS, COMBO_PITCH_STEPS, LOOT_BOUNCE, LOOT_REST_MS,
     LOOT_LABEL_MS, LOOT_DRAW_ACCEL, LOOT_DRAW_MAX, LOOT_EAT_DIST,
 } from "@/lib/marketplace/grove-juice.js";
@@ -640,14 +641,19 @@ export default function GroveScene({
             p.node = el;
             w.pops.push(p);
         };
-        const burst = (x, y, { crit = false, dir = 0, kind = "spark" } = {}) => {
+        // ⚠️ The scale option IS A REAL ARGUMENT, NOT A HINT. A boss hitting the floor has to throw more dirt
+        // than a rat does, and an option this function quietly ignored would have been a dead
+        // parameter at the only call site that passes it. It moves the COUNT and the SPEED; the
+        // particle size is set in CSS and stays put.
+        const burst = (x, y, { crit = false, dir = 0, kind = "spark", scale = 1 } = {}) => {
             const layer = fxRef.current;
             if (!layer) return;
             const dust = kind === "dust";
-            const n = dust ? DUST.n : crit ? SPARK.nCrit : SPARK.n;
+            const base = dust ? DUST.n : crit ? SPARK.nCrit : SPARK.n;
+            const n = Math.max(1, Math.round(base * scale));
             for (let i = 0; i < n; i += 1) {
                 const s = makeSpark(i, n, x, y, {
-                    speed: dust ? DUST.speed : crit ? SPARK.speedCrit : SPARK.speed,
+                    speed: (dust ? DUST.speed : crit ? SPARK.speedCrit : SPARK.speed) * scale,
                     life: dust ? DUST.life : crit ? SPARK.lifeCrit : SPARK.life,
                     dir, rand: w.rand,
                 });
@@ -678,7 +684,13 @@ export default function GroveScene({
             wd.shake.add(foe.isBoss ? TRAUMA.boss : TRAUMA.kill);
             // The death pop: launched away from the blow, spinning, fading. ⚠️ IT IS A REAL IMPULSE
             // through the solver rather than a CSS animation, so a creature killed on a ledge falls off it.
-            impulse(foe, (foe.face || 1) * -0.75, 0.75);
+            // ⚠️ LAUNCHED BY WEIGHT, AND THE DIRECTION IS REMEMBERED. A rat is thrown; a boss barely
+            // moves. `deathDir` is what the topple rotates away from, so the fall points back at the blow
+            // instead of picking a fixed side.
+            const dk = deathKit(foe);
+            foe.deathKit = dk;
+            foe.deathDir = foe.face || 1;
+            impulse(foe, foe.deathDir * -dk.launch, dk.up);
             foe.dying = now;
             foe.flash = 1;
             burst(foe.x, foe.y + foe.h * 0.45, { crit: true, dir: -(foe.face || 1), kind: "spark" });
@@ -1016,8 +1028,22 @@ export default function GroveScene({
                 if (f.flashUntil && now >= f.flashUntil) { f.flash = 0; f.flashUntil = 0; }
                 else if (f.flashUntil) f.flash = Math.max(0, (f.flashUntil - now) / FLASH_MS);
                 if (f.dying) {
-                    // Spinning, fading, and still falling — the solver keeps it honest.
-                    f.spin = (f.spin || 0) + dt * 14 * (f.face || 1);
+                    // ── THE TOPPLE ──────────────────────────────────────────────────────────────
+                    // Still falling: the solver already ran over this body in settle(), so a creature
+                    // killed on a ledge comes off it. What is added here is the WEIGHT — the rotation
+                    // eases out instead of ticking over at a fixed rate, so the blow owns the first
+                    // part of the fall and the ground owns the end of it.
+                    const kit = f.deathKit || (f.deathKit = deathKit(f));
+                    const k = Math.min(1, (now - f.dying) / kit.ms);
+                    // 1-(1-k)^3: fast away from the blow, settling as it meets the floor.
+                    f.lean = -(f.deathDir || 1) * kit.lean * (1 - (1 - k) ** 3);
+                    // ⚠️ THE IMPACT IS AN EVENT, NOT A POSE. A body that lands part-way through its fall
+                    // squashes ONCE at the moment it touches, and only if it was actually in the air —
+                    // reading `grounded` every frame would squash a creature that died standing still.
+                    if (!f.deathHit && f.grounded && now - f.dying > 60) {
+                        f.deathHit = now;
+                        burst(f.x, f.floorY == null ? f.y : f.floorY, { kind: "dust", scale: kit.dust });
+                    }
                     continue;
                 }
                 if (f.hp <= 0) continue;
@@ -1176,6 +1202,14 @@ export default function GroveScene({
                     burst(w.hero.x, w.hero.y + HERO_UNITS * 0.5, { crit: true });
                     shockwave(w.hero.x, w.hero.y + HERO_UNITS * 0.4, "hurt");
                     playDeath();
+                    // ── ⚠️ HE NOW ACTUALLY FALLS ────────────────────────────────────────────
+                    // Everything above was already here and all of it happened to a hero who stayed
+                    // standing bolt upright underneath the panel that followed. He is thrown back by
+                    // whatever killed him and goes down through the same solver every other body uses,
+                    // so he comes off a ledge if he died on one.
+                    w.heroDeath = now;
+                    w.heroDeathDir = w.hero.face || 1;
+                    impulse(w.hero, w.heroDeathDir * -HERO_DEATH.launch, HERO_DEATH.up);
                     setDead(true);
                 }
             }
@@ -1284,17 +1318,63 @@ export default function GroveScene({
             place(w.pet, cam, camY, unit);
             pose(w.pet, now, unit, { moving: Math.abs(w.pet.vx) > 0.04 });
 
+            // ── THE HERO GOING DOWN ─────────────────────────────────────────────────────────────────
+            // Runs AFTER the normal pose so it overwrites it — the same shape the foe topple uses, with
+            // two differences that are the whole character of it.
+            //
+            //   1. HE BUCKLES BEFORE HE GOES OVER. The first third is a knee giving way: he drops and
+            //      squashes without much rotation, and only then keels. A single rotation from upright
+            //      to flat reads as a felled tree, not a person.
+            //   2. HE DOES NOT DISAPPEAR. He settles at a readable opacity and stays there. The run
+            //      ending with the body still on the floor is the picture; a hero who dissolves reads
+            //      as a disconnect rather than a death.
+            if (w.heroDeath && w.hero.art0) {
+                const k = Math.min(1, (now - w.heroDeath) / HERO_DEATH.ms);
+                const knee = Math.min(1, k / HERO_DEATH.knee);
+                const over = Math.max(0, (k - HERO_DEATH.knee) / (1 - HERO_DEATH.knee));
+                const lean = -(w.heroDeathDir || 1) * HERO_DEATH.lean * (1 - (1 - over) ** 3);
+                // The buckle: compressing as the knee goes, easing out of it as he turns over.
+                const sy = 1 - 0.18 * knee * (1 - over * 0.6);
+                const sx = 1 + 0.10 * knee * (1 - over * 0.6);
+                const sink = (w.hero.foot || 0) * 100 + k * DEATH_SINK * 100;
+                w.hero.art0.style.transformOrigin = "50% 92%";
+                w.hero.art0.style.transform =
+                    `translateY(${sink}%) rotate(${lean}deg) scale(${sx}, ${sy}) scaleX(${w.hero.face || 1})`;
+                if (w.hero.node) {
+                    w.hero.node.style.opacity = String(1 - (1 - HERO_DEATH.rest) * k);
+                }
+                if (!w.heroDeathHit && w.hero.grounded && now - w.heroDeath > 80) {
+                    w.heroDeathHit = now;
+                    burst(w.hero.x, w.hero.floorY == null ? w.hero.y : w.hero.floorY,
+                        { kind: "dust", scale: 1.5 });
+                }
+            }
+
             for (let i = w.foes.length - 1; i >= 0; i -= 1) {
                 const f = w.foes[i];
                 place(f, cam, camY, unit);
                 if (f.dying) {
-                    const k = Math.min(1, (now - f.dying) / DEATH_MS);
+                    const kit = f.deathKit || (f.deathKit = deathKit(f));
+                    const k = Math.min(1, (now - f.dying) / kit.ms);
                     if (f.node) {
-                        f.node.style.opacity = String(1 - k);
+                        // It holds full opacity through the topple and only then goes, so the fall is
+                        // watched rather than faded through.
+                        const fade = Math.max(0, (k - DEATH_OPAQUE_UNTIL) / (1 - DEATH_OPAQUE_UNTIL));
+                        f.node.style.opacity = String(1 - fade);
                         f.node.style.pointerEvents = "none";
                     }
-                    if (f.art0) f.art0.style.transform =
-                        `translateY(${(f.foot || 0) * 100}%) rotate(${f.spin || 0}deg) scale(${1 - k * 0.3}) scaleX(${f.face || 1})`;
+                    if (f.art0) {
+                        // The landing squash, decaying over its own short window.
+                        const hit = f.deathHit ? Math.max(0, 1 - (now - f.deathHit) / DEATH_IMPACT.ms) : 0;
+                        const sx = 1 + (DEATH_IMPACT.sx - 1) * hit;
+                        const sy = 1 + (DEATH_IMPACT.sy - 1) * hit;
+                        // Sinking into the floor as it goes — a share of its own height, never a world
+                        // distance, so the zoom cannot break it.
+                        const sink = (f.foot || 0) * 100 + k * DEATH_SINK * 100;
+                        f.art0.style.transformOrigin = "50% 92%";
+                        f.art0.style.transform =
+                            `translateY(${sink}%) rotate(${f.lean || 0}deg) scale(${sx}, ${sy}) scaleX(${f.face || 1})`;
+                    }
                     if (f.flashNode) f.flashNode.style.opacity = String(Math.max(0, 1 - k * 3));
                     if (k >= 1) {
                         // ⚠️ HIDDEN, NEVER .remove()d — THIS CRASHED THE WHOLE SCENE. A foe's node is
@@ -1965,6 +2045,54 @@ function setUpLabScene(w, scene) {
             boss.vx = 0; boss.vy = 0; boss.grounded = true; boss.face = -1;
             w.moveTo = { x: boss.x - 12, y: 0 };
         }
+    } else if (scene === "kill") {
+        // ⚠️ THE OPPOSITE PROBLEM TO THE FIGHT SCENE. That one gives its creatures 2,000 health so the
+        // moment lasts long enough to film; this one exists to film the moment they RUN OUT, so they get
+        // just enough to survive the wind-up and die a few frames into the sheet. Too little and the first
+        // frame is already a corpse; too much and the sheet ends before anything falls.
+        //
+        // Three of them, spread out, so one topple is never hidden behind another — and the hero kills them
+        // in sequence rather than all at once, which is also what exercises the step-to-the-next-one rule.
+        const marks = w.foes.filter((f) => !f.isBoss).slice(0, 3);
+        marks.forEach((f, i) => {
+            f.x = Math.max(6, w.hero.x + (i === 0 ? 3.2 : i === 1 ? -3.2 : 6.4));
+            f.y = w.hero.y;
+            f.vx = 0; f.vy = 0;
+            f.grounded = true;
+            f.face = f.x > w.hero.x ? -1 : 1;
+            f.passive = false;
+            f.hit = true;
+            // Enough to take a couple of swings, not enough to outlast the sheet.
+            f.hp = 60; f.maxHp = 60;
+            // They must not kill the hero mid-film: this scene is about THEIR deaths.
+            f.dmg = [0, 0];
+        });
+        if (marks[0]) w.target = marks[0];
+        w.moveTo = null;
+    } else if (scene === "killbig") {
+        // The heavy fall, which has its own timing and its own weight class in the death kit. One creature,
+        // made big, so the slow topple and the larger dust get a sheet of their own rather than being judged
+        // from a rat.
+        const big = w.foes.find((f) => !f.isBoss);
+        if (big) {
+            big.x = Math.max(6, w.hero.x + 3.6);
+            big.y = w.hero.y;
+            big.vx = 0; big.vy = 0;
+            big.grounded = true;
+            big.face = -1;
+            big.passive = false;
+            big.hit = true;
+            // big=true is what picks the heavy weight class out of the death kit. Its HEIGHT is
+            // deliberately left alone: scaling h moved the body out of the hero reach check and the
+            // first film of this scene was a man swinging at nothing.
+            big.big = true;
+            // Dies to the first swing on purpose: the sheet is about what happens AFTER the blow, so
+            // every frame spent getting there is a frame not spent on the topple.
+            big.hp = 18; big.maxHp = 18;
+            big.dmg = [0, 0];
+            w.target = big;
+        }
+        w.moveTo = null;
     } else if (scene === "death") {
         // ⚠️ THE ONE MOMENT THAT CANNOT BE REACHED BY PLAYING WELL. Dying on the bench means standing a
         // hero with almost no health next to something already angry — and using a zone whose creatures
