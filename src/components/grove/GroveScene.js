@@ -648,6 +648,38 @@ export default function GroveScene({
             bar.style.setProperty("--gv-bj", `${jolt.jolt.toFixed(2)}px`);
         };
 
+        // ── THE HERO'S OWN BAR ──────────────────────────────────────────────────────────────────────
+        // Luke: "I cant see my hp, was hoping to see that above my char."
+        //
+        // ⚠️ THE RULE IS THE OPPOSITE OF THE CREATURES'. A foe shows a bar only while it is the target or
+        // was hit in the last couple of seconds, because thirty permanent bars is a row of interface laid
+        // across a painted forest. There is only ever ONE hero, and the whole point of the number is to be
+        // glanceable before you are in trouble rather than after -- so his is always on.
+        //
+        // It is the same strip, chase and colour the creatures use, read from the same helpers, so a big
+        // hit takes the same visible bite out of his bar as it does out of theirs. Two bars built from two
+        // sets of rules would drift the first time either was tuned.
+        const drawHeroBar = (now) => {
+            const b = w.hero;
+            const bar = b.barNode;
+            if (!bar) return;
+            if (!b.barOn) { b.barOn = true; bar.classList.add("is-on"); }
+            if (!b.chase) b.chase = makeChase(1);
+            const frac = Math.max(0, w.hp) / Math.max(1, maxHp);
+            stepChase(b.chase, now, frac);
+            const c = barColor(frac);
+            const jolt = barHit(w.hurtAt ? now - w.hurtAt : null);
+            if (b.barFill) {
+                b.barFill.style.width = `${b.chase.shown * 100}%`;
+                b.barFill.style.setProperty("--gv-bar1", c.from);
+                b.barFill.style.setProperty("--gv-bar2", c.to);
+            }
+            if (b.barGhost) b.barGhost.style.width = `${b.chase.ghost * 100}%`;
+            bar.style.setProperty("--gv-bf", jolt.flash.toFixed(3));
+            bar.style.setProperty("--gv-bs", jolt.swell.toFixed(3));
+            bar.style.setProperty("--gv-bj", `${jolt.jolt.toFixed(2)}px`);
+        };
+
         // ── POPS AND PARTICLES ARE BUILT BY HAND, NOT BY REACT ──────────────────────────────────────
         // ⚠️ AND THAT IS THE EXCEPTION TO THE RULE AT THE TOP OF THIS FILE, ON PURPOSE. A damage number, a
         // spark and a dust mote are born and dead inside half a second, several per swing — rendering them
@@ -1356,6 +1388,7 @@ export default function GroveScene({
             }
             place(w.pet, cam, camY, unit);
             pose(w.pet, now, unit, { moving: Math.abs(w.pet.vx) > 0.04 });
+            drawHeroBar(now);
 
             // ── THE HERO GOING DOWN ─────────────────────────────────────────────────────────────────
             // Runs AFTER the normal pose so it overwrites it — the same shape the foe topple uses, with
@@ -1919,6 +1952,15 @@ export default function GroveScene({
                 </div>
                 <div className="gv-hero" style={{ "--gv-h": HERO_UNITS }} ref={wire(world.hero)}>
                     {bodyArt(heroArt, { swipe: true })}
+                    {/* ⚠️ THIS IS NOT THE BAR LUKE DELETED. That one was .gv-hp, a strip across the top of
+                        the screen -- "I hate the kill display and red bar" -- and it is still gone. This is
+                        the SAME over-head bar every creature in the zone already wears, on the one body that
+                        did not have one, so the player reads their own health where they are already
+                        looking: at their character. wire() finds .gv-ehp by itself, so the hero inherits the
+                        foe bar's whole machinery -- ghost, colour bands, hit flash -- for free. */}
+                    <span className="gv-ehp is-hero" aria-hidden="true">
+                        <u /><i /><s />
+                    </span>
                 </div>
 
                 {/* Damage numbers, sparks, dust and shockwaves are created by hand into this layer. */}

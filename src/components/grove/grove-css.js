@@ -819,6 +819,14 @@ export const GROVE_CSS = `
     box-shadow: 0 0 0 1px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.6);
     opacity: 0; transition: opacity 180ms linear; pointer-events: none; }
 .gv-ehp.is-on { opacity: 1; }
+/* ⚠️ THE PLAYER'S OWN BAR, AND IT IS THE SAME STRIP ON PURPOSE. Luke: "I cant see my hp, was hoping
+   to see that above my char." Not the .gv-hp strip he had removed -- that was a HUD bar across the top
+   of the screen and it stays deleted. This is the over-head bar every creature already wears, on the
+   one body that lacked one, so his health is read where his eyes already are.
+   Slightly taller and ringed, because among thirty creatures wearing the same strip the player has to
+   be able to pick out their own at a glance. */
+.gv-ehp.is-hero { height: calc(0.68 * var(--gv-unit, 1%)); min-height: 4px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.30), 0 0 0 2px rgba(0,0,0,0.6), 0 2px 5px rgba(0,0,0,0.65); }
 .gv-ehp u, .gv-ehp i, .gv-ehp s { position: absolute; left: 0; top: 0; height: 100%; display: block;
     border-radius: inherit; }
 /* The ghost: where the health WAS, catching up, so the chunk just taken off is a shape rather than a
