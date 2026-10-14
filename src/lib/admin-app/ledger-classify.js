@@ -155,10 +155,16 @@ export function reconcileSpend(entries, { windowDays = 6 } = {}) {
     const plaid = spend.filter(isPlaidRow);
     // Cash moving between the bank and the till. Never spend, but it is what the bank's bare round
     // numbers ARE, so it has to be matchable.
-    // Cash and equity moving, not spend: a withdrawal to the till, an owner contribution funding a
-    // card purchase, a reimbursement. Each shows up in the bank feed as a bare amount, so each has to
-    // be matchable or it masquerades as unexplained cost.
-    const MOVE_TYPES = ["CashFloat", "Transfer", "OwnerContribution", "OwnerDraw", "Reimbursement"];
+    // Cash moving between the bank and the till. Never spend, but it is what the bank's bare round
+    // numbers ARE, so it has to be matchable.
+    //
+    // ⚠️ OWNER CONTRIBUTIONS ARE DELIBERATELY NOT IN HERE, and that was a real regression for a while.
+    // An owner-funded purchase is booked as a PAIR sharing a pairGroupId -- the expense and the money
+    // Luke put in to cover it -- and both legs are real. Treating the contribution as a match for its
+    // own expense made five Meta ad rows vanish out of operating cost into "cash to the drawer",
+    // because each ad has a funding twin of the same amount on the same day. 91 paired rows worth
+    // $6,512.46 were exposed to the same bug. A pairGroupId means INTENTIONAL, never duplicate.
+    const MOVE_TYPES = ["CashFloat", "Transfer"];
     const cashMoves = entries.filter((e) => MOVE_TYPES.includes(e.type) && !isPlaidRow(e));
 
     const index = (rows) => {
