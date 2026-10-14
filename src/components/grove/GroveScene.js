@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
-    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, HEAL_AT, scaledFoe, groveBoss, groveSize, grovePart,
+    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, HEAL_AT, scaledFoe, scaledRare, groveDepth, groveBoss, groveSize, grovePart,
     groveArt, groveEmblem, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
@@ -370,7 +370,12 @@ export default function GroveScene({
             const i = w.killIndex + w.foes.length;
             const isRare = rollRareSpawn(GROVE_RARE.spawnChance, seed, i, bonuses);
             const pickId = zone.enemies[Math.floor(w.rand() * zone.enemies.length)];
-            const base = isRare ? GROVE_RARE : scaledFoe(pickId, zone.n);
+            // ⚠️ DEPTH, NOT `zone.n` — see groveDepth. A zone number restarts on every map, so scaling
+            // against it would have made map 2 a second tutorial. `zone.map` is absent on map 1's zones and
+            // groveDepth reads that as map 1, which is why this is the same number today and the right one
+            // the day a second map lands. The rare climbs with everything else now.
+            const depth = groveDepth(zone.map, zone.n);
+            const base = isRare ? scaledRare(depth) : scaledFoe(pickId, depth);
             const id = isRare ? GROVE_RARE.id : pickId;
             const size = groveSize(id);
             // ⚠️ SPAWNED ALREADY STANDING ON A LEDGE, not dropped from above. Luke: "just like spawn them on
