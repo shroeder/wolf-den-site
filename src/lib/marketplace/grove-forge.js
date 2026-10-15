@@ -251,5 +251,105 @@ export const SET_RARITY = [
 ];
 export const setRarityForZone = (n) => SET_RARITY.find((r) => (Number(n) || 1) <= r.upTo) || SET_RARITY[SET_RARITY.length - 1];
 
+/**
+ * The five sets, one per rarity band.
+ *
+ * ⚠️ THIS IS THE ONLY SINK MERITS HAVE. They have had one faucet since the day they were built -- every boss
+ * pays them -- and nothing at all to spend them on, which is the shape every economy note in this repo warns
+ * about. prove-grove-forge.mjs has been printing "THE SETS ARE THE ONLY SINK AND THEY MUST BE PRICED AGAINST
+ * THIS" at the bottom of its run since before they existed. So the prices below are set against LIFETIME
+ * merit income on a repeatable boss, not against one clear.
+ *
+ * ⚠️ THREE DISTINCT SLOTS, NOT THREE COPIES OF ONE. A set whose pieces share a slot can never be completed,
+ * so its set bonus is unreachable and nothing says so on screen. See [[worn-sets-need-distinct-slots]] --
+ * that gate is gone and this is the hand-check it asked for.
+ *
+ * The stats are STAT POINTS in the same vocabulary the emblems use, because grove-kit folds both into the
+ * Arena's own pool. A point of Might here is worth exactly what a point of Might on a sword is worth, through
+ * the same curve, which is the whole reason that file calls combatStats instead of adding numbers up.
+ */
+export const ARMOUR_SLOTS = [
+    { slot: "head", noun: "Crown" },
+    { slot: "body", noun: "Mantle" },
+    { slot: "feet", noun: "Treads" },
+];
+
+// What each slot is FOR, before rarity scales it. Three different answers so a half-finished set still
+// pulls in a direction, rather than three pieces of the same bonus in different sizes.
+// ⚠️ SIZED AGAINST THE OTHER FOUR STAT SOURCES, NOT AGAINST NOTHING. The first pass of these numbers gave
+// a FULL LEGENDARY SET 17 Might -- against about 202 for a best-in-slot wardrobe and about 356 for a full
+// badge set. The deepest grind in the Grove would have been worth less than one badge, which is the kind of
+// reward that teaches a player the content is not worth doing. See [[combat-stat-sources-four]].
+const SLOT_PROFILE = {
+    head: { crit_rate: 1.05, rarity_find: 2.4 },
+    body: { armour: 6, vitality: 7.2 },
+    feet: { attack_speed: 1.2, move_speed: 2.4 },
+};
+
+// ⚠️ ONE CURVE, NOT A HAND-WRITTEN NUMBER PER PIECE. Fifteen pieces authored by hand is fifteen chances to
+// make the epic Treads quietly better than the legendary ones. Rarity scales the profile; nothing else does.
+const RARITY_SCALE = { common: 1, uncommon: 1.9, rare: 3.2, epic: 5, legendary: 7.2 };
+
+// ⚠️ PRICED AGAINST THE REPEAT. Clearing every boss once pays 240 merits and the cooldown is 30 minutes PER
+// ZONE, so a determined player can earn several hundred an hour -- the first pass of these prices put the
+// ENTIRE wardrobe at 1.2x a single full clear, which is about thirty-five minutes for everything the system
+// has. These put the Heartwrought set at roughly ten days of steady play and the whole wardrobe at 8x a
+// full clear. See [[economy-nerf-measure-daily-total]].
+export const GROVE_SETS = {
+    common: { id: "common", name: "Rootbound", zones: [1, 3], merits: 60 },
+    uncommon: { id: "uncommon", name: "Barrowplate", zones: [4, 6], merits: 141 },
+    rare: { id: "rare", name: "Warrenweave", zones: [7, 9], merits: 300 },
+    epic: { id: "epic", name: "Rotwood", zones: [10, 11], merits: 519 },
+    legendary: { id: "legendary", name: "Heartwrought", zones: [12, 12], merits: 900 },
+};
+export const GROVE_SET_ORDER = ["common", "uncommon", "rare", "epic", "legendary"];
+
+/** Every forgeable piece, built from the three tables above rather than listed. */
+export const ARMOUR_PIECES = GROVE_SET_ORDER.flatMap((rid) => {
+    const set = GROVE_SETS[rid];
+    const scale = RARITY_SCALE[rid];
+    return ARMOUR_SLOTS.map((s) => ({
+        id: `${rid}_${s.slot}`,
+        setId: rid,
+        slot: s.slot,
+        name: `${set.name} ${s.noun}`,
+        rarity: rid,
+        rarityName: SET_RARITY.find((r) => r.id === rid)?.name || rid,
+        // Rounded to two places: these are added to a pool that is itself rounded at the swing, and a
+        // fourteen-decimal stat point in a tooltip reads as a bug.
+        stats: Object.fromEntries(
+            Object.entries(SLOT_PROFILE[s.slot]).map(([k, v]) => [k, Math.round(v * scale * 100) / 100]),
+        ),
+        // The toll. Merits are the gate; the parts are the grind, and they come from the chest the boss of
+        // that band actually drops, so the set is paid for with the band it belongs to.
+        merits: Math.round(set.merits / 3),
+        parts: chestForZone(set.zones[1]).parts.slice(0, 2).map((r) => ({
+            part: r.part,
+            n: Math.round(r.n[1] * (1 + GROVE_SET_ORDER.indexOf(rid) * 0.45)),
+        })),
+    }));
+});
+
+export const pieceById = (id) => ARMOUR_PIECES.find((p) => p.id === id) || null;
+
+/**
+ * What wearing the whole set is worth on top of its pieces.
+ *
+ * ⚠️ A SET BONUS THAT IS JUST MORE OF THE SAME STATS IS NOT A SET BONUS. It has to be a reason to finish the
+ * set rather than to wear the best three pieces you happen to own, so it pays stats NONE of the three slots
+ * pay on their own -- finishing a set is the only way to get these at all.
+ */
+export const setBonusFor = (rarityId) => {
+    const scale = RARITY_SCALE[rarityId] || 1;
+    return {
+        might: Math.round(9.6 * scale * 100) / 100,
+        crit_damage: Math.round(3.6 * scale * 100) / 100,
+        life_steal: Math.round(1.4 * scale * 100) / 100,
+    };
+};
+
+/** Which set a zone's boss wears, so the kill card and the armoury agree on one answer. */
+export const setForZone = (n) => GROVE_SETS[setRarityForZone(n).id] || GROVE_SETS.common;
+
 /** The zone a boss stands at, so a set can price itself off the thing that drops its parts. */
 export const zoneOfBoss = (bossId) => GROVE_ZONES.find((z) => z.boss === bossId)?.n || 1;

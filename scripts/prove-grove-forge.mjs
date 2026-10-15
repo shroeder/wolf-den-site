@@ -7,7 +7,8 @@
 // Pure maths. Touches no database and no network.
 const { craftLevel, craftXpForLevel, craftXpFor, rollQuality, qualityBand, toolBonusFor,
     GROVE_CHESTS, GROVE_CHEST_ORDER, chestForZone, bossChestChance, bossMerits,
-    setRarityForZone, CRAFT_LEVEL_CAP } = await import("../src/lib/marketplace/grove-forge.js");
+    setRarityForZone, CRAFT_LEVEL_CAP, ARMOUR_PIECES, GROVE_SETS, GROVE_SET_ORDER, setBonusFor,
+    ARMOUR_SLOTS } = await import("../src/lib/marketplace/grove-forge.js");
 const { GROVE_RECIPES, toolBonusPct } = await import("../src/lib/marketplace/grove-recipes.js");
 
 const pad = (s, n) => String(s).padEnd(n);
@@ -87,12 +88,45 @@ for (const id of GROVE_CHEST_ORDER) {
 
 console.log();
 rule();
+console.log("  THE BOSS SETS -- WHAT MERITS ARE ACTUALLY FOR");
+rule();
+console.log(`  ${pad("set", 15)}${pad("rarity", 11)}${pad("zones", 8)}${rp("merits", 8)}   stats at 3/3 (pieces + set bonus)`);
+for (const id of GROVE_SET_ORDER) {
+    const set = GROVE_SETS[id];
+    const ps = ARMOUR_PIECES.filter((x) => x.setId === id);
+    const merits = ps.reduce((n, x) => n + x.merits, 0);
+    const total = {};
+    for (const x of ps) for (const [k, v] of Object.entries(x.stats)) total[k] = (total[k] || 0) + v;
+    for (const [k, v] of Object.entries(setBonusFor(id))) total[k] = Math.round(((total[k] || 0) + v) * 100) / 100;
+    console.log(`  ${pad(set.name, 15)}${pad(id, 11)}${pad(set.zones.join("-"), 8)}${rp(merits, 8)}   `
+        + Object.entries(total).map(([k, v]) => `${k} ${v}`).join(" · "));
+    console.log(`  ${" ".repeat(42)}each piece also costs ${ps[0].parts.map((r) => `${r.n} ${r.part}`).join(" + ")}`);
+}
+
+// ⚠️ THE CHECK THE MISSING GATE USED TO DO. A set whose pieces share a slot can never be completed, so its
+// set bonus is unreachable and NOTHING ON SCREEN SAYS SO. See worn-sets-need-distinct-slots.
+let slotFault = 0;
+for (const id of GROVE_SET_ORDER) {
+    const slots = ARMOUR_PIECES.filter((x) => x.setId === id).map((x) => x.slot);
+    if (new Set(slots).size !== slots.length || slots.length !== ARMOUR_SLOTS.length) {
+        console.log(`  !! ${id} cannot be completed: slots ${slots.join(",")}`);
+        slotFault += 1;
+    }
+}
+console.log();
+console.log(slotFault ? `  !! ${slotFault} SET(S) UNCOMPLETABLE` : "  every set has one piece in each of the three slots, so 3/3 is reachable.");
+
+console.log();
+rule();
 console.log("  ⚠ THE SINK CHECK");
 rule();
 // A currency with a faucet and no sink is the thing every economy note in this repo is about.
 let lifetimeMerits = 0;
 for (let n = 1; n <= 12; n += 1) lifetimeMerits += bossMerits(n);
 console.log(`  clearing every boss once pays ${lifetimeMerits} merits.`);
-console.log(`  repeatable on a 30-minute cooldown per zone, so merits are uncapped over time --`);
-console.log(`  THE SETS ARE THE ONLY SINK AND THEY MUST BE PRICED AGAINST THIS, NOT AGAINST ONE CLEAR.`);
+console.log(`  repeatable on a 30-minute cooldown per zone, so merits are uncapped over time.`);
+const allSets = GROVE_SET_ORDER.reduce((n, id) =>
+    n + ARMOUR_PIECES.filter((x) => x.setId === id).reduce((m, x) => m + x.merits, 0), 0);
+console.log(`  every piece of every set costs ${allSets} merits -- ${(allSets / lifetimeMerits).toFixed(1)}x one full clear.`);
+console.log(`  THE SETS ARE THE ONLY SINK. Priced against the repeat, not against the first clear.`);
 console.log();

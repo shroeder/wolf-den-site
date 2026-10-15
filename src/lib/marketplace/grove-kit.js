@@ -5,6 +5,7 @@ import { combatStats, fighterFrom } from "@/lib/marketplace/arena.js";
 import { treeEffects } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects } from "@/lib/marketplace/arena-upgrades.js";
 import { GROVE_EMBLEMS, emblemStars } from "@/lib/marketplace/grove-catalog.js";
+import { pieceById, setBonusFor, ARMOUR_SLOTS } from "@/lib/marketplace/grove-forge.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const logger = createServerLogger({ source: "api", subsystem: "grove-kit" });
@@ -30,6 +31,38 @@ const logger = createServerLogger({ source: "api", subsystem: "grove-kit" });
 // ⚠️ AND BADGES ARE THE BIG ONE. 131 badges carry a combat bonus, worth about +356 Might at a full set
 // against +202 for a best-in-slot wardrobe. A system that reads gear and skips badges is not slightly off —
 // it is ignoring the largest single source of a veteran's power.
+
+/**
+ * Add Grove-vocabulary stat points into the Arena's pool.
+ *
+ * ⚠️ ONE MAPPING, TWO CALLERS, AND IT WAS INLINE IN THE EMBLEM LOOP UNTIL THE BOSS SETS ARRIVED. The two
+ * systems name the same stats differently -- the Grove says `crit_rate` and `armour`, the pool says
+ * `crit_chance` and `armor` -- and a second copy of that translation is a second thing to forget when a
+ * stat is added. A set piece granting `crit_rate` into a pool that reads `crit_chance` does not throw; it
+ * is silently worth nothing. See [[reuse-the-rule-never-restate-it]].
+ *
+ * Two stats do not live in the pool at all and get their own channels: attack speed is a PERCENT here and
+ * a rate there, so it rides the class tree's tempoBonus; and move speed is the Grove's alone, because
+ * there is nothing in the ring to walk across.
+ */
+function addGroveStat(stats, bag, onTempo, onMove) {
+    for (const [stat, v] of Object.entries(bag || {})) {
+        if (!v) continue;
+        const add = (k) => { stats[k] = (Number(stats[k]) || 0) + v; };
+        if (stat === "might") add("might");
+        else if (stat === "vitality") add("vitality");
+        else if (stat === "armour") add("armor");
+        else if (stat === "crit_rate") add("crit_chance");
+        else if (stat === "crit_damage") add("crit_power");
+        else if (stat === "life_steal") add("lifesteal");
+        else if (stat === "ferocity") add("ferocity");
+        else if (stat === "tenacity") add("tenacity");
+        else if (stat === "attack_speed") onTempo?.(v);
+        else if (stat === "move_speed") onMove?.(v);
+        // rarity_find and emblem_find are read by the drop roll, not by the fighter, so they are
+        // deliberately not in this list -- see bonusesFrom in grove.js.
+    }
+}
 
 /** The fields the Grove scene actually reads. Everything else `fighterFrom` returns is Arena-only. */
 function forGrove(f) {
@@ -96,21 +129,34 @@ export async function groveFighter(buyerId) {
             // Stars are earned by HOW MANY you have collected, not by the one you slotted.
             const { stars } = emblemStars(Number(row.count) || 0);
             if (!stars) continue;
-            const v = meta.per * stars;
-            const add = (k) => { stats[k] = (Number(stats[k]) || 0) + v; };
-            if (meta.stat === "might") add("might");
-            else if (meta.stat === "vitality") add("vitality");
-            else if (meta.stat === "armour") add("armor");
-            else if (meta.stat === "crit_rate") add("crit_chance");
-            else if (meta.stat === "crit_damage") add("crit_power");
-            else if (meta.stat === "life_steal") add("lifesteal");
-            else if (meta.stat === "ferocity") add("ferocity");
-            else if (meta.stat === "tenacity") add("tenacity");
-            // Attack speed is a PERCENT on the emblem and tempo is a rate, so it rides the tree's own
-            // channel for exactly this — the one the node cards quote.
-            else if (meta.stat === "attack_speed") emblemTempo += v / 100;
-            // Move speed is the Grove's alone: there is nothing in the ring to walk across.
-            else if (meta.stat === "move_speed") moveSpeed += v;
+            addGroveStat(stats, { [meta.stat]: meta.per * stars },
+                (v) => { emblemTempo += v / 100; }, (v) => { moveSpeed += v; });
+        }
+
+        // ── ⚠️ THE BOSS SETS JOIN THE SAME POOL, THROUGH THE SAME MAPPING ───────────────────────────
+        // Luke: "you can make boss armor that is a set in game."
+        //
+        // Deliberately the SECOND loop over the same `add` and the same stat names rather than a parallel
+        // path: armour and emblems are two ways to wear a thing, and the moment they are two ways to
+        // CALCULATE a thing they start disagreeing about what a point of Might is. The names are mapped
+        // once, in the block above, and this reuses that mapping verbatim.
+        //
+        // ⚠️ THE SET BONUS IS WHY THIS READS THE WHOLE WARDROBE AND NOT JUST THE SLOTS. Three pieces of
+        // one set pays stats that NO individual piece pays -- so the bonus cannot be computed per row, it
+        // needs the count of worn pieces per set first.
+        const armRows = await db.query(
+            `SELECT piece_id FROM mkt_grove_armour WHERE buyer_id = $1 AND worn`, [buyerId]
+        ).catch(() => []);
+        const wornBySet = {};
+        for (const row of armRows || []) {
+            const piece = pieceById(row.piece_id);
+            if (!piece) continue;
+            wornBySet[piece.setId] = (wornBySet[piece.setId] || 0) + 1;
+            addGroveStat(stats, piece.stats, (v) => { emblemTempo += v / 100; }, (v) => { moveSpeed += v; });
+        }
+        for (const [setId, worn] of Object.entries(wornBySet)) {
+            if (worn < ARMOUR_SLOTS.length) continue;
+            addGroveStat(stats, setBonusFor(setId), (v) => { emblemTempo += v / 100; }, (v) => { moveSpeed += v; });
         }
 
         const prog = await db.queryOne(

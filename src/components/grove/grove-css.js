@@ -1381,6 +1381,66 @@ export const GROVE_CSS = `
 .gv-sect .gv-slot { border-color: color-mix(in srgb, var(--area) 26%, rgba(255,255,255,0.10)); }
 .gv-sect .gv-slot span { color: var(--area); }
 
+/* -- THE ARMOURY ------------------------------------------------------------------------------
+   Five sets, three pieces each, and every tile has to answer three questions at once: what does it
+   give me, what does it cost, am I wearing it. So the stats are a list, the cost is always on screen
+   rather than behind the button, and the worn state is a colour rather than a word.
+
+   The set colour comes from the rarity rather than from the panel, because rarity is the only thing
+   that distinguishes one of these from another -- Rootbound and Heartwrought are the same three
+   slots with the same three stat profiles, and the band IS the progression.
+
+   NO BACKTICKS IN THESE COMMENTS -- template literal. */
+.gv-arm-say { margin: 0 0 12px; font-size: 0.78rem; color: #9aa08f; }
+.gv-arm-set { --rar: #9aa08f; margin: 0 0 13px; padding: 10px; border-radius: 12px;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); }
+.gv-arm-set.is-common { --rar: #9aa08f; }
+.gv-arm-set.is-uncommon { --rar: #9be36a; }
+.gv-arm-set.is-rare { --rar: #6fd0ff; }
+.gv-arm-set.is-epic { --rar: #e0a8ff; }
+.gv-arm-set.is-legendary { --rar: #ffb648; }
+.gv-arm-set.is-complete { border-color: var(--rar);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--rar) 26%, transparent); }
+
+.gv-arm-set > header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; }
+.gv-arm-set > header b { font-size: 0.98rem; color: var(--rar); }
+.gv-arm-set > header em { font-style: normal; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--rar); opacity: 0.8; }
+.gv-arm-set > header span { font-size: 0.68rem; color: #777d70; }
+.gv-arm-set > header u { margin-left: auto; text-decoration: none; font-size: 0.74rem; font-weight: 800;
+    font-variant-numeric: tabular-nums; color: #cfc6b6; }
+
+.gv-arm-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.gv-arm-piece { display: flex; flex-direction: column; gap: 6px; padding: 8px 7px; border-radius: 10px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.4), rgba(0,0,0,0.26));
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.5); }
+.gv-arm-piece.is-have { border-color: rgba(255,255,255,0.14); }
+.gv-arm-piece.is-on { border-color: var(--rar);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--rar) 18%, rgba(0,0,0,0.4)), rgba(0,0,0,0.3)); }
+.gv-arm-piece > b { font-size: 0.78rem; color: #fff6df; }
+.gv-arm-piece ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.gv-arm-piece li { font-size: 0.62rem; color: #9be36a; }
+
+.gv-arm-cost { display: flex; flex-direction: column; gap: 2px; margin-top: auto; }
+.gv-arm-cost i { display: flex; align-items: center; gap: 4px; font-style: normal; font-size: 0.6rem;
+    color: #9aa08f; }
+.gv-arm-cost i img { width: 14px; height: 14px; object-fit: contain; }
+/* What you cannot pay, said in the colour the rest of the game says it in. */
+.gv-arm-cost i.is-short { color: #f0a08a; font-weight: 700; }
+
+.gv-arm-go { margin-top: 4px; padding: 6px 4px; border-radius: 999px; border: 0; cursor: pointer;
+    font: inherit; font-size: 0.72rem; font-weight: 800; color: #1a1a12;
+    background: linear-gradient(180deg, #ffd166, #e0a83c); }
+.gv-arm-go:disabled { cursor: default; color: #8d8577;
+    background: rgba(255,255,255,0.06); }
+.gv-arm-go.is-off { color: #cfc6b6; background: rgba(255,255,255,0.08); }
+
+.gv-arm-bonus { margin: 9px 0 0; font-size: 0.66rem; color: #777d70; }
+.gv-arm-bonus b { color: #9aa08f; }
+.gv-arm-bonus.is-on { color: var(--rar); }
+.gv-arm-bonus.is-on b { color: var(--rar); }
+
 /* -- THE ITEM TILE ---------------------------------------------------------------------------
    Luke: "The item tiles look bad both in quality and also the text layout relative to the sprite."
 

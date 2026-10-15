@@ -2,7 +2,8 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
-import { craftLevel, craftXpFor, rollQuality, qualityBand, toolBonusFor, qualityOdds, GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
+import { craftLevel, craftXpFor, rollQuality, qualityBand, toolBonusFor, qualityOdds, GROVE_CHESTS,
+    ARMOUR_PIECES, pieceById, setBonusFor, GROVE_SETS } from "@/lib/marketplace/grove-forge.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
@@ -134,7 +135,7 @@ async function heroLook(buyerId) {
 export async function groveState(buyerId) {
     if (!buyerId || !groveOpen(buyerId)) return { ok: false, error: "closed" };
 
-    const [p, zones, items, seen, emblems, tools, chests, craftLog, look, hero] = await Promise.all([
+    const [p, zones, items, seen, emblems, tools, chests, craftLog, armour, look, hero] = await Promise.all([
         playerRow(buyerId),
         // ⚠️ THE COOLDOWN IS COMPUTED IN SQL, ON THE QUERY THIS ALREADY RAN. Two reasons. It costs nothing
         // — no extra round trip, and round trips are the meter that bills. And the comparison happens where
@@ -160,6 +161,7 @@ export async function groveState(buyerId) {
                FROM mkt_grove_craft_log WHERE buyer_id = $1
               ORDER BY created_at DESC LIMIT 12`, [buyerId],
         ).catch(() => []),
+        db.query(`SELECT piece_id, worn FROM mkt_grove_armour WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         heroLook(buyerId),
         // ⚠️ WHAT THE PLAYER ACTUALLY BUILT. Gear, forge, sets, jewels, compendium, pet, badges, casino
         // tracks and the class tree, through the Arena's own combatStats + fighterFrom. Before this the
@@ -230,6 +232,14 @@ export async function groveState(buyerId) {
         toolQuality: Object.fromEntries((tools || []).map((t) => [t.slot, t.quality == null ? null : Number(t.quality)])),
         // ⚠️ THE GROVE'S OWN CHESTS, NOT mkt_chest. See the note on the boss grant.
         chests: Object.fromEntries((chests || []).map((c) => [c.tier, Number(c.qty) || 0])),
+        // ⚠️ OWNED AND WORN AS TWO SHAPES, NOT ONE LIST WITH A FLAG. The armoury asks "do I have this
+        // piece" fifteen times while it renders, and "what is in this slot" three times; a flat list
+        // makes both of those a scan. The catalogue stays the only thing that knows what a piece IS.
+        armour: {
+            owned: (armour || []).map((r) => r.piece_id),
+            worn: Object.fromEntries((armour || []).filter((r) => r.worn)
+                .map((r) => [pieceById(r.piece_id)?.slot, r.piece_id]).filter(([k]) => k)),
+        },
         merits: Number(p?.merits) || 0,
         craft: {
             ...craftLevel(Number(p?.craft_xp) || 0),
@@ -654,6 +664,108 @@ export async function groveBoss(buyerId, zoneId) {
         first: Boolean(after?.was_first),
         cooldownMs: BOSS_COOLDOWN_MS,
     };
+}
+
+/**
+ * Forge one piece of boss armour.
+ *
+ * ⚠️ MERITS ARE TAKEN BY A CONDITIONAL UPDATE, NOT BY READ-THEN-WRITE. "Check you can afford it, then
+ * charge" is two statements with a gap, and two taps on a slow connection both walk through that gap and
+ * forge two pieces for one price. The UPDATE carries its own `merits >= $2` and RETURNING says whether it
+ * actually took anything -- the same shape as the chest open and every other claim in this file.
+ *
+ * ⚠️ AND THE PARTS ARE TAKEN FIRST. There is no transaction available here (neon() is the HTTP driver, so
+ * every query is its own request -- see [[postgres-landmines]]), which means the order of the two debits is
+ * the whole of the safety. Parts first: if the merit debit then fails the player is out some parts, which
+ * the next kill replaces. Merits first and a failed part debit would hand out a free piece, which nothing
+ * replaces. Fail toward the recoverable side.
+ */
+export async function groveForgeArmour(buyerId, pieceId) {
+    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
+    const piece = pieceById(String(pieceId || ""));
+    if (!piece) return { ok: false, error: "no_piece" };
+
+    const already = await db.queryOne(
+        `SELECT 1 FROM mkt_grove_armour WHERE buyer_id = $1 AND piece_id = $2`, [buyerId, piece.id],
+    ).catch(() => null);
+    if (already) return { ok: false, error: "already_made" };
+
+    // The parts, each conditionally, and each put back if a later one is short.
+    const taken = [];
+    for (const need of piece.parts) {
+        const got = await db.queryOne(
+            `UPDATE mkt_grove_item SET qty = qty - $4
+              WHERE buyer_id = $1 AND place = $2 AND part_id = $3 AND qty >= $4 RETURNING qty`,
+            [buyerId, "pack", need.part, need.n],
+        ).catch(() => null);
+        if (!got) {
+            for (const back of taken) {
+                await db.query(
+                    `UPDATE mkt_grove_item SET qty = qty + $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2`,
+                    [buyerId, back.part, back.n],
+                ).catch(() => {});
+            }
+            return { ok: false, error: "not_enough_parts" };
+        }
+        taken.push(need);
+    }
+
+    const paid = await db.queryOne(
+        `UPDATE mkt_grove_player SET merits = merits - $2, updated_at = NOW()
+          WHERE buyer_id = $1 AND merits >= $2 RETURNING merits`,
+        [buyerId, piece.merits],
+    ).catch(() => null);
+    if (!paid) {
+        for (const back of taken) {
+            await db.query(
+                `UPDATE mkt_grove_item SET qty = qty + $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2`,
+                [buyerId, back.part, back.n],
+            ).catch(() => {});
+        }
+        return { ok: false, error: "not_enough_merits" };
+    }
+
+    await db.query(
+        `INSERT INTO mkt_grove_armour (buyer_id, piece_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [buyerId, piece.id],
+    ).catch(() => {});
+    await trackActivity(buyerId, "grove_armour", { piece: piece.id }).catch(() => {});
+
+    return { ok: true, piece: { id: piece.id, name: piece.name, slot: piece.slot, rarity: piece.rarity,
+        stats: piece.stats }, meritsLeft: Number(paid.merits) || 0, spent: piece.parts };
+}
+
+/**
+ * Wear a piece, or take off whatever is in its slot.
+ *
+ * ⚠️ TAKE OFF THE SLOT FIRST, ALWAYS, EVEN WHEN PUTTING SOMETHING ON. The unique index refuses a second
+ * worn piece in a slot (see migration 480), so "wear this" without clearing the slot is a query that throws
+ * on exactly the common case -- swapping a crown for a better crown.
+ */
+export async function groveWearArmour(buyerId, pieceId) {
+    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
+    const piece = pieceById(String(pieceId || ""));
+    if (!piece) return { ok: false, error: "no_piece" };
+
+    const owned = await db.queryOne(
+        `SELECT worn FROM mkt_grove_armour WHERE buyer_id = $1 AND piece_id = $2`, [buyerId, piece.id],
+    ).catch(() => null);
+    if (!owned) return { ok: false, error: "not_owned" };
+
+    // Tapping the piece you are already wearing takes it off, which is how the emblems already behave.
+    const takingOff = Boolean(owned.worn);
+    await db.query(
+        `UPDATE mkt_grove_armour SET worn = false
+          WHERE buyer_id = $1 AND worn AND split_part(piece_id, '_', 2) = $2`,
+        [buyerId, piece.slot],
+    ).catch(() => {});
+    if (!takingOff) {
+        await db.query(
+            `UPDATE mkt_grove_armour SET worn = true WHERE buyer_id = $1 AND piece_id = $2`,
+            [buyerId, piece.id],
+        ).catch(() => {});
+    }
+    return { ok: true, worn: !takingOff, slot: piece.slot };
 }
 
 export async function groveMove(buyerId, { partId, from, to, qty = 1 } = {}) {

@@ -233,7 +233,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                         player is saving up rather than a stat -- which makes a running total the whole of
                         what the screen owes them. It was a suffix on a sentence; it is a chip now. */}
                     {merits > 0 ? (
-                        <span className="gv-merits" title="Won from bosses">
+                        <span className="gv-merits" title="Won from bosses - spent on boss armour, under Emblems">
                             <GiLaurelCrown aria-hidden="true" focusable="false" />
                             <b>{merits}</b>
                         </span>

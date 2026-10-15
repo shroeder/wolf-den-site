@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
-    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveEquipEmblem, groveBelt, groveBoss, groveOpenChest } from "@/lib/marketplace/grove.js";
+    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveEquipEmblem, groveBelt, groveBoss, groveOpenChest,
+    groveForgeArmour, groveWearArmour } from "@/lib/marketplace/grove.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -51,6 +52,8 @@ export async function POST(request) {
                 case "craft": return noStore(await groveCraft(buyer.id, String(b.recipe || "")));
                 // The Grove's own chest line, never chests.js. See the note on the boss grant.
                 case "openChest": return noStore(await groveOpenChest(buyer.id, String(b.tier || "")));
+                case "forgeArmour": return noStore(await groveForgeArmour(buyer.id, String(b.piece || "")));
+                case "wearArmour": return noStore(await groveWearArmour(buyer.id, String(b.piece || "")));
                 case "emblem": return noStore(await groveEquipEmblem(buyer.id, b));
                 case "belt": return noStore(await groveBelt(buyer.id, b.food ? String(b.food) : null));
                 default: return noStore({ error: "bad_action" }, { status: 400 });

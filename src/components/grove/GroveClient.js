@@ -10,6 +10,7 @@ import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt } from "@/lib/marketplace/grove-catalog.js";
 import GroveBench from "@/components/grove/GroveBench";
 import Area from "@/components/grove/GroveArea.js";
+import GroveArmoury from "@/components/grove/GroveArmoury.js";
 import { GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
 import { GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
@@ -518,6 +519,10 @@ export default function GroveClient({ initial }) {
                             {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">No emblems yet. They fall rarely.</p> : null}
                         </div>
                         </Area>
+                        {/* The second thing you wear, under the first. This panel is the answer to "what
+                            am I wearing", so both live here rather than one here and one at the bench. */}
+                        <GroveArmoury st={st} partName={partName} PartIcon={PartIcon}
+                            post={post} refresh={refresh} setNote={setNote} />
                     </div>
                 ) : null}
 
