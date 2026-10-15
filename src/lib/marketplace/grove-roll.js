@@ -106,6 +106,8 @@ const span = ([lo, hi], r) => Math.round(lo + (hi - lo) * r);
 const XP_PER_FOE_HP = 96;    // 770hp -> 8 xp,  1460hp -> 15 xp
 const XP_PER_BOSS_HP = 200;  // 59k   -> 295,   180k   -> 900
 
+import { bossChestChance, bossMerits, chestForZone } from "@/lib/marketplace/grove-forge.js";
+
 export function rollKill(foe, seed, index, bonus = {}) {
     const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0 };
     if (!foe) return out;
@@ -158,7 +160,7 @@ export function rollKill(foe, seed, index, bonus = {}) {
  * @param {object} bonus  emblem-derived { rarityFind, emblemFind }
  */
 export function rollBoss(boss, zoneN, seed, index, bonus = {}, hyperChance = 0, hyperTable = null) {
-    const out = { parts: {}, emblem: null, hyper: null, xp: 0 };
+    const out = { parts: {}, emblem: null, hyper: null, xp: 0, chest: null, merits: 0 };
     if (!boss) return out;
     const r = killRng(seed, index);
 
@@ -182,6 +184,49 @@ export function rollBoss(boss, zoneN, seed, index, bonus = {}, hyperChance = 0, 
     }
 
     out.xp = Math.max(4, Math.round((boss.hp || 100) / XP_PER_BOSS_HP));
+
+    // ── ⚠️ THE CHEST AND THE MERITS, AND WHY THEY ARE HERE AND NOT IN THE CHEST CHAIN ────────────────
+    // Luke: "the boss table has a loot table its got good shot like random chests and stuff, the chests
+    // are a parallel chest that have rare crafting goods for the grove."
+    //
+    // Rolled from the SAME seeded stream as everything else above, so the server re-rolling a claimed
+    // boss arrives at the identical answer the client already showed -- which is the whole contract of
+    // this file. A chest decided anywhere else would be a second source of truth about one kill.
+    //
+    // It is a Grove chest, never one of chests.js's eight tiers. Granting through addChests would push
+    // Grove parts into the chain that pays Arena gear, where the first match wins and raising one tier
+    // steals from the ones beneath it. See [[chest-rolls-are-a-chain]].
+    //
+    // ⚠️ MERITS ARE FLAT AND NOT ROLLED. The chest is the variance; a standing currency that swung as
+    // well would make the thing it buys unpriceable, and merits exist to have exactly one sink.
+    const depth = Math.max(1, Number(zoneN) || 1);
+    if (r() < bossChestChance(depth)) out.chest = chestForZone(depth).id;
+    out.merits = bossMerits(depth);
+    return out;
+}
+
+/**
+ * What a Grove chest pays when it is opened.
+ *
+ * ⚠️ EVERY ROW IS ROLLED INDEPENDENTLY, NOT AS A WEIGHTED CHAIN. A chest should feel like opening a chest --
+ * several things at once -- and an independent roll per row cannot be stolen from by raising a sibling,
+ * which is the exact failure the main chest line has and the reason this one is separate at all.
+ *
+ * Seeded by the chest's own opening, not by a kill: these are opened from the bag at a time of the player's
+ * choosing, long after whatever dropped them.
+ */
+export function rollGroveChest(chest, seed, index, bonus = {}) {
+    const out = { parts: {}, merits: 0 };
+    if (!chest) return out;
+    const r = killRng(seed, index);
+    const rarity = Number(bonus.rarityFind) || 0;
+    for (const row of chest.parts || []) {
+        if (row.chance != null && r() >= row.chance) continue;
+        let n = span(row.n, r());
+        if (rarity > 0 && r() < Math.min(0.75, rarity / 100)) n += 1;
+        out.parts[row.part] = (out.parts[row.part] || 0) + n;
+    }
+    out.merits = span(chest.merits, r());
     return out;
 }
 

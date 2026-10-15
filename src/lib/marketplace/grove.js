@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
+import { craftLevel, craftXpFor, rollQuality, qualityBand, toolBonusFor, GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
@@ -12,7 +13,7 @@ import {
     GROVE_FOODS, HEAL_AT, emblemStars, groveZone,
     GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, groveBoss as bossById,
 } from "@/lib/marketplace/grove-catalog.js";
-import { settleKills, rollBoss } from "@/lib/marketplace/grove-roll.js";
+import { settleKills, rollBoss, rollGroveChest } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { groveFighter } from "@/lib/marketplace/grove-kit.js";
 import { grantStone } from "@/lib/marketplace/pet-ascension.js";
@@ -133,7 +134,7 @@ async function heroLook(buyerId) {
 export async function groveState(buyerId) {
     if (!buyerId || !groveOpen(buyerId)) return { ok: false, error: "closed" };
 
-    const [p, zones, items, seen, emblems, tools, look, hero] = await Promise.all([
+    const [p, zones, items, seen, emblems, tools, chests, look, hero] = await Promise.all([
         playerRow(buyerId),
         // ⚠️ THE COOLDOWN IS COMPUTED IN SQL, ON THE QUERY THIS ALREADY RAN. Two reasons. It costs nothing
         // — no extra round trip, and round trips are the meter that bills. And the comparison happens where
@@ -148,7 +149,8 @@ export async function groveState(buyerId) {
         db.query(`SELECT place, part_id, qty FROM mkt_grove_item WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT part_id FROM mkt_grove_seen WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []),
-        db.query(`SELECT slot, tier FROM mkt_grove_tool WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.query(`SELECT slot, tier, quality FROM mkt_grove_tool WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.query(`SELECT tier, qty FROM mkt_grove_chest WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         heroLook(buyerId),
         // ⚠️ WHAT THE PLAYER ACTUALLY BUILT. Gear, forge, sets, jewels, compendium, pet, badges, casino
         // tracks and the class tree, through the Arena's own combatStats + fighterFrom. Before this the
@@ -214,10 +216,24 @@ export async function groveState(buyerId) {
         foods: GROVE_FOODS,
         // One row per slot holding the best tier reached. Map two raises these; nothing here changes.
         tools: Object.fromEntries((tools || []).map((t) => [t.slot, Number(t.tier) || 0])),
+        // Kept beside the tier rather than folded into it: the screen wants to SAY "Fine" and the bonus
+        // maths wants the number, and a single merged value could serve neither without being decoded.
+        toolQuality: Object.fromEntries((tools || []).map((t) => [t.slot, t.quality == null ? null : Number(t.quality)])),
+        // ⚠️ THE GROVE'S OWN CHESTS, NOT mkt_chest. See the note on the boss grant.
+        chests: Object.fromEntries((chests || []).map((c) => [c.tier, Number(c.qty) || 0])),
+        merits: Number(p?.merits) || 0,
+        craft: craftLevel(Number(p?.craft_xp) || 0),
         toolMeta: TOOL_SLOTS.map((t) => ({
             ...t,
             tier: Number((tools || []).find((x) => x.slot === t.slot)?.tier) || 0,
-            pct: toolBonusPct((tools || []).find((x) => x.slot === t.slot)?.tier || 0),
+            quality: (tools || []).find((x) => x.slot === t.slot)?.quality ?? null,
+            // ⚠️ THE REPORTED BONUS NOW INCLUDES THE QUALITY, because that is what the tool actually
+            // gives. A screen showing the tier's base while the game applied a multiplied number would
+            // be lying in the one place a player checks whether crafting well was worth it.
+            pct: toolBonusFor(
+                (tools || []).find((x) => x.slot === t.slot)?.tier || 0,
+                (tools || []).find((x) => x.slot === t.slot)?.quality ?? null,
+            ),
         })),
         seen: [...seenSet],
         // The tablet: what you have seen out of everything there is, and what that is worth.
@@ -560,6 +576,31 @@ export async function groveBoss(buyerId, zoneId) {
 
     const hyper = got.hyper ? await grantHyper(buyerId, got.hyper, { zone: zoneId, boss: boss.id }) : null;
 
+    // ── ⚠️ THE CHEST GOES IN THE GROVE'S OWN TABLE, NOT THROUGH addChests ─────────────────────────
+    // Luke: "the chests are a parallel chest that have rare crafting goods for the grove."
+    //
+    // chests.js grants into mkt_chest, whose roll is a CHAIN across eight tiers paying Arena gear, gold
+    // and coins -- and in a chain the first match wins, so adding anything to it silently steals from
+    // every tier beneath. A Grove chest pays Grove parts out of its own roll and must stay out of that
+    // table entirely. See [[chest-rolls-are-a-chain]].
+    if (got.chest) {
+        await db.query(
+            `INSERT INTO mkt_grove_chest (buyer_id, tier, qty) VALUES ($1, $2, 1)
+             ON CONFLICT (buyer_id, tier) DO UPDATE
+                SET qty = mkt_grove_chest.qty + 1, updated_at = NOW()`,
+            [buyerId, got.chest],
+        ).catch(() => {});
+    }
+    // ⚠️ MERITS ARE NOT GOLD AND MUST NEVER TOUCH awardXp. awardXp pays gold 1:1 with points unless told
+    // otherwise, which is the landmine two lines above this one; merits are their own column with one
+    // faucet (this) and one sink (the boss sets). See [[awardxp-gold-tracks-xp-landmine]].
+    if (got.merits > 0) {
+        await db.query(
+            `UPDATE mkt_grove_player SET merits = merits + $2, updated_at = NOW() WHERE buyer_id = $1`,
+            [buyerId, got.merits],
+        ).catch(() => {});
+    }
+
     const after = await db.queryOne(
         `UPDATE mkt_grove_zone
             SET boss_at = NOW(),
@@ -582,6 +623,10 @@ export async function groveBoss(buyerId, zoneId) {
         xp: got.xp,
         newlySeen,
         hyper,
+        // Both reported back so the kill card can show them rather than the player discovering a chest in
+        // their bag later and not knowing what dropped it.
+        chest: got.chest || null,
+        merits: got.merits || 0,
         kills: Number(after?.boss_kills) || 1,
         first: Boolean(after?.was_first),
         cooldownMs: BOSS_COOLDOWN_MS,
@@ -718,6 +763,57 @@ export async function groveCraft(buyerId, recipeId) {
     }
 
     await trackActivity(buyerId, "grove_craft", { recipe: recipe.id, kind: recipe.kind }).catch(() => {});
+    // ── ⚠️ THE CRAFTING LEVEL, AND THE QUALITY IT BUYS ────────────────────────────────────────────
+    // Luke: "as you craft gear you gain levels in crafting each crafting level helps your rolls on
+    // crafting improving quality of the in game things you craft."
+    //
+    // The xp is priced off the recipe's own PART COST, never flat per craft -- a flat award makes the
+    // cheapest recipe the fastest ladder, which turns crafting into poultice spam. Food is additionally
+    // the worst-paying kind, because it is the one recipe that makes a stack and is meant to be made
+    // constantly.
+    //
+    // ⚠️ THE QUALITY IS ROLLED AGAINST THE LEVEL THE PLAYER HAD *BEFORE* THIS CRAFT. Reading it after
+    // would let the craft that levels you up also benefit from the level it just earned, which is a
+    // small thing that is nonetheless wrong and is the kind of off-by-one nobody ever finds again.
+    const beforeXp = Number(p.craft_xp) || 0;
+    const beforeLevel = craftLevel(beforeXp).level;
+    const gained = craftXpFor(recipe);
+    // Seeded off the player's own running total rather than the session seed: a craft is not a kill and
+    // has no kill index, and a client that could re-roll a bad quality by retrying is a client that
+    // never gets a bad quality.
+    const qRand = (() => {
+        let x = ((beforeXp + 1) * 2654435761) >>> 0;
+        return () => {
+            x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
+            return x / 4294967296;
+        };
+    })();
+    const quality = recipe.kind === "tool" ? rollQuality(beforeLevel, qRand) : null;
+
+    const afterRow = await db.queryOne(
+        `UPDATE mkt_grove_player SET craft_xp = craft_xp + $2, updated_at = NOW()
+          WHERE buyer_id = $1 RETURNING craft_xp`,
+        [buyerId, gained],
+    ).catch(() => null);
+    const afterLevel = craftLevel(Number(afterRow?.craft_xp) || beforeXp + gained);
+
+    // ⚠️ THE QUALITY IS WRITTEN ON THE TOOL, THE BONUS IT IMPLIES IS NOT. Quality is the roll -- a fact
+    // about history that no curve change can invalidate -- and what it is worth is computed at read time
+    // from tier and quality together. Storing "this rod gives 4.2%" would need a backfill the first time
+    // the ladder moved. Same rule as TOOL_PCT_PER_TIER.
+    if (recipe.kind === "tool" && quality != null) {
+        await db.query(
+            `UPDATE mkt_grove_tool SET quality = $3 WHERE buyer_id = $1 AND slot = $2`,
+            [buyerId, recipe.slot, quality],
+        ).catch(() => {});
+    }
+
+    await db.query(
+        `INSERT INTO mkt_grove_craft_log (buyer_id, recipe_id, kind, xp, quality)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [buyerId, recipe.id, recipe.kind, gained, quality],
+    ).catch(() => {});
+
     // ⚠️ WHAT IT COST COMES BACK WITH WHAT IT MADE. The craft used to answer with a name and nothing
     // else, so the screen could say "Made Moss Poultice" and not what had just left the bag -- a
     // system that silently eats sixteen parts and reports four words. The spent array is the exact list
@@ -729,6 +825,17 @@ export async function groveCraft(buyerId, recipeId) {
         adds: Number(recipe.adds) || null,
         tier: Number(recipe.tier) || null,
         slot: recipe.slot || null,
+        // The ladder, reported back so the result card can show the bar moving and say when it levelled.
+        craft: {
+            xpGained: gained,
+            level: afterLevel.level,
+            levelled: afterLevel.level > beforeLevel,
+            progress: afterLevel.progress,
+            intoLevel: afterLevel.intoLevel,
+            needForNext: afterLevel.needForNext,
+        },
+        quality,
+        qualityBand: quality == null ? null : qualityBand(quality).id,
     };
 }
 
@@ -764,3 +871,60 @@ export async function groveEquipEmblem(buyerId, { emblemId, slot } = {}) {
 }
 
 export { GROVE_RECIPES };
+
+
+/**
+ * Open one Grove chest.
+ *
+ * ⚠️ THE DECREMENT IS THE GUARD, NOT A READ-THEN-WRITE. "Check you have one, then take one" is two
+ * statements with a gap between them, and a player tapping twice on a slow connection walks through that
+ * gap and opens a chest they do not have. The UPDATE carries its own `qty > 0` and RETURNING tells us
+ * whether it actually took anything -- if no row comes back, there was nothing to open and nothing was
+ * paid. Same shape as every other claim in this file.
+ *
+ * ⚠️ AND IT PAYS INTO THE BAG, WHICH CAN BE FULL. storeParts already owns the slot rule and reports what
+ * would not fit; a chest that silently vaporised an overflowing reward would be the worst possible version
+ * of a reward. The overflow comes back so the screen can say so.
+ */
+export async function groveOpenChest(buyerId, tier) {
+    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
+    const chest = GROVE_CHESTS[String(tier || "")];
+    if (!chest) return { ok: false, error: "no_chest" };
+
+    const took = await db.queryOne(
+        `UPDATE mkt_grove_chest SET qty = qty - 1, updated_at = NOW()
+          WHERE buyer_id = $1 AND tier = $2 AND qty > 0
+          RETURNING qty`,
+        [buyerId, chest.id],
+    ).catch(() => null);
+    if (!took) return { ok: false, error: "none_held" };
+
+    const p = await playerRow(buyerId);
+    const emblemRows = await db.query(
+        `SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId],
+    ).catch(() => []);
+
+    // ⚠️ SEEDED ON THE OPENING, NOT ON A KILL. These are opened from the bag whenever the player likes,
+    // long after whatever dropped them -- there is no kill index to share. The index is how many of this
+    // tier they have left, which moves every open and cannot be steered by retrying.
+    const got = rollGroveChest(chest, Number(p?.seed) || 1, Number(took.qty) + chest.id.length, bonusesFrom(emblemRows));
+
+    const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p?.pack_slots) || 16);
+    if (got.merits > 0) {
+        await db.query(
+            `UPDATE mkt_grove_player SET merits = merits + $2, updated_at = NOW() WHERE buyer_id = $1`,
+            [buyerId, got.merits],
+        ).catch(() => {});
+    }
+
+    return {
+        ok: true,
+        tier: chest.id,
+        name: chest.name,
+        left: Number(took.qty) || 0,
+        parts: stored,
+        overflow,
+        newlySeen,
+        merits: got.merits || 0,
+    };
+}
