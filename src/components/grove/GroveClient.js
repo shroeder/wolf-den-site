@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { GiLaurelCrown } from "react-icons/gi";
+import { GiAnvil, GiCompass, GiDigHole, GiFarmTractor, GiFishingPole,
+    GiLaurelCrown, GiMineWagon, GiStoneCrafting } from "react-icons/gi";
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt } from "@/lib/marketplace/grove-catalog.js";
@@ -54,6 +55,19 @@ const DOCK = [
 // Sized by role rather than one shared number: a slot is something you pick out of a grid at arm's length, a
 // recipe cost is read inside a sentence. fail-silent on purpose — a part added later with no sprite yet gets
 // its name and nothing else, which is a smaller fault than a broken-image glyph.
+// The unfilled half of a bag. Keyed by index and inert: an empty slot is a hole in a grid, not a control.
+// Same map the workbench uses for the same six slots. Kept beside it rather than imported because
+// GroveBench owns a recipe-shaped version of it; if a seventh tool ever lands, both want editing.
+const TOOL_GLYPH = {
+    rod: GiFishingPole, pick: GiMineWagon, shovel: GiDigHole,
+    hammer: GiAnvil, hoe: GiFarmTractor, sextant: GiCompass,
+};
+
+const emptyCells = (slots, held) => Array.from(
+    { length: Math.max(0, (Number(slots) || 0) - held) },
+    (_, i) => <span key={`e${i}`} className="gv-cell is-empty" aria-hidden="true" />,
+);
+
 const PartIcon = ({ id, size = 34 }) => {
     const art = groveArt(id);
     if (!art) return null;
@@ -357,28 +371,39 @@ export default function GroveClient({ initial }) {
                     <div className="gv-bag">
                         <Area id="bag" icon="ui-bag" title="Backpack"
                             count={`${bagRows.length}/${st.packSlots}`}>
-                            <div className="gv-slots">
+                            {/* -- THE EMPTY SLOTS ARE DRAWN -------------------------------------
+                                Luke: "a lot of void in the area where we show the items."
+
+                                The grid only ever held what you were carrying, so six parts in a bag of
+                                twenty left most of a painted board empty, and empty board reads as a
+                                mistake. Every inventory in every game draws its capacity instead, which
+                                turns the void into what it actually is: room. It also states 6/20 twice,
+                                once as a number and once as a shape, and the shape is the half a counter
+                                on its own can never tell you. */}
+                            <div className="gv-inv">
                                 {bagRows.map(([p, n]) => (
-                                    <button key={p} type="button" className="gv-slot"
+                                    <button key={p} type="button" className="gv-cell"
+                                        title={partName(p) + " - tap to bank"}
                                         onClick={async () => { await post({ action: "move", partId: p, from: "pack", to: "bank", qty: n }); refresh(); }}>
-                                        <PartIcon id={p} />
-                                        <b>{partName(p)}</b><span>{n}</span><em>to bank →</em>
+                                        <span className="gv-cell-face"><PartIcon id={p} size={46} /><i>{n}</i></span>
+                                        <span className="gv-cell-name">{partName(p)}</span>
                                     </button>
                                 ))}
-                                {!bagRows.length ? <p className="muted">Empty. Go and kill something.</p> : null}
+                                {emptyCells(st.packSlots, bagRows.length)}
                             </div>
                         </Area>
                         <Area id="bank" icon="ui-vault" title="Bank"
                             count={`${bankRows.length}/${st.bankSlots}`}>
-                            <div className="gv-slots">
+                            <div className="gv-inv">
                                 {bankRows.map(([p, n]) => (
-                                    <button key={p} type="button" className="gv-slot"
+                                    <button key={p} type="button" className="gv-cell"
+                                        title={partName(p) + " - tap to take"}
                                         onClick={async () => { await post({ action: "move", partId: p, from: "bank", to: "pack", qty: n }); refresh(); }}>
-                                        <PartIcon id={p} />
-                                        <b>{partName(p)}</b><span>{n}</span><em>← to bag</em>
+                                        <span className="gv-cell-face"><PartIcon id={p} size={46} /><i>{n}</i></span>
+                                        <span className="gv-cell-name">{partName(p)}</span>
                                     </button>
                                 ))}
-                                {!bankRows.length ? <p className="muted">Nothing stored.</p> : null}
+                                {emptyCells(st.bankSlots, bankRows.length)}
                             </div>
                         </Area>
                         {/* ── THE BELT ────────────────────────────────────────────────────────────────
@@ -386,21 +411,24 @@ export default function GroveClient({ initial }) {
                             percent hp." One slot: choosing which is the decision. */}
                         <Area id="belt" icon="ui-belt" title="The Belt"
                             count={`eats below ${Math.round((st.healAt || 0.6) * 100)}%`}>
+                            {/* The whole ladder, dim where you hold none. One poultice sitting in a row
+                                built for four was most of the void on this panel, and a list that shows
+                                only what you already have cannot show you what you are missing. */}
                             <div className="gv-slots">
-                                {Object.entries(st.food || {}).filter(([, n]) => n > 0).map(([id, n]) => {
-                                    const f = GROVE_FOODS[id];
+                                {Object.entries(GROVE_FOODS).map(([id, f]) => {
+                                    const n = Number(st.food?.[id]) || 0;
                                     const on = st.belt === id;
                                     return (
-                                        <button key={id} type="button" className={`gv-slot${on ? " is-on" : ""}`}
+                                        <button key={id} type="button" disabled={!n}
+                                            className={`gv-slot${on ? " is-on" : ""}${n ? "" : " is-dim"}`}
                                             onClick={async () => { await post({ action: "belt", food: on ? null : id }); refresh(); }}>
+                                            <PartIcon id={id} />
                                             <b>{f?.name || id}</b>
-                                            <span>{n}</span>
+                                            <span>{n || "0"}</span>
                                             <em>{on ? "on the belt" : `heals ${Math.round((f?.heals || 0) * 100)}%`}</em>
                                         </button>
                                     );
                                 })}
-                                {!Object.values(st.food || {}).some((n) => n > 0)
-                                    ? <p className="muted">No food. Craft some at the workbench.</p> : null}
                             </div>
                         </Area>
 
@@ -409,13 +437,17 @@ export default function GroveClient({ initial }) {
                         <Area id="tools" icon="ui-tools" title="Tools"
                             count={`${(st.toolMeta || []).filter((t) => t.tier).length}/${(st.toolMeta || []).length}`}>
                             <div className="gv-slots">
-                                {(st.toolMeta || []).map((t) => (
+                                {(st.toolMeta || []).map((t) => {
+                                    const Glyph = TOOL_GLYPH[t.slot] || GiStoneCrafting;
+                                    return (
                                     <span key={t.slot} className={`gv-slot${t.tier ? "" : " is-dim"}`}>
+                                        <span className="gv-glyph"><Glyph aria-hidden="true" focusable="false" /></span>
                                         <b>{t.name}</b>
                                         <span>{t.tier ? `Tier ${t.tier}` : "—"}</span>
                                         <em>{t.tier ? `+${t.pct}% ${t.bonus}` : t.bonus}</em>
                                     </span>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </Area>
 

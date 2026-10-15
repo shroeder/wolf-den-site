@@ -1381,10 +1381,73 @@ export const GROVE_CSS = `
 .gv-sect .gv-slot { border-color: color-mix(in srgb, var(--area) 26%, rgba(255,255,255,0.10)); }
 .gv-sect .gv-slot span { color: var(--area); }
 
+/* -- THE ITEM TILE ---------------------------------------------------------------------------
+   Luke: "The item tiles look bad both in quality and also the text layout relative to the sprite."
+
+   What was here was a left-aligned CARD: sprite in the top-left corner at 34px, then the name, then
+   the count, then a hint, each on its own line down the left edge. Three problems in one.
+
+     THE SPRITE WAS A BULLET POINT. Pinned to the corner at 34px with three lines of text running
+     past it, the picture read as an icon decorating a list row. These are drawn objects and the
+     object is the thing being picked out of a grid -- it leads, centred, at 46px.
+
+     THE TEXT FOUGHT IT. Name, count and hint stacked in a column beside a picture is four reading
+     positions for one item. The count belongs ON the sprite as a badge, the way a stack count has
+     worked in every inventory since Diablo, and the name belongs in a band UNDER it where it reads
+     as a caption rather than as a competing heading. The hint goes to the tooltip -- "tap to bank"
+     printed on all twenty tiles is the same sentence twenty times.
+
+     AND THE SLOT DID NOT LOOK LIKE A SLOT. A flat rounded rectangle with a hairline border reads as
+     a button. A slot is a recess: inset shadow, darker than the board it is cut into, so a filled
+     one reads as an object sitting IN something.
+
+   NO BACKTICKS IN THESE COMMENTS -- template literal. */
+.gv-inv { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 7px; }
+.gv-cell { position: relative; display: flex; flex-direction: column; align-items: stretch;
+    padding: 0; overflow: hidden; border-radius: 11px; font: inherit; color: #efe7d8; cursor: pointer;
+    background: linear-gradient(180deg, rgba(0,0,0,0.42), rgba(0,0,0,0.3));
+    border: 1px solid rgba(0,0,0,0.55);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6), inset 0 -1px 0 rgba(255,255,255,0.05);
+    transition: transform 120ms ease, border-color 120ms ease; }
+.gv-cell:active { transform: scale(0.95); }
+.gv-cell:hover { border-color: color-mix(in srgb, var(--area, #e0a83c) 55%, rgba(0,0,0,0.55)); }
+
+/* The object leads. aspect-ratio rather than a height so the tile scales with the column. */
+.gv-cell-face { position: relative; display: grid; place-items: center; aspect-ratio: 1 / 0.86; }
+.gv-cell-face .gv-ico { width: 46px; height: 46px; object-fit: contain; object-position: 50% 50%;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,0.6)); }
+/* The stack count, on the object rather than under it. */
+.gv-cell-face i { position: absolute; right: 3px; bottom: 1px; padding: 1px 6px; border-radius: 999px;
+    font-style: normal; font-size: 0.72rem; font-weight: 800; font-variant-numeric: tabular-nums;
+    color: #fff6df; background: rgba(8,10,7,0.86); border: 1px solid rgba(255,255,255,0.12); }
+/* The name is a caption band, not a heading. One line, always. */
+.gv-cell-name { display: block; padding: 3px 5px 4px; font-size: 0.58rem; line-height: 1.15;
+    letter-spacing: 0.02em; text-align: center; color: #b9b1a2;
+    background: rgba(0,0,0,0.42); border-top: 1px solid rgba(255,255,255,0.05);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ROOM, NOT VOID. The unfilled half of the bag, drawn as what it is. */
+.gv-cell.is-empty { aspect-ratio: 1 / 1.12; border-style: dashed; border-color: rgba(255,255,255,0.07);
+    background: rgba(0,0,0,0.3); box-shadow: inset 0 2px 7px rgba(0,0,0,0.5); cursor: default; }
+
 .gv-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
-.gv-slot { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 10px; cursor: pointer;
-    text-align: left; font: inherit; color: #efe7d8; background: rgba(255,255,255,0.045);
+/* -- THE ROW TILE ---------------------------------------------------------------------------
+   The inventory grid above is for identity and a count. This is the other shape: things that carry
+   a STAT as well as a name -- a food with a heal fraction, a tool with a tier and a bonus -- where a
+   caption band under a square has nowhere to put the third line.
+
+   Same fix as the grid though, which was Luke's actual complaint: "the text layout relative to the
+   sprite". The picture used to sit in the top-left CORNER with three lines of text running down past
+   it, so it read as a bullet point rather than as the object. It is a proper framed thumbnail on the
+   left now, vertically centred against its own text block, on the same recessed plate the grid cells
+   use so the two shapes look like they come from one game. */
+.gv-slot { display: grid; grid-template-columns: auto 1fr; column-gap: 11px; row-gap: 1px;
+    align-items: center; padding: 9px 11px; border-radius: 11px; cursor: pointer;
+    text-align: left; font: inherit; color: #efe7d8;
+    background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025));
     border: 1px solid rgba(255,255,255,0.10); }
+.gv-slot > b, .gv-slot > span, .gv-slot > em { grid-column: 2; }
+.gv-slot:disabled { cursor: default; }
 .gv-slot b { font-size: 0.84rem; }
 .gv-slot span { font-size: 1.05rem; font-weight: 800; color: #9fe08a; }
 .gv-slot em { font-style: normal; font-size: 0.68rem; color: #8d8577; }
@@ -1392,9 +1455,18 @@ export const GROVE_CSS = `
    A slot is picked out of a grid at a glance, so the picture leads and the name confirms it. The
    sprites are drawn on a dark forest and these panels are dark too, so they need no plate behind them —
    just the shadow that keeps them from floating off the row. */
-.gv-slot .gv-ico { display: block; width: 34px; height: 34px; object-fit: contain;
-    object-position: 50% 100%; margin-bottom: 2px;
+.gv-slot .gv-ico, .gv-slot .gv-glyph {
+    grid-column: 1; grid-row: 1 / -1; align-self: center;
+    box-sizing: border-box; display: block; width: 52px; height: 52px; padding: 4px;
+    object-fit: contain; border-radius: 10px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.42), rgba(0,0,0,0.28));
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
+/* A tool has no painted sprite, so it wears its glyph on the same plate rather than leaving the
+   column empty -- half the tiles framed and half not is worse than neither. */
+.gv-slot .gv-glyph { display: grid; place-items: center; padding: 0; filter: none; color: #cbd5dc; }
+.gv-slot .gv-glyph svg { width: 28px; height: 28px; }
+.gv-slot.is-dim .gv-glyph { color: #6d7366; }
 /* Inside a sentence rather than above one, so it sits on the text baseline instead of on the line box. */
 .gv-recipe .gv-ico { display: inline-block; width: 20px; height: 20px; object-fit: contain;
     vertical-align: -0.35em; margin-right: 3px;
