@@ -1285,6 +1285,123 @@ export const GROVE_CSS = `
    through in grey. The player should be able to find what they can make without reading a word.
 
    NO BACKTICKS IN THESE COMMENTS -- this is a template literal. See the header of this file. */
+/* ── THE CRAFTING LADDER ──────────────────────────────────────────────────────────────────────
+   Luke: "The crafting level needs dopamine massively and visibility transparency recall and awareness."
+
+   It is the first thing on the panel rather than a number that flashes past in a result card. The bar
+   is the dopamine, the odds row is the transparency, the recall list is the history, and each tool on
+   the bench below wears the band it rolled -- so what the level BUYS is visible on the thing it was
+   spent on.
+
+   NO BACKTICKS IN THESE COMMENTS -- template literal. See the header of this file. */
+.gv-level { padding: 14px; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(224,168,60,0.17), rgba(0,0,0,0.26));
+    border: 1px solid rgba(224,168,60,0.3); }
+.gv-level-top { display: flex; align-items: center; gap: 12px; }
+.gv-level-no { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    flex: none; width: 56px; height: 56px; border-radius: 14px;
+    background: rgba(0,0,0,0.4); border: 1px solid rgba(224,168,60,0.42); }
+.gv-level-no i { font-style: normal; font-size: 0.5rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #e0a83c; }
+.gv-level-no b { font-size: 1.55rem; line-height: 1; color: #fff6df; font-variant-numeric: tabular-nums; }
+.gv-level-meta { min-width: 0; }
+.gv-level-meta > b { display: block; font-size: 1.02rem; color: #fff6df; }
+.gv-level-meta > span { display: block; margin-top: 2px; font-size: 0.76rem; color: #9aa08f; }
+
+/* The bar. ⚠️ NO TRANSITION ON THE WIDTH: it is written from server state on every refresh, and an
+   easing curve on top of a value that arrives in one step reads as lag rather than as motion. The
+   dopamine is the SHEEN, which is its own animation and does not fight the width. */
+.gv-level-bar { position: relative; margin-top: 11px; height: 9px; border-radius: 999px; overflow: hidden;
+    background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.08); }
+.gv-level-bar i { display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #e0a83c, #ffd166 60%, #fff3c4); }
+.gv-level-bar::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.45) 50%, transparent 80%);
+    transform: translateX(-100%); animation: gvLevelSheen 2600ms ease-in-out infinite; }
+@keyframes gvLevelSheen { 0%, 55% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+.gv-level-say { margin: 12px 0 6px; font-size: 0.76rem; color: #cfc6b6; }
+
+/* ⚠️ THE ODDS ARE THE POINT OF THIS ROW. They come from the server computed off the same curve the roll
+   uses, so what is shown and what is rolled cannot drift -- a hand-written table here would be the
+   worst possible version of "transparency". */
+.gv-odds { list-style: none; margin: 0; padding: 0; display: grid;
+    grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.gv-odds li { padding: 7px 4px; border-radius: 9px; text-align: center;
+    background: rgba(0,0,0,0.32); border: 1px solid rgba(255,255,255,0.07); }
+.gv-odds b { display: block; font-size: 0.94rem; color: #fff6df; font-variant-numeric: tabular-nums; }
+.gv-odds span { display: block; font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.gv-odds em { display: block; font-style: normal; font-size: 0.58rem; color: #8f968a; margin-top: 1px; }
+.gv-odds li.is-rough span { color: #9aa08f; }
+.gv-odds li.is-sound span { color: #9be36a; }
+.gv-odds li.is-fine span { color: #6fd0ff; }
+.gv-odds li.is-pristine span { color: #e0a8ff; }
+.gv-odds li.is-pristine { border-color: rgba(224,168,255,0.34); }
+
+/* RECALL. Collapsed by default: it is the answer to a question, not a thing to scroll past every time. */
+.gv-recall { margin-top: 11px; }
+.gv-recall summary { cursor: pointer; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #e0a83c; }
+.gv-recall ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.gv-recall li { display: flex; align-items: center; gap: 8px; font-size: 0.76rem;
+    padding: 5px 8px; border-radius: 7px; background: rgba(0,0,0,0.26); }
+.gv-recall li span { flex: 1; min-width: 0; color: #cfc6b6; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+.gv-recall li em { font-style: normal; font-size: 0.66rem; color: #9aa08f; }
+.gv-recall li b { color: #e0a83c; font-variant-numeric: tabular-nums; }
+
+/* AWARENESS: the band a tool rolled, worn on the recipe that made it. */
+.gv-tag.is-q { background: rgba(255,255,255,0.08); }
+.gv-tag.is-rough { color: #9aa08f; }
+.gv-tag.is-sound { color: #9be36a; background: rgba(155,227,106,0.16); }
+.gv-tag.is-fine { color: #6fd0ff; background: rgba(111,208,255,0.16); }
+.gv-tag.is-pristine { color: #e0a8ff; background: rgba(224,168,255,0.18); }
+.gv-recall li em.is-sound { color: #9be36a; }
+.gv-recall li em.is-fine { color: #6fd0ff; }
+.gv-recall li em.is-pristine { color: #e0a8ff; }
+
+/* DOPAMINE: the ladder moving, on the card that just moved it. */
+.gv-made-lv { margin-top: 16px; padding: 12px; border-radius: 12px;
+    background: rgba(0,0,0,0.34); border: 1px solid rgba(255,255,255,0.08); }
+.gv-made-lv.is-up { border-color: rgba(224,168,60,0.6);
+    background: linear-gradient(180deg, rgba(224,168,60,0.2), rgba(0,0,0,0.3));
+    animation: gvLevelUp 760ms cubic-bezier(.16,1,.3,1) both; }
+/* THE LEVEL-UP ITSELF. It gets the biggest number on the card -- a crafting level is earned over many
+   crafts and the moment it moves is the only time the ladder is worth interrupting the player for. The old
+   number is struck through beside the new one so the jump is shown rather than stated. */
+.gv-made-lv-up { display: block; text-align: center; margin-bottom: 12px; }
+.gv-made-lv-up i { display: block; font-style: normal; font-size: 0.64rem; font-weight: 800;
+    letter-spacing: 0.22em; text-transform: uppercase; color: #e0a83c; }
+.gv-made-lv-up b { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin: 2px 0 4px; }
+.gv-made-lv-up s { font-size: 1.3rem; color: #6d7366; text-decoration-thickness: 2px; }
+.gv-made-lv-up u { font-size: 2.5rem; line-height: 1; text-decoration: none; color: #fff6df;
+    text-shadow: 0 0 26px rgba(224,168,60,0.75);
+    animation: gvLvNum 720ms cubic-bezier(.16,1,.3,1) both; }
+.gv-made-lv-up > span { display: block; font-size: 0.76rem; color: #cfc6b6; }
+@keyframes gvLvNum {
+    0% { transform: scale(0.4) rotate(-7deg); opacity: 0; }
+    60% { transform: scale(1.14) rotate(2deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.gv-made-lv-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.gv-made-lv-top b { font-size: 0.9rem; color: #fff6df; }
+.gv-made-lv-top em { font-style: normal; font-size: 0.8rem; font-weight: 800; color: #e0a83c; }
+.gv-made-lv-bar { display: block; margin-top: 8px; height: 7px; border-radius: 999px; overflow: hidden;
+    background: rgba(0,0,0,0.5); }
+.gv-made-lv-bar i { display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #e0a83c, #ffd166); }
+.gv-made-q { display: block; margin-top: 9px; font-size: 0.8rem; font-weight: 700; }
+.gv-made-q.is-rough { color: #9aa08f; }
+.gv-made-q.is-sound { color: #9be36a; }
+.gv-made-q.is-fine { color: #6fd0ff; }
+.gv-made-q.is-pristine { color: #e0a8ff; }
+@keyframes gvLevelUp {
+    0% { transform: scale(0.94); box-shadow: 0 0 0 rgba(224,168,60,0); }
+    45% { transform: scale(1.035); box-shadow: 0 0 34px rgba(224,168,60,0.55); }
+    100% { transform: scale(1); box-shadow: 0 0 0 rgba(224,168,60,0); }
+}
+
 .gv-bench2 { display: flex; flex-direction: column; gap: 12px; }
 
 .gv-bh { display: flex; align-items: baseline; gap: 10px;

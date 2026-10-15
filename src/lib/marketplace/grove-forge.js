@@ -118,6 +118,27 @@ export function rollQuality(level, rand) {
 }
 
 /**
+ * The exact band shares at a given crafting level.
+ *
+ * ⚠️ DERIVED FROM THE CURVE, NEVER TABULATED. The screen is going to SHOW these as the player's odds, and
+ * a hand-written table beside a live formula is two numbers that disagree the moment either is tuned --
+ * the player would be shown one set of chances and rolled against another, which is the worst possible
+ * version of "transparency". Closed form: P(q >= at) = 1 - (at/100)^(1/p).
+ */
+export function qualityOdds(level) {
+    const lv = Math.max(1, Math.min(CRAFT_LEVEL_CAP, Number(level) || 1));
+    const p = 1 / (1 + lv * QUALITY_BIAS);
+    const atLeast = (at) => (at <= 0 ? 1 : 1 - (at / 100) ** (1 / p));
+    const out = [];
+    for (let i = 0; i < QUALITY_BANDS.length; i += 1) {
+        const band = QUALITY_BANDS[i];
+        const above = i === 0 ? 0 : atLeast(QUALITY_BANDS[i - 1].at);
+        out.push({ id: band.id, name: band.name, mult: band.mult, share: Math.max(0, atLeast(band.at) - above) });
+    }
+    return out;
+}
+
+/**
  * What a tool is ACTUALLY worth: its tier, multiplied by how well it came out.
  *
  * ⚠️ IT IMPORTS toolBonusPct RATHER THAN RESTATING THE PER-TIER NUMBER. A copied constant is a second,

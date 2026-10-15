@@ -8,6 +8,7 @@ import {
 } from "react-icons/gi";
 
 import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
+import { QUALITY_BANDS, qualityBand } from "@/lib/marketplace/grove-forge.js";
 
 // ── THE WORKBENCH ───────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "Crafting is very ghetto, needs full pass of grove crafting dopamine thoughtfulness and
@@ -61,6 +62,10 @@ function payoff(r, st, built = false) {
     return r.blurb || "";
 }
 
+const RECIPE_NAME = Object.fromEntries(GROVE_RECIPES.map((r) => [r.id, r.name]));
+const recipeName = (id) => RECIPE_NAME[id] || id;
+const bandName = (id) => QUALITY_BANDS.find((b) => b.id === id)?.name || id;
+
 export default function GroveBench({ st, known, partName, PartIcon, post, refresh, setNote }) {
     const [result, setResult] = useState(null);
     const [busy, setBusy] = useState(null);
@@ -110,6 +115,13 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     }, [known, st]);
 
     const readyCount = rows.filter((x) => x.ready).length;
+    // ⚠️ DEFAULTED, BECAUSE THE SERVER THAT SENDS THESE IS NEWER THAN THE CLIENT THAT MAY BE OPEN. A
+    // player with the page already loaded when this deploys gets a payload without them, and a panel
+    // that throws on a missing field is a worse outcome than one that shows level 1 for a minute.
+    const lvl = st.craft || { level: 1, progress: 0, intoLevel: 0, needForNext: null, capped: false };
+    const odds = lvl.odds || [];
+    const recent = lvl.recent || [];
+    const merits = Number(st.merits) || 0;
 
     const craft = async (r) => {
         setBusy(r.id);
@@ -128,14 +140,72 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
 
     return (
         <div className="gv-bench2">
-            <header className="gv-bh">
-                <div>
-                    <b>{readyCount > 0 ? `${readyCount} ready to make` : "Nothing ready yet"}</b>
-                    <span>
-                        {rows.length} recipe{rows.length === 1 ? "" : "s"} discovered ·
-                        {" "}a recipe appears once you have found every part it needs, even if you dropped them
+            {/* ── ⚠️ THE LADDER, SHOWN RATHER THAN CLAIMED ────────────────────────────────────────
+                Luke: "The crafting level needs dopamine massively and visibility transparency recall and
+                awareness."
+
+                Four things, and each answers a different question the old screen could not:
+
+                  VISIBILITY    the level and its bar are the first thing on the panel, not a number
+                                buried in a result card that is gone in two seconds.
+                  TRANSPARENCY  the ODDS ARE PRINTED. "Higher levels improve your rolls" is a claim; the
+                                real band shares at this exact level are a fact that can be checked
+                                against what actually comes out. They are computed from the same curve
+                                the server rolls on, in closed form, so the two cannot drift.
+                  RECALL        the last twelve things made, with how each came out -- a ladder with no
+                                history behind it is a number you are asked to take on faith.
+                  AWARENESS     every tool on the bench wears its own band, so the thing the level BUYS
+                                is visible on the thing it was spent on. */}
+            <header className="gv-level">
+                <div className="gv-level-top">
+                    <span className="gv-level-no">
+                        <i>Crafting</i>
+                        <b>{lvl.level}</b>
+                    </span>
+                    <span className="gv-level-meta">
+                        <b>{readyCount > 0 ? `${readyCount} ready to make` : "Nothing ready yet"}</b>
+                        <span>
+                            {lvl.capped
+                                ? "Top of the ladder."
+                                : `${lvl.intoLevel} / ${lvl.needForNext} xp to ${lvl.level + 1}`}
+                            {merits > 0 ? ` · ${merits} merits` : ""}
+                        </span>
                     </span>
                 </div>
+
+                <div className="gv-level-bar">
+                    <i style={{ width: `${Math.round((lvl.progress || 0) * 100)}%` }} />
+                </div>
+
+                {odds.length ? (
+                    <>
+                        <p className="gv-level-say">Every tool you make rolls a quality. At level {lvl.level}:</p>
+                        <ul className="gv-odds">
+                            {odds.map((b) => (
+                                <li key={b.id} className={`is-${b.id}`}>
+                                    <b>{Math.round(b.share * 100)}%</b>
+                                    <span>{b.name}</span>
+                                    <em>×{b.mult.toFixed(2)}</em>
+                                </li>
+                            ))}
+                        </ul>
+                    </>
+                ) : null}
+
+                {recent.length ? (
+                    <details className="gv-recall">
+                        <summary>Last {recent.length} crafted</summary>
+                        <ul>
+                            {recent.map((c, i) => (
+                                <li key={`${c.recipe}-${i}`}>
+                                    <span>{recipeName(c.recipe)}</span>
+                                    {c.band ? <em className={`is-${c.band}`}>{bandName(c.band)}</em> : null}
+                                    <b>+{c.xp}</b>
+                                </li>
+                            ))}
+                        </ul>
+                    </details>
+                ) : null}
             </header>
 
             {!rows.length ? <p className="muted">Nothing discovered yet. Kill things and keep what drops.</p> : null}
@@ -155,7 +225,12 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                             <div className="gv-rec-body">
                                 <div className="gv-rec-top">
                                     <b>{r.name}</b>
-                                    {built ? <em className="gv-tag is-done">Built</em>
+                                    {built && r.kind === "tool" && st.toolQuality?.[r.slot] != null ? (
+                                        // The thing the level BUYS, on the thing it was spent on.
+                                        <em className={`gv-tag is-q is-${qualityBand(st.toolQuality[r.slot]).id}`}>
+                                            {qualityBand(st.toolQuality[r.slot]).name}
+                                        </em>
+                                    ) : built ? <em className="gv-tag is-done">Built</em>
                                         : ready ? <em className="gv-tag is-go">Ready</em>
                                             : <em className="gv-tag">{haveParts}/{costs.length} parts</em>}
                                 </div>
@@ -226,6 +301,44 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                             </>
                         ) : null}
 
+                        {result.craft ? (
+                            <div className={`gv-made-lv${result.craft.levelled ? " is-up" : ""}`}>
+                                {/* The level-up is the LOUDEST thing on this card, because it is the rarest.
+                                    The exact odds deliberately do NOT appear here. The curve is gentle on
+                                    purpose -- one level moves Pristine by well under a point -- so printing
+                                    the per-level delta on the celebration would be honest and demoralising
+                                    at the same time. The feeling belongs here; the numbers belong on the
+                                    banner, where they stand in front of the player on every visit. */}
+                                {result.craft.levelled ? (
+                                    <span className="gv-made-lv-up">
+                                        <i>Level up</i>
+                                        <b>
+                                            <s>{result.craft.level - 1}</s>
+                                            <u>{result.craft.level}</u>
+                                        </b>
+                                        <span>Better rolls on everything you make from here</span>
+                                    </span>
+                                ) : null}
+                                <span className="gv-made-lv-top">
+                                    {/* On a level-up the big number above has already said the level, so
+                                        this row spends itself on the next rung instead of repeating it. */}
+                                    <b>
+                                        {result.craft.levelled && result.craft.needForNext
+                                            ? `${result.craft.intoLevel} / ${result.craft.needForNext} to ${result.craft.level + 1}`
+                                            : `Crafting ${result.craft.level}`}
+                                    </b>
+                                    <em>+{result.craft.xpGained} xp</em>
+                                </span>
+                                <span className="gv-made-lv-bar">
+                                    <i style={{ width: `${Math.round((result.craft.progress || 0) * 100)}%` }} />
+                                </span>
+                                {result.quality != null ? (
+                                    <span className={`gv-made-q is-${result.qualityBand}`}>
+                                        Rolled {bandName(result.qualityBand)} · {result.quality}/100
+                                    </span>
+                                ) : null}
+                            </div>
+                        ) : null}
                         <button type="button" onClick={() => setResult(null)}>Good</button>
                     </div>
                 </div>

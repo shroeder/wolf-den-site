@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
-import { craftLevel, craftXpFor, rollQuality, qualityBand, toolBonusFor, GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
+import { craftLevel, craftXpFor, rollQuality, qualityBand, toolBonusFor, qualityOdds, GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
@@ -134,7 +134,7 @@ async function heroLook(buyerId) {
 export async function groveState(buyerId) {
     if (!buyerId || !groveOpen(buyerId)) return { ok: false, error: "closed" };
 
-    const [p, zones, items, seen, emblems, tools, chests, look, hero] = await Promise.all([
+    const [p, zones, items, seen, emblems, tools, chests, craftLog, look, hero] = await Promise.all([
         playerRow(buyerId),
         // ⚠️ THE COOLDOWN IS COMPUTED IN SQL, ON THE QUERY THIS ALREADY RAN. Two reasons. It costs nothing
         // — no extra round trip, and round trips are the meter that bills. And the comparison happens where
@@ -151,6 +151,15 @@ export async function groveState(buyerId) {
         db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT slot, tier, quality FROM mkt_grove_tool WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT tier, qty FROM mkt_grove_chest WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
+        // ⚠️ RECALL. Luke: the crafting level needs "visibility transparency recall and awareness". A level
+        // with no history behind it is a number the player is asked to take on faith -- and this one is a
+        // ladder they are being asked to climb, so "what have I actually made, and how did it come out"
+        // has to be answerable on the same screen. Twelve is enough to show a run without becoming a log.
+        db.query(
+            `SELECT recipe_id, kind, xp, quality, created_at
+               FROM mkt_grove_craft_log WHERE buyer_id = $1
+              ORDER BY created_at DESC LIMIT 12`, [buyerId],
+        ).catch(() => []),
         heroLook(buyerId),
         // ⚠️ WHAT THE PLAYER ACTUALLY BUILT. Gear, forge, sets, jewels, compendium, pet, badges, casino
         // tracks and the class tree, through the Arena's own combatStats + fighterFrom. Before this the
@@ -222,7 +231,21 @@ export async function groveState(buyerId) {
         // ⚠️ THE GROVE'S OWN CHESTS, NOT mkt_chest. See the note on the boss grant.
         chests: Object.fromEntries((chests || []).map((c) => [c.tier, Number(c.qty) || 0])),
         merits: Number(p?.merits) || 0,
-        craft: craftLevel(Number(p?.craft_xp) || 0),
+        craft: {
+            ...craftLevel(Number(p?.craft_xp) || 0),
+            // ⚠️ THE ODDS ARE SENT, NOT DESCRIBED. "Higher levels improve your rolls" is a claim; the
+            // actual band shares at THIS level are a fact the player can check against what they get.
+            // Computed from the same curve the server rolls against, so the screen cannot drift from it.
+            odds: qualityOdds(craftLevel(Number(p?.craft_xp) || 0).level),
+            recent: (craftLog || []).map((r) => ({
+                recipe: r.recipe_id,
+                kind: r.kind,
+                xp: Number(r.xp) || 0,
+                quality: r.quality == null ? null : Number(r.quality),
+                band: r.quality == null ? null : qualityBand(Number(r.quality)).id,
+                at: r.created_at,
+            })),
+        },
         toolMeta: TOOL_SLOTS.map((t) => ({
             ...t,
             tier: Number((tools || []).find((x) => x.slot === t.slot)?.tier) || 0,
