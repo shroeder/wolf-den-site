@@ -2021,6 +2021,32 @@ export default function GroveScene({
                 as the pause failing to resume properly rather than as a stray walk order. onTapFoe already
                 stopped propagation for exactly this reason; the HUD and the dock never did, which also
                 quietly made the full-screen toggle a move command. */}
+            {/* ── ⚠️ THE COUNT IS THE RUNNING TOTAL, AND IT IS AIMED AT THE DOOR ──────────────────
+                Luke: "I want to see kill count on top middle of screen."
+
+                Not the bare number it used to be -- that version was removed because a naked tally is one
+                more figure on the screen that answers nothing ("I hate the kill display"). What a player
+                actually wants to know is how far off the way opening is, so the count is shown AGAINST
+                toUnlock and the number underneath is what is left. Once the zone is open it drops to the
+                total alone, because the goal it was counting toward is gone.
+
+                killsHere, not `kills`: the server has banked every kill from every previous session in
+                this zone, and a counter that restarts at zero each visit would tell a player on their
+                nineteenth kill that they had made no progress at all. */}
+            <div className="gv-kills" aria-hidden="true">
+                {killsHere < zone.toUnlock ? (
+                    <>
+                        <b>{killsHere}<i>/{zone.toUnlock}</i></b>
+                        <span>{zone.toUnlock - killsHere} to open the way</span>
+                    </>
+                ) : (
+                    <>
+                        <b>{killsHere}</b>
+                        <span>felled here</span>
+                    </>
+                )}
+            </div>
+
             <div className="gv-hud" onPointerDown={(e) => e.stopPropagation()}>
                 {belt?.id ? <b className="gv-belt">{belt.name} x{Math.max(0, beltLeft)}</b> : null}
                 {canNative ? (

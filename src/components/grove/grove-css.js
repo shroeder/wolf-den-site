@@ -1088,6 +1088,28 @@ export const GROVE_CSS = `
 /* ⚠️ SAFE-AREA INSETS. Full screen on a phone puts this row under the notch and the rounded corners;
    Leave is the control you most need when something has gone wrong, so it must never be the thing tucked
    behind a camera cutout. env() resolves to 0 everywhere that has no cutout, so this costs nothing. */
+/* ── THE KILL COUNT ───────────────────────────────────────────────────────────────────────────
+   Luke: "I want to see kill count on top middle of screen."
+
+   Top centre, on the same line as the HUD row but positioned independently of it -- the HUD is a flex
+   row with the belt pushed left and the buttons right, and dropping a centred item into it would be
+   centred between those two rather than on the screen. It sits ABOVE the boss banner, which owns 40px
+   down, so the two never collide when a boss wakes up.
+
+   Tabular figures, because a count that shifts its own width every time it ticks past a 1 reads as the
+   whole element twitching. */
+.gv-kills { position: absolute; z-index: 4; pointer-events: none; text-align: center;
+    left: 50%; transform: translateX(-50%);
+    top: calc(8px + env(safe-area-inset-top)); }
+.gv-kills b { display: block; font-size: 1.32rem; font-weight: 800; line-height: 1;
+    color: #fff6df; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 14px rgba(0,0,0,0.95), 0 2px 5px rgba(0,0,0,0.95); }
+/* The denominator is deliberately quieter: the number that moves is the one worth reading. */
+.gv-kills b i { font-style: normal; font-size: 0.78em; font-weight: 700; opacity: 0.55; }
+.gv-kills span { display: block; margin-top: 2px; font-size: 0.6rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; color: #e0a83c;
+    text-shadow: 0 0 10px rgba(0,0,0,1), 0 1px 4px rgba(0,0,0,0.95); }
+
 .gv-hud { position: absolute; display: flex; align-items: center; gap: 10px; pointer-events: none;
     left: calc(10px + env(safe-area-inset-left));
     right: calc(10px + env(safe-area-inset-right));
@@ -1109,7 +1131,13 @@ export const GROVE_CSS = `
    the element is deliberate: a stale rule for a shape that no longer exists is how a later element with a
    reused class name inherits a background nobody meant it to have. See stale-css-rule-on-reshape. */
 .gv-hud b { font-size: 0.78rem; color: #efe7d8; text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
-.gv-leave { margin-left: auto; pointer-events: auto; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+/* ⚠️ THE PUSH BELONGS TO THE FIRST BUTTON, NOT TO EVERY BUTTON. Both of these carried
+   margin-left:auto, and flexbox SPLITS free space between multiple auto margins -- so with the
+   full-screen toggle present the pair straddled the row and the toggle sat dead centre, where it
+   collided with the kill count the moment that was added. Pushing only the first one sends the whole
+   group right and keeps working whether the toggle is rendered or not. */
+.gv-hud > button:first-of-type { margin-left: auto; }
+.gv-leave { pointer-events: auto; padding: 6px 14px; border-radius: 999px; cursor: pointer;
     font: inherit; font-size: 0.78rem; font-weight: 700; color: #efe7d8;
     background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.22); }
 

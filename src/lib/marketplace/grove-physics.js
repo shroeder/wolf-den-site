@@ -325,7 +325,15 @@ export function navigate(platforms, body, goalX, goalY, { arrive = 1.6 } = {}) {
  * twenty seconds and every ledge was permanently empty — which is the same bug as the ledges being
  * unreachable, seen from the other side. edgeAhead is what a creature uses to notice the floor ends.
  */
-export const WANDER_HOP_CHANCE = 0.18;
+// ⚠️ READ THIS AS A RATE, NOT A PROBABILITY. It is rolled every time the wander timer resets, and that
+// timer is 30-140 FRAMES -- about 1.4 seconds on average. At 0.18 a single creature hopped every eight
+// seconds or so, which sounds rare until you remember a zone holds fifteen to thirty of them: two to four
+// hops a second somewhere on screen, for ever. Luke: "Enemies jump a lot for no reason."
+//
+// A hop still has to exist -- it is how a wanderer gets onto a ledge, and empty ledges were the bug this
+// whole wanderer was written to fix. But it should read as a creature deciding something, which means
+// roughly one hop per creature per half-minute rather than one per eight seconds.
+export const WANDER_HOP_CHANCE = 0.04;
 export function wanderIntent(body, platforms, rand, dt) {
     const f = body;
     f.wait = (f.wait || 0) - dt;
