@@ -49,8 +49,24 @@ const BOSS = `A single colossal fantasy forest BOSS CREATURE, full body, three-q
 // creature you cannot hit.
 const PLATE = `A wide SIDE-ON 2D platformer background plate for a forest game level. FLAT LAYERED composition with distinct foreground, midground and far background bands — NO vanishing point, NO deep perspective, NO receding corridor, as the camera scrolls sideways across it. Completely EMPTY of characters and creatures. Clear horizontal ground line along the bottom with room to walk. ${STYLE} No characters, no creatures, no people, no text, no words, no logo, no watermark, no UI, no border.`;
 
+// The BOSS CHEST brief. Four of them, one per depth band, and they must read as the SAME object getting
+// grander rather than as four unrelated containers -- the player is meant to see a Reliquary and know
+// instantly it outranks the Cache they have three of. So: one silhouette, escalating materials, each one
+// built out of the band it drops in. Closed, because the open one is the moment and the shelf shows the
+// one you have not had yet.
+//
+// ⚠️ SAME MARGIN CLAUSE AS THE BOSSES. A chest is a wide object with a lid, and an edge-touching draw
+// loses the lid -- which is the half that says "chest". See sprite-amputation-vs-clipping.
+const CHEST = `A single closed fantasy TREASURE CHEST, three-quarter view, sturdy and ornate, clearly a container of valuable things. Drawn LARGE but ENTIRELY INSIDE the frame with roughly 10% empty space on all four sides: no part of the lid, lock, hinges, straps or decoration may touch or run off any edge. ${STYLE} ${CUTOUT}`;
+
 // key → [prompt, kind]
 const ART = {
+    // ── THE FOUR BOSS CHESTS ────────────────────────────────────────────────────────────────────────
+    "chest-mossbound": [`${CHEST} A small rough chest of damp green wood, bound in living moss and pale roots that have grown over the lid, a simple iron clasp furred with verdigris. Mossy greens and wet brown.`, "item"],
+    "chest-barrowed": [`${CHEST} A grave-casket of dark bog oak banded in black iron, a bone-handled clasp, carved barrow-marks on the lid, a scatter of dry earth caught in the carving. Deep browns, cold iron, bone white.`, "item"],
+    "chest-warrenspun": [`${CHEST} A coffer wrapped in layered pale spider-silk over bleached wood, the silk drawn tight like binding, a tooth-shaped catch, faint luminous dust in the weave. Cool blue-greys and silver-white.`, "item"],
+    "chest-heartwrought": [`${CHEST} A grand reliquary carved from a single piece of glowing heartwood, veins of warm ember light running through the grain, gold-riveted corners and a crystal set into the lid. Rich amber, molten gold, violet crystal glow.`, "item"],
+
     // ── TWELVE ZONE BACKDROPS ───────────────────────────────────────────────────────────────────────
     "bg-thicket": [`${PLATE} ZONE: the bright outer edge of a forest. Slim birch and hazel, sun breaking through in warm shafts, long grass, a worn dirt path along the bottom. Fresh greens and gold. The safest-looking place in the wood.`, "plate"],
     "bg-hollow": [`${PLATE} ZONE: a damp mossy hollow. Everything carpeted in thick green moss, fallen logs furred with it, standing water in shallow pools, mushrooms in clusters. Cool wet greens, low soft light.`, "plate"],

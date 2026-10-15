@@ -71,9 +71,17 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
         // with its toll showing; "unlock" is one kill short, so the very next thing that dies opens it.
         // "travel" banks the full toll, so the gate is already open and the only thing left to film is
         // what walking through one looks like.
+        //
+        // The boss scenes bank it too, and THAT IS A FIX RATHER THAN A TIDY-UP. `bossReady` below used to be
+        // the whole gate, so setting it true was enough to put a boss in the world. It no longer is: the
+        // scene now recomputes readiness live, off the kill count, so that a player who walks in one kill
+        // short sees the boss arrive without a reload. Correct in the game, and it silently emptied the
+        // bench -- "scene=boss" filmed a hero standing in an empty clearing with no boss and no error, which
+        // reads as "the boss is broken" rather than "the fixture is".
         const banked = scene === "travel" ? z.toUnlock
             : scene === "unlock" ? Math.max(0, z.toUnlock - 1)
             : scene === "door" ? Math.max(0, z.toUnlock - 7)
+            : scene === "boss" || scene === "bossin" ? z.toUnlock
             : 0;
         return { ...z, bossReady: true, kills: banked };
     }, [zoneN, scene, travelled]);

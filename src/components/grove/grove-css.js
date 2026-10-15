@@ -1366,6 +1366,104 @@ export const GROVE_CSS = `
 .gv-made-lv.is-up { border-color: rgba(224,168,60,0.6);
     background: linear-gradient(180deg, rgba(224,168,60,0.2), rgba(0,0,0,0.3));
     animation: gvLevelUp 760ms cubic-bezier(.16,1,.3,1) both; }
+/* What the boss actually paid, on the card that says it died. */
+.gv-won-chest { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 9px;
+    margin-top: 12px; padding: 11px 13px; border-radius: 12px; font-size: 1rem; color: #fff6df;
+    background: linear-gradient(180deg, rgba(224,168,60,0.26), rgba(0,0,0,0.3));
+    border: 1px solid rgba(224,168,60,0.56);
+    animation: gvWonDrop 640ms cubic-bezier(.16,1,.3,1) both; }
+.gv-won-chest img { width: 34px; height: 34px; object-fit: contain; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.6)); }
+.gv-won-chest em { flex-basis: 100%; font-style: normal; font-size: 0.72rem; color: #cfc6b6; }
+.gv-won-merits { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px;
+    font-size: 0.88rem; font-weight: 700; color: #e0a83c; }
+.gv-won-merits svg { width: 18px; height: 18px; }
+@keyframes gvWonDrop {
+    0% { transform: translateY(-14px) scale(0.9); opacity: 0; }
+    60% { transform: translateY(0) scale(1.04); opacity: 1; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* ── THE CHEST SHELF AND THE OPENING ─────────────────────────────────────────────────────────────
+   Luke, playing the live game: "I don't see any of the dopamine." He was right -- the boss had been
+   paying chests and merits into the database for as long as they had existed and no screen said so.
+
+   The shelf is the first thing on the bench because an unopened chest outranks every recipe under it,
+   and the opening is staggered because a reward that arrives already complete was never revealed.
+
+   NO BACKTICKS IN THESE COMMENTS -- template literal. */
+.gv-shelf { padding: 13px; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(155,227,106,0.14), rgba(0,0,0,0.3));
+    border: 1px solid rgba(155,227,106,0.32); }
+.gv-shelf h3 { margin: 0 0 9px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #9be36a; }
+.gv-shelf ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.gv-chest button { width: 100%; display: flex; align-items: center; gap: 11px; padding: 8px 10px;
+    border-radius: 11px; background: rgba(0,0,0,0.34); border: 1px solid rgba(255,255,255,0.09);
+    color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.gv-chest button:disabled { opacity: 0.6; cursor: default; }
+.gv-chest-art { position: relative; flex: none; display: grid; place-items: center;
+    width: 46px; height: 46px; border-radius: 10px; background: rgba(0,0,0,0.4); }
+.gv-chest-art img { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 3px 7px rgba(0,0,0,0.6)); }
+/* The count rides the art, not the name -- "three of these" is a fact about the pile. */
+.gv-chest-art em { position: absolute; right: -4px; bottom: -4px; padding: 1px 5px; border-radius: 999px;
+    font-style: normal; font-size: 0.64rem; font-weight: 800; color: #1a1a12; background: #e0a83c; }
+.gv-chest b { flex: 1; min-width: 0; font-size: 0.92rem; color: #fff6df; }
+.gv-chest-go { flex: none; padding: 6px 13px; border-radius: 999px; font-size: 0.8rem; font-weight: 800;
+    color: #1a1a12; background: linear-gradient(180deg, #ffd166, #e0a83c);
+    box-shadow: 0 0 18px rgba(224,168,60,0.4); }
+
+.gv-merits { margin-left: auto; display: flex; align-items: center; gap: 5px; flex: none;
+    padding: 5px 10px; border-radius: 999px; background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(224,168,60,0.34); }
+.gv-merits svg { width: 17px; height: 17px; color: #e0a83c; }
+.gv-merits b { font-size: 0.92rem; color: #fff6df; font-variant-numeric: tabular-nums; }
+
+.gv-spill-face { position: relative; display: grid; place-items: center; margin: 4px 0 10px; }
+.gv-spill-face img { width: 104px; height: 104px; object-fit: contain;
+    filter: drop-shadow(0 0 26px rgba(224,168,60,0.6));
+    animation: gvLidBurst 620ms cubic-bezier(.16,1,.3,1) both; }
+.gv-spill-burst { position: absolute; width: 112px; height: 112px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,243,196,0.75), rgba(224,168,60,0) 68%);
+    animation: gvBurst 760ms ease-out both; }
+@keyframes gvLidBurst {
+    0% { transform: scale(0.72) rotate(-10deg); opacity: 0; }
+    55% { transform: scale(1.12) rotate(4deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes gvBurst {
+    0% { transform: scale(0.3); opacity: 0.95; }
+    100% { transform: scale(2.1); opacity: 0; }
+}
+
+/* THE STAGGER IS THE REVEAL. Each row carries its own inline animation-delay. */
+.gv-spill-loot { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.gv-spill-loot li { display: flex; align-items: center; gap: 9px; padding: 7px 11px; border-radius: 10px;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07);
+    animation: gvSpillIn 460ms cubic-bezier(.16,1,.3,1) both; }
+.gv-spill-loot b { font-size: 1rem; color: #e0a83c; font-variant-numeric: tabular-nums; }
+.gv-spill-loot span { flex: 1; min-width: 0; font-size: 0.86rem; color: #cfc6b6; }
+.gv-tag.is-new { color: #9be36a; background: rgba(155,227,106,0.18); }
+@keyframes gvSpillIn {
+    0% { transform: translateY(-16px) scale(0.9); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.gv-spill-merits { display: flex; align-items: center; justify-content: center; gap: 7px;
+    margin-top: 11px; padding: 10px; border-radius: 11px;
+    background: linear-gradient(180deg, rgba(224,168,60,0.22), rgba(0,0,0,0.3));
+    border: 1px solid rgba(224,168,60,0.44);
+    animation: gvSpillIn 520ms cubic-bezier(.16,1,.3,1) both; }
+.gv-spill-merits svg { width: 22px; height: 22px; color: #e0a83c; }
+.gv-spill-merits b { font-size: 1.2rem; color: #fff6df; }
+.gv-spill-merits span { font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: #cfc6b6; }
+
+.gv-spill-over { margin: 10px 0 0; font-size: 0.76rem; color: #f0a08a; }
+.gv-spill-again { margin-top: 14px; width: 100%; padding: 11px; border-radius: 999px;
+    font-size: 0.9rem; font-weight: 800; color: #1a1a12; border: 0; cursor: pointer;
+    background: linear-gradient(180deg, #ffd166, #e0a83c); }
+.gv-spill-again:disabled { opacity: 0.6; cursor: default; }
+.gv-spill-card > button:last-child { margin-top: 8px; }
+
 /* THE LEVEL-UP ITSELF. It gets the biggest number on the card -- a crafting level is earned over many
    crafts and the moment it moves is the only time the ladder is worth interrupting the player for. The old
    number is struck through beside the new one so the jump is shown rather than stated. */

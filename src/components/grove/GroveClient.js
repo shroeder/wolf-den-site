@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { GiLaurelCrown } from "react-icons/gi";
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt } from "@/lib/marketplace/grove-catalog.js";
 import GroveBench from "@/components/grove/GroveBench";
+import { GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
 import { GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { MAP_LAYOUT, mapSpot, nodeArt, trailPath } from "@/lib/marketplace/grove-map.js";
@@ -531,6 +533,30 @@ export default function GroveClient({ initial }) {
                                 forty-five at the deepest zone, so when it lands it must not be a word in a
                                 list of roots. */}
                             {bossWon.hyper ? <strong className="gv-hyper">{bossWon.hyper.name}</strong> : null}
+                            {/* ── ⚠️ THE CHEST AND THE MERITS, ANNOUNCED WHERE THEY ARE WON ──────────
+                                Both have been returned by the kill since they were built -- the server's
+                                own comment says "so the kill card can show them rather than the player
+                                discovering a chest in their bag later and not knowing what dropped it" --
+                                and the card showed neither. Luke, playing it: "I'm not seeing any of the
+                                new loot. I don't see any of the dopamine."
+
+                                The chest gets the louder line of the two: it is roughly one kill in two
+                                and it is the only route to the deep crafting parts, so it is the reason
+                                to come back. Merits are a running total, so they read as a score. */}
+                            {bossWon.chest ? (
+                                <strong className="gv-won-chest">
+                                    <img src={`/images/grove/chest-${bossWon.chest}.webp`} alt=""
+                                        width={34} height={34} />
+                                    {GROVE_CHESTS[bossWon.chest]?.name || "A chest"}
+                                    <em>open it at the workbench</em>
+                                </strong>
+                            ) : null}
+                            {bossWon.merits > 0 ? (
+                                <span className="gv-won-merits">
+                                    <GiLaurelCrown aria-hidden="true" focusable="false" />
+                                    +{bossWon.merits} merits
+                                </span>
+                            ) : null}
                             <button type="button" onClick={() => setBossWon(null)}>Good</button>
                         </div>
                     </div>
