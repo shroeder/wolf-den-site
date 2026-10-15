@@ -80,16 +80,57 @@ export const DAILY_CANDY_CAP = 250;
 // deferral is a property of the faucet, not of the cap.
 export const BANKABLE_SOURCES = new Set(["gacha", "trick_or_treat_door"]);
 
+// ── ⚠️ THE ONE KIND OF PAYOUT THE CEILING DOES NOT TOUCH ─────────────────────────────────────────────────
+// The cap exists to stop a member GRINDING candy: every faucet above is something you can do again, so the
+// day's total is the only honest bound on it. The Candy Snatcher is the opposite shape — ONE pail in the
+// whole plaza, at most one claim a day across the entire Den, and it is gone the moment somebody taps it.
+// There is nothing to grind, so there is nothing for the ceiling to defend, and running it through
+// grantCandy would have paid the rarest thing in the event like a harvest: trimmed to whatever was left of
+// 250 (which, measured over the live table, is usually nothing by evening — members are averaging ~200 a
+// day). The carry-over would not have saved it either: MAX_OWED_CANDY is one day's cap, so 1,000 would have
+// arrived as 250 today and 250 tomorrow and 500 would have evaporated.
+//
+// ⚠️ AND IT MUST NOT EAT THE DAY'S ROOM EITHER, which is the part that is easy to miss. If a 1,000-candy row
+// counted towards "earned today", winning the Snatcher would silently switch off every other faucet the
+// member has until midnight — their doors, their dungeon, their spin, all paying zero for the rest of the
+// day as a direct consequence of the best thing that has ever happened to them. So these sources are
+// excluded from candyEarnedToday as well as from the trim.
+//
+// ⚠️ ONE LIST, READ TWICE — the grant and the earned-today exclusion both come from here. Two expressions is
+// how a source ends up uncapped on the way in and counted on the way out, which is the worst of both.
+export const UNCAPPED_CANDY_RATES = { candy_snatcher: 1000 };
+export const UNCAPPED_SOURCES = Object.keys(UNCAPPED_CANDY_RATES);
+
 /** What this member has EARNED today (spends do not refund cap room — see the note in grantCandy). */
 export async function candyEarnedToday(buyerId) {
     if (!buyerId) return 0;
     const r = await db.queryOne(
         `SELECT COALESCE(SUM(delta), 0)::int AS n FROM mkt_candy_event
           WHERE buyer_id = $1 AND delta > 0
+            AND source <> ALL($3::text[])
             AND (created_at AT TIME ZONE 'America/Chicago')::date = $2::date`,
-        [buyerId, storeDay().dayKey],
+        [buyerId, storeDay().dayKey, UNCAPPED_SOURCES],
     ).catch(() => null);
     return Number(r?.n) || 0;
+}
+
+/**
+ * Pay a once-a-day, one-winner prize that the ceiling does not apply to. See UNCAPPED_CANDY_RATES.
+ *
+ * Same shape as grantCandy on purpose — the amount lives in a table in this file, the caller names a source,
+ * and the ledger row is written here — so the event's mint is still measurable in one place. The ONLY
+ * difference is that nothing trims it and it does not count against the day.
+ */
+export async function grantUncappedCandy(buyerId, source) {
+    if (!buyerId || !halloweenOn(buyerId)) return 0;
+    const give = UNCAPPED_CANDY_RATES[source];
+    if (!give) return 0;
+    await db.query(`UPDATE mkt_buyer SET candy = COALESCE(candy, 0) + $2 WHERE id = $1`, [buyerId, give]).catch(() => {});
+    await db.query(
+        `INSERT INTO mkt_candy_event (buyer_id, delta, source, meta) VALUES ($1, $2, $3, '{"uncapped":true}'::jsonb)`,
+        [buyerId, give, source],
+    ).catch(() => {});
+    return give;
 }
 
 // ── ⚠️ WHAT THE CAP TRIMMED, HELD FOR TOMORROW ───────────────────────────────────────────────────────────

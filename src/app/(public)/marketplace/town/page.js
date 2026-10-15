@@ -5,7 +5,7 @@ import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { getTownState } from "@/lib/marketplace/town.js";
 import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
 import { IDLE_LINES, GREET_LINES, BUY_LINES, BROKE_LINES, OWNED_LINES } from "@/lib/marketplace/gourdfather.js";
-import { DOORS, knockedToday } from "@/lib/marketplace/trick-or-treat.js";
+import { DOORS, knockedToday, snatcherDoors } from "@/lib/marketplace/trick-or-treat.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +49,11 @@ export default async function TownPage() {
             // this after mount means painting eighteen full ones and then emptying six a beat later, which
             // reads as the night resetting itself. One indexed read on a page that is already dynamic.
             knocked: await knockedToday(buyer.id).catch(() => []),
+            // ⚠️ AND WHICH PAIL IS KICKING, ON THE FIRST PAINT FOR THE SAME REASON. The legs have to be
+            // there when the street appears — a bucket that grows a skeleton fifteen seconds after you
+            // walked past it has been missed by everyone who was already looking at it. Costs nothing: it
+            // is a hash of (you, door, tonight), not a query. Almost always [].
+            legs: await snatcherDoors(buyer.id).catch(() => []),
         }
         : null;
     return (

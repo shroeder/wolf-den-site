@@ -819,6 +819,31 @@ function rollBurst(candy, chest) {
     });
 }
 
+// ── THE SNATCHER'S LAP ───────────────────────────────────────────────────────────────────────────────────
+// What he does once he is out of the pail: a panicked dash up the street, a skid, a longer bolt back the
+// other way, then a short one before he gives up and drops the sack. Each leg is a target x RELATIVE to the
+// pail he came out of and how long he takes to get there, so he always runs around the porch you tapped
+// rather than teleporting to the middle of a street he was never standing in.
+//
+// ⚠️ THE LEGS ARE NOT EVEN LENGTHS AND THAT IS THE ANIMATION. Three equal dashes read as a loop running;
+// long-short-longer with a turn between them reads as something panicking. The turns are where the sprite
+// flips, so the uneven timing is also what stops the flip landing on a metronome.
+// ⚠️ dx IS A SHARE OF THE STREET AND HAS TO BE READ AS A SHARE OF THE SCREEN. WORLD_W is ~4,841px, so ONE
+// PERCENT IS ~48px — and the camera follows your hero, not him. A phone shows 390px of that street, which is
+// 8% of the world: the first draft of this ran him 14%, i.e. nearly TWO SCREENS, so he would have sprinted
+// out of frame and the whole animation would have been four seconds of empty cobbles. These are sized off
+// the FRAME instead — ~32%, ~40% and ~20% of a phone viewport — which is a real dash on a phone and still
+// legible on a desktop, where the same percentages are a smaller share of a wider window.
+// And the TIMES are a speed, not a mood: 2.6% of the street is ~126px, so 760ms is ~165px a second, which is
+// a sprite crossing its own width in under half a second. Slower than that and a panicking skeleton saunters.
+const SNATCH_POP_MS = 520;      // wedged in the pail, kicking, then OUT
+const SNATCH_RUN = [
+    { dx: 2.6, ms: 760 },
+    { dx: -3.2, ms: 900 },
+    { dx: 1.6, ms: 560 },
+];
+const SNATCH_DROP_MS = 620;     // he drops the sack and legs it off-screen while the sweets are still in the air
+
 const TREE_CLEAR = 4.2;
 const LAMP_CLEAR = 2.2;
 // ── ⚠️ AND A THIRD CLEARANCE, FOR THE THING NOTHING WAS CHECKING: THE SIGNS ───────────────────────────────
@@ -1221,6 +1246,20 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // The sweets in the air. Keyed by knock so React replaces the whole spray rather than reusing nodes and
     // restarting half of them mid-flight.
     const [burst, setBurst] = useState(null);
+    // ── THE CANDY SNATCHER ───────────────────────────────────────────────────────────────────────────
+    // Which of tonight's pails has a skeleton wedged in it, head-first, legs kicking. Comes down with the
+    // first paint for the same reason `knocked` does — a bucket that only starts kicking once a poll has
+    // landed has been walked past by everybody who was already standing there. Nearly always empty; see
+    // snatcherDoors in trick-or-treat.js, which is a hash of (you, door, tonight) rather than a spawn.
+    const legs = useMemo(() => new Set(gourd?.legs || []), [gourd]);
+    // Him, while he is out: { x, flip, ms, out }. Null the rest of the time, which is almost always.
+    const [snatch, setSnatch] = useState(null);
+    const [snatchCard, setSnatchCard] = useState(null); // the payout, once he has gone: { candy, label }
+    // ⚠️ EVERY TIMER IN THE CHAIN IS HELD, because the chain outlives a tap by four seconds and a member who
+    // walks into the Tavern mid-run unmounts the street underneath it. Left loose, each setTimeout would
+    // fire setState on a dead component — and the last one in the chain hands out the prize card.
+    const snatchTimers = useRef([]);
+    useEffect(() => () => snatchTimers.current.forEach(clearTimeout), []);
 
     //
     // ⚠️ WHICH DOORS EXIST COMES FROM THE SERVER (gourd.doors), NOT FROM THIS LIST. trick-or-treat.js owns
@@ -1270,8 +1309,12 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     const doorsLeft = doorPosts.filter((d) => !knocked.has(d.id)).length;
     const barkAt = bark ? (doorPosts.find((d) => d.id === bark.door)?.x ?? null) : null;
     // The spray starts at the pail's mouth, which is its top -- hence the small lift off the post's own top.
+    // A burst that carries its own x drops THERE — the snatcher gives up somewhere out in the street, which
+    // is not a porch. Everything else is a pail and falls back to the door it came out of.
     const burstAt = burst
-        ? (() => { const d = doorPosts.find((x) => x.id === burst.door); return d ? { x: d.x, top: d.top - 2.4 } : null; })()
+        ? (burst.x != null
+            ? { x: burst.x, top: burst.top }
+            : (() => { const d = doorPosts.find((x) => x.id === burst.door); return d ? { x: d.x, top: d.top - 2.4 } : null; })())
         : null;
     // His street bark rotates on its own clock. An index, not a string — see the note in the stall.
     const [gourdBark, setGourdBark] = useState(0);
@@ -1447,6 +1490,46 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // The server's own insert is the lock (one row per door per day, ON CONFLICT DO NOTHING), so the worst a
     // double-tap can do is get `already_knocked` — and a marker that waits for the round trip is a marker you
     // can tap three times on a slow phone, which looks exactly like a reward that did not pay.
+    // ── HE COMES OUT OF THE PAIL ─────────────────────────────────────────────────────────────────────
+    // The payout is already banked by the time this runs — the server paid it the moment the pail was
+    // tapped — so this is theatre and nothing else, and the card at the end is a RECEIPT rather than a
+    // promise. That ordering matters: a member who closes the tab mid-run keeps the candy, and a run that
+    // had to finish before anything was paid would be a reward you can lose by walking away.
+    const runSnatcher = useCallback((door, candy, label) => {
+        const post = doorPosts.find((p) => p.id === door);
+        const x0 = post?.x ?? 50;
+        const top = (post?.top ?? GROUND + 2.2) + 5.4;  // he runs in FRONT of the porch, nearer the camera
+        snatchTimers.current.forEach(clearTimeout);
+        snatchTimers.current = [];
+        const hold = (fn, at) => snatchTimers.current.push(setTimeout(fn, at));
+        // Frame one: still in the bucket. The pail is gone from under him on the same frame he appears, so
+        // the eye reads one object turning into another rather than two objects briefly existing at once.
+        setSnatch({ door, x: x0, top, flip: 1, ms: 0, out: false });
+        hold(() => setSnatch((s) => (s ? { ...s, out: true } : s)), 60);
+        let x = x0;
+        let at = SNATCH_POP_MS;
+        for (const leg of SNATCH_RUN) {
+            const nx = clamp(x + leg.dx, 3, 97);
+            const flip = nx >= x ? 1 : -1;
+            const ms = leg.ms;
+            hold(() => setSnatch((s) => (s ? { ...s, x: nx, flip, ms } : s)), at);
+            at += ms;
+            x = nx;
+        }
+        // The sack goes over. Reuses the doorstep's own explosion — same arcs, same keyframe, same sweets —
+        // at the spot he gave up on rather than at a pail, which is what the explicit x on `burst` is for.
+        hold(() => {
+            setBurst({ door, x, top: top - 3.4, at: Date.now(), bits: rollBurst(16, true) });
+            knockSound({ candy: 16, chest: true });
+            knockHaptic({ candy: 16, chest: true });
+        }, at);
+        hold(() => {
+            setSnatch(null);
+            setSnatchCard({ candy, label });
+            if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
+        }, at + SNATCH_DROP_MS);
+    }, [doorPosts]);
+
     const knock = useCallback(async (door) => {
         if (knocking || knocked.has(door)) return;
         setKnocking(door);
@@ -1462,6 +1545,15 @@ export default function TownClient({ initial, frozen = false, halloween = false,
             method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "knock", door }),
         }).then((r) => r.json()).catch(() => null);
         setKnocking(null);
+        // ⚠️ THE SKELETON IS AN ANSWER TO A KNOCK, NOT A SECOND REQUEST. Nobody came to the door — the thing
+        // in the bucket ran off with the sweets — so this branch replaces the bark and the handful entirely,
+        // and the run plays instead. Driven off the SERVER's answer rather than off what the pail was
+        // drawing, so a stale tab that still shows kicking legs cannot stage a 1,000-candy celebration for a
+        // payout that did not happen.
+        if (d?.ok && d.snatcher) {
+            runSnatcher(door, Number(d.snatcher.candy) || 0, d.label || "");
+            return;
+        }
         if (d?.ok) {
             setBark({ door, line: d.line, candy: d.candy || 0, sweet: d.sweet || null, chest: Boolean(d.chest), trick: Boolean(d.trick) });
             setBurst({ door, at: Date.now(), bits: rollBurst(d.candy, Boolean(d.chest)) });
@@ -1471,7 +1563,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
             if (d.chest) knockHaptic({ candy: d.candy || 0, chest: true });
             if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
         }
-    }, [knocking, knocked]);
+    }, [knocking, knocked, runSnatcher]);
 
     // Sweets are swept up once they have landed. Tied to the burst's own id so a second knock during the
     // first one's flight cannot clear the new spray with the old timer.
@@ -2400,17 +2492,29 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         <>
                             {doorPosts.map((d) => {
                                 const done = knocked.has(d.id);
-                                const pail = done ? art.hw_treat_spent?.url : art.hw_treat_full?.url;
+                                // ⚠️ THE KICKING PAIL IS ONLY ON A DOOR YOU HAVE NOT KNOCKED, and it goes
+                                // the instant he is out — `knocked` is marked optimistically on tap, so the
+                                // legs vanish in the same frame the skeleton appears without waiting for the
+                                // server. And while he is running it must not come back: `snatch` outlives
+                                // the tap by four seconds.
+                                const kicking = legs.has(d.id) && !done && snatch?.door !== d.id;
+                                const pail = kicking
+                                    ? art.hw_treat_legs?.url
+                                    : done ? art.hw_treat_spent?.url : art.hw_treat_full?.url;
                                 return (
                                     <button
                                         key={`door-${d.id}`}
                                         type="button"
-                                        className={`tw-door${done ? " is-done" : ""}`}
-                                        style={{ left: `${d.x}%`, top: `${d.top}%`, zIndex: d.z }}
+                                        className={`tw-door${kicking ? " is-kicking" : done ? " is-done" : ""}`}
+                                        style={{ left: `${d.x}%`, top: `${d.top}%`, zIndex: kicking ? d.z + 20 : d.z }}
                                         disabled={done || knocking === d.id}
                                         onClick={(e) => { e.stopPropagation(); knock(d.id); }}
-                                        aria-label={done ? `${d.label} — already knocked tonight` : `Knock on ${d.label}`}
-                                        title={done ? "Already knocked tonight" : `Knock on ${d.label}`}
+                                        // ⚠️ IT DOES NOT SAY WHAT IT IS. "A 1,000-candy skeleton" on the
+                                        // hover would hand the whole surprise to a mouse pointer. The label
+                                        // says what you can SEE — a bucket moving on its own — which is also
+                                        // what a screen reader needs to know it is worth pressing.
+                                        aria-label={kicking ? `Something is kicking inside the pail at ${d.label}` : done ? `${d.label} — already knocked tonight` : `Knock on ${d.label}`}
+                                        title={kicking ? "…that bucket is moving." : done ? "Already knocked tonight" : `Knock on ${d.label}`}
                                     >
                                         {pail ? (
                                             // eslint-disable-next-line @next/next/no-img-element
@@ -2419,6 +2523,33 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                     </button>
                                 );
                             })}
+                            {/* ── AND OUT HE COMES ─────────────────────────────────────────────────
+                                Inside tw-world like everything else that belongs to a place, so he runs
+                                along the STREET and the camera can be dragged away from him mid-dash. He is
+                                one sprite: the lean, the bob and the flip are the animation (see twBob on
+                                the avatars — two AI-drawn frames of "the same skeleton" come back as two
+                                different skeletons). pointer-events none throughout; he is a cutscene, and a
+                                4-second cutscene you can accidentally tap is a 4-second blocked street. */}
+                            {snatch ? (
+                                <span
+                                    className={`tw-snatch${snatch.out ? " is-out" : ""}`}
+                                    style={{ left: `${snatch.x}%`, top: `${snatch.top}%`, transition: `left ${snatch.ms || 0}ms linear` }}
+                                    aria-hidden="true"
+                                >
+                                    {/* ⚠️ THE FLIP IS ON THE IMG AND NOTHING ELSE ANIMATES THE IMG'S
+                                        TRANSFORM. A keyframe touching `transform` beats an inline style
+                                        outright, so a bob hung on this element would silently cancel the
+                                        mirror and he would moonwalk the leg home. The pop and the bob live
+                                        on the span inside. */}
+                                    {art.hw_snatcher?.url ? (
+                                        <span className="tw-snatch-pop">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={art.hw_snatcher.url} alt="" draggable={false}
+                                                style={{ transform: `scaleX(${snatch.flip})` }} />
+                                        </span>
+                                    ) : null}
+                                </span>
+                            ) : null}
                             {/* ── THE SWEETS IN THE AIR ────────────────────────────────────────────
                                 Drawn at the pail's own spot inside tw-world, so the spray rides the street
                                 with the door it came out of rather than hanging in the middle of the screen.
@@ -3384,6 +3515,44 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                 </div>
             ) : null}
 
+            {/* ── THE SACK ─────────────────────────────────────────────────────────────────────────────
+                He has already run, already dropped it, and the candy is already in the balance — this is the
+                receipt, and it is the only screen that ever says the number out loud. Deliberately the LAST
+                thing that happens rather than the first: tapping a bucket and getting a modal would have
+                skipped the entire reason the feature exists. */}
+            {snatchCard ? (
+                <div className="tw-duel" role="presentation" onClick={() => setSnatchCard(null)}>
+                    <div className="tw-duel-card" onClick={(e) => e.stopPropagation()} style={{ textAlign: "center", position: "relative", overflow: "hidden" }}>
+                        <div className="tw-shiny-burst" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <span key={i} style={{ "--i": i }} />)}</div>
+                        {art.hw_snatcher?.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={art.hw_snatcher.url} alt="" draggable={false}
+                                style={{ width: 120, height: 120, objectFit: "contain", display: "block", margin: "0 auto",
+                                    position: "relative", zIndex: 2, filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.6))" }} />
+                        ) : null}
+                        <div className="tw-duel-verdict win" style={{ fontSize: "1.25rem", position: "relative", zIndex: 2 }}>He dropped the sack!</div>
+                        <div className="muted" style={{ margin: "2px 0 10px", fontSize: "0.82rem", position: "relative", zIndex: 2 }}>
+                            Something was wedged head-first in the pail at {snatchCard.label || "a doorstep"}. It got away — the sweets did not.
+                        </div>
+                        <div className="tw-door-got" style={{ justifyContent: "center", fontSize: "1.35rem", position: "relative", zIndex: 2 }}>
+                            {art.hw_candy?.url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="tw-candy-mark" src={art.hw_candy.url} alt="" draggable={false} style={{ width: 26, height: 26 }} />
+                            ) : null}
+                            +{Number(snatchCard.candy || 0).toLocaleString()}
+                        </div>
+                        {/* ⚠️ THE ONE SENTENCE THAT HAS TO BE HERE. Every other candy payout in the event is
+                            trimmed by the 250 ceiling and the screens say so, so a member who has already
+                            capped out tonight will assume this one was trimmed too and that the number is a
+                            lie. It is not: see UNCAPPED_CANDY_RATES. */}
+                        <div className="muted" style={{ margin: "8px 0 2px", fontSize: "0.75rem", position: "relative", zIndex: 2 }}>
+                            Every last piece of it — the daily candy cap does not touch this one.
+                        </div>
+                        <button type="button" className="tw-levelup-btn" onClick={() => setSnatchCard(null)}>Mine now</button>
+                    </div>
+                </div>
+            ) : null}
+
             {/* Hangout buff earned — the one-shot celebration (not advertised anywhere until this moment). */}
             {buffCele ? (
                 <div className="tw-buffcele" role="status" onClick={() => setBuffCele(null)}>
@@ -3571,6 +3740,69 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-door-dot { display: block; width: 18px; height: 18px; border-radius: 999px;
     background: radial-gradient(circle, #ffcf6a, #e8700f 70%); box-shadow: 0 0 12px rgba(255,160,50,0.9); }
 @keyframes twDoorBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+/* ── THE PAIL WITH SOMETHING IN IT ────────────────────────────────────────────────────────────────────
+   A skeleton has gone in head-first after the good sweets. The legs are drawn INTO the sprite, so all this
+   has to do is sell that the bucket is moving on its own: a wider, faster, uneven rock than the idle bob the
+   other seventeen pails are doing, and a colder light on the cobbles under it than the warm amber everything
+   else on the street throws.
+
+   ⚠️ THE ROCK IS NOT twDoorBob WITH A SHORTER DURATION. A faster version of the same up-and-down reads as a
+   pail that is keen, not as a pail with something struggling inside it -- the tell is the ROTATION, which
+   nothing else in the plaza does, and the stagger in the keyframe so it never settles into a rhythm.
+
+   ⚠️ AND IT IS DELIBERATELY NOT LOUD. Luke's whole idea is that you have to notice it. A glow and a wobble
+   at 54px, in a street already full of lit pumpkins, is exactly as findable as it should be -- see the
+   shiny glint for the opposite failure, where "barely visible" meant nobody ever found one. */
+.tw-door.is-kicking img { height: 58px; animation: snatchKick 1.15s ease-in-out infinite;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6)) drop-shadow(0 0 11px rgba(190,230,255,0.5)); }
+@keyframes snatchKick {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    18%      { transform: translateY(-4px) rotate(-7deg); }
+    34%      { transform: translateY(-1px) rotate(4deg); }
+    52%      { transform: translateY(-5px) rotate(6deg); }
+    70%      { transform: translateY(0) rotate(-3deg); }
+    84%      { transform: translateY(-2px) rotate(1deg); }
+}
+.tw-door.is-kicking::after { background: radial-gradient(ellipse, rgba(175,220,255,0.5), rgba(120,170,255,0.14) 55%, transparent 72%); }
+
+/* ── AND OUT HE COMES ─────────────────────────────────────────────────────────────────────────────────
+   One sprite, drawn mid-stride and facing right. The flip is an inline transform on the img (see the note
+   at the markup); everything that MOVES lives on the span between them, so the two can never fight.
+
+   The pop overshoots on purpose -- up past where he lands, then down into the run. A pop that eases into
+   its final size reads as a thing fading in; a pop that goes too far and comes back reads as a thing that
+   was being compressed and is now free, which is the actual story of a skeleton stuck in a bucket. */
+.tw-snatch { position: absolute; transform: translate(-50%, -100%); z-index: 300; pointer-events: none;
+    line-height: 0; }
+.tw-snatch img { height: 72px; width: auto; display: block;
+    filter: drop-shadow(0 5px 7px rgba(0,0,0,0.6)) drop-shadow(0 0 12px rgba(190,230,255,0.45)); }
+.tw-snatch-pop { display: block; opacity: 0; }
+.tw-snatch.is-out .tw-snatch-pop { opacity: 1;
+    animation: snatchOut .52s cubic-bezier(.2,.8,.3,1.25) both, snatchRun .34s ease-in-out .52s infinite; }
+@keyframes snatchOut {
+    0%   { transform: translateY(10px) scale(0.2); opacity: 0; }
+    30%  { opacity: 1; }
+    62%  { transform: translateY(-20px) scale(1.14); opacity: 1; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+/* The run itself: a bob with a lean in it. The lean is what the two-frame cycle would have bought, for the
+   price of nothing and with no risk of the second drawing being a different skeleton. */
+@keyframes snatchRun {
+    0%, 100% { transform: translateY(0) rotate(-2.5deg); }
+    50%      { transform: translateY(-6px) rotate(2.5deg); }
+}
+/* He is drawn mid-air with both feet off the ground, which is right for a run and wrong for a street: with
+   nothing under him he reads as pasted onto the picture. This is the contact -- it stays on the ground line
+   while he bobs above it, which is the whole trick. */
+.tw-snatch.is-out::after { content: ""; position: absolute; left: 50%; bottom: -2px; width: 46px;
+    aspect-ratio: 4 / 1; transform: translateX(-50%); border-radius: 50%; pointer-events: none;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent 70%);
+    animation: snatchShade .34s ease-in-out .52s infinite; }
+@keyframes snatchShade {
+    0%, 100% { opacity: 0.55; transform: translateX(-50%) scale(1); }
+    50%      { opacity: 0.32; transform: translateX(-50%) scale(0.82); }
+}
 
 /* ── THE CANDY EXPLOSION ──────────────────────────────────────────────────────────────────────────────
    One keyframe, shared by every piece; everything that makes a piece ITS OWN piece arrives as a custom

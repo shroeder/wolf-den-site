@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { storeDay } from "@/lib/marketplace/store-day.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
+import { UNCAPPED_CANDY_RATES, grantCandy, grantUncappedCandy } from "@/lib/marketplace/candy.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { rollTicket } from "@/lib/marketplace/gachapon.js";
 
@@ -74,6 +75,76 @@ export const DOOR_IDS = Object.keys(DOORS);
 
 const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 
+// ── THE CANDY SNATCHER ───────────────────────────────────────────────────────────────────────────────────
+// Luke: "a rare chance for one of the candy buckets to spawn with two skeleton legs poking out of them. And
+// then if you tap that, he pops out ... a skeleton holding a sack of candy over his shoulder. And he runs
+// around, and then you get like 1,000 candy once he's done running around."
+//
+// Somebody has gone head-first into one of the pails after the good sweets and got wedged, and two bony legs
+// are kicking out of the top of it. Tap it and he bolts.
+//
+// ⚠️ THE ROLL IS DETERMINISTIC, NOT RANDOM, AND THAT IS THE WHOLE MECHANISM. The legs have to be visible
+// BEFORE you touch anything — that is the entire idea — so the answer cannot be rolled when you tap. It is a
+// hash of (member, door, day): the plaza simply draws what the hash says, the knock handler asks the same
+// question again and gets the same answer, and there is no row to write, nothing to spawn and nothing to
+// schedule. It also means a refresh cannot re-roll it, which a per-render Math.random() would have handed
+// out for free: eighteen pails re-rolled on every poll is a member holding F5 until a skeleton turns up.
+//
+// ⚠️ AND IT IS PER MEMBER, which is already true of every pail on the street — `knocked` is per member, so
+// your porch is tipped over while mine is still full. One person's find is their own; nobody can be beaten
+// to it, and nobody stands next to a pail they cannot see.
+//
+// ⚠️ THE PAYOUT IS NOT RUN THROUGH grantCandy. See UNCAPPED_CANDY_RATES in candy.js: the 250/day ceiling is
+// there to bound GRINDING, and members are averaging ~200 a day against it, so a capped 1,000 would have
+// arrived as "+40 candy" most evenings. This one payout is exempt and does not eat the day's room either.
+export const SNATCHER_CANDY = UNCAPPED_CANDY_RATES.candy_snatcher;
+
+// How rare. Per member, per door, per day — so the Den's rate is this times how many pails actually get
+// knocked, and the constant is not the rate anybody experiences.
+//
+// Measured off the live table rather than guessed (32 members earned candy in the last week, 18 doors each
+// once the gated one is out): 1.6 a day across the whole Den if every member walks every door, so about one
+// a day in practice, and a given member finds one roughly every 20 days. At 1,000 a find that mints ~1,600
+// candy a day against a Den that currently mints ~4,500 — which is the number to look at before moving this.
+//
+// ⚠️ IT IS A RATE PER PAIL, NOT PER NIGHT. Raising it multiplies by ~570 pail-knocks a day, so 0.01 is five
+// a day and 0.03 is sixteen. `node --experimental-loader ./scripts/lib/app-loader.mjs scripts/snatcher-odds.mjs`
+// prints all of the above for whatever this is set to; run it before changing the number, not after.
+// Exported so scripts/snatcher-odds.mjs reports the rate THIS number actually produces, rather than the rate
+// a second copy of it in a script would produce.
+export const SNATCHER_CHANCE = 0.003;
+
+// ⚠️ A HASH, NOT Math.random(), AND IT HAS TO SPREAD. FNV-1a over the three things that identify this pail
+// tonight. A cheap `str.length + charCodeAt(0)` style hash clusters hard on ids that share a prefix — every
+// buyer id here is a UUID, so half the input is the same shape for everybody — and clustering in a 0.3%
+// test is invisible until the day it hands the same member a skeleton five times.
+function pailHash01(buyerId, door, dayKey) {
+    const s = `${buyerId}|${door}|${dayKey}|snatcher`;
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h / 4294967296;
+}
+
+/**
+ * Which of this member's pails have a skeleton in them tonight. Almost always empty.
+ *
+ * ⚠️ THE OWNER-GATED DOOR IS EXCLUDED, because a skeleton hidden behind a door the member cannot see is a
+ * find that silently never happens. Which buildings are gated is town.js's fact and stays there — a second
+ * copy of "who can see the Arena" is a copy that nobody updates when the gate moves. Imported dynamically:
+ * this module is pulled in by the town page and the town route, and a static edge into town.js is the shape
+ * of cycle that has taken features down in this directory before.
+ */
+export async function snatcherDoors(buyerId) {
+    if (!buyerId || !halloweenOn(buyerId)) return [];
+    const { GATED_BUILDINGS } = await import("@/lib/marketplace/town.js");
+    const gated = new Set(GATED_BUILDINGS.filter((b) => b.gate).map((b) => b.id));
+    const day = storeDay().dayKey;
+    return DOOR_IDS.filter((id) => !gated.has(id) && pailHash01(buyerId, id, day) < SNATCHER_CHANCE);
+}
+
 /** Which doors this member has already knocked on today. */
 export async function knockedToday(buyerId) {
     if (!buyerId || !halloweenOn(buyerId)) return [];
@@ -97,21 +168,38 @@ export async function knock(buyerId, door) {
     const d = DOORS[door];
     if (!d) return { ok: false, error: "no_such_door" };
 
-    const candy = rnd(PER_DOOR[0], PER_DOOR[1]);
-    const trick = Math.random() < TRICK_CHANCE;
+    // Is there a skeleton in this one? Asked BEFORE the row is written, and asked of the same hash the plaza
+    // drew the kicking legs from, so what you tapped and what you get cannot disagree.
+    const snatcher = (await snatcherDoors(buyerId).catch(() => [])).includes(door);
 
+    const candy = snatcher ? 0 : rnd(PER_DOOR[0], PER_DOOR[1]);
+    const trick = !snatcher && Math.random() < TRICK_CHANCE;
+
+    // ⚠️ THE SNATCHER IS LOCKED BY THE SAME PRIMARY KEY AS THE DOOR, which is why he needs no table of his
+    // own. A pail can only be knocked once per member per day, the insert is the claim, and a 1,000-candy
+    // payout therefore inherits a guard that has already been proved against a double-tapping thumb.
     const claimed = await db.queryOne(
         `INSERT INTO mkt_trick_or_treat (buyer_id, door, day, candy, treat)
          VALUES ($1, $2, $3::date, $4, $5)
          ON CONFLICT (buyer_id, door, day) DO NOTHING
          RETURNING door`,
-        [buyerId, door, storeDay().dayKey, candy, trick ? "trick" : "treat"],
+        [buyerId, door, storeDay().dayKey, candy, snatcher ? "snatcher" : trick ? "trick" : "treat"],
     ).catch(() => null);
     if (!claimed) return { ok: false, error: "already_knocked" };
 
+    // ── HE BOLTS ─────────────────────────────────────────────────────────────────────────────────────
+    // A skeleton in the pail REPLACES the doorstep — nobody answered, because you never knocked: you touched
+    // a bucket that was moving on its own and something ran out of it with the sweets. So there is no line,
+    // no 4-7 candy and no sweet roll here, and the whole payout is the sack he drops. The ticket still rolls
+    // below because the ACTION still happened: this was your one go at this door tonight.
+    if (snatcher) {
+        const paid = await grantUncappedCandy(buyerId, "candy_snatcher");
+        await rollTicket(buyerId, "trick_or_treat_door").catch(() => {});
+        return { ok: true, door, label: d.label, snatcher: { candy: paid } };
+    }
+
     // ⚠️ PAID THROUGH grantCandy, NOT A BARE UPDATE. The daily cap lives in that function, and a door that
     // wrote straight to the balance would be a faucet outside the only ceiling the event has.
-    const { grantCandy } = await import("@/lib/marketplace/candy.js");
     // Rated 1 in CANDY_RATES because the door decides the amount; the multiplier carries the payout.
     const paid = await grantCandy(buyerId, "trick_or_treat_door", candy);
     await rollTicket(buyerId, "trick_or_treat_door").catch(() => {});

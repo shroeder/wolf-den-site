@@ -1,0 +1,8 @@
+{
+  "/api/marketplace/town": {
+    "ok": true,
+    "door": "forge",
+    "label": "The Forge",
+    "snatcher": { "candy": 1000 }
+  }
+}

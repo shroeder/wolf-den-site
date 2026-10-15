@@ -331,6 +331,44 @@ Object.assign(ART_PROMPTS, {
         "beside it",
         { extra: HW_NEAR_EXTRA }
     ),
+    // ── THE CANDY SNATCHER ───────────────────────────────────────────────────────────────────────────
+    // The rare one. A skeleton has gone head-first into somebody's pail after the good sweets and is stuck
+    // there with his legs in the air; tap it and he bolts up the street with his sack. See town-snatcher.js.
+    //
+    // ⚠️ IT HAS TO BE THE SAME PAIL, DOWN TO THE HANDLE. This sprite is swapped in for hw_treat_full at ONE
+    // door on the street while everybody else's porch keeps the ordinary one, so the joke only lands if the
+    // bucket is recognisably the same bucket with something sticking out of it. A differently-shaped pail
+    // reads as a new decoration rather than as "something is IN that one" — hence the deliberate repetition
+    // of the description above rather than a looser "a pail".
+    hw_treat_legs: housePrompt(
+        "A child's TRICK-OR-TREAT PAIL standing upright on the ground — a round orange pail with a carved " +
+        "jack-o'-lantern face on the front and a sturdy arched black handle across the top — with a cartoon " +
+        "SKELETON stuck HEAD-FIRST INSIDE IT: only its two bare bony LEGS stick up out of the mouth of the " +
+        "pail, kicking in the air, knees bent at different angles and bony feet splayed, as if it dived in " +
+        "after the sweets and got wedged. A few wrapped sweets knocked out onto the ground beside it",
+        { extra: HW_NEAR_EXTRA + " Comic and charming rather than gruesome — clean rounded white bones. The " +
+            "pail sits flat on the ground at the bottom of the frame and the kicking legs are fully inside " +
+            "the frame with clear empty margin above the feet. No skull, no face, no torso and no arms are " +
+            "visible — only the two legs from the thigh down." }
+    ),
+    // ⚠️ HE FACES RIGHT, LIKE EVERY OTHER MOVING THING WE DRAW. The client mirrors him with a CSS flip on
+    // the leg of the run that goes the other way, which is only possible if there is ONE canonical facing;
+    // the arena learned this the hard way with its foes.
+    //
+    // ⚠️ AND HE IS ONE SPRITE, NOT A TWO-FRAME CYCLE. Two separately generated drawings of "the same
+    // skeleton" come back with different skulls and a different sack, and swapping between them every
+    // 200ms reads as a glitch rather than as running — the town's own avatars sell a walk with a bob and a
+    // lean on a single sprite (twBob), so he does the same. The pose therefore has to already BE a run.
+    hw_snatcher: housePrompt(
+        "A cartoon SKELETON running fast to the RIGHT and looking back over its shoulder, caught mid-stride " +
+        "with one leg stretched out in front and the other kicked up behind, leaning forward, a big bulging " +
+        "cloth SACK of stolen sweets slung over one shoulder and held by its neck in a bony hand, wrapped " +
+        "sweets spilling out of the top of the sack, grinning",
+        { extra: HW_NEAR_EXTRA + " Full body, head to foot, seen from the side and facing RIGHT. Comic, " +
+            "mischievous and charming rather than gruesome — clean rounded white bones. Mid-air mid-run: " +
+            "nothing touches the bottom of the frame, with clear empty margin under the trailing foot and " +
+            "around the whole figure." }
+    ),
     hw_lantern: housePrompt(
         "An old wrought-IRON HANGING LANTERN with a domed cap and a ring at the top to hang it by, four panes " +
         "of warped amber glass, a fat lit candle burning inside it",
@@ -619,7 +657,7 @@ const isBuildingKey = (key) => HW_BUILDING_IDS.includes(key) || key.startsWith("
 export const HALLOWEEN_PROP_KEYS = [
     "hw_moon", "hw_witch_a", "hw_witch_b", "hw_bats", "hw_tree",
     "hw_pumpkin", "hw_lantern", "hw_candles", "hw_ghost",
-    "hw_treat_full", "hw_treat_spent", "hw_candy", "hw_candy_b", "hw_candy_c", "thresher",
+    "hw_treat_full", "hw_treat_spent", "hw_treat_legs", "hw_snatcher", "hw_candy", "hw_candy_b", "hw_candy_c", "thresher",
     "hw_scarecrow", "hw_haybale", "hw_cauldron", "hw_gravestone", "hw_skeleton", "hw_pumpkin_stack", "hw_crow",
     "hw_cobble", "hw_tree_fall", "hw_lamppost", "hw_verge", "hw_shrub",
     "hw_depth1", "hw_depth3", "hw_mid", "hw_fg",

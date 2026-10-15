@@ -131,7 +131,10 @@ export const GATED_BUILDINGS = [
 // from the Vault and 6% from the Festival Stage, i.e. straight through both of them. Computing the spread means
 // adding a building can never collide with one again, and a viewer who can't see the gated one still gets the
 // original nine-building layout they're used to.
-function spaceOut(list) {
+// Exported for the lab, which has to lay its street out the way the real one does or every position measured
+// off a photograph of it is a position that does not exist. Not a balance number, but the same argument: one
+// expression, read twice.
+export function spaceOut(list) {
     if (!list.length) return list;
     const FIRST = 4, LAST = 92;
     const step = list.length > 1 ? (LAST - FIRST) / (list.length - 1) : 0;
