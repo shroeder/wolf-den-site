@@ -8,6 +8,7 @@ import {
     GiLaurelCrown,
 } from "react-icons/gi";
 
+import Area from "@/components/grove/GroveArea.js";
 import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
 import { QUALITY_BANDS, qualityBand, GROVE_CHESTS, GROVE_CHEST_ORDER } from "@/lib/marketplace/grove-forge.js";
 
@@ -186,10 +187,12 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 history behind it is a number you are asked to take on faith.
                   AWARENESS     every tool on the bench wears its own band, so the thing the level BUYS
                                 is visible on the thing it was spent on. */}
+            {/* The heading wears the DEEPEST chest on the shelf rather than a generic one, so the panel
+                itself says whether what is waiting is a Cache or a Reliquary. */}
             {chests.length ? (
-                <section className="gv-shelf" aria-label="Unopened chests">
-                    <h3>{chests.reduce((n, c) => n + c.have, 0)} unopened</h3>
-                    <ul>
+                <Area id="chests" icon={`chest-${chests[chests.length - 1].id}`} title="Unopened"
+                    count={`${chests.reduce((n, c) => n + c.have, 0)}`}>
+                    <ul className="gv-shelf">
                         {chests.map((c) => (
                             <li key={c.id} className={`gv-chest is-${c.id}`}>
                                 <button type="button" disabled={busy === `chest:${c.id}`}
@@ -207,9 +210,11 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                             </li>
                         ))}
                     </ul>
-                </section>
+                </Area>
             ) : null}
 
+            <Area id="bench" icon="ui-bench" title="Workbench"
+                count={readyCount > 0 ? `${readyCount} ready` : null}>
             <header className="gv-level">
                 <div className="gv-level-top">
                     <span className="gv-level-no">
@@ -321,6 +326,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                     );
                 })}
             </ul>
+            </Area>
 
             {/* ── THE RESULT ──────────────────────────────────────────────────────────────────────────
                 Both halves of the trade, because that is the accountability: the parts that left on the

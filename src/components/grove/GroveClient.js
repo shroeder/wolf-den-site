@@ -8,6 +8,7 @@ import { GiLaurelCrown } from "react-icons/gi";
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt } from "@/lib/marketplace/grove-catalog.js";
 import GroveBench from "@/components/grove/GroveBench";
+import Area from "@/components/grove/GroveArea.js";
 import { GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
 import { GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
@@ -354,8 +355,8 @@ export default function GroveClient({ initial }) {
                 {/* ── BAG AND BANK ─────────────────────────────────────────────────────────────────── */}
                 {panel === "bag" ? (
                     <div className="gv-bag">
-                        <section>
-                            <h4>Backpack <i>{bagRows.length}/{st.packSlots}</i></h4>
+                        <Area id="bag" icon="ui-bag" title="Backpack"
+                            count={`${bagRows.length}/${st.packSlots}`}>
                             <div className="gv-slots">
                                 {bagRows.map(([p, n]) => (
                                     <button key={p} type="button" className="gv-slot"
@@ -366,9 +367,9 @@ export default function GroveClient({ initial }) {
                                 ))}
                                 {!bagRows.length ? <p className="muted">Empty. Go and kill something.</p> : null}
                             </div>
-                        </section>
-                        <section>
-                            <h4>Bank <i>{bankRows.length}/{st.bankSlots}</i></h4>
+                        </Area>
+                        <Area id="bank" icon="ui-vault" title="Bank"
+                            count={`${bankRows.length}/${st.bankSlots}`}>
                             <div className="gv-slots">
                                 {bankRows.map(([p, n]) => (
                                     <button key={p} type="button" className="gv-slot"
@@ -379,12 +380,12 @@ export default function GroveClient({ initial }) {
                                 ))}
                                 {!bankRows.length ? <p className="muted">Nothing stored.</p> : null}
                             </div>
-                        </section>
+                        </Area>
                         {/* ── THE BELT ────────────────────────────────────────────────────────────────
                             Luke: "a way to equip food or potions that auto heal you if you get below 60
                             percent hp." One slot: choosing which is the decision. */}
-                        <section>
-                            <h4>The Belt <i>auto-eats below {Math.round((st.healAt || 0.6) * 100)}%</i></h4>
+                        <Area id="belt" icon="ui-belt" title="The Belt"
+                            count={`eats below ${Math.round((st.healAt || 0.6) * 100)}%`}>
                             <div className="gv-slots">
                                 {Object.entries(st.food || {}).filter(([, n]) => n > 0).map(([id, n]) => {
                                     const f = GROVE_FOODS[id];
@@ -401,12 +402,12 @@ export default function GroveClient({ initial }) {
                                 {!Object.values(st.food || {}).some((n) => n > 0)
                                     ? <p className="muted">No food. Craft some at the workbench.</p> : null}
                             </div>
-                        </section>
+                        </Area>
 
                         {/* ── THE TOOLS ───────────────────────────────────────────────────────────────
                             A ladder, not six items: each map raises every tool by a tier. */}
-                        <section>
-                            <h4>Tools</h4>
+                        <Area id="tools" icon="ui-tools" title="Tools"
+                            count={`${(st.toolMeta || []).filter((t) => t.tier).length}/${(st.toolMeta || []).length}`}>
                             <div className="gv-slots">
                                 {(st.toolMeta || []).map((t) => (
                                     <span key={t.slot} className={`gv-slot${t.tier ? "" : " is-dim"}`}>
@@ -416,14 +417,14 @@ export default function GroveClient({ initial }) {
                                     </span>
                                 ))}
                             </div>
-                        </section>
+                        </Area>
 
                         {/* The stone tablet, which is a record of what the Grove has shown you. */}
-                        <section className="gv-tablet">
-                            <h4>The Tablet</h4>
+                        <Area id="tablet" icon="ui-tablet" title="The Tablet"
+                            count={`${st.tablet.seen}/${st.tablet.total}`}>
                             <p><b>{st.tablet.seen}</b> of <b>{st.tablet.total}</b> parts discovered</p>
                             <ul>{st.tablet.bonuses.map((b) => <li key={b.at}>{b.label} — +{b.value}{b.kind === "pct" ? "%" : ""} {b.stat.replace(/_/g, " ")}</li>)}</ul>
-                        </section>
+                        </Area>
                     </div>
                 ) : null}
 
@@ -438,6 +439,8 @@ export default function GroveClient({ initial }) {
                 {/* ── EMBLEMS ──────────────────────────────────────────────────────────────────────── */}
                 {panel === "emblems" ? (
                     <div className="gv-emblems">
+                        <Area id="emblems" icon="ui-emblems" title="Emblems"
+                            count={`${(st.emblems || []).filter((e) => e.slot != null).length}/3 worn`}>
                         <p className="muted">Three may be worn. Three more are sealed.</p>
                         <div className="gv-eslots">
                             {[0, 1, 2].map((s) => {
@@ -482,6 +485,7 @@ export default function GroveClient({ initial }) {
                             })}
                             {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">No emblems yet. They fall rarely.</p> : null}
                         </div>
+                        </Area>
                     </div>
                 ) : null}
 

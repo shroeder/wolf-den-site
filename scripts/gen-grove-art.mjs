@@ -61,6 +61,30 @@ const CHEST = `A single closed fantasy TREASURE CHEST, three-quarter view, sturd
 
 // key → [prompt, kind]
 const ART = {
+    // ── THE PANEL CHROME ────────────────────────────────────────────────────────────────────────────
+    // Luke: "hate the lack of color and lack of sprite paneling and trim ... Sprites in title etc are
+    // needed for each respective area."
+    //
+    // ⚠️ THE HEADER PLATE IS NOT HERE BECAUSE IT ALREADY EXISTS. slab-plank is a lashed plank board with
+    // painted rope end-caps, already pinned to 1024x320 and already sliced by the stylesheet -- it is
+    // exactly a name-board and it is drawn in the same hand as everything else. Art already paid for is
+    // art already paid for. See check-existing-sprites-first.
+    //
+    // ⚠️ AND THE BOARD IS DELIBERATELY QUIET. A panel backing sits under five hundred words of counts and
+    // part names on a phone; a vigorous wood grain behind that is a legibility bug wearing a costume. It
+    // is asked for flat, worn and low-contrast on purpose, and the stylesheet darkens it further.
+    "ui-board": [`A seamless dark worn WOODEN BOARD surface for a game menu panel, viewed flat face-on. Aged planks fitted edge to edge, muted desaturated brown-grey, soft even lighting, very LOW CONTRAST and visually quiet with no strong highlights. Completely EMPTY: no objects, no props, no creatures, no nails, no carving, no text. A plain background material. ${STYLE} No text, no words, no logo, no watermark, no border, no frame.`, "plate"],
+    "ui-corner": [`A single ornate dark IRON CORNER BRACKET for a wooden chest or menu frame, shaped as a right angle with two arms of equal length meeting at a square corner, decorated with round rivets and a small leaf scroll, viewed flat face-on. The corner of the bracket sits at the TOP-LEFT. ${STYLE} ${CUTOUT}`, "item"],
+
+    // ── TITLE SPRITES, ONE PER AREA ─────────────────────────────────────────────────────────────────
+    // The bag panel already had four headings and all four were the same word in the same green. These are
+    // the three with no sprite anywhere in the folder yet; Backpack, Workbench, Map and Emblems reuse the
+    // dock's own ui-*.webp, and the chest shelf wears the chest it holds.
+    "ui-tablet": [`A weathered grey STONE TABLET standing upright, its face covered in small carved pictograms of leaves, antlers and roots arranged in neat rows, one corner chipped away, faint green moss in the carved grooves. Cool stone greys with green moss. ${STYLE} ${CUTOUT}`, "item"],
+    "ui-vault": [`A sturdy fantasy STRONGBOX chest-safe for storing supplies, closed, heavy dark timber banded in cold iron with a large keyhole plate, three-quarter view, standing on short feet. Cool grey-blue iron and dark wood. ${STYLE} ${CUTOUT}`, "item"],
+    "ui-belt": [`A worn brown leather ADVENTURER'S BELT with two small pouches and a bundled cloth bandage tucked under it, laid out in a loose curve, three-quarter view. Warm leather browns, brass buckle, a sprig of green herb in one pouch. ${STYLE} ${CUTOUT}`, "item"],
+    "ui-tools": [`A bundle of simple fantasy hand TOOLS crossed together -- a wooden-handled pickaxe, a smith's hammer and a fishing rod -- arranged in a neat fan, three-quarter view. Worn wood handles, steel heads, a coil of line. ${STYLE} ${CUTOUT}`, "item"],
+
     // ── THE FOUR BOSS CHESTS ────────────────────────────────────────────────────────────────────────
     "chest-mossbound": [`${CHEST} A small rough chest of damp green wood, bound in living moss and pale roots that have grown over the lid, a simple iron clasp furred with verdigris. Mossy greens and wet brown.`, "item"],
     "chest-barrowed": [`${CHEST} A grave-casket of dark bog oak banded in black iron, a bone-handled clasp, carved barrow-marks on the lid, a scatter of dry earth caught in the carving. Deep browns, cold iron, bone white.`, "item"],

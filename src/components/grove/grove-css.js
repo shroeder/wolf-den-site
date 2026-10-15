@@ -65,10 +65,33 @@ export const GROVE_CSS = `
    ⚠️ SIZED FOR A THUMB, NOT FOR THE ART. 56px is about the smallest a reliable touch target gets; the
    sprite inside is 40 and is allowed to overflow its button slightly, because a painted object cropped to
    a circle stops reading as an object. */
+/* ⚠️ A ROW ALONG THE BOTTOM, NOT A COLUMN UP THE RIGHT EDGE, AND THAT IS A BUG FIX.
+   Luke: "Hate how the buttons cover stuff up."
+
+   A fixed column on the right hand edge is four objects parked ON TOP of the right-hand quarter of
+   every panel underneath it -- and the panels are two-column grids, so it was permanently sitting on
+   the whole right column: the Craft button on the workbench, Pickaxe and Smith's Hammer in the bag.
+   Nothing overflowed and nothing errored; the content was simply underneath it.
+
+   The zone's dock has been a centred bottom row since Luke asked for one ("Across the bottom, perhaps
+   slightly smaller. Floating"), and the fix here is to be the same thing. A bottom row only ever covers
+   a strip the scroller can be padded past, which .gv-sheet already is. */
+/* ⚠️ A BAR, NOT FOUR CIRCLES FLOATING ON THE CONTENT. Even as a bottom row the dock passes over the
+   panel while it scrolls, and four round objects sitting on top of a word read as a mistake. Given its
+   own board it reads as the chrome it is -- the same plank the name-boards are cut from, so it belongs
+   to the furniture rather than to the page it is covering. The scroller is already padded past it, so
+   the END of the content clears it; this is about the middle. */
 .gv-dock { position: fixed; z-index: 65;
-    right: calc(12px + env(safe-area-inset-right));
-    bottom: calc(14px + env(safe-area-inset-bottom));
-    display: flex; flex-direction: column; gap: 10px; }
+    left: 50%; transform: translateX(-50%);
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: row; gap: 10px;
+    padding: 8px 12px; border-radius: 999px;
+    background: linear-gradient(180deg, rgba(14,17,12,0.93), rgba(8,10,7,0.97)),
+        url("/images/grove/ui-board.webp") center / cover;
+    border: 1px solid rgba(0,0,0,0.7);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07); }
+/* Inside a bar the buttons no longer need their own plate -- two nested dark discs is one too many. */
+.gv-dock button { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.10); box-shadow: none; }
 .gv-dock button { width: 56px; height: 56px; border-radius: 50%; cursor: pointer; padding: 0;
     display: grid; place-items: center; font: inherit;
     background: rgba(8,12,8,0.68); border: 1px solid rgba(255,255,255,0.16);
@@ -1245,9 +1268,119 @@ export const GROVE_CSS = `
 @keyframes gvPop { from { opacity: 0; transform: scale(0.84) translateY(10px); } to { opacity: 1; transform: none; } }
 
 /* ── BAG, BANK, TABLET ───────────────────────────────────────────────────────────────────────── */
-.gv-bag { display: flex; flex-direction: column; gap: 16px; }
-.gv-bag h4 { margin: 0 0 8px; font-size: 0.86rem; letter-spacing: .06em; text-transform: uppercase; color: #9fe08a; }
-.gv-bag h4 i { font-style: normal; color: #8d8577; margin-left: 6px; }
+/* ── ⚠️ THE PANELS STACK AS BLOCKS, AND THE SCROLLER MUST NOT SQUASH THEM ────────────────────
+   Every panel in here is a child of .gv-sheet, which is a COLUMN FLEXBOX that also scrolls. A flex item
+   defaults to flex-shrink: 1, so the scroller's own content was being compressed to fit the viewport
+   INSTEAD of scrolling -- and once compressed, flex redistributed that height across the sections, which
+   is why the Bank came out taller than the one line it contains and the Backpack came out shorter than
+   its own six slots. The sections were drawn as flat rectangles before, so there was nothing to see;
+   giving them a painted box made a layout bug that had been there all along suddenly visible.
+
+   Two rules fix it at the root. The scroller's children keep their natural height and the scroller
+   scrolls; the panels themselves stack as plain blocks, where there is no shrinking and no stretching to
+   a common height to go wrong in the first place. */
+.gv-sheet > * { flex: none; }
+.gv-bag { display: block; }
+
+/* ── ⚠️ NAMED .gv-sect, AND THAT IS THE SECOND VERSION OF THIS FILE'S .gv-area ────────────────
+   The first cut of these panels was called .gv-area -- a class THIS STYLESHEET ALREADY USED, 200 lines
+   up, for the map strip's zone cards: width 188px, height 250px, scroll-snapped. So every painted panel
+   silently inherited a 188x250 box. That is exactly what the symptoms were: half width, every section
+   the same height, the Backpack clipped through its own slots and the Bank padded out with empty board.
+   Nothing errored, nothing overflowed the viewport, and the paint looked deliberate enough to screenshot.
+   It cost four rounds of trying to explain it with flexbox before the probe showed a height was being
+   SET rather than computed.
+
+   The reverse direction was live too and worse: the map's zone cards were wearing this panel's board,
+   iron corners and name-board rules the whole time.
+
+   Grep the stylesheet for a class name before taking it. */
+/* ── ⚠️ A PANEL IS A PAINTED OBJECT NOW, NOT A ROUNDED RECTANGLE ──────────────────────────────
+   Luke: "hate the lack of color and lack of sprite paneling and trim ... Sprites in title etc are
+   needed for each respective area."
+
+   What was here: four headings on the bag panel, all four the same word in the same green, over cards
+   that were rgba(255,255,255,0.045) on black. Nothing told you which area you were in except reading it.
+
+   Four things carry it now, and each is doing a job rather than decorating:
+
+     THE BOARD    a worn plank surface behind the section, darkened hard so it reads as material
+                  rather than as texture competing with the counts printed on it.
+     THE CORNERS  one iron bracket sprite, flipped into all four corners. A frame made of a drawn
+                  object rather than of a 1px border.
+     THE PLATE    the heading sits on slab-plank -- the SAME 3-slice board the ledges are built from,
+                  already pinned to 1024x320 with its rope caps painted at the edges. Reused, not
+                  redrawn. border-image-slice 0 150 fill is the ledges' own number.
+     THE COLOUR   one --area hue per section, worn by the heading rule, the count chip and the cards'
+                  own borders, so Bank never reads as Backpack at a glance.
+
+   ⚠️ NO BACKTICKS IN THESE COMMENTS -- template literal. See the header of this file. */
+/* ⚠️ THE BOX IS STATED, NOT INHERITED, AND THAT IS WHAT THE FIRST CUT GOT WRONG.
+   Dropped into .gv-bag -- a column flexbox -- the first version of these panels came out HALF WIDTH with
+   their contents clipped: each one had shrunk to its own max-content width (one slot column) and then been
+   squeezed vertically by flex-shrink against a short viewport. Nothing errored and the paint looked
+   deliberate, which is exactly how a layout bug survives a screenshot.
+
+   A section that is going to be reused inside four different parents must not depend on what any of them
+   sets for align-items. So it says its own width, refuses to shrink, and counts its padding inside that
+   width. */
+.gv-sect { --area: #e0a83c;
+    width: 100%; box-sizing: border-box; flex: none; align-self: stretch;
+    /* ⚠️ AND CAPPED, BECAUSE THE NAME-BOARD IS A PAINTING. The plank is a 3-slice: its ends are pinned
+       and its middle is STRETCHED. At 1900px on a desktop that middle smears into a flat grey bar and
+       the wood stops being wood -- caught on the wide pass, invisible on a phone. A capped, centred
+       column is the better reading measure for a six-slot grid anyway. */
+    max-width: 760px; margin-inline: auto;
+    position: relative; margin: 0 auto 15px; padding: 0 12px 13px; border-radius: 14px;
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, rgba(9,11,8,0.80), rgba(9,11,8,0.90)),
+        url("/images/grove/ui-board.webp") center / cover;
+    border: 1px solid rgba(0,0,0,0.65);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.055); }
+.gv-sect.is-bank { --area: #7cc6f0; }
+.gv-sect.is-belt { --area: #9be36a; }
+.gv-sect.is-tools { --area: #cbd5dc; }
+.gv-sect.is-chests { --area: #9be36a; }
+.gv-sect.is-emblems { --area: #e0a8ff; }
+.gv-sect.is-map { --area: #f0d8a0; }
+
+/* FOUR CORNERS OUT OF ONE SPRITE. The painting is drawn with its corner at the TOP-LEFT, so the other
+   three are that same file mirrored -- which is why the brief asked for a symmetrical L. */
+.gv-sect::before, .gv-sect::after,
+.gv-sect-trim::before, .gv-sect-trim::after {
+    content: ""; position: absolute; width: 21px; height: 21px; pointer-events: none; opacity: 0.9;
+    background: url("/images/grove/ui-corner.webp") center / contain no-repeat; }
+.gv-sect::before { top: 5px; left: 5px; }
+.gv-sect::after { top: 5px; right: 5px; transform: scaleX(-1); }
+.gv-sect-trim::before { bottom: 5px; left: 5px; transform: scaleY(-1); }
+.gv-sect-trim::after { bottom: 5px; right: 5px; transform: scale(-1); }
+
+/* THE NAME BOARD. Pulled out past the panel padding so the plank spans the full width of the panel and
+   its rope caps land on the panel edge, which is what makes it read as fixed TO the board rather than
+   floating on it. */
+.gv-sect > h4 { position: relative; margin: 0 0 12px; min-height: 52px;
+    display: flex; align-items: center; gap: 9px; padding: 7px 10px;
+    border-style: solid; border-width: 0 26px; border-image-source: url("/images/grove/slab-plank.webp");
+    border-image-slice: 0 150 fill; border-image-repeat: stretch;
+    font-size: 0.92rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    /* ⚠️ DARK INK ON PALE WOOD. The plank is light grey; the cream the rest of this screen is set in
+       would be invisible on it, and a text-shadow does not rescue a 1.2:1 pairing. */
+    color: #22190f; text-shadow: 0 1px 0 rgba(255,255,255,0.28);
+    /* A long title loses size before it loses the board it is written on. */
+    min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.gv-sect-ico { width: 38px; height: 38px; flex: none; object-fit: contain; object-position: 50% 100%;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.55)); }
+/* The sub-count rides the board as its own pressed-in plate, in the area's colour. */
+.gv-sect > h4 i { margin-left: auto; flex: none; font-style: normal; font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.08em; padding: 4px 10px; border-radius: 999px;
+    color: var(--area); background: rgba(14,16,11,0.82); text-shadow: none;
+    border: 1px solid rgba(0,0,0,0.5); }
+
+/* The cards inside an area take its colour, faintly, so the hue reaches past the heading. */
+.gv-sect .gv-slot { border-color: color-mix(in srgb, var(--area) 26%, rgba(255,255,255,0.10)); }
+.gv-sect .gv-slot span { color: var(--area); }
+
 .gv-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
 .gv-slot { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 10px; cursor: pointer;
     text-align: left; font: inherit; color: #efe7d8; background: rgba(255,255,255,0.045);
@@ -1271,8 +1404,7 @@ export const GROVE_CSS = `
 /* A tool not yet made: shown so the ladder is visible before you can climb it. */
 .gv-slot.is-dim { opacity: 0.55; }
 .gv-belt { color: #9fe08a !important; }
-.gv-tablet { padding: 14px; border-radius: 12px; background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.10); }
+
 .gv-tablet ul { margin: 8px 0 0; padding-left: 18px; font-size: 0.82rem; color: #cfc6b6; }
 
 /* ── THE WORKBENCH ───────────────────────────────────────────────────────────────────────────── */
@@ -1391,12 +1523,7 @@ export const GROVE_CSS = `
    and the opening is staggered because a reward that arrives already complete was never revealed.
 
    NO BACKTICKS IN THESE COMMENTS -- template literal. */
-.gv-shelf { padding: 13px; border-radius: 14px;
-    background: linear-gradient(180deg, rgba(155,227,106,0.14), rgba(0,0,0,0.3));
-    border: 1px solid rgba(155,227,106,0.32); }
-.gv-shelf h3 { margin: 0 0 9px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.16em;
-    text-transform: uppercase; color: #9be36a; }
-.gv-shelf ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.gv-shelf { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
 .gv-chest button { width: 100%; display: flex; align-items: center; gap: 11px; padding: 8px 10px;
     border-radius: 11px; background: rgba(0,0,0,0.34); border: 1px solid rgba(255,255,255,0.09);
     color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -1500,7 +1627,7 @@ export const GROVE_CSS = `
     100% { transform: scale(1); box-shadow: 0 0 0 rgba(224,168,60,0); }
 }
 
-.gv-bench2 { display: flex; flex-direction: column; gap: 12px; }
+.gv-bench2 { display: flex; flex-direction: column; }
 
 .gv-bh { display: flex; align-items: baseline; gap: 10px;
     padding: 12px 14px; border-radius: 12px;
