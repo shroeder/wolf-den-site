@@ -190,7 +190,7 @@ const PET_LOST = 30;
 
 export default function GroveScene({
     zone, seed, bonuses, stats, heroArt, petArt, belt, labScene,
-    onSettle, onBoss, onLeave, onDeath, onTravel, onPanel, paused = false,
+    onSettle, onBoss, onLeave, onDeath, onTravel, onPanel, paused = false, unlockedN = 1,
 }) {
     const hostRef = useRef(null);
     const worldLayerRef = useRef(null);
@@ -828,6 +828,15 @@ export default function GroveScene({
                 // "Onward" is only for zone twelve, where there is nowhere further to name.
                 const nextZone = GROVE_ZONES.find((z) => z.n === zone.n + 1);
                 fireHerald("The way is open", nextZone?.name || "Onward", "way");
+                // ⚠️ AND BANK IT NOW, OR THE DOOR STAYS SHUT FOR UP TO A RESPAWN WINDOW. The door is
+                // gated on the server's unlocked_n, which only moves on a settle -- so without this
+                // flush the player watches the way open, hears it open, and then finds it locked for
+                // another forty-five seconds. Fire and forget: the kills are spliced out of the log
+                // by the call, so a failure cannot double-claim them and the next settle carries on.
+                if (wd.killLog.length) {
+                    const ate = wd.eaten; wd.eaten = {};
+                    Promise.resolve(onSettle?.(wd.killLog.splice(0), ate)).catch(() => {});
+                }
             }
 
             wd.combo = now < wd.comboUntil ? wd.combo + 1 : 1;
@@ -1903,8 +1912,21 @@ export default function GroveScene({
                 {/* ⚠️ BEFORE THE CREATURES AND THE HERO, so a door never paints over something you need
                     to hit. Document order is the whole stacking rule in this layer. */}
                 {world.doors.map((dr) => {
-                    const locked = dr.side === "on" && killsHere < zone.toUnlock;
-                    const need = Math.max(0, zone.toUnlock - killsHere);
+                    // ── ⚠️ LOCKED BY WHAT THE SERVER WILL ALLOW, NOT BY WHAT WE HAVE COUNTED ──────
+                    // groveEnter refuses any zone past unlocked_n. This used to read killsHere < toUnlock
+                    // instead -- the client's own optimistic tally, which includes kills the server has
+                    // not banked yet and kills the rolling ceiling may trim. The two disagree exactly
+                    // when it matters, and the result was an open-looking portal that answered "That one
+                    // is still closed." Luke: "the portal keeps showing it can go through even when I
+                    // dont have enough."
+                    //
+                    // The counter above still runs on the optimistic number, because that is a progress
+                    // readout and should move on the kill. The DOOR is a rule, and a rule has to match
+                    // the thing enforcing it.
+                    const locked = dr.side === "on" && dr.to > unlockedN;
+                    // What is still owed, floored at one: if the server has not opened the way, there is
+                    // at least one more kill to bank even when the local tally has already got there.
+                    const need = Math.max(1, zone.toUnlock - killsHere);
                     return (
                         <button key={dr.side} type="button"
                             className={`gv-door${locked ? " is-locked" : ""}${

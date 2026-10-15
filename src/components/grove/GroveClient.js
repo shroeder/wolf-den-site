@@ -520,6 +520,14 @@ export default function GroveClient({ initial }) {
             <div className="gv">
                 <GroveScene
                     zone={session.zone} seed={session.seed} bonuses={session.bonuses}
+                    // ⚠️ THE DOOR'S GATE IS THE SERVER'S, NOT THE CLIENT'S KILL COUNT. groveEnter refuses
+                    // any zone past unlocked_n, and the door used to decide for itself from local kills --
+                    // so a count the server had not banked yet (the settle still in flight, or trimmed by
+                    // the kill ceiling) painted an open portal that then answered "That one is still
+                    // closed." Handing the scene the same number the server checks makes the picture and
+                    // the rule the same thing. settle() calls refresh(), so this lands as soon as the
+                    // kills are banked.
+                    unlockedN={Number(st?.unlockedN) || 1}
                     stats={stats} heroArt={session.heroArt || st?.heroArt || null}
                     petArt={session.petArt || st?.petArt || null}
                     belt={beltNow} onSettle={settle} onBoss={bossKill} onLeave={leave}
