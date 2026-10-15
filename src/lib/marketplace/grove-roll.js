@@ -75,6 +75,37 @@ const span = ([lo, hi], r) => Math.round(lo + (hi - lo) * r);
  * @param {object} bonus   emblem-derived multipliers: { rarityFind, emblemFind }
  * @returns {{parts: object, emblem: string|null, gold: number, chest: string|null, xp: number}}
  */
+// ── WHAT A KILL IS WORTH ────────────────────────────────────────────────────────────────────────────────────
+// Luke: "I think the grove probably gives a little too much EXP, including the bosses and enemies."
+//
+// It was a lot more than a little, and the reason is that the divisors were set against the creature's HEALTH
+// without ever being compared to what anything else in the game pays. Measured against the last seven days of
+// mkt_xp_event:
+//
+//   a rootrat    770 hp / 12  =    64 xp   -- an ARENA WIN pays 67, a fishing catch 66, a mining trip 66
+//   deepest foe 1460 hp / 12  =   122 xp
+//   Glutmaw   59,000 hp / 40  = 1,475 xp   -- a DELVE RUN pays 225, a raid 287, an xp potion 1,311
+//   zone 12  180,000 hp / 40  = 4,500 xp
+//
+// A rootrat is the cheapest action in the game -- there are fifteen to thirty of them, they replenish every
+// forty-five seconds, and they do not fight back in zone one -- and each one paid what winning an arena bout
+// pays. That is roughly 77,000 xp an hour in zone one and 146,000 at depth, against the game's top earner
+// making 212,438 in a WEEK from everything else combined.
+//
+// ⚠️ THE BAND TO AIM AT IS THE OTHER REPEATABLE LOOPS, NOT A NUMBER SOMEBODY LIKES. craft_combine pays 9.1
+// per event, harvest 11.1, salvage 11.2, a sail wave 13.3, a town duel 17.8. Those are the things a player
+// does hundreds of times, which is exactly what a Grove kill is -- and unlike a daily, this loop has no cap
+// at all. See [[economy-nerf-measure-daily-total]]: the per-event number only matters through how often it
+// can be repeated.
+//
+// A boss is a different animal: once per zone, behind a kill count and a thirty-minute cooldown. Its peers
+// are the delve run (225) and the raid (287), and it should sit above them and scale with depth.
+//
+// Both are single constants on purpose. If these are still wrong, they are wrong by a multiplier and the fix
+// is one number, not a formula.
+const XP_PER_FOE_HP = 96;    // 770hp -> 8 xp,  1460hp -> 15 xp
+const XP_PER_BOSS_HP = 200;  // 59k   -> 295,   180k   -> 900
+
 export function rollKill(foe, seed, index, bonus = {}) {
     const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0 };
     if (!foe) return out;
@@ -105,7 +136,7 @@ export function rollKill(foe, seed, index, bonus = {}) {
     // Small, flat, and deliberately boring. Luke: "small amounts of exp are fine."
     // ⚠️ Whoever grants this MUST pass `gold: 0` to awardXp — it pays gold 1:1 with points otherwise, which
     // on a repeatable kill loop is a money printer. See awardxp-gold-tracks-xp-landmine.
-    out.xp = Math.max(1, Math.round((foe.hp || 10) / 12));
+    out.xp = Math.max(1, Math.round((foe.hp || 10) / XP_PER_FOE_HP));
     return out;
 }
 
@@ -150,7 +181,7 @@ export function rollBoss(boss, zoneN, seed, index, bonus = {}, hyperChance = 0, 
         out.hyper = pickHyper(zoneN, r(), hyperTable);
     }
 
-    out.xp = Math.max(4, Math.round((boss.hp || 100) / 40));
+    out.xp = Math.max(4, Math.round((boss.hp || 100) / XP_PER_BOSS_HP));
     return out;
 }
 

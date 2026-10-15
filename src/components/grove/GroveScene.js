@@ -1682,7 +1682,20 @@ export default function GroveScene({
         const w = worldRef.current;
         if (w?.killLog?.length) {
             const ate = w.eaten; w.eaten = {};
-            await onSettle?.(w.killLog.splice(0), ate);
+            // ⚠️ A FAILED SETTLE MUST NOT EAT THE TAP. This await used to be unguarded, so any rejection
+            // -- a dropped request on shop wifi, a 500, a timeout -- threw out of the handler before
+            // onPanel ran and the button did nothing at all. No error, no feedback, just a dock that
+            // ignores you, which is half of what was reported. The settle exists to make the panel open
+            // onto FRESH state; failing it is a reason to show slightly stale parts, never a reason to
+            // refuse to open the backpack.
+            //
+            // The kills are already spliced out of the log by the call, so a rejection does not
+            // double-claim them either: they are gone from the client's list whichever way this goes.
+            try {
+                await onSettle?.(w.killLog.splice(0), ate);
+            } catch {
+                /* open anyway */
+            }
         }
         onPanel?.(kind);
     }, [onSettle, onPanel]);

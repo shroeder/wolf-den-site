@@ -85,6 +85,29 @@ export default function GroveClient({ initial }) {
     // stylesheet is written around actually holds.
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); }, []);
+
+    // ── ⚠️ AND IN NATIVE FULL SCREEN, document.body IS THE WRONG PARENT ─────────────────────────
+    // Luke: "when I click the buttons on the bottom when I'm running around in the grove, it doesn't
+    // open up the interface as I'd expect it to. Even if you're full screen, it should pop up the
+    // interface that you can craft and look at your backpack and look at the map."
+    //
+    // The note above is right that the sheet has to escape the page tree -- but it escaped one level
+    // too far. GroveScene calls requestFullscreen on its own host, and a browser in native full screen
+    // paints ONLY that element's subtree. The sheet, portalled to body, is its SIBLING: present in the
+    // DOM, correct in the stylesheet, and never drawn. Nothing errors and nothing is logged; the button
+    // simply does nothing, which is exactly what was reported.
+    //
+    // So the portal follows the full-screen element when there is one and falls back to body when there
+    // is not. Tracked as state rather than read at render time because entering full screen does not
+    // re-render this component on its own -- the value would be read once, while still null, and stay
+    // wrong for the whole session.
+    const [fsHost, setFsHost] = useState(null);
+    useEffect(() => {
+        const onChange = () => setFsHost(document.fullscreenElement || null);
+        onChange();
+        document.addEventListener("fullscreenchange", onChange);
+        return () => document.removeEventListener("fullscreenchange", onChange);
+    }, []);
     const router = useRouter();
     const stripRef = useRef(null);
 
@@ -550,7 +573,7 @@ export default function GroveClient({ initial }) {
                         {sheetNode}
                         <style>{GROVE_CSS}</style>
                     </div>
-                ), document.body) : null}
+                ), fsHost || document.body) : null}
                 {popNode}
                 <style>{GROVE_CSS}</style>
             </div>
