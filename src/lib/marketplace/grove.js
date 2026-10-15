@@ -718,7 +718,18 @@ export async function groveCraft(buyerId, recipeId) {
     }
 
     await trackActivity(buyerId, "grove_craft", { recipe: recipe.id, kind: recipe.kind }).catch(() => {});
-    return { ok: true, made: recipe.id, kind: recipe.kind, name: recipe.name };
+    // ⚠️ WHAT IT COST COMES BACK WITH WHAT IT MADE. The craft used to answer with a name and nothing
+    // else, so the screen could say "Made Moss Poultice" and not what had just left the bag -- a
+    // system that silently eats sixteen parts and reports four words. The spent array is the exact list
+    // the transaction decremented, so the panel can show the trade rather than assert it.
+    return {
+        ok: true, made: recipe.id, kind: recipe.kind, name: recipe.name,
+        spent: spent.map(([part, n]) => ({ part, n })),
+        makes: Number(recipe.makes) || null,
+        adds: Number(recipe.adds) || null,
+        tier: Number(recipe.tier) || null,
+        slot: recipe.slot || null,
+    };
 }
 
 /**

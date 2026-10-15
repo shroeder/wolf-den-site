@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt } from "@/lib/marketplace/grove-catalog.js";
+import GroveBench from "@/components/grove/GroveBench";
 import { GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { MAP_LAYOUT, mapSpot, nodeArt, trailPath } from "@/lib/marketplace/grove-map.js";
@@ -426,38 +427,10 @@ export default function GroveClient({ initial }) {
 
                 {/* ── THE WORKBENCH ────────────────────────────────────────────────────────────────── */}
                 {panel === "bench" ? (
-                    <div className="gv-bench">
-                        <p className="muted">A recipe appears once you have found every part it needs — even if you dropped them.</p>
-                        {GROVE_RECIPES.filter((r) => known.has(r.id)).map((r) => {
-                            const ready = canCraft(r, st.pack);
-                            const built = (st.packsBuilt || []).includes(r.id) || (st.banksBuilt || []).includes(r.id);
-                            return (
-                                <div key={r.id} className={`gv-recipe${ready && !built ? " is-ready" : ""}`}>
-                                    <div>
-                                        <b>{r.name}</b>
-                                        {r.blurb ? <p>{r.blurb}</p> : null}
-                                        <ul>
-                                            {Object.entries(r.parts).map(([p, n]) => (
-                                                <li key={p} className={(st.pack?.[p] || 0) >= n ? "is-have" : ""}>
-                                                    <PartIcon id={p} size={20} />
-                                                    {partName(p)} <span>{st.pack?.[p] || 0}/{n}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                    <button type="button" disabled={!ready || built}
-                                        onClick={async () => {
-                                            const d = await post({ action: "craft", recipe: r.id });
-                                            setNote(d?.ok ? `Made ${d.name}` : "Couldn't make that.");
-                                            refresh();
-                                        }}>
-                                        {built ? "Built" : ready ? "Craft" : "Not yet"}
-                                    </button>
-                                </div>
-                            );
-                        })}
-                        {!known.size ? <p className="muted">Nothing discovered yet.</p> : null}
-                    </div>
+                    <GroveBench
+                        st={st} known={known} partName={partName} PartIcon={PartIcon}
+                        post={post} refresh={refresh} setNote={setNote}
+                    />
                 ) : null}
 
                 {/* ── EMBLEMS ──────────────────────────────────────────────────────────────────────── */}

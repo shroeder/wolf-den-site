@@ -1247,6 +1247,117 @@ export const GROVE_CSS = `
 .gv-tablet ul { margin: 8px 0 0; padding-left: 18px; font-size: 0.82rem; color: #cfc6b6; }
 
 /* ── THE WORKBENCH ───────────────────────────────────────────────────────────────────────────── */
+/* ── THE WORKBENCH ────────────────────────────────────────────────────────────────────────────
+   Luke: "Crafting is very ghetto, needs full pass of grove crafting dopamine thoughtfulness and
+   accountability to user."
+
+   The old .gv-bench was a stack of plain rows. What this adds is RANK: a ready recipe is lit from the
+   left with a gold rail and its own ground, an impossible one recedes, and a built one is struck
+   through in grey. The player should be able to find what they can make without reading a word.
+
+   NO BACKTICKS IN THESE COMMENTS -- this is a template literal. See the header of this file. */
+.gv-bench2 { display: flex; flex-direction: column; gap: 12px; }
+
+.gv-bh { display: flex; align-items: baseline; gap: 10px;
+    padding: 12px 14px; border-radius: 12px;
+    background: linear-gradient(180deg, rgba(224,168,60,0.14), rgba(0,0,0,0.22));
+    border: 1px solid rgba(224,168,60,0.26); }
+.gv-bh b { display: block; font-size: 1.04rem; color: #fff6df; }
+.gv-bh span { display: block; margin-top: 3px; font-size: 0.76rem; color: #9aa08f; line-height: 1.45; }
+
+.gv-recs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+
+/* The rail on the left is the whole ranking signal: gold means go. */
+.gv-rec { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+    padding: 12px; border-radius: 12px;
+    background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: inset 3px 0 0 rgba(255,255,255,0.10); }
+.gv-rec.is-ready { background: linear-gradient(90deg, rgba(224,168,60,0.17), rgba(255,255,255,0.04) 60%);
+    border-color: rgba(224,168,60,0.44); box-shadow: inset 3px 0 0 #e0a83c, 0 6px 18px rgba(224,168,60,0.13); }
+.gv-rec.is-built { opacity: 0.55; box-shadow: inset 3px 0 0 rgba(255,255,255,0.18); }
+
+.gv-rec-face { width: 54px; height: 54px; flex: none; display: grid; place-items: center;
+    border-radius: 11px; background: rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.07); }
+.gv-rec-face svg { width: 30px; height: 30px; color: #cfc6b6; }
+.gv-rec.is-ready .gv-rec-face { background: rgba(224,168,60,0.16); border-color: rgba(224,168,60,0.4); }
+.gv-rec.is-ready .gv-rec-face svg { color: #ffd166; }
+.gv-rec-face img { object-fit: contain; }
+
+.gv-rec-body { min-width: 0; }
+.gv-rec-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gv-rec-top b { font-size: 0.98rem; color: #fff6df; }
+.gv-tag { font-style: normal; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 3px 7px; border-radius: 999px;
+    background: rgba(255,255,255,0.08); color: #9aa08f; }
+.gv-tag.is-go { background: rgba(224,168,60,0.22); color: #ffd166; }
+.gv-tag.is-done { background: rgba(67,196,107,0.18); color: #7ddc9b; }
+
+/* ⚠️ THE PAYOFF LINE IS THE ACCOUNTABILITY, AND IT OUTRANKS THE FLAVOUR TEXT. What a thing DOES, in
+   numbers, above what it is like. The blurb used to be the only line here. */
+.gv-rec-pay { margin: 5px 0 0; font-size: 0.82rem; color: #e0a83c; font-weight: 600; line-height: 1.4; }
+.gv-rec-blurb { margin: 3px 0 0; font-size: 0.78rem; color: #8f968a; line-height: 1.4; font-style: italic; }
+
+.gv-cost { list-style: none; margin: 9px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 5px; }
+.gv-cost li { display: flex; align-items: center; gap: 5px; padding: 4px 8px 4px 5px;
+    border-radius: 999px; font-size: 0.74rem;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); }
+.gv-cost li.is-have { border-color: rgba(67,196,107,0.34); }
+.gv-cost li.is-short { border-color: rgba(224,91,106,0.4); background: rgba(224,91,106,0.1); }
+.gv-cost-n { font-weight: 800; color: #fff6df; font-variant-numeric: tabular-nums; }
+.gv-cost li.is-short .gv-cost-n { color: #ff9c8a; }
+.gv-cost-name { color: #9aa08f; }
+.gv-cost li em { font-style: normal; font-weight: 700; color: #ff9c8a; }
+.gv-cost :global(img) { width: 18px; height: 18px; object-fit: contain; }
+
+.gv-rec-go { flex: none; pointer-events: auto; cursor: pointer; font: inherit;
+    padding: 11px 16px; border-radius: 999px; font-weight: 800; font-size: 0.84rem;
+    color: #9aa08f; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); }
+.gv-rec.is-ready .gv-rec-go { color: #1a1403; border: none;
+    background: linear-gradient(180deg, #ffd166, #e0a83c);
+    box-shadow: 0 6px 18px rgba(224,168,60,0.34); }
+.gv-rec-go:disabled { cursor: default; }
+
+/* ── THE RESULT ───────────────────────────────────────────────────────────────────────────────
+   Both halves of the trade on one card: what arrived, and underneath it what left. A toast can
+   report a name; it can never report a cost, which is the thing a player needs to see to trust the
+   system enough to spend twenty minutes of parts on it again. */
+/* ⚠️ ABOVE THE DOCK. The dock sits over the panel by design and kept floating on top of the
+   result card, so the moment that is supposed to own the screen had four buttons punched
+   through it. 1200 clears every chrome layer this feature has. */
+.gv-made { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center;
+    background: rgba(4,6,4,0.76); padding: 18px;
+    animation: gvMadeIn 220ms ease-out both; }
+.gv-made-card { width: min(380px, 100%); text-align: center; padding: 22px 20px 18px;
+    border-radius: 18px; border: 1px solid rgba(224,168,60,0.42);
+    background: radial-gradient(120% 90% at 50% 0%, rgba(224,168,60,0.2), transparent 62%), #14170f;
+    box-shadow: 0 24px 70px rgba(0,0,0,0.7);
+    animation: gvMadePop 420ms cubic-bezier(.16,1,.3,1) both; }
+.gv-made-kick { display: block; font-style: normal; font-size: 0.64rem; font-weight: 800;
+    letter-spacing: 0.26em; text-transform: uppercase; color: #e0a83c; }
+.gv-made-name { display: block; margin-top: 4px; font-size: 1.5rem; line-height: 1.15; color: #fff6df; }
+.gv-made-face { margin: 14px auto 10px; width: 112px; height: 112px; display: grid; place-items: center;
+    border-radius: 20px; background: rgba(224,168,60,0.13); border: 1px solid rgba(224,168,60,0.3); }
+.gv-made-face svg { width: 62px; height: 62px; color: #ffd166; }
+.gv-made-face img { object-fit: contain; }
+.gv-made-pay { margin: 0 0 14px; font-size: 0.88rem; color: #e0a83c; font-weight: 600; }
+.gv-made-cost { margin-top: 12px; color: #8f968a; }
+.gv-made-spent { list-style: none; margin: 8px 0 0; padding: 0;
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.gv-made-spent li { display: flex; align-items: center; gap: 5px; padding: 5px 9px 5px 6px;
+    border-radius: 999px; font-size: 0.76rem;
+    background: rgba(0,0,0,0.34); border: 1px solid rgba(255,255,255,0.08); }
+.gv-made-spent span { font-weight: 800; color: #ff9c8a; font-variant-numeric: tabular-nums; }
+.gv-made-spent em { font-style: normal; color: #9aa08f; }
+.gv-made-spent :global(img) { width: 20px; height: 20px; object-fit: contain; }
+.gv-made-card button { margin-top: 18px; cursor: pointer; font: inherit; font-weight: 800;
+    padding: 12px 30px; border-radius: 999px; border: none; color: #1a1403;
+    background: linear-gradient(180deg, #ffd166, #e0a83c); }
+@keyframes gvMadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gvMadePop {
+    0% { opacity: 0; transform: scale(0.88) translateY(14px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 .gv-bench { display: flex; flex-direction: column; gap: 10px; }
 .gv-recipe { display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 12px;
     background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.10); }
