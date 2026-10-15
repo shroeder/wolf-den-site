@@ -90,6 +90,55 @@ export function knockSound({ candy = 5, trick = false, sweet = false, chest = fa
     }
 }
 
+// ── THE SKELETON COMING OUT OF THE BUCKET ────────────────────────────────────────────────────────────────
+// ⚠️ IT CANNOT BE THE KNOCK SOUND. The rarest thing in the event was playing the same two knuckles on wood as
+// the other seventeen porches, which is the audio version of the thing the seasonal-reskin rule is about: the
+// moment is only a moment if it does not sound like the ordinary case with more of it.
+//
+// Three parts, in the order the eye sees them: the pail rattling as something inside realises it is caught,
+// the CLATTER of a skeleton coming out of a bucket, and a scatter of bones receding as he bolts.
+//
+// The clatter is woodblock, not noise. A burst of filtered noise is a crash — a box being dropped — whereas
+// bones are a handful of short, dry, pitched knocks landing on top of each other at slightly wrong intervals.
+// Hence the prime-ish spacing and the detune: anything evenly spaced reads as a drum roll.
+export function snatcherSound() {
+    const b = ensureBus();
+    if (!b) return;
+    // The pail, rocking harder. Low, hollow, two bumps.
+    tone({ freq: 150, to: 60, type: "sine", at: 0, dur: 0.1, gain: 0.2, bus: b });
+    tone({ freq: 170, to: 70, type: "sine", at: 0.09, dur: 0.1, gain: 0.22, bus: b });
+    // OUT. A short upward whoop under the clatter so the burst has a direction — up.
+    tone({ freq: 220, to: 760, type: "triangle", at: 0.19, dur: 0.22, gain: 0.12, bus: b });
+    const BONES = [0.2, 0.237, 0.268, 0.311, 0.344, 0.392, 0.431, 0.49];
+    BONES.forEach((at, i) => {
+        tone({ freq: 740 + (i % 4) * 180, type: "square", at, dur: 0.035, gain: 0.055, detune: (i * 37) % 90, bus: b });
+        noise({ at, dur: 0.03, gain: 0.03, type: "highpass", freq: 3200, bus: b });
+    });
+}
+
+/** He gives up and dumps the sack: a soft thud, then an avalanche of wrappers that keeps going. */
+export function snatcherDropSound() {
+    const b = ensureBus();
+    if (!b) return;
+    tone({ freq: 120, to: 48, type: "sine", at: 0, dur: 0.16, gain: 0.26, bus: b });
+    // The avalanche. Longer and wider than a doorstep handful, because this IS the difference between four
+    // sweets and a thousand — the ear counts duration, not volume.
+    noise({ at: 0.04, dur: 0.72, gain: 0.1, type: "highpass", freq: 2200, sweepTo: 5600, bus: b });
+    for (let i = 0; i < 14; i += 1) {
+        const at = 0.06 + (i / 14) ** 1.25 * 0.62;
+        tone({ freq: PENT[(i * 3 + 1) % PENT.length] * (i > 8 ? 2 : 1), type: "triangle", at, dur: 0.12, gain: 0.07, bus: b });
+    }
+    // And the flourish, an octave apart, which every other payout in the plaza only gets a third of.
+    tone({ freq: 659.25, type: "triangle", at: 0.6, dur: 0.18, gain: 0.1, bus: b });
+    tone({ freq: 987.77, type: "triangle", at: 0.7, dur: 0.22, gain: 0.1, bus: b });
+    tone({ freq: 1318.5, type: "triangle", at: 0.8, dur: 0.34, gain: 0.09, bus: b });
+}
+
+/** A skeleton exploding out of a bucket, in your hand: one hard hit, then bones. */
+export function snatcherHaptic() {
+    Haptic.fire([0, 26, 40, 12, 30, 12, 26, 10, 22, 10, 60, 40]);
+}
+
 /**
  * The same event in your hand. Two taps for the knock, then a flutter for the sweets landing — so the pattern
  * has the SHAPE of the sound rather than being a single buzz pinned to it.

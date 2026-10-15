@@ -6,7 +6,7 @@ import * as Gi from "react-icons/gi";
 
 import ArenaClient from "@/components/ArenaClient";
 import GourdfatherStall from "@/components/GourdfatherStall";
-import { knockHaptic, knockSound, stopTownAudio } from "@/components/town/town-audio.js";
+import { knockHaptic, knockSound, snatcherDropSound, snatcherHaptic, snatcherSound, stopTownAudio } from "@/components/town/town-audio.js";
 import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
 import CoinCta from "@/components/CoinCta";
@@ -795,8 +795,11 @@ const BURST_MAX = 22;
 // the difference between them is barely a shape, and it is exactly enough that a handful reads as a HANDFUL.
 const BURST_ART = ["hw_candy", "hw_candy_b", "hw_candy_c"];
 
-function rollBurst(candy, chest) {
-    const n = Math.min(BURST_MAX, Math.max(BURST_MIN, Math.round((candy || 1) * BURST_PER_CANDY) + (chest ? 8 : 0)));
+// `max` overrides the ceiling for the one payout that is not a doorstep handful: the Snatcher tips a whole
+// SACK out, and a sack that throws the same twenty-two pieces as a four-candy porch is the picture telling
+// you it was an ordinary night. Nothing else passes it, so the cap still holds everywhere it should.
+function rollBurst(candy, chest, max = BURST_MAX) {
+    const n = Math.min(max, Math.max(BURST_MIN, Math.round((candy || 1) * BURST_PER_CANDY) + (chest ? 8 : 0)));
     return Array.from({ length: n }, (_, i) => {
         // Fired upward and outward in a fan, never straight down: the pail is on the ground, so the whole
         // spray belongs above it. -150deg..-30deg is that fan, with the edges of it weaker so the shape is a
@@ -830,19 +833,36 @@ function rollBurst(candy, chest) {
 // flips, so the uneven timing is also what stops the flip landing on a metronome.
 // ⚠️ dx IS A SHARE OF THE STREET AND HAS TO BE READ AS A SHARE OF THE SCREEN. WORLD_W is ~4,841px, so ONE
 // PERCENT IS ~48px — and the camera follows your hero, not him. A phone shows 390px of that street, which is
-// 8% of the world: the first draft of this ran him 14%, i.e. nearly TWO SCREENS, so he would have sprinted
-// out of frame and the whole animation would have been four seconds of empty cobbles. These are sized off
-// the FRAME instead — ~32%, ~40% and ~20% of a phone viewport — which is a real dash on a phone and still
-// legible on a desktop, where the same percentages are a smaller share of a wider window.
-// And the TIMES are a speed, not a mood: 2.6% of the street is ~126px, so 760ms is ~165px a second, which is
-// a sprite crossing its own width in under half a second. Slower than that and a panicking skeleton saunters.
-const SNATCH_POP_MS = 520;      // wedged in the pail, kicking, then OUT
+// 8% of the world: the first draft ran him 14%, i.e. nearly TWO SCREENS, so he would have sprinted out of
+// frame and the whole thing would have been four seconds of empty cobbles.
+//
+// ⚠️ THEN THE SECOND DRAFT UNDERSHOT, WHICH IS WORSE, AND ONLY THE FILM SHOWED IT. At 2.6% he covered 125px
+// in three quarters of a second — so the sprite bobbed, the legs cycled, and he read as HOVERING rather than
+// running, because the distance a thing covers IS the speed the eye measures. These are ~42%, ~62% and ~30%
+// of a phone viewport at roughly 240px a second, which is a sprite crossing its own body-length three times
+// a second: unmistakably a sprint, and still inside the frame at both ends.
+// ⚠️ SO THE LEGS ARE MEASURED IN FRAMES, NOT IN STREET. `dx` here is a share of what the player can SEE —
+// 0.42 is "most of the way across their screen" on any device — and runSnatcher converts it to street
+// percent against the viewport at the moment he comes out. A fixed street percentage is a share of the
+// frame in disguise, and it is only correct at the one width it was tuned on: 3.4% of the street is 42% of
+// a 390px phone and 15% of a 1000px desktop, so the same animation that sprints on a phone is a shuffle on
+// a laptop, and the dash that carries him off the side of the screen ends with him fading out in the middle
+// of the road. Same mistake the Grove made with world units when the camera zoomed.
+const SNATCH_JOLT_MS = 190;     // the pail jumps — something in there has realised it is caught
+const SNATCH_POP_MS = 430;      // and out he comes, up and forward, landing in front of the porch
 const SNATCH_RUN = [
-    { dx: 2.6, ms: 760 },
-    { dx: -3.2, ms: 900 },
-    { dx: 1.6, ms: 560 },
+    { dx: 0.42, ms: 620 },
+    { dx: -0.62, ms: 880 },
+    { dx: 0.30, ms: 460 },
 ];
-const SNATCH_DROP_MS = 620;     // he drops the sack and legs it off-screen while the sweets are still in the air
+const SNATCH_DUMP_MS = 360;     // the sack goes over
+// Comfortably more than half a frame, so he is off the edge of the screen before he fades, at every width.
+const SNATCH_FLEE = { dx: 0.85, ms: 560 };
+// A sweet falls out of the sack this often while he runs. ⚠️ THIS IS THE LINE THAT EXPLAINS THE PAYOUT. A
+// skeleton running about is a skeleton running about; a skeleton running about SHEDDING SWEETS is where the
+// thousand candy comes from, said without a word of text — and it leaves a trail on the cobbles pointing
+// back at the pail, so the whole event is still legible a second after it ends.
+const SNATCH_TRAIL_MS = 105;
 
 const TREE_CLEAR = 4.2;
 const LAMP_CLEAR = 2.2;
@@ -1255,6 +1275,8 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // Him, while he is out: { x, flip, ms, out }. Null the rest of the time, which is almost always.
     const [snatch, setSnatch] = useState(null);
     const [snatchCard, setSnatchCard] = useState(null); // the payout, once he has gone: { candy, label }
+    // The sweets shaken out of the sack as he runs, left lying on the cobbles behind him.
+    const [crumbs, setCrumbs] = useState([]);
     // ⚠️ EVERY TIMER IN THE CHAIN IS HELD, because the chain outlives a tap by four seconds and a member who
     // walks into the Tavern mid-run unmounts the street underneath it. Left loose, each setTimeout would
     // fire setState on a dead component — and the last one in the chain hands out the prize card.
@@ -1498,37 +1520,76 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     const runSnatcher = useCallback((door, candy, label) => {
         const post = doorPosts.find((p) => p.id === door);
         const x0 = post?.x ?? 50;
-        const top = (post?.top ?? GROUND + 2.2) + 5.4;  // he runs in FRONT of the porch, nearer the camera
+        // ⚠️ HE RUNS IN THE FOREGROUND, NOT ON THE PORCH LINE, and that is legibility rather than polish.
+        // Filmed on the porch line he spent the middle second of his run inside the knot of the hero's
+        // avatar, their name tag and the nearest NPC. He was drawn on top of them, so not hidden exactly --
+        // but a white skeleton laid over a wolf and a farmer is a shape nobody can read. Down here he is the
+        // only thing in that band of the street and he crosses clean in front of everybody.
+        const top = Math.min((post?.top ?? GROUND + 2.2) + 11, GROUND + 14);
         snatchTimers.current.forEach(clearTimeout);
         snatchTimers.current = [];
         const hold = (fn, at) => snatchTimers.current.push(setTimeout(fn, at));
-        // Frame one: still in the bucket. The pail is gone from under him on the same frame he appears, so
-        // the eye reads one object turning into another rather than two objects briefly existing at once.
+        setCrumbs([]);
+        // One frame, as a percentage of the street. Everything he does is measured in these (see SNATCH_RUN),
+        // so the run is the same run on a phone and on a laptop instead of being the same number of pixels of
+        // a 4,800px street. Floored at a phone's share so a freak narrow window cannot shrink it to nothing.
+        const frame = Math.max(7, (viewportW / Math.max(1, WORLD_W)) * 100);
+        // ⚠️ HE IS MOUNTED BEFORE HE IS VISIBLE, with the pail still drawn over the top of him. The pail must
+        // not become the tipped one until the frame he actually bursts out -- the first cut marked the door
+        // knocked on tap, so the kicking pail turned into an empty tipped pail and THEN, 150ms later, a
+        // skeleton faded in beside it. On film that middle frame is a hole exactly where the surprise is:
+        // the thing you pressed vanished, and something unrelated arrived afterwards.
         setSnatch({ door, x: x0, top, flip: 1, ms: 0, out: false });
-        hold(() => setSnatch((s) => (s ? { ...s, out: true } : s)), 60);
+        snatcherSound();
+        snatcherHaptic();
+        hold(() => setSnatch((s) => (s ? { ...s, out: true } : s)), SNATCH_JOLT_MS);
+
         let x = x0;
-        let at = SNATCH_POP_MS;
+        let at = SNATCH_JOLT_MS + SNATCH_POP_MS;
+        let seed = 0;
         for (const leg of SNATCH_RUN) {
-            const nx = clamp(x + leg.dx, 3, 97);
+            const nx = clamp(x + leg.dx * frame, 3, 97);
             const flip = nx >= x ? 1 : -1;
-            const ms = leg.ms;
-            hold(() => setSnatch((s) => (s ? { ...s, x: nx, flip, ms } : s)), at);
-            at += ms;
+            const from = x;
+            const t0 = at;
+            hold(() => setSnatch((s) => (s ? { ...s, x: nx, flip, ms: leg.ms } : s)), at);
+            // The sweets coming out of the sack, dropped along the leg he is on. Positions are INTERPOLATED
+            // from the schedule rather than read off the element: the element's x is a CSS transition, so the
+            // DOM knows where he is and React does not -- and asking the DOM every 105ms during an animation
+            // is a layout read per sweet, mid-animation, which is the one place it costs.
+            for (let t = SNATCH_TRAIL_MS; t < leg.ms; t += SNATCH_TRAIL_MS) {
+                const px = from + (nx - from) * (t / leg.ms);
+                const id = (seed += 1);
+                hold(() => setCrumbs((c) => [...c.slice(-13), {
+                    id,
+                    x: px - flip * 0.18,                       // out of the sack, which is behind him
+                    top: top - 1.6,
+                    art: BURST_ART[id % BURST_ART.length],
+                    size: 11 + ((id * 7) % 6),
+                    drift: (id % 2 ? 1 : -1) * (6 + ((id * 3) % 10)),
+                }]), t0 + t);
+            }
+            at += leg.ms;
             x = nx;
         }
-        // The sack goes over. Reuses the doorstep's own explosion — same arcs, same keyframe, same sweets —
-        // at the spot he gave up on rather than at a pail, which is what the explicit x on `burst` is for.
+
+        // ⚠️ THE SACK GOES OVER. Twice the biggest doorstep burst, its own sound and its own shake. This one
+        // payout is worth two hundred and fifty doors, so it is the one that must not look like a door.
         hold(() => {
-            setBurst({ door, x, top: top - 3.4, at: Date.now(), bits: rollBurst(16, true) });
-            knockSound({ candy: 16, chest: true });
-            knockHaptic({ candy: 16, chest: true });
+            setBurst({ door, x, top: top - 3.4, at: Date.now(), bits: rollBurst(30, true, 44) });
+            snatcherDropSound();
+            knockHaptic({ candy: 20, chest: true });
         }, at);
+        // And then he is gone -- off the side of the frame at a sprint, which is the PICTURE of "it got away"
+        // that the card used to have to say in words.
+        hold(() => setSnatch((s) => (s ? { ...s, x: clamp(x + SNATCH_FLEE.dx * frame, 3, 110), flip: 1, ms: SNATCH_FLEE.ms, fled: true } : s)), at + SNATCH_DUMP_MS);
         hold(() => {
             setSnatch(null);
+            setCrumbs([]);
             setSnatchCard({ candy, label });
             if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
-        }, at + SNATCH_DROP_MS);
-    }, [doorPosts]);
+        }, at + SNATCH_DUMP_MS + SNATCH_FLEE.ms);
+    }, [doorPosts, viewportW, WORLD_W]);
 
     const knock = useCallback(async (door) => {
         if (knocking || knocked.has(door)) return;
@@ -2492,12 +2553,15 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         <>
                             {doorPosts.map((d) => {
                                 const done = knocked.has(d.id);
-                                // ⚠️ THE KICKING PAIL IS ONLY ON A DOOR YOU HAVE NOT KNOCKED, and it goes
-                                // the instant he is out — `knocked` is marked optimistically on tap, so the
-                                // legs vanish in the same frame the skeleton appears without waiting for the
-                                // server. And while he is running it must not come back: `snatch` outlives
-                                // the tap by four seconds.
-                                const kicking = legs.has(d.id) && !done && snatch?.door !== d.id;
+                                // ⚠️ THE KICKING PAIL SURVIVES THE TAP, AND ONLY UNTIL HE IS OUT. `knocked`
+                                // is marked optimistically the instant you press, so the obvious spelling —
+                                // "legs if not knocked" — swapped it for the empty tipped pail 190ms BEFORE
+                                // the skeleton existed. The surprise had a hole in the middle of it: the
+                                // thing you pressed disappeared, and a skeleton turned up afterwards. So the
+                                // legs stay for as long as he is still in there (`stuck`), jolting, and the
+                                // pail tips over on the exact frame he bursts out of it.
+                                const stuck = snatch?.door === d.id && !snatch.out;
+                                const kicking = (legs.has(d.id) && !done) || stuck;
                                 const pail = kicking
                                     ? art.hw_treat_legs?.url
                                     : done ? art.hw_treat_spent?.url : art.hw_treat_full?.url;
@@ -2505,7 +2569,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                     <button
                                         key={`door-${d.id}`}
                                         type="button"
-                                        className={`tw-door${kicking ? " is-kicking" : done ? " is-done" : ""}`}
+                                        className={`tw-door${kicking ? ` is-kicking${stuck ? " is-jolt" : ""}` : done ? " is-done" : ""}`}
                                         style={{ left: `${d.x}%`, top: `${d.top}%`, zIndex: kicking ? d.z + 20 : d.z }}
                                         disabled={done || knocking === d.id}
                                         onClick={(e) => { e.stopPropagation(); knock(d.id); }}
@@ -2530,9 +2594,26 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 the avatars — two AI-drawn frames of "the same skeleton" come back as two
                                 different skeletons). pointer-events none throughout; he is a cutscene, and a
                                 4-second cutscene you can accidentally tap is a 4-second blocked street. */}
+                            {/* The sweets shaken out of the sack as he goes. They land on the cobbles and
+                                stay there for the rest of the run, so the street is left with a trail
+                                pointing back at the pail he came out of. */}
+                            {crumbs.map((c) => (
+                                art[c.art]?.url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                        key={c.id}
+                                        className="tw-crumb"
+                                        src={art[c.art].url}
+                                        alt=""
+                                        draggable={false}
+                                        style={{ left: `${c.x}%`, top: `${c.top}%`, width: `${c.size}px`, height: `${c.size}px`,
+                                            "--drift": `${c.drift}px` }}
+                                    />
+                                ) : null
+                            ))}
                             {snatch ? (
                                 <span
-                                    className={`tw-snatch${snatch.out ? " is-out" : ""}`}
+                                    className={`tw-snatch${snatch.out ? " is-out" : ""}${snatch.fled ? " is-fled" : ""}`}
                                     style={{ left: `${snatch.x}%`, top: `${snatch.top}%`, transition: `left ${snatch.ms || 0}ms linear` }}
                                     aria-hidden="true"
                                 >
@@ -3530,23 +3611,25 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 style={{ width: 120, height: 120, objectFit: "contain", display: "block", margin: "0 auto",
                                     position: "relative", zIndex: 2, filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.6))" }} />
                         ) : null}
-                        <div className="tw-duel-verdict win" style={{ fontSize: "1.25rem", position: "relative", zIndex: 2 }}>He dropped the sack!</div>
-                        <div className="muted" style={{ margin: "2px 0 10px", fontSize: "0.82rem", position: "relative", zIndex: 2 }}>
-                            Something was wedged head-first in the pail at {snatchCard.label || "a doorstep"}. It got away — the sweets did not.
-                        </div>
-                        <div className="tw-door-got" style={{ justifyContent: "center", fontSize: "1.35rem", position: "relative", zIndex: 2 }}>
+                        {/* ⚠️ THE NUMBER IS THE CARD. The first cut led with a headline, then two lines of
+                            prose explaining what had just been animated at you for three and a half seconds
+                            — and that prose was the tell that the animation was not doing its job. It is
+                            doing it now: he spills sweets the whole way and then legs it off the side of the
+                            frame, so "it got away, the sweets did not" is a thing you watched rather than a
+                            thing you read. What is left is where it happened, and how much. */}
+                        <div className="tw-snatch-take" style={{ position: "relative", zIndex: 2 }}>
                             {art.hw_candy?.url ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img className="tw-candy-mark" src={art.hw_candy.url} alt="" draggable={false} style={{ width: 26, height: 26 }} />
+                                <img className="tw-candy-mark" src={art.hw_candy.url} alt="" draggable={false} style={{ width: 34, height: 34 }} />
                             ) : null}
                             +{Number(snatchCard.candy || 0).toLocaleString()}
                         </div>
-                        {/* ⚠️ THE ONE SENTENCE THAT HAS TO BE HERE. Every other candy payout in the event is
-                            trimmed by the 250 ceiling and the screens say so, so a member who has already
-                            capped out tonight will assume this one was trimmed too and that the number is a
-                            lie. It is not: see UNCAPPED_CANDY_RATES. */}
-                        <div className="muted" style={{ margin: "8px 0 2px", fontSize: "0.75rem", position: "relative", zIndex: 2 }}>
-                            Every last piece of it — the daily candy cap does not touch this one.
+                        <div className="tw-duel-verdict win" style={{ fontSize: "1.05rem", position: "relative", zIndex: 2 }}>He dropped the sack!</div>
+                        {/* The cap line stays, in small type, for one reason: every other candy payout in the
+                            event IS trimmed at 250 and the screens say so, so a member who capped out hours
+                            ago would otherwise assume this number is a lie. Six words, not a sentence. */}
+                        <div className="muted" style={{ margin: "2px 0 10px", fontSize: "0.78rem", position: "relative", zIndex: 2 }}>
+                            from the pail at {snatchCard.label || "a doorstep"} · no daily cap
                         </div>
                         <button type="button" className="tw-levelup-btn" onClick={() => setSnatchCard(null)}>Mine now</button>
                     </div>
@@ -3756,6 +3839,16 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    shiny glint for the opposite failure, where "barely visible" meant nobody ever found one. */
 .tw-door.is-kicking img { height: 58px; animation: snatchKick 1.15s ease-in-out infinite;
     filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6)) drop-shadow(0 0 11px rgba(190,230,255,0.5)); }
+/* The 190ms between your thumb and the skeleton: the pail stops rocking and starts FIGHTING. Without a
+   wind-up the burst has nothing to be the release of, and the whole beat reads as a thing appearing rather
+   than as a thing escaping. */
+.tw-door.is-jolt img { animation: snatchJolt .19s cubic-bezier(.3,1.4,.5,1) 1 both; }
+@keyframes snatchJolt {
+    0%   { transform: translateY(0) rotate(0deg) scale(1); }
+    40%  { transform: translateY(-11px) rotate(-14deg) scale(1.08, 0.94); }
+    75%  { transform: translateY(-4px) rotate(11deg) scale(0.96, 1.06); }
+    100% { transform: translateY(0) rotate(0deg) scale(1); }
+}
 @keyframes snatchKick {
     0%, 100% { transform: translateY(0) rotate(0deg); }
     18%      { transform: translateY(-4px) rotate(-7deg); }
@@ -3779,12 +3872,26 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     filter: drop-shadow(0 5px 7px rgba(0,0,0,0.6)) drop-shadow(0 0 12px rgba(190,230,255,0.45)); }
 .tw-snatch-pop { display: block; opacity: 0; }
 .tw-snatch.is-out .tw-snatch-pop { opacity: 1;
-    animation: snatchOut .52s cubic-bezier(.2,.8,.3,1.25) both, snatchRun .34s ease-in-out .52s infinite; }
+    animation: snatchOut .43s cubic-bezier(.2,.8,.3,1.2) both, snatchRun .3s ease-in-out .43s infinite; }
+/* ⚠️ THE ARC STARTS AT THE PAIL'S MOUTH, NOT AT HIS FEET. He is anchored eleven percent of the street
+   NEARER the camera than the pail he comes out of -- about 56px down on a phone -- so an arc that began at
+   his own position would be a skeleton appearing in the road in front of a bucket. Starting at -56px and
+   landing at 0 is the same thing the eye would draw: out of the mouth of the pail, up, and down into the
+   foreground. The overshoot past full size is the release of the jolt above. */
 @keyframes snatchOut {
-    0%   { transform: translateY(10px) scale(0.2); opacity: 0; }
-    30%  { opacity: 1; }
-    62%  { transform: translateY(-20px) scale(1.14); opacity: 1; }
-    100% { transform: translateY(0) scale(1); opacity: 1; }
+    0%   { transform: translate(-6px, -56px) scale(0.22); opacity: 0; }
+    22%  { opacity: 1; }
+    55%  { transform: translate(2px, -34px) scale(1.16); opacity: 1; }
+    100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+/* He is away. Not a fade -- a fade is a thing being switched off; this is a thing leaving, so the lean goes
+   with it and the shadow goes first, as the ground drops away behind him. */
+.tw-snatch.is-fled .tw-snatch-pop { animation: snatchRun .24s ease-in-out infinite, snatchGone .56s ease-in both; }
+.tw-snatch.is-fled::after { animation: none; opacity: 0; transition: opacity .3s ease; }
+@keyframes snatchGone {
+    0%   { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; }
 }
 /* The run itself: a bob with a lean in it. The lean is what the two-frame cycle would have bought, for the
    price of nothing and with no risk of the second drawing being a different skeleton. */
@@ -3792,6 +3899,32 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     0%, 100% { transform: translateY(0) rotate(-2.5deg); }
     50%      { transform: translateY(-6px) rotate(2.5deg); }
 }
+/* ── WHAT FALLS OUT OF THE SACK ───────────────────────────────────────────────────────────────────────
+   One sweet every 105ms while he runs, dropped behind him and left lying there. This is the only part of
+   the whole sequence that EXPLAINS anything: a skeleton running about is a skeleton running about, and a
+   skeleton running about shedding sweets is where a thousand candy came from -- said in pictures, and still
+   readable a second later as a trail on the cobbles pointing back at the pail.
+
+   Each one falls out at sack height, tumbles, bounces once and stays. z 290 is deliberately BELOW him, so
+   he runs in front of what he is dropping rather than behind it. */
+/* The take, on the card. Big enough to be the first thing read and the thing remembered -- four digits is
+   the entire point of the feature, and it was previously set in the same 1.35rem as a four-candy doorstep. */
+.tw-snatch-take { display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 2.5rem; font-weight: 900; line-height: 1.05; letter-spacing: -0.5px;
+    color: #ffd98a; text-shadow: 0 2px 0 rgba(0,0,0,0.45), 0 0 22px rgba(255,170,60,0.55);
+    margin: 6px 0 2px; }
+
+.tw-crumb { position: absolute; z-index: 290; pointer-events: none; object-fit: contain;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)) drop-shadow(0 0 6px rgba(255,180,70,0.45));
+    animation: snatchCrumb .52s cubic-bezier(.32,.66,.4,1) both; }
+@keyframes snatchCrumb {
+    0%   { transform: translate(-50%, -210%) scale(0.55) rotate(0deg); opacity: 0; }
+    18%  { opacity: 1; }
+    64%  { transform: translate(calc(-50% + var(--drift) * 0.72), -100%) scale(1) rotate(130deg); opacity: 1; }
+    80%  { transform: translate(calc(-50% + var(--drift) * 0.88), -126%) scale(1) rotate(168deg); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--drift)), -100%) scale(1) rotate(190deg); opacity: 1; }
+}
+
 /* He is drawn mid-air with both feet off the ground, which is right for a run and wrong for a street: with
    nothing under him he reads as pasted onto the picture. This is the contact -- it stays on the ground line
    while he bobs above it, which is the whole trick. */
