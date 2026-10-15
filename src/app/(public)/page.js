@@ -61,11 +61,11 @@ export default async function HomePage() {
                     <p>Gear up your hero, deal damage all week, and win real Wolf Den prizes — a physical raffle prize, in-game loot, and a loot chest for everyone who fights.</p>
                 </div>
                 <div className="just-in-cta-actions">
-                    <Link className="button primary" href="/marketplace/boss">
-                        Fight the Boss
+                    <Link className="button primary" href="/play">
+                        See the Game
                     </Link>
-                    <Link className="button" href="/marketplace">
-                        Enter the Marketplace
+                    <Link className="button" href="/marketplace/boss">
+                        Fight the Boss
                     </Link>
                 </div>
             </section>
