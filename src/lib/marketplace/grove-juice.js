@@ -325,7 +325,10 @@ export const FOE_BAR_LINGER_MS = 2600;
 //
 //   hit   apex 2.6 units — about the height of a rootrat, so it clears the body and no more
 //   crit  apex 4.5       — higher on purpose: the arc itself is part of what says this one was bigger
-export const POP_MS = { hit: 620, crit: 820, heal: 700, took: 760, loot: 850 };
+// ⚠️ A PROC HOLDS, IT IS NOT THROWN. A damage number is one of several on screen and gets out of the way
+// quickly; a proc is the only thing saying the player's own gear just fired, and it is rarer than a hit by
+// an order of magnitude. It rises straight, with no sideways drift, and stays long enough to be read.
+export const POP_MS = { hit: 620, crit: 820, heal: 700, took: 760, loot: 850, proc: 900 };
 export const POP_GRAVITY = 0.028;
 const POP_THROW = {
     hit: { vy: 0.38, vx: 0.17 },
@@ -333,6 +336,8 @@ const POP_THROW = {
     heal: { vy: 0.32, vx: 0.14 },
     took: { vy: 0.42, vx: 0.22 },
     loot: { vy: 0.20, vx: 0.07 },
+    // Straight up, no sideways throw: nothing about a proc should look like it was knocked loose by a blow.
+    proc: { vy: 0.30, vx: 0 },
 };
 
 export function makePop(kind, x, y, rand) {

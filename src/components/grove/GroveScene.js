@@ -685,7 +685,7 @@ export default function GroveScene({
         // spark and a dust mote are born and dead inside half a second, several per swing — rendering them
         // through state would re-render the entire zone a few times a second to draw things that never need
         // reconciling, because nothing ever updates one: it is created, it moves, it is removed.
-        const addPop = (kind, text, x, y, weight = null) => {
+        const addPop = (kind, text, x, y, weight = null, art = null) => {
             const layer = fxRef.current;
             if (!layer) return;
             const p = makePop(kind, x, y, w.rand);
@@ -700,7 +700,17 @@ export default function GroveScene({
             p.tilt = (w.rand() * 2 - 1) * (kind === "crit" ? 9 : 5);
             const el = document.createElement("span");
             el.className = `gv-num is-${kind}${weight?.big && kind !== "crit" ? " is-big" : ""}`;
-            el.textContent = text;
+            if (art) {
+                // Built by hand rather than with innerHTML: a part name is authored data today, but a
+                // label is exactly the kind of string that later arrives from somewhere else.
+                const img = document.createElement("img");
+                img.src = art;
+                img.alt = "";
+                el.appendChild(img);
+                el.appendChild(document.createTextNode(text));
+            } else {
+                el.textContent = text;
+            }
             layer.appendChild(el);
             p.node = el;
             w.pops.push(p);
@@ -730,6 +740,36 @@ export default function GroveScene({
                 w.sparks.push(s);
             }
         };
+        // ── ⚠️ A PROC IS AN EVENT, AND IT WAS WEARING A DAMAGE NUMBER'S CLOTHES ──────────────────
+        // Luke: "if something procs like haste it should be dopamine inducing."
+        //
+        // HASTE fired addPop("hit", "HASTE") -- the word rendered in the same cream as every ordinary hit,
+        // at the same size, drifting up alongside four actual damage numbers. The one moment the player's
+        // own gear did something arrived indistinguishable from the thing it was happening next to.
+        //
+        // This is its own object: it rides at the hero rather than at the target, it punches in wide and
+        // snaps, it carries a ring out from him, and it has its own colour per proc so two different
+        // procs are two different events rather than two words.
+        const procCall = (text, kind = "haste") => {
+            const layer = fxRef.current;
+            if (!layer) return;
+            const el = document.createElement("b");
+            el.className = `gv-proc is-${kind}`;
+            el.textContent = text;
+            layer.appendChild(el);
+            // Positioned by the same pop pipeline so it rides the camera and is cleaned up with everything
+            // else -- a hand-placed node here would be left behind by a zone swap.
+            const pr = makePop("proc", w.hero.x, w.hero.y + w.hero.h * 0.9, w.rand);
+            pr.born = w.sceneNow ? w.sceneNow() : performance.now();
+            pr.weight = 1;
+            pr.tilt = 0;
+            pr.node = el;
+            w.pops.push(pr);
+            // The ring is what makes it read as coming OUT of the hero rather than appearing above him.
+            shockwave(w.hero.x, w.hero.y + w.hero.h * 0.45, kind);
+            w.shake.add(TRAUMA.hit * 0.8);
+        };
+
         const shockwave = (x, y, kind) => {
             const layer = fxRef.current;
             if (!layer) return;
@@ -1051,6 +1091,12 @@ export default function GroveScene({
                     const px = foe.x - dir * foe.halfW * 0.6;
                     const py = foe.y + foe.h * 0.5;
                     burst(px, py, { crit: hit.crit, dir: -dir });
+                    // ⚠️ A CRIT GETS A RING AND AN ORDINARY HIT DOES NOT. Everything else separating the
+                    // two -- a longer flash, a harder stop, more trauma, a brighter number -- is a
+                    // DIFFERENCE IN DEGREE, and degrees stop reading once they are happening sixty times
+                    // a minute. The ring is the only thing on screen that an ordinary hit never does, so
+                    // it is the only part a player can catch without counting.
+                    if (hit.crit) shockwave(px, py, "crit");
                     // ⚠️ SIZED BY THE SHARE IT TOOK OFF, NOT BY THE RAW NUMBER. 400 is a huge hit on a
                     // rootrat and a scratch on the Heartwood Elder, so a flat threshold would call the
                     // scratch the big one. See popWeight.
@@ -1059,8 +1105,15 @@ export default function GroveScene({
                     playHit(Math.min(COMBO_PITCH_STEPS, w.combo), hit.crit);
                     // The haste roll rides the landed blow, the same place the ring rolls it.
                     if ((stats?.haste || 0) > 0 && w.rand() < procFrom(stats.haste, HASTE_PER_POINT)) {
+                        // ⚠️ THE WORD ONLY FIRES WHEN THE BUFF ACTUALLY STARTS. The roll happens on every
+                        // landed blow, so a proc landing while haste was ALREADY running printed a second
+                        // HASTE on top of the first -- two identical words overlapping, which reads as a
+                        // rendering fault rather than as a second proc. Refreshing the duration is right;
+                        // announcing it twice is not. Caught on the juice sheet, where the scene pins the
+                        // proc to near-certainty and the collision happens every other swing.
+                        const wasHasted = now < (w.hasteUntil || 0);
                         w.hasteUntil = now + HASTE_MS;
-                        addPop("hit", "HASTE", w.hero.x, w.hero.y + w.hero.h, 0.7);
+                        if (!wasHasted) procCall("HASTE", "haste");
                     }
                     if (hit.healed > 0) {
                         w.hp = Math.min(maxHp, w.hp + hit.healed);
@@ -1325,7 +1378,12 @@ export default function GroveScene({
                         // Hidden rather than removed, for the same reason as a dying foe above.
                         if (d.node) d.node.style.display = "none";
                         w.drops.splice(i, 1);
-                        addPop("loot", d.label, w.hero.x + w.hero.face * 1.5, w.hero.y + HERO_UNITS * 0.75);
+                        // ⚠️ THE THING YOU PICKED UP, NOT THE NAME OF IT. Luke: "You should actually see
+                        // the sprite and the name of it." The drop spends its whole life as a sprite on
+                        // the floor and then became a line of text at the moment of collection, which is
+                        // the one moment it is a reward. The art rides the label now.
+                        addPop("loot", d.label, w.hero.x + w.hero.face * 1.5, w.hero.y + HERO_UNITS * 0.75,
+                            null, d.art || null);
                         playPickup(Boolean(d.rare));
                         rerender();
                         continue;
@@ -2194,6 +2252,32 @@ function setUpLabScene(w, scene) {
             boss.vx = 0; boss.vy = 0; boss.grounded = true; boss.face = -1;
             w.moveTo = { x: boss.x - 12, y: 0 };
         }
+    } else if (scene === "juice") {
+        // ⚠️ EVERY RARE BEAT AT ONCE, ON PURPOSE. Crits, haste procs, kills and loot pickups each happen
+        // on their own schedule in a real zone -- a crit is one swing in five, a proc rarer still, and a
+        // pickup needs something to have died first. Filmed separately that is four sheets and a lot of
+        // waiting; filmed together it is one sheet that answers whether they READ APART from each other,
+        // which is the actual question. Two numbers, a ring and a word all arriving in the same 200ms is
+        // the case that matters, and it is the case no other scene produces.
+        //
+        // Health tuned so the first one dies a few frames in (loot and the death topple) while the second
+        // survives the whole sheet (crits and procs keep landing after the first corpse).
+        const marks = w.foes.filter((f) => !f.isBoss).slice(0, 2);
+        marks.forEach((f, i) => {
+            f.x = Math.max(6, w.hero.x + (i === 0 ? 3.2 : -3.4));
+            f.y = w.hero.y;
+            f.vx = 0; f.vy = 0;
+            f.grounded = true;
+            f.face = f.x > w.hero.x ? -1 : 1;
+            f.passive = false;
+            f.hit = true;
+            f.hp = i === 0 ? 70 : 4000;
+            f.maxHp = f.hp;
+            // They must not kill the hero mid-film: this scene is about what HE does.
+            f.dmg = [0, 0];
+        });
+        if (marks[0]) w.target = marks[0];
+        w.moveTo = null;
     } else if (scene === "kill") {
         // ⚠️ THE OPPOSITE PROBLEM TO THE FIGHT SCENE. That one gives its creatures 2,000 health so the
         // moment lasts long enough to film; this one exists to film the moment they RUN OUT, so they get

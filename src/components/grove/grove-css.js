@@ -776,6 +776,35 @@ export const GROVE_CSS = `
     -webkit-text-stroke: calc(0.1em) rgba(12,10,8,0.92);
     paint-order: stroke fill;
     text-shadow: 0 2px 5px rgba(0,0,0,0.9); }
+/* ── ⚠️ LOOT ARRIVES WITH ITS OWN FACE ────────────────────────────────────────────────────────
+   Luke: "You should actually see the sprite and the name of it." The drop spends its whole life as a
+   sprite on the floor and then turned into a line of text at the exact moment it became a reward. */
+.gv-num.is-loot img { width: 1.5em; height: 1.5em; margin-right: 0.3em; vertical-align: -0.38em;
+    object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85)); }
+
+/* ── ⚠️ A PROC IS NOT A DAMAGE NUMBER ─────────────────────────────────────────────────────────
+   Luke: "if something procs like haste it should be dopamine inducing."
+
+   HASTE used to render in the same cream as every ordinary hit, at the same size, drifting up beside
+   four real damage numbers -- the one moment the player's own gear did something was indistinguishable
+   from the thing it happened next to. This is wider, tracked out, electric rather than warm, and it
+   carries a ring out of the hero. Warm is what damage looks like in this game; a proc has to not be
+   warm or it joins the same conversation. */
+.gv-proc { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    font-weight: 900; font-size: calc(0.92rem * var(--gv-nb, 1)); letter-spacing: 0.22em;
+    white-space: nowrap; pointer-events: none; will-change: transform, opacity;
+    transform-origin: 50% 100%; text-transform: uppercase;
+    -webkit-text-stroke: 0.09em rgba(6,12,18,0.95); paint-order: stroke fill;
+    color: #9fe8ff;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(80,200,255,0.95), 0 0 36px rgba(40,140,255,0.6); }
+.gv-proc.is-haste { color: #9fe8ff; }
+
+/* The ring a crit throws, and the one a proc throws. ⚠️ A CRIT'S IS THE ONLY THING AN ORDINARY HIT
+   NEVER DOES -- everything else between them is a difference of degree, and degrees stop reading once
+   they are happening sixty times a minute. */
+.gv-boom.is-crit { border-color: rgba(255,186,80,0.95); }
+.gv-boom.is-haste { border-color: rgba(120,215,255,0.95); }
+
 .gv-num.is-hit { color: #ffe9a8; }
 /* ⚠️ A CRIT IS A DIFFERENT EVENT, NOT A BIGGER NUMBER. Bigger alone reads as more damage; what says CRIT
    is that it is a different colour, it is lit from inside, and it arrives at an angle nothing else does. */
