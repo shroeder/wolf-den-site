@@ -145,6 +145,10 @@ const LOOT_DRAW_RANGE = 6;
 // How far in from the wall a door stands. Far enough that the hero can get fully past it and turn round —
 // flush against the wall he would be standing inside it with nowhere to step back to.
 const DOOR_INSET = 9;
+// ⚠️ HALF THE GATE'S OWN BUTTON, AND IT MUST MATCH THE STYLESHEET. .gv-door is 12 units wide and centred on
+// its x (margin-left: -6), so the thing you can press reaches six units either side of the door's position.
+// Anything that must not cover the way out is placed against this.
+const DOOR_HALF = 6;
 // How close the hero has to be for a working door to notice him. Wide enough that it wakes up while he is
 // still walking toward it — a reaction that only fires once you are standing inside the thing reads as a bug.
 const DOOR_NEAR = 11;
@@ -162,10 +166,9 @@ const EMBLEM_THROW = 1.15;
 // Further out than its own reach (26) so the announcement lands while you are still deciding to approach,
 // not once you are already inside the fight.
 const BOSS_NOTICE = 34;
-const BOSS_INTRO_MS = 2000;
-// Matches the herald's CSS animation. A banner cleared on a timer rather than on animationend, for the
-// same reason the boss banner is: animationend never fires if the element is not painted, and a banner
-// that never clears is a word sitting across the middle of a fight.
+// Matches the herald's CSS animation. A banner cleared on a timer rather than on animationend, because
+// animationend never fires if the element is not painted, and a banner that never clears is a word
+// sitting across the middle of a fight.
 const HERALD_MS = 2200;
 
 // ── DYING ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -208,8 +211,13 @@ export default function GroveScene({
     const camRef = useRef(0);
     const camYRef = useRef(0);
 
-    // What a human reads, and only what changes a few times a minute.
-    const [kills, setKills] = useState(0);
+    // ⚠️ THE SESSION'S KILL COUNT IS NOT STATE ANY MORE, AND THAT WAS A REAL CARRY-OVER. It was a
+    // useState seeded at zero on MOUNT, and the scene does not unmount between zones — the world is
+    // rebuilt by a useMemo and the component lives on — so walking through a gate took the last zone's
+    // tally with it. The door's readout is `zone.kills + kills`, so arriving in the Hollow after twenty
+    // kills in the Thicket showed 20/25 on a zone you had never swung in. The world already counts this
+    // (w.killIndex, which the boss-readiness check reads), so there were two numbers for one fact and
+    // only one of them was reset when the zone was.
     // One door at a time: two taps while the first request is in flight would enter twice.
     const travelRef = useRef(false);
     // ⚠️ A REF, NOT A DEPENDENCY. Pausing through the effect's dep array would TEAR THE LOOP DOWN AND
@@ -227,17 +235,21 @@ export default function GroveScene({
     // persists, we don't want it to get reset if you leave." The door reads the sum, so walking out at 19
     // of 20 and coming back needs one more kill — not twenty. Adding the live count on top is what makes
     // the door open on the kill that earns it rather than on the next settle.
-    const killsHere = (Number(zone.kills) || 0) + kills;
     const [dead, setDead] = useState(false);
-    const [bossName, setBossName] = useState(null);
+    // ⚠️ THE BAR'S NAME LIVES ON THE WORLD, NOT IN STATE, BECAUSE ITS NUMBER ALREADY DID. w.bossBar
+    // holds the hit points and this held the name, and the two had different lifetimes: the world is
+    // rebuilt when the zone changes and component state is not. So walking away from a live boss and
+    // going on carried its NAME into the next zone with a bar that could never move again. One fact, one
+    // lifetime — and the reset comes free with the world rather than needing to be remembered.
     // The one-shot banner across the middle when a boss first notices you, distinct from the bar it leaves.
-    const [bossIntro, setBossIntro] = useState(null);
+    // ⚠️ bossIntro IS GONE: IT WAS NEVER SET TO ANYTHING. Both of its setters passed null — it was
+    // superseded by the herald below and the leftovers stayed, so `{bossIntro ? <div …>}` could not
+    // render under any circumstances. Declared but never read; see the lint gate of that name.
     // ── THE HERALD ──────────────────────────────────────────────────────────────────────────────
     // Centred on the VIEWPORT, which is the entire point. The old unlock announcement was a float at
     // the door's world position, so killing the twentieth creature anywhere else on the map put the
     // zone's biggest beat off screen entirely. Not a modal: nothing is dismissed and nothing is
     // blocked -- it says its piece and leaves.
-    const [herald, setHerald] = useState(null);
     const heraldTimer = useRef(null);
     const [beltLeft, setBeltLeft] = useState(Number(belt?.count) || 0);
     // ── ⚠️ THE LIST IS STATE; THE POSITIONS ARE NOT ─────────────────────────────────────────────────
@@ -301,14 +313,27 @@ export default function GroveScene({
     // ⚠️ ONE TIMER, CLEARED ON REPLACE. Two beats can land within a second of each other -- the way
     // opening and the boss waking are both caused by the SAME kill -- and without clearing, the first
     // banner's timer would take the second one off the screen early.
+    // ⚠️ ON THE WORLD TOO, AND THE TIMER CHECKS IT IS STILL THE SAME WORLD. A banner fired a second
+    // before a gate is walked through used to arrive in the NEXT zone and sit there for its full three
+    // seconds, announcing something that happened somewhere else. Writing it onto the world means the
+    // swap clears it; the identity check means the timer cannot clear or revive a banner belonging to a
+    // zone that no longer exists.
     const fireHerald = useCallback((kicker, word, kind = "way") => {
-        setHerald({ kicker, word, kind });
+        const w = worldRef.current;
+        if (!w) return;
+        w.herald = { kicker, word, kind };
+        rerender();
         if (heraldTimer.current) clearTimeout(heraldTimer.current);
-        heraldTimer.current = setTimeout(() => setHerald(null), HERALD_MS);
-    }, []);
+        heraldTimer.current = setTimeout(() => {
+            if (worldRef.current !== w) return;
+            w.herald = null;
+            rerender();
+        }, HERALD_MS);
+    }, [rerender]);
     useEffect(() => () => { if (heraldTimer.current) clearTimeout(heraldTimer.current); }, []);
 
-    const W = zoneWidth(zone.n) * UNITS_PER_SCREEN;
+    // ⚠️ UNITS, NOT SCREENS — zoneWidth answers in world units now. See the note on it.
+    const W = zoneWidth(zone.n);
     const maxHp = stats?.maxHp || 100;
 
     // ── THE WORLD ───────────────────────────────────────────────────────────────────────────────────
@@ -346,7 +371,7 @@ export default function GroveScene({
             doors: [
                 ...(zone.n > 1 ? [{ side: "back", to: zone.n - 1, x: DOOR_INSET, node: null }] : []),
                 ...(zone.n < ZONE_COUNT
-                    ? [{ side: "on", to: zone.n + 1, x: zoneWidth(zone.n) * UNITS_PER_SCREEN - DOOR_INSET, node: null }]
+                    ? [{ side: "on", to: zone.n + 1, x: zoneWidth(zone.n) - DOOR_INSET, node: null }]
                     : []),
             ],
             drops: [],
@@ -365,6 +390,10 @@ export default function GroveScene({
             foodLeft: Number(belt?.count) || 0,
             boss: null,
             bossClaimed: false,
+            // The name beside the big health bar (a boss, or the rare spawn once you hit it), and the
+            // banner across the middle. Both belong to the ZONE, so both are replaced when it is.
+            barName: null,
+            herald: null,
             // ── FEEL STATE ──────────────────────────────────────────────────────────────────────
             clock: makeClock(),
             shake: makeShaker(),
@@ -383,6 +412,48 @@ export default function GroveScene({
     }, [zone.n, seed, stats?.moveSpeed, stats?.maxHp]);
 
     useEffect(() => { worldRef.current = world; }, [world]);
+
+    // ── ⚠️ WHAT THE LAST ZONE LEFT BEHIND ───────────────────────────────────────────────────────────
+    // Luke: "the grove had a bunch of stale carry over between maps, like boss state. Damage numbers etc."
+    //
+    // The scene does NOT unmount when you walk through a gate. `world` is a useMemo keyed on the zone, so
+    // the simulation is replaced — but every useState in this component and every node the loop has put in
+    // the fx layer by hand belongs to the component, and the component lives on. Three things came through
+    // the door with the player:
+    //
+    //   · THE BOSS BAR AND ITS NAME. setBossName is cleared when a boss DIES (see killFoe) and nowhere
+    //     else, so walking away from a live one and going on carried its name and a frozen bar into the
+    //     next zone. Its hp lives on the world, so the bar could not even move: a dead-looking readout for
+    //     a creature in a different forest.
+    //   · THE DAMAGE NUMBERS. Pops and sparks are real DOM nodes appended to the fx layer, retired by the
+    //     loop when it walks w.pops — and w.pops is replaced with [] by the new world, so anything in
+    //     flight at the moment of the swap is orphaned and stays on screen for ever. The comment on
+    //     procCall already claimed these were "cleaned up with everything else"; nothing was doing it.
+    //   · THE BANNER. The herald clears on a timer, so it survived a fast exit and announced the last
+    //     zone's news in the new one. It lives on the world now, with the timer checking the world is
+    //     still the one it was fired for.
+    //
+    // ⚠️ KEYED ON THE SEED AS WELL AS THE ZONE. Re-entering the SAME zone from the map is a new session
+    // with a new seed and the same zone.n, and that is just as much a fresh start as a different place.
+    //
+    // (Every setState here is to null or false, so this cannot cascade: on a zone where nothing was left
+    // behind, each one is a no-op React drops.)
+    useEffect(() => {
+        if (heraldTimer.current) { clearTimeout(heraldTimer.current); heraldTimer.current = null; }
+        fxRef.current?.replaceChildren();
+    }, [zone.n, seed]);
+
+    // ── THE DOOR'S READOUT ──────────────────────────────────────────────────────────────────────────
+    // The running total: what the server has banked for this zone across every session, plus what has died
+    // since this one started. Luke: "Ensure the kill count persists, we don't want it to get reset if you
+    // leave." Walking out at 19 of 20 and coming back needs one more kill, not twenty.
+    //
+    // ⚠️ DECLARED UNDER THE WORLD IT READS. A hook above the `world` useMemo that names `world` is the
+    // temporal-dead-zone trap check:hook-deps exists to catch — and this one moved here from above it.
+    // `gen` is a dependency because killIndex is a mutable field: the loop bumps gen on every kill, and
+    // without it React has no reason to read the number again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const killsHere = useMemo(() => (Number(zone.kills) || 0) + (world.killIndex || 0), [zone.kills, world, gen]);
 
     // ── SPAWNING ────────────────────────────────────────────────────────────────────────────────────
     // Luke: "15 to 30 enemies, fully replenishing every 45 seconds."
@@ -441,7 +512,23 @@ export default function GroveScene({
         const bossReadyNow = liveKills >= zone.toUnlock && (Number(zone.bossWaitMs) || 0) <= 0;
         if (bd && bossReadyNow && !w.boss && !w.bossClaimed) {
             const bsz = groveSize(bd.id, { boss: true });
-            const spot = { x: W - 20, y: 0 };
+            // ── ⚠️ CLEAR OF THE GATE, AND THIS IS WHY YOU "HAD TO" BEAT IT ─────────────────────────
+            // Luke: "you have to beat the boss to move on." You did, and nothing in the rules said so —
+            // the server opens the next zone on a KILL COUNT and the boss has never been a gate (see the
+            // note on toUnlock in grove-catalog.js). It was geometry.
+            //
+            // The boss stood at W - 20. The gate stands at W - DOOR_INSET and its button is twelve units
+            // wide and centred (.gv-door in grove-css.js), so it spans W-15 to W-3. A creature's button is
+            // a SQUARE the height of its sprite — and a boss is 14 to 22 units tall, so its box reached
+            // from W-31 to W-9 and lay across the left half of the doorway. Both are positioned siblings
+            // with no z-index and the foes are rendered after the doors, so the boss's transparent corner
+            // won every tap aimed at the gate. The way on was unpressable until the thing standing on it
+            // was dead, which is indistinguishable from a rule.
+            //
+            // So it stands its own half-width plus the door's clear of the gate. It is still the last
+            // thing in the zone and still blocks the APPROACH — it just no longer sits on the handle.
+            const clearOfGate = DOOR_INSET + DOOR_HALF + bsz.h * 0.5 + 3;
+            const spot = { x: Math.max(W * 0.5, W - clearOfGate), y: 0 };
             w.boss = {
                 ...makeBody({ x: spot.x, y: spot.y, h: bsz.h, halfW: bsz.h * 0.3, speed: 0.42 }),
                 uid: `boss-${bd.id}`, id: bd.id, name: bd.name, art: bd.art, foot: bsz.foot,
@@ -559,7 +646,7 @@ export default function GroveScene({
             window.__grove = w;
             if (labScene !== "wander") {
                 const named = setUpLabScene(w, labScene);
-                if (named) setBossName(named);
+                if (named) w.barName = named;
                 // ⚠️ AND THE CAMERA GOES WITH HIM, OR THE SCENE FILMS ITS OWN PAN. camRef eases toward the
                 // hero at about 5.5% a frame from wherever it was, and a lab scene teleports him — so
                 // "door" and "unlock" put him at the far wall and then spent two and a half seconds
@@ -800,7 +887,7 @@ export default function GroveScene({
             burst(foe.x, foe.y + foe.h * 0.45, { crit: true, dir: -(foe.face || 1), kind: "spark" });
             burst(foe.x, foe.y, { kind: "dust" });
 
-            if (foe.big || foe.rare) { wd.bossBar = null; setBossName(null); }
+            if (foe.big || foe.rare) { wd.bossBar = null; wd.barName = null; }
 
             // ── ⚠️ A BOSS IS NOT ADDED TO THE KILL LOG ────────────────────────────────────────────
             // It has its own request (action: "boss") because it has its own authority: the server checks the
@@ -838,7 +925,9 @@ export default function GroveScene({
             const i = wd.killIndex;
             wd.killIndex += 1;
             wd.killLog.push({ id: foe.id, i });
-            setKills((k) => k + 1);
+            // The counter is drawn from wd.killIndex, which the line above has just moved; this is what
+            // tells React to look at it again. It is the same re-render the foe list needs anyway.
+            rerender();
 
             // ── THE STREAK ──────────────────────────────────────────────────────────────────────
             // ⚠️ PRESENTATION ONLY. It pays nothing — see COMBO_WINDOW_MS in grove-juice.js for why a kill
@@ -1216,13 +1305,11 @@ export default function GroveScene({
                     w.bossChase = makeChase(1);
                     w.shake.add(TRAUMA.boss);
                     playBossNotice();
-                    setBossName(f.name);
-                    setBossIntro(null);
+                    w.barName = f.name;
                     fireHerald("The zone stirs", f.name, "boss");
                     // ⚠️ CLEARED ON A TIMER rather than an animation event, for the same reason the warp is:
                     // animationend never fires if the element is not painted, and a banner that never
                     // clears is a name sitting across the middle of a boss fight.
-                    setTimeout(() => setBossIntro(null), BOSS_INTRO_MS);
                 }
                 const angry = f.isBoss ? (f === tgt || f.hit) : (!f.passive && (f === tgt || f.hit));
                 const near = Math.abs(f.x - w.hero.x) < (f.isBoss ? 26 : 15)
@@ -1855,9 +1942,13 @@ export default function GroveScene({
         if (foe.big || foe.rare) {
             w.bossBar = { hp: foe.hp, maxHp: foe.maxHp };
             w.bossChase = makeChase(foe.hp / foe.maxHp);
-            setBossName(foe.name);
+            // ⚠️ AND REPAINT. This used to be setBossName, which brought a render with it; the name is a
+            // field on the world now, so the bar would not appear until something else happened to
+            // re-render the scene — which on a quiet screen is the next spawn, up to 45 seconds later.
+            w.barName = foe.name;
+            rerender();
         }
-    }, [dead]);
+    }, [dead, rerender]);
 
     // ── ⚠️ ONE REF CALLBACK PER BODY, AND IT FINDS ITS OWN PARTS ───────────────────────────────────
     // Each body is four nodes — a positioned shell, a contact shadow, the sprite, and a white silhouette for
@@ -2067,20 +2158,17 @@ export default function GroveScene({
                 the zone can be rebuilt underneath it unseen. */}
             {warp ? <div className={`gv-warp is-${warp}`} aria-hidden="true" /> : null}
 
-            {herald ? (
-                <div className={`gv-herald is-${herald.kind}`} aria-hidden="true">
-                    <i>{herald.kicker}</i>
-                    <b>{herald.word}</b>
+            {world.herald ? (
+                <div className={`gv-herald is-${world.herald.kind}`} aria-hidden="true">
+                    <i>{world.herald.kicker}</i>
+                    <b>{world.herald.word}</b>
                     <u />
                 </div>
             ) : null}
-            {bossIntro ? (
-                <div className="gv-boss-intro" aria-hidden="true"><b>{bossIntro}</b></div>
-            ) : null}
 
-            {bossName ? (
+            {world.barName ? (
                 <div className="gv-boss">
-                    <b>{bossName}</b>
+                    <b>{world.barName}</b>
                     <span ref={bossStripRef}>
                         <u ref={bossGhostRef} />
                         <i ref={bossFillRef} />
@@ -2361,7 +2449,7 @@ function setUpLabScene(w, scene) {
             victim.hit = true; victim.passive = false;
             w.target = victim;
         }
-    } else if (scene === "door" || scene === "unlock" || scene === "travel") {
+    } else if (scene === "door" || scene === "unlock" || scene === "travel" || scene === "gate") {
         // ⚠️ THE FAR WALL, WHICH NO AMOUNT OF ORDINARY PLAY REACHES INSIDE A FILM. The way on stands at
         // the right-hand end of a zone three to seven hundred units wide, so without this the only door
         // anyone could ever photograph was the one you spawn beside. Stand him where the toll is readable.

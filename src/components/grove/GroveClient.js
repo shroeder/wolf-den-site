@@ -140,6 +140,13 @@ export default function GroveClient({ initial }) {
         const d = await post({ action: "enter", zone: zone.id });
         if (!d?.ok) { setNote(d?.error === "locked" ? "That one is still closed." : "Couldn't go in."); return; }
         setSession({ zone: d.zone, seed: d.seed, bonuses: d.bonuses });
+        // ⚠️ AND THE LAST ZONE'S CARDS GO WITH IT. Both of these are click-to-dismiss overlays owned by
+        // this component, which does not unmount between zones — so a boss kill card or an unlock pop left
+        // standing was still standing in the next place. Cleared HERE rather than in the door handler
+        // because the map panel enters a zone too (see the note below travel): a reset that lives on one
+        // of the two ways in is a reset that is missing from the other.
+        setBossWon(null);
+        setUnlockedNow(null);
         // ⚠️ AND THE SHEET COMES DOWN WITH IT. The map is one of the panels openable from inside a zone,
         // so tapping a place on it is now a way to travel WITHOUT leaving — and leaving the panel up over
         // the zone you just walked into means arriving somewhere new behind a backpack.

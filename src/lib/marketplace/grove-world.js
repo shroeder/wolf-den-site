@@ -35,8 +35,30 @@ export const UNITS_PER_SCREEN = 100;
 // 0.0042 clears 0.6 units when the lowest ledge is at 26. Enemies spawned, the hero took a step, and nothing
 // in the zone could ever be reached by anybody.
 
-// A zone is this many screens wide. Zone 1 is small and they open out.
-export const zoneWidth = (n) => 3 + Math.min(4, Math.floor((n - 1) / 3));
+// ── HOW BIG A ZONE IS, IN SECONDS ────────────────────────────────────────────────────────────────────────────
+// Luke, playing it: "the levels are too long its too much walking."
+//
+// ⚠️ THE OLD ONE WAS A VIEW-SPACE CONSTANT WEARING A WORLD-SPACE NAME, which is the third time this file has
+// been bitten by exactly that. It read `3 + min(4, floor((n-1)/3))` SCREENS and the caller multiplied by
+// UNITS_PER_SCREEN = 100 — so a zone was "three to seven screens wide" in a frame that holds a hundred units.
+// The camera does not hold a hundred units and never has: viewFor clamps the scale so the hero stays
+// 19-26% of the viewport HEIGHT, and on a portrait phone that floor wins outright. Measured through the
+// real viewFor:
+//
+//   phone 390x700   20.5 units on screen      zone 1 = 14.6 screens, 23s to walk end to end
+//   desktop 1280    58.9 units on screen      zone 12 = 29.2 screens, 46s to walk end to end
+//
+// And a zone is crossed SEVERAL TIMES — it takes 20 to 80 kills to open the way and the population refills
+// every 45 seconds — so zone 12 was asking for something over five minutes of holding a direction down.
+//
+// ⚠️ SO IT IS SIZED IN TIME NOW, WHICH IS THE ONE UNIT THAT CANNOT DRIFT WITH THE CAMERA. A player's
+// experience of "too long" is seconds, not screens and not units: screens change meaning when the scale
+// changes (that is this whole comment), and units never meant anything to anybody. drive() tops out at
+// MAX_DRIVE units a frame at 60fps, so the width is simply that speed times the seconds a crossing should
+// take — about ten at the Thicket, rising to eighteen in the Heartwood. check-grove.mjs asserts it.
+export const TOP_SPEED = 0.22 * 60;          // drive()'s ceiling in units a second — see grove-physics drive()
+export const CROSS_SECONDS = (n) => 9.8 + Math.min(11, Math.max(0, (Number(n) || 1) - 1)) * 0.76;
+export const zoneWidth = (n) => Math.round(CROSS_SECONDS(n) * TOP_SPEED);
 
 // How far apart the tiers are. ⚠️ ONE NUMBER, AND grove-physics.js HOP IS CHOSEN AGAINST IT — a standing
 // hop rises 36 units, so a 26-unit tier is clearable with room to misjudge. Raise this past HOP_RISE and
@@ -74,7 +96,9 @@ const TIER_OVERLAP = 7;
  * heights read as debris.
  */
 export function platformsFor(zoneN, rand) {
-    const w = zoneWidth(zoneN) * UNITS_PER_SCREEN;
+    // ⚠️ zoneWidth IS UNITS NOW, NOT SCREENS. It used to be a screen count that every caller multiplied by
+    // UNITS_PER_SCREEN; leaving that multiply here would make the zone a hundred times its own length.
+    const w = zoneWidth(zoneN);
     // ⚠️ EACH LEDGE RECORDS THE ONE IT WAS BUILT ON TOP OF, and that is not bookkeeping — it is the route.
     // The generator is the only thing that ever KNOWS which ledge is reachable from which; rediscovering it
     // at run time from positions alone is guesswork, and guessing is what left the hero walking to the

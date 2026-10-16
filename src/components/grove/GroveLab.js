@@ -78,7 +78,12 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
         // short sees the boss arrive without a reload. Correct in the game, and it silently emptied the
         // bench -- "scene=boss" filmed a hero standing in an empty clearing with no boss and no error, which
         // reads as "the boss is broken" rather than "the fixture is".
-        const banked = scene === "travel" ? z.toUnlock
+        // "gate" is the one that was missing, and the bug it would have caught cost Luke a zone: the boss
+        // spawns at the far wall and the way on is at the far wall, so the only question that matters about
+        // either of them is what they look like STANDING TOGETHER. No scene put them in the same frame —
+        // "door" is seven kills short so no boss exists, and "boss" teleports it to the hero's elbow in the
+        // middle of the zone. The gate had never been photographed with the thing that stands beside it.
+        const banked = scene === "travel" || scene === "gate" ? z.toUnlock
             : scene === "unlock" ? Math.max(0, z.toUnlock - 1)
             : scene === "door" ? Math.max(0, z.toUnlock - 7)
             : scene === "boss" || scene === "bossin" ? z.toUnlock
