@@ -24510,95 +24510,166 @@ body.cas-seated .social-fab { display: none; }
     background: rgba(255,255,255,0.06); }
 
 /* ── THE PEEKERS: GAMIFYING THE FUNNEL ────────────────────────────────────────────────────────────────
-   Luke: "if you arent logged in you should see fun stuff pop out from the sides and jiggle around and tempt
-   you to sign up ... a chest or boss or ship ... and also help you understand the context of the ask."
+   Luke: "fun stuff pop out from the sides and jiggle around and tempt you to sign up", then "make sure its
+   super cool looking and has lots of dopamine."
 
-   One at a time, from alternating edges, on every page of the site except the game, the admin and anything
-   to do with paying. See PlayPeekers.js for the schedule and the reasons.
+   Something from the game leans in from the edge of the screen, and you can CATCH it: tap and it bursts,
+   the bag fills by one, and the next one comes sooner. See PlayPeekers.js for the schedule and the reasons.
 
    ⚠️ IT HUGS THE EDGE RATHER THAN SITTING IN THE PAGE. A card in the middle of the screen is a modal, and a
-   modal is the thing that makes people leave. Anchored to the side with the sprite overhanging the frame, it
-   reads as something LEANING IN — which is both the ask Luke made and the thing that keeps the shop usable
-   while it is on screen.
+   modal is the thing that makes people leave. Anchored to the side with the creature overhanging the frame
+   it reads as something LEANING IN, which is both the ask and what keeps the shop usable while it is up.
 
-   ⚠️ AND IT IS 58% DOWN, NOT CENTRED. The header is fixed at the top and the web-push banner and cookie
-   strip live at the bottom; the middle-low band is the one horizontal stripe of a phone screen with nothing
-   else fixed in it. */
-/* ⚠️ 70%, NOT 58%. Filmed at 58 it landed exactly on the shop's own "See all inventory" button and sat
-   there for eleven seconds. A thing built to convert a visitor must not cover the page's own call to
-   action to do it — further down it overlaps product art instead, which costs the page nothing. */
+   ⚠️ AND IT IS 70% DOWN, NOT 58%. Filmed at 58 it landed exactly on the shop own gold "See all inventory"
+   button and sat there for eleven seconds. A thing built to convert a visitor must not cover the page own
+   call to action to do it; further down it overlaps product art, which costs the page nothing. */
 .peek { position: fixed; top: 70%; z-index: 45; pointer-events: none;
-    max-width: min(330px, 86vw); }
-/* ⚠️ THE SPRITE SITS AT THE SCREEN EDGE, NOT AT THE INBOARD END. Filmed the first way round, the pill slid
-   in with the creature furthest INTO the page and the sentence nearest the edge — so the thing peeking was
-   the text, and the whole point of using a boss or a chest to do this was pointing the wrong way. Both the
-   row and the pill inside it reverse together, which is why there are two rules per side. */
+    max-width: min(336px, 88vw);
+    --peek-key: #ffc95e; --peek-key-soft: rgba(255,201,94,0.42); }
 .peek-right { right: 0; }
 .peek-left { left: 0; }
 
-/* The body is the whole target. A sprite you cannot press is a sprite that taught somebody the game and then
-   made them go and find the link themselves. */
-.peek-body { pointer-events: auto; display: flex; align-items: center; gap: 9px;
-    padding: 9px 12px 9px 8px; text-decoration: none; cursor: pointer;
-    background: linear-gradient(135deg, rgba(32,22,52,0.97), rgba(18,13,30,0.97));
-    border: 1px solid rgba(255,196,86,0.42);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 0 22px rgba(255,170,60,0.14); }
-.peek-right .peek-body { border-radius: 16px 0 0 16px; border-right: 0; flex-direction: row-reverse;
-    padding: 9px 8px 9px 12px; }
-.peek-left .peek-body { border-radius: 0 16px 16px 0; border-left: 0; }
+/* Per-creature colour. The glow, the border and the burst all read off these two, so a boss arrives in
+   venom green and a chest in gold without a second rule being written for either. A sprite that brings its
+   own light with it is the difference between a cutout and a thing that is actually there. */
+.peek.tone-boss { --peek-key: #9ef5b6; --peek-key-soft: rgba(158,245,182,0.45); }
+.peek.tone-loot { --peek-key: #ffc95e; --peek-key-soft: rgba(255,201,94,0.48); }
+.peek.tone-sea { --peek-key: #86d8ff; --peek-key-soft: rgba(134,216,255,0.45); }
+.peek.tone-blood { --peek-key: #ff8f7a; --peek-key-soft: rgba(255,143,122,0.45); }
+.peek.tone-deep { --peek-key: #b9a4ff; --peek-key-soft: rgba(185,164,255,0.45); }
 
-/* ⚠️ THE SPRITE OVERHANGS THE PILL, which is what makes it read as peeking IN rather than as an icon in a
-   banner. It is also the only part that keeps moving once the thing has arrived. */
-.peek-art { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; margin-top: -14px;
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.65));
+.peek-body { pointer-events: auto; position: relative; display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px 10px 8px;
+    background: linear-gradient(135deg, rgba(34,24,54,0.97), rgba(16,12,28,0.98));
+    border: 1px solid var(--peek-key-soft);
+    box-shadow: 0 12px 34px rgba(0,0,0,0.62), 0 0 26px -6px var(--peek-key-soft),
+        inset 0 1px 0 rgba(255,255,255,0.06); }
+.peek-right .peek-body { border-radius: 18px 0 0 18px; border-right: 0; flex-direction: row-reverse;
+    padding: 10px 8px 10px 12px; }
+.peek-left .peek-body { border-radius: 0 18px 18px 0; border-left: 0; }
+
+/* ⚠️ THE SPRITE SITS AT THE SCREEN EDGE, NOT AT THE INBOARD END. Filmed the first way round, the pill slid
+   in with the creature furthest INTO the page and the sentence nearest the edge — so the thing peeking was
+   the text, and the whole reason for using a boss to do this was pointing backwards. */
+.peek-artwrap { position: relative; width: 76px; height: 76px; flex: 0 0 auto; margin-top: -16px; }
+.peek-art { position: relative; z-index: 1; width: 76px; height: 76px; object-fit: contain;
+    filter: drop-shadow(0 5px 9px rgba(0,0,0,0.7)) drop-shadow(0 0 10px var(--peek-key-soft));
     animation: peekJiggle 2.6s ease-in-out infinite; transform-origin: 50% 85%; }
-.peek-left .peek-art { transform: scaleX(-1); animation-name: peekJiggleFlip; }
+.peek-left .peek-art { animation-name: peekJiggleFlip; }
 
-.peek-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.peek-tag { font-size: 10px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;
-    color: #ffc95e; }
-.peek-line { font-size: 12px; line-height: 1.33; color: #f1e8da; }
-.peek-cta { font-size: 11px; font-weight: 800; color: #9fe8d4; margin-top: 2px; }
+/* The light it brings with it. Its own element because the sprite transform is already spoken for by the
+   jiggle, and two animations writing one property is the fight that silently cancels one of them. */
+.peek-glow { position: absolute; inset: -16%; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, var(--peek-key-soft), transparent 62%);
+    filter: blur(5px); animation: peekGlow 2.6s ease-in-out infinite; }
 
-/* The dismiss. Small, outside the pill, and it is the reason the whole thing is allowed to be this cheerful:
-   anything that leans into your page uninvited has to be closable in one tap, and it stays closed for a week
-   (see OFF_DAYS). */
-/* ⚠️ TUCKED INTO THE PILL'S OWN CORNER, NOT SAT BESIDE IT. As a flex sibling it rode on the INBOARD side,
-   which put a 24px button down on top of whatever the page had there — on the shop that was the middle of
-   the gold "See all inventory" button. Absolutely positioned against the pill it belongs to the pill, which
-   is also the only place a visitor looks for the way to close something. */
-.peek-x { pointer-events: auto; position: absolute; top: -8px; width: 24px; height: 24px;
+.peek-words { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.peek-tag { font-size: 10px; font-weight: 900; letter-spacing: 0.085em; text-transform: uppercase;
+    color: var(--peek-key); }
+.peek-got { color: #fff2cf; text-shadow: 0 0 12px var(--peek-key-soft);
+    animation: peekGotIn .42s cubic-bezier(.2,.9,.3,1.3) both; }
+.peek-line { font-size: 12px; line-height: 1.34; color: #efe6d8; }
+.peek-hint { font-size: 11px; font-weight: 800; color: var(--peek-key); opacity: .92;
+    animation: peekHint 1.5s ease-in-out infinite; }
+
+/* The bag. Pips, not a number — a number is a score and a row of pips is a SET, and a set with two filled
+   is what makes somebody want the other three. */
+.peek-bag { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.peek-pip { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.16);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); }
+.peek-pip.is-on { background: var(--peek-key); box-shadow: 0 0 8px var(--peek-key-soft); }
+/* The one that just landed gets the pop, which is the whole reason the pips are worth having. */
+.peek-pip.is-new { animation: peekPip .5s cubic-bezier(.2,.9,.3,1.5) both; }
+.peek-bagn { font-size: 9.5px; font-weight: 800; color: #b9ad97; margin-left: 2px; letter-spacing: .04em; }
+
+/* The way in, once it has been earned. Gold on every tone, because this is the one element that must never
+   be mistaken for part of the creature it came from. */
+.peek-go { display: inline-block; margin-top: 5px; padding: 6px 11px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 900; text-decoration: none; color: #2a1a06;
+    background: linear-gradient(180deg, #ffe488, #f3b23a);
+    box-shadow: 0 4px 14px rgba(243,178,58,0.38);
+    animation: peekGoIn .46s cubic-bezier(.2,.9,.3,1.35) .08s both; }
+.peek-go:hover { filter: brightness(1.06); }
+
+/* The catch target: the whole pill, as a real button rather than a handler on a div, so it is reachable by
+   keyboard and announces what it does. Removed on catch, which is what frees the link underneath. */
+.peek-hit { position: absolute; inset: 0; pointer-events: auto; cursor: pointer;
+    background: none; border: 0; padding: 0; border-radius: inherit; }
+.peek-hit:focus-visible { outline: 2px solid var(--peek-key); outline-offset: 3px; }
+
+/* ⚠️ TUCKED INTO THE PILL OWN CORNER, NOT SAT BESIDE IT. As a flex sibling it rode on the INBOARD side,
+   which put a 24px button down on whatever the page had there — on the shop that was the middle of the gold
+   "See all inventory". Against the pill it belongs to the pill, which is also the only place a visitor
+   looks for the way to close something. */
+.peek-x { pointer-events: auto; position: absolute; top: -8px; width: 24px; height: 24px; z-index: 3;
     display: grid; place-items: center; border-radius: 999px; cursor: pointer;
-    color: #cbbfa6; background: rgba(18,13,30,0.98); border: 1px solid rgba(255,255,255,0.22);
+    color: #cbbfa6; background: rgba(16,12,28,0.98); border: 1px solid rgba(255,255,255,0.22);
     box-shadow: 0 2px 8px rgba(0,0,0,0.6); }
 .peek-right .peek-x { left: -8px; }
 .peek-left .peek-x { right: -8px; }
-.peek-x:hover { color: #fff; background: rgba(40,28,62,0.98); }
+.peek-x:hover { color: #fff; background: rgba(42,30,64,0.99); }
+
+/* ── THE CATCH ────────────────────────────────────────────────────────────────────────────────────────
+   One keyframe for twelve pieces, with everything that makes a piece its own arriving as a custom property
+   — the same trick the Hallowe'en candy burst uses, and the reason a burst this size is free on a phone.
+   The sprite punches up and blows out; the pill flashes once from the inside. */
+.peek-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 2; }
+.peek-bit { position: absolute; left: 0; top: 0; border-radius: 50%; display: block;
+    animation: peekFly .72s cubic-bezier(.17,.73,.3,1) both; }
+.peek-bit.k0 { background: var(--peek-key); box-shadow: 0 0 10px var(--peek-key-soft); }
+.peek-bit.k1 { background: #fff3d2; box-shadow: 0 0 9px rgba(255,243,210,0.75); }
+.peek-bit.k2 { background: #ffd05e; border-radius: 2px; box-shadow: 0 0 9px rgba(255,208,94,0.7); }
+@keyframes peekFly {
+    0% { transform: translate(-50%, -50%) scale(.3) rotate(0deg); opacity: 0; }
+    14% { opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + 26px)) scale(.7) rotate(var(--rot));
+        opacity: 0; }
+}
+.peek.is-caught .peek-art { animation: peekPop .54s cubic-bezier(.2,.8,.3,1.4) both; }
+.peek.is-caught .peek-glow { animation: peekGlowPop .54s ease-out both; }
+.peek.is-caught .peek-body { animation: peekFlash .5s ease-out both; }
+@keyframes peekPop {
+    0% { transform: scale(1); }
+    34% { transform: scale(1.34) rotate(-6deg); }
+    100% { transform: scale(1.06) rotate(0deg); }
+}
+@keyframes peekGlowPop {
+    0% { transform: scale(1); opacity: .8; }
+    30% { transform: scale(1.7); opacity: 1; }
+    100% { transform: scale(1.25); opacity: .55; }
+}
+@keyframes peekFlash {
+    0% { box-shadow: 0 12px 34px rgba(0,0,0,0.62), 0 0 0 0 var(--peek-key-soft); }
+    22% { box-shadow: 0 12px 34px rgba(0,0,0,0.62), 0 0 44px 8px var(--peek-key-soft); }
+    100% { box-shadow: 0 12px 34px rgba(0,0,0,0.62), 0 0 26px -6px var(--peek-key-soft); }
+}
+/* The full bag is a bigger moment than a catch, so it is allowed a brighter rim and a slow breath. */
+.peek.is-full .peek-body { border-color: var(--peek-key);
+    animation: peekFlash .5s ease-out both, peekFullBreath 2.4s ease-in-out .5s infinite; }
 
 /* ── THE ARRIVAL ──────────────────────────────────────────────────────────────────────────────────────
    Out past where it lands, then back — a pop rather than a slide. A thing that eases to a stop reads as a
    panel opening; a thing that overshoots and settles reads as alive, which is the entire point of using the
-   game's own creatures to do this. */
-.peek.is-in { animation: peekInRight 620ms cubic-bezier(.17,.89,.32,1.28) both; }
+   game own creatures to do this. */
+.peek.is-in { animation: peekInRight 640ms cubic-bezier(.17,.89,.32,1.3) both; }
 .peek-left.is-in { animation-name: peekInLeft; }
-.peek.is-out { animation: peekOutRight 520ms cubic-bezier(.5,0,.75,0) both; }
+.peek.is-out { animation: peekOutRight 540ms cubic-bezier(.5,0,.75,0) both; }
 .peek-left.is-out { animation-name: peekOutLeft; }
-
 @keyframes peekInRight {
-    0% { transform: translateX(104%); opacity: 0; }
-    60% { opacity: 1; }
-    100% { transform: translateX(0); opacity: 1; }
+    0% { transform: translateX(106%) scale(.92); opacity: 0; }
+    55% { opacity: 1; }
+    100% { transform: translateX(0) scale(1); opacity: 1; }
 }
 @keyframes peekInLeft {
-    0% { transform: translateX(-104%); opacity: 0; }
-    60% { opacity: 1; }
-    100% { transform: translateX(0); opacity: 1; }
+    0% { transform: translateX(-106%) scale(.92); opacity: 0; }
+    55% { opacity: 1; }
+    100% { transform: translateX(0) scale(1); opacity: 1; }
 }
-@keyframes peekOutRight { to { transform: translateX(104%); opacity: 0; } }
-@keyframes peekOutLeft { to { transform: translateX(-104%); opacity: 0; } }
+@keyframes peekOutRight { to { transform: translateX(106%); opacity: 0; } }
+@keyframes peekOutLeft { to { transform: translateX(-106%); opacity: 0; } }
 
-/* The jiggle itself. Small, slow and uneven — a sprite that vibrates is a hazard light, and the difference
-   between "alive" and "alarm" is entirely in the amplitude. */
+/* The jiggle. Small, slow and uneven — a sprite that vibrates is a hazard light, and the difference between
+   alive and alarm is entirely in the amplitude. */
 @keyframes peekJiggle {
     0%, 100% { transform: rotate(-3.5deg) translateY(0); }
     30% { transform: rotate(3deg) translateY(-3px); }
@@ -24611,11 +24682,22 @@ body.cas-seated .social-fab { display: none; }
     55% { transform: scaleX(-1) rotate(-2deg) translateY(0); }
     78% { transform: scaleX(-1) rotate(1.5deg) translateY(-2px); }
 }
+@keyframes peekGlow { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: .9; transform: scale(1.1); } }
+@keyframes peekHint { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes peekPip { 0% { transform: scale(.4); } 55% { transform: scale(1.9); } 100% { transform: scale(1); } }
+@keyframes peekGotIn { 0% { transform: translateY(5px) scale(.9); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes peekGoIn { 0% { transform: translateY(6px) scale(.85); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes peekFullBreath {
+    0%, 100% { box-shadow: 0 12px 34px rgba(0,0,0,0.62), 0 0 26px -6px var(--peek-key-soft); }
+    50% { box-shadow: 0 12px 34px rgba(0,0,0,0.62), 0 0 40px 2px var(--peek-key-soft); }
+}
 
 /* A narrow phone gets the same idea at a size that leaves the shop readable behind it. */
 @media (max-width: 430px) {
-    .peek { max-width: 80vw; top: 68%; }
-    .peek-art { width: 60px; height: 60px; }
+    .peek { max-width: 82vw; top: 68%; }
+    .peek-artwrap, .peek-art { width: 62px; height: 62px; }
+    .peek-artwrap { margin-top: -13px; }
     .peek-line { font-size: 11.5px; }
-    .peek-body { padding: 8px 10px 8px 6px; gap: 7px; }
+    .peek-body { padding: 9px 10px 9px 6px; gap: 8px; }
+    .peek-right .peek-body { padding: 9px 6px 9px 10px; }
 }
