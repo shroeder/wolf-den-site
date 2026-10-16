@@ -496,16 +496,17 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         [buyerId, zoneId, list.length],
     ).catch(() => null);
 
-    let unlocked = null;
-    if (Number(z?.kills) >= zone.toUnlock && zone.n < GROVE_ZONES.length) {
-        const next = GROVE_ZONES[zone.n]; // zone.n is 1-based, so this is the one after it
-        const up = await db.queryOne(
-            `UPDATE mkt_grove_player SET unlocked_n = GREATEST(unlocked_n, $2), updated_at = NOW()
-              WHERE buyer_id = $1 RETURNING unlocked_n`,
-            [buyerId, next.n],
-        ).catch(() => null);
-        if (Number(up?.unlocked_n) === next.n) unlocked = next;
-    }
+    // ── ⚠️ SETTLE NO LONGER OPENS THE WAY. THE BOSS DOES. ──────────────────────────────────────────
+    // This is where the unlock used to live, keyed on `kills >= toUnlock` — so the next zone opened on the
+    // KILL COUNT and the boss standing at the end of the zone was scenery you could walk straight past.
+    // Littlewolf, testing it, reached zone ten having killed nought bosses: the entire ladder skipped, and
+    // every boss chest, merit and emblem skipped with it. Luke: "he is able to skip the area boss and go to
+    // the next area. I dont like that."
+    //
+    // The catalogue always said these were two different jobs — see the toUnlock note in grove-catalog.js —
+    // and now they actually are. Clearing a zone earns the RIGHT TO FIGHT its boss; killing the boss is what
+    // ENDS the zone and opens the next one. See openTheWay, which is the only thing that moves unlocked_n.
+    const cleared = Number(z?.kills) >= zone.toUnlock;
 
     // One UPDATE, folded into what settle already writes — the window costs no extra round trip. A stale
     // window is reset here rather than by a cron: the only thing that needs to know is the next settle.
@@ -533,12 +534,39 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         ate,
         rejected,
         zoneKills: Number(z?.kills) || 0,
-        unlocked,
+        // The zone is cleared; the boss is what opens the way now, so settle reports the right to FIGHT it
+        // and nothing about the next zone. `unlocked` moved to the boss response.
+        cleared,
         capped: list.length < (kills || []).length,
     };
 }
 
 /** Move a part between the bag and the bank. Slots are counted in ROWS at the destination. */
+/**
+ * Open the way to the next zone.
+ *
+ * ⚠️ ONE FUNCTION, AND THE BOSS KILL IS ITS ONLY CALLER. This used to be nine lines inline in settle keyed
+ * on the kill count, which is how a tester walked to zone ten past ten live bosses. Two paths that both
+ * move a player forward drift the moment one of them is edited — see
+ * [[atomic-split-into-steps-drops-lines]] — so there is exactly one, and settle does not touch unlocked_n
+ * at all any more.
+ *
+ * ⚠️ AND THE UPDATE CARRIES ITS OWN `unlocked_n < $2`. GREATEST alone would match every repeat kill of an
+ * old boss and report the next zone as freshly opened each time, so the herald would fire on a door that
+ * has been open for days. With the predicate the statement only matches when it genuinely advances, and
+ * RETURNING hands back a row only then.
+ */
+async function openTheWay(buyerId, zone) {
+    if (!zone || zone.n >= GROVE_ZONES.length) return null;
+    const next = GROVE_ZONES[zone.n]; // zone.n is 1-based, so this is the one after it
+    const up = await db.queryOne(
+        `UPDATE mkt_grove_player SET unlocked_n = GREATEST(unlocked_n, $2), updated_at = NOW()
+          WHERE buyer_id = $1 AND unlocked_n < $2 RETURNING unlocked_n`,
+        [buyerId, next.n],
+    ).catch(() => null);
+    return up ? next : null;
+}
+
 /**
  * The boss at the end of a zone.
  *
@@ -645,6 +673,13 @@ export async function groveBoss(buyerId, zoneId) {
         [buyerId, zoneId],
     ).catch(() => null);
 
+    // ── ⚠️ AND THIS IS WHAT OPENS THE NEXT ZONE ───────────────────────────────────────────────────
+    // Written AFTER boss_done above, deliberately. There is no transaction here (neon() is the HTTP driver
+    // — see [[postgres-landmines]]), so the order of the two writes is the whole of the safety: a failure
+    // here leaves a dead boss and a shut door, which the player fixes by killing it again. The other order
+    // would leave an open door and a boss still standing, which nothing fixes.
+    const unlocked = await openTheWay(buyerId, zone);
+
     await trackActivity(buyerId, "grove_boss", { zone: zoneId, boss: boss.id, hyper: hyper?.id || null }).catch(() => {});
 
     return {
@@ -662,6 +697,9 @@ export async function groveBoss(buyerId, zoneId) {
         merits: got.merits || 0,
         kills: Number(after?.boss_kills) || 1,
         first: Boolean(after?.was_first),
+        // The zone this kill just opened, or null if it was already open (a repeat kill, or zone twelve).
+        // The dopamine pop is driven off this, which is why it has to be the boss response that carries it.
+        unlocked,
         cooldownMs: BOSS_COOLDOWN_MS,
     };
 }

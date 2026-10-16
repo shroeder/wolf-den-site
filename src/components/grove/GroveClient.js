@@ -171,7 +171,6 @@ export default function GroveClient({ initial }) {
         if (!kills?.length || !session) return;
         const d = await post({ action: "settle", zone: session.zone.id, kills, eaten: eaten || {} });
         if (!d?.ok) return;
-        if (d.unlocked) setUnlockedNow(d.unlocked);
         if (d.newlySeen?.length) {
             // The recipe moment. Luke: "The recipe unlock should be dopamine inducing and inspectsble with a
             // call to action to craft it."
@@ -194,6 +193,9 @@ export default function GroveClient({ initial }) {
             return;
         }
         setBossWon(d);
+        // ⚠️ THE POP IS DRIVEN FROM HERE NOW, NOT FROM SETTLE. The boss kill is what moves unlocked_n
+        // (see openTheWay in grove.js), so it is the only response that can carry the new zone.
+        if (d.unlocked) setUnlockedNow(d.unlocked);
         await refresh();
     }, [session, refresh]);
 

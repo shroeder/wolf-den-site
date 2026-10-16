@@ -390,6 +390,8 @@ export default function GroveScene({
             foodLeft: Number(belt?.count) || 0,
             boss: null,
             bossClaimed: false,
+            // One-shot: the settle that banks the clearing kills so groveBoss will accept the fight.
+            clearFlushed: false,
             // The name beside the big health bar (a boss, or the rare spawn once you hit it), and the
             // banner across the middle. Both belong to the ZONE, so both are replaced when it is.
             barName: null,
@@ -900,6 +902,28 @@ export default function GroveScene({
                 wd.boss = null;
                 wd.target = null;
                 playKill(11);
+                // ── ⚠️ THE BOSS IS WHAT OPENS THE WAY, SO THE BEAT BELONGS HERE ───────────────
+                // It used to fire on the kill that crossed toUnlock, back when that was what moved
+                // unlocked_n. Now the door opens on this kill, and the biggest beat in the zone
+                // lands on the biggest thing in it.
+                //
+                // The door gets its own burst and shockwave because that is WHERE it opened; the
+                // herald says WHAT happened, in the middle of the screen, because the boss may have
+                // died nowhere near the door. The word is the PLACE it opened — a name you can now
+                // walk to is the reward. "Onward" is only for zone twelve, where there is nowhere
+                // further to name.
+                const open = wd.doors.find((d) => d.side === "on");
+                if (open && !open.openedAt) {
+                    open.openedAt = now;
+                    const y = 6;
+                    burst(open.x, y, { crit: true });
+                    burst(open.x, y, { kind: "dust" });
+                    shockwave(open.x, y, "kill");
+                    wd.shake.add(TRAUMA.boss);
+                    celebrateUnlock();
+                    const nextZone = GROVE_ZONES.find((z) => z.n === zone.n + 1);
+                    fireHerald("The way is open", nextZone?.name || "Onward", "way");
+                }
                 onBoss?.();
                 return;
             }
@@ -941,27 +965,22 @@ export default function GroveScene({
             //
             // Fired from here rather than from an effect because burst, shockwave and the shaker all live in
             // this closure, and because this is the one place that knows a kill just happened.
+            // ── ⚠️ CROSSING toUnlock EARNS THE BOSS, NOT THE DOOR ────────────────────────────
+            // This used to burst the door, shake the screen and herald "The way is open" right here,
+            // which was a lie the moment the boss became a real gate: the door stays shut until the
+            // thing at the end of the zone is dead. The beat moved to the boss kill below, where it
+            // is actually earned. The boss appearing has its own beat already — the spawn pass fires
+            // "The zone stirs" and playBossNotice the instant bossReadyNow goes true.
+            //
+            // ⚠️ BUT THE FLUSH STAYS, AND IT IS LOAD-BEARING. groveBoss refuses the kill unless the
+            // DATABASE says kills >= toUnlock, so the kills claimed since the last settle have to be
+            // banked before the boss can be fought at all — otherwise the player clears the zone,
+            // walks into the boss, and the server answers "Clear the zone first" for up to a respawn
+            // window. Fire and forget: the kills are spliced out of the log by the call, so a failure
+            // cannot double-claim them and the next settle carries on.
             const way = wd.doors.find((d) => d.side === "on");
-            if (way && !way.openedAt && (Number(zone.kills) || 0) + wd.killIndex >= zone.toUnlock) {
-                way.openedAt = now;
-                const y = 6;
-                burst(way.x, y, { crit: true });
-                burst(way.x, y, { kind: "dust" });
-                shockwave(way.x, y, "kill");
-                wd.shake.add(TRAUMA.boss);
-                celebrateUnlock();
-                // The door still gets its own burst and shockwave above, because that is WHERE it
-                // happened. The herald says WHAT happened, in the middle of the screen, because the
-                // player may be nowhere near the door when the kill that opens it lands.
-                // The word is the PLACE it opened, because a name you can now go to is the reward;
-                // "Onward" is only for zone twelve, where there is nowhere further to name.
-                const nextZone = GROVE_ZONES.find((z) => z.n === zone.n + 1);
-                fireHerald("The way is open", nextZone?.name || "Onward", "way");
-                // ⚠️ AND BANK IT NOW, OR THE DOOR STAYS SHUT FOR UP TO A RESPAWN WINDOW. The door is
-                // gated on the server's unlocked_n, which only moves on a settle -- so without this
-                // flush the player watches the way open, hears it open, and then finds it locked for
-                // another forty-five seconds. Fire and forget: the kills are spliced out of the log
-                // by the call, so a failure cannot double-claim them and the next settle carries on.
+            if (way && !wd.clearFlushed && (Number(zone.kills) || 0) + wd.killIndex >= zone.toUnlock) {
+                wd.clearFlushed = true;
                 if (wd.killLog.length) {
                     const ate = wd.eaten; wd.eaten = {};
                     Promise.resolve(onSettle?.(wd.killLog.splice(0), ate)).catch(() => {});
@@ -2073,9 +2092,15 @@ export default function GroveScene({
                     // readout and should move on the kill. The DOOR is a rule, and a rule has to match
                     // the thing enforcing it.
                     const locked = dr.side === "on" && dr.to > unlockedN;
-                    // What is still owed, floored at one: if the server has not opened the way, there is
-                    // at least one more kill to bank even when the local tally has already got there.
-                    const need = Math.max(1, zone.toUnlock - killsHere);
+                    // ── ⚠️ WHAT IS OWED CHANGES ONCE THE ZONE IS CLEARED ──────────────────────
+                    // Before the clear it is kills, floored at one: the server may not have banked
+                    // the last few even when the local tally has got there. After it, the only gate
+                    // left is the boss — and a skull with "1" beside it on a door that wants a boss
+                    // reads as "one more rat", which is exactly the misread that let the boss look
+                    // optional in the first place. So: a number while kills are owed, and the glyph
+                    // alone once the thing you owe is a creature.
+                    const owed = Math.max(0, zone.toUnlock - killsHere);
+                    const need = owed > 0 ? Math.max(1, owed) : null;
                     return (
                         <button key={dr.side} type="button"
                             className={`gv-door${locked ? " is-locked" : ""}${
@@ -2084,7 +2109,9 @@ export default function GroveScene({
                             ref={(n) => { const d = dr; d.node = n; }}
                             onPointerDown={locked ? undefined : () => { setEntering(dr.side); travel(dr.to); }}
                             aria-label={locked
-                                ? `Locked — ${need} more kills to open the way on`
+                                ? (need
+                                    ? `Locked — ${need} more kills to open the way on`
+                                    : `Locked — defeat ${groveBoss(zone.boss)?.name || "the boss"} to open the way on`)
                                 : dr.side === "back" ? "Back a zone" : "On to the next zone"}>
                             {/* ⚠️ KEYED, SO REACT REPLACES THE ELEMENT RATHER THAN SWAPPING ITS src.
                                 A CSS animation on an element that merely changed attribute does not run
@@ -2095,7 +2122,7 @@ export default function GroveScene({
                             {locked ? (
                                 <span className="gv-door-need">
                                     <img src={DOOR_ART.skull} alt="" />
-                                    <b>{need}</b>
+                                    {need ? <b>{need}</b> : null}
                                 </span>
                             ) : null}
                         </button>

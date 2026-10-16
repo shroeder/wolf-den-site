@@ -59,6 +59,18 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
     // Where a gate has taken us, overriding the zone in the URL once one is walked through.
     const [travelled, setTravelled] = useState(null);
     const [panel, setPanel] = useState(null);
+    // ── ⚠️ THE BENCH HAD NO WAY TO FILM AN OPEN DOOR, AND NOW THAT MATTERS ─────────────────────────
+    // GroveScene locks the way on with `dr.to > unlockedN`, and the lab never passed unlockedN — so it
+    // defaulted to 1 and every door on this bench was drawn locked, in every scene, for ever. That was
+    // survivable while the door opened on the kill count (the beat it exists to film was the burst, not
+    // the state). It is not survivable now that the BOSS is the gate: the whole change is "locked while
+    // the boss lives, open once it dies", and a bench that can only ever show one of those two states
+    // cannot review it. See [[harness-must-reproduce-the-bug-first]].
+    //
+    // So the bench holds the same fact the server does, and moves it on the same event: the boss kill.
+    // onBoss is the real scene's own callback, which is exactly what GroveClient now reads `unlocked`
+    // from — so the bench walks the real sequence rather than a staged copy of it.
+    const [bossDown, setBossDown] = useState(scene === "travel");
     // ⚠️ bossReady, OR THE BOSS SCENE IS EMPTY. The real client sets that flag from the server (the zone
     // must be cleared and the cooldown elapsed); without it the spawn pass skips the boss entirely and the
     // boss scene films a rootrat.
@@ -69,8 +81,13 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
         // The way on opens at toUnlock, which is 25 kills in zone two — forty seconds of film in which
         // nothing happens and then one thing does. "door" stands at the threshold so the gate is sealed
         // with its toll showing; "unlock" is one kill short, so the very next thing that dies opens it.
-        // "travel" banks the full toll, so the gate is already open and the only thing left to film is
-        // what walking through one looks like.
+        // "travel" banks the full toll AND starts with the boss already down (see bossDown above), so the
+        // gate is open and the only thing left to film is what walking through one looks like.
+        //
+        // ⚠️ AND NOTE WHAT "unlock" NOW FILMS. It is one kill short of the toll, which used to be one kill
+        // short of the DOOR opening. It no longer is: crossing the toll spawns the boss, and the door opens
+        // on the boss. So "unlock" films the boss arriving and "gate" films the sealed door standing beside
+        // it — the beat moved, and the scene that used to own it now sets it up.
         //
         // The boss scenes bank it too, and THAT IS A FIX RATHER THAN A TIDY-UP. `bossReady` below used to be
         // the whole gate, so setting it true was enough to put a boss in the world. It no longer is: the
@@ -119,7 +136,10 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
     const onTravelLab = useCallback((n) => { say(`travel ${n}`); setTravelled(n); }, [say]);
     const onSettleLab = useCallback((batch) => say(`settle ${batch.length}`), [say]);
     const onPanelLab = useCallback((k) => { say(`panel ${k}`); setPanel(k); }, [say]);
-    const onBossLab = useCallback(() => say("boss"), [say]);
+    // ⚠️ AND IT OPENS THE WAY, because that is what the kill now does. The real client does this off
+    // `unlocked` in the boss response (see openTheWay in grove.js); there is no server here, so the
+    // bench does it off the same callback.
+    const onBossLab = useCallback(() => { say("boss"); setBossDown(true); }, [say]);
     const onLeaveLab = useCallback(() => say("leave"), [say]);
     const onDeathLab = useCallback(() => say("death"), [say]);
 
@@ -143,6 +163,8 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
                 petArt={PET}
                 belt={LAB_BELT}
                 labScene={scene}
+                // Locked while the boss stands, open once it falls — the one thing this change is about.
+                unlockedN={bossDown ? (travelled || zoneN) + 1 : (travelled || zoneN)}
                 // ⚠️ THE LAB TRAVELS FOR REAL, or the transition cannot be filmed at all. onTravel was
                 // simply absent here, so tapping a gate on the bench did nothing and the one moment the
                 // door exists to deliver was the one moment unreviewable. No server: it swaps the zone
