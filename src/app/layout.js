@@ -3,6 +3,7 @@ import { Manrope, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { SITE_URL, STORE_PHONE_TEL } from "@/lib/site";
 import { openingHoursSpecification } from "@/lib/marketplace/store-hours.js";
+import PlayPeekers from "@/components/PlayPeekers";
 import Telemetry from "@/components/Telemetry";
 import ChunkRecovery from "@/components/ChunkRecovery";
 
@@ -157,6 +158,13 @@ export default function RootLayout({ children }) {
                 />
                 <Telemetry />
                 {children}
+                {/* ⚠️ AFTER {children}, AND IT IS NOT COSMETIC. It is position: fixed, so paint order is what
+                    decides whether the sprite sits over the page or under it — and rendered before the page
+                    it would be under every card on the site. Mounted in the ROOT layout because Luke's ask
+                    was "regardless of page you are on", and as a CLIENT component because a server one
+                    reading the session here would opt every static page in the site out of static
+                    rendering to answer a question about a sprite. */}
+                <PlayPeekers />
             </body>
         </html>
     );

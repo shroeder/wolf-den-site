@@ -24508,3 +24508,114 @@ body.cas-seated .social-fab { display: none; }
 .farm-neigh-chip.is-strip.is-done { opacity: 0.55; }
 .farm-neigh-noface { display: block; width: 100%; height: 100%; border-radius: inherit;
     background: rgba(255,255,255,0.06); }
+
+/* ── THE PEEKERS: GAMIFYING THE FUNNEL ────────────────────────────────────────────────────────────────
+   Luke: "if you arent logged in you should see fun stuff pop out from the sides and jiggle around and tempt
+   you to sign up ... a chest or boss or ship ... and also help you understand the context of the ask."
+
+   One at a time, from alternating edges, on every page of the site except the game, the admin and anything
+   to do with paying. See PlayPeekers.js for the schedule and the reasons.
+
+   ⚠️ IT HUGS THE EDGE RATHER THAN SITTING IN THE PAGE. A card in the middle of the screen is a modal, and a
+   modal is the thing that makes people leave. Anchored to the side with the sprite overhanging the frame, it
+   reads as something LEANING IN — which is both the ask Luke made and the thing that keeps the shop usable
+   while it is on screen.
+
+   ⚠️ AND IT IS 58% DOWN, NOT CENTRED. The header is fixed at the top and the web-push banner and cookie
+   strip live at the bottom; the middle-low band is the one horizontal stripe of a phone screen with nothing
+   else fixed in it. */
+/* ⚠️ 70%, NOT 58%. Filmed at 58 it landed exactly on the shop's own "See all inventory" button and sat
+   there for eleven seconds. A thing built to convert a visitor must not cover the page's own call to
+   action to do it — further down it overlaps product art instead, which costs the page nothing. */
+.peek { position: fixed; top: 70%; z-index: 45; pointer-events: none;
+    max-width: min(330px, 86vw); }
+/* ⚠️ THE SPRITE SITS AT THE SCREEN EDGE, NOT AT THE INBOARD END. Filmed the first way round, the pill slid
+   in with the creature furthest INTO the page and the sentence nearest the edge — so the thing peeking was
+   the text, and the whole point of using a boss or a chest to do this was pointing the wrong way. Both the
+   row and the pill inside it reverse together, which is why there are two rules per side. */
+.peek-right { right: 0; }
+.peek-left { left: 0; }
+
+/* The body is the whole target. A sprite you cannot press is a sprite that taught somebody the game and then
+   made them go and find the link themselves. */
+.peek-body { pointer-events: auto; display: flex; align-items: center; gap: 9px;
+    padding: 9px 12px 9px 8px; text-decoration: none; cursor: pointer;
+    background: linear-gradient(135deg, rgba(32,22,52,0.97), rgba(18,13,30,0.97));
+    border: 1px solid rgba(255,196,86,0.42);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 0 22px rgba(255,170,60,0.14); }
+.peek-right .peek-body { border-radius: 16px 0 0 16px; border-right: 0; flex-direction: row-reverse;
+    padding: 9px 8px 9px 12px; }
+.peek-left .peek-body { border-radius: 0 16px 16px 0; border-left: 0; }
+
+/* ⚠️ THE SPRITE OVERHANGS THE PILL, which is what makes it read as peeking IN rather than as an icon in a
+   banner. It is also the only part that keeps moving once the thing has arrived. */
+.peek-art { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; margin-top: -14px;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.65));
+    animation: peekJiggle 2.6s ease-in-out infinite; transform-origin: 50% 85%; }
+.peek-left .peek-art { transform: scaleX(-1); animation-name: peekJiggleFlip; }
+
+.peek-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.peek-tag { font-size: 10px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;
+    color: #ffc95e; }
+.peek-line { font-size: 12px; line-height: 1.33; color: #f1e8da; }
+.peek-cta { font-size: 11px; font-weight: 800; color: #9fe8d4; margin-top: 2px; }
+
+/* The dismiss. Small, outside the pill, and it is the reason the whole thing is allowed to be this cheerful:
+   anything that leans into your page uninvited has to be closable in one tap, and it stays closed for a week
+   (see OFF_DAYS). */
+/* ⚠️ TUCKED INTO THE PILL'S OWN CORNER, NOT SAT BESIDE IT. As a flex sibling it rode on the INBOARD side,
+   which put a 24px button down on top of whatever the page had there — on the shop that was the middle of
+   the gold "See all inventory" button. Absolutely positioned against the pill it belongs to the pill, which
+   is also the only place a visitor looks for the way to close something. */
+.peek-x { pointer-events: auto; position: absolute; top: -8px; width: 24px; height: 24px;
+    display: grid; place-items: center; border-radius: 999px; cursor: pointer;
+    color: #cbbfa6; background: rgba(18,13,30,0.98); border: 1px solid rgba(255,255,255,0.22);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6); }
+.peek-right .peek-x { left: -8px; }
+.peek-left .peek-x { right: -8px; }
+.peek-x:hover { color: #fff; background: rgba(40,28,62,0.98); }
+
+/* ── THE ARRIVAL ──────────────────────────────────────────────────────────────────────────────────────
+   Out past where it lands, then back — a pop rather than a slide. A thing that eases to a stop reads as a
+   panel opening; a thing that overshoots and settles reads as alive, which is the entire point of using the
+   game's own creatures to do this. */
+.peek.is-in { animation: peekInRight 620ms cubic-bezier(.17,.89,.32,1.28) both; }
+.peek-left.is-in { animation-name: peekInLeft; }
+.peek.is-out { animation: peekOutRight 520ms cubic-bezier(.5,0,.75,0) both; }
+.peek-left.is-out { animation-name: peekOutLeft; }
+
+@keyframes peekInRight {
+    0% { transform: translateX(104%); opacity: 0; }
+    60% { opacity: 1; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes peekInLeft {
+    0% { transform: translateX(-104%); opacity: 0; }
+    60% { opacity: 1; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes peekOutRight { to { transform: translateX(104%); opacity: 0; } }
+@keyframes peekOutLeft { to { transform: translateX(-104%); opacity: 0; } }
+
+/* The jiggle itself. Small, slow and uneven — a sprite that vibrates is a hazard light, and the difference
+   between "alive" and "alarm" is entirely in the amplitude. */
+@keyframes peekJiggle {
+    0%, 100% { transform: rotate(-3.5deg) translateY(0); }
+    30% { transform: rotate(3deg) translateY(-3px); }
+    55% { transform: rotate(-2deg) translateY(0); }
+    78% { transform: rotate(1.5deg) translateY(-2px); }
+}
+@keyframes peekJiggleFlip {
+    0%, 100% { transform: scaleX(-1) rotate(-3.5deg) translateY(0); }
+    30% { transform: scaleX(-1) rotate(3deg) translateY(-3px); }
+    55% { transform: scaleX(-1) rotate(-2deg) translateY(0); }
+    78% { transform: scaleX(-1) rotate(1.5deg) translateY(-2px); }
+}
+
+/* A narrow phone gets the same idea at a size that leaves the shop readable behind it. */
+@media (max-width: 430px) {
+    .peek { max-width: 80vw; top: 68%; }
+    .peek-art { width: 60px; height: 60px; }
+    .peek-line { font-size: 11.5px; }
+    .peek-body { padding: 8px 10px 8px 6px; gap: 7px; }
+}

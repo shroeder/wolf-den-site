@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { borderClass } from "@/lib/marketplace/borders.js";
+import { memberSession } from "@/lib/member-session-client";
 import { useTvMode } from "@/lib/tv-mode-client";
 
 const navItems = [
@@ -50,9 +51,10 @@ export default function SiteHeader() {
     useEffect(() => {
         let alive = true;
         (async () => {
-            const r = await fetch("/api/marketplace/auth/me", { cache: "no-store" }).catch(() => null);
-            const d = r && r.ok ? await r.json().catch(() => null) : null;
-            const b = d?.buyer;
+            // ⚠️ THROUGH memberSession, NOT A BARE FETCH. The peekers need the same answer on the same
+            // page load, and two layout-mounted components asking the same endpoint is one request per
+            // navigation per visitor for ever. One promise, both callers.
+            const b = await memberSession();
             if (alive && b) {
                 setMktAuthed(true);
                 setMktAvatar(b.avatarUrl || null);
