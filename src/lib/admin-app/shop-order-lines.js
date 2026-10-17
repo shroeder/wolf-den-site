@@ -48,8 +48,28 @@ export async function expandShopOrderLines(responseBody) {
     try {
         payload = JSON.parse(responseBody);
     } catch { return responseBody; }
-    const orders = payload?.orders;
-    if (!Array.isArray(orders) || !orders.length) return responseBody;
+    if (!Array.isArray(payload?.orders) || !payload.orders.length) return responseBody;
+    const n = await expandShopOrders(payload.orders);
+    if (!n) return responseBody;
+    try { return JSON.stringify(payload); } catch { return responseBody; }
+}
+
+/**
+ * The expansion itself, over PARSED orders, mutating them in place and returning how many it rewrote.
+ *
+ * ⚠️ IT IS SPLIT OUT BECAUSE THE SECOND READER ARRIVED AND DID NOT GET IT. For months the only caller was
+ * the proxy, so the work lived inside a function that takes and returns a JSON STRING — the shape a proxy
+ * happens to hold. reports-v2.js then went straight to Square instead of through the proxy, could not call
+ * a string-in/string-out helper against parsed orders, and silently did without: the same online order that
+ * the phone splits into the product, "Sales tax" and "Online processing fee" landed in v2 as one unnamed
+ * CUSTOM_AMOUNT line under Uncategorized at ~100% margin, counting the state's sales tax as profit. That is
+ * the exact bug this file was written to kill, alive again in the report meant to REPLACE the one it fixed.
+ *
+ * So the rule is the rule everywhere else in this codebase: one implementation, two thin callers. See
+ * [[two-paths-for-one-payout-always-drift]].
+ */
+export async function expandShopOrders(orders) {
+    if (!Array.isArray(orders) || !orders.length) return 0;
 
     // Which shop orders are referenced at all? One pass, so a page with none costs a single scan and no query.
     const wanted = new Set();
@@ -60,7 +80,7 @@ export async function expandShopOrderLines(responseBody) {
             if (id) wanted.add(id.toLowerCase());
         }
     }
-    if (!wanted.size) return responseBody;
+    if (!wanted.size) return 0;
 
     let rows = [];
     try {
@@ -71,10 +91,10 @@ export async function expandShopOrderLines(responseBody) {
         );
     } catch (error) {
         logger.warn("admin_app.shop_lines.lookup_failed", { message: error?.message });
-        return responseBody;
+        return 0;
     }
     const byId = new Map(rows.map((r) => [String(r.id).toLowerCase(), r]));
-    if (!byId.size) return responseBody;
+    if (!byId.size) return 0;
 
     let expanded = 0;
     for (const order of orders) {
@@ -157,7 +177,7 @@ export async function expandShopOrderLines(responseBody) {
         if (changed) order.line_items = out;
     }
 
-    if (!expanded) return responseBody;
+    if (!expanded) return 0;
     logger.info("admin_app.shop_lines.expanded", { orders: expanded });
-    try { return JSON.stringify(payload); } catch { return responseBody; }
+    return expanded;
 }

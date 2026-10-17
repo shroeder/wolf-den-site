@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db.js";
 import { annotateFifoCosts } from "@/lib/admin-app/fifo-annotate.js";
 import { createServerLogger } from "@/lib/server-logger";
+import { expandShopOrders } from "@/lib/admin-app/shop-order-lines.js";
 
 const logger = createServerLogger({ source: "api", subsystem: "reports-v2" });
 
@@ -335,6 +336,18 @@ export async function fetchSaleLines({ lookbackDays = 180, mysteryPackCostByVari
     if (!locationIds.length) return [];
     const orders = await searchCompletedOrders({ locationIds, lookbackDays });
     if (!orders.length) return [];
+
+    // ── AN ONLINE ORDER IS A LUMP UNTIL THIS RUNS ────────────────────────────────────────────────────────
+    // The website's checkout charges Square one anonymous CUSTOM_AMOUNT with no name and no catalog id, so
+    // without this an online order reports as a single Uncategorized line at ~100% margin — with the sales
+    // tax inside it counted as the shop's profit. The phone has been right about this for months only
+    // because it fetches Square THROUGH the admin proxy, which expands on the way past; this report goes to
+    // Square directly and so saw the lump. Same function the proxy calls, deliberately.
+    const expanded = await expandShopOrders(orders).catch((error) => {
+        logger.warn("reports_v2.shop_expand_failed", { message: error?.message });
+        return 0;
+    });
+    if (expanded) logger.info("reports_v2.shop_orders_expanded", { orders: expanded });
 
     const variationIds = new Set();
     for (const order of orders) {
