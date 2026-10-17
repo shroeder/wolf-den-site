@@ -8,7 +8,7 @@ import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
-import { pieceById } from "@/lib/marketplace/collection-pieces.js";
+import { pieceById, piecesOfSource } from "@/lib/marketplace/collection-pieces.js";
 import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
 import { setWheelBonus, setWheelRespinChance, itemsOfSet } from "@/lib/marketplace/sets.js";
 import { HALLOWEEN_PUBLIC, HALLOWEEN_WHEEL_SET } from "@/lib/marketplace/halloween.js";
@@ -417,6 +417,9 @@ const bonusGearFor = (wheelId) => (wheelId === "wheel_gold" ? GOLD_WHEEL_GEAR : 
 // Same shape as the mini wheel, which upgraded everything except the round it sent you to.
 const BONUS_DUPE_CHEST = { wheel: "gold", wheel_gold: "mythic" };
 const dupeChestFor = (wheelId) => BONUS_DUPE_CHEST[wheelId] || "gold";
+/** The tier a finished collection is paid on THIS member's wheel. Exported for scripts/halloween-piece-backfill
+ *  — a replay that invented its own tier would pay a different chest than the game does. */
+export const dupeChestForMember = async (buyerId) => dupeChestFor((await wheelForMember(buyerId, 1)).id);
 const BOARD_ITEMS = 6; // distinct gear on the board (× 3 tiles each = 18 tiles → big, readable match-3)
 
 // LEVEL ONLY. A perk wheel is never reachable from here — it is bought, not grown into — and skipping it in
@@ -506,7 +509,33 @@ const shuffle = (a) => { for (let i = a.length - 1; i > 0; i -= 1) { const j = M
 // ⚠️ THE CONTENTS ARE NEVER SENT UNTIL THE CHOICE IS MADE. rollPickEm returns a COUNT and nothing else; the
 // slots live on mkt_buyer.spin_bonus and only pickEmChoose reveals them. The match-3 next door has the same
 // property for the same reason — a board sent to the client is a board the client can read.
-const UNQUIET_PIECES = itemsOfSet(HALLOWEEN_WHEEL_SET);
+// ── ⚠️ READ AS TROPHIES, NOT AS ITEMS ────────────────────────────────────────────────────────────────────
+// The Unquiet's five pieces moved out of items.js with the other collections, and this round did not move
+// with them. Every one of the three things it does to a piece was still spelled in the language of gear:
+//
+//   the pool            itemsOfSet(...) ids, checked against getOwnedGearIds — the GEAR BAG, which trophies
+//                       left, so every member read as owning NONE of the five
+//   the grant           grantItem, which resolves through itemById and returns {ok:false,"unknown_item"}
+//                       for a trophy — so the chosen pumpkin wrote no row at all
+//   the card            itemById for the name and rarity, so the reveal said "A piece of The Unquiet"
+//
+// Together: the set page showed a member all five, the wheel told the same member they had none, boarded two
+// they already owned, and paid nothing for the one they picked. Four days, 73 rounds, not one piece granted
+// to anybody. The wheel was the only source — so the set was unobtainable and said otherwise.
+//
+// It is sourced off the TROPHY table now, so an id that does not resolve as a piece cannot be boarded, and
+// piecesOfSource throws at import rather than handing this file an empty pool (see collection-pieces.js).
+const UNQUIET_PIECES = piecesOfSource("offering").map((p) => p.id);
+// The set is the authority on what completes it, and the pool is the authority on what can be won. They must
+// be the same five — a piece in one and not the other is either unwinnable or uncountable.
+{
+    const inSet = new Set(itemsOfSet(HALLOWEEN_WHEEL_SET) || []);
+    const off = UNQUIET_PIECES.filter((id) => !inSet.has(id));
+    if (off.length || inSet.size !== UNQUIET_PIECES.length) {
+        throw new Error(`THE OFFERING and ${HALLOWEEN_WHEEL_SET} disagree: the wheel can win `
+            + `[${UNQUIET_PIECES.join(", ")}] and the set counts [${[...inSet].join(", ")}]`);
+    }
+}
 // Two of the three slots hold a piece you are missing. Not three: a pick with no wrong answer is not a pick,
 // and the empty pumpkin is what makes the other two worth choosing between.
 const OFFERING_PIECES = 2;
@@ -525,8 +554,10 @@ async function offeringCards(slots) {
     const art = new Map((rows || []).map((r) => [r.item_id, r.url]));
     return slots.map((sl) => {
         if (sl.kind === "piece") {
-            const it = itemById(sl.id);
-            return { kind: "piece", id: sl.id, name: it?.name || "A piece of The Unquiet", rarity: it?.rarity || "legendary", sprite: art.get(sl.id) || null, slot: it?.slot || null };
+            // A trophy, so pieceById — and no slot, because it is not worn. The sprite rows are still keyed
+            // by the old item id, which is why the lookup above did not have to change.
+            const pc = pieceById(sl.id);
+            return { kind: "piece", id: sl.id, name: pc?.name || "A piece of The Unquiet", rarity: pc?.rarity || "legendary", sprite: art.get(sl.id) || null, slot: null };
         }
         if (sl.kind === "chest") return { kind: "chest", name: CHEST_TIERS[sl.tierId]?.label || "Chest", rarity: "rare", sprite: P(`chest-${sl.tierId}`) };
         return { kind: "gold", name: `${sl.amount.toLocaleString()} gold`, rarity: "normal", sprite: P("coins-small") };
@@ -535,8 +566,9 @@ async function offeringCards(slots) {
 
 async function rollPickEm(buyerId) {
     const wheel = await wheelForMember(buyerId, 1);
-    const { getOwnedGearIds } = await import("@/lib/marketplace/inventory.js");
-    const owned = new Set(await getOwnedGearIds(buyerId).catch(() => []));
+    // THE TROPHY TABLE, and the TRUTH in it — not the gear bag (which no longer holds a piece) and not the
+    // loan (a borrowed piece must still be winnable, see getOwnedPieceIds).
+    const owned = new Set(await getOwnedPieceIds(buyerId, { includeLoan: false }).catch(() => []));
     const missing = UNQUIET_PIECES.filter((id) => !owned.has(id));
 
     // ── A FINISHED SET IS TOLD SO BEFORE IT PICKS ────────────────────────────────────────────────────────
@@ -581,10 +613,34 @@ export async function pickEmChoose(buyerId, index) {
 
     const chosen = g.slots[i];
     let text = "";
+    // What the pumpkin paid, when it is not the piece on the card — the client needs it to draw a chest over
+    // the reveal instead of a trophy the member already has.
+    let instead = null;
     if (chosen.kind === "piece") {
-        const { grantItem: give } = await import("@/lib/marketplace/inventory.js");
-        await give(buyerId, chosen.id, "spin_offering").catch(() => {});
-        text = `${itemById(chosen.id)?.name || "A piece"} — a piece of The Unquiet!`;
+        // ── AND A PIECE YOU ALREADY HOLD PAYS A CHEST ────────────────────────────────────────────────────
+        // grantPiece is ON CONFLICT DO NOTHING and returns false when the row already existed. That return
+        // was being thrown away here (it was grantItem, which could not even write the row) — so the one
+        // outcome that paid nothing looked exactly like winning: confetti, a trophy card, no row.
+        //
+        // The board should not be able to reach this any more now that ownership is read off the right table,
+        // but the pick-em is written three ways in two files and the match-3 next door learned this the hard
+        // way. A round that cannot pay the thing on the card pays the wheel's own top chest instead — the
+        // same rule bonusFlip uses, deliberately the same function, so the two cannot drift apart.
+        const granted = await grantPiece(buyerId, chosen.id, "spin_offering").catch(() => false);
+        const name = pieceById(chosen.id)?.name || "A piece";
+        if (granted) {
+            text = `${name} — a piece of The Unquiet!`;
+        } else {
+            const wheel = await wheelForMember(buyerId, 1);
+            const tier = dupeChestFor(wheel.id);
+            await addChests(buyerId, { [tier]: 1 }, { source: "spin_offering_dupe", meta: { piece: chosen.id, wheel: wheel.id } }).catch(() => {});
+            instead = { kind: "chest", tier, rarity: "rare", label: CHEST_TIERS[tier]?.label || "Chest", sprite: P(`chest-${tier}`) };
+            text = `${name} is already yours — a ${instead.label} instead!`;
+        }
+        // ⚠️ THE TELEMETRY THIS ROUND NEVER HAD. The match-3 logs spin_bonus_win / spin_bonus_dupe; this one
+        // logged nothing, so when it broke there was no way to tell who had played it and lost — the backfill
+        // had to be reconstructed from the WEDGE label on daily_spin and replayed. Never again.
+        await trackActivity(buyerId, granted ? "spin_offering_win" : "spin_offering_dupe", { piece: chosen.id, chest: instead?.tier || null }).catch(() => {});
     } else if (chosen.kind === "chest") {
         await addChests(buyerId, { [chosen.tierId]: 1 }, { source: "spin_offering" }).catch(() => {});
         text = `${CHEST_TIERS[chosen.tierId]?.label || "A chest"} — your set is complete.`;
@@ -597,7 +653,11 @@ export async function pickEmChoose(buyerId, index) {
 
     await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ ...g, picked: i, done: true })]).catch(() => {});
     const cards = await offeringCards(g.slots);
-    return { ok: true, picked: i, won: cards[i], reveal: cards, text, ...(await getSpinState(buyerId)) };
+    // The reveal still shows what was in all three pumpkins, because that is what was in them. Only the WON
+    // card carries the substitution, so the screen says both halves: the piece it held, and what you were
+    // paid because you already had it.
+    const won = instead ? { ...cards[i], duplicate: true, instead } : cards[i];
+    return { ok: true, picked: i, won, reveal: cards, text, ...(await getSpinState(buyerId)) };
 }
 
 // The BONUS GAME is a MATCH-3: a board of face-down tiles, THREE of every gear on it (so the end reveal is

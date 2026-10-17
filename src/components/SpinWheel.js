@@ -622,21 +622,26 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
                             {Array.from({ length: offer.size }).map((_, i) => {
                                 const card = offer.reveal ? offer.reveal[i] : null;
                                 const won = offer.picked === i;
+                                // A pumpkin holding a piece already in your cabinet PAYS A CHEST, so the won
+                                // card draws the chest it paid rather than the trophy you were already shown
+                                // on the sets page. The other two still show what they held — the substitution
+                                // belongs to the pick you made, not to the board.
+                                const show = won && offer.won?.duplicate && offer.won.instead ? offer.won.instead : card;
                                 return (
                                     <button
                                         key={i}
                                         type="button"
                                         className={`cw-offer-pick${card ? " is-open" : ""}${won ? " is-won" : ""}${offer.picked != null && !won ? " is-passed" : ""}`}
-                                        style={card ? { "--rar": rarCol(card.rarity) } : undefined}
+                                        style={show ? { "--rar": rarCol(show.rarity) } : undefined}
                                         onClick={() => chooseOffer(i)}
                                         disabled={offer.busy || offer.picked != null}
-                                        aria-label={card ? card.name : `Pumpkin ${i + 1}`}
+                                        aria-label={show ? (show.name || show.label) : `Pumpkin ${i + 1}`}
                                     >
-                                        {card ? (
+                                        {show ? (
                                             <>
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                {card.sprite ? <img src={card.sprite} alt="" className="cw-offer-img" /> : null}
-                                                <span className="cw-offer-name">{card.name}</span>
+                                                {show.sprite ? <img src={show.sprite} alt="" className="cw-offer-img" /> : null}
+                                                <span className="cw-offer-name">{show.name || show.label}</span>
                                             </>
                                         ) : (
                                             <>

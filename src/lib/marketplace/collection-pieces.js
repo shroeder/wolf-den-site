@@ -18,6 +18,12 @@
 // The guards are gone because the category error is impossible.
 //
 // `source` is how you EARN it, not what it is — chest, xp_shop, wheel_bonus, mining or forge.
+//
+// ⚠️ AND IT IS A ROUTING KEY, NOT A LABEL. rollPieceDrop / unownedFromSource draw their pool by matching it,
+// so two paths that share a `source` share a pool whether their authors meant to or not. The three Hallowe'en
+// sets arrived here reading `source: "chest"` — the ordinary chest's key — which put a seasonal set into the
+// pool of every wooden chest in the game and made "only from the Hallowe'en chest" false. They are
+// "hw_chest" and "offering" now, and PIECE_SOURCES below is the list of keys something actually serves.
 
 export const COLLECTION_PIECES = [
     { id: "heavens_trident", set: "corsair", name: "Heaven's Trident", rarity: "mythic", icon: "GiTrident", flavor: "Forged for a god of storms.", sea: { plunder: 8 }, source: "chest", sort: 206 },
@@ -114,25 +120,25 @@ export const COLLECTION_PIECES = [
     // NO `slot` AND NO COMBAT STATS, by the same contract the other forty pieces are under. Their set
     // bonuses are untouched — those live in sets.js and pay for being OWNED, and getOwnedSetIds reads the
     // trophy table and the gear bag both, so the payout never noticed the move.
-    { id: "hw_hollow_crown", set: "hw_harvest", name: "Hollow Crown", rarity: "legendary", icon: "GiPumpkinLantern", flavor: "Someone cut a face in it. The face stayed.", source: "chest", sort: 1300 },
-    { id: "hw_reapers_sickle", set: "hw_harvest", name: "Reaper's Sickle", rarity: "mythic", icon: "GiSickle", flavor: "It is a harvest tool. It was always a harvest tool.", source: "chest", sort: 1302 },
-    { id: "hw_wisp_lantern", set: "hw_harvest", name: "Wisp Lantern", rarity: "legendary", icon: "GiOldLantern", flavor: "Follow it and see.", source: "chest", sort: 1303 },
-    { id: "hw_cord_small_hours", set: "hw_harvest", name: "Cord of Small Hours", rarity: "legendary", icon: "GiBelt", flavor: "Knotted once for every hour nobody was awake.", source: "chest", sort: 1305 },
-    { id: "hw_nine_candles", set: "hw_harvest", name: "Ring of Nine Candles", rarity: "legendary", icon: "GiCandleLight", flavor: "Eight are lit. The ninth is for later.", source: "chest", sort: 1308 },
+    { id: "hw_hollow_crown", set: "hw_harvest", name: "Hollow Crown", rarity: "legendary", icon: "GiPumpkinLantern", flavor: "Someone cut a face in it. The face stayed.", source: "hw_chest", sort: 1300 },
+    { id: "hw_reapers_sickle", set: "hw_harvest", name: "Reaper's Sickle", rarity: "mythic", icon: "GiSickle", flavor: "It is a harvest tool. It was always a harvest tool.", source: "hw_chest", sort: 1302 },
+    { id: "hw_wisp_lantern", set: "hw_harvest", name: "Wisp Lantern", rarity: "legendary", icon: "GiOldLantern", flavor: "Follow it and see.", source: "hw_chest", sort: 1303 },
+    { id: "hw_cord_small_hours", set: "hw_harvest", name: "Cord of Small Hours", rarity: "legendary", icon: "GiBelt", flavor: "Knotted once for every hour nobody was awake.", source: "hw_chest", sort: 1305 },
+    { id: "hw_nine_candles", set: "hw_harvest", name: "Ring of Nine Candles", rarity: "legendary", icon: "GiCandleLight", flavor: "Eight are lit. The ninth is for later.", source: "hw_chest", sort: 1308 },
 
-    { id: "hw_quiet_row_skullcap", set: "hw_gravebound", name: "Skullcap of the Quiet Row", rarity: "legendary", icon: "GiSkullMask", flavor: "Third from the end, under the yew.", source: "chest", sort: 1309 },
-    { id: "hw_gravemould_cuirass", set: "hw_gravebound", name: "Grave-Mould Cuirass", rarity: "legendary", icon: "GiBreastplate", flavor: "Dug up twice. Worn once.", source: "chest", sort: 1301 },
-    { id: "hw_femur_maul", set: "hw_gravebound", name: "Femur Maul", rarity: "mythic", icon: "GiBoneMace", flavor: "It belonged to something that walked upright.", source: "chest", sort: 1310 },
-    { id: "hw_gravewalkers", set: "hw_gravebound", name: "Gravewalkers", rarity: "legendary", icon: "GiBoots", flavor: "Quiet on purpose.", source: "chest", sort: 1304 },
-    { id: "hw_knucklebone_charm", set: "hw_gravebound", name: "Knucklebone Charm", rarity: "legendary", icon: "GiCrossedBones", flavor: "Rattle them and ask again.", source: "chest", sort: 1311 },
+    { id: "hw_quiet_row_skullcap", set: "hw_gravebound", name: "Skullcap of the Quiet Row", rarity: "legendary", icon: "GiSkullMask", flavor: "Third from the end, under the yew.", source: "hw_chest", sort: 1309 },
+    { id: "hw_gravemould_cuirass", set: "hw_gravebound", name: "Grave-Mould Cuirass", rarity: "legendary", icon: "GiBreastplate", flavor: "Dug up twice. Worn once.", source: "hw_chest", sort: 1301 },
+    { id: "hw_femur_maul", set: "hw_gravebound", name: "Femur Maul", rarity: "mythic", icon: "GiBoneMace", flavor: "It belonged to something that walked upright.", source: "hw_chest", sort: 1310 },
+    { id: "hw_gravewalkers", set: "hw_gravebound", name: "Gravewalkers", rarity: "legendary", icon: "GiBoots", flavor: "Quiet on purpose.", source: "hw_chest", sort: 1304 },
+    { id: "hw_knucklebone_charm", set: "hw_gravebound", name: "Knucklebone Charm", rarity: "legendary", icon: "GiCrossedBones", flavor: "Rattle them and ask again.", source: "hw_chest", sort: 1311 },
 
-    { id: "hw_poltergeist_chain", set: "hw_unquiet", name: "Poltergeist's Chain", rarity: "mythic", icon: "GiChainedHeart", flavor: "You will hear it before the room does.", source: "chest", sort: 1314 },
-    { id: "hw_coldspot_mirror", set: "hw_unquiet", name: "Coldspot Mirror", rarity: "legendary", icon: "GiMirrorMirror", flavor: "Nothing is behind you. Check anyway.", source: "chest", sort: 1312 },
-    { id: "hw_ninth_night_shroud", set: "hw_unquiet", name: "Shroud of the Ninth Night", rarity: "mythic", icon: "GiCape", flavor: "Eight nights it was only a sheet.", source: "chest", sort: 1306 },
-    { id: "hw_trailing_hem", set: "hw_unquiet", name: "Trailing Hem", rarity: "legendary", icon: "GiLegArmor", flavor: "It does not quite reach the floor. It never has.", source: "chest", sort: 1313 },
+    { id: "hw_poltergeist_chain", set: "hw_unquiet", name: "Poltergeist's Chain", rarity: "mythic", icon: "GiChainedHeart", flavor: "You will hear it before the room does.", source: "offering", sort: 1314 },
+    { id: "hw_coldspot_mirror", set: "hw_unquiet", name: "Coldspot Mirror", rarity: "legendary", icon: "GiMirrorMirror", flavor: "Nothing is behind you. Check anyway.", source: "offering", sort: 1312 },
+    { id: "hw_ninth_night_shroud", set: "hw_unquiet", name: "Shroud of the Ninth Night", rarity: "mythic", icon: "GiCape", flavor: "Eight nights it was only a sheet.", source: "offering", sort: 1306 },
+    { id: "hw_trailing_hem", set: "hw_unquiet", name: "Trailing Hem", rarity: "legendary", icon: "GiLegArmor", flavor: "It does not quite reach the floor. It never has.", source: "offering", sort: 1313 },
     // The chase piece, and the only ascendant of the fifteen — the Ghost chest is the top of the ladder and
     // has to hold something the other three cannot.
-    { id: "hw_candle_eye", set: "hw_unquiet", name: "Candle-Eye Amulet", rarity: "ascendant", icon: "GiCandleFlame", flavor: "It watches the wick, not you. Mostly.", source: "chest", sort: 1307 },
+    { id: "hw_candle_eye", set: "hw_unquiet", name: "Candle-Eye Amulet", rarity: "ascendant", icon: "GiCandleFlame", flavor: "It watches the wick, not you. Mostly.", source: "offering", sort: 1307 },
 ];
 
 export const PIECE_IDS = COLLECTION_PIECES.map((p) => p.id);
@@ -140,6 +146,30 @@ const BY_ID = new Map(COLLECTION_PIECES.map((p) => [p.id, p]));
 export const pieceById = (id) => BY_ID.get(String(id || "")) || null;
 export const isPieceId = (id) => BY_ID.has(String(id || ""));
 export const piecesOfSet = (setId) => COLLECTION_PIECES.filter((p) => p.set === setId);
+
+/**
+ * Every piece a given acquisition path hands out — THE pool builder, so a reward path names its key once and
+ * cannot be holding a list that has quietly gone empty.
+ *
+ * ⚠️ IT THROWS ON AN EMPTY POOL, AT IMPORT, and that is the whole point of it existing. The Hallowe'en chest
+ * built its pool as `ITEMS.filter(isHalloweenItem)` and The Offering built its ownership check against the
+ * gear bag; the migration took the pieces out of ITEMS and out of that bag, and both pools became empty
+ * arrays. Nothing threw. The chest's top rung fell through to candy and the wheel's pick-em handed over
+ * nothing at all, for four days, while both screens went on advertising the set — a reward path that pays
+ * nothing is indistinguishable from a reward path nobody has won yet.
+ *
+ * The mini wheel (MINI_WHEEL_WEDGES, spin.js) already refuses to load against a list that does not match its
+ * art, for exactly this reason. Same contract: a pool this file cannot fill is a build failure, not a
+ * surprise in production.
+ */
+export const piecesOfSource = (source) => {
+    const pool = COLLECTION_PIECES.filter((p) => p.source === source);
+    if (!pool.length) {
+        throw new Error(`no collection piece carries source "${source}" — a reward path is asking for a pool `
+            + `nothing fills, which pays out NOTHING silently. Fix the source key or the pieces.`);
+    }
+    return pool;
+};
 
 // The affinity a set of OWNED pieces contributes. Mirrors sumItemSea / sumItemFarm / sumItemDepth in items.js,
 // but over pieces — an owned piece's affix applies without being worn, which is the whole contract.

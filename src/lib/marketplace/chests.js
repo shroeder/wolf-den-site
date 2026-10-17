@@ -3,9 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { RARITIES } from "@/lib/marketplace/rarity.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
-import { ITEMS, isHalloweenItem } from "@/lib/marketplace/items.js";
-import { itemsOfSet } from "@/lib/marketplace/sets.js";
-import { HALLOWEEN_WHEEL_SET } from "@/lib/marketplace/halloween.js";
+import { ITEMS } from "@/lib/marketplace/items.js";
+import { piecesOfSource } from "@/lib/marketplace/collection-pieces.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { maybeGrantChestPet } from "@/lib/marketplace/pet-drops.js";
@@ -556,12 +555,24 @@ export async function openChests(buyerId, { tier = null, max = BULK_OPEN_CAP } =
 // measured and paid an active member about six pieces out of fifteen for the whole event — a chase nobody
 // finishes is a chase nobody starts. Re-run scripts/halloween-odds.mjs before touching them; it carries the
 // arithmetic and the measurement together.
-// The five pieces of The Unquiet, read from the set itself rather than listed again here. A second copy of
-// those ids is a second thing to update the day a piece is renamed, and the copy that gets missed is the one
-// that quietly puts the wheel's exclusive set back into the chest pool.
-const WHEEL_SET_PIECES = new Set(itemsOfSet(HALLOWEEN_WHEEL_SET) || []);
+// ── THE TWO TROPHY POOLS THIS FILE DRAWS FROM, ASSERTED AT IMPORT ────────────────────────────────────────
+// `source` is the routing key rollPieceDrop matches on, so these two strings are the whole of which chest
+// hands out which collection — and piecesOfSource THROWS on a pool nothing fills rather than returning [].
+//
+// ⚠️ THAT ASSERTION IS HERE BECAUSE THIS EXACT RUNG WENT DEAD FOR FOUR DAYS. The Hallowe'en chest's top rung
+// built its pool as `ITEMS.filter(isHalloweenItem)`; the pieces moved out of items.js on 12 Oct and the
+// filter started returning an empty array. Nothing threw, the rung fell through to the pet and the candy,
+// and Hollowed Harvest and Gravebound became unobtainable while both panels went on showing them. 235 chests
+// were opened in that window and not one piece came out of any of them.
+//
+// It also replaces WHEEL_SET_PIECES, which used to subtract The Unquiet from this pool by hand. The wheel's
+// set carries `source: "offering"` now, so it is not in either of these pools to begin with — "only from the
+// wheel" is a property of the data rather than a filter somebody has to remember.
+const CHEST_PIECE_SOURCE = "chest";       // the ordinary chest — Corsair
+const HW_CHEST_PIECE_SOURCE = "hw_chest"; // the Hallowe'en chest — Hollowed Harvest + Gravebound
+for (const s of [CHEST_PIECE_SOURCE, HW_CHEST_PIECE_SOURCE]) piecesOfSource(s);
 
-const HW_GEAR_CHANCE = { hw_candycorn: 0.12, hw_pumpkin: 0.20, hw_skeleton: 0.28, hw_ghost: 0.40 };
+export const HW_GEAR_CHANCE = { hw_candycorn: 0.12, hw_pumpkin: 0.20, hw_skeleton: 0.28, hw_ghost: 0.40 };
 const HW_PET_CHANCE = { hw_candycorn: 0.04, hw_pumpkin: 0.06, hw_skeleton: 0.09, hw_ghost: 0.15 };
 
 // Each chest leads with its own pet — that is what makes somebody want a SPECIFIC chest rather than any
@@ -604,28 +615,21 @@ async function openHalloweenChest(buyerId, tier, remaining) {
     // Un-owned only, and a member holding the full set falls THROUGH to the pet and the candy rather than
     // being paid gold dust. Dust is the ordinary chest's answer to a finished collection; on an eight-piece
     // seasonal set it would mean the chest stopped being a Halloween chest the moment you completed it.
-    if (Math.random() < (HW_GEAR_CHANCE[tier] || 0)) {
-        // Listed pieces count as owned here too — same reason as the ordinary chest roll below.
-        const [ownedRows, listedRows] = await Promise.all([
-            db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
-            db.query(`SELECT item_id FROM mkt_auction WHERE seller_id = $1 AND status = 'active'`, [buyerId]).catch(() => []),
-        ]);
-        const owned = new Set([...ownedRows.map((r) => r.item_id), ...listedRows.map((r) => r.item_id)]);
-        // ⚠️ THE UNQUIET IS NOT IN THIS POOL — IT IS THE WHEEL'S SET. Luke: "a set for halloween you can only
-        // get from the wheel during halloween." Its five pieces come off THE OFFERING (spin.js) and nowhere
-        // else, so a chest that could also hand them over would make "only from the wheel" false on the one
-        // screen that says it. See HALLOWEEN_WHEEL_SET.
-        //
-        // The other two Halloween sets are still here: Hollowed Harvest and Gravebound have nothing to do with
-        // the wheel, and this is where they belong.
-        const pool = ITEMS.filter((i) => isHalloweenItem(i) && !owned.has(i.id) && !WHEEL_SET_PIECES.has(i.id));
-        if (pool.length) {
-            const item = pool[Math.floor(Math.random() * pool.length)];
-            // `via` is a STRING that lands in acquired_via, not an options bag — an object here writes
-            // "[object Object]" into the column every existing report groups by.
-            await grantItem(buyerId, item.id, "chest").catch(() => {});
-            return { ok: true, remaining, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, flavor: item.flavor } };
-        }
+    // ⚠️ THE UNQUIET IS NOT IN THIS POOL — IT IS THE WHEEL'S SET. Luke: "a set for halloween you can only get
+    // from the wheel during halloween." Its five pieces come off THE OFFERING (spin.js) and nowhere else, and
+    // they carry `source: "offering"`, so this rung cannot reach them even by mistake.
+    //
+    // The other two Halloween sets are here: Hollowed Harvest and Gravebound have nothing to do with the
+    // wheel, and this is where they belong. Through rollPieceDrop — the same function the ordinary chest and
+    // the mine use — which rolls the chance, skips anything already owned, writes the trophy row and returns
+    // the piece. A member holding all ten gets null and falls THROUGH to the pet and the candy rather than
+    // being paid gold dust: dust is the ordinary chest's answer to a finished collection, and on a seasonal
+    // set it would mean the chest stopped being a Hallowe'en chest the moment you completed it.
+    const { rollPieceDrop } = await import("@/lib/marketplace/collection-owned.js");
+    const trophy = await rollPieceDrop(buyerId, { source: HW_CHEST_PIECE_SOURCE, chance: HW_GEAR_CHANCE[tier] || 0 }).catch(() => null);
+    if (trophy) {
+        return { ok: true, remaining, piece: true,
+            item: { id: trophy.id, name: trophy.name, rarity: trophy.rarity, slot: null, icon: trophy.icon, flavor: trophy.flavor } };
     }
 
     // ── THE PET ──────────────────────────────────────────────────────────────────────────────────────────
@@ -909,7 +913,7 @@ export async function openChest(buyerId, tier) {
     // Rolled at the same rarity, uncommonly, and never a duplicate.
     if (!isEliteRarity) {
         const { rollPieceDrop } = await import("@/lib/marketplace/collection-owned.js");
-        const trophy = await rollPieceDrop(buyerId, { source: "chest", rarity, chance: 0.12 }).catch(() => null);
+        const trophy = await rollPieceDrop(buyerId, { source: CHEST_PIECE_SOURCE, rarity, chance: 0.12 }).catch(() => null);
         if (trophy) {
             return { ok: true, remaining: dec.count, piece: true,
                 item: { id: trophy.id, name: trophy.name, rarity: trophy.rarity, slot: null, icon: trophy.icon, stats: null, reqLevel: null, signature: null, charged: false, chargeReward: null } };
