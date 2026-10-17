@@ -138,9 +138,48 @@ export async function expandShopOrders(orders) {
                 });
             });
 
-            // Tax, shipping and the online fee, named rather than buried in a product's price.
+            // ── TAX RIDES THE UNITS, LIKE EVERY OTHER SALE IN THE SHOP ──────────────────────────────────
+            // Luke: "every tax is associated to a unit, why is this unique".
+            //
+            // It was unique, and the online order was the odd one out rather than the tax. On a register
+            // sale Square hangs the tax on the LINE — `total_tax_money`, sitting beside the sale, never
+            // inside it — so tax is never revenue, never a category, and has no margin to be wrong about.
+            // 64 of 71 lines on the day this was written worked that way; one online order did not.
+            //
+            // Tax was emitted here as a named CUSTOM_AMOUNT line instead, because the lump Square charged
+            // includes it and dropping it would leave the order short. But a line is REVENUE, so it then
+            // needed a fake "cost" equal to itself to cancel out, and the card fee allocated to it had
+            // nowhere to go — which is what surfaced as "Sales Tax (held for the state) ... -3%" on the
+            // day's category list. Every one of those problems is downstream of the shape.
+            //
+            // So it goes where the register puts it: spread across the product lines as `total_tax_money`,
+            // which is the exact field both readers already use (reports-v2.js `fetchSaleLines`, Kotlin
+            // `SquareTransactionsService`). The money does not move — it is still counted, still inside
+            // the reconciliation below — it just stops pretending to be a sale.
+            const taxCents = Number(shop.tax_cents) || 0;
+            if (taxCents > 0 && built.length) {
+                // Proportional to each line's share, with the rounding remainder landing on the biggest
+                // line. The parts MUST add back to taxCents exactly: this number is a liability to the
+                // state, and a penny invented here is a penny that never gets remitted.
+                let assigned = 0;
+                const shares = built.map((b, i) => {
+                    const base = Number(b.total_money?.amount) || 0;
+                    const share = productCents > 0 ? Math.floor((taxCents * base) / productCents) : (i === 0 ? taxCents : 0);
+                    assigned += share;
+                    return share;
+                });
+                let biggest = 0;
+                for (let i = 1; i < built.length; i += 1) {
+                    if ((Number(built[i].total_money?.amount) || 0) > (Number(built[biggest].total_money?.amount) || 0)) biggest = i;
+                }
+                shares[biggest] += taxCents - assigned;
+                built.forEach((b, i) => { if (shares[i] > 0) b.total_tax_money = money(shares[i]); });
+            }
+
+            // Shipping and the online fee stay NAMED LINES, and that is not an oversight. Both are money the
+            // shop actually took — shipping is cost recovery the carrier then takes back, the fee is revenue
+            // that offsets the card cost — so each is a sale with a story, unlike tax, which was never ours.
             const extras = [
-                ["Sales tax", Number(shop.tax_cents) || 0],
                 ["Shipping", Number(shop.shipping_cents) || 0],
                 ["Online processing fee", Number(shop.online_fee_cents) || 0],
             ];
@@ -161,9 +200,15 @@ export async function expandShopOrders(orders) {
             // ⚠️ THE REFUSAL. If the rebuilt lines do not add back to what Square charged, something about this
             // order is not what we think it is (a partial refund, a discount we did not model, a stale row) —
             // and the honest response is to leave it alone rather than publish a number that is merely close.
-            if (productCents + extraCents !== lumpCents) {
+            //
+            // ⚠️ TAX IS STILL IN THIS SUM EVEN THOUGH IT IS NO LONGER A LINE. The lump Square charged is the
+            // basket PLUS tax, so the moment tax stopped being counted in `extraCents` it had to be counted
+            // here instead — otherwise every online order in the shop fails this check by exactly its tax
+            // and the expansion silently stops happening, which is the bug this whole file exists to fix,
+            // restored by the fix for a different one.
+            if (productCents + taxCents + extraCents !== lumpCents) {
                 logger.warn("admin_app.shop_lines.total_mismatch", {
-                    shopOrderId: shop.id, lumpCents, productCents, extraCents,
+                    shopOrderId: shop.id, lumpCents, productCents, taxCents, extraCents,
                 });
                 out.push(li);
                 continue;
