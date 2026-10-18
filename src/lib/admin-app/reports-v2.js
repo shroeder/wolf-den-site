@@ -122,7 +122,7 @@ function extractItemCategoryId(itemData) {
  * DELETES sold-out items rather than archiving them. Without it every past sale of a deleted item loses its
  * cost, its name and its image — 559 of 877 variations, once. See [[square-deleted-items-cost-loss]].
  */
-async function fetchVariationCatalogData(variationIds) {
+async function fetchVariationCatalogData(variationIds, imageIdByItemId = new Map()) {
     const out = new Map();
     for (let i = 0; i < variationIds.length; i += 100) {
         const batch = variationIds.slice(i, i + 100);
@@ -137,6 +137,11 @@ async function fetchVariationCatalogData(variationIds) {
             const id = String(o.id || "").trim();
             const cat = extractItemCategoryId(o.item_data);
             if (id && cat) categoryByItemId.set(id, cat);
+            // The item's picture, captured in the pass that is already running. The ITEM objects are here
+            // either way, so the report's images cost no extra Square call at this stage — only the second
+            // hop below, which resolves the image ids to URLs.
+            const img = String(o.item_data?.image_ids?.[0] || "").trim();
+            if (id && img) imageIdByItemId.set(id, img);
         }
         for (const o of objects) {
             if (String(o.type).toUpperCase() !== "ITEM_VARIATION") continue;
@@ -150,6 +155,30 @@ async function fetchVariationCatalogData(variationIds) {
                 squareCategoryId: extractItemCategoryId(o.item_data) || categoryByItemId.get(itemId) || "",
                 raw: o,
             });
+        }
+    }
+    return out;
+}
+
+/**
+ * Image ids → their hosted URLs.
+ *
+ * ⚠️ `include_deleted_objects` AGAIN, AND FOR THE SAME REASON AS EVERYWHERE ELSE IN THIS FILE. Deleting an
+ * item takes its IMAGE object with it, and a report of last month's sales still wants the picture. Without
+ * the flag every sale of a since-deleted item loses its image — which, on a shop whose intake DELETES
+ * sold-out items, is most of the history.
+ */
+async function fetchImageUrls(imageIds) {
+    const out = new Map();
+    const ids = [...new Set(imageIds.filter(Boolean))];
+    for (let i = 0; i < ids.length; i += 100) {
+        const { json } = await squarePost("/v2/catalog/batch-retrieve", {
+            object_ids: ids.slice(i, i + 100), include_deleted_objects: true,
+        });
+        for (const o of json.objects || []) {
+            if (String(o.type).toUpperCase() !== "IMAGE") continue;
+            const url = String(o.image_data?.url || "").trim();
+            if (url) out.set(String(o.id), url);
         }
     }
     return out;
@@ -356,8 +385,28 @@ export async function fetchSaleLines({ lookbackDays = 180, mysteryPackCostByVari
             if (vid) variationIds.add(vid);
         }
     }
-    const catalogByVariationId = await fetchVariationCatalogData([...variationIds]);
+    // ── THE PICTURES ────────────────────────────────────────────────────────────────────────────────────
+    // v1 shows a thumbnail on every report row and v2 showed a grey placeholder on all of them, because the
+    // port hardcoded `imageUrl: null` — the one field of SoldItem it never filled. The shared ReportsScreen
+    // draws whatever it is handed, so the difference was never the UI.
+    //
+    // Resolved the same two hops the Kotlin uses (fetchItemImageUrls): the ITEM carries `image_ids`, and the
+    // IMAGE object carries the URL. The first hop is free — fetchVariationCatalogData is already pulling
+    // those ITEM objects for the category and the cost.
+    const imageIdByItemId = new Map();
+    const catalogByVariationId = await fetchVariationCatalogData([...variationIds], imageIdByItemId);
     const costByVariationId = await resolveUnitCosts(catalogByVariationId);
+    const imageUrlByImageId = await fetchImageUrls([...imageIdByItemId.values()]).catch((error) => {
+        // A missing picture is never worth failing a report over.
+        logger.warn("reports_v2.image_lookup_failed", { message: error?.message });
+        return new Map();
+    });
+    const imageUrlByItemId = new Map();
+    for (const [itemId, imageId] of imageIdByItemId) {
+        const url = imageUrlByImageId.get(imageId);
+        if (url) imageUrlByItemId.set(itemId, url);
+    }
+    logger.info("reports_v2.images", { items: imageIdByItemId.size, resolved: imageUrlByItemId.size });
 
     const paymentIdsByOrderId = new Map();
     for (const order of orders) {
@@ -424,6 +473,7 @@ export async function fetchSaleLines({ lookbackDays = 180, mysteryPackCostByVari
                 quantity,
                 netSales,
                 itemId: lookup?.itemId || null,
+                imageUrl: (lookup?.itemId && imageUrlByItemId.get(lookup.itemId)) || null,
                 variationId: variationId || null,
                 cost: unitCost * quantity,
                 unitCost,
@@ -749,7 +799,8 @@ function buildLevel({ lines, cashRefunds, consigned, classifiers: c, bucketOf, l
                     productName: name,
                     quantity: qty,
                     revenue: sum(prodLines, (l) => l.netSales),
-                    imageUrl: null,
+                    // First line that has one, exactly as v1 does (`firstNotNullOfOrNull { it.imageUrl }`).
+                    imageUrl: prodLines.find((l) => l.imageUrl)?.imageUrl || null,
                     cost: lineCost,
                     unitCost: qty !== 0 ? lineCost / qty : (prodLines[0]?.unitCost || 0),
                     processingFee: sum(prodLines, (l) => l.processingFee),
