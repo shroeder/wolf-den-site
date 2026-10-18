@@ -65,12 +65,17 @@ const RULES = [
     { re: /rent:wolff|rent:wo|\brent\b/, bucket: "Rent", cost: true },
     { re: /travelers|next insurance|^next\b|insurance/, bucket: "Insurance", cost: true },
     { re: /metronet|comcast|xfinity|internet/, bucket: "Internet", cost: true },
-    { re: /vercel|neon|resend|namecheap|easypost|github|squarespace|openai|anthropic|chatgpt|claude|google|microsoft/,
+    { re: /vercel|neon|resend|namecheap|github|squarespace|openai|anthropic|chatgpt|claude|google|microsoft/,
       bucket: "Software & hosting", cost: true },
     { re: /ingstad|radio|advertis|facebook|meta ads/, bucket: "Advertising", cost: true },
     { re: /cvs|dollar general|target|walmart|menards|hardware|office|staples|top loader|sleeve|label/,
       bucket: "Supplies", cost: true },
-    { re: /u\.s\. post office|usps|ups|fedex|shipping|postage/, bucket: "Shipping", cost: true },
+    // ⚠️ EASYPOST IS POSTAGE, NOT HOSTING. It sat in the "Software & hosting" rule above, which put
+    // prepaid postage in the same line as Vercel and Neon — the line that gets read when the hosting bill is
+    // the question (see [[hosting-cost-what-actually-bills]]). An EasyPost debit is not a bill at all: it is a
+    // balance top-up that buys USPS labels, and the buyer already paid that postage at checkout. $120 of
+    // top-ups in October would have read as the hosting bill tripling.
+    { re: /u\.s\. post office|usps|ups|fedex|easypost|shipping|postage/, bucket: "Shipping", cost: true },
     { re: /painting|repair|install|plumb|electric/, bucket: "Repairs & services", cost: true },
 ];
 
