@@ -68,6 +68,18 @@ const RECIPE_NAME = Object.fromEntries(GROVE_RECIPES.map((r) => [r.id, r.name]))
 const recipeName = (id) => RECIPE_NAME[id] || id;
 const bandName = (id) => QUALITY_BANDS.find((b) => b.id === id)?.name || id;
 
+// ⚠️ "Storage" AND "Farm" GROUP TWO RECIPE KINDS EACH, on purpose. A player thinks "where do I put things"
+// and "what about the farm" — they do not think "pack" and "bank" as separate questions, and six chips that
+// each hide three rows is a worse list than four that hide nine.
+const FILTERS = [
+    { id: "all", label: "All" },
+    { id: "ready", label: "Ready" },
+    { id: "tool", label: "Tools" },
+    { id: "food", label: "Food" },
+    { id: "store", label: "Storage" },
+    { id: "farm", label: "Farm" },
+];
+
 export default function GroveBench({ st, known, partName, PartIcon, post, refresh, setNote }) {
     const [result, setResult] = useState(null);
     const [busy, setBusy] = useState(null);
@@ -123,9 +135,18 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // Ready first, then whatever is closest to ready, then the ones already built. "Closest" is counted in
     // PARTS STILL MISSING rather than in recipes-with-everything, because a recipe needing one more root is
     // a different prospect from one needing eleven and both would otherwise read as "Not yet".
-    const rows = useMemo(() => {
+    // ── THE FILTER ──────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ THE DEFAULT IS "ALL", AND THE SORT IS THE REAL ANSWER. 26 recipes is not a list that needs
+    // filtering to be usable — it needs ORDERING, and the sort below already puts what you can make now
+    // at the top and what you have already built at the bottom. The chips are for the other question, the
+    // one a sort cannot answer: "show me only the tools", when you came here to finish the tool ladder.
+    const [kind, setKind] = useState("all");
+    // Two memos, deliberately: the chip COUNTS must describe the whole list, so they cannot be computed
+    // from the filtered one. Picking "Tools" should not make every other chip read 0.
+    const allRows = useMemo(() => {
         const pack = st.pack || {};
-        const list = GROVE_RECIPES.filter((r) => known.has(r.id)).map((r) => {
+        const seen = new Set(st.seen || []);
+        const list = GROVE_RECIPES.map((r) => {
             const built = (st.packsBuilt || []).includes(r.id)
                 || (st.banksBuilt || []).includes(r.id)
                 || (st.plotsBuilt || []).includes(r.id)
@@ -136,16 +157,31 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
             });
             const missing = costs.reduce((a, c) => a + c.short, 0);
             const haveParts = costs.filter((c) => c.short === 0).length;
-            return { r, built, costs, missing, haveParts, ready: missing === 0 && !built };
+            // Every recipe is readable now, so a row has to say whether you have even MET its parts —
+            // that is what the discovery rule used to communicate by hiding the row entirely.
+            const unmet = costs.filter((c) => !seen.has(c.part)).length;
+            return { r, built, costs, missing, haveParts, unmet, ready: missing === 0 && !built };
         });
-        return list.sort((a, b) => {
+        return list;
+    }, [st]);
+
+    const rows = useMemo(() => {
+        const picked = kind === "all" ? allRows
+            : kind === "ready" ? allRows.filter((x) => x.ready)
+            : kind === "store" ? allRows.filter((x) => x.r.kind === "pack" || x.r.kind === "bank")
+            : kind === "farm" ? allRows.filter((x) => x.r.kind === "deco" || x.r.kind === "plot")
+            : allRows.filter((x) => x.r.kind === kind);
+        return [...picked].sort((a, b) => {
             if (a.built !== b.built) return a.built ? 1 : -1;
             if (a.ready !== b.ready) return a.ready ? -1 : 1;
-            return a.missing - b.missing;
+            // Then CLOSEST FIRST. "Two roots away" is the row that sends somebody back out to the zone;
+            // burying it under a recipe needing forty parts is what makes a crafting list feel like a wall.
+            if (a.missing !== b.missing) return a.missing - b.missing;
+            return a.unmet - b.unmet;
         });
-    }, [known, st]);
+    }, [kind, allRows]);
 
-    const readyCount = rows.filter((x) => x.ready).length;
+    const readyCount = allRows.filter((x) => x.ready).length;
     // ⚠️ DEFAULTED, BECAUSE THE SERVER THAT SENDS THESE IS NEWER THAN THE CLIENT THAT MAY BE OPEN. A
     // player with the page already loaded when this deploys gets a payload without them, and a panel
     // that throws on a missing field is a worse outcome than one that shows level 1 for a minute.
@@ -275,7 +311,37 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                 ) : null}
             </header>
 
-            {!rows.length ? <p className="muted">Nothing discovered yet. Kill things and keep what drops.</p> : null}
+            {/* Counts on the chips, because a filter you have to tap to discover is empty is a filter that
+                wastes a tap. "Ready" carries the only number anybody is actually looking for. */}
+            <div className="gv-recfilter" role="tablist" aria-label="Filter recipes">
+                {FILTERS.map((f) => {
+                    const n = f.id === "all" ? allRows.length
+                        : f.id === "ready" ? allRows.filter((x) => x.ready).length
+                        : f.id === "store" ? allRows.filter((x) => x.r.kind === "pack" || x.r.kind === "bank").length
+                        : f.id === "farm" ? allRows.filter((x) => x.r.kind === "deco" || x.r.kind === "plot").length
+                        : allRows.filter((x) => x.r.kind === f.id).length;
+                    return (
+                        <button
+                            key={f.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={kind === f.id}
+                            className={`gv-recchip${kind === f.id ? " is-on" : ""}`}
+                            onClick={() => setKind(f.id)}
+                        >
+                            {f.label}<em>{n}</em>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {!rows.length ? (
+                <p className="muted">
+                    {kind === "ready"
+                        ? "Nothing is ready to make yet — the list above shows what each one still needs."
+                        : "Nothing in this group yet."}
+                </p>
+            ) : null}
 
             <ul className="gv-recs">
                 {rows.map(({ r, built, costs, missing, haveParts, ready }) => {

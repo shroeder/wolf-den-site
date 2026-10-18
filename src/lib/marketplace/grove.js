@@ -21,7 +21,7 @@ import { grantStone } from "@/lib/marketplace/pet-ascension.js";
 import { grantDecoration } from "@/lib/marketplace/farm-decorations.js";
 import { GROVE_PLOT_CAP } from "@/lib/marketplace/farm-crops.js";
 import {
-    GROVE_RECIPES, recipeById, discoveredRecipes, tabletBonuses, TOOL_SLOTS, toolBonusPct,
+    GROVE_RECIPES, recipeById, tabletBonuses, TOOL_SLOTS, toolBonusPct,
 } from "@/lib/marketplace/grove-recipes.js";
 
 // ── THE GROVE, SERVER SIDE ───────────────────────────────────────────────────────────────────────────────────
@@ -271,7 +271,18 @@ export async function groveState(buyerId) {
         seen: [...seenSet],
         // The tablet: what you have seen out of everything there is, and what that is worth.
         tablet: { seen: seenSet.size, total: Object.keys(GROVE_PARTS).length, bonuses: tabletBonuses(seenSet.size) },
-        recipes: discoveredRecipes(seenSet).map((r) => r.id),
+        // ── EVERY RECIPE, ALWAYS ────────────────────────────────────────────────────────────────────
+        // ⚠️ THIS REVERSES A RULE THAT WAS DELIBERATE, so it is worth saying why rather than letting the
+        // old comment in grove-recipes.js read as still true. The bench used to show only recipes whose
+        // every part you had already seen — Luke: "You only see recipes once youve found the items that
+        // require it". Played, it hid the thing a crafting screen is FOR: with 26 recipes and 16 parts a
+        // new player saw an empty bench and no reason to pick up a root, and the shape of the map-1 goal
+        // was invisible until it was nearly finished. Luke, after living with it: "I think we should see
+        // all recipes instead of the silly find all to unlock."
+        //
+        // The seen-set is still sent and still matters — it drives the tablet and lets the bench grey the
+        // parts you have never laid eyes on — it just no longer decides what you are allowed to read.
+        recipes: GROVE_RECIPES.map((r) => r.id),
         emblems: (emblems || []).map((e) => ({
             id: e.emblem_id, count: Number(e.count), slot: e.slot,
             ...emblemStars(Number(e.count)), meta: GROVE_EMBLEMS[e.emblem_id] || null,

@@ -138,6 +138,18 @@ export const recipeById = (id) => GROVE_RECIPES.find((r) => r.id === id) || null
  * ⚠️ TAKES A SEEN-SET, NOT AN INVENTORY. See the note at the top: discarding or banking a part must not
  * re-lock the recipe it unlocked. This is the one rule most likely to get "simplified" into reading the bag.
  */
+/**
+ * ⚠️ RETIRED AS A GATE, 2026-10-18, AND KEPT ONLY AS A QUESTION THE BENCH ASKS.
+ *
+ * This used to decide which recipes a player was allowed to SEE. Luke: "I think we should see all recipes
+ * instead of the silly find all to unlock." Lived with, the rule hid the thing a crafting screen is for —
+ * a new player met an empty bench and no reason to pick up a root, and could not see the shape of the map
+ * until they had nearly finished it. The header above describes why it was built; this describes why it
+ * stopped being load-bearing.
+ *
+ * It still answers "have I met everything this needs", which is worth showing on a row. It no longer
+ * answers "may I look at this".
+ */
 export function discoveredRecipes(seenPartIds) {
     const seen = seenPartIds instanceof Set ? seenPartIds : new Set(seenPartIds || []);
     return GROVE_RECIPES.filter((r) => Object.keys(r.parts).every((p) => seen.has(p)));

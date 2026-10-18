@@ -1768,6 +1768,17 @@ export const GROVE_CSS = `
 .gv-bh b { display: block; font-size: 1.04rem; color: #fff6df; }
 .gv-bh span { display: block; margin-top: 3px; font-size: 0.76rem; color: #9aa08f; line-height: 1.45; }
 
+/* The recipe filter. Scrolls sideways rather than wrapping: six chips on a 375px phone wrap to two rows
+   and push the list it filters off the fold, which is the one thing a filter must never do. */
+.gv-recfilter { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 8px; margin: 0;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.gv-recfilter::-webkit-scrollbar { display: none; }
+.gv-recchip { flex: none; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+    padding: 6px 11px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .02em;
+    color: #cfc6b6; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); }
+.gv-recchip em { font-style: normal; font-size: 11px; font-weight: 800; opacity: .65; }
+.gv-recchip.is-on { color: #1b1408; background: #e0a83c; border-color: #e0a83c; }
+.gv-recchip.is-on em { opacity: .75; }
 .gv-recs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
 
 /* The rail on the left is the whole ranking signal: gold means go. */
