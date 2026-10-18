@@ -1,8 +1,10 @@
 import Link from "next/link";
 
 import RewardsTrack from "@/components/RewardsTrack";
+import VerifyNudge from "@/components/VerifyNudge";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getRewardsTrack } from "@/lib/marketplace/track.js";
+import { verifyOffer } from "@/lib/marketplace/verified-perks.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -29,6 +31,11 @@ export default async function RewardsTrackPage() {
     }
 
     const track = await getRewardsTrack(buyer.id).catch(() => null);
+    // ── WHERE THE VERIFIED PERKS ARE KEPT ────────────────────────────────────────────────────────────────
+    // The offer card lives on the game hub; this is the other half of [[reward-with-no-screen-is-not-shipped]]
+    // — a standing perk has to be VISIBLE somewhere after the moment it was won, or a member has no way to
+    // tell it is still running. The rewards track is the page that answers "what am I getting", so it says.
+    const verify = await verifyOffer(buyer.id).catch(() => null);
 
     return (
         <div className="stack reveal">
@@ -37,6 +44,24 @@ export default async function RewardsTrackPage() {
                 <Link href="/marketplace/profile" className="pill">← Profile</Link>
             </div>
             <RewardsTrack track={track} />
+            {verify?.verified ? (
+                <section className="card">
+                    <h2 style={{ marginTop: 0 }}>Verified perks</h2>
+                    <p className="muted" style={{ margin: 0 }}>
+                        Your email address is verified, so these are running on your account right now:
+                    </p>
+                    <ul className="muted" style={{ marginBottom: 0 }}>
+                        <li><strong>+{verify.perks.xpPct}% XP</strong> on everything you earn.</li>
+                        <li>
+                            <strong>+{verify.perks.goldPerDay.toLocaleString()} gold and +{verify.perks.xpPerDay.toLocaleString()} XP a day</strong>{" "}
+                            accruing while you&apos;re away — it banks for up to {verify.perks.capHours} hours and lands when you check in.
+                        </li>
+                    </ul>
+                </section>
+            ) : (
+                /* Not verified: the same offer card as the game hub, off the same shared feed. */
+                <VerifyNudge />
+            )}
         </div>
     );
 }

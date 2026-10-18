@@ -10,6 +10,7 @@ import HelmetSprite from "@/components/HelmetSprite";
 import RaidDefenseReport from "@/components/RaidDefenseReport";
 import ReferralInvite from "@/components/ReferralInvite";
 import SpinNudge from "@/components/SpinNudge";
+import VerifyNudge from "@/components/VerifyNudge";
 import PlayLanding from "@/components/PlayLanding";
 import ViewPing from "@/components/ViewPing";
 import { db } from "@/lib/db";
@@ -76,6 +77,8 @@ export default async function GamePlayHub({ searchParams }) {
         <div className="stack reveal game-hub">
             <ViewPing event="view_game_hub" />
             {buyer ? <RaidDefenseReport /> : null}
+            {/* Unverified members only — it renders nothing for everyone else, off the shared nudge feed. */}
+            {buyer ? <VerifyNudge /> : null}
             {buyer ? <SpinNudge /> : null}
             <section className="card game-hub-hero">
                 <h1 style={{ margin: 0 }}>The Wolf Den Game</h1>

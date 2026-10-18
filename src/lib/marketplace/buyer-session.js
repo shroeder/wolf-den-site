@@ -9,7 +9,8 @@ import { db } from "@/lib/db";
 import { DEFAULT_AVATAR } from "@/lib/marketplace/avatar-options.js";
 import { ensureSquareCustomerForBuyer } from "@/lib/marketplace/loyalty.js";
 import { ensureAlias } from "@/lib/marketplace/profile.js";
-import { attachReferrer } from "@/lib/marketplace/referral.js";
+import { attachReferrer, maybeGrantReferral } from "@/lib/marketplace/referral.js";
+import { bridgeMarketplaceToShop } from "@/lib/marketplace/shop-bridge.js";
 import { grantStarterSeeds } from "@/lib/marketplace/farm-crops.js";
 import { claimPendingPurchases } from "@/lib/marketplace/xp.js";
 
@@ -211,6 +212,23 @@ export async function verifyEmailCode(email, code) {
         [row.id]
     );
     return { ok: true, buyer: mapBuyer(row) };
+}
+
+// ── EVERYTHING THAT HAPPENS THE MOMENT AN ADDRESS BECOMES VERIFIED ───────────────────────────────────────
+// There are two doors to verifying now: the six-digit code on the login screen (a fresh signup), and the
+// same code entered from inside the game by a member who was signed in all along without ever verifying —
+// which is every till scan, see counter-claim.js. Both must do this, and it is one function because
+// [[atomic-split-into-steps-drops-lines]]: the referral reward is the half that silently goes missing.
+//
+// Referrals pay out HERE rather than at signup on purpose ("so throwaway signups can't farm it" —
+// referral.js), so a route that verifies an address and forgets this call is a route that quietly stops
+// paying the member who did the inviting.
+//
+// Best-effort, both of them: neither may fail the verification that triggered it.
+export async function afterEmailVerified(buyer) {
+    if (!buyer?.id) return;
+    await bridgeMarketplaceToShop(buyer.email).catch(() => {});
+    await maybeGrantReferral(buyer.id).catch(() => {});
 }
 
 export async function createBuyerSession(buyerId, { deviceLabel = "app" } = {}) {

@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { petsPeek, petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare, setPetWish, setPetAppearance } from "@/lib/marketplace/pets.js";
-import { settlePetIncome, petIncomeRate } from "@/lib/marketplace/pet-income.js";
+import { settleIdleIncome, idleIncomeRate } from "@/lib/marketplace/pet-income.js";
 import { db } from "@/lib/db";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -33,10 +33,11 @@ export async function GET(request) {
                 const state = await petsPeek(buyer?.id || null);
                 return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
             }
-            // Settle passive pet income BEFORE reading state so the gold/xp shown is already up to date.
-            const incomeEarned = buyer?.id ? await settlePetIncome(buyer.id).catch(() => ({ xp: 0, gold: 0 })) : { xp: 0, gold: 0 };
+            // Settle passive idle income BEFORE reading state so the gold/xp shown is already up to date.
+            // Returns a per-source breakdown (pets vs the verified-email passive) — the banner names which.
+            const incomeEarned = buyer?.id ? await settleIdleIncome(buyer.id).catch(() => ({ xp: 0, gold: 0 })) : { xp: 0, gold: 0 };
             const state = await petsState(buyer?.id || null, { sync: true });
-            const income = buyer?.id ? await petIncomeRate(buyer.id).catch(() => null) : null;
+            const income = buyer?.id ? await idleIncomeRate(buyer.id).catch(() => null) : null;
             const sprites = await statSprites().catch(() => ({}));
             // Opening the page IS seeing the new pets on it, so the "New" flags clear from here. Only on the
             // FULL read — `peek` above is the background level-up watcher, and letting that mark the page seen

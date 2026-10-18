@@ -6,6 +6,7 @@ import { nextUnlockPayload } from "@/lib/marketplace/unlocks.js";
 import { getHappyHourState } from "@/lib/marketplace/happy-hour-core.js";
 import { pendingRecipeReveals } from "@/lib/marketplace/cooking.js";
 import { pendingBadge } from "@/lib/marketplace/badge-pop.js";
+import { verifyOffer } from "@/lib/marketplace/verified-perks.js";
 
 // ── THE FOUR THINGS THAT MIGHT POP AT YOU, ASKED ONCE ────────────────────────────────────────────────────────
 // RewardNudge, HappyHourWatcher, RecipeFoundWatcher and BadgePop are all mounted in the root layout, so they
@@ -23,11 +24,14 @@ export async function GET(request) {
         const buyer = await getAuthenticatedBuyer().catch(() => null);
         const id = buyer?.id || null;
         const safe = async (p, fallback) => { try { return await p; } catch { return fallback; } };
-        const [unlock, happy, recipes, badge] = await Promise.all([
+        const [unlock, happy, recipes, badge, verify] = await Promise.all([
             safe(nextUnlockPayload(id), { authed: false }),
             safe(getHappyHourState(id), null),
             id ? safe(pendingRecipeReveals(id), []) : [],
             id ? safe(pendingBadge(id), null) : null,
+            // "Your address is still unverified, and here is what verifying is worth." ONE indexed row — the
+            // reason it rides this request instead of fetching its own is written at the top of this file.
+            id ? safe(verifyOffer(id), null) : null,
         ]);
         const res = NextResponse.json({
             authed: Boolean(id),
@@ -35,6 +39,7 @@ export async function GET(request) {
             happyHour: happy,
             recipes: { pending: recipes || [] },
             badge: { badge: badge || null },
+            verify: verify || null,
         });
         res.headers.set("Cache-Control", "no-store");
         return res;

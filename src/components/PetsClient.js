@@ -708,20 +708,36 @@ export default function PetsClient() {
                                 tiles={passiveEntries.map(([stat, val]) => ({ key: stat, icon: PET_STAT_META[stat]?.icon || "•", sprite: state.statSprites?.[stat], label: PET_STAT_META[stat]?.label || stat, value: `+${val}`, desc: PET_STAT_META[stat]?.desc }))}
                             />
                             <MenagerieGroup
-                                title="Earning" sub="your earner pets, auto-banked" accent="#8fe39a"
+                                /* ⚠️ THE PER-DAY FIGURES ARE THE NET ONES (xpPerDay / goldPerDay), NOT rate x 24.
+                                   This panel used to render `goldPerHour * 24`, which is the GROSS rate before
+                                   the mint rate is applied to the payout — so it promised 2.5x what landed.
+                                   pet-income.js computes both; only the netted ones may appear on a screen. */
+                                title="Earning" sub="banked while you're away, collected when you check in" accent="#8fe39a"
                                 tiles={[
-                                    state.income?.xpPerHour > 0 ? { key: "xp", icon: "✨", sprite: state.statSprites?.xp, label: "XP per day", value: `+${(state.income.xpPerHour * 24).toLocaleString()}`, desc: "Passive XP, accrued around the clock and banked until you check in." } : null,
-                                    state.income?.goldPerHour > 0 ? { key: "gold", icon: COIN_ICON, sprite: state.statSprites?.gold, label: "Gold per day", value: `+${(state.income.goldPerHour * 24).toLocaleString()}`, desc: "Passive gold, accrued around the clock and banked until you check in." } : null,
+                                    state.income?.pet?.xpPerDay > 0 ? { key: "xp", icon: "✨", sprite: state.statSprites?.xp, label: "XP per day", value: `+${state.income.pet.xpPerDay.toLocaleString()}`, desc: "Passive XP from your earner pets, accrued around the clock." } : null,
+                                    state.income?.pet?.goldPerDay > 0 ? { key: "gold", icon: COIN_ICON, sprite: state.statSprites?.gold, label: "Gold per day", value: `+${state.income.pet.goldPerDay.toLocaleString()}`, desc: "Passive gold from your earner pets, accrued around the clock." } : null,
+                                    /* The verified-email passive. Its own tiles rather than folded into the two
+                                       above, because a member with no earner pets would otherwise read their
+                                       mail as something the pets were doing. */
+                                    state.income?.verified?.xpPerDay > 0 ? { key: "vxp", icon: "✨", sprite: state.statSprites?.xp, label: "Mail XP per day", value: `+${state.income.verified.xpPerDay.toLocaleString()}`, desc: "Your verified-email perk — XP that accrues whether you play or not." } : null,
+                                    state.income?.verified?.goldPerDay > 0 ? { key: "vgold", icon: COIN_ICON, sprite: state.statSprites?.gold, label: "Mail gold per day", value: `+${state.income.verified.goldPerDay.toLocaleString()}`, desc: "Your verified-email perk — gold that accrues whether you play or not." } : null,
                                 ].filter(Boolean)}
                             />
                         </div>
-                        {state.incomeEarned && (state.incomeEarned.xp > 0 || state.incomeEarned.gold > 0) ? (
-                            <div style={{ padding: "8px 12px", borderRadius: 10, background: "rgba(255,215,94,0.1)", border: "1px solid rgba(255,215,94,0.35)", color: "#ffe9a8", fontWeight: 700, fontSize: "0.88rem" }}>
-                                🐾 Your pets earned you {state.incomeEarned.xp > 0 ? `+${state.incomeEarned.xp} XP` : ""}
-                                {state.incomeEarned.xp > 0 && state.incomeEarned.gold > 0 ? " · " : ""}
-                                {state.incomeEarned.gold > 0 ? `+${state.incomeEarned.gold} gold` : ""} since your last visit!
+                        {/* WHO PAID IT, not just how much. Idle income has two sources now (pets and the
+                            verified-email passive), they settle together, and the settler returns them apart
+                            for exactly this line — crediting the menagerie with somebody's mail is the
+                            cheerful kind of lie that makes a member distrust every other number on the page. */}
+                        {[
+                            { key: "pets", label: "Your pets earned you", part: state.incomeEarned?.pet },
+                            { key: "mail", label: "Your verified mail delivered", part: state.incomeEarned?.verified },
+                        ].filter((r) => (r.part?.xp || 0) > 0 || (r.part?.gold || 0) > 0).map((r) => (
+                            <div key={r.key} style={{ padding: "8px 12px", borderRadius: 10, background: "rgba(255,215,94,0.1)", border: "1px solid rgba(255,215,94,0.35)", color: "#ffe9a8", fontWeight: 700, fontSize: "0.88rem" }}>
+                                {r.label} {r.part.xp > 0 ? `+${r.part.xp} XP` : ""}
+                                {r.part.xp > 0 && r.part.gold > 0 ? " · " : ""}
+                                {r.part.gold > 0 ? `+${r.part.gold} gold` : ""} since your last visit!
                             </div>
-                        ) : null}
+                        ))}
                         {/* The equipped pet is the one build-defining extra on top of the stacked passives. */}
                         <p className="muted" style={{ margin: 0, fontSize: "0.78rem", display: "flex", gap: 7, alignItems: "baseline" }}>
                             <span aria-hidden="true">⭐</span>

@@ -10,6 +10,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { VERIFIED_XP_BONUS_PCT } from "@/lib/marketplace/verified-perks.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
@@ -223,15 +224,29 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
         // the return value. Recomputing it in JS would be two expressions that have to agree forever, and the
         // one deciding your level would eventually disagree with the one that moved your XP.
         const CUR = "(1 + COALESCE(trophy_pct, 0) / 100.0)";
+        // ── AND THE VERIFIED-EMAIL BOOST, IN THE SAME STATEMENT ──────────────────────────────────────────
+        // A standing +5% XP for as long as the member's address is verified. It rides HERE, beside the
+        // curator's bonus and for the same reason: this function runs on every XP award in the game, and
+        // reading a flag first would put back the round trip the comment above celebrates removing. The
+        // column is on the row we are already writing.
+        //
+        // XP ONLY, like the curator's bonus, and the argument above applies word for word — gold is the
+        // tighter economy and a permanent multiplier on every gold award is the thing that gets found three
+        // weeks later in a balance pass. The verified perk pays its gold as a flat, measurable trickle
+        // instead (verified-perks.js), not as a cut of everything.
+        //
+        // The `flat` branch below does NOT get it: that path exists to pay exactly the number on the tin for
+        // things you BUY at a fixed price, and an XP scroll should not get cheaper because you verified.
+        const VER = `(1 + (CASE WHEN email_verified THEN ${VERIFIED_XP_BONUS_PCT} ELSE 0 END) / 100.0)`;
         const row = flat
             ? await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, gold = gold + $3, updated_at = NOW() WHERE id = $1 RETURNING xp, $2::int AS pts_got`, [buyerId, pts, goldDelta])
             : await db.queryOne(
                 `UPDATE mkt_buyer
-                    SET xp = xp + GREATEST(0, ROUND($2 * ${CUR}))::int,
+                    SET xp = xp + GREATEST(0, ROUND($2 * ${CUR} * ${VER}))::int,
                         gold = gold + $3,
                         updated_at = NOW()
                   WHERE id = $1
-              RETURNING xp, GREATEST(0, ROUND($2 * ${CUR}))::int AS pts_got`,
+              RETURNING xp, GREATEST(0, ROUND($2 * ${CUR} * ${VER}))::int AS pts_got`,
                 [buyerId, pts, goldDelta]
             );
         // If this award crossed a level boundary, celebrate it with a browser push (once, at the crossing).

@@ -64,6 +64,11 @@ const MINT_REASONS = new Set([
     "ship_battle", "raid_complete", "town_duel", "boss_reward",
     // -- collection and progression --
     "badge_reward", "badge_milestone", "loot_pig", "chest_reward", "pet_income",
+    // The verified-email passive (verified-perks.js). A NEW faucet, declared here on the day it shipped so the
+    // one lever can see it — the whole argument of this file is that an earner nobody adds to this set pays
+    // full rate for ever and is only ever found as an outlier on the coin-economy screen. Deliberately NOT a
+    // HEAVY faucet: it is a flat 8 gross an hour against a top-ten faucet's hundreds of thousands a month.
+    "verified_income",
     // ⚠️ "patronage" IS THE COUNTER'S HAUL, AND IT WAS MISSING. patronage-store.js has always carried the
     // comment "THROUGH mint(), like every other faucet" beside the grant — and because the reason was not in
     // this set, mint() handed the number straight back and the haul paid full rate. A faucet the one lever
