@@ -531,6 +531,17 @@ for (const map of GROVE_MAPS) {
     }
 }
 
+// ── ONE EMBLEM PER MAP ──────────────────────────────────────────────────────────────────────────
+// Not one per creature: 132 passive stat stacks is a second stat system. Each map has a single mark,
+// and it is the mark of the PLACE, which is why the brief is the map's own line rather than a monster.
+for (const map of GROVE_MAPS) {
+    if (!map.emblem) continue;
+    ART[`emblem-${map.emblem.id}`] = [
+        `${ITEM} ${map.emblem.name}: a small carved token or medallion, the mark of ${map.name} — ${map.blurb} Made from what that place is made of, worn smooth by being carried, hanging from a short cord.`,
+        "item",
+    ];
+}
+
 // --map N draws one whole map: its zones, creatures, bosses and materials.
 const MAP_ARG = Number(arg("--map") || 0);
 if (MAP_ARG) {
@@ -539,6 +550,7 @@ if (MAP_ARG) {
     for (const part of map.parts) ONLY.push(`part-${part.id}`);
     for (const c of map.creatures) ONLY.push(c.id);
     for (const z of map.zones) { ONLY.push(`boss-${z.bossId}`); ONLY.push(`zone-${z.id}`); }
+    if (map.emblem) ONLY.push(`emblem-${map.emblem.id}`);
 }
 
 for (const [id, subject] of Object.entries(EMBLEMS)) ART[`emblem-${id}`] = [`${ITEM} ${subject}`, "item"];

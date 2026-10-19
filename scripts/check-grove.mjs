@@ -25,7 +25,7 @@ import {
     GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, GROVE_RARE, emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS, GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, GROVE_FOODS, groveArt, GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE, toolArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS, TOOL_TIER_CAP } from "@/lib/marketplace/grove-recipes.js";
-import { MAP_LAYOUT, mapSpot, nodeArt } from "@/lib/marketplace/grove-map.js";
+import { MAP_LAYOUT, mapSpot, nodeArt, spotForDepth } from "@/lib/marketplace/grove-map.js";
 import { pickHyper, rollBoss } from "@/lib/marketplace/grove-roll.js";
 import { makeTelegraph } from "@/lib/marketplace/grove-world.js";
 import { CONSUMABLES } from "@/lib/marketplace/consumables.js";
@@ -159,11 +159,23 @@ for (const [id, p] of Object.entries(GROVE_PARTS)) {
 // ── 4. DIFFICULTY CLIMBS ─────────────────────────────────────────────────────────────────────────────
 // ⚠️ BOSS HP IS READ STRAIGHT, NOT THROUGH scaledFoe. A boss is authored at the depth it stands at, so
 // putting it through the per-zone climb would compound on a number already written for zone 12.
+// ⚠️ AND THE RAMP RESTARTS AT EVERY DOOR, so "harder than the one before it" is only true INSIDE a map.
+// The design doc: "35 seconds at the start of a map rising to 80 at the end of it, so tough is a place you
+// arrive at. The ramp restarts each map because a boss is the end of ITS map." Map two's first boss is
+// meant to be a 35-second fight again — against a hero a whole map stronger — so it is smaller than map
+// one's last, and asserting one continuous climb would force the opposite of what the feature wants.
+//
+// What must still hold, and is checked below: a map climbs from its first boss to its last, and each map's
+// FIRST boss is harder than the previous map's first. That is the ladder; the sawtooth is the shape.
 let lastHp = 0;
+let lastMap = 0;
+const firstBossOfMap = {};
 for (const z of GROVE_ZONES) {
     const boss = GROVE_BOSSES[z.boss];
     if (!boss) continue;
-    ok(boss.hp > lastHp, `zone ${z.n} (${z.id}): boss is not harder than the one before it`);
+    const mapN = z.map || 1;
+    if (mapN !== lastMap) { lastHp = 0; lastMap = mapN; firstBossOfMap[mapN] = boss.hp; }
+    ok(boss.hp > lastHp, `zone ${z.n} (${z.id}): boss is not harder than the one before it in its own map`);
     lastHp = boss.hp;
 }
 
@@ -266,10 +278,13 @@ for (const id of Object.keys(GROVE_FOODS)) checkArt(`food ${id}`, groveArt(id));
 // The map draws a symbol per zone at coordinates grove-map.js owns, so a zone added to the catalogue
 // without a spot simply does not appear on the map — no error, no gap, it is just missing, and the
 // trail quietly routes around where it should have been.
+// ⚠️ POSITION IS BY DEPTH NOW, NOT BY ID. Twelve zones to a map and twelve positions on the paper, so
+// every map reuses them: ((depth - 1) % 12). Checking ids would demand MAP_LAYOUT grow to 144 entries for
+// a chart that only ever shows twelve at a time.
 for (const z of GROVE_ZONES) {
-    const spot = mapSpot(z.id);
-    ok(spot, `zone ${z.id}: no place on the map (add it to MAP_LAYOUT)`);
-    if (spot) checkArt(`map symbol ${z.id}`, nodeArt(z.id));
+    const spot = spotForDepth(z.n);
+    ok(spot, `zone ${z.id} (depth ${z.n}): no place on the paper`);
+    if (spot) checkArt(`map symbol ${z.id}`, z.node || nodeArt(z.id));
 }
 for (const m of MAP_LAYOUT) {
     ok(GROVE_ZONES.some((z) => z.id === m.id), `map has a place for unknown zone "${m.id}"`);
@@ -360,6 +375,15 @@ for (const r of GROVE_RECIPES.filter((x) => x.kind === "deco")) {
     ok(d?.price == null, `decoration ${r.id}: has a price, so it is also buyable`);
 }
 ok(GROVE_RECIPES.filter((x) => x.kind === "plot").length === 2, "Luke said two extra plots, ever");
+
+// Each map opens harder than the last one opened. This is the half the sawtooth must not break.
+{
+    const maps = Object.keys(firstBossOfMap).map(Number).sort((a, b) => a - b);
+    for (let i = 1; i < maps.length; i += 1) {
+        ok(firstBossOfMap[maps[i]] > firstBossOfMap[maps[i - 1]],
+            `map ${maps[i]} opens with an easier boss than map ${maps[i - 1]} did`);
+    }
+}
 
 // ── 5. THE EMBLEM LADDER FAILS UPWARD ────────────────────────────────────────────────────────────────
 // Two of this game's worst bugs were ladders that fell off the end and paid the BOTTOM rung.

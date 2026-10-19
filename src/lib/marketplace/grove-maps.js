@@ -628,7 +628,10 @@ export const groveMap = (n) => GROVE_MAPS.find((m) => m.n === Number(n)) || null
 // Everything above is designed: places, residents, drops and recipes. What a map still needs before a member
 // can stand in it is ART — a backdrop a zone, a sprite a creature, a sprite a part — and that is the number
 // this gates. Raise it as a map's art lands and the bench, the gate and the tablet all move together.
-export const MAPS_BUILT = 1;
+// 2026-10-19: maps one to seven. Luke: "Up to 7 live, live being behind the flag" — the Grove itself is
+// still preview-gated (groveOpen -> canPreview), so this opens the first seven to whoever is on that list
+// and to nobody else. Maps 8-12 are designed and undrawn; see docs/grove-maps-remaining.md.
+export const MAPS_BUILT = 7;
 export const mapIsBuilt = (n) => Number(n) <= MAPS_BUILT;
 
 // ── WHAT COMES OFF WHAT ──────────────────────────────────────────────────────────────────────────────────────
@@ -780,6 +783,47 @@ export const MAP_EMBLEMS = Object.fromEntries(
         name: m.emblem.name, stat: m.emblem.stat, per: m.emblem.per, kind: m.emblem.kind || "flat",
         ...(m.emblem.global ? { global: true } : {}), map: m.n,
     }]));
+
+// ── THE FOUR SPARES ARE THAT MAP'S FOOD ──────────────────────────────────────────────────────────────────────
+// Twelve materials, eight roles: four of every map's drops are not in any tool. Luke's rule from map one is
+// that "each part you can get from an enemy has uses in at least one recipe" — a part that drops and does
+// nothing is litter in a sixteen-slot bag — and check-grove.mjs enforces it the moment a map goes live.
+//
+// So the spares are what you eat. Map one has four foods healing 25/40/60/100%, and the ladder cannot go
+// past 100, so a deeper map does not heal HARDER — it makes MORE per craft. Map seven's poultice is the
+// same mouthful; you simply come home with eleven of them instead of five.
+const FOOD_HEALS = [0.25, 0.40, 0.60, 1.00];
+const FOOD_NAMES = ["Poultice", "Flask", "Tonic", "Draught"];
+const USED_ROLES = new Set(Object.values(TOOL_ROLES).flat());
+
+/** The four food recipes for one generated map, built from the materials its tools do not want. */
+export function foodRecipesForMap(n) {
+    const map = groveMap(n);
+    if (!map?.parts) return [];
+    const spares = map.parts.filter((p, i) => map.parts.findIndex((q) => q.role === p.role) !== i || !USED_ROLES.has(p.role));
+    return spares.slice(0, 4).map((part, i) => ({
+        id: `food_${map.id}_${i + 1}`,
+        name: `${map.short} ${FOOD_NAMES[i]}`,
+        heals: FOOD_HEALS[i],
+        // Four more a craft every map, so the deep ones are worth carrying home rather than worth more.
+        makes: 5 + (n - 1),
+        tier: part.tier,
+        map: n,
+        parts: { [part.id]: 4 + Math.round((n - 1) * 0.5), [map.parts[(map.parts.indexOf(part) + 6) % map.parts.length].id]: 3 },
+        blurb: `${part.blurb.replace(/\.$/, "")}, pressed into something you can swallow.`,
+    }));
+}
+
+/** Every generated map's food, flat, in GROVE_FOODS shape. */
+// ⚠️ THE PICTURE IS BORROWED, LIKE THE CHART SYMBOLS. A poultice is a poultice: moss and fat packed into a
+// leaf in map one, ash-glass and wire-root in map seven, and at thirty pixels on a belt the difference is
+// not visible. Forty-four more drawings to say something the name already says.
+const FOOD_ART = ["food_poultice", "food_flask", "food_tonic", "food_draught"];
+export const MAP_FOODS = Object.fromEntries(
+    GROVE_MAPS.filter((m) => m.parts).flatMap((m) => foodRecipesForMap(m.n).map((f, i) => [f.id, {
+        name: f.name, heals: f.heals, tier: f.tier, blurb: f.blurb, map: f.map,
+        art: `/images/grove/food-${FOOD_ART[i]}.webp`,
+    }])));
 
 /**
  * The twelve tool recipes for one generated map.

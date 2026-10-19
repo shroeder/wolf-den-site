@@ -25,7 +25,7 @@
 // exists somewhere. See check-existing-sprites-first.
 
 import {
-    MAP_PARTS, MAP_ENEMIES, MAP_BOSSES, MAP_ZONES, MAP_EMBLEMS, mapIsBuilt,
+    MAP_PARTS, MAP_ENEMIES, MAP_BOSSES, MAP_ZONES, MAP_EMBLEMS, MAP_FOODS, mapIsBuilt,
 } from "@/lib/marketplace/grove-maps.js";
 
 // ── PARTS ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ export const GROVE_PARTS = { ...MAP_ONE_PARTS, ...MAP_PARTS };
 // slots are the scarcest thing a player has.
 export const HEAL_AT = 0.60;   // Luke's number: it fires below 60% of max HP
 
-export const GROVE_FOODS = {
+const MAP_ONE_FOODS = {
     food_poultice: { name: "Moss Poultice", heals: 0.25, tier: 1,
         blurb: "Chewed moss and grub fat, packed into a leaf. It works, which is the only nice thing about it." },
     food_flask: { name: "Gourd Flask", heals: 0.40, tier: 3,
@@ -86,6 +86,12 @@ export const GROVE_FOODS = {
         blurb: "Faintly luminous. Drinking it feels like standing up too fast, and then being fine." },
     food_draught: { name: "Heartwood Draught", heals: 1.00, tier: 6,
         blurb: "Pressed from the middle of a very old tree. There is not much of it in the world." },
+};
+
+/** Every food in the world: map one's four, plus the four each built map presses out of its spare drops. */
+export const GROVE_FOODS = {
+    ...MAP_ONE_FOODS,
+    ...Object.fromEntries(Object.entries(MAP_FOODS).filter(([, f]) => mapIsBuilt(f.map))),
 };
 
 export const groveFood = (id) => GROVE_FOODS[id] || null;
@@ -721,7 +727,8 @@ export const groveEmblem = (id) => GROVE_EMBLEMS[id] || null;
 export const groveArt = (id) => {
     if (GROVE_PARTS[id]) return `/images/grove/part-${id}.webp`;
     if (GROVE_EMBLEMS[id]) return `/images/grove/emblem-${id}.webp`;
-    if (GROVE_FOODS[id]) return `/images/grove/food-${id}.webp`;
+    // A generated map's food borrows map one's picture for its heal tier, so the path is on the food.
+    if (GROVE_FOODS[id]) return GROVE_FOODS[id].art || `/images/grove/food-${id}.webp`;
     return null;
 };
 

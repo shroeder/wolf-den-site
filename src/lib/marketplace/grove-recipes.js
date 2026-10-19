@@ -1,4 +1,4 @@
-import { toolRecipesForMap } from "@/lib/marketplace/grove-maps.js";
+import { foodRecipesForMap, toolRecipesForMap } from "@/lib/marketplace/grove-maps.js";
 
 // ── THE GROVE'S RECIPES — THE NEW CRAFTING SYSTEM ────────────────────────────────────────────────────────────
 // Luke: "It would be a new system accessible in its own area with upgrades badges and its own set
@@ -189,6 +189,16 @@ export const GROVE_RECIPES = [
 // a design; the zones that drop them do not. mapIsBuilt() is the line, and everything player-facing filters
 // on it — see the note on MAPS_BUILT. The alternative, leaving the ladder undeclared until its map lands,
 // means the shape of the thing is invisible until it is too late to change cheaply.
+// Every generated map presses its four unused drops into food — see foodRecipesForMap. Registered as the
+// same `kind: "food"` map one uses, so the belt, the bench and the gate all treat them identically.
+for (let n = 2; n <= TOOL_TIER_CAP; n += 1) {
+    for (const f of foodRecipesForMap(n)) {
+        GROVE_RECIPES.push(R(f.id, f.name, "food", f.parts, {
+            makes: f.makes, map: n, blurb: f.blurb,
+        }));
+    }
+}
+
 for (let n = 2; n <= TOOL_TIER_CAP; n += 1) {
     for (const r of toolRecipesForMap(n)) {
         const base = TOOL_SLOTS.find((t) => t.slot === r.slot);
