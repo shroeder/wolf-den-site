@@ -520,7 +520,9 @@ for (const map of GROVE_MAPS) {
     for (const c of map.creatures) {
         const home = map.zones.find((z) => z.foes[0] === map.creatures.indexOf(c));
         const look = BIOME_LOOK[home?.biome] || "";
-        ART[`foe-${c.id}`] = [`${FOE} THE CREATURE: a ${c.name} of ${map.name}. ${c.blurb} It lives where everything is ${look}, and it must look like it belongs there and nowhere else.`, "foe"];
+        // ⚠️ NO `foe-` IN THE KEY. The writer adds it for kind "foe" (see the note by `name` below),
+        // and a key that carries it too lands as foe-foe-*.webp while the catalogue points at foe-*.webp.
+        ART[c.id] = [`${FOE} THE CREATURE: a ${c.name} of ${map.name}. ${c.blurb} It lives where everything is ${look}, and it must look like it belongs there and nowhere else.`, "foe"];
     }
 
     for (const z of map.zones) {
@@ -535,7 +537,7 @@ if (MAP_ARG) {
     const map = GROVE_MAPS.find((m) => m.n === MAP_ARG);
     if (!map?.zones) throw new Error(`map ${MAP_ARG} has no design to draw`);
     for (const part of map.parts) ONLY.push(`part-${part.id}`);
-    for (const c of map.creatures) ONLY.push(`foe-${c.id}`);
+    for (const c of map.creatures) ONLY.push(c.id);
     for (const z of map.zones) { ONLY.push(`boss-${z.bossId}`); ONLY.push(`zone-${z.id}`); }
 }
 

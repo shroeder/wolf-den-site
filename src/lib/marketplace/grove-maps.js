@@ -547,7 +547,7 @@ export const GROVE_MAPS = [
             C("thorn_elder", "Thorn Elder", "striker", "The garden oldest hedge, and it has opinions."),
             C("stem_walker", "Stem Walker", "grazer", "Tall, hollow, and it leans to look at you."),
             C("creeper", "The Creeper", "stalker", "Arrives by having already been there."),
-            C("husk", "Husk", "swarm", "Whatever wore this is finished. The husk is not."),
+            C("rot_husk", "Rot Husk", "swarm", "Whatever wore this is finished. The husk is not."),
             C("fever_bloom", "Fever Bloom", "caster", "Opens, and the air goes wrong."),
             C("spore_lantern", "Spore Lantern", "caster", "Lights the path. The path goes inward."),
             C("canker_brute", "Canker Brute", "brute", "A trunk with a growth, and the growth is driving."),

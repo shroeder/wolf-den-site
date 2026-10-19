@@ -17,7 +17,10 @@
 //   node --import ./scripts/lib/register-loader.mjs scripts/check-grove.mjs
 import fs from "node:fs";
 
-import { mapIsBuilt, MAPS_BUILT, GROVE_MAPS, toolRecipesForMap } from "@/lib/marketplace/grove-maps.js";
+import {
+    mapIsBuilt, MAPS_BUILT, GROVE_MAPS, toolRecipesForMap, ROLES,
+    MAP_ENEMIES, MAP_BOSSES, MAP_PARTS, MAP_ZONES,
+} from "@/lib/marketplace/grove-maps.js";
 import {
     GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, GROVE_RARE, emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS, GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, GROVE_FOODS, groveArt, GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE, toolArt,
 } from "@/lib/marketplace/grove-catalog.js";
@@ -83,6 +86,45 @@ for (const [slot, tiers] of ladders) {
     // Every ladder climbs together, because a tier IS a map: if any tool reached tier N, that map shipped.
     ok(sorted.length === tierDepth,
         `tool slot "${slot}" stops at tier ${sorted.length} while others reach ${tierDepth} — a map shipped a partial ladder`);
+}
+
+// ── 1c. NOTHING IS NAMED TWICE ───────────────────────────────────────────────────────────────────────
+// Eleven maps of generated content merge into the same four tables map one hand-wrote, keyed by id. A
+// collision does not error: the later entry WINS, which silently replaces a creature, a boss, a material or
+// a zone with another map's version of it and points the original's art at the wrong thing.
+//
+// It has already happened once: the Rotgarden shipped a "husk" and map one has had a Straw Walker with that
+// id since the day the Grove opened. Caught by a sweep rather than by anything breaking, which is exactly
+// why it is asserted here now.
+const idClash = (what, generated, ours) => {
+    const mine = new Set(ours);
+    for (const id of generated) ok(!mine.has(id), `${what} id "${id}" is used by map one AND by a generated map`);
+    const seen = new Set();
+    for (const id of generated) {
+        ok(!seen.has(id), `${what} id "${id}" is declared twice across the generated maps`);
+        seen.add(id);
+    }
+};
+idClash("creature", Object.keys(MAP_ENEMIES), Object.values(GROVE_ENEMIES).filter((e) => (e.map ?? 1) === 1).map((e) => e.id));
+idClash("boss", Object.keys(MAP_BOSSES), Object.values(GROVE_BOSSES).filter((b) => (b.map ?? 1) === 1).map((b) => b.id));
+idClash("part", Object.keys(MAP_PARTS), Object.entries(GROVE_PARTS).filter(([, p]) => (p.map ?? 1) === 1).map(([id]) => id));
+idClash("zone", MAP_ZONES.map((z) => z.id), GROVE_ZONES.filter((z) => (z.map ?? 1) === 1).map((z) => z.id));
+
+// ── 1d. EVERY MATERIAL IS SOMEBODY'S PRIMARY DROP ────────────────────────────────────────────────────
+// The rule the world is built on: creature i is the resident of zone i and part i is what that zone is made
+// of. If a map ever has more materials than residents, or the two lists drift apart, a material becomes
+// unreachable in a way no screen would show — the recipe simply never completes.
+for (const m of GROVE_MAPS) {
+    if (!m.parts || !m.creatures) continue;
+    ok(m.parts.length === m.creatures.length,
+        `map ${m.n} (${m.id}) has ${m.parts.length} materials and ${m.creatures.length} creatures — they must pair up`);
+    ok(m.zones?.length === 12, `map ${m.n} (${m.id}) has ${m.zones?.length ?? 0} zones, not 12`);
+    const roles = new Set(m.parts.map((x) => x.role));
+    for (const r of ROLES) ok(roles.has(r), `map ${m.n} (${m.id}) has no "${r}" material — its tools cannot be built`);
+    for (const z of m.zones || []) {
+        for (const idx of z.foes) ok(m.creatures[idx], `map ${m.n} zone ${z.id} names creature #${idx}, which does not exist`);
+        ok(GROVE_BIOMES[z.biome], `map ${m.n} zone ${z.id} has biome "${z.biome}", which is not in GROVE_BIOMES`);
+    }
 }
 
 // ── 2. EVERY PART IS WANTED ──────────────────────────────────────────────────────────────────────────
