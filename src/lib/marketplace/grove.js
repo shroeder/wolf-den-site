@@ -21,8 +21,9 @@ import { grantStone } from "@/lib/marketplace/pet-ascension.js";
 import { grantDecoration } from "@/lib/marketplace/farm-decorations.js";
 import { GROVE_PLOT_CAP } from "@/lib/marketplace/farm-crops.js";
 import {
-    GROVE_RECIPES, recipeById, tabletBonuses, TOOL_SLOTS, toolBonusPct,
+    GROVE_RECIPES, recipeById, recipeMap, tabletBonuses, TOOL_SLOTS, toolBonusPct,
 } from "@/lib/marketplace/grove-recipes.js";
+import { mapIsBuilt } from "@/lib/marketplace/grove-maps.js";
 
 // ── THE GROVE, SERVER SIDE ───────────────────────────────────────────────────────────────────────────────────
 // The client plays the whole scene (see grove-roll.js for why). This file does the four things the client is
@@ -282,7 +283,14 @@ export async function groveState(buyerId) {
         //
         // The seen-set is still sent and still matters — it drives the tablet and lets the bench grey the
         // parts you have never laid eyes on — it just no longer decides what you are allowed to read.
-        recipes: GROVE_RECIPES.map((r) => r.id),
+        //
+        // ⚠️ "EVERY RECIPE" MEANS EVERY RECIPE OF A MAP YOU CAN WALK TO. The ladder is declared to tier XII
+        // so it can be priced and read as a whole (grove-maps.js), which is 132 recipes asking for materials
+        // that have no creature to drop them yet. Sending those would bury the twelve real ones in a list of
+        // things nobody can make and nobody can work toward — the exact failure the "show them all" change
+        // above was fixing, arriving from the other direction. mapIsBuilt is the line; raise MAPS_BUILT the
+        // day a map's zones land and its recipes appear here on their own.
+        recipes: GROVE_RECIPES.filter((r) => mapIsBuilt(recipeMap(r))).map((r) => r.id),
         emblems: (emblems || []).map((e) => ({
             id: e.emblem_id, count: Number(e.count), slot: e.slot,
             ...emblemStars(Number(e.count)), meta: GROVE_EMBLEMS[e.emblem_id] || null,

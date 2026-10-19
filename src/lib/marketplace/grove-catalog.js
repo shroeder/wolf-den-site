@@ -24,13 +24,18 @@
 // town raids. `art: null` marks the handful that genuinely need drawing; nothing is generated that already
 // exists somewhere. See check-existing-sprites-first.
 
+import { MAP_PARTS } from "@/lib/marketplace/grove-maps.js";
+
 // ── PARTS ────────────────────────────────────────────────────────────────────────────────────────────────────
 // ⚠️ EVERY PART HERE IS USED BY AT LEAST ONE RECIPE. Luke: "Each part you can get from an enemy has uses in at
 // least one recipe." check-grove.mjs fails the build if one is ever orphaned — a part that drops and does
 // nothing is litter in a 16-slot backpack.
 //
 // `tier` tracks the depth it comes from and is what recipes price against.
-export const GROVE_PARTS = {
+// ⚠️ MAP ONE'S SIXTEEN. Maps two to twelve declare their materials in grove-maps.js and are merged into this
+// object below — one lookup for every part in the world, whichever map it belongs to, because every reader of
+// GROVE_PARTS (the bag, the bench, the tablet, the gate) would otherwise need to know which file to ask.
+const MAP_ONE_PARTS = {
     // ── shallow (zones 1-4) ──────────────────────────────────────────────────────────────────────────
     gnawed_root: { name: "Gnawed Root", tier: 1, blurb: "Chewed through and spat out. Still springy." },
     damp_moss: { name: "Damp Moss", tier: 1, blurb: "Holds water for days. The hollow is carpeted in it." },
@@ -51,6 +56,12 @@ export const GROVE_PARTS = {
     elder_heartwood: { name: "Elder Heartwood", tier: 6, blurb: "Cut from the middle of something very old." },
     crystal_shard: { name: "Crystal Shard", tier: 6, blurb: "Only ever off the crystal-touched. Hums faintly.", rare: true },
 };
+
+// Map one's parts carry their map number here rather than in every literal above it.
+for (const p of Object.values(MAP_ONE_PARTS)) p.map = 1;
+
+/** Every part in the world: map one's sixteen, plus the twelve each generated map declares. */
+export const GROVE_PARTS = { ...MAP_ONE_PARTS, ...MAP_PARTS };
 
 // ── FOOD AND POTIONS ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "We need a way to equip food or potions that auto heal you if you get below 60 percent hp."

@@ -1,3 +1,5 @@
+import { toolRecipesForMap } from "@/lib/marketplace/grove-maps.js";
+
 // ── THE GROVE'S RECIPES — THE NEW CRAFTING SYSTEM ────────────────────────────────────────────────────────────
 // Luke: "It would be a new system accessible in its own area with upgrades badges and its own set
 // (nonwearable). You could craft a variety of things."
@@ -178,10 +180,32 @@ export const GROVE_RECIPES = [
         { slot: "horn", tier: 1, blurb: "Sounded before the strike. Something always answers." }),
 ];
 
+// ── TIERS II TO XII, ONE MAP AT A TIME ───────────────────────────────────────────────────────────────────────
+// Generated from grove-maps.js rather than typed. The design is in TOOL_ROLES (a pickaxe is an edge, a haft
+// and a hide); each map supplies its own material for each role, and the recipe is that sentence in that
+// map's vocabulary. 132 recipes, one rule.
+//
+// ⚠️ THEY ARE REAL RECIPES AND THEY ARE UNREACHABLE, WHICH IS THE POINT. The materials for map seven exist as
+// a design; the zones that drop them do not. mapIsBuilt() is the line, and everything player-facing filters
+// on it — see the note on MAPS_BUILT. The alternative, leaving the ladder undeclared until its map lands,
+// means the shape of the thing is invisible until it is too late to change cheaply.
+for (let n = 2; n <= TOOL_TIER_CAP; n += 1) {
+    for (const r of toolRecipesForMap(n)) {
+        const base = TOOL_SLOTS.find((t) => t.slot === r.slot);
+        GROVE_RECIPES.push(R(`${r.slot}_t${n}`, `${r.short} ${base?.name || r.slot}`, "tool", r.parts, {
+            slot: r.slot, tier: n, map: n, mapName: r.mapName,
+            blurb: `${base?.name || "A tool"}, remade out of what ${r.mapName.replace(/^The /, "the ")} is made of.`,
+        }));
+    }
+}
+
 /** Every tool recipe for one slot, lowest tier first — the ladder as it currently exists. */
 export const toolLadder = (slot) => GROVE_RECIPES
     .filter((r) => r.kind === "tool" && r.slot === slot)
     .sort((a, b) => (a.tier || 0) - (b.tier || 0));
+
+/** The map a recipe belongs to. Map one's hand-authored recipes have no `map` field; they are map one. */
+export const recipeMap = (r) => Number(r?.map) || 1;
 
 export const recipeById = (id) => GROVE_RECIPES.find((r) => r.id === id) || null;
 

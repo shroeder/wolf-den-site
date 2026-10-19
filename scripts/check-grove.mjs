@@ -17,6 +17,7 @@
 //   node --import ./scripts/lib/register-loader.mjs scripts/check-grove.mjs
 import fs from "node:fs";
 
+import { mapIsBuilt, MAPS_BUILT, GROVE_MAPS, toolRecipesForMap } from "@/lib/marketplace/grove-maps.js";
 import {
     GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, GROVE_RARE, emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS, GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, GROVE_FOODS, groveArt, GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE, toolArt,
 } from "@/lib/marketplace/grove-catalog.js";
@@ -86,8 +87,14 @@ for (const [slot, tiers] of ladders) {
 
 // ── 2. EVERY PART IS WANTED ──────────────────────────────────────────────────────────────────────────
 // Luke: "Each part you can get from an enemy has uses in at least one recipe."
+//
+// ⚠️ THE SPARES ARE SPARES ON PURPOSE. A generated map declares twelve materials and its twelve tools use
+// eight of them — the other four exist so a zone has something of its own to drop rather than every creature
+// on the map handing over the same eight things. They are not litter until a map SHIPS with them unused and
+// nothing else to want them, which is a map-one-style authoring question, so the rule applies to built maps.
 const wanted = new Set(GROVE_RECIPES.flatMap((r) => Object.keys(r.parts)));
-for (const id of Object.keys(GROVE_PARTS)) {
+for (const [id, p] of Object.entries(GROVE_PARTS)) {
+    if (!mapIsBuilt(p.map ?? 1)) continue;
     ok(wanted.has(id), `part "${id}" drops but no recipe asks for it — litter in a 16-slot bag`);
 }
 
@@ -97,7 +104,13 @@ const dropped = new Set([
     ...Object.values(GROVE_ENEMIES).flatMap((e) => e.loot.map((l) => l.part)),
     ...GROVE_RARE.loot.map((l) => l.part),
 ]);
-for (const id of Object.keys(GROVE_PARTS)) {
+// ⚠️ SAME LINE AS THE OTHER TWO RULES. On a BUILT map, a material nothing drops is a recipe nobody can make
+// and the gate must say so. On a designed-but-unbuilt map it is the expected state — the creatures that will
+// drop it are the next job — and failing here would mean the gate screamed for eleven maps' worth of content
+// the moment anyone sketched a ladder. What keeps that honest is MAPS_BUILT: raise it without the zones and
+// every one of these fires at once.
+for (const [id, p] of Object.entries(GROVE_PARTS)) {
+    if (!mapIsBuilt(p.map ?? 1)) continue;
     ok(dropped.has(id), `part "${id}" is in a recipe but nothing drops it`);
 }
 
@@ -189,7 +202,14 @@ for (const [id, b] of Object.entries(GROVE_BIOMES)) {
 // reading an authored field, which means adding a part to the catalogue silently promises a sprite that
 // nobody has drawn — and the first time anyone sees that promise broken is a broken-image glyph on the
 // floor of a live zone. The derivation is only safe with this loop behind it.
-for (const id of Object.keys(GROVE_PARTS)) checkArt(`part ${id}`, groveArt(id));
+// ⚠️ ART IS REQUIRED WHEN THE MAP SHIPS, NOT WHEN THE MATERIAL IS DESIGNED. The materials for maps two to
+// twelve are declared so the ladder can be priced and read; drawing 132 sprites for places nobody can walk
+// to yet is $5.60 of art against content that may still move. The day a map's zones land, MAPS_BUILT goes
+// up and this gate starts demanding its pictures — which is the right moment to be told.
+for (const [id, p] of Object.entries(GROVE_PARTS)) {
+    if (!mapIsBuilt(p.map ?? 1)) continue;
+    checkArt(`part ${id}`, groveArt(id));
+}
 for (const id of Object.keys(GROVE_EMBLEMS)) checkArt(`emblem ${id}`, groveArt(id));
 for (const id of Object.keys(GROVE_FOODS)) checkArt(`food ${id}`, groveArt(id));
 // ── ⚠️ AND EVERY PLACE IS ON THE CHART ────────────────────────────────────────────────────────────
