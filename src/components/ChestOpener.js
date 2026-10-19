@@ -17,9 +17,12 @@ const RARITY_LABEL = { common: "Common", rare: "Rare", epic: "Epic", legendary: 
 // Shared, so a stat added to STAT_META shows up here without anyone remembering to come back.
 import { describeStats } from "@/lib/marketplace/items.js";
 const statLine = (stats = {}, opts) => describeStats(stats, opts);
-const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
-const PARTICLE_COUNT = { common: 16, rare: 22, epic: 28, legendary: 36, mythic: 46, ascendant: 58, eternal: 72 };
-const BIG_RARITIES = new Set(["epic", "legendary", "mythic", "ascendant", "eternal"]);
+// Three tables keyed by the rarity ladder, and all three used to stop at eternal — two rungs short. Everything
+// here then fell to its own fallback: no colour, a wooden chest's sixteen sparks, and RARITY_RANK pinned to 0,
+// so the two rarest reveals in the game celebrated exactly like a common. A ladder lookup must fail UPWARD.
+const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8", celestial: "#a7f0ff", primordial: "#fffdf0" };
+const PARTICLE_COUNT = { common: 16, rare: 22, epic: 28, legendary: 36, mythic: 46, ascendant: 58, eternal: 72, celestial: 88, primordial: 104 };
+const BIG_RARITIES = new Set(["epic", "legendary", "mythic", "ascendant", "eternal", "celestial", "primordial"]);
 
 // Where a rarity sits on the ladder, for "which of these is the best one" questions. RARITY_COLOR is already
 // declared in ladder order, so the ladder is read off it rather than typed out a second time.

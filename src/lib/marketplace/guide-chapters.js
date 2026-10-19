@@ -96,7 +96,7 @@ export const GUIDE_CHAPTERS = [
         id: "kitchen", name: "The Kitchen", minLevel: 5, tint: "#ffb45e", icon: "/images/guide/ch-kitchen.webp",
         blurb: "Turns what the farm grows into buffs that matter.",
         steps: [
-            { key: "kitchen_recipe", label: "Learn a recipe", why: "Recipes drop from the wheel, chests and the town. Each one unlocks a dish with its own buff.", href: "/marketplace/cooking", cta: "Open the kitchen", gold: 100, events: ["recipe_learned"] },
+            { key: "kitchen_recipe", label: "Learn a recipe", why: "Recipes drop from the wheel, chests and the town. Each one unlocks a dish with its own buff.", href: "/marketplace/cooking", cta: "Open the kitchen", gold: 100, events: ["recipe_learned", "buy_recipe"], verify: "recipe" },
             { key: "kitchen_cook", label: "Cook something", why: "Cooking is a timing minigame — hit the band and the dish comes out better. Eat it before a boss night.", href: "/marketplace/cooking", cta: "Cook", gold: 125, events: ["cooked"] },
         ],
         reward: { gold: 225, chest: "iron" },

@@ -370,8 +370,24 @@ export function signatureFor(itemId) {
     if (s.cheerXp) parts.push(`Earn +${CHEER.xp[i]} bonus XP every time you cheer.`);
     if (s.cheerPetXp) parts.push(`${pct(CHEER.petXpChance[i])} chance when you cheer to feed your equipped pet ${CHEER.petXpAmt[i]} XP.`);
     if (s.cheerFirstStrike) parts.push(`Your FIRST cheer each day also strikes the boss for ${CHEER.firstStrike[i]}.`);
-    if (s.cheerFragment) parts.push(`${pct(CHEER.fragmentChance[i])} chance on your first cheer each day to unearth a treasure-chest fragment.`);
+    // ⚠️ IT PAYS DOUBLOONS. Fragments were deleted when a dig started turning up a whole chest; boss.js has
+    // granted CHEER_DOUBLOONS here ever since, and this line went on naming a currency the game no longer has.
+    if (s.cheerFragment) parts.push(`${pct(CHEER.fragmentChance[i])} chance on your first cheer each day to turn up a handful of doubloons.`);
     if (s.creditBonus) parts.push(`+${pct(s.creditBonus)} bonus coins whenever you buy store credit.`);
+    // ── ⚠️ SAY THE CEILING, BECAUSE A SECOND COPY CAN BE WORTH NOTHING ──────────────────────────────────
+    // signatureHit multiplies every equipped signature together and THEN clamps: always-on procs at
+    // SIG_MULT_CAP, overcharge/highroller at BURST_CAP. An eternal Overcharge is ×5 on its own, which IS the
+    // burst ceiling — so a second piece carrying it moves no number at all, silently.
+    //
+    // GrayKitsune measured it before anyone told him: "Based on my testing, two overcharge doesn't change the
+    // damage vs 1 item with it." ValkyrieSylve asked the same question twice in plain words: "if we have 2
+    // pieces of gear with the same perk, do those perks stack or just one stays active and I have a wasted
+    // slot?" Both deserved an answer on the card rather than in the chat.
+    const BURSTY = (s.overcharge || s.highroller) && isTop3(itemId);
+    const MULTY = s.firstHitMult || s.eruptChance || s.critMult || s.opportunist || s.onslaught
+        || s.giantSlayer || s.vanguard || s.attuned || s.bloodlust || s.packTactics;
+    if (BURSTY) parts.push(`Bursts from everything you are wearing multiply together and then stop at ×${BURST_CAP} — at this tier one piece can already reach that, so a second copy may add nothing.`);
+    else if (MULTY) parts.push(`Damage perks from everything you are wearing multiply together and then stop at ×${SIG_MULT_CAP} combined.`);
     return { label: s.label, desc: parts.join(" ") };
 }
 

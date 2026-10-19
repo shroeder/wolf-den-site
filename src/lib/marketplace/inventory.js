@@ -271,9 +271,16 @@ function gearPhraseFromSlots(bySlot) {
     if (armor.length) parts.push(`wearing ${armor.join(", ")}`);
     if (back) parts.push(`a ${gearDesc(back.def)} flowing dramatically from their back`);
     if (acc.length) parts.push(`adorned with ${acc.join(", ")}`);
-    const rank = { legendary: 1, mythic: 2, ascendant: 3, eternal: 4 };
-    const best = items.reduce((b, x) => (rank[x.def.rarity] > (rank[b] || 0) ? x.def.rarity : b), null);
-    const aura = best === "eternal"
+    // Two rungs were added above eternal and this table never grew: a hero in head-to-toe primordial scored
+    // `undefined` on every piece and the portrait came back with no aura at all, while a single eternal ring
+    // blazed. A ladder lookup must fail UPWARD.
+    const rank = { legendary: 1, mythic: 2, ascendant: 3, eternal: 4, celestial: 5, primordial: 6 };
+    const best = items.reduce((b, x) => ((rank[x.def.rarity] || 0) > (rank[b] || 0) ? x.def.rarity : b), null);
+    const aura = best === "primordial"
+        ? " This is a PRIMORDIAL hero, wearing the first things that were ever made — their gear burns molten white-gold shot through with red, a slow sunburst of rays turning behind them, older and hotter than any magic around it."
+        : best === "celestial"
+        ? " This is a CELESTIAL hero — their gear is lit from inside with white-hot light inside a drifting cyan-to-violet aurora, as though it were made of daylight."
+        : best === "eternal"
         ? " This is a GODLIKE, eternal champion — their gear blazes with impossible prismatic rainbow light, radiant energy pours off them, and reality bends and warps around their silhouette."
         : best === "ascendant"
         ? " This is an ASCENDANT hero — their gear is wreathed in molten orange-gold light and transcendent fire, clearly beyond legendary."

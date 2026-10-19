@@ -14,6 +14,7 @@ import { trackClient } from "@/lib/marketplace/track-client";
 import { GiOpenBook } from "react-icons/gi";
 
 import { describeDepth, describeFarm, describeSea, describeStat, describeStats, EQUIP_SLOTS, itemFitsSlot, sortStatKeys, STAT_META, statValue } from "@/lib/marketplace/items.js";
+import { RARITIES } from "@/lib/marketplace/rarity.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { scoreStats, statDelta, PRIORITY_STATS } from "@/lib/marketplace/item-value.js";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
@@ -43,7 +44,11 @@ const SLOT_ICON = {
 // ordering that tells you nothing once you own forty pieces. RARITY DESCENDING is what people actually scan
 // for, and slot is the tie-break because the next question after "what is my best stuff" is always "what is
 // my best HELMET".
-const RARITY_ORDER = ["eternal", "ascendant", "mythic", "legendary", "epic", "rare", "common"];
+// ⚠️ DERIVED FROM THE LADDER, NEVER RETYPED. This list was a hand-written copy that stopped at eternal, so
+// celestial and primordial — the two rungs ABOVE it — scored list.length and sorted BELOW common. ValkyrieSylve
+// found it the only way anybody could: "Primordial gear seems to be classified as a lower rarity than commons
+// when sorting by rarity." A rarity lookup must fail UPWARD; the way to guarantee that is to not keep a copy.
+const RARITY_ORDER = [...RARITIES].reverse();
 const SLOT_ORDER = ["main_hand", "off_hand", "helmet", "chest", "belt", "boots", "back", "amulet", "ring"];
 const rank = (list, v) => { const i = list.indexOf(v); return i < 0 ? list.length : i; };
 // Power is the plain sum of a piece's stats — the same one-number reading the delve uses, so "strongest" means

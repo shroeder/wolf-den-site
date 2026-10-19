@@ -12,6 +12,7 @@ import { COLLECTIBLES, collectibleById, petPassive, petSpecialPassive, petPassiv
 import { FORTUNE_SHORT } from "@/lib/marketplace/fortune";
 import { petPerkAt, petRealWorld } from "@/lib/marketplace/pet-perks";
 import { COIN_ICON } from "@/lib/coin-icon";
+import { RARITY_RANK } from "@/lib/marketplace/rarity.js";
 import Glyph from "@/components/Glyph";
 
 const SOURCES = [
@@ -32,7 +33,9 @@ const SOURCES = [
     { id: "counter", label: "In-store" },
 ];
 
-const RARITY_ORDER = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+// Off the shared ladder: a pet tops out at eternal today, but a copy that stops there is exactly how the gear
+// bag ended up sorting primordial below common.
+const RARITY_ORDER = RARITY_RANK;
 
 function statText(s) {
     const m = PET_STAT_META[s.stat] || { label: s.stat, icon: "" };

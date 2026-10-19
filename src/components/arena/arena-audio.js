@@ -17,6 +17,12 @@
 // (challenging, choosing a command), and `unlock()` is called on the first one; before that the context does not
 // exist at all, so nothing is blocked and nothing warns.
 
+// ── HOW LOUD A CHEST IS ──────────────────────────────────────────────────────────────────────────────────────
+// Keyed by CHEST TIER (wooden..primordial) as well as by gear rarity, and it has to reach the TOP of the
+// ladder. The two copies of this that stopped at eternal gave a Celestial chest a common's one-note chime and
+// a common's buzz — the rarest opening in the game sounded like the commonest.
+const CHEST_RANK = { wooden: 0, common: 0, iron: 1, rare: 1, gold: 2, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6, celestial: 7, primordial: 8 };
+
 let ctx = null;
 let master = null;
 let sfxBus = null;
@@ -436,8 +442,7 @@ export const Sfx = {
 
     /** The lid goes. A wooden crack, then the haul chiming out — longer and brighter the better it is. */
     chestOpen(rarity = "common", at = 0) {
-        const RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
-        const r = RANK[rarity] ?? 0;
+        const r = CHEST_RANK[rarity] ?? 0;
         // The lid: a low thud with a splintery top, the same for every chest — what changes is what comes out.
         tone({ at, freq: 132, to: 44, type: "sine", dur: 0.3, gain: 0.34 });
         noise({ at, dur: 0.22, gain: 0.2, type: "lowpass", freq: 3000, sweepTo: 320 });
@@ -869,8 +874,7 @@ export const Haptic = {
     chestShake() { Haptic.fire([0, 18, 170, 22, 150, 26, 130, 34, 110, 44]); },
     /** The lid going, scaled by what came out: a common is a thump, an eternal is a fanfare you can feel. */
     chestOpen(rarity = "common") {
-        const RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
-        const r = RANK[rarity] ?? 0;
+        const r = CHEST_RANK[rarity] ?? 0;
         const p = [0, 40 + r * 10];
         for (let i = 0; i < Math.min(4, r); i += 1) p.push(50, 22 + i * 8);
         Haptic.fire(p);

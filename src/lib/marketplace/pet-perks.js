@@ -537,6 +537,17 @@ const CAP_SUFFIX = (key, v) => {
         const at = Number(v) >= cap - 0.01;
         return at ? ` · at the ×${cap} cap` : ` · cap ×${cap}`;
     }
+    // ⚠️ AND TWO MORE ARE DESCRIBED IN A DERIVED UNIT. perkDescRaw divides these down before it writes the
+    // sentence — beachcomber by 10 into FINDS, neverturns by 25 into RAIDS — so printing the raw ceiling put
+    // two different units in one line. GrayKitsune: "'# extra finds each dig' ... say max 20 ... I am
+    // guessing that max 20 is +20 Beachcomber, not +20 finds each dig. Wording needs fixed." It was, and it
+    // is the same fault first_hit above was fixed for: a ceiling shown in the wrong unit is worse than none.
+    const PER = { beachcomber: 10, neverturns: 25 };
+    if (PER[key]) {
+        const top = Math.max(1, Math.round(cap / PER[key]));
+        const mine = Math.max(1, Math.round(Number(v) / PER[key]));
+        return mine >= top ? ` · at the ${top} cap` : ` · cap ${top}`;
+    }
     const shown = PROC_CAP[key] != null && SYSTEM_PERK_CAP[key] == null ? Math.round(cap * 100) : cap;
     const at = Number(v) >= Number(shown) - 0.05;
     return at ? ` · at the ${shown} cap` : ` · cap ${shown}`;

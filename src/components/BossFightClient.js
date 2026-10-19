@@ -273,7 +273,7 @@ export default function BossFightClient({ halloween = false }) {
                             +{cheerToast.xp} XP · +{cheerToast.gold} <Coin />
                             {cheerToast.petXp ? ` · 🐾 +${cheerToast.petXp}` : ""}
                             {cheerToast.selfDamage ? ` · ⚔️ ${cheerToast.selfDamage}` : ""}
-                            {cheerToast.fragment ? " · 🧩 fragment!" : ""}
+                            {cheerToast.fragment ? " · 🪙 doubloons!" : ""}
                         </div>
                         {cheerToast.badges?.length ? cheerToast.badges.map((b) => (
                             <div key={b.slug} className="cheer-toast-badge"><BadgeArt slug={b.slug} icon={b.icon} /> {b.label} unlocked!</div>

@@ -99,7 +99,12 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
         cancelAnimationFrame(raf.current);
         const gold = Math.max(floor, Math.min(ceil, s.score));
         const perfect = s.lives >= 3 && s.missed === 0; // caught EVERY coin AND never took a hit
-        setRecap({ gold, hits: 3 - s.lives, missed: s.missed, perfect });
+        // ⚠️ THE NUMBER ON THE FIELD IS NOT THE PAYOUT. What you catch is a SCORE; what reaches your purse is
+        // that score through sea bounty and then through the mint, and the two are far apart — Sunflower Jinxx
+        // caught 151 and was paid 97. The recap therefore keeps the caught count AND waits for the server's own
+        // figure rather than printing the one the client happens to know. Two numbers for one payout always
+        // drift; here only one of them was ever true.
+        setRecap({ gold, caught: s.score, hits: 3 - s.lives, missed: s.missed, perfect });
         setRecapReady(false);
         setPhase("done");
         onPlay(gold, perfect); // server clamps + grants the badge/pet on a perfect run
@@ -221,7 +226,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                     >
                         <div className="mg-hud">
                             <span>{"❤️".repeat(Math.max(0, lives))}<span style={{ opacity: 0.3 }}>{"❤️".repeat(Math.max(0, 3 - lives))}</span></span>
-                            <span className="mg-hud-score"><Coin /> {score}</span>
+                            <span className="mg-hud-score">🪙 {score}</span>
                             <span>⏱️ {timeLeft}s</span>
                         </div>
                         {/* The merchant leans in from the top, flinging the coins into play. */}
@@ -260,7 +265,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                     </>) : (
                     <>
                         {played ? (
-                            <div className="merchant-won"><Coin /> You caught <strong>{merchant.goldWon || Math.max(floor, Math.min(ceil, score))}</strong> gold from the coin toss!</div>
+                            <div className="merchant-won"><Coin /> The coin toss paid you <strong>{typeof merchant.goldWon === "number" ? merchant.goldWon.toLocaleString() : "…"}</strong> gold!</div>
                         ) : (
                             <button type="button" className="sail-cta sail-cta-wind" onClick={start}><Coin /> Catch the coin toss!</button>
                         )}
@@ -321,7 +326,8 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                     <div className={`mg-recap${recap.perfect ? " is-perfect" : ""}`}>
                         <div className="mg-recap-title">{recap.perfect ? "✨ PERFECT RUN! ✨" : "Coin toss complete!"}</div>
                         <div className="mg-recap-stats">
-                            <div><span><Coin /> Gold caught</span><strong>{recap.gold}</strong></div>
+                            <div><span>🪙 Coins caught</span><strong>{recap.caught}</strong></div>
+                            <div><span><Coin /> Paid into your purse</span><strong>{typeof merchant.goldWon === "number" ? merchant.goldWon.toLocaleString() : "…"}</strong></div>
                             <div><span>💥 Hits taken</span><strong>{recap.hits}</strong></div>
                             <div><span>💨 Coins missed</span><strong>{recap.missed}</strong></div>
                         </div>

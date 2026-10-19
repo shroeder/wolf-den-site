@@ -11,7 +11,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { applyGrowthTonic, grantSeedBundle, grantFarmFertilizer, grantHarvestLuckCharges, grantExtraPettings, grantExtraRatings } from "@/lib/marketplace/farm-consumables.js";
 import { SEED_PACKS } from "@/lib/marketplace/seed-packs.js";
-import { RECIPES, MASTER_RECIPES, SEASON_RECIPES } from "@/lib/marketplace/cooking-recipes.js";
+import { FULL_BOOK } from "@/lib/marketplace/cooking-recipes.js";
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
@@ -256,7 +256,18 @@ export const DISH_IDS = [];
 // SEASON_RECIPES joins them for exactly the reason MASTER_RECIPES did: a dish with no consumable definition
 // cooks into an id that resolves to nothing. Same note applies — CONSUMABLES says what a thing IS, not what
 // you may have, and a member who never walked the Road can neither learn the page nor cook the dish.
-for (const r of [...RECIPES, ...MASTER_RECIPES, ...SEASON_RECIPES]) {
+//
+// ── ⚠️ AND THEN IT HAPPENED A THIRD TIME, WHICH IS WHY THIS NOW READS FULL_BOOK ──────────────────────────
+// The list above was hand-maintained, and two more books were added to cooking-recipes.js without it: the six
+// DEEP_RECIPES behind the charts and the three HALLOWEEN_RECIPES. Nine dishes you could learn, could cook,
+// and came away from with the ladder rung and NO PLATE — grantConsumable(rec.id) wrote nothing, so the pet
+// XP the card promised could never be fed to anything. GrayKitsune: "I think a few of the new cooking
+// recipes aren't giving the food item, I had 5 mythic chests after doing some cooking but only like 3 +exp
+// items." He was counting the hole exactly.
+//
+// FULL_BOOK is the book. A seventh collection added tomorrow is covered the day it is written, because the
+// only way to add a dish the game can cook is to add it there.
+for (const r of FULL_BOOK) {
     if (r.kind !== "dish") continue;
     if (CONSUMABLES[r.id]) throw new Error(`cooking recipe "${r.id}" collides with an existing consumable id`);
     const amount = dishPetXp(r.tier);
@@ -814,7 +825,11 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
             // worth something.
             const r = await db.queryOne(`UPDATE mkt_sailing SET dig_lure = COALESCE(dig_lure, 0) + 1 WHERE buyer_id = $1 RETURNING dig_lure`, [buyerId]).catch(() => null);
             const n = Number(r?.dig_lure) || 1;
-            applied = n > 1 ? `Charmed — ${n} digs banked, each worth +50% fragments.` : "Your next dig will turn up +50% fragments.";
+            // Said "fragments", a currency the sea stopped paying months ago. A lure does two real things:
+            // a 35% shot at a second chest on the site, and half again as many doubloons out of the sand.
+            applied = n > 1
+                ? `Charmed — ${n} digs banked: each has a shot at a second chest and turns up +50% doubloons.`
+                : "Your next dig has a shot at a second chest, and turns up +50% doubloons.";
         }
         else if (e.type === "sail_storm") { await db.query(`UPDATE mkt_sailing SET returns_at = NOW() + (returns_at - NOW()) / 2 WHERE buyer_id = $1 AND returns_at > NOW()`, [buyerId]).catch(() => {}); applied = "The storm hurls you homeward — sail time halved!"; }
         else if (e.type === "sail_tailwind") { const h = Math.max(1, Number(e.hours) || 2); await db.query(`UPDATE mkt_sailing SET returns_at = GREATEST(NOW(), returns_at - ($2 || ' hours')::interval) WHERE buyer_id = $1 AND dig_state IS NULL AND returns_at > NOW()`, [buyerId, String(h)]).catch(() => {}); applied = `A strong gust fills your sails — ${h} hours shaved off the voyage!`; }

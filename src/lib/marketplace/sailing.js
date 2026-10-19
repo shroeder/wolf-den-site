@@ -406,7 +406,7 @@ function seaEffects(sea = {}) {
         goldBonus: Math.min(0.6, (sea.bounty || 0) * 0.03),             // Bounty: +3% raid/merchant gold/pt (cap +60%)
         // Digging
         digProcBonus: Math.min(0.18, (sea.dredge || 0) * 0.01),         // Dredge: +1% dig-tool proc/pt (cap +18%)
-        fragBonus: Math.min(0.6, (sea.trove || 0) * 0.03),             // Trove: +3% dig fragment yield/pt (cap +60%)
+        fragBonus: Math.min(0.6, (sea.trove || 0) * 0.03),             // Trove: +3% dig DOUBLOONS/pt (cap +60%) — the name is older than the currency
         // Voyages
         voyageSpeed: Math.min(0.15, (sea.tailwind || 0) * 0.01),        // Tailwind: −1% voyage time/pt (cap −15%)
         bonusWaves: Math.floor((sea.tailwind || 0) / 4),                // Tailwind: +1 daily wave per 4 points

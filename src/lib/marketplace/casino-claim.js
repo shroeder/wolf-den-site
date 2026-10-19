@@ -89,6 +89,19 @@ export async function ladder(buyerId) {
         ? await db.query(`SELECT pet_id, url FROM mkt_pet_sprite WHERE pet_id = ANY($1) AND url IS NOT NULL`, [petIds])
             .then((rows) => Object.fromEntries(rows.map((r) => [r.pet_id, r.url]))).catch(() => ({}))
         : {};
+    // ── ⚠️ A PET CAN HAVE ARRIVED FROM SOMEWHERE ELSE ENTIRELY ─────────────────────────────────────────
+    // The claim table was treated as the whole story for pets — "everything else has only ever come from
+    // this ladder" — and that is not true of one of them: The Ivory Adder is also the card game's rung 15.
+    // Kaishiern earned his at the cards and the ladder told him he did not own it; GrayKitsune took his off
+    // the ladder and it does not count for the casino-pet badge, because its home is the card room.
+    // The pet rungs read REAL OWNERSHIP now, the same way the stat and unlock rungs already read a level you
+    // bought before the rework. A rung whose animal is already in your menagerie is a rung you have taken.
+    const petOwned = petIds.length
+        ? await db.query(
+            `SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet' AND ref = ANY($2)`,
+            [buyerId, petIds])
+            .then((rows) => new Set(rows.map((r) => r.ref))).catch(() => new Set())
+        : new Set();
 
     const artFor = (kind, ref) => {
         if (kind === "pet" || kind === "vip_pet") return petArt[ref] || null;
@@ -102,7 +115,9 @@ export async function ladder(buyerId) {
         // only ever come from this ladder, so the claim table is the whole story for them.
         const already = (e.kind === "stat" || e.kind === "unlock")
             ? Math.max(got[key] || 0, Number(perks?.[e.ref]) || 0)
-            : (got[key] || 0);
+            : (e.kind === "pet" || e.kind === "vip_pet")
+                ? Math.max(got[key] || 0, petOwned.has(e.ref) ? 1 : 0)
+                : (got[key] || 0);
         const ready = Math.max(0, e.n - already);
         return {
             kind: e.kind,

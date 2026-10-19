@@ -73,7 +73,9 @@ export const RECIPES = [
     B("kb_fire_oil",    "Drizzle the Fire Oil",  3, { p_chilli: 1, fish_urchin: 2 },       "b_fire_oil",     "Gloves. Every time. Ask anyone."),
     B("kb_minnow",      "Carve a Glass Minnow",  4, { p_essence: 1, fish_smelt: 3 },       "b_glass_minnow", "Carved from the inside out."),
     B("kb_deep_lure",   "Weight a Deep Lure",    4, { p_smoked: 2, fish_lionfish: 2 },     "b_deep_lure",    "Heavy enough to reach the cold layer."),
-    B("kb_marrow",      "Render the Marrow",     4, { p_leviathan: 1, fish_squid: 2 },     "b_marrow_paste", "Rendered slow. Do not do it indoors."),
+    // Named away from the prep page above it, which is also a marrow and was also called "Render the Marrow".
+    // Two pages, one name, two different boards — Kaishiern found it the only way anyone could, by owning both.
+    B("kb_marrow",      "Work the Marrow Paste", 4, { p_leviathan: 1, fish_squid: 2 },     "b_marrow_paste", "Rendered slow. Do not do it indoors."),
     B("kb_storm_chum",  "Mix the Storm Chum",    4, { p_roe: 2, fish_stormpike: 1 },       "b_storm_chum",   "Made to be thrown into weather."),
     B("kb_star_bait",   "Cut the Star Bait",     5, { starfruit: 2, p_essence: 1 },        "b_star_bait",    "On the cross, so every point catches the light."),
     B("kb_kraken_ink",  "Draw the Kraken Ink",   5, { fish_kraken: 1, p_brine: 2 },        "b_kraken_ink",   "It stains everything it touches, permanently."),

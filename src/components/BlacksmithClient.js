@@ -8,6 +8,7 @@ import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
 import { bandTable, GRADE_COLOR } from "@/lib/marketplace/timing.js";
 import { statValue } from "@/lib/marketplace/items.js";
+import { RARITIES } from "@/lib/marketplace/rarity.js";
 import CoinCta from "@/components/CoinCta";
 import Coin from "@/components/Coin";
 import Glyph from "@/components/Glyph";
@@ -67,8 +68,9 @@ const MISS = { key: "miss", score: 0, label: "MISS", color: GRADE_COLOR.miss };
 const gradeFor = (dist, widen = 0) => BANDS.find((b) => dist <= b.max + widen) || MISS;
 const STRIKES = 6;
 
-// Worst → best, so the bulk chips read in the order you would clear them out.
-const RARITY_ORDER = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal"];
+// Worst → best, so the bulk chips read in the order you would clear them out. Taken off the ladder rather than
+// retyped — the hand-written copy stopped at eternal, which put a celestial pile at indexOf -1, i.e. first.
+const RARITY_ORDER = RARITIES;
 const EMPTY_FORGE = { parts: [], salvage: [], enhance: [], upgrades: [], dailies: [], regalia: null, hearthBg: null };
 
 // Every refusal ascendItem can return, in words that say what happened. A raw error key on the rarest action

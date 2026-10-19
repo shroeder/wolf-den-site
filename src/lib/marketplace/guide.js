@@ -6,6 +6,7 @@ import { addChests } from "@/lib/marketplace/chests.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { GUIDE_CHAPTERS, DONE_CHAPTER, DONE_STEP, SEEDED, chapterById } from "@/lib/marketplace/guide-chapters.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { STARTER_RECIPES } from "@/lib/marketplace/cooking.js";
 
 // ── THE PATHFINDER: PROGRESS ─────────────────────────────────────────────────────────────────────────────────
 // Steps are VERIFIED, never claimed. One pass over the member's distinct activity events plus three small
@@ -26,7 +27,7 @@ async function trueSteps(buyerId, steps) {
     if (!steps.length) return new Set();
     const wanted = [...new Set(steps.flatMap((s) => s.events || []))];
     const needs = (v) => steps.some((s) => s.verify === v);
-    const [events, avatar, table, wish, push, purchase, shopVisit] = await Promise.all([
+    const [events, avatar, table, wish, push, purchase, recipe, shopVisit] = await Promise.all([
         wanted.length
             ? db.query(`SELECT DISTINCT event FROM mkt_activity_event WHERE buyer_id = $1 AND event = ANY($2)`, [buyerId, wanted]).catch(() => [])
             : [],
@@ -88,6 +89,19 @@ async function trueSteps(buyerId, steps) {
         // dozens of times each — the last step of a 33-step guide, uncompletable for everyone. The ping is
         // fixed, but reading the PAGE VIEW as well is what un-sticks the people already stuck: page_view has
         // always recorded the path, so the evidence was sitting there the whole time.
+        // ── A RECIPE THEY ALREADY HOLD ──────────────────────────────────────────────────────────────
+        // Anamarisa: "If you open the kitchen and accept the recipes before you get to the intro quest that
+        // sends you there... you get stuck until you find another recipe." Exactly right. `recipe_learned` is
+        // written by learnRecipe and by nothing else — the three starter pages, and anything granted by a path
+        // that writes mkt_recipe_known directly, leave no event behind. So a member who had already collected
+        // every page within reach was told to go and learn one, with none left to learn. Reading the BOOK
+        // answers the question the step is actually asking, and credits everyone already stuck the moment it
+        // ships. The starters do not count: being handed three pages at signup is not learning one.
+        needs("recipe")
+            ? db.queryOne(
+                `SELECT 1 AS x FROM mkt_recipe_known
+                  WHERE buyer_id = $1 AND recipe_id <> ALL($2::text[]) LIMIT 1`, [buyerId, STARTER_RECIPES]).catch(() => null)
+            : null,
         needs("shopvisit")
             ? db.queryOne(
                 `SELECT 1 AS x FROM mkt_activity_event
@@ -105,6 +119,7 @@ async function trueSteps(buyerId, steps) {
         else if (s.verify === "wishlist" && wish) out.add(s.key);
         else if (s.verify === "push" && push) out.add(s.key);
         else if (s.verify === "purchase" && purchase) out.add(s.key);
+        else if (s.verify === "recipe" && recipe) out.add(s.key);
         else if (s.verify === "shopvisit" && (shopVisit || purchase)) out.add(s.key);
     }
     return out;

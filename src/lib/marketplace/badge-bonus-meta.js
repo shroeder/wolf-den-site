@@ -48,7 +48,11 @@ export const BONUS_META = {
             plunder: { art: "/images/bonus/plunder.png", icon: "🏴‍☠️", label: "Plunder", suffix: "" },
             bounty: { art: "/images/bonus/bounty.png", icon: COIN_ICON, label: "Sea Gold", suffix: "" },
             dredge: { art: "/images/bonus/dredge.png", icon: "⛏️", label: "Dig Luck", suffix: "" },
-            trove: { art: "/images/bonus/trove.png", icon: "💎", label: "Fragments", suffix: "" },
+            // ⚠️ NOT "FRAGMENTS". Fragments were deleted when a dig started turning up a whole chest, and this
+            // label outlived them by two months — Kaishiern: "The sailing badge overview still mentions
+            // Fragments and we did away with those a while ago." Trove swells the DOUBLOONS a dig pays
+            // (see sailing.js fragBonus), so that is what it is called.
+            trove: { art: "/images/bonus/trove.png", icon: "💎", label: "Dig Doubloons", suffix: "" },
             // Labelled by its EFFECT, not its name: "+3 Tailwind" reads as "three tailwinds a day" because a
             // tailwind is also a once-daily action you spend. It's actually −1% voyage time per point (cap −15%),
             // so the point value already IS the percentage — show that instead.
