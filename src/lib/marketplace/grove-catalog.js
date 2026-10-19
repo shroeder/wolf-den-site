@@ -24,7 +24,9 @@
 // town raids. `art: null` marks the handful that genuinely need drawing; nothing is generated that already
 // exists somewhere. See check-existing-sprites-first.
 
-import { MAP_PARTS } from "@/lib/marketplace/grove-maps.js";
+import {
+    MAP_PARTS, MAP_ENEMIES, MAP_BOSSES, MAP_ZONES, MAP_EMBLEMS, mapIsBuilt,
+} from "@/lib/marketplace/grove-maps.js";
 
 // ── PARTS ────────────────────────────────────────────────────────────────────────────────────────────────────
 // ⚠️ EVERY PART HERE IS USED BY AT LEAST ONE RECIPE. Luke: "Each part you can get from an enemy has uses in at
@@ -125,7 +127,7 @@ export function emblemStars(count) {
 }
 
 // What an emblem gives, per star. The value is PER STAR — a 3-star emblem gives three times the row below.
-export const GROVE_EMBLEMS = {
+const MAP_ONE_EMBLEMS = {
     em_rootrat: { name: "The Gnawed Root", stat: "might", per: 2, kind: "flat" },
     em_grub: { name: "The Pale Grub", stat: "vitality", per: 3, kind: "flat" },
     em_thornling: { name: "The Thornling", stat: "attack_speed", per: 0.6, kind: "pct" },
@@ -139,6 +141,13 @@ export const GROVE_EMBLEMS = {
     em_goblin: { name: "The Palisade", stat: "ferocity", per: 2, kind: "flat" },
     em_elder: { name: "The Elder Root", stat: "tenacity", per: 2, kind: "flat" },
     em_crystal: { name: "The Crystal-Touched", stat: "rare_spawn", per: 0.8, kind: "pct", rare: true },
+};
+
+// One emblem per generated map rather than one per creature: 132 new passive stat stacks is a second stat
+// system arriving by the back door, and stat ceilings are still an open question in the design doc.
+export const GROVE_EMBLEMS = {
+    ...MAP_ONE_EMBLEMS,
+    ...Object.fromEntries(Object.entries(MAP_EMBLEMS).filter(([, e]) => mapIsBuilt(e.map))),
 };
 
 // ── ⚠️ THE CURVE IS ANCHORED TO TWO REAL MEMBERS, AND THE HIGH ANCHOR IS MAP 12 ──────────────────────────
@@ -206,7 +215,10 @@ export const GROVE_EMBLEMS = {
 // `loot` weights are relative within the enemy. `n` is how many drop when that row wins.
 const E = (id, name, art, o) => ({ id, name, art, ...o });
 
-export const GROVE_ENEMIES = {
+// ⚠️ MAP ONE'S TWELVE. Maps two to twelve declare their residents in grove-maps.js and are merged below,
+// filtered to maps that are actually BUILT — a creature with no art is a broken-image glyph wandering a zone
+// nobody can reach, and the design is not helped by shipping it early.
+const MAP_ONE_ENEMIES = {
     rootrat: E("rootrat", "Rootrat", "/images/delves/foe-rootrat.webp", {
         passive: true, hp: 770, dmg: [62, 96], telegraph: 0,
         emblem: "em_rootrat", emblemChance: 0.0026,
@@ -267,6 +279,12 @@ export const GROVE_ENEMIES = {
         emblem: "em_elder", emblemChance: 0.0014,
         loot: [{ part: "elder_heartwood", n: [1, 2], w: 60 }, { part: "rotwood_knot", n: [1, 2], w: 40 }],
     }),
+};
+
+/** Every creature in the world: map one's twelve, plus the twelve of each map whose art has landed. */
+export const GROVE_ENEMIES = {
+    ...MAP_ONE_ENEMIES,
+    ...Object.fromEntries(Object.entries(MAP_ENEMIES).filter(([, e]) => mapIsBuilt(e.map))),
 };
 
 // ── THE RARE SPAWN ───────────────────────────────────────────────────────────────────────────────────────────
@@ -405,7 +423,7 @@ const A = {
 // zone-1 Thornling into a zone-5 Thornling would compound on a number that was already written for zone 5.
 const B = (id, name, o) => ({ id, name, art: `/images/grove/boss-${id}.webp`, boss: true, ...o });
 
-export const GROVE_BOSSES = {
+const MAP_ONE_BOSSES = {
     glutmaw: B("glutmaw", "Glutmaw, the Burrow King", {
         hp: 59000, dmg: [190, 260], emblem: "em_rootrat", emblemChance: 0.09,
         attacks: [A.slam, A.sweep],
@@ -466,6 +484,12 @@ export const GROVE_BOSSES = {
         attacks: [A.sweep, A.slam, A.volley],
         loot: [{ part: "elder_heartwood", n: [4, 8] }, { part: "rotwood_knot", n: [4, 7] }],
     }),
+};
+
+/** Every boss in the world, built maps only — same rule as the creatures above. */
+export const GROVE_BOSSES = {
+    ...MAP_ONE_BOSSES,
+    ...Object.fromEntries(Object.entries(MAP_BOSSES).filter(([, b]) => mapIsBuilt(b.map))),
 };
 
 // How long a boss stays dead. ⚠️ THE ONLY THROTTLE ON THE HYPER-RARE FAUCET, so it is wall-clock and per
@@ -589,7 +613,7 @@ export const sitArt = (id) => `/images/grove/sit-${id}.webp`;
 const Z = (n, id, name, enemies, boss, toUnlock, biome, o = {}) =>
     ({ n, id, name, enemies, boss, toUnlock, biome, bg: `/images/grove/zone-${id}.webp`, ...o });
 
-export const GROVE_ZONES = [
+const MAP_ONE_ZONES = [
     Z(1, "thicket", "Thicket Edge", ["rootrat"], "glutmaw", 20, "wood", { blurb: "Where the trees start. Nothing here has noticed you yet." }),
     Z(2, "hollow", "Mossy Hollow", ["grub"], "mossmother", 25, "moss", { blurb: "Wet underfoot and quiet. Something is eating the deadfall." }),
     Z(3, "fernway", "The Fernway", ["rootrat", "thornling"], "thistlecrown", 30, "wood", { blurb: "Head-high ferns, and the first thing that hits back." }),
@@ -602,6 +626,22 @@ export const GROVE_ZONES = [
     Z(10, "rotwood", "Rotwood", ["ashwraith", "voidmoth"], "everburning", 65, "char", { blurb: "The trees burned a long time ago and never went out." }),
     Z(11, "palisade", "The Palisade", ["goblin", "ashwraith"], "stakelord", 70, "plank", { blurb: "Sharpened stakes, facing outward. Somebody is keeping something in." }),
     Z(12, "heartwood", "Heartwood", ["elderling", "goblin"], "heartwood_elder", 80, "heart", { blurb: "The middle of the forest, and the oldest thing in it." }),
+];
+
+// Map one's zones carry their map number here rather than in twelve literals.
+for (const z of MAP_ONE_ZONES) { z.map = 1; z.mapName = "The Grove"; }
+
+/**
+ * Every zone a member can walk into, in depth order.
+ *
+ * ⚠️ BUILT MAPS ONLY, AND THE DESIGN IS NOT THE GAME. grove-maps.js declares 132 more zones — named, themed,
+ * populated and priced — because the shape of the climb had to be decided before anything was drawn. A zone
+ * with no backdrop is a black screen, so a map joins this list when its art lands and not before. Raise
+ * MAPS_BUILT and the whole map arrives at once: zones, residents, bosses, materials and its emblem.
+ */
+export const GROVE_ZONES = [
+    ...MAP_ONE_ZONES,
+    ...MAP_ZONES.filter((z) => mapIsBuilt(z.map)),
 ];
 
 // ── DIFFICULTY ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -685,7 +725,16 @@ export const groveArt = (id) => {
     return null;
 };
 
-// A tool's picture, by SLOT rather than by recipe id. Twelve tiers of the same slot are the same object made
-// better, so they share one sprite until a tier earns its own — the ladder changes the number beside the
-// picture, not the picture.
-export const toolArt = (slot) => (slot ? `/images/grove/tool-${slot}.webp` : null);
+// ── A TOOL'S PICTURE, BY SLOT AND RUNG ───────────────────────────────────────────────────────────────────────
+// It used to be one sprite per slot, on the reasoning that a ladder changes the number beside the picture
+// rather than the picture. That was wrong, and the recipes are why: tier VII is not a better rod, it is a rod
+// made out of a DIFFERENT PLACE — comet thread and void rod have nothing in common with root and moss except
+// what they are for. Every rung is drawn from its own map's three materials.
+//
+// `tool-<slot>-t<n>.webp` is the real name. The bare `tool-<slot>.webp` is kept as the fallback for any
+// caller that does not know a tier (and is byte-identical to -t1), so an old reference cannot 404.
+export const toolArt = (slot, tier = 0) => {
+    if (!slot) return null;
+    const n = Math.max(0, Math.floor(Number(tier) || 0));
+    return n >= 1 ? `/images/grove/tool-${slot}-t${n}.webp` : `/images/grove/tool-${slot}.webp`;
+};

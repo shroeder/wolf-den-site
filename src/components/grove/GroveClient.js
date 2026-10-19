@@ -468,7 +468,7 @@ export default function GroveClient({ initial }) {
                                             that. [[img-onerror-fires-before-hydration]] */}
                                         <span className="gv-glyph">
                                             <img
-                                                src={toolArt(t.slot)} alt="" draggable={false}
+                                                src={toolArt(t.slot, t.tier)} alt="" draggable={false}
                                                 onError={(e) => {
                                                     e.currentTarget.style.display = "none";
                                                     e.currentTarget.parentElement?.classList.add("is-noart");

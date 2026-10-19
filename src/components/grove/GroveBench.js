@@ -1,6 +1,7 @@
 "use client";
 
 import { ROMAN } from "@/lib/marketplace/grove-recipes.js";
+import { toolArt } from "@/lib/marketplace/grove-catalog.js";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -351,7 +352,12 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
             <ul className="gv-recs">
                 {rows.map(({ r, built, costs, missing, haveParts, ready }) => {
                     const Icon = (r.kind === "tool" && SLOT_ICON[r.slot]) || KIND_ICON[r.kind] || GiStoneCrafting;
-                    const art = r.kind === "food" ? `/images/grove/food-${r.id}.webp` : null;
+                    // A tool recipe shows the rung it would make, not a generic slot icon — the whole point
+                    // of drawing twelve of each was that tier VII is a different object, and a workbench that
+                    // shows the same picture for all twelve hides exactly that.
+                    const art = r.kind === "food" ? `/images/grove/food-${r.id}.webp`
+                        : r.kind === "tool" ? toolArt(r.slot, r.tier)
+                        : null;
                     return (
                         <li key={r.id} className={`gv-rec${ready ? " is-ready" : ""}${built ? " is-built" : ""}`}>
                             <div className="gv-rec-face">

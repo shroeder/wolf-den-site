@@ -21,6 +21,8 @@ import path from "node:path";
 
 import sharp from "sharp";
 import { quality, priceRun } from "./lib/gen-guard.mjs";
+// Pure data, no @ alias and no imports of its own, so plain node can read it.
+import { GROVE_MAPS, TOOL_ROLES } from "../src/lib/marketplace/grove-maps.js";
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const KEY = props.match(/OPENAI_API_KEY=(.+)/)?.[1]?.trim();
@@ -431,7 +433,112 @@ const TOOLS = {
 };
 for (const [id, subject] of Object.entries(TOOLS)) ART[`tool-${id}`] = [`${ITEM} ${subject}`, "item"];
 
+// ── A SPRITE FOR EVERY RUNG ─────────────────────────────────────────────────────────────────────
+// Luke: "you didnt show me each sprite for each level of each tool." One picture per slot was the
+// original call — the ladder changes the number beside it, not the object — and it is wrong for the
+// reason the recipes are built the way they are: tier VII is not a better rod, it is a rod made out of
+// a DIFFERENT PLACE. A rod of comet thread and void rod has nothing in common with one of root and moss
+// except what it is for.
+//
+// So each rung is drawn from its own map's three materials, which is exactly what its recipe asks for,
+// and the craft gets finer as the ladder climbs: tier II is still lashed and found, tier XII is made by
+// somebody who has done this eleven times before.
+//
+// ⚠️ TIER I IS NOT REDRAWN. The twelve originals are map one's rung and they are already approved; they
+// are copied to the -t1 names by the companion step rather than redrawn, which saves the money and keeps
+// the picture everybody has already seen.
+const TOOL_NOUN = {
+    rod: "FISHING ROD", pick: "PICKAXE", shovel: "SPADE", hammer: "SMITH'S HAMMER",
+    hoe: "HOE", sextant: "SEXTANT", knife: "KNIFE", collar: "ANIMAL COLLAR",
+    lantern: "HANDHELD LANTERN", loupe: "JEWELLER'S LOUPE", banner: "WAR STANDARD", horn: "HUNTING HORN",
+};
+// How well made it is, by rung. The materials carry the place; this carries the twelve maps of practice.
+const CRAFT = [
+    "", "crude and lashed together, clearly improvised from what was lying about",
+    "roughly made but deliberate, the bindings even",
+    "solidly made, the joints fitted rather than wrapped",
+    "well made, with simple decoration cut into it",
+    "finely made, balanced, with inlay at the joins",
+    "expertly made, every surface worked",
+    "masterfully made, ornamented without being fussy",
+    "exquisite, the materials showcased rather than merely used",
+    "a masterwork, unmistakably the best of its kind",
+    "a legendary piece, worked beyond what the materials should allow",
+    "an artefact, humming with the place it came from",
+];
+for (const map of GROVE_MAPS) {
+    if (!map.parts || map.n < 2) continue;
+    const byRole = {};
+    for (const p of map.parts) if (!byRole[p.role]) byRole[p.role] = p;
+    for (const [slot, roles] of Object.entries(TOOL_ROLES)) {
+        const mats = roles.map((r) => byRole[r]).filter(Boolean);
+        if (mats.length !== 3) continue;
+        const made = mats.map((m) => `${m.name} (${m.blurb.replace(/\.$/, "")})`).join(", ");
+        ART[`tool-${slot}-t${map.n}`] = [
+            `${ITEM} A ${TOOL_NOUN[slot]} from ${map.name}, ${CRAFT[map.n - 1]}. MADE FROM: ${made}. The object must read unmistakably as a ${TOOL_NOUN[slot]} while being built entirely out of those three materials.`,
+            "item",
+        ];
+    }
+}
+
 for (const [id, subject] of Object.entries(PARTS)) ART[`part-${id}`] = [`${ITEM} ${subject}`, "item"];
+
+// ── MAPS TWO TO TWELVE: THE PLACES, THEIR RESIDENTS, AND WHAT COMES OFF THEM ────────────────────
+// grove-maps.js designs eleven more maps — twelve zones, twelve creatures, twelve bosses and twelve
+// materials each. This registers all four families so a map can be drawn as a unit:
+//
+//   node scripts/gen-grove-art.mjs --map 2            # price map two
+//   node scripts/gen-grove-art.mjs --map 2 --apply    # draw it (48 images, about half an hour)
+//
+// ⚠️ A MAP IS DRAWN AS A WHOLE OR NOT AT ALL. Half a map is twelve zones where six have backdrops, which
+// is worse than none: the zones with art look finished and the ones without look broken. MAPS_BUILT is
+// what lets a member in, and it should only move when every one of these exists.
+//
+// The briefs lean on each map and each subject's own words rather than a generic fantasy prompt, because
+// the whole reason the places were written first is that a Frostmere wolf and a Rotgarden husk should not
+// come back looking like the same animal in two palettes.
+const BIOME_LOOK = {
+    burrow: "underground, earth and root, no sky",
+    stone: "bare rock, cold grey light",
+    moss: "wet green, standing water, soft edges",
+    field: "open flat ground, low cover, big sky",
+    bramble: "dense thorn and tangle",
+    char: "burnt, black, ash underfoot",
+    plank: "built timber, weathered and salvaged",
+    glow: "lit from within by its own light source, dark around it",
+    wood: "living forest, trunks and canopy",
+    heart: "ancient overgrown green, everything older than it should be",
+};
+
+for (const map of GROVE_MAPS) {
+    if (!map.zones) continue;
+
+    for (const part of map.parts) {
+        ART[`part-${part.id}`] = [`${ITEM} A ${part.name} from ${map.name}: ${part.blurb} It is a raw material, a single object, unmistakably from a place that is ${map.blurb}`, "item"];
+    }
+
+    for (const c of map.creatures) {
+        const home = map.zones.find((z) => z.foes[0] === map.creatures.indexOf(c));
+        const look = BIOME_LOOK[home?.biome] || "";
+        ART[`foe-${c.id}`] = [`${FOE} THE CREATURE: a ${c.name} of ${map.name}. ${c.blurb} It lives where everything is ${look}, and it must look like it belongs there and nowhere else.`, "foe"];
+    }
+
+    for (const z of map.zones) {
+        ART[`boss-${z.bossId}`] = [`${BOSS} THE BOSS: ${z.bossName}, which rules ${z.name} in ${map.name}. ${z.blurb} It is the largest and oldest thing in a place where everything is ${BIOME_LOOK[z.biome] || ""}, and it is kin to what wanders there rather than a bigger copy of it.`, "foe"];
+        ART[`zone-${z.id}`] = [`${PLATE} THE PLACE: ${z.name}, in ${map.name}. ${z.blurb} The ground and everything in frame is ${BIOME_LOOK[z.biome] || ""}. ${map.blurb}`, "plate"];
+    }
+}
+
+// --map N draws one whole map: its zones, creatures, bosses and materials.
+const MAP_ARG = Number(arg("--map") || 0);
+if (MAP_ARG) {
+    const map = GROVE_MAPS.find((m) => m.n === MAP_ARG);
+    if (!map?.zones) throw new Error(`map ${MAP_ARG} has no design to draw`);
+    for (const part of map.parts) ONLY.push(`part-${part.id}`);
+    for (const c of map.creatures) ONLY.push(`foe-${c.id}`);
+    for (const z of map.zones) { ONLY.push(`boss-${z.bossId}`); ONLY.push(`zone-${z.id}`); }
+}
+
 for (const [id, subject] of Object.entries(EMBLEMS)) ART[`emblem-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(FOODS)) ART[`food-${id}`] = [`${ITEM} ${subject}`, "item"];
 

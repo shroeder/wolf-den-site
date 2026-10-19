@@ -157,7 +157,15 @@ checkArt("rare spawn", GROVE_RARE.art);
 // Every tool has a picture. A slot whose sprite is missing falls back to a react-icons glyph on screen, so
 // nothing LOOKS broken -- which is exactly why it needs a gate: the failure is a generic pickaxe standing in
 // for one knapped out of an antler, and nobody would ever file that as a bug.
-for (const t of TOOL_SLOTS) checkArt(`tool ${t.slot}`, toolArt(t.slot));
+// Every RUNG has its own picture now, drawn from its own map's materials. Checked per tier rather than per
+// slot, because a ladder missing one rung's art falls back to a sprite made of the wrong world and nothing
+// on screen says so.
+for (const t of TOOL_SLOTS) {
+    checkArt(`tool ${t.slot}`, toolArt(t.slot));
+    for (const r of GROVE_RECIPES.filter((x) => x.kind === "tool" && x.slot === t.slot)) {
+        checkArt(`tool ${t.slot} tier ${r.tier}`, toolArt(t.slot, r.tier));
+    }
+}
 for (const z of GROVE_ZONES) checkArt(`zone ${z.id}`, z.bg);
 // ── ⚠️ AND EVERY ZONE IS MADE OF SOMETHING THAT EXISTS ───────────────────────────────────────────
 // A zone with no biome, or one naming a biome that is not in the table, falls back to `wood` — so the

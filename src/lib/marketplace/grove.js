@@ -271,7 +271,16 @@ export async function groveState(buyerId) {
         })),
         seen: [...seenSet],
         // The tablet: what you have seen out of everything there is, and what that is worth.
-        tablet: { seen: seenSet.size, total: Object.keys(GROVE_PARTS).length, bonuses: tabletBonuses(seenSet.size) },
+        // ⚠️ THE DENOMINATOR IS WHAT YOU CAN ACTUALLY FIND. GROVE_PARTS holds every material in the world,
+        // including the 132 designed for maps nobody can walk into yet; counting those turns "16 of 16,
+        // every part discovered" into "16 of 148" and reads as eleven twelfths of the game missing rather
+        // than not built. The tablet is a record of what the Grove has shown you, so it counts what the
+        // Grove can show you.
+        tablet: {
+            seen: seenSet.size,
+            total: Object.values(GROVE_PARTS).filter((p) => mapIsBuilt(p.map ?? 1)).length,
+            bonuses: tabletBonuses(seenSet.size),
+        },
         // ── EVERY RECIPE, ALWAYS ────────────────────────────────────────────────────────────────────
         // ⚠️ THIS REVERSES A RULE THAT WAS DELIBERATE, so it is worth saying why rather than letting the
         // old comment in grove-recipes.js read as still true. The bench used to show only recipes whose
