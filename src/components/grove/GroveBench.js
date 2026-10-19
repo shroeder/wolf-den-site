@@ -1,5 +1,6 @@
 "use client";
 
+import { ROMAN } from "@/lib/marketplace/grove-recipes.js";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -197,6 +198,10 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
         if (!d?.ok) {
             setNote(d?.error === "not_enough_parts" ? "Not enough parts for that."
                 : d?.error === "already_built" ? "You already have that one."
+                // A rung is climbed from the one below it. Say which one is missing rather than refusing
+                // flatly — "you cannot make this" with no reason reads as a bug in a crafting screen.
+                : d?.error === "needs_previous_tier"
+                    ? `Make tier ${ROMAN[(d.need || 1) - 1] || d.need} first — each tier is remade from the one below it.`
                 : "Couldn't make that.");
             return;
         }

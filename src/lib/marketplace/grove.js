@@ -875,7 +875,18 @@ export async function groveCraft(buyerId, recipeId) {
     if (recipe.kind === "tool") {
         const held = await db.queryOne(`SELECT tier FROM mkt_grove_tool WHERE buyer_id = $1 AND slot = $2`,
             [buyerId, recipe.slot]).catch(() => null);
-        if (Number(held?.tier) >= Number(recipe.tier)) return { ok: false, error: "already_built" };
+        const have = Number(held?.tier) || 0;
+        if (have >= Number(recipe.tier)) return { ok: false, error: "already_built" };
+        // ── ⚠️ A RUNG IS CLIMBED FROM THE ONE BELOW IT ───────────────────────────────────────────────
+        // Luke: "every tier requires the previous to craft." Without this the ladder is a menu: carry map
+        // nine's materials home on your first trip and the tier IX tool is craftable from tier 0, which
+        // skips eight rungs, eight maps' worth of grind, and the entire reason the ladder exists.
+        //
+        // The tool is REMADE rather than replaced — one row per slot holding the tier reached — so the
+        // previous tier is spent by being upgraded. There is no tier I rod left over to sell or keep.
+        if (have !== Number(recipe.tier) - 1) {
+            return { ok: false, error: "needs_previous_tier", need: Number(recipe.tier) - 1, have };
+        }
     }
 
     // Discovery gate: you cannot craft what you have not found.
