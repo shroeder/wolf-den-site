@@ -1,4 +1,5 @@
 import "server-only";
+import { groveToolPct } from "@/lib/marketplace/grove-tools.js";
 
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
@@ -578,7 +579,15 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
     if (cleared && outPowers.has("gem_cutter_s_eye") && oneIn(2)) {
         try {
             const { grantRandomGem } = await import("@/lib/marketplace/jeweller.js");
+            // ── THE GROVE'S LOUPE ────────────────────────────────────────────────────────────────
+            // Gems enter the game in exactly one place: a delve boss. So this is where the jeweller's tool
+            // has to live — there is no other faucet to raise. A chance of a SECOND stone rather than a
+            // percentage on one, for the same reason the lantern takes its bonus as a chance.
+            const loupePct = (await groveToolPct(buyerId, "loupe").catch(() => 0)) / 100;
             const got = await grantRandomGem(buyerId, "delve_boss");
+            if (loupePct > 0 && Math.random() < loupePct) {
+                await grantRandomGem(buyerId, "delve_boss_loupe").catch(() => {});
+            }
             if (got?.ok) gemOut = got.gem;
         } catch { /* a gem is a bonus; never fail the wrap card over one */ }
     }

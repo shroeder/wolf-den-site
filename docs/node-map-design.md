@@ -458,7 +458,7 @@ an empty forest with the backdrop scrolling behind nothing.
 
 ### Still to build
 
-- **Maps 2-20.** Map one is the pattern: a catalogue of parts, enemies, zones and emblems, recipes that raise
+- **Maps 2-12.** Map one is the pattern: a catalogue of parts, enemies, zones and emblems, recipes that raise
   the tool tiers, and twelve backdrops. Nothing structural should need to change.
 - **The Crystal Stag's own loot table per map.** It has one; each map wants its own crystal creature.
 - **Opening the door to members.** Still owner-gated by `groveOpen`, on Luke's call.
@@ -509,3 +509,45 @@ earned; showing none loses what the chart is for.
 tiles. The new places reuse that class name, so every one of them rendered as a dark rounded tile with its
 drawing clipped away inside it — the new rule won every property it set and lost every property it did not
 think to set. Change an element's shape and delete its old rule.
+
+### 2026-10-18 - twelve tools, twelve maps, twelve rungs
+
+Luke: *"the easy gaps we should fix. Which include feeding all systems. And making sure we extend them to
+their highest tiers, which I would say would be represented by a tier per map. And we have 12 maps? Tiers
+would be represented with Roman numerals. These extensions should use the pattern we set up, where its an
+equippable crafting equipment for the respective system."*
+
+**TWELVE MAPS IS SETTLED, AND IT WAS ALREADY SETTLED.** The difficulty curve has been anchored to it since
+2026-10-14 - grove-catalog.js prices depth 133 as map 12 zone 1, x32 of power and x5.7 of durability spread
+over 132 zones. The "maps 2-20" line in Still to build was stale and is corrected above. `TOOL_TIER_CAP = 12`
+in grove-recipes.js is now the one place that number lives.
+
+**SIX SYSTEMS HAD NO TOOL AND THEREFORE NO REASON TO CARE THE GROVE EXISTED.** The original six covered
+fishing, mining, digging, the forge, the farm and sailing. The kitchen, the menagerie, the dungeons, the
+jeweller, the arena and the weekly boss got nothing. Added:
+
+| Tool | System | What it moves | Where it lands |
+|---|---|---|---|
+| Cook's Knife | cooking | recipe luck | `recipeLuck()`, additive with the pet's nose |
+| Pet Collar | pets | pet XP share | `creditEquippedPetXp`, on the share only |
+| Delver's Lantern | delves | parts recovered | frozen on the run at the door, spent in `bank()` |
+| Jeweller's Loupe | jeweller | gem find | the delve boss, the only place gems enter the game |
+| War Banner | arena | laurels won | the bout payout, win or loss |
+| Hunting Horn | boss | strike reward | the swing's own XP |
+
+**EVERY ONE OF THEM PAYS ON THE REWARD SIDE, NEVER ON COMBAT POWER**, and that is a rule rather than a
+preference. §11 still has "stat ceilings" open: a tool that added damage would have to be priced against a
+ceiling nobody has set, and twelve ladders of damage is a second stat system arriving by the back door. A
+tool that adds YIELD is priced against its own system and nothing else, which is also why the banner pays
+laurels and not power, and the horn pays the strike's XP and not the strike.
+
+**SMALL DROPS TAKE THEIR BONUS AS A CHANCE, NOT AS A RATE.** 3% of one gem is one gem; a yield-shaped bonus
+on a single-digit drop does nothing until tier IV. The lantern and the loupe roll for one MORE instead - the
+same answer the farm's hoe already uses for a double harvest.
+
+**check-grove.mjs now guards the ladders.** Two failures it exists to catch, both invisible in a diff: a tool
+slot with no recipe (a promise on screen nothing can fill), and a map shipping eleven of the twelve tools (a
+ladder that silently stops for ever). It also prints which rung the whole set is on - today, tier I of XII.
+
+Tiers II-XII are one recipe per tool per map, out of that map's own parts. Nothing structural changes: add
+twelve recipes carrying `tier: n` and the ladder grows.

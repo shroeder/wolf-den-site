@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { GiAnvil, GiCompass, GiDigHole, GiFarmTractor, GiFishingPole,
-    GiLaurelCrown, GiMineWagon, GiStoneCrafting } from "react-icons/gi";
+import {
+    GiAnvil, GiBugleCall, GiButterflyKnife, GiCompass, GiCutDiamond, GiDigHole, GiFarmTractor, GiFishingPole, GiFlagObjective, GiLaurelCrown, GiMineWagon, GiOldLantern, GiPawPrint, GiStoneCrafting,
+} from "react-icons/gi";
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt } from "@/lib/marketplace/grove-catalog.js";
@@ -12,7 +13,9 @@ import GroveBench from "@/components/grove/GroveBench";
 import Area from "@/components/grove/GroveArea.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
 import { GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
-import { GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
+import {
+    GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
+} from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { MAP_LAYOUT, mapSpot, nodeArt, trailPath } from "@/lib/marketplace/grove-map.js";
 import { celebrateUnlock } from "@/components/grove/grove-sfx.js";
@@ -62,6 +65,9 @@ const DOCK = [
 const TOOL_GLYPH = {
     rod: GiFishingPole, pick: GiMineWagon, shovel: GiDigHole,
     hammer: GiAnvil, hoe: GiFarmTractor, sextant: GiCompass,
+    // The six that feed the systems the Grove used to ignore.
+    knife: GiButterflyKnife, collar: GiPawPrint, lantern: GiOldLantern,
+    loupe: GiCutDiamond, banner: GiFlagObjective, horn: GiBugleCall,
 };
 
 const emptyCells = (slots, held) => Array.from(
@@ -453,7 +459,9 @@ export default function GroveClient({ initial }) {
                                     <span key={t.slot} className={`gv-slot${t.tier ? "" : " is-dim"}`}>
                                         <span className="gv-glyph"><Glyph aria-hidden="true" focusable="false" /></span>
                                         <b>{t.name}</b>
-                                        <span>{t.tier ? `Tier ${t.tier}` : "—"}</span>
+                                        {/* Roman numerals, and the ceiling beside them: a tier means
+                                            nothing without knowing how many there are. One per map. */}
+                                        <span>{t.tier ? `Tier ${toolNumeral(t.tier)} of ${toolNumeral(TOOL_TIER_CAP)}` : "—"}</span>
                                         <em>{t.tier ? `+${t.pct}% ${t.bonus}` : t.bonus}</em>
                                     </span>
                                     );

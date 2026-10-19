@@ -312,8 +312,14 @@ export async function levelUpPet(buyerId, petId) {
 export async function creditEquippedPetXp(buyerId, memberXp) {
     // The Long Vigil triples the share. Applied to the SHARE rather than to the pet's XP after the fact, so a
     // level-up fires on the same call that earned it instead of on the next read.
-    const vigil = await hasPower(buyerId, "long_vigil");
-    const share = Math.round((Number(memberXp) || 0) * PET_XP_SHARE * (vigil ? 3 : 1));
+    // The Grove's collar rides here, on the SHARE rather than on the member's own XP — the Grove is not
+    // allowed to inflate levelling, only the animal's cut of it.
+    const { groveToolPct } = await import("@/lib/marketplace/grove-tools.js");
+    const [vigil, collar] = await Promise.all([
+        hasPower(buyerId, "long_vigil"),
+        groveToolPct(buyerId, "collar").catch(() => 0),
+    ]);
+    const share = Math.round((Number(memberXp) || 0) * PET_XP_SHARE * (vigil ? 3 : 1) * (1 + (Number(collar) || 0) / 100));
     if (share <= 0) return;
     // Every earning pet takes the SAME share, not a fraction — the package promises "passive XP just like
     // your equipped pet" and a discount here would make that a half-truth. addEquippedPetXp walks them all.

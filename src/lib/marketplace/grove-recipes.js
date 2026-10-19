@@ -31,13 +31,39 @@
 // recipe that raises it. The bonus is read from the tier, so adding map two means adding recipes and nothing
 // else — no new columns, no migration, no second place that has to agree about what a pickaxe is worth.
 export const TOOL_SLOTS = [
-    { slot: "rod", name: "Fishing Rod", system: "fishing", bonus: "fishing luck" },
+    { slot: "rod", name: "Fishing Rod", system: "fishing", bonus: "treasure chance" },
     { slot: "pick", name: "Pickaxe", system: "mining", bonus: "ore yield" },
     { slot: "shovel", name: "Shovel", system: "digging", bonus: "dig depth" },
     { slot: "hammer", name: "Smith's Hammer", system: "forge", bonus: "salvage returned" },
     { slot: "hoe", name: "Hoe", system: "farm", bonus: "harvest yield" },
     { slot: "sextant", name: "Sextant", system: "sailing", bonus: "sea fortune" },
+    // ── THE SIX THE GROVE NEVER LEARNED TO FEED ─────────────────────────────────────────────────────────
+    // Luke: "the easy gaps we should fix, which include feeding all systems." Six systems had no tool and
+    // therefore no reason to care the Grove existed: the kitchen, the menagerie, the dungeons, the
+    // jeweller, the arena and the weekly boss.
+    //
+    // ⚠️ EVERY ONE OF THESE PAYS ON THE REWARD SIDE, NEVER ON COMBAT POWER. That is not timidity, it is the
+    // one rule that keeps twelve ladders from becoming a second stat system: §11 of the design doc still
+    // has "stat ceilings" open, and a tool that adds damage would have to be priced against a ceiling
+    // nobody has set. A tool that adds YIELD is priced against its own system and nothing else.
+    { slot: "knife", name: "Cook's Knife", system: "cooking", bonus: "recipe luck" },
+    { slot: "collar", name: "Pet Collar", system: "pets", bonus: "pet XP share" },
+    { slot: "lantern", name: "Delver's Lantern", system: "delves", bonus: "parts recovered" },
+    { slot: "loupe", name: "Jeweller's Loupe", system: "jeweller", bonus: "gem find" },
+    { slot: "banner", name: "War Banner", system: "arena", bonus: "laurels won" },
+    { slot: "horn", name: "Hunting Horn", system: "boss", bonus: "strike reward" },
 ];
+
+// ── TWELVE TOOLS, TWELVE MAPS, TWELVE RUNGS ──────────────────────────────────────────────────────────────────
+// Luke: "extend them to their highest tiers, which I would say would be represented by a tier per map. And we
+// have 12 maps?" Twelve is right, and it is not an opinion — the difficulty curve is already anchored to it
+// (grove-catalog.js prices depth 133 as map 12 zone 1, x32 power over 132 zones). The design doc still says
+// "maps 2-20" in one line; that line is stale and this constant is the truth.
+//
+// A tool's tier IS the map that taught it. Map one grants tier I of all twelve tools, map two grants tier II
+// out of map two's parts, and so on to XII. Nothing here needs to change when a map lands: add twelve recipes
+// carrying `tier: n` and the ladder grows.
+export const TOOL_TIER_CAP = 12;
 
 export const toolSlot = (slot) => TOOL_SLOTS.find((t) => t.slot === slot) || null;
 
@@ -51,8 +77,13 @@ export const toolSlot = (slot) => TOOL_SLOTS.find((t) => t.slot === slot) || nul
 export const TOOL_PCT_PER_TIER = 3;
 export const toolBonusPct = (tier) => Math.max(0, Number(tier) || 0) * TOOL_PCT_PER_TIER;
 
-// Roman numerals, because the expansions are numbered that way and there are never going to be many.
-export const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
+// Roman numerals. The expansions are numbered this way, and so are tool tiers — Luke: "Tiers would be
+// represented with Roman numerals." Twelve of them, because that is the whole map count; a tier past the end
+// of this list would render as "undefined" on the one screen that exists to show progress.
+export const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+
+/** A tool tier as the player reads it. Tier 0 is "not made yet" and has no numeral. */
+export const toolNumeral = (tier) => ROMAN[Math.max(0, Math.floor(Number(tier) || 0)) - 1] || "";
 
 const R = (id, name, kind, parts, o = {}) => ({ id, name, kind, parts, ...o });
 
@@ -128,7 +159,29 @@ export const GROVE_RECIPES = [
         { adds: 1, numeral: "I", blurb: "Enough forest pushed back for one more row." }),
     R("plot_ii", "Cleared Ground II", "plot", { elder_heartwood: 20, crystal_shard: 6, ash_ember: 20 },
         { adds: 1, numeral: "II", blurb: "The last ground the Grove will give up." }),
+
+    // ── TIER I OF THE SIX NEW LADDERS ───────────────────────────────────────────────────────────────
+    // Same rule as the first six: the parts come from the DEPTH the tool's power implies, not from the
+    // system it serves. The knife is shallow because the kitchen is an early room; the loupe wants a
+    // crystal shard because gems are the deep end of the game.
+    R("knife_t1", "Flintbone Knife", "tool", { split_antler: 6, thorn_barb: 5, damp_moss: 4 },
+        { slot: "knife", tier: 1, blurb: "Bone, knapped flint, and a handle wrapped in something." }),
+    R("collar_t1", "Braided Collar", "tool", { warren_silk: 6, bristle_hide: 5, grub_fat: 4 },
+        { slot: "collar", tier: 1, blurb: "Spun in the dark, and whatever wears it walks closer to you." }),
+    R("lantern_t1", "Hollow Lantern", "tool", { mothlight_dust: 5, gourd_rind: 5, bound_straw: 4 },
+        { slot: "lantern", tier: 1, blurb: "A dried gourd with a handful of glow in it. It finds the floor." }),
+    R("loupe_t1", "Crystal Loupe", "tool", { crystal_shard: 1, mothlight_dust: 4, split_antler: 4 },
+        { slot: "loupe", tier: 1, blurb: "A shard ground flat enough to see through, which took a while." }),
+    R("banner_t1", "Bramble Standard", "tool", { thorn_barb: 6, bound_straw: 6, bristle_hide: 4 },
+        { slot: "banner", tier: 1, blurb: "Carried into the ring. It makes the laurels heavier." }),
+    R("horn_t1", "Barrow Horn", "tool", { barrow_tooth: 6, rotwood_knot: 5, ash_ember: 4 },
+        { slot: "horn", tier: 1, blurb: "Sounded before the strike. Something always answers." }),
 ];
+
+/** Every tool recipe for one slot, lowest tier first — the ladder as it currently exists. */
+export const toolLadder = (slot) => GROVE_RECIPES
+    .filter((r) => r.kind === "tool" && r.slot === slot)
+    .sort((a, b) => (a.tier || 0) - (b.tier || 0));
 
 export const recipeById = (id) => GROVE_RECIPES.find((r) => r.id === id) || null;
 

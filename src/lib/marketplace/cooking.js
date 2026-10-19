@@ -685,8 +685,16 @@ export async function grantBoughtRecipe(buyerId) {
 export async function recipeLuck(buyerId) {
     try {
         const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
-        const nose = await getPetSystemPerk(buyerId, "recipe_nose");
-        return nose > 0 ? 1 + nose / 100 : 1;
+        const { groveToolPct } = await import("@/lib/marketplace/grove-tools.js");
+        const [nose, knife] = await Promise.all([
+            getPetSystemPerk(buyerId, "recipe_nose"),
+            // The Grove's knife. Additive with the pet's nose rather than multiplied over it, which is the
+            // same choice the pick and the rod made: both of these already stack with the band weights, and
+            // a tool that scaled the product would be worth more than the kitchen.
+            groveToolPct(buyerId, "knife").catch(() => 0),
+        ]);
+        const pct = (Number(nose) || 0) + (Number(knife) || 0);
+        return pct > 0 ? 1 + pct / 100 : 1;
     } catch { return 1; }
 }
 

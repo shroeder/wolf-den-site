@@ -24,7 +24,7 @@ import {
     GROVE_FOODS, groveArt,
     GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE,
 } from "@/lib/marketplace/grove-catalog.js";
-import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS } from "@/lib/marketplace/grove-recipes.js";
+import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS, TOOL_TIER_CAP } from "@/lib/marketplace/grove-recipes.js";
 import { MAP_LAYOUT, mapSpot, nodeArt } from "@/lib/marketplace/grove-map.js";
 import { pickHyper, rollBoss } from "@/lib/marketplace/grove-roll.js";
 import { makeTelegraph } from "@/lib/marketplace/grove-world.js";
@@ -59,6 +59,33 @@ for (const row of GROVE_RARE.loot) ok(GROVE_PARTS[row.part], `rare spawn: unknow
 ok(GROVE_EMBLEMS[GROVE_RARE.emblem], "rare spawn: unknown emblem");
 for (const r of GROVE_RECIPES) {
     for (const p of Object.keys(r.parts)) ok(GROVE_PARTS[p], `recipe ${r.id}: unknown part "${p}"`);
+}
+
+// ── 1b. EVERY SYSTEM IS FED, AND EVERY LADDER IS WHOLE ───────────────────────────────────────────────
+// Luke: "the easy gaps we should fix, which include feeding all systems" and "extend them to their highest
+// tiers, which I would say would be represented by a tier per map."
+//
+// Two failures this exists to catch, both of which look fine in a diff:
+//   A TOOL WITH NO RECIPE   a slot on the screen that can never be filled. The slot renders, the bonus
+//                           reads as a promise, and nothing in the game can produce it.
+//   A LADDER WITH A HOLE    map four shipping eleven of the twelve tools. The twelfth slot silently stops
+//                           at tier III for ever, and the only way anyone finds out is by grinding to it.
+const ladders = new Map(TOOL_SLOTS.map((t) => [t.slot, []]));
+for (const r of GROVE_RECIPES.filter((x) => x.kind === "tool")) {
+    ok(ladders.has(r.slot), `tool recipe ${r.id}: slot "${r.slot}" is not a TOOL_SLOT`);
+    ok(Number.isInteger(r.tier) && r.tier >= 1 && r.tier <= TOOL_TIER_CAP,
+        `tool recipe ${r.id}: tier ${r.tier} is outside 1..${TOOL_TIER_CAP}`);
+    if (ladders.has(r.slot)) ladders.get(r.slot).push(Number(r.tier));
+}
+const tierDepth = Math.max(0, ...[...ladders.values()].map((v) => v.length));
+for (const [slot, tiers] of ladders) {
+    const sorted = [...tiers].sort((a, b) => a - b);
+    ok(sorted.length > 0, `tool slot "${slot}" has no recipe at all — a system that can never be fed`);
+    ok(new Set(sorted).size === sorted.length, `tool slot "${slot}" has two recipes claiming the same tier`);
+    sorted.forEach((t, i) => ok(t === i + 1, `tool slot "${slot}" jumps to tier ${t} with no tier ${i + 1}`));
+    // Every ladder climbs together, because a tier IS a map: if any tool reached tier N, that map shipped.
+    ok(sorted.length === tierDepth,
+        `tool slot "${slot}" stops at tier ${sorted.length} while others reach ${tierDepth} — a map shipped a partial ladder`);
 }
 
 // ── 2. EVERY PART IS WANTED ──────────────────────────────────────────────────────────────────────────
@@ -295,7 +322,7 @@ const needArt = [
 console.log(`── THE GROVE ────────────────────────────────────────────────────────────────`);
 console.log(`  ${zones} zones (${twoTypes} with two enemy types)   ${Object.keys(GROVE_ENEMIES).length} enemies`);
 console.log(`  ${Object.keys(GROVE_PARTS).length} parts   ${GROVE_RECIPES.length} recipes   ${Object.keys(GROVE_EMBLEMS).length} emblems`);
-console.log(`  ${TOOL_SLOTS.length} new tool slots: ${TOOL_SLOTS.map((t) => t.name).join(", ")}`);
+console.log(`  ${TOOL_SLOTS.length} tool slots, tier ${tierDepth} of ${TOOL_TIER_CAP} built: ${TOOL_SLOTS.map((t) => `${t.name} (${t.system})`).join(", ")}`);
 console.log(`  population ${GROVE_POP.min}-${GROVE_POP.max}, full respawn every ${GROVE_POP.respawnMs / 1000}s`);
 console.log(`  rare spawn: ${GROVE_RARE.name} at ${(GROVE_RARE.spawnChance * 100).toFixed(2)}% per enemy`);
 console.log(`  ${Object.keys(GROVE_BOSSES).length} bosses, back up every ${BOSS_COOLDOWN_MS / 60000} min   ${GROVE_HYPER.length} hyper-rares`);

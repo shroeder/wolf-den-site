@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { groveToolPct } from "@/lib/marketplace/grove-tools.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
@@ -285,6 +286,9 @@ export async function startDelve(buyerId, dungeonId) {
         potions: potionCount(row?.satchel_level),
         potionHeal: potionHealFrac(row?.flask_level),
         ward: wardCut(row?.ward_level),
+        // The Grove's lantern, FROZEN AT THE DOOR like the health and the swing above it, and for the same
+        // reason: a bonus re-read mid-run is a bonus you can go and craft between floors.
+        lantern: await groveToolPct(buyerId, "lantern").catch(() => 0),
         floors: dealFloors(d, (await hasPower(buyerId, "warren_map")) ? 1 : 0),
         banked: { gold: 0, xp: 0, chests: [] },
         log: [],
@@ -372,8 +376,18 @@ const bank = (run, { gold = 0, xp = 0, chest = null, parts = null, frags = 0, ge
     // Parts and fragments are BANKED like everything else and handed over at the surface, so dying still pays
     // them out. Gear is the exception — it is granted the moment it drops, because the whole point of a gear
     // drop is the card that shows you what you got.
-    if (parts) { run.banked.parts = run.banked.parts || {}; run.banked.parts[parts.tier] = (run.banked.parts[parts.tier] || 0) + parts.n; }
-    if (frags) run.banked.frags = (run.banked.frags || 0) + frags;
+    // ── THE LANTERN FINDS WHAT THE FLOOR DROPPED ─────────────────────────────────────────────────────
+    // A CHANCE OF ONE MORE, not a multiplier. Delve parts come in ones and twos, and 3% of 1 rounds to 1 —
+    // a yield-shaped bonus on a single-digit drop is a bonus that does nothing until tier IV. The farm's
+    // hoe already solved this the same way: small drops take their bonus as a chance, big ones take it as
+    // a rate. [[reuse-the-rule-never-restate-it]]
+    const lanternChance = Math.max(0, Number(run.lantern) || 0) / 100;
+    const foundOneMore = lanternChance > 0 && Math.random() < lanternChance;
+    if (parts) {
+        run.banked.parts = run.banked.parts || {};
+        run.banked.parts[parts.tier] = (run.banked.parts[parts.tier] || 0) + parts.n + (foundOneMore ? 1 : 0);
+    }
+    if (frags) run.banked.frags = (run.banked.frags || 0) + frags + (!parts && foundOneMore ? 1 : 0);
     if (gear) { run.banked.gear = run.banked.gear || []; run.banked.gear.push(gear); }
     return { gold: paidGold, xp };
 };

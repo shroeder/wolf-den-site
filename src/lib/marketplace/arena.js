@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { grantCandy } from "@/lib/marketplace/candy.js";
+import { groveToolPct } from "@/lib/marketplace/grove-tools.js";
 import { rollTicket } from "@/lib/marketplace/gachapon.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -2586,9 +2587,16 @@ async function finishBout(buyerId, row, b, won) {
     // member bout has always been worth (XP has paid it for months), and a losing payout scaled by the share
     // of their health you actually took off. See the long note in arena-rewards.js for why paying a loss is
     // safe HERE and would not be on the Road — twelve fights a day is the ration that stops it being a farm.
-    const baseLaurels = won
+    // ── THE GROVE'S BANNER ───────────────────────────────────────────────────────────────────────────
+    // Reward side only. A Grove tool that added damage would have to be priced against the stat ceiling
+    // that §11 of the node-map doc still lists as undecided; laurels are a currency with its own sinks and
+    // can be tuned on their own. It pays on a loss too, because the loss payout exists to reward how you
+    // fought and a banner carried into a fight you lost was still carried.
+    const bannerPct = (await groveToolPct(buyerId, "banner").catch(() => 0)) / 100;
+    const earnedLaurels = won
         ? boutLaurels({ won, myPower, theirPower, kind })
         : Math.round(lossLaurels({ myPower, theirPower, kind }) * lossEffort(b));
+    const baseLaurels = Math.round(earnedLaurels * (1 + bannerPct));
     const { feats, laurels: featLaurels, vp: featVp } = featsFor(b);
     // ── VICTORY POINTS COME OUT OF THE OTHER FIGHTER ─────────────────────────────────────────────────────
     // Luke: "you can only get them from opponents who have them." So a Gauntlet tier and a Road rung move

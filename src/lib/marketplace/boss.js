@@ -11,6 +11,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-weakness.js";
 import { getElementOverrides, getElementOverridesForMembers } from "@/lib/marketplace/item-element.js";
 import { luckyRoll } from "@/lib/marketplace/fortune.js";
+import { groveToolPct } from "@/lib/marketplace/grove-tools.js";
 import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { barredFromPrizes, isHouse, isOwner } from "@/lib/marketplace/owner.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
@@ -28,7 +29,7 @@ import { rollTicket } from "@/lib/marketplace/gachapon.js";
 import { syncEarnedBadges, grantRandomDropBadge, getBadgePassives } from "@/lib/marketplace/badges.js";
 import { grantBossTrophy } from "@/lib/marketplace/boss-trophy.js";
 import { broadcastBossDefeated, broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
-import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
+import { awardXp, levelForXp, XP_ACTIONS } from "@/lib/marketplace/xp.js";
 import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { getPetCombatBonus, getPackPetBonuses, manualStatMultiplier, procMultiplier } from "@/lib/marketplace/pet-combat.js";
@@ -1540,7 +1541,15 @@ export async function attackBoss(buyerId) {
     // gear/pets/potions) are actually rewarded, not just damage + tickets. The dedupeKey is per-swing (keyed to
     // the atomic swing number / hit id) so a retried or double-fired request can't double-award for one swing;
     // total swings/day is still bounded by dailyStrikeCap, so this rewards extra-strike investment, not spam.
-    await awardXp(buyerId, "boss_attack", { dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${slot.n}`}` }).catch(() => {});
+    // ── THE GROVE'S HORN ─────────────────────────────────────────────────────────────────────────────
+    // The swing's own XP, raised by the horn. Reward side, like every Grove tool: it does not make the
+    // strike hit harder, it makes the strike worth more. Passed as explicit points because awardXp reads
+    // XP_ACTIONS when none is given, and a multiplier has to be applied to the number before that.
+    const hornPct = (await groveToolPct(buyerId, "horn").catch(() => 0)) / 100;
+    await awardXp(buyerId, "boss_attack", {
+        points: Math.round(XP_ACTIONS.boss_attack * (1 + hornPct)),
+        dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${slot.n}`}`,
+    }).catch(() => {});
     // Signature rewards: Scholar XP + Prospector gold on this hit.
     if (onHit.xp > 0) await awardXp(buyerId, "signature_bonus", { points: onHit.xp, dedupeKey: `sigxp:${hit?.id}` }).catch(() => {});
     onHit.gold = mint(onHit.gold, "boss_reward"); // the Prospector proc, halved with the rest of the faucets
