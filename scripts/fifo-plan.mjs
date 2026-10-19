@@ -47,6 +47,15 @@ console.log(`sale lines seen     ${r.lines ?? "—"}`);
 console.log(`lines costed        ${r.costed ?? "—"}`);
 console.log(`lines short         ${r.short ?? "—"}   (batches ran out; these stay unreportable, never $0)`);
 console.log(`lines skipped       ${r.skipped ?? "—"}   (no linked purchase history at all)`);
+if (r.consumption) {
+    const c = r.consumption;
+    console.log(`
+stock that left WITHOUT a sale (these spend batches too):`);
+    console.log(`  trade-outs          ${c.tradeOuts}   (taken as the OUT side of a trade, paid in store credit)`);
+    console.log(`  hand-pulled         ${c.pulls}   (damage, prizes, demo boxes — removed in Square by a person)`);
+    console.log(`  sale footprints     ${c.matched}   (recognised as a sale's own stock movement, not double-counted)`);
+    if (c.unmatchedSold) console.log(`  ⚠️ unmatched SOLD    ${c.unmatchedSold}   (a stock movement that looks like a sale but pairs with no order — left alone)`);
+}
 
 if (r.summary) {
     const s = r.summary;
@@ -55,6 +64,7 @@ if (r.summary) {
     console.log(`    lines that change     ${s.changed}`);
     console.log(`    lines unchanged       ${s.unchanged}`);
     if (full) console.log(`    stored lines dropped  ${s.removed}`);
+    if (s.consumed) console.log(`    consumption rows      ${s.consumed}   (batch spent, no reported cost — see above)`);
     console.log(`\n    net movement in reported COGS: ${money(s.deltaDollars)}`);
     if (r.movers?.length) {
         console.log(`\n  biggest movers:`);

@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { costSales } from "@/lib/cogs/fifo.js";
+import { isConsumptionRow, nonSaleConsumption } from "@/lib/cogs/stock-moves.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const logger = createServerLogger({ source: "api", subsystem: "cogs-fifo-reconcile" });
@@ -79,12 +80,18 @@ async function comparePlanToStored(rows, { full = false } = {}) {
         return Math.round((fallback.get(String(r.variationId)) || 0) * Number(r.units));
     };
 
-    let added = 0, changed = 0, same = 0, deltaCents = 0;
+    let added = 0, changed = 0, same = 0, deltaCents = 0, consumed = 0;
     const movers = [];
     const seen = new Set();
     for (const r of rows) {
         const key = `${r.orderId}|${r.lineUid}`;
         seen.add(key);
+        // ── A CONSUMED UNIT IS NOT A REPORTED COST ──────────────────────────────────────────────────────
+        // Trade-outs and hand-pulls spend a batch but have no sold line on any report — nothing looks them
+        // up, because storedCosts() is keyed on real Square order ids. Counting them in the money diff
+        // would show a seeding run "moving" thousands of dollars of margin that no screen will ever show,
+        // and bury the handful of real changes underneath it. They are counted as what they are instead.
+        if (isConsumptionRow(r.orderId)) { consumed += 1; continue; }
         const was = stored.get(key);
         // Both sides are measured as WHAT THE REPORT SHOWS: today's figure (FIFO if usable, else the recorded
         // per-item cost) against the figure this plan would put there. A short line stays unusable and so keeps
@@ -106,7 +113,7 @@ async function comparePlanToStored(rows, { full = false } = {}) {
 
     movers.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
     return {
-        summary: { added, changed, unchanged: same, removed, deltaDollars: Number((deltaCents / 100).toFixed(2)) },
+        summary: { added, changed, unchanged: same, removed, consumed, deltaDollars: Number((deltaCents / 100).toFixed(2)) },
         movers: movers.slice(0, 25).map((m) => ({
             line: m.key, variationId: m.variationId,
             from: m.from == null ? null : Number((m.from / 100).toFixed(2)),
@@ -238,6 +245,27 @@ export async function reconcileFifo({ full = false, dryRun = false } = {}) {
         next = page.cursor || null;
     } while (next);
 
+    // ── THE UNITS THAT LEFT WITHOUT RINGING UP ──────────────────────────────────────────────────────────────
+    // Trade-outs and hand-pulled stock never produced an order, so they never spent a batch, so FIFO went on
+    // holding boxes that were gone and quoting the price of a layer the shelf had already finished. They are
+    // read from Square's inventory log and merged into the same queue as the sales, in time order, because
+    // FIFO does not care WHY a unit left — only when. See lib/cogs/stock-moves.js for how a sale's own
+    // inventory footprint is recognised and skipped rather than counted a second time.
+    let consumption = { events: [], matched: 0, tradeOuts: 0, pulls: 0, unmatchedSold: 0 };
+    const tracked = (await db.query(
+        `SELECT DISTINCT variation_id FROM cogs_ledger WHERE variation_id IS NOT NULL AND variation_id <> ''`
+    ).catch(() => [])).map((r) => String(r.variation_id));
+    if (tracked.length) {
+        consumption = await nonSaleConsumption(tracked, startAt, sales).catch((error) => {
+            // Loud, and NOT fatal: a Square hiccup here must not stop the sales half from being costed. It
+            // does mean this run under-consumes, which the next one corrects — the events are read from the
+            // log every time rather than remembered, so nothing is lost by missing a pass.
+            logger.error("cogs.fifo.stock_moves_failed", { message: error?.message });
+            return { events: [], matched: 0, tradeOuts: 0, pulls: 0, unmatchedSold: 0 };
+        });
+        sales.push(...consumption.events);
+    }
+
     // ── ⚠️ A DRY RUN SAYS WHAT WOULD CHANGE, NOT HOW MANY ORDERS IT SAW ─────────────────────────────────────
     // Luke, on seeding the purchase history that FIFO still cannot see: "my concern is existing items, and how
     // you can seed that properly without interrupting anything." This is the answer. Link some rows, run this,
@@ -249,8 +277,10 @@ export async function reconcileFifo({ full = false, dryRun = false } = {}) {
     if (dryRun) {
         const planned = await costSales(sales, { write: false, fresh: full });
         const diff = await comparePlanToStored(planned.rows, { full });
-        logger.info("cogs.fifo.dry_run", { orders, lines: sales.length, recovered, ...diff.summary });
+        logger.info("cogs.fifo.dry_run", { orders, lines: sales.length, recovered, ...consumption, events: consumption.events.length, ...diff.summary });
         return { ok: true, dryRun: true, scanned: orders, lines: sales.length, recovered,
+                 consumption: { tradeOuts: consumption.tradeOuts, pulls: consumption.pulls,
+                                matched: consumption.matched, unmatchedSold: consumption.unmatchedSold },
                  costed: planned.costed, short: planned.short, skipped: planned.skipped, ...diff };
     }
 
@@ -272,6 +302,12 @@ export async function reconcileFifo({ full = false, dryRun = false } = {}) {
         [endAt, orders, result.costed]
     ).catch(() => {});
 
-    logger.info("cogs.fifo.reconciled", { orders, ...result });
-    return { ok: true, scanned: orders, lines: sales.length, ...result };
+    logger.info("cogs.fifo.reconciled", {
+        orders, tradeOuts: consumption.tradeOuts, pulls: consumption.pulls,
+        matchedFootprints: consumption.matched, unmatchedSold: consumption.unmatchedSold, ...result,
+    });
+    return { ok: true, scanned: orders, lines: sales.length,
+             consumption: { tradeOuts: consumption.tradeOuts, pulls: consumption.pulls,
+                            matched: consumption.matched, unmatchedSold: consumption.unmatchedSold },
+             ...result };
 }
