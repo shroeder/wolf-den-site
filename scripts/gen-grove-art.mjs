@@ -404,6 +404,33 @@ for (const [id, subject] of Object.entries(SLABS)) ART[`slab-${id}`] = [`${SLAB}
 for (const [id, subject] of Object.entries(HANGS)) ART[`hang-${id}`] = [`${HANG} THE OBJECT: ${subject}`, "hang"];
 for (const [id, subject] of Object.entries(SITS)) ART[`sit-${id}`] = [`${SIT} THE OBJECT: ${subject}`, "sit"];
 
+// ── THE TWELVE TOOLS ────────────────────────────────────────────────────────────────────────────
+// Luke: "if no sprites exist make them." None did — not even for the original six, which have been
+// rendering as react-icons glyphs since the day the ladder shipped.
+//
+// ⚠️ EVERY TOOL IS BUILT OUT OF ITS OWN RECIPE. A fishing rod is a fishing rod in any game; THIS one is
+// eight gnawed roots, four handfuls of damp moss and three of grub fat, and if the picture does not say
+// so then the recipe underneath it is just a cost. So each subject below names the materials the tier I
+// recipe actually asks for, in the proportions it asks for them.
+//
+// ⚠️ AND THEY ARE TIER I, WHICH IS THE CRUDE END OF A TWELVE-RUNG LADDER. Lashed, knapped, bound, found.
+// Tier XII will be the same object made properly; drawing tier I as a masterwork leaves nowhere to go.
+const TOOLS = {
+    rod: "A crude FISHING ROD made from forest scraps: a long springy pale root stripped of bark as the shaft, slightly crooked, bound at the grip with wraps of damp green moss and twine, a bone hook swinging on a short line at the tip. Pale wood, moss green, bone white.",
+    pick: "A crude PICKAXE: a single split stag antler lashed crosswise as the head, its broken tine forming a sharp point, bound with strips of brown bristly hide to a short knotted wooden haft wrapped in thorn-studded cord. Bone cream, dark brown hide, grey-brown wood.",
+    shovel: "A crude SPADE: a broad flat blade made from a curved yellowed tooth-like plate of bone, bound with woven straw rope to a stubby antler-and-wood handle. Bone yellow, straw gold, weathered grey wood.",
+    hammer: "A crude SMITH'S HAMMER: a heavy knotted burl of dark rotted wood as the head, studded with crude iron rivets, scorched black along one face with glowing orange embers still in the cracks, on a short thick haft. Charcoal black, ember orange, rust red rivets.",
+    hoe: "A crude HOE: a wide flat blade of hardened orange gourd rind edged with long black thorns, bound with strips of brown hide to a long straight wooden handle. Burnt orange, thorn black, brown hide.",
+    sextant: "An ornate SEXTANT made of forest materials: a curved arc frame of pale polished wood wound with silvery spider silk, tiny brass fittings, a faintly glowing violet crystal shard set as the lens, luminous pale dust caught in the silk. Pale wood, silver silk, glowing violet.",
+    knife: "A crude KNIFE: a knapped grey flint blade with visible chipped facets, lashed with cord to a short pale bone handle wrapped in dark green moss. Flint grey, bone cream, moss green.",
+    collar: "A braided animal COLLAR: a thick cord of silvery woven spider silk plaited with strips of brown hide, closed with a small carved bone toggle, a single pale charm hanging from it. Silver silk, warm brown hide, bone white.",
+    lantern: "A handheld LANTERN made from a hollowed dried gourd: a round orange-brown gourd shell pierced with small openings glowing warm gold from within, a braided straw handle arching over the top, pale luminous dust escaping through the holes. Gourd orange, straw gold, warm glow.",
+    loupe: "A jeweller's LOUPE: a thick disc of clear violet crystal ground flat and smooth, held in a carved pale antler-bone ring frame with a short handle, faint light refracting through the lens. Violet crystal, bone cream, soft prismatic sparkle.",
+    banner: "A small war STANDARD: a tall straight pole of bound straw and dark wood, a triangular pennant of stiff brown hide stitched at the edges and hung from a crossbar, long black thorns bristling along the pole. Brown hide, straw gold, thorn black.",
+    horn: "A HUNTING HORN: a long curved tapering tusk-like horn of yellowed bone, banded with dark knotted wood rings and a plaited carry-strap, a few glowing orange ember flecks inlaid near the mouthpiece. Bone yellow, dark wood, ember orange.",
+};
+for (const [id, subject] of Object.entries(TOOLS)) ART[`tool-${id}`] = [`${ITEM} ${subject}`, "item"];
+
 for (const [id, subject] of Object.entries(PARTS)) ART[`part-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(EMBLEMS)) ART[`emblem-${id}`] = [`${ITEM} ${subject}`, "item"];
 for (const [id, subject] of Object.entries(FOODS)) ART[`food-${id}`] = [`${ITEM} ${subject}`, "item"];

@@ -8,7 +8,9 @@ import {
 } from "react-icons/gi";
 
 import GroveScene from "@/components/grove/GroveScene.js";
-import { GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt } from "@/lib/marketplace/grove-catalog.js";
+import {
+    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt, toolArt,
+} from "@/lib/marketplace/grove-catalog.js";
 import GroveBench from "@/components/grove/GroveBench";
 import Area from "@/components/grove/GroveArea.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
@@ -457,7 +459,23 @@ export default function GroveClient({ initial }) {
                                     const Glyph = TOOL_GLYPH[t.slot] || GiStoneCrafting;
                                     return (
                                     <span key={t.slot} className={`gv-slot${t.tier ? "" : " is-dim"}`}>
-                                        <span className="gv-glyph"><Glyph aria-hidden="true" focusable="false" /></span>
+                                        {/* ── THE TOOL, DRAWN ─────────────────────────────────────────
+                                            Every one of these was a react-icons glyph until the sprites
+                                            existed: a generic pickaxe standing in for a pick knapped out
+                                            of a stag's antler. The glyph stays as the fallback because a
+                                            slot with a hole where its picture goes reads as broken, and
+                                            a new tool added before its art is drawn would do exactly
+                                            that. [[img-onerror-fires-before-hydration]] */}
+                                        <span className="gv-glyph">
+                                            <img
+                                                src={toolArt(t.slot)} alt="" draggable={false}
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = "none";
+                                                    e.currentTarget.parentElement?.classList.add("is-noart");
+                                                }}
+                                            />
+                                            <Glyph aria-hidden="true" focusable="false" />
+                                        </span>
                                         <b>{t.name}</b>
                                         {/* Roman numerals, and the ceiling beside them: a tier means
                                             nothing without knowing how many there are. One per map. */}

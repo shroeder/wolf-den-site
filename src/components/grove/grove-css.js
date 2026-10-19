@@ -1527,6 +1527,15 @@ export const GROVE_CSS = `
 .gv-slot .gv-glyph { display: grid; place-items: center; padding: 0; filter: none; color: #cbd5dc; }
 .gv-slot .gv-glyph svg { width: 28px; height: 28px; }
 .gv-slot.is-dim .gv-glyph { color: #6d7366; }
+/* THE TOOL SPRITE, AND THE GLYPH UNDERNEATH IT. Both are in the markup: the picture is what a player
+   should see, and the icon is what they see instead if the file is missing. So the glyph is hidden by
+   default and the img reveals it by tagging its parent on error - the opposite order would flash an icon
+   on every load, and a sibling selector cannot do it because the fallback has to survive the img failing. */
+.gv-slot .gv-glyph img { width: 44px; height: 44px; object-fit: contain;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
+.gv-slot .gv-glyph svg { display: none; }
+.gv-slot .gv-glyph.is-noart svg { display: block; }
+.gv-slot.is-dim .gv-glyph img { filter: grayscale(0.75) brightness(0.62) drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
 /* Inside a sentence rather than above one, so it sits on the text baseline instead of on the line box. */
 .gv-recipe .gv-ico { display: inline-block; width: 20px; height: 20px; object-fit: contain;
     vertical-align: -0.35em; margin-right: 3px;

@@ -18,11 +18,7 @@
 import fs from "node:fs";
 
 import {
-    GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, GROVE_RARE,
-    emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS,
-    GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance,
-    GROVE_FOODS, groveArt,
-    GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE,
+    GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, GROVE_RARE, emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS, GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, GROVE_FOODS, groveArt, GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE, toolArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS, TOOL_TIER_CAP } from "@/lib/marketplace/grove-recipes.js";
 import { MAP_LAYOUT, mapSpot, nodeArt } from "@/lib/marketplace/grove-map.js";
@@ -145,6 +141,10 @@ const checkArt = (what, url) => {
 for (const [id, e] of Object.entries(GROVE_ENEMIES)) checkArt(`enemy ${id}`, e.art);
 for (const [id, b] of Object.entries(GROVE_BOSSES)) checkArt(`boss ${id}`, b.art);
 checkArt("rare spawn", GROVE_RARE.art);
+// Every tool has a picture. A slot whose sprite is missing falls back to a react-icons glyph on screen, so
+// nothing LOOKS broken -- which is exactly why it needs a gate: the failure is a generic pickaxe standing in
+// for one knapped out of an antler, and nobody would ever file that as a bug.
+for (const t of TOOL_SLOTS) checkArt(`tool ${t.slot}`, toolArt(t.slot));
 for (const z of GROVE_ZONES) checkArt(`zone ${z.id}`, z.bg);
 // ── ⚠️ AND EVERY ZONE IS MADE OF SOMETHING THAT EXISTS ───────────────────────────────────────────
 // A zone with no biome, or one naming a biome that is not in the table, falls back to `wood` — so the

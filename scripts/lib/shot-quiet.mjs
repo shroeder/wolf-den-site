@@ -51,6 +51,11 @@ export const QUIET_HIDE = [
     // production has it; hiding it here stops the rig reporting a bug that does not exist.
     "nextjs-portal", "[data-nextjs-toast]", "#__next-build-watcher",
     ".checkin-overlay",
+    // ── THE LAUNCH ANNOUNCEMENT ──────────────────────────────────────────────────────────────────────
+    // One card, shown once, over whatever page the member happens to open — which for a rig means the
+    // first shot after any announcement goes out is a photograph of the announcement. Found the hard way
+    // photographing the Grove's tools the same evening one was posted: a perfect shot of the wrong thing.
+    ".ann-scrim", ".ann-card",
     // ── THE BADGE POP ────────────────────────────────────────────────────────────────────────────────
     // It is marked seen on DISMISS and server-side, deliberately — a tab closed mid-read should hand the
     // badge back rather than swallow it (see BadgePop). Which is right for a member and merciless for a

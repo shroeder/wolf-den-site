@@ -18,7 +18,9 @@ const PREFIX = process.argv[3] || "";
 const DIR = "public/images/grove";
 
 const files = fs.readdirSync(DIR)
-    .filter((f) => /^(part|emblem|food)-/.test(f) && f.endsWith(".webp") && f.startsWith(PREFIX))
+    // ⚠️ `tool` JOINED THIS LIST THE DAY THE TOOLS WERE DRAWN. The sheet is the only place a set is judged
+    // together — a family missing from this regex is a family nobody ever looks at side by side.
+    .filter((f) => /^(part|emblem|food|tool)-/.test(f) && f.endsWith(".webp") && f.startsWith(PREFIX))
     .sort();
 if (!files.length) { console.log("no item sprites drawn yet"); process.exit(0); }
 

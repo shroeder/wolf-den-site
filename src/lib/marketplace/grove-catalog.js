@@ -673,3 +673,8 @@ export const groveArt = (id) => {
     if (GROVE_FOODS[id]) return `/images/grove/food-${id}.webp`;
     return null;
 };
+
+// A tool's picture, by SLOT rather than by recipe id. Twelve tiers of the same slot are the same object made
+// better, so they share one sprite until a tier earns its own — the ladder changes the number beside the
+// picture, not the picture.
+export const toolArt = (slot) => (slot ? `/images/grove/tool-${slot}.webp` : null);
