@@ -36,6 +36,21 @@ export const MAP_LAYOUT = [
 
 export const mapSpot = (id) => MAP_LAYOUT.find((m) => m.id === id) || null;
 
+// ── THE SAME CHART, TWELVE TIMES ─────────────────────────────────────────────────────────────────────────────
+// Every map has twelve zones, so every map uses these twelve positions. The plate changes, the symbols change,
+// the route is the same shape — which is deliberate: a chart that rearranged itself per map would make the
+// Undercave unreadable to somebody who had learned the Grove.
+//
+// ⚠️ KEYED ON DEPTH, NOT ON ID. Map one's ids happen to be in MAP_LAYOUT order, and relying on that would
+// silently break the moment a generated map named a zone something that collided. Depth 13 is map two zone
+// one, so ((n - 1) % 12) is that zone's place on its own paper.
+export const spotForDepth = (n) => MAP_LAYOUT[(Math.max(1, Number(n) || 1) - 1) % 12] || null;
+
+/** The trail for one map's twelve, in walking order. */
+export const trailForZones = (zones = []) => trailPath(
+    zones.slice().sort((a, b) => a.n - b.n).map((z) => spotForDepth(z.n)).filter(Boolean),
+);
+
 /** The symbol drawn for a place. Named off the zone id, like every other piece of Grove art. */
 export const nodeArt = (id) => `/images/grove/node-${id}.webp`;
 

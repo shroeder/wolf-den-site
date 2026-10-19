@@ -19,7 +19,7 @@ import {
     GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
 } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
-import { MAP_LAYOUT, mapSpot, nodeArt, trailPath } from "@/lib/marketplace/grove-map.js";
+import { MAP_LAYOUT, nodeArt, spotForDepth, trailForZones, trailPath } from "@/lib/marketplace/grove-map.js";
 import { celebrateUnlock } from "@/components/grove/grove-sfx.js";
 
 // ── THE GROVE ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -84,6 +84,10 @@ const PartIcon = ({ id, size = 34 }) => {
 };
 
 export default function GroveClient({ initial }) {
+    // Which map the paper is showing. ⚠️ UP HERE WITH THE OTHER HOOKS, not beside the code that uses
+    // it: that sits after the "not signed in" early return, and a hook called conditionally changes
+    // the hook ORDER between renders, which React treats as a different component.
+    const [paperMap, setPaperMap] = useState(null);
     const [st, setSt] = useState(initial);
     const [view, setView] = useState("map");     // map | zone | bag | bench | emblems
     // ⚠️ THE SAME BODY CLASS THE ZONE ALREADY USES, not a second mechanism. It stops the page behind
@@ -319,7 +323,18 @@ export default function GroveClient({ initial }) {
     // ⚠️ THE TRAIL STOPS WHERE YOU DID. Drawing the whole route in confident ink would tell a new player
     // the shape of a map they have not earned; drawing none of it loses the one thing the chart is for.
     // Faint for the whole journey, inked as far as you have actually walked.
-    const walkedSpots = MAP_LAYOUT.filter((m) => (st.zones || []).some((z) => z.id === m.id && z.unlocked));
+    // ── WHICH MAP THE PAPER IS SHOWING ───────────────────────────────────────────────────────────────
+    // Twelve zones to a map and twelve maps, so the chart shows ONE of them. It opens on the furthest map
+    // you have reached rather than on map one, because the place you are working is the place you want to
+    // look at; the arrows walk back through the ones you have opened.
+    const zoneMaps = [...new Set((st.zones || []).map((z) => z.map || 1))].sort((a, b) => a - b);
+    const openMaps = zoneMaps.filter((m) => (st.zones || []).some((z) => (z.map || 1) === m && z.unlocked));
+    const deepestMap = openMaps.length ? openMaps[openMaps.length - 1] : 1;
+    const shownMap = paperMap && zoneMaps.includes(paperMap) ? paperMap : deepestMap;
+    const shownZones = (st.zones || []).filter((z) => (z.map || 1) === shownMap);
+    const shownName = shownZones[0]?.mapName || "The Grove";
+    const mapIdx = openMaps.indexOf(shownMap);
+    const walkedZones = shownZones.filter((z) => z.unlocked);
 
 
     const panel = view === "zone" ? zonePanel : view;
@@ -353,14 +368,25 @@ export default function GroveClient({ initial }) {
                                 Two passes: the whole route faint, then the part you have actually opened
                                 drawn over it in confident ink. preserveAspectRatio none because the viewBox is
                                 in percent and has to stretch with the paper. */}
+                            {/* Which paper this is. Only maps you have opened are reachable from here --
+                                the arrows are a way back to work you have done, not a preview of what is
+                                coming. */}
+                            <div className="gv-paper-head">
+                                <button type="button" className="gv-paper-arrow" disabled={mapIdx <= 0}
+                                    onClick={() => setPaperMap(openMaps[mapIdx - 1])} aria-label="Previous map">&lsaquo;</button>
+                                <b>{shownName}</b>
+                                <i>map {shownMap} of 12</i>
+                                <button type="button" className="gv-paper-arrow" disabled={mapIdx < 0 || mapIdx >= openMaps.length - 1}
+                                    onClick={() => setPaperMap(openMaps[mapIdx + 1])} aria-label="Next map">&rsaquo;</button>
+                            </div>
                             <svg className="gv-paper-trail" viewBox="0 0 100 100"
                                 preserveAspectRatio="none" aria-hidden="true">
                                 <path className="is-ghost" d={trailPath()} />
-                                <path className="is-walked" d={trailPath(walkedSpots)} />
+                                <path className="is-walked" d={trailForZones(walkedZones)} />
                             </svg>
 
-                            {st.zones.map((z) => {
-                                const spot = mapSpot(z.id);
+                            {shownZones.map((z) => {
+                                const spot = spotForDepth(z.n);
                                 if (!spot) return null;
                                 const done = z.kills >= z.toUnlock;
                                 return (
@@ -370,7 +396,7 @@ export default function GroveClient({ initial }) {
                                         disabled={!z.unlocked} onClick={() => enter(z)}
                                         aria-label={`${z.name}${z.unlocked ? "" : " (locked)"}`}>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={nodeArt(z.id)} alt="" />
+                                        <img src={z.node || nodeArt(z.id)} alt="" />
                                         <span className="gv-node-label">
                                             <em>{z.name}</em>
                                             {z.unlocked

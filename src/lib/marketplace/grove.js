@@ -201,7 +201,12 @@ export async function groveState(buyerId) {
             // bigint comes back as a STRING from the HTTP driver, so Number() is not optional here.
             const wait = Math.max(0, Number(row?.boss_wait_ms) || 0);
             return {
+                // `map` and `mapName` ride along so the chart can show one paper at a time. They are on the
+                // zone itself rather than derived from n, because a client doing (n - 1) / 12 would be a
+                // second place that has to agree about how many zones a map has.
                 ...z,
+                map: z.map || 1,
+                mapName: z.mapName || "The Grove",
                 kills,
                 bossDone: Boolean(row?.boss_done),
                 unlocked: z.n <= (Number(p?.unlocked_n) || 1),

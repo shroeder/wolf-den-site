@@ -554,7 +554,20 @@ const SIZES = { plate: "1536x1024", foe: "1024x1024", map: "1024x1536", item: "1
 // A plate is a full-bleed backdrop; everything else is a die-cut sprite.
 const OPAQUE = new Set(["plate", "map"]);
 
-const keys = Object.keys(ART).filter((k) => !ONLY.length || ONLY.includes(k));
+// ── --missing ── DRAW ONLY WHAT IS NOT ON DISK ───────────────────────────────────────────────────────────────
+// A re-run of --map N redraws all forty-eight, which is money spent to replace files that already exist and
+// were already looked at. This filters to the gaps, so an interrupted map costs what it is short and not what
+// it is worth. The name on disk is derived the same way the writer derives it, below.
+const MISSING_ONLY = process.argv.includes("--missing");
+const fileFor = (key, kind) => (key.startsWith("bg-") ? key.replace(/^bg-/, "zone-")
+    : (kind !== "foe" || key.startsWith("boss-")) ? key
+    : `foe-${key}`);
+let keys = Object.keys(ART).filter((k) => !ONLY.length || ONLY.includes(k));
+if (MISSING_ONLY) {
+    const before = keys.length;
+    keys = keys.filter((k) => !fs.existsSync(path.join(OUT, `${fileFor(k, ART[k][1])}.webp`)));
+    console.log(`  --missing: ${before - keys.length} already drawn, ${keys.length} to go`);
+}
 // ⚠️ PRICED BY KIND, NOT "plates and everything else". The old sum called every non-plate a creature at
 // the square rate, which was true until the map arrived at 1024x1536 and silently under-quoted itself.
 const byKind = {};

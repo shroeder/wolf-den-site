@@ -676,17 +676,89 @@ export const MAP_ENEMIES = Object.fromEntries(
 );
 
 /** Every boss of every generated map, in GROVE_BOSSES shape. */
+// ── A BOSS IS AUTHORED AT THE DEPTH IT STANDS AT ─────────────────────────────────────────────────────────────
+// ⚠️ scaledFoe DOES NOT TOUCH A BOSS. grove-catalog.js says so in capitals: the climb that turns a zone-1
+// Thornling into a zone-5 Thornling would compound on a number already written for zone 5. So a generated
+// boss has to carry its FINAL hp — and the first cut of this file gave all 132 of them 59,000, which is map
+// one zone one. The Fallen, at the edge of the world, would have had exactly the health of the first thing a
+// newcomer kills, and nothing would have flagged it: it reads as a boss, it fights, it dies in four swings.
+//
+// Map one's twelve were authored by hand from 59,000 to 180,000 — x1.0267 a zone, the same rate the
+// wanderers climb at. Extending that line is what stops map two's first boss being easier than map one's
+// last and resetting the whole game at every door.
+// ── TWO FACTORS, NOT ONE ─────────────────────────────────────────────────────────────────────────────────────
+// A continuous per-zone rate looks right and is wrong, and map one is the proof. Its twelve bosses were
+// authored by hand from 59,000 to 180,000 — a x3.05 ramp ACROSS THE MAP — while the wanderers in the same
+// twelve zones climb at x1.0267 a zone, which is only x1.37 end to end. Those are different curves on
+// purpose, and the design doc says why: "BOSS 35 seconds at the start of a map rising to 80 at the end of
+// it, so tough is a place you arrive at. The ramp restarts each map because a boss is the end of ITS map."
+//
+// So a boss is priced by WHERE IN ITS MAP it stands and WHICH MAP that is:
+//
+//   per map    x1.372, the hero's own power step (grove-catalog.js), so the first boss of every map is
+//              the same 35-second fight against a hero who has grown
+//   per zone   x3.05 spread over the twelve, so the last boss of a map is the 80-second wall
+//
+// Run continuously instead and map two's last boss lands at 108,000 against map one's 180,000 — the game
+// getting easier as you go deeper, which no screen would ever tell you.
+const BOSS_HP_D1 = 59000;
+const BOSS_DMG_D1 = [190, 260];
+const MAP_STEP_HP = 1.372;     // the hero's power step per map
+const MAP_STEP_DMG = 1.172;    // the hero's durability step per map
+const MAP_RAMP_HP = 3.05;      // 59,000 -> 180,000 across map one's twelve
+const MAP_RAMP_DMG = 1.16;     // 190 -> 220 across the same twelve
+const bossHp = (mapN, i) =>
+    BOSS_HP_D1 * MAP_STEP_HP ** (mapN - 1) * MAP_RAMP_HP ** (i / 11);
+const bossDmg = (mapN, i, k) =>
+    BOSS_DMG_D1[k] * MAP_STEP_DMG ** (mapN - 1) * MAP_RAMP_DMG ** (i / 11);
+
+// ⚠️ A BOSS WITH NO ATTACK LIST NEVER SWINGS. GroveScene guards on `f.attacks?.length`, so an empty list is
+// a health bar standing still while you hit it — a fight that looks finished before it starts. These mirror
+// the A table in grove-catalog.js, kept as plain data so this file stays pure.
+const BOSS_ATTACKS = {
+    slam: { kind: "slam", reach: 5, telegraph: 620, mult: 1.45 },
+    sweep: { kind: "sweep", reach: 10, telegraph: 1050, mult: 0.85 },
+    volley: { kind: "volley", reach: 4, telegraph: 820, mult: 0.75, shots: 3, spread: 13 },
+};
+// Which pattern a boss gets is decided by the ground it rules: a thing in a narrow place closes and slams,
+// a thing in the open sweeps, a thing in a lit hall throws. So no map is twelve of the same fight.
+const BIOME_ATTACKS = {
+    burrow: ["slam", "sweep"], stone: ["slam", "volley"], moss: ["sweep", "volley"],
+    field: ["sweep", "slam"], bramble: ["sweep", "slam"], char: ["volley", "slam"],
+    plank: ["slam", "sweep"], glow: ["volley", "sweep"], wood: ["slam", "sweep"],
+    heart: ["sweep", "volley", "slam"],
+};
+
+/** Every boss of every generated map, in GROVE_BOSSES shape. */
 export const MAP_BOSSES = Object.fromEntries(
     GROVE_MAPS.filter((m) => m.zones).flatMap((m) =>
-        m.zones.map((z) => [z.bossId, {
-            id: z.bossId, name: z.bossName, art: `/images/grove/boss-${z.bossId}.webp`, boss: true,
-            // Bosses are priced off their zone's depth by scaledFoe like everything else; these are the
-            // depth-1 baselines map one's bosses use, so the two sets sit on one curve.
-            hp: 59000, dmg: [190, 260], map: m.n,
-            emblem: m.emblem?.id || null, emblemChance: 0.09,
-            loot: bossLoot(m, z),
-        }])),
+        m.zones.map((z, i) => {
+            const depth = zoneDepth(m.n, i);
+            return [z.bossId, {
+                id: z.bossId, name: z.bossName, art: `/images/grove/boss-${z.bossId}.webp`, boss: true,
+                hp: Math.round(bossHp(m.n, i) / 1000) * 1000,
+                dmg: [Math.round(bossDmg(m.n, i, 0)), Math.round(bossDmg(m.n, i, 1))],
+                attacks: (BIOME_ATTACKS[z.biome] || ["slam", "sweep"]).map((k) => BOSS_ATTACKS[k]),
+                map: m.n, depth,
+                emblem: m.emblem?.id || null, emblemChance: 0.09,
+                loot: bossLoot(m, z),
+            }];
+        })),
 );
+
+// ── THE CHART SYMBOL A ZONE IS DRAWN WITH ────────────────────────────────────────────────────────────────────
+// Map one has a symbol per place: a grouping of trees for the Thicket, a mound for the Barrows, a cave mouth
+// for the Warren. Twelve more maps is seventy-two more drawings, and a map symbol is the one piece of art in
+// this feature whose job is to say WHAT KIND OF PLACE this is rather than which place it is.
+//
+// So a generated zone borrows the map-one symbol for its ground. A cave zone gets the cave, a burnt zone gets
+// the burnt wood, a lit zone gets the lantern clearing. It is free, it is thematically right, and the day a
+// map earns its own twelve the file simply exists and this falls away.
+const BIOME_NODE = {
+    burrow: "warren", stone: "barrows", moss: "hollow", field: "stubble", bramble: "bramble",
+    char: "rotwood", plank: "palisade", glow: "mothlight", wood: "thicket", heart: "heartwood",
+};
+export const biomeNode = (biome) => BIOME_NODE[biome] || "thicket";
 
 /** Every zone of every generated map, in GROVE_ZONES shape. */
 export const MAP_ZONES = GROVE_MAPS.filter((m) => m.zones).flatMap((m) =>
@@ -697,6 +769,8 @@ export const MAP_ZONES = GROVE_MAPS.filter((m) => m.zones).flatMap((m) =>
             enemies: z.foes.map((idx) => m.creatures[idx].id),
             boss: z.bossId, toUnlock: zoneUnlock(depth), biome: z.biome,
             bg: `/images/grove/zone-${z.id}.webp`, blurb: z.blurb,
+            // The chart symbol. Its own if one is ever drawn; its ground's otherwise.
+            node: `/images/grove/node-${biomeNode(z.biome)}.webp`,
         };
     }));
 
