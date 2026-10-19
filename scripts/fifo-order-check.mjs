@@ -55,5 +55,35 @@ const straddle = allocate(BATCHES, 10, 3);
 check("a 3-unit sale across the boundary pays 1x$120 + 2x$115", straddle.costCents, 12000 + 2 * 11500);
 check("  ...and names both batches", straddle.batches.length, 2);
 
+// ── A BOX THAT ARRIVED AFTER THE SALE CANNOT HAVE PAID FOR IT ───────────────────────────────────
+// The second defect found on 2026-10-18: allocate() walked the batch list oldest-first with no regard for
+// whether a batch existed yet, so an item whose purchases were entered later had its old sales charged to a
+// future delivery — 140 stored lines, 185 units, July sales paid for by a 12 October box.
+console.log("\nA sale on 2026-06-15, with the $115 boxes not bought until 1 July.\n");
+
+const beforeTheBoxes = allocate(BATCHES, 11, 1, { onOrBefore: "2026-06-15" });
+check("a June sale cannot reach the July batch", beforeTheBoxes.costCents, 0);
+check("  ...it reports the unit as short instead", beforeTheBoxes.short, 1);
+
+const sameDay = allocate(BATCHES, 11, 1, { onOrBefore: "2026-07-01" });
+check("a sale ON the delivery day may use it", sameDay.costCents, 11500);
+
+const laterSale = allocate(BATCHES, 11, 1, { onOrBefore: "2026-09-30" });
+check("a later sale is unaffected by the gate", laterSale.costCents, 11500);
+
+// The gate must not disturb the skip: June's own batch is still reachable at the right price.
+const juneFromJune = allocate(BATCHES, 0, 11, { onOrBefore: "2026-06-15" });
+check("the June batch still pays for June's first 11 units", juneFromJune.costCents, 11 * 12000);
+check("  ...with nothing short", juneFromJune.short, 0);
+
+// ── AND THE OPENING POSITION IS KEYED ON LINES, NOT DATES ────────────────────────────────────────
+// priorConsumption() excluding "everything newer than the oldest sale in this walk" is what let an incremental
+// run forget sales it had already costed. The contract it has now: every stored row counts except the exact
+// lines this walk is rewriting. That is a query rather than arithmetic, so what is asserted here is the
+// consequence — once every unit is spent, no later walk may be handed the oldest batch again.
+const walkReachesBack = allocate(BATCHES, 16, 1, { onOrBefore: "2026-09-30" });
+check("with all 16 units already spent, the next sale is short", walkReachesBack.short, 1);
+check("  ...and is never handed the oldest batch again", walkReachesBack.costCents, 0);
+
 console.log(`\n${failures === 0 ? "all checks passed" : failures + " CHECK(S) FAILED"}\n`);
 process.exit(failures === 0 ? 0 : 1);

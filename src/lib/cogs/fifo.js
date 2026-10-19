@@ -17,6 +17,11 @@ const logger = createServerLogger({ source: "api", subsystem: "cogs-fifo" });
 // fractional cent per unit becomes a real discrepancy over a few hundred units, so the conversion happens
 // once, at the edge, and nothing downstream sees a float.
 
+/** The shop's own calendar day for an instant — purchases are dated in it, so sales are judged against it. */
+const storeDay = (d) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" })
+        .format(d instanceof Date ? d : new Date(d));
+
 /** A ledger row, in the shape the allocator wants. Oldest first is the caller's job. */
 const toBatch = (row) => ({
     ledgerId: String(row.id),
@@ -37,14 +42,28 @@ const toBatch = (row) => ({
  * are reported as `short` and the caller decides — the one thing that must never happen is a silent $0 that
  * turns into 100% margin on a report.
  */
-export function allocate(batches, alreadySold, units) {
+export function allocate(batches, alreadySold, units, { onOrBefore = null } = {}) {
     const want = Math.max(0, Number(units) || 0);
     let skip = Math.max(0, Number(alreadySold) || 0);
     let left = want;
     let costCents = 0;
     const used = [];
 
-    for (const b of batches) {
+    // ── ⚠️ A SALE CANNOT BE PAID FOR BY A BOX THAT ARRIVED AFTER IT ───────────────────────────────────────
+    // Without this gate the walk just takes the oldest batch in the list, whatever its date — so an item whose
+    // purchases were entered later had its old sales charged to a future delivery. Measured on prod before the
+    // fix: 140 stored lines, 185 units, including July sales costed against a batch bought on 12 October.
+    //
+    // FILTERING A SUFFIX IS WHY `alreadySold` STILL LINES UP. The list is ordered oldest-first, so everything
+    // this removes is at the END of it. The units earlier sales consumed are a prefix of what remains — an
+    // earlier sale can only ever have drawn on batches older than its own date, which are older than this
+    // sale's date too — so skipping that many units from the front still lands in the right place.
+    //
+    // Units with nothing legitimate behind them come back as `short`, which is the honest answer: the line
+    // keeps falling back to the recorded per-item cost instead of being handed a price from the future.
+    const usable = onOrBefore ? batches.filter((b) => String(b.occurredOn) <= String(onOrBefore)) : batches;
+
+    for (const b of usable) {
         if (left <= 0) break;
         let available = b.units;
         if (skip > 0) {
@@ -90,20 +109,32 @@ export async function batchesFor(variationIds) {
  * Units of each variation already spent by sales costed in EARLIER runs — the opening position for an
  * incremental walk, keyed variationId -> units.
  *
- * `before` is the oldest sale about to be costed. Rows at or after it are excluded because the caller is
- * recomputing them; counting them here would consume their batches twice and silently overprice everything
- * behind them.
+ * `recomputing` is every "orderId|lineUid" in this walk. Those are excluded because they are about to be
+ * written again; EVERY OTHER STORED ROW COUNTS, whatever its date.
+ *
+ * ⚠️ IT USED TO EXCLUDE BY DATE — everything at or after the oldest sale in the walk — on the assumption
+ * that a walk recomputes its whole time range. A FULL run does. An incremental run does not: it carries the
+ * handful of lines it just discovered, so every already-costed sale after that cut-off was forgotten and its
+ * units were handed out a second time. Any walk that reached backwards therefore re-spent batches, and the
+ * reconciler reached backwards constantly — one run covered "14 lines, sales 17 Jul .. 18 Oct".
+ *
+ * What that cost, measured on prod the day this was fixed: 22 items where a purchase batch had been charged
+ * for more units than it holds, 74 units and $1,110.54 of cost booked against purchases that never covered
+ * it. Worst single case was a batch of ONE pack at $5.00 charged for 15 units across 15 lines.
+ *
+ * Keying on the lines themselves cannot drift: a row is either being rewritten by this walk or it is history.
  */
-export async function priorConsumption(variationIds, before) {
+export async function priorConsumption(variationIds, recomputing = []) {
     const ids = [...new Set((variationIds || []).map((v) => String(v || "").trim()).filter(Boolean))];
     const out = new Map();
-    if (!ids.length || !before) return out;
+    if (!ids.length) return out;
+    const keys = [...new Set((recomputing || []).map((k) => String(k)))];
     const rows = await db.query(
         `SELECT variation_id, COALESCE(SUM(units), 0) AS used
            FROM cogs_fifo_cost
-          WHERE variation_id = ANY($1) AND sold_at < $2
+          WHERE variation_id = ANY($1) AND (order_id || '|' || line_uid) <> ALL($2)
           GROUP BY variation_id`,
-        [ids, new Date(before).toISOString()]
+        [ids, keys]
     ).catch((error) => {
         // ⚠️ LOUD, AND EMPTY IS NOT A SAFE ANSWER HERE. Returning an empty map on failure would look exactly
         // like "nothing has been sold yet" and hand every sale the oldest batch — the bug this function exists
@@ -139,6 +170,48 @@ export async function costSales(sales, { write = true, fresh = false } = {}) {
 
     if (!list.length) return { costed: 0, short: 0, skipped: 0 };
 
+    // ── ⚠️ REACHING BACKWARDS MEANS REDOING THE SEQUENCE, NOT SQUEEZING INTO IT ────────────────────────────
+    // FIFO is an ordering, so a sale that turns up late — an order closed out of sequence, a line whose
+    // variation was only just linked — cannot simply be costed after the sales that already took their
+    // batches. It belongs BEFORE them, and everything behind it shifts.
+    //
+    // So any stored line for the same item that is not older than the oldest sale in this walk is pulled back
+    // into the walk and recomputed in its proper place. The stored row carries everything needed to re-cost
+    // it (order, line, item, when, how many), so this costs one query and no Square call, and the write is an
+    // upsert on the same (order_id, line_uid) — it corrects rows rather than growing new ones.
+    //
+    // The normal nightly case pulls back nothing: a walk of today's sales has nothing stored after it.
+    let reclaimed = 0;
+    if (!fresh) {
+        const oldest = new Map();
+        for (const s of list) {
+            const cur = oldest.get(s.variationId);
+            if (!cur || s.soldAt < cur) oldest.set(s.variationId, s.soldAt);
+        }
+        const have = new Set(list.map((s) => `${s.orderId}|${s.lineUid}`));
+        const stored = await db.query(
+            `SELECT order_id, line_uid, variation_id, sold_at, units FROM cogs_fifo_cost WHERE variation_id = ANY($1)`,
+            [[...oldest.keys()]]
+        ).catch(() => []);
+        for (const r of stored) {
+            const cut = oldest.get(String(r.variation_id));
+            if (!cut) continue;
+            const soldAt = new Date(r.sold_at);
+            if (soldAt < cut) continue; // genuinely earlier — stays counted as the opening position
+            const key = `${r.order_id}|${r.line_uid}`;
+            if (have.has(key)) continue; // this walk is already rewriting it
+            have.add(key);
+            list.push({
+                orderId: String(r.order_id), lineUid: String(r.line_uid), variationId: String(r.variation_id),
+                soldAt, units: Number(r.units) || 0,
+            });
+            reclaimed += 1;
+        }
+        if (reclaimed) {
+            list.sort((a, b) => a.soldAt - b.soldAt || a.orderId.localeCompare(b.orderId) || a.lineUid.localeCompare(b.lineUid));
+        }
+    }
+
     const batches = await batchesFor(list.map((s) => s.variationId));
 
     // ── ⚠️ WHAT EARLIER RUNS ALREADY SPENT, NOT JUST THIS ONE ────────────────────────────────────────────────
@@ -157,7 +230,7 @@ export async function costSales(sales, { write = true, fresh = false } = {}) {
     // made of its own footprints. A plan that does not match the run it is planning is worse than no plan.
     const consumed = fresh
         ? new Map()
-        : await priorConsumption(list.map((s) => s.variationId), list[0].soldAt);
+        : await priorConsumption(list.map((s) => s.variationId), list.map((s) => `${s.orderId}|${s.lineUid}`));
     let costed = 0, short = 0, skipped = 0;
     // Every row this walk would write. Kept whether or not it is written, because the question "what would
     // seeding these purchases DO to the numbers?" has to be answerable before it is done to them.
@@ -170,7 +243,11 @@ export async function costSales(sales, { write = true, fresh = false } = {}) {
         if (!mine?.length) { skipped += 1; continue; }
 
         const already = consumed.get(sale.variationId) || 0;
-        const result = allocate(mine, already, sale.units);
+        // The store's own day, not UTC's. `occurred_on` is a business date Luke types in Montgomery, and a
+        // sale at 01:30 UTC happened the previous evening here — comparing against the UTC date would refuse
+        // a batch bought the same day and report a short line for a purchase that was sitting on the shelf.
+        // See [[marketplace-date-tz-bug]]: every day boundary in this codebase is America/Chicago.
+        const result = allocate(mine, already, sale.units, { onOrBefore: storeDay(sale.soldAt) });
         consumed.set(sale.variationId, already + sale.units);
 
         if (result.units <= 0) { skipped += 1; continue; }
@@ -207,8 +284,8 @@ export async function costSales(sales, { write = true, fresh = false } = {}) {
         }
     }
 
-    logger.info("cogs.fifo.costed", { costed, short, skipped, written: write });
-    return { costed, short, skipped, rows };
+    logger.info("cogs.fifo.costed", { costed, short, skipped, reclaimed, written: write });
+    return { costed, short, skipped, reclaimed, rows };
 }
 
 /** The stored cost for a set of sold lines, keyed "orderId|lineUid". Used by the proxy to annotate a report. */
