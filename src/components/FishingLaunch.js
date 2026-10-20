@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import useScrollLock from "@/lib/useScrollLock";
+import { claimLaunchCard, releaseLaunchCard } from "@/lib/marketplace/launch-modals.js";
 
 // ── First-visit "Fishing is live!" announcement ───────────────────────────────────────────────────────────────
 // Fires once per browser for signed-in members, says what fishing is, and drops them straight into it. Built to
@@ -32,7 +33,11 @@ export default function FishingLaunch() {
     useEffect(() => {
         let seen = null;
         try { seen = localStorage.getItem(SEEN_KEY); } catch { /* private mode — just don't show it */ }
-        if (!seen) setShow(true);
+        // ⚠️ ONE CARD AT A TIME. Seven of these exist and each one only ever asked its own marker, so a
+        // browser owed several met them stacked back to back. claimLaunchCard lets exactly one hold the
+        // screen per page load; the rest stay closed and come up on later visits, one at a time.
+        if (!seen && claimLaunchCard(SEEN_KEY)) setShow(true);
+        return () => releaseLaunchCard(SEEN_KEY);
     }, []);
 
     const dismiss = () => {

@@ -642,6 +642,24 @@ export default function SpinWheel({ halloween = false, hwArt = {} }) {
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                                 {show.sprite ? <img src={show.sprite} alt="" className="cw-offer-img" /> : null}
                                                 <span className="cw-offer-name">{show.name || show.label}</span>
+                                                {/* ── ⚠️ SAY WHICH ONE WAS YOURS, IN A WORD ──────────────────────────────
+                                                    The reveal opens all three, because seeing what you walked past is
+                                                    what makes the choice a choice. The only thing separating the one
+                                                    you OPENED from the two you did not was a border colour and 44%
+                                                    opacity — and a dimmed amulet is still, unmistakably, an amulet.
+
+                                                    SoullessShiitake: "I just won the candle-eye amulet from the wheel
+                                                    but it didn't actually give it to me?" He had not won it. It was
+                                                    in a pumpkin he did not open, his own paid out its gold, and the
+                                                    screen let him read the board as a prize list. The grant was
+                                                    correct and the screen was the bug.
+
+                                                    A word cannot be misread the way a border can. */}
+                                                {offer.picked != null ? (
+                                                    <span className={`cw-offer-tag${won ? " is-yours" : ""}`}>
+                                                        {won ? "Yours" : "Not opened"}
+                                                    </span>
+                                                ) : null}
                                             </>
                                         ) : (
                                             <>
@@ -1001,7 +1019,11 @@ const CW_CSS = `
    a reveal where everything looks equally won does not tell you what you chose. */
 .cw-offer-pick.is-won { border-color: var(--rar, #ffd75e); box-shadow: 0 0 0 2px var(--rar, #ffd75e), 0 10px 26px rgba(0,0,0,0.6), 0 0 34px color-mix(in srgb, var(--rar, #ffd75e) 55%, transparent); }
 .cw-offer-pick.is-won .cw-offer-name { color: var(--rar, #ffd75e); }
-.cw-offer-pick.is-passed { opacity: 0.44; filter: saturate(0.5); }
+.cw-offer-pick.is-passed { opacity: 0.3; filter: saturate(0.25) grayscale(0.5); }
+/* The word, not the border. Small, flat, and impossible to read as anything but what it says. */
+.cw-offer-tag { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #c9c2d6; }
+.cw-offer-tag.is-yours { background: var(--rar, #ffd75e); color: #1a1208; }
 @media (prefers-reduced-motion: reduce) { .cw-offer-pick .cw-offer-lid { animation: none; } }
 
 .cw-celebrate { position: fixed; inset: 0; z-index: 320; display: grid; place-items: center; background: rgba(6,4,10,0.72); backdrop-filter: blur(3px); }

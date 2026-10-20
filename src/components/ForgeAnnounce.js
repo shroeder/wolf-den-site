@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import useScrollLock from "@/lib/useScrollLock";
+import { claimLaunchCard, releaseLaunchCard } from "@/lib/marketplace/launch-modals.js";
 
 // ── First-login "The Forge is open!" announcement — a juiced hearth-themed modal that fires once per browser
 // for signed-in members, tells them what the Forge does + how to reach it, and drops them straight in. Shows
@@ -38,7 +39,10 @@ export default function ForgeAnnounce() {
         try { seen = Boolean(localStorage.getItem(SEEN_KEY)); } catch { seen = false; }
         // Hydration-safe: only the client can read localStorage, so decide after mount.
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        if (!seen) setOpen(true);
+        // ⚠️ ONE CARD AT A TIME — see claimLaunchCard. Seven of these exist and each only ever asked its
+        // own marker, so a browser owed several met them stacked back to back.
+        if (!seen && claimLaunchCard(SEEN_KEY)) setOpen(true);
+        return () => releaseLaunchCard(SEEN_KEY);
     }, []);
 
     const dismiss = () => {

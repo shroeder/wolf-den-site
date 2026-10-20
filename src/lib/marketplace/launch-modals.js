@@ -44,3 +44,56 @@ export function markLaunchesSeen() {
         try { window.localStorage.setItem(key, "1"); } catch { /* storage unavailable */ }
     }
 }
+
+// ── ⚠️ SIGNUP WAS THE WRONG MOMENT, AND IT WAS THE ONLY ONE ──────────────────────────────────────────────────
+// markLaunchesSeen() below fires once, in the browser that creates the account. That protects exactly one
+// browser on one device, and the people it protects least are the ones it was written for:
+//
+//   • a member who signs up on the shop laptop and then plays on their phone — the phone has no markers, so
+//     the phone gets all seven
+//   • anybody who clears their browser, or opens the Den in a private window
+//   • every member who joined BEFORE this file existed and has not been back since — which is precisely the
+//     dormant list the October win-back email went to. They were about to walk into the wall.
+//
+// Luke: "it leaves a terrible taste in their mouth when they see 2 3 or even 7 back to back modals."
+//
+// THE MOMENT THAT ACTUALLY MATTERS IS FIRST CONTACT WITH THIS BROWSER, not account creation. A browser that
+// has never carried a single Wolf Den marker has never been shown any of this, and there is no version of
+// "catching up" that is worth seven dialogs — so it starts caught up. A real veteran has dismissal markers
+// already, so this never fires for them and a genuinely new announcement still reaches them.
+const FIRST_SEEN_KEY = "wolfden-first-seen";
+
+/**
+ * Call on first paint of any marketplace page. A browser with no history here is marked caught up on every
+ * launch announcement; a browser that has been here before is left completely alone.
+ */
+export function catchUpNewBrowser() {
+    if (typeof window === "undefined") return false;
+    try {
+        if (window.localStorage.getItem(FIRST_SEEN_KEY)) return false;
+        // Anything at all from the Den means this is not a first contact — a member mid-way through reading
+        // the announcements must not be marked caught up on the rest of them.
+        const known = LAUNCH_SEEN_KEYS.some((k) => window.localStorage.getItem(k));
+        window.localStorage.setItem(FIRST_SEEN_KEY, String(Date.now()));
+        if (known) return false;
+        markLaunchesSeen();
+        return true;
+    } catch { return false; }
+}
+
+// ── AND NEVER TWO AT ONCE ────────────────────────────────────────────────────────────────────────────────────
+// The rule above empties the queue for new browsers. This one stops the queue EXISTING: even a veteran who is
+// genuinely owed three announcements should meet them one at a time. The claim is per page load rather than
+// stored, so dismissing one and navigating shows the next — which is a sequence, not a wall.
+let openCard = null;
+
+/** True if this card may take the screen. Claims it until releaseLaunchCard is called with the same key. */
+export function claimLaunchCard(key) {
+    if (openCard && openCard !== key) return false;
+    openCard = key;
+    return true;
+}
+
+export function releaseLaunchCard(key) {
+    if (openCard === key) openCard = null;
+}

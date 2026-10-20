@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import useScrollLock from "@/lib/useScrollLock";
+import { claimLaunchCard, releaseLaunchCard } from "@/lib/marketplace/launch-modals.js";
 
 // ── First-visit "The Mine is open!" announcement ──────────────────────────────────────────────────────────────
 // Fires once per browser for signed-in members, says what the mine is, and drops them into it. Built to match
@@ -36,7 +37,11 @@ export default function MiningLaunch() {
         try { seen = localStorage.getItem(SEEN_KEY); } catch { /* private mode — just don't show it */ }
         // Hydration-safe: only the client can read localStorage, so decide after mount.
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        if (!seen) setShow(true);
+        // ⚠️ ONE CARD AT A TIME. Seven of these exist and each one only ever asked its own marker, so a
+        // browser owed several met them stacked back to back. claimLaunchCard lets exactly one hold the
+        // screen per page load; the rest stay closed and come up on later visits, one at a time.
+        if (!seen && claimLaunchCard(SEEN_KEY)) setShow(true);
+        return () => releaseLaunchCard(SEEN_KEY);
     }, []);
 
     const dismiss = () => {

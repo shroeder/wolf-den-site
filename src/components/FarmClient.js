@@ -105,6 +105,16 @@ const FARM_PAD = 6; // % margin so pets (anchored by their center) never clip of
 // So water pets get rows. The row is `idx % AQ_ROWS` rather than `idx / AQ_ROWS` on purpose: interleaving
 // means consecutive slots land on DIFFERENT depths, so two pets that are neighbours horizontally are never
 // also neighbours vertically, which is what stops the name tags colliding.
+//
+// ⚠️ AND THE ROWS MUST BE OFFSET FROM EACH OTHER, WHICH THEY WERE NOT. Interleaving fills the grid COLUMN
+// BY COLUMN, so the first `rows` fish are all the FIRST fish of their row — and every row started at exactly
+// AQ_PAD. Four of them therefore stacked into a vertical line hard against the left glass with three
+// quarters of the tank empty, which is precisely the picture ValkyrieSylve sent: "the aquarium pets dont
+// spread out." The arithmetic was self-consistent and the layout was still wrong.
+//
+// Odd rows are inset by half a gap now, so the columns interlock like bricks instead of lining up. Nothing
+// clamps: the inset is applied as PADDING, so an odd row spreads inside the even row's span rather than
+// running past the edge and piling up on it.
 // ⚠️ THE ROW COUNT IS CAPPED BUT NOT FIXED — IT IS DRIVEN BY AQ_PER_ROW. A constant 3 rows looks right at
 // eleven pets and absurd at three, where it stacks them in a vertical line down the middle of the tank with
 // the whole width empty. Rows are added as fish arrive instead, three to a row, up to four rows.
@@ -392,8 +402,17 @@ export default function FarmClient({ initial, viewingAlias }) {
     const homeX = useCallback((i) => {
         if (petView(i) === "aquarium") {
             const a = aqSlot(i);
+            // Half a gap of extra padding on every other row. That is what turns a grid whose first column
+            // is a vertical line at the glass into interlocking rows — and it is expressed as PADDING rather
+            // than as a shift so both ends stay inside the tank without a clamp flattening them together.
+            // ⚠️ AND THE INSET IS CAPPED, or a SHORT row eats the whole tank. A row of two has a gap of 68,
+            // so half of it is 34 — padding both sides by that leaves a span of zero and lands both fish on
+            // the centre line, on top of each other. A sixth of the usable width is the most an offset may
+            // ever take.
+            const gap = a.rowCount > 1 ? (100 - AQ_PAD * 2) / (a.rowCount - 1) : 0;
+            const pad = AQ_PAD + (a.row % 2 ? Math.min(gap / 2, (100 - AQ_PAD * 2) / 6) : 0);
             // Clamped to the tank's own margins so the wobble can never push a name tag back off the glass.
-            return clamp(petSlotX(a.inRow, a.rowCount, AQ_PAD) + aqWobble(i * 2) * 5, AQ_PAD, 100 - AQ_PAD);
+            return clamp(petSlotX(a.inRow, a.rowCount, pad) + aqWobble(i * 2) * 5, AQ_PAD, 100 - AQ_PAD);
         }
         const s = viewSlotOf(i, pets.length);
         return petSlotX(s.idx, s.count);

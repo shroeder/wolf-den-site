@@ -364,6 +364,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, go
     // `atRest`, not `idle` — `idle` is already the reels' resting faces further down this file, and a
     // second one would shadow it.
     const counting = celebrating;
+    // ⚠️ "colossal" IS DELIBERATELY ABSENT. It means ColossalReels is still playing — its own reveal, its
+    // free round and its recap — and the held balance must not be released until it says it is finished.
     const atRest = phase === "idle" || (phase === "done" && !counting);
     // ── TWO LOCKS, BECAUSE BEING BROKE AND BEING BUSY ARE NOT THE SAME REFUSAL ───────────────────────────
     // `playing` is "the machine is in the middle of something" and stops everything. `locked` is that PLUS
@@ -767,7 +769,19 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, go
             if (r.hold) { flashTrigger(r.hold.trigger, () => setPhase("pick")); return; }
             if (r.warren) { flashTrigger(m.bonus, () => setPhase("warren")); return; }
             if (r.locked) { flashTrigger(m.bonus, () => announceFree(r, "locked")); return; }
-            setPhase("done");
+            // ── ⚠️ THE COLOSSAL CABINET IS NOT FINISHED WHEN ITS FIRST GRID IS ──────────────────────
+            // Its free round lives under `r.colossal.free` and is played inside ColossalReels, so none of
+            // the branches above match and this line used to fire the moment the small reels landed.
+            // `done` with nothing counting IS `atRest`, atRest releases the held balance — so the purse
+            // jumped to the post-bonus total before a single free spin had been played.
+            //
+            // SoullessShiitake: "with the menagerie, if you get the free spins, it adds how much you will
+            // win to your gold before the spins even happen." That is the whole of it, and it gives away
+            // the result of the round you are about to watch.
+            //
+            // ColossalReels calls onDone when IT is finished, and that is what moves this to `done`. Until
+            // then the machine sits in a phase that is deliberately not a resting one.
+            setPhase(m.colossal ? "colossal" : "done");
         };
         const after = () => {
             // The reels have finished paying, so the row may now say what they paid — see shownMeter.
@@ -798,7 +812,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, go
                 if (r.hold) { flashTrigger(r.hold.trigger, () => setPhase("pick")); return; }
                 if (r.warren) { flashTrigger(m.bonus, () => setPhase("warren")); return; }
                 if (r.locked) { flashTrigger(m.bonus, () => announceFree(r, "locked")); return; }
-                setPhase("done");
+                // Same reason as `rest()` above: on a colossal cabinet the round is still to come.
+                setPhase(m.colossal ? "colossal" : "done");
             },
         });
     // `announceFree` is deliberately NOT in this list. It is declared BELOW this hook, and a dependency
@@ -982,6 +997,19 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, go
     //   (the longest celebration plus a second), it never fires in normal play, and it means the worst this
     //   can ever do again is hold the button a moment too long instead of forever.
     const isColossal = useMemo(() => Boolean(slot5(machineId).colossal), [machineId]);
+    // ── AND THE COLOSSAL PHASE EXPIRES ON ITS OWN ────────────────────────────────────────────────────────
+    // Same lesson as the celebration flag directly above, applied to the phase that replaced "done" on this
+    // cabinet: a state whose only exit is a callback from another component is a state that bricks the
+    // machine the day that component throws, unmounts early, or simply never reaches its last frame. SPIN
+    // is disabled for as long as this holds, so the failure would read as a dead cabinet.
+    //
+    // The ceiling is far longer than a real round (fifteen free spins plus the recap) and never fires in
+    // normal play. The worst it can now do is release the purse a little late instead of never.
+    useEffect(() => {
+        if (phase !== "colossal") return undefined;
+        const t = setTimeout(() => setPhase("done"), 120000);
+        return () => clearTimeout(t);
+    }, [phase]);
     useEffect(() => {
         if (isColossal) return undefined;
         if (phase !== "done" || !(Number(result?.wonGold || 0) > 0)) return undefined;

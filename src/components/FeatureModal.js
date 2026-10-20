@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { claimLaunchCard, releaseLaunchCard } from "@/lib/marketplace/launch-modals.js";
 
 // One-time feature-launch announcement, shown once per browser to signed-in members. To announce a NEW
 // feature later, change SEEN_KEY (a new key re-shows it to everyone) and update the copy below.
@@ -22,11 +23,15 @@ export default function FeatureModal() {
             const r = await fetch("/api/marketplace/auth/me", { cache: "no-store" }).catch(() => null);
             const d = r && r.ok ? await r.json().catch(() => null) : null;
             if (!alive || !d?.buyer) return;
-            timer = setTimeout(() => alive && setShow(true), 1100); // let the page settle first
+            // ⚠️ ONE CARD AT A TIME — see claimLaunchCard. The claim is taken at the moment this one
+            // would actually open, not earlier, so a card that never shows does not hold the screen
+            // shut for the others.
+            timer = setTimeout(() => alive && claimLaunchCard(SEEN_KEY) && setShow(true), 1100);
         })();
         return () => {
             alive = false;
             if (timer) clearTimeout(timer);
+            releaseLaunchCard(SEEN_KEY);
         };
     }, []);
 
