@@ -23,6 +23,35 @@
 // doesn't record, and `claim: "client"` is only for browser permissions, which the server cannot observe.
 
 export const GUIDE_CHAPTERS = [
+    // ── ⚠️ THIS CHAPTER IS FIRST, AND IT IS FIRST BECAUSE OF WHAT THE NUMBERS SAID ──────────────────────
+    // Measured across the 140 accounts created in the last ninety days, by what somebody did in their first
+    // twenty actions:
+    //
+    //            spun the wheel   median 232 lifetime actions, 67% got past 100
+    //            opened a chest   median 150,                  58%
+    //            equipped gear    median 123,                  56%
+    //            checked in       median  89,                  47%
+    //        none of the above    median  13,                  14%
+    //
+    // Correlation, not proof — somebody who was going to stay does more of everything. But the wheel is one
+    // tap with a guaranteed payout and a big animation, which is the kind of thing that MAKES a first minute
+    // rather than merely marking one, and it was the fourth thing this book asked for. A new member was sent
+    // to look at an empty character sheet, equip nothing, draw an avatar and fertilise a crop before anybody
+    // offered them the free spin sitting in their account.
+    //
+    // So: wheel, then the chest it pays, then the streak that brings them back tomorrow. Reordering is safe
+    // for everybody already in the book — a chapter completes from ACTIVITY, not from its position, so a
+    // veteran's progress does not move when the list does.
+    {
+        id: "chests", name: "Chests", minLevel: 1, tint: "#ffb020", icon: "/images/guide/ch-chests.webp",
+        blurb: "Where most of your early gear comes from.",
+        steps: [
+            { key: "chest_spin", label: "Spin the daily wheel", why: "One free spin a day, twenty wedges, a jackpot that grows every time anyone in the Den spins it. It costs nothing to take.", href: "/marketplace/spin", cta: "Spin", gold: 100, events: ["daily_spin"] },
+            { key: "chest_open", label: "Open a chest", why: "Chests drop gear, gold and the occasional pet. They come from quests, the wheel, the boss and the sea — you will never be short of them for long.", href: "/marketplace/inventory", cta: "Open one", gold: 100, events: ["open_chest"] },
+            { key: "chest_checkin", label: "Check in for the day", why: "A streak pays more the longer you hold it, and it resets if you miss a day. Thirty seconds, every day, forever.", href: "/marketplace/play", cta: "Check in", gold: 100, events: ["daily_checkin"] },
+        ],
+        reward: { gold: 200, chest: "iron" },
+    },
     {
         id: "hero", name: "Your Hero", minLevel: 1, tint: "#ffd75e", icon: "/images/guide/ch-hero.webp",
         blurb: "The character sheet everything else feeds into.",
@@ -42,16 +71,6 @@ export const GUIDE_CHAPTERS = [
             { key: "farm_harvest", label: "Bring in a harvest", why: "Harvests pay gold and ingredients. The ingredients are what the kitchen turns into buffs — that's chapter seven.", href: "/marketplace/farm", cta: "Harvest", gold: 125, events: ["harvest_crop"] },
         ],
         reward: { gold: 200, chest: "wooden" },
-    },
-    {
-        id: "chests", name: "Chests", minLevel: 2, tint: "#ffb020", icon: "/images/guide/ch-chests.webp",
-        blurb: "Where most of your early gear comes from.",
-        steps: [
-            { key: "chest_open", label: "Open a chest", why: "Chests drop gear, gold and the occasional pet. They come from quests, the wheel, the boss and the sea — you will never be short of them for long.", href: "/marketplace/inventory", cta: "Open one", gold: 100, events: ["open_chest"] },
-            { key: "chest_spin", label: "Spin the daily wheel", why: "One free spin a day, twenty wedges, a jackpot that grows every time anyone in the Den spins it. It costs nothing to take.", href: "/marketplace/spin", cta: "Spin", gold: 100, events: ["daily_spin"] },
-            { key: "chest_checkin", label: "Check in for the day", why: "A streak pays more the longer you hold it, and it resets if you miss a day. Thirty seconds, every day, forever.", href: "/marketplace/play", cta: "Check in", gold: 100, events: ["daily_checkin"] },
-        ],
-        reward: { gold: 200, chest: "iron" },
     },
     {
         id: "pets", name: "Pets", minLevel: 2, tint: "#ff9ad5", icon: "/images/guide/ch-pets.webp",

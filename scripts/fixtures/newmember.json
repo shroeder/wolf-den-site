@@ -1,0 +1,10 @@
+{
+ "/api/marketplace/guide": { "json": {
+   "signedIn": true, "level": 1,
+   "current": { "chapter": "chests", "name": "Chests", "tint": "#ffb020",
+     "icon": "/images/guide/ch-chests.webp", "index": 1, "stepIndex": 1, "stepCount": 3,
+     "step": { "key": "chest_spin", "label": "Spin the daily wheel",
+       "why": "One free spin a day, twenty wedges, a jackpot that grows every time anyone in the Den spins it. It costs nothing to take.",
+       "href": "/marketplace/spin", "cta": "Spin", "gold": 100, "done": false } },
+   "chapters": [], "totals": { "steps": 33, "doneSteps": 0 } } }
+}

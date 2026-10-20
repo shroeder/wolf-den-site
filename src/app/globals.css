@@ -24802,6 +24802,8 @@ body.cas-seated .social-fab { display: none; }
 .ph-start-art { flex: none; display: flex; }
 .ph-start-art img { display: block; object-fit: contain; }
 .ph-start-body { flex: 1; min-width: 0; }
+.ph-start-kick { display: block; font-size: 0.64rem; font-weight: 900; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #ffd75e; margin-bottom: 2px; }
 .ph-start-body b { display: block; font-size: 1rem; color: #fff; }
 .ph-start-body em { display: block; font-style: normal; font-size: 0.8rem; color: #cbc2b0; line-height: 1.35; margin-top: 3px; }
 .ph-start-go { flex: none; font-size: 1.4rem; font-weight: 900; color: #ffd75e; }

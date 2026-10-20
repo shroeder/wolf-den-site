@@ -43,7 +43,15 @@ export default function GuideStrip() {
     // no guide. Derived from the catalog, so this cannot drift.
     const onGame = isGamePath(pathname) || GUIDE_STEP_PATHS.some((h) => pathname === h || pathname.startsWith(`${h}/`));
     // The guide page shows all of this in full; a strip above it would just be the same sentence twice.
-    const show = onGame && pathname !== "/marketplace/guide";
+    // ⚠️ AND NOT ON THE HUB, WHERE THE SAME STEP IS ALREADY THE LOUDEST THING ON THE PAGE. A new member
+    // now gets "Start here · Chests · 1 of 3 — Spin the daily wheel" as a full card three inches below
+    // this strip, saying the same sentence about the same step. Two of one instruction stacked is how a
+    // page starts reading as nagging, and the card is the better of the two: it carries the WHY.
+    // Everywhere else the strip is the only prompt there is, which is what it was written for — INCLUDING
+    // the hub for a member past level 5, who gets no card and must not lose the strip with it. The level
+    // comes back in the same reply this already loads, so standing down costs nothing extra.
+    const onHub = pathname === "/marketplace/play";
+    const show = onGame && pathname !== "/marketplace/guide" && !(onHub && (g?.level ?? 99) < 5);
     const step = g?.current?.step || null;
     // DISMISSABLE. A step whose completion signal is broken traps you on it forever — the Pathfinder's last
     // step recorded zero events Den-wide for months and members sat staring at it. The signal is fixed, but a

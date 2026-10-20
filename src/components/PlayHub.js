@@ -119,6 +119,7 @@ const TILES = [
 export default function PlayHub({ name = "", avatar = null, level = null, isNew = false }) {
     const [hud, setHud] = useState(null);
     const [unlock, setUnlock] = useState(null);
+    const [next, setNext] = useState(null);     // the Pathfinder's current step, new members only
 
     useEffect(() => {
         let alive = true;
@@ -132,10 +133,29 @@ export default function PlayHub({ name = "", avatar = null, level = null, isNew 
             if (!alive) return;
             setHud(h); setUnlock(u);
         })();
+        // ── ⚠️ ONLY FOR A NEW ACCOUNT, AND ONLY ON THIS PAGE ────────────────────────────────────────
+        // /api/marketplace/guide answers thirty-odd steps out of one activity sweep. That is cheap for a
+        // page but it is NOT free, and the hub is the most-opened screen in the Den — so a veteran, who
+        // would be shown nothing anyway, never pays for it. `isNew` is decided on the server from a level
+        // the page had already read.
+        if (isNew) {
+            fetch("/api/marketplace/guide", { cache: "no-store", credentials: "same-origin" })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => {
+                    // ⚠️ `current`, NOT A SECOND SEARCH THROUGH `chapters`. The guide already computes "the
+                    // first unlocked chapter with something left in it, and the first thing left in that
+                    // chapter" — its own comment says the play page shows it. Recomputing the same thing
+                    // here is how the hub and the book end up pointing at two different steps.
+                    if (!alive || !d?.current?.step) return;
+                    setNext({ ...d.current.step, chapter: d.current.name, icon: d.current.icon,
+                        at: d.current.stepIndex, of: d.current.stepCount });
+                })
+                .catch(() => { /* the hub works without it */ });
+        }
         const onRefresh = () => { hudFeed().then((h) => alive && setHud(h)); };
         window.addEventListener("wolfden-hud-refresh", onRefresh);
         return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
-    }, []);
+    }, [isNew]);
 
     const ready = hud ? READY.map((r) => ({ ...r, n: Number(r.n(hud)) || 0 })).filter((r) => r.n > 0) : [];
     const tiles = TILES.filter((t) => !t.when || (hud && t.when(hud)));
@@ -184,15 +204,21 @@ export default function PlayHub({ name = "", avatar = null, level = null, isNew 
                 So for a new account it goes ABOVE everything, before the rail and before the grid, and it is
                 the only thing on the page styled as an instruction. It disappears on its own as they level,
                 because a veteran being told where to start is the same failure in the other direction. */}
-            {isNew ? (
-                <Link href="/marketplace/guide" className="ph-start">
+            {/* ⚠️ THE STEP ITSELF, NOT A DOOR TO WHERE THE STEP LIVES. The first version of this card said
+                "New here? Start with the Pathfinder" and linked to the book — which is one more page to
+                read before anything happens, and the whole problem being solved is that a new member does
+                not know what to DO. It names the actual next thing, says what it is for, carries its own
+                button, and goes straight there. The Pathfinder is still underneath it, keeping score. */}
+            {isNew && next ? (
+                <Link href={next.href || "/marketplace/guide"} className="ph-start">
                     <span className="ph-start-art" aria-hidden="true">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/images/guide/ch-hero.webp" alt="" width={52} height={52} />
+                        <img src={next.icon || "/images/guide/ch-chests.webp"} alt="" width={52} height={52} />
                     </span>
                     <span className="ph-start-body">
-                        <b>New here? Start with the Pathfinder.</b>
-                        <em>One thing at a time, in order, and it pays you for each one. Takes about a minute to get going.</em>
+                        <span className="ph-start-kick">Start here · {next.chapter} · {next.at} of {next.of}</span>
+                        <b>{next.label}</b>
+                        <em>{next.why}</em>
                     </span>
                     <span className="ph-start-go" aria-hidden="true">→</span>
                 </Link>
