@@ -20,6 +20,91 @@ import path from "node:path";
 import { put } from "@vercel/blob";
 import { Pool } from "@neondatabase/serverless";
 
+// ── ⚠️ NEVER PUBLISH AN APK THAT IS MISSING A CLASS IT NEEDS ────────────────────────────────────────────────
+// 2026-10-20: v1.0.709 shipped without com.google.android.gms.common.R$string and every launch died in
+// FirebaseInitProvider.onCreate -- before a single line of our own code ran, so it read as "the app crashes
+// on open" with no way in. The ledger was down for a working day.
+//
+// NOTHING WAS WRONG WITH THE SOURCE. The commit that shipped it touched prompt text, a string constant and
+// two conditionals in the add-entry path, none of which runs at startup. The APK was the problem: an
+// incremental build under android.nonTransitiveRClass=true dropped the generated per-library R classes, and
+// the broken artifact was 100MB with 11 dex files where a clean build is 111MB with 19. Gradle then
+// considered that artifact UP-TO-DATE, so rebuilding produced nothing and reinstalling the same bytes could
+// never have helped.
+//
+// Every signal that normally catches a bad build was green: it compiled, it assembled, it installed, and
+// its size looked plausible. The only place the fault is visible is inside the dex, which is exactly where
+// nobody looks. So this looks -- once, at the one moment the artifact leaves the machine.
+//
+// It verifies CLASS DEFINITIONS, not string matches. Grepping the raw dex for the class name finds the
+// failing REFERENCE and passes a broken APK, which is the first thing that fooled me while debugging this.
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { mkdtempSync, rmSync } from "node:fs";
+
+// Classes whose absence is silent at build time and fatal at launch. Keep this list short and load-bearing:
+// a gate that checks forty things is one somebody disables the first time it is wrong.
+const MUST_DEFINE = [
+    // Firebase reads its options through this during ContentProvider init, before onCreate.
+    "Lcom/google/android/gms/common/R$string;",
+    // Our own entry point. If this is missing the APK is damaged in a way nothing else would catch.
+    "Lcom/wolfdenledger/MainActivity;",
+];
+
+function dexdumpPath() {
+    const sdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT
+        || path.join(process.env.LOCALAPPDATA || "", "Android", "Sdk");
+    const dir = path.join(sdk, "build-tools");
+    if (!fs.existsSync(dir)) return null;
+    const newest = fs.readdirSync(dir).sort().pop();
+    if (!newest) return null;
+    const exe = path.join(dir, newest, process.platform === "win32" ? "dexdump.exe" : "dexdump");
+    return fs.existsSync(exe) ? exe : null;
+}
+
+/** Throw unless every MUST_DEFINE class is actually defined in one of the APK's dex files. */
+function verifyApk(apkPath) {
+    const dexdump = dexdumpPath();
+    if (!dexdump) {
+        // ⚠️ LOUD, NOT SILENT. A gate that quietly skips itself when a tool is missing is not a gate -- and
+        // the whole point of this one is that the failure it catches is invisible everywhere else.
+        throw new Error("cannot verify the APK: dexdump not found in the Android SDK build-tools. "
+            + "Install build-tools or set ANDROID_HOME. Refusing to publish unverified.");
+    }
+    const work = mkdtempSync(path.join(tmpdir(), "apkverify-"));
+    try {
+        // ⚠️ COPY TO .zip, THEN Expand-Archive. Two Windows quirks, both paid for while writing this:
+        // Expand-Archive refuses a .apk extension outright ("only .zip is supported"), and a hand-rolled
+        // ZipFile extraction loop fails PART WAY THROUGH without a non-zero exit -- it wrote one dex out of
+        // nineteen and reported success, which would have made this gate pass a broken APK for the wrong
+        // reason. Slower and boring beats clever and quietly incomplete, for a check that runs once per
+        // publish and exists precisely because silent incompleteness shipped an outage.
+        const zipCopy = path.join(work, "apk.zip");
+        fs.copyFileSync(apkPath, zipCopy);
+        execFileSync("powershell", ["-NoProfile", "-Command",
+            `Expand-Archive -LiteralPath '${zipCopy}' -DestinationPath '${work}' -Force`], { stdio: "pipe" });
+        const dexes = fs.readdirSync(work).filter((f) => /^classes\d*\.dex$/.test(f));
+        if (!dexes.length) throw new Error("no dex files in the APK at all");
+        const defined = new Set();
+        for (const dex of dexes) {
+            const out = execFileSync(dexdump, ["-f", path.join(work, dex)], {
+                encoding: "latin1", maxBuffer: 1024 * 1024 * 512,
+            });
+            for (const m of out.matchAll(/Class descriptor\s*:\s*'([^']+)'/g)) defined.add(m[1]);
+        }
+        const missing = MUST_DEFINE.filter((c) => !defined.has(c));
+        if (missing.length) {
+            throw new Error(`REFUSING TO PUBLISH -- this APK is missing ${missing.length} class(es) it needs `
+                + `at launch:\n  ${missing.join("\n  ")}\n`
+                + `${dexes.length} dex files, ${defined.size} classes defined. This is what shipped as `
+                + `v1.0.709 and took the ledger down for a day. Run: ./gradlew clean assembleFullDebug`);
+        }
+        console.log(`  verified: ${dexes.length} dex files, ${defined.size} classes, all ${MUST_DEFINE.length} required ones defined`);
+    } finally {
+        rmSync(work, { recursive: true, force: true });
+    }
+}
+
 function parseArgs(argv) {
     const args = { variant: "debug" };
     for (let i = 0; i < argv.length; i += 1) {
@@ -118,6 +203,9 @@ async function main() {
     }
 
     console.log(`Publishing ${path.basename(apkPath)}  v${versionName} (code ${versionCode}, ${(sizeBytes / 1e6).toFixed(1)} MB)`);
+    // ⚠️ THE LAST MOMENT THIS CAN BE CAUGHT. Everything upstream of here -- compile, assemble,
+    // install, file size -- was green for the APK that took the ledger down. See verifyApk.
+    verifyApk(apkPath);
 
     console.log(`Channel: ${channel}`);
 
