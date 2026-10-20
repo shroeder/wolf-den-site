@@ -1307,7 +1307,22 @@ export default function GroveScene({
                     f.bleed.left -= 1;
                     f.bleed.nextAt = now + BLEED_TICK_MS;
                     if (f.bleed.left <= 0) f.bleed = null;
-                    if (f.hp <= 0) { f.hp = 0; }
+                    // ── ⚠️ A BLEED KILL IS A KILL, AND THIS LINE USED TO JUST CLAMP IT TO ZERO ──
+                    // `if (f.hp <= 0) { f.hp = 0; }` and nothing else. The creature reached zero and then
+                    // STOOD THERE: no topple, no loot, no kill-log entry, and `bossBar` never cleared —
+                    // and because the hero only ever targets `hp > 0 && !dying`, it could not be hit
+                    // again either. An unkillable statue holding the boss bar.
+                    //
+                    // Luke, on the Crystal Stag: "i killed it but no drop no death now I cant attack."
+                    // The rare has 9,000 HP and is exactly the kind of thing you finish with a bleed
+                    // ticking, which is why it surfaced there first — but every bleed kill in the Grove
+                    // did this, on every creature, since bleed shipped.
+                    //
+                    // TWO PATHS FOR ONE OUTCOME ALWAYS DRIFT. The sword's path calls killFoe (see the hit
+                    // resolution above); this one has to be the SAME call, not a second opinion about what
+                    // dying means. `continue` because killFoe sets `dying`, and everything below here is
+                    // the behaviour of something still alive.
+                    if (f.hp <= 0) { f.hp = 0; killFoe(w, f, now); continue; }
                 }
 
                 // Passive early enemies never initiate — Luke: "the ones earlier in the game being fully
