@@ -14,6 +14,9 @@ import {
     GROVE_FOODS, HEAL_AT, emblemStars, groveZone,
     GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, groveBoss as bossById,
 } from "@/lib/marketplace/grove-catalog.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
+import { petBiteShare } from "@/lib/marketplace/grove-world.js";
 import { settleKills, rollBoss, rollGroveChest } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { groveFighter } from "@/lib/marketplace/grove-kit.js";
@@ -124,12 +127,36 @@ function bonusesFrom(emblemRows) {
  */
 async function heroLook(buyerId) {
     const row = await db.queryOne(
-        `SELECT b.avatar_sprite_url AS hero, ps.url AS pet
+        `SELECT b.avatar_sprite_url AS hero, ps.url AS pet, b.featured_collectible AS pet_id,
+                COALESCE(pl.xp, 0) AS pet_xp
            FROM mkt_buyer b
            LEFT JOIN mkt_pet_sprite ps ON ps.pet_id = b.featured_collectible
+           LEFT JOIN mkt_pet_level pl ON pl.buyer_id = b.id AND pl.pet_id = b.featured_collectible
           WHERE b.id = $1`, [buyerId],
     ).catch(() => null);
-    return { heroArt: row?.hero || null, petArt: row?.pet || null };
+    // ── ⚠️ WHO THE PET IS, NOT JUST WHAT IT LOOKS LIKE ──────────────────────────────────────────────
+    // Luke: "I want the pet that you have equipped to matter in the grove, like its level, its rarity."
+    //
+    // So the scene needs the pet's rarity and level, and the cheapest place to get them is the row that
+    // was already being read for its picture: two more columns and one more LEFT JOIN on the same query.
+    // mkt_pet_level is keyed (buyer_id, pet_id) and a pet with no row is implicitly Lv1 at 0 xp, which is
+    // what the COALESCE says. Asking separately would have been a second round trip for a number already
+    // sitting on the same row — and round trips are the meter that bills. See CLAUDE.md.
+    //
+    // THE SHARE IS COMPUTED HERE, ONCE, rather than handing the client a rarity and a level to multiply.
+    // The scene gets one number it can only use the way it was meant, the balance table stays on the
+    // server where the rest of the Grove's numbers live, and a tampered client cannot invent a rarity.
+    const pet = row?.pet_id ? collectibleById(row.pet_id) : null;
+    const petLevel = pet ? petLevelForXp(row?.pet_xp || 0, pet.rarity) : 0;
+    return {
+        heroArt: row?.hero || null,
+        petArt: row?.pet || null,
+        // No pet equipped is a share of ZERO, which is the one case petBiteShare is never asked about: it
+        // fails rarity UPWARD by design, so handing it a null rarity would arm an empty collar with a
+        // primordial bite.
+        petBite: pet ? petBiteShare(pet.rarity, petLevel) : 0,
+        petLevel,
+    };
 }
 
 /** The whole screen: where you are, what you carry, what you have seen, what you can make. */

@@ -449,6 +449,29 @@ export const GROVE_CSS = `
     -webkit-mask-image: radial-gradient(closest-side, transparent 76%, #000 82%, #000 96%, transparent 99%);
     mask-image: radial-gradient(closest-side, transparent 76%, #000 82%, #000 96%, transparent 99%); }
 
+/* ── THE PET'S CLAW MARK ──────────────────────────────────────────────────────────────────────
+   The pet's answer to .gv-swipe, and deliberately a different SHAPE rather than a smaller crescent.
+
+   Luke: "it has to be differentiated from the character that's attacking, because otherwise it might just
+   get too noisy and confusing."
+
+   The hero cuts one long arc with a hard leading edge. This is three short parallel rakes, slanted across
+   the direction of travel, in the pet's cool green rather than the hero's hot cream -- so the two marks
+   differ in count, in angle and in colour, and any one of those three is enough to tell them apart at a
+   glance in the middle of a fight. Visible for the 85ms of the leap and nothing else.
+
+   The lines are children rather than a repeating-linear-gradient because they are different LENGTHS: a
+   rake where the middle claw reaches furthest reads as a paw, and three identical bars read as a UI
+   element. */
+.gv-claw { position: absolute; left: 52%; top: 24%; width: 52%; height: 54%; opacity: 0;
+    pointer-events: none; transform: rotate(-16deg); }
+.gv-claw i { position: absolute; left: 0; width: 100%; height: 9%; border-radius: 50%;
+    background: linear-gradient(90deg, rgba(190,255,170,0) 0%, rgba(214,255,190,0.95) 55%, rgba(255,255,255,0.9) 78%, rgba(255,255,255,0) 100%);
+    filter: drop-shadow(0 0 3px rgba(150,240,130,0.8)); }
+.gv-claw i:nth-child(1) { top: 8%; width: 82%; }
+.gv-claw i:nth-child(2) { top: 44%; width: 100%; }
+.gv-claw i:nth-child(3) { top: 80%; width: 74%; }
+
 /* A rare spawn and a boss are lit so you can pick them out. The glow is per-layer on the sprite rather
    than an overlay across the scene — a tint over the whole frame flattens every pixel to one colour.
    See no-overlay-for-lighting. */
@@ -836,6 +859,17 @@ export const GROVE_CSS = `
 /* The loudest a hit gets without being a crit: a hit worth a seventh of the target. Same colour family as
    an ordinary hit, so the ladder still reads as one scale rather than as a third kind of event. */
 .gv-num.is-big { color: #fff3c4; text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,205,110,0.7); }
+/* ── ⚠️ THE PET'S NUMBER IS COOL AND SMALL, AND BOTH ARE LOAD-BEARING ─────────────────────────
+   Warm is what the player's own damage looks like in this game -- cream for a hit, gold for a crit, pale
+   gold for a big one. The pet's bite is the same KIND of event from a different body, so it has to be
+   legible as damage while never competing with the number the player is actually reading.
+
+   Cool green does that in one move, and it is the pet's existing colour: .gv-pet's fallback gradient is
+   green and the claw mark above is green, so a green number is the third thing saying the same thing
+   rather than a fourth colour to learn. 0.78 keeps it clearly subordinate -- the pet bites for about a
+   third of your blow, and a number the same size as yours would claim parity it does not have. */
+.gv-num.is-pet { color: #aef09a; --gv-nb: 0.78; font-weight: 800;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.9), 0 0 12px rgba(120,230,110,0.5); }
 .gv-num.is-took { color: #ff6b6b; --gv-nb: 1.08; }
 .gv-num.is-heal { color: #7cffb2; }
 .gv-num.is-loot { color: #cdf5bd; --gv-nb: 0.74; font-weight: 700; -webkit-text-stroke: 0.07em rgba(12,10,8,0.9); }
@@ -903,6 +937,11 @@ export const GROVE_CSS = `
     border-radius: 50%; pointer-events: none; will-change: transform, opacity;
     background: #fff6cf; box-shadow: 0 0 6px 2px rgba(255,220,130,0.8); }
 .gv-spark.is-crit { background: #fff; box-shadow: 0 0 9px 3px rgba(255,170,60,0.95); }
+/* The pet's bite throws its own colour, and fewer of them (PET_SPARKS). Smaller too: the spark is the
+   thing that says a blow CONNECTED, and the pet's connects for less. */
+.gv-spark.is-pet { width: calc(0.34 * var(--gv-unit, 1%)); height: calc(0.34 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.17 * var(--gv-unit, 1%)) calc(-0.17 * var(--gv-unit, 1%));
+    background: #ddffcc; box-shadow: 0 0 5px 2px rgba(150,240,120,0.75); }
 /* Dust is bigger, slower and has no light of its own — it is displaced earth, not energy. */
 .gv-spark.is-dust { width: calc(1.1 * var(--gv-unit, 1%)); height: calc(1.1 * var(--gv-unit, 1%));
     margin: 0 0 calc(-0.55 * var(--gv-unit, 1%)) calc(-0.55 * var(--gv-unit, 1%));

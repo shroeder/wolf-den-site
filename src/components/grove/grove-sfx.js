@@ -248,6 +248,32 @@ export function playPickup(rare = false) {
     } catch { /* ignore */ }
 }
 
+/**
+ * The pet's bite. Deliberately NOT playHit at a lower volume.
+ *
+ * ⚠️ A DIFFERENT TIMBRE, NOT A QUIETER COPY. The hero's hit is a low filtered thud with a semitone ladder
+ * climbing through the combo; the same sample at half volume underneath it does not read as a second
+ * attacker, it reads as the first one's sound being inconsistent — and at half a second apart the ear
+ * reliably hears a quiet copy of a loud thing as an echo or a fault.
+ *
+ * So this is short, dry and HIGH, with a tiny bit of noise in it: a snap rather than an impact. It sits in
+ * a band the hero's blows do not occupy, which is what lets both be audible at once without either having
+ * to get out of the way.
+ *
+ * ⚠️ AND IT TAKES NO COMBO STEP. The ladder is the player's streak — it is the sound of THEIR run going
+ * well, and a companion walking up the same scale on its own schedule turns a rising line into noise.
+ */
+export function playPetHit(crit = false) {
+    const a = audio();
+    if (!a) return;
+    try {
+        thud(a, { freq: crit ? 1480 : 1180, dur: 0.045, peak: crit ? 0.15 : 0.1, q: 2.2, type: "highpass" });
+        // One short high note on a crit, a fifth above the snap — the pet's equivalent of the hero's glint,
+        // and the only thing that separates its crit from its ordinary bite by ear.
+        if (crit) note(a, 1760, 0.015, 0.05, 0.055, "triangle");
+    } catch { /* silence must never break a fight */ }
+}
+
 /** A telegraph resolving on empty ground — the sound of having got out of the way, which deserves one. */
 export function playWhiff() {
     const a = audio();

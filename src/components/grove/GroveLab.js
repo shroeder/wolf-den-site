@@ -161,6 +161,12 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
                 stats={stats}
                 heroArt={HERO}
                 petArt={PET}
+                // ⚠️ A REAL SHARE, OR THE PET SCENE FILMS A COMPANION STANDING THERE. petBite is 0 for a
+                // member with no pet equipped and the resolver reads 0 as "do not bite", so a lab that
+                // left it at its default would have photographed exactly the behaviour this change
+                // replaced. 0.39 is a maxed eternal -- the top of the table, because the scene exists to
+                // judge the loudest the pet ever gets, which is where "too noisy" would show up.
+                petBite={scene === "pet" ? 0.39 : 0.13}
                 belt={LAB_BELT}
                 labScene={scene}
                 // Locked while the boss stands, open once it falls — the one thing this change is about.

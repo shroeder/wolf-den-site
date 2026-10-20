@@ -334,6 +334,109 @@ export const BLEED_SHARE = 0.18;
 /** How often a wound ticks, and for how long. Short enough to read as bleeding, long enough to matter. */
 export const BLEED_TICK_MS = 700;
 export const BLEED_TICKS = 5;
+// ── THE PET FIGHTS ───────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "I want the pet that you have equipped to matter in the grove, like its level, its rarity. I want it
+// to attack, and I want it to do like the associated kind of damage that reflects its rarity and level."
+//
+// ⚠️ A SHARE OF YOUR OWN BLOW, NOT A NUMBER OF ITS OWN. This is the whole design decision and everything
+// else follows from it.
+//
+// A pet with its own damage figure has to be balanced against the hero's, and the hero's spans three orders
+// of magnitude: an account opened this morning swings for single digits and a best-in-slot veteran with a
+// full badge set swings for thousands (see grove-kit.js). Any flat number is therefore wrong twice — it is
+// the entire fight at zone one and it is a rounding error at zone twelve. Pick a number that matters to the
+// veteran and the pet solos the early game; pick one that is polite there and the pet is cosmetic again by
+// the time anybody has a rare one, which is the exact complaint this is answering.
+//
+// A share cannot drift out of relevance. It rides every stat the member has ever invested in, for free and
+// for ever, because it is a share OF that investment — which is also what the game already says a pet is:
+// "a pet is an extension of you, not a creature with its own sheet" (arena.js). The Grove's reading of that
+// line is that your companion hits for a fraction of what you hit for.
+//
+// ⚠️ AND IT GOES THROUGH swing(), THE HERO'S OWN FUNCTION. Crit chance, crit damage, the crit STACKS a
+// 150%-crit build earns, dmgPct and armour mitigation all apply to the pet's blow exactly as they do to
+// yours, because it is the same arithmetic with a smaller damage figure fed in. A second damage formula here
+// would be a second thing to update every time the first one moves. See [[reuse-the-rule-never-restate-it]].
+
+// -- WHAT A RARITY IS WORTH ----------------------------------------------------------------------------------
+// The share of one of your swings that a Lv1 pet of each rarity bites for. Rarity is the coarse lever and
+// level is the fine one, so the two together span 5% (a common you were given) to 39% (an eternal you have
+// spent three months growing) of your own damage.
+//
+// ⚠️ IT COVERS ALL NINE TIERS, INCLUDING THE TWO NO PET HAS YET. Four pets in the game are eternal and none
+// is celestial or primordial — but the Den has minted those tiers elsewhere, and a rarity table that stops
+// at the highest rarity currently in use is the single most repeated bug in this repo: fifty-nine lookups
+// never grew past `eternal` and quietly fell back DOWNWARD, which forged celestial gear at a 625th of its
+// price. See [[rarity-tables-stop-at-eternal]], [[ladder-lookups-must-fail-upward]].
+export const PET_BITE_BY_RARITY = {
+    common: 0.05, rare: 0.065, epic: 0.085, legendary: 0.105, mythic: 0.13,
+    ascendant: 0.155, eternal: 0.185, celestial: 0.22, primordial: 0.26,
+};
+// The order the tiers climb in, so an unknown rarity can fail UPWARD to the top of the ladder rather than
+// collapsing to `common`. A pet whose rarity this file has never heard of is far likelier to be a tier added
+// above eternal than a new kind of common.
+const PET_BITE_TIERS = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal", "celestial", "primordial"];
+
+// -- WHAT A LEVEL IS WORTH -----------------------------------------------------------------------------------
+// Lv1 to Lv6 roughly doubles the bite (x2.1 at the top). Deliberately NOT petActiveLevelMult, which is the
+// equipped pet's ACTIVE curve and runs to x3.5: multiplied into a share that is already rarity-scaled, x3.5
+// would put a maxed eternal pet at 65% of your swing, which is a second hero rather than a companion.
+//
+// The ceiling is the design: at the very top the pet is a bit over a third of one of your blows, landing at
+// about half your rate, so it is worth having, worth levelling, and never the thing killing the creature.
+export const PET_BITE_PER_LEVEL = 0.22;
+export const PET_BITE_MAX_LEVEL = 6;
+
+/** The share of one hero swing this pet bites for. Rarity sets the floor, level multiplies it. */
+export function petBiteShare(rarity, level = 1) {
+    const known = String(rarity || "").toLowerCase();
+    // Unknown rarity fails UPWARD: an unrecognised tier is treated as the top of the ladder, never as the
+    // bottom of it. A missing pet is the one case that is genuinely nothing, and the caller handles that by
+    // not calling this at all.
+    const base = PET_BITE_BY_RARITY[known] ?? PET_BITE_BY_RARITY.primordial;
+    const lv = Math.max(1, Math.min(PET_BITE_MAX_LEVEL, Math.round(Number(level) || 1)));
+    return base * (1 + (lv - 1) * PET_BITE_PER_LEVEL);
+}
+
+// -- HOW OFTEN -----------------------------------------------------------------------------------------------
+// ⚠️ ONE LEVER, AND IT IS THE DAMAGE. Cadence is deliberately NOT a second thing rarity and level move: two
+// levers on one axis multiply, so a maxed pet would have been 2.1x the damage at 2.1x the rate and the
+// "share of your swing" ceiling above would have been a lie by a factor of four.
+//
+// It tracks the hero's attack speed instead, because a pet that keeps its own fixed rhythm while a tempo-4
+// build swings every 102ms stops reading as joining in — it becomes an unrelated thing happening nearby.
+// Halved relative to yours, so you are always visibly the one doing the work.
+export const PET_BITE_EVERY = 2;
+// ⚠️ AND A FLOOR, WHICH IS THE ANSWER TO "it might just get too noisy and confusing". At tempo 4 the hero
+// swings every 102ms; half of that is a bite every 51ms, which is not an attack, it is a strobe with damage
+// numbers coming out of it. The floor caps the pet at about three bites a second however fast you get, and
+// the damage it does not deal below the floor is deliberately dropped rather than banked.
+export const PET_BITE_MIN_MS = 300;
+
+/** How long between bites, given the hero's current swing cooldown. */
+export const petBiteCd = (heroCdMs) => Math.max(PET_BITE_MIN_MS, (Number(heroCdMs) || 0) * PET_BITE_EVERY);
+
+/**
+ * The pet's blow: the hero's own swing, at a share of the damage.
+ *
+ * ⚠️ LIFESTEAL AND BLEED ARE STRIPPED, AND BOTH FOR THE SAME REASON — they are the hero's weapon drinking
+ * and the hero's blade cutting, and a second body applying them is one investment paying twice. Bleed also
+ * REFRESHES rather than stacks (see the wound note in GroveScene), so a pet re-applying a weaker wound on
+ * top of the hero's stronger one would actively fight the player's own build.
+ *
+ * Crit is kept, and kept in full: a member who built to crit sees their pet crit, which is the point of
+ * every stat mattering.
+ */
+export function petBite(f, share, targetArmour, rand) {
+    const s = Math.max(0, Number(share) || 0);
+    if (!s) return { dealt: 0, crit: false, stacks: 0, healed: 0, bleed: null };
+    const blow = swing({ ...f, damage: (Number(f?.damage) || 0) * s, lifesteal: 0, bleedChance: 0 },
+        targetArmour, rand);
+    // A bite always lands for at least 1 if it landed at all, the same floor a bleed tick has: a pet whose
+    // share rounds to zero against a heavily-armoured boss reads as broken, not as weak.
+    return { ...blow, dealt: Math.max(1, blow.dealt), healed: 0, bleed: null };
+}
+
 
 // ── TELEGRAPHS ───────────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "He is unique had different attack animations that telecast where they will damage" and enemies

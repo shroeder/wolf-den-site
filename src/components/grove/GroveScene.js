@@ -10,7 +10,7 @@ import {
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
 import {
     UNITS_PER_SCREEN, zoneWidth, platformsFor, decorateLedges, swing, makeTelegraph, telegraphHits, mitigate,
-    BLEED_TICK_MS, BLEED_TICKS,
+    BLEED_TICK_MS, BLEED_TICKS, petBite, petBiteCd,
 } from "@/lib/marketplace/grove-world.js";
 // Pure files, both of them — no DB and no server-only, which is why a client scene may read them. The
 // alternative was a second haste curve that drifts from the ring's the first time either is touched.
@@ -43,10 +43,12 @@ import {
     deathKit, DEATH_SINK, DEATH_OPAQUE_UNTIL, DEATH_IMPACT, HERO_DEATH, DEATH_VEIL_DELAY_MS,
     SPARK, DUST, VIGNETTE, COMBO_WINDOW_MS, COMBO_PITCH_STEPS, LOOT_BOUNCE, LOOT_REST_MS,
     LOOT_LABEL_MS, LOOT_DRAW_ACCEL, LOOT_DRAW_MAX, LOOT_EAT_DIST,
+    pouncePose, POUNCE, PET_TRAUMA_SHARE, PET_KNOCK_SHARE, PET_SPARKS,
 } from "@/lib/marketplace/grove-juice.js";
 import { footOf } from "@/components/grove/grove-foot.js";
 import {
     playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice, playDeath,
+    playPetHit,
 } from "@/components/grove/grove-sfx.js";
 // ── ⚠️ THE GEOMETRY LIVES IN ITS OWN FILE SO IT CAN BE CHECKED ─────────────────────────────────────
 // Every distance that is really a SHARE OF THE FRAME is in grove-view.js, with the long version of why. The
@@ -141,6 +143,30 @@ const reachTo = (foe) => ATTACK_RANGE + (Number(foe?.halfW) || 0);
 // close you have to come before it commits to you.
 const LOOT_DRAW_RANGE = 6;
 
+// ── THE PET'S OWN NUMBERS ────────────────────────────────────────────────────────────────────────────────
+// How close the pet gets before it bites. Shorter than the hero's 4.5, because a pet has no weapon: the
+// whole read of a pounce is that the animal arrives at the thing and bites it, and a companion snapping at
+// air from a sword's length away looks like it missed on every single hit.
+const PET_REACH = 2.6;
+// ⚠️ HOW LONG THE PET KEEPS FIGHTING AFTER YOUR LAST SWING. Must be longer than one hero swing at the
+// SLOWEST tempo (410ms at tempo 1) or the pet downs tools between your blows and never crosses the gap;
+// short enough that tapping away stops it inside a second, because "I walked off and my pet was still
+// over there fighting" is the complaint this number exists to prevent. Also what makes a kill end the
+// pet's involvement cleanly: the window lapses, there is nothing left to renew it.
+const PET_ENGAGE_MS = 900;
+// How far the pet will range to collect a drop. Generous on purpose — a fetcher that only picks up what
+// you were nearly standing on anyway has not saved you a single step, which is the entire feature.
+// How close to its flanking spot counts as arrived. Loose enough that the pet is not nudging itself into
+// position for ever against a creature that wanders, tight enough that it actually crosses over.
+const PET_FLANK_SLACK = 1.6;
+const PET_FETCH_RANGE = 26;
+// And how close it has to get before the drop commits to it. Wider than the hero's LOOT_EAT_DIST because
+// the pet is 4.5 units tall against his 7 and reaching rather than walking over the top of it.
+const PET_FETCH_REACH = 3.2;
+// What the fetch bench puts on the floor. A zone-one part, so its sprite certainly exists; named here
+// rather than inline so the one place it is typed is the one place it can be wrong.
+const LAB_FETCH_PART = "grub_fat";
+
 // ── THE DOORS ────────────────────────────────────────────────────────────────────────────────────────────
 // How far in from the wall a door stands. Far enough that the hero can get fully past it and turn round —
 // flush against the wall he would be standing inside it with nowhere to step back to.
@@ -193,6 +219,13 @@ const PET_LOST = 30;
 
 export default function GroveScene({
     zone, seed, bonuses, stats, heroArt, petArt, belt, labScene,
+    // ⚠️ ONE NUMBER, ALREADY MULTIPLIED OUT, AND NOT THE RARITY AND LEVEL IT CAME FROM. The share of a
+    // hero swing this member's companion bites for, computed on the server in heroLook (grove.js) off the
+    // equipped pet's rarity and its pet-XP level. Handing the scene the two inputs instead would have put
+    // the balance table in the client, where a tampered one could claim to be primordial — and would have
+    // meant two places that know how rarity becomes damage. 0 means no pet equipped, and the resolver
+    // reads that as "do not bite", not as "bite for nothing".
+    petBite: petShare = 0,
     onSettle, onBoss, onLeave, onDeath, onTravel, onPanel, paused = false, unlockedN = 1,
 }) {
     const hostRef = useRef(null);
@@ -356,6 +389,19 @@ export default function GroveScene({
             rand,
             hero: mk(12, HERO_UNITS, 1 + (stats?.moveSpeed || 0) / 100, heroArt),
             pet: mk(6, PET_UNITS, 0.95, petArt),
+            // ── THE PET'S FIGHT ─────────────────────────────────────────────────────────────────
+            // What it is biting, until when, and where it is in its pounce. petDone starts TRUE: the
+            // resolver below reads "a pounce is in flight" as !petDone, so starting false would resolve
+            // a phantom bite against a null foe on frame one.
+            petFoe: null,
+            // Which side of the target it takes. Set when the target changes; see the engage block.
+            petSide: 1,
+            petEngagedUntil: 0,
+            petBiting: null,
+            petAt: null,
+            petDone: true,
+            // The one drop it has committed to collecting, so it does not dither between two piles.
+            petFetch: null,
             // Replaced by the real figure at the end of the first camera pass; this is only what the pet
             // follow reads on frame one, before anything has been measured.
             visibleUnits: UNITS_PER_SCREEN,
@@ -671,7 +717,7 @@ export default function GroveScene({
         };
 
         // The visible sprite: facing, breath, landing squash, swing pose, and the measured foot nudge.
-        const pose = (b, nowMs, unit, { sx = 1, sy = 1, moving = false } = {}) => {
+        const pose = (b, nowMs, unit, { sx = 1, sy = 1, dy = 0, moving = false } = {}) => {
             if (b.art0) {
                 const br = breathe(b.phase, nowMs, moving);
                 const sq = landSquash(nowMs - (b.landedAt || 0), 1);
@@ -684,7 +730,11 @@ export default function GroveScene({
                 // look pasted on" actually was. The working theory before measuring was object-fit
                 // centring a landscape sprite in a square box; the sprites are square and that would have
                 // fixed nothing.
-                const down = (b.foot || 0) * 100;
+                // ⚠️ dy IS IN WORLD UNITS AND EVERYTHING ELSE HERE IS A PERCENTAGE OF THE BODY. The
+                // pounce leaves the ground, and the only body that passes a dy is the pet; converting
+                // through the body's own height keeps it the same leap at every zoom level, which a
+                // percentage typed in by eye would not be. See [[view-space-constants-break-on-zoom]].
+                const down = (b.foot || 0) * 100 - (dy / (b.h || 1)) * 100;
                 b.art0.style.transform = `translateY(${down}%) scale(${fx}, ${fy}) scaleX(${b.face || 1})`;
             }
             if (b.flashNode) b.flashNode.style.opacity = String(b.flash || 0);
@@ -1135,6 +1185,29 @@ export default function GroveScene({
                     w.swingAt = now;
                     w.swingFoe = tgt;
                     w.swingDone = false;
+                    // ── ⚠️ THIS IS THE WHOLE "ONLY IF YOU ATTACK" RULE, AND IT LIVES HERE ──────────
+                    // Luke: "I think the pet should only attack if you attack, and it should attack your
+                    // target."
+                    //
+                    // Both halves are one line each because both are read off the hero's own commitment
+                    // to a swing rather than inferred. A pet that picks its own fights turns every walk
+                    // across a zone into a brawl with the thirty wandering creatures the player was
+                    // deliberately not engaging — and in a zone where a rare spawn and a boss are the
+                    // things you choose your moment with, a companion that starts fights is actively
+                    // hostile to the player.
+                    //
+                    // ⚠️ A WINDOW, NOT A FLAG. Tied to "the hero has a target" the pet would keep
+                    // biting while he walked away from a fight he had disengaged from; tied to the
+                    // single swing it would stop dead in the gap between swings and never reach
+                    // anything. The window is longer than one hero swing and shorter than a walk, so it
+                    // renews as long as you keep swinging and lapses on its own when you tap away.
+                    // ⚠️ THE SIDE IS PICKED ONCE PER TARGET, NOT EVERY FRAME. Recomputed from the
+                    // hero's current position it flips the instant he steps past the creature's centre,
+                    // and the pet turns round and re-crosses — which at a jittering stand-off distance
+                    // is a companion running back and forth through a rootrat for ever.
+                    if (w.petFoe !== tgt) w.petSide = Math.sign(tgt.x - w.hero.x) || 1;
+                    w.petFoe = tgt;
+                    w.petEngagedUntil = now + PET_ENGAGE_MS;
                 }
             } else if (w.moveTo) {
                 const nav = navigate(plats, w.hero, w.moveTo.x, w.moveTo.y);
@@ -1246,11 +1319,171 @@ export default function GroveScene({
             // 100-unit frame and THIRTY-FIVE PERCENT of a 26-unit one, which parked the pet on the left
             // bezel and then off it entirely. See grove-view.js.
             const pf = petFollow(w.visibleUnits || UNITS_PER_SCREEN);
-            const petWant = w.hero.x - w.hero.face * pf.trail;
-            if (Math.abs(petWant - w.pet.x) > pf.slack || Math.abs(w.hero.y - w.pet.y) > 4) {
-                const nav = navigate(plats, w.pet, petWant, w.hero.y);
-                drive(w.pet, nav.dir);
-                if (nav.hop) hop(w.pet, HOP);
+
+            // ── ⚠️ THREE JOBS, IN A FIXED ORDER, AND THE ORDER IS THE DESIGN ────────────────────
+            // Luke: "the pet should only attack if you attack, and it should attack your target", and
+            // separately "the pet should be able to set it to pick up items for you. Actually, it should
+            // do that automatically."
+            //
+            // FIGHT beats FETCH beats FOLLOW, and fighting winning is what makes the pickup safe to make
+            // automatic. The alternative — nearest job wins — means a drop landing mid-boss walks your
+            // damage out of the fight to go shopping, which is the kind of "help" a player would want a
+            // toggle to switch off. Loot never expires (a drop rests in w.drops until something collects
+            // it), so deferring the sweep until the fight is over costs nothing at all: the pet tidies the
+            // floor on the walk to the next thing. That is why there is no setting. The priority IS the
+            // setting, and it is the one a player would have picked.
+            const petTgt = w.petFoe && w.petFoe.hp > 0 && !w.petFoe.dying ? w.petFoe : null;
+            const petting = now < (w.petEngagedUntil || 0) && petTgt;
+            if (petting) {
+                // ── FIGHT ──────────────────────────────────────────────────────────────────────
+                // ⚠️ IT FLANKS, and that is a readability fix rather than a flourish. Standing on the
+                // hero's side it pounces through the same six units of screen he is already swinging
+                // through, so two bodies, two sets of sparks and two numbers all land in one place —
+                // which is the "too noisy" failure in its purest form. On the far side of the target the
+                // fight has two legible halves, and the pet stops painting over the hero's sword arm.
+                const far = petTgt.x + w.petSide * (PET_REACH + petTgt.halfW);
+                // ...unless the far side is off the end of the zone, in which case it takes the near one.
+                // A pet shoved against the wall by the solver reads as stuck, and at the zone edges —
+                // where the boss stands — that would be most of the fight that matters.
+                const flank = far > 4 && far < bounds[1] - 4
+                    ? far
+                    : petTgt.x - w.petSide * (PET_REACH + petTgt.halfW);
+                // ⚠️ IT WALKS TO THE FLANK EVEN WHEN IT IS ALREADY IN RANGE, AND THAT IS THE WHOLE POINT.
+                // Gated on being out of bite range instead, the pet stops the moment it can reach — which
+                // on a probe put hero at 50, pet at 52 and the creature at 54, the pet sandwiched between
+                // the two of them with both sets of sparks landing in the same two units of screen. That
+                // is the "too noisy and confusing" failure exactly, and it passed every other check: it
+                // bit, it did the right damage, and it looked fine in a still.
+                //
+                // So reaching the SPOT and being able to BITE are two different tests now. It crosses,
+                // then it settles, and the fight has two legible halves.
+                const atFlank = Math.abs(w.pet.x - flank) < PET_FLANK_SLACK;
+                const inBite = Math.abs(petTgt.x - w.pet.x) <= PET_REACH + petTgt.halfW
+                    && Math.abs(petTgt.y - w.pet.y) <= SWING_V_REACH;
+                if (!atFlank) {
+                    const nav = navigate(plats, w.pet, flank, petTgt.y);
+                    drive(w.pet, nav.dir);
+                    if (nav.hop) hop(w.pet, HOP);
+                }
+                // Facing is always at the creature, including while crossing to the far side of it — a
+                // pet that turns its back on the thing it is biting is the one pose that cannot be right.
+                if (w.petDone) w.pet.face = Math.sign(petTgt.x - w.pet.x) || w.pet.face;
+                // ⚠️ THE CADENCE IS HALF THE HERO'S, FLOORED — see petBiteCd. It reads the SAME
+                // swingRate() the hero's cooldown does, so a tempo build speeds its companion up too
+                // rather than leaving the pet plodding along beside a blur.
+                const petCd = petBiteCd(SWING_TOTAL_MS / swingRate());
+                if (inBite && w.petDone && now - (w.petAt || -1e9) > petCd) {
+                    w.petAt = now;
+                    w.petBiting = petTgt;
+                    w.petDone = false;
+                }
+            } else if (w.petFetch && (w.petFetch.state !== "rest" || !w.drops.includes(w.petFetch))) {
+                // The drop it was going for was collected by the hero on his way past, or the zone was
+                // rebuilt under it. Drop the errand rather than walking to where it used to be.
+                w.petFetch = null;
+            } else {
+                // ── FETCH ──────────────────────────────────────────────────────────────────────
+                // Nothing to fight: the pet goes and gets the floor. It commits to ONE drop at a time and
+                // keeps it until it is collected — re-picking the nearest every frame makes it dither
+                // between two equidistant piles for ever, which films as a pet having a seizure.
+                if (!w.petFetch) {
+                    let best = null;
+                    let bestD = PET_FETCH_RANGE;
+                    for (const d of w.drops) {
+                        if (d.state !== "rest") continue;
+                        // Not the ones the hero is about to walk over himself. Letting the pet race him
+                        // for a drop two units from his feet steals the one bit of collecting that is
+                        // supposed to feel like the player did it.
+                        if (Math.hypot(d.x - w.hero.x, d.y - w.hero.y) < LOOT_DRAW_RANGE) continue;
+                        const dist = Math.hypot(d.x - w.pet.x, (d.y - w.pet.y) * 0.8);
+                        if (dist < bestD) { bestD = dist; best = d; }
+                    }
+                    w.petFetch = best;
+                }
+                if (w.petFetch) {
+                    const d = w.petFetch;
+                    const nav = navigate(plats, w.pet, d.x, d.y);
+                    drive(w.pet, nav.dir);
+                    if (nav.hop) hop(w.pet, HOP);
+                    // Close enough: the drop commits to the PET and is drawn in by the same magnet that
+                    // serves the hero. See the loot block for why that matters.
+                    if (Math.hypot(d.x - w.pet.x, (d.y - w.pet.y) * 0.8) < PET_FETCH_REACH) {
+                        d.state = "draw";
+                        d.dv = 0;
+                        d.to = "pet";
+                        w.petFetch = null;
+                    }
+                } else {
+                    // ── FOLLOW ─────────────────────────────────────────────────────────────────
+                    const petWant = w.hero.x - w.hero.face * pf.trail;
+                    if (Math.abs(petWant - w.pet.x) > pf.slack || Math.abs(w.hero.y - w.pet.y) > 4) {
+                        const nav = navigate(plats, w.pet, petWant, w.hero.y);
+                        drive(w.pet, nav.dir);
+                        if (nav.hop) hop(w.pet, HOP);
+                    }
+                }
+            }
+
+            // ── ⚠️ THE BITE LANDS ON THE LEAP, NOT WHEN THE POUNCE STARTS ───────────────────────
+            // The same rule as the hero's strike and for the same reason: the coil is anticipation, and
+            // damage resolved on frame one with an animation played afterwards is a hit being mimed.
+            if (!w.petDone && w.petAt != null && now - w.petAt >= POUNCE.coilMs) {
+                w.petDone = true;
+                const foe = w.petBiting;
+                w.petBiting = null;
+                const still = foe && foe.hp > 0 && !foe.dying
+                    && Math.abs(foe.x - w.pet.x) <= PET_REACH + foe.halfW + 2
+                    && Math.abs(foe.y - w.pet.y) <= SWING_V_REACH;
+                // ⚠️ NO WHIFF SOUND ON A MISSED BITE. The hero's whiff is the sound of HAVING DODGED
+                // something; a companion's missed lunge is a non-event, and a second whiff layered over
+                // the hero's own swings is the kind of noise that has no information in it.
+                if (still && petShare > 0) {
+                    const bite = petBite(stats, petShare, 0, w.rand);
+                    foe.hp -= bite.dealt;
+                    foe.hit = true;
+                    // ⚠️ DELIBERATELY NOT foe.lastCrit. That field is read by killFoe to decide how big
+                    // the death is, and a pet crit landing the killing blow would give the hero's kill
+                    // the pet's reason — the body is thrown and the screen shaken on the strength of
+                    // something the player did not do.
+                    foe.hurtAt = now;
+                    foe.flash = 1;
+                    foe.flashUntil = now + FLASH_MS;
+                    const dir = Math.sign(foe.x - w.pet.x) || 1;
+                    const mass = Math.max(0.35, Math.min(1.6, HERO_UNITS / foe.h));
+                    // A twitch, not a throw: the pet's knockback is a fraction of the hero's so the
+                    // target stays roughly where the player put it. See PET_KNOCK_SHARE.
+                    impulse(foe, dir * KNOCK.hit * mass * PET_KNOCK_SHARE, KNOCK.up * mass * PET_KNOCK_SHARE);
+                    // ⚠️ NO clock.stop(). Hit-stop freezes the simulation, and a second body freezing it
+                    // on its own schedule is a stutter rather than impact. The hero owns time here —
+                    // see the note over PET_TRAUMA_SHARE in grove-juice.js.
+                    if (bite.crit) w.shake.add(TRAUMA.hit * PET_TRAUMA_SHARE);
+                    const px = foe.x - dir * foe.halfW * 0.6;
+                    // ⚠️ LOW ON THE BODY, AND THE SEPARATION IS VERTICAL ON PURPOSE. The hero's number
+                    // spawns at half the creature's height; the pet attacks from the other side, so the
+                    // two were relying on HORIZONTAL distance to stay apart — about 1.2 half-widths. On a
+                    // 17-unit phone frame that is a couple of units, and the two numbers overlapped into
+                    // something unreadable. A share of the creature's own height separates them at every
+                    // zoom and on every size of creature, which a horizontal gap cannot do. See
+                    // [[view-space-constants-break-on-zoom]].
+                    //
+                    // It is also simply where a companion bites: at the legs.
+                    const py = foe.y + foe.h * 0.12;
+                    burst(px, py, { dir: -dir, kind: "pet", scale: PET_SPARKS });
+                    // ⚠️ AND NO CRIT RING, even on a crit. The ring is the only thing on screen an
+                    // ordinary hit never does, which is exactly what makes it readable; handing it to a
+                    // second body is how that signal stops being one.
+                    addPop("pet", `${bite.dealt}${bite.crit ? "!" : ""}`, px, py,
+                        popWeight(bite.dealt, foe.maxHp));
+                    playPetHit(bite.crit);
+                    if (foe.big || foe.rare) w.bossBar = { hp: Math.max(0, foe.hp), maxHp: foe.maxHp };
+                    if (foe.isBoss || foe.big || foe.rare) w.bossHurtAt = now;
+                    // ⚠️ AND IT CAN LAND THE KILL, THROUGH THE HERO'S OWN killFoe. A pet whose bite
+                    // cannot finish a creature would leave rats standing at 1hp waiting for the player,
+                    // and the loot, the kill log and the zone's banked count all hang off this one
+                    // function. Two paths for one payout always drift — see
+                    // [[atomic-split-into-steps-drops-lines]].
+                    if (foe.hp <= 0) killFoe(w, foe, now);
+                }
             }
             // ⚠️ AND IT GETS RESCUED. A follower with real physics WILL eventually be left behind — stuck
             // under a ledge it mistimed, or on the wrong side of the zone after the hero climbed. Every game
@@ -1485,13 +1718,26 @@ export default function GroveScene({
                 } else if (d.state === "rest") {
                     integrate(d, plats, dt, { clampX: bounds });
                     const dist = Math.hypot(d.x - w.hero.x, (d.y - w.hero.y) * 0.8);
-                    if (now - d.restAt > LOOT_REST_MS && dist < LOOT_DRAW_RANGE) { d.state = "draw"; d.dv = 0; }
+                    if (now - d.restAt > LOOT_REST_MS && dist < LOOT_DRAW_RANGE) {
+                        d.state = "draw"; d.dv = 0; d.to = "hero";
+                        // The hero walking over a drop outranks the errand: if the pet was on its way,
+                        // the errand is simply over. Without this the pet keeps walking to a pile that
+                        // is already flying to the hero and then stands on the empty spot.
+                        if (d === w.petFetch) w.petFetch = null;
+                    }
                 } else {
                     // ⚠️ EASING IN, NOT A CONSTANT GLIDE. A magnet that commits is the whole feeling; a
                     // piece of loot sliding over at a fixed speed reads as a UI element animating.
+                    //
+                    // ⚠️ AND IT IS DRAWN TO WHOEVER CLAIMED IT. The pet fetching a drop sets d.to, and
+                    // the magnet follows that body instead of the hero — which is how the pickup stays
+                    // ONE pipeline with one payout rather than the pet growing a second collection path
+                    // beside this one. Two paths for one payout always drift; this repo has paid for that
+                    // twice. See [[atomic-split-into-steps-drops-lines]].
                     d.dv = Math.min(LOOT_DRAW_MAX, (d.dv || 0) + LOOT_DRAW_ACCEL * dt);
-                    const hx = w.hero.x;
-                    const hy = w.hero.y + HERO_UNITS * 0.45;
+                    const by = d.to === "pet" ? w.pet : w.hero;
+                    const hx = by.x;
+                    const hy = by.y + by.h * 0.45;
                     const dist = Math.hypot(hx - d.x, hy - d.y) || 1;
                     d.x += ((hx - d.x) / dist) * d.dv * dt;
                     d.y += ((hy - d.y) / dist) * d.dv * dt;
@@ -1499,11 +1745,17 @@ export default function GroveScene({
                         // Hidden rather than removed, for the same reason as a dying foe above.
                         if (d.node) d.node.style.display = "none";
                         w.drops.splice(i, 1);
+                        if (d === w.petFetch) w.petFetch = null;
                         // ⚠️ THE THING YOU PICKED UP, NOT THE NAME OF IT. Luke: "You should actually see
                         // the sprite and the name of it." The drop spends its whole life as a sprite on
                         // the floor and then became a line of text at the moment of collection, which is
                         // the one moment it is a reward. The art rides the label now.
-                        addPop("loot", d.label, w.hero.x + w.hero.face * 1.5, w.hero.y + HERO_UNITS * 0.75,
+                        //
+                        // ⚠️ THE LABEL POPS AT WHOEVER COLLECTED IT. A drop the pet ran twenty units to
+                        // fetch announcing itself over the hero's head says the player picked it up, and
+                        // the one thing this feature has to communicate is that the PET did — otherwise
+                        // it reads as loot teleporting and the whole errand went unnoticed.
+                        addPop("loot", d.label, by.x + (by.face || 1) * 1.5, by.y + by.h * 0.75,
                             null, d.art || null);
                         playPickup(Boolean(d.rare));
                         rerender();
@@ -1574,8 +1826,20 @@ export default function GroveScene({
                 // that is supposed to look fast.
                 w.hero.swipeNode.style.opacity = sp.t === "strike" ? "1" : "0";
             }
-            place(w.pet, cam, camY, unit);
-            pose(w.pet, now, unit, { moving: Math.abs(w.pet.vx) > 0.04 });
+            // ⚠️ THE POUNCE IS NOT SCALED BY swingRate() THE WAY THE HERO'S SWING IS. His animation is
+            // stretched to his attack speed so the arm keeps up with the blows; the pet's cadence is
+            // already derived from that rate (petBiteCd), so scaling the animation too would compress a
+            // 410ms pounce into 100ms at tempo 4 — a blur with no readable coil, which is the opposite
+            // of what a differentiated motion is for.
+            const pp = pouncePose(w.petAt == null ? null : now - w.petAt, w.pet.face);
+            place(w.pet, cam, camY, unit, pp.dx);
+            pose(w.pet, now, unit, { sx: pp.sx, sy: pp.sy, dy: pp.dy,
+                moving: Math.abs(w.pet.vx) > 0.04 });
+            if (w.pet.clawNode) {
+                // Only during the crossing — 85ms. Same rule as the hero's crescent: the shortest beat of
+                // the motion is the one that is meant to look fast.
+                w.pet.clawNode.style.opacity = pp.t === "leap" ? "1" : "0";
+            }
             drawHeroBar(now);
 
             // ── THE HERO GOING DOWN ─────────────────────────────────────────────────────────────────
@@ -1996,6 +2260,7 @@ export default function GroveScene({
         body.flashNode = n?.querySelector(".gv-flash") || null;
         body.shadowNode = n?.querySelector(".gv-shadow") || null;
         body.swipeNode = n?.querySelector(".gv-swipe") || null;
+        body.clawNode = n?.querySelector(".gv-claw") || null;
         // The creature's own health bar: the strip, the ghost behind it, the fill, and the white strike.
         // Looked up once here rather than queried in the loop, like everything else on a body.
         body.barNode = n?.querySelector(".gv-ehp") || null;
@@ -2004,7 +2269,7 @@ export default function GroveScene({
     }, []);
 
     // A body: shell (position) > shadow + art (facing, squash) > sprite + flash.
-    const bodyArt = (art, { swipe = false } = {}) => (
+    const bodyArt = (art, { swipe = false, claw = false } = {}) => (
         <>
             {/* The only thing on screen that says how high off the floor a body is, which makes it the thing
                 that sells "grounded". A sprite with no shadow is pasted on. */}
@@ -2021,6 +2286,10 @@ export default function GroveScene({
                     barely reads at all. */}
                 {art ? <span className="gv-flash" style={{ "--gv-art-url": `url(${art})` }} aria-hidden="true" /> : null}
                 {swipe ? <span className="gv-swipe" aria-hidden="true" /> : null}
+                {/* The pet's equivalent, and deliberately a different MARK rather than a smaller version
+                    of the hero's crescent: three short claw lines across the direction of travel. Two
+                    copies of one shape at two sizes is what reads as one shape stuttering. */}
+                {claw ? <span className="gv-claw" aria-hidden="true"><i /><i /><i /></span> : null}
             </span>
         </>
     );
@@ -2174,7 +2443,7 @@ export default function GroveScene({
                     which made the two of them read as one lumpy object. The player's own character is the
                     one thing on screen that must never be occluded by anything friendly. */}
                 <div className="gv-pet" style={{ "--gv-h": PET_UNITS }} ref={wire(world.pet)}>
-                    {bodyArt(petArt)}
+                    {bodyArt(petArt, { claw: true })}
                 </div>
                 <div className="gv-hero" style={{ "--gv-h": HERO_UNITS }} ref={wire(world.hero)}>
                     {bodyArt(heroArt, { swipe: true })}
@@ -2344,6 +2613,51 @@ function setUpLabScene(w, scene) {
         // and not swinging — which reads as the attack animation being broken rather than as the scene
         // never having asked for one.
         if (a) w.target = a;
+    } else if (scene === "pet") {
+        // ── THE PET FIGHTING ───────────────────────────────────────────────────────────────────────
+        // The same staging as "fight" -- one creature with enough health to survive being photographed,
+        // already awake, already targeted -- because what has to happen during the film is the HERO
+        // swinging: the pet only joins in off the hero's own commitment to a swing, so a scene that does
+        // not make him attack cannot produce a single bite.
+        //
+        // ⚠️ ONE CREATURE, NOT TWO. The fight scene puts one either side to exercise both facings, which
+        // is right for the hero and wrong here: the pet flanks to the far side of its target, and with a
+        // second creature standing there the flank lands inside another body and the thing being judged
+        // (can you tell the two attackers apart) is obscured by the thing that is not.
+        const [one] = w.foes.filter((f) => !f.isBoss);
+        if (one) {
+            near(one, 9);
+            one.hit = true;
+            one.passive = false;
+            // Fat enough to outlive the film at a mid-game kit plus a top-rarity pet biting for a third
+            // of every swing. 2000 died inside two seconds once the pet was contributing.
+            one.hp = 6000;
+            one.maxHp = 6000;
+            w.target = one;
+        }
+    } else if (scene === "fetch") {
+        // ── THE PET COLLECTING ─────────────────────────────────────────────────────────────────────
+        // Loot on the floor, well out of the hero's own draw range, and nothing left alive to fight — so
+        // the pet drops into its FETCH job on frame one and the errand is the whole shot.
+        //
+        // ⚠️ THE DROPS ARE PLACED, NOT KILLED FOR. The loot scene kills creatures and lets the spill
+        // land where it falls, which puts most of it within six units of the hero and collected by him
+        // before the pet has taken a step. These are put down by hand at a distance only the pet will
+        // cover, which is the one arrangement that films the feature.
+        const weak = w.foes.filter((x) => !x.isBoss);
+        weak.forEach((f) => { f.hp = 1; f.passive = true; });
+        for (let i = 0; i < 4; i += 1) {
+            w.drops.push({
+                ...makeBody({ x: w.hero.x + 13 + i * 5, y: 0, h: 2.4, halfW: 1.2 }),
+                // ⚠️ A REAL PART ID, AND ITS NAME READ OUT OF THE CATALOGUE. grub_husk does not exist --
+                // groveArt would have returned nothing and the shot would have been four invisible drops
+                // being fetched, which photographs as the pet walking off for no reason.
+                uid: `lab-fetch-${i}`, part: LAB_FETCH_PART,
+                label: `1x ${grovePart(LAB_FETCH_PART)?.name || LAB_FETCH_PART}`,
+                art: groveArt(LAB_FETCH_PART), state: "rest", restAt: -1e9, born: -1e9, node: null,
+                grounded: true, tier: 1, rare: i === 3,
+            });
+        }
     } else if (scene === "loot") {
         // One hit point, so the first swing kills and the spill, the rest and the draw-in all land inside
         // three seconds of film.

@@ -130,6 +130,98 @@ export function swingPose(elapsedMs, face) {
     return { dx: SWING_LUNGE * (1 - e) * face, sx: 1, sy: 1, t: "recover" };
 }
 
+// ── THE POUNCE ──────────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "I want it to be juicy. Don't overlook the fact that we put all this time and effort into making a
+// dopamine inducing hit effects and stuff for the character in the grove. We also want that same thing for
+// the pet, but it has to be differentiated from the character that's attacking, because otherwise it might
+// just get too noisy and confusing."
+//
+// ⚠️ SO IT IS NOT A SWING, AND THE DIFFERENCE IS THE SHAPE OF THE MOTION, NOT THE SIZE OF IT. The tempting
+// version of "differentiated" is the hero's swing scaled down and tinted — and that is precisely the thing
+// that becomes noise, because two copies of one motion at two sizes is what the eye reads as one motion
+// stuttering. Nothing tells you which body it belonged to without stopping to look.
+//
+// A pounce is a different VERB. The hero plants his feet, winds back and cuts a crescent through the target
+// from where he stands; the pet gathers, throws its whole body ACROSS the gap, and snaps back out. One is an
+// arc at arm's length, the other is a round trip. At a glance, from the corner of your eye, in the middle of
+// a fight with four numbers on screen, you can tell which one just happened — which is the entire
+// requirement.
+//
+// The three beats are deliberately faster than the hero's 410ms swing and front-loaded differently: a short
+// coil, a very fast crossing, and a long drift back to the pet's own spot. The pet is never the body you are
+// reading the fight from, so its animation has to be over quickly and then get out of the way.
+// 370ms against the hero's 410. Quicker on purpose and asserted in check-grove-pet.mjs: the pet is
+// never the body you read the fight from, so its animation has to be over and out of the way first.
+export const POUNCE = { coilMs: 95, leapMs: 85, backMs: 190 };
+export const POUNCE_TOTAL_MS = POUNCE.coilMs + POUNCE.leapMs + POUNCE.backMs;
+// How far it coils back and then throws itself, in world units. The leap is larger than the hero's lunge
+// (3.4) because the pet is crossing a gap rather than extending a weapon — it has to visibly ARRIVE at the
+// thing it is biting, or the bite reads as happening at a distance.
+export const POUNCE_COIL = 1.0;
+export const POUNCE_LEAP = 5.2;
+// A hop off the floor on the crossing. Small — the pet is lunging, not jumping a ledge — but a pounce with
+// no vertical at all reads as a slide, and a slide is the one thing in this scene that says "animating UI".
+export const POUNCE_RISE = 1.5;
+
+/**
+ * Where the pet's body is in its pounce: a render-only offset in world units, exactly like swingPose.
+ *
+ * ⚠️ RENDER-ONLY, for the same reason the hero's is. Moving the simulated body would mean the pet's own
+ * reach test, the loot it is walking to, and the solver that keeps it on a ledge all changed on every frame
+ * of its own animation. `dy` rides the same rule: the shadow stays where the feet are.
+ */
+export function pouncePose(elapsedMs, face) {
+    if (elapsedMs == null || elapsedMs < 0 || elapsedMs > POUNCE_TOTAL_MS) {
+        return { dx: 0, dy: 0, sx: 1, sy: 1, t: null };
+    }
+    const { coilMs, leapMs } = POUNCE;
+    if (elapsedMs < coilMs) {
+        // The coil: down and back, squashing. A cat flattening before it goes.
+        const k = elapsedMs / coilMs;
+        const e = 1 - (1 - k) * (1 - k);
+        return { dx: -POUNCE_COIL * e * face, dy: 0, sx: 1 + 0.14 * e, sy: 1 - 0.18 * e, t: "coil" };
+    }
+    if (elapsedMs < coilMs + leapMs) {
+        // The crossing. Stretched along the direction of travel and off the ground — the smear is vertical
+        // here where the hero's is horizontal, because the body is travelling rather than reaching.
+        const k = (elapsedMs - coilMs) / leapMs;
+        return {
+            dx: POUNCE_LEAP * k * face,
+            // Up and back down inside the leap, so it arcs rather than hovers.
+            dy: POUNCE_RISE * Math.sin(k * Math.PI),
+            sx: 1 - 0.1 * (1 - k), sy: 1 + 0.2 * (1 - k), t: "leap",
+        };
+    }
+    // The way back. Long and eased, so the pet drifts home instead of teleporting to heel.
+    const k = (elapsedMs - coilMs - leapMs) / POUNCE.backMs;
+    const e = 1 - (1 - k) ** 3;
+    return { dx: POUNCE_LEAP * (1 - e) * face, dy: 0, sx: 1, sy: 1, t: "back" };
+}
+
+// ── ⚠️ AND THE PET'S HIT IS QUIETER THAN THE HERO'S, BY DESIGN ──────────────────────────────────────────────
+// The feel kit above is a set of dials that all point at the player's attention, and attention is the one
+// resource in this scene that cannot be increased. If the pet gets the hero's hit-stop, the hero's trauma and
+// the hero's crit ring, then at tempo 2 something is grabbing the camera five times a second and the fight
+// becomes unreadable — which is exactly the "too noisy and confusing" Luke named.
+//
+// So the pet gets the parts that say WHERE and WHAT, and none of the parts that say STOP AND LOOK:
+//
+//   HIT FLASH     yes. It is the thing that says which body was bitten, and it is free.
+//   SPARKS        yes, fewer and in the pet's own colour.
+//   KNOCKBACK     a fraction. The target twitches; it is not thrown.
+//   DAMAGE NUMBER yes, in the pet's colour, smaller. See .gv-num.is-pet.
+//   HIT-STOP      NEVER. This is the important one. Hit-stop freezes the whole simulation, and a second
+//                 body freezing it on its own schedule is not twice the impact, it is a stutter. The hero
+//                 owns time in this scene.
+//   SCREEN SHAKE  a sixth, and only on a crit. Below that it is indistinguishable from the hero's and
+//                 therefore just adds to the total amount of shaking.
+//   CRIT RING     NEVER. The ring is the one thing an ordinary hero hit never does, which is what makes it
+//                 readable (see the note in GroveScene). Spending it on the pet as well is how a signal
+//                 stops being a signal.
+export const PET_TRAUMA_SHARE = 0.17;
+export const PET_KNOCK_SHARE = 0.3;
+export const PET_SPARKS = 0.5;
+
 // ── KNOCKBACK ───────────────────────────────────────────────────────────────────────────────────────────────
 // Light, and mostly horizontal. A big vertical component launches everything into the canopy and the zone
 // stops reading as a place with a floor.
@@ -328,7 +420,17 @@ export const FOE_BAR_LINGER_MS = 2600;
 // ⚠️ A PROC HOLDS, IT IS NOT THROWN. A damage number is one of several on screen and gets out of the way
 // quickly; a proc is the only thing saying the player's own gear just fired, and it is rarer than a hit by
 // an order of magnitude. It rises straight, with no sideways drift, and stays long enough to be read.
-export const POP_MS = { hit: 620, crit: 820, heal: 700, took: 760, loot: 850, proc: 900 };
+// ⚠️ pet IS A REGISTERED KIND, NOT A FALLBACK. makePop reads POP_MS[kind] || 700 and POP_THROW[kind] ||
+// POP_THROW.hit, so an unlisted kind silently inherits a HIT's lifetime and a hit's arc — which is how the
+// pet's bite ended up thrown on the same trajectory, for nearly the same duration, as the blow it is
+// supposed to be distinguishable from. Filmed at 375px the two numbers overlapped into unreadable gibberish
+// and the DOM had to be read to find out what they even said. Nothing threw, nothing errored, and the
+// defect was invisible at desktop width.
+//
+// The pet's number is the shortest-lived on the board: it fires twice as often as anything else here and it
+// describes the smaller half of the damage, so it has to clear out of the way of the number the player is
+// actually reading.
+export const POP_MS = { hit: 620, crit: 820, heal: 700, took: 760, loot: 850, proc: 900, pet: 520 };
 export const POP_GRAVITY = 0.028;
 const POP_THROW = {
     hit: { vy: 0.38, vx: 0.17 },
@@ -338,6 +440,10 @@ const POP_THROW = {
     loot: { vy: 0.20, vx: 0.07 },
     // Straight up, no sideways throw: nothing about a proc should look like it was knocked loose by a blow.
     proc: { vy: 0.30, vx: 0 },
+    // A lower, wider arc than a hit. Lower so it stays down near the legs where the bite landed instead of
+    // climbing into the band the hero's number occupies; wider so two bites in a row do not stack into one
+    // column. apex is vy squared over twice gravity: 1.6 units here against the hit's 2.6.
+    pet: { vy: 0.30, vx: 0.26 },
 };
 
 export function makePop(kind, x, y, rand) {

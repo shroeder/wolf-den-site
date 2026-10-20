@@ -607,6 +607,14 @@ export default function GroveClient({ initial }) {
                     unlockedN={Number(st?.unlockedN) || 1}
                     stats={stats} heroArt={session.heroArt || st?.heroArt || null}
                     petArt={session.petArt || st?.petArt || null}
+                    // ⚠️ THE SAME session-THEN-state FALLBACK AS THE ART, AND FOR THE SAME REASON:
+                    // groveEnter returns the session, groveState returns the screen, and either may be
+                    // the one that has arrived. Nullish rather than || so a genuine 0 -- no pet
+                    // equipped -- is not mistaken for "not loaded yet" and replaced by the other
+                    // source. Without this line the scene defaults petBite to 0 and the pet never
+                    // bites in the actual game: the bench passes its own value, so every rig would
+                    // still have shown it working. Declared but never mounted, in its purest form.
+                    petBite={session.petBite ?? st?.petBite ?? 0}
                     belt={beltNow} onSettle={settle} onBoss={bossKill} onLeave={leave}
                     onTravel={travel}
                     // ⚠️ THE ZONE IS FROZEN WHILE A PANEL IS OPEN, AND IT HAS TO BE. Crafting in front of
