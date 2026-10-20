@@ -59,10 +59,17 @@ export const SURVEY_MIN_ACTIONS = 1000;
 // ladder already hands out, so the economy has a price for it: the Den mints about 1,300 a month, so a round
 // of this is roughly two days of ordinary supply, once.
 //
-// PAID PER ROUND, ONCE. Answering again is explicitly allowed -- the thanks screen says so, and a member who
-// changes their mind should not have to choose between an honest answer and keeping the chest. The grant
-// ledger is what makes that safe: one `survey_rN` row per member per round, checked before paying, so the
-// second answer pays nothing and nobody has to remember not to re-submit.
+// ONE CHEST PER MEMBER, EVER -- NOT ONE PER ROUND. Luke: "Just one chest at the end."
+//
+// I built it per round first, which meant the twenty-eight people who answered both of the earlier rounds
+// were paid twice. The rule is simpler than that and it is the simpler one that is right: helping is worth a
+// chest, and it is worth a chest once. A fourth round next spring pays the people who have never answered
+// and nobody else.
+//
+// The grant ledger is what makes that safe rather than a flag somebody has to remember: the check is for ANY
+// `survey_r%` row, so re-answering pays nothing, a new round pays nothing to anyone already thanked, and
+// nobody has to remember not to re-submit. Answering again is explicitly allowed -- the thanks screen says
+// so -- and a member changing their mind must never have to choose between an honest answer and the chest.
 export const SURVEY_CHEST = "mythic";
 export const surveyChestSource = (round = SURVEY_ROUND) => `survey_r${round}`;
 
@@ -70,8 +77,10 @@ export const surveyChestSource = (round = SURVEY_ROUND) => `survey_r${round}`;
  *  actually granted, so the caller can tell the member what they got rather than guessing. */
 export async function paySurveyChest(buyerId, round = SURVEY_ROUND) {
     const source = surveyChestSource(round);
+    // ⚠️ `LIKE 'survey_r%'`, NOT this round's source. That one character is the whole rule — matching only
+    // the current round is what paid the repeat answerers twice.
     const had = await db.queryOne(
-        `SELECT 1 AS x FROM mkt_chest_grant WHERE buyer_id = $1 AND source = $2 LIMIT 1`, [buyerId, source]
+        `SELECT 1 AS x FROM mkt_chest_grant WHERE buyer_id = $1 AND source LIKE 'survey\_r%' LIMIT 1`, [buyerId]
     ).catch(() => ({ x: 1 }));   // on a DB error, assume paid: a double chest is worse than a missing one
     if (had) return false;
     await addChests(buyerId, { [SURVEY_CHEST]: 1 }, { source, meta: { round } }).catch(() => {});

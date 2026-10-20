@@ -5,24 +5,28 @@
 //
 // Luke: "the survey should reward a mythic chest... backfill for if someone already did it."
 //
-// PER ROUND, NOT PER PERSON. The reward is for answering a survey, and twenty-eight members answered two of
-// them — in August about a game that had no casino, and again in October about one that did. Those are two
-// separate favours and they are paid as two. 34 + 70 = 104 chests across 76 members.
+// ONE PER PERSON, NOT PER ROUND. Luke: "Just one chest at the end."
+//
+// I ran this per round first and paid the twenty-eight members who answered both of them twice;
+// _survey-chest-dedupe.mjs put that back. The rule is the simpler one: helping is worth a chest, and it is
+// worth a chest once. 76 members, 76 chests, and a fourth round next spring pays only people who have never
+// answered.
 //
 // WHY THAT IS SAFE: the Den mints about 1,300 mythic chests a month, so this is roughly two days of ordinary
 // supply, once. Mythic is also the highest tier carrying no real-world money — celestial and primordial pay
 // store credit at the till, which is not something to hand out for filling in a form.
 //
-// IDEMPOTENT THROUGH THE SAME LEDGER THE LIVE PATH USES. paySurveyChest writes one `survey_rN` grant row per
-// member per round and refuses if one exists; this calls that function rather than its own INSERT, so a
-// re-run pays nobody twice and a member who answers round 3 tomorrow is unaffected by what happened here.
+// IDEMPOTENT THROUGH THE SAME LEDGER THE LIVE PATH USES. paySurveyChest refuses if the member holds ANY
+// `survey_r%` grant; this calls that function rather than its own INSERT, so the backfill and the live path
+// cannot drift about what "already thanked" means — and somebody backfilled today gets nothing extra when
+// they answer round 3 tonight, which is the whole point of the rule.
 import fs from "node:fs";
 
 process.env.DATABASE_URL = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/.env", "utf8")
     .match(/^DATABASE_URL=["']?([^"'\r\n]+)/m)[1];
 
 const { db } = await import("@/lib/db");
-const { paySurveyChest, SURVEY_CHEST, surveyChestSource } = await import("@/lib/marketplace/survey.js");
+const { paySurveyChest, SURVEY_CHEST } = await import("@/lib/marketplace/survey.js");
 
 const APPLY = process.argv.includes("--apply");
 
@@ -35,11 +39,19 @@ const rows = await db.query(
       WHERE s.round < 3
       ORDER BY s.round, who`);
 
+// ⚠️ KEYED ON THE MEMBER, NOT ON MEMBER-AND-ROUND. Keying it per round is exactly what paid the repeat
+// answerers twice, and it would do it again on the next run: the duplicate grant rows have since been
+// deleted, so a per-round key would read those members as unpaid and hand out another twenty-eight chests.
 const paidAlready = new Set(
-    (await db.query(`SELECT buyer_id, source FROM mkt_chest_grant WHERE source LIKE 'survey_r%'`))
-        .map((r) => `${r.buyer_id}:${r.source}`),
+    (await db.query(`SELECT DISTINCT buyer_id FROM mkt_chest_grant WHERE source LIKE 'survey\\_r%'`))
+        .map((r) => r.buyer_id),
 );
-const todo = rows.filter((r) => !paidAlready.has(`${r.buyer_id}:${surveyChestSource(r.round)}`));
+const seen = new Set();
+const todo = rows.filter((r) => {
+    if (paidAlready.has(r.buyer_id) || seen.has(r.buyer_id)) return false;
+    seen.add(r.buyer_id);
+    return true;
+});
 
 const byRound = {};
 for (const r of todo) byRound[r.round] = (byRound[r.round] || 0) + 1;
