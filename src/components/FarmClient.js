@@ -1355,6 +1355,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-scroll { scrollbar-width: thin; }
                 /* Illustrated backdrop tiled with the mirror trick: [A A' A A'] — every other copy flipped, so
                    each junction's edges match and there's no seam even with non-tiling art (same as the sailing sky). */
+                /* The aquarium's single tank. inset:0 + cover means it is exactly the scene box -- it cannot
+                   overflow, so .farm-scroll has nothing to scroll and the pets' percentages resolve against
+                   the same width the player can actually see. See the note at the render site. */
+                .farm-bg-tank { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%;
+                    object-fit: cover; object-position: center; pointer-events: none; user-select: none; }
                 .farm-bg-strip { position: absolute; inset: 0; z-index: 0; display: flex; width: max-content; min-width: 100%; }
                 .farm-bg-strip img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; pointer-events: none; user-select: none; }
                 .farm-bg-strip img:nth-child(even) { transform: scaleX(-1); }
@@ -1543,7 +1548,30 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {bgUrl ? (
                             // The aquarium is one image, like the Garden: a tank has ends, and mirroring it
                             // three times would put the same coral on both sides of a seam.
-                            (view === "outside" || view === "inside") ? (
+                            view === "aquarium" ? (
+                                // ── ⚠️ ONE TANK, FITTED, AND IT DOES NOT SCROLL ──────────────────────
+                                // Luke, for the FOURTH time: "the aquarium still shows all pets on the
+                                // leftmost part of the horizontal scroll area."
+                                //
+                                // The first three fixes all changed the pet LAYOUT MATHS, and the maths was
+                                // never wrong -- measured live it produces 16% to 84%, properly spread. The
+                                // bug was underneath it: the aquarium fell through to the Garden's strip,
+                                // which lays down SIX copies of the image. At a phone height each copy is
+                                // 608px, so the tank became 3,644px of scroll -- the same coral and the same
+                                // rock, six times -- while the pets sat inside a 359px objects layer in the
+                                // first copy. Every pet really was at the far left, of ten screens of
+                                // duplicated empty water.
+                                //
+                                // A tank has ENDS. Repeating it is not a seam problem, it is six aquariums.
+                                // So: a single image, covering the scene, no overflow and nothing to scroll
+                                // -- which also makes the pets' percentages land across the visible glass,
+                                // because the scene box and the painted tank are finally the same thing.
+                                //
+                                // ⚠️ object-fit: cover, NOT width:auto. width:auto is what let the image
+                                // size itself off its own aspect and overflow the box in the first place.
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="farm-bg-tank" src={bgUrl} alt="" draggable={false} aria-hidden="true" />
+                            ) : (view === "outside" || view === "inside") ? (
                                 // Outside/Inside: repeat the backdrop 3× with the mirror trick [A A' A] so it scrolls as one
                                 // seamless wide scene (Garden stays a single image because crops sit at fixed positions).
                                 <div className="farm-bg-tiled" aria-hidden="true">
