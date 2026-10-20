@@ -126,14 +126,27 @@ function bonusesFrom(emblemRows) {
  * the player gets the browser's broken-image glyph. See img-onerror-fires-before-hydration.
  */
 async function heroLook(buyerId) {
+    // ⚠️ b.id::text, AND THE CAST IS LOAD-BEARING. mkt_pet_level.buyer_id is TEXT while mkt_buyer.id is
+    // UUID, so the uncast join throws "operator does not exist: text = uuid" — and the .catch below turns
+    // that into a null row, which means NO HERO SPRITE, NO PET SPRITE AND NO BITE for every player in the
+    // game. It shipped exactly that way: the build does not run queries, the bench passes its own
+    // fixtures, and the CDP probe read the bench — so every gate was green while the live Grove rendered
+    // two coloured discs. Found only by signing in and looking at it. See [[postgres-landmines]].
     const row = await db.queryOne(
         `SELECT b.avatar_sprite_url AS hero, ps.url AS pet, b.featured_collectible AS pet_id,
                 COALESCE(pl.xp, 0) AS pet_xp
            FROM mkt_buyer b
            LEFT JOIN mkt_pet_sprite ps ON ps.pet_id = b.featured_collectible
-           LEFT JOIN mkt_pet_level pl ON pl.buyer_id = b.id AND pl.pet_id = b.featured_collectible
+           LEFT JOIN mkt_pet_level pl ON pl.buyer_id = b.id::text AND pl.pet_id = b.featured_collectible
           WHERE b.id = $1`, [buyerId],
-    ).catch(() => null);
+    ).catch((error) => {
+        // ⚠️ LOUD, THEN NULL. Falling back to "no art" is correct -- the Grove must open for somebody whose
+        // avatar row is genuinely missing -- but a THROWN query and an empty one are not the same event and
+        // this used to report them identically. A type mismatch in the join above was invisible for exactly
+        // that reason. The fallback stays; the silence does not.
+        console.error("grove.heroLook failed", error?.message);
+        return null;
+    });
     // ── ⚠️ WHO THE PET IS, NOT JUST WHAT IT LOOKS LIKE ──────────────────────────────────────────────
     // Luke: "I want the pet that you have equipped to matter in the grove, like its level, its rarity."
     //
