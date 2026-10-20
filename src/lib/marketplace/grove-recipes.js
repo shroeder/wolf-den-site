@@ -1,4 +1,4 @@
-import { foodRecipesForMap, toolRecipesForMap } from "@/lib/marketplace/grove-maps.js";
+import { foodRecipesForMap, toolRecipesForMap, mapIsBuilt } from "@/lib/marketplace/grove-maps.js";
 
 // ── THE GROVE'S RECIPES — THE NEW CRAFTING SYSTEM ────────────────────────────────────────────────────────────
 // Luke: "It would be a new system accessible in its own area with upgrades badges and its own set
@@ -240,6 +240,63 @@ export const recipeById = (id) => GROVE_RECIPES.find((r) => r.id === id) || null
 export function discoveredRecipes(seenPartIds) {
     const seen = seenPartIds instanceof Set ? seenPartIds : new Set(seenPartIds || []);
     return GROVE_RECIPES.filter((r) => Object.keys(r.parts).every((p) => seen.has(p)));
+}
+
+// ── ⚠️ ONE PLACE DECIDES WHETHER A RECIPE IS READY ──────────────────────────────────────────────────────────
+// This logic lived inside GroveBench's useMemo, which was fine while the workbench was the only thing that
+// wanted it. It is not any more: the zone dock has to carry a count of what you could make right now, and a
+// second implementation of "ready" is a second answer to the one question this system exists to answer.
+//
+// So it moves here, pure and shared, and the bench calls it like everyone else. See
+// [[reuse-the-rule-never-restate-it]].
+//
+// ── ⚠️ AND IT ONLY EVER RETURNS RECIPES YOU CAN REACH ───────────────────────────────────────────────────────
+// 208 recipes are defined; 80 of them need parts from maps 8-12, which are not built. Counting those in
+// told a player they had unlocked a small fraction of crafting when, in the forest they can actually walk,
+// they had unlocked rather a lot of it -- and no amount of play would ever have moved the number. A wall of
+// permanently impossible rows is not content; it is discouragement with a count on it.
+//
+// Filtered HERE rather than in the workbench, so the chip counts, the dock badge and the unlock moment all
+// agree about what exists. When map 8 ships, MAPS_BUILT moves and these appear on their own.
+export const reachableRecipes = () => GROVE_RECIPES.filter((r) => mapIsBuilt(recipeMap(r)));
+
+// `st` is the groveState payload: { pack, seen, tools, packsBuilt, banksBuilt, plotsBuilt }.
+export function recipeRows(st = {}) {
+    const pack = st.pack || {};
+    const seen = st.seen instanceof Set ? st.seen : new Set(st.seen || []);
+    return reachableRecipes().map((r) => {
+        const built = (st.packsBuilt || []).includes(r.id)
+            || (st.banksBuilt || []).includes(r.id)
+            || (st.plotsBuilt || []).includes(r.id)
+            || (r.kind === "tool" && Number(st.tools?.[r.slot] || 0) >= Number(r.tier));
+        const costs = Object.entries(r.parts).map(([part, n]) => {
+            const have = Number(pack[part] || 0);
+            return { part, need: n, have, short: Math.max(0, n - have) };
+        });
+        const missing = costs.reduce((a, c) => a + c.short, 0);
+        const haveParts = costs.filter((c) => c.short === 0).length;
+        // Every recipe is readable now, so a row has to say whether you have even MET its parts —
+        // that is what the discovery rule used to communicate by hiding the row entirely.
+        const unmet = costs.filter((c) => !seen.has(c.part)).length;
+        return { r, built, costs, missing, haveParts, unmet, ready: missing === 0 && !built };
+    });
+}
+
+/** How many recipes could be made RIGHT NOW. What the zone dock's badge counts. */
+export const readyCount = (st) => recipeRows(st).filter((x) => x.ready).length;
+
+/**
+ * Did this part just put a recipe within reach that was not before?
+ *
+ * ⚠️ IT COMPARES TWO BAGS RATHER THAN ASKING "is it ready now". A player who already had four roots and
+ * picks up a fifth has not unlocked anything, and firing the moment every time a ready recipe's part lands
+ * would announce the same Rootwood Rod on fifty consecutive kills. The moment is the TRANSITION.
+ *
+ * Returns the recipes that crossed from not-ready to ready, newest-cheapest first.
+ */
+export function newlyReady(before, after) {
+    const was = new Set(recipeRows(before).filter((x) => x.ready).map((x) => x.r.id));
+    return recipeRows(after).filter((x) => x.ready && !was.has(x.r.id)).map((x) => x.r);
 }
 
 /** Can it be made right now — what is in the bag, as opposed to what has been discovered. */

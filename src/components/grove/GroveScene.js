@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
-    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, HEAL_AT, scaledFoe, scaledRare, groveDepth, groveBoss, groveSize, grovePart,
+    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, GROVE_HYPER, HEAL_AT, scaledFoe, scaledRare, groveDepth, groveBoss, groveSize, grovePart,
     groveArt, groveEmblem, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
@@ -226,6 +226,9 @@ export default function GroveScene({
     // meant two places that know how rarity becomes damage. 0 means no pet equipped, and the resolver
     // reads that as "do not bite", not as "bite for nothing".
     petBite: petShare = 0,
+    // How many things are waiting at the workbench -- craftable recipes plus unopened chests. Counted in
+    // GroveClient off the shared recipe rule; see the note there.
+    benchReady = 0,
     onSettle, onBoss, onLeave, onDeath, onTravel, onPanel, paused = false, unlockedN = 1,
 }) {
     const hostRef = useRef(null);
@@ -1042,7 +1045,11 @@ export default function GroveScene({
             playKill(Math.min(COMBO_PITCH_STEPS, wd.combo));
 
             // The client rolls the SAME answer the server will, so the loot can spill immediately.
-            const got = rollKill(foe.rare ? GROVE_RARE : GROVE_ENEMIES[foe.id], seed, i, bonuses);
+            // ⚠️ zone.n AND GROVE_HYPER ARE PASSED ON BOTH SIDES OR NEITHER. The server replays this exact
+            // call to verify the settle (see settleKills), so an argument present here and absent there is
+            // a client that celebrates a Power Scroll the settle then declines to hand over.
+            const got = rollKill(foe.rare ? GROVE_RARE : GROVE_ENEMIES[foe.id], seed, i, bonuses,
+                zone.n, GROVE_HYPER);
             // ⚠️ LAB ONLY, AND ONCE. An emblem is roughly one kill in four hundred, so the rarest moment in
             // the Grove could otherwise only be reviewed by killing four hundred things and hoping — which
             // is the same reason the boss and the climb have scenes. Guarded by labScene, which is null in
@@ -1072,8 +1079,27 @@ export default function GroveScene({
             };
             for (const [part, count] of rows) {
                 const meta = grovePart(part);
+                // ⚠️ WHAT MADE IT SPECIAL RIDES THE DROP. A twelve-fold windfall that lands looking like a
+                // single root is a windfall nobody noticed, and the whole point of the tail is that the
+                // player SEES the roll land. Two different kinds of special, dressed differently: a big
+                // pile is LOUD (band), one uncommon part is VALUABLE (rare).
+                const isRareRow = got.rare === part;
                 spill(`d${i}-${part}`, part, `${count}x ${meta?.name || part.replace(/_/g, " ")}`,
-                    { tier: meta?.tier || 1, rare: Boolean(meta?.rare) });
+                    { tier: meta?.tier || 1, rare: Boolean(meta?.rare) || isRareRow,
+                      band: isRareRow ? null : got.band, rareRow: isRareRow });
+            }
+            // ── ⚠️ A HYPER OFF AN ORDINARY KILL IS THE RAREST THING IN THE FEATURE ──────────────────
+            // About one kill in two thousand. It gets the emblem's treatment -- the world stops, a ring
+            // goes out, the screen takes a boss-weight knock -- because a drop this rare arriving with the
+            // same four pixels as a root is a rarity the player cannot feel. See [[no-pity-progress-bars]]
+            // for the opposite failure; this is the one place loudness is earned.
+            if (got.hyper) {
+                wd.clock.stop(now, EMBLEM_STOP_MS);
+                wd.shake.add(TRAUMA.boss);
+                shockwave(foe.x, foe.y + foe.h * 0.4, "crit");
+                burst(foe.x, foe.y + foe.h * 0.4, { crit: true });
+                playEmblemDrop();
+                procCall(String(got.hyper.name || "A RARE FIND").toUpperCase(), "hyper");
             }
             // ── ⚠️ AN EMBLEM IS ABOUT ONE KILL IN FOUR HUNDRED AND IT LANDED LIKE A TWIG ───────────
             // Luke: "Emblems are rare." The drop itself knew that — gold glow, a sheen, its own silhouette —
@@ -2373,7 +2399,7 @@ export default function GroveScene({
                     The drawn tier-stone stays as the fallback for anything with no art yet — a new part
                     added without a sprite should land on the floor looking like loot, not like a hole. */}
                 {world.drops.map((d) => (
-                    <span key={d.uid} className={`gv-drop t${d.tier || 1}${d.emblem ? " is-emblem" : ""}${d.rare ? " is-rare" : ""}`}
+                    <span key={d.uid} className={`gv-drop t${d.tier || 1}${d.emblem ? " is-emblem" : ""}${d.rare ? " is-rare" : ""}${d.band ? ` is-${d.band}` : ""}${d.rareRow ? " is-rarerow" : ""}`}
                         ref={(n) => { const dd = d; dd.node = n; dd.labelNode = n?.querySelector("b") || null; }}
                         aria-hidden="true">
                         {d.art ? <img src={d.art} alt="" /> : <i />}
@@ -2570,9 +2596,20 @@ export default function GroveScene({
             {onPanel ? (
                 <nav className="gv-zdock" aria-label="The Grove" onPointerDown={(e) => e.stopPropagation()}>
                     {ZONE_DOCK.map((d) => (
-                        <button key={d.k} type="button" title={d.label} aria-label={d.label}
+                        <button key={d.k} type="button" title={d.label}
+                            aria-label={d.k === "bench" && benchReady > 0
+                                ? `${d.label}, ${benchReady} waiting` : d.label}
                             onClick={() => openPanel(d.k)}>
                             <img src={d.art} alt="" draggable={false} />
+                            {/* ⚠️ A NUMBER ON A DOOR, NOT A PROMPT. The one thing standing between a
+                                player with 93 parts and the crafting system is that nothing in the zone
+                                -- where the whole session happens -- ever mentions it exists. A badge is
+                                the smallest possible thing that fixes that, and the only kind of
+                                teaching this game does. It counts chests too: "is there anything to go
+                                and do" is one question from the player's side. */}
+                            {d.k === "bench" && benchReady > 0 ? (
+                                <b className="gv-zdock-n" aria-hidden="true">{benchReady > 99 ? "99+" : benchReady}</b>
+                            ) : null}
                         </button>
                     ))}
                 </nav>

@@ -26,6 +26,7 @@
 
 import {
     MAP_PARTS, MAP_ENEMIES, MAP_BOSSES, MAP_ZONES, MAP_EMBLEMS, MAP_FOODS, mapIsBuilt,
+    RARE_CHANCE,
 } from "@/lib/marketplace/grove-maps.js";
 
 // ── PARTS ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -224,65 +225,83 @@ const E = (id, name, art, o) => ({ id, name, art, ...o });
 // ⚠️ MAP ONE'S TWELVE. Maps two to twelve declare their residents in grove-maps.js and are merged below,
 // filtered to maps that are actually BUILT — a creature with no art is a broken-image glyph wandering a zone
 // nobody can reach, and the design is not helped by shipping it early.
+// ⚠️ IMPORTED, NOT RE-DECLARED. Map one's twelve creatures are hand-authored here and maps two to seven are
+// generated in grove-maps.js; a rare-drop rate that differed between them is a difference no player could
+// explain and no designer intended. One number, one home. See [[balance-constants-never-copied]].
+
+// Each creature's rare drop is a part from DEEPER in the forest than it lives, so it reads as a glimpse of
+// what is coming rather than more of what you already have. See the rare row in grove-roll.js.
 const MAP_ONE_ENEMIES = {
     rootrat: E("rootrat", "Rootrat", "/images/delves/foe-rootrat.webp", {
         passive: true, hp: 770, dmg: [62, 96], telegraph: 0,
         emblem: "em_rootrat", emblemChance: 0.0026,
+        rareChance: RARE_CHANCE, rareLoot: { part: "thorn_barb", n: [1, 2] },
         loot: [{ part: "gnawed_root", n: [1, 2], w: 70 }, { part: "damp_moss", n: [1, 1], w: 30 }],
     }),
     grub: E("grub", "Pale Grub", "/images/delves/foe-grub.webp", {
         passive: true, hp: 810, dmg: [67, 101], telegraph: 0,
         emblem: "em_grub", emblemChance: 0.0026,
+        rareChance: RARE_CHANCE, rareLoot: { part: "bristle_hide", n: [1, 2] },
         loot: [{ part: "grub_fat", n: [1, 2], w: 75 }, { part: "damp_moss", n: [1, 2], w: 25 }],
     }),
     thornling: E("thornling", "Thornling", "/images/delves/foe-thornling.webp", {
         passive: false, hp: 900, dmg: [75, 111], telegraph: 650,
         emblem: "em_thornling", emblemChance: 0.0024,
+        rareChance: RARE_CHANCE, rareLoot: { part: "bound_straw", n: [1, 2] },
         loot: [{ part: "thorn_barb", n: [1, 3], w: 65 }, { part: "gnawed_root", n: [1, 2], w: 35 }],
     }),
     badger: E("badger", "Bristleback", "/images/delves/foe-badger.webp", {
         passive: false, hp: 920, dmg: [79, 115], telegraph: 700,
         emblem: "em_badger", emblemChance: 0.0022,
+        rareChance: RARE_CHANCE, rareLoot: { part: "barrow_tooth", n: [1, 2] },
         loot: [{ part: "bristle_hide", n: [1, 2], w: 60 }, { part: "split_antler", n: [1, 1], w: 40 }],
     }),
     gourdling: E("gourdling", "Gourdling", "/images/delves/foe-gourdling.webp", {
         passive: false, hp: 1040, dmg: [83, 120], telegraph: 620,
         emblem: "em_gourdling", emblemChance: 0.0022,
+        rareChance: RARE_CHANCE, rareLoot: { part: "warren_silk", n: [1, 2] },
         loot: [{ part: "gourd_rind", n: [1, 2], w: 70 }, { part: "thorn_barb", n: [1, 2], w: 30 }],
     }),
     husk: E("husk", "Straw Walker", "/images/grove/foe-husk.webp", {
         passive: false, hp: 1060, dmg: [86, 134], telegraph: 750,
         emblem: "em_husk", emblemChance: 0.002,
+        rareChance: RARE_CHANCE, rareLoot: { part: "mothlight_dust", n: [1, 2] },
         loot: [{ part: "bound_straw", n: [1, 3], w: 70 }, { part: "gourd_rind", n: [1, 1], w: 30 }],
     }),
     barrowhound: E("barrowhound", "Barrow Hound", "/images/delves/foe-barrowhound.webp", {
         passive: false, hp: 1080, dmg: [90, 138], telegraph: 520,
         emblem: "em_barrowhound", emblemChance: 0.002,
+        rareChance: RARE_CHANCE, rareLoot: { part: "rotwood_knot", n: [1, 2] },
         loot: [{ part: "barrow_tooth", n: [1, 2], w: 65 }, { part: "bristle_hide", n: [1, 2], w: 35 }],
     }),
     warren_mother: E("warren_mother", "Warren Mother", "/images/delves/foe-warren-mother.webp", {
         passive: false, hp: 1200, dmg: [94, 142], telegraph: 820,
         emblem: "em_warren", emblemChance: 0.0018,
+        rareChance: RARE_CHANCE, rareLoot: { part: "ash_ember", n: [1, 2] },
         loot: [{ part: "warren_silk", n: [1, 2], w: 70 }, { part: "barrow_tooth", n: [1, 2], w: 30 }],
     }),
     voidmoth: E("voidmoth", "Mothlight", "/images/delves/foe-voidmoth.webp", {
         passive: false, hp: 1210, dmg: [98, 146], telegraph: 600,
         emblem: "em_voidmoth", emblemChance: 0.0018,
+        rareChance: RARE_CHANCE, rareLoot: { part: "goblin_rivet", n: [1, 2] },
         loot: [{ part: "mothlight_dust", n: [1, 2], w: 72 }, { part: "warren_silk", n: [1, 1], w: 28 }],
     }),
     ashwraith: E("ashwraith", "Ash Wraith", "/images/delves/foe-ashwraith.webp", {
         passive: false, hp: 1230, dmg: [102, 150], telegraph: 700,
         emblem: "em_ashwraith", emblemChance: 0.0016,
+        rareChance: RARE_CHANCE, rareLoot: { part: "elder_heartwood", n: [1, 2] },
         loot: [{ part: "ash_ember", n: [1, 2], w: 68 }, { part: "rotwood_knot", n: [1, 2], w: 32 }],
     }),
     goblin: E("goblin", "Palisade Goblin", "/images/grove/foe-goblin.webp", {
         passive: false, hp: 1290, dmg: [110, 159], telegraph: 560,
         emblem: "em_goblin", emblemChance: 0.0016,
+        rareChance: RARE_CHANCE, rareLoot: { part: "elder_heartwood", n: [1, 2] },
         loot: [{ part: "goblin_rivet", n: [1, 3], w: 70 }, { part: "ash_ember", n: [1, 1], w: 30 }],
     }),
     elderling: E("elderling", "Elderling", "/images/grove/foe-elderling.webp", {
         passive: false, hp: 1460, dmg: [118, 182], telegraph: 880,
         emblem: "em_elder", emblemChance: 0.0014,
+        rareChance: RARE_CHANCE, rareLoot: { part: "crystal_shard", n: [1, 1] },
         loot: [{ part: "elder_heartwood", n: [1, 2], w: 60 }, { part: "rotwood_knot", n: [1, 2], w: 40 }],
     }),
 };
@@ -531,6 +550,20 @@ export const GROVE_HYPER = [
 // Per boss kill, before the emblem's rarity bonus. Climbs with depth so the deep bosses — the ones that are
 // actually hard — are where this lives, rather than whichever one is cheapest to kill on repeat.
 export const bossHyperChance = (zoneN) => 0.006 + 0.0015 * Math.max(0, (Number(zoneN) || 1) - 1);
+
+// ── ⚠️ AND A SLIVER OF IT ON ORDINARY KILLS ─────────────────────────────────────────────────────────────────
+// Kept next to the boss rate so the two are read together and nobody tunes one without seeing the other.
+//
+// Luke: "am I suprised by rare events drops". The hyper table was the only genuinely surprising thing in the
+// feature and it was locked entirely behind bosses -- which, measured on the live database, nobody had ever
+// fought. So the best content in the Grove had been seen by no one.
+//
+// About one kill in two thousand at the surface, one in eight hundred at depth. At the observed pace that is
+// a few times across a whole campaign, which is the correct rate for a thing worth telling somebody about --
+// and the depth scaling puts it where the fights are actually hard rather than on whichever creature is
+// cheapest to farm. It is roughly a two-hundredth of the boss rate, on purpose: the boss stays the reliable
+// route and this stays the lightning strike.
+export const wandererHyperChance = (zoneN) => 0.0005 + 0.00008 * Math.max(0, (Number(zoneN) || 1) - 1);
 
 // ── WHAT A LEDGE IS MADE OF, AND WHAT GROWS ON IT ────────────────────────────────────────────────────────────
 // Luke: "Lets make the platforms more detailed. And add sprite decorations like vines hanging from platforms

@@ -12,6 +12,7 @@ import {
     GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt, toolArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import GroveBench from "@/components/grove/GroveBench";
+import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area from "@/components/grove/GroveArea.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
 import { GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
@@ -227,6 +228,23 @@ export default function GroveClient({ initial }) {
     // the Grove's emblems folded into the SAME stat pool so an emblem's Might rides the same curve a
     // sword's does. Nothing is summed here any more — a second copy of the arithmetic is how the two would
     // drift. See grove-kit.js.
+    // ── ⚠️ WHAT IS WAITING FOR YOU, ON THE BUTTON, IN THE ZONE ──────────────────────────────────────
+    // Luke: "little wolf not crafting, we should find a way to guide and condition him."
+    //
+    // The workbench already says "5 READY" -- but only once you have opened it, and nothing ever gives a
+    // player a reason to open it. A kid with 93 Bound Straw and twenty-five makeable recipes has no way of
+    // knowing any of that from inside the fight, which is where he spends his whole session.
+    //
+    // So the number comes out to the button. It counts BOTH things that are waiting -- recipes you could
+    // make now and chests you have not opened -- because from the player's side those are one question:
+    // is there anything to go and do. No tutorial, no prompt, no modal: a number on a door, which is how
+    // this game teaches everything else. See [[teach-by-showing-not-telling]].
+    const benchReady = useMemo(() => {
+        if (!st) return 0;
+        const chests = Object.values(st.chests || {}).reduce((a, n) => a + (Number(n) || 0), 0);
+        return readyCount(st) + chests;
+    }, [st]);
+
     const stats = useMemo(() => {
         const h = st?.hero;
         // The neutral fighter, for a state that has not loaded yet. Deliberately NOT the old 12/120/8:
@@ -388,10 +406,27 @@ export default function GroveClient({ initial }) {
                             {shownZones.map((z) => {
                                 const spot = spotForDepth(z.n);
                                 if (!spot) return null;
-                                const done = z.kills >= z.toUnlock;
+                                // ── ⚠️ "CLEARED" WAS A LIE, AND IT WAS THE MOST CONFUSING THING ON
+                                //        THE SCREEN ────────────────────────────────────────────────
+                                // Luke's own account, live: The Old Stand read "Cleared" at 50/35 kills
+                                // while Bramblewall next to it read "Locked", and nothing anywhere said
+                                // why. The kill quota earns the RIGHT TO FIGHT the boss; the boss is what
+                                // opens the way. So a zone at quota with its boss still standing is the
+                                // opposite of cleared -- it is the one place the player should be going,
+                                // and the map was telling them they were finished there.
+                                //
+                                // The in-zone door has always said it properly ("defeat Grandfather
+                                // Bristle to open"), but only once you have walked to the far end of a
+                                // zone you have been told you have finished. Measured on the live
+                                // database, the player who has gone deepest had never fought a single
+                                // boss -- and with no boss there are no merits, and with no merits there
+                                // is no armour, which is most of why crafting felt pointless too.
+                                const atQuota = z.kills >= z.toUnlock;
+                                const bossStands = atQuota && !z.bossDone;
+                                const done = atQuota && z.bossDone;
                                 return (
                                     <button key={z.id} type="button" data-n={z.n}
-                                        className={`gv-node${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}`}
+                                        className={`gv-node${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}${bossStands ? " is-boss" : ""}`}
                                         style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
                                         disabled={!z.unlocked} onClick={() => enter(z)}
                                         aria-label={`${z.name}${z.unlocked ? "" : " (locked)"}`}>
@@ -400,7 +435,9 @@ export default function GroveClient({ initial }) {
                                         <span className="gv-node-label">
                                             <em>{z.name}</em>
                                             {z.unlocked
-                                                ? <u>{done ? "Cleared" : `${z.kills}/${z.toUnlock}`}</u>
+                                                ? <u>{done ? "Cleared"
+                                                    : bossStands ? (z.bossDef?.name || "Boss waits")
+                                                    : `${z.kills}/${z.toUnlock}`}</u>
                                                 : <u>Locked</u>}
                                         </span>
                                     </button>
@@ -615,6 +652,7 @@ export default function GroveClient({ initial }) {
                     // bites in the actual game: the bench passes its own value, so every rig would
                     // still have shown it working. Declared but never mounted, in its purest form.
                     petBite={session.petBite ?? st?.petBite ?? 0}
+                    benchReady={benchReady}
                     belt={beltNow} onSettle={settle} onBoss={bossKill} onLeave={leave}
                     onTravel={travel}
                     // ⚠️ THE ZONE IS FROZEN WHILE A PANEL IS OPEN, AND IT HAS TO BE. Crafting in front of

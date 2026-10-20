@@ -643,10 +643,37 @@ export const mapIsBuilt = (n) => Number(n) <= MAPS_BUILT;
 // ⚠️ EVERY PART MUST BE SOMEBODY'S PRIMARY. Twelve creatures, twelve parts, index for index: that is what
 // guarantees no material is unreachable, and check-grove.mjs asserts it rather than trusting this comment.
 const SECOND_OFFSET = 3;
+// ⚠️ ONE NUMBER FOR ALL 84 CREATURES, and map one declares its own copy for its hand-authored twelve. Kept
+// identical on purpose: a rare drop that is rarer on generated maps than on the authored one is a
+// difference no player could explain and no designer intended.
+export const RARE_CHANCE = 0.032;
 export const creatureLoot = (map, i) => ([
     { part: map.parts[i].id, n: [1, 2], w: 70 },
     { part: map.parts[(i + SECOND_OFFSET) % map.parts.length].id, n: [1, 2], w: 30 },
 ]);
+
+// ── ⚠️ AND A THIRD ROW, WHICH IS WHAT MAKES ONE CREATURE WORTH KILLING OVER ANOTHER ──────────────────────────
+// Before this, every one of the 84 creatures in the game ran the identical machine: 70% its own part, 30% a
+// neighbour's. The names differed and nothing else did, so killing the rarest thing in a zone paid exactly
+// what the first rootrat paid. Luke, reading the live numbers: "am I rewarded for killing a unique monster".
+//
+// The rare row is a part from DEEPER than the creature lives -- a glimpse of what is ahead rather than more
+// of what you already have, and it unlocks a recipe early because discovery is on SEEING a part rather than
+// hoarding it. See the long note on the rare row in grove-roll.js for why it is an existing part and not a
+// new item.
+//
+// ⚠️ IT REACHES FORWARD, AND AT THE LAST MAP IT REACHES SIDEWAYS. A creature in the final built map has
+// nothing deeper to point at, so it falls back to a part from its own map that is not its primary -- which
+// is still a part it does not otherwise drop. Falling off the end to undefined would have put a rareLoot of
+// { part: undefined } on twelve creatures, and rollKill would have written a part named "undefined" into
+// the player's bag. A lookup that runs off the end must land somewhere real.
+// See [[ladder-lookups-must-fail-upward]].
+const RARE_LOOK_AHEAD = 4;
+export const creatureRareLoot = (map, i, deeperMap) => {
+    const source = deeperMap && deeperMap.parts?.length ? deeperMap : map;
+    const idx = deeperMap ? i % source.parts.length : (i + RARE_LOOK_AHEAD) % source.parts.length;
+    return { part: source.parts[idx].id, n: [1, 2] };
+};
 
 /** A boss pays its zone's residents' materials, in bulk — the same shape map one's bosses use. */
 export const bossLoot = (map, zone) => zone.foes.slice(0, 2).map((idx, k) => ({
@@ -675,6 +702,9 @@ export const MAP_ENEMIES = Object.fromEntries(
             // system arriving by the back door, and §11 of the design doc still has stat ceilings open.
             emblem: m.emblem?.id || null, emblemChance: 0.0024,
             loot: creatureLoot(m, i),
+            // The same 1-in-30 every creature in the game uses; what differs per creature is WHAT it is.
+            rareChance: RARE_CHANCE,
+            rareLoot: creatureRareLoot(m, i, GROVE_MAPS.find((x) => x.n === m.n + 1 && x.parts?.length) || null),
         }])),
 );
 

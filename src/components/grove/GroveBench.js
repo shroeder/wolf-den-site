@@ -11,7 +11,7 @@ import {
 } from "react-icons/gi";
 
 import Area from "@/components/grove/GroveArea.js";
-import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
+import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes } from "@/lib/marketplace/grove-recipes.js";
 import { QUALITY_BANDS, qualityBand, GROVE_CHESTS, GROVE_CHEST_ORDER } from "@/lib/marketplace/grove-forge.js";
 
 // ── THE WORKBENCH ───────────────────────────────────────────────────────────────────────────────────────────
@@ -73,6 +73,8 @@ const bandName = (id) => QUALITY_BANDS.find((b) => b.id === id)?.name || id;
 // ⚠️ "Storage" AND "Farm" GROUP TWO RECIPE KINDS EACH, on purpose. A player thinks "where do I put things"
 // and "what about the farm" — they do not think "pack" and "bank" as separate questions, and six chips that
 // each hide three rows is a worse list than four that hide nine.
+// ⚠️ "All" MEANS "ALL YOU CAN REACH", NOT "ALL THAT EXIST" -- the filtering happens in recipeRows, which
+// drops recipes belonging to maps that are not built. See the note there.
 const FILTERS = [
     { id: "all", label: "All" },
     { id: "ready", label: "Ready" },
@@ -145,27 +147,10 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     const [kind, setKind] = useState("all");
     // Two memos, deliberately: the chip COUNTS must describe the whole list, so they cannot be computed
     // from the filtered one. Picking "Tools" should not make every other chip read 0.
-    const allRows = useMemo(() => {
-        const pack = st.pack || {};
-        const seen = new Set(st.seen || []);
-        const list = GROVE_RECIPES.map((r) => {
-            const built = (st.packsBuilt || []).includes(r.id)
-                || (st.banksBuilt || []).includes(r.id)
-                || (st.plotsBuilt || []).includes(r.id)
-                || (r.kind === "tool" && Number(st.tools?.[r.slot] || 0) >= Number(r.tier));
-            const costs = Object.entries(r.parts).map(([p, n]) => {
-                const have = Number(pack[p] || 0);
-                return { part: p, need: n, have, short: Math.max(0, n - have) };
-            });
-            const missing = costs.reduce((a, c) => a + c.short, 0);
-            const haveParts = costs.filter((c) => c.short === 0).length;
-            // Every recipe is readable now, so a row has to say whether you have even MET its parts —
-            // that is what the discovery rule used to communicate by hiding the row entirely.
-            const unmet = costs.filter((c) => !seen.has(c.part)).length;
-            return { r, built, costs, missing, haveParts, unmet, ready: missing === 0 && !built };
-        });
-        return list;
-    }, [st]);
+    // ⚠️ THE SHARED RULE, NOT A LOCAL COPY. This used to be twenty lines inline here, and the zone dock now
+    // needs the same answer for its badge. Two implementations of "can I make this" is two answers to the
+    // only question the workbench exists to answer. See recipeRows in grove-recipes.js.
+    const allRows = useMemo(() => recipeRows(st), [st]);
 
     const rows = useMemo(() => {
         const picked = kind === "all" ? allRows

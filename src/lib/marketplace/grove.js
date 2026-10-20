@@ -532,7 +532,12 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     }
 
     const emblemRows = await db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-    const got = settleKills(list, foeById, Number(p.seed), bonusesFrom(emblemRows));
+    // ⚠️ THE SAME ARGUMENTS THE SCENE PASSED, OR THE REPLAY LANDS SOMEWHERE ELSE. rollKill now takes the
+    // zone depth and the hyper table; GroveScene passes zone.n and GROVE_HYPER, so this must too. An
+    // argument present on one side and absent on the other is a stream that diverges mid-kill, which the
+    // player experiences as a drop they watched fall and never received.
+    const zoneN = Number(zone?.n) || 0;
+    const got = settleKills(list, foeById, Number(p.seed), bonusesFrom(emblemRows), zoneN, GROVE_HYPER);
 
     const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p.pack_slots) || 16);
 
@@ -559,6 +564,16 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     }
     for (const tier of got.chests) {
         await addChests(buyerId, { [tier]: 1 }, { source: "grove_rare" }).catch(() => {});
+    }
+    // ── ⚠️ THE HYPER-RARES, THROUGH THE BOSS'S OWN grantHyper ───────────────────────────────────────
+    // Ordinary kills can now pay the hyper table at about one in two thousand. This grants them with the
+    // function the boss already uses rather than a second path beside it -- two routes for one payout
+    // always drift, and this repo has paid for that twice.
+    // See [[atomic-split-into-steps-drops-lines]].
+    const hypers = [];
+    for (const h of got.hypers || []) {
+        const paid = await grantHyper(buyerId, h, { zone: zoneId, from: "wanderer" }).catch(() => null);
+        if (paid) hypers.push(paid);
     }
 
     // ── ZONE PROGRESS, AND THE UNLOCK ───────────────────────────────────────────────────────────────
@@ -602,6 +617,10 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         emblems: got.emblems,
         gold: got.gold,
         chests: got.chests,
+        // Named in the response so the screen can say what arrived. The scene already celebrated it on the
+        // kill; a reward announced in the world but missing from the receipt is half a reward.
+        // See [[reward-with-no-screen-is-not-shipped]].
+        hypers,
         xp: got.xp,
         newlySeen,
         ate,
@@ -1019,7 +1038,39 @@ export async function groveCraft(buyerId, recipeId) {
         ).catch(() => {});
     }
 
-    await trackActivity(buyerId, "grove_craft", { recipe: recipe.id, kind: recipe.kind }).catch(() => {});
+    // ── ⚠️ THE FIRST CRAFT EVER PAYS A CHEST ────────────────────────────────────────────────────────
+    // Luke: "little wolf not crafting, we should find a way to guide and condition him."
+    //
+    // He has 93 Bound Straw, can make 25 recipes and has made none. The reason is not difficulty: it is
+    // that a first craft costs three piles of parts and returns a tool whose entire payoff happens in
+    // ANOTHER SYSTEM, days later, as a percentage. There is nothing at the end of the first one to tell
+    // a player the machine pays out at all.
+    //
+    // So the first craft, once per account ever, hands back a Mossbound Cache: a real object, visible
+    // where it is kept, openable on the spot, that pays merits and a hyper roll. It teaches the loop by
+    // completing it rather than by explaining it -- see [[teach-by-showing-not-telling]].
+    //
+    // ⚠️ ONE CHEST, AND NOTHING ELSE ALONGSIDE IT. A chest handed over next to some other reward makes
+    // both of them smaller and neither of them the point. See [[rewards-must-be-scoped]].
+    //
+    // ⚠️ AND IT IS GATED ON THE CRAFT LOG, NOT ON A FLAG SOMEBODY HAS TO REMEMBER TO SET. The log already
+    // records every craft; "has this account ever crafted" is a question it can answer, and a question
+    // answered from the real record cannot drift out of step with it.
+    let firstCraft = false;
+    const everCrafted = await db.queryOne(
+        `SELECT 1 AS x FROM mkt_grove_craft_log WHERE buyer_id = $1 LIMIT 1`, [buyerId],
+    ).catch(() => ({ x: 1 }));   // on a DB error, assume they have: a wrongly-paid chest is worse than a missed one
+    if (!everCrafted) {
+        firstCraft = true;
+        await db.query(
+            `INSERT INTO mkt_grove_chest (buyer_id, tier, qty) VALUES ($1, 'mossbound', 1)
+             ON CONFLICT (buyer_id, tier) DO UPDATE
+                SET qty = mkt_grove_chest.qty + 1, updated_at = NOW()`,
+            [buyerId],
+        ).catch(() => {});
+    }
+
+    await trackActivity(buyerId, "grove_craft", { recipe: recipe.id, kind: recipe.kind, first: firstCraft }).catch(() => {});
     // ── ⚠️ THE CRAFTING LEVEL, AND THE QUALITY IT BUYS ────────────────────────────────────────────
     // Luke: "as you craft gear you gain levels in crafting each crafting level helps your rolls on
     // crafting improving quality of the in game things you craft."
@@ -1077,6 +1128,8 @@ export async function groveCraft(buyerId, recipeId) {
     // the transaction decremented, so the panel can show the trade rather than assert it.
     return {
         ok: true, made: recipe.id, kind: recipe.kind, name: recipe.name,
+        // The screen announces this; a chest granted silently is a chest nobody knows they have.
+        firstCraft,
         spent: spent.map(([part, n]) => ({ part, n })),
         makes: Number(recipe.makes) || null,
         adds: Number(recipe.adds) || null,
@@ -1164,7 +1217,8 @@ export async function groveOpenChest(buyerId, tier) {
     // ⚠️ SEEDED ON THE OPENING, NOT ON A KILL. These are opened from the bag whenever the player likes,
     // long after whatever dropped them -- there is no kill index to share. The index is how many of this
     // tier they have left, which moves every open and cannot be steered by retrying.
-    const got = rollGroveChest(chest, Number(p?.seed) || 1, Number(took.qty) + chest.id.length, bonusesFrom(emblemRows));
+    const got = rollGroveChest(chest, Number(p?.seed) || 1, Number(took.qty) + chest.id.length,
+        bonusesFrom(emblemRows), GROVE_HYPER);
 
     const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p?.pack_slots) || 16);
     if (got.merits > 0) {
@@ -1173,6 +1227,9 @@ export async function groveOpenChest(buyerId, tier) {
             [buyerId, got.merits],
         ).catch(() => {});
     }
+    // The thing that makes a chest worth opening rather than a bigger pile of what you have. Same grant
+    // path as the boss and the wanderer roll.
+    const hyper = got.hyper ? await grantHyper(buyerId, got.hyper, { chest: chest.id }).catch(() => null) : null;
 
     return {
         ok: true,
@@ -1183,5 +1240,6 @@ export async function groveOpenChest(buyerId, tier) {
         overflow,
         newlySeen,
         merits: got.merits || 0,
+        hyper,
     };
 }

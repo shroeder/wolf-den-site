@@ -66,6 +66,70 @@ export function pickWeighted(rows, r) {
 
 const span = ([lo, hi], r) => Math.round(lo + (hi - lo) * r);
 
+// ── ⚠️ A KILL HAS TO FEEL ROLLED, NOT DEALT ────────────────────────────────────────────────────────────────
+// Luke: "am I suprised by rare events drops, or is it super predictable".
+//
+// It was super predictable, and measurably so. Every enemy in the game drops [1,2], [1,1] or [1,3] of a
+// part -- those are the ONLY three amounts that exist across all 84 creatures -- and span() is a flat lerp.
+// So twenty consecutive Bristlebacks produce "1x Bristle Hide", "2x Bristle Hide", "1x Split Antler", and
+// nothing else, ever. Three outcomes. The player is not watching a roll land; they are watching a number
+// they already knew.
+//
+// This keeps the authored band as the normal case and puts a tail on it:
+//
+//   ordinary   82%     the band as authored -- still what usually happens, by a mile
+//   handful    15%     2-3x the top of the band
+//   haul      2.8%     5-7x
+//   windfall  0.2%     12-16x, about one kill in five hundred
+//
+// ⚠️ ONE DRAW, THROUGH A PIECEWISE INVERSE-CDF, NOT FOUR ROLLS. The server replays this seeded stream to
+// verify a settle, so THE NUMBER OF r() CALLS PER KILL IS PART OF THE CONTRACT -- spend an extra draw here
+// and every roll after it in the same kill lands somewhere else, which is the "watch a drop and then not
+// receive it" failure this file's header exists to prevent. Spending exactly one uniform, as span() did,
+// keeps both sides in step.
+//
+// ⚠️ AND IT IS DELIBERATELY NOT span() ITSELF. span() also rolls the Crystal Stag's GOLD, and a 16x tail on
+// a [400,900] band is a fourteen-thousand-gold drop. Gold has fourteen faucets already and this feature
+// deliberately mints almost none of it. Parts only. See [[gold-mint-rate-lever]].
+export const DROP_TAIL = [
+    { upTo: 0.820, mult: [1, 1], band: null },
+    { upTo: 0.970, mult: [2, 3], band: "handful" },
+    { upTo: 0.998, mult: [5, 7], band: "haul" },
+    { upTo: 1.000, mult: [12, 16], band: "windfall" },
+];
+
+/**
+ * A part count: the authored band most of the time, with a fat tail. Spends exactly one draw.
+ *
+ * Returns { n, band } -- the band comes OUT of the roll rather than being re-derived from the number,
+ * because deriving it is guesswork: a "handful" of a [1,2] part can land on 2, which is also an ordinary
+ * roll, and a drop that was special but did not get dressed as special is a drop nobody noticed.
+ */
+export function spanTailed([lo, hi], r) {
+    let at = 0;
+    for (const t of DROP_TAIL) {
+        if (r < t.upTo) {
+            // Re-spread the draw inside its own band, so results still vary within a tier rather than
+            // every haul landing on the same number.
+            const k = (r - at) / Math.max(1e-9, t.upTo - at);
+            // ⚠️ A TAIL BAND MULTIPLIES THE TOP OF THE AUTHORED BAND, NOT A RE-SPREAD BASE. Spreading the
+            // base across the band first put a "handful" of a [1,2] part at 1 x 2 = 2 -- which is also an
+            // ordinary roll of that part, so the loudest thing the tail could produce was a number the
+            // player saw every other kill. Filmed as twenty kills with three HANDFUL tags on drops of two.
+            // A band that cannot be distinguished from the ordinary case is not a band.
+            if (!t.band) return { n: Math.max(1, Math.round(lo + (hi - lo) * k)), band: null };
+            // ⚠️ A FLOOR OF 2 ON THE BASE, so a band means the same thing whatever row it came off. Most
+            // secondary parts are authored [1,1], where hi is 1 -- multiplying that gave a "handful" of
+            // two, which is a number the primary part drops on an ordinary roll every other kill. The
+            // band has to be legible without knowing which row produced it.
+            const mult = t.mult[0] + (t.mult[1] - t.mult[0]) * k;
+            return { n: Math.max(hi + 1, Math.round(Math.max(2, hi) * mult)), band: t.band };
+        }
+        at = t.upTo;
+    }
+    return { n: Math.max(1, hi), band: null };
+}
+
 /**
  * What one kill produces. The SAME call on both sides of the wire.
  *
@@ -107,21 +171,54 @@ const XP_PER_FOE_HP = 96;    // 770hp -> 8 xp,  1460hp -> 15 xp
 const XP_PER_BOSS_HP = 200;  // 59k   -> 295,   180k   -> 900
 
 import { bossChestChance, bossMerits, chestForZone } from "@/lib/marketplace/grove-forge.js";
+import { wandererHyperChance } from "@/lib/marketplace/grove-catalog.js";
 
-export function rollKill(foe, seed, index, bonus = {}) {
-    const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0 };
+export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = null) {
+    // ⚠️ zoneN AND hyperTable DEFAULT TO OFF, and that is a safety property rather than tidiness. Both
+    // sides of the wire have to pass the same arguments or the replay disagrees; defaulting to "no hyper
+    // roll" means a caller that has not been updated is merely missing a feature instead of quietly
+    // rolling a different stream and handing the player a drop the server then declines.
+    const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0, band: null, rare: null, hyper: null };
     if (!foe) return out;
     const r = killRng(seed, index);
 
     // ── PARTS ───────────────────────────────────────────────────────────────────────────────────────
     const row = pickWeighted(foe.loot, r());
     if (row) {
-        let n = span(row.n, r());
+        const rolled = spanTailed(row.n, r());
+        let n = rolled.n;
         // "increased rarity of items found in this feature" — the emblem reads as MORE of the thing, which
         // is the only reading that works on a table where every row is a part rather than a rarity tier.
         const rarity = Number(bonus.rarityFind) || 0;
         if (rarity > 0 && r() < Math.min(0.75, rarity / 100)) n += 1;
         out.parts[row.part] = (out.parts[row.part] || 0) + n;
+        // What the scene dresses the drop as. A haul that looks like one root is a haul nobody noticed.
+        out.band = rolled.band;
+    }
+
+    // ── 1.2 THE RARE ROW ────────────────────────────────────────────────────────────────────────────
+    // Luke: "am I rewarded for killing a unique monster".
+    //
+    // Before this, no. Every creature ran the same machine -- 70% its own part, 30% a neighbour's -- so the
+    // names differed and nothing else did, and killing the rarest thing in a zone paid what the first
+    // rootrat paid.
+    //
+    // ⚠️ IT DROPS A PART FROM DEEPER IN THE FOREST RATHER THAN A NEW ITEM, and all three reasons matter:
+    //
+    //   1. NO NEW ART. A part with no sprite is a broken-image glyph on the floor of every zone (see
+    //      [[img-onerror-fires-before-hydration]]), and one new part per creature is 84 new drawings.
+    //   2. IT FEEDS DISCOVERY, which is the best idea in the crafting system and the most starved: a
+    //      recipe unlocks once you have SEEN its parts, and the deepest player had seen 14 of 148. A
+    //      rootrat that occasionally coughs up Elder Heartwood unlocks a recipe many zones early and
+    //      tells you what is waiting down there.
+    //   3. IT CANNOT BREAK ANYTHING. It is a part that already exists, at a tier you would reach anyway.
+    //      One of them is a tease and not a shortcut, because the recipe still wants eight.
+    //
+    // rareLoot is authored per creature in grove-catalog.js, so each creature's rare drop is ITS rare drop.
+    if (foe.rareLoot && r() < (Number(foe.rareChance) || 0) * (1 + (Number(bonus.rarityFind) || 0) / 100)) {
+        const rare = foe.rareLoot;
+        out.parts[rare.part] = (out.parts[rare.part] || 0) + span(rare.n || [1, 1], r());
+        out.rare = rare.part;
     }
 
     // ── EMBLEM ──────────────────────────────────────────────────────────────────────────────────────
@@ -134,6 +231,21 @@ export function rollKill(foe, seed, index, bonus = {}) {
     // into the chest ROLL, which is a chain where the first match wins and raising one tier steals from gear.
     if (Array.isArray(foe.gold)) out.gold = span(foe.gold, r());
     if (foe.chestChance && r() < foe.chestChance) out.chest = foe.chestTier || "wooden";
+
+    // ── 1.3 THE WOW ─────────────────────────────────────────────────────────────────────────────────
+    // The hyper table -- enchant scroll, power scroll, ship upgrade, Mythic Morsel, enshrinement stone --
+    // was built, plumbed and granted, and locked entirely behind bosses at about one percent. With nobody
+    // fighting bosses, the most exciting thing in the feature had never been seen by anybody at all.
+    //
+    // So a sliver of it rides ordinary kills: about one in two thousand at the surface, climbing with
+    // depth. A handful of times across a long campaign, which is the right rate for the thing you tell
+    // somebody about. It costs nothing to build because grantHyper already exists and the boss uses it.
+    //
+    // ⚠️ GATED TO THE WEAK END BY zoneN, through the same pickHyper the boss uses. A rootrat handing over
+    // an enshrinement stone is not a surprise, it is a bug the player assumes they exploited.
+    if (zoneN && hyperTable && r() < wandererHyperChance(zoneN) * (1 + (Number(bonus.rarityFind) || 0) / 100)) {
+        out.hyper = pickHyper(zoneN, r(), hyperTable);
+    }
 
     // Small, flat, and deliberately boring. Luke: "small amounts of exp are fine."
     // ⚠️ Whoever grants this MUST pass `gold: 0` to awardXp — it pays gold 1:1 with points otherwise, which
@@ -215,8 +327,8 @@ export function rollBoss(boss, zoneN, seed, index, bonus = {}, hyperChance = 0, 
  * Seeded by the chest's own opening, not by a kill: these are opened from the bag at a time of the player's
  * choosing, long after whatever dropped them.
  */
-export function rollGroveChest(chest, seed, index, bonus = {}) {
-    const out = { parts: {}, merits: 0 };
+export function rollGroveChest(chest, seed, index, bonus = {}, hyperTable = null) {
+    const out = { parts: {}, merits: 0, hyper: null };
     if (!chest) return out;
     const r = killRng(seed, index);
     const rarity = Number(bonus.rarityFind) || 0;
@@ -227,6 +339,19 @@ export function rollGroveChest(chest, seed, index, bonus = {}) {
         out.parts[row.part] = (out.parts[row.part] || 0) + n;
     }
     out.merits = span(chest.merits, r());
+
+    // ── ⚠️ AND ONE THING THE ZONE CANNOT GIVE YOU ───────────────────────────────────────────────────
+    // Luke, reading his own chest contents against his own bag: a Barrowed Casket paid 4-8 Bristle Hide to
+    // a player holding 71 of it. Opening it could not feel like anything, and five of them sat unopened in
+    // the workbench -- which is the system reporting its own verdict.
+    //
+    // A chest is not a bigger pile. It is the one place you reliably meet something you cannot farm: the
+    // merits above (which buy the boss armour and have exactly one other faucet) and, at a real rate, a
+    // roll on the hyper table. hyperFloor is the chest's own depth, so a Mossbound Cache cannot pay an
+    // enshrinement stone -- see pickHyper, whose floor fails upward.
+    if (hyperTable && chest.hyperChance && r() < chest.hyperChance * (1 + rarity / 100)) {
+        out.hyper = pickHyper(chest.hyperFloor || 1, r(), hyperTable);
+    }
     return out;
 }
 
@@ -264,22 +389,29 @@ export function rollRareSpawn(baseChance, seed, index, bonus = {}) {
  * does not get to say what fell out. That is the entire anti-cheat budget of this design and it costs one
  * request instead of two hundred.
  */
-export function settleKills(kills, lookup, seed, bonus = {}) {
+export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTable = null) {
     const parts = {};
     const emblems = {};
     let gold = 0;
     let xp = 0;
     const chests = [];
+    // ⚠️ COLLECTED AND RETURNED, OR THE SCENE CELEBRATES SOMETHING THAT NEVER ARRIVES. rollKill can now
+    // produce a hyper on an ordinary kill; if settleKills dropped it on the floor the client would show a
+    // Power Scroll and the settle would hand over nothing, which is precisely the failure the header of
+    // this file is about. The caller grants these through grantHyper, the same function the boss uses --
+    // one payout, one path. See [[atomic-split-into-steps-drops-lines]].
+    const hypers = [];
 
     for (const k of kills || []) {
         const foe = lookup(k.id);
         if (!foe) continue;
-        const got = rollKill(foe, seed, k.i, bonus);
+        const got = rollKill(foe, seed, k.i, bonus, zoneN, hyperTable);
         for (const [p, n] of Object.entries(got.parts)) parts[p] = (parts[p] || 0) + n;
         if (got.emblem) emblems[got.emblem] = (emblems[got.emblem] || 0) + 1;
         gold += got.gold;
         xp += got.xp;
         if (got.chest) chests.push(got.chest);
+        if (got.hyper) hypers.push(got.hyper);
     }
-    return { parts, emblems, gold, xp, chests };
+    return { parts, emblems, gold, xp, chests, hypers };
 }

@@ -449,6 +449,60 @@ export const GROVE_CSS = `
     -webkit-mask-image: radial-gradient(closest-side, transparent 76%, #000 82%, #000 96%, transparent 99%);
     mask-image: radial-gradient(closest-side, transparent 76%, #000 82%, #000 96%, transparent 99%); }
 
+/* ── ⚠️ A DROP THAT WAS SPECIAL HAS TO LOOK SPECIAL ───────────────────────────────────────────
+   Luke: "am I suprised by rare events drops, or is it super predictable".
+
+   The drop roll has a tail on it now -- usually the authored band, sometimes several times it, rarely
+   twelve times it -- and a twelvefold windfall that lands looking exactly like a single root is a
+   windfall nobody noticed. The roll already knows which band it came out of; this is where that becomes
+   visible.
+
+   TWO DIFFERENT KINDS OF SPECIAL, DRESSED DIFFERENTLY ON PURPOSE. A big pile is LOUD: warm, bigger,
+   with a glow that says quantity. One uncommon part is VALUABLE: cool violet, a slow pulse, small. They
+   must not borrow each other's clothes or the player learns neither. */
+.gv-drop.is-handful img { filter: drop-shadow(0 0 7px rgba(255,214,120,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+.gv-drop.is-handful { transform-origin: 50% 100%; }
+.gv-drop.is-haul img { filter: drop-shadow(0 0 11px rgba(255,186,70,0.95)) drop-shadow(0 2px 5px rgba(0,0,0,0.65));
+    scale: 1.22; }
+.gv-drop.is-windfall img { filter: drop-shadow(0 0 16px rgba(255,150,40,1)) drop-shadow(0 0 30px rgba(255,110,20,0.75))
+    drop-shadow(0 3px 6px rgba(0,0,0,0.7)); scale: 1.5; }
+/* The rare row: a part from deeper in the forest than the thing that dropped it. Violet, because every
+   other loud thing in this scene is warm and this one is not about quantity. */
+.gv-drop.is-rarerow img { filter: drop-shadow(0 0 10px rgba(178,140,255,0.95)) drop-shadow(0 2px 5px rgba(0,0,0,0.6));
+    animation: gv-rarebeat 1.5s ease-in-out infinite; }
+@keyframes gv-rarebeat { 0%, 100% { scale: 1; } 50% { scale: 1.14; } }
+
+/* ── ⚠️ WHAT IS WAITING AT THE WORKBENCH, ON THE BUTTON ───────────────────────────────────────
+   A player spends the entire session inside a zone. Nothing in a zone ever mentioned that crafting
+   existed, let alone that twenty-five recipes were already makeable -- so the deepest player in the
+   game had 93 of one part and had never crafted anything at all.
+
+   A count on the door, which is how this game teaches everything. Deliberately NOT a prompt, a modal or
+   a tutorial: see no-temp-ui-scaffolding and teach-by-showing-not-telling. */
+.gv-zdock button { position: relative; }
+.gv-zdock-n { position: absolute; top: -4px; right: -4px; min-width: 1.15rem; height: 1.15rem;
+    padding: 0 0.22rem; border-radius: 999px; background: linear-gradient(180deg, #ffd978, #e8a02c);
+    color: #2a1a05; font-size: 0.7rem; font-weight: 900; line-height: 1.15rem; text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.6), 0 0 9px rgba(255,190,80,0.55);
+    animation: gv-benchpulse 2.6s ease-in-out infinite; }
+@keyframes gv-benchpulse { 0%, 92%, 100% { transform: scale(1); } 96% { transform: scale(1.18); } }
+
+/* ── THE ZONE WHOSE BOSS IS STILL STANDING ────────────────────────────────────────────────────
+   The map used to say "Cleared" the moment the kill quota was met, while the next node still said
+   "Locked" and nothing said why. The quota earns the right to FIGHT the boss; the boss opens the way.
+   A node at quota with its boss alive is the one place the player should be going, so it says so and
+   it is lit. */
+.gv-node.is-boss .gv-node-label { background: linear-gradient(180deg, #ffe3a8, #f0b44c); border-color: #b97d1c; }
+.gv-node.is-boss .gv-node-label u { color: #5a3708; font-weight: 800; }
+.gv-node.is-boss img { filter: drop-shadow(0 0 12px rgba(255,170,70,0.9)); animation: gv-bossbeat 2.2s ease-in-out infinite; }
+@keyframes gv-bossbeat { 0%, 100% { scale: 1; } 50% { scale: 1.07; } }
+
+/* A hyper-rare off an ordinary kill is about one in two thousand -- the rarest thing in the feature.
+   It wears the proc word, in the colour nothing else uses. */
+.gv-proc.is-hyper { color: #ffd0ff; text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 20px rgba(255,120,255,0.95),
+    0 0 38px rgba(210,70,255,0.7); }
+.gv-boom.is-hyper { border-color: rgba(255,150,255,0.95); }
+
 /* ── THE PET'S CLAW MARK ──────────────────────────────────────────────────────────────────────
    The pet's answer to .gv-swipe, and deliberately a different SHAPE rather than a smaller crescent.
 

@@ -39,6 +39,7 @@
     "check:grove-roll": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-roll.mjs",
     "check:grove-physics": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-physics.mjs",
     "check:grove-pet": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-pet.mjs",
+    "check:grove-loot": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-loot.mjs",
     "grove:sprites": "node --import ./scripts/lib/register-loader.mjs scripts/grove-sprite-bounds.mjs",
     "gen:season-art": "node --import ./scripts/lib/register-loader.mjs scripts/gen-season-art.mjs",
     "mine:report": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/mine-report.mjs",

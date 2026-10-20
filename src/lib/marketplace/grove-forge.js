@@ -164,9 +164,21 @@ export function toolBonusFor(tier, quality) {
 // `parts` rows are rolled INDEPENDENTLY, not as a weighted chain. A chest should feel like opening a chest --
 // several things at once -- and an independent roll per row cannot be "stolen from" by raising a sibling,
 // which is the exact failure mode the main chest line has.
+// ── ⚠️ hyperChance IS THE REASON TO OPEN ONE ────────────────────────────────────────────────────────────────
+// The parts below are bulk, and bulk is what the player already has too much of; measured live, a chest's
+// whole payload was 4-8 of a part somebody was holding 71 of. What makes a chest worth the tap is that it is
+// the one reliable place to meet the hyper table -- a scroll, a ship upgrade, pet food, a stone -- which
+// otherwise only a boss can pay, and nobody had ever fought a boss.
+//
+// Climbing by tier, and hyperFloor keeps a shallow chest paying shallow rewards: pickHyper's floor fails
+// upward, so a Mossbound Cache from zone two can never hand over an enshrinement stone.
+//
+// ⚠️ THIS IS NOT THE EIGHT-TIER CHEST CHAIN IN chests.js, where the first match wins and raising one tier
+// silently steals from the ones beneath. A Grove chest rolls every row independently, so adding this took
+// nothing away from anything. See [[chest-rolls-are-a-chain]].
 export const GROVE_CHESTS = {
     mossbound: {
-        id: "mossbound", name: "Mossbound Cache", zones: [1, 3], merits: [2, 4],
+        id: "mossbound", hyperChance: 0.10, hyperFloor: 1, name: "Mossbound Cache", zones: [1, 3], merits: [2, 4],
         parts: [
             { part: "damp_moss", n: [4, 8], chance: 1 },
             { part: "gnawed_root", n: [4, 8], chance: 1 },
@@ -174,7 +186,7 @@ export const GROVE_CHESTS = {
         ],
     },
     barrowed: {
-        id: "barrowed", name: "Barrowed Casket", zones: [4, 6], merits: [4, 8],
+        id: "barrowed", hyperChance: 0.16, hyperFloor: 4, name: "Barrowed Casket", zones: [4, 6], merits: [4, 8],
         parts: [
             { part: "bristle_hide", n: [4, 8], chance: 1 },
             { part: "thorn_barb", n: [4, 8], chance: 1 },
@@ -183,7 +195,7 @@ export const GROVE_CHESTS = {
         ],
     },
     warrenspun: {
-        id: "warrenspun", name: "Warrenspun Coffer", zones: [7, 9], merits: [8, 14],
+        id: "warrenspun", hyperChance: 0.24, hyperFloor: 7, name: "Warrenspun Coffer", zones: [7, 9], merits: [8, 14],
         parts: [
             { part: "barrow_tooth", n: [4, 9], chance: 1 },
             { part: "warren_silk", n: [4, 9], chance: 1 },
@@ -192,7 +204,7 @@ export const GROVE_CHESTS = {
         ],
     },
     heartwrought: {
-        id: "heartwrought", name: "Heartwrought Reliquary", zones: [10, 12], merits: [14, 24],
+        id: "heartwrought", hyperChance: 0.34, hyperFloor: 10, name: "Heartwrought Reliquary", zones: [10, 12], merits: [14, 24],
         parts: [
             { part: "ash_ember", n: [5, 10], chance: 1 },
             { part: "rotwood_knot", n: [4, 9], chance: 1 },
