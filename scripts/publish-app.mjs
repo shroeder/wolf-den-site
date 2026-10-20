@@ -105,6 +105,74 @@ function verifyApk(apkPath) {
     }
 }
 
+// ── ⚠️ AND REFUSE A BUILD THAT SUDDENLY GOT SMALLER ─────────────────────────────────────────────────────────
+// The class check above only catches classes somebody thought to list. The thing that would have caught the
+// v1.0.709 outage with no foresight at all is far dumber: the broken APK was 100.4MB and the release before
+// it was 111.3MB. Nearly eleven megabytes of dex went missing and every other signal stayed green.
+//
+// So the last good release for this channel is the baseline, and a sudden shrink is treated as a damaged
+// build until a human says otherwise. This generalises past the MUST_DEFINE list: a future incremental
+// build that drops some OTHER library's classes trips this without anybody having predicted which.
+//
+// ⚠️ A SHRINK CAN ALSO BE LEGITIMATE -- turning on minification, or finally shipping a release variant,
+// should make the APK much smaller. That is what --allow-shrink is for. It must be a deliberate word typed
+// by a person, because the whole failure mode here is a build quietly losing content.
+const SHRINK_TOLERANCE = 0.05;
+
+async function verifySize(pool, channel, sizeBytes, allowShrink) {
+    const { rows } = await pool.query(
+        "SELECT version_name, size_bytes FROM app_release WHERE channel = $1 AND size_bytes > 0 "
+        + "ORDER BY created_at DESC LIMIT 1", [channel],
+    );
+    const last = rows[0];
+    if (!last) { console.log("  size: no previous release on this channel to compare against"); return; }
+    const prev = Number(last.size_bytes);
+    const drop = (prev - sizeBytes) / prev;
+    const pct = (drop * 100).toFixed(1);
+    if (drop <= SHRINK_TOLERANCE) {
+        console.log(`  size: ${(sizeBytes / 1e6).toFixed(1)}MB vs ${(prev / 1e6).toFixed(1)}MB in ${last.version_name} `
+            + `(${drop > 0 ? `-${pct}%` : `+${(-drop * 100).toFixed(1)}%`}) -- fine`);
+        return;
+    }
+    if (allowShrink) {
+        console.log(`  size: ${pct}% SMALLER than ${last.version_name} -- allowed by --allow-shrink`);
+        return;
+    }
+    throw new Error(`REFUSING TO PUBLISH -- this APK is ${pct}% smaller than ${last.version_name} `
+        + `(${(sizeBytes / 1e6).toFixed(1)}MB vs ${(prev / 1e6).toFixed(1)}MB).\n`
+        + `A build that loses content usually still compiles, assembles and installs -- that is exactly how `
+        + `v1.0.709 shipped missing eight dex files and took the ledger down for a day.\n`
+        + `Run: ./gradlew clean assembleFullDebug   (plain assemble will report UP-TO-DATE and do nothing)\n`
+        + `If the shrink is deliberate (minification, a release variant), re-run with --allow-shrink`);
+}
+
+/** Is this artifact older than the code it is supposed to contain? */
+function warnIfStale(apkPath) {
+    // ⚠️ GRADLE WILL TELL YOU A BROKEN ARTIFACT IS UP-TO-DATE. During the v1.0.709 outage
+    // `./gradlew assembleFullDebug` did nothing at all and reported success, because Gradle's view of the
+    // task was satisfied while the APK itself was missing content. The only thing that regenerated it was
+    // `clean`. So publishing an APK older than the newest source file is worth saying out loud.
+    try {
+        const srcDir = path.resolve("../accounting_app/app/src");
+        if (!fs.existsSync(srcDir)) return;
+        const apkTime = fs.statSync(apkPath).mtimeMs;
+        let newest = 0;
+        const walk = (dir) => {
+            for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) walk(full);
+                else newest = Math.max(newest, fs.statSync(full).mtimeMs);
+            }
+        };
+        walk(srcDir);
+        if (newest > apkTime) {
+            const hrs = ((newest - apkTime) / 3600000).toFixed(1);
+            console.log(`  ⚠️  WARNING: this APK is ${hrs}h OLDER than the newest source file. `
+                + `Gradle reports UP-TO-DATE even when the artifact is damaged -- run a clean build.`);
+        }
+    } catch { /* a stale-check that throws must never block a publish */ }
+}
+
 function parseArgs(argv) {
     const args = { variant: "debug" };
     for (let i = 0; i < argv.length; i += 1) {
@@ -114,6 +182,7 @@ function parseArgs(argv) {
         else if (a === "--flavor") args.flavor = argv[++i];
         else if (a === "--app") args.app = argv[++i];
         else if (a === "--notes") args.notes = argv[++i];
+        else if (a === "--allow-shrink") args.allowShrink = true;
     }
     return args;
 }
@@ -206,6 +275,17 @@ async function main() {
     // ⚠️ THE LAST MOMENT THIS CAN BE CAUGHT. Everything upstream of here -- compile, assemble,
     // install, file size -- was green for the APK that took the ledger down. See verifyApk.
     verifyApk(apkPath);
+    warnIfStale(apkPath);
+
+    // ⚠️ THE SIZE CHECK NEEDS THE DATABASE, SO THE POOL IS OPENED HERE RATHER THAN AFTER THE UPLOAD. Doing
+    // it the other way round would mean a damaged APK is already sitting in blob storage by the time it is
+    // refused -- and the next thing to read that store would serve it.
+    const guardPool = new Pool({ connectionString: dbUrl });
+    try {
+        await verifySize(guardPool, channel, sizeBytes, Boolean(args.allowShrink));
+    } finally {
+        await guardPool.end();
+    }
 
     console.log(`Channel: ${channel}`);
 
