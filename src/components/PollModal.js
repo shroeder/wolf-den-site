@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import useScrollLock from "@/lib/useScrollLock";
+import { claimLaunchCard, releaseLaunchCard } from "@/lib/marketplace/launch-modals.js";
 
 // ── ASKING THE DEN A DESIGN QUESTION ─────────────────────────────────────────────────────────────────────────
 // The survey asks the same three questions every round. This asks whatever is genuinely undecided right now —
@@ -60,11 +61,15 @@ export default function PollModal() {
                 if (localStorage.getItem(SNOOZE_PREFIX + d.poll.id)) return;
                 // Never on top of an announcement somebody has not read yet.
                 if (LAUNCH_KEYS.some((k) => !localStorage.getItem(k))) return;
+                // ⚠️ AND NOT ON TOP OF THE SURVEY. Both of these are full-screen cards that open on a timer
+                // after the page settles, so without a shared claim they simply both appear — which is what
+                // the rig photographed. One at a time; the loser comes back on the next visit.
+                if (!claimLaunchCard("poll")) return;
             } catch { return; }
             // Let the page settle before asking for anything.
             setTimeout(() => alive && setPoll(d.poll), 1400);
         })();
-        return () => { alive = false; };
+        return () => { alive = false; releaseLaunchCard("poll"); };
     }, []);
 
     const snooze = () => {

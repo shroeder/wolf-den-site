@@ -1,12 +1,5 @@
 import Link from "next/link";
-import { FaDharmachakra } from "react-icons/fa6";
-import {
-    GiAnvil, GiBullseye, GiCrossedSwords, GiOpenTreasureChest, GiPawPrint, GiPodium,
-    GiRibbonMedal, GiSailboat, GiScrollUnfurled, GiTrophyCup, GiBarn,
-} from "react-icons/gi";
 
-import GameHubStats from "@/components/GameHubStats";
-import HelmetSprite from "@/components/HelmetSprite";
 import RaidDefenseReport from "@/components/RaidDefenseReport";
 import ReferralInvite from "@/components/ReferralInvite";
 import VerifyNudge from "@/components/VerifyNudge";
@@ -35,22 +28,6 @@ export const metadata = {
     },
 };
 
-// THE GAME hub — the single "game" area (one entry in the site header) with its own dopamine-forward menu,
-// kept separate from real commerce (Shop / Vendor Marketplace). Every game feature is broken out here.
-const FEATURES = [
-    { href: "/marketplace/boss", Icon: GiCrossedSwords, title: "Weekly Boss", desc: "Land your daily strike on the shared boss for XP & raffle tickets.", tone: "boss" },
-    { href: "/marketplace/spin", Icon: FaDharmachakra, title: "Daily Spin", desc: "One free spin a day — gold, XP, chests… and the jackpot.", tone: "spin" },
-    { href: "/marketplace/pets", Icon: GiPawPrint, title: "Pets", desc: "Collect companions, equip one, and level it up.", tone: "pets" },
-    { href: "/marketplace/inventory", Icon: GiOpenTreasureChest, title: "Gear", desc: "Your loadout, the gold shop, and loot chests.", tone: "gear" },
-    { href: "/marketplace/blacksmith", Icon: GiAnvil, title: "The Forge", desc: "Salvage & enhance your gear — hammer it stronger on the anvil.", tone: "boss" },
-    { href: "/marketplace/sets", sprite: "helmet", title: "Gear Sets", desc: "Match pieces for set bonuses and capstones.", tone: "sets" },
-    { href: "/marketplace/quests", Icon: GiScrollUnfurled, title: "Quests", desc: "Fresh daily bounties → gold, chests & tokens.", tone: "quests" },
-    { href: "/marketplace/track", Icon: GiTrophyCup, title: "Rewards Track", desc: "See your next unlock and everything you've earned.", tone: "track" },
-    { href: "/marketplace/badges", Icon: GiRibbonMedal, title: "Badges", desc: "Every badge you've earned — pick 3 to show on your card.", tone: "track" },
-    { href: "/marketplace/leaderboard", Icon: GiPodium, title: "Leaderboard", desc: "Where you rank against the whole pack.", tone: "leader" },
-    { href: "/marketplace/bounties", Icon: GiBullseye, title: "Bounties", desc: "Post gold for real-world help — or claim someone else's.", tone: "bounty" },
-    { href: "/marketplace/invite", Icon: GiOpenTreasureChest, title: "Invite Friends", desc: "Share your link — you both earn 500 gold + a chest.", tone: "track" },
-];
 
 export default async function GamePlayHub({ searchParams }) {
     // Owner-only preview features (hidden from everyone else) surface an extra tile here.
@@ -103,13 +80,16 @@ export default async function GamePlayHub({ searchParams }) {
 
             {owner ? (
             <div className="game-hub-grid">
+                {/* Sprites here too — the owner tiles were the last two glyphs on the page. */}
                 <Link href="/marketplace/grove" className="game-tile tone-pets">
-                    <span className="game-tile-emoji" aria-hidden="true"><GiBarn /></span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <span className="game-tile-emoji" aria-hidden="true"><img src="/images/nav/farm.png" alt="" width={30} height={30} style={{ display: "block", objectFit: "contain" }} /></span>
                     <span className="game-tile-title">The Grove <span className="muted" style={{ fontSize: "0.7em" }}>· owner</span></span>
                     <span className="game-tile-desc">Seven maps of it, behind the preview flag.</span>
                 </Link>
                 <Link href="/marketplace/cards" className="game-tile tone-sets">
-                    <span className="game-tile-emoji" aria-hidden="true"><GiScrollUnfurled /></span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <span className="game-tile-emoji" aria-hidden="true"><img src="/images/nav/cards.png" alt="" width={30} height={30} style={{ display: "block", objectFit: "contain" }} /></span>
                     <span className="game-tile-title">Card Game <span className="muted" style={{ fontSize: "0.7em" }}>· owner</span></span>
                     <span className="game-tile-desc">The deck-building run and its four acts.</span>
                 </Link>

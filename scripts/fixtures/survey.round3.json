@@ -1,0 +1,139 @@
+{
+ "/api/marketplace/survey": {
+  "json": {
+   "ask": true,
+   "systems": [
+    {
+     "key": "arena",
+     "label": "The Arena",
+     "blurb": "Duels, the skill tree, the Long Road",
+     "art": "/images/guide/ch-arena.webp"
+    },
+    {
+     "key": "boss",
+     "label": "The World Boss",
+     "blurb": "The weekly boss everybody hits",
+     "art": "/images/nav/boss.png"
+    },
+    {
+     "key": "casino",
+     "label": "The Casino",
+     "blurb": "Slots, blackjack, keno, bingo",
+     "art": "/images/nav/casino.png"
+    },
+    {
+     "key": "dungeons",
+     "label": "The Dungeons",
+     "blurb": "Delve runs, a boss at the bottom",
+     "art": "/images/nav/delves.png"
+    },
+    {
+     "key": "mine",
+     "label": "The Mine",
+     "blurb": "Mining, smelting, the depths",
+     "art": "/images/nav/mining.png"
+    },
+    {
+     "key": "sailing",
+     "label": "Sailing",
+     "blurb": "Voyages, ship battles, digging",
+     "art": "/images/nav/sailing.png"
+    },
+    {
+     "key": "fishing",
+     "label": "Fishing",
+     "blurb": "Casting for species and records",
+     "art": "/images/nav/fishing.png"
+    },
+    {
+     "key": "farm",
+     "label": "The Farm",
+     "blurb": "Crops, decorations, visiting",
+     "art": "/images/nav/farm.png"
+    },
+    {
+     "key": "kitchen",
+     "label": "The Kitchen",
+     "blurb": "Recipes and cooking",
+     "art": "/images/guide/ch-kitchen.webp"
+    },
+    {
+     "key": "cards",
+     "label": "The Card Game",
+     "blurb": "The deck-building run",
+     "art": "/images/nav/cards.png"
+    },
+    {
+     "key": "town",
+     "label": "The Town",
+     "blurb": "The plaza, raids, the stockade",
+     "art": "/images/nav/town.png"
+    },
+    {
+     "key": "pets",
+     "label": "Pets",
+     "blurb": "Collecting and levelling companions",
+     "art": "/images/nav/pets.png"
+    },
+    {
+     "key": "gear",
+     "label": "Gear & sets",
+     "blurb": "Loot, sets, trading, the auction",
+     "art": "/images/nav/gear.png"
+    },
+    {
+     "key": "forge",
+     "label": "The Forge",
+     "blurb": "Salvage, combine, enhance",
+     "art": "/images/nav/forge.png"
+    },
+    {
+     "key": "wheel",
+     "label": "The Prize Wheel",
+     "blurb": "The daily spin",
+     "art": "/images/nav/spin.png"
+    },
+    {
+     "key": "quests",
+     "label": "Quests & badges",
+     "blurb": "Dailies, bounties, the shelf",
+     "art": "/images/nav/quests.png"
+    },
+    {
+     "key": "gems",
+     "label": "Gems & the Jeweller",
+     "blurb": "Cutting and socketing stones",
+     "art": "/images/guide/ch-jeweller.webp"
+    },
+    {
+     "key": "creations",
+     "label": "Creations",
+     "blurb": "Custom art for your farm",
+     "art": "/images/nav/creations.png"
+    }
+   ],
+   "pace": [
+    {
+     "key": "idle",
+     "label": "Keep it as it is",
+     "blurb": "I like checking in. Things ticking away while I am at work is the whole appeal."
+    },
+    {
+     "key": "active",
+     "label": "I would play something hands-on",
+     "blurb": "Give me something to actually play, moment to moment, when I have twenty minutes."
+    },
+    {
+     "key": "both",
+     "label": "Both, in that order",
+     "blurb": "Hands-on is welcome as long as nothing I already have stops ticking over."
+    },
+    {
+     "key": "nopref",
+     "label": "No strong feeling",
+     "blurb": "Honestly do not mind either way."
+    }
+   ]
+  }
+ }
+}

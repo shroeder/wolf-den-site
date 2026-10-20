@@ -1,7 +1,8 @@
 "use client";
 
 // ── SURVEY READ-OUT ──────────────────────────────────────────────────────────────────────────────────────────
-// Two numbers per system — how many called it their favourite, how many their least — drawn as a DIVERGING bar
+// Two numbers per system — how many called it their favourite, and (round 3 on) how many want MORE of it —
+// drawn as a DIVERGING bar
 // off a shared centre line. That shape is the whole point: a system with 6 loves and 5 dislikes and a system
 // nobody mentioned both score about zero net, and only the diverging bars tell you which is which. One is
 // divisive and worth a decision; the other is invisible and worth a different one.
@@ -15,15 +16,23 @@ const fmtDate = (d) => {
 };
 
 export default function SurveyResults({ data, round = 1, rounds = 1 }) {
-    const { responses = 0, systems = [], wishes = [], responsesList = [] } = data || {};
+    const { responses = 0, systems = [], wishes = [], responsesList = [], pace = [] } = data || {};
     // Round 1's answers are kept so the rounds can be read against each other; without a way to switch, that
     // is a promise the screen does not deliver on.
     const roundLinks = rounds > 1 ? Array.from({ length: rounds }, (_, i) => i + 1) : [];
     // System key → its display label, so the per-person table reads "The Kitchen" rather than "kitchen".
     const labelOf = Object.fromEntries(systems.map((s2) => [s2.key, s2.label]));
     // Both halves scale off the single largest count on either side, so the two wings stay comparable.
-    const peak = Math.max(1, ...systems.map((s) => Math.max(s.favorite, s.least)));
-    const answered = systems.reduce((n, s) => n + s.favorite + s.least, 0);
+    // ── THE OPPOSING WING CHANGED, BECAUSE THE QUESTION DID ──────────────────────────────────────────
+    // Rounds 1 and 2 set favourite against LEAST favourite. Round 3 dropped the least-favourite question for
+    // "which would you like MORE of", which is the more useful pairing: what people love, against where they
+    // want the next few months spent. They are not the same thing and the gap between them is the finding.
+    //
+    // Both are read, so an old round still draws exactly as it always did — `more` is simply zero there, and
+    // `least` is zero in round 3. No branch on the round number, which would be a second way to be wrong.
+    const against = (x) => Math.max(x.least || 0, x.more || 0);
+    const peak = Math.max(1, ...systems.map((x) => Math.max(x.favorite, against(x))));
+    const answered = systems.reduce((n, x) => n + x.favorite + against(x), 0);
 
     return (
         <div className="stack reveal">
@@ -51,7 +60,7 @@ export default function SurveyResults({ data, round = 1, rounds = 1 }) {
                 <section className="card">
                     <div className="svr-legend">
                         <span><i className="svr-dot is-fav" /> favourite</span>
-                        <span><i className="svr-dot is-least" /> least favourite</span>
+                        <span><i className="svr-dot is-least" /> want more of / least favourite</span>
                         <span className="muted">sorted by net</span>
                     </div>
                     <div className="svr-rows">
@@ -60,7 +69,7 @@ export default function SurveyResults({ data, round = 1, rounds = 1 }) {
                                 <span className="svr-name">{s.label}</span>
                                 <span className="svr-bars">
                                     <span className="svr-side is-l">
-                                        {s.least ? <span className="svr-bar is-least" style={{ width: `${(s.least / peak) * 100}%` }}>{s.least}</span> : null}
+                                        {against(s) ? <span className="svr-bar is-least" style={{ width: `${(against(s) / peak) * 100}%` }}>{against(s)}</span> : null}
                                     </span>
                                     <i className="svr-axis" aria-hidden="true" />
                                     <span className="svr-side is-r">
@@ -72,6 +81,34 @@ export default function SurveyResults({ data, round = 1, rounds = 1 }) {
                                 </span>
                             </div>
                         ))}
+                    </div>
+                </section>
+            ) : null}
+
+            {/* ── HOW THEY WANT TO SPEND THE TIME ────────────────────────────────────────────────────────
+                Round 3's reason for existing, and the one chart here that is NOT sorted by size. The split
+                is the finding — a bar list that reorders itself hides which way the room leans, and leaning
+                is the whole question. Authored order, every time. */}
+            {pace.length ? (
+                <section className="card">
+                    <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>How they want to spend the time</h2>
+                    <p className="muted" style={{ marginTop: 0, fontSize: "0.82rem" }}>
+                        Asked without naming anything: whether the Den should stay a thing you check on, or grow
+                        something you sit down and play.
+                    </p>
+                    <div className="svr-pace">
+                        {pace.map((o) => {
+                            const top = Math.max(1, ...pace.map((x) => x.n || 0));
+                            return (
+                                <div key={o.key} className="svr-pace-row">
+                                    <span className="svr-pace-label"><b>{o.label}</b><em>{o.blurb}</em></span>
+                                    <span className="svr-pace-track">
+                                        <span className="svr-pace-bar" style={{ width: `${((o.n || 0) / top) * 100}%` }} />
+                                    </span>
+                                    <span className="svr-pace-n">{o.n || 0}</span>
+                                </div>
+                            );
+                        })}
                     </div>
                 </section>
             ) : null}
@@ -121,6 +158,14 @@ export default function SurveyResults({ data, round = 1, rounds = 1 }) {
 
             <style jsx>{`
                 .svr-legend { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; font-size: 0.76rem; font-weight: 800; color: #9aa2ab; }
+                .svr-pace { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+                .svr-pace-row { display: grid; grid-template-columns: minmax(0,1fr) 120px 28px; gap: 10px; align-items: center; }
+                .svr-pace-label b { display: block; font-size: 0.86rem; }
+                .svr-pace-label em { display: block; font-style: normal; font-size: 0.72rem; color: #8d8599; line-height: 1.3; }
+                .svr-pace-track { height: 10px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+                .svr-pace-bar { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ffd75e, #ff9a3c); }
+                .svr-pace-n { text-align: right; font-weight: 900; font-size: 0.9rem; }
+                @media (max-width: 520px) { .svr-pace-row { grid-template-columns: minmax(0,1fr) 72px 24px; } }
                 .svr-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
                 .svr-dot.is-fav { background: #4ad07f; }
                 .svr-dot.is-least { background: #ff6f7d; }
