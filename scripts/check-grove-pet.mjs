@@ -15,6 +15,7 @@ import {
 } from "../src/lib/marketplace/grove-world.js";
 import { pouncePose, POUNCE, POUNCE_TOTAL_MS, SWING_TOTAL_MS } from "../src/lib/marketplace/grove-juice.js";
 import { COLLECTIBLES } from "../src/lib/marketplace/collectibles.js";
+import { GROVE_ZONES, GROVE_ENEMIES, scaledFoe } from "../src/lib/marketplace/grove-catalog.js";
 
 let fails = 0;
 const ok = (name, cond, extra = "") => {
@@ -128,5 +129,36 @@ for (let t = 0; t <= POUNCE_TOTAL_MS; t += 1) {
 }
 ok("every frame of it is bounded and on-stage", worst < 8, `worst offset ${worst}`);
 
-console.log(fails ? `\ncheck:grove-pet — ${fails} FAILED\n` : "\nOK — the pet's bite climbs with rarity and level, fails upward, stays support, and its pounce comes home.\n");
+// ── ⚠️ CAN THE PET ACTUALLY REACH A FIGHT BEFORE IT IS OVER? ────────────────────────────────────────────────
+// The one thing every other check passed while the feature was, in ordinary play, doing nothing at all.
+//
+// The cadence was gating the OPENING bite as well as the repeat ones. A member hitting for 413 (measured in
+// the live game, not invented) kills a zone-one-to-six creature in 410-820ms; the first bite could not land
+// before petBiteCd + coil = 915ms. So across half the forest the pet crossed to the flank, arrived, and the
+// creature was already dead. On a boss it bit a hundred times and looked perfect, which is precisely why the
+// bench -- whose creature has 6,000 health so it can be filmed -- never showed it.
+//
+// This asserts the SHAPE of that trap rather than the fix: if an ordinary creature dies faster than one
+// cadence, then the opening bite must not be on the cadence. GroveScene clears petAt on a new target to
+// honour that; if someone re-gates it, this is the note that says why they must not.
+console.log("\nCAN IT REACH THE FIGHT IN TIME");
+const REF_BLOW = 413;        // one blow from a mid-game member, measured in The Old Stand
+const heroCd = SWING_TOTAL_MS;
+const openIfGated = petBiteCd(heroCd) + POUNCE.coilMs;
+const quick = [];
+for (const z of GROVE_ZONES.slice(0, 12)) {
+    const id = Array.isArray(z.enemies) ? z.enemies[0] : z.enemy;
+    const base = GROVE_ENEMIES[id];
+    if (!base) continue;
+    const hp = (typeof scaledFoe === "function" ? scaledFoe(id, z.n)?.hp : null) ?? base.hp;
+    const ttk = (Math.ceil(hp / REF_BLOW) - 1) * heroCd;
+    if (ttk < openIfGated) quick.push(`${z.name} (${ttk}ms)`);
+}
+ok(`ordinary creatures die faster than one pet cadence (${quick.length} of 12 zones), so the opening bite cannot be gated on it`,
+    quick.length > 0, "if this ever fails the trap is gone and the note above can go with it");
+console.log(`     dies inside ${openIfGated}ms: ${quick.join(", ") || "none"}`);
+ok("the pounce's coil is short enough to fit inside the quickest kill",
+    POUNCE.coilMs < 410, `coil ${POUNCE.coilMs}ms vs a 410ms one-blow kill`);
+
+console.log(fails ? `\ncheck:grove-pet — ${fails} FAILED\n` : "\nOK — the pet's bite climbs with rarity and level, fails upward, stays support, reaches the fight, and its pounce comes home.\n");
 process.exit(fails ? 1 : 0);

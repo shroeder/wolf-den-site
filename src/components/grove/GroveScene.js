@@ -1205,7 +1205,27 @@ export default function GroveScene({
                     // hero's current position it flips the instant he steps past the creature's centre,
                     // and the pet turns round and re-crosses — which at a jittering stand-off distance
                     // is a companion running back and forth through a rootrat for ever.
-                    if (w.petFoe !== tgt) w.petSide = Math.sign(tgt.x - w.hero.x) || 1;
+                    if (w.petFoe !== tgt) {
+                        w.petSide = Math.sign(tgt.x - w.hero.x) || 1;
+                        // ── ⚠️ A NEW TARGET GETS THE FIRST BITE FREE, AND WITHOUT THIS THE PET NEVER
+                        //        ATTACKS ANYTHING AT ALL ────────────────────────────────────────────
+                        // The cadence exists to stop a fast build turning its companion into a strobe
+                        // DURING a sustained fight. Applied to the opening bite as well it gates the one
+                        // bite most fights ever get to: measured against the live game, a member hitting
+                        // for 413 kills an ordinary creature in 410-820ms, and the first bite could not
+                        // arrive before 915ms. Zones one to six, every creature, every time: the pet
+                        // crossed to the flank, arrived, and the fight was already over.
+                        //
+                        // It worked perfectly on a boss -- 104 bites across 85 seconds -- which is exactly
+                        // why nothing caught it. The bench scene gives its creature 6,000 health so it can
+                        // be filmed, so the only fight anybody had ever watched was a long one.
+                        //
+                        // Clearing petAt makes the first bite available the moment the pet is in reach,
+                        // and the cadence takes over from the second bite on. Switching targets re-arms it,
+                        // which is not exploitable: changing target restarts the HERO's swing too, so the
+                        // trade is symmetric, and the bite is a tenth of a blow.
+                        w.petAt = null;
+                    }
                     w.petFoe = tgt;
                     w.petEngagedUntil = now + PET_ENGAGE_MS;
                 }

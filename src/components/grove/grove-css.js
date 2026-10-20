@@ -481,6 +481,21 @@ export const GROVE_CSS = `
 
 /* The hero and the pet. The gradient stays as the BACKGROUND of the box, so it is what shows through when
    there is no sprite yet — a fallback that is a CSS background cannot itself fail to load. */
+/* ── ⚠️ NEITHER OF THEM MAY EAT A TAP ─────────────────────────────────────────────────────────
+   The hero's box is 148px square on a 390px phone -- 38% of the width -- and the pet's is 95px. Both are
+   painted AFTER the creatures (document order is the whole stacking rule here), so anything standing on or
+   next to you is behind them. With pointer-events left at the default, a tap aimed at a creature inside
+   either box lands on the sprite's img instead, falls through to the scene's own handler, and is read as
+   "walk to where you are already standing". Nothing happens, and nothing says why.
+
+   Probed in the live game: EVERY creature on screen was untappable on three runs out of three. The whole
+   input vocabulary of this feature is "tap the thing you want to hit", and the thing you most want to hit
+   is the one that has walked up to you.
+
+   Neither element is interactive -- no handler, no role, no focus. The creatures are real <button>s, the
+   doors have their own hit box, and the scene behind handles walk-taps. So this costs nothing and is the
+   whole fix. See [[farm-z-order-steals-taps]], which is the same bug in the Farm. */
+.gv-hero, .gv-pet { pointer-events: none; }
 .gv-hero { background: radial-gradient(circle at 50% 40%, #ffe28a, #c8872e 62%, transparent 70%); }
 .gv-pet { background: radial-gradient(circle at 50% 40%, #9fe08a, #3f7a35 62%, transparent 70%); }
 .gv-hero:has(img), .gv-pet:has(img) { background: none; }
