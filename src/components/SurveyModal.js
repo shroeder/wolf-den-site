@@ -83,13 +83,17 @@ export default function SurveyModal() {
         setSystems(null);
     };
 
+    const [paid, setPaid] = useState(false);
     const submit = async (finalWish) => {
         setBusy(true);
-        await fetch("/api/marketplace/survey", {
+        const res = await fetch("/api/marketplace/survey", {
             method: "POST", credentials: "same-origin",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ favorite, more, pace, wish: finalWish ?? wish }),
-        }).catch(() => { /* the answer is nice-to-have; never block the UI on it */ });
+        }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        // Only claimed when the server says it actually granted one — a member who is answering a second
+        // time has already been paid, and promising them a chest they will not find is worse than silence.
+        setPaid(Boolean(res?.chest));
         setBusy(false);
         setStep(4);
     };
@@ -174,6 +178,9 @@ export default function SurveyModal() {
                         <>
                             <div className="svy-done" aria-hidden="true">✓</div>
                             <h2>Thanks — that genuinely helps</h2>
+                            {paid ? (
+                                <p className="svy-chest">A <b>Mythic Chest</b> is on your account.</p>
+                            ) : null}
                             <p className="svy-sub">
                                 You can change your mind any time; answering again just replaces what you said.
                             </p>
@@ -223,6 +230,7 @@ export default function SurveyModal() {
                 .svy-go:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
                 .svy-skip { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 0; background: transparent;
                     cursor: pointer; font-size: 0.78rem; font-weight: 800; color: #8f88a0; }
+                .svy-chest { margin: 0 0 10px; font-size: 0.92rem; color: #ffd75e; font-weight: 800; }
                 .svy-done { width: 54px; height: 54px; margin: 2px auto 8px; border-radius: 50%; display: grid; place-items: center;
                     font-size: 26px; font-weight: 900; color: #06240f; background: linear-gradient(180deg, #b9ffd0, #4ad07f); }
                 @media (max-width: 380px) { .svy-grid { grid-template-columns: 1fr; } }

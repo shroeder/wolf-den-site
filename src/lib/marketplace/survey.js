@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { addChests } from "@/lib/marketplace/chests.js";
 
 // ── THE MEMBER SURVEY ────────────────────────────────────────────────────────────────────────────────────────
 // Which systems people actually LIKE. Telemetry already says what gets used, which is a different question — a
@@ -49,6 +50,33 @@ export const surveyOpen = (now = Date.now()) => now >= SURVEY_OPENS && now < SUR
 // COUNTED, NOT ESTIMATED, AND ONLY ONCE -- the count scans one member's events over thirty days, which is not
 // free, so it runs only after the cheap tests have passed. See shouldAsk.
 export const SURVEY_MIN_ACTIONS = 1000;
+
+// -- WHAT ANSWERING IS WORTH ---------------------------------------------------------------------------------
+// Luke: "the survey should reward a mythic chest."
+//
+// Mythic is the highest tier that carries no real-world money -- celestial and primordial pay store credit at
+// the till, and a reward for filling in a form is not where that belongs. It is also the tier the casino
+// ladder already hands out, so the economy has a price for it: the Den mints about 1,300 a month, so a round
+// of this is roughly two days of ordinary supply, once.
+//
+// PAID PER ROUND, ONCE. Answering again is explicitly allowed -- the thanks screen says so, and a member who
+// changes their mind should not have to choose between an honest answer and keeping the chest. The grant
+// ledger is what makes that safe: one `survey_rN` row per member per round, checked before paying, so the
+// second answer pays nothing and nobody has to remember not to re-submit.
+export const SURVEY_CHEST = "mythic";
+export const surveyChestSource = (round = SURVEY_ROUND) => `survey_r${round}`;
+
+/** Pay the chest for answering, unless this member has already been paid for this round. Returns true if it
+ *  actually granted, so the caller can tell the member what they got rather than guessing. */
+export async function paySurveyChest(buyerId, round = SURVEY_ROUND) {
+    const source = surveyChestSource(round);
+    const had = await db.queryOne(
+        `SELECT 1 AS x FROM mkt_chest_grant WHERE buyer_id = $1 AND source = $2 LIMIT 1`, [buyerId, source]
+    ).catch(() => ({ x: 1 }));   // on a DB error, assume paid: a double chest is worse than a missing one
+    if (had) return false;
+    await addChests(buyerId, { [SURVEY_CHEST]: 1 }, { source, meta: { round } }).catch(() => {});
+    return true;
+}
 
 // ── THE SYSTEMS ON OFFER ─────────────────────────────────────────────────────────────────────────────────────
 // Round 2 adds what shipped since round 1 — the Arena above all, which was literally the most-asked-for thing
@@ -175,7 +203,10 @@ export async function saveResponse(buyerId, { favorite, least, more, pace, wish 
         [buyerId, fav, lst, mor, pce, note || null, SURVEY_ROUND]
     ).catch(() => {});
     await trackActivity(buyerId, "survey_answer", { round: SURVEY_ROUND, favorite: fav, more: mor, pace: pce, wrote: Boolean(note) }).catch(() => {});
-    return { ok: true };
+    // After the answer is safely written, never before: a chest paid for a row that failed to save is a
+    // reward for nothing, and the member would have no way to tell.
+    const chest = await paySurveyChest(buyerId).catch(() => false);
+    return { ok: true, chest };
 }
 
 /** Tallies for the admin read-out: how many picked each system as their favorite / least favorite. */
