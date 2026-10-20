@@ -1,0 +1,174 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { FaDharmachakra } from "react-icons/fa6";
+import {
+    GiAnvil, GiBullseye, GiCrossedSwords, GiFishingPole, GiMineWagon, GiOpenTreasureChest,
+    GiPawPrint, GiPodium, GiRibbonMedal, GiRoundTable, GiSailboat, GiScrollUnfurled,
+    GiTrophyCup, GiBarn, GiCookingPot,
+} from "react-icons/gi";
+
+import Glyph from "@/components/Glyph";
+import HelmetSprite from "@/components/HelmetSprite";
+import { hudFeed } from "@/lib/hud-feed";
+import { nudgeFeed } from "@/lib/nudge-feed";
+
+// ── THE GAME HUB ─────────────────────────────────────────────────────────────────────────────────────────────
+// Luke, looking at the old one: "This page looks ugly and needs a lot of work it should be sexy."
+//
+// WHAT IT WAS. A text card reading "The Wolf Den Game — level up, fight the boss, collect pets & gear, and
+// spin the wheel", then a full-width invite panel, then twelve identical grey tiles. Three problems, and the
+// third is the one that matters:
+//
+//   1. THE HEADLINE TOLD A LEVEL 43 PLAYER WHAT THE GAME IS. They know. It is the page they open every day.
+//   2. THE INVITE CARD HELD THE SECOND SLOT FOREVER for a thing you do once.
+//   3. NOTHING ON IT WAS ALIVE. Twelve doors, all the same size, none of them saying whether there was
+//      anything behind them. The member had to open the Mine to find out the Mine had nothing today.
+//
+// Every number needed to fix (3) was already on the page. GameNav asks /api/marketplace/hud in the layout —
+// chests, spins, boss strikes, quests, crops, free chips, arena fights, mine trips, delve runs — and this
+// used to ignore all of it and call /api/marketplace/spin for one figure. It rides the same reply now (see
+// hud-feed.js), so the hub got livelier and cheaper in the same change.
+//
+// ⚠️ A BADGE IS ONLY DRAWN WHEN IT IS A REASON TO TAP. Zero is never rendered. A row of grey "0"s is a wall
+// of disappointment and it is also how you teach somebody to stop reading the badges.
+
+// What is ACTIONABLE right now, in the order a member would want it. Each reads one field off the HUD reply.
+// `tone` drives the colour; `want` turns a raw count into the sentence on the chip.
+const READY = [
+    { key: "spin", href: "/marketplace/spin", tone: "spin", Icon: FaDharmachakra,
+        n: (h) => h.spins, want: (n) => (n === 1 ? "Free spin ready" : `${n} spins ready`) },
+    { key: "boss", href: "/marketplace/boss", tone: "boss", Icon: GiCrossedSwords,
+        n: (h) => h.bossStrikes, want: (n) => (n === 1 ? "Boss strike ready" : `${n} boss strikes`) },
+    { key: "chests", href: "/marketplace/inventory", tone: "gear", Icon: GiOpenTreasureChest,
+        n: (h) => h.chests, want: (n) => `${n} chest${n === 1 ? "" : "s"} to open` },
+    { key: "quests", href: "/marketplace/quests", tone: "quests", Icon: GiScrollUnfurled,
+        n: (h) => h.questsReady, want: (n) => `${n} quest${n === 1 ? "" : "s"} to claim` },
+    { key: "crops", href: "/marketplace/farm", tone: "pets", Icon: GiBarn,
+        n: (h) => h.farm?.cropsReady, want: (n) => `${n} crop${n === 1 ? "" : "s"} ready` },
+    { key: "arena", href: "/marketplace/arena", tone: "boss", Icon: GiCrossedSwords,
+        n: (h) => (h.arena?.unlocked ? h.arena.fightsLeft : 0), want: (n) => `${n} arena fight${n === 1 ? "" : "s"}` },
+    { key: "mine", href: "/marketplace/mining", tone: "quests", Icon: GiMineWagon,
+        n: (h) => (h.mine?.unlocked ? h.mine.trips : 0), want: (n) => `${n} mine trip${n === 1 ? "" : "s"}` },
+    { key: "casts", href: "/marketplace/fishing", tone: "sets", Icon: GiFishingPole,
+        n: (h) => (h.sailing?.fishing ? h.sailing.casts : 0), want: (n) => `${n} cast${n === 1 ? "" : "s"} left` },
+    { key: "chips", href: "/marketplace/casino", tone: "track", Icon: GiRoundTable,
+        n: (h) => (h.casinoChips ? 1 : 0), want: () => "Free chips waiting" },
+    { key: "delves", href: "/marketplace/dungeons", tone: "bounty", Icon: GiOpenTreasureChest,
+        n: (h) => (h.delves?.unlocked ? h.delves.runs : 0), want: (n) => `${n} dungeon run${n === 1 ? "" : "s"}` },
+];
+
+// The doors. `badge` is the live count drawn in the corner; everything without one is a place rather than a
+// chore, and gets no badge at all rather than a zero.
+const TILES = [
+    { href: "/marketplace/boss", Icon: GiCrossedSwords, title: "Weekly Boss", desc: "Strike the shared boss for XP and raffle tickets.", tone: "boss", badge: (h) => h.bossStrikes, big: true },
+    { href: "/marketplace/spin", Icon: FaDharmachakra, title: "Daily Spin", desc: "One free spin a day — gold, chests, the jackpot.", tone: "spin", badge: (h) => h.spins, big: true },
+    { href: "/marketplace/inventory", Icon: GiOpenTreasureChest, title: "Gear & Chests", desc: "Your loadout, the shop, and everything unopened.", tone: "gear", badge: (h) => h.chests },
+    { href: "/marketplace/pets", Icon: GiPawPrint, title: "Pets", desc: "Collect companions, equip one, level it up.", tone: "pets" },
+    { href: "/marketplace/farm", Icon: GiBarn, title: "The Farm", desc: "Crops grow while you are gone. Pets roam it.", tone: "pets", badge: (h) => h.farm?.cropsReady, when: () => true },
+    { href: "/marketplace/arena", Icon: GiCrossedSwords, title: "Arena", desc: "Fight the pack and climb the NPC ladder.", tone: "boss", badge: (h) => h.arena?.fightsLeft, when: (h) => h.arena?.unlocked },
+    { href: "/marketplace/mining", Icon: GiMineWagon, title: "The Mine", desc: "Push your luck downward for ore and gems.", tone: "quests", badge: (h) => h.mine?.trips, when: (h) => h.mine?.unlocked },
+    { href: "/marketplace/fishing", Icon: GiFishingPole, title: "Fishing", desc: "Cast for the kitchen, and for what is deeper.", tone: "sets", badge: (h) => h.sailing?.casts, when: (h) => h.sailing?.fishing },
+    { href: "/marketplace/sailing", Icon: GiSailboat, title: "Sailing", desc: "Send the boat out, dig up what it finds.", tone: "sets", when: (h) => h.sailing?.fishing },
+    { href: "/marketplace/cooking", Icon: GiCookingPot, title: "The Kitchen", desc: "Turn the harvest into buffs worth timing.", tone: "quests", when: (h) => h.kitchen },
+    { href: "/marketplace/casino", Icon: GiRoundTable, title: "The Casino", desc: "Five cabinets, a wheel, and a card table.", tone: "track", badge: (h) => (h.casinoChips ? "!" : 0), when: (h) => h.casino },
+    { href: "/marketplace/dungeons", Icon: GiOpenTreasureChest, title: "Dungeons", desc: "A run with a boss at the bottom of it.", tone: "bounty", badge: (h) => h.delves?.runs, when: (h) => h.delves?.unlocked },
+    { href: "/marketplace/blacksmith", Icon: GiAnvil, title: "The Forge", desc: "Salvage and enhance — hammer it stronger.", tone: "boss" },
+    { href: "/marketplace/quests", Icon: GiScrollUnfurled, title: "Quests", desc: "Fresh daily bounties for gold and chests.", tone: "quests", badge: (h) => h.questsReady },
+    { href: "/marketplace/sets", sprite: "helmet", title: "Gear Sets", desc: "Match pieces for set bonuses and capstones.", tone: "sets" },
+    { href: "/marketplace/track", Icon: GiTrophyCup, title: "Rewards Track", desc: "Your next unlock, and everything earned.", tone: "track" },
+    { href: "/marketplace/badges", Icon: GiRibbonMedal, title: "Badges", desc: "Every badge — pick three for your card.", tone: "track" },
+    { href: "/marketplace/leaderboard", Icon: GiPodium, title: "Leaderboard", desc: "Where you rank against the whole pack.", tone: "leader" },
+    { href: "/marketplace/bounties", Icon: GiBullseye, title: "Bounties", desc: "Post gold for real help, or claim someone's.", tone: "bounty" },
+];
+
+export default function PlayHub({ name = "", avatar = null, level = null }) {
+    const [hud, setHud] = useState(null);
+    const [unlock, setUnlock] = useState(null);
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            // Both of these are already in flight for this page load — the HUD for the menu, the nudge feed
+            // for the root-layout watchers. Neither call opens a request of its own.
+            const [h, u] = await Promise.all([
+                hudFeed(),
+                nudgeFeed().then((d) => d?.nextUnlock || null).catch(() => null),
+            ]);
+            if (!alive) return;
+            setHud(h); setUnlock(u);
+        })();
+        const onRefresh = () => { hudFeed().then((h) => alive && setHud(h)); };
+        window.addEventListener("wolfden-hud-refresh", onRefresh);
+        return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
+    }, []);
+
+    const ready = hud ? READY.map((r) => ({ ...r, n: Number(r.n(hud)) || 0 })).filter((r) => r.n > 0) : [];
+    const tiles = TILES.filter((t) => !t.when || (hud && t.when(hud)));
+
+    return (
+        <div className="ph">
+            {/* ── THE HERO ── who you are, not what the game is. */}
+            <section className="ph-hero">
+                <div className="ph-hero-art" aria-hidden="true">
+                    {avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatar} alt="" />
+                    ) : <span className="ph-hero-fallback"><GiPawPrint /></span>}
+                </div>
+                <div className="ph-hero-body">
+                    <div className="ph-hero-kick">
+                        {name ? `Welcome back, ${name}` : "Welcome back"}
+                        {level != null ? <span className="ph-lv">Lv {level}</span> : null}
+                    </div>
+                    {/* ⚠️ THE BAR IS A DISTANCE, NOT A PAT ON THE HEAD. It names the thing it is counting
+                        toward, because a progress bar with no prize at the end of it is decoration. */}
+                    {unlock && !unlock.maxed && unlock.label ? (
+                        <>
+                            <div className="ph-bar"><span style={{ width: `${unlock.pct || 0}%` }} /></div>
+                            <div className="ph-next">
+                                Next: <Glyph value={unlock.icon} /> <b>{unlock.label}</b>
+                                <span className="muted"> · {(unlock.xpToGo || 0).toLocaleString()} XP to go</span>
+                            </div>
+                        </>
+                    ) : unlock ? (
+                        <div className="ph-next muted">{(unlock.xp || 0).toLocaleString()} XP</div>
+                    ) : <div className="ph-next muted">&nbsp;</div>}
+                </div>
+            </section>
+
+            {/* ── READY NOW ── only what can be done this minute. Collapses to nothing when nothing can. */}
+            {ready.length ? (
+                <section className="ph-ready" aria-label="Ready now">
+                    <h2 className="ph-ready-h">Ready now</h2>
+                    <div className="ph-rail">
+                        {ready.map((r) => (
+                            <Link key={r.key} href={r.href} className={`ph-chip tone-${r.tone}`}>
+                                <span className="ph-chip-ico" aria-hidden="true"><r.Icon /></span>
+                                <span>{r.want(r.n)}</span>
+                            </Link>
+                        ))}
+                    </div>
+                </section>
+            ) : null}
+
+            <div className="ph-grid">
+                {tiles.map((t) => {
+                    const n = hud && t.badge ? t.badge(hud) : 0;
+                    return (
+                        <Link key={t.href} href={t.href} className={`ph-tile tone-${t.tone}${t.big ? " is-big" : ""}`}>
+                            <span className="ph-tile-ico" aria-hidden="true">
+                                {t.sprite === "helmet" ? <HelmetSprite size={34} /> : <t.Icon />}
+                            </span>
+                            <span className="ph-tile-title">{t.title}</span>
+                            <span className="ph-tile-desc">{t.desc}</span>
+                            {/* Zero is never drawn — see the note at the top. */}
+                            {n ? <span className="ph-tile-badge">{n}</span> : null}
+                        </Link>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}

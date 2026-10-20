@@ -20,6 +20,7 @@ import BadgePop from "@/components/BadgePop";
 import ForgeAnnounce from "@/components/ForgeAnnounce";
 import { useItemSprite } from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
+import { hudFeed, refreshHud } from "@/lib/hud-feed";
 
 // The Sets menu icon: the die-cut Warplate Helm sprite (falls back to a helmet emoji until it loads) — a real
 // piece of gear reads far better here than the old puzzle-piece glyph.
@@ -135,9 +136,12 @@ export default function GameNav() {
         // Mine in it, with nothing to say so. The cooking fetch used to carry this retry alone; now that one
         // reply decides the whole strip, it matters fourteen times as much. A wrong "no" costs one more request
         // a second later, and only ever when the first answer was negative.
+        // Through hudFeed so the game hub's tile badges ride THIS reply instead of opening a second one.
+        // refreshHud() first on a re-read: the shared promise is the thing being replaced, and a `load(1)`
+        // that re-used the cached answer would retry nothing.
         const load = (attempt = 0) => {
-            fetch("/api/marketplace/hud", { cache: "no-store", credentials: "same-origin" })
-                .then((r) => (r.ok ? r.json() : null))
+            if (attempt > 0) refreshHud();
+            hudFeed()
                 .then((d) => {
                     if (dead) return;
                     if (d) setHud(d);
