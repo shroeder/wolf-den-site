@@ -171,6 +171,24 @@ export const GROVE_CSS = `
    the journey runs. */
 .gv-paper { width: 100%; height: 100%; overflow: auto hidden; -webkit-overflow-scrolling: touch;
     scrollbar-width: none; border-radius: 12px; }
+/* ── ⚠️ THE MAP NEEDS A DEFINITE HEIGHT, AND IN A ZONE NOTHING WAS GIVING IT ONE ──────────────
+   Luke: "When i click the map while in the grove its teeny on vertical phone."
+
+   The chart sizes itself BACKWARDS compared to everything else on this screen: .gv-paper-in is
+   aspect-ratio 2/1 with height:100%, so its WIDTH is derived from its height. That is fine wherever a
+   parent hands it a real height -- and exactly one rule does, .gv.is-full .gv-paper { flex: 1 }, which
+   only matches when the map is the whole screen on the hub.
+
+   Opened from inside a zone it is not there. It is rendered through a createPortal into .gv-zsheet, which
+   is outside .gv.is-full entirely, so height:100% has no definite parent to resolve against, collapses to
+   its content, and drags the width down with it through the aspect-ratio. Hence a postage stamp, and hence
+   only in a zone -- the hub map, which Luke has never complained about, is the same markup under the rule
+   that works.
+
+   A viewport height is the right fix rather than another flex chain: the sheet is position:fixed over the
+   whole screen, so vh IS its height, and this cannot be undone by whatever the portal is nested in. The
+   floor stops a short landscape phone collapsing it again. */
+.gv-zsheet .gv-paper { height: min(60vh, 520px); min-height: 280px; }
 .gv-paper::-webkit-scrollbar { display: none; }
 /* ⚠️ 2:1, WIDER THAN THE PLATE IS. Twelve places across a 3:2 chart sit 88px apart, which is barely
    wider than the symbols themselves; at 2:1 they get 109 and stop crowding. The plate covers the box and
