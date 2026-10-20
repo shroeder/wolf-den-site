@@ -2357,6 +2357,10 @@ export default function GroveScene({
             <div className="gv-world" ref={worldLayerRef}>
                 {/* The backdrop, mirror-tiled so it can scroll. Five tiles covers any viewport plus a full
                     two-tile wrap; they share one decoded bitmap, so the extra nodes cost nothing. */}
+                {/* ⚠️ BEHIND THE PLATE AND OUTSIDE .gv-sky, so it neither scrolls with the tiles nor gets
+                    clipped to their height. It only shows where the world-sized plate stops short of the
+                    top of the screen -- nothing at all on anything short and wide. See .gv-haze. */}
+                <div className="gv-haze" style={{ "--gv-haze-img": `url(${zone.bg})` }} aria-hidden="true" />
                 <div className="gv-sky" ref={(n) => { if (worldRef.current) worldRef.current.skyNode = n; }}>
                     {Array.from({ length: SKY_TILE_COUNT }, (_, i) => i).map((i) => (
                         <div key={i} className="gv-sky-t" style={{ backgroundImage: `url(${zone.bg})` }} />

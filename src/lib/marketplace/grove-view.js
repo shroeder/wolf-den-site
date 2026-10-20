@@ -41,8 +41,41 @@ export const GROUND_OF_PLATE = 0.13;
 export const SPAN_NARROW = 44;
 export const SPAN_MID = 56;
 export const SPAN_WIDE = 68;
-export const HERO_MIN_VH = 0.19;
+// ── ⚠️ 0.13, AND THE PLATE IS WHAT MADE 0.19 UNMOVABLE ──────────────────────────────────────────────────────
+// Luke: "The grove on mobile is too zoomed in to the character." A phone saw 17 world units across while a
+// laptop saw 59 -- the hero was 41% of the width of a phone screen and 12% of a laptop's.
+//
+// Every previous attempt to pull the camera back hit the same wall. The hero is scaled by the WORLD; the
+// backdrop was scaled to COVER THE VIEWPORT. Those are independent, so zooming out shrank the hero and left
+// the painted grass exactly where it was, and he waded into it -- the ant-in-a-forest bug, which
+// check-grove.mjs correctly refuses. That looked like a hard constraint from the art. It was not: it was
+// the plate being sized against the screen instead of against the world.
+//
+// Size the plate in WORLD UNITS (see PLATE_UNITS) and the two shrink together. The hero stands exactly as
+// proud of the grass at any zoom, because the ratio no longer contains the viewport at all:
+//
+//     heroOverGround = HERO_UNITS / (GROUND_OF_PLATE * PLATE_UNITS)      -- a constant
+//
+// So this number is finally free to be chosen for how the game READS rather than for what the backdrop
+// will tolerate. 0.13 gives a phone 25 units across instead of 17.
+export const HERO_MIN_VH = 0.13;
 export const HERO_MAX_VH = 0.26;
+
+// ── ⚠️ HOW TALL THE PLATE IS, IN WORLD UNITS ────────────────────────────────────────────────────────────────
+// The number that replaces "cover the viewport". It is not invented: it is what the old scheme already
+// produced, so the painting's relationship to the hero is preserved exactly rather than re-tuned.
+//
+//     old plate height = vh * SKY_HEADROOM = 1.12vh, at unit = 0.19vh/7  ->  1.12 / (0.19/7) = 41.3 units
+//
+// Which is why heroOverGround still comes out at 1.30, the value every backdrop was drawn against and the
+// value check-grove.mjs asserts. Raising this zooms the PAINTING out without touching the world; lowering
+// it is the grass-taller-than-the-knight bug.
+export const PLATE_UNITS = 41.3;
+// ⚠️ AND A FLOOR, OR A WIDE SHORT SCREEN PAINTS A LETTERBOX. On a landscape phone the span term wins and
+// unit falls far enough that a world-sized plate would occupy under half the height, leaving more haze than
+// painting. Below this the plate goes back to covering, and the hero simply reads a little taller against
+// the grass there -- which is the right way to fail, because that is the screen with the least grass on it.
+export const MIN_PLATE_OF_VH = 0.72;
 
 // ⚠️ 0.13 RATHER THAN 0.09 BECAUSE OF WHAT A PORTRAIT PHONE LOOKS LIKE. At 0.09 the hero was a perfectly
 // reasonable 76px and the frame was still 90% empty canopy, with the whole zone in a strip along the bottom.
@@ -157,7 +190,21 @@ export function viewFor(vw, vh, topY = 0) {
     // by laying down more tiles; only the HEIGHT has to be covered by one. Carrying a vw-based term here
     // forced a 3440px screen to render the plate 2293px tall — a 2.24x stretch of a 1536px painting, for
     // no reason at all. Height alone now, which means the stretch depends only on how tall the viewport is.
-    const skyBoxH = vh * SKY_HEADROOM;
+    // ⚠️ THE PLATE IS SIZED BY THE WORLD NOW, NOT BY THE SCREEN. This one line is the whole fix: with the
+    // plate in world units, the grass and the hero shrink together and the zoom is free. See PLATE_UNITS.
+    //
+    // ⚠️ AND IT MAY BE SHORTER THAN THE VIEWPORT, WHICH IS THE PRICE AND IT IS PAYABLE. On a tall narrow
+    // phone a world-sized plate no longer reaches the top of the screen. Measured across all 84 backdrops,
+    // the top 8% of 64 of them is flat atmospheric haze a gradient continues invisibly; 14 are middling and
+    // 6 are busy enough to show a seam (fernway, boar_run, wirewood_stand, kelpforest, ember_drift,
+    // palisade). The scene paints that band with the plate's own top colour -- see hazeH, and the note on
+    // .gv-haze in grove-css.js.
+    // ⚠️ AND A CEILING AT THE OLD COVER HEIGHT, OR AN ULTRAWIDE PAINTS A MURAL. There the span term wins
+    // and unit reaches 50px, so a world-sized plate would be 2090px tall for a 1440px screen -- a 2.04x
+    // upscale of a 1536px source, which check-grove.mjs correctly calls soft next to crisp sprites. The
+    // plate never needs to be taller than it was before; above this it just goes back to covering, and the
+    // hero reads a little MORE proud of the grass there, which is the safe direction to fail in.
+    const skyBoxH = Math.min(vh * SKY_HEADROOM, Math.max(vh * MIN_PLATE_OF_VH, PLATE_UNITS * unit));
 
     const groundPx = GROUND_OF_PLATE * skyBoxH;
     return {
@@ -167,6 +214,9 @@ export function viewFor(vw, vh, topY = 0) {
         skyUnits: Math.max(40, vh - groundPx) / unit,
         groundPx,
         skyBoxH,
+        // How much bare sky sits above the plate, in px. Zero on anything short and wide, where the
+        // world-sized plate still overtops the viewport and gets cropped exactly as it always did.
+        hazeH: Math.max(0, vh - skyBoxH),
         tileW: skyBoxH * PLATE_AR,
         heroPx: HERO_UNITS * unit,
         // ⚠️ THE NUMBER THAT DECIDES WHETHER HE LOOKS LIKE A PERSON OR AN INSECT. Above 1 the hero

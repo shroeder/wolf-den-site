@@ -354,8 +354,39 @@ export const GROVE_CSS = `
    Anchored BOTTOM and taller than the scene, so the vertical camera has painted sky to pan into rather
    than a hole. Width is left to the flex children so the strip sizes itself to its tiles. The loop writes
    --gv-sky-h / --gv-sky-w and the transform; see SKY_PX / SKY_PY in GroveScene.js. */
+/* ── ⚠️ THE SKY ABOVE THE PLATE ────────────────────────────────────────────────────────────────
+   The plate is sized in WORLD units now (see PLATE_UNITS in grove-view.js), which is what let the camera
+   finally pull back without the hero drowning in painted grass. The price is that on a tall narrow phone a
+   world-sized plate no longer reaches the top of the screen, and the band above it has to be painted or the
+   page shows through.
+
+   ⚠️ IT IS THE PLATE'S OWN TOP EDGE, STRETCHED -- NOT A COLOUR SOMEBODY SAMPLED. A generated per-zone
+   colour table is 84 numbers that drift silently the first time a backdrop is redrawn, and a redrawn
+   backdrop is a thing this game does often. background-size 100% 1600% blows the image up sixteen times
+   the box height so only its top ~6% is visible, smeared vertically: whatever the artist painted at the
+   top of that plate is exactly what continues upward, for ever, with no table to keep in step.
+
+   Measured across all 84 backdrops, the top 8% of 64 of them is flat atmospheric haze where this is
+   invisible. Six are busy enough to show the smear (fernway, boar_run, wirewood_stand, kelpforest,
+   ember_drift, palisade) -- the blur is what keeps those readable as distance rather than as a stretched
+   texture. It sits BEHIND the tiles and does not scroll with them, which is correct: it is the furthest
+   thing in the scene. */
+.gv-haze { position: absolute; left: 0; right: 0; top: 0; bottom: 0; pointer-events: none;
+    background-image: var(--gv-haze-img); background-size: 100% 1600%;
+    background-position: top center; background-repeat: repeat-x;
+    filter: blur(14px) saturate(0.92); transform: scale(1.06); transform-origin: top center; }
+/* ⚠️ AND THE PLATE'S TOP EDGE FADES INTO THAT HAZE, OR THE JOIN IS A RULED LINE. Filmed without this the
+   two met at a hard horizontal seam across the top fifth of a phone screen -- the stretched haze read as a
+   flat band of paint rather than as distance. Fading the plate out over its top tenth lets the two blend.
+
+   ⚠️ IT IS SAFE ON EVERY SCREEN, INCLUDING THE ONES WITH NO HAZE AT ALL. The element is bottom-anchored,
+   so where the plate overtops the viewport its faded top sits ABOVE the screen and is never seen. A mask
+   does not create a containing block either -- unlike a filter, which on this element would break the
+   camera transform. See [[filter-creates-containing-block]]. */
 .gv-sky { position: absolute; left: 0; bottom: 0; height: var(--gv-sky-h, 100%);
-    display: flex; align-items: stretch; pointer-events: none; will-change: transform; }
+    display: flex; align-items: stretch; pointer-events: none; will-change: transform;
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 11%);
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 11%); }
 /* Each tile is the plate's own aspect ratio at the strip's height, so 100% 100% is cover and stretches
    nothing. */
 .gv-sky-t { flex: 0 0 auto; width: var(--gv-sky-w, 100%); height: 100%;
