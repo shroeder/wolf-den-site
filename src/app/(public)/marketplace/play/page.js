@@ -45,6 +45,7 @@ export default async function GamePlayHub({ searchParams }) {
                FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null)
         : null;
     const alias = me?.alias || null;
+    const lv = levelForXp(Number(me?.xp) || 0)?.level ?? null;
     const ref = String((await searchParams)?.ref || "").trim().replace(/^@/, "");
 
     // ── LOGGED OUT ── a stranger gets sold, not shown a table of contents. The old view was a grid of emoji
@@ -72,7 +73,11 @@ export default async function GamePlayHub({ searchParams }) {
                 on every OTHER page, which is where it was always doing the work. */}
             {/* ── THE HUB ── hero, what is ready this minute, then the doors. See PlayHub for why the old
                 headline, the invite panel's position and the flat grid all had to go. */}
-            <PlayHub name={me?.name || ""} avatar={me?.avatar_sprite_url || null} level={levelForXp(Number(me?.xp) || 0)?.level ?? null} />
+            {/* `isNew` off the level we already have rather than a guide-progress query: this page is opened
+                more than any other in the Den and a fifth read of mkt_buyer to decide whether to draw one
+                card is the exact shape CLAUDE.md warns about. Level 5 is roughly the first evening. */}
+            <PlayHub name={me?.name || ""} avatar={me?.avatar_sprite_url || null}
+                level={lv} isNew={lv != null && lv < 5} />
 
             {/* ⚠️ LAST, NOT SECOND. Inviting a friend is a thing you do ONCE, and it was holding the slot
                 directly under the title on every visit for the rest of your life. */}

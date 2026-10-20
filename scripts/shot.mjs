@@ -144,7 +144,7 @@ await send("Page.navigate", { url });
 // Let the sprites actually arrive — a blank shot proves nothing. 2600ms was not enough on a cold dev server:
 // a launch modal's art came out as an empty 82px box while a DOM probe at 5s showed it loaded and visible, so
 // the picture was wrong and looked deliberate. Cheap insurance on a tool whose whole job is being trustworthy.
-await sleep(4200);
+await sleep(Number(process.env.SHOT_WAIT) || 4200);
 
 // ── SOME STATES HAVE NO BUTTON AT ALL ────────────────────────────────────────────────────────────────────────
 // A modal that only appears when the app dispatches an event — the pet level-up celebration, an XP toast — has

@@ -316,13 +316,24 @@ export default function PlayPeekers() {
                         <span className="peek-bagn">{bag}/{HOARD.length}</span>
                     </span>
 
-                    {peek.caught ? (
-                        <Link href="/play" className="peek-go" onClick={stop}>
-                            {full ? "Claim your character — free" : "See the rest — free"}
-                        </Link>
-                    ) : (
-                        <span className="peek-hint">Tap to catch it</span>
-                    )}
+                    {/* ── ⚠️ THE LINK IS ALWAYS THERE NOW, NOT ONLY ONCE YOU HAVE CAUGHT ONE ──────────
+                        This used to show "Tap to catch it" and nothing else until the pill was tapped, so
+                        the ONLY door into the game was behind a deliberate interaction with a floating card
+                        that has a big ✕ on it. The most button-like thing on it was the close button.
+
+                        Measured on the day the 30th promo went out: 119 signed-out visitors, 57 of them on
+                        shop pages, 30 on the product itself — and four signups, which is the ordinary daily
+                        number and three of those were within eight minutes of each other, so almost
+                        certainly people standing at the counter. The traffic more than doubled and the
+                        conversion did not move at all.
+
+                        A visitor who is there to look at one product does not play a five-stage catching
+                        game to find out there is a game. The catch is still there and still pays its set —
+                        it is just no longer the toll gate in front of the only link. */}
+                    <Link href="/play" className="peek-go" onClick={stop}>
+                        {full ? "Claim your character — free" : peek.caught ? "See the rest — free" : "Play free — no download"}
+                    </Link>
+                    {peek.caught ? null : <span className="peek-hint">…or tap the sprite to catch it</span>}
                 </div>
             </div>
 

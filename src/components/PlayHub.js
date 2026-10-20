@@ -116,7 +116,7 @@ const TILES = [
     { href: "/marketplace/bounties", art: "bounties", title: "Bounties", desc: "Post gold for real help, or claim someone's.", tone: "bounty" },
 ];
 
-export default function PlayHub({ name = "", avatar = null, level = null }) {
+export default function PlayHub({ name = "", avatar = null, level = null, isNew = false }) {
     const [hud, setHud] = useState(null);
     const [unlock, setUnlock] = useState(null);
 
@@ -170,6 +170,33 @@ export default function PlayHub({ name = "", avatar = null, level = null }) {
                     ) : <div className="ph-next muted">&nbsp;</div>}
                 </div>
             </section>
+
+            {/* ── ⚠️ A NEW MEMBER IS SHOWN THE DOOR, NOT THE BUILDING ────────────────────────────────────
+                Luke: "when you sign up for the game, we really need the guide more prevalent to help them
+                learn what to do."
+
+                The four people who joined on the day the 30th promo ran did between seven and twelve things
+                each and stopped. That is not somebody who disliked the game, it is somebody who opened a
+                screen with nineteen doors on it and had no idea which one was first — and the Pathfinder,
+                which exists precisely to answer that, was a tile in the nav drawer with the same weight as
+                the leaderboard.
+
+                So for a new account it goes ABOVE everything, before the rail and before the grid, and it is
+                the only thing on the page styled as an instruction. It disappears on its own as they level,
+                because a veteran being told where to start is the same failure in the other direction. */}
+            {isNew ? (
+                <Link href="/marketplace/guide" className="ph-start">
+                    <span className="ph-start-art" aria-hidden="true">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/guide/ch-hero.webp" alt="" width={52} height={52} />
+                    </span>
+                    <span className="ph-start-body">
+                        <b>New here? Start with the Pathfinder.</b>
+                        <em>One thing at a time, in order, and it pays you for each one. Takes about a minute to get going.</em>
+                    </span>
+                    <span className="ph-start-go" aria-hidden="true">→</span>
+                </Link>
+            ) : null}
 
             {/* ── READY NOW ── only what can be done this minute. Collapses to nothing when nothing can. */}
             {ready.length ? (

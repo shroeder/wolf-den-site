@@ -24789,3 +24789,19 @@ body.cas-seated .social-fab { display: none; }
     .ph-tile.is-big { grid-column: span 1; }
     .ph-hero-art { width: 62px; height: 62px; }
 }
+
+/* ── "START HERE" — THE ONLY INSTRUCTION ON THE HUB ───────────────────────────────────────────────────────
+   Shown to accounts under level 5 and to nobody else. Deliberately the loudest thing on the page while it
+   is there: a new member's problem is not that the Den has too little to do, it is that nineteen doors all
+   look equally like the first one. */
+.ph-start { display: flex; align-items: center; gap: 14px; padding: 15px 16px; border-radius: 18px;
+    text-decoration: none; color: inherit; border: 1.5px solid #ffd75e;
+    background: linear-gradient(120deg, rgba(255,215,94,0.2), rgba(255,154,60,0.09) 60%, transparent);
+    box-shadow: 0 0 34px -12px #ffd75e; }
+.ph-start:hover { background: linear-gradient(120deg, rgba(255,215,94,0.3), rgba(255,154,60,0.14) 60%, transparent); }
+.ph-start-art { flex: none; display: flex; }
+.ph-start-art img { display: block; object-fit: contain; }
+.ph-start-body { flex: 1; min-width: 0; }
+.ph-start-body b { display: block; font-size: 1rem; color: #fff; }
+.ph-start-body em { display: block; font-style: normal; font-size: 0.8rem; color: #cbc2b0; line-height: 1.35; margin-top: 3px; }
+.ph-start-go { flex: none; font-size: 1.4rem; font-weight: 900; color: #ffd75e; }
