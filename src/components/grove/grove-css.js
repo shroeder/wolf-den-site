@@ -2185,27 +2185,14 @@ export const GROVE_CSS = `
 .gv-odds li.is-masterwork { border-color: color-mix(in srgb, var(--band) 55%, transparent);
     box-shadow: 0 0 14px color-mix(in srgb, var(--band) 24%, transparent); }
 
-/* ── THE CRAFT ACT ───────────────────────────────────────────────────────────────────────────────────────
-   Three notes got this to its third draft, and all three are worth keeping in the file:
-
-     "Looks terrible"  — it was a flat charcoal card with no Grove in it. It wears the panel chrome now.
-     "the best thing is small and in the middle, and then it goes out from there" — it was a one-way ramp
-       with a cliff. It is a real plinko rack now, symmetric, jackpot narrow and dead centre.
-     "Your colors you selected are muted and terrible. We use colors across the whole website" — right
-       twice over. The bands no longer carry colours of their own; they carry RARITY_META, the ladder every
-       chest, pet, item and drop screen in the Den already speaks. */
-.gv-act { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center;
-    background: rgba(4,5,3,0.92); backdrop-filter: blur(4px); padding: 12px; }
-.gv-act-in { position: relative; width: min(430px, 100%); max-height: 100%; overflow-y: auto;
-    display: flex; flex-direction: column; gap: 10px; padding: 0 12px 14px; border-radius: 14px;
-    background:
-        linear-gradient(180deg, rgba(9,11,8,0.80), rgba(9,11,8,0.93)),
-        url("/images/grove/ui-board.webp") center / cover;
-    border: 1px solid rgba(0,0,0,0.65);
-    box-shadow: 0 18px 50px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.055); }
-/* ⚠️ THE SHAKE IS ON THE PANEL, NOT THE PAGE. Moving the whole viewport is the cheap version and it makes
-   people queasy on a phone; a 480ms jolt on the card lands the hit without touching anything else. */
-.gv-act-in.is-shook { animation: gv-act-shake 480ms cubic-bezier(.36,.07,.19,.97); }
+/* ── THE CRAFT ACT: THREE STAGES ─────────────────────────────────────────────────────────────────────────
+   Luke: "its 3 separate stages with immersive background and sprite decorations, you seem to have combined
+   it all?" The first build was one panel with the rack bolted on top and the controls swapping underneath —
+   a widget with three modes. These are three rooms: the fire, the anvil, the cooling rack, each behind its
+   own painted backdrop with the piece you are making as the hero of the scene. */
+.gv-act { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 12px;
+    background: #090806; overflow: hidden; }
+.gv-act.is-shook { animation: gv-act-shake 480ms cubic-bezier(.36,.07,.19,.97); }
 @keyframes gv-act-shake {
     0%, 100% { transform: translate3d(0,0,0); }
     12% { transform: translate3d(-6px,2px,0) rotate(-0.5deg); }
@@ -2214,6 +2201,28 @@ export const GROVE_CSS = `
     66% { transform: translate3d(3px,-1px,0); }
     84% { transform: translate3d(-1px,1px,0); }
 }
+
+/* THE SCENES. One layer per stage, cross-faded — swapping a url pops the next room in unpainted. */
+.gv-act-scenes { position: absolute; inset: 0; pointer-events: none; }
+.gv-act-scene { position: absolute; inset: 0; opacity: 0; background-size: cover;
+    background-position: center 62%; transition: opacity 520ms ease, transform 900ms ease;
+    transform: scale(1.06); }
+.gv-act-scene.is-on { opacity: 1; transform: scale(1); }
+/* ⚠️ A SCRIM OVER THE ART, NOT A DARKER PAINTING. The backdrops have to stay readable as rooms while
+   carrying type and a plinko rack; dimming them in the file would have made three murky plates that could
+   never be brightened. Heavier at the top, where the panel sits, and light at the bottom so the floor of
+   the room still reads. */
+.gv-act-scenes::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(6,5,4,0.58) 0%, rgba(6,5,4,0.20) 42%, rgba(6,5,4,0.62) 100%); }
+
+/* ⚠️ THE PANEL BARELY FILLS. The first cut put a 52-80% wash here ON TOP of the scene scrim, and two
+   stacked scrims turned three painted rooms into a dark smudge — the opposite of the immersive backdrop
+   that was asked for. The controls carry their own dark pills and the type carries a shadow, so the panel
+   only needs to soften the middle of the frame, not hide it. */
+.gv-act-in { position: relative; z-index: 1; width: min(430px, 100%); max-height: 100%; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px; padding: 0 12px 14px; border-radius: 14px;
+    background: radial-gradient(130% 78% at 50% 62%, rgba(6,8,5,0.68), rgba(6,8,5,0.26) 78%, transparent);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.45); }
 .gv-act-in::before, .gv-act-in::after,
 .gv-act-trim::before, .gv-act-trim::after {
     content: ""; position: absolute; width: 21px; height: 21px; pointer-events: none; opacity: 0.9;
@@ -2232,45 +2241,108 @@ export const GROVE_CSS = `
     min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .gv-act-ico { width: 34px; height: 34px; flex: none; object-fit: contain;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.55)); }
-.gv-act-plank i { margin-left: auto; flex: none; font-style: normal; font-size: 0.66rem; font-weight: 700;
+.gv-act-plank i { margin-left: auto; flex: none; font-style: normal; font-size: 0.62rem; font-weight: 700;
     letter-spacing: 0.1em; padding: 4px 10px; border-radius: 999px; color: #ffd75e;
-    background: rgba(14,16,11,0.85); text-shadow: none; border: 1px solid rgba(0,0,0,0.5); }
+    background: rgba(14,16,11,0.88); text-shadow: none; border: 1px solid rgba(0,0,0,0.5); }
 
 .gv-act-beats { display: flex; gap: 5px; justify-content: center; }
-.gv-act-beats span { width: 26px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.14); }
+.gv-act-beats span { width: 30px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.16); }
 .gv-act-beats span.is-done { background: #5ce0c0; }
 .gv-act-beats span.is-now { background: #ffd75e; box-shadow: 0 0 10px rgba(255,215,94,0.8); }
 
+.gv-act-stage { display: flex; flex-direction: column; gap: 10px;
+    animation: gv-act-enter 420ms cubic-bezier(.2,.8,.3,1); }
+@keyframes gv-act-enter {
+    from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .gv-act-stage, .gv-act-scene { animation: none; transition: opacity 200ms ease; }
+}
+
+/* ── THE HERO. The piece you are making, standing in the room. ───────────────────────────────────────── */
+.gv-act-hero { position: relative; display: grid; place-items: center; height: 136px; }
+.gv-act-hero img { width: 104px; height: 104px; object-fit: contain; position: relative; z-index: 1;
+    transition: filter 120ms linear; }
+.gv-act-emberglow { position: absolute; width: 190px; height: 120px; border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(255,140,40,0.75), rgba(255,90,20,0.18) 55%, transparent 72%);
+    filter: blur(6px); transition: opacity 120ms linear; }
+.gv-act-hero img.is-struck { animation: gv-act-ring 300ms cubic-bezier(.2,1.6,.4,1); }
+@keyframes gv-act-ring {
+    0% { transform: scale(1) rotate(0); } 30% { transform: scale(1.14) rotate(-4deg); }
+    100% { transform: scale(1) rotate(0); }
+}
+.gv-act-hero img.is-perfect { filter: drop-shadow(0 0 20px rgba(255,215,94,0.95)) brightness(1.3); }
+.gv-act-flash { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal;
+    font-size: 1.3rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; z-index: 2;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.95); animation: gv-act-pop 460ms ease-out; }
+.gv-act-flash.is-perfect { color: #ffd75e; }
+.gv-act-flash.is-hit { color: #5ce0c0; }
+.gv-act-flash.is-miss { color: #ff7a6a; }
+@keyframes gv-act-pop {
+    0% { transform: scale(0.6); opacity: 0; } 26% { transform: scale(1.18); opacity: 1; }
+    100% { transform: scale(1.05); opacity: 0; }
+}
+
+.gv-act-say { margin: 0; text-align: center; font-size: 0.94rem; font-weight: 700;
+    letter-spacing: 0.04em; color: #fff4e2;
+    text-shadow: 0 1px 3px #000, 0 2px 10px rgba(0,0,0,0.95); }
+
+/* THE HEAT */
+.gv-act-bar { position: relative; height: 24px; border-radius: 7px; overflow: hidden;
+    background: rgba(0,0,0,0.6); border: 1px solid rgba(0,0,0,0.65);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.7); }
+.gv-act-fill { position: absolute; inset: 0 auto 0 0; transition: width 90ms linear;
+    background: linear-gradient(90deg, #8a2f0d, #ff7a3c 45%, #ffd75e 80%, #fff3c4); }
+.gv-act-bar em { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal;
+    font-size: 0.72rem; font-weight: 800; color: #fff6df; text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    font-variant-numeric: tabular-nums; }
+.gv-act-clock { display: block; height: 3px; border-radius: 2px; background: rgba(0,0,0,0.55); }
+.gv-act-clock i { display: block; height: 100%; border-radius: 2px; background: #ffd75e;
+    transition: width 90ms linear; }
+
+/* THE ANVIL */
+.gv-act-anvil { position: relative; height: 36px; border-radius: 8px; overflow: hidden;
+    background: linear-gradient(180deg, rgba(44,48,41,0.9), rgba(16,18,13,0.95));
+    border: 1px solid rgba(0,0,0,0.7); box-shadow: inset 0 2px 7px rgba(0,0,0,0.75); }
+.gv-act-zone { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
+    background: rgba(92,224,192,0.22); border-left: 1px solid rgba(92,224,192,0.55);
+    border-right: 1px solid rgba(92,224,192,0.55); }
+.gv-act-core { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
+    background: rgba(255,215,94,0.5); box-shadow: 0 0 14px rgba(255,215,94,0.5); }
+.gv-act-marker { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px;
+    background: #fff6df; box-shadow: 0 0 12px rgba(255,246,223,0.95); }
+.gv-act-hits { list-style: none; display: flex; gap: 6px; margin: 0; padding: 0; }
+.gv-act-hits li { flex: 1; text-align: center; padding: 6px 0; border-radius: 6px; font-size: 0.62rem;
+    letter-spacing: 0.07em; text-transform: uppercase; color: #8b8375; background: rgba(0,0,0,0.5); }
+.gv-act-hits li.is-perfect { color: #2a1f05; background: #ffd75e; box-shadow: 0 0 12px rgba(255,215,94,0.5); }
+.gv-act-hits li.is-hit { color: #05251e; background: #5ce0c0; }
+.gv-act-hits li.is-miss { color: #ffe2dc; background: rgba(255,122,106,0.6); }
+
 /* ── THE RACK ─────────────────────────────────────────────────────────────────────────────────────────
-   A lit well of pegs over the buckets, jackpot dead centre. */
+   Sits over the painted cooling rack, so the pegs and bins line up with a room rather than floating. */
 .gv-act-rack { position: relative; padding: 9px 9px 22px; border-radius: 10px; touch-action: none;
-    background: radial-gradient(130% 80% at 50% 102%, rgba(55,245,192,0.13), transparent 62%),
-                radial-gradient(120% 90% at 50% 0%, rgba(255,160,60,0.10), rgba(0,0,0,0.5) 72%);
-    border: 1px solid rgba(0,0,0,0.6); box-shadow: inset 0 3px 12px rgba(0,0,0,0.6); }
-.gv-act-pegs { position: relative; height: 152px; display: flex; flex-direction: column;
+    background: rgba(6,8,10,0.55); border: 1px solid rgba(0,0,0,0.6);
+    box-shadow: inset 0 3px 14px rgba(0,0,0,0.55); }
+.gv-act-pegs { position: relative; height: 150px; display: flex; flex-direction: column;
     justify-content: space-between; }
 .gv-act-pegrow { display: flex; justify-content: space-around; }
 .gv-act-pegrow i { width: 5px; height: 5px; border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #efe0bb, #8a7a52 70%, #2a2318);
     box-shadow: 0 1px 1px rgba(0,0,0,0.6); transition: box-shadow 120ms, background 120ms; }
-/* The row it just struck flares. This is most of what makes the fall read as a fall. */
 .gv-act-pegrow.is-struck i { background: radial-gradient(circle at 35% 30%, #fffbe8, #ffd75e 65%, #b47a12);
     box-shadow: 0 0 10px rgba(255,215,94,0.95), 0 0 20px rgba(255,215,94,0.45); }
-
 .gv-act-piece { position: absolute; width: 32px; height: 32px; margin: -16px 0 0 -16px;
     display: grid; place-items: center; z-index: 2;
-    transition: left 95ms linear, top 95ms linear, opacity 200ms; }
-.gv-act-piece img { width: 32px; height: 32px; object-fit: contain; }
-.gv-act-piece.is-hot img { filter: drop-shadow(0 0 12px rgba(255,150,40,0.95)) brightness(1.3) saturate(1.25); }
+    transition: left 95ms linear, top 95ms linear; }
+.gv-act-piece img { width: 32px; height: 32px; object-fit: contain;
+    filter: drop-shadow(0 0 12px rgba(255,150,40,0.95)) brightness(1.3) saturate(1.25); }
 .gv-act-piece.is-set { transition: none; animation: gv-act-land 440ms cubic-bezier(.2,1.6,.4,1); }
 @keyframes gv-act-land { 0% { transform: scale(1.45); } 50% { transform: scale(0.78); } 100% { transform: scale(1); } }
 
-/* THE BURST. Twelve sparks thrown from where it stopped, in the band's own colour. */
 .gv-act-burst { position: absolute; bottom: -6px; width: 0; height: 0; z-index: 3; pointer-events: none; }
 .gv-act-burst i { position: absolute; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%;
     background: var(--band, #ffd75e); box-shadow: 0 0 8px var(--band, #ffd75e);
-    animation: gv-act-spark 720ms ease-out forwards;
-    transform: rotate(var(--a)) translateY(0); }
+    animation: gv-act-spark 720ms ease-out forwards; transform: rotate(var(--a)) translateY(0); }
 @keyframes gv-act-spark {
     0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1.2); }
     100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(0.3); }
@@ -2282,46 +2354,35 @@ export const GROVE_CSS = `
 .gv-act-bucket { position: relative; height: 100%; display: grid; place-items: center; min-width: 0;
     border-left: 1px solid rgba(0,0,0,0.8);
     box-shadow: inset 0 8px 12px rgba(0,0,0,0.45), inset 0 -3px 0 rgba(255,255,255,0.22);
-    /* ⚠️ A SHALLOW GRADIENT. Lifting the top 8% toward white and crushing the bottom a quarter toward
-       black took the epic violet of a Fine slot visibly pink on a phone. The band colour has to survive
-       being painted. */
+    /* ⚠️ A SHALLOW GRADIENT. Lifting the top toward white and crushing the bottom took the epic violet of
+       a Fine bin visibly pink on a phone. The band colour has to survive being painted. */
     background: linear-gradient(180deg,
         color-mix(in srgb, var(--band) 96%, #fff 4%),
         color-mix(in srgb, var(--band) 86%, #000 14%));
     transition: filter 180ms, transform 180ms; }
 .gv-act-bucket b { font-size: 0.56rem; font-weight: 900; color: rgba(0,0,0,0.6);
     text-shadow: 0 1px 0 rgba(255,255,255,0.3); white-space: nowrap; overflow: hidden; }
-/* ⚠️ THE JACKPOT IS PRISMATIC, NOT A HUE. It is three percent of the rack and it is the thing the whole
-   beat is aimed at; the next colour along the ladder would not have carried that. */
-.gv-act-bucket.is-masterwork {
+.gv-act-bucket.is-masterwork { margin-top: -7px; height: calc(100% + 7px); border-radius: 3px 3px 0 0;
+    border-left: 1px solid rgba(255,255,255,0.5); border-right: 1px solid rgba(255,255,255,0.5);
     box-shadow: inset 0 8px 12px rgba(0,0,0,0.25), inset 0 -3px 0 rgba(255,255,255,0.5),
         0 0 18px color-mix(in srgb, var(--band) 75%, transparent); }
-/* ⚠️ A GLOW, NOT A HUE SHIFT. saturate(1.3) on top of brightness pushed the epic purple of a Fine slot
-   into hot pink, so the second-best bucket lit up looking like the jackpot. The colour has to stay the
-   colour it is; the light around it is what changes. */
+/* ⚠️ A GLOW, NOT A HUE SHIFT. saturate() on top of brightness pushed a Fine bin into hot pink, so the
+   second-best bucket lit up looking like the jackpot. */
 .gv-act-bucket.is-hit { filter: brightness(1.3); transform: translateY(3px);
     box-shadow: inset 0 8px 12px rgba(0,0,0,0.2), inset 0 -3px 0 rgba(255,255,255,0.5),
         0 0 28px color-mix(in srgb, var(--band) 85%, transparent); }
 
-/* ── THE JACKPOT FLAG ─────────────────────────────────────────────────────────────────────────────────
-   A dotted post down the middle of the well with the multiplier hanging at the top. Three percent of a
-   bar cannot announce itself; this is what says "here, and it is worth 1.90". */
+/* The jackpot flag. Three percent of a bar cannot announce itself; the tab hangs UNDER the rack where the
+   falling piece can never cover it. */
 .gv-act-jack { position: absolute; top: 2px; bottom: 20px; width: 1px; margin-left: -0.5px;
     pointer-events: none; z-index: 1;
     background: repeating-linear-gradient(180deg, rgba(55,245,192,0.5) 0 5px, transparent 5px 11px); }
-/* ⚠️ THE TAB HANGS UNDER THE RACK, NOT OVER IT. Placed at the top it sat exactly where the piece waits
-   while you aim — and since the thing you aim at is the middle, the sprite covered the label precisely
-   when the player most wanted to read it. Under the buckets nothing can ever be in front of it. */
 .gv-act-jack b { position: absolute; bottom: -17px; left: 50%; transform: translateX(-50%);
     padding: 2px 8px; border-radius: 999px; font-size: 0.58rem; font-weight: 900; letter-spacing: 0.06em;
     color: #032a20; white-space: nowrap; background: #37f5c0;
     box-shadow: 0 0 16px rgba(55,245,192,0.7); }
 .gv-act-jack b::before { content: ""; position: absolute; top: -4px; left: 50%; margin-left: -4px;
     border: 4px solid transparent; border-bottom-color: #37f5c0; }
-/* ⚠️ AND THE SLOT ITSELF STANDS PROUD. Flush with its neighbours it is a seam; two pixels taller with a
-   lip of its own, it is a cup. */
-.gv-act-bucket.is-masterwork { margin-top: -7px; height: calc(100% + 7px); border-radius: 3px 3px 0 0;
-    border-left: 1px solid rgba(255,255,255,0.5); border-right: 1px solid rgba(255,255,255,0.5); }
 .gv-act-aim { position: absolute; top: 4px; bottom: 58px; width: 2px; margin-left: -1px; z-index: 4;
     background: linear-gradient(180deg, rgba(255,215,94,0.1), #ffd75e);
     box-shadow: 0 0 12px rgba(255,215,94,0.9); pointer-events: none; }
@@ -2329,61 +2390,13 @@ export const GROVE_CSS = `
     margin-left: -8.5px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fffbe8, #ffd75e);
     box-shadow: 0 0 14px rgba(255,215,94,0.95), 0 2px 5px rgba(0,0,0,0.6); }
 
-/* THE ODDS FOR THIS AIM — not the widths. */
 .gv-act-odds { list-style: none; display: flex; gap: 4px; margin: 0; padding: 0; }
 .gv-act-odds li { flex: 1; text-align: center; padding: 5px 2px; border-radius: 7px;
-    background: rgba(10,12,8,0.78); border: 1px solid rgba(0,0,0,0.5);
-    font-size: 0.5rem; letter-spacing: 0.04em; text-transform: uppercase; color: #8f968a;
-    transition: border-color 200ms; }
-.gv-act-odds b { display: block; font-size: 0.82rem; font-variant-numeric: tabular-nums;
-    color: var(--band); }
+    background: rgba(8,10,6,0.82); border: 1px solid rgba(0,0,0,0.55);
+    font-size: 0.5rem; letter-spacing: 0.04em; text-transform: uppercase; color: #9aa08f; }
+.gv-act-odds b { display: block; font-size: 0.82rem; font-variant-numeric: tabular-nums; color: var(--band); }
 .gv-act-odds li.is-masterwork { border-color: color-mix(in srgb, var(--band) 60%, transparent);
     box-shadow: 0 0 12px color-mix(in srgb, var(--band) 28%, transparent); }
-
-.gv-act-say { margin: 2px 0 0; text-align: center; font-size: 0.92rem; font-weight: 700;
-    letter-spacing: 0.04em; color: #f0e6d6; }
-.gv-act-hint { margin: 0; text-align: center; font-size: 0.72rem; line-height: 1.45; color: #9aa08f; }
-
-/* THE HEAT */
-.gv-act-bar { position: relative; height: 24px; border-radius: 7px; overflow: hidden;
-    background: rgba(0,0,0,0.55); border: 1px solid rgba(0,0,0,0.6);
-    box-shadow: inset 0 2px 6px rgba(0,0,0,0.65); }
-.gv-act-fill { position: absolute; inset: 0 auto 0 0; transition: width 90ms linear;
-    background: linear-gradient(90deg, #8a2f0d, #ff7a3c 45%, #ffd75e 80%, #fff3c4); }
-.gv-act-bar em { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal;
-    font-size: 0.72rem; font-weight: 800; color: #fff6df; text-shadow: 0 1px 3px rgba(0,0,0,0.9);
-    font-variant-numeric: tabular-nums; }
-.gv-act-clock { display: block; height: 3px; border-radius: 2px; background: rgba(0,0,0,0.5); }
-.gv-act-clock i { display: block; height: 100%; border-radius: 2px; background: #ffd75e;
-    transition: width 90ms linear; }
-
-/* THE ANVIL */
-.gv-act-anvil { position: relative; height: 36px; border-radius: 8px; overflow: hidden;
-    background: linear-gradient(180deg, #2c3029, #16180f); border: 1px solid rgba(0,0,0,0.65);
-    box-shadow: inset 0 2px 7px rgba(0,0,0,0.7); }
-.gv-act-zone { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
-    background: rgba(92,224,192,0.22); border-left: 1px solid rgba(92,224,192,0.55);
-    border-right: 1px solid rgba(92,224,192,0.55); }
-.gv-act-core { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
-    background: rgba(255,215,94,0.5); box-shadow: 0 0 14px rgba(255,215,94,0.5); }
-.gv-act-marker { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px;
-    background: #fff6df; box-shadow: 0 0 12px rgba(255,246,223,0.95); }
-.gv-act-flash { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal;
-    font-size: 0.92rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
-    text-shadow: 0 2px 7px rgba(0,0,0,0.95); animation: gv-act-pop 440ms ease-out; }
-.gv-act-flash.is-perfect { color: #ffd75e; }
-.gv-act-flash.is-hit { color: #5ce0c0; }
-.gv-act-flash.is-miss { color: #ff7a6a; }
-@keyframes gv-act-pop {
-    0% { transform: scale(0.65); opacity: 0; } 28% { transform: scale(1.14); opacity: 1; }
-    100% { transform: scale(1); opacity: 0; }
-}
-.gv-act-hits { list-style: none; display: flex; gap: 6px; margin: 0; padding: 0; }
-.gv-act-hits li { flex: 1; text-align: center; padding: 6px 0; border-radius: 6px; font-size: 0.62rem;
-    letter-spacing: 0.07em; text-transform: uppercase; color: #6f7566; background: rgba(0,0,0,0.42); }
-.gv-act-hits li.is-perfect { color: #2a1f05; background: #ffd75e; box-shadow: 0 0 12px rgba(255,215,94,0.5); }
-.gv-act-hits li.is-hit { color: #05251e; background: #5ce0c0; }
-.gv-act-hits li.is-miss { color: #ffe2dc; background: rgba(255,122,106,0.55); }
 
 /* THE ONE BUTTON */
 .gv-act-hit { padding: 15px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 1rem;
@@ -2394,7 +2407,7 @@ export const GROVE_CSS = `
 .gv-act-hit.is-bellows { background: linear-gradient(180deg, #ffb46a, #ff7a3c); border-color: #9a4a12; }
 .gv-act-hit.is-release { background: linear-gradient(180deg, #8fd8ff, #4aa3ff); border-color: #2a6fb0;
     color: #04202f; }
-.gv-act-work { text-align: center; font-size: 0.74rem; color: #8f968a; }
+.gv-act-work { text-align: center; font-size: 0.74rem; color: #9aa08f; }
 .gv-act-hit.is-band {
     background: linear-gradient(180deg,
         color-mix(in srgb, var(--band) 97%, #fff 3%),
