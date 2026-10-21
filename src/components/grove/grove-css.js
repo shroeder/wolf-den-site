@@ -1767,6 +1767,10 @@ export const GROVE_CSS = `
 .gv-odds li.is-fine span { color: #6fd0ff; }
 .gv-odds li.is-pristine span { color: #e0a8ff; }
 .gv-odds li.is-pristine { border-color: rgba(224,168,255,0.34); }
+/* MASTERWORK. Warmer and brighter than Pristine, and the only band given a glow: it is a few percent
+   at every level, so the one time a player sees it the screen should not be subtle about it. */
+.gv-odds li.is-masterwork span { color: #ffc861; }
+.gv-odds li.is-masterwork { border-color: rgba(255,200,97,0.5); box-shadow: 0 0 14px rgba(255,200,97,0.22) inset; }
 
 /* RECALL. Collapsed by default: it is the answer to a question, not a thing to scroll past every time. */
 .gv-recall { margin-top: 11px; }
@@ -1786,9 +1790,11 @@ export const GROVE_CSS = `
 .gv-tag.is-sound { color: #9be36a; background: rgba(155,227,106,0.16); }
 .gv-tag.is-fine { color: #6fd0ff; background: rgba(111,208,255,0.16); }
 .gv-tag.is-pristine { color: #e0a8ff; background: rgba(224,168,255,0.18); }
+.gv-tag.is-masterwork { color: #ffc861; background: rgba(255,200,97,0.2); }
 .gv-recall li em.is-sound { color: #9be36a; }
 .gv-recall li em.is-fine { color: #6fd0ff; }
 .gv-recall li em.is-pristine { color: #e0a8ff; }
+.gv-recall li em.is-masterwork { color: #ffc861; }
 
 /* DOPAMINE: the ladder moving, on the card that just moved it. */
 .gv-made-lv { margin-top: 16px; padding: 12px; border-radius: 12px;
@@ -1919,6 +1925,7 @@ export const GROVE_CSS = `
 .gv-made-q.is-sound { color: #9be36a; }
 .gv-made-q.is-fine { color: #6fd0ff; }
 .gv-made-q.is-pristine { color: #e0a8ff; }
+.gv-made-q.is-masterwork { color: #ffc861; text-shadow: 0 0 12px rgba(255,200,97,0.55); }
 @keyframes gvLevelUp {
     0% { transform: scale(0.94); box-shadow: 0 0 0 rgba(224,168,60,0); }
     45% { transform: scale(1.035); box-shadow: 0 0 34px rgba(224,168,60,0.55); }
@@ -1948,7 +1955,13 @@ export const GROVE_CSS = `
 .gv-recs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
 
 /* The rail on the left is the whole ranking signal: gold means go. */
-.gv-rec { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+/* ⚠️ THE CARD IS A COLUMN; THE THREE COLUMNS ARE A ROW INSIDE IT. The temper strip was first added as a
+   fourth grid child spanning 1 / -1, which is exactly the trap grid sets for you: a spanning item's
+   min-content is distributed into the tracks it crosses. Measured on a 375px phone, the auto column took
+   214px of that and the 1fr body column resolved to 0px, so the recipe text wrapped one word per line and
+   the cost rows fell off the right edge. minmax(0, 1fr) did not help -- it simply let the body collapse
+   without complaint. A sibling cannot size a grid it is not in. */
+.gv-rec { display: flex; flex-direction: column; gap: 8px;
     padding: 12px; border-radius: 12px;
     background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08);
     box-shadow: inset 3px 0 0 rgba(255,255,255,0.10); }
@@ -1956,6 +1969,7 @@ export const GROVE_CSS = `
     border-color: rgba(224,168,60,0.44); box-shadow: inset 3px 0 0 #e0a83c, 0 6px 18px rgba(224,168,60,0.13); }
 .gv-rec.is-built { opacity: 0.55; box-shadow: inset 3px 0 0 rgba(255,255,255,0.18); }
 
+.gv-rec-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
 .gv-rec-face { width: 54px; height: 54px; flex: none; display: grid; place-items: center;
     border-radius: 11px; background: rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.07); }
 .gv-rec-face svg { width: 30px; height: 30px; color: #cfc6b6; }
@@ -2088,4 +2102,59 @@ export const GROVE_CSS = `
 .gv-em button { padding: 7px 15px; border-radius: 999px; border: none; cursor: pointer; font: inherit;
     font-size: 0.76rem; font-weight: 700; background: rgba(159,224,138,0.18); color: #cdf5bd; }
 .gv-em button:disabled { opacity: 0.5; cursor: default; }
+
+/* ── TEMPERING ───────────────────────────────────────────────────────────────────────────────────────────
+   The one control on a recipe card that is a choice rather than a confirmation, so it reads as a switch
+   with a price on it: the button, what it buys, and what it costs, on one line. Dim until armed — an
+   always-lit second button beside Craft would compete with the thing the card is for. */
+.gv-temper { display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    padding: 6px 8px; border-radius: 9px; background: rgba(0,0,0,0.24);
+    border: 1px solid rgba(255,255,255,0.06); }
+.gv-temper.is-on { border-color: rgba(255,200,97,0.42); background: rgba(255,200,97,0.09); }
+.gv-temper-go { flex: none; padding: 4px 10px; border-radius: 7px; cursor: pointer;
+    font-size: 0.68rem; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 700;
+    color: #cfc6b6; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); }
+.gv-temper.is-on .gv-temper-go { color: #2a1f05; background: #ffc861; border-color: #c89a3a; }
+/* ⚠️ nowrap AND overflow-hidden, because this sits in a ~250px column beside the recipe art. Allowed to
+   wrap, the odds and the cost reflowed into each other and printed on top of one another on a phone. */
+.gv-temper-odds { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 0.68rem; color: #9aa08f; font-variant-numeric: tabular-nums; }
+.gv-temper-odds i { margin: 0 3px; font-style: normal; }
+.gv-temper-odds b { color: #ffc861; }
+.gv-temper-odds em { margin-left: 6px; font-style: normal; font-size: 0.62rem; color: #8f968a; }
+
+/* What the band bought, on the card for the thing it bought it for. Sits under the roll, because it is
+   the roll's consequence and reads as its second half. */
+.gv-made-bonus { display: block; margin-top: 4px; font-size: 0.86rem; font-weight: 800; color: #9be36a; }
+.gv-made-bonus.is-pristine { color: #e0a8ff; }
+.gv-made-bonus.is-masterwork { color: #ffc861; text-shadow: 0 0 12px rgba(255,200,97,0.45); }
+.gv-made-tmp { margin-left: 7px; font-style: normal; font-size: 0.62rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #ffc861; opacity: 0.85; }
+
+/* ── CHARMS ──────────────────────────────────────────────────────────────────────────────────────────────
+   A slot row like the belt's, because it is the same kind of decision: one of several, armed for the next
+   run. The band rides the name, since two rows of one charm differ by nothing else. */
+.gv-q { font-style: normal; font-size: 0.62rem; letter-spacing: 0.05em; text-transform: uppercase;
+    margin-left: 5px; color: #9aa08f; }
+.gv-q.is-sound { color: #9be36a; }
+.gv-q.is-fine { color: #6fd0ff; }
+.gv-q.is-pristine { color: #e0a8ff; }
+.gv-q.is-masterwork { color: #ffc861; }
+/* The glyph carries the band's colour too. Three rows of one charm differ only by how well they came out,
+   and a stark white icon on all of them makes the shelf read as three identical things. */
+.gv-slot.is-rough svg { color: #9aa08f; }
+.gv-slot.is-sound svg { color: #9be36a; }
+.gv-slot.is-fine svg { color: #6fd0ff; }
+.gv-slot.is-pristine svg { color: #e0a8ff; }
+.gv-slot.is-masterwork svg { color: #ffc861; filter: drop-shadow(0 0 7px rgba(255,200,97,0.5)); }
+.gv-empty { margin: 4px 2px; font-size: 0.78rem; line-height: 1.45; color: #9aa08f; }
+
+/* The recipe a boss handed over. The loudest line on the kill card, because it happens once per map and
+   a row quietly appearing in a list of two hundred is a reward nobody notices they earned. */
+.gv-won-taught { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+    padding: 9px 11px; border-radius: 11px; font-size: 0.9rem; font-weight: 800; color: #2a1f05;
+    background: linear-gradient(180deg, #ffd98a, #e6a93c); border: 1px solid #c89a3a; }
+.gv-won-taught svg { width: 20px; height: 20px; }
+.gv-won-taught em { flex-basis: 100%; font-style: normal; font-size: 0.68rem; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.72; }
 `;

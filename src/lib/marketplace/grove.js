@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { craftLevel, craftXpFor, rollQuality, qualityBand, qualityOdds, QUALITY_BANDS, toolBonusFor, GROVE_CHESTS,
-    ARMOUR_PIECES, pieceById, setBonusFor, GROVE_SETS } from "@/lib/marketplace/grove-forge.js";
+    ARMOUR_PIECES, pieceById, setBonusFor, GROVE_SETS, craftBonusFor, charmValue, charmValueOf } from "@/lib/marketplace/grove-forge.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
@@ -11,13 +11,13 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { canPreview } from "@/lib/marketplace/owner.js";
 import {
     GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_PARTS, GROVE_EMBLEMS, GROVE_POP,
-    GROVE_FOODS, HEAL_AT, emblemStars, groveZone,
+    GROVE_FOODS, GROVE_CHARMS, HEAL_AT, emblemStars, groveZone,
     GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, groveBoss as bossById,
 } from "@/lib/marketplace/grove-catalog.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { petBiteShare } from "@/lib/marketplace/grove-world.js";
-import { reworkCost, toolRecipeFor } from "@/lib/marketplace/grove-recipes.js";
+import { reworkCost, temperCost, toolRecipeFor } from "@/lib/marketplace/grove-recipes.js";
 import { settleKills, rollBoss, rollGroveChest } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { groveFighter } from "@/lib/marketplace/grove-kit.js";
@@ -100,8 +100,22 @@ async function playerRow(buyerId) {
 }
 
 /** Emblem-derived multipliers, which the roll needs and the client is told so its preview matches. */
-function bonusesFrom(emblemRows) {
+// ── ⚠️ AND THE CHARM BURNING ON THIS RUN, IF THERE IS ONE ───────────────────────────────────────────────────
+// A charm pays into these same three numbers and into nothing else, which is why it needed no new plumbing:
+// the drop roll already reads rarityFind, emblemFind and rareSpawn, and a charm simply adds to one of them.
+//
+// ⚠️ THE SECOND ARGUMENT IS NOT OPTIONAL IN SPIRIT. The roll runs twice for every kill — once in the scene,
+// so the player watches the part fall, and once on the server at settle, which is the version that counts.
+// Both sides must be handed the SAME bundle or they diverge, and a divergence here is a drop the player saw
+// and never received. Every call site passes the player row; the charm travels with the session on that
+// row, which is also why a charm cannot expire mid-run. See migration 483.
+function bonusesFrom(emblemRows, player = null) {
     const out = { rarityFind: 0, emblemFind: 0, rareSpawn: 0 };
+    const charmId = player?.charm_id;
+    if (charmId && GROVE_CHARMS[charmId]) {
+        const stat = GROVE_CHARMS[charmId].stat;
+        if (stat in out) out[stat] += charmValue(charmId, player.charm_band);
+    }
     for (const r of emblemRows || []) {
         const meta = GROVE_EMBLEMS[r.emblem_id];
         if (!meta || r.slot === null || r.slot === undefined) continue;   // only EQUIPPED emblems apply
@@ -177,7 +191,7 @@ async function heroLook(buyerId) {
 export async function groveState(buyerId) {
     if (!buyerId || !groveOpen(buyerId)) return { ok: false, error: "closed" };
 
-    const [p, zones, items, seen, emblems, tools, chests, craftLog, armour, look, hero] = await Promise.all([
+    const [p, zones, items, seen, emblems, tools, chests, craftLog, armour, charms, look, hero] = await Promise.all([
         playerRow(buyerId),
         // ⚠️ THE COOLDOWN IS COMPUTED IN SQL, ON THE QUERY THIS ALREADY RAN. Two reasons. It costs nothing
         // — no extra round trip, and round trips are the meter that bills. And the comparison happens where
@@ -204,6 +218,9 @@ export async function groveState(buyerId) {
               ORDER BY created_at DESC LIMIT 12`, [buyerId],
         ).catch(() => []),
         db.query(`SELECT piece_id, worn FROM mkt_grove_armour WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        // ⚠️ IN THE SAME Promise.all, NOT A FOURTEENTH ROUND TRIP. Round trips are the meter that
+        // bills — see CLAUDE.md — and this is one more row set on a query set that is already in flight.
+        db.query(`SELECT charm_id, band, qty FROM mkt_grove_charm WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         heroLook(buyerId),
         // ⚠️ WHAT THE PLAYER ACTUALLY BUILT. Gear, forge, sets, jewels, compendium, pet, badges, casino
         // tracks and the class tree, through the Arena's own combatStats + fighterFrom. Before this the
@@ -297,6 +314,11 @@ export async function groveState(buyerId) {
             // actual band shares at THIS level are a fact the player can check against what they get.
             // Computed from the same curve the server rolls against, so the screen cannot drift from it.
             odds: qualityOdds(craftLevel(Number(p?.craft_xp) || 0).level),
+            // ⚠️ AND THE TEMPERED ODDS BESIDE THEM, FROM THE SAME CURVE. The bench shows both columns so
+            // the player can see what the extra parts actually buy before spending them — a "better
+            // chance" with no number is a thing you are asked to believe rather than a decision you can
+            // make. Same function, one flag, so the two can never drift apart.
+            oddsTempered: qualityOdds(craftLevel(Number(p?.craft_xp) || 0).level, true),
             recent: (craftLog || []).map((r) => ({
                 recipe: r.recipe_id,
                 kind: r.kind,
@@ -348,22 +370,80 @@ export async function groveState(buyerId) {
         // things nobody can make and nobody can work toward — the exact failure the "show them all" change
         // above was fixing, arriving from the other direction. mapIsBuilt is the line; raise MAPS_BUILT the
         // day a map's zones land and its recipes appear here on their own.
-        recipes: GROVE_RECIPES.filter((r) => mapIsBuilt(recipeMap(r))).map((r) => r.id),
+        // ⚠️ MINUS THE ONES A BOSS HAS NOT TAUGHT YET. The one narrow exception to "every recipe, always"
+        // — see reachableRecipes. A charm recipe you have not earned is not greyed out on the bench, it is
+        // absent, because a visible row you cannot act on is the wall this list exists to avoid and a
+        // visible row labelled "beat a boss you have not reached" is a spoiler as well as a wall.
+        recipes: GROVE_RECIPES.filter((r) => mapIsBuilt(recipeMap(r))
+            && (!r.taughtBy || (p?.taught || []).includes(r.id))).map((r) => r.id),
+        // What the bosses have taught, so the bench can run the same filter the server just ran.
+        taught: p?.taught || [],
+        // ── THE CHARMS IN HAND ──────────────────────────────────────────────────────────────────────
+        // ⚠️ ONE ENTRY PER (charm, quality), BECAUSE THAT IS WHAT A STACK IS HERE. Two Rootwood Seekings
+        // rolled Rough and Masterwork are different objects and the player picks between them at the
+        // door; merging them into "2x Rootwood Seeking" would throw away the only thing that makes a
+        // second one worth crafting.
+        charms: (charms || []).map((c) => ({
+            id: c.charm_id,
+            band: c.band,
+            qty: Number(c.qty) || 0,
+            value: charmValue(c.charm_id, c.band),
+            meta: GROVE_CHARMS[c.charm_id] || null,
+        })).filter((c) => c.meta),
+        // What is burning on the run in progress, if the player is mid-session.
+        charmOn: p?.charm_id && GROVE_CHARMS[p.charm_id]
+            ? { id: p.charm_id, band: p.charm_band, value: charmValue(p.charm_id, p.charm_band),
+                meta: GROVE_CHARMS[p.charm_id] }
+            : null,
         emblems: (emblems || []).map((e) => ({
             id: e.emblem_id, count: Number(e.count), slot: e.slot,
             ...emblemStars(Number(e.count)), meta: GROVE_EMBLEMS[e.emblem_id] || null,
         })),
-        bonuses: bonusesFrom(emblems),
+        bonuses: bonusesFrom(emblems, p),
     };
 }
 
 /** Open a zone: hand back the seed the client plays from. */
-export async function groveEnter(buyerId, zoneId) {
+export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const zone = groveZone(zoneId);
     if (!zone) return { ok: false, error: "no_zone" };
     const p = await playerRow(buyerId);
     if (zone.n > (Number(p?.unlocked_n) || 1)) return { ok: false, error: "locked" };
+
+    // ── ⚠️ THE CHARM IS SPENT HERE, AT THE DOOR, AND IT IS SPENT WHETHER THE RUN GOES WELL OR NOT ───
+    // That is the decision the charm exists to create: this zone, this dive, now — not a buff you hold
+    // until the perfect moment, which is a buff nobody ever uses.
+    //
+    // ⚠️ THE DECREMENT IS THE GUARD, NOT A READ-THEN-WRITE. Same shape as opening a chest: "check you
+    // have one, then take one" is two statements with a gap, and a double-tap on a slow connection walks
+    // through it and burns a charm the player does not own. The UPDATE carries its own `qty > 0` and
+    // RETURNING says whether it actually took anything.
+    //
+    // ⚠️ A FAILED TAKE IS NOT A FAILED ENTRY. Refusing the whole dive because a charm had already been
+    // used would strand a player at the door over something optional; they go in without it instead, and
+    // the payload says so.
+    let charmOn = null;
+    if (charm?.id && GROVE_CHARMS[charm.id] && QUALITY_BANDS.some((b) => b.id === charm.band)) {
+        const took = await db.queryOne(
+            `UPDATE mkt_grove_charm SET qty = qty - 1
+              WHERE buyer_id = $1 AND charm_id = $2 AND band = $3 AND qty > 0 RETURNING qty`,
+            [buyerId, charm.id, charm.band],
+        ).catch(() => null);
+        if (took) charmOn = { id: charm.id, band: charm.band };
+    }
+    // Written on the player row even when null, so last run's charm cannot haunt this one — a stale
+    // charm_id would quietly pay a bonus nobody spent anything for, on every dive after the first.
+    await db.query(
+        `UPDATE mkt_grove_player SET charm_id = $2, charm_band = $3 WHERE buyer_id = $1`,
+        [buyerId, charmOn?.id || null, charmOn?.band || null],
+    ).catch(() => {});
+    // ⚠️ AND THE LOCAL ROW IS UPDATED TOO, because `bonuses` below is built from it. Reading the charm
+    // back out of the database would be a round trip for a fact we just wrote, and forgetting to do
+    // either would hand the scene a bundle without the charm the player just burned — the exact
+    // client/server divergence bonusesFrom exists to prevent.
+    p.charm_id = charmOn?.id || null;
+    p.charm_band = charmOn?.band || null;
 
     // ⚠️ THE SEED IS THE SERVER'S. A client-chosen seed is a client that can shop for one that drops well.
     const seed = Math.floor(Math.random() * 0x7fffffff);
@@ -408,7 +488,9 @@ export async function groveEnter(buyerId, zoneId) {
             bossReady: kills >= zone.toUnlock && wait <= 0,
         },
         pop: GROVE_POP,
-        bonuses: bonusesFrom(emblems),
+        bonuses: bonusesFrom(emblems, p),
+        // What is burning on this run, so the scene can show it and the player can see what they paid for.
+        charm: charmOn ? { ...charmOn, ...GROVE_CHARMS[charmOn.id], value: charmValue(charmOn.id, charmOn.band) } : null,
         ...look,
     };
 }
@@ -541,7 +623,7 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     // argument present on one side and absent on the other is a stream that diverges mid-kill, which the
     // player experiences as a drop they watched fall and never received.
     const zoneN = Number(zone?.n) || 0;
-    const got = settleKills(list, foeById, Number(p.seed), bonusesFrom(emblemRows), zoneN, GROVE_HYPER);
+    const got = settleKills(list, foeById, Number(p.seed), bonusesFrom(emblemRows, p), zoneN, GROVE_HYPER);
 
     const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p.pack_slots) || 16);
 
@@ -715,7 +797,7 @@ export async function groveBoss(buyerId, zoneId) {
     // The kill index continues the session stream, so the client and the server land on the same roll.
     const index = Number(p.kills_settled) || 0;
     const emblemRows = await db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-    const got = rollBoss(boss, zone.n, Number(p.seed), index, bonusesFrom(emblemRows), bossHyperChance(zone.n), GROVE_HYPER);
+    const got = rollBoss(boss, zone.n, Number(p.seed), index, bonusesFrom(emblemRows, p), bossHyperChance(zone.n), GROVE_HYPER);
 
     const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p.pack_slots) || 16);
 
@@ -776,7 +858,31 @@ export async function groveBoss(buyerId, zoneId) {
     // would leave an open door and a boss still standing, which nothing fixes.
     const unlocked = await openTheWay(buyerId, zone);
 
-    await trackActivity(buyerId, "grove_boss", { zone: zoneId, boss: boss.id, hyper: hyper?.id || null }).catch(() => {});
+    // ── ⚠️ AND THIS IS WHERE A RECIPE IS TAUGHT ───────────────────────────────────────────────────
+    // The only way a charm recipe ever reaches the bench. Every other row on that screen has been visible
+    // since the day the account was made -- which is right, and is also why nothing there can be found.
+    //
+    // ⚠️ TAUGHT ONCE, AND SILENTLY IF ALREADY KNOWN. array_append on a repeat kill would grow the column
+    // for ever and the bench would show the same recipe four times. The guard is in the WHERE, not in a
+    // read before it, because a boss killed twice in two tabs must not write two rows.
+    //
+    // ⚠️ AND IT IS RETURNED, because a reward with no screen is not shipped: a recipe that silently
+    // appears in a list of two hundred is a recipe nobody will ever notice they earned. The kill card
+    // announces it. See [[reward-with-no-screen-is-not-shipped]].
+    const teaches = GROVE_RECIPES.find((r) => r.taughtBy === boss.id) || null;
+    let taught = null;
+    if (teaches) {
+        const row = await db.queryOne(
+            `UPDATE mkt_grove_player SET taught = array_append(taught, $2), updated_at = NOW()
+              WHERE buyer_id = $1 AND NOT ($2 = ANY(taught)) RETURNING taught`,
+            [buyerId, teaches.id],
+        ).catch(() => null);
+        if (row) taught = { id: teaches.id, name: teaches.name, blurb: teaches.blurb };
+    }
+
+    await trackActivity(buyerId, "grove_boss", {
+        zone: zoneId, boss: boss.id, hyper: hyper?.id || null, taught: taught?.id || null,
+    }).catch(() => {});
 
     return {
         ok: true,
@@ -796,6 +902,8 @@ export async function groveBoss(buyerId, zoneId) {
         // The zone this kill just opened, or null if it was already open (a repeat kill, or zone twelve).
         // The dopamine pop is driven off this, which is why it has to be the boss response that carries it.
         unlocked,
+        // The recipe this boss just handed over, the first time it does. Null on every repeat kill.
+        taught,
         cooldownMs: BOSS_COOLDOWN_MS,
     };
 }
@@ -937,12 +1045,17 @@ export async function groveMove(buyerId, { partId, from, to, qty = 1 } = {}) {
 }
 
 /** Craft a discovered recipe. Parts come out of the BAG. */
-export async function groveCraft(buyerId, recipeId) {
+export async function groveCraft(buyerId, recipeId, { temper = false } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const recipe = recipeById(recipeId);
     if (!recipe) return { ok: false, error: "no_recipe" };
 
     const p = await playerRow(buyerId);
+
+    // ⚠️ A RECIPE A BOSS HAS NOT TAUGHT YOU IS NOT A RECIPE YOU HAVE. Checked on the server and not merely
+    // hidden on the bench: the workbench filters these out of the list, but a hidden row is a UI decision
+    // and this is a rule. Without it the charm for a map you have never finished is one POST away.
+    if (recipe.taughtBy && !(p.taught || []).includes(recipe.id)) return { ok: false, error: "not_taught" };
 
     // ⚠️ ONE-TIME THINGS ARE CHECKED BEFORE ANYTHING IS SPENT. A backpack expansion crafted twice is four
     // slots paid for and four slots given once.
@@ -974,8 +1087,17 @@ export async function groveCraft(buyerId, recipeId) {
     // ⚠️ EVERY PART DEBITED CONDITIONALLY, AND ROLLED BACK IF ANY FAILS. neon() over HTTP has no
     // transactions (see CLAUDE.md), so the rollback is by hand — without it a half-paid craft eats parts and
     // gives nothing.
+    // ── ⚠️ TEMPERING IS PAID IN THE SAME DEBIT, NOT IN A SECOND ONE ─────────────────────────────────
+    // Two debits means two failure points and a window where the recipe is paid for and the temper is not —
+    // on a driver with no transactions, that window is a player who loses sixteen parts and gets nothing.
+    // Folding the extra into one cost map means the existing conditional-debit-and-roll-back covers both,
+    // and a shortfall anywhere refunds everything exactly as it already did.
+    const extra = temper ? (temperCost(recipe) || {}) : {};
+    const cost = { ...recipe.parts };
+    for (const [part, n] of Object.entries(extra)) cost[part] = (cost[part] || 0) + n;
+
     const spent = [];
-    for (const [part, need] of Object.entries(recipe.parts)) {
+    for (const [part, need] of Object.entries(cost)) {
         const row = await db.queryOne(
             `UPDATE mkt_grove_item SET qty = qty - $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2 AND qty >= $3
              RETURNING qty`, [buyerId, part, need],
@@ -990,24 +1112,62 @@ export async function groveCraft(buyerId, recipeId) {
         spent.push([part, need]);
     }
 
+    // ── ⚠️ THE ROLL HAPPENS BEFORE THE GRANT NOW, BECAUSE THE GRANT DEPENDS ON IT ───────────────────
+    // It used to sit below, after everything had already been handed over, which was fine while only tools
+    // rolled -- a tool's quality is written on the tool afterwards. It is not fine now that a band decides
+    // how many poultices come out of a batch and how many slots a vault adds: the number has to exist
+    // before the INSERT that uses it.
+    //
+    // ⚠️ ROLLED AGAINST THE LEVEL THE PLAYER HAD BEFORE THIS CRAFT. Reading it after would let the craft
+    // that levels you up also benefit from the level it just earned.
+    const beforeXp = Number(p.craft_xp) || 0;
+    const beforeLevel = craftLevel(beforeXp).level;
+    const gained = craftXpFor(recipe);
+    // Seeded off the player's own running total rather than the session seed: a craft is not a kill and has
+    // no kill index, and a client that could re-roll a bad quality by retrying is a client that never gets
+    // a bad quality. The temper flag joins the seed so the two paths cannot collide on one total.
+    const qRand = (() => {
+        let x = (((beforeXp + 1) * 2654435761) ^ (temper ? 0x9e3779b9 : 0)) >>> 0;
+        return () => {
+            x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
+            return x / 4294967296;
+        };
+    })();
+    // ⚠️ EVERY KIND ROLLS. This was `recipe.kind === "tool" ? ... : null`, which is the single line that
+    // made three crafts in four a vending machine — see craftBonusFor for what each kind does with it.
+    const quality = rollQuality(beforeLevel, qRand, temper);
+    const bonus = craftBonusFor(recipe, quality);
+
     // ── WHAT IT MAKES ───────────────────────────────────────────────────────────────────────────────
     if (recipe.kind === "pack") {
+        // ⚠️ bonus.slots IS ADDED TO THE AUTHORED `adds`, not instead of it. The recipe still promises +4;
+        // a good roll makes it +5 or +6 and the card says so.
         await db.query(
             `UPDATE mkt_grove_player SET pack_slots = pack_slots + $2, packs_built = array_append(packs_built, $3), updated_at = NOW()
-              WHERE buyer_id = $1`, [buyerId, recipe.adds, recipe.id],
+              WHERE buyer_id = $1`, [buyerId, Number(recipe.adds) + bonus.slots, recipe.id],
         ).catch(() => {});
     } else if (recipe.kind === "bank") {
-        // ⚠️ 64 IS THE CEILING Luke named. LEAST() rather than a check so no sequence of crafts can pass it.
+        // ⚠️ 64 IS THE CEILING Luke named. LEAST() rather than a check so no sequence of crafts can pass it
+        // — and that includes a Masterwork roll's bonus slots, which go through the same clamp.
         await db.query(
             `UPDATE mkt_grove_player SET bank_slots = LEAST(64, bank_slots + $2), banks_built = array_append(banks_built, $3), updated_at = NOW()
-              WHERE buyer_id = $1`, [buyerId, recipe.adds, recipe.id],
+              WHERE buyer_id = $1`, [buyerId, Number(recipe.adds) + bonus.slots, recipe.id],
         ).catch(() => {});
     } else if (recipe.kind === "food") {
-        // Into the bag, where it takes a slot like anything else.
+        // Into the bag, where it takes a slot like anything else. A good roll is a bigger batch.
         await db.query(
             `INSERT INTO mkt_grove_item (buyer_id, place, part_id, qty) VALUES ($1, 'pack', $2, $3)
              ON CONFLICT (buyer_id, place, part_id) DO UPDATE SET qty = mkt_grove_item.qty + $3`,
-            [buyerId, recipe.id, Math.max(1, Number(recipe.makes) || 1)],
+            [buyerId, recipe.id, Math.max(1, Number(recipe.makes) || 1) + bonus.extra],
+        ).catch(() => {});
+    } else if (recipe.kind === "charm") {
+        // ⚠️ KEYED ON (charm, quality) SO TWO POTENCIES NEVER MERGE. A Rough and a Masterwork Rootwood
+        // Seeking are not two of the same thing, and stacking them into one pile of two would throw away
+        // the only reason to make a second one.
+        await db.query(
+            `INSERT INTO mkt_grove_charm (buyer_id, charm_id, band, qty) VALUES ($1, $2, $3, 1)
+             ON CONFLICT (buyer_id, charm_id, band) DO UPDATE SET qty = mkt_grove_charm.qty + 1`,
+            [buyerId, recipe.id, bonus.band],
         ).catch(() => {});
     } else if (recipe.kind === "tool") {
         // ⚠️ THE TIER ONLY EVER GOES UP. GREATEST means crafting a tier you already hold, or one below it,
@@ -1074,34 +1234,24 @@ export async function groveCraft(buyerId, recipeId) {
         ).catch(() => {});
     }
 
-    await trackActivity(buyerId, "grove_craft", { recipe: recipe.id, kind: recipe.kind, first: firstCraft }).catch(() => {});
-    // ── ⚠️ THE CRAFTING LEVEL, AND THE QUALITY IT BUYS ────────────────────────────────────────────
-    // Luke: "as you craft gear you gain levels in crafting each crafting level helps your rolls on
-    // crafting improving quality of the in game things you craft."
-    //
+    await trackActivity(buyerId, "grove_craft", {
+        recipe: recipe.id, kind: recipe.kind, first: firstCraft, quality, temper, band: bonus.band,
+    }).catch(() => {});
+
+    // ── ⚠️ THE BAND PAYS MERITS ON THE TWO KINDS THAT HAVE NO "MORE" TO GIVE ────────────────────────
+    // A plot is capped at two and a decoration is one object, so a good roll cannot hand over a bigger
+    // one. Merits are the Grove's own currency with its own sink (the five boss sets), which keeps the
+    // payout inside this system rather than inventing a third plot or minting gold on a kill loop.
+    if (bonus.merits > 0) {
+        await db.query(`UPDATE mkt_grove_player SET merits = merits + $2, updated_at = NOW() WHERE buyer_id = $1`,
+            [buyerId, bonus.merits]).catch(() => {});
+    }
+
     // The xp is priced off the recipe's own PART COST, never flat per craft -- a flat award makes the
     // cheapest recipe the fastest ladder, which turns crafting into poultice spam. Food is additionally
     // the worst-paying kind, because it is the one recipe that makes a stack and is meant to be made
-    // constantly.
-    //
-    // ⚠️ THE QUALITY IS ROLLED AGAINST THE LEVEL THE PLAYER HAD *BEFORE* THIS CRAFT. Reading it after
-    // would let the craft that levels you up also benefit from the level it just earned, which is a
-    // small thing that is nonetheless wrong and is the kind of off-by-one nobody ever finds again.
-    const beforeXp = Number(p.craft_xp) || 0;
-    const beforeLevel = craftLevel(beforeXp).level;
-    const gained = craftXpFor(recipe);
-    // Seeded off the player's own running total rather than the session seed: a craft is not a kill and
-    // has no kill index, and a client that could re-roll a bad quality by retrying is a client that
-    // never gets a bad quality.
-    const qRand = (() => {
-        let x = ((beforeXp + 1) * 2654435761) >>> 0;
-        return () => {
-            x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
-            return x / 4294967296;
-        };
-    })();
-    const quality = recipe.kind === "tool" ? rollQuality(beforeLevel, qRand) : null;
-
+    // constantly. ⚠️ TEMPERING PAYS NO EXTRA XP: it is parts spent on odds, not on a bigger craft, and
+    // paying the ladder for it would make tempering the fastest way to level rather than a decision.
     const afterRow = await db.queryOne(
         `UPDATE mkt_grove_player SET craft_xp = craft_xp + $2, updated_at = NOW()
           WHERE buyer_id = $1 RETURNING craft_xp`,
@@ -1135,10 +1285,18 @@ export async function groveCraft(buyerId, recipeId) {
         // The screen announces this; a chest granted silently is a chest nobody knows they have.
         firstCraft,
         spent: spent.map(([part, n]) => ({ part, n })),
-        makes: Number(recipe.makes) || null,
-        adds: Number(recipe.adds) || null,
+        // ⚠️ THE TOTALS, NOT THE AUTHORED NUMBERS. A card that printed `recipe.makes` after a Masterwork
+        // roll would say five while eight landed in the bag — the same class of lie as the tool card that
+        // once announced "Rough to Fine" over an unchanged 3%.
+        makes: recipe.makes ? Number(recipe.makes) + bonus.extra : null,
+        adds: recipe.adds ? Number(recipe.adds) + bonus.slots : null,
         tier: Number(recipe.tier) || null,
         slot: recipe.slot || null,
+        // What the band bought on top of the recipe, so the card can show the roll paying for itself.
+        bonus,
+        tempered: Boolean(temper),
+        // A charm's whole payoff is its rolled potency; the card has nothing else to show for it.
+        charm: recipe.kind === "charm" ? { stat: recipe.stat, value: charmValueOf(recipe.id, quality) } : null,
         // The ladder, reported back so the result card can show the bar moving and say when it levelled.
         craft: {
             xpGained: gained,
@@ -1336,7 +1494,7 @@ export async function groveOpenChest(buyerId, tier) {
     // long after whatever dropped them -- there is no kill index to share. The index is how many of this
     // tier they have left, which moves every open and cannot be steered by retrying.
     const got = rollGroveChest(chest, Number(p?.seed) || 1, Number(took.qty) + chest.id.length,
-        bonusesFrom(emblemRows), GROVE_HYPER);
+        bonusesFrom(emblemRows, p), GROVE_HYPER);
 
     const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p?.pack_slots) || 16);
     if (got.merits > 0) {

@@ -45,11 +45,16 @@ export async function POST(request) {
             if (!buyer?.id) return noStore({ ok: false, error: "signed_out" }, { status: 401 });
             const b = await request.json().catch(() => ({}));
             switch (b?.action) {
-                case "enter": return noStore(await groveEnter(buyer.id, String(b.zone || "")));
+                // ⚠️ THE CHARM RIDES THE ENTER, it is not its own action. Choosing one and spending it
+                // must be the same request: a two-step "select, then enter" leaves a charm marked as
+                // chosen and never burned if the player closes the tab between them.
+                case "enter": return noStore(await groveEnter(buyer.id, String(b.zone || ""), {
+                    charm: b.charm ? { id: String(b.charm.id || ""), band: String(b.charm.band || "") } : null,
+                }));
                 case "settle": return noStore(await groveSettle(buyer.id, { zoneId: String(b.zone || ""), kills: b.kills, eaten: b.eaten }));
                 case "boss": return noStore(await groveBoss(buyer.id, String(b.zone || "")));
                 case "move": return noStore(await groveMove(buyer.id, b));
-                case "craft": return noStore(await groveCraft(buyer.id, String(b.recipe || "")));
+                case "craft": return noStore(await groveCraft(buyer.id, String(b.recipe || ""), { temper: Boolean(b.temper) }));
                 case "rework": return noStore(await groveRework(buyer.id, String(b.slot || "")));
                 // The Grove's own chest line, never chests.js. See the note on the boss grant.
                 case "openChest": return noStore(await groveOpenChest(buyer.id, String(b.tier || "")));

@@ -1,3 +1,4 @@
+import { GROVE_CHARMS } from "@/lib/marketplace/grove-catalog.js";
 import { foodRecipesForMap, toolRecipesForMap, mapIsBuilt } from "@/lib/marketplace/grove-maps.js";
 
 // ── THE GROVE'S RECIPES — THE NEW CRAFTING SYSTEM ────────────────────────────────────────────────────────────
@@ -209,6 +210,21 @@ for (let n = 2; n <= TOOL_TIER_CAP; n += 1) {
     }
 }
 
+// ── THE CHARMS ───────────────────────────────────────────────────────────────────────────────────────────────
+// One per map, and the first consumable the bench makes that is not food. The definitions (what each one
+// bends, by how much, and which boss teaches it) live in grove-catalog.js beside the foods and emblems; this
+// turns each into a row the workbench can show.
+//
+// ⚠️ `taughtBy` IS WHAT MAKES THESE DIFFERENT FROM EVERY OTHER ROW. The discovery gate was retired in October
+// -- "I think we should see all recipes instead of the silly find all to unlock" -- and that was right, but
+// it left a bench on which nothing can ever be found. A charm recipe is invisible until that map's last boss
+// hands it over. One kind of row earned one way, against 208 that are always on screen.
+for (const c of Object.values(GROVE_CHARMS)) {
+    GROVE_RECIPES.push(R(c.id, c.name, "charm", c.parts, {
+        map: c.map, blurb: c.blurb, taughtBy: c.taughtBy, stat: c.stat, per: c.per,
+    }));
+}
+
 /** Every tool recipe for one slot, lowest tier first — the ladder as it currently exists. */
 export const toolLadder = (slot) => GROVE_RECIPES
     .filter((r) => r.kind === "tool" && r.slot === slot)
@@ -258,13 +274,21 @@ export function discoveredRecipes(seenPartIds) {
 //
 // Filtered HERE rather than in the workbench, so the chip counts, the dock badge and the unlock moment all
 // agree about what exists. When map 8 ships, MAPS_BUILT moves and these appear on their own.
-export const reachableRecipes = () => GROVE_RECIPES.filter((r) => mapIsBuilt(recipeMap(r)));
+// ── ⚠️ AND A TAUGHT RECIPE IS NOT REACHABLE UNTIL IT HAS BEEN TAUGHT ────────────────────────────────────────
+// The same filter, for the same reason: a row nobody can act on is not content. The difference is that a map
+// 8 recipe becomes reachable when the map ships and a charm becomes reachable when YOU beat its boss, so
+// this one is per player and takes the taught list. Everything that counts rows — the chips, the dock badge,
+// the unlock moment — goes through here, so they cannot disagree about whether a charm exists yet.
+export const reachableRecipes = (taught) => {
+    const known = taught instanceof Set ? taught : new Set(taught || []);
+    return GROVE_RECIPES.filter((r) => mapIsBuilt(recipeMap(r)) && (!r.taughtBy || known.has(r.id)));
+};
 
 // `st` is the groveState payload: { pack, seen, tools, packsBuilt, banksBuilt, plotsBuilt }.
 export function recipeRows(st = {}) {
     const pack = st.pack || {};
     const seen = st.seen instanceof Set ? st.seen : new Set(st.seen || []);
-    return reachableRecipes().map((r) => {
+    return reachableRecipes(st.taught).map((r) => {
         const built = (st.packsBuilt || []).includes(r.id)
             || (st.banksBuilt || []).includes(r.id)
             || (st.plotsBuilt || []).includes(r.id)
@@ -318,6 +342,24 @@ export function reworkCost(recipe) {
     if (!recipe || recipe.kind !== "tool") return null;
     return Object.fromEntries(
         Object.entries(recipe.parts).map(([part, n]) => [part, Math.max(1, Math.ceil(n * REWORK_SHARE))]),
+    );
+}
+
+// ── ⚠️ TEMPERING IS PRICED THE SAME WAY, AND DELIBERATELY SO ────────────────────────────────────────────────
+// A share of the recipe, floor of one each, exactly like a rework — because they are the same bargain seen
+// from two sides: pay parts to improve a roll. Two different pricing schemes for one idea would be two
+// tables to extend every time the ladder grows, and the player would have to learn both.
+//
+// Cheaper than a rework (40% against 60%) because tempering is paid BEFORE the roll and buys only better
+// odds, while a rework is paid against a known outcome and can never lose ground. Paying more for the
+// gamble than for the guarantee would make the gamble the wrong button every time.
+export const TEMPER_SHARE = 0.4;
+
+/** What tempering this craft costs, as { part: n } — on TOP of the recipe's own cost. */
+export function temperCost(recipe) {
+    if (!recipe) return null;
+    return Object.fromEntries(
+        Object.entries(recipe.parts).map(([part, n]) => [part, Math.max(1, Math.ceil(n * TEMPER_SHARE))]),
     );
 }
 

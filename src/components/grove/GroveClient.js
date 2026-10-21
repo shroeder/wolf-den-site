@@ -15,7 +15,7 @@ import GroveBench from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area from "@/components/grove/GroveArea.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
-import { GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
+import { GROVE_CHESTS, CHARM_STAT_LABEL, QUALITY_BANDS } from "@/lib/marketplace/grove-forge.js";
 import {
     GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
 } from "@/lib/marketplace/grove-recipes.js";
@@ -73,6 +73,13 @@ const TOOL_GLYPH = {
     loupe: GiCutDiamond, banner: GiFlagObjective, horn: GiBugleCall,
 };
 
+// ⚠️ A GLYPH, NOT A SPRITE, AND ON PURPOSE. Twelve charms would be twelve drawings to say what the name
+// and the bonus already say — the same call the foods made when every map's poultice borrowed map one's
+// picture. One per flavour, so the three are told apart at a glance.
+const CHARM_GLYPH = { rarityFind: GiCutDiamond, emblemFind: GiPawPrint, rareSpawn: GiFlagObjective };
+// The band's own word, from the band table rather than a second copy of the five names.
+const bandWord = (id) => QUALITY_BANDS.find((b) => b.id === id)?.name || "";
+
 const emptyCells = (slots, held) => Array.from(
     { length: Math.max(0, (Number(slots) || 0) - held) },
     (_, i) => <span key={`e${i}`} className="gv-cell is-empty" aria-hidden="true" />,
@@ -103,6 +110,10 @@ export default function GroveClient({ initial }) {
     const [note, setNote] = useState(null);
     const [unlockedNow, setUnlockedNow] = useState(null);
     const [bossWon, setBossWon] = useState(null);
+    // The charm armed for the next dive, or null. ⚠️ NOT PERSISTED AND DELIBERATELY SO — arming is a
+    // choice about the run you are about to take, and a choice that survived a reload would be spent on
+    // a dive the player had forgotten they armed it for.
+    const [charmPick, setCharmPick] = useState(null);
     // Which panel is open OVER the zone, or null for none. Separate from `view`, which stays "zone" the
     // whole time you are in one — see the hoist note above the panels.
     const [zonePanel, setZonePanel] = useState(null);
@@ -150,9 +161,15 @@ export default function GroveClient({ initial }) {
 
     // ── ENTER A ZONE ────────────────────────────────────────────────────────────────────────────────
     const enter = useCallback(async (zone) => {
-        const d = await post({ action: "enter", zone: zone.id });
+        // ⚠️ THE CHARM GOES WITH THE ENTER, so choosing one and burning it are a single request. The
+        // server returns what it actually took — a charm already spent in another tab comes back null —
+        // and the pick is cleared either way, because an armed charm that survived the dive would be
+        // spent again on the next one without the player choosing to.
+        const d = await post({ action: "enter", zone: zone.id, charm: charmPick || undefined });
         if (!d?.ok) { setNote(d?.error === "locked" ? "That one is still closed." : "Couldn't go in."); return; }
-        setSession({ zone: d.zone, seed: d.seed, bonuses: d.bonuses });
+        setCharmPick(null);
+        if (d.charm) setNote(`${d.charm.name} burning — ${CHARM_STAT_LABEL[d.charm.stat] || "bonus"} +${d.charm.value}%`);
+        setSession({ zone: d.zone, seed: d.seed, bonuses: d.bonuses, charm: d.charm || null });
         // ⚠️ AND THE LAST ZONE'S CARDS GO WITH IT. Both of these are click-to-dismiss overlays owned by
         // this component, which does not unmount between zones — so a boss kill card or an unlock pop left
         // standing was still standing in the next place. Cleared HERE rather than in the door handler
@@ -165,7 +182,7 @@ export default function GroveClient({ initial }) {
         // the zone you just walked into means arriving somewhere new behind a backpack.
         setZonePanel(null);
         setView("zone");
-    }, []);
+    }, [charmPick]);
 
     // ── THE DOORS ───────────────────────────────────────────────────────────────────────────────────
     // ⚠️ RESOLVED FROM THE CATALOGUE, NOT FROM st. A door is walked through immediately after a settle that
@@ -513,6 +530,48 @@ export default function GroveClient({ initial }) {
                             </div>
                         </Area>
 
+                        {/* ── THE CHARMS ──────────────────────────────────────────────────────────────
+                            ⚠️ CHOSEN HERE, SPENT AT THE DOOR. Picking one does nothing but arm it; the
+                            charm is taken by the server when you walk into a zone, on the same request,
+                            so there is no state where a charm is "selected" and quietly lost. What you
+                            pick survives until you go in or pick something else.
+
+                            ⚠️ AND IT IS ONE ROW PER POTENCY, not per charm. A Rough and a Masterwork
+                            Rootwood Seeking are different objects and choosing between them is the
+                            decision — collapsing them into one row with a count would hide the only
+                            thing crafting a second one ever buys. */}
+                        <Area id="charms" icon="ui-emblems" title="Charms"
+                            count={charmPick ? "armed" : `${(st.charms || []).reduce((a, c) => a + c.qty, 0) || "none"}`}>
+                            {(st.charms || []).length ? (
+                                <div className="gv-slots">
+                                    {(st.charms || []).map((c) => {
+                                        const on = charmPick?.id === c.id && charmPick?.band === c.band;
+                                        return (
+                                            <button key={`${c.id}-${c.band}`} type="button"
+                                                className={`gv-slot is-${c.band}${on ? " is-on" : ""}`}
+                                                onClick={() => setCharmPick(on ? null : { id: c.id, band: c.band })}>
+                                                {(() => { const G = CHARM_GLYPH[c.meta?.stat] || GiCutDiamond; return <G size={30} aria-hidden="true" />; })()}
+                                                {/* ⚠️ THE BAND IS ON THE NAME, not hidden in the detail
+                                                    line. Two rows of the same charm differ only by how
+                                                    well they came out, so that word is the entire
+                                                    difference between them. */}
+                                                <b>{c.meta?.name || c.id} <i className={`gv-q is-${c.band}`}>{bandWord(c.band)}</i></b>
+                                                <span>{c.qty}</span>
+                                                <em>{on ? "carried in next" : `${CHARM_STAT_LABEL[c.meta?.stat] || ""} +${c.value}%`}</em>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                // ⚠️ AN EMPTY SHELF HAS TO SAY WHERE THEY COME FROM. A panel that is blank
+                                // because you have none reads identically to one that is blank because the
+                                // feature is broken, and a charm recipe is the one thing on the bench a
+                                // player cannot find by looking for it.
+                                <p className="gv-empty">None yet. A map&apos;s last boss teaches its charm
+                                    &mdash; beat one and the recipe appears at the workbench.</p>
+                            )}
+                        </Area>
+
                         {/* ── THE TOOLS ───────────────────────────────────────────────────────────────
                             A ladder, not six items: each map raises every tool by a tier. */}
                         <Area id="tools" icon="ui-tools" title="Tools"
@@ -704,6 +763,19 @@ export default function GroveClient({ initial }) {
                                     <GiLaurelCrown aria-hidden="true" focusable="false" />
                                     +{bossWon.merits} merits
                                 </span>
+                            ) : null}
+                            {/* ── ⚠️ THE RECIPE IT TAUGHT, AND IT GETS THE LOUDEST LINE ON THE CARD ──
+                                This happens once per map, ever, and it is the only way a recipe reaches
+                                the bench that is not simply being alive. A row quietly appearing in a
+                                list of two hundred is a reward nobody notices they earned — see
+                                [[reward-with-no-screen-is-not-shipped]], which is the same scar as the
+                                chest line above it. */}
+                            {bossWon.taught ? (
+                                <strong className="gv-won-taught">
+                                    <GiStoneCrafting aria-hidden="true" focusable="false" />
+                                    It taught you {bossWon.taught.name}
+                                    <em>a new recipe, at the workbench</em>
+                                </strong>
                             ) : null}
                             <button type="button" onClick={() => setBossWon(null)}>Good</button>
                         </div>

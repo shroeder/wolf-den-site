@@ -11,8 +11,8 @@ import {
 } from "react-icons/gi";
 
 import Area from "@/components/grove/GroveArea.js";
-import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes, reworkCost } from "@/lib/marketplace/grove-recipes.js";
-import { QUALITY_BANDS, qualityBand, toolBonusFor, GROVE_CHESTS, GROVE_CHEST_ORDER } from "@/lib/marketplace/grove-forge.js";
+import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes, reworkCost, temperCost } from "@/lib/marketplace/grove-recipes.js";
+import { QUALITY_BANDS, qualityBand, toolBonusFor, GROVE_CHESTS, GROVE_CHEST_ORDER, craftBonusLabel, charmValue, CHARM_STAT_LABEL } from "@/lib/marketplace/grove-forge.js";
 
 // ── THE WORKBENCH ───────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "Crafting is very ghetto, needs full pass of grove crafting dopamine thoughtfulness and
@@ -37,7 +37,7 @@ import { QUALITY_BANDS, qualityBand, toolBonusFor, GROVE_CHESTS, GROVE_CHEST_ORD
 
 const KIND_ICON = {
     tool: GiStoneCrafting, food: GiHealthPotion, pack: GiBackpack,
-    bank: GiAnvil, plot: GiFarmTractor, decor: GiTreasureMap,
+    bank: GiAnvil, plot: GiFarmTractor, decor: GiTreasureMap, charm: GiLaurelCrown,
 };
 const SLOT_ICON = {
     rod: GiFishingPole, pick: GiMineWagon, shovel: GiDigHole,
@@ -47,6 +47,12 @@ const SLOT_ICON = {
 /** What the thing actually does, in numbers, so a recipe is never a name and a vibe. */
 function payoff(r, st, built = false) {
     if (r.kind === "food") return `Makes ${r.makes || 1} · heals on the belt`;
+    // ⚠️ THE RANGE, NOT A SINGLE NUMBER. A charm's worth is its base times the band it rolls, so quoting
+    // only the base would understate the good half of the outcome — and the spread IS the reason to make
+    // another one. Both ends come from charmValue so the card cannot drift from what the roll pays.
+    if (r.kind === "charm") {
+        return `${CHARM_STAT_LABEL[r.stat] || "Bonus"} +${charmValue(r.id, 0)}% to +${charmValue(r.id, 100)}% · one run`;
+    }
     if (r.kind === "pack") return `+${r.adds} backpack slots (now ${st.packSlots || 16})`;
     if (r.kind === "bank") return `+${r.adds} vault slots (now ${st.bankSlots || 16})`;
     if (r.kind === "plot") return "+1 farm plot";
@@ -92,6 +98,10 @@ const FILTERS = [
     { id: "ready", label: "Ready" },
     { id: "tool", label: "Tools" },
     { id: "food", label: "Food" },
+    // ⚠️ ITS OWN CHIP EVEN THOUGH THERE IS AT MOST ONE PER MAP. A charm is the only consumable here that
+    // is not food and the only row a boss had to teach; burying it under "All" would hide the one thing
+    // on this screen the player went and earned.
+    { id: "charm", label: "Charms" },
     { id: "store", label: "Storage" },
     { id: "farm", label: "Farm" },
 ];
@@ -99,6 +109,12 @@ const FILTERS = [
 export default function GroveBench({ st, known, partName, PartIcon, post, refresh, setNote }) {
     const [result, setResult] = useState(null);
     const [busy, setBusy] = useState(null);
+    // ── ⚠️ TEMPERING IS PER ROW, NOT A MODE THE SCREEN IS IN ────────────────────────────────────────
+    // A single "temper" switch at the top would be armed from one recipe and fire on the next one the
+    // player pressed, spending a surplus of commons on a vault they only wanted one of. Holding the
+    // recipe id means the choice belongs to the thing it was made about, and pressing Craft on any other
+    // row is an ordinary craft.
+    const [tempering, setTempering] = useState(null);
     // ⚠️ ITS OWN CARD, NOT THE CRAFT RESULT. An open and a craft pay different things and the open can
     // CHAIN -- "open another" has to leave the card standing while the thing underneath it changes.
     const [opened, setOpened] = useState(null);
@@ -186,12 +202,24 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // that throws on a missing field is a worse outcome than one that shows level 1 for a minute.
     const lvl = st.craft || { level: 1, progress: 0, intoLevel: 0, needForNext: null, capped: false };
     const odds = lvl.odds || [];
+    // ── ⚠️ "FINE OR BETTER", NOT "MASTERWORK" ───────────────────────────────────────────────────────
+    // Quoting the top band alone would advertise tempering with a number that moves from 2% to 4% and
+    // read as buying nothing, when what it actually shifts is the whole distribution. The three best
+    // bands together are the threshold a player feels, and the set is taken from QUALITY_BANDS by
+    // position rather than by name, so adding a sixth band tomorrow does not quietly change what this
+    // sentence means.
+    const GOOD = new Set(QUALITY_BANDS.slice(0, 3).map((b) => b.id));
+    const goodShare = (list) => (list || []).filter((b) => GOOD.has(b.id)).reduce((a, b) => a + (b.share || 0), 0);
+    const topBandName = `${QUALITY_BANDS[2].name}+`;
+    const topOdds = goodShare(odds);
+    const topOddsT = goodShare(lvl.oddsTempered);
     const recent = lvl.recent || [];
     const merits = Number(st.merits) || 0;
 
     const craft = async (r) => {
+        const temper = tempering === r.id;
         setBusy(r.id);
-        const d = await post({ action: "craft", recipe: r.id });
+        const d = await post({ action: "craft", recipe: r.id, temper });
         setBusy(null);
         if (!d?.ok) {
             setNote(d?.error === "not_enough_parts" ? "Not enough parts for that."
@@ -203,6 +231,9 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                 : "Couldn't make that.");
             return;
         }
+        // ⚠️ CLEARED ON SUCCESS, so a tempered craft does not quietly temper the next one. The cost is
+        // real and silently repeating it is the kind of charge a player only notices in the bag.
+        setTempering(null);
         // The moment. Built from the SERVER's spent list, so what is shown is what actually left the bag.
         setResult({ ...d, recipe: r });
         await refresh();
@@ -309,7 +340,11 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
 
                 {odds.length ? (
                     <>
-                        <p className="gv-level-say">Every tool you make rolls a quality. At level {lvl.level}:</p>
+                        {/* ⚠️ "EVERYTHING", NOT "EVERY TOOL". This line was true when tools were the only
+                            kind that rolled; it is now the sentence that tells a player their poultices
+                            and vaults roll too, which is the whole change. A banner describing the old
+                            rule is worse than no banner — it is the screen telling you not to bother. */}
+                        <p className="gv-level-say">Everything you make rolls a quality. At level {lvl.level}:</p>
                         <ul className="gv-odds">
                             {odds.map((b) => (
                                 <li key={b.id} className={`is-${b.id}`}>
@@ -397,8 +432,24 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                         : [];
                     const reworkShort = rwShortList.reduce((a, b) => a + b, 0);
                     const reworkReady = canRework && reworkShort === 0;
+                    // ── WHAT TEMPERING THIS ROW WOULD COST AND BUY ───────────────────────────────
+                    // ⚠️ OFFERED ONLY WHERE THERE IS A ROLL TO IMPROVE — so not on a row already built,
+                    // and not on a rework (which is its own re-roll and is priced separately). Showing
+                    // it on a finished vault would be a button that spends parts on nothing.
+                    const canTemper = !built && !canRework;
+                    const temperOn = tempering === r.id;
+                    const tmpCost = canTemper ? temperCost(r) : null;
+                    const temperExtra = tmpCost ? Object.values(tmpCost).reduce((a, b) => a + b, 0) : 0;
                     return (
                         <li key={r.id} className={`gv-rec${ready ? " is-ready" : ""}${built ? " is-built" : ""}`}>
+                            {/* ⚠️ THE THREE COLUMNS LIVE IN THEIR OWN ROW. The temper strip used to be a
+                                fourth child of this grid spanning 1 / -1, and a spanning item's
+                                min-content is distributed into the tracks it crosses: measured live, the
+                                auto column took 214px of it and the body column collapsed to EXACTLY 0px,
+                                so every word of the recipe wrapped onto its own line. Wrapped like this
+                                the strip is a sibling of the grid rather than a member of it, and cannot
+                                size anything. */}
+                            <div className="gv-rec-main">
                             <div className="gv-rec-face">
                                 {art
                                     ? <img src={art} alt="" width={44} height={44} loading="lazy" />
@@ -422,14 +473,22 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 {r.blurb ? <p className="gv-rec-blurb">{r.blurb}</p> : null}
 
                                 <ul className="gv-cost">
-                                    {costs.map((c) => (
-                                        <li key={c.part} className={c.short ? "is-short" : "is-have"}>
-                                            <PartIcon id={c.part} size={18} />
-                                            <span className="gv-cost-n">{Math.min(c.have, c.need)}/{c.need}</span>
-                                            <span className="gv-cost-name">{partName(c.part)}</span>
-                                            {c.short ? <em>need {c.short}</em> : null}
-                                        </li>
-                                    ))}
+                                    {costs.map((c) => {
+                                        // ⚠️ THE COST SHOWN IS THE COST CHARGED. With tempering armed the
+                                        // row has to count the surcharge too, or the card says twelve and
+                                        // the bag loses seventeen — the exact unaccountability this screen
+                                        // was rebuilt to remove.
+                                        const need = c.need + (temperOn ? (tmpCost?.[c.part] || 0) : 0);
+                                        const short = Math.max(0, need - c.have);
+                                        return (
+                                            <li key={c.part} className={short ? "is-short" : "is-have"}>
+                                                <PartIcon id={c.part} size={18} />
+                                                <span className="gv-cost-n">{Math.min(c.have, need)}/{need}</span>
+                                                <span className="gv-cost-name">{partName(c.part)}</span>
+                                                {short ? <em>need {short}</em> : null}
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             </div>
 
@@ -453,6 +512,37 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     {busy === r.id ? "…" : built ? "Built" : ready ? "Craft" : `${missing} short`}
                                 </button>
                             )}
+                            </div>
+                            {/* ── ⚠️ THE ONE DECISION A CRAFT HAS EVER OFFERED ───────────────────
+                                Luke: crafting lacked "engagement" — and pressing Craft took no input
+                                at all. The parts were fixed and the roll was the game's, so the
+                                player's whole contribution was picking a row.
+
+                                ⚠️ IT SHOWS THE ODDS IT BUYS, BOTH WAYS, BEFORE THE SPEND. "Better
+                                chance" with no number is a thing you are asked to believe; two
+                                percentages are a decision. Both come from the server's own curve
+                                (st.craft.odds / oddsTempered), so what is printed here is exactly
+                                what the roll will be run against. */}
+                            {canTemper ? (
+                                <div className={`gv-temper${temperOn ? " is-on" : ""}`}>
+                                    <button type="button" className="gv-temper-go"
+                                        aria-pressed={temperOn}
+                                        onClick={() => setTempering(temperOn ? null : r.id)}>
+                                        {temperOn ? "Tempering" : "Temper"}
+                                    </button>
+                                    {/* ⚠️ ONE LINE, NOT THREE FLEX CHILDREN. The card's body column is
+                                        about 250px on a phone — the art sits beside it — and three
+                                        separate items at that width wrapped INSIDE themselves and
+                                        overlapped: "+8 parts" printed on top of "44%". One nowrap
+                                        string cannot collide with itself. */}
+                                    <span className="gv-temper-odds">
+                                        {Math.round(topOdds * 100)}%
+                                        <i aria-hidden="true">&rarr;</i>
+                                        <b>{Math.round(topOddsT * 100)}%</b>
+                                        <em>{topBandName} · +{temperExtra} parts</em>
+                                    </span>
+                                </div>
+                            ) : null}
                         </li>
                     );
                 })}
@@ -615,6 +705,18 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 {result.quality != null ? (
                                     <span className={`gv-made-q is-${result.qualityBand}`}>
                                         Rolled {bandName(result.qualityBand)} · {result.quality}/100
+                                        {result.tempered ? <i className="gv-made-tmp">tempered</i> : null}
+                                    </span>
+                                ) : null}
+                                {/* ── ⚠️ WHAT THE BAND ACTUALLY BOUGHT, IN THE THING THE PLAYER MADE ──
+                                    A word and a score out of a hundred is a number about the roll, not
+                                    about the object: "Rolled Fine · 81/100" over a batch of poultices
+                                    says nothing about how many poultices. This is the line that closes
+                                    that — and it is absent at Rough rather than printing "+0", because a
+                                    bad roll should read as a bad roll and not as a reward of nothing. */}
+                                {craftBonusLabel(result.recipe, result.quality) ? (
+                                    <span className={`gv-made-bonus is-${result.qualityBand}`}>
+                                        {craftBonusLabel(result.recipe, result.quality)}
                                     </span>
                                 ) : null}
                             </div>

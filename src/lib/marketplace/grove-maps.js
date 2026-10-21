@@ -844,6 +844,68 @@ export function foodRecipesForMap(n) {
     }));
 }
 
+// ── THE CHARMS: THE FIRST NEW KIND OF THING SINCE MAP ONE ────────────────────────────────────────────────────
+// Luke, on the whole system: "does it lack variety, excitement, engagement, suprise, wonder, fun,
+// progression, meaningfulness".
+//
+// The structural answer to variety was that NO NEW KIND OF OBJECT is ever introduced after map one. Packs
+// stop at five, vaults at six, plots at two and decorations at three -- all authored in map one, all capped
+// by design -- so from map two onward the bench is twelve tool ladders and a food stack, for eleven maps. A
+// player at map nine is crafting the same twelve objects they crafted on day one in a new vocabulary.
+//
+// A charm is the new kind, and it is the first CONSUMABLE the bench has ever made that is not food. That is
+// what makes it a loop rather than another climb: a tool is made once and a vault is built once, but a charm
+// is burned at the mouth of a zone and the next dive wants another one.
+//
+// ⚠️ THEY PAY INTO THE THREE BONUSES THE DROP ROLL ALREADY READS -- rarityFind, emblemFind, rareSpawn -- and
+// into nothing else. Not damage, not health, not a stat with a name. §11 of the design doc still has stat
+// ceilings open, and a twelfth ladder that added combat power would have to be priced against a ceiling
+// nobody has set. These are priced against the drop table, which is a thing the Grove already owns outright.
+//
+// ⚠️ ONE PER MAP, CYCLING THROUGH THE THREE. Map one's charm finds rarer parts, map two's finds emblems, map
+// three's wakes rare spawns, and then it comes round again deeper and stronger. Three flavours means the
+// choice at the door is a real one by map three; one flavour per map forever would mean twelve versions of
+// the same decision.
+const CHARM_STATS = [
+    { stat: "rarityFind", word: "Seeking", blurb: "what it finds is rarer" },
+    { stat: "emblemFind", word: "Totem", blurb: "the dead leave more of themselves" },
+    { stat: "rareSpawn", word: "Beckoning", blurb: "something bigger comes looking" },
+];
+// Per-map potency before the quality band multiplies it. Climbs with depth, because a charm made of map
+// nine's materials costs map nine's materials.
+const CHARM_BASE = { rarityFind: 9, emblemFind: 7, rareSpawn: 5 };
+const CHARM_GROWTH = 0.45;   // share of the base added per map below the surface
+
+/** The charm recipe for one map, or null for a map with no parts authored yet. */
+export function charmForMap(n) {
+    const map = groveMap(n);
+    if (!map?.parts) return null;
+    const flavour = CHARM_STATS[(n - 1) % CHARM_STATS.length];
+    const base = CHARM_BASE[flavour.stat];
+    // Two of that map's materials, deliberately not the ones its tools fight over most: the charm should be
+    // a reason to keep a surplus rather than a competitor for the tool ladder.
+    const a = map.parts[Math.min(2, map.parts.length - 1)];
+    const b = map.parts[Math.min(map.parts.length - 1, 7)];
+    return {
+        id: `charm_${map.id}`,
+        name: `${map.short} ${flavour.word}`,
+        stat: flavour.stat,
+        per: Math.round(base * (1 + (n - 1) * CHARM_GROWTH) * 10) / 10,
+        map: n,
+        parts: { [a.id]: 6 + Math.round((n - 1) * 0.8), [b.id]: 4 + Math.round((n - 1) * 0.6) },
+        blurb: `Carried into the trees, and ${flavour.blurb}.`,
+        // ⚠️ TAUGHT BY THE LAST BOSS OF ITS OWN MAP, not the first. A recipe handed over at the mouth of a
+        // map is a recipe you can make before you have seen the place; handed over at the bottom, it is the
+        // thing the map gives you for finishing it, and it is made of materials you are by then holding too
+        // many of. `zones` is in walking order, so the last one is the deep one.
+        taughtBy: map.zones?.[map.zones.length - 1]?.bossId || null,
+    };
+}
+
+/** Every generated map's charm, flat, keyed by id. */
+export const MAP_CHARMS = Object.fromEntries(
+    GROVE_MAPS.filter((m) => m.parts).map((m) => charmForMap(m.n)).filter(Boolean).map((c) => [c.id, c]));
+
 /** Every generated map's food, flat, in GROVE_FOODS shape. */
 // ⚠️ THE PICTURE IS BORROWED, LIKE THE CHART SYMBOLS. A poultice is a poultice: moss and fat packed into a
 // leaf in map one, ash-glass and wire-root in map seven, and at thirty pixels on a belt the difference is

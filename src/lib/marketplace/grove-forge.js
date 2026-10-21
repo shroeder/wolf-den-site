@@ -15,7 +15,7 @@
 // steals from the tiers under it -- see [[chest-rolls-are-a-chain]] and [[reward-tables-are-shared-objects]].
 // A Grove chest pays Grove parts and nothing else, out of its own table, through its own roll.
 
-import { GROVE_ZONES } from "@/lib/marketplace/grove-catalog.js";
+import { GROVE_ZONES, GROVE_CHARMS } from "@/lib/marketplace/grove-catalog.js";
 import { toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
 
 // ── THE CRAFTING LEVEL ──────────────────────────────────────────────────────────────────────────────────────
@@ -60,7 +60,14 @@ export function craftLevel(xp) {
 // any faucet with no cap. Paying for the PARTS consumed means the ladder advances at the rate the player
 // actually gathers, which is the thing the level is supposed to measure.
 export const CRAFT_XP_PER_PART = 2;
-export const CRAFT_XP_KIND = { tool: 2.2, pack: 1.8, bank: 1.8, plot: 2.5, food: 0.5, decor: 1.4 };
+// ⚠️ A CHARM IS PRICED LIKE FOOD, NOT LIKE A TOOL, AND FOR THE SAME REASON. Everything else on this list
+// is a one-time climb: a tier is made once, a vault built once, so paying them well cannot be farmed. Food
+// and charms are the two kinds that are CONSUMED, which makes them repeatable for as long as the parts
+// last, on a kill loop with no daily cap. At the default multiplier of 1 a charm paid 20 xp a craft and
+// became the fastest route up the ladder by a wide margin — the exact shape of the poultice spam the food
+// multiplier already exists to prevent. Slightly above food because a charm costs more and is not made
+// five at a time.
+export const CRAFT_XP_KIND = { tool: 2.2, pack: 1.8, bank: 1.8, plot: 2.5, food: 0.5, charm: 0.7, decor: 1.4 };
 
 export function craftXpFor(recipe) {
     if (!recipe) return 0;
@@ -83,7 +90,26 @@ export function craftXpFor(recipe) {
 // ⚠️ AND THE BONUS IS NOT STORED. What gets written down is the ROLL -- a fact about history that no curve
 // change can invalidate. What the roll is worth is computed at read time, so retuning never needs a backfill.
 // Same rule as TOOL_PCT_PER_TIER. See the migration note.
+// ── ⚠️ MASTERWORK SITS ABOVE PRISTINE AND TAKES NOTHING FROM IT ─────────────────────────────────────────────
+// Luke, on whether crafting lacks surprise: it did, and this is the arithmetic reason. The best thing that
+// could happen at the bench was a word the player had already seen, because Pristine covered 90-100 and the
+// curve lifts the FLOOR rather than the ceiling -- so a level-25 crafter hit the top band often enough that
+// it stopped being an event, and had nothing left above it to want.
+//
+// A fifth band at 98 is rare at EVERY level by construction: about 2.1% at level 1 and still only about 5.0%
+// at the cap. That is the shape a top band should have -- a thing that happens to you a few times a season
+// rather than a thing you grind to make routine.
+//
+// ⚠️ IT COSTS NOBODY ANYTHING. Pristine keeps x1.60 and simply ends at 97; every tool already made keeps the
+// exact band and multiplier it had. The highest quality on the live database is 78, so nothing in existence
+// even reaches the new boundary.
+//
+// ⚠️ AND IT REOPENS REWORK AT THE TOP. groveRework refuses at QUALITY_BANDS[0] so nobody spends parts on a
+// change they cannot see -- which, with four bands, meant a Pristine tool was finished for ever and the
+// player's best tool was the one the bench had least use for. Because that guard names the array's first
+// entry rather than the word "pristine", it followed the new band on its own.
 export const QUALITY_BANDS = [
+    { at: 98, id: "masterwork", name: "Masterwork", mult: 1.90 },
     { at: 90, id: "pristine", name: "Pristine", mult: 1.60 },
     { at: 72, id: "fine", name: "Fine", mult: 1.35 },
     { at: 45, id: "sound", name: "Sound", mult: 1.15 },
@@ -91,6 +117,10 @@ export const QUALITY_BANDS = [
 ];
 
 export const qualityBand = (q) => QUALITY_BANDS.find((b) => (Number(q) || 0) >= b.at) || QUALITY_BANDS[QUALITY_BANDS.length - 1];
+
+/** How many bands above Rough a roll landed. 0 for Rough, 4 for Masterwork — what every non-tool payoff
+ *  below is priced in, so adding a band moves them all at once instead of none of them. */
+export const qualityStep = (q) => (QUALITY_BANDS.length - 1) - QUALITY_BANDS.findIndex((b) => b.id === qualityBand(q).id);
 
 /**
  * Roll a quality, biased by the crafting level.
@@ -110,9 +140,24 @@ export const qualityBand = (q) => QUALITY_BANDS.find((b) => (Number(q) || 0) >= 
  */
 export const QUALITY_BIAS = 0.062;   // how hard a level bends the curve
 
-export function rollQuality(level, rand) {
+// ── ⚠️ TEMPERING: THE ONLY DECISION THE CRAFT ITSELF HAS EVER OFFERED ───────────────────────────────────────
+// Pressing Craft took no input. The parts were fixed, the roll was the game's, and the player's entire
+// contribution was choosing a row -- which is why a crafting screen built around a random outcome still felt
+// like a vending machine. Tempering is the choice: pay a share of the recipe again and the roll bends.
+//
+// ⚠️ IT BENDS THE SAME CURVE THE LEVEL DOES, rather than being a second mechanism bolted beside it. A flat
+// "+10 quality" would collide with the band edges in ways no screen could explain, and a separate roll would
+// need its own odds table living next to a live formula -- two numbers that disagree the first time either is
+// tuned. This is one extra term in one exponent, so qualityOdds shows the tempered chances by passing the
+// same flag, and the player is rolled against exactly the odds they were shown.
+//
+// Worth about eight crafting levels at the bottom of the ladder and rather less at the top, which is the
+// right shape: it is most useful to the player who has least, and it never becomes a formality.
+export const TEMPER_BONUS = 0.5;
+
+export function rollQuality(level, rand, temper = false) {
     const lv = Math.max(1, Math.min(CRAFT_LEVEL_CAP, Number(level) || 1));
-    const p = 1 / (1 + lv * QUALITY_BIAS);
+    const p = 1 / (1 + lv * QUALITY_BIAS + (temper ? TEMPER_BONUS : 0));
     const u = Math.min(0.999999, Math.max(1e-9, rand()));
     return Math.max(0, Math.min(100, Math.round(100 * u ** p)));
 }
@@ -125,10 +170,24 @@ export function rollQuality(level, rand) {
  * the player would be shown one set of chances and rolled against another, which is the worst possible
  * version of "transparency". Closed form: P(q >= at) = 1 - (at/100)^(1/p).
  */
-export function qualityOdds(level) {
+export function qualityOdds(level, temper = false) {
     const lv = Math.max(1, Math.min(CRAFT_LEVEL_CAP, Number(level) || 1));
-    const p = 1 / (1 + lv * QUALITY_BIAS);
-    const atLeast = (at) => (at <= 0 ? 1 : 1 - (at / 100) ** (1 / p));
+    const p = 1 / (1 + lv * QUALITY_BIAS + (temper ? TEMPER_BONUS : 0));
+    // ── ⚠️ THE BAND EDGE IS HALF A POINT LOWER THAN IT LOOKS, BECAUSE THE ROLL ROUNDS ───────────────
+    // rollQuality returns Math.round(100 * u ** p), so a score of 98 is produced by anything from 97.5
+    // up. Integrating to a flat 98 therefore computes the odds of a roll the game does not make.
+    //
+    // It was invisible while there were four bands: every share except the top one is the DIFFERENCE of
+    // two cumulatives, and the half-point offsets very nearly cancel. The top band has nothing above it
+    // to cancel against — its share IS the tail — so the whole error lands there, and it lands there in
+    // the player's favour, which is the kind of discrepancy nobody reports. Measured against 120,000
+    // rolls through the server's own seeding, Masterwork came out 2.66% against a printed 2.12%: a
+    // quarter more often than the screen promised, at every level.
+    //
+    // ⚠️ THE SCREEN IS WHAT MOVES, NOT THE ROLL. The roll was never wrong — a band is "98 and up" and it
+    // rounds like a score should. It is the odds that were describing a slightly different game, and the
+    // whole point of sending them is that the player can check them against what they get.
+    const atLeast = (at) => (at <= 0 ? 1 : 1 - (Math.max(0, at - 0.5) / 100) ** (1 / p));
     const out = [];
     for (let i = 0; i < QUALITY_BANDS.length; i += 1) {
         const band = QUALITY_BANDS[i];
@@ -151,6 +210,94 @@ export function qualityOdds(level) {
  */
 export function toolBonusFor(tier, quality) {
     return Math.round(toolBonusPct(tier) * qualityBand(quality).mult * 10) / 10;
+}
+
+// ── ⚠️ EVERY KIND ROLLS NOW, NOT JUST TOOLS ─────────────────────────────────────────────────────────────────
+// Luke, on crafting: "does it lack variety, excitement, engagement, suprise, wonder, fun, progression,
+// meaningfulness".
+//
+// It lacked surprise for a reason that was one line of code: `recipe.kind === "tool" ? rollQuality(...) : null`.
+// Tools rolled; food, backpacks, vaults, plots and decorations did not. In map one that is fifteen of the
+// twenty-seven authored recipes where crafting was arithmetic -- known parts in, known thing out, every time
+// for ever. A crafting level that improves your rolls is worth very little on a bench where three crafts in
+// four have no roll to improve.
+//
+// So the roll is universal and the BAND is read differently per kind. One roll, one ladder, one set of odds
+// on screen; what changes is what the band buys.
+//
+//   food        more of them. A batch is the natural unit and a good cook gets a bigger batch.
+//   pack/bank   a bonus slot or two. Slots are the scarcest thing a player has, and these are one-time
+//               crafts -- a roll is the only way the same recipe can ever be worth making well.
+//   plot/deco   merits, because a plot is capped at two and a decoration is one object: there is no "more"
+//               to give, so the band pays in the Grove's own currency instead of inventing a second plot.
+//   tool        nothing here -- toolBonusFor already multiplies the tier by the band, and paying a tool
+//               twice for one roll would be the only kind worth crafting.
+//
+// ⚠️ ROUGH IS EXACTLY WHAT THE RECIPE ALREADY SAID. Every number below is an ADDITION to the authored value,
+// so no craft in the game got worse the day this shipped and no recipe's printed payoff became a lie.
+const EXTRA_SLOTS = [0, 0, 1, 2, 3];      // by band step: rough, sound, fine, pristine, masterwork
+const MERITS_PER_STEP = 12;
+const FOOD_EXTRA_SHARE = 0.18;            // of the authored batch, per band step
+
+/**
+ * What the roll bought, on top of what the recipe promised. Returns zeroes at Rough rather than null, so a
+ * caller never has to branch on "did this kind roll" — they all do.
+ *
+ * ⚠️ RETURNS THE EXTRA, NOT THE TOTAL. The authored `makes`/`adds` stays the source of truth for what the
+ * recipe is; this says what the bench added to it. A function that returned the total would be a second
+ * place that knows how big a batch of poultices is.
+ */
+export function craftBonusFor(recipe, quality) {
+    const step = qualityStep(quality);
+    const out = { step, band: qualityBand(quality).id, extra: 0, slots: 0, merits: 0 };
+    if (!recipe || !step) return out;
+    if (recipe.kind === "food") {
+        out.extra = Math.round((Number(recipe.makes) || 1) * FOOD_EXTRA_SHARE * step);
+    } else if (recipe.kind === "pack" || recipe.kind === "bank") {
+        out.slots = EXTRA_SLOTS[Math.min(step, EXTRA_SLOTS.length - 1)];
+    } else if (recipe.kind === "plot" || recipe.kind === "deco") {
+        out.merits = step * MERITS_PER_STEP;
+    }
+    return out;
+}
+
+// ── ⚠️ WHAT A CHARM IS WORTH IS ITS BASE TIMES ITS BAND, EXACTLY LIKE A TOOL ────────────────────────────────
+// Not stored, computed. The same rule as TOOL_PCT_PER_TIER and toolBonusFor: what gets written down is the
+// ROLL, and what the roll is worth is read back from the curve, so retuning never needs a backfill. A charm
+// rolled Masterwork is worth 1.9x the one rolled Rough out of the same two piles of parts — which is the
+// whole reason to make another one, and the reason a charm is the first thing on this bench worth making
+// twice.
+/** The three things a charm can bend, in the player's words rather than the drop roll's. One place, because
+ *  the bench, the door and the result card all have to call the same bonus the same thing. */
+export const CHARM_STAT_LABEL = {
+    rarityFind: "Rarity find",
+    emblemFind: "Emblem find",
+    rareSpawn: "Rare spawn",
+};
+
+export function charmValue(charmId, bandId) {
+    const c = GROVE_CHARMS[charmId];
+    if (!c) return 0;
+    const mult = QUALITY_BANDS.find((b) => b.id === bandId)?.mult ?? 1;
+    return Math.round(Number(c.per) * mult * 10) / 10;
+}
+
+/** The same thing from a raw 0-100 roll, for the one caller that has just rolled one. */
+export const charmValueOf = (charmId, quality) => charmValue(charmId, qualityBand(quality).id);
+
+/** The one line the result card and the recipe row both print for what a band bought. Null when it bought
+ *  nothing, so a Rough craft says nothing rather than saying "+0". */
+export function craftBonusLabel(recipe, quality) {
+    const b = craftBonusFor(recipe, quality);
+    // A charm's band is not an extra on top of the thing — it IS the thing, so it reads as the value.
+    if (recipe?.kind === "charm") {
+        const c = GROVE_CHARMS[recipe.id];
+        return c ? `${CHARM_STAT_LABEL[c.stat] || c.stat} +${charmValueOf(recipe.id, quality)}%` : null;
+    }
+    if (b.extra) return `+${b.extra} extra`;
+    if (b.slots) return `+${b.slots} bonus ${recipe.kind === "bank" ? "vault" : "pack"} slot${b.slots > 1 ? "s" : ""}`;
+    if (b.merits) return `+${b.merits} merits`;
+    return null;
 }
 
 // ── THE GROVE'S CHESTS ──────────────────────────────────────────────────────────────────────────────────────

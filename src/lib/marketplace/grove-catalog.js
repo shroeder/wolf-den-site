@@ -25,7 +25,7 @@
 // exists somewhere. See check-existing-sprites-first.
 
 import {
-    MAP_PARTS, MAP_ENEMIES, MAP_BOSSES, MAP_ZONES, MAP_EMBLEMS, MAP_FOODS, mapIsBuilt,
+    MAP_PARTS, MAP_ENEMIES, MAP_BOSSES, MAP_ZONES, MAP_EMBLEMS, MAP_FOODS, MAP_CHARMS, mapIsBuilt,
     RARE_CHANCE,
 } from "@/lib/marketplace/grove-maps.js";
 
@@ -96,6 +96,38 @@ export const GROVE_FOODS = {
 };
 
 export const groveFood = (id) => GROVE_FOODS[id] || null;
+
+// ── CHARMS ───────────────────────────────────────────────────────────────────────────────────────────────────
+// One per map, consumed at the mouth of a zone, good for that run. The first kind of object the bench has
+// made since map one that is neither a ladder rung nor a mouthful of food — see charmForMap in grove-maps.js
+// for why the Grove needed one and why these pay into the drop roll and nothing else.
+//
+// ⚠️ MAP ONE'S IS HAND-AUTHORED HERE because map one is hand-authored here: GROVE_MAPS carries `parts: null`
+// for it and everything about the forest lives in this file. Same shape, same three stats, so the consumer
+// cannot tell which of the two wrote it.
+//
+// ⚠️ TAUGHT BY THE HEARTWOOD ELDER, the last boss of the forest. A player holding map one's charm has
+// finished map one — that is what it says about them, and it is why the recipe is not on the bench until
+// then. The Rootwood Seeking is also the ONLY charm a player will meet for a long while, which is the point:
+// the first one should arrive as a surprise from a boss fight rather than as row twenty-eight of a list.
+const MAP_ONE_CHARMS = {
+    charm_grove: {
+        id: "charm_grove", name: "Rootwood Seeking", stat: "rarityFind", per: 9, map: 1,
+        parts: { gnawed_root: 6, warren_silk: 4 },
+        blurb: "Bound at the Heartwood and carried back out. What it finds is rarer.",
+        taughtBy: "heartwood_elder",
+    },
+};
+
+/** Every charm in the world: the forest's, plus one per built map. */
+export const GROVE_CHARMS = {
+    ...MAP_ONE_CHARMS,
+    ...Object.fromEntries(Object.entries(MAP_CHARMS).filter(([, c]) => mapIsBuilt(c.map))),
+};
+
+export const groveCharm = (id) => GROVE_CHARMS[id] || null;
+// ⚠️ WHAT A CHARM IS WORTH lives in grove-forge.js beside the band table, not here. This file is imported BY
+// grove-forge, so reaching the other way for qualityBand would close a cycle.
 
 // ── EMBLEMS ──────────────────────────────────────────────────────────────────────────────────────────────────
 // ⚠️ ALL EMBLEM BONUSES ARE PASSIVE AND ALL OF THEM ARE BREAKPOINTED. An emblem is not a stat stick you equip
