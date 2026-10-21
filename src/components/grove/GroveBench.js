@@ -11,6 +11,7 @@ import {
 } from "react-icons/gi";
 
 import Area from "@/components/grove/GroveArea.js";
+import GroveCraftAct from "@/components/grove/GroveCraftAct.js";
 import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes, reworkCost, temperCost } from "@/lib/marketplace/grove-recipes.js";
 import { QUALITY_BANDS, qualityBand, toolBonusFor, GROVE_CHESTS, GROVE_CHEST_ORDER, craftBonusLabel, charmValue, CHARM_STAT_LABEL } from "@/lib/marketplace/grove-forge.js";
 
@@ -115,6 +116,9 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // recipe id means the choice belongs to the thing it was made about, and pressing Craft on any other
     // row is an ordinary craft.
     const [tempering, setTempering] = useState(null);
+    // The craft being played out, or null. Holds the recipe and whether it was tempered, because
+    // both are needed when the act finally posts and the row underneath may have re-sorted by then.
+    const [acting, setActing] = useState(null);
     // ⚠️ ITS OWN CARD, NOT THE CRAFT RESULT. An open and a craft pay different things and the open can
     // CHAIN -- "open another" has to leave the card standing while the thing underneath it changes.
     const [opened, setOpened] = useState(null);
@@ -216,11 +220,26 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     const recent = lvl.recent || [];
     const merits = Number(st.merits) || 0;
 
-    const craft = async (r) => {
-        const temper = tempering === r.id;
+    // ── ⚠️ PRESSING CRAFT OPENS THE ACT; THE ACT DOES THE CRAFTING ──────────────────────────────────
+    // Luke: "Let's make it fun." The button no longer spends anything — it starts three beats, and the
+    // third of them posts. Nothing has left the bag until the hammer work is done, so backing out of the
+    // overlay costs nothing and a player who opens it by accident is not charged for curiosity.
+    const craft = (r) => { setActing({ recipe: r, temper: tempering === r.id }); };
+
+    /** Called by the act once the skill beats are played. This is the only place a craft is posted. */
+    const commitCraft = async (act) => {
+        const r = acting?.recipe;
+        if (!r) return { ok: false };
         setBusy(r.id);
-        const d = await post({ action: "craft", recipe: r.id, temper });
+        const d = await post({ action: "craft", recipe: r.id, temper: Boolean(acting.temper), act });
         setBusy(null);
+        return d;
+    };
+
+    /** Called when the act closes — with the finished craft, or with an error it could not complete. */
+    const finishCraft = async (d) => {
+        const r = acting?.recipe;
+        setActing(null);
         if (!d?.ok) {
             setNote(d?.error === "not_enough_parts" ? "Not enough parts for that."
                 : d?.error === "already_built" ? "You already have that one."
@@ -617,6 +636,20 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                         <button type="button" onClick={() => setOpened(null)}>Good</button>
                     </div>
                 </div>
+            ), host) : null}
+
+            {/* ── ⚠️ THE ACT, PORTALLED LIKE EVERY OTHER FULL-SCREEN LAYER HERE ──────────────────────
+                Into the SAME host the result card uses. The Grove runs in native full screen, where
+                document.body is the wrong parent and a layer rendered into the page tree paints under
+                the scene no matter what its z-index says. */}
+            {acting && host ? createPortal((
+                <GroveCraftAct
+                    recipe={acting.recipe}
+                    level={lvl.level}
+                    temper={acting.temper}
+                    onCommit={commitCraft}
+                    onClose={finishCraft}
+                />
             ), host) : null}
 
             {result && host ? createPortal((

@@ -155,9 +155,14 @@ export const QUALITY_BIAS = 0.062;   // how hard a level bends the curve
 // right shape: it is most useful to the player who has least, and it never becomes a formality.
 export const TEMPER_BONUS = 0.5;
 
-export function rollQuality(level, rand, temper = false) {
+// ⚠️ `extra` IS A THIRD TERM, NOT A FOURTH CURVE. The craft act (grove-craft-act.js) needs to bend the same
+// exponent that the level and the temper bend, and the first attempt expressed it as extra LEVELS -- which
+// silently did nothing at level 25, because the level is clamped to the cap. A capped crafter would have
+// played the beats perfectly and watched the board not move, which is the dead-ladder bug this curve was
+// rewritten once already to remove. A term outside the clamp cannot have that problem.
+export function rollQuality(level, rand, temper = false, extra = 0) {
     const lv = Math.max(1, Math.min(CRAFT_LEVEL_CAP, Number(level) || 1));
-    const p = 1 / (1 + lv * QUALITY_BIAS + (temper ? TEMPER_BONUS : 0));
+    const p = 1 / (1 + lv * QUALITY_BIAS + (temper ? TEMPER_BONUS : 0) + Math.max(0, Number(extra) || 0));
     const u = Math.min(0.999999, Math.max(1e-9, rand()));
     return Math.max(0, Math.min(100, Math.round(100 * u ** p)));
 }
@@ -170,9 +175,9 @@ export function rollQuality(level, rand, temper = false) {
  * the player would be shown one set of chances and rolled against another, which is the worst possible
  * version of "transparency". Closed form: P(q >= at) = 1 - (at/100)^(1/p).
  */
-export function qualityOdds(level, temper = false) {
+export function qualityOdds(level, temper = false, extra = 0) {
     const lv = Math.max(1, Math.min(CRAFT_LEVEL_CAP, Number(level) || 1));
-    const p = 1 / (1 + lv * QUALITY_BIAS + (temper ? TEMPER_BONUS : 0));
+    const p = 1 / (1 + lv * QUALITY_BIAS + (temper ? TEMPER_BONUS : 0) + Math.max(0, Number(extra) || 0));
     // ── ⚠️ THE BAND EDGE IS HALF A POINT LOWER THAN IT LOOKS, BECAUSE THE ROLL ROUNDS ───────────────
     // rollQuality returns Math.round(100 * u ** p), so a score of 98 is produced by anything from 97.5
     // up. Integrating to a flat 98 therefore computes the odds of a roll the game does not make.

@@ -54,7 +54,14 @@ export async function POST(request) {
                 case "settle": return noStore(await groveSettle(buyer.id, { zoneId: String(b.zone || ""), kills: b.kills, eaten: b.eaten }));
                 case "boss": return noStore(await groveBoss(buyer.id, String(b.zone || "")));
                 case "move": return noStore(await groveMove(buyer.id, b));
-                case "craft": return noStore(await groveCraft(buyer.id, String(b.recipe || ""), { temper: Boolean(b.temper) }));
+                // ⚠️ THE ACT RIDES THE CRAFT, exactly like the charm rides the enter. The two skill beats
+                // are played before this fires and reported with it, so there is still ONE request per
+                // craft — a begin/commit pair would double the round trips on the one screen a player
+                // visits in bursts, and round trips are the meter that bills (see CLAUDE.md).
+                case "craft": return noStore(await groveCraft(buyer.id, String(b.recipe || ""), {
+                    temper: Boolean(b.temper),
+                    act: b.act && typeof b.act === "object" ? b.act : null,
+                }));
                 case "rework": return noStore(await groveRework(buyer.id, String(b.slot || "")));
                 // The Grove's own chest line, never chests.js. See the note on the boss grant.
                 case "openChest": return noStore(await groveOpenChest(buyer.id, String(b.tier || "")));

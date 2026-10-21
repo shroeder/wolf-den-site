@@ -18,6 +18,8 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { petBiteShare } from "@/lib/marketplace/grove-world.js";
 import { reworkCost, temperCost, toolRecipeFor } from "@/lib/marketplace/grove-recipes.js";
+import { boardFor, boardOdds, dropAt, bandAt, rattle, qualityInBand, clampAct, actScore }
+    from "@/lib/marketplace/grove-craft-act.js";
 import { settleKills, rollBoss, rollGroveChest } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { groveFighter } from "@/lib/marketplace/grove-kit.js";
@@ -1045,7 +1047,7 @@ export async function groveMove(buyerId, { partId, from, to, qty = 1 } = {}) {
 }
 
 /** Craft a discovered recipe. Parts come out of the BAG. */
-export async function groveCraft(buyerId, recipeId, { temper = false } = {}) {
+export async function groveCraft(buyerId, recipeId, { temper = false, act = null } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const recipe = recipeById(recipeId);
     if (!recipe) return { ok: false, error: "no_recipe" };
@@ -1126,16 +1128,30 @@ export async function groveCraft(buyerId, recipeId, { temper = false } = {}) {
     // Seeded off the player's own running total rather than the session seed: a craft is not a kill and has
     // no kill index, and a client that could re-roll a bad quality by retrying is a client that never gets
     // a bad quality. The temper flag joins the seed so the two paths cannot collide on one total.
-    const qRand = (() => {
-        let x = (((beforeXp + 1) * 2654435761) ^ (temper ? 0x9e3779b9 : 0)) >>> 0;
-        return () => {
-            x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
-            return x / 4294967296;
-        };
-    })();
+    // ── ⚠️ THE BOARD IS THE ROLL ────────────────────────────────────────────────────────────────────
+    // Luke: "Let's make it fun ... 3 interactive steps ... one is just rng, la plinko ball hitting pegs on
+    // itd way down. With varying buckets."
+    //
+    // The quality no longer comes from rollQuality here. It comes from where the ball lands on a board whose
+    // five buckets are the five bands, each exactly as wide as its chance at this level, with this temper,
+    // after this act. That is not decoration over a number decided elsewhere: the landing IS the number, so
+    // the thing the player watched is the thing they were given. See grove-craft-act.js for the two versions
+    // of this that were not honest and why.
+    //
+    // rollQuality is still the game's quality roll — groveRework uses it, and qualityOdds is what the board
+    // is cut from — so there is still one curve. What changed is where the dice are thrown.
+    //
+    // ⚠️ SEEDED ON THE PLAYER'S RUNNING XP, like the roll it replaces. A craft has no kill index, and a
+    // client that could retry for a better landing is a client that never gets a bad one. It cannot retry
+    // anyway — the parts are already spent by the time this runs — but the seed should not invite it.
+    const tidy = clampAct(act);
+    const seed = ((beforeXp + 1) * 2654435761) ^ (temper ? 0x9e3779b9 : 0) ^ Math.round(actScore(tidy) * 1e6);
+    const spans = boardFor(beforeLevel, { temper, act: tidy });
+    const landing = dropAt(seed);
+    const band = bandAt(spans, landing);
     // ⚠️ EVERY KIND ROLLS. This was `recipe.kind === "tool" ? ... : null`, which is the single line that
     // made three crafts in four a vending machine — see craftBonusFor for what each kind does with it.
-    const quality = rollQuality(beforeLevel, qRand, temper);
+    const quality = qualityInBand(band, seed);
     const bonus = craftBonusFor(recipe, quality);
 
     // ── WHAT IT MAKES ───────────────────────────────────────────────────────────────────────────────
@@ -1295,6 +1311,20 @@ export async function groveCraft(buyerId, recipeId, { temper = false } = {}) {
         // What the band bought on top of the recipe, so the card can show the roll paying for itself.
         bonus,
         tempered: Boolean(temper),
+        // ── ⚠️ THE FALL, SENT BACK SO THE SCREEN CAN PLAY IT ────────────────────────────────────────
+        // The client is handed the board it was already looking at, the landing the server chose, and a
+        // rattle that provably ends on it. It animates the drop it is given rather than running its own
+        // physics and reporting where the ball stopped — the same rule as a kill, where the scene plays
+        // the fight and the server decides the loot.
+        set: {
+            spans,
+            landing,
+            band,
+            path: rattle(landing, seed),
+            odds: boardOdds(spans),
+            act: tidy,
+            score: actScore(tidy),
+        },
         // A charm's whole payoff is its rolled potency; the card has nothing else to show for it.
         charm: recipe.kind === "charm" ? { stat: recipe.stat, value: charmValueOf(recipe.id, quality) } : null,
         // The ladder, reported back so the result card can show the bar moving and say when it levelled.
