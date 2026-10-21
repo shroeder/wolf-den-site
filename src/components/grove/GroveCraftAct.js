@@ -42,6 +42,22 @@ import { playHit, playPickup, playDrop, celebrateUnlock } from "@/components/gro
 const STAGE = { fire: 0, shaping: 1, setting: 2 };
 const STAGE_NAME = ["The fire", "The shaping", "The setting"];
 const STAGE_BG = ["bg-forge", "bg-anvil", "bg-rack"];
+// ── ⚠️ WHERE THE WORK HAPPENS IN EACH ROOM ───────────────────────────────────────────────────────────────
+// Luke: "I still think the crafting needs more work visually. Its still lacking."
+//
+// It was: the piece hung in the dead centre of the panel while the coals sat a third of the way across the
+// painting and the anvil face sat lower still. A sprite floating in front of a picture is a sprite and a
+// picture; a sprite sitting IN the coals is a forge. These are the hot spot of each backdrop as a percentage
+// of the plate, measured off the art, and the piece is positioned there rather than in the middle of a box.
+//
+// ⚠️ THEY BELONG TO THE PAINTINGS AND MUST BE RE-MEASURED IF THE ART IS REDRAWN. There is no way for code to
+// find the fire in a .webp, so this is the one place in the feature where a number is pinned to a picture.
+// The stage is skipped for the rack, where the piece belongs to the plinko board instead.
+const STAGE_ANCHOR = [
+    { x: 25, y: 62 },   // bg-forge — the coal bed
+    { x: 45, y: 58 },   // bg-anvil — the face of the anvil
+    null,               // bg-rack  — the piece lives in the rack itself
+];
 // ⚠️ A DIFFERENT WORD PER BAND. "It sets" for every outcome taught the player there was nothing to read.
 const SET_WORD = {
     masterwork: "MASTERWORK",
@@ -210,6 +226,49 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 ))}
             </div>
 
+            {/* ── THE WORK, STANDING IN THE ROOM ─────────────────────────────────────────────────
+                Positioned over the SCENE at that room's hot spot, not inside the control panel —
+                so the piece is in the coal bed and on the anvil face rather than hovering in front
+                of them. The panel sits below it and no longer covers what you are looking at. */}
+            {STAGE_ANCHOR[stage] ? (
+                <div className="gv-act-work-at"
+                    style={{ left: `${STAGE_ANCHOR[stage].x}%`, top: `${STAGE_ANCHOR[stage].y}%` }}>
+                    {stage === STAGE.fire ? (
+                        <>
+                            <span className="gv-act-emberglow" style={{ opacity: 0.18 + heat * 0.82 }} aria-hidden="true" />
+                            {/* ⚠️ EMBERS THAT ANSWER THE TAPPING. Eight of them, each on its own delay,
+                                rising faster and brighter as the bar fills — this is what makes the
+                                bellows feel connected to the fire rather than to a progress bar. */}
+                            <span className="gv-act-embers" aria-hidden="true">
+                                {Array.from({ length: 8 }, (_, i) => (
+                                    <i key={i} style={{
+                                        "--i": i,
+                                        opacity: heat > i / 10 ? 1 : 0,
+                                        animationDuration: `${2.4 - heat * 1.1}s`,
+                                    }} />
+                                ))}
+                            </span>
+                        </>
+                    ) : null}
+                    {art ? (
+                        <img className={`gv-act-work-piece${flash ? ` is-struck is-${flash.id}` : ""}`}
+                            src={art} alt="" width={104} height={104}
+                            style={stage === STAGE.fire ? {
+                                filter: `drop-shadow(0 0 ${8 + heat * 34}px rgba(255,${Math.round(165 - heat * 75)},45,${0.4 + heat * 0.6})) brightness(${1 + heat * 0.5}) saturate(${1 + heat * 0.4})`,
+                            } : undefined} />
+                    ) : null}
+                    {flash ? <em className={`gv-act-flash is-${flash.id}`}>{flash.label}</em> : null}
+                    {/* Sparks off the anvil on every blow, in the colour the blow earned. */}
+                    {stage === STAGE.shaping && flash ? (
+                        <span className={`gv-act-sparks is-${flash.id}`} aria-hidden="true">
+                            {Array.from({ length: 10 }, (_, i) => (
+                                <i key={i} style={{ "--a": `${-20 - i * 14}deg`, "--d": `${26 + (i % 3) * 14}px` }} />
+                            ))}
+                        </span>
+                    ) : null}
+                </div>
+            ) : null}
+
             <div className="gv-act-in">
                 <h4 className="gv-act-plank">
                     {art ? <img className="gv-act-ico" src={art} alt="" width={34} height={34} /> : null}
@@ -226,15 +285,6 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 {/* ── STAGE ONE: THE FIRE ───────────────────────────────────────────────────────── */}
                 {stage === STAGE.fire ? (
                     <div className="gv-act-stage">
-                        {/* ⚠️ THE PIECE IS IN THE COALS AND BRIGHTENS AS THE BAR FILLS. The heat is the
-                            thing you are making, not a meter standing next to it. */}
-                        <div className="gv-act-hero">
-                            <span className="gv-act-emberglow" style={{ opacity: 0.2 + heat * 0.8 }} />
-                            {art ? (
-                                <img src={art} alt="" width={104} height={104}
-                                    style={{ filter: `drop-shadow(0 0 ${8 + heat * 32}px rgba(255,${Math.round(160 - heat * 70)},45,${0.45 + heat * 0.55})) brightness(${1 + heat * 0.45}) saturate(${1 + heat * 0.35})` }} />
-                            ) : null}
-                        </div>
                         <p className="gv-act-say">Work the bellows</p>
                         <div className="gv-act-bar">
                             <i className="gv-act-fill" style={{ width: `${heat * 100}%` }} />
@@ -250,13 +300,6 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 {/* ── STAGE TWO: THE SHAPING ────────────────────────────────────────────────────── */}
                 {stage === STAGE.shaping ? (
                     <div className="gv-act-stage">
-                        <div className="gv-act-hero">
-                            {art ? (
-                                <img className={flash ? `is-struck is-${flash.id}` : ""} src={art} alt=""
-                                    width={104} height={104} />
-                            ) : null}
-                            {flash ? <em className={`gv-act-flash is-${flash.id}`}>{flash.label}</em> : null}
-                        </div>
                         <p className="gv-act-say">Strike it &mdash; {STRIKES - hits.length} left</p>
                         <div className="gv-act-anvil">
                             <span className="gv-act-zone" style={{ width: `${STRIKE_HIT * 100}%` }} />

@@ -2190,8 +2190,16 @@ export const GROVE_CSS = `
    it all?" The first build was one panel with the rack bolted on top and the controls swapping underneath —
    a widget with three modes. These are three rooms: the fire, the anvil, the cooling rack, each behind its
    own painted backdrop with the piece you are making as the hero of the scene. */
-.gv-act { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 12px;
-    background: #090806; overflow: hidden; }
+/* ⚠️ THE PANEL SITS AT THE BOTTOM, NOT THE MIDDLE. Centred, it covered the coals and the anvil — the
+   exact part of each painting the stage exists to show. The controls belong under the work, the way they
+   would if you were standing at the bench. */
+/* ⚠️ ABOVE THE PUSH PROMPT, WHICH IS z-index 1200. The act was 120, and the moment its panel moved to the
+   bottom of the screen the site's "Turn on notifications" banner — fixed, full width on a phone, bottom 10px
+   — landed squarely on top of the PUMP button and made the first stage unplayable. It only showed up because
+   the stage was photographed on an account that has not enabled push; a modal that owns the whole screen has
+   to outrank a passive prompt. */
+.gv-act { position: fixed; inset: 0; z-index: 1300; display: grid; align-items: end; justify-items: center;
+    padding: 12px; background: #090806; overflow: hidden; }
 .gv-act.is-shook { animation: gv-act-shake 480ms cubic-bezier(.36,.07,.19,.97); }
 @keyframes gv-act-shake {
     0%, 100% { transform: translate3d(0,0,0); }
@@ -2213,13 +2221,13 @@ export const GROVE_CSS = `
    never be brightened. Heavier at the top, where the panel sits, and light at the bottom so the floor of
    the room still reads. */
 .gv-act-scenes::after { content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(6,5,4,0.58) 0%, rgba(6,5,4,0.20) 42%, rgba(6,5,4,0.62) 100%); }
+    background: linear-gradient(180deg, rgba(6,5,4,0.50) 0%, rgba(6,5,4,0.12) 38%, rgba(6,5,4,0.78) 100%); }
 
 /* ⚠️ THE PANEL BARELY FILLS. The first cut put a 52-80% wash here ON TOP of the scene scrim, and two
    stacked scrims turned three painted rooms into a dark smudge — the opposite of the immersive backdrop
    that was asked for. The controls carry their own dark pills and the type carries a shadow, so the panel
    only needs to soften the middle of the frame, not hide it. */
-.gv-act-in { position: relative; z-index: 1; width: min(430px, 100%); max-height: 100%; overflow-y: auto;
+.gv-act-in { position: relative; z-index: 2; width: min(430px, 100%); max-height: 86%; overflow-y: auto;
     display: flex; flex-direction: column; gap: 10px; padding: 0 12px 14px; border-radius: 14px;
     background: radial-gradient(130% 78% at 50% 62%, rgba(6,8,5,0.68), rgba(6,8,5,0.26) 78%, transparent);
     box-shadow: 0 18px 50px rgba(0,0,0,0.45); }
@@ -2259,21 +2267,61 @@ export const GROVE_CSS = `
     .gv-act-stage, .gv-act-scene { animation: none; transition: opacity 200ms ease; }
 }
 
-/* ── THE HERO. The piece you are making, standing in the room. ───────────────────────────────────────── */
-.gv-act-hero { position: relative; display: grid; place-items: center; height: 136px; }
-.gv-act-hero img { width: 104px; height: 104px; object-fit: contain; position: relative; z-index: 1;
-    transition: filter 120ms linear; }
-.gv-act-emberglow { position: absolute; width: 190px; height: 120px; border-radius: 50%;
-    background: radial-gradient(ellipse at center, rgba(255,140,40,0.75), rgba(255,90,20,0.18) 55%, transparent 72%);
-    filter: blur(6px); transition: opacity 120ms linear; }
-.gv-act-hero img.is-struck { animation: gv-act-ring 300ms cubic-bezier(.2,1.6,.4,1); }
+/* ── THE WORK, STANDING IN THE ROOM ──────────────────────────────────────────────────────────────────
+   Absolutely placed over the SCENE at that room's hot spot — in the coal bed, on the anvil face — rather
+   than centred in a control panel in front of it. That one change is most of what "it still looks like a
+   sprite in front of a picture" was describing. */
+.gv-act-work-at { position: absolute; z-index: 1; width: 0; height: 0;
+    display: grid; place-items: center; pointer-events: none; }
+.gv-act-work-piece { width: 104px; height: 104px; object-fit: contain; grid-area: 1 / 1;
+    transition: filter 120ms linear;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.65)); }
+.gv-act-work-piece.is-struck { animation: gv-act-ring 320ms cubic-bezier(.2,1.6,.4,1); }
 @keyframes gv-act-ring {
-    0% { transform: scale(1) rotate(0); } 30% { transform: scale(1.14) rotate(-4deg); }
+    0% { transform: scale(1) rotate(0); } 28% { transform: scale(1.16) rotate(-5deg); }
     100% { transform: scale(1) rotate(0); }
 }
-.gv-act-hero img.is-perfect { filter: drop-shadow(0 0 20px rgba(255,215,94,0.95)) brightness(1.3); }
-.gv-act-flash { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal;
-    font-size: 1.3rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; z-index: 2;
+.gv-act-work-piece.is-perfect { filter: drop-shadow(0 0 22px rgba(255,215,94,0.95)) brightness(1.35); }
+.gv-act-work-piece.is-hit { filter: drop-shadow(0 0 16px rgba(92,224,192,0.8)) brightness(1.2); }
+
+.gv-act-emberglow { grid-area: 1 / 1; width: 230px; height: 150px; border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(255,150,45,0.8), rgba(255,90,20,0.22) 52%, transparent 70%);
+    filter: blur(8px); transition: opacity 140ms linear; }
+
+/* ⚠️ EMBERS THAT ANSWER THE TAPPING. Eight motes on staggered delays, rising faster and further as the
+   bar fills — the thing that makes the bellows feel wired to the fire instead of to a progress bar. */
+.gv-act-embers { grid-area: 1 / 1; width: 110px; height: 10px; position: relative; }
+.gv-act-embers i { position: absolute; bottom: 0; width: 4px; height: 4px; border-radius: 50%;
+    left: calc(var(--i) * 13px); background: #ffbe5a;
+    box-shadow: 0 0 7px rgba(255,170,60,0.95);
+    animation: gv-act-ember 2s ease-out infinite; animation-delay: calc(var(--i) * -0.27s);
+    transition: opacity 200ms linear; }
+@keyframes gv-act-ember {
+    0% { transform: translate3d(0,0,0) scale(1); opacity: 0.95; }
+    70% { opacity: 0.5; }
+    100% { transform: translate3d(calc(var(--i) * 1.6px - 6px), -120px, 0) scale(0.25); opacity: 0; }
+}
+
+/* Sparks off the anvil, in the colour the blow earned. */
+/* ⚠️ A POSITIONED BOX OF ITS OWN, AND ABOVE THE PIECE. The first cut was a 0x0 grid cell with no
+   a position of its own, so ten sparks resolved against a different ancestor and stacked invisibly behind the
+   sprite — the harness counted ten elements and the screenshot showed none. An element count is not
+   evidence that anything was drawn. */
+.gv-act-sparks { grid-area: 1 / 1; position: relative; width: 1px; height: 1px; z-index: 3; }
+.gv-act-sparks i { position: absolute; top: 0; left: 0; width: 4px; height: 13px; margin: -6px -2px;
+    border-radius: 2px; transform-origin: 50% 100%;
+    background: #ffd75e; box-shadow: 0 0 10px rgba(255,215,94,0.95);
+    transform: rotate(var(--a)); animation: gv-act-spark-fly 560ms ease-out forwards; }
+.gv-act-sparks.is-hit i { background: #5ce0c0; box-shadow: 0 0 8px rgba(92,224,192,0.9); }
+.gv-act-sparks.is-miss i { background: #8b8375; box-shadow: none; opacity: 0.5; }
+@keyframes gv-act-spark-fly {
+    0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1); }
+    100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(0.35); }
+}
+
+.gv-act-flash { grid-area: 1 / 1; display: grid; place-items: center; font-style: normal;
+    white-space: nowrap; margin-top: -78px;
+    font-size: 1.35rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; z-index: 2;
     text-shadow: 0 2px 10px rgba(0,0,0,0.95); animation: gv-act-pop 460ms ease-out; }
 .gv-act-flash.is-perfect { color: #ffd75e; }
 .gv-act-flash.is-hit { color: #5ce0c0; }
