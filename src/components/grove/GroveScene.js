@@ -560,6 +560,7 @@ export default function GroveScene({
         // the burst, returned, and at the exact moment the player earned the quiet.
         const room = w.filled ? Math.min(w.want, w.foes.length + 1) : w.want;
         w.filled = true;
+        const before = w.foes.length;
         while (w.foes.length < room) {
             const i = w.killIndex + w.foes.length;
             const isRare = rollRareSpawn(GROVE_RARE.spawnChance, seed, i, bonuses);
@@ -642,7 +643,11 @@ export default function GroveScene({
         }
 
         w.nextRespawn = now + spawnGapMs();
-        rerender();
+        // ⚠️ ONLY IF SOMETHING ARRIVED. The drip wakes this up every 1.5s instead of every 45, and a full
+        // zone takes that path doing nothing -- an unconditional rerender() there is forty re-renders a
+        // minute of a thirty-button list while the player stands still. The boss counts: it is pushed
+        // outside the loop above, after `before` is taken.
+        if (w.foes.length !== before) rerender();
     }, [zone, seed, bonuses, W, rerender]);
 
     // ── ⚠️ THE HERO AND THE PET HAVE THEIR FEET MEASURED, BECAUSE NOTHING CAN AUTHOR THEM ───────────
