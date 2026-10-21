@@ -61,6 +61,7 @@ export async function POST(request) {
                 case "craft": return noStore(await groveCraft(buyer.id, String(b.recipe || ""), {
                     temper: Boolean(b.temper),
                     act: b.act && typeof b.act === "object" ? b.act : null,
+                    aim: b.aim,
                 }));
                 case "rework": return noStore(await groveRework(buyer.id, String(b.slot || "")));
                 // The Grove's own chest line, never chests.js. See the note on the boss grant.

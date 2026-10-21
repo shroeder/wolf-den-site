@@ -13,7 +13,7 @@ import {
 import Area from "@/components/grove/GroveArea.js";
 import GroveCraftAct from "@/components/grove/GroveCraftAct.js";
 import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes, reworkCost, temperCost } from "@/lib/marketplace/grove-recipes.js";
-import { QUALITY_BANDS, qualityBand, toolBonusFor, GROVE_CHESTS, GROVE_CHEST_ORDER, craftBonusLabel, charmValue, CHARM_STAT_LABEL } from "@/lib/marketplace/grove-forge.js";
+import { QUALITY_BANDS, qualityBand, toolBonusFor, GROVE_CHESTS, GROVE_CHEST_ORDER, craftBonusLabel, charmValue, CHARM_STAT_LABEL, bandTint } from "@/lib/marketplace/grove-forge.js";
 
 // ── THE WORKBENCH ───────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "Crafting is very ghetto, needs full pass of grove crafting dopamine thoughtfulness and
@@ -227,11 +227,11 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     const craft = (r) => { setActing({ recipe: r, temper: tempering === r.id }); };
 
     /** Called by the act once the skill beats are played. This is the only place a craft is posted. */
-    const commitCraft = async (act) => {
+    const commitCraft = async (act, aim) => {
         const r = acting?.recipe;
         if (!r) return { ok: false };
         setBusy(r.id);
-        const d = await post({ action: "craft", recipe: r.id, temper: Boolean(acting.temper), act });
+        const d = await post({ action: "craft", recipe: r.id, temper: Boolean(acting.temper), act, aim });
         setBusy(null);
         return d;
     };
@@ -366,7 +366,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                         <p className="gv-level-say">Everything you make rolls a quality. At level {lvl.level}:</p>
                         <ul className="gv-odds">
                             {odds.map((b) => (
-                                <li key={b.id} className={`is-${b.id}`}>
+                                <li key={b.id} className={`is-${b.id}`} style={{ "--band": bandTint(b.id) }}>
                                     <b>{Math.round(b.share * 100)}%</b>
                                     <span>{b.name}</span>
                                     <em>×{b.mult.toFixed(2)}</em>
@@ -383,7 +383,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                             {recent.map((c, i) => (
                                 <li key={`${c.recipe}-${i}`}>
                                     <span>{recipeName(c.recipe)}</span>
-                                    {c.band ? <em className={`is-${c.band}`}>{bandName(c.band)}</em> : null}
+                                    {c.band ? <em className={`is-${c.band}`} style={{ "--band": bandTint(c.band) }}>{bandName(c.band)}</em> : null}
                                     <b>+{c.xp}</b>
                                 </li>
                             ))}
@@ -480,7 +480,8 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     <b>{r.name}</b>
                                     {built && r.kind === "tool" && st.toolQuality?.[r.slot] != null ? (
                                         // The thing the level BUYS, on the thing it was spent on.
-                                        <em className={`gv-tag is-q is-${qualityBand(st.toolQuality[r.slot]).id}`}>
+                                        <em className={`gv-tag is-q is-${qualityBand(st.toolQuality[r.slot]).id}`}
+                                            style={{ "--band": bandTint(qualityBand(st.toolQuality[r.slot]).id) }}>
                                             {qualityBand(st.toolQuality[r.slot]).name}
                                         </em>
                                     ) : built ? <em className="gv-tag is-done">Built</em>
@@ -736,7 +737,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     <i style={{ width: `${Math.round((result.craft.progress || 0) * 100)}%` }} />
                                 </span>
                                 {result.quality != null ? (
-                                    <span className={`gv-made-q is-${result.qualityBand}`}>
+                                    <span className={`gv-made-q is-${result.qualityBand}`} style={{ "--band": bandTint(result.qualityBand) }}>
                                         Rolled {bandName(result.qualityBand)} · {result.quality}/100
                                         {result.tempered ? <i className="gv-made-tmp">tempered</i> : null}
                                     </span>
@@ -748,7 +749,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     that — and it is absent at Rough rather than printing "+0", because a
                                     bad roll should read as a bad roll and not as a reward of nothing. */}
                                 {craftBonusLabel(result.recipe, result.quality) ? (
-                                    <span className={`gv-made-bonus is-${result.qualityBand}`}>
+                                    <span className={`gv-made-bonus is-${result.qualityBand}`} style={{ "--band": bandTint(result.qualityBand) }}>
                                         {craftBonusLabel(result.recipe, result.quality)}
                                     </span>
                                 ) : null}

@@ -1762,14 +1762,8 @@ export const GROVE_CSS = `
 .gv-odds b { display: block; font-size: 0.94rem; color: #fff6df; font-variant-numeric: tabular-nums; }
 .gv-odds span { display: block; font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; }
 .gv-odds em { display: block; font-style: normal; font-size: 0.58rem; color: #8f968a; margin-top: 1px; }
-.gv-odds li.is-rough span { color: #9aa08f; }
-.gv-odds li.is-sound span { color: #9be36a; }
-.gv-odds li.is-fine span { color: #6fd0ff; }
-.gv-odds li.is-pristine span { color: #e0a8ff; }
-.gv-odds li.is-pristine { border-color: rgba(224,168,255,0.34); }
 /* MASTERWORK. Warmer and brighter than Pristine, and the only band given a glow: it is a few percent
    at every level, so the one time a player sees it the screen should not be subtle about it. */
-.gv-odds li.is-masterwork span { color: #ffc861; }
 .gv-odds li.is-masterwork { border-color: rgba(255,200,97,0.5); box-shadow: 0 0 14px rgba(255,200,97,0.22) inset; }
 
 /* RECALL. Collapsed by default: it is the answer to a question, not a thing to scroll past every time. */
@@ -1786,15 +1780,6 @@ export const GROVE_CSS = `
 
 /* AWARENESS: the band a tool rolled, worn on the recipe that made it. */
 .gv-tag.is-q { background: rgba(255,255,255,0.08); }
-.gv-tag.is-rough { color: #9aa08f; }
-.gv-tag.is-sound { color: #9be36a; background: rgba(155,227,106,0.16); }
-.gv-tag.is-fine { color: #6fd0ff; background: rgba(111,208,255,0.16); }
-.gv-tag.is-pristine { color: #e0a8ff; background: rgba(224,168,255,0.18); }
-.gv-tag.is-masterwork { color: #ffc861; background: rgba(255,200,97,0.2); }
-.gv-recall li em.is-sound { color: #9be36a; }
-.gv-recall li em.is-fine { color: #6fd0ff; }
-.gv-recall li em.is-pristine { color: #e0a8ff; }
-.gv-recall li em.is-masterwork { color: #ffc861; }
 
 /* DOPAMINE: the ladder moving, on the card that just moved it. */
 .gv-made-lv { margin-top: 16px; padding: 12px; border-radius: 12px;
@@ -1921,11 +1906,6 @@ export const GROVE_CSS = `
 .gv-made-lv-bar i { display: block; height: 100%; border-radius: 999px;
     background: linear-gradient(90deg, #e0a83c, #ffd166); }
 .gv-made-q { display: block; margin-top: 9px; font-size: 0.8rem; font-weight: 700; }
-.gv-made-q.is-rough { color: #9aa08f; }
-.gv-made-q.is-sound { color: #9be36a; }
-.gv-made-q.is-fine { color: #6fd0ff; }
-.gv-made-q.is-pristine { color: #e0a8ff; }
-.gv-made-q.is-masterwork { color: #ffc861; text-shadow: 0 0 12px rgba(255,200,97,0.55); }
 @keyframes gvLevelUp {
     0% { transform: scale(0.94); box-shadow: 0 0 0 rgba(224,168,60,0); }
     45% { transform: scale(1.035); box-shadow: 0 0 34px rgba(224,168,60,0.55); }
@@ -2126,8 +2106,6 @@ export const GROVE_CSS = `
 /* What the band bought, on the card for the thing it bought it for. Sits under the roll, because it is
    the roll's consequence and reads as its second half. */
 .gv-made-bonus { display: block; margin-top: 4px; font-size: 0.86rem; font-weight: 800; color: #9be36a; }
-.gv-made-bonus.is-pristine { color: #e0a8ff; }
-.gv-made-bonus.is-masterwork { color: #ffc861; text-shadow: 0 0 12px rgba(255,200,97,0.45); }
 .gv-made-tmp { margin-left: 7px; font-style: normal; font-size: 0.62rem; letter-spacing: 0.08em;
     text-transform: uppercase; color: #ffc861; opacity: 0.85; }
 
@@ -2136,17 +2114,8 @@ export const GROVE_CSS = `
    run. The band rides the name, since two rows of one charm differ by nothing else. */
 .gv-q { font-style: normal; font-size: 0.62rem; letter-spacing: 0.05em; text-transform: uppercase;
     margin-left: 5px; color: #9aa08f; }
-.gv-q.is-sound { color: #9be36a; }
-.gv-q.is-fine { color: #6fd0ff; }
-.gv-q.is-pristine { color: #e0a8ff; }
-.gv-q.is-masterwork { color: #ffc861; }
 /* The glyph carries the band's colour too. Three rows of one charm differ only by how well they came out,
    and a stark white icon on all of them makes the shelf read as three identical things. */
-.gv-slot.is-rough svg { color: #9aa08f; }
-.gv-slot.is-sound svg { color: #9be36a; }
-.gv-slot.is-fine svg { color: #6fd0ff; }
-.gv-slot.is-pristine svg { color: #e0a8ff; }
-.gv-slot.is-masterwork svg { color: #ffc861; filter: drop-shadow(0 0 7px rgba(255,200,97,0.5)); }
 .gv-empty { margin: 4px 2px; font-size: 0.78rem; line-height: 1.45; color: #9aa08f; }
 
 /* The recipe a boss handed over. The loudest line on the kill card, because it happens once per map and
@@ -2158,84 +2127,139 @@ export const GROVE_CSS = `
 .gv-won-taught em { flex-basis: 100%; font-style: normal; font-size: 0.68rem; font-weight: 700;
     letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.72; }
 
-/* ── THE CRAFT ACT ───────────────────────────────────────────────────────────────────────────────────────
-   Three beats over a board that stays on screen the whole time. Full screen, because it is the only thing
-   happening and because the scrolling bench underneath would pull the eye off it. */
-.gv-act { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center;
-    background: rgba(6,8,6,0.88); backdrop-filter: blur(3px); padding: 14px; }
-.gv-act-in { width: min(440px, 100%); max-height: 100%; overflow-y: auto; display: flex;
-    flex-direction: column; gap: 12px; padding: 16px; border-radius: 16px;
-    background: linear-gradient(180deg, #23200f, #171509); border: 1px solid rgba(224,168,60,0.34);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
-.gv-act-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.gv-act-head b { font-size: 1.02rem; color: #fff6df; }
-.gv-act-beats { display: flex; gap: 7px; font-size: 0.6rem; letter-spacing: 0.1em;
-    text-transform: uppercase; }
-.gv-act-beats i { font-style: normal; color: #6f7566; }
-.gv-act-beats i.is-done { color: #9be36a; }
-.gv-act-beats i.is-now { color: #ffc861; text-shadow: 0 0 10px rgba(255,200,97,0.5); }
 
-/* THE BOARD: pegs above, the floor of varying buckets below, the odds under that. */
-.gv-act-board { border-radius: 12px; padding: 10px; background: rgba(0,0,0,0.34);
-    border: 1px solid rgba(255,255,255,0.07); }
-.gv-act-pegs { position: relative; height: 150px; display: flex; flex-direction: column;
+
+/* ── THE CRAFT ACT ───────────────────────────────────────────────────────────────────────────────────────
+   ⚠️ DRESSED LIKE A GROVE PANEL, BECAUSE THE FIRST VERSION WAS NOT AND LUKE SAID SO. Every other surface
+   in this feature is a painted board: ui-board.webp under a dark wash, four brass ui-corner.webp pieces,
+   a slab-plank.webp name board carrying DARK ink on pale wood. The act was a flat charcoal card with a
+   candy-stripe bar and a white outline for a result. Same chrome as .gv-sect now, same corners, same
+   plank, and the thing being made is on screen as its own sprite. */
+.gv-act { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center;
+    background: rgba(5,6,4,0.9); backdrop-filter: blur(3px); padding: 12px; }
+.gv-act-in { position: relative; width: min(430px, 100%); max-height: 100%; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px; padding: 0 12px 14px; border-radius: 14px;
+    background:
+        linear-gradient(180deg, rgba(9,11,8,0.80), rgba(9,11,8,0.92)),
+        url("/images/grove/ui-board.webp") center / cover;
+    border: 1px solid rgba(0,0,0,0.65);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.055); }
+.gv-act-in::before, .gv-act-in::after,
+.gv-act-trim::before, .gv-act-trim::after {
+    content: ""; position: absolute; width: 21px; height: 21px; pointer-events: none; opacity: 0.9;
+    background: url("/images/grove/ui-corner.webp") center / contain no-repeat; z-index: 2; }
+.gv-act-in::before { top: 5px; left: 5px; }
+.gv-act-in::after { top: 5px; right: 5px; transform: scaleX(-1); }
+.gv-act-trim::before { bottom: 5px; left: 5px; transform: scaleY(-1); }
+.gv-act-trim::after { bottom: 5px; right: 5px; transform: scale(-1); }
+
+/* The name board. Dark ink on pale wood — the cream used everywhere else is invisible on this plank. */
+.gv-act-plank { position: relative; margin: 0 -12px 2px; min-height: 52px; display: flex;
+    align-items: center; gap: 9px; padding: 7px 10px;
+    border-style: solid; border-width: 0 26px; border-image-source: url("/images/grove/slab-plank.webp");
+    border-image-slice: 0 150 fill; border-image-repeat: stretch;
+    font-size: 0.9rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #22190f; text-shadow: 0 1px 0 rgba(255,255,255,0.28);
+    min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.gv-act-ico { width: 34px; height: 34px; flex: none; object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.55)); }
+.gv-act-plank i { margin-left: auto; flex: none; font-style: normal; font-size: 0.66rem; font-weight: 700;
+    letter-spacing: 0.1em; padding: 4px 10px; border-radius: 999px; color: #e0a83c;
+    background: rgba(14,16,11,0.82); text-shadow: none; border: 1px solid rgba(0,0,0,0.5); }
+
+/* Four pips for four beats, rather than four words competing with the plank. */
+.gv-act-beats { display: flex; gap: 5px; justify-content: center; }
+.gv-act-beats span { width: 24px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.14); }
+.gv-act-beats span.is-done { background: #6aa34b; }
+.gv-act-beats span.is-now { background: #ffc861; box-shadow: 0 0 9px rgba(255,200,97,0.7); }
+
+/* ── THE RACK ─────────────────────────────────────────────────────────────────────────────────────────
+   A sunken well of pegs over a row of real buckets with walls and a lip, and a CLIFF at the right-hand
+   end. The old floor was a 16px candy stripe that read as a progress bar; this one you can land in. */
+.gv-act-rack { position: relative; padding: 9px 9px 0; border-radius: 10px; touch-action: none;
+    background: radial-gradient(120% 90% at 50% 0%, rgba(224,120,40,0.09), rgba(0,0,0,0.42) 70%);
+    border: 1px solid rgba(0,0,0,0.55); box-shadow: inset 0 3px 10px rgba(0,0,0,0.55); }
+.gv-act-pegs { position: relative; height: 142px; display: flex; flex-direction: column;
     justify-content: space-between; }
 .gv-act-pegrow { display: flex; justify-content: space-around; }
-.gv-act-pegrow i { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.22); }
-/* ⚠️ THE BALL IS POSITIONED, NOT TRANSITIONED TO THE FLOOR. It is stepped one peg row at a time by the
-   component, because a ball that slides smoothly into its bucket has not bounced off anything and the
-   rattle IS the drama. The short transition only smooths each single hop. */
-.gv-act-ball { position: absolute; width: 13px; height: 13px; margin: -7px 0 0 -7px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #fff3cf, #e0a83c 60%, #8a5f16);
-    box-shadow: 0 0 12px rgba(255,200,97,0.6); transition: left 105ms linear, top 105ms linear; }
-.gv-act-ball.is-set { transition: none; animation: gv-act-land 420ms ease-out; }
-@keyframes gv-act-land {
-    0% { transform: scale(1.35); } 55% { transform: scale(0.75); } 100% { transform: scale(1); }
-}
-.gv-act-floor { display: flex; height: 16px; margin-top: 7px; border-radius: 5px; overflow: hidden;
-    border: 1px solid rgba(0,0,0,0.5); }
-.gv-act-slot { height: 100%; transition: width 260ms ease-out; }
-.gv-act-slot.is-rough { background: #4a4d42; }
-.gv-act-slot.is-sound { background: #6aa34b; }
-.gv-act-slot.is-fine { background: #3d8fc4; }
-.gv-act-slot.is-pristine { background: #a06ccb; }
-.gv-act-slot.is-masterwork { background: linear-gradient(180deg, #ffd98a, #e0a83c); }
-.gv-act-slot.is-hit { box-shadow: 0 0 0 2px #fff6df inset, 0 0 16px rgba(255,246,223,0.7);
-    animation: gv-act-hit 520ms ease-out; }
-@keyframes gv-act-hit { 0%, 100% { filter: brightness(1); } 40% { filter: brightness(2.1); } }
-.gv-act-key { list-style: none; display: flex; gap: 5px; margin: 8px 0 0; padding: 0; }
-.gv-act-key li { flex: 1; text-align: center; font-size: 0.56rem; letter-spacing: 0.04em;
-    text-transform: uppercase; color: #8f968a; }
-.gv-act-key b { display: block; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
-.gv-act-key li.is-rough b { color: #9aa08f; }
-.gv-act-key li.is-sound b { color: #9be36a; }
-.gv-act-key li.is-fine b { color: #6fd0ff; }
-.gv-act-key li.is-pristine b { color: #e0a8ff; }
-.gv-act-key li.is-masterwork b { color: #ffc861; }
+.gv-act-pegrow i { width: 5px; height: 5px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #c9b38a, #6b5a3c 70%, #2a2318);
+    box-shadow: 0 1px 1px rgba(0,0,0,0.6); }
+/* ⚠️ THE PIECE IS THE ITEM'S OWN SPRITE, and it is stepped one peg row at a time rather than transitioned
+   to the floor — a piece that glides smoothly into its bucket has not bounced off anything. */
+.gv-act-piece { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px;
+    display: grid; place-items: center; transition: left 100ms linear, top 100ms linear, opacity 200ms; }
+.gv-act-piece img { width: 30px; height: 30px; object-fit: contain; }
+.gv-act-piece.is-hot img { filter: drop-shadow(0 0 10px rgba(255,150,40,0.85)) brightness(1.25) saturate(1.2); }
+.gv-act-piece.is-set { transition: none; animation: gv-act-land 420ms ease-out; }
+@keyframes gv-act-land { 0% { transform: scale(1.3); } 55% { transform: scale(0.82); } 100% { transform: scale(1); } }
 
-/* THE BEATS */
-.gv-act-beat { display: flex; flex-direction: column; gap: 9px; align-items: stretch; }
-.gv-act-say { margin: 0; text-align: center; font-size: 0.82rem; letter-spacing: 0.05em; color: #cfc6b6; }
+.gv-act-buckets { display: flex; align-items: flex-end; height: 34px; margin-top: 6px; }
+.gv-act-bucket { position: relative; height: 100%; display: grid; place-items: center;
+    border-left: 1px solid rgba(0,0,0,0.75); border-right: 1px solid rgba(255,255,255,0.08);
+    box-shadow: inset 0 7px 11px rgba(0,0,0,0.5), inset 0 -2px 0 rgba(255,255,255,0.14);
+    transition: filter 200ms; overflow: hidden; }
+.gv-act-bucket b { font-size: 0.6rem; font-weight: 900; letter-spacing: 0.04em; color: rgba(0,0,0,0.55);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.22); }
+.gv-act-bucket.is-hit { filter: brightness(1.5); box-shadow: inset 0 7px 11px rgba(0,0,0,0.3),
+    inset 0 -2px 0 rgba(255,255,255,0.3), 0 0 22px rgba(255,246,223,0.65);
+    animation: gv-act-catch 560ms ease-out; }
+@keyframes gv-act-catch { 0%, 100% { transform: translateY(0); } 35% { transform: translateY(3px); } }
+/* THE CLIFF. The right-hand end of the rack is a drop, and it is drawn as one — the whole risk of the
+   aim beat is that this is right next to the gold. */
+.gv-act-cliff { flex: none; width: 10px; height: 100%; margin-left: 2px; border-radius: 0 3px 3px 0;
+    background: repeating-linear-gradient(135deg, #2a1410 0 4px, #140a08 4px 8px);
+    box-shadow: inset 2px 0 4px rgba(0,0,0,0.8); }
+.gv-act-cliff.is-hit { box-shadow: inset 2px 0 4px rgba(0,0,0,0.8), 0 0 20px rgba(210,112,94,0.8);
+    animation: gv-act-catch 560ms ease-out; }
+
+/* The aim marker: a plumb line down the rack with a grip you can actually hit with a thumb. */
+.gv-act-aim { position: absolute; top: 4px; bottom: 36px; width: 2px; margin-left: -1px;
+    background: linear-gradient(180deg, rgba(255,246,223,0.15), #fff6df);
+    box-shadow: 0 0 10px rgba(255,246,223,0.7); pointer-events: none; }
+.gv-act-aim::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 15px; height: 15px;
+    margin-left: -7.5px; border-radius: 50%; background: #fff6df;
+    box-shadow: 0 0 12px rgba(255,246,223,0.9), 0 2px 4px rgba(0,0,0,0.6); }
+
+/* THE ODDS FOR THIS AIM. Little pressed plates, like the count on every panel name board. */
+.gv-act-odds { list-style: none; display: flex; gap: 4px; margin: 0; padding: 0; }
+.gv-act-odds li { flex: 1; text-align: center; padding: 4px 2px; border-radius: 7px;
+    background: rgba(14,16,11,0.72); border: 1px solid rgba(0,0,0,0.5);
+    font-size: 0.52rem; letter-spacing: 0.04em; text-transform: uppercase; color: #8f968a; }
+.gv-act-odds b { display: block; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.gv-act-odds li.is-miss { border-color: rgba(210,112,94,0.45); }
+
+.gv-act-say { margin: 2px 0 0; text-align: center; font-size: 0.84rem; letter-spacing: 0.04em;
+    color: #cfc6b6; }
+.gv-act-hint { margin: 0; text-align: center; font-size: 0.72rem; line-height: 1.45; color: #9aa08f; }
+.gv-act-hint b { color: #d2705e; }
+
+/* THE HEAT */
 .gv-act-bar { position: relative; height: 22px; border-radius: 7px; overflow: hidden;
-    background: rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.08); }
-.gv-act-fill { position: absolute; inset: 0 auto 0 0; transition: width 90ms linear; }
-.gv-act-fill.is-heat { background: linear-gradient(90deg, #8a3b12, #e0702c 55%, #ffc861); }
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(0,0,0,0.6);
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.6); }
+.gv-act-fill { position: absolute; inset: 0 auto 0 0; transition: width 90ms linear;
+    background: linear-gradient(90deg, #7a2f0d, #e0702c 55%, #ffc861); }
 .gv-act-bar em { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal;
-    font-size: 0.7rem; font-weight: 800; color: #fff6df; text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    font-size: 0.7rem; font-weight: 800; color: #fff6df; text-shadow: 0 1px 3px rgba(0,0,0,0.85);
     font-variant-numeric: tabular-nums; }
+.gv-act-clock { display: block; height: 3px; border-radius: 2px; background: rgba(0,0,0,0.45); }
+.gv-act-clock i { display: block; height: 100%; border-radius: 2px; background: #ffc861;
+    transition: width 90ms linear; }
 
-/* THE ANVIL: the hit zone, the perfect core, and a marker sweeping across both. */
-.gv-act-anvil { position: relative; height: 34px; border-radius: 8px; background: rgba(0,0,0,0.42);
-    border: 1px solid rgba(255,255,255,0.08); overflow: hidden; }
+/* THE ANVIL */
+.gv-act-anvil { position: relative; height: 34px; border-radius: 8px; overflow: hidden;
+    background: linear-gradient(180deg, #30332a, #1b1d17); border: 1px solid rgba(0,0,0,0.6);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6); }
 .gv-act-zone { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
-    background: rgba(155,227,106,0.2); border-left: 1px solid rgba(155,227,106,0.4);
-    border-right: 1px solid rgba(155,227,106,0.4); }
+    background: rgba(124,185,90,0.26); border-left: 1px solid rgba(124,185,90,0.5);
+    border-right: 1px solid rgba(124,185,90,0.5); }
 .gv-act-core { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
-    background: rgba(255,200,97,0.34); }
+    background: rgba(255,200,97,0.42); }
 .gv-act-marker { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px;
-    background: #fff6df; box-shadow: 0 0 10px rgba(255,246,223,0.8); }
+    background: #fff6df; box-shadow: 0 0 10px rgba(255,246,223,0.85); }
 .gv-act-flash { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal;
-    font-size: 0.86rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase;
+    font-size: 0.88rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9); animation: gv-act-pop 420ms ease-out; }
 .gv-act-flash.is-perfect { color: #ffc861; }
 .gv-act-flash.is-hit { color: #9be36a; }
@@ -2244,37 +2268,60 @@ export const GROVE_CSS = `
     0% { transform: scale(0.7); opacity: 0; } 30% { transform: scale(1.1); opacity: 1; }
     100% { transform: scale(1); opacity: 0; }
 }
+.gv-act-hits { list-style: none; display: flex; gap: 6px; margin: 0; padding: 0; }
+.gv-act-hits li { flex: 1; text-align: center; padding: 5px 0; border-radius: 6px; font-size: 0.62rem;
+    letter-spacing: 0.07em; text-transform: uppercase; color: #6f7566; background: rgba(0,0,0,0.38); }
+.gv-act-hits li.is-perfect { color: #2a1f05; background: #ffc861; }
+.gv-act-hits li.is-hit { color: #10220a; background: #9be36a; }
+.gv-act-hits li.is-miss { color: #f2cdc5; background: rgba(210,112,94,0.5); }
 
 /* THE ONE BUTTON. Big, because it is pressed fast and repeatedly and a thumb is not accurate. */
-.gv-act-hit { padding: 15px; border-radius: 12px; cursor: pointer; font: inherit; font-size: 1rem;
+.gv-act-hit { padding: 14px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 0.98rem;
     font-weight: 900; letter-spacing: 0.14em; color: #2a1f05; border: 1px solid #c89a3a;
     background: linear-gradient(180deg, #ffd98a, #e0a83c); touch-action: manipulation;
     -webkit-user-select: none; user-select: none; }
 .gv-act-hit:active { transform: translateY(1px); filter: brightness(1.12); }
 .gv-act-hit.is-bellows { background: linear-gradient(180deg, #ffb46a, #d4651f); border-color: #9a4a12; }
-.gv-act-hit.is-done { background: linear-gradient(180deg, #a9e38a, #5aa63c); border-color: #3f7a28; }
-.gv-act-clock { display: block; height: 3px; border-radius: 2px; background: #ffc861;
-    transition: width 90ms linear; }
-.gv-act-hits { list-style: none; display: flex; gap: 6px; margin: 0; padding: 0; }
-.gv-act-hits li { flex: 1; text-align: center; padding: 5px 0; border-radius: 6px; font-size: 0.64rem;
-    letter-spacing: 0.07em; text-transform: uppercase; color: #6f7566; background: rgba(0,0,0,0.3); }
-.gv-act-hits li.is-perfect { color: #2a1f05; background: #ffc861; }
-.gv-act-hits li.is-hit { color: #10220a; background: #9be36a; }
-.gv-act-hits li.is-miss { color: #f2cdc5; background: rgba(210,112,94,0.45); }
+.gv-act-hit.is-release { background: linear-gradient(180deg, #e8e2d2, #b3ab96); border-color: #807957;
+    color: #221d10; }
 .gv-act-work { text-align: center; font-size: 0.74rem; color: #8f968a; }
-
-
 /* The finish button wears the band it is announcing. A green button reading "Rough" says two opposite
    things at once, and the colour is the one the eye believes. */
-.gv-act-hit.is-band.is-rough { background: linear-gradient(180deg, #8d9185, #5a5e52); border-color: #3f4239;
-    color: #f0f2ec; }
-.gv-act-hit.is-band.is-sound { background: linear-gradient(180deg, #a9e38a, #5aa63c); border-color: #3f7a28;
-    color: #10220a; }
-.gv-act-hit.is-band.is-fine { background: linear-gradient(180deg, #8fd6ff, #2f8ec4); border-color: #1f6b96;
-    color: #04202f; }
-.gv-act-hit.is-band.is-pristine { background: linear-gradient(180deg, #e3bcff, #9a5fd0); border-color: #70409c;
-    color: #230736; }
-.gv-act-hit.is-band.is-masterwork { background: linear-gradient(180deg, #fff0bd, #e0a83c);
-    border-color: #c89a3a; color: #2a1f05; box-shadow: 0 0 26px rgba(255,200,97,0.6); }
+
+
+/* ── ⚠️ ONE RULE FOR EVERY BAND COLOUR ───────────────────────────────────────────────────────────────────
+   There were eleven places in this file naming a hex for Pristine, and all eleven had to agree. They are
+   gone: QUALITY_BANDS carries a tint and an ink, components hand them over as --band and --band-ink, and
+   the only thing left here is what to DO with a colour. Change the palette in grove-forge.js and every
+   surface in the feature moves together. See [[balance-constants-never-copied]] — a copied colour is the
+   same defect as a copied number, it is just quieter about it. */
+.gv-odds li[style*="--band"] span,
+.gv-recall li em[style*="--band"],
+.gv-made-q[style*="--band"],
+.gv-made-bonus[style*="--band"],
+.gv-q[style*="--band"],
+.gv-act-odds li[style*="--band"] b { color: var(--band); }
+.gv-tag.is-q[style*="--band"] { color: var(--band);
+    background: color-mix(in srgb, var(--band) 18%, transparent); }
+.gv-slot[style*="--band"] svg { color: var(--band); }
+.gv-slot.is-masterwork svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--band) 60%, transparent)); }
+.gv-made-q.is-masterwork, .gv-made-bonus.is-masterwork {
+    text-shadow: 0 0 12px color-mix(in srgb, var(--band) 55%, transparent); }
+.gv-odds li.is-masterwork { border-color: color-mix(in srgb, var(--band) 45%, transparent); }
+
+/* The rack buckets and the finish button, both painted from the same tint. */
+.gv-act-bucket[style*="--band"] {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--band) 86%, #fff 14%),
+        color-mix(in srgb, var(--band) 72%, #000 28%)); }
+.gv-act-hit.is-band {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--band) 88%, #fff 12%),
+        color-mix(in srgb, var(--band) 78%, #000 22%));
+    border-color: color-mix(in srgb, var(--band) 60%, #000 40%);
+    color: var(--band-ink, #2a1f05); }
+.gv-act-hit.is-band.is-masterwork { box-shadow: 0 0 26px color-mix(in srgb, var(--band) 55%, transparent); }
+.gv-act-hit.is-band.is-miss { background: linear-gradient(180deg, #c98675, #8a4435); border-color: #5e2c22;
+    color: #fbeae6; }
 
 `;

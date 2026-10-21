@@ -108,13 +108,33 @@ export function craftXpFor(recipe) {
 // change they cannot see -- which, with four bands, meant a Pristine tool was finished for ever and the
 // player's best tool was the one the bench had least use for. Because that guard names the array's first
 // entry rather than the word "pristine", it followed the new band on its own.
+// ── ⚠️ AND THE BANDS CARRY THEIR OWN COLOUR, AS A TEMPER SCALE ─────────────────────────────────────────────
+// Luke, on the first version of the craft act: "I hate the colors so much on that pink thing, its terrible."
+//
+// He was right and the cause is worth recording. The bands were coloured with the generic rarity palette
+// every game uses — green, blue, purple — which has nothing to do with the Grove. The Grove is wood, brass,
+// cream and warm light, and a saturated lavender button a finger wide in the middle of it looks like it
+// wandered in from another product. It had been tolerable while the colour was a six-point tag on a list;
+// the act made it the biggest thing on the screen, which is how a palette that was never chosen gets found.
+//
+// These are a FORGE TEMPER SCALE instead: cold iron, grey steel, hot copper, bright brass, white-hot. It
+// reads cold-to-hot, which is what the act is literally about, and the best thing on the rack is the
+// brightest — so the eye finds it without being told.
+//
+// ⚠️ THE COLOUR LIVES HERE, NOT IN A STYLESHEET. It was eleven hexes across grove-css.js that all had to
+// agree about what Pristine looks like, which is the shape of defect this repo has paid for repeatedly.
+// Components hand `tint` to CSS as a custom property; nothing else is allowed to name a band colour.
 export const QUALITY_BANDS = [
-    { at: 98, id: "masterwork", name: "Masterwork", mult: 1.90 },
-    { at: 90, id: "pristine", name: "Pristine", mult: 1.60 },
-    { at: 72, id: "fine", name: "Fine", mult: 1.35 },
-    { at: 45, id: "sound", name: "Sound", mult: 1.15 },
-    { at: 0, id: "rough", name: "Rough", mult: 1.00 },
+    { at: 98, id: "masterwork", name: "Masterwork", mult: 1.90, tint: "#ffeab0", ink: "#2a1f05" },
+    { at: 90, id: "pristine", name: "Pristine", mult: 1.60, tint: "#e8b23c", ink: "#2a1f05" },
+    { at: 72, id: "fine", name: "Fine", mult: 1.35, tint: "#c0702e", ink: "#1c0c04" },
+    { at: 45, id: "sound", name: "Sound", mult: 1.15, tint: "#8d9aa0", ink: "#14191b" },
+    { at: 0, id: "rough", name: "Rough", mult: 1.00, tint: "#6b7065", ink: "#f2f4ee" },
 ];
+
+/** A band's colour, by id. The one accessor; nothing should reach into the table for a hex. */
+export const bandTint = (id) => QUALITY_BANDS.find((b) => b.id === id)?.tint || "#6b7065";
+export const bandInk = (id) => QUALITY_BANDS.find((b) => b.id === id)?.ink || "#f2f4ee";
 
 export const qualityBand = (q) => QUALITY_BANDS.find((b) => (Number(q) || 0) >= b.at) || QUALITY_BANDS[QUALITY_BANDS.length - 1];
 

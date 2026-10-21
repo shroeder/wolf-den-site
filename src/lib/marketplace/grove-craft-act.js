@@ -25,7 +25,10 @@ import { QUALITY_BANDS, qualityOdds } from "@/lib/marketplace/grove-forge.js";
 // bug fixed the day before this shipped — printed odds not matching the roll — would now be VISIBLE, as a
 // board whose buckets were the wrong size.
 //
-// ── WHAT THE SKILL BEATS DO, AND WHAT THEY DELIBERATELY DO NOT ──────────────────────────────────────────────
+// ── WHAT THE SKILL BEATS DO: THEY TIGHTEN THE SCATTER ───────────────────────────────────────────────────────
+// They do not widen the buckets and they do not aim the piece. They decide how closely it lands to where
+// the PLAYER aimed it, which is what makes the far end of the rack reachable at all. See rackFor.
+//
 // ⚠️ AND THE BIAS IS CAPPED AT ROUGHLY WHAT TEMPERING BUYS. Two reasons, and the second is the real one.
 // First, a thumb should not out-earn the crafting LADDER — twenty-five levels would mean nothing against a
 // player with fast hands. Second, this is the one number in the Grove the server cannot verify: it can
@@ -102,105 +105,157 @@ export function clampAct(act) {
 /** The bias the act adds, in the same units the level and the temper feed. */
 export const actBias = (act) => actScore(clampAct(act)) * ACT_MAX_BIAS;
 
-// ── THE SET: THE BOARD ───────────────────────────────────────────────────────────────────────────────────────
-// Luke: "one is just rng, la plinko ball hitting pegs on itd way down. With varying buckets."
+// ── THE SET: THE RACK ────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "one is just rng, la plinko ball hitting pegs on itd way down. With varying buckets." And then:
+// "User should be able to pick where to drop the thing also."
 //
-// ⚠️ THE FLOOR IS A BAR OF FIVE REGIONS WITH EXACT WIDTHS, AND THE BALL LANDS UNIFORMLY ALONG IT. That is the
-// third version of this and the first honest one, so the two that failed are worth recording.
+// ⚠️ A CHOSEN DROP POINT IS ONLY A DECISION IF AIMING HIGH CAN COST YOU. That is the whole design and it is
+// worth stating plainly, because the obvious implementation has no decision in it at all: if the ball simply
+// scatters around wherever you aimed and the worst case is landing in a slightly poorer band, then aiming at
+// the best bucket is correct every single time and the choice is a button that looks like a choice.
 //
-// The first drew thirteen discrete slots and let a binomial walk choose one. Contiguous bands over a
-// binomial cannot be given arbitrary widths — the centre slot alone is a fifth of every fall — so the board
-// could only take a handful of shapes. The gate caught it at once: levels 4, 12 and 25 produced the IDENTICAL
-// floor, and Rough played 22.6% where the curve asked for 36.4%.
+// So the rack has an END. The bands run worst to best, left to right, and a ball that scatters past the last
+// bucket goes off the rack and onto the floor — which is a ROUGH, the same as the cheapest bucket. Aiming at
+// the gold therefore means standing close enough to the edge to miss the rack entirely.
 //
-// The second widened it to seventeen slots and walked the cumulative boundaries instead of filling band by
-// band, which halved the error and left the fatal part untouched: at levels 10 and 25 a perfect act changed
-// the board NOT AT ALL. A beat that cannot be played well at the cap is the dead-ladder bug the quality
-// curve already had once, arriving by a different road.
+//   ROUGH ──── SOUND ──────── FINE ────── PRISTINE ── MASTERWORK │ off the end
+//     safe                                                 rich │ nothing
 //
-// Both failed for one reason: a quantised floor cannot express a continuous curve. So the floor stops being
-// quantised. Each band owns a span of the bar exactly as wide as its share, the ball lands at a uniform
-// position along the bar, and the chance of finishing in a band IS its share — not approximately, exactly,
-// and at every level and act and temper state. The pegs are still there and the ball still rattles through
-// them; what the pegs no longer do is decide anything.
+// ⚠️ AND THE TWO SKILL BEATS BUY THE RIGHT TO BE GREEDY. They no longer widen the buckets; they tighten the
+// SCATTER. A sloppy heat and three missed strikes mean the piece lands anywhere within a wide band of your
+// aim, so aiming at Masterwork throws most of your chances off the end. A clean act means it lands close to
+// where you put it, and the far end becomes worth reaching for. That is a better use of skill than widening:
+// it changes what you are ABLE to attempt rather than quietly improving a number.
 //
-// It is also the more legible object. A wider bucket is more likely, which is what anybody looking at it
-// would already assume — where a binomial board is a thing you have to know is centre-weighted before it
-// tells you the truth.
+// ⚠️ THE WIDTHS ARE STILL CUT FROM qualityOdds. A band is as wide as its share at your crafting level, so the
+// rack is still a picture of the curve — the ladder is visible as Masterwork growing from a sliver into
+// something you can actually aim at. What the level no longer does is decide the outcome on its own.
 
-/** How many rows of pegs the ball rattles through. Purely how long the fall LOOKS; it decides nothing. */
+/** How many rows of pegs the piece rattles through. Purely how long the fall LOOKS; it decides nothing. */
 export const PEG_ROWS = 9;
 
 /**
- * The floor: one span per band, in bar order, each exactly as wide as that band share.
+ * The rack: one span per band, worst on the left, best on the right, each as wide as its share.
  *
- * ⚠️ RAREST AT THE EDGES, COMMONEST IN THE MIDDLE. Nothing forces this now that the landing is uniform — it
- * is a reading decision. The eye finds the middle of a bar first, so the band you will usually get belongs
- * there, and the thin gold slivers at the two ends are the ones worth hunting for. Masterwork is split
- * across both edges so the board stays symmetric and neither end is the lucky one.
+ * ⚠️ A GRADIENT, NOT A SYMMETRIC BOARD. The earlier version mirrored the rare bands to both edges, which was
+ * right when the ball landed uniformly and nobody was aiming — it made the board unbiased. The moment the
+ * player chooses a drop point, two good edges means two identical correct answers and a board with a mirror
+ * line down it. One direction of "better" is what makes an aim mean something.
  */
-export function boardFor(level, { temper = false, act = null } = {}) {
-    // ⚠️ THE ACT IS ITS OWN TERM IN THE CURVE, NOT EXTRA LEVELS. Expressing it as levels was the first
-    // attempt and it silently did nothing at the cap, because qualityOdds clamps the level to 25: a maxed
-    // crafter would have played the beats perfectly and watched the board refuse to move. The gate caught
-    // it; nobody playing it would have, because the board would simply have looked normal.
-    const odds = qualityOdds(level, temper, act ? actBias(act) : 0);
-    const share = Object.fromEntries(odds.map((o) => [o.id, o.share]));
-    // masterwork is halved and mirrored; the rest nest inward in rarity order.
-    const half = ["masterwork", "pristine", "fine", "sound"];
+export function rackFor(level, { temper = false } = {}) {
+    const share = Object.fromEntries(qualityOdds(level, temper).map((o) => [o.id, o.share]));
+    const worstFirst = [...QUALITY_BANDS].reverse();            // rough ... masterwork
     const spans = [];
     let x = 0;
-    const push = (id, w) => { if (w > 0) { spans.push({ id, from: x, to: x + w }); x += w; } };
-    for (const id of half) push(id, (share[id] || 0) / 2);
-    push("rough", share.rough || 0);
-    for (let i = half.length - 1; i >= 0; i -= 1) push(half[i], (share[half[i]] || 0) / 2);
-    // ⚠️ THE LAST SPAN IS STRETCHED TO EXACTLY 1. Floating point leaves a sliver at the end otherwise, and a
-    // ball landing in that sliver would land in no band at all.
+    for (const b of worstFirst) {
+        const w = share[b.id] || 0;
+        if (w <= 0) continue;
+        spans.push({ id: b.id, name: b.name, from: x, to: x + w });
+        x += w;
+    }
+    // ⚠️ THE LAST SPAN IS STRETCHED TO EXACTLY 1, or floating point leaves a sliver at the end of the rack
+    // that is neither a bucket nor off the edge.
     if (spans.length) spans[spans.length - 1].to = 1;
     return spans;
 }
 
-/** What each band is worth on a given floor — what every screen that quotes odds must quote. */
-export function boardOdds(spans) {
-    const out = {};
-    for (const s of spans || []) out[s.id] = (out[s.id] || 0) + (s.to - s.from);
-    return QUALITY_BANDS.map((b) => ({ id: b.id, name: b.name, mult: b.mult, share: out[b.id] || 0 }));
-}
+// ── THE SCATTER ──────────────────────────────────────────────────────────────────────────────────────────────
+// How far the piece can stray from where it was aimed. A fumbled act is nearly a third of the rack either
+// way, which makes the gold end unusable; a flawless one is tight enough to pick a bucket.
+//
+// ⚠️ IT IS A STANDARD DEVIATION, NOT A HARD LIMIT. A cap would let a player aim exactly one cap-width from
+// the end and be mathematically safe, which turns the whole beat into arithmetic. A tail means the edge is
+// always a risk, and a small one even for a perfect act.
+export const SCATTER_WORST = 0.30;
+export const SCATTER_BEST = 0.055;
+export const scatterFor = (act) => SCATTER_WORST - (SCATTER_WORST - SCATTER_BEST) * actScore(clampAct(act));
 
-/** Where the ball lands, 0..1 along the bar. Uniform, so a band share IS its width. */
-export function dropAt(seed) {
+/**
+ * Where the piece actually lands, given an aim and a scatter. Returns a position along the rack, which may
+ * be OFF it — below 0 or above 1 — and the caller treats that as the floor.
+ *
+ * Box-Muller from a seeded stream, so the server and the replay agree and nothing can be retried for a
+ * better number.
+ */
+export function landingFor(aim, scatter, seed) {
     let x = ((Math.floor(Number(seed) || 1) + 101) * 2654435761) >>> 0;
-    x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
-    return Math.min(0.999999, x / 4294967296);
+    const rnd = () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return (x >>> 0) / 4294967296; };
+    const u1 = Math.max(1e-9, rnd());
+    const u2 = rnd();
+    const g = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    return (Number(aim) || 0) + g * (Number(scatter) || 0);
 }
 
-/** The band a landing position falls in. */
+/** The band a landing falls in. Anything off either end of the rack hit the floor, and that is a Rough. */
 export function bandAt(spans, at) {
-    const p = Math.max(0, Math.min(0.999999, Number(at) || 0));
+    const p = Number(at);
+    if (!Number.isFinite(p) || p < 0 || p >= 1) return "rough";
     for (const s of spans || []) if (p >= s.from && p < s.to) return s.id;
     return "rough";
 }
 
+/** Did it miss the rack altogether? Worth knowing separately: the screen owes the player that sight. */
+export const missedRack = (at) => !(Number(at) >= 0 && Number(at) < 1);
+
 /**
- * The rattle: one horizontal offset per peg row, ENDING at the landing position.
+ * ⚠️ THE ODDS FOR THIS AIM, WHICH IS WHAT THE SCREEN MUST SHOW.
  *
- * ⚠️ IT DECIDES NOTHING AND IT IS NOT ALLOWED TO. The landing comes from dropAt and the fall is then drawn
- * to agree with it, rather than the client bouncing a ball wherever its own physics takes it and the server
- * being asked to believe where it stopped. Every offset is scaled so the last one is exactly the landing.
+ * Band width stopped being band chance the moment the player got to choose where to drop — the chance now
+ * depends on the aim and the scatter, and a screen still quoting the widths would be telling the player the
+ * odds of a game they are no longer playing. That is the same defect as the printed-odds bug in qualityOdds,
+ * so it gets the same treatment: computed from the real distribution, live, as the aim moves.
  *
- * The deflections shrink as the ball falls, which is both how a real board behaves and what stops the last
- * row from being a visible jump sideways into the right bucket.
+ * Numerically integrated rather than solved with an error function, because the spans are arbitrary and a
+ * grid of a thousand slices is exact to well under a tenth of a point — far finer than a percentage shown to
+ * the player — and it cannot be subtly wrong in the way a hand-rolled erf can.
+ */
+export function oddsForAim(spans, aim, scatter) {
+    const SLICES = 1200;
+    const sd = Math.max(1e-4, Number(scatter) || 0);
+    const a = Number(aim) || 0;
+    const out = {};
+    let off = 0;
+    // Integrate over +/- 4 standard deviations, which holds all but about 0.006% of the mass.
+    const lo = a - sd * 4;
+    const hi = a + sd * 4;
+    const step = (hi - lo) / SLICES;
+    let total = 0;
+    for (let i = 0; i < SLICES; i += 1) {
+        const x = lo + step * (i + 0.5);
+        const z = (x - a) / sd;
+        const w = Math.exp(-0.5 * z * z);
+        total += w;
+        if (x < 0 || x >= 1) { off += w; continue; }
+        const band = bandAt(spans, x);
+        out[band] = (out[band] || 0) + w;
+    }
+    // ⚠️ OFF THE RACK IS ADDED TO ROUGH, because that is what it pays. Reporting it as its own row would be
+    // more informative and would also be the only row on the screen that is not a band, so it rides with
+    // Rough and `miss` carries the number for the one line that says it out loud.
+    out.rough = (out.rough || 0) + off;
+    return {
+        bands: QUALITY_BANDS.map((b) => ({ id: b.id, name: b.name, mult: b.mult, share: (out[b.id] || 0) / total })),
+        miss: off / total,
+    };
+}
+
+/**
+ * The rattle: one horizontal position per peg row, ENDING where the piece landed.
+ *
+ * ⚠️ IT DECIDES NOTHING. The landing comes from landingFor and the fall is then drawn to agree with it,
+ * rather than the client bouncing a ball wherever its own physics takes it and the server being asked to
+ * believe where it stopped. The deflections shrink as it falls, which is how a real rack behaves and is also
+ * what stops the last row being a visible jump sideways into the right bucket.
  */
 export function rattle(at, seed) {
-    const end = Math.max(0, Math.min(1, Number(at) || 0));
+    const end = Number(at) || 0;
     let x = ((Math.floor(Number(seed) || 1) + 17) * 2246822519) >>> 0;
     const rnd = () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
     const out = [];
     for (let r = 0; r < PEG_ROWS; r += 1) {
         const t = (r + 1) / PEG_ROWS;
-        // Lerp from the centre toward the landing, with a wobble that fades out as it arrives.
-        const wobble = (rnd() - 0.5) * 0.26 * (1 - t) ** 1.4;
-        out.push(Math.max(0.02, Math.min(0.98, 0.5 + (end - 0.5) * t + wobble)));
+        const wobble = (rnd() - 0.5) * 0.17 * (1 - t) ** 1.3;
+        out.push(end * t + 0.5 * (1 - t) + wobble);
     }
     out[out.length - 1] = end;
     return out;
@@ -211,7 +266,7 @@ export function rattle(at, seed) {
  * rather than a band id in disguise.
  *
  * ⚠️ THE BAND IS DECIDED FIRST AND THIS ONLY FILLS IN A SCORE. Rolling a score and reading its band back
- * would be a second roll free to disagree with where the ball landed — the player watching it stop in
+ * would be a second roll free to disagree with where the piece landed — the player watching it stop in
  * Pristine and being handed a Fine tool.
  */
 export function qualityInBand(bandId, seed) {
@@ -222,4 +277,3 @@ export function qualityInBand(bandId, seed) {
     x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
     return Math.max(0, Math.min(100, band.at + Math.floor((x / 4294967296) * (top - band.at + 1))));
 }
-

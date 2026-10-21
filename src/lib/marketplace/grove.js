@@ -18,8 +18,8 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { petBiteShare } from "@/lib/marketplace/grove-world.js";
 import { reworkCost, temperCost, toolRecipeFor } from "@/lib/marketplace/grove-recipes.js";
-import { boardFor, boardOdds, dropAt, bandAt, rattle, qualityInBand, clampAct, actScore }
-    from "@/lib/marketplace/grove-craft-act.js";
+import { rackFor, scatterFor, landingFor, bandAt, missedRack, oddsForAim, rattle, qualityInBand,
+    clampAct, actScore } from "@/lib/marketplace/grove-craft-act.js";
 import { settleKills, rollBoss, rollGroveChest } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { groveFighter } from "@/lib/marketplace/grove-kit.js";
@@ -1047,7 +1047,7 @@ export async function groveMove(buyerId, { partId, from, to, qty = 1 } = {}) {
 }
 
 /** Craft a discovered recipe. Parts come out of the BAG. */
-export async function groveCraft(buyerId, recipeId, { temper = false, act = null } = {}) {
+export async function groveCraft(buyerId, recipeId, { temper = false, act = null, aim = 0.5 } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const recipe = recipeById(recipeId);
     if (!recipe) return { ok: false, error: "no_recipe" };
@@ -1145,10 +1145,18 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
     // client that could retry for a better landing is a client that never gets a bad one. It cannot retry
     // anyway — the parts are already spent by the time this runs — but the seed should not invite it.
     const tidy = clampAct(act);
-    const seed = ((beforeXp + 1) * 2654435761) ^ (temper ? 0x9e3779b9 : 0) ^ Math.round(actScore(tidy) * 1e6);
-    const spans = boardFor(beforeLevel, { temper, act: tidy });
-    const landing = dropAt(seed);
+    // ⚠️ THE AIM IS CLAMPED AND NOTHING ELSE IS DONE WITH IT. It is a number from the client like the skill
+    // scores, and like them it cannot buy anything the rack does not already offer: it chooses WHERE on the
+    // rack the piece is thrown, and the rack decides the rest. An aim of 40 is an aim at the far end, which
+    // is also the most dangerous place to aim.
+    const where = Math.max(0, Math.min(1, Number(aim)));
+    const seed = ((beforeXp + 1) * 2654435761) ^ (temper ? 0x9e3779b9 : 0) ^ Math.round(actScore(tidy) * 1e6)
+        ^ Math.round(where * 1e5);
+    const spans = rackFor(beforeLevel, { temper });
+    const scatter = scatterFor(tidy);
+    const landing = landingFor(where, scatter, seed);
     const band = bandAt(spans, landing);
+    const missed = missedRack(landing);
     // ⚠️ EVERY KIND ROLLS. This was `recipe.kind === "tool" ? ... : null`, which is the single line that
     // made three crafts in four a vending machine — see craftBonusFor for what each kind does with it.
     const quality = qualityInBand(band, seed);
@@ -1320,8 +1328,14 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
             spans,
             landing,
             band,
+            // ⚠️ SAID OUT LOUD, because "it fell off the end" and "it landed in the cheap bucket" pay the
+            // same and are completely different stories. A player who reached too far is owed the sight of
+            // having reached too far.
+            missed,
+            aim: where,
+            scatter,
             path: rattle(landing, seed),
-            odds: boardOdds(spans),
+            odds: oddsForAim(spans, where, scatter),
             act: tidy,
             score: actScore(tidy),
         },

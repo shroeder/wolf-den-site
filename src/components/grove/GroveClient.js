@@ -15,7 +15,7 @@ import GroveBench from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area from "@/components/grove/GroveArea.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
-import { GROVE_CHESTS, CHARM_STAT_LABEL, QUALITY_BANDS } from "@/lib/marketplace/grove-forge.js";
+import { GROVE_CHESTS, CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
 import {
     GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
 } from "@/lib/marketplace/grove-recipes.js";
@@ -548,14 +548,14 @@ export default function GroveClient({ initial }) {
                                         const on = charmPick?.id === c.id && charmPick?.band === c.band;
                                         return (
                                             <button key={`${c.id}-${c.band}`} type="button"
-                                                className={`gv-slot is-${c.band}${on ? " is-on" : ""}`}
+                                                className={`gv-slot is-${c.band}${on ? " is-on" : ""}`} style={{ "--band": bandTint(c.band) }}
                                                 onClick={() => setCharmPick(on ? null : { id: c.id, band: c.band })}>
                                                 {(() => { const G = CHARM_GLYPH[c.meta?.stat] || GiCutDiamond; return <G size={30} aria-hidden="true" />; })()}
                                                 {/* ⚠️ THE BAND IS ON THE NAME, not hidden in the detail
                                                     line. Two rows of the same charm differ only by how
                                                     well they came out, so that word is the entire
                                                     difference between them. */}
-                                                <b>{c.meta?.name || c.id} <i className={`gv-q is-${c.band}`}>{bandWord(c.band)}</i></b>
+                                                <b>{c.meta?.name || c.id} <i className={`gv-q is-${c.band}`} style={{ "--band": bandTint(c.band) }}>{bandWord(c.band)}</i></b>
                                                 <span>{c.qty}</span>
                                                 <em>{on ? "carried in next" : `${CHARM_STAT_LABEL[c.meta?.stat] || ""} +${c.value}%`}</em>
                                             </button>

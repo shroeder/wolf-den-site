@@ -4,74 +4,79 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
     HEAT_MS, HEAT_TARGET, heatScore, STRIKES, STRIKE_MS, STRIKE_HIT, STRIKE_PERFECT,
-    strikeGrade, actScore, boardFor, boardOdds, PEG_ROWS,
+    strikeGrade, actScore, rackFor, scatterFor, oddsForAim, PEG_ROWS,
 } from "@/lib/marketplace/grove-craft-act.js";
-import { QUALITY_BANDS } from "@/lib/marketplace/grove-forge.js";
+import { QUALITY_BANDS, bandTint, bandInk } from "@/lib/marketplace/grove-forge.js";
+import { groveArt, toolArt } from "@/lib/marketplace/grove-catalog.js";
 
 // ── THE ACT ──────────────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "Let's make it fun." Then: "3 interactive steps, thematically fitting, one is timing based, one is tap
 // frequency based. And one is just rng, la plinko ball hitting pegs on itd way down. With varying buckets."
+// Then, on the first cut: "Looks terrible." And: "User should be able to pick where to drop the thing also."
 //
-//   HEAT     tap the bellows, the coals come up
-//   STRIKE   three hammer blows into a moving window
-//   SET      the piece falls through the pegs into a band
+//   HEAT    tap the bellows, the coals come up
+//   STRIKE  three hammer blows into a sweeping window
+//   AIM     choose where on the rack to throw it — the gold end is also the edge
+//   SET     it falls through the pegs and lands, or misses the rack
 //
-// The maths is all in grove-craft-act.js, which the server reads too. This file is the hands.
+// The maths is in grove-craft-act.js, which the server reads too. This file is the hands and the look.
 //
-// ── ⚠️ THE THIRD BEAT IS NOT PLAYED LOCALLY ─────────────────────────────────────────────────────────────────
-// The first two beats are skill and happen here. The fall does not: pressing through the strike POSTS the
-// craft, and the server answers with the landing it chose and a rattle that provably ends on it. The ball
-// then drops down a path it was handed.
+// ── ⚠️ IT IS DRESSED LIKE THE REST OF THE GROVE, AND THE FIRST VERSION WAS NOT ──────────────────────────────
+// That is what "looks terrible" was. Every other panel in this feature is a painted board: ui-board.webp
+// under a dark wash, four brass ui-corner.webp pieces, a slab-plank.webp name board with DARK ink on pale
+// wood, and the thing you are handling drawn as its own sprite. The act had none of it — a flat charcoal
+// card, a candy-stripe bar that read as a progress meter, and the result announced inside what looked like
+// a focused text input. Correct, and a wireframe.
 //
-// That ordering is the whole integrity of the screen. The alternative — bounce a ball locally and tell the
-// server where it stopped — is a client deciding its own loot, which this game does not do anywhere (see
-// grove-roll.js, where the scene plays the whole fight and the server still re-rolls every drop). It also
-// means the wait for the request happens UNDER the ball release, where it reads as suspense rather than as
-// a spinner.
+// ⚠️ THE PIECE IS THE ITEM'S OWN SPRITE. It is already drawn — groveArt for food and parts, toolArt for a
+// tool at its tier — and watching the actual poultice or the actual rod come up to heat and then fall is
+// the whole difference between making a thing and moving a token.
+//
+// ── ⚠️ THE FALL IS NOT PLAYED LOCALLY ───────────────────────────────────────────────────────────────────────
+// Releasing POSTS the craft; the server answers with where it landed and a rattle that provably ends there.
+// A client bouncing its own piece and reporting where it stopped is a client deciding its own loot, which
+// this game does nowhere. It also puts the request under the release, where the wait reads as suspense.
 
-const BEAT = { heat: 0, strike: 1, set: 2 };
+const BEAT = { heat: 0, strike: 1, aim: 2, set: 3 };
+const BEAT_NAME = ["Heat", "Strike", "Aim", "Set"];
 
 export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose }) {
     const [beat, setBeat] = useState(BEAT.heat);
-
-    // ── BEAT 1: THE HEAT ────────────────────────────────────────────────────────────────────────────
     const [taps, setTaps] = useState(0);
     const [heatLeft, setHeatLeft] = useState(HEAT_MS);
-    const heat = heatScore(taps);
-
-    // ── BEAT 2: THE STRIKE ──────────────────────────────────────────────────────────────────────────
-    const [marker, setMarker] = useState(0);          // -1..1 across the bar
-    const [hits, setHits] = useState([]);             // one grade per strike taken
-    const [flash, setFlash] = useState(null);         // the word, briefly, after each blow
-
-    // ── BEAT 3: THE SET ─────────────────────────────────────────────────────────────────────────────
-    const [result, setResult] = useState(null);       // the server answer, once it lands
-    const [fallRow, setFallRow] = useState(-1);       // which peg row the ball is on, -1 before release
+    const [marker, setMarker] = useState(0);
+    const [hits, setHits] = useState([]);
+    const [flash, setFlash] = useState(null);
+    const [aim, setAim] = useState(0.5);
+    const [result, setResult] = useState(null);
+    const [fallRow, setFallRow] = useState(-1);
     const [settled, setSettled] = useState(false);
 
     const raf = useRef(0);
-    const started = useRef(0);
     const posted = useRef(false);
+    const rackRef = useRef(null);
 
-    // ⚠️ THE BOARD IS BUILT FROM WHAT HAS BEEN PLAYED SO FAR, and re-built as it is played. That is the
-    // point of widening rather than aiming: the player watches the gold slivers grow while they work, so
-    // the reward for a good heat is on screen BEFORE the ball is released rather than inferred after it.
-    const liveAct = useMemo(() => ({ heat, strikes: hits.map((h) => h.score) }), [heat, hits]);
-    const spans = useMemo(() => boardFor(level, { temper, act: liveAct }), [level, temper, liveAct]);
-    const odds = useMemo(() => boardOdds(spans), [spans]);
-    const score = actScore(liveAct);
+    const heat = heatScore(taps);
+    const act = useMemo(() => ({ heat, strikes: hits.map((h) => h.score) }), [heat, hits]);
+    const score = actScore(act);
+    // ⚠️ THE RACK DOES NOT MOVE. It is cut from the crafting level and the temper and nothing else — the
+    // skill beats tighten the SCATTER instead, which is what makes the far end reachable. A rack that also
+    // widened would be paying for the same thumb twice.
+    const rack = useMemo(() => rackFor(level, { temper }), [level, temper]);
+    const scatter = scatterFor(act);
+    const odds = useMemo(() => oddsForAim(rack, aim, scatter), [rack, aim, scatter]);
+
+    const art = recipe?.kind === "tool" ? toolArt(recipe.slot, recipe.tier) : groveArt(recipe?.id);
 
     // ── THE HEAT CLOCK ──────────────────────────────────────────────────────────────────────────────
-    // ⚠️ rAF, NOT setInterval, and the elapsed time is read from the CLOCK rather than counted in ticks.
-    // A dropped frame under a backgrounded tab would otherwise leave the bellows running, and the first
-    // frame's timestamp can predate the start — see [[negative-dt-first-frame]], which put every body in
-    // the Grove through the floor for a day. Clamped at zero here for the same reason.
+    // ⚠️ rAF with the elapsed time read from the CLOCK, never counted in ticks. A backgrounded tab would
+    // otherwise leave the bellows running, and the first frame can predate the start — see
+    // [[negative-dt-first-frame]], which dropped every body in the Grove through the floor for a day.
     useEffect(() => {
         if (beat !== BEAT.heat) return undefined;
-        started.current = performance.now();
+        const t0 = performance.now();
         const tick = () => {
-            const gone = Math.max(0, performance.now() - started.current);
-            const left = Math.max(0, HEAT_MS - gone);
+            const left = Math.max(0, HEAT_MS - Math.max(0, performance.now() - t0));
             setHeatLeft(left);
             if (left <= 0) { setBeat(BEAT.strike); return; }
             raf.current = requestAnimationFrame(tick);
@@ -80,15 +85,12 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         return () => cancelAnimationFrame(raf.current);
     }, [beat]);
 
-    // ── THE STRIKE MARKER ───────────────────────────────────────────────────────────────────────────
-    // A triangle wave across the bar. Same clock discipline as above.
     useEffect(() => {
         if (beat !== BEAT.strike) return undefined;
         const t0 = performance.now();
         const tick = () => {
-            const gone = Math.max(0, performance.now() - t0);
-            const phase = (gone % STRIKE_MS) / STRIKE_MS;          // 0..1
-            setMarker(phase < 0.5 ? -1 + phase * 4 : 3 - phase * 4); // -1 -> 1 -> -1
+            const phase = (Math.max(0, performance.now() - t0) % STRIKE_MS) / STRIKE_MS;
+            setMarker(phase < 0.5 ? -1 + phase * 4 : 3 - phase * 4);
             raf.current = requestAnimationFrame(tick);
         };
         raf.current = requestAnimationFrame(tick);
@@ -96,9 +98,8 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     }, [beat]);
 
     // ── THE FALL ────────────────────────────────────────────────────────────────────────────────────
-    // Steps the ball one peg row at a time once the server has answered. Deliberately a row at a time
-    // rather than a CSS transition to the floor: the rattle is the drama, and a ball that slides smoothly
-    // to its bucket has not bounced off anything.
+    // Stepped a peg row at a time rather than transitioned to the floor: the rattle is the drama, and a
+    // piece that slides smoothly into its bucket has not bounced off anything.
     useEffect(() => {
         if (!result?.set?.path) return undefined;
         let row = 0;
@@ -108,167 +109,201 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
             if (row >= result.set.path.length) {
                 clearInterval(id);
                 setFallRow(result.set.path.length - 1);
-                // A breath on the floor before the card, or the landing is over before it is read.
-                setTimeout(() => setSettled(true), 520);
+                setTimeout(() => setSettled(true), 560);
                 return;
             }
             setFallRow(row);
-        }, 115);
+        }, 110);
         return () => clearInterval(id);
     }, [result]);
 
-    // ── COMMITTING ──────────────────────────────────────────────────────────────────────────────────
-    // ⚠️ ONCE, EVER. The strike beat can finish by its own count and by the player tapping the last blow
-    // in the same frame; without the ref the craft posts twice and the parts leave the bag twice.
-    const commit = useCallback(async (finalHits) => {
+    // ⚠️ POSTED ONCE, EVER. Release can fire from a tap and from a pointer-up in the same frame.
+    const release = useCallback(async () => {
         if (posted.current) return;
         posted.current = true;
-        const act = { heat, strikes: finalHits.map((h) => h.score) };
-        const d = await onCommit(act);
+        setBeat(BEAT.set);
+        const d = await onCommit(act, aim);
         if (!d?.ok) { onClose(d); return; }
         setResult(d);
-    }, [heat, onCommit, onClose]);
+    }, [act, aim, onCommit, onClose]);
 
-    const tapHeat = useCallback(() => {
-        if (beat !== BEAT.heat) return;
-        setTaps((n) => n + 1);
-    }, [beat]);
+    const tapHeat = useCallback(() => { if (beat === BEAT.heat) setTaps((n) => n + 1); }, [beat]);
 
-    // ⚠️ THE SIDE EFFECTS HAPPEN OUTSIDE THE UPDATER, AND THE FIRST VERSION DID NOT.
-    // Advancing the beat and posting the craft were done INSIDE setHits(prev => ...), which React runs
-    // during render — so the craft POST, and the setBusy it fires on GroveBench, ran mid-render of a
-    // different component. React said so plainly ("Cannot update a component while rendering a different
-    // component") and the screen still worked, which is the dangerous part: nothing was visibly wrong,
-    // and only reading the browser console caught it. A state updater has to be pure.
-    //
-    // Reading `hits` directly is safe here because a strike is a discrete tap, not something that can
-    // fire twice in a frame — and `posted` guards the commit regardless.
+    // ⚠️ THE SIDE EFFECTS SIT OUTSIDE THE UPDATER. Advancing the beat from inside setHits(prev => ...) ran
+    // a POST during render and React said so; the screen worked perfectly and only the browser console
+    // ever mentioned it. A state updater has to be pure.
     const strike = useCallback(() => {
         if (beat !== BEAT.strike || hits.length >= STRIKES) return;
         const grade = strikeGrade(marker);
         const next = [...hits, grade];
         setFlash({ ...grade, at: marker });
         setHits(next);
-        if (next.length >= STRIKES) { setBeat(BEAT.set); commit(next); }
+        if (next.length >= STRIKES) setBeat(BEAT.aim);
         setTimeout(() => setFlash(null), 420);
-    }, [beat, hits, marker, commit]);
+    }, [beat, hits, marker]);
 
-    // Space and Enter play it too — the whole act is one button pressed repeatedly, and a keyboard is a
-    // perfectly good thumb.
+    // ── AIMING ──────────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ NO setPointerCapture. It is the obvious way to track a drag and it breaks MOUSE clicks outright —
+    // see [[pointer-capture-kills-desktop-clicks]]. Listening on the rack element and reading clientX
+    // against its own rect works for a thumb and a mouse alike.
+    const aimAt = useCallback((clientX) => {
+        const box = rackRef.current?.getBoundingClientRect();
+        if (!box || !box.width) return;
+        setAim(Math.max(0, Math.min(1, (clientX - box.left) / box.width)));
+    }, []);
+    const dragging = useRef(false);
+    const onDown = (e) => { if (beat !== BEAT.aim) return; dragging.current = true; aimAt(e.clientX); };
+    const onMove = (e) => { if (beat === BEAT.aim && dragging.current) aimAt(e.clientX); };
+    const onUp = () => { dragging.current = false; };
+
     useEffect(() => {
         const key = (e) => {
+            if (beat === BEAT.aim) {
+                if (e.key === "ArrowLeft") { e.preventDefault(); setAim((a) => Math.max(0, a - 0.02)); }
+                if (e.key === "ArrowRight") { e.preventDefault(); setAim((a) => Math.min(1, a + 0.02)); }
+                if (e.key === " " || e.key === "Enter") { e.preventDefault(); release(); }
+                return;
+            }
             if (e.key !== " " && e.key !== "Enter") return;
             e.preventDefault();
             if (beat === BEAT.heat) tapHeat(); else if (beat === BEAT.strike) strike();
         };
         window.addEventListener("keydown", key);
         return () => window.removeEventListener("keydown", key);
-    }, [beat, tapHeat, strike]);
+    }, [beat, tapHeat, strike, release]);
 
-    const ballX = fallRow >= 0 && result?.set?.path ? result.set.path[fallRow] : 0.5;
+    const pieceX = fallRow >= 0 && result?.set?.path ? result.set.path[fallRow] : aim;
     const landedBand = settled ? result?.set?.band : null;
+    const missed = settled && result?.set?.missed;
+    const say = beat === BEAT.heat ? "Work the bellows"
+        : beat === BEAT.strike ? `Strike it — ${STRIKES - hits.length} left`
+        : beat === BEAT.aim ? "Pick your spot"
+        : settled ? (missed ? "It went off the end" : "It sets")
+        : result ? "Let it fall" : "Quenching…";
 
     return (
         <div className="gv-act" role="dialog" aria-label={`Crafting ${recipe?.name || ""}`}>
             <div className="gv-act-in">
-                <header className="gv-act-head">
-                    <b>{recipe?.name}</b>
-                    <span className="gv-act-beats">
-                        {["Heat", "Strike", "Set"].map((w, i) => (
-                            <i key={w} className={i === beat ? "is-now" : i < beat ? "is-done" : ""}>{w}</i>
-                        ))}
-                    </span>
-                </header>
+                {/* THE NAME BOARD — the same painted plank every other panel in the Grove wears. */}
+                <h4 className="gv-act-plank">
+                    {art ? <img className="gv-act-ico" src={art} alt="" width={34} height={34} /> : null}
+                    {recipe?.name}
+                    <i>{BEAT_NAME[beat]}</i>
+                </h4>
 
-                {/* ── THE BOARD, VISIBLE THROUGHOUT ──────────────────────────────────────────────────
-                    Not revealed at the end. The whole reason skill WIDENS buckets rather than aiming the
-                    ball is so the player can watch the gold grow while they work — a reward you can see
-                    coming is worth more than one explained afterwards. */}
-                <div className="gv-act-board">
+                <div className="gv-act-beats" aria-hidden="true">
+                    {BEAT_NAME.map((w, i) => (
+                        <span key={w} className={i === beat ? "is-now" : i < beat ? "is-done" : ""} />
+                    ))}
+                </div>
+
+                {/* ── THE RACK ───────────────────────────────────────────────────────────────────────
+                    Worst on the left, best on the right, and the right-hand end IS the edge: overshoot
+                    and the piece goes on the floor. The buckets have walls and a lip so they read as
+                    things a piece can land IN, which the flat stripe did not. */}
+                <div className="gv-act-rack" ref={rackRef}
+                    onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}>
                     <div className="gv-act-pegs" aria-hidden="true">
                         {Array.from({ length: PEG_ROWS }, (_, r) => (
                             <span key={r} className="gv-act-pegrow">
-                                {Array.from({ length: 7 + (r % 2) }, (_, c) => <i key={c} />)}
+                                {Array.from({ length: 8 + (r % 2) }, (_, c) => <i key={c} />)}
                             </span>
                         ))}
-                        {fallRow >= 0 ? (
-                            <span className={`gv-act-ball${settled ? " is-set" : ""}`}
-                                style={{ left: `${ballX * 100}%`, top: `${((fallRow + 1) / PEG_ROWS) * 100}%` }} />
-                        ) : null}
+                        {/* The piece itself: hot while it is worked, its own sprite the whole way down. */}
+                        <span className={`gv-act-piece${beat >= BEAT.aim ? " is-hot" : ""}${settled ? " is-set" : ""}`}
+                            style={{
+                                left: `${Math.max(-6, Math.min(106, pieceX * 100))}%`,
+                                top: fallRow >= 0 ? `${((fallRow + 1) / PEG_ROWS) * 100}%` : "0%",
+                                opacity: beat >= BEAT.aim ? 1 : 0.25,
+                            }}>
+                            {art ? <img src={art} alt="" width={30} height={30} /> : null}
+                        </span>
                     </div>
-                    <div className="gv-act-floor">
-                        {spans.filter((s) => s.to > s.from).map((s, i) => (
-                            <span key={`${s.id}-${i}`} className={`gv-act-slot is-${s.id}${landedBand === s.id ? " is-hit" : ""}`}
-                                style={{ width: `${(s.to - s.from) * 100}%` }} />
+
+                    <div className="gv-act-buckets">
+                        {rack.map((s) => (
+                            <span key={s.id} className={`gv-act-bucket is-${s.id}${landedBand === s.id && !missed ? " is-hit" : ""}`}
+                                style={{ width: `${(s.to - s.from) * 100}%`, "--band": bandTint(s.id) }}>
+                                <b>{s.name.slice(0, 1)}</b>
+                            </span>
                         ))}
+                        <span className={`gv-act-cliff${missed ? " is-hit" : ""}`} aria-hidden="true" />
                     </div>
-                    <ul className="gv-act-key">
-                        {odds.filter((o) => o.share > 0.001).map((o) => (
-                            <li key={o.id} className={`is-${o.id}`}>
-                                <b>{Math.round(o.share * 100)}%</b>
-                                <span>{o.name}</span>
-                            </li>
-                        ))}
-                    </ul>
+
+                    {beat === BEAT.aim ? (
+                        <span className="gv-act-aim" style={{ left: `${aim * 100}%` }} aria-hidden="true" />
+                    ) : null}
                 </div>
 
-                {/* ── BEAT 1 ─────────────────────────────────────────────────────────────────────── */}
+                {/* THE ODDS FOR THIS AIM — not the widths. The chance changed the moment the player got to
+                    choose where to throw, and a screen still quoting widths would be quoting a game nobody
+                    is playing. */}
+                <ul className="gv-act-odds">
+                    {odds.bands.filter((o) => o.share > 0.004).map((o) => (
+                        <li key={o.id} className={`is-${o.id}`} style={{ "--band": bandTint(o.id) }}>
+                            <b>{Math.round(o.share * 100)}%</b>
+                            <span>{o.name}</span>
+                        </li>
+                    ))}
+                    {odds.miss > 0.004 ? (
+                        <li className="is-miss"><b>{Math.round(odds.miss * 100)}%</b><span>Off the end</span></li>
+                    ) : null}
+                </ul>
+
+                <p className="gv-act-say">{say}</p>
+
                 {beat === BEAT.heat ? (
-                    <div className="gv-act-beat">
-                        <p className="gv-act-say">Work the bellows</p>
+                    <>
                         <div className="gv-act-bar">
-                            <i className="gv-act-fill is-heat" style={{ width: `${heat * 100}%` }} />
+                            <i className="gv-act-fill" style={{ width: `${heat * 100}%` }} />
                             <em>{taps}/{HEAT_TARGET}</em>
                         </div>
-                        {/* ⚠️ onPointerDown, NOT onClick, and NO setPointerCapture. A tap-frequency beat on
-                            click fires once per full press-and-release and feels like treacle; capture
-                            would break the mouse entirely, which is the scar in
-                            [[pointer-capture-kills-desktop-clicks]]. */}
-                        <button type="button" className="gv-act-hit is-bellows" onPointerDown={tapHeat}>
-                            TAP
-                        </button>
-                        <span className="gv-act-clock" style={{ width: `${(heatLeft / HEAT_MS) * 100}%` }} />
-                    </div>
+                        {/* onPointerDown, not onClick: a tap-frequency beat on click fires once per full
+                            press-and-release and feels like treacle. */}
+                        <button type="button" className="gv-act-hit is-bellows" onPointerDown={tapHeat}>TAP</button>
+                        <span className="gv-act-clock"><i style={{ width: `${(heatLeft / HEAT_MS) * 100}%` }} /></span>
+                    </>
                 ) : null}
 
-                {/* ── BEAT 2 ─────────────────────────────────────────────────────────────────────── */}
                 {beat === BEAT.strike ? (
-                    <div className="gv-act-beat">
-                        <p className="gv-act-say">Strike it — {STRIKES - hits.length} left</p>
+                    <>
                         <div className="gv-act-anvil">
                             <span className="gv-act-zone" style={{ width: `${STRIKE_HIT * 100}%` }} />
                             <span className="gv-act-core" style={{ width: `${STRIKE_PERFECT * 100}%` }} />
                             <span className="gv-act-marker" style={{ left: `${(marker + 1) * 50}%` }} />
                             {flash ? <em className={`gv-act-flash is-${flash.id}`}>{flash.label}</em> : null}
                         </div>
-                        <button type="button" className="gv-act-hit is-hammer" onPointerDown={strike}>
-                            STRIKE
-                        </button>
+                        <button type="button" className="gv-act-hit is-hammer" onPointerDown={strike}>STRIKE</button>
                         <ul className="gv-act-hits">
                             {Array.from({ length: STRIKES }, (_, i) => (
                                 <li key={i} className={hits[i] ? `is-${hits[i].id}` : ""}>{hits[i]?.label || "—"}</li>
                             ))}
                         </ul>
-                    </div>
+                    </>
                 ) : null}
 
-                {/* ── BEAT 3 ─────────────────────────────────────────────────────────────────────── */}
-                {beat === BEAT.set ? (
-                    <div className="gv-act-beat">
-                        <p className="gv-act-say">{settled ? "It sets" : result ? "Let it fall" : "Quenching…"}</p>
-                        {settled && result ? (
-                            // ⚠️ IT WEARS THE BAND IT IS ANNOUNCING. A green success button reading "Rough"
-                            // tells the player two opposite things at once, and the louder of the two is
-                            // the colour.
-                            <button type="button" className={`gv-act-hit is-band is-${result.set.band}`}
-                                onPointerDown={() => onClose(result)}>
-                                {QUALITY_BANDS.find((b) => b.id === result.set.band)?.name || "Done"}
-                            </button>
-                        ) : (
-                            <span className="gv-act-work">the work is {Math.round(score * 100)}%</span>
-                        )}
-                    </div>
+                {beat === BEAT.aim ? (
+                    <>
+                        <p className="gv-act-hint">
+                            Drag along the rack. The far end pays best and it is also the edge
+                            {odds.miss > 0.01 ? <> — <b>{Math.round(odds.miss * 100)}%</b> of throws from here miss it</> : null}.
+                        </p>
+                        <button type="button" className="gv-act-hit is-release" onPointerDown={release}>LET IT GO</button>
+                    </>
                 ) : null}
+
+                {beat === BEAT.set ? (
+                    settled && result ? (
+                        <button type="button"
+                            className={`gv-act-hit is-band is-${missed ? "miss" : result.set.band}`}
+                            style={missed ? undefined : { "--band": bandTint(result.set.band), "--band-ink": bandInk(result.set.band) }}
+                            onPointerDown={() => onClose(result)}>
+                            {missed ? "Off the end — Rough"
+                                : QUALITY_BANDS.find((b) => b.id === result.set.band)?.name || "Done"}
+                        </button>
+                    ) : <span className="gv-act-work">the work is {Math.round(score * 100)}%</span>
+                ) : null}
+                <span className="gv-act-trim" aria-hidden="true" />
             </div>
         </div>
     );
