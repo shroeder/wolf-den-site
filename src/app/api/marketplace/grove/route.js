@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
-    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveEquipEmblem, groveBelt, groveBoss, groveOpenChest,
+    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveRework, groveEquipEmblem, groveBelt, groveBoss, groveOpenChest,
     groveForgeArmour, groveWearArmour } from "@/lib/marketplace/grove.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -50,6 +50,7 @@ export async function POST(request) {
                 case "boss": return noStore(await groveBoss(buyer.id, String(b.zone || "")));
                 case "move": return noStore(await groveMove(buyer.id, b));
                 case "craft": return noStore(await groveCraft(buyer.id, String(b.recipe || "")));
+                case "rework": return noStore(await groveRework(buyer.id, String(b.slot || "")));
                 // The Grove's own chest line, never chests.js. See the note on the boss grant.
                 case "openChest": return noStore(await groveOpenChest(buyer.id, String(b.tier || "")));
                 case "forgeArmour": return noStore(await groveForgeArmour(buyer.id, String(b.piece || "")));

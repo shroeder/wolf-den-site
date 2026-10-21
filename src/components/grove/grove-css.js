@@ -2014,6 +2014,17 @@ export const GROVE_CSS = `
     animation: gvMadePop 420ms cubic-bezier(.16,1,.3,1) both; }
 .gv-made-kick { display: block; font-style: normal; font-size: 0.64rem; font-weight: 800;
     letter-spacing: 0.26em; text-transform: uppercase; color: #e0a83c; }
+/* ── THE REWORK ───────────────────────────────────────────────────────────────────────────────
+   The one button on the bench that can be pressed twice, so it reads differently from Craft: the same
+   shape, cooler, and clearly an attempt rather than a purchase. */
+.gv-rec-go.is-rework { background: linear-gradient(180deg, #6f87c4, #3f5591); border-color: #2c3d6b;
+    color: #f2f6ff; }
+.gv-rec-go.is-rework:disabled { filter: saturate(.3) brightness(.8); }
+/* A roll that lost is not a failure to hide -- it is the outcome the player paid for. Stated plainly in
+   the same place the win would be, one shade quieter. */
+.gv-made-roll { margin: 2px 0 10px; font-size: 14px; color: #cfe0c6; text-align: center; }
+.gv-made-roll b { color: #ffe9a8; }
+.gv-made-kick.is-held { color: #b9c7ea; }
 .gv-made-name { display: block; margin-top: 4px; font-size: 1.5rem; line-height: 1.15; color: #fff6df; }
 .gv-made-face { margin: 14px auto 10px; width: 112px; height: 112px; display: grid; place-items: center;
     border-radius: 20px; background: rgba(224,168,60,0.13); border: 1px solid rgba(224,168,60,0.3); }

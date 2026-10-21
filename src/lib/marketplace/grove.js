@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
-import { craftLevel, craftXpFor, rollQuality, qualityBand, toolBonusFor, qualityOdds, GROVE_CHESTS,
+import { craftLevel, craftXpFor, rollQuality, qualityBand, qualityOdds, QUALITY_BANDS, toolBonusFor, GROVE_CHESTS,
     ARMOUR_PIECES, pieceById, setBonusFor, GROVE_SETS } from "@/lib/marketplace/grove-forge.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -17,6 +17,7 @@ import {
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { petBiteShare } from "@/lib/marketplace/grove-world.js";
+import { reworkCost, toolRecipeFor } from "@/lib/marketplace/grove-recipes.js";
 import { settleKills, rollBoss, rollGroveChest } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { groveFighter } from "@/lib/marketplace/grove-kit.js";
@@ -191,7 +192,7 @@ export async function groveState(buyerId) {
         db.query(`SELECT place, part_id, qty FROM mkt_grove_item WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT part_id FROM mkt_grove_seen WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []),
-        db.query(`SELECT slot, tier, quality FROM mkt_grove_tool WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.query(`SELECT slot, tier, quality, reworks FROM mkt_grove_tool WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT tier, qty FROM mkt_grove_chest WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         // ⚠️ RECALL. Luke: the crafting level needs "visibility transparency recall and awareness". A level
         // with no history behind it is a number the player is asked to take on faith -- and this one is a
@@ -276,6 +277,9 @@ export async function groveState(buyerId) {
         // Kept beside the tier rather than folded into it: the screen wants to SAY "Fine" and the bonus
         // maths wants the number, and a single merged value could serve neither without being decoded.
         toolQuality: Object.fromEntries((tools || []).map((t) => [t.slot, t.quality == null ? null : Number(t.quality)])),
+        // How many times each tool has been reworked. Beside the quality because it is the same fact seen
+        // from the other side: what it came out at, and how many tries that took.
+        toolReworks: Object.fromEntries((tools || []).map((t) => [t.slot, Number(t.reworks) || 0])),
         // ⚠️ THE GROVE'S OWN CHESTS, NOT mkt_chest. See the note on the boss grant.
         chests: Object.fromEntries((chests || []).map((c) => [c.tier, Number(c.qty) || 0])),
         // ⚠️ OWNED AND WORN AS TWO SHAPES, NOT ONE LIST WITH A FLAG. The armoury asks "do I have this
@@ -1196,6 +1200,120 @@ export { GROVE_RECIPES };
  * would not fit; a chest that silently vaporised an overflowing reward would be the worst possible version
  * of a reward. The overflow comes back so the screen can say so.
  */
+/**
+ * Rework a tool already on the bench: re-roll its quality and KEEP THE BETTER of the two.
+ *
+ * Luke: "the output should have some rng, and maybe some more layering of improvments."
+ *
+ * ⚠️ WHY THIS EXISTS AT ALL. A tool's tier only ever goes up and its quality was fixed for ever at the
+ * moment it was made, so once a player had crafted the best tier their parts could reach, the workbench had
+ * nothing left to want from them. Measured on the live database: five crafts in the game's history, and the
+ * player who has gone deepest holds 93 Bound Straw and has never crafted anything. The parts had no sink.
+ *
+ * ⚠️ IT CAN NEVER MAKE A TOOL WORSE, AND THAT IS NOT GENEROSITY. A re-roll that can downgrade what you
+ * already own is a trap: the correct play becomes never pressing the button, and a button whose best use is
+ * to leave it alone is worse than no button. Keeping the better of the two makes the cost the only thing
+ * being risked, which is a decision a player can actually make.
+ *
+ * ⚠️ AND IT PAYS NO CRAFTING XP. Crafting a tier is a one-time act -- the tier only goes up, so the ladder
+ * is self-limiting. Reworking is not: with a surplus of parts it can be repeated for ever, and paying XP for
+ * it would be an uncapped faucet on a loop that already has no daily cap. The reward for a rework is the
+ * quality. See [[economy-nerf-measure-daily-total]].
+ */
+export async function groveRework(buyerId, slot) {
+    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
+    const want = String(slot || "");
+    if (!want) return { ok: false, error: "no_slot" };
+
+    const tool = await db.queryOne(
+        `SELECT slot, tier, quality, reworks FROM mkt_grove_tool WHERE buyer_id = $1 AND slot = $2`,
+        [buyerId, want],
+    ).catch(() => null);
+    if (!tool) return { ok: false, error: "no_tool" };
+
+    const recipe = toolRecipeFor(tool.slot, tool.tier);
+    if (!recipe) return { ok: false, error: "no_recipe" };
+
+    // ⚠️ REFUSED AT THE TOP BAND, SO NOBODY SPENDS PARTS ON NOTHING. Quality is a 0-100 score but what it
+    // is WORTH is the band it falls in -- a 91 and a 99 are both Pristine and both pay x1.60. Allowing a
+    // rework there would take real parts for a change the player cannot see and that does not exist in any
+    // number the game shows them.
+    const band = qualityBand(Number(tool.quality) || 0);
+    if (band?.id === QUALITY_BANDS[0].id) return { ok: false, error: "already_best", band: band.id };
+
+    const cost = reworkCost(recipe);
+    if (!cost) return { ok: false, error: "no_cost" };
+
+    const p = await playerRow(buyerId);
+
+    // The same conditional-debit-and-roll-back-by-hand as a craft: neon() over HTTP has no transactions,
+    // and a half-paid rework that eats parts and returns nothing is the worst outcome available here.
+    const spent = [];
+    for (const [part, need] of Object.entries(cost)) {
+        const row = await db.queryOne(
+            `UPDATE mkt_grove_item SET qty = qty - $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2 AND qty >= $3
+             RETURNING qty`, [buyerId, part, need],
+        ).catch(() => null);
+        if (!row) {
+            for (const [backPart, backN] of spent) {
+                await db.query(`UPDATE mkt_grove_item SET qty = qty + $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2`,
+                    [buyerId, backPart, backN]).catch(() => {});
+            }
+            return { ok: false, error: "not_enough_parts", missing: part, cost };
+        }
+        spent.push([part, need]);
+    }
+
+    // ⚠️ SEEDED ON THE REWORK COUNT, WHICH IS WHY THE COLUMN EXISTS. A roll derived from state that does not
+    // change between attempts hands back the same answer every time; seeded on the counter, every rework is
+    // its own draw and a retried request cannot shop for a better one. Same reasoning as the craft's own
+    // roll, which rides the player's running XP total.
+    const before = Number(tool.quality) || 0;
+    const level = craftLevel(Number(p?.craft_xp) || 0).level;
+    const rand = (() => {
+        let x = ((Number(tool.reworks) + 1) * 2654435761 ^ (before + 1) * 40503 ^ want.length * 97) >>> 0;
+        return () => {
+            x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
+            return x / 4294967296;
+        };
+    })();
+    const rolled = rollQuality(level, rand);
+    const after = Math.max(before, rolled);
+    // ── ⚠️ "IMPROVED" MEANS THE BAND MOVED, NOT THE SCORE ───────────────────────────────────────────
+    // Quality is stored 0-100 but what it is WORTH is the band it falls in -- toolBonusFor multiplies by
+    // qualityBand(q).mult and nothing else, so a 0 and a 44 are both Rough and both pay x1.00. The first
+    // rework in testing rolled 0 -> 32 and the card proudly announced "Rough -> Rough": a real cost paid,
+    // a cheerful arrow drawn, and mechanically nothing had happened. Reporting the score as an improvement
+    // is the same class of lie as the tool card that once printed "ore yield 3% -> 3%".
+    const bandIndex = (q) => QUALITY_BANDS.findIndex((b) => b.id === qualityBand(q)?.id);
+    const improved = bandIndex(after) < bandIndex(before);
+
+    await db.query(
+        `UPDATE mkt_grove_tool SET quality = $3, reworks = reworks + 1 WHERE buyer_id = $1 AND slot = $2`,
+        [buyerId, want, after],
+    ).catch(() => {});
+    await trackActivity(buyerId, "grove_rework", {
+        slot: want, tier: tool.tier, before, rolled, after, improved,
+    }).catch(() => {});
+
+    return {
+        ok: true,
+        slot: want,
+        tier: Number(tool.tier) || 1,
+        name: recipe.name,
+        // ⚠️ THE ROLL AND THE RESULT ARE BOTH REPORTED, because "you rolled Rough and kept your Fine" is a
+        // different and much better story than a screen that silently says Fine again. The player paid for
+        // the roll; they are owed the sight of it.
+        before, rolled, after,
+        improved,
+        bandBefore: qualityBand(before)?.id || null,
+        bandAfter: qualityBand(after)?.id || null,
+        bandRolled: qualityBand(rolled)?.id || null,
+        spent: spent.map(([part, n]) => ({ part, n })),
+        reworks: Number(tool.reworks) + 1,
+    };
+}
+
 export async function groveOpenChest(buyerId, tier) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const chest = GROVE_CHESTS[String(tier || "")];

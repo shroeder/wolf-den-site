@@ -299,6 +299,33 @@ export function newlyReady(before, after) {
     return recipeRows(after).filter((x) => x.ready && !was.has(x.r.id)).map((x) => x.r);
 }
 
+// ── ⚠️ WHAT A REWORK COSTS, AND WHY IT IS A SHARE OF THE RECIPE ─────────────────────────────────────────────
+// Luke: "the output should have some rng, and maybe some more layering of improvments."
+//
+// Reworking re-rolls a tool's quality and keeps the better result. The cost is a share of the recipe that
+// made it, never a table of its own: a tier-IX tool costs tier-IX parts to rework, automatically, for ever,
+// and nobody has to remember to extend a second list when the ladder grows. Same reason the whole file
+// derives rather than tabulates. See [[balance-constants-never-copied]].
+//
+// 60% rounded UP, with a floor of one of each part. Cheap enough that a surplus of commons is finally worth
+// something; expensive enough that it is a decision rather than a button you hold down. And the floor
+// matters at the shallow end, where 60% of a 2-part recipe would otherwise round to nothing and make the
+// first tool in the game infinitely re-rollable for free.
+export const REWORK_SHARE = 0.6;
+
+/** What one rework of this recipe's tool costs, as { part: n }. */
+export function reworkCost(recipe) {
+    if (!recipe || recipe.kind !== "tool") return null;
+    return Object.fromEntries(
+        Object.entries(recipe.parts).map(([part, n]) => [part, Math.max(1, Math.ceil(n * REWORK_SHARE))]),
+    );
+}
+
+/** The recipe that made the tool now sitting in a slot, which is the one a rework is priced against. */
+export const toolRecipeFor = (slot, tier) => GROVE_RECIPES.find(
+    (r) => r.kind === "tool" && r.slot === slot && Number(r.tier) === Number(tier),
+) || null;
+
 /** Can it be made right now — what is in the bag, as opposed to what has been discovered. */
 export function canCraft(recipe, haveCounts) {
     if (!recipe) return false;

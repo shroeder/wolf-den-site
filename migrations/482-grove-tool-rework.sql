@@ -1,0 +1,16 @@
+-- ── REWORKING A TOOL YOU ALREADY OWN ─────────────────────────────────────────────────────────────────────────
+-- Luke, on crafting: "I feel the output should have some rng, and maybe some more layering of improvments."
+--
+-- Today a tool is made once and its quality is whatever it rolled, for ever. The tier only ever goes up, so
+-- the moment a player has made the highest tier their parts can reach, the workbench has nothing left to
+-- want -- which is most of why the deepest player in the game has 93 Bound Straw and has never crafted.
+--
+-- A rework re-rolls the quality of a tool already on the bench and KEEPS THE BETTER of the two. That turns
+-- the part surplus into a decision instead of a wall, and it is why this column exists: the roll has to be
+-- different every attempt, and it must not be re-rollable by retrying a failed request.
+--
+-- ⚠️ A COUNTER, NOT A TIMESTAMP. made_at was the tempting reuse -- it changes on every rework and needs no
+-- migration -- but it means "when this tool was made", and a player's oldest tool quietly becoming their
+-- newest is the kind of lie that breaks a screen nobody has written yet. A counter also says something the
+-- timestamp cannot: how many times this tool has been worked, which the bench can show.
+ALTER TABLE mkt_grove_tool ADD COLUMN IF NOT EXISTS reworks int NOT NULL DEFAULT 0;

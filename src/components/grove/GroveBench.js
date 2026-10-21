@@ -11,8 +11,8 @@ import {
 } from "react-icons/gi";
 
 import Area from "@/components/grove/GroveArea.js";
-import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes } from "@/lib/marketplace/grove-recipes.js";
-import { QUALITY_BANDS, qualityBand, GROVE_CHESTS, GROVE_CHEST_ORDER } from "@/lib/marketplace/grove-forge.js";
+import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes, reworkCost } from "@/lib/marketplace/grove-recipes.js";
+import { QUALITY_BANDS, qualityBand, toolBonusFor, GROVE_CHESTS, GROVE_CHEST_ORDER } from "@/lib/marketplace/grove-forge.js";
 
 // ── THE WORKBENCH ───────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "Crafting is very ghetto, needs full pass of grove crafting dopamine thoughtfulness and
@@ -60,7 +60,17 @@ function payoff(r, st, built = false) {
         // ⚠️ A BUILT TOOL HAS NO TRANSITION TO SHOW. Rendering the arrow regardless printed
         // "fishing luck 3% -> 3%" on every tool already owned, which is worse than silence: it is a
         // number that looks like it is telling you something and is not.
-        if (built) return `${t?.name || "Tool"} tier ${r.tier} · ${t?.bonus || "bonus"} ${next}%`;
+        // ⚠️ A BUILT TOOL SHOWS WHAT IT IS ACTUALLY WORTH, QUALITY INCLUDED. toolBonusPct is the TIER's
+        // share and nothing else; the thing the player's tool really pays is tier x the quality band's
+        // multiplier (toolBonusFor). Without this the rework -- whose entire purpose is to move that
+        // multiplier -- announced "Rough to Fine" and then printed the same 3% underneath it, which is the
+        // same lie as the "3% -> 3%" arrow the note above this line exists to have removed.
+        if (built) {
+            const q = st.toolQuality?.[r.slot] ?? 0;
+            const worth = toolBonusFor(r.tier, q);
+            const band = bandName(qualityBand(q)?.id);
+            return `${t?.name || "Tool"} tier ${r.tier} · ${band} · ${t?.bonus || "bonus"} ${worth}%`;
+        }
         return `${t?.name || "Tool"} tier ${r.tier} · ${t?.bonus || "bonus"} ${now}% → ${next}%`;
     }
     return r.blurb || "";
@@ -69,6 +79,8 @@ function payoff(r, st, built = false) {
 const RECIPE_NAME = Object.fromEntries(GROVE_RECIPES.map((r) => [r.id, r.name]));
 const recipeName = (id) => RECIPE_NAME[id] || id;
 const bandName = (id) => QUALITY_BANDS.find((b) => b.id === id)?.name || id;
+// The band a raw 0-100 score falls in, named — what the Rework button shows you are trying to beat.
+const bandNameOf = (score) => bandName(qualityBand(Number(score) || 0)?.id);
 
 // ⚠️ "Storage" AND "Farm" GROUP TWO RECIPE KINDS EACH, on purpose. A player thinks "where do I put things"
 // and "what about the farm" — they do not think "pack" and "bank" as separate questions, and six chips that
@@ -193,6 +205,30 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
         }
         // The moment. Built from the SERVER's spent list, so what is shown is what actually left the bag.
         setResult({ ...d, recipe: r });
+        await refresh();
+    };
+
+    // ── ⚠️ REWORKING A BUILT TOOL ───────────────────────────────────────────────────────────────
+    // The only thing on this screen you can press TWICE. Everything else is a one-time climb: a tier is
+    // made once, a vault is built once. A tool whose quality came out Rough was Rough for ever, so once
+    // a player had made the best tier their parts could reach the bench had nothing left to want from
+    // them -- which is most of why the deepest player in the game has 93 Bound Straw and has never
+    // crafted. See groveRework.
+    const rework = async (r) => {
+        setBusy(`rw-${r.id}`);
+        const d = await post({ action: "rework", slot: r.slot });
+        setBusy(null);
+        if (!d?.ok) {
+            setNote(d?.error === "not_enough_parts" ? "Not enough parts to rework that."
+                : d?.error === "already_best" ? "That one is already Pristine — there is nothing better to roll."
+                : d?.error === "no_tool" ? "Make it first."
+                : "Couldn't rework that.");
+            return;
+        }
+        // ⚠️ THE ROLL IS SHOWN EVEN WHEN IT LOSES. "You rolled Rough and kept your Fine" is a real
+        // outcome and a better story than a screen that silently says Fine again -- the player paid for
+        // that roll and is owed the sight of it.
+        setResult({ ...d, recipe: r, isRework: true });
         await refresh();
     };
 
@@ -343,6 +379,24 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                     const art = r.kind === "food" ? `/images/grove/food-${r.id}.webp`
                         : r.kind === "tool" ? toolArt(r.slot, r.tier)
                         : null;
+                    // ── ⚠️ WHAT A REWORK WOULD COST, PRICED OFF THIS RECIPE ──────────────────────
+                    // Only ever offered on the tool actually sitting in the slot: a tier-III card for a
+                    // slot now holding tier VII must not offer to re-roll tier VII at tier-III prices.
+                    // ⚠️ A NULL QUALITY IS ROUGH, NOT "INELIGIBLE". Every tool that exists in the game
+                    // today predates the quality roll and has quality null, which grove-forge.js already
+                    // treats as Rough on purpose ("inventing a value would be making up history"). Gating
+                    // the rework on a non-null quality would have hidden the button from literally every
+                    // tool in the game -- and from exactly the players most likely to want it.
+                    const toolQ = st.toolQuality?.[r.slot] ?? 0;
+                    const inSlot = Number(st.tools?.[r.slot] || 0) === Number(r.tier);
+                    const topBand = qualityBand(toolQ)?.id === QUALITY_BANDS[0].id;
+                    const canRework = r.kind === "tool" && built && inSlot && !topBand;
+                    const rwCost = canRework ? reworkCost(r) : null;
+                    const rwShortList = rwCost
+                        ? Object.entries(rwCost).map(([part, n]) => Math.max(0, n - Number((st.pack || {})[part] || 0)))
+                        : [];
+                    const reworkShort = rwShortList.reduce((a, b) => a + b, 0);
+                    const reworkReady = canRework && reworkShort === 0;
                     return (
                         <li key={r.id} className={`gv-rec${ready ? " is-ready" : ""}${built ? " is-built" : ""}`}>
                             <div className="gv-rec-face">
@@ -379,11 +433,26 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 </ul>
                             </div>
 
-                            <button type="button" className="gv-rec-go"
-                                disabled={!ready || busy === r.id}
-                                onClick={() => craft(r)}>
-                                {busy === r.id ? "…" : built ? "Built" : ready ? "Craft" : `${missing} short`}
-                            </button>
+                            {/* ⚠️ "Built" WAS A DEAD END, AND IT IS THE ONLY STATE A FINISHED PLAYER EVER
+                                SEES. A tool you own showed a disabled button saying so and nothing else --
+                                the end of the line on the one screen that is supposed to keep wanting your
+                                parts. If it can still be improved, it now offers that instead. */}
+                            {built && canRework ? (
+                                <button type="button" className="gv-rec-go is-rework"
+                                    disabled={!reworkReady || busy === `rw-${r.id}`}
+                                    title={`Re-roll the quality and keep the better of the two`}
+                                    onClick={() => rework(r)}>
+                                    {busy === `rw-${r.id}` ? "…"
+                                        : reworkReady ? `Rework · ${bandNameOf(toolQ)}`
+                                        : `Rework · ${reworkShort} short`}
+                                </button>
+                            ) : (
+                                <button type="button" className="gv-rec-go"
+                                    disabled={!ready || busy === r.id}
+                                    onClick={() => craft(r)}>
+                                    {busy === r.id ? "…" : built ? "Built" : ready ? "Craft" : `${missing} short`}
+                                </button>
+                            )}
                         </li>
                     );
                 })}
@@ -464,8 +533,23 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                 <div className="gv-made" role="dialog" aria-label={`Made ${result.name}`}
                     onClick={() => setResult(null)}>
                     <div className="gv-made-card" onClick={(e) => e.stopPropagation()}>
-                        <i className="gv-made-kick">Crafted</i>
+                        <i className={`gv-made-kick${result.isRework && !result.improved ? " is-held" : ""}`}>
+                            {result.isRework ? (result.improved ? "Reworked" : "Rolled") : "Crafted"}
+                        </i>
                         <b className="gv-made-name">{result.name}</b>
+
+                        {/* ⚠️ THE ROLL IS NAMED EVEN WHEN IT LOSES, and losing is the common case: the
+                            rework keeps the better of the two, so most attempts end with the tool you
+                            already had. A card that just said "Fine" again would read as a button that
+                            did nothing. Saying "rolled Rough, kept Fine" is the difference between a
+                            miss and a bug. */}
+                        {result.isRework ? (
+                            <p className="gv-made-roll">
+                                {result.improved
+                                    ? <>{bandName(result.bandBefore)} <span aria-hidden="true">→</span> <b>{bandName(result.bandAfter)}</b></>
+                                    : <>Rolled {bandName(result.bandRolled)} — still <b>{bandName(result.bandAfter)}</b>. No better this time.</>}
+                            </p>
+                        ) : null}
 
                         <div className="gv-made-face">
                             {result.kind === "food"
