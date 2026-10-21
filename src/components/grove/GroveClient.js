@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-    GiAnvil, GiBugleCall, GiButterflyKnife, GiCompass, GiCutDiamond, GiDigHole, GiFarmTractor, GiFishingPole, GiFlagObjective, GiLaurelCrown, GiMineWagon, GiOldLantern, GiPawPrint, GiStoneCrafting,
+    GiAnvil, GiBroom, GiBugleCall, GiButterflyKnife, GiCompass, GiCutDiamond, GiDigHole, GiFarmTractor, GiFishingPole, GiFlagObjective, GiLaurelCrown, GiMineWagon, GiOldLantern, GiPawPrint, GiStoneCrafting,
 } from "react-icons/gi";
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import {
-    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt, toolArt,
+    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt, toolArt, zoneHasParts,
 } from "@/lib/marketplace/grove-catalog.js";
+import { useWishlist } from "@/components/grove/useWishlist.js";
 import GroveBench from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area from "@/components/grove/GroveArea.js";
@@ -92,6 +93,8 @@ export default function GroveClient({ initial }) {
     // it: that sits after the "not signed in" early return, and a hook called conditionally changes
     // the hook ORDER between renders, which React treats as a different component.
     const [paperMap, setPaperMap] = useState(null);
+    // The shopping list, shared with the bench and the zone. Client-only — see useWishlist.
+    const { wish, toggle: toggleWish, clear: clearWish } = useWishlist();
     const [st, setSt] = useState(initial);
     const [view, setView] = useState("map");     // map | zone | bag | bench | emblems
     // ⚠️ THE SAME BODY CLASS THE ZONE ALREADY USES, not a second mechanism. It stops the page behind
@@ -479,6 +482,26 @@ export default function GroveClient({ initial }) {
                                             : bossStands ? `${z.bossDef?.name || "boss"} still standing`
                                             : `${z.kills} of ${z.toUnlock} cleared`) : "locked"}${isNext ? ", go here next" : ""}`}>
                                         {isNext ? <span className="gv-node-pin" aria-hidden="true" /> : null}
+                                        {/* ── ⚠️ WHERE THE THING ON YOUR LIST ACTUALLY IS ─────────────
+                                            Luke: "see on the map where to find". The pictures ARE the
+                                            answer -- a count would say "3 here" and leave the player to
+                                            work out which three, which is the question they arrived
+                                            with. Capped at three, because a node is a thumbnail and a
+                                            fourth sprite would be below the size it reads at; the
+                                            overflow is a plain +n rather than a half-drawn part. */}
+                                        {z.unlocked && wish.length ? (() => {
+                                            const here = zoneHasParts(z, wish);
+                                            if (!here.length) return null;
+                                            return (
+                                                <span className="gv-node-wish" aria-hidden="true">
+                                                    {here.slice(0, 3).map((pt) => (
+                                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                                        <img key={pt} src={groveArt(pt)} alt="" width={18} height={18} />
+                                                    ))}
+                                                    {here.length > 3 ? <i>+{here.length - 3}</i> : null}
+                                                </span>
+                                            );
+                                        })() : null}
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={z.node || nodeArt(z.id)} alt="" />
                                         <span className="gv-node-label">
@@ -516,6 +539,35 @@ export default function GroveClient({ initial }) {
                                 <li key={i} className={`is-${kind}${frontier && frontier.n % 12 === (i + 1) % 12 ? " is-next" : ""}`} />
                             ))}
                         </ol>
+                        {/* ── THE LIST ITSELF, AND THE ONE WAY OFF IT ──────────────────────────────
+                            Luke: "you can tap to remove similar to how yoi add. And an abikity to clear
+                            your wishlist."
+
+                            ⚠️ IT IS ONLY HERE WHEN THERE IS ONE. A permanently docked empty strip saying
+                            "wishlist" would spend a row of the map on a feature most sessions never use,
+                            and the map is the surface Luke has already called out four times for being
+                            cramped on a phone. No list, no bar.
+
+                            ⚠️ AND THE SAME TAP TAKES IT OFF. Adding is a tap on a part; removing has to be
+                            a tap on the same part, or the player has to learn two gestures for one idea.
+                            Clear is a separate shape on the far side so it cannot be hit by aiming at the
+                            last chip. */}
+                        {wish.length ? (
+                            <div className="gv-wishbar">
+                                <ul>
+                                    {wish.map((pt) => (
+                                        <li key={pt}>
+                                            <button type="button" onClick={() => toggleWish(pt)}
+                                                title={`${partName(pt)} — tap to take off the list`}>
+                                                <PartIcon id={pt} size={20} />
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <button type="button" className="gv-wish-clear" onClick={clearWish}
+                                    aria-label="Clear the whole list"><GiBroom aria-hidden="true" /></button>
+                            </div>
+                        ) : null}
                     </div>
                     </div>
                 ) : null}
@@ -689,7 +741,12 @@ export default function GroveClient({ initial }) {
                     <div className="gv-emblems">
                         <Area id="emblems" icon="ui-emblems" title="Emblems"
                             count={`${(st.emblems || []).filter((e) => e.slot != null).length}/3 worn`}>
-                        <p className="muted">Three may be worn. Three more are sealed.</p>
+                        {/* ⚠️ NO CAPTION HERE. It read "Three may be worn. Three more are sealed." —
+                            above three slots, under a header already counting "1/3 worn", with the
+                            sealed ones drawn sealed. Three statements of the same fact and only one of
+                            them was a picture. Luke: "Dont use words to explain use proffesional
+                            design." */
+}
                         <div className="gv-eslots">
                             {[0, 1, 2].map((s) => {
                                 const on = (st.emblems || []).find((e) => e.slot === s);

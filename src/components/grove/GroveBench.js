@@ -2,6 +2,8 @@
 
 import { ROMAN } from "@/lib/marketplace/grove-recipes.js";
 import { toolArt, recipeArt } from "@/lib/marketplace/grove-catalog.js";
+
+import { useWishlist } from "./useWishlist.js";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -118,6 +120,8 @@ const FILTERS = [
 ];
 
 export default function GroveBench({ st, known, partName, PartIcon, post, refresh, setNote }) {
+    // The shopping list. Client-only on purpose — see useWishlist.
+    const { wish, toggle } = useWishlist();
     const [result, setResult] = useState(null);
     const [busy, setBusy] = useState(null);
     // ── ⚠️ TEMPERING IS PER ROW, NOT A MODE THE SCREEN IS IN ────────────────────────────────────────
@@ -513,10 +517,23 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                             // three-part recipe was three lines of text; the sprite says
                                             // which part it is and the tooltip says it in words for anyone
                                             // who does not know the picture yet.
-                                            <li key={c.part} className={short ? "is-short" : "is-have"}
-                                                title={`${partName(c.part)} — ${c.have} of ${need}`}>
-                                                <PartIcon id={c.part} size={17} />
-                                                <span className="gv-cost-n">{Math.min(c.have, need)}/{need}</span>
+                                            // ⚠️ THE CHIP IS THE WISHLIST CONTROL, because it is already
+                                            // the thing a player is looking at when they want one. Luke:
+                                            // "You should be able to tap ingredients to add to wish list
+                                            // ... and you can tap to remove similar to how yoi add." A
+                                            // separate add-to-wishlist button beside it would be a second
+                                            // control doing one job, on 129 rows.
+                                            <li key={c.part} className={short ? "is-short" : "is-have"}>
+                                                <button type="button"
+                                                    className={wish.includes(c.part) ? "is-wished" : undefined}
+                                                    aria-pressed={wish.includes(c.part)}
+                                                    onClick={() => toggle(c.part)}
+                                                    title={`${partName(c.part)} — ${c.have} of ${need}`
+                                                        + (wish.includes(c.part) ? " · on your list, tap to remove"
+                                                            : " · tap to find it")}>
+                                                    <PartIcon id={c.part} size={17} />
+                                                    <span className="gv-cost-n">{Math.min(c.have, need)}/{need}</span>
+                                                </button>
                                             </li>
                                         );
                                     })}

@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { useWishlist } from "./useWishlist.js";
+
 import {
-    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, HEAL_AT, scaledFoe, scaledRare, groveDepth, groveBoss, groveSize, grovePart,
+    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, dropsAnyOf, HEAL_AT, scaledFoe, scaledRare, groveDepth, groveBoss, groveSize, grovePart,
     groveArt, groveEmblem, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
@@ -316,6 +318,24 @@ export default function GroveScene({
     // straight onto the node.
     const [gen, bumpGen] = useState(0);
     const rerender = useCallback(() => bumpGen((g) => g + 1), []);
+
+    // ── WHAT THE CREATURES IN THIS ZONE ARE CARRYING OFF YOUR LIST ──────────────────────────────
+    // ⚠️ KEYED BY CREATURE AND BUILT ONCE PER (zone, list). Every body in the zone renders against it, so
+    // the alternative is dropsAnyOf per body per re-render — and the answer is the same for all nineteen
+    // Husks on screen. Memoised on the list joined, not on the array, because the hook hands back a new
+    // array identity on every notify.
+    const { wish } = useWishlist();
+    const wishKey = wish.join(",");
+    const wishHere = useMemo(() => {
+        const out = {};
+        if (!wish.length) return out;
+        for (const id of [...(zone?.enemies || []), GROVE_RARE.id]) {
+            const hit = wish.filter((p) => dropsAnyOf(id, [p]));
+            if (hit.length) out[id] = hit;
+        }
+        return out;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [zone?.id, wishKey]);
 
     // ── ⚠️ THE PAGE BEHIND A FIXED OVERLAY STILL SCROLLS ──────────────────────────────────
     // position: fixed takes the scene out of the flow; it does not stop the document under it moving. On a
@@ -2543,6 +2563,28 @@ export default function GroveScene({
                                 <u /><i /><s />
                             </span>
                         )}
+                        {/* ── ⚠️ WHICH OF THESE IS CARRYING WHAT YOU CAME FOR ──────────────────────
+                            Luke: "above enemies which items they have that you wish for".
+
+                            A zone holds fifteen to thirty creatures of three or four kinds and they are
+                            told apart by silhouette, which works right up until the question is "which
+                            one drops Thornhusk". This answers it in the one place the player is already
+                            aiming. The PART's own sprite, not a generic marker: the generic marker says
+                            "something you want" and a player with four things on their list still has to
+                            go and check.
+
+                            ⚠️ COMPUTED HERE AND NOT IN THE LOOP. It depends only on the creature's id and
+                            the list, both of which change on a tap and never on a frame — putting it in
+                            the rAF would be per-body work sixty times a second to answer a question whose
+                            answer cannot have changed. */}
+                        {wishHere[f.id]?.length ? (
+                            <span className="gv-foe-wish" aria-hidden="true">
+                                {wishHere[f.id].slice(0, 3).map((pt) => (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                    <img key={pt} src={groveArt(pt)} alt="" width={16} height={16} />
+                                ))}
+                            </span>
+                        ) : null}
                     </button>
                 ))}
 

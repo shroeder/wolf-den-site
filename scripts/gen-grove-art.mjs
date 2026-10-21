@@ -560,8 +560,26 @@ for (const [id, subject] of Object.entries(FOODS)) ART[`food-${id}`] = [`${ITEM}
 // brick with air on both sides — which the three-slice then cuts its end caps out of, so the caps come out
 // as empty transparent strips and the ledge loses both ends. The widest size on the menu is the nearest
 // thing to its real shape.
-const SIZES = { plate: "1536x1024", foe: "1024x1024", map: "1024x1536", item: "1024x1024",
+// ── ⚠️ A CREATURE IS DRAWN PORTRAIT AND DELIVERED SQUARE ────────────────────────────────────────────────────
+// `foe` was 1024x1024 and that one value cut the tops off FORTY-FOUR of the bestiary's 160 sprites. Luke
+// found it in a boss fight: "The harvest man had a cut off head can u fix along with any other similar
+// issues." His straw head is sliced flat across the top row of its plate, and so are the Heartwood Elder's
+// antlers, the Elderling's, Oldtimber's, and another forty.
+//
+// It is not a prompt problem and a framing clause does not fix it — see sprite-amputation-vs-clipping. These
+// creatures are ANTLERED FOREST THINGS; drawn to fill a square plate they are taller than they are wide, and
+// the crown is simply the part that does not fit. Asking for a square and getting a clipped square is the
+// model doing what it was told.
+//
+// So: ask for portrait, where the shape has somewhere to go, and square it on the way to disk (below) by
+// trimming to the paint and padding the SIDES. Height still fills the plate, so on-stage scale is unchanged
+// — canvas fill IS on-stage scale, and GROVE_SIZE's h/foot are authored against a square plate.
+const SIZES = { plate: "1536x1024", foe: "1024x1536", map: "1024x1536", item: "1024x1024",
     slab: "1536x1024", hang: "1024x1536", sit: "1536x1024" };
+
+// The share of a delivered creature plate left empty above its crown. Small: a creature drawn small inside a
+// big transparent plate renders small, so this buys headroom without costing presence.
+const CREATURE_MARGIN = 0.04;
 
 // A plate is a full-bleed backdrop; everything else is a die-cut sprite.
 const OPAQUE = new Set(["plate", "map"]);
@@ -671,6 +689,41 @@ for (const key of keys) {
     // full canvas size with a fringe that CSS drop-shadow renders as a hard box around the sprite. Run
     // scripts/grove-decor-clean.mjs after any --apply that touches a slab, hang or sit; it zeroes the floor,
     // re-trims, and re-pins the slab geometry the stylesheet depends on.
+    // ── ⚠️ PORTRAIT IN, SQUARE OUT, AND MEASURED RATHER THAN TRUSTED ──────────────────────────────
+    // The drawing is trimmed to its own alpha bounds and scaled by HEIGHT into a square plate, with the
+    // sides padded. Scaled by height and not fitted: object-fit is contain in a square box, so apparent
+    // size on stage is set by how much of the plate's height the paint fills. Fitting a tall figure inside
+    // a square would shrink every creature in the Grove the first time this ran.
+    //
+    // ⚠️ AND IT CHECKS ITS OWN WORK. A flat run of opaque pixels along the top row is what an amputation
+    // looks like, and that is exactly the defect this branch exists to prevent — so it says so, loudly,
+    // rather than writing a clipped sprite and letting it reach a boss fight. See
+    // scripts/grove-sprite-amputation.mjs, which is how the forty-four were found.
+    if (kind === "foe") {
+        const raw = sharp(bytes).ensureAlpha();
+        const { data: px, info } = await raw.raw().toBuffer({ resolveWithObject: true });
+        let x0 = info.width, y0 = info.height, x1 = -1, y1 = -1;
+        for (let y = 0; y < info.height; y += 1) for (let x = 0; x < info.width; x += 1) {
+            if (px[(y * info.width + x) * 4 + 3] > 6) {
+                if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+            }
+        }
+        if (x1 < 0) { console.log(`  FAILED ${key}: nothing drawn`); continue; }
+        let run = 0, worst = 0;
+        for (let x = 0; x < info.width; x += 1) {
+            if (px[x * 4 + 3] > 6) { run += 1; worst = Math.max(worst, run); } else run = 0;
+        }
+        if (worst >= 40) console.log(`  ⚠️  ${key} IS STILL CLIPPED (${worst}px flat along the top) — reroll it`);
+        const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+        const inner = Math.round(1024 * (1 - CREATURE_MARGIN * 2));
+        const w = Math.max(1, Math.round(bw * (inner / bh)));
+        const body = await sharp(bytes).extract({ left: x0, top: y0, width: bw, height: bh })
+            .resize(w, inner, { fit: "fill" }).png().toBuffer();
+        bytes = await sharp({ create: { width: 1024, height: 1024, channels: 4,
+                background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+            .composite([{ input: body, left: Math.round((1024 - w) / 2), top: Math.round(1024 * CREATURE_MARGIN) }])
+            .webp({ quality: 92 }).toBuffer();
+    }
     if (kind === "hang" || kind === "sit") {
         const img = sharp(bytes).trim({ threshold: 6 });
         const meta = await img.metadata();

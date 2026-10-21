@@ -1283,6 +1283,63 @@ export const GROVE_CSS = `
 
    ⚠️ pointer-events: none, OR IT EATS THE FIRST TAP OF THE FIGHT. It covers the whole width for two
    seconds, which is exactly the two seconds in which the player is reaching for the boss. */
+/* -- THE WISHLIST, ON THREE SURFACES ------------------------------------------------------------
+   Luke: "You should be able to tap ingredients to add to wish list and see on the map where to find
+   and above enemies which items they have that you wish for, and you can tap to remove similar to how
+   yoi add. And an abikity to clear your wishlist."
+
+   ⚠️ ONE LANGUAGE ACROSS ALL THREE, AND IT IS THE PART'S OWN PICTURE. A bench chip, a map node and an
+   enemy's head are three completely different contexts, and the one thing that has to survive the trip
+   between them is "this is the thing I am looking for". A badge, a dot or a count would each need
+   learning once per surface. The sprite needs learning never. Luke, on the screen before this one:
+   "Dont use words to explain use proffesional design."
+
+   The shared mark is the GOLD RING. Wished on the bench, wished on the map, wished over a creature. */
+.gv-cost li > button { display: flex; align-items: center; gap: 5px; min-height: 32px; padding: 3px 9px 3px 4px;
+    border-radius: 999px; border: 1px solid transparent; background: none; cursor: pointer;
+    font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+.gv-cost li > button.is-wished { border-color: #e0a83c; background: rgba(224,168,60,0.16);
+    box-shadow: 0 0 10px rgba(224,168,60,0.25); }
+
+/* THE MAP NODE. Pinned to the node's top-right corner, outside the label, so it never collides with the
+   zone name -- which has its own history of wrapping to three lines in a box the width of a shrub. */
+.gv-node-wish { position: absolute; top: -6px; right: -6px; z-index: 3; display: flex; align-items: center;
+    gap: 1px; padding: 2px 4px; border-radius: 999px;
+    background: rgba(18,12,4,0.86); border: 1px solid #e0a83c;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 12px rgba(224,168,60,0.3); }
+.gv-node-wish img { width: 18px; height: 18px; object-fit: contain; display: block; }
+.gv-node-wish i { font-style: normal; font-size: 0.6rem; font-weight: 800; color: #ffd75e; padding: 0 2px; }
+
+/* OVER A CREATURE'S HEAD. Above the health bar, which already owns the strip directly over a body.
+   ⚠️ pointer-events: none -- the whole creature is one button and tapping it is how you attack. A marker
+   that swallowed the tap would make the enemy you most want to hit the one you cannot. */
+.gv-foe-wish { position: absolute; left: 50%; bottom: 100%; transform: translate(-50%, -4px);
+    pointer-events: none; display: flex; gap: 1px; padding: 2px 3px; border-radius: 999px;
+    background: rgba(18,12,4,0.8); border: 1px solid #e0a83c;
+    box-shadow: 0 0 10px rgba(224,168,60,0.4);
+    animation: gvWishBob 2200ms ease-in-out infinite; }
+.gv-foe-wish img { width: 16px; height: 16px; object-fit: contain; display: block; }
+@keyframes gvWishBob { 0%, 100% { transform: translate(-50%, -4px); }
+    50% { transform: translate(-50%, -8px); } }
+
+/* THE LIST ITSELF, under the map's pips. Scrolls sideways rather than wrapping: the map sheet is short on
+   a phone and a second row of chips would come out of the map. */
+.gv-wishbar { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
+.gv-wishbar > ul { flex: 1; min-width: 0; list-style: none; margin: 0; padding: 2px;
+    display: flex; gap: 5px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.gv-wishbar > ul::-webkit-scrollbar { display: none; }
+.gv-wishbar li { flex: none; }
+.gv-wishbar li > button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0;
+    border-radius: 9px; cursor: pointer; background: rgba(18,12,4,0.5); border: 1px solid #e0a83c;
+    -webkit-tap-highlight-color: transparent; }
+/* ⚠️ IT HAS TO LOOK PRESSABLE ON PARCHMENT. The first pass used the dark-panel treatment -- a grey
+   glyph on a translucent black chip -- and on the map's cream paper that is exactly how this codebase
+   draws a DISABLED control. It sits beside live gold chips, so it takes the paper's own ink. */
+.gv-wish-clear { flex: none; display: grid; place-items: center; width: 34px; height: 34px; padding: 0;
+    border-radius: 9px; cursor: pointer; color: #5c4a2a;
+    background: rgba(92,74,42,0.1); border: 1px solid rgba(92,74,42,0.38); }
+.gv-wish-clear svg { width: 18px; height: 18px; }
+
 /* -- THE HAUL, DOWN THE LEFT -------------------------------------------------------------------
    Luke: "I want to see them pop up on the left side in like a snack bar that tells me how many I got.
    And if you get more, it makes the amount go up so that it stays there longer."

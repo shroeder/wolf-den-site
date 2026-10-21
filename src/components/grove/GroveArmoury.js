@@ -66,9 +66,11 @@ export default function GroveArmoury({ st, partName, PartIcon, post, refresh, se
 
     return (
         <Area id="armoury" icon="ui-vault" title="Boss Armour" count={`${merits} merits`}>
-            <p className="gv-arm-say">
-                Won from bosses. Three pieces to a set, and the set pays more than its parts.
-            </p>
+            {/* ⚠️ NO CAPTION HERE EITHER. "Won from bosses. Three pieces to a set, and the set pays
+                more than its parts." — where the merits are spent is the header's own count, the three
+                pieces are three drawn slots, and the set bonus is printed on the set. See the note in
+                GroveClient's emblem panel. */
+}
 
             {GROVE_SET_ORDER.map((setId) => {
                 const set = GROVE_SETS[setId];

@@ -844,6 +844,63 @@ export const GROVE_POP = { min: 15, max: 30, respawnMs: 45_000 };
 // How long between two individual arrivals. A full zone's worth per respawnMs: 1.5s at today's numbers.
 export const spawnGapMs = () => GROVE_POP.respawnMs / GROVE_POP.max;
 
+// ── ⚠️ WHERE A PART COMES FROM, DERIVED FROM THE LOOT TABLES THAT PAY IT ────────────────────────────────────
+// Luke: "You should be able to tap ingredients to add to wish list and see on the map where to find and above
+// enemies which items they have that you wish for."
+//
+// The bench has always been able to say a recipe needs six Thornhusk and the player has one. It has never
+// been able to say WHERE the other five are, and that is the actual question — the Grove is seven maps of
+// eighty-four zones and the answer was "go and find out". Not a new table: the loot rows already say which
+// creature pays which part, and the zone list already says which creature lives where. This is the join.
+//
+// ⚠️ BUILT ONCE AT IMPORT, NOT PER CALL. A bench row asks about three parts and a map asks about every zone;
+// walking every creature's loot table for each question is the getFarm mistake in miniature. One pass.
+//
+// ⚠️ AND IT INCLUDES THE RARE ROW. A creature's rare drop is a part from DEEPER in the forest, so it is the
+// one source a player could never guess by looking at where they are standing — which makes it the most
+// worth printing, not the least.
+const PART_SOURCE = (() => {
+    const byPart = new Map();
+    const note = (part, enemyId) => {
+        if (!part) return;
+        if (!byPart.has(part)) byPart.set(part, { enemies: new Set(), zones: new Set() });
+        byPart.get(part).enemies.add(enemyId);
+    };
+    for (const e of Object.values(GROVE_ENEMIES)) {
+        for (const row of e.loot || []) note(row.part, e.id);
+        note(e.rareLoot?.part, e.id);
+    }
+    for (const row of GROVE_RARE.loot || []) note(row.part, GROVE_RARE.id);
+    note(GROVE_RARE.rareLoot?.part, GROVE_RARE.id);
+    // ⚠️ ZONES COME FROM GROVE_ZONES, so an unbuilt map never appears as somewhere to go. A wishlist that
+    // points at a zone nobody can walk into is worse than one that says nothing.
+    for (const z of GROVE_ZONES) {
+        for (const id of z.enemies || []) {
+            for (const [, v] of byPart) if (v.enemies.has(id)) v.zones.add(z.id);
+        }
+    }
+    return byPart;
+})();
+
+/** Which creatures drop this part, and which walkable zones they live in. Never null. */
+export function partSources(partId) {
+    const v = PART_SOURCE.get(partId);
+    return { enemies: [...(v?.enemies || [])], zones: [...(v?.zones || [])] };
+}
+
+/** Does this creature drop any of these parts? The in-zone marker asks this per body, per frame. */
+export function dropsAnyOf(enemyId, parts) {
+    if (!parts?.length) return false;
+    for (const p of parts) if (PART_SOURCE.get(p)?.enemies.has(enemyId)) return true;
+    return false;
+}
+
+/** Which of these parts can be found in this zone — what the map pin counts. */
+export function zoneHasParts(zone, parts) {
+    if (!zone || !parts?.length) return [];
+    return parts.filter((p) => PART_SOURCE.get(p)?.zones.has(zone.id));
+}
+
 export const groveZone = (id) => GROVE_ZONES.find((z) => z.id === id) || null;
 export const groveBoss = (id) => GROVE_BOSSES[id] || null;
 export const grovePart = (id) => GROVE_PARTS[id] || null;
