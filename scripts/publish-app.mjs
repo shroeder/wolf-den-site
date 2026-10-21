@@ -14,7 +14,11 @@
  * ../accounting_app/.env as a fallback): BLOB_READ_WRITE_TOKEN and DATABASE_URL.
  */
 
-import { readFileSync, statSync } from "node:fs";
+// ⚠️ THE NAMESPACE AND THE NAMED IMPORTS BOTH. The preflight gate below calls fs.existsSync,
+// fs.readdirSync, fs.copyFileSync and fs.statSync; with only the named imports those are a ReferenceError
+// at the exact moment the gate is supposed to protect a publish. Caught by npm run lint:undef, which the
+// build cannot see -- see [[lint-undef-gate]].
+import fs, { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 import { put } from "@vercel/blob";
@@ -183,6 +187,10 @@ function parseArgs(argv) {
         else if (a === "--app") args.app = argv[++i];
         else if (a === "--notes") args.notes = argv[++i];
         else if (a === "--allow-shrink") args.allowShrink = true;
+        // ⚠️ SO THE GATE ITSELF CAN BE TESTED. Everything up to and including verification runs; nothing
+        // is uploaded and no row is written. Without this the only way to exercise the preflight was to
+        // actually publish, which is why a ReferenceError inside it survived two commits.
+        else if (a === "--dry-run") args.dryRun = true;
     }
     return args;
 }
@@ -285,6 +293,11 @@ async function main() {
         await verifySize(guardPool, channel, sizeBytes, Boolean(args.allowShrink));
     } finally {
         await guardPool.end();
+    }
+
+    if (args.dryRun) {
+        console.log("--dry-run: verification passed, stopping before upload");
+        return;
     }
 
     console.log(`Channel: ${channel}`);
