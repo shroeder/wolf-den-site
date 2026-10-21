@@ -2270,6 +2270,47 @@ export const GROVE_CSS = `
 .gv-odds li.is-masterwork { border-color: color-mix(in srgb, var(--band) 55%, transparent);
     box-shadow: 0 0 14px color-mix(in srgb, var(--band) 24%, transparent); }
 
+/* ── ⚠️ EVERY CONTROL IN THE GROVE IS AT LEAST 32px TALL ─────────────────────────────────────────────
+   Luke: "audit every detail of the grove on all screen sizes." Driving all nine viewports found no
+   overflow, no broken art and no console errors — the structure is sound — but five controls were under
+   the 32px a thumb can reliably hit, on every touch size, and two of them I had added myself this
+   session. None of it shows up on a laptop, which is where a mouse makes a 21px button feel fine.
+
+     .gv-paper-arrow   22x22   the map-to-map arrows
+     .gv-temper-go     66x21   the Temper toggle
+     .gv-arm-go        _x27    forge a boss-armour piece
+     .gv-recchip       _x31    the recipe filter chips, one pixel short
+     .gv-em button     56x30   equip or unequip an emblem
+
+   min-height rather than padding, so a control grows to the floor and no further — padding on the
+   already-tall ones would have pushed the panels out of a 441px phone. */
+.gv-paper-arrow { min-width: 32px; min-height: 32px; }
+.gv-temper-go { min-height: 32px; padding-inline: 12px; }
+.gv-arm-go { min-height: 32px; }
+.gv-recchip { min-height: 34px; }
+.gv-em button { min-height: 32px; }
+.gv-act-hit, .gv-rec-go, .gv-slot { min-height: 32px; }
+
+/* ── ⚠️ AND THE PLANK TITLES STOP TRUNCATING AT 320px ────────────────────────────────────────────────
+   "Backpack 11/20", "Workbench 7 ready", "Emblems 0/3 worn" and "Boss Armour 368 merits" all lost
+   characters to an ellipsis on the smallest phone, and the last one clipped at 390 too — which is an
+   ordinary modern handset, not an edge case. The name is what identifies the panel, so the COUNT gives
+   up its space first: smaller, tighter, and allowed to shrink. */
+@media (max-width: 400px) {
+    /* ⚠️ IT WRAPS RATHER THAN TRUNCATES AT THE NARROWEST SIZES. Shrinking the type got three of the five
+       titles to fit and left "Workbench 7 ready" and "Boss Armour 368 merits" still losing characters at
+       320px. A name with its end cut off is worse than a name on two lines — and the plank is a 3-slice
+       that stretches, so it simply grows to hold them. */
+    .gv-sect > h4 { padding: 7px 6px; font-size: 0.84rem; letter-spacing: 0.03em;
+        white-space: normal; line-height: 1.16; text-overflow: clip; }
+    .gv-sect > h4 i { font-size: 0.62rem; padding: 3px 7px; min-width: 0; overflow: hidden;
+        text-overflow: ellipsis; }
+    .gv-sect-ico { width: 30px; height: 30px; }
+    .gv-paper-head { max-width: calc(100% - 20px); gap: 5px; padding: 4px 5px; }
+    .gv-paper-head b { font-size: 0.72rem; }
+    .gv-paper-head i { font-size: 0.56rem; padding: 2px 5px; }
+}
+
 /* ── THE CRAFT ACT: THREE STAGES ─────────────────────────────────────────────────────────────────────────
    Luke: "its 3 separate stages with immersive background and sprite decorations, you seem to have combined
    it all?" The first build was one panel with the rack bolted on top and the controls swapping underneath —
