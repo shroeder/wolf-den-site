@@ -39,7 +39,11 @@ const TOP = 10;
 export async function leaderboard(buyerId) {
     const [rows, hot] = await Promise.all([
         db.query(
-            `SELECT id, display_name AS name, avatar_sprite_url AS sprite, avatar_url AS fallback,
+            // ⚠️ alias IS SELECTED BECAUSE display_name IS OFTEN NULL. Seven players on this board have a
+            // perfectly good alias and no display name, so the scoreboard called them "Someone" -- in
+            // public, next to their own winnings. alexromano3434 and WyldStallyn were sitting at 6th and
+            // 7th as anonymous strangers.
+            `SELECT id, display_name AS name, alias, avatar_sprite_url AS sprite, avatar_url AS fallback,
                     COALESCE(casino_won, 0)::bigint AS won
                FROM mkt_buyer WHERE COALESCE(casino_won, 0) > 0
               ORDER BY casino_won DESC`,
@@ -57,7 +61,9 @@ export async function leaderboard(buyerId) {
     const ranked = (rows || []).map((r, i) => ({
         rank: i + 1,
         id: r.id,
-        name: r.name || "Someone",
+        // display_name first, then alias -- the order used almost everywhere else in the codebase.
+        // "Someone" now means a member who genuinely has neither, which is nobody on this board today.
+        name: r.name || r.alias || "Someone",
         sprite: r.sprite || r.fallback || null,
         won: Number(r.won) || 0,
         week: recent[r.id] || 0,
