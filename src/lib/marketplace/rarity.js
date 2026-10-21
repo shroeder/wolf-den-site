@@ -44,3 +44,25 @@ export const RARITY_META = {
     celestial: { label: "Celestial", color: "#7c5cff" },
     primordial: { label: "Primordial", color: "#ffe9b0" },
 };
+
+// ── ⚠️ WHAT GEAR ACTUALLY LOOKS LIKE ON SCREEN ──────────────────────────────────────────────────────────────
+// RARITY_META above is the generic table. It is NOT what a player sees on their gear, and the difference is
+// not cosmetic: RARITY_META calls mythic hot pink, while every screen that shows an actual item — the chest
+// opener, the auction, the boss fight loot, the blacksmith — renders mythic MINT and keeps pink for eternal.
+// Four components carry byte-identical private copies of the list below and have done for months.
+//
+// Luke, after a third palette went by: "use rarity of gear colors just to get on the right track". This is
+// that list, named once so the next feature does not have to go and find which of the five tables is the
+// real one. The private copies in those components should converge on this; they are left alone for now
+// because retinting four live screens is not this change.
+export const GEAR_RARITY_COLOR = {
+    common: "#9aa7b5",
+    rare: "#4aa3ff",
+    epic: "#b76bff",
+    legendary: "#ffb52e",
+    mythic: "#37f5c0",
+    ascendant: "#ff7a3c",
+    eternal: "#ff5cc8",
+    celestial: "#a7f0ff",
+    primordial: "#fffdf0",
+};

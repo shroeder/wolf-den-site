@@ -18,7 +18,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { petBiteShare } from "@/lib/marketplace/grove-world.js";
 import { reworkCost, temperCost, toolRecipeFor } from "@/lib/marketplace/grove-recipes.js";
-import { rackFor, scatterFor, landingFor, bandAt, missedRack, oddsForAim, rattle, qualityInBand,
+import { rackFor, scatterFor, landingFor, bandAt, oddsForAim, rattle, qualityInBand,
     clampAct, actScore } from "@/lib/marketplace/grove-craft-act.js";
 import { settleKills, rollBoss, rollGroveChest } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
@@ -1147,8 +1147,8 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
     const tidy = clampAct(act);
     // ⚠️ THE AIM IS CLAMPED AND NOTHING ELSE IS DONE WITH IT. It is a number from the client like the skill
     // scores, and like them it cannot buy anything the rack does not already offer: it chooses WHERE on the
-    // rack the piece is thrown, and the rack decides the rest. An aim of 40 is an aim at the far end, which
-    // is also the most dangerous place to aim.
+    // rack the piece is thrown, and the rack decides the rest. The middle is worth the most and is the
+    // hardest to hold, which is the whole of the decision.
     const where = Math.max(0, Math.min(1, Number(aim)));
     const seed = ((beforeXp + 1) * 2654435761) ^ (temper ? 0x9e3779b9 : 0) ^ Math.round(actScore(tidy) * 1e6)
         ^ Math.round(where * 1e5);
@@ -1156,7 +1156,6 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
     const scatter = scatterFor(tidy);
     const landing = landingFor(where, scatter, seed);
     const band = bandAt(spans, landing);
-    const missed = missedRack(landing);
     // ⚠️ EVERY KIND ROLLS. This was `recipe.kind === "tool" ? ... : null`, which is the single line that
     // made three crafts in four a vending machine — see craftBonusFor for what each kind does with it.
     const quality = qualityInBand(band, seed);
@@ -1328,10 +1327,6 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
             spans,
             landing,
             band,
-            // ⚠️ SAID OUT LOUD, because "it fell off the end" and "it landed in the cheap bucket" pay the
-            // same and are completely different stories. A player who reached too far is owed the sight of
-            // having reached too far.
-            missed,
             aim: where,
             scatter,
             path: rattle(landing, seed),

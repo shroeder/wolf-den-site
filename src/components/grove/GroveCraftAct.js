@@ -4,8 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
     HEAT_MS, HEAT_TARGET, heatScore, STRIKES, STRIKE_MS, STRIKE_HIT, STRIKE_PERFECT,
-    strikeGrade, actScore, rackFor, scatterFor, oddsForAim, PEG_ROWS,
+    strikeGrade, actScore, rackFor, scatterFor, oddsForAim, PEG_ROWS, RACK_MIDDLE,
 } from "@/lib/marketplace/grove-craft-act.js";
+// ⚠️ THE SOUND IS THE KIT THE GROVE ALREADY HAS. grove-sfx.js synthesises every note from an oscillator —
+// nothing to host, nothing to preload, nothing to 404 on one bar of signal — and every call is already
+// wrapped so a blocked AudioContext is a silent craft rather than a broken screen. A new sound file for
+// this would have been a download and a second way for audio to fail.
+import { playHit, playPickup, playDrop, celebrateUnlock } from "@/components/grove/grove-sfx.js";
 import { QUALITY_BANDS, bandTint, bandInk } from "@/lib/marketplace/grove-forge.js";
 import { groveArt, toolArt } from "@/lib/marketplace/grove-catalog.js";
 
@@ -39,6 +44,14 @@ import { groveArt, toolArt } from "@/lib/marketplace/grove-catalog.js";
 
 const BEAT = { heat: 0, strike: 1, aim: 2, set: 3 };
 const BEAT_NAME = ["Heat", "Strike", "Aim", "Set"];
+// ⚠️ A DIFFERENT WORD PER BAND. "It sets" for everything taught the player there was nothing to read.
+const SET_WORD = {
+    masterwork: "MASTERWORK",
+    pristine: "Beautiful work",
+    fine: "That will do nicely",
+    sound: "Sound enough",
+    rough: "Rough, but it holds",
+};
 
 export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose }) {
     const [beat, setBeat] = useState(BEAT.heat);
@@ -52,9 +65,16 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     const [fallRow, setFallRow] = useState(-1);
     const [settled, setSettled] = useState(false);
 
+    // ── THE JUICE ───────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ A ROW INDEX, NOT A LIST OF PARTICLES. The pegs the piece has just passed light up and fade; the
+    // only state that needs is which row it is on, which the fall already tracks. A particle system here
+    // would be a second animation loop to keep in step with the first.
+    const [burst, setBurst] = useState(false);
+    const [shake, setShake] = useState(false);
     const raf = useRef(0);
     const posted = useRef(false);
     const rackRef = useRef(null);
+    const rang = useRef(-1);
 
     const heat = heatScore(taps);
     const act = useMemo(() => ({ heat, strikes: hits.map((h) => h.score) }), [heat, hits]);
@@ -109,9 +129,21 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
             if (row >= result.set.path.length) {
                 clearInterval(id);
                 setFallRow(result.set.path.length - 1);
-                setTimeout(() => setSettled(true), 560);
+                // ── THE MOMENT ──────────────────────────────────────────────────────────────────
+                // ⚠️ SCALED TO THE RESULT. A Rough gets a thud and nothing else; the top two bands get
+                // the burst, the shake and the full unlock chime. A celebration that fires identically
+                // for every outcome teaches the player to stop reading it.
+                const band = result.set.band;
+                const big = band === "masterwork" || band === "pristine";
+                setBurst(true);
+                if (big) { setShake(true); setTimeout(() => setShake(false), 480); }
+                if (band === "masterwork") celebrateUnlock();
+                else playPickup(big);
+                setTimeout(() => setSettled(true), 520);
                 return;
             }
+            // A tick off every peg on the way down, rising as it falls — the rattle you can hear.
+            if (rang.current !== row) { rang.current = row; playDrop(); }
             setFallRow(row);
         }, 110);
         return () => clearInterval(id);
@@ -127,7 +159,11 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         setResult(d);
     }, [act, aim, onCommit, onClose]);
 
-    const tapHeat = useCallback(() => { if (beat === BEAT.heat) setTaps((n) => n + 1); }, [beat]);
+    const tapHeat = useCallback(() => {
+        if (beat !== BEAT.heat) return;
+        // The pitch climbs with the bar, so the bellows sound like they are working.
+        setTaps((n) => { playHit(Math.min(7, Math.floor((n / HEAT_TARGET) * 8))); return n + 1; });
+    }, [beat]);
 
     // ⚠️ THE SIDE EFFECTS SIT OUTSIDE THE UPDATER. Advancing the beat from inside setHits(prev => ...) ran
     // a POST during render and React said so; the screen worked perfectly and only the browser console
@@ -136,6 +172,7 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         if (beat !== BEAT.strike || hits.length >= STRIKES) return;
         const grade = strikeGrade(marker);
         const next = [...hits, grade];
+        playHit(hits.length * 3, grade.id === "perfect");
         setFlash({ ...grade, at: marker });
         setHits(next);
         if (next.length >= STRIKES) setBeat(BEAT.aim);
@@ -174,16 +211,15 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
 
     const pieceX = fallRow >= 0 && result?.set?.path ? result.set.path[fallRow] : aim;
     const landedBand = settled ? result?.set?.band : null;
-    const missed = settled && result?.set?.missed;
     const say = beat === BEAT.heat ? "Work the bellows"
         : beat === BEAT.strike ? `Strike it — ${STRIKES - hits.length} left`
         : beat === BEAT.aim ? "Pick your spot"
-        : settled ? (missed ? "It went off the end" : "It sets")
+        : settled ? SET_WORD[result?.set?.band] || "It sets"
         : result ? "Let it fall" : "Quenching…";
 
     return (
         <div className="gv-act" role="dialog" aria-label={`Crafting ${recipe?.name || ""}`}>
-            <div className="gv-act-in">
+            <div className={`gv-act-in${shake ? " is-shook" : ""}`}>
                 {/* THE NAME BOARD — the same painted plank every other panel in the Grove wears. */}
                 <h4 className="gv-act-plank">
                     {art ? <img className="gv-act-ico" src={art} alt="" width={34} height={34} /> : null}
@@ -204,31 +240,63 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 <div className="gv-act-rack" ref={rackRef}
                     onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}>
                     <div className="gv-act-pegs" aria-hidden="true">
+                        {/* ⚠️ THE ROW THE PIECE IS ON LIGHTS UP. Nine static rows of studs was a void with
+                            texture; lighting the row it just struck is what makes the fall read as the
+                            piece hitting things rather than sliding past them. */}
                         {Array.from({ length: PEG_ROWS }, (_, r) => (
-                            <span key={r} className="gv-act-pegrow">
+                            <span key={r} className={`gv-act-pegrow${fallRow === r ? " is-struck" : ""}`}>
                                 {Array.from({ length: 8 + (r % 2) }, (_, c) => <i key={c} />)}
                             </span>
                         ))}
-                        {/* The piece itself: hot while it is worked, its own sprite the whole way down. */}
+                        {/* The piece: its own sprite, glowing hot once it has been worked. */}
                         <span className={`gv-act-piece${beat >= BEAT.aim ? " is-hot" : ""}${settled ? " is-set" : ""}`}
                             style={{
-                                left: `${Math.max(-6, Math.min(106, pieceX * 100))}%`,
+                                left: `${Math.max(0, Math.min(100, pieceX * 100))}%`,
                                 top: fallRow >= 0 ? `${((fallRow + 1) / PEG_ROWS) * 100}%` : "0%",
-                                opacity: beat >= BEAT.aim ? 1 : 0.25,
+                                opacity: beat >= BEAT.aim ? 1 : 0.3,
                             }}>
-                            {art ? <img src={art} alt="" width={30} height={30} /> : null}
+                            {art ? <img src={art} alt="" width={32} height={32} /> : null}
                         </span>
+                        {/* The landing burst — twelve sparks thrown from where it stopped. */}
+                        {burst ? (
+                            <span className={`gv-act-burst is-${result?.set?.band}`}
+                                style={{ left: `${Math.max(0, Math.min(100, pieceX * 100))}%`,
+                                         "--band": bandTint(result?.set?.band) }}>
+                                {Array.from({ length: 12 }, (_, i) => (
+                                    <i key={i} style={{ "--a": `${i * 30}deg`, "--d": `${18 + (i % 4) * 9}px` }} />
+                                ))}
+                            </span>
+                        ) : null}
                     </div>
 
                     <div className="gv-act-buckets">
-                        {rack.map((s) => (
-                            <span key={s.id} className={`gv-act-bucket is-${s.id}${landedBand === s.id && !missed ? " is-hit" : ""}`}
-                                style={{ width: `${(s.to - s.from) * 100}%`, "--band": bandTint(s.id) }}>
-                                <b>{s.name.slice(0, 1)}</b>
-                            </span>
-                        ))}
-                        <span className={`gv-act-cliff${missed ? " is-hit" : ""}`} aria-hidden="true" />
+                        {rack.map((s, i) => {
+                            const w = s.to - s.from;
+                            return (
+                                <span key={`${s.id}-${i}`}
+                                    className={`gv-act-bucket is-${s.id}${landedBand === s.id && settled ? " is-hit" : ""}`}
+                                    style={{ width: `${w * 100}%`, "--band": bandTint(s.id) }}>
+                                    {/* ⚠️ THE LABEL ONLY FITS IN A WIDE BUCKET. Printing it in every slot put
+                                        "x1.60x1.90x1.60" on top of itself in the narrow middle three — three
+                                        numbers overlapping into mush in exactly the place the eye goes
+                                        first. A slot too thin to read is left to its colour. */}
+                                    {s.id !== "masterwork" && w > 0.085
+                                        ? <b>×{s.mult.toFixed(2)}</b>
+                                        : null}
+                                </span>
+                            );
+                        })}
                     </div>
+
+                    {/* ── THE JACKPOT, FLAGGED ───────────────────────────────────────────────────────
+                        ⚠️ THREE PERCENT OF A BAR IS NOT A PRIZE, IT IS A SEAM. Coloured prismatic and left
+                        at that, the best thing on the rack was a sliver between two amber buckets and read
+                        as a rendering artefact. It needs a post through the board, a crown on top and the
+                        multiplier written where there is room for it — the whole beat is aimed at this and
+                        the player has to be able to SEE what they are aiming at. */}
+                    <span className="gv-act-jack" style={{ left: `${RACK_MIDDLE * 100}%` }} aria-hidden="true">
+                        <b>×{(QUALITY_BANDS[0].mult).toFixed(2)}</b>
+                    </span>
 
                     {beat === BEAT.aim ? (
                         <span className="gv-act-aim" style={{ left: `${aim * 100}%` }} aria-hidden="true" />
@@ -245,9 +313,6 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                             <span>{o.name}</span>
                         </li>
                     ))}
-                    {odds.miss > 0.004 ? (
-                        <li className="is-miss"><b>{Math.round(odds.miss * 100)}%</b><span>Off the end</span></li>
-                    ) : null}
                 </ul>
 
                 <p className="gv-act-say">{say}</p>
@@ -285,8 +350,9 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 {beat === BEAT.aim ? (
                     <>
                         <p className="gv-act-hint">
-                            Drag along the rack. The far end pays best and it is also the edge
-                            {odds.miss > 0.01 ? <> — <b>{Math.round(odds.miss * 100)}%</b> of throws from here miss it</> : null}.
+                            Drag to choose where it drops. The middle is worth the most and is the
+                            hardest to hold &mdash; a cleaner heat and better strikes keep it from
+                            straying.
                         </p>
                         <button type="button" className="gv-act-hit is-release" onPointerDown={release}>LET IT GO</button>
                     </>
@@ -295,11 +361,10 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 {beat === BEAT.set ? (
                     settled && result ? (
                         <button type="button"
-                            className={`gv-act-hit is-band is-${missed ? "miss" : result.set.band}`}
-                            style={missed ? undefined : { "--band": bandTint(result.set.band), "--band-ink": bandInk(result.set.band) }}
+                            className={`gv-act-hit is-band is-${result.set.band}`}
+                            style={{ "--band": bandTint(result.set.band), "--band-ink": bandInk(result.set.band) }}
                             onPointerDown={() => onClose(result)}>
-                            {missed ? "Off the end — Rough"
-                                : QUALITY_BANDS.find((b) => b.id === result.set.band)?.name || "Done"}
+                            {QUALITY_BANDS.find((b) => b.id === result.set.band)?.name || "Done"}
                         </button>
                     ) : <span className="gv-act-work">the work is {Math.round(score * 100)}%</span>
                 ) : null}

@@ -17,6 +17,7 @@
 
 import { GROVE_ZONES, GROVE_CHARMS } from "@/lib/marketplace/grove-catalog.js";
 import { toolBonusPct } from "@/lib/marketplace/grove-recipes.js";
+import { GEAR_RARITY_COLOR } from "@/lib/marketplace/rarity.js";
 
 // ── THE CRAFTING LEVEL ──────────────────────────────────────────────────────────────────────────────────────
 // ⚠️ THE LEVEL IS DERIVED FROM XP, NEVER STORED. The same rule the tool ladder already follows: a stored
@@ -108,32 +109,40 @@ export function craftXpFor(recipe) {
 // change they cannot see -- which, with four bands, meant a Pristine tool was finished for ever and the
 // player's best tool was the one the bench had least use for. Because that guard names the array's first
 // entry rather than the word "pristine", it followed the new band on its own.
-// ── ⚠️ AND THE BANDS CARRY THEIR OWN COLOUR, AS A TEMPER SCALE ─────────────────────────────────────────────
-// Luke, on the first version of the craft act: "I hate the colors so much on that pink thing, its terrible."
+// ── ⚠️ AND THE BANDS CARRY THEIR OWN COLOUR — THE SITE LADDER, NOT A NEW ONE ───────────────────────────────
+// This is the third palette and the first one that is not invented. The two that failed are worth keeping,
+// because they failed in opposite directions and both were my own taste rather than the product.
 //
-// He was right and the cause is worth recording. The bands were coloured with the generic rarity palette
-// every game uses — green, blue, purple — which has nothing to do with the Grove. The Grove is wood, brass,
-// cream and warm light, and a saturated lavender button a finger wide in the middle of it looks like it
-// wandered in from another product. It had been tolerable while the colour was a six-point tag on a list;
-// the act made it the biggest thing on the screen, which is how a palette that was never chosen gets found.
+//   1  The generic rarity palette: a washed lavender Pristine. Luke: "I hate the colors so much on that
+//      pink thing, its terrible." Fair — a desaturated mauve a finger wide in a feature made of wood and
+//      brass looks like it wandered in from somewhere else.
+//   2  A muted forge temper scale: iron, steel, copper, brass. Luke: "Your colors you selected are muted
+//      and terrible. We use colors across the whole website for all sorts of mini games and everything."
+//      Also fair, and worse — I over-corrected from too-loud into drab, and drab is not a reward.
 //
-// These are a FORGE TEMPER SCALE instead: cold iron, grey steel, hot copper, bright brass, white-hot. It
-// reads cold-to-hot, which is what the act is literally about, and the best thing on the rack is the
-// brightest — so the eye finds it without being told.
+// So the colours stop being chosen. GEAR_RARITY_COLOR in rarity.js is the ladder this game already speaks:
+// grey, blue, purple, amber, hot pink, carried by chests, items, pets, decorations and every drop screen in
+// the Den. A crafting band is a reward tier like any other and now reads in exactly the same language — a
+// player who knows what a legendary looks like already knows what a Pristine tool looks like.
 //
-// ⚠️ THE COLOUR LIVES HERE, NOT IN A STYLESHEET. It was eleven hexes across grove-css.js that all had to
-// agree about what Pristine looks like, which is the shape of defect this repo has paid for repeatedly.
-// Components hand `tint` to CSS as a custom property; nothing else is allowed to name a band colour.
+// ⚠️ MASTERWORK IS MYTHIC MINT, NOT A RAINBOW. The prismatic treatment was one more invention on top
+// of a palette that had already been rejected twice; mint is what the top of this ladder looks like
+// everywhere else in the Den, it is the brightest thing on the rack, and it is unmistakable against
+// amber, violet, blue and grey without needing to animate.
+//
+// ⚠️ IMPORTED, NEVER RESTATED. Copying five hexes out of the table would be a sixth palette that drifts
+// the first time the site is retinted — the same defect as a copied balance number, just quieter.
+// See [[balance-constants-never-copied]].
 export const QUALITY_BANDS = [
-    { at: 98, id: "masterwork", name: "Masterwork", mult: 1.90, tint: "#ffeab0", ink: "#2a1f05" },
-    { at: 90, id: "pristine", name: "Pristine", mult: 1.60, tint: "#e8b23c", ink: "#2a1f05" },
-    { at: 72, id: "fine", name: "Fine", mult: 1.35, tint: "#c0702e", ink: "#1c0c04" },
-    { at: 45, id: "sound", name: "Sound", mult: 1.15, tint: "#8d9aa0", ink: "#14191b" },
-    { at: 0, id: "rough", name: "Rough", mult: 1.00, tint: "#6b7065", ink: "#f2f4ee" },
+    { at: 98, id: "masterwork", name: "Masterwork", mult: 1.90, tint: GEAR_RARITY_COLOR.mythic, ink: "#032a20" },
+    { at: 90, id: "pristine", name: "Pristine", mult: 1.60, tint: GEAR_RARITY_COLOR.legendary, ink: "#2a1b05" },
+    { at: 72, id: "fine", name: "Fine", mult: 1.35, tint: GEAR_RARITY_COLOR.epic, ink: "#1b0632" },
+    { at: 45, id: "sound", name: "Sound", mult: 1.15, tint: GEAR_RARITY_COLOR.rare, ink: "#04202f" },
+    { at: 0, id: "rough", name: "Rough", mult: 1.00, tint: GEAR_RARITY_COLOR.common, ink: "#13181d" },
 ];
 
-/** A band's colour, by id. The one accessor; nothing should reach into the table for a hex. */
-export const bandTint = (id) => QUALITY_BANDS.find((b) => b.id === id)?.tint || "#6b7065";
+/** A band colour, by id. The one accessor; nothing else may name a band colour. */
+export const bandTint = (id) => QUALITY_BANDS.find((b) => b.id === id)?.tint || GEAR_RARITY_COLOR.common;
 export const bandInk = (id) => QUALITY_BANDS.find((b) => b.id === id)?.ink || "#f2f4ee";
 
 export const qualityBand = (q) => QUALITY_BANDS.find((b) => (Number(q) || 0) >= b.at) || QUALITY_BANDS[QUALITY_BANDS.length - 1];

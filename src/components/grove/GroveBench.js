@@ -46,16 +46,26 @@ const SLOT_ICON = {
 };
 
 /** What the thing actually does, in numbers, so a recipe is never a name and a vibe. */
-function payoff(r, st, built = false) {
-    if (r.kind === "food") return `Makes ${r.makes || 1} · heals on the belt`;
+/**
+ * What the thing does, in numbers.
+ *
+ * ⚠️ `got` IS THE SERVER'S ANSWER AND IT WINS OVER THE RECIPE. A Fine roll on a Moss Poultice puts SEVEN
+ * in the bag, and this line printed "Makes 5" over the top of it — the authored number, on the one card
+ * whose entire job is to say what just happened. The server already returns the totals (makes and adds
+ * include the band bonus); the card simply was not reading them. Same class of defect as the tool card
+ * that once announced "Rough to Fine" above an unchanged 3%, and it survived two passes over this file
+ * because the recipe is right there and reading it looks correct.
+ */
+function payoff(r, st, built = false, got = null) {
+    if (r.kind === "food") return `Makes ${got?.makes || r.makes || 1} · heals on the belt`;
     // ⚠️ THE RANGE, NOT A SINGLE NUMBER. A charm's worth is its base times the band it rolls, so quoting
     // only the base would understate the good half of the outcome — and the spread IS the reason to make
     // another one. Both ends come from charmValue so the card cannot drift from what the roll pays.
     if (r.kind === "charm") {
         return `${CHARM_STAT_LABEL[r.stat] || "Bonus"} +${charmValue(r.id, 0)}% to +${charmValue(r.id, 100)}% · one run`;
     }
-    if (r.kind === "pack") return `+${r.adds} backpack slots (now ${st.packSlots || 16})`;
-    if (r.kind === "bank") return `+${r.adds} vault slots (now ${st.bankSlots || 16})`;
+    if (r.kind === "pack") return `+${got?.adds || r.adds} backpack slots (now ${st.packSlots || 16})`;
+    if (r.kind === "bank") return `+${got?.adds || r.adds} vault slots (now ${st.bankSlots || 16})`;
     if (r.kind === "plot") return "+1 farm plot";
     if (r.kind === "tool") {
         const t = TOOL_SLOTS.find((x) => x.slot === r.slot);
@@ -488,9 +498,12 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                         : ready ? <em className="gv-tag is-go">Ready</em>
                                             : <em className="gv-tag">{haveParts}/{costs.length} parts</em>}
                                 </div>
-                                {/* ⚠️ WHAT IT DOES, IN NUMBERS. The blurb is flavour and was all there was. */}
+                                {/* ⚠️ WHAT IT DOES, IN NUMBERS, ON ONE LINE. The blurb used to sit under this
+                                    and it cost two more lines on every one of 129 rows — Luke: "cards are
+                                    too big and verbose". Flavour is worth having where a player has
+                                    stopped to look at one thing; in a list it is what stops them finding
+                                    anything. It still shows on the craft act and the result card. */}
                                 <p className="gv-rec-pay">{payoff(r, st, built)}</p>
-                                {r.blurb ? <p className="gv-rec-blurb">{r.blurb}</p> : null}
 
                                 <ul className="gv-cost">
                                     {costs.map((c) => {
@@ -501,11 +514,14 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                         const need = c.need + (temperOn ? (tmpCost?.[c.part] || 0) : 0);
                                         const short = Math.max(0, need - c.have);
                                         return (
-                                            <li key={c.part} className={short ? "is-short" : "is-have"}>
-                                                <PartIcon id={c.part} size={18} />
+                                            // ⚠️ THE NAME IS A TITLE, NOT A LINE. One chip per row meant a
+                                            // three-part recipe was three lines of text; the sprite says
+                                            // which part it is and the tooltip says it in words for anyone
+                                            // who does not know the picture yet.
+                                            <li key={c.part} className={short ? "is-short" : "is-have"}
+                                                title={`${partName(c.part)} — ${c.have} of ${need}`}>
+                                                <PartIcon id={c.part} size={17} />
                                                 <span className="gv-cost-n">{Math.min(c.have, need)}/{need}</span>
-                                                <span className="gv-cost-name">{partName(c.part)}</span>
-                                                {short ? <em>need {short}</em> : null}
                                             </li>
                                         );
                                     })}
@@ -688,7 +704,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                             time this renders, so the "before" value IS the after value and the arrow
                             printed "ore yield 3% -> 3%" on the very card celebrating the upgrade. What
                             the player wants from a result is what they NOW have. */}
-                        <p className="gv-made-pay">{payoff(result.recipe, st, true)}</p>
+                        <p className="gv-made-pay">{payoff(result.recipe, st, true, result)}</p>
 
                         {result.spent?.length ? (
                             <>

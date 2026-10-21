@@ -1905,7 +1905,7 @@ export const GROVE_CSS = `
     background: rgba(0,0,0,0.5); }
 .gv-made-lv-bar i { display: block; height: 100%; border-radius: 999px;
     background: linear-gradient(90deg, #e0a83c, #ffd166); }
-.gv-made-q { display: block; margin-top: 9px; font-size: 0.8rem; font-weight: 700; }
+.gv-made-q { display: block; margin-top: 9px; font-size: 0.82rem; font-weight: 800; }
 @keyframes gvLevelUp {
     0% { transform: scale(0.94); box-shadow: 0 0 0 rgba(224,168,60,0); }
     45% { transform: scale(1.035); box-shadow: 0 0 34px rgba(224,168,60,0.55); }
@@ -1941,7 +1941,7 @@ export const GROVE_CSS = `
    214px of that and the 1fr body column resolved to 0px, so the recipe text wrapped one word per line and
    the cost rows fell off the right edge. minmax(0, 1fr) did not help -- it simply let the body collapse
    without complaint. A sibling cannot size a grid it is not in. */
-.gv-rec { display: flex; flex-direction: column; gap: 8px;
+.gv-rec { display: flex; flex-direction: column; gap: 6px;
     padding: 12px; border-radius: 12px;
     background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08);
     box-shadow: inset 3px 0 0 rgba(255,255,255,0.10); }
@@ -1949,8 +1949,8 @@ export const GROVE_CSS = `
     border-color: rgba(224,168,60,0.44); box-shadow: inset 3px 0 0 #e0a83c, 0 6px 18px rgba(224,168,60,0.13); }
 .gv-rec.is-built { opacity: 0.55; box-shadow: inset 3px 0 0 rgba(255,255,255,0.18); }
 
-.gv-rec-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
-.gv-rec-face { width: 54px; height: 54px; flex: none; display: grid; place-items: center;
+.gv-rec-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.gv-rec-face { width: 44px; height: 44px; flex: none; display: grid; place-items: center;
     border-radius: 11px; background: rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.07); }
 .gv-rec-face svg { width: 30px; height: 30px; color: #cfc6b6; }
 .gv-rec.is-ready .gv-rec-face { background: rgba(224,168,60,0.16); border-color: rgba(224,168,60,0.4); }
@@ -2105,7 +2105,10 @@ export const GROVE_CSS = `
 
 /* What the band bought, on the card for the thing it bought it for. Sits under the roll, because it is
    the roll's consequence and reads as its second half. */
-.gv-made-bonus { display: block; margin-top: 4px; font-size: 0.86rem; font-weight: 800; color: #9be36a; }
+/* ⚠️ NO COLOUR ON THE BASE RULE. It carried a hardcoded green that beat the band tint on
+   specificity, so every result read the same shade whatever it rolled — the colour is the
+   fastest thing on the card to read and it was saying nothing. */
+.gv-made-bonus { display: block; margin-top: 4px; font-size: 0.9rem; font-weight: 800; }
 .gv-made-tmp { margin-left: 7px; font-style: normal; font-size: 0.62rem; letter-spacing: 0.08em;
     text-transform: uppercase; color: #ffc861; opacity: 0.85; }
 
@@ -2129,31 +2132,97 @@ export const GROVE_CSS = `
 
 
 
+
+
+
+
+/* ── ⚠️ THE RECIPE ROW IS A LIST ITEM, NOT A POSTER ──────────────────────────────────────────────────────
+   Luke: "cards are too big and verbose". There are 129 of these and each one carried a name, a tag, a
+   payoff line, two lines of italic flavour, one full-width row PER INGREDIENT, and a temper strip — about
+   190px of phone for a thing you are scanning past. The flavour is gone from the row, the ingredients are
+   chips on one wrapped line instead of a stack, and the padding is tighter. Roughly half the height, with
+   nothing a player was actually reading removed. */
+.gv-rec { padding: 9px 10px; }
+.gv-cost { display: flex; flex-wrap: wrap; gap: 5px; list-style: none; margin: 5px 0 0; padding: 0; }
+.gv-cost li { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 4px;
+    border-radius: 999px; font-size: 0.72rem; background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.08); }
+.gv-cost li.is-have { border-color: rgba(124,185,90,0.42); }
+.gv-cost li.is-short { border-color: rgba(255,122,106,0.42); }
+.gv-cost li.is-short .gv-cost-n { color: #ff9f90; }
+.gv-cost-n { font-weight: 800; font-variant-numeric: tabular-nums; color: #e9e2d2; }
+.gv-rec-pay { margin: 2px 0 0; font-size: 0.78rem; line-height: 1.3; color: #e0a83c;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.gv-rec-top b { font-size: 0.9rem; }
+.gv-temper { margin-top: 0; padding: 5px 8px; }
+.gv-rec-go { padding: 9px 13px; font-size: 0.82rem; }
+
+/* ── ⚠️ ONE RULE FOR EVERY BAND COLOUR ───────────────────────────────────────────────────────────────────
+   There were eleven places in this file naming a hex for Pristine and all eleven had to agree. They are
+   gone: QUALITY_BANDS carries a tint and an ink, components hand them over as --band and --band-ink, and
+   the only thing left here is what to DO with a colour. Retint the ladder in rarity.js and every surface
+   in the feature moves together.
+
+   ⚠️ AND THIS BLOCK WAS SILENTLY DELETED ONCE. A later edit replaced the craft-act styles by cutting from
+   their header to the end of the template literal — which swallowed everything that happened to sit
+   after them, including this. Nothing failed: no gate, no build error, no console warning. The band
+   labels simply went back to inherited cream and stayed that way until a screenshot was read closely.
+   Anything appended at the end of this file is one careless slice away from vanishing; this lives above
+   the act block now, where the act block cannot reach it. */
+.gv-odds li[style*="--band"] span,
+.gv-recall li em[style*="--band"],
+.gv-made-q[style*="--band"],
+.gv-made-bonus[style*="--band"],
+.gv-q[style*="--band"],
+.gv-act-odds li[style*="--band"] b { color: var(--band) !important; }
+.gv-tag.is-q[style*="--band"] { color: var(--band);
+    background: color-mix(in srgb, var(--band) 18%, transparent); }
+.gv-slot[style*="--band"] svg { color: var(--band); }
+.gv-slot.is-masterwork svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--band) 60%, transparent)); }
+.gv-made-q.is-masterwork, .gv-made-bonus.is-masterwork {
+    text-shadow: 0 0 12px color-mix(in srgb, var(--band) 55%, transparent); }
+.gv-odds li[style*="--band"] { border-color: color-mix(in srgb, var(--band) 26%, transparent); }
+.gv-odds li.is-masterwork { border-color: color-mix(in srgb, var(--band) 55%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--band) 24%, transparent); }
+
 /* ── THE CRAFT ACT ───────────────────────────────────────────────────────────────────────────────────────
-   ⚠️ DRESSED LIKE A GROVE PANEL, BECAUSE THE FIRST VERSION WAS NOT AND LUKE SAID SO. Every other surface
-   in this feature is a painted board: ui-board.webp under a dark wash, four brass ui-corner.webp pieces,
-   a slab-plank.webp name board carrying DARK ink on pale wood. The act was a flat charcoal card with a
-   candy-stripe bar and a white outline for a result. Same chrome as .gv-sect now, same corners, same
-   plank, and the thing being made is on screen as its own sprite. */
+   Three notes got this to its third draft, and all three are worth keeping in the file:
+
+     "Looks terrible"  — it was a flat charcoal card with no Grove in it. It wears the panel chrome now.
+     "the best thing is small and in the middle, and then it goes out from there" — it was a one-way ramp
+       with a cliff. It is a real plinko rack now, symmetric, jackpot narrow and dead centre.
+     "Your colors you selected are muted and terrible. We use colors across the whole website" — right
+       twice over. The bands no longer carry colours of their own; they carry RARITY_META, the ladder every
+       chest, pet, item and drop screen in the Den already speaks. */
 .gv-act { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center;
-    background: rgba(5,6,4,0.9); backdrop-filter: blur(3px); padding: 12px; }
+    background: rgba(4,5,3,0.92); backdrop-filter: blur(4px); padding: 12px; }
 .gv-act-in { position: relative; width: min(430px, 100%); max-height: 100%; overflow-y: auto;
     display: flex; flex-direction: column; gap: 10px; padding: 0 12px 14px; border-radius: 14px;
     background:
-        linear-gradient(180deg, rgba(9,11,8,0.80), rgba(9,11,8,0.92)),
+        linear-gradient(180deg, rgba(9,11,8,0.80), rgba(9,11,8,0.93)),
         url("/images/grove/ui-board.webp") center / cover;
     border: 1px solid rgba(0,0,0,0.65);
-    box-shadow: 0 18px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.055); }
+    box-shadow: 0 18px 50px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.055); }
+/* ⚠️ THE SHAKE IS ON THE PANEL, NOT THE PAGE. Moving the whole viewport is the cheap version and it makes
+   people queasy on a phone; a 480ms jolt on the card lands the hit without touching anything else. */
+.gv-act-in.is-shook { animation: gv-act-shake 480ms cubic-bezier(.36,.07,.19,.97); }
+@keyframes gv-act-shake {
+    0%, 100% { transform: translate3d(0,0,0); }
+    12% { transform: translate3d(-6px,2px,0) rotate(-0.5deg); }
+    28% { transform: translate3d(5px,-3px,0) rotate(0.4deg); }
+    46% { transform: translate3d(-4px,2px,0) rotate(-0.3deg); }
+    66% { transform: translate3d(3px,-1px,0); }
+    84% { transform: translate3d(-1px,1px,0); }
+}
 .gv-act-in::before, .gv-act-in::after,
 .gv-act-trim::before, .gv-act-trim::after {
     content: ""; position: absolute; width: 21px; height: 21px; pointer-events: none; opacity: 0.9;
-    background: url("/images/grove/ui-corner.webp") center / contain no-repeat; z-index: 2; }
+    background: url("/images/grove/ui-corner.webp") center / contain no-repeat; z-index: 3; }
 .gv-act-in::before { top: 5px; left: 5px; }
 .gv-act-in::after { top: 5px; right: 5px; transform: scaleX(-1); }
 .gv-act-trim::before { bottom: 5px; left: 5px; transform: scaleY(-1); }
 .gv-act-trim::after { bottom: 5px; right: 5px; transform: scale(-1); }
 
-/* The name board. Dark ink on pale wood — the cream used everywhere else is invisible on this plank. */
 .gv-act-plank { position: relative; margin: 0 -12px 2px; min-height: 52px; display: flex;
     align-items: center; gap: 9px; padding: 7px 10px;
     border-style: solid; border-width: 0 26px; border-image-source: url("/images/grove/slab-plank.webp");
@@ -2164,164 +2233,174 @@ export const GROVE_CSS = `
 .gv-act-ico { width: 34px; height: 34px; flex: none; object-fit: contain;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.55)); }
 .gv-act-plank i { margin-left: auto; flex: none; font-style: normal; font-size: 0.66rem; font-weight: 700;
-    letter-spacing: 0.1em; padding: 4px 10px; border-radius: 999px; color: #e0a83c;
-    background: rgba(14,16,11,0.82); text-shadow: none; border: 1px solid rgba(0,0,0,0.5); }
+    letter-spacing: 0.1em; padding: 4px 10px; border-radius: 999px; color: #ffd75e;
+    background: rgba(14,16,11,0.85); text-shadow: none; border: 1px solid rgba(0,0,0,0.5); }
 
-/* Four pips for four beats, rather than four words competing with the plank. */
 .gv-act-beats { display: flex; gap: 5px; justify-content: center; }
-.gv-act-beats span { width: 24px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.14); }
-.gv-act-beats span.is-done { background: #6aa34b; }
-.gv-act-beats span.is-now { background: #ffc861; box-shadow: 0 0 9px rgba(255,200,97,0.7); }
+.gv-act-beats span { width: 26px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.14); }
+.gv-act-beats span.is-done { background: #5ce0c0; }
+.gv-act-beats span.is-now { background: #ffd75e; box-shadow: 0 0 10px rgba(255,215,94,0.8); }
 
 /* ── THE RACK ─────────────────────────────────────────────────────────────────────────────────────────
-   A sunken well of pegs over a row of real buckets with walls and a lip, and a CLIFF at the right-hand
-   end. The old floor was a 16px candy stripe that read as a progress bar; this one you can land in. */
-.gv-act-rack { position: relative; padding: 9px 9px 0; border-radius: 10px; touch-action: none;
-    background: radial-gradient(120% 90% at 50% 0%, rgba(224,120,40,0.09), rgba(0,0,0,0.42) 70%);
-    border: 1px solid rgba(0,0,0,0.55); box-shadow: inset 0 3px 10px rgba(0,0,0,0.55); }
-.gv-act-pegs { position: relative; height: 142px; display: flex; flex-direction: column;
+   A lit well of pegs over the buckets, jackpot dead centre. */
+.gv-act-rack { position: relative; padding: 9px 9px 22px; border-radius: 10px; touch-action: none;
+    background: radial-gradient(130% 80% at 50% 102%, rgba(55,245,192,0.13), transparent 62%),
+                radial-gradient(120% 90% at 50% 0%, rgba(255,160,60,0.10), rgba(0,0,0,0.5) 72%);
+    border: 1px solid rgba(0,0,0,0.6); box-shadow: inset 0 3px 12px rgba(0,0,0,0.6); }
+.gv-act-pegs { position: relative; height: 152px; display: flex; flex-direction: column;
     justify-content: space-between; }
 .gv-act-pegrow { display: flex; justify-content: space-around; }
 .gv-act-pegrow i { width: 5px; height: 5px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #c9b38a, #6b5a3c 70%, #2a2318);
-    box-shadow: 0 1px 1px rgba(0,0,0,0.6); }
-/* ⚠️ THE PIECE IS THE ITEM'S OWN SPRITE, and it is stepped one peg row at a time rather than transitioned
-   to the floor — a piece that glides smoothly into its bucket has not bounced off anything. */
-.gv-act-piece { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px;
-    display: grid; place-items: center; transition: left 100ms linear, top 100ms linear, opacity 200ms; }
-.gv-act-piece img { width: 30px; height: 30px; object-fit: contain; }
-.gv-act-piece.is-hot img { filter: drop-shadow(0 0 10px rgba(255,150,40,0.85)) brightness(1.25) saturate(1.2); }
-.gv-act-piece.is-set { transition: none; animation: gv-act-land 420ms ease-out; }
-@keyframes gv-act-land { 0% { transform: scale(1.3); } 55% { transform: scale(0.82); } 100% { transform: scale(1); } }
+    background: radial-gradient(circle at 35% 30%, #efe0bb, #8a7a52 70%, #2a2318);
+    box-shadow: 0 1px 1px rgba(0,0,0,0.6); transition: box-shadow 120ms, background 120ms; }
+/* The row it just struck flares. This is most of what makes the fall read as a fall. */
+.gv-act-pegrow.is-struck i { background: radial-gradient(circle at 35% 30%, #fffbe8, #ffd75e 65%, #b47a12);
+    box-shadow: 0 0 10px rgba(255,215,94,0.95), 0 0 20px rgba(255,215,94,0.45); }
 
-.gv-act-buckets { display: flex; align-items: flex-end; height: 34px; margin-top: 6px; }
-.gv-act-bucket { position: relative; height: 100%; display: grid; place-items: center;
-    border-left: 1px solid rgba(0,0,0,0.75); border-right: 1px solid rgba(255,255,255,0.08);
-    box-shadow: inset 0 7px 11px rgba(0,0,0,0.5), inset 0 -2px 0 rgba(255,255,255,0.14);
-    transition: filter 200ms; overflow: hidden; }
-.gv-act-bucket b { font-size: 0.6rem; font-weight: 900; letter-spacing: 0.04em; color: rgba(0,0,0,0.55);
-    text-shadow: 0 1px 0 rgba(255,255,255,0.22); }
-.gv-act-bucket.is-hit { filter: brightness(1.5); box-shadow: inset 0 7px 11px rgba(0,0,0,0.3),
-    inset 0 -2px 0 rgba(255,255,255,0.3), 0 0 22px rgba(255,246,223,0.65);
-    animation: gv-act-catch 560ms ease-out; }
-@keyframes gv-act-catch { 0%, 100% { transform: translateY(0); } 35% { transform: translateY(3px); } }
-/* THE CLIFF. The right-hand end of the rack is a drop, and it is drawn as one — the whole risk of the
-   aim beat is that this is right next to the gold. */
-.gv-act-cliff { flex: none; width: 10px; height: 100%; margin-left: 2px; border-radius: 0 3px 3px 0;
-    background: repeating-linear-gradient(135deg, #2a1410 0 4px, #140a08 4px 8px);
-    box-shadow: inset 2px 0 4px rgba(0,0,0,0.8); }
-.gv-act-cliff.is-hit { box-shadow: inset 2px 0 4px rgba(0,0,0,0.8), 0 0 20px rgba(210,112,94,0.8);
-    animation: gv-act-catch 560ms ease-out; }
+.gv-act-piece { position: absolute; width: 32px; height: 32px; margin: -16px 0 0 -16px;
+    display: grid; place-items: center; z-index: 2;
+    transition: left 95ms linear, top 95ms linear, opacity 200ms; }
+.gv-act-piece img { width: 32px; height: 32px; object-fit: contain; }
+.gv-act-piece.is-hot img { filter: drop-shadow(0 0 12px rgba(255,150,40,0.95)) brightness(1.3) saturate(1.25); }
+.gv-act-piece.is-set { transition: none; animation: gv-act-land 440ms cubic-bezier(.2,1.6,.4,1); }
+@keyframes gv-act-land { 0% { transform: scale(1.45); } 50% { transform: scale(0.78); } 100% { transform: scale(1); } }
 
-/* The aim marker: a plumb line down the rack with a grip you can actually hit with a thumb. */
-.gv-act-aim { position: absolute; top: 4px; bottom: 36px; width: 2px; margin-left: -1px;
-    background: linear-gradient(180deg, rgba(255,246,223,0.15), #fff6df);
-    box-shadow: 0 0 10px rgba(255,246,223,0.7); pointer-events: none; }
-.gv-act-aim::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 15px; height: 15px;
-    margin-left: -7.5px; border-radius: 50%; background: #fff6df;
-    box-shadow: 0 0 12px rgba(255,246,223,0.9), 0 2px 4px rgba(0,0,0,0.6); }
+/* THE BURST. Twelve sparks thrown from where it stopped, in the band's own colour. */
+.gv-act-burst { position: absolute; bottom: -6px; width: 0; height: 0; z-index: 3; pointer-events: none; }
+.gv-act-burst i { position: absolute; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%;
+    background: var(--band, #ffd75e); box-shadow: 0 0 8px var(--band, #ffd75e);
+    animation: gv-act-spark 720ms ease-out forwards;
+    transform: rotate(var(--a)) translateY(0); }
+@keyframes gv-act-spark {
+    0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1.2); }
+    100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(0.3); }
+}
+.gv-act-burst.is-masterwork i { animation-duration: 1100ms; width: 7px; height: 7px; }
 
-/* THE ODDS FOR THIS AIM. Little pressed plates, like the count on every panel name board. */
+.gv-act-buckets { display: flex; align-items: flex-end; height: 38px; margin-top: 6px;
+    border-radius: 4px; overflow: hidden; }
+.gv-act-bucket { position: relative; height: 100%; display: grid; place-items: center; min-width: 0;
+    border-left: 1px solid rgba(0,0,0,0.8);
+    box-shadow: inset 0 8px 12px rgba(0,0,0,0.45), inset 0 -3px 0 rgba(255,255,255,0.22);
+    /* ⚠️ A SHALLOW GRADIENT. Lifting the top 8% toward white and crushing the bottom a quarter toward
+       black took the epic violet of a Fine slot visibly pink on a phone. The band colour has to survive
+       being painted. */
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--band) 96%, #fff 4%),
+        color-mix(in srgb, var(--band) 86%, #000 14%));
+    transition: filter 180ms, transform 180ms; }
+.gv-act-bucket b { font-size: 0.56rem; font-weight: 900; color: rgba(0,0,0,0.6);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.3); white-space: nowrap; overflow: hidden; }
+/* ⚠️ THE JACKPOT IS PRISMATIC, NOT A HUE. It is three percent of the rack and it is the thing the whole
+   beat is aimed at; the next colour along the ladder would not have carried that. */
+.gv-act-bucket.is-masterwork {
+    box-shadow: inset 0 8px 12px rgba(0,0,0,0.25), inset 0 -3px 0 rgba(255,255,255,0.5),
+        0 0 18px color-mix(in srgb, var(--band) 75%, transparent); }
+/* ⚠️ A GLOW, NOT A HUE SHIFT. saturate(1.3) on top of brightness pushed the epic purple of a Fine slot
+   into hot pink, so the second-best bucket lit up looking like the jackpot. The colour has to stay the
+   colour it is; the light around it is what changes. */
+.gv-act-bucket.is-hit { filter: brightness(1.3); transform: translateY(3px);
+    box-shadow: inset 0 8px 12px rgba(0,0,0,0.2), inset 0 -3px 0 rgba(255,255,255,0.5),
+        0 0 28px color-mix(in srgb, var(--band) 85%, transparent); }
+
+/* ── THE JACKPOT FLAG ─────────────────────────────────────────────────────────────────────────────────
+   A dotted post down the middle of the well with the multiplier hanging at the top. Three percent of a
+   bar cannot announce itself; this is what says "here, and it is worth 1.90". */
+.gv-act-jack { position: absolute; top: 2px; bottom: 20px; width: 1px; margin-left: -0.5px;
+    pointer-events: none; z-index: 1;
+    background: repeating-linear-gradient(180deg, rgba(55,245,192,0.5) 0 5px, transparent 5px 11px); }
+/* ⚠️ THE TAB HANGS UNDER THE RACK, NOT OVER IT. Placed at the top it sat exactly where the piece waits
+   while you aim — and since the thing you aim at is the middle, the sprite covered the label precisely
+   when the player most wanted to read it. Under the buckets nothing can ever be in front of it. */
+.gv-act-jack b { position: absolute; bottom: -17px; left: 50%; transform: translateX(-50%);
+    padding: 2px 8px; border-radius: 999px; font-size: 0.58rem; font-weight: 900; letter-spacing: 0.06em;
+    color: #032a20; white-space: nowrap; background: #37f5c0;
+    box-shadow: 0 0 16px rgba(55,245,192,0.7); }
+.gv-act-jack b::before { content: ""; position: absolute; top: -4px; left: 50%; margin-left: -4px;
+    border: 4px solid transparent; border-bottom-color: #37f5c0; }
+/* ⚠️ AND THE SLOT ITSELF STANDS PROUD. Flush with its neighbours it is a seam; two pixels taller with a
+   lip of its own, it is a cup. */
+.gv-act-bucket.is-masterwork { margin-top: -7px; height: calc(100% + 7px); border-radius: 3px 3px 0 0;
+    border-left: 1px solid rgba(255,255,255,0.5); border-right: 1px solid rgba(255,255,255,0.5); }
+.gv-act-aim { position: absolute; top: 4px; bottom: 58px; width: 2px; margin-left: -1px; z-index: 4;
+    background: linear-gradient(180deg, rgba(255,215,94,0.1), #ffd75e);
+    box-shadow: 0 0 12px rgba(255,215,94,0.9); pointer-events: none; }
+.gv-act-aim::after { content: ""; position: absolute; left: 50%; bottom: -8px; width: 17px; height: 17px;
+    margin-left: -8.5px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fffbe8, #ffd75e);
+    box-shadow: 0 0 14px rgba(255,215,94,0.95), 0 2px 5px rgba(0,0,0,0.6); }
+
+/* THE ODDS FOR THIS AIM — not the widths. */
 .gv-act-odds { list-style: none; display: flex; gap: 4px; margin: 0; padding: 0; }
-.gv-act-odds li { flex: 1; text-align: center; padding: 4px 2px; border-radius: 7px;
-    background: rgba(14,16,11,0.72); border: 1px solid rgba(0,0,0,0.5);
-    font-size: 0.52rem; letter-spacing: 0.04em; text-transform: uppercase; color: #8f968a; }
-.gv-act-odds b { display: block; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
-.gv-act-odds li.is-miss { border-color: rgba(210,112,94,0.45); }
+.gv-act-odds li { flex: 1; text-align: center; padding: 5px 2px; border-radius: 7px;
+    background: rgba(10,12,8,0.78); border: 1px solid rgba(0,0,0,0.5);
+    font-size: 0.5rem; letter-spacing: 0.04em; text-transform: uppercase; color: #8f968a;
+    transition: border-color 200ms; }
+.gv-act-odds b { display: block; font-size: 0.82rem; font-variant-numeric: tabular-nums;
+    color: var(--band); }
+.gv-act-odds li.is-masterwork { border-color: color-mix(in srgb, var(--band) 60%, transparent);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--band) 28%, transparent); }
 
-.gv-act-say { margin: 2px 0 0; text-align: center; font-size: 0.84rem; letter-spacing: 0.04em;
-    color: #cfc6b6; }
+.gv-act-say { margin: 2px 0 0; text-align: center; font-size: 0.92rem; font-weight: 700;
+    letter-spacing: 0.04em; color: #f0e6d6; }
 .gv-act-hint { margin: 0; text-align: center; font-size: 0.72rem; line-height: 1.45; color: #9aa08f; }
-.gv-act-hint b { color: #d2705e; }
 
 /* THE HEAT */
-.gv-act-bar { position: relative; height: 22px; border-radius: 7px; overflow: hidden;
-    background: rgba(0,0,0,0.5); border: 1px solid rgba(0,0,0,0.6);
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.6); }
+.gv-act-bar { position: relative; height: 24px; border-radius: 7px; overflow: hidden;
+    background: rgba(0,0,0,0.55); border: 1px solid rgba(0,0,0,0.6);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.65); }
 .gv-act-fill { position: absolute; inset: 0 auto 0 0; transition: width 90ms linear;
-    background: linear-gradient(90deg, #7a2f0d, #e0702c 55%, #ffc861); }
+    background: linear-gradient(90deg, #8a2f0d, #ff7a3c 45%, #ffd75e 80%, #fff3c4); }
 .gv-act-bar em { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal;
-    font-size: 0.7rem; font-weight: 800; color: #fff6df; text-shadow: 0 1px 3px rgba(0,0,0,0.85);
+    font-size: 0.72rem; font-weight: 800; color: #fff6df; text-shadow: 0 1px 3px rgba(0,0,0,0.9);
     font-variant-numeric: tabular-nums; }
-.gv-act-clock { display: block; height: 3px; border-radius: 2px; background: rgba(0,0,0,0.45); }
-.gv-act-clock i { display: block; height: 100%; border-radius: 2px; background: #ffc861;
+.gv-act-clock { display: block; height: 3px; border-radius: 2px; background: rgba(0,0,0,0.5); }
+.gv-act-clock i { display: block; height: 100%; border-radius: 2px; background: #ffd75e;
     transition: width 90ms linear; }
 
 /* THE ANVIL */
-.gv-act-anvil { position: relative; height: 34px; border-radius: 8px; overflow: hidden;
-    background: linear-gradient(180deg, #30332a, #1b1d17); border: 1px solid rgba(0,0,0,0.6);
-    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6); }
+.gv-act-anvil { position: relative; height: 36px; border-radius: 8px; overflow: hidden;
+    background: linear-gradient(180deg, #2c3029, #16180f); border: 1px solid rgba(0,0,0,0.65);
+    box-shadow: inset 0 2px 7px rgba(0,0,0,0.7); }
 .gv-act-zone { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
-    background: rgba(124,185,90,0.26); border-left: 1px solid rgba(124,185,90,0.5);
-    border-right: 1px solid rgba(124,185,90,0.5); }
+    background: rgba(92,224,192,0.22); border-left: 1px solid rgba(92,224,192,0.55);
+    border-right: 1px solid rgba(92,224,192,0.55); }
 .gv-act-core { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
-    background: rgba(255,200,97,0.42); }
+    background: rgba(255,215,94,0.5); box-shadow: 0 0 14px rgba(255,215,94,0.5); }
 .gv-act-marker { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px;
-    background: #fff6df; box-shadow: 0 0 10px rgba(255,246,223,0.85); }
+    background: #fff6df; box-shadow: 0 0 12px rgba(255,246,223,0.95); }
 .gv-act-flash { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal;
-    font-size: 0.88rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase;
-    text-shadow: 0 2px 6px rgba(0,0,0,0.9); animation: gv-act-pop 420ms ease-out; }
-.gv-act-flash.is-perfect { color: #ffc861; }
-.gv-act-flash.is-hit { color: #9be36a; }
-.gv-act-flash.is-miss { color: #d2705e; }
+    font-size: 0.92rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
+    text-shadow: 0 2px 7px rgba(0,0,0,0.95); animation: gv-act-pop 440ms ease-out; }
+.gv-act-flash.is-perfect { color: #ffd75e; }
+.gv-act-flash.is-hit { color: #5ce0c0; }
+.gv-act-flash.is-miss { color: #ff7a6a; }
 @keyframes gv-act-pop {
-    0% { transform: scale(0.7); opacity: 0; } 30% { transform: scale(1.1); opacity: 1; }
+    0% { transform: scale(0.65); opacity: 0; } 28% { transform: scale(1.14); opacity: 1; }
     100% { transform: scale(1); opacity: 0; }
 }
 .gv-act-hits { list-style: none; display: flex; gap: 6px; margin: 0; padding: 0; }
-.gv-act-hits li { flex: 1; text-align: center; padding: 5px 0; border-radius: 6px; font-size: 0.62rem;
-    letter-spacing: 0.07em; text-transform: uppercase; color: #6f7566; background: rgba(0,0,0,0.38); }
-.gv-act-hits li.is-perfect { color: #2a1f05; background: #ffc861; }
-.gv-act-hits li.is-hit { color: #10220a; background: #9be36a; }
-.gv-act-hits li.is-miss { color: #f2cdc5; background: rgba(210,112,94,0.5); }
+.gv-act-hits li { flex: 1; text-align: center; padding: 6px 0; border-radius: 6px; font-size: 0.62rem;
+    letter-spacing: 0.07em; text-transform: uppercase; color: #6f7566; background: rgba(0,0,0,0.42); }
+.gv-act-hits li.is-perfect { color: #2a1f05; background: #ffd75e; box-shadow: 0 0 12px rgba(255,215,94,0.5); }
+.gv-act-hits li.is-hit { color: #05251e; background: #5ce0c0; }
+.gv-act-hits li.is-miss { color: #ffe2dc; background: rgba(255,122,106,0.55); }
 
-/* THE ONE BUTTON. Big, because it is pressed fast and repeatedly and a thumb is not accurate. */
-.gv-act-hit { padding: 14px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 0.98rem;
+/* THE ONE BUTTON */
+.gv-act-hit { padding: 15px; border-radius: 11px; cursor: pointer; font: inherit; font-size: 1rem;
     font-weight: 900; letter-spacing: 0.14em; color: #2a1f05; border: 1px solid #c89a3a;
-    background: linear-gradient(180deg, #ffd98a, #e0a83c); touch-action: manipulation;
+    background: linear-gradient(180deg, #ffe28a, #ffb020); touch-action: manipulation;
     -webkit-user-select: none; user-select: none; }
-.gv-act-hit:active { transform: translateY(1px); filter: brightness(1.12); }
-.gv-act-hit.is-bellows { background: linear-gradient(180deg, #ffb46a, #d4651f); border-color: #9a4a12; }
-.gv-act-hit.is-release { background: linear-gradient(180deg, #e8e2d2, #b3ab96); border-color: #807957;
-    color: #221d10; }
+.gv-act-hit:active { transform: translateY(1px); filter: brightness(1.14); }
+.gv-act-hit.is-bellows { background: linear-gradient(180deg, #ffb46a, #ff7a3c); border-color: #9a4a12; }
+.gv-act-hit.is-release { background: linear-gradient(180deg, #8fd8ff, #4aa3ff); border-color: #2a6fb0;
+    color: #04202f; }
 .gv-act-work { text-align: center; font-size: 0.74rem; color: #8f968a; }
-/* The finish button wears the band it is announcing. A green button reading "Rough" says two opposite
-   things at once, and the colour is the one the eye believes. */
-
-
-/* ── ⚠️ ONE RULE FOR EVERY BAND COLOUR ───────────────────────────────────────────────────────────────────
-   There were eleven places in this file naming a hex for Pristine, and all eleven had to agree. They are
-   gone: QUALITY_BANDS carries a tint and an ink, components hand them over as --band and --band-ink, and
-   the only thing left here is what to DO with a colour. Change the palette in grove-forge.js and every
-   surface in the feature moves together. See [[balance-constants-never-copied]] — a copied colour is the
-   same defect as a copied number, it is just quieter about it. */
-.gv-odds li[style*="--band"] span,
-.gv-recall li em[style*="--band"],
-.gv-made-q[style*="--band"],
-.gv-made-bonus[style*="--band"],
-.gv-q[style*="--band"],
-.gv-act-odds li[style*="--band"] b { color: var(--band); }
-.gv-tag.is-q[style*="--band"] { color: var(--band);
-    background: color-mix(in srgb, var(--band) 18%, transparent); }
-.gv-slot[style*="--band"] svg { color: var(--band); }
-.gv-slot.is-masterwork svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--band) 60%, transparent)); }
-.gv-made-q.is-masterwork, .gv-made-bonus.is-masterwork {
-    text-shadow: 0 0 12px color-mix(in srgb, var(--band) 55%, transparent); }
-.gv-odds li.is-masterwork { border-color: color-mix(in srgb, var(--band) 45%, transparent); }
-
-/* The rack buckets and the finish button, both painted from the same tint. */
-.gv-act-bucket[style*="--band"] {
-    background: linear-gradient(180deg,
-        color-mix(in srgb, var(--band) 86%, #fff 14%),
-        color-mix(in srgb, var(--band) 72%, #000 28%)); }
 .gv-act-hit.is-band {
     background: linear-gradient(180deg,
-        color-mix(in srgb, var(--band) 88%, #fff 12%),
-        color-mix(in srgb, var(--band) 78%, #000 22%));
-    border-color: color-mix(in srgb, var(--band) 60%, #000 40%);
+        color-mix(in srgb, var(--band) 97%, #fff 3%),
+        color-mix(in srgb, var(--band) 88%, #000 12%));
+    border-color: color-mix(in srgb, var(--band) 55%, #000 45%);
     color: var(--band-ink, #2a1f05); }
-.gv-act-hit.is-band.is-masterwork { box-shadow: 0 0 26px color-mix(in srgb, var(--band) 55%, transparent); }
-.gv-act-hit.is-band.is-miss { background: linear-gradient(180deg, #c98675, #8a4435); border-color: #5e2c22;
-    color: #fbeae6; }
+.gv-act-hit.is-band.is-masterwork { box-shadow: 0 0 32px color-mix(in srgb, var(--band) 70%, transparent); }
 
 `;

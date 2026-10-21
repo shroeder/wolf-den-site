@@ -1,23 +1,24 @@
-// ── THE RACK HAS TO BE A REAL GAMBLE ─────────────────────────────────────────────────────────────────────────
-// The craft act ends with the player aiming a piece at a rack of five buckets running worst to best, and
-// where it stops IS the craft. Luke asked for the aim; an aim is only a decision if reaching for the gold can
-// cost you, so most of this file exists to prove that it can.
+// ── A PLINKO RACK HAS TO BEHAVE LIKE ONE ─────────────────────────────────────────────────────────────────────
+// Luke: "the best thing is small and in the middle, and then it goes out from there." The craft act ends by
+// throwing the piece at a symmetric rack whose jackpot is a narrow slot dead centre, and where it stops IS
+// the craft. This proves the shape, the honesty and the difficulty.
 //
 //   node --import ./scripts/lib/register-loader.mjs scripts/check-craft-act.mjs
 //
-//   1  the rack is whole — the spans tile 0..1, worst to best, no gap and no overlap
-//   2  the rack is cut from the curve — a higher crafting level means a wider gold end
-//   3  THE QUOTED ODDS ARE THE REAL ODDS for the aim being quoted, against a live simulation
-//   4  AIMING AT THE GOLD IS A GAMBLE — the far end carries a real chance of missing the rack entirely
-//   5  SKILL BUYS GREED — a good act makes the gold end worth reaching for and a bad one does not
-//   6  nothing is a free win — slamming the aim to the edge must not be optimal regardless of skill
+//   1  the rack is whole, SYMMETRIC, and gets better toward the middle from both directions
+//   2  the jackpot is the NARROWEST thing on it, and it is one undivided slot at dead centre
+//   3  a band total across both halves is exactly its share from the crafting curve
+//   4  THE QUOTED ODDS ARE THE REAL ODDS for the aim being quoted, against a live simulation
+//   5  THE MIDDLE IS HARD TO HOLD — a fumbled act cannot reliably hit it, a flawless one can try
+//   6  SKILL IS WHAT PAYS: a better act is worth more at every level
 //   7  the rattle always ends exactly on the landing, so the fall can never contradict the grant
 //   8  a quality score always reads back as the band it was drawn for
 import {
-    rackFor, scatterFor, landingFor, bandAt, missedRack, oddsForAim, rattle, qualityInBand,
+    rackFor, rackOdds, scatterFor, landingFor, bandAt, oddsForAim, rattle, qualityInBand, RACK_MIDDLE,
     actScore, actBias, strikeGrade, heatScore, PEG_ROWS, SCATTER_BEST, SCATTER_WORST,
 } from "@/lib/marketplace/grove-craft-act.js";
-import { QUALITY_BANDS, qualityOdds, qualityBand } from "@/lib/marketplace/grove-forge.js";
+import { QUALITY_BANDS, qualityOdds, qualityBand, bandTint } from "@/lib/marketplace/grove-forge.js";
+import { GEAR_RARITY_COLOR } from "@/lib/marketplace/rarity.js";
 
 let bad = 0;
 const fail = (msg) => { console.error("  FAIL  " + msg); bad += 1; };
@@ -29,8 +30,8 @@ const ACTS = {
 const LEVELS = [1, 4, 12, 25];
 const value = (id) => QUALITY_BANDS.find((b) => b.id === id)?.mult || 1;
 
-// ── 1 + 2 ───────────────────────────────────────────────────────────────────────────────────────────────────
-console.log("the rack, worst to best, cut from the crafting curve");
+// ── 1 + 2 + 3: THE SHAPE ────────────────────────────────────────────────────────────────────────────────────
+console.log("the rack — worst at the edges, jackpot narrow and dead centre");
 for (const lv of LEVELS) {
     const rack = rackFor(lv);
     let cursor = 0;
@@ -39,42 +40,65 @@ for (const lv of LEVELS) {
         cursor = s.to;
     }
     if (Math.abs(cursor - 1) > 1e-12) fail(`level ${lv}: the rack ends at ${cursor}, not 1`);
-    const order = rack.map((s) => value(s.id));
-    for (let i = 1; i < order.length; i += 1) {
-        if (order[i] < order[i - 1]) fail(`level ${lv}: the rack is not worst-to-best at span ${i}`);
+
+    // value must climb to the middle and fall away again — never dip and rise
+    const mid = rack.findIndex((s) => s.id === "masterwork");
+    if (mid < 0) fail(`level ${lv}: there is no jackpot slot on the rack`);
+    for (let i = 1; i <= mid; i += 1) {
+        if (value(rack[i].id) < value(rack[i - 1].id)) fail(`level ${lv}: value drops on the way in, at span ${i}`);
     }
+    for (let i = mid + 1; i < rack.length; i += 1) {
+        if (value(rack[i].id) > value(rack[i - 1].id)) fail(`level ${lv}: value rises on the way out, at span ${i}`);
+    }
+    // symmetric about the centre
+    const jack = rack[mid];
+    if (Math.abs((jack.from + jack.to) / 2 - RACK_MIDDLE) > 1e-9) {
+        fail(`level ${lv}: the jackpot is centred on ${((jack.from + jack.to) / 2).toFixed(4)}, not the middle`);
+    }
+    if (rack.filter((s) => s.id === "masterwork").length !== 1) fail(`level ${lv}: the jackpot is split in two`);
+    // and it is the narrowest slot there is
+    const widths = rack.map((s) => s.to - s.from);
+    if (Math.min(...widths) !== jack.to - jack.from) {
+        fail(`level ${lv}: the jackpot is not the narrowest slot on the rack`);
+    }
+    // each band across both halves is exactly its share
+    const played = Object.fromEntries(rackOdds(rack).map((o) => [o.id, o.share]));
     const design = Object.fromEntries(qualityOdds(lv).map((o) => [o.id, o.share]));
-    for (const s of rack) {
-        if (Math.abs((s.to - s.from) - design[s.id]) > 1e-9) {
-            fail(`level ${lv}: ${s.name} is ${((s.to - s.from) * 100).toFixed(2)}% wide against a share of ${(design[s.id] * 100).toFixed(2)}%`);
+    for (const b of QUALITY_BANDS) {
+        if (Math.abs((played[b.id] || 0) - design[b.id]) > 1e-9) {
+            fail(`level ${lv}: ${b.name} covers ${((played[b.id] || 0) * 100).toFixed(2)}% of the rack against a share of ${(design[b.id] * 100).toFixed(2)}%`);
         }
     }
-    console.log(`  lvl ${String(lv).padStart(2)}  ` + rack.map((s) => `${s.name} ${((s.to - s.from) * 100).toFixed(1)}%`).join("  "));
+    console.log(`  lvl ${String(lv).padStart(2)}  ` + rack.map((s) => `${s.name.slice(0, 4)} ${((s.to - s.from) * 100).toFixed(1)}`).join(" | "));
 }
-const gold1 = rackFor(1).find((s) => s.id === "masterwork");
-const gold25 = rackFor(25).find((s) => s.id === "masterwork");
-if (!(gold25.to - gold25.from > gold1.to - gold1.from)) fail("the gold end does not grow with the crafting level");
 
-// ── 3: THE QUOTED ODDS ARE THE REAL ODDS ────────────────────────────────────────────────────────────────────
-// The screen shows the odds for wherever the player is aiming right now. If the integration and the actual
-// seeded landing disagree, the bench is printing one game and playing another — the defect fixed in
-// qualityOdds two days ago, arriving by a new road.
-console.log("\nquoted odds against 120,000 real drops, per aim:");
+// ── THE PALETTE IS THE GEAR PALETTE ─────────────────────────────────────────────────────────────────────────
+// Three invented palettes were rejected before this one. Luke: "use rarity of gear colors". So the check is
+// that the bands carry no colour of their own at all — they carry GEAR_RARITY_COLOR, which is what the chest
+// opener, the auction and the boss loot actually render.
+//
+// ⚠️ GEAR_RARITY_COLOR, NOT RARITY_META. The two disagree, and that disagreement is why this gate exists:
+// RARITY_META calls mythic hot pink while every screen showing a real item renders it MINT. Pointing the
+// bands at the generic table produced a jackpot in the wrong colour and read as another invention.
+const LADDER = { rough: "common", sound: "rare", fine: "epic", pristine: "legendary", masterwork: "mythic" };
+for (const [band, rarity] of Object.entries(LADDER)) {
+    if (bandTint(band) !== GEAR_RARITY_COLOR[rarity]) {
+        fail(`${band} is ${bandTint(band)}, not the gear ${rarity} colour ${GEAR_RARITY_COLOR[rarity]} — another palette has crept in`);
+    }
+}
+console.log("\n  colours: " + Object.entries(LADDER).map(([b, r]) => `${b}=${r}`).join("  "));
+
+// ── 4: THE QUOTED ODDS ARE THE REAL ODDS ────────────────────────────────────────────────────────────────────
+console.log("\nquoted odds against 120,000 real throws, per aim:");
 const rack4 = rackFor(4);
 let worstOdds = 0;
 for (const [name, act] of Object.entries(ACTS)) {
     const sd = scatterFor(act);
-    for (const aim of [0.2, 0.5, 0.8, 0.97]) {
+    for (const aim of [0.14, 0.33, 0.5, 0.72]) {
         const quoted = oddsForAim(rack4, aim, sd);
         const hit = {};
-        let missed = 0;
         const N = 120000;
-        for (let s = 1; s <= N; s += 1) {
-            const at = landingFor(aim, sd, s);
-            if (missedRack(at)) missed += 1;
-            const b = bandAt(rack4, at);
-            hit[b] = (hit[b] || 0) + 1;
-        }
+        for (let s = 1; s <= N; s += 1) hit[bandAt(rack4, landingFor(aim, sd, s))] = (hit[bandAt(rack4, landingFor(aim, sd, s))] || 0) + 1;
         for (const b of quoted.bands) {
             const gap = Math.abs((hit[b.id] || 0) / N - b.share);
             worstOdds = Math.max(worstOdds, gap);
@@ -82,54 +106,47 @@ for (const [name, act] of Object.entries(ACTS)) {
                 fail(`${name} aiming ${aim}: ${b.name} quoted ${(b.share * 100).toFixed(2)}% but landed ${(((hit[b.id] || 0) / N) * 100).toFixed(2)}%`);
             }
         }
-        if (Math.abs(missed / N - quoted.miss) > 0.008) {
-            fail(`${name} aiming ${aim}: miss quoted ${(quoted.miss * 100).toFixed(2)}% but was ${((missed / N) * 100).toFixed(2)}%`);
-        }
     }
 }
 console.log(`  worst gap between quoted and played: ${(worstOdds * 100).toFixed(3)} points`);
 
-// ── 4: THE GOLD END IS A GAMBLE ─────────────────────────────────────────────────────────────────────────────
-console.log("\naiming at the very end — the chance of missing the rack altogether:");
+// ── 5: THE MIDDLE IS HARD TO HOLD ───────────────────────────────────────────────────────────────────────────
+// A jackpot you can simply decide to take is not a jackpot. Aiming dead centre with a perfect act must
+// still mostly miss, and with a fumbled one it must be close to hopeless.
+console.log("\naiming dead centre — the chance of actually holding it:");
+const centre = {};
 for (const [name, act] of Object.entries(ACTS)) {
-    const sd = scatterFor(act);
-    const o = oddsForAim(rack4, 0.99, sd);
+    const o = oddsForAim(rack4, RACK_MIDDLE, scatterFor(act));
     const mw = o.bands.find((b) => b.id === "masterwork").share;
-    console.log(`  ${name.padEnd(9)} scatter ${sd.toFixed(3)}   miss ${(o.miss * 100).toFixed(1)}%   masterwork ${(mw * 100).toFixed(1)}%`);
-    // ⚠️ EVEN A FLAWLESS ACT MUST RISK IT. A scatter tight enough to make the end safe turns the beat into
-    // arithmetic: stand one cap-width from the edge and the decision is gone.
-    if (o.miss < 0.04) fail(`${name}: aiming at the very end misses only ${(o.miss * 100).toFixed(1)}% of the time — the edge carries no risk`);
+    const good = o.bands.filter((b) => ["masterwork", "pristine"].includes(b.id)).reduce((a, b) => a + b.share, 0);
+    centre[name] = mw;
+    console.log(`  ${name.padEnd(9)} scatter ${scatterFor(act).toFixed(3)}   masterwork ${(mw * 100).toFixed(1)}%   pristine+ ${(good * 100).toFixed(1)}%`);
+    if (mw > 0.45) fail(`${name}: the jackpot lands ${(mw * 100).toFixed(1)}% of the time from the middle — it is not a jackpot`);
+}
+if (!(centre.flawless > centre.fumbled * 1.5)) {
+    fail(`skill does not make the middle reachable — fumbled ${(centre.fumbled * 100).toFixed(1)}% against flawless ${(centre.flawless * 100).toFixed(1)}%`);
 }
 
-// ── 5 + 6: SKILL BUYS GREED, AND GREED ALONE DOES NOT PAY ───────────────────────────────────────────────────
-console.log("\nthe aim a player should actually pick, per act:");
-const bestAim = (act) => {
+// ── 6: SKILL PAYS, AT EVERY LEVEL ───────────────────────────────────────────────────────────────────────────
+console.log("\nbest expected multiplier, played properly, per act:");
+const bestAim = (act, lv) => {
+    const rack = rackFor(lv);
     const sd = scatterFor(act);
-    let best = { aim: 0, ev: -1 };
+    let best = -1;
     for (let aim = 0.02; aim <= 1.0001; aim += 0.02) {
-        const o = oddsForAim(rack4, aim, sd);
-        const ev = o.bands.reduce((a, b) => a + b.share * b.mult, 0);
-        if (ev > best.ev) best = { aim, ev };
+        const ev = oddsForAim(rack, aim, sd).bands.reduce((a, b) => a + b.share * b.mult, 0);
+        if (ev > best) best = ev;
     }
     return best;
 };
-const picks = Object.fromEntries(Object.entries(ACTS).map(([n, a]) => [n, bestAim(a)]));
-for (const [name, b] of Object.entries(picks)) {
-    console.log(`  ${name.padEnd(9)} aim ${b.aim.toFixed(2)}   expected multiplier ${b.ev.toFixed(3)}`);
+for (const lv of LEVELS) {
+    const f = bestAim(ACTS.fumbled, lv);
+    const d = bestAim(ACTS.decent, lv);
+    const g = bestAim(ACTS.flawless, lv);
+    console.log(`  lvl ${String(lv).padStart(2)}   fumbled ${f.toFixed(3)}   decent ${d.toFixed(3)}   flawless ${g.toFixed(3)}`);
+    if (!(g > d + 0.005)) fail(`level ${lv}: a flawless act is worth no more than a decent one`);
+    if (!(d > f + 0.005)) fail(`level ${lv}: a decent act is worth no more than a fumbled one`);
 }
-if (!(picks.flawless.aim > picks.fumbled.aim + 0.05)) {
-    fail(`skill does not buy greed — fumbled aims at ${picks.fumbled.aim.toFixed(2)} and flawless at ${picks.flawless.aim.toFixed(2)}`);
-}
-if (!(picks.flawless.ev > picks.fumbled.ev + 0.02)) fail("a flawless act is worth no more than a fumbled one");
-
-const edgeEv = (act) => {
-    const o = oddsForAim(rack4, 0.995, scatterFor(act));
-    return o.bands.reduce((a, b) => a + b.share * b.mult, 0);
-};
-if (edgeEv(ACTS.fumbled) >= picks.fumbled.ev - 1e-9) {
-    fail("with a fumbled act, slamming the aim to the far edge is still optimal — the risk is not biting");
-}
-console.log(`  fumbled: the far edge is worth ${edgeEv(ACTS.fumbled).toFixed(3)} against ${picks.fumbled.ev.toFixed(3)} played sensibly — greed is punished.`);
 
 // ── 7 ───────────────────────────────────────────────────────────────────────────────────────────────────────
 let rattled = 0;
@@ -137,7 +154,8 @@ for (let seed = 1; seed <= 4000; seed += 1) {
     const at = landingFor(0.5, 0.12, seed);
     const path = rattle(at, seed);
     if (path.length !== PEG_ROWS) fail(`rattle seed ${seed}: ${path.length} rows`);
-    if (Math.abs(path[path.length - 1] - at) > 1e-12) fail(`rattle seed ${seed} ends at ${path[path.length - 1]}, landing is ${at}`);
+    const want = Math.max(-0.04, Math.min(1.04, at));
+    if (Math.abs(path[path.length - 1] - want) > 1e-12) fail(`rattle seed ${seed} ends at ${path[path.length - 1]}, landing is ${want}`);
     rattled += 1;
 }
 console.log(`\n${rattled.toLocaleString()} falls drawn, every one ending exactly on its landing.`);
@@ -149,9 +167,6 @@ for (const b of QUALITY_BANDS) {
         if (qualityBand(q).id !== b.id) fail(`qualityInBand gave ${q} for ${b.name}, which reads back as ${qualityBand(q).id}`);
     }
 }
-// ⚠️ A TOLERANCE, BECAUSE THIS IS A LERP. SCATTER_WORST - (SCATTER_WORST - SCATTER_BEST) * 1 is 0.055
-// to every digit that matters and not to the last bit of a double. Asserting exact equality here failed
-// twice and both times the maths was right — a float comparison dressed as a logic check.
 const near = (a, b) => Math.abs(a - b) < 1e-12;
 if (!near(scatterFor(ACTS.flawless), SCATTER_BEST)) fail("a flawless act does not reach the tightest scatter");
 if (!near(scatterFor(ACTS.fumbled), SCATTER_WORST)) fail("a fumbled act is not the widest scatter");
@@ -164,6 +179,6 @@ if (actBias({ heat: 0, strikes: [0, 0, 0] }) !== 0) fail("a fumbled act is not w
 
 console.log(bad
     ? `\ncheck:craft-act — ${bad} problem(s).`
-    : "\ncheck:craft-act — the quoted odds are the played odds, the gold end is a real gamble, "
-      + "and skill is what buys the right to reach for it.");
+    : "\ncheck:craft-act — the jackpot is the narrowest slot and sits dead centre, the quoted odds are the "
+      + "played odds, and skill is what makes the middle worth going for.");
 process.exit(bad ? 1 : 0);
