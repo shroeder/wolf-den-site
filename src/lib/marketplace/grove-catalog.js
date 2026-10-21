@@ -126,6 +126,30 @@ export const GROVE_CHARMS = {
 };
 
 export const groveCharm = (id) => GROVE_CHARMS[id] || null;
+
+// ── ⚠️ EVERY RECIPE HAS A PICTURE, AND NONE OF THEM IS A GLYPH ──────────────────────────────────────────────
+// Luke: "Never show glyphs only ever sprites fix this also."
+//
+// Tools and food have had painted sprites since the Grove shipped; backpacks, vaults, plots, decorations
+// and charms had none and fell through to a react-icons outline — so a bench row showed a painted poultice
+// sitting directly above a flat yellow pictogram of a rucksack, in the same list, at the same size. Two of
+// the five needed nothing drawn: ui-bag and ui-vault already existed and are the same hand.
+//
+// ⚠️ ONE CHARM PICTURE PER FLAVOUR, NOT PER MAP. Twelve charms would be twelve drawings to say what the
+// name and the bonus already say; the three KINDS are what a player chooses between at the door. Same call
+// the foods made when every map's poultice borrowed map one's picture.
+export function recipeArt(recipe) {
+    if (!recipe) return null;
+    switch (recipe.kind) {
+        case "food": return `/images/grove/food-${recipe.id}.webp`;
+        case "pack": return "/images/grove/ui-bag.webp";
+        case "bank": return "/images/grove/ui-vault.webp";
+        case "plot": return "/images/grove/item-plot.webp";
+        case "deco": return `/images/grove/item-${recipe.id}.webp`;
+        case "charm": return `/images/grove/charm-${GROVE_CHARMS[recipe.id]?.stat || "rarityFind"}.webp`;
+        default: return null;   // tools resolve through toolArt, which knows the tier
+    }
+}
 // ⚠️ WHAT A CHARM IS WORTH lives in grove-forge.js beside the band table, not here. This file is imported BY
 // grove-forge, so reaching the other way for qualityBand would close a cycle.
 
@@ -726,11 +750,29 @@ export const GROVE_ZONES = [
 //     twenty times. `groveDepth()` is the only thing that should ever reach this function.
 //   · COMPOUNDING, NOT ADDITIVE. `1 + rate * z` and `(1 + rate) ** z` agree closely over eleven steps and
 //     disagree by a factor of SEVEN over a hundred and thirty-two. Luke's "linear growth line" is the
-//     anchored endpoint, not arithmetic growth: reaching x32 by map 12 is only possible compounding.
+//     anchored endpoint, not arithmetic growth: reaching x40 is only possible compounding.
 //
 // The per-enemy hp/dmg above are that creature's baseline at depth 1; this is the climb applied on top, so a
 // Thornling in the Fernway and a Thornling at Bramblewall are the same animal at different depths.
-export const GROVE_SCALE = { hpPerZone: 0.0267, dmgPerZone: 0.0133, zonesPerMap: 12 };
+//
+// ── ⚠️ THE HIGH ANCHOR IS MAP 8 ZONE 1 — DEPTH 85, NOT 133 ───────────────────────────────────────────────────
+// Luke: "I meant he should start to struggle around map 8... Not node 8 on map 1, but map 8 node 1."
+//
+// The number these rates come from is the gap between the two ends of the real Den, measured off production
+// by `npm run grove:curve`: Littlewolf at 1716 dps / 1823 effective HP, Eric D at 68058 / 9541. That is x40
+// of power, and the only question the curve answers is HOW MANY ZONES it is spread over. Spread it over 132
+// and the top of the Den strolls two thirds of a twenty-map game; spread it over 84 and the wall lands where
+// Luke wants it.
+//
+// ⚠️ IT IS A SPAN, AND SHORTENING IT MAKES EVERY BUILT ZONE HARDER — including the only one that exists.
+// Map 1 zone 12's wanderers go 1300 hp -> 1600 and its boss 187k -> 222k, and Littlewolf's boss fight there
+// goes from 109 seconds to 129. That is not a side effect of this change, it IS this change: the whole
+// curve pivots about depth 1, so pulling the far end in lifts everything between. Flagged to Luke.
+//
+// ⚠️ grove-curve.mjs's DEFAULT MUST MATCH THIS. The tool prints a recommended GROVE_SCALE for whatever anchor
+// it is asked about, and a default that disagrees with the shipped constant means the next person to run it
+// reads a table describing a game that is not this one.
+export const GROVE_SCALE = { hpPerZone: 0.0448, dmgPerZone: 0.0199, zonesPerMap: 12 };
 
 /**
  * How deep in the whole Grove a zone is, counting across maps — the ONE number difficulty scales against.
@@ -776,7 +818,31 @@ export function scaledRare(depth) {
 
 // ── POPULATION ───────────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "15 to 30 enemies, fully replenishing every 45 seconds."
+//
+// ── ⚠️ respawnMs IS A REFILL RATE, NOT A TIMER, AND READING IT AS A TIMER WAS THE BUG ────────────────────────
+// Luke, looking at a zone on 20 of 50 kills with two creatures on the whole screen: "This level needs faster
+// respawns."
+//
+// It was literally a timer: every 45 seconds the scene topped the zone back up to a freshly rolled target, and
+// did nothing at all in between. Three things came out of that one shape, and only the first is obvious.
+//
+//   · a zone you are clearing well goes EMPTY and stays empty. Kill the eight bodies near you at second 5 and
+//     the forest is a backdrop until second 45. That is the complaint.
+//   · the target is re-rolled on every refill, so a window that rolls 16 against a standing population of 19
+//     spawns NOTHING. Perfectly possible to clear half a zone, wait the full 45 seconds, and get nobody.
+//   · thirty bodies arrive on the same frame, which is the one frame in the window that can least afford it.
+//
+// So the number is now what it always read as -- a FULL ZONE'S WORTH PER respawnMs -- delivered one creature
+// at a time, every respawnMs/max. Same roof on kills per minute, same killCeiling arithmetic server-side
+// (which divides elapsed by respawnMs and multiplies by max, and is correct for a drip for exactly the same
+// reason it was correct for a burst), and no window in which the zone is empty.
+//
+// ⚠️ THE TARGET IS ROLLED ONCE PER ZONE, NOT PER REFILL. 15-to-30 was always meant to be the difference
+// between one zone and another, not a number that moves under you every 45 seconds. See the second bullet.
 export const GROVE_POP = { min: 15, max: 30, respawnMs: 45_000 };
+
+// How long between two individual arrivals. A full zone's worth per respawnMs: 1.5s at today's numbers.
+export const spawnGapMs = () => GROVE_POP.respawnMs / GROVE_POP.max;
 
 export const groveZone = (id) => GROVE_ZONES.find((z) => z.id === id) || null;
 export const groveBoss = (id) => GROVE_BOSSES[id] || null;

@@ -188,7 +188,9 @@ export const GROVE_CSS = `
    A viewport height is the right fix rather than another flex chain: the sheet is position:fixed over the
    whole screen, so vh IS its height, and this cannot be undone by whatever the portal is nested in. The
    floor stops a short landscape phone collapsing it again. */
-.gv-zsheet .gv-paper { height: min(60vh, 520px); min-height: 280px; }
+/* Superseded by .gv-zsheet .gv-paper-wrap below — the height moved up one level when the
+   wrapper was introduced. Kept at 100% so the scroller fills whatever the wrapper is given. */
+.gv-zsheet .gv-paper { height: 100%; }
 .gv-paper::-webkit-scrollbar { display: none; }
 /* ⚠️ 2:1, WIDER THAN THE PLATE IS. Twelve places across a 3:2 chart sit 88px apart, which is barely
    wider than the symbols themselves; at 2:1 they get 109 and stop crowding. The plate covers the box and
@@ -587,30 +589,39 @@ export const GROVE_CSS = `
    class is never styled; it just quietly does not exist.
 
    Both of these sit OUTSIDE the horizontal scroller, over it, so they stay put while the paper slides. */
+/* ⚠️ THE WRAPPER CARRIES THE HEIGHT, AND GETTING THAT WRONG BROKE THE IN-ZONE MAP FOR THE FOURTH TIME.
+   There has been a rule for this case since the paper was built — .gv-zsheet .gv-paper { height:
+   min(60vh, 520px) } — because opened from inside a zone the chart is portalled into .gv-zsheet, which is
+   NOT a flex column and hands its children no height at all. Adding .gv-paper-wrap put a second selector
+   of exactly equal specificity later in the file, so "height: 100%" quietly beat it, resolved against an
+   auto-height parent, and collapsed a 2:1 plate into a short band with twelve places piled on top of each
+   other. Nothing errored; the only symptom was a screenshot.
+
+   The height now lives on the WRAPPER in both contexts and .gv-paper simply fills it, so there is one
+   chain rather than two rules fighting over the same box. */
 .gv-paper-wrap { position: relative; width: 100%; height: 100%; }
 .gv-paper-wrap > .gv-paper { height: 100%; }
+.gv-zsheet .gv-paper-wrap { height: min(68vh, 620px); min-height: 300px; }
 
-.gv-paper-head { position: absolute; z-index: 4; top: 8px; left: 50%; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 8px; padding: 5px 7px; border-radius: 999px;
-    max-width: calc(100% - 96px);
+/* THE PLATE. One object: name and arrows on top, the twelve places beneath. */
+.gv-paper-chrome { position: absolute; z-index: 4; top: 8px; left: 50%; transform: translateX(-50%);
+    max-width: calc(100% - 28px); display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 5px 7px 6px; border-radius: 16px;
     background: rgba(247, 238, 214, 0.94); border: 1px solid rgba(94, 70, 38, 0.32);
-    box-shadow: 0 3px 10px rgba(50, 36, 14, 0.3); }
-.gv-paper-head b { font-size: 0.76rem; font-weight: 800; color: #3f2e18; letter-spacing: 0.01em;
+    box-shadow: 0 3px 12px rgba(50, 36, 14, 0.32); }
+.gv-paper-head { display: flex; align-items: center; gap: 7px; max-width: 100%; }
+.gv-paper-head b { font-size: 0.78rem; font-weight: 800; color: #3f2e18; letter-spacing: 0.01em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gv-paper-head i { font-style: normal; font-size: 0.6rem; font-weight: 700; color: #6f5a35;
-    white-space: nowrap; padding: 2px 7px; border-radius: 999px; background: rgba(94, 70, 38, 0.13); }
-.gv-paper-arrow { flex: none; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
-    display: grid; place-items: center; font: inherit; font-size: 0.9rem; line-height: 1;
-    color: #4a3720; background: rgba(94, 70, 38, 0.12); border: 1px solid rgba(94, 70, 38, 0.26); }
+.gv-paper-head i { font-style: normal; font-size: 0.62rem; font-weight: 800; color: #6f5a35;
+    white-space: nowrap; padding: 2px 7px; border-radius: 999px; background: rgba(94, 70, 38, 0.14);
+    font-variant-numeric: tabular-nums; }
 .gv-paper-arrow:disabled { opacity: 0.3; cursor: default; }
 
 /* ── THE WHOLE CHART, AS TWELVE PIPS ──────────────────────────────────────────────────────────────
-   A phone shows about three of the twelve places, so without this there is no way to tell whether you
-   are near the start or the end, how much is left, or that something is still standing behind you. */
-.gv-paper-pips { position: absolute; z-index: 4; top: 42px; left: 50%; transform: translateX(-50%);
-    display: flex; gap: 5px; margin: 0; padding: 5px 10px; list-style: none; border-radius: 999px;
-    background: rgba(247, 238, 214, 0.9); border: 1px solid rgba(94, 70, 38, 0.28);
-    box-shadow: 0 2px 7px rgba(60, 44, 20, 0.22); }
+   A phone shows about two of the twelve places, so without this there is no way to tell whether you are
+   near the start or the end, how much is left, or that something is still standing behind you. Inside
+   the plate rather than floating under it, because two stacked chips read as two controls. */
+.gv-paper-pips { display: flex; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .gv-paper-pips li { width: 7px; height: 7px; border-radius: 50%; background: rgba(94, 70, 38, 0.18); }
 .gv-paper-pips li.is-done { background: #b98f2e; }
 .gv-paper-pips li.is-open { background: rgba(94, 70, 38, 0.45); }
@@ -1272,6 +1283,47 @@ export const GROVE_CSS = `
 
    ⚠️ pointer-events: none, OR IT EATS THE FIRST TAP OF THE FIGHT. It covers the whole width for two
    seconds, which is exactly the two seconds in which the player is reaching for the boss. */
+/* -- THE HAUL, DOWN THE LEFT -------------------------------------------------------------------
+   Luke: "I want to see them pop up on the left side in like a snack bar that tells me how many I got.
+   And if you get more, it makes the amount go up so that it stays there longer."
+
+   A tally, not an alert. It sits on the left wall at mid height, over empty sky in every zone -- the
+   hero lives on the lower right of the frame and the boss bar owns the top, so this is the one strip of
+   the screen a running list can hold without covering anything that matters.
+
+   ⚠️ pointer-events: none ON THE LIST. Every tap in a zone is a move order on the world underneath, and
+   a list that grows under the player's thumb while they are walking left would silently eat those taps.
+   Nothing in here is pressable and nothing in here may become pressable. */
+.gv-haul { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 42%;
+    transform: translateY(-50%); z-index: 5; pointer-events: none;
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 5px; max-width: min(56vw, 230px); }
+.gv-haul li { display: flex; align-items: center; gap: 7px; padding: 4px 9px 4px 4px;
+    border-radius: 999px; background: rgba(8,11,8,0.68); border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.4); backdrop-filter: blur(3px);
+    animation: gvHaulIn 260ms cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.gv-haul li img { flex: none; width: 26px; height: 26px; object-fit: contain; display: block;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+.gv-haul li span { flex: 1; min-width: 0; font-size: 0.74rem; font-weight: 600; color: #e6e0d2;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ⚠️ THE COUNT IS THE POINT OF THE ROW, so it is the only thing in it that moves. The node is keyed on
+   the number in the JSX, so React swaps the element and this animation re-runs -- rewriting the text of
+   a live element does not restart a CSS animation, and a number that changes without moving is a number
+   nobody sees change. */
+.gv-haul li b { flex: none; min-width: 22px; text-align: right; font-size: 0.86rem; font-weight: 900;
+    color: #ffd75e; font-variant-numeric: tabular-nums;
+    animation: gvHaulBump 320ms cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+/* The one uncommon part in a pile gets the same gold the drop itself wore on the floor. */
+.gv-haul li.is-rare { border-color: rgba(255,200,97,0.45); background: rgba(38,26,6,0.74);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.4), 0 0 14px rgba(255,200,97,0.18); }
+.gv-haul li.is-rare span { color: #ffe6a8; }
+@keyframes gvHaulIn { from { opacity: 0; transform: translateX(-14px) scale(0.92); }
+    to { opacity: 1; transform: none; } }
+@keyframes gvHaulBump { 0% { transform: scale(1); } 40% { transform: scale(1.5); color: #fff6df; }
+    100% { transform: scale(1); } }
+/* ⚠️ NO prefers-reduced-motion BRANCH, AND THAT IS THE HOUSE RULE, NOT AN OVERSIGHT -- see
+   animations-always-play. The bump IS the readout. */
+
 /* ── THE HERALD ────────────────────────────────────────────────────────────────────────────────────────────
    Luke: "nothing pops up in the middle of my screen letting me know ive got a boss encounter or the portal
    unlocked. Not a modal, but stylized text with dopamine."
@@ -1809,33 +1861,7 @@ export const GROVE_CSS = `
    spent on.
 
    NO BACKTICKS IN THESE COMMENTS -- template literal. See the header of this file. */
-.gv-level { padding: 14px; border-radius: 14px;
-    background: linear-gradient(180deg, rgba(224,168,60,0.17), rgba(0,0,0,0.26));
-    border: 1px solid rgba(224,168,60,0.3); }
-.gv-level-top { display: flex; align-items: center; gap: 12px; }
-.gv-level-no { display: flex; flex-direction: column; align-items: center; justify-content: center;
-    flex: none; width: 56px; height: 56px; border-radius: 14px;
-    background: rgba(0,0,0,0.4); border: 1px solid rgba(224,168,60,0.42); }
-.gv-level-no i { font-style: normal; font-size: 0.5rem; letter-spacing: 0.14em; text-transform: uppercase;
-    color: #e0a83c; }
-.gv-level-no b { font-size: 1.55rem; line-height: 1; color: #fff6df; font-variant-numeric: tabular-nums; }
-.gv-level-meta { min-width: 0; }
-.gv-level-meta > b { display: block; font-size: 1.02rem; color: #fff6df; }
-.gv-level-meta > span { display: block; margin-top: 2px; font-size: 0.76rem; color: #9aa08f; }
-
-/* The bar. ⚠️ NO TRANSITION ON THE WIDTH: it is written from server state on every refresh, and an
-   easing curve on top of a value that arrives in one step reads as lag rather than as motion. The
-   dopamine is the SHEEN, which is its own animation and does not fight the width. */
-.gv-level-bar { position: relative; margin-top: 11px; height: 9px; border-radius: 999px; overflow: hidden;
-    background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.08); }
-.gv-level-bar i { display: block; height: 100%; border-radius: 999px;
-    background: linear-gradient(90deg, #e0a83c, #ffd166 60%, #fff3c4); }
-.gv-level-bar::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.45) 50%, transparent 80%);
-    transform: translateX(-100%); animation: gvLevelSheen 2600ms ease-in-out infinite; }
-@keyframes gvLevelSheen { 0%, 55% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-
-.gv-level-say { margin: 12px 0 6px; font-size: 0.76rem; color: #cfc6b6; }
+.gv-level-top, .gv-level-meta, .gv-level-say { display: none; }
 
 /* ⚠️ THE ODDS ARE THE POINT OF THIS ROW. They come from the server computed off the same curve the roll
    uses, so what is shown and what is rolled cannot drift -- a hand-written table here would be the
@@ -2270,6 +2296,50 @@ export const GROVE_CSS = `
 .gv-odds li.is-masterwork { border-color: color-mix(in srgb, var(--band) 55%, transparent);
     box-shadow: 0 0 14px color-mix(in srgb, var(--band) 24%, transparent); }
 
+/* ── ⚠️ THE BENCH HEADER IS ONE STRIP ────────────────────────────────────────────────────────────────
+   It was 294px on a 390x920 phone and the first pressable recipe started at y=472 — over half the
+   screen spent on statistics before a single Craft button. A seven-year-old called it too
+   complicated and he was being kind about it.
+
+   Level, a thin bar, merits, and a Details disclosure. The odds table moved inside that disclosure
+   because the craft act already shows the odds LIVE and for the aim you are actually taking; a static
+   copy on the screen before it was the less useful of the two and was charging the most rent. */
+.gv-level { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; padding: 8px 11px;
+    border-radius: 11px; background: rgba(0,0,0,0.26); border: 1px solid rgba(255,255,255,0.07); }
+.gv-level-no { flex: none; display: inline-flex; align-items: baseline; gap: 4px; }
+.gv-level-no i { font-style: normal; font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: #9aa08f; }
+.gv-level-no b { font-size: 1.05rem; font-weight: 900; color: #e0a83c; font-variant-numeric: tabular-nums; }
+.gv-level-bar { position: relative; flex: 1; min-width: 0; height: 6px; border-radius: 999px; overflow: hidden;
+    background: rgba(0,0,0,0.5); box-shadow: inset 0 1px 3px rgba(0,0,0,0.6); }
+.gv-level-bar i { display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #b47a12, #ffd75e); transition: width 300ms ease; }
+.gv-level-bar::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.45) 50%, transparent 80%);
+    transform: translateX(-100%); animation: gvLevelSheen 2600ms ease-in-out infinite; }
+@keyframes gvLevelSheen { 0%, 55% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.gv-level-more { flex: none; }
+.gv-level-more > summary { list-style: none; cursor: pointer; min-height: 32px; display: grid;
+    place-items: center; padding: 0 11px; border-radius: 999px; font-size: 0.66rem; font-weight: 700;
+    letter-spacing: 0.07em; text-transform: uppercase; color: #cfc6b6;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); }
+.gv-level-more > summary::-webkit-details-marker { display: none; }
+.gv-level-more[open] > summary { color: #1b1408; background: #e0a83c; border-color: #e0a83c; }
+/* ⚠️ THE OPEN PANEL ESCAPES THE STRIP. The strip is a flex row; left in flow the details body would
+   squeeze the bar to nothing the moment it opened. Absolute, full width of the bench, under the row. */
+.gv-level-more > div { position: absolute; left: 0; right: 0; z-index: 5; margin-top: 9px;
+    padding: 11px; border-radius: 11px; background: #171a13;
+    border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+    display: flex; flex-direction: column; gap: 10px; }
+.gv-bench2 { position: relative; }
+.gv-recall-list { list-style: none; display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; }
+.gv-recall-list li { display: flex; align-items: center; gap: 8px; font-size: 0.76rem;
+    padding: 5px 8px; border-radius: 7px; background: rgba(0,0,0,0.26); }
+.gv-recall-list li span { flex: 1; min-width: 0; color: #cfc6b6; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+.gv-recall-list li em { font-style: normal; font-size: 0.66rem; font-weight: 700; color: var(--band); }
+.gv-recall-list li b { color: #e0a83c; font-variant-numeric: tabular-nums; font-size: 0.74rem; }
+
 /* ── ⚠️ EVERY CONTROL IN THE GROVE IS AT LEAST 32px TALL ─────────────────────────────────────────────
    Luke: "audit every detail of the grove on all screen sizes." Driving all nine viewports found no
    overflow, no broken art and no console errors — the structure is sound — but five controls were under
@@ -2306,7 +2376,8 @@ export const GROVE_CSS = `
     .gv-sect > h4 i { font-size: 0.62rem; padding: 3px 7px; min-width: 0; overflow: hidden;
         text-overflow: ellipsis; }
     .gv-sect-ico { width: 30px; height: 30px; }
-    .gv-paper-head { max-width: calc(100% - 20px); gap: 5px; padding: 4px 5px; }
+    .gv-paper-chrome { max-width: calc(100% - 16px); padding: 4px 5px 5px; }
+    .gv-paper-head { gap: 5px; }
     .gv-paper-head b { font-size: 0.72rem; }
     .gv-paper-head i { font-size: 0.56rem; padding: 2px 5px; }
 }

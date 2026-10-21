@@ -289,8 +289,34 @@ export function navigate(platforms, body, goalX, goalY, { arrive = 1.6 } = {}) {
         const dx = toX - b.x;
         return { dir: Math.abs(dx) > arrive ? Math.sign(dx) : 0, hop: false };
     };
-    // Level with us, or below: walk at it. Falling needs no decision — the lip of the ledge makes it.
-    if (goalY - b.y < 4) return walk(goalX);
+    // ── ⚠️ GOING DOWN IS A DECISION TOO, AND IT USED NOT TO BE ─────────────────────────────────
+    // Luke, standing on a ledge and tapping the forest floor underneath himself: "when i tap the bottom
+    // in this scenario it doesnt climb down."
+    //
+    // The line that was here read "Falling needs no decision — the lip of the ledge makes it" and walked
+    // straight at goalX. That is true for a goal OFF to one side: walk at it, meet the lip on the way,
+    // fall. It is false for the one case a player actually taps, which is the ground DIRECTLY BELOW the
+    // ledge they are standing on. goalX is then the hero's own x, walk() reads the distance as zero,
+    // returns dir 0, and the hero stands on the ledge not moving while the tap indicator sits on the
+    // grass under his feet. Nothing is broken, nothing is stuck, and he will not come down.
+    //
+    // ⚠️ THE LIP IS THE TARGET, NOT THE GOAL. When the goal is below and its x is inside the span of the
+    // ledge we are on, there is no path to it along this surface at all — the only way off is an end. So
+    // aim at the NEARER end, one unit past it, and let gravity do the rest. Once airborne the body is no
+    // longer on that ledge and the ordinary walk-at-it branch takes over, which is what steers the
+    // landing. Biased to the end that faces the goal when the goal is off to a side, so a tap down and to
+    // the left never sends him off the right-hand lip first.
+    if (goalY - b.y < 4) {
+        const on = surfaceUnder(platforms, b.x, b.y + 0.5);
+        const below = goalY < b.y - 3 && on.y > goalY + 0.5;
+        const boxed = below && goalX > on.x && goalX < on.x + on.w;
+        // ⚠️ A HARD dir, NOT walk(). walk() stops pushing within `arrive` (1.6) of its aim, and an aim
+        // just past the lip is within 1.6 of floor that is still solid — so the hero would halt a unit
+        // short of the edge and stand there for ever. That is the launch-pad deadlock in the climb
+        // branch below, in the other direction. Push until the floor runs out; that always terminates.
+        if (boxed) return { dir: b.x - on.x <= on.x + on.w - b.x ? -1 : 1, hop: false };
+        return walk(goalX);
+    }
 
     const next = routeTo(platforms, b, goalX, goalY);
     if (!next) return walk(goalX);

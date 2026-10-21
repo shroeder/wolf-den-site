@@ -73,10 +73,6 @@ const TOOL_GLYPH = {
     loupe: GiCutDiamond, banner: GiFlagObjective, horn: GiBugleCall,
 };
 
-// ⚠️ A GLYPH, NOT A SPRITE, AND ON PURPOSE. Twelve charms would be twelve drawings to say what the name
-// and the bonus already say — the same call the foods made when every map's poultice borrowed map one's
-// picture. One per flavour, so the three are told apart at a glance.
-const CHARM_GLYPH = { rarityFind: GiCutDiamond, emblemFind: GiPawPrint, rareSpawn: GiFlagObjective };
 // The band's own word, from the band table rather than a second copy of the five names.
 const bandWord = (id) => QUALITY_BANDS.find((b) => b.id === id)?.name || "";
 
@@ -494,24 +490,33 @@ export default function GroveClient({ initial }) {
                             })}
                         </div>
                     </div>
-                                        <div className="gv-paper-head">
-                        <button type="button" className="gv-paper-arrow" disabled={mapIdx <= 0}
-                            onClick={() => setPaperMap(openMaps[mapIdx - 1])} aria-label="Previous map">&lsaquo;</button>
-                        <b>{shownName}</b>
-                        <i>{clearedCount}/{shownZones.length} cleared</i>
-                        <button type="button" className="gv-paper-arrow" disabled={mapIdx < 0 || mapIdx >= openMaps.length - 1}
-                            onClick={() => setPaperMap(openMaps[mapIdx + 1])} aria-label="Next map">&rsaquo;</button>
+                    {/* ── ⚠️ ONE PLATE, NOT TWO ──────────────────────────────────────────────────
+                        Luke: "Two things on top compete and seem redundant." They did, and they were:
+                        a parchment pill reading "3/12 cleared" sitting directly on top of a second
+                        parchment pill of twelve pips, both saying how far through the map you are, in
+                        two different notations, as two separate floating objects. Two chips stacked
+                        like that read as two controls — the eye has to work out which one it is meant
+                        to be using.
+
+                        They are one plate now: the name and the arrows on the first line, the twelve
+                        places on the second. The pips are kept rather than the count because they say
+                        strictly more — per zone, cleared or boss or locked, and which one is next —
+                        and the count rides along as the quick version of the same fact. */}
+                    <div className="gv-paper-chrome">
+                        <div className="gv-paper-head">
+                            <button type="button" className="gv-paper-arrow" disabled={mapIdx <= 0}
+                                onClick={() => setPaperMap(openMaps[mapIdx - 1])} aria-label="Previous map">&lsaquo;</button>
+                            <b>{shownName}</b>
+                            <i>{clearedCount}/{shownZones.length}</i>
+                            <button type="button" className="gv-paper-arrow" disabled={mapIdx < 0 || mapIdx >= openMaps.length - 1}
+                                onClick={() => setPaperMap(openMaps[mapIdx + 1])} aria-label="Next map">&rsaquo;</button>
+                        </div>
+                        <ol className="gv-paper-pips" aria-label={`${clearedCount} of ${shownZones.length} zones cleared`}>
+                            {progress.map((kind, i) => (
+                                <li key={i} className={`is-${kind}${frontier && frontier.n % 12 === (i + 1) % 12 ? " is-next" : ""}`} />
+                            ))}
+                        </ol>
                     </div>
-                    {/* ⚠️ THE WHOLE CHART IN ONE STRIP. A phone shows about three of the twelve
-                        places at a time, so without this there is no way to know whether you are
-                        near the start or the end, how much is left, or that anything is waiting
-                        behind you. Twelve pips is the cheapest possible overview and it reads
-                        without being explained. */}
-                    <ol className="gv-paper-pips" aria-label={`${clearedCount} of ${shownZones.length} zones cleared`}>
-                        {progress.map((kind, i) => (
-                            <li key={i} className={`is-${kind}${frontier && frontier.n % 12 === (i + 1) % 12 ? " is-next" : ""}`} />
-                        ))}
-                    </ol>
                     </div>
                 ) : null}
 
@@ -601,7 +606,9 @@ export default function GroveClient({ initial }) {
                                             <button key={`${c.id}-${c.band}`} type="button"
                                                 className={`gv-slot is-${c.band}${on ? " is-on" : ""}`} style={{ "--band": bandTint(c.band) }}
                                                 onClick={() => setCharmPick(on ? null : { id: c.id, band: c.band })}>
-                                                {(() => { const G = CHARM_GLYPH[c.meta?.stat] || GiCutDiamond; return <G size={30} aria-hidden="true" />; })()}
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={`/images/grove/charm-${c.meta?.stat || "rarityFind"}.webp`}
+                                                    alt="" width={34} height={34} className="gv-ico" />
                                                 {/* ⚠️ THE BAND IS ON THE NAME, not hidden in the detail
                                                     line. Two rows of the same charm differ only by how
                                                     well they came out, so that word is the entire

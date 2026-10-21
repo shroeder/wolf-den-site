@@ -1,7 +1,7 @@
 "use client";
 
 import { ROMAN } from "@/lib/marketplace/grove-recipes.js";
-import { toolArt } from "@/lib/marketplace/grove-catalog.js";
+import { toolArt, recipeArt } from "@/lib/marketplace/grove-catalog.js";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -338,66 +338,62 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
 
             <Area id="bench" icon="ui-bench" title="Workbench"
                 count={readyCount > 0 ? `${readyCount} ready` : null}>
+            {/* ── ⚠️ THE BENCH OPENS ON THINGS YOU CAN MAKE ──────────────────────────────────────
+                Luke showed this to his seven-year-old, who said it looked way too complicated, and he
+                agreed: "The entire viewport is not actively crafting controls."
+
+                Measured on a 390x920 phone, he was being generous. This header was 294px tall — a level
+                tile, a sentence, an xp bar, FIVE odds tiles and a history expander — and the first
+                recipe you could actually press started at y=472. Fifty-one percent of the screen was
+                statistics before a single Craft button.
+
+                It is one strip now: the level, a thin bar, the merits. The odds table went with it,
+                because the craft act already shows the odds LIVE and per-aim — a static copy of the
+                same numbers on the screen before it was the less useful of the two, printed in the
+                place where it cost the most room. Both it and the history are one tap away under
+                "Details" for anyone who wants them. */}
             <header className="gv-level">
-                <div className="gv-level-top">
-                    <span className="gv-level-no">
-                        <i>Crafting</i>
-                        <b>{lvl.level}</b>
-                    </span>
-                    <span className="gv-level-meta">
-                        <b>{readyCount > 0 ? `${readyCount} ready to make` : "Nothing ready yet"}</b>
-                        <span>
-                            {lvl.capped
-                                ? "Top of the ladder."
-                                : `${lvl.intoLevel} / ${lvl.needForNext} xp to ${lvl.level + 1}`}
-                        </span>
-                    </span>
-                    {/* Merits have ONE faucet (bosses) and ONE sink (the sets), so they are a score the
-                        player is saving up rather than a stat -- which makes a running total the whole of
-                        what the screen owes them. It was a suffix on a sentence; it is a chip now. */}
-                    {merits > 0 ? (
-                        <span className="gv-merits" title="Won from bosses - spent on boss armour, under Emblems">
-                            <GiLaurelCrown aria-hidden="true" focusable="false" />
-                            <b>{merits}</b>
-                        </span>
-                    ) : null}
-                </div>
-
-                <div className="gv-level-bar">
+                <span className="gv-level-no"><i>Lv</i><b>{lvl.level}</b></span>
+                <span className="gv-level-bar">
                     <i style={{ width: `${Math.round((lvl.progress || 0) * 100)}%` }} />
-                </div>
-
-                {odds.length ? (
-                    <>
-                        {/* ⚠️ "EVERYTHING", NOT "EVERY TOOL". This line was true when tools were the only
-                            kind that rolled; it is now the sentence that tells a player their poultices
-                            and vaults roll too, which is the whole change. A banner describing the old
-                            rule is worse than no banner — it is the screen telling you not to bother. */}
-                        <p className="gv-level-say">Everything you make rolls a quality. At level {lvl.level}:</p>
-                        <ul className="gv-odds">
-                            {odds.map((b) => (
-                                <li key={b.id} className={`is-${b.id}`} style={{ "--band": bandTint(b.id) }}>
-                                    <b>{Math.round(b.share * 100)}%</b>
-                                    <span>{b.name}</span>
-                                    <em>×{b.mult.toFixed(2)}</em>
-                                </li>
-                            ))}
-                        </ul>
-                    </>
+                </span>
+                {merits > 0 ? (
+                    <span className="gv-merits" title="Won from bosses — spent on boss armour, under Emblems">
+                        <GiLaurelCrown aria-hidden="true" focusable="false" />
+                        <b>{merits}</b>
+                    </span>
                 ) : null}
-
-                {recent.length ? (
-                    <details className="gv-recall">
-                        <summary>Last {recent.length} crafted</summary>
-                        <ul>
-                            {recent.map((c, i) => (
-                                <li key={`${c.recipe}-${i}`}>
-                                    <span>{recipeName(c.recipe)}</span>
-                                    {c.band ? <em className={`is-${c.band}`} style={{ "--band": bandTint(c.band) }}>{bandName(c.band)}</em> : null}
-                                    <b>+{c.xp}</b>
-                                </li>
-                            ))}
-                        </ul>
+                {odds.length || recent.length ? (
+                    <details className="gv-level-more">
+                        <summary aria-label="Crafting odds and recent crafts">Details</summary>
+                        <div>
+                            {odds.length ? (
+                                <ul className="gv-odds">
+                                    {odds.map((b) => (
+                                        <li key={b.id} className={`is-${b.id}`} style={{ "--band": bandTint(b.id) }}>
+                                            <b>{Math.round(b.share * 100)}%</b>
+                                            <span>{b.name}</span>
+                                            <em>×{b.mult.toFixed(2)}</em>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : null}
+                            {recent.length ? (
+                                <ul className="gv-recall-list">
+                                    {recent.map((c, i) => (
+                                        <li key={`${c.recipe}-${i}`}>
+                                            <span>{recipeName(c.recipe)}</span>
+                                            {c.band ? (
+                                                <em className={`is-${c.band}`} style={{ "--band": bandTint(c.band) }}>
+                                                    {bandName(c.band)}
+                                                </em>
+                                            ) : null}
+                                            <b>+{c.xp}</b>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : null}
+                        </div>
                     </details>
                 ) : null}
             </header>
@@ -440,9 +436,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                     // A tool recipe shows the rung it would make, not a generic slot icon — the whole point
                     // of drawing twelve of each was that tier VII is a different object, and a workbench that
                     // shows the same picture for all twelve hides exactly that.
-                    const art = r.kind === "food" ? `/images/grove/food-${r.id}.webp`
-                        : r.kind === "tool" ? toolArt(r.slot, r.tier)
-                        : null;
+                    const art = r.kind === "tool" ? toolArt(r.slot, r.tier) : recipeArt(r);
                     // ── ⚠️ WHAT A REWORK WOULD COST, PRICED OFF THIS RECIPE ──────────────────────
                     // Only ever offered on the tool actually sitting in the slot: a tier-III card for a
                     // slot now holding tier VII must not offer to re-roll tier VII at tier-III prices.
@@ -479,10 +473,11 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 the strip is a sibling of the grid rather than a member of it, and cannot
                                 size anything. */}
                             <div className="gv-rec-main">
+                            {/* ⚠️ A SPRITE OR NOTHING. The glyph fallback is gone — a line pictogram beside
+                                a painted poultice does not read as the same game, and every kind has art
+                                now. An empty frame is a smaller fault than the wrong kind of picture. */}
                             <div className="gv-rec-face">
-                                {art
-                                    ? <img src={art} alt="" width={44} height={44} loading="lazy" />
-                                    : <Icon aria-hidden="true" />}
+                                {art ? <img src={art} alt="" width={44} height={44} loading="lazy" /> : null}
                             </div>
 
                             <div className="gv-rec-body">

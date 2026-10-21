@@ -7,11 +7,12 @@
 // meaning anything. This reads both ends off PRODUCTION, runs the real swing() a few thousand times so crit
 // stacking and bleed are measured rather than assumed, and prints the curve that falls out.
 //
-//   npm run grove:curve                 the shipped anchor — Eric has a tough time at MAP 12 ZONE 1
-//   npm run grove:curve -- --map 8      ask what a nearer wall would cost instead
+//   npm run grove:curve                  the shipped anchor — Eric has a tough time at MAP 8 ZONE 1
+//   npm run grove:curve -- --map 12      ask what a further wall would cost instead
 //
-// ⚠️ THE HIGH ANCHOR IS A MAP, NOT A ZONE, AND THAT IS THE WHOLE SHAPE OF THE CURVE. Luke: "Lets make it so
-// eric would have a tough time with map 12 first zone." The first cut of this tool spanned the gap over
+// ⚠️ THE HIGH ANCHOR IS A MAP, NOT A ZONE, AND THAT IS THE WHOLE SHAPE OF THE CURVE. Luke, first: "Lets
+// make it so eric would have a tough time with map 12 first zone." Then, having played it: "I meant he should
+// start to struggle around map 8... Not node 8 on map 1, but map 8 node 1." So the default is 8. The first cut of this tool spanned the gap over
 // ELEVEN steps (map 1 zone 1 -> map 1 zone 12) instead of 132, which made the opening forest the entire
 // difficulty range of a twenty-map game. The step it produced was right; the granularity was not. If you
 // change nothing else here, do not change that.
@@ -32,7 +33,7 @@ const { GROVE_SCALE } = await import("@/lib/marketplace/grove-catalog.js");
 const SWING_MS = 410;
 const ZPM = GROVE_SCALE.zonesPerMap;                        // imported, never retyped — see [[balance-constants-never-copied]]
 const ai = process.argv.indexOf("--map");
-const HI_MAP = ai > -1 ? Math.max(2, Number(process.argv[ai + 1]) || 12) : 12;
+const HI_MAP = ai > -1 ? Math.max(2, Number(process.argv[ai + 1]) || 8) : 8;   // ⚠️ MATCHES GROVE_SCALE
 
 async function profile(name) {
     const r = await db.queryOne(`SELECT id FROM mkt_buyer WHERE display_name = $1`, [name]);

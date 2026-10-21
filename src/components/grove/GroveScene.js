@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
-    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, GROVE_HYPER, HEAL_AT, scaledFoe, scaledRare, groveDepth, groveBoss, groveSize, grovePart,
+    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, HEAL_AT, scaledFoe, scaledRare, groveDepth, groveBoss, groveSize, grovePart,
     groveArt, groveEmblem, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
@@ -154,6 +154,26 @@ const PET_REACH = 2.6;
 // over there fighting" is the complaint this number exists to prevent. Also what makes a kill end the
 // pet's involvement cleanly: the window lapses, there is nothing left to renew it.
 const PET_ENGAGE_MS = 900;
+// ── ⚠️ WHAT YOU WALKED OUT WITH, NOT WHAT YOU JUST TOUCHED ─────────────────────────────────────────────
+// Luke: "when we collect items, I want to see them pop up on the left side in like a snack bar that tells me
+// how many I got. And if you get more, it makes the amount go up so that it stays there longer, just so you
+// can see what you're actually getting."
+//
+// The floating label at the collector's head already says what ONE pickup was, and it is the right thing for
+// that job — it fires at whoever collected it, which is how the pet's errands read as the pet's. What it
+// cannot do is add up. Six Thornhusk over twenty seconds is six labels that each live 1.1 seconds, in six
+// different places, and at the end of it the honest answer to "what am I actually getting in here" is that
+// you have no idea.
+//
+// So the tally is a SECOND surface, not a replacement: one row per kind, pinned left, counting up. A row's
+// life extends on every arrival rather than restarting, which is the "stays there longer" — a kind that keeps
+// dropping keeps its row, and the row for the thing you stopped finding ages out on its own.
+const HAUL_MS = 4200;            // how long a row survives its last arrival
+const HAUL_MAX_MS = 14_000;      // ⚠️ and the ceiling on that. Without it a common part in a good zone renews
+                                 // its row for ever and the tally becomes permanent furniture down one side
+                                 // of the screen -- which is the HUD the whole Grove was built without.
+const HAUL_ROWS = 5;             // oldest row falls off the bottom; five is what fits above the dock on a phone
+
 // How far the pet will range to collect a drop. Generous on purpose — a fetcher that only picks up what
 // you were nearly standing on anyway has not saved you a single step, which is the entire feature.
 // How close to its flanking spot counts as arrived. Loose enough that the pet is not nudging itself into
@@ -435,6 +455,8 @@ export default function GroveScene({
             swingFoe: null,
             swingDone: true,
             nextRespawn: 0,
+            // The running tally down the left. Keyed by label so two drops of one kind share a row.
+            haul: new Map(),
             eaten: {},
             foodLeft: Number(belt?.count) || 0,
             boss: null,
@@ -509,8 +531,16 @@ export default function GroveScene({
     // ── SPAWNING ────────────────────────────────────────────────────────────────────────────────────
     // Luke: "15 to 30 enemies, fully replenishing every 45 seconds."
     const spawn = useCallback((w, now) => {
-        const want = GROVE_POP.min + Math.floor(w.rand() * (GROVE_POP.max - GROVE_POP.min + 1));
-        while (w.foes.length < want) {
+        // ⚠️ ONE BODY PER CALL ONCE THE ZONE IS STANDING, THE WHOLE ZONE ON THE FIRST CALL. See GROVE_POP:
+        // the 45 seconds is a refill RATE, and the burst reading of it left a cleared zone visibly empty for
+        // most of every window. `w.want` is rolled once, by the caller, when the zone is built.
+        if (!w.want) w.want = GROVE_POP.min + Math.floor(w.rand() * (GROVE_POP.max - GROVE_POP.min + 1));
+        // ⚠️ GATED ON "HAS THIS ZONE EVER FILLED", NOT ON "ARE THERE ANY FOES LEFT". Keying off the standing
+        // population reads an emptied zone as a fresh one and dumps the whole roster back in on one frame —
+        // the burst, returned, and at the exact moment the player earned the quiet.
+        const room = w.filled ? Math.min(w.want, w.foes.length + 1) : w.want;
+        w.filled = true;
+        while (w.foes.length < room) {
             const i = w.killIndex + w.foes.length;
             const isRare = rollRareSpawn(GROVE_RARE.spawnChance, seed, i, bonuses);
             const pickId = zone.enemies[Math.floor(w.rand() * zone.enemies.length)];
@@ -591,7 +621,7 @@ export default function GroveScene({
             w.foes.push(w.boss);
         }
 
-        w.nextRespawn = now + GROVE_POP.respawnMs;
+        w.nextRespawn = now + spawnGapMs();
         rerender();
     }, [zone, seed, bonuses, W, rerender]);
 
@@ -1086,7 +1116,9 @@ export default function GroveScene({
                 const isRareRow = got.rare === part;
                 spill(`d${i}-${part}`, part, `${count}x ${meta?.name || part.replace(/_/g, " ")}`,
                     { tier: meta?.tier || 1, rare: Boolean(meta?.rare) || isRareRow,
-                      band: isRareRow ? null : got.band, rareRow: isRareRow });
+                      band: isRareRow ? null : got.band, rareRow: isRareRow,
+                      // ⚠️ THE TALLY KEYS ON THESE, NOT ON `label`. See HAUL_MS.
+                      name: meta?.name || part.replace(/_/g, " "), qty: count });
             }
             // ── ⚠️ A HYPER OFF AN ORDINARY KILL IS THE RAREST THING IN THE FEATURE ──────────────────
             // About one kill in two thousand. It gets the emblem's treatment -- the world stops, a ring
@@ -1119,7 +1151,7 @@ export default function GroveScene({
                 burst(foe.x, foe.y + foe.h * 0.4, { crit: true });
                 playEmblemDrop();
                 addPop("loot", em?.name || "Emblem", foe.x, foe.y + foe.h + 4);
-                spill(`e${i}`, got.emblem, em?.name || "Emblem",
+                spill(`e${i}`, got.emblem, em?.name || "Emblem", // name/qty default below
                     { emblem: true, tier: 6, rare: true, vy: EMBLEM_THROW, vx: 0 });
             }
             rerender();
@@ -1150,6 +1182,16 @@ export default function GroveScene({
             last = now;
 
             if (now >= w.nextRespawn) spawn(w, now);
+
+            // ⚠️ PRUNED IN THE LOOP AND RE-RENDERED ONLY WHEN SOMETHING ACTUALLY LEFT. A setTimeout per row
+            // is a timer per pickup, and a pickup is the single most frequent event in the Grove; the loop is
+            // already running and already knows the time. The guard is what keeps this from being a React
+            // render sixty times a second for as long as the tally is on screen.
+            if (w.haul.size) {
+                let gone = false;
+                for (const [k, row] of w.haul) if (now >= row.until) { w.haul.delete(k); gone = true; }
+                if (gone) rerender();
+            }
 
             const plats = w.platforms;
             // Walkable bounds, inset by a body so nothing can stand with half of itself outside the zone.
@@ -1803,6 +1845,23 @@ export default function GroveScene({
                         // it reads as loot teleporting and the whole errand went unnoticed.
                         addPop("loot", d.label, by.x + (by.face || 1) * 1.5, by.y + by.h * 0.75,
                             null, d.art || null);
+                        // ⚠️ EXTENDED, NOT RESTARTED, AND CAPPED. See HAUL_MS. An arrival pushes the row's
+                        // expiry out by one more HAUL_MS from NOW, so a steady trickle of one kind holds its
+                        // row open; HAUL_MAX_MS from the row's birth is the furthest that can ever reach.
+                        {
+                            const key = d.part || d.label;
+                            const row = w.haul.get(key);
+                            if (row) {
+                                row.qty += d.qty || 1;
+                                row.at = now;
+                                row.until = Math.min(now + HAUL_MS, row.born + HAUL_MAX_MS);
+                                if (d.rare) row.rare = true;
+                            } else {
+                                w.haul.set(key, { key, label: d.name || d.label, art: d.art || null,
+                                    rare: Boolean(d.rare), qty: d.qty || 1,
+                                    born: now, at: now, until: now + HAUL_MS });
+                            }
+                        }
                         playPickup(Boolean(d.rare));
                         rerender();
                         continue;
@@ -2518,6 +2577,28 @@ export default function GroveScene({
             {/* The journey itself. Outside the world layer so it does not shake, and above everything so
                 the zone can be rebuilt underneath it unseen. */}
             {warp ? <div className={`gv-warp is-${warp}`} aria-hidden="true" /> : null}
+
+            {/* ── THE HAUL, DOWN THE LEFT ───────────────────────────────────────────────────────
+                Newest at the TOP, because the row that just changed is the one being read. aria-hidden:
+                every one of these also fired a pop at the collector and every one of them is banked in the
+                pack -- a screen reader announcing each arrival twice is noise, not access. */}
+            {world.haul?.size ? (
+                <ul className="gv-haul" aria-hidden="true">
+                    {[...world.haul.values()].sort((a, b) => b.at - a.at).slice(0, HAUL_ROWS).map((row) => (
+                        <li key={row.key} className={row.rare ? "is-rare" : undefined}>
+                            {row.art ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={row.art} alt="" width={26} height={26} />
+                            ) : null}
+                            <span>{row.label}</span>
+                            {/* ⚠️ KEYED ON THE COUNT so React replaces the node and the bump animation
+                                re-runs. Mutating the text of a live element does not restart a CSS
+                                animation, which is the whole tell that the number went up. */}
+                            <b key={row.qty}>{row.qty}</b>
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
 
             {world.herald ? (
                 <div className={`gv-herald is-${world.herald.kind}`} aria-hidden="true">
