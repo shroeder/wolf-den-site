@@ -48,7 +48,7 @@ export const GROVE_CSS = `
    vertically and be pushed out of reach by them. */
 .gv.is-full .gv-strip { margin-block: auto; }
 /* The paper takes the whole sheet rather than being centred in it — a chart is the screen, not an item on it. */
-.gv.is-full .gv-paper { flex: 1; min-height: 0; }
+.gv.is-full .gv-paper-wrap { flex: 1; min-height: 0; }
 
 /* The way out. Top-left, where a back control is looked for, and clear of the dock. */
 .gv-exit { position: fixed; z-index: 66;
@@ -220,17 +220,25 @@ export const GROVE_CSS = `
 .gv-node img { width: 100%; height: auto; display: block;
     filter: drop-shadow(0 2px 3px rgba(60, 44, 20, 0.35)); }
 .gv-node:not(.is-locked):hover { transform: translate(-50%, -50%) scale(1.07); }
+.gv-node:not(.is-locked):active { transform: translate(-50%, -50%) scale(0.94); }
 /* ⚠️ IT WRAPS TO THE SYMBOL, rather than running as wide as the name happens to be. nowrap made every
    label wider than the place it belonged to, so neighbouring names overlapped each other across the
    trail and it was no longer clear which name went with which drawing. */
-.gv-node-label { display: flex; flex-direction: column; align-items: center; line-height: 1.12;
-    max-width: 124%; padding: 2px 5px; border-radius: 7px; background: rgba(247, 238, 214, 0.88);
+/* ⚠️ THE NAME GETS ONE LINE AND THE STATE GETS A CHIP. It used to be two stacked blocks of wrapping
+   text in a box the width of a shrub, so "Mossy Hollow / The Mossmother" came out as three cramped lines
+   and the name and the state ran together. One line that truncates, one chip underneath. */
+.gv-node-label { display: flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.15;
+    max-width: 150%; padding: 3px 6px; border-radius: 7px; background: rgba(247, 238, 214, 0.92);
     border: 1px solid rgba(94, 70, 38, 0.28); text-align: center; }
-.gv-node-label em { font-style: normal; font-weight: 700; font-size: 0.58rem; color: #4a3720; }
-.gv-node-label u { text-decoration: none; font-size: 0.54rem; color: #7b6442; }
-/* Cleared is a gold seal on the label rather than a tick somewhere else — a scribe stamps the page. */
-.gv-node.is-clear .gv-node-label { background: rgba(250, 236, 196, 0.94); border-color: rgba(186, 142, 46, 0.75); }
-.gv-node.is-clear .gv-node-label u { color: #8a6514; font-weight: 700; }
+.gv-node-label em { font-style: normal; font-weight: 700; font-size: 0.6rem; color: #4a3720;
+    max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gv-node-label u { text-decoration: none; font-size: 0.52rem; font-weight: 700; color: #7b6442;
+    letter-spacing: 0.02em; padding: 1px 5px; border-radius: 999px; white-space: nowrap;
+    background: rgba(94, 70, 38, 0.10); }
+/* Cleared is a stamp on the page — a scribe marks a job finished. */
+.gv-node.is-clear .gv-node-label { background: rgba(250, 236, 196, 0.94); border-color: rgba(186, 142, 46, 0.6); }
+.gv-node.is-clear .gv-node-label u { color: #6f5208; background: rgba(186, 142, 46, 0.22); }
+.gv-node.is-clear .gv-node-label u::before { content: "✓ "; font-weight: 900; }
 /* ⚠️ A LOCKED PLACE KEEPS ITS DRAWING AND LOSES ITS COLOUR. Blanking it would make most of the chart
    empty paper with nothing to walk toward; full colour would spoil twelve places at a glance. */
 .gv-node.is-locked { cursor: not-allowed; }
@@ -541,9 +549,86 @@ export const GROVE_CSS = `
    "Locked" and nothing said why. The quota earns the right to FIGHT the boss; the boss opens the way.
    A node at quota with its boss alive is the one place the player should be going, so it says so and
    it is lit. */
-.gv-node.is-boss .gv-node-label { background: linear-gradient(180deg, #ffe3a8, #f0b44c); border-color: #b97d1c; }
-.gv-node.is-boss .gv-node-label u { color: #5a3708; font-weight: 800; }
-.gv-node.is-boss img { filter: drop-shadow(0 0 12px rgba(255,170,70,0.9)); animation: gv-bossbeat 2.2s ease-in-out infinite; }
+/* ── ⚠️ "A BOSS IS HERE" AND "GO HERE NEXT" ARE NOT THE SAME THING ───────────────────────────────
+   Both wore this amber and both pulsed, so a chart with two unfought bosses shouted twice and pointed
+   nowhere — Luke, reading his own map: "Why are two selected". On that save one of them was the frontier
+   and the other was four zones behind him. A boss standing behind you is a note; the frontier is an
+   instruction, and only one thing on a map may be an instruction. */
+.gv-node.is-boss .gv-node-label { border-color: rgba(185, 125, 28, 0.6); }
+.gv-node.is-boss .gv-node-label u { color: #7a4a06; background: rgba(240, 180, 76, 0.3); }
+.gv-node.is-boss:not(.is-next) img { filter: drop-shadow(0 2px 3px rgba(60,44,20,0.35))
+    drop-shadow(0 0 7px rgba(255,170,70,0.4)); }
+
+/* THE FRONTIER. One pin, one bob, one gold label — the single place the chart is pointing at. */
+.gv-node.is-next { z-index: 3; }
+.gv-node.is-next .gv-node-label { background: linear-gradient(180deg, #ffe3a8, #f0b44c);
+    border-color: #a86c12; box-shadow: 0 2px 10px rgba(150, 95, 10, 0.4); }
+.gv-node.is-next .gv-node-label em { color: #3a2906; }
+.gv-node.is-next .gv-node-label u { color: #4a2d04; background: rgba(255,255,255,0.42); }
+.gv-node.is-next img { filter: drop-shadow(0 3px 5px rgba(60,44,20,0.45))
+    drop-shadow(0 0 14px rgba(255,180,70,0.95)); animation: gv-bossbeat 2.2s ease-in-out infinite; }
+/* The pin: a dropped marker that lands once and then holds, so it reads as placed rather than throbbing. */
+.gv-node-pin { position: absolute; top: -17px; left: 50%; width: 15px; height: 15px; margin-left: -7.5px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: linear-gradient(135deg, #ffd978, #d98b16);
+    border: 1.5px solid #8a5607; box-shadow: 0 3px 7px rgba(60, 44, 20, 0.5);
+    animation: gv-pin-drop 560ms cubic-bezier(.2,1.5,.4,1) both; }
+.gv-node-pin::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: #5a3708; }
+@keyframes gv-pin-drop {
+    0% { opacity: 0; transform: rotate(-45deg) translate(14px, -14px) scale(0.5); }
+    100% { opacity: 1; transform: rotate(-45deg) translate(0, 0) scale(1); }
+}
+
+
+
+/* ── THE CHART'S CHROME ──────────────────────────────────────────────────────────────────────────────
+   ⚠️ .gv-paper-head HAD NO RULES AT ALL. It has been in the markup for two passes carrying the map name,
+   the map-to-map arrows and now the cleared count, and every one of them rendered as bare unstyled text
+   on parchment — invisible in every screenshot anybody looked at, including mine. Nothing fails when a
+   class is never styled; it just quietly does not exist.
+
+   Both of these sit OUTSIDE the horizontal scroller, over it, so they stay put while the paper slides. */
+.gv-paper-wrap { position: relative; width: 100%; height: 100%; }
+.gv-paper-wrap > .gv-paper { height: 100%; }
+
+.gv-paper-head { position: absolute; z-index: 4; top: 8px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 8px; padding: 5px 7px; border-radius: 999px;
+    max-width: calc(100% - 96px);
+    background: rgba(247, 238, 214, 0.94); border: 1px solid rgba(94, 70, 38, 0.32);
+    box-shadow: 0 3px 10px rgba(50, 36, 14, 0.3); }
+.gv-paper-head b { font-size: 0.76rem; font-weight: 800; color: #3f2e18; letter-spacing: 0.01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gv-paper-head i { font-style: normal; font-size: 0.6rem; font-weight: 700; color: #6f5a35;
+    white-space: nowrap; padding: 2px 7px; border-radius: 999px; background: rgba(94, 70, 38, 0.13); }
+.gv-paper-arrow { flex: none; width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+    display: grid; place-items: center; font: inherit; font-size: 0.9rem; line-height: 1;
+    color: #4a3720; background: rgba(94, 70, 38, 0.12); border: 1px solid rgba(94, 70, 38, 0.26); }
+.gv-paper-arrow:disabled { opacity: 0.3; cursor: default; }
+
+/* ── THE WHOLE CHART, AS TWELVE PIPS ──────────────────────────────────────────────────────────────
+   A phone shows about three of the twelve places, so without this there is no way to tell whether you
+   are near the start or the end, how much is left, or that something is still standing behind you. */
+.gv-paper-pips { position: absolute; z-index: 4; top: 42px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 5px; margin: 0; padding: 5px 10px; list-style: none; border-radius: 999px;
+    background: rgba(247, 238, 214, 0.9); border: 1px solid rgba(94, 70, 38, 0.28);
+    box-shadow: 0 2px 7px rgba(60, 44, 20, 0.22); }
+.gv-paper-pips li { width: 7px; height: 7px; border-radius: 50%; background: rgba(94, 70, 38, 0.18); }
+.gv-paper-pips li.is-done { background: #b98f2e; }
+.gv-paper-pips li.is-open { background: rgba(94, 70, 38, 0.45); }
+.gv-paper-pips li.is-boss { background: #e8a93a; }
+.gv-paper-pips li.is-next { background: #f0b44c; box-shadow: 0 0 0 2px rgba(240, 180, 76, 0.5);
+    transform: scale(1.3); }
+
+/* ── THE TRAIL DRAWS ITSELF ──────────────────────────────────────────────────────────────────────
+   The route you have walked inks in when the chart opens. One pass, 900ms, then it simply sits there —
+   a line that redrew on every render would be a fidget rather than an arrival.
+   ⚠️ A LENGTH LARGE ENOUGH FOR ANY ROUTE. The path is in percent space so its true length is small and
+   varies per map; 400 covers twelve legs of a 100x100 box with room to spare, and an over-long dash just
+   means the animation starts fully hidden, which is what it wants anyway. */
+.gv-paper-trail .is-walked { animation: gv-ink 900ms ease-out both; }
+@keyframes gv-ink { from { stroke-dasharray: 0 400; } to { stroke-dasharray: 7 6; } }
+@media (prefers-reduced-motion: reduce) {
+    .gv-paper-trail .is-walked, .gv-node-pin, .gv-node.is-next img { animation: none; }
+}
 @keyframes gv-bossbeat { 0%, 100% { scale: 1; } 50% { scale: 1.07; } }
 
 /* A hyper-rare off an ordinary kill is about one in two thousand -- the rarest thing in the feature.

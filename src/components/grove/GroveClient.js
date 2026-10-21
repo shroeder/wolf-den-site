@@ -371,6 +371,32 @@ export default function GroveClient({ initial }) {
     const mapIdx = openMaps.indexOf(shownMap);
     const walkedZones = shownZones.filter((z) => z.unlocked);
 
+    // ── ⚠️ ONE PLACE TO GO NEXT, AND IT IS NOT THE SAME AS "A BOSS IS HERE" ─────────────────────────
+    // Luke, looking at the chart: "Why are two selected". Nothing was — two zones had bosses standing
+    // and both wore the same loud amber, so the map was shouting twice and pointing nowhere. On his own
+    // save those two meant completely different things: Bramblewall is the deepest place he has opened
+    // and its boss is alive, which is the frontier; Mossy Hollow is unfinished business four zones
+    // BEHIND him. Identical styling for "go here next" and "you skipped this" is the whole confusion.
+    //
+    // The frontier is the deepest unlocked zone that is not finished. Exactly one, or none when every
+    // open zone is cleared and the next is still locked behind a boss elsewhere.
+    const zoneState = (z) => {
+        const atQuota = z.kills >= z.toUnlock;
+        return { atQuota, bossStands: atQuota && !z.bossDone, done: atQuota && z.bossDone };
+    };
+    const frontier = shownZones
+        .filter((z) => z.unlocked && !zoneState(z).done)
+        .sort((a, b) => b.n - a.n)[0] || null;
+    // The whole chart in one strip, because a phone only ever shows about three places of twelve.
+    const progress = shownZones.slice().sort((a, b) => a.n - b.n).map((z) => {
+        const st2 = zoneState(z);
+        if (!z.unlocked) return "locked";
+        if (st2.done) return "done";
+        if (st2.bossStands) return "boss";
+        return "open";
+    });
+    const clearedCount = progress.filter((x) => x === "done").length;
+
 
     const panel = view === "zone" ? zonePanel : view;
     const sheetNode = (
@@ -394,6 +420,12 @@ export default function GroveClient({ initial }) {
                     coordinates grove-map.js owns — a path painted into the art could never line up with nodes
                     positioned by code, and generated lettering is gibberish on inspection. */}
                 {panel === "map" ? (
+                    // ⚠️ THE CHROME SITS OUTSIDE THE SCROLLER. The map name and the progress pips were
+                    // inside .gv-paper-in, which is a 2:1 plate several screens wide — so they were
+                    // centred on the MAP rather than on the phone and slid off the edge the moment you
+                    // scrolled anywhere. A readout that travels with the thing it describes is a readout
+                    // nobody can read.
+                    <div className="gv-paper-wrap">
                     <div className="gv-paper" ref={stripRef}>
                         <div className="gv-paper-in">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -406,14 +438,6 @@ export default function GroveClient({ initial }) {
                             {/* Which paper this is. Only maps you have opened are reachable from here --
                                 the arrows are a way back to work you have done, not a preview of what is
                                 coming. */}
-                            <div className="gv-paper-head">
-                                <button type="button" className="gv-paper-arrow" disabled={mapIdx <= 0}
-                                    onClick={() => setPaperMap(openMaps[mapIdx - 1])} aria-label="Previous map">&lsaquo;</button>
-                                <b>{shownName}</b>
-                                <i>map {shownMap} of 12</i>
-                                <button type="button" className="gv-paper-arrow" disabled={mapIdx < 0 || mapIdx >= openMaps.length - 1}
-                                    onClick={() => setPaperMap(openMaps[mapIdx + 1])} aria-label="Next map">&rsaquo;</button>
-                            </div>
                             <svg className="gv-paper-trail" viewBox="0 0 100 100"
                                 preserveAspectRatio="none" aria-hidden="true">
                                 <path className="is-ghost" d={trailPath()} />
@@ -438,29 +462,56 @@ export default function GroveClient({ initial }) {
                                 // database, the player who has gone deepest had never fought a single
                                 // boss -- and with no boss there are no merits, and with no merits there
                                 // is no armour, which is most of why crafting felt pointless too.
-                                const atQuota = z.kills >= z.toUnlock;
-                                const bossStands = atQuota && !z.bossDone;
-                                const done = atQuota && z.bossDone;
+                                const { bossStands, done } = zoneState(z);
+                                const isNext = frontier?.id === z.id;
+                                // ⚠️ THE BOSS NAME ONLY ON THE FRONTIER. Everywhere else it blew the
+                                // label out to three wrapped lines -- "Mossy Hollow / The Mossmother" in
+                                // a box the width of a shrub. The name is flavour and it is worth having
+                                // exactly where the player is being asked to act; behind them a short
+                                // word does the job and the full name stays in the button's label.
+                                const state = !z.unlocked ? "Locked"
+                                    : done ? "Cleared"
+                                    : bossStands ? (isNext ? (z.bossDef?.name || "Boss waits") : "Boss alive")
+                                    : `${z.kills}/${z.toUnlock}`;
                                 return (
                                     <button key={z.id} type="button" data-n={z.n}
-                                        className={`gv-node${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}${bossStands ? " is-boss" : ""}`}
+                                        className={`gv-node${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}`
+                                            + `${bossStands ? " is-boss" : ""}${isNext ? " is-next" : ""}`}
                                         style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
                                         disabled={!z.unlocked} onClick={() => enter(z)}
-                                        aria-label={`${z.name}${z.unlocked ? "" : " (locked)"}`}>
+                                        aria-label={`${z.name} — ${z.unlocked ? (done ? "cleared"
+                                            : bossStands ? `${z.bossDef?.name || "boss"} still standing`
+                                            : `${z.kills} of ${z.toUnlock} cleared`) : "locked"}${isNext ? ", go here next" : ""}`}>
+                                        {isNext ? <span className="gv-node-pin" aria-hidden="true" /> : null}
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={z.node || nodeArt(z.id)} alt="" />
                                         <span className="gv-node-label">
                                             <em>{z.name}</em>
-                                            {z.unlocked
-                                                ? <u>{done ? "Cleared"
-                                                    : bossStands ? (z.bossDef?.name || "Boss waits")
-                                                    : `${z.kills}/${z.toUnlock}`}</u>
-                                                : <u>Locked</u>}
+                                            <u>{state}</u>
                                         </span>
                                     </button>
                                 );
                             })}
                         </div>
+                    </div>
+                                        <div className="gv-paper-head">
+                        <button type="button" className="gv-paper-arrow" disabled={mapIdx <= 0}
+                            onClick={() => setPaperMap(openMaps[mapIdx - 1])} aria-label="Previous map">&lsaquo;</button>
+                        <b>{shownName}</b>
+                        <i>{clearedCount}/{shownZones.length} cleared</i>
+                        <button type="button" className="gv-paper-arrow" disabled={mapIdx < 0 || mapIdx >= openMaps.length - 1}
+                            onClick={() => setPaperMap(openMaps[mapIdx + 1])} aria-label="Next map">&rsaquo;</button>
+                    </div>
+                    {/* ⚠️ THE WHOLE CHART IN ONE STRIP. A phone shows about three of the twelve
+                        places at a time, so without this there is no way to know whether you are
+                        near the start or the end, how much is left, or that anything is waiting
+                        behind you. Twelve pips is the cheapest possible overview and it reads
+                        without being explained. */}
+                    <ol className="gv-paper-pips" aria-label={`${clearedCount} of ${shownZones.length} zones cleared`}>
+                        {progress.map((kind, i) => (
+                            <li key={i} className={`is-${kind}${frontier && frontier.n % 12 === (i + 1) % 12 ? " is-next" : ""}`} />
+                        ))}
+                    </ol>
                     </div>
                 ) : null}
 
