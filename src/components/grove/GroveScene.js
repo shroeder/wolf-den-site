@@ -1448,7 +1448,12 @@ export default function GroveScene({
                         popWeight(hit.dealt, foe.maxHp));
                     playHit(Math.min(COMBO_PITCH_STEPS, w.combo), hit.crit);
                     // The haste roll rides the landed blow, the same place the ring rolls it.
-                    if ((stats?.haste || 0) > 0 && w.rand() < procFrom(stats.haste, HASTE_PER_POINT)) {
+                    // ⚠️ THE SHARE RIDES ON TOP OF THE POINTS, SAME AS LIFESTEAL. Bloodscent pays a flat
+                    // percentage and the ring adds it after the per-point curve; this read the points
+                    // alone, so a Reaver's node did nothing here.
+                    const hasteOdds = procFrom(stats?.haste || 0, HASTE_PER_POINT)
+                        + Math.max(0, Number(stats?.hasteBonus) || 0);
+                    if (hasteOdds > 0 && w.rand() < hasteOdds) {
                         // ⚠️ THE WORD ONLY FIRES WHEN THE BUFF ACTUALLY STARTS. The roll happens on every
                         // landed blow, so a proc landing while haste was ALREADY running printed a second
                         // HASTE on top of the first -- two identical words overlapping, which reads as a

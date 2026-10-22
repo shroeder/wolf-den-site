@@ -30,6 +30,8 @@ import { pickHyper, rollBoss } from "@/lib/marketplace/grove-roll.js";
 import { makeTelegraph } from "@/lib/marketplace/grove-world.js";
 import { CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { DECORATIONS } from "@/lib/marketplace/decorations.js";
+import { CLASSES, treeFor } from "@/lib/marketplace/arena-classes.js";
+import { fighterFrom } from "@/lib/marketplace/arena.js";
 import {
     HERO_UNITS, PET_UNITS, SKY_TILE_COUNT,
     viewFor, petFollow, cameraX, cameraY, screenX, fetchRangeFor, bossNoticeFor, petLostFor,
@@ -471,6 +473,56 @@ console.log(`  backdrops to draw: ${zones} (one per zone)`);
 //
 // So: run the real geometry at the real viewport sizes and assert the two things a player would notice.
 // Reading the component would never have shown this; only putting numbers through it does.
+// ── ⚠️ EVERY CLASS NODE EITHER COUNTS IN A ZONE OR IS NAMED HERE AS NOT COUNTING ───────────────────────────
+// Luke: "all choices on your class must be honored."
+//
+// grove-kit's forGrove() is an ALLOWLIST, and an allowlist forgotten as the data grows is the bug that cost
+// The Long Road a hundred unpaid fights and that treeAbilities carries a warning about. It was doing it
+// again: fighterFrom computes every tree stat correctly, the ring applies them, and forGrove named fourteen
+// fields -- so a Warden could spend twelve nodes and have two of them mean anything in here, silently, with
+// a screen that said nothing either way.
+//
+// This asks the engine the same question grove-kit does and prints the answer every run. A node that moves
+// no Grove number must be named in NOT_IN_THE_GROVE with the mechanic it is waiting on; anything else fails
+// the build. So the gap is a list somebody chose rather than a thing nobody knew.
+const GROVE_FIELDS = ["damage", "critChance", "critMult", "tempo", "haste", "lifesteal", "lifestealBonus",
+    "hasteBonus", "stun", "bleedChance", "bleedDamage", "bleedLeech", "armor", "health", "dmgPct", "might"];
+// The mechanic each one is waiting for. Shrinking this list is the work; adding to it is a decision.
+const NOT_IN_THE_GROVE = {
+    counterBonus: "no counter-attack in a side-scroller yet",
+    stunBonus: "the hero has stun points and nothing in a zone reads them",
+    wildProc: "no wild proc",
+    blockChance: "no block", blockReductionBonus: "no block",
+    guardChance: "no guard", guardSize: "no guard",
+    regen: "no heal-over-time on the hero", grudge: "no grudge", thorns: "no reflect",
+    burnChance: "no burn (the bleed machine could carry it)", burnDamage: "no burn", burnLeech: "no burn",
+    freeze: "no freeze", chill: "no slow", iceThorns: "no reflect",
+    ward: "no absorb shield", wardRefill: "no absorb shield",
+    surge: "no surge", soulfire: "no soulfire", cataclysm: "no cataclysm",
+};
+{
+    // A realistic build: a multiplier on a zero base looks inert and is not.
+    const S = { might: 300, vitality: 250, armor: 180, crit_chance: 0.2, crit_power: 0.6,
+        lifesteal: 12, ferocity: 40, tenacity: 30, haste: 25, stun: 10 };
+    const base = fighterFrom(S, {}, null);
+    const inert = [];
+    for (const c of CLASSES) {
+        for (const n of treeFor(c.id)) {
+            if (!n.stat) continue;
+            const f = fighterFrom(S, { [n.stat]: (n.per || 0) * (n.ranks || 1) || 1 }, null);
+            const moved = GROVE_FIELDS.some((k) => Math.abs((Number(f[k]) || 0) - (Number(base[k]) || 0)) > 1e-9);
+            if (moved) continue;
+            if (!NOT_IN_THE_GROVE[n.stat]) {
+                fail.push(`${c.name}'s ${n.name} (${n.stat}) moves no Grove number and is not named in NOT_IN_THE_GROVE — a class node nobody can spend points in`);
+            } else inert.push(`${c.name} ${n.name} — ${NOT_IN_THE_GROVE[n.stat]}`);
+        }
+    }
+    const total = CLASSES.reduce((a, c) => a + treeFor(c.id).filter((n) => n.stat).length, 0);
+    console.log(`
+  class nodes honoured in the Grove: ${total - inert.length}/${total}`);
+    for (const line of inert) console.log(`    waiting:  ${line}`);
+}
+
 const VIEWPORTS = [
     [360, 640, "small phone"],
     [390, 844, "phone portrait"],

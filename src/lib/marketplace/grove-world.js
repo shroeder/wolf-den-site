@@ -313,7 +313,14 @@ export function swing(f, targetArmour, rand) {
 
     // LIFESTEAL IS RAW POINTS and the per-point rate lives with the engine, so a point is worth the same
     // here as it is in the ring.
-    const healed = Math.round(dealt * procFrom(Number(f?.lifesteal) || 0, LIFESTEAL_PER_POINT));
+    //
+    // ⚠️ PLUS THE SHARE, WHICH IS WHERE THE CLASS TREE LIVES. Bloodletting and Bloodwarden pay a flat
+    // percentage rather than points, and arena.js folds them into `lifestealBonus` precisely because it
+    // has to be added AFTER the per-point curve -- running a share through procFrom would price it as if
+    // it were points. The ring has always done this; the Grove dropped the field before the swing ever
+    // saw it, so two nodes of a Reaver's tree and one of a Warden's healed nobody in here.
+    const healed = Math.round(dealt * (procFrom(Number(f?.lifesteal) || 0, LIFESTEAL_PER_POINT)
+        + Math.max(0, Number(f?.lifestealBonus) || 0)));
 
     // ── BLEED: A SHARE OF THE BLOW THAT KEEPS ARRIVING ──────────────────────────────────────────────────
     // ⚠️ THE MAGNITUDE IS A SHARE OF WHAT LANDED, NOT A FLAT NUMBER. Piercing armour is bleed's identity —

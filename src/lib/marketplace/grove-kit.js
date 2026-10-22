@@ -92,6 +92,17 @@ function forGrove(f) {
         // Raw points. The per-point conversions live in the engine, so they are applied at the swing.
         haste: Math.max(0, Number(f.haste) || 0),
         lifesteal: Math.max(0, Number(f.lifesteal) || 0),
+        // ── ⚠️ THE SHARES THAT RIDE ON TOP OF THE POINTS, WHICH THIS LIST WAS DROPPING ─────────
+        // Luke: "all choices on your class must be honored." forGrove is an allowlist, and an allowlist
+        // forgotten as the data grew is the bug that cost The Long Road a hundred unpaid fights. It was
+        // doing it again one layer down: fighterFrom computes lifestealBonus and hasteBonus correctly,
+        // the ring applies both, and this line never named them -- so Bloodletting, Bloodwarden and
+        // Bloodscent, three nodes a player spent real points in, were worth exactly nothing in a zone.
+        //
+        // Points and shares are different things and both are needed: `lifesteal` above is raw points
+        // through LIFESTEAL_PER_POINT, and this is the share the engine adds AFTER that conversion.
+        lifestealBonus: Math.max(0, Number(f.lifestealBonus) || 0),
+        hasteBonus: Math.max(0, Number(f.hasteBonus) || 0),
         stun: Math.max(0, Number(f.stun) || 0),
         // Shares already.
         bleedChance: Math.max(0, Math.min(1, Number(f.bleedChance) || 0)),
