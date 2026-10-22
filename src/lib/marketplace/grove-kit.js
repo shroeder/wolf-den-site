@@ -45,6 +45,20 @@ const logger = createServerLogger({ source: "api", subsystem: "grove-kit" });
  * a rate there, so it rides the class tree's tempoBonus; and move speed is the Grove's alone, because
  * there is nothing in the ring to walk across.
  */
+/**
+ * The same perk bag with the tree's own contributions subtracted back out.
+ *
+ * ⚠️ SUBTRACTED RATHER THAN REBUILT. perks is the tree plus the arena upgrades summed per key, so a
+ * second pass that simply omitted the tree would also drop whatever an upgrade put in the same key --
+ * and the diff would then credit the class with an upgrade's number, which is the one direction a
+ * readout must never be wrong in.
+ */
+function withoutTree(perks, tree) {
+    const out = { ...(perks || {}) };
+    for (const [k, v] of Object.entries(tree || {})) out[k] = (Number(out[k]) || 0) - (Number(v) || 0);
+    return out;
+}
+
 function addGroveStat(stats, bag, onTempo, onMove) {
     for (const [stat, v] of Object.entries(bag || {})) {
         if (!v) continue;
@@ -171,11 +185,41 @@ export async function groveFighter(buyerId) {
         }
         perks.tempoBonus = (Number(perks.tempoBonus) || 0) + emblemTempo;
 
-        return { ...forGrove(fighterFrom(stats, perks, classId)), moveSpeed };
+        // ── ⚠️ WHO YOU ARE COMES OUT WITH WHAT YOU HIT FOR ────────────────────────────────────────
+        // Luke: readability. The class tree has been folded into this fighter since grove-kit was
+        // written -- a Reaver's Rend and a Warden's Bulwark genuinely change how a dive goes -- and both
+        // the class id and the tree's contribution were computed here and dropped on this line. So the
+        // Grove honoured the player's class perfectly and never once said it had.
+        //
+        // ⚠️ THE TREE ALONE, NOT `perks`. perks is the tree PLUS the arena upgrades, and attributing an
+        // upgrade's number to the class would be a readout that lies in the player's favour -- the exact
+        // kind of wrong that nobody reports because it flatters them. The upgrades have their own screen.
+        const mine = forGrove(fighterFrom(stats, perks, classId));
+
+        // ── ⚠️ WHAT THE CLASS IS WORTH HERE, ASKED OF THE ENGINE RATHER THAN DESCRIBED ────────────
+        // The obvious readout is a list of the nodes you have taken, and it would be wrong: the three
+        // trees grant about thirty distinct stats and the Grove's engine reads fourteen. A Warden's
+        // Thornmail and Bastion are real points spent on nodes this zone does not implement, so a screen
+        // listing them says "your class is doing this here" about things it is not doing.
+        //
+        // So the difference is MEASURED: build the same fighter with the tree and without it, and report
+        // where the Grove's own numbers actually moved. It cannot drift from the engine because it is the
+        // engine answering, it needs no table of stat names to maintain, and the day a node is added or
+        // the Grove starts reading thorns, this is right on its own. Pure arithmetic over values already
+        // in memory -- no query, nothing to bill.
+        // ⚠️ SPREADING THE NEGATIVES OVER perks WOULD NOT SUBTRACT, IT WOULD REPLACE -- and the first
+        // cut of this line did exactly that, which credits the class with every upgrade sharing a key.
+        const without = forGrove(fighterFrom(stats, withoutTree(perks, tree), classId));
+        const classGives = {};
+        for (const k of Object.keys(mine)) {
+            const d = (Number(mine[k]) || 0) - (Number(without[k]) || 0);
+            if (Math.abs(d) > 1e-9) classGives[k] = d;
+        }
+        return { ...mine, moveSpeed, classId, classGives };
     } catch (error) {
         logger.warn("grove_kit.failed", { message: error?.message });
         // A broken lookup must not shut the Grove — it falls back to the neutral fighter, which is what an
         // account with nothing equipped would get anyway.
-        return { ...forGrove(fighterFrom({}, {}, null)), moveSpeed: 0 };
+        return { ...forGrove(fighterFrom({}, {}, null)), moveSpeed: 0, classId: null, classGives: {} };
     }
 }

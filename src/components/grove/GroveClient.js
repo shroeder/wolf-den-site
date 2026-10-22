@@ -23,6 +23,7 @@ import {
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { MAP_LAYOUT, nodeArt, spotForDepth, trailForZones, trailPath } from "@/lib/marketplace/grove-map.js";
 import { celebrateUnlock } from "@/components/grove/grove-sfx.js";
+import { CLASSES } from "@/lib/marketplace/arena-classes.js";
 
 // ── THE GROVE ────────────────────────────────────────────────────────────────────────────────────────────────
 // Map, zone, bag, bank, workbench and emblems. The scene itself is GroveScene; this is everything around it.
@@ -36,6 +37,36 @@ const post = (body) => fetch("/api/marketplace/grove", {
 }).then((r) => r.json()).catch(() => ({ ok: false }));
 
 const partName = (id) => GROVE_PARTS[id]?.name || id;
+
+// ── HOW A GROVE STAT READS ──────────────────────────────────────────────────────────────────────────────────
+// ⚠️ THE ORDER IS THE READING ORDER, not alphabetical: what you hit for, then how often it lands big, then
+// speed, then the things that keep you alive. A player scanning this wants the headline first.
+//
+// ⚠️ AND THE UNITS ARE NOT UNIFORM, WHICH IS WHY EACH ONE CARRIES ITS OWN FORMATTER. critChance is a SHARE
+// (0.17 is 17%), tempo is a MULTIPLE of the bare swing rate, haste and armour are raw POINTS fed through
+// curves at the swing. Printing all of them one way is how a 0.06 becomes "+0.06 crit chance".
+//
+// ⚠️ ONE pct, NOT A SECOND IDENTICAL `mult`. A share and a multiplier delta mean different things and
+// render identically, and the first cut gave them a function each -- two names for one operation, which
+// is the thing that drifts the day somebody edits only the one they are looking at.
+const pct = (v) => `${v > 0 ? "+" : ""}${(v * 100).toFixed(1).replace(/\.0$/, "")}%`;
+const pts = (v) => `${v > 0 ? "+" : ""}${Math.round(v)}`;
+const GROVE_STAT_READOUT = {
+    damage: { label: "Damage a swing", fmt: pts },
+    dmgPct: { label: "All damage", fmt: pct },
+    might: { label: "Might", fmt: pts },
+    critChance: { label: "Crit chance", fmt: pct },
+    critMult: { label: "Crit damage", fmt: pct },
+    tempo: { label: "Attack speed", fmt: pct },
+    haste: { label: "Haste", fmt: pts },
+    bleedChance: { label: "Bleed chance", fmt: pct },
+    bleedDamage: { label: "Bleed damage", fmt: pct },
+    bleedLeech: { label: "Bleed leech", fmt: pts },
+    lifesteal: { label: "Lifesteal", fmt: pts },
+    stun: { label: "Stun", fmt: pts },
+    armor: { label: "Armour", fmt: pts },
+    health: { label: "Health", fmt: pts },
+};
 
 // ── ⚠️ THE MAIN SCREEN IS THE MAP, AND EVERYTHING ELSE FLOATS ────────────────────────────────────────────────
 // Luke: "The main screen for the grove. It should only have a map. The backpack and other stuff should be
@@ -341,6 +372,26 @@ export default function GroveClient({ initial }) {
         if (!slots) return null;
         return Math.max(0, slots - Object.keys(st?.pack || {}).length);
     }, [st?.packSlots, st?.pack]);
+
+    // ── WHAT THE CLASS IS, AND WHAT IT IS WORTH IN HERE ────────────────────────────────────────────
+    // ⚠️ THE LABELS ARE THE GROVE'S OWN FOURTEEN, NOT THE TREE'S THIRTY. classGives arrives already in
+    // this engine's vocabulary because grove-kit measured it against this engine, so the map below only
+    // ever has to cover what a zone can actually do. A table of every stat the three trees grant would
+    // be a second copy of arena-classes, forever one node behind it.
+    const heroClass = useMemo(
+        () => CLASSES.find((c) => c.id === st?.hero?.classId) || null,
+        [st?.hero?.classId],
+    );
+    const classLines = useMemo(() => {
+        const gives = st?.hero?.classGives || {};
+        const out = [];
+        for (const [key, meta] of Object.entries(GROVE_STAT_READOUT)) {
+            const v = Number(gives[key]) || 0;
+            if (!v) continue;
+            out.push({ key, label: meta.label, value: meta.fmt(v) });
+        }
+        return out;
+    }, [st?.hero?.classGives]);
 
     const beltNow = useMemo(() => {
         const id = st?.belt;
@@ -802,6 +853,49 @@ export default function GroveClient({ initial }) {
                 {/* ── EMBLEMS ──────────────────────────────────────────────────────────────────────── */}
                 {panel === "emblems" ? (
                     <div className="gv-emblems">
+                        {/* ── ⚠️ YOUR CLASS HAS BEEN COUNTING IN HERE ALL ALONG ────────────────────
+                            grove-kit folds the class tree into the Grove fighter -- a Reaver's Rend and
+                            a Warden's Bulwark genuinely change how a dive goes -- and nothing anywhere
+                            in the feature mentioned a class existed. Points spent, numbers moved, and
+                            the game silent about it, which is the same fault crafting had.
+
+                            ⚠️ AND IT SHOWS WHAT THE GROVE ACTUALLY USES, NOT WHAT THE TREE GRANTS. The
+                            three trees hand out about thirty stats and this engine reads fourteen, so a
+                            list of the nodes you have taken would claim Thornmail is working here. These
+                            numbers are measured by grove-kit against the engine itself -- the same
+                            fighter built with and without the tree -- so the screen cannot promise
+                            something the zone does not do. See classGives. */}
+                        <Area id="training" icon="ui-emblems" title="Your Training"
+                            count={heroClass ? heroClass.name : "no class"}>
+                            {heroClass ? (
+                                <div className="gv-train">
+                                    <img className="gv-train-sigil" src={heroClass.emblem} alt=""
+                                        width={46} height={46} />
+                                    <div className="gv-train-body">
+                                        <b style={{ color: heroClass.color }}>{heroClass.name}</b>
+                                        <em>{heroClass.tag}</em>
+                                        {classLines.length ? (
+                                            <ul className="gv-train-list">
+                                                {classLines.map((l) => (
+                                                    <li key={l.key}><span>{l.label}</span><b>{l.value}</b></li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            // ⚠️ A CLASS WITH NO POINTS IN IT IS NOT A BROKEN READOUT.
+                                            // Picking a class costs nothing; the tree is where the choice
+                                            // actually happens, and an empty one is genuinely worth zero
+                                            // here. Saying so beats an empty box the player reads as a bug.
+                                            <p className="muted">No points spent yet — your tree is worth
+                                                nothing in the Grove until it has some.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="muted">No class chosen. A class changes how you fight in
+                                    here as much as it does in the Arena.</p>
+                            )}
+                        </Area>
+
                         <Area id="emblems" icon="ui-emblems" title="Emblems"
                             count={`${(st.emblems || []).filter((e) => e.slot != null).length}/3 worn`}>
                         {/* ⚠️ NO CAPTION HERE. It read "Three may be worn. Three more are sealed." —

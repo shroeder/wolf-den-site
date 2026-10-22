@@ -2068,6 +2068,26 @@ export const GROVE_CSS = `
     100% { background: rgba(0,0,0,0.5); color: #fff6df; }
 }
 
+/* ── YOUR CLASS, IN THE GROVE'S OWN NUMBERS ───────────────────────────────────────────────────
+   The sigil is the Arena's own class emblem rather than a second drawing -- a Reaver should be the same
+   object in both places, and a member who has stared at that mark in the ring recognises it here with
+   no caption at all. */
+.gv-train { display: flex; gap: 12px; align-items: flex-start; }
+.gv-train-sigil { flex: none; width: 46px; height: 46px; object-fit: contain;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.6)); }
+.gv-train-body { flex: 1; min-width: 0; }
+.gv-train-body > b { display: block; font-size: 1rem; line-height: 1.2; }
+.gv-train-body > em { display: block; font-style: normal; font-size: 0.76rem; color: #a99f8d;
+    margin-bottom: 8px; }
+/* Two columns on anything but the narrowest phone: these are short label/value pairs and a single
+   column of them is a tall thin list with half the card empty beside it. */
+.gv-train-list { list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(146px, 1fr)); gap: 2px 14px; }
+.gv-train-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    font-size: 0.8rem; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.gv-train-list li span { color: #cfc6b6; }
+.gv-train-list li b { color: #9fe08a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 .gv-tablet ul { margin: 8px 0 0; padding-left: 18px; font-size: 0.82rem; color: #cfc6b6; }
 
 /* ── THE WORKBENCH ───────────────────────────────────────────────────────────────────────────── */
