@@ -535,6 +535,47 @@ export const GROVE_CSS = `
     .gv-flash { display: none; }
 }
 
+/* ── ⚠️ WHAT IS HAPPENING TO A CREATURE, FOR AS LONG AS IT IS HAPPENING ───────────────────────
+   Luke: "it should feel like a real game." A freeze holds for two seconds, a chill for eight, a burn
+   for three ticks -- and every one of them used to be a word that flashed once over a body that then
+   looked completely untouched for the whole duration. You could not glance at a fight and see which
+   creature was on fire.
+
+   ⚠️ MASKED TO THE SPRITE, LIKE THE FLASH ABOVE, AND HIDDEN ENTIRELY WHERE MASKING IS NOT SUPPORTED.
+   A tinted rectangle sitting over a creature is worse than no tint, which is exactly why .gv-flash
+   carries the same fallback. */
+.gv-status { position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    -webkit-mask-image: var(--gv-art-url); mask-image: var(--gv-art-url);
+    -webkit-mask-size: contain; mask-size: contain;
+    -webkit-mask-position: 50% 100%; mask-position: 50% 100%;
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    transition: opacity 180ms ease; }
+@supports not ((-webkit-mask-image: url(x)) or (mask-image: url(x))) {
+    .gv-status { display: none; }
+}
+/* Fire sits ON the body and moves; ice sits over it and does not. The burn flickers because a flame
+   that holds still reads as a colour wash, and the whole point is that it is alive. */
+.gv-status.is-burning { opacity: 0.62;
+    background: linear-gradient(0deg, #ff7a18 0%, #ffb347 42%, rgba(255,220,150,0.35) 100%);
+    animation: gvBurnFlicker 420ms steps(3, end) infinite; }
+@keyframes gvBurnFlicker { 0% { opacity: 0.52; } 50% { opacity: 0.72; } 100% { opacity: 0.52; } }
+/* A hard, flat, pale blue -- the one condition that should read as STOPPED, so nothing about it moves. */
+.gv-status.is-frozen { opacity: 0.74; background: linear-gradient(0deg, #6fb5ff 0%, #cdeaff 100%); }
+/* ⚠️ A STUN IS A BLOW TO THE HEAD, NOT ICE. It holds a creature through the same lock a freeze does,
+   which is right mechanically and would be wrong on screen: a player has to be able to tell which of
+   their own stats just fired. Hot white rather than blue, and it pulses, because a stunned creature is
+   reeling where a frozen one is stopped. */
+.gv-status.is-stunned { opacity: 0.6; background: linear-gradient(0deg, #ffe9a8 0%, #fffdf2 100%);
+    animation: gvStunReel 300ms ease-in-out infinite; }
+@keyframes gvStunReel { 0%, 100% { opacity: 0.44; } 50% { opacity: 0.68; } }
+/* Chill is the same colour at a fraction of the weight: a creature slowed, not stopped. */
+.gv-status.is-chilled { opacity: 0.3; background: linear-gradient(0deg, #6fb5ff 0%, #cdeaff 100%); }
+/* ⚠️ BURNING AND FROZEN AT ONCE IS CATACLYSM, and it must not look like either one alone -- that
+   combination is one swing in twenty on a full tree and the rarest thing a Runecaller does. */
+.gv-status.is-burning.is-frozen { opacity: 0.8;
+    background: linear-gradient(0deg, #ff7a18 0%, #ffd9a0 45%, #cdeaff 100%);
+    animation: none; }
+
 /* ── THE CONTACT SHADOW ───────────────────────────────────────────────────────────────────────
    The only thing on screen that says how high off the floor a body is, which makes it the thing that sells
    "grounded" — a sprite with no shadow is pasted on, and the Grove had none. The loop plants it at the
@@ -720,7 +761,9 @@ export const GROVE_CSS = `
        appear, so the slide goes and the line stays. See animations-always-play for the house rule and
        why the bump on a kill count does not get this treatment. */
     .gv-paper-trail .is-walked, .gv-node-pin, .gv-node.is-next img, .gv-note.is-zone,
-    .gv-belt.is-eat, .gv-belt.is-eat i { animation: none; }
+    .gv-belt.is-eat, .gv-belt.is-eat i,
+    /* The tint IS the readout; only the flicker on it is decoration. */
+    .gv-status.is-burning, .gv-status.is-stunned { animation: none; }
 }
 @keyframes gv-bossbeat { 0%, 100% { scale: 1; } 50% { scale: 1.07; } }
 
@@ -1162,6 +1205,26 @@ export const GROVE_CSS = `
    Only the heal, deliberately: the haste proc is left-anchored, tuned and shipped, and moving it is not
    this change's business. This one carries a sprite and a two-word name, so it is nearly three times as
    wide and hangs off the hero's shoulder instead of sitting over him. */
+/* ── THE COLD, AND THE ONE THAT IS BOTH ───────────────────────────────────────────────────────
+   FROZEN, STUNNED and CHILLED used to be drawn at damage-number size while SURGE and HASTE got the big
+   tracked call-out with a ring behind it -- so the most dramatic things in the game were the quietest
+   on screen. A freeze that stops a creature dead for two seconds should not land softer than an
+   attack-speed buff. */
+.gv-proc.is-ice { translate: -50% 0; color: #cdeaff; letter-spacing: 0.22em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(140,210,255,0.95), 0 0 34px rgba(60,150,255,0.6); }
+.gv-boom.is-ice { border-color: rgba(190,230,255,0.95); }
+/* Hot white, the stun's own. Warm because a blow landed; not gold, because a crit already owns gold. */
+.gv-proc.is-stun { translate: -50% 0; color: #fffdf2; letter-spacing: 0.22em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,235,170,0.95), 0 0 32px rgba(255,200,80,0.6); }
+.gv-boom.is-stun { border-color: rgba(255,240,190,0.95); }
+/* Both halves at once, so it wears both colours and is the only thing on screen that does. */
+.gv-proc.is-cata { translate: -50% 0; color: #ffd9a0; letter-spacing: 0.26em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.95), 0 0 18px rgba(255,150,60,0.95), 0 0 38px rgba(120,190,255,0.8); }
+.gv-boom.is-cata { border-color: rgba(255,200,140,0.95); }
+/* Soulfire is a second blow of pure magic off the first, so it is neither a hit colour nor a crit one. */
+.gv-num.is-soul { color: #e3b8ff; --gv-nb: 0.9;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(190,120,255,0.9); }
+
 /* ── THE WARDEN'S ANSWER ──────────────────────────────────────────────────────────────────────
    Steel rather than heat. Every other call-out in here is something the player DID to a creature --
    a crit, a haste proc, a poultice -- and this one is something that did not happen to them, which is

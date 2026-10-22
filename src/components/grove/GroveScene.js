@@ -1065,7 +1065,12 @@ export default function GroveScene({
         // over the hero to itself. The quaff does not: it is TRIGGERED by the blow that dropped him under
         // the line, so the red number for that blow is in the frame at the same instant and at the same
         // height, and the two drew through each other every single time. Haste keeps its tuned 0.9.
-        const procCall = (text, kind = "haste", art = null, atY = 0.9) => {
+        // ⚠️ AND IT CAN RIDE SOMEWHERE OTHER THAN THE HERO. Every proc this was built for happens TO the
+        // player -- haste, surge, a poultice -- so it was hardcoded to him. The conditions are the
+        // opposite: a freeze, a stun, a chill happen to a CREATURE, and announcing them over the hero
+        // tells the player the one thing they already know (it was them) instead of the thing they need
+        // (which of thirty bodies it landed on). `on` is the body it belongs to.
+        const procCall = (text, kind = "haste", art = null, atY = 0.9, on = null) => {
             const layer = fxRef.current;
             if (!layer) return;
             const el = document.createElement("b");
@@ -1082,14 +1087,15 @@ export default function GroveScene({
             layer.appendChild(el);
             // Positioned by the same pop pipeline so it rides the camera and is cleaned up with everything
             // else -- a hand-placed node here would be left behind by a zone swap.
-            const pr = makePop("proc", w.hero.x, w.hero.y + w.hero.h * atY, w.rand);
+            const src = on || w.hero;
+            const pr = makePop("proc", src.x, src.y + src.h * atY, w.rand);
             pr.born = w.sceneNow ? w.sceneNow() : performance.now();
             pr.weight = 1;
             pr.tilt = 0;
             pr.node = el;
             w.pops.push(pr);
             // The ring is what makes it read as coming OUT of the hero rather than appearing above him.
-            shockwave(w.hero.x, w.hero.y + w.hero.h * 0.45, kind);
+            shockwave(src.x, src.y + src.h * 0.45, kind);
             w.shake.add(TRAUMA.hit * 0.8);
         };
 
@@ -1548,15 +1554,21 @@ export default function GroveScene({
                     // them through the same `def.stunned` counter and the only differences here are the
                     // duration and the word. A second copy would be the bleed/burn mistake again.
                     // `word` may be null when the caller has already announced itself -- see cataclysm.
-                    const lock = (ms, word) => {
+                    const lock = (ms, word, kind = "ice") => {
                         if (foe.isBoss || now < (foe.lockImmuneUntil || 0)) return false;
                         foe.stunUntil = now + ms;
+                        // Which kind of hold this was, so the body can wear the right one.
+                        foe.lockKind = kind;
                         foe.lockImmuneUntil = foe.stunUntil + LOCK_IMMUNE_MS;
                         foe.nextAttack = Math.max(foe.nextAttack || 0, foe.stunUntil);
                         foe.windUntil = 0;
                         // Filtered rather than removed by hand: React owns these nodes.
                         w.tels = w.tels.filter((t) => t.foeUid !== foe.uid);
-                        if (word) addPop("proc", word, foe.x, foe.y + foe.h * 1.05);
+                        // ⚠️ procCall, NOT addPop. These were drawn at damage-number size while SURGE
+                        // and HASTE got the big tracked call-out with a ring -- so the most dramatic
+                        // things in the game were the quietest on screen. A freeze that stops a creature
+                        // dead for two seconds should not land softer than an attack-speed buff.
+                        if (word) procCall(word, kind, null, 1.15, foe);
                         return true;
                     };
 
@@ -1565,8 +1577,8 @@ export default function GroveScene({
                     const freezeOdds = Math.max(0, Number(stats?.freeze) || 0);
                     // ⚠️ FREEZE IS OFFERED FIRST because it is the longer hold and the rarer stat; rolling
                     // the stun first would let a 15% stun eat the roll a 10% freeze was going to win.
-                    if (freezeOdds > 0 && w.rand() < freezeOdds) lock(FREEZE_MS, "FROZEN");
-                    else if (stunOdds > 0 && w.rand() < stunOdds) lock(STUN_MS, "STUNNED");
+                    if (freezeOdds > 0 && w.rand() < freezeOdds) lock(FREEZE_MS, "FROZEN", "ice");
+                    else if (stunOdds > 0 && w.rand() < stunOdds) lock(STUN_MS, "STUNNED", "stun");
 
                     // ── THE COLD BUILDS UP ──────────────────────────────────────────────────────
                     // Every landed blow adds another share and the whole thing fades over eight
@@ -1577,7 +1589,7 @@ export default function GroveScene({
                         const was = foe.chill || 0;
                         foe.chill = Math.min(CHILL_MAX, was + chillPer);
                         foe.chillAt = now;
-                        if (was === 0) addPop("proc", "CHILLED", foe.x, foe.y + foe.h * 1.05);
+                        if (was === 0) procCall("CHILLED", "ice", null, 1.15, foe);
                     }
 
                     // ── ⚠️ SOULFIRE GOES PAST ARMOUR AND PAST SHIELDS BOTH ─────────────────────
@@ -1587,7 +1599,7 @@ export default function GroveScene({
                     if ((stats?.soulfire || 0) > 0 && hit.dealt > 0 && foe.hp > 0) {
                         const soul = Math.max(1, Math.round(hit.dealt * stats.soulfire));
                         foe.hp -= soul;
-                        addPop("proc", `${soul}`, foe.x, foe.y + foe.h * 0.8);
+                        addPop("soul", `${soul}`, foe.x, foe.y + foe.h * 0.8);
                     }
 
                     // ── CATACLYSM LIGHTS AND FREEZES AT ONCE, BOTH GUARANTEED ──────────────────
@@ -1604,7 +1616,9 @@ export default function GroveScene({
                         // tell the player nothing, which is the exact fault this whole pass has been
                         // about. The burn is the half that always happens; the freeze is the half that
                         // can be refused.
-                        addPop("proc", "CATACLYSM", foe.x, foe.y + foe.h * 1.05);
+                        // The rarest thing a Runecaller does -- one swing in twenty at a full tree, and
+                        // it is both halves at once. It gets its own word and its own colour.
+                        procCall("CATACLYSM", "cata", null, 1.3, foe);
                         lock(FREEZE_MS, null);
                     }
 
@@ -2465,6 +2479,22 @@ export default function GroveScene({
                     continue;
                 }
                 const born = now - (f.born || 0);
+                // ── THE CONDITION ON THE BODY ──────────────────────────────────────────────────
+                // ⚠️ WRITTEN ONLY WHEN IT CHANGES. This runs for every creature every frame -- thirty
+                // bodies at sixty hertz -- and assigning className unconditionally would dirty the style
+                // of every one of them on every tick for no reason. The cached string is the guard.
+                if (f.statusNode) {
+                    // ⚠️ A STUN IS NOT A FREEZE AND MUST NOT LOOK LIKE ONE. Both hold a creature still
+                    // through the same lock, which is right mechanically and wrong visually: one is a
+                    // blow to the head and the other is ice. A player reading a fight has to be able to
+                    // tell which of their own stats just fired. lock() records which it was.
+                    const held = now < (f.stunUntil || 0);
+                    const cls = "gv-status"
+                        + (f.burn ? " is-burning" : "")
+                        + (held ? (f.lockKind === "ice" ? " is-frozen" : " is-stunned") : "")
+                        + ((f.chill || 0) > 0 && !held ? " is-chilled" : "");
+                    if (f.statusCls !== cls) { f.statusNode.className = cls; f.statusCls = cls; }
+                }
                 if (born < SPAWN_FADE_MS && f.node) f.node.style.opacity = String(born / SPAWN_FADE_MS);
                 else if (f.node && f.node.style.opacity !== "1") f.node.style.opacity = "1";
                 const wind = f.windUntil && now < f.windUntil;
@@ -2810,6 +2840,8 @@ export default function GroveScene({
         body.shadowNode = n?.querySelector(".gv-shadow") || null;
         body.swipeNode = n?.querySelector(".gv-swipe") || null;
         body.clawNode = n?.querySelector(".gv-claw") || null;
+        // The persistent condition layer -- frost, flame, stars. The loop writes its class directly.
+        body.statusNode = n?.querySelector(".gv-status") || null;
         // The creature's own health bar: the strip, the ghost behind it, the fill, and the white strike.
         // Looked up once here rather than queried in the loop, like everything else on a body.
         body.barNode = n?.querySelector(".gv-ehp") || null;
@@ -2969,10 +3001,25 @@ export default function GroveScene({
                 {world.foes.map((f) => (
                     <button key={f.uid} type="button"
                         className={`gv-foe${f.rare ? " is-rare" : ""}${f.isBoss ? " is-boss" : ""}`}
-                        style={{ "--gv-h": f.h }}
+                        // ⚠️ THE SPRITE URL RIDES ON THE SHELL so the status layer can mask to the
+                        // creature's own silhouette, the way .gv-flash already does. A condition painted
+                        // as a rectangle over the body is far worse than no condition at all -- that is
+                        // the lesson .gv-flash's own @supports fallback is written around.
+                        style={{ "--gv-h": f.h, "--gv-art-url": f.art ? `url(${f.art})` : undefined }}
                         ref={wire(f)}
                         onPointerDown={onTapFoe(f.uid)} aria-label={f.name}>
                         {bodyArt(f.art)}
+                        {/* ── ⚠️ WHAT IS HAPPENING TO THIS CREATURE, FOR AS LONG AS IT IS HAPPENING ──
+                            A freeze lasts two seconds, a chill eight and a burn three ticks, and until
+                            now NONE of them put a mark on the body. The word flashed once and vanished,
+                            and for the rest of the duration a burning, frozen, chilled creature looked
+                            exactly like one that was fine. You could not look at a fight and see what
+                            was happening to whom -- which is most of what makes a fight readable.
+
+                            Rendered once and never touched by React again: the loop owns its className
+                            outright. Putting the state on the BUTTON's own class would work until the
+                            next rerender() dropped it, because that class belongs to React. */}
+                        <i className="gv-status" aria-hidden="true" />
                         {/* ⚠️ THE BAR IS RENDERED FOR EVERY CREATURE AND SHOWN FOR ALMOST NONE OF THEM.
                             It is one hidden strip per body, which costs nothing, and it means the loop can
                             reveal one the instant a hit lands — building the element at that moment would
