@@ -23,7 +23,8 @@ import {
 // whole of mitigation, and the ceiling for a system that no longer exists went with it.
 import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
 import { procFrom, critChanceFrom, critMultFrom, drFrom, healthFrom, swingFrom,
-    COUNTER_PER_POINT, HASTE_PER_POINT, LIFESTEAL_PER_POINT, PIERCE_PER_POINT, STUN_PER_POINT } from "@/lib/marketplace/arena-kit.js";
+    COUNTER_PER_POINT, HASTE_PER_POINT, LIFESTEAL_PER_POINT, PIERCE_PER_POINT, STUN_PER_POINT,
+    defendBlow } from "@/lib/marketplace/arena-kit.js";
 // Pure, and shared with every drop roll in the Den — a fighter's luck and a chest's luck are the same curve.
 import { luckyRoll } from "@/lib/marketplace/fortune.js";
 
@@ -393,12 +394,18 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             // 0 x stacks, and `stacks` itself was clamped by `Math.min(def.blockStackMax, ...)` with a max of
             // 0 — a counter that counted to zero, feeding a multiplier that was zero. Three lines of state
             // that could not change an outcome.
-            if (def.blockChance > 0 && rng() < def.blockChance) {
-                const before = blow;
-                blow = Math.max(1, Math.round(blow * (1 - def.blockReduction)));
-                // THORNS ANSWER THE BLOCK, not the blow: what the shield turned aside is what comes back.
-                if (def.thorns > 0) thornsBack += Math.round((before - blow) * def.thorns);
-                turned += before - blow;
+            // ⚠️ defendBlow() IN arena-kit, NOT THESE THREE LINES. The Grove had no block, no guard and no
+            // thorns, so a Warden spending twelve nodes had nine of them mean nothing in a zone -- and
+            // writing this arithmetic a second time over there would be two implementations of what a
+            // shield does, drifting the first time either is tuned. Proved identical to the lines it
+            // replaces over 200,000 random blows before the ring was pointed at it.
+            //
+            // THORNS ANSWER THE BLOCK, not the blow: what the shield turned aside is what comes back.
+            const guardResult = defendBlow(blow, def, rng);
+            if (guardResult.blocked) {
+                blow = guardResult.blow;
+                thornsBack += guardResult.thornsBack;
+                turned += guardResult.turned;
                 blocked += 1;
             }
             dealt += blow;

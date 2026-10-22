@@ -145,6 +145,20 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
         // ⚠️ THE BURN SCENE PINS WHAT IS OTHERWISE A ROLL. Kindle's top rank is a 30% chance, so filming
         // a spread off real odds is shooting sheets until one catches. Certainty here, the same reason
         // the juice scene pins crit and haste: the lab exists to make the moment happen DURING the film.
+        // ── THE WARDEN, WHOSE WHOLE DEFENCE WAS UNFILMABLE ─────────────────────────────────────────
+        // ⚠️ THE REAL MAXED NUMBERS, NOT PINNED CERTAINTY, AND THE FIRST CUT PROVED WHY. Pinning block
+        // and guard to 1 made the hero unkillable: every blow halved and then wholly eaten by a shield
+        // worth a fifth of his health, so health never moved -- and GRUDGE, which banks what reaches
+        // health, could never fire. A bench tuned to show one thing had hidden two others.
+        //
+        // These are what a full Warden tree actually grants. Blocks are rarer to film and every one of
+        // the four is reachable, which is the trade worth making.
+        blockChance: scene === "warden" ? 0.15 : 0,
+        blockReduction: scene === "warden" ? 0.5 : 0,
+        guardChance: scene === "warden" ? 0.2 : 0,
+        guardSize: scene === "warden" ? 0.2 : 0,
+        thorns: scene === "warden" ? 0.2 : 0,
+        grudge: scene === "warden" ? 0.15 : 0,
         burnChance: scene === "burn" ? 1 : 0,
         burnDamage: scene === "burn" ? 0.2 : 0,
         burnLeech: scene === "burn" ? 0.15 : 0,

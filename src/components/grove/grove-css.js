@@ -1162,6 +1162,13 @@ export const GROVE_CSS = `
    Only the heal, deliberately: the haste proc is left-anchored, tuned and shipped, and moving it is not
    this change's business. This one carries a sprite and a two-word name, so it is nearly three times as
    wide and hangs off the hero's shoulder instead of sitting over him. */
+/* ── THE WARDEN'S ANSWER ──────────────────────────────────────────────────────────────────────
+   Steel rather than heat. Every other call-out in here is something the player DID to a creature --
+   a crit, a haste proc, a poultice -- and this one is something that did not happen to them, which is
+   a different kind of good news and should not share a palette with damage. */
+.gv-proc.is-block { translate: -50% 0; color: #bcd8ff; letter-spacing: 0.2em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 14px rgba(150,200,255,0.9), 0 0 30px rgba(70,130,220,0.55); }
+.gv-boom.is-block { border-color: rgba(170,210,255,0.9); }
 .gv-proc.is-heal { translate: -50% 0; color: #8dffb8; letter-spacing: 0.16em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(80,255,160,0.9), 0 0 36px rgba(30,200,110,0.6); }
 /* Sized off the type like the loot pop's, so the object scales with the number beside it rather than

@@ -1077,6 +1077,36 @@ export const drFrom = (armour = 0, pierce = 0) => {
 export { procFrom, PIERCE_PER_POINT, HASTE_PER_POINT, STUN_PER_POINT, COUNTER_PER_POINT, LIFESTEAL_PER_POINT };
 
 export const BLOCK_REDUCTION = 0.35;
+
+/**
+ * One blow meeting one shield. Pure, and shared by every place a defender exists.
+ *
+ * ⚠️ IT LIVES HERE BECAUSE THE GROVE NEEDED IT AND A SECOND COPY IS A SECOND GAME. The ring has carried
+ * this arithmetic inline since it was written; the Grove had no block, no guard and no thorns at all, so a
+ * Warden spending twelve nodes had nine of them mean nothing in a zone. Writing the same three lines into
+ * grove-world would have been the bleed/burn mistake one level up -- two implementations of "what a shield
+ * does", drifting the first time either is tuned.
+ *
+ * ⚠️ THORNS ANSWER THE BLOCK, NOT THE BLOW. What comes back is a share of what the shield TURNED ASIDE, so
+ * a build with thorns and no block returns nothing. That is the rule the ring has always used and it is the
+ * reason Thornmail reads as a shield talent rather than a damage one.
+ *
+ * ⚠️ AND THE BLOCK IS ROLLED PER BLOW. A doublestrike gets two chances to be blocked rather than one
+ * verdict covering both.
+ */
+export function defendBlow(blow, def = {}, rng = Math.random) {
+    const chance = Math.max(0, Math.min(1, Number(def.blockChance) || 0));
+    if (chance <= 0 || rng() >= chance) return { blow, blocked: false, turned: 0, thornsBack: 0 };
+    const before = blow;
+    const after = Math.max(1, Math.round(blow * (1 - (Number(def.blockReduction) || 0))));
+    const turned = before - after;
+    return {
+        blow: after,
+        blocked: true,
+        turned,
+        thornsBack: (Number(def.thorns) || 0) > 0 ? Math.round(turned * Number(def.thorns)) : 0,
+    };
+}
 // What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.
 export const GUARD_BASE_SHARE = 0.10;
 // ── THE EXTRA-TURN CONVERSION IS GONE, AND WITH IT THE SECOND ATTACK SPEED ───────────────────────────────────

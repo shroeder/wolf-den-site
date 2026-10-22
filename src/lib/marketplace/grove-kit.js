@@ -109,6 +109,15 @@ function forGrove(f) {
         burnChance: Math.max(0, Math.min(1, Number(f.burnChance) || 0)),
         burnDamage: Math.max(0, Number(f.burnDamage) || 0),
         burnLeech: Math.max(0, Number(f.burnLeech) || 0),
+        // ── THE WARDEN'S DEFENCE, WHICH THIS LIST WAS EATING WHOLE ───────────────────────────
+        // Nine of a Warden's twelve nodes did nothing in a zone, and four of them were these. The ring
+        // computes every one correctly; forGrove simply never named them. See defendBlow in arena-kit.
+        blockChance: Math.max(0, Math.min(1, Number(f.blockChance) || 0)),
+        blockReduction: Math.max(0, Math.min(0.95, Number(f.blockReduction) || 0)),
+        guardChance: Math.max(0, Math.min(1, Number(f.guardChance) || 0)),
+        guardSize: Math.max(0, Number(f.guardSize) || 0),
+        thorns: Math.max(0, Number(f.thorns) || 0),
+        grudge: Math.max(0, Number(f.grudge) || 0),
         bleedChance: Math.max(0, Math.min(1, Number(f.bleedChance) || 0)),
         bleedDamage: Math.max(0, Number(f.bleedDamage) || 0),
         bleedLeech: Math.max(0, Math.min(1, Number(f.bleedLeech) || 0)),

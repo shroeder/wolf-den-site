@@ -17,7 +17,7 @@ import {
 } from "@/lib/marketplace/grove-world.js";
 // Pure files, both of them — no DB and no server-only, which is why a client scene may read them. The
 // alternative was a second haste curve that drifts from the ring's the first time either is touched.
-import { procFrom, HASTE_PER_POINT } from "@/lib/marketplace/arena-kit.js";
+import { procFrom, HASTE_PER_POINT, defendBlow } from "@/lib/marketplace/arena-kit.js";
 
 /** What a haste proc is worth, and for how long. */
 const HASTE_MULT = 1.6;
@@ -1447,6 +1447,18 @@ export default function GroveScene({
                     // The whole fighter, not four hand-picked fields. Creatures carry no armour, so the
                     // 0 is honest rather than a placeholder — mitigation runs on what comes AT you.
                     const hit = swing(stats, 0, w.rand);
+
+                    // ── ⚠️ THE GRUDGE RIDES THE SWING THAT ANSWERS IT ───────────────────────────
+                    // Grudge's own words: "a share of everything done to you since your last swing is
+                    // added to your next one." Banked in the hurt path, spent here, and cleared whether
+                    // or not it was worth anything -- a grudge that survived its own swing would pay
+                    // twice and keep paying.
+                    const grudgeShare = Math.max(0, Number(stats?.grudge) || 0);
+                    const avenged = grudgeShare > 0 && (w.banked || 0) > 0
+                        ? Math.round(w.banked * grudgeShare) : 0;
+                    if ((w.banked || 0) > 0) w.banked = 0;
+                    if (avenged > 0) hit.dealt += avenged;
+
                     foe.hp -= hit.dealt;
                     foe.hit = true;
                     foe.lastCrit = hit.crit;
@@ -1472,6 +1484,22 @@ export default function GroveScene({
                         if (better) {
                             foe.burn = { dmg: hit.burn.dmg, leech: hit.burn.leech, spread: true,
                                 left: BURN_TICKS, nextAt: now + BURN_TICK_MS };
+                        }
+                    }
+                    // ── ⚠️ A GUARD IS RAISED ON YOUR OWN SWING ──────────────────────────────────
+                    // The ring rolls guardChance at the top of the acting fighter's turn. A side-scroller
+                    // has no turns, and the closest honest analogue is the moment you commit to a blow --
+                    // which also keeps the Warden's defence tied to being in the fight rather than
+                    // accruing while standing still in an empty clearing.
+                    //
+                    // Capped at one guard's worth so it cannot bank into an invulnerability across a long
+                    // fight; the ring decays it per turn for the same reason and this is that rule in
+                    // real-time terms.
+                    if ((stats?.guardChance || 0) > 0 && w.rand() < stats.guardChance) {
+                        const one = Math.round(maxHp * (Number(stats?.guardSize) || 0));
+                        if (one > 0 && (w.shield || 0) < one) {
+                            w.shield = one;
+                            procCall("GUARD", "block", null, 1.1);
                         }
                     }
                     // When its bar was last struck. Drives whether the bar is up at all, and the flash,
@@ -1865,7 +1893,46 @@ export default function GroveScene({
                 const raw = Math.max(1, Math.round(base * (Number(tel.mult) || 1)));
                 // ⚠️ mitigate(), NOT A SECOND COPY OF IT. This was the 60/(60+armour) formula written out by
                 // hand, next to a module that exports exactly that rule as ARMOUR_K. Two copies is two games.
-                const dealt = mitigate(raw, stats?.armour || 0);
+                const armoured = mitigate(raw, stats?.armour || 0);
+
+                // ── ⚠️ THE WARDEN'S DEFENCE, WHICH THIS LINE USED TO SKIP ENTIRELY ──────────────
+                // Luke: "all choices on your class must be honored." Nine of a Warden's twelve nodes did
+                // nothing in a zone and four of them resolve right here -- the hero took armoured damage
+                // straight to health with no block, no guard and no thorns anywhere in the feature.
+                //
+                // ⚠️ defendBlow() IS THE RING'S OWN RULE, NOT A SECOND COPY. It was lifted out of
+                // arena-engine into arena-kit for this and proved identical to the lines it replaced over
+                // 200,000 random blows. "What a shield does" must not have two answers.
+                const guard = defendBlow(armoured, stats || {}, w.rand);
+                let dealt = guard.blow;
+
+                // A GUARD EATS WHAT IT CAN BEFORE HEALTH SEES ANY OF IT. Raised on the hero's own swing
+                // (see the guard roll in the swing block) because that is the ring's "your turn", and the
+                // nearest thing a side-scroller has to one.
+                let soaked = 0;
+                if ((w.shield || 0) > 0 && dealt > 0) {
+                    soaked = Math.min(w.shield, dealt);
+                    w.shield -= soaked;
+                    dealt -= soaked;
+                }
+
+                // ⚠️ THORNS ANSWER THE BLOCK, NOT THE BLOW, so a build with thorns and no block returns
+                // nothing -- the ring's rule, and the reason Thornmail reads as a shield talent. The
+                // damage goes back to the body that actually swung, and a thorns kill is a KILL: killFoe,
+                // never a clamp to zero, which is the bug a bleed tick already paid for here once.
+                if (guard.thornsBack > 0 && foe && !foe.dying && foe.hp > 0) {
+                    foe.hp -= guard.thornsBack;
+                    foe.hurtAt = now;
+                    addPop("hit", `${guard.thornsBack}`, foe.x, foe.y + foe.h * 0.6,
+                        popWeight(guard.thornsBack, foe.maxHp) * 0.7);
+                    if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
+                }
+
+                // THE GRUDGE banks what reached health and rides the next swing -- see the swing block.
+                if ((stats?.grudge || 0) > 0 && dealt > 0) w.banked = (w.banked || 0) + dealt;
+
+                if (guard.blocked) procCall(soaked > 0 ? "GUARDED" : "BLOCK", "block", null, 1.1);
+                else if (soaked > 0) procCall("GUARDED", "block", null, 1.1);
 
                 w.hp -= dealt;
                 w.hurtAt = now;
@@ -1873,7 +1940,9 @@ export default function GroveScene({
                 w.shake.add(TRAUMA.hurt);
                 w.combo = 0;
                 impulse(w.hero, Math.sign(w.hero.x - tel.x || 1) * 0.42, 0.2);
-                addPop("took", `-${dealt}`, w.hero.x, w.hero.y + HERO_UNITS * 0.9);
+                // ⚠️ WHAT REACHED HEALTH, NOT WHAT WAS SWUNG. A blocked-and-soaked blow that took four
+                // off you must not print the thirty it started as, or the defence reads as broken.
+                if (dealt > 0) addPop("took", `-${dealt}`, w.hero.x, w.hero.y + HERO_UNITS * 0.9);
                 burst(w.hero.x, w.hero.y + HERO_UNITS * 0.4, { crit: true, dir: Math.sign(w.hero.x - tel.x || 1) });
                 playHurt();
 
@@ -3186,6 +3255,19 @@ function setUpLabScene(w, scene) {
             f.hp = 4000; f.maxHp = 4000;
         });
         if (row[0]) w.target = row[0];
+    } else if (scene === "warden") {
+        // Surrounded and being hit, which is the only state a Warden's tree has anything to say about.
+        // Fat creatures so the exchange outlives the film, and the hero already swinging so the guard
+        // roll (which rides his own blow) actually happens.
+        const two = w.foes.filter((f) => !f.isBoss).slice(0, 2);
+        two.forEach((f, i) => {
+            f.x = w.hero.x + (i % 2 ? 3.6 : -3.6);
+            f.y = 0;
+            f.vx = 0; f.vy = 0; f.grounded = true;
+            f.hit = true; f.passive = false;
+            f.hp = 9000; f.maxHp = 9000;
+        });
+        if (two[0]) w.target = two[0];
     } else if (scene === "eat") {
         // ── ⚠️ THE ONE BEAT THE BENCH COULD NOT PRODUCE ────────────────────────────────────────
         // The eat fires below 60% of max health with food on the belt, which in ordinary play means
