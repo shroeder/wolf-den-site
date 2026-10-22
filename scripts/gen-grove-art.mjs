@@ -31,6 +31,29 @@ const APPLY = process.argv.includes("--apply");
 const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
 const ONLY = (arg("--only") || "").split(",").map((s) => s.trim()).filter(Boolean);
 const Q = quality();
+// ── ⚠️ gpt-image-1 DRAWS, 2.5 REPAIRS. DO NOT SWAP THE DRAWING MODEL. ───────────────────────────────────────
+// A long session on 2026-10-21 tested 1.5, 2 and both 2.5 variants against the live art, eleven generations
+// deep, and the conclusion is narrow and firm: the newer models draw at a much higher detail density —
+// hundreds of individually outlined marks where gpt-image-1 lays down large smooth grouped forms. Luke, on
+// the first one: "it's all high detail and noisy, its not the right style."
+//
+// That density is STRUCTURAL and nothing reaches it:
+//   · ten prompt iterations ("a few large shapes", "never individual strands", "broad flat sheaves",
+//     "around fifty large straw shapes") were ignored every single time
+//   · a median filter at r=2/3/5 moves the edge metric and not the appearance
+//   · colour quantisation down to THIRTEEN colours changes nothing, because every mark carries its own
+//     dark outline and outlines survive quantisation
+//
+// So the house style IS gpt-image-1. It costs more (4.2c against 1.3c) and it ignores the frame
+// instruction about a quarter of the time, and both of those are worth paying. The clipping is handled
+// below instead of by changing the model.
+const MODEL = "gpt-image-1";
+
+// ⚠️ THE REPAIR MODEL IS A DIFFERENT QUESTION. 2.5's headline feature is "precise editing and subject
+// preservation", and it is genuinely good at it: handed a finished sprite and asked to change one thing, it
+// returns the same drawing with the crown restored. That is the one job it does better than gpt-image-1,
+// which given the same task produced a flaming pumpkin head.
+const REPAIR_MODEL = "gpt-image-2.5-sunburst";
 
 const STYLE = "Painterly cel-shaded 2D video-game art, bold clean dark outlines, chunky readable silhouette, high contrast, vibrant colors, soft inner shading, fantasy action-RPG style.";
 const CUTOUT = "ISOLATED as a clean die-cut sprite on a FULLY TRANSPARENT background (alpha channel) — absolutely NO backdrop, NO scenery, NO ground, NO cast shadow, NO glow halo, NO white sticker rim. Nothing but the subject. No text, no words, no letters, no logo, no watermark, no border.";
@@ -600,6 +623,8 @@ if (!KEY) throw new Error("no OPENAI_API_KEY");
 fs.mkdirSync(OUT, { recursive: true });
 
 let done = 0;
+let spentTokens = 0;
+let repairCost = 0;
 for (const key of keys) {
     const [prompt, kind] = ART[key];
     // ── ⚠️ THE KEY DECIDES THE FILENAME, AND THE CATALOGUE HAS TO AGREE WITH IT ────────────────────
@@ -615,7 +640,22 @@ for (const key of keys) {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
         body: JSON.stringify({
-            model: "gpt-image-1",
+            // ── ⚠️ 2.5 FLARE, NOT gpt-image-1 ──────────────────────────────────────────────────
+            // gpt-image-1 shipped April 2025 and three generations have landed since: 1.5, 2, and 2.5.
+            // We were still on the oldest one, paying the MOST for it — $40 per million output tokens
+            // against $30 for 2.5.
+            //
+            // FLARE over SUNBURST on purpose. They cost the same per token; sunburst is "our most
+            // capable model for image generation and editing" and flare is "our fastest model for
+            // high-quality, everyday image generation". 160 game sprites at 44px in a bench row are
+            // everyday, and the capable one plausibly burns more tokens per image for detail nothing
+            // here renders.
+            //
+            // ⚠️ AND IT MAY FIX THE CLIPPING, WHICH IS WHY IT MATTERS MORE THAN THE PRICE. The crowns
+            // are cut off because the model ignores a prompt that already says "NO part of the subject
+            // may touch or run off any edge" — an instruction-following failure, which is the thing
+            // that improves most between image model generations.
+            model: MODEL,
             prompt,
             size: SIZES[kind],
             quality: Q,
@@ -631,7 +671,75 @@ for (const key of keys) {
     const data = await resp.json();
     const b64 = data?.data?.[0]?.b64_json;
     if (!b64) { console.log(`  FAILED ${key}: no image back`); continue; }
+    // ⚠️ WHAT IT ACTUALLY COST, OFF THE RESPONSE. priceRun's table is hardcoded for gpt-image-1 and
+    // OpenAI does not publish per-image token counts for 2.5 at all, so the estimate printed before the
+    // run is a guess for this model. usage is not — it is what we are billed on. Luke: "Your price run
+    // really hasn't been that accurate anyway."
+    const u = data?.usage;
+    if (u) {
+        spentTokens += u.output_tokens || 0;
+        console.log(`    usage: ${u.output_tokens} output tokens  (~$${(((u.output_tokens || 0) * 30) / 1e6).toFixed(4)} at $30/M)`);
+    }
     let bytes = Buffer.from(b64, "base64");
+
+    // ── ⚠️ IF THE CROWN RAN OFF THE TOP, REPAIR IT FROM ITSELF ────────────────────────────────────
+    // Luke asked for this on every generation, and it is the synthesis of a whole evening: gpt-image-1
+    // makes the right picture and sometimes draws it off the edge of the plate; 2.5 cannot make the right
+    // picture but can fix one. So the fallback only ever runs on a sprite that is MEASURABLY broken, and
+    // it is handed the drawing itself rather than a description of it.
+    //
+    // ⚠️ MEASURED, NOT ASSUMED, AND THE TEST IS A CONTIGUOUS RUN. A sprite whose highest pixel merely
+    // grazes the top row is fine and most of them do — that is canvas fill, which IS on-stage scale. What
+    // marks an amputation is a long FLAT run of opaque pixels along that row, where a silhouette should be
+    // curving away. 40px of a 1024 plate; antler tips come in under it, a sliced head does not.
+    //
+    // ⚠️ AND THE ASK IS TINY. "Change one thing, keep everything else identical." Anything that invites
+    // reinterpretation gets it: the same idea phrased as "finish the head, horns, antlers or flames" grew
+    // antlers on a legless blob. Never name a body part; never offer a list.
+    if (kind === "foe" && !OPAQUE.has(kind)) {
+        const probe = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+        let run = 0, worst = 0;
+        for (let x = 0; x < probe.info.width; x += 1) {
+            if (probe.data[x * 4 + 3] > 6) { run += 1; worst = Math.max(worst, run); } else run = 0;
+        }
+        if (worst >= 40) {
+            process.stdout.write(`    crown clipped (${worst}px flat) — repairing on ${REPAIR_MODEL} … `);
+            const form = new FormData();
+            form.append("model", REPAIR_MODEL);
+            form.append("prompt", "Redraw this exact character in EXACTLY the same art style, same palette, "
+                + "same brushwork, same line weight, same proportions and same pose. Change one thing only: "
+                + "the top of it is cut off by the edge of the picture — draw it complete, with clear empty "
+                + "space above, and make sure no part of the figure touches any edge of the frame. Keep "
+                + "everything else identical. Transparent background.");
+            form.append("size", SIZES[kind]);
+            form.append("quality", Q);
+            form.append("background", "transparent");
+            form.append("output_format", "png");
+            form.append("n", "1");
+            form.append("image", new Blob([bytes], { type: "image/webp" }), "ref.webp");
+            const rr = await fetch("https://api.openai.com/v1/images/edits", {
+                method: "POST", headers: { Authorization: `Bearer ${KEY}` }, body: form,
+            }).then((x) => x.json()).catch((e) => ({ error: { message: String(e) } }));
+            const fixed = rr?.data?.[0]?.b64_json;
+            if (!fixed) {
+                // ⚠️ KEEP THE ORIGINAL. A failed repair must never lose the drawing we already paid for.
+                console.log(`FAILED (${JSON.stringify(rr?.error || {}).slice(0, 90)}) — keeping the clipped one`);
+            } else {
+                const cand = Buffer.from(fixed, "base64");
+                const after = await sharp(cand).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+                let r2 = 0, w2 = 0;
+                for (let x = 0; x < after.info.width; x += 1) {
+                    if (after.data[x * 4 + 3] > 6) { r2 += 1; w2 = Math.max(w2, r2); } else r2 = 0;
+                }
+                // ⚠️ ONLY KEEP IT IF IT ACTUALLY HELPED. A repair that comes back just as clipped is a
+                // worse picture for the same money; there is no reason to take it.
+                if (w2 < worst) { bytes = await sharp(cand).webp({ quality: 92 }).toBuffer(); console.log(`fixed (${worst}px -> ${w2}px)`); }
+                else console.log(`no better (${worst}px -> ${w2}px) — keeping the original`);
+                const ru = rr.usage || {};
+                repairCost += ((ru.output_tokens || 0) * 30 + (ru.input_tokens_details?.image_tokens || 0) * 8) / 1e6;
+            }
+        }
+    }
     // ── ⚠️ WHAT THE MODEL HANDS BACK IS NEARLY UNCOMPRESSED ───────────────────────────────────────
     // gpt-image-1 returns webp at close to lossless, so every backdrop this script has ever written
     // landed on disk at 1.6 to 1.8 MB — for a picture shown at about 1,400px on the widest screen
