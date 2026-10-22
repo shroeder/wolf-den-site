@@ -1385,6 +1385,27 @@ export const GROVE_CSS = `
 .gv-spark.is-pet { width: calc(0.34 * var(--gv-unit, 1%)); height: calc(0.34 * var(--gv-unit, 1%));
     margin: 0 0 calc(-0.17 * var(--gv-unit, 1%)) calc(-0.17 * var(--gv-unit, 1%));
     background: #ddffcc; box-shadow: 0 0 5px 2px rgba(150,240,120,0.75); }
+/* ── ⚠️ A PARTICLE PER KIND, BECAUSE A COLOURED WORD IS NOT AN EFFECT ─────────────────────────
+   Luke: "the effects should be cool, not words, or not just words." Every proc in here used to be a
+   caption with a ring behind it; these are the things the caption is a label FOR.
+
+   Ice is the one that is not round. A shard reads as ice the moment it is not a dot, and it is the
+   cheapest possible way to say "this is a different element" -- no new art, one border-radius. */
+/* ⚠️ BIGGER AND BLUER THAN THE FIRST CUT. At spark size in near-white they read as the ordinary hit
+   sparks they sit next to -- against a lit forest everything pale looks the same. A shard has to be
+   large enough to show it is not round and saturated enough to be a colour rather than a highlight. */
+.gv-spark.is-ice { width: calc(0.95 * var(--gv-unit, 1%)); height: calc(0.95 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.47 * var(--gv-unit, 1%)) calc(-0.47 * var(--gv-unit, 1%));
+    border-radius: 2px 70% 2px 70%; background: #7fd4ff;
+    box-shadow: 0 0 14px 5px rgba(60,170,255,0.95); }
+/* A stun is a blow that rang their head -- hot white, hard, and gone quickly. */
+.gv-spark.is-stun { background: #fffdf2; box-shadow: 0 0 9px 3px rgba(255,225,150,0.95); }
+/* Soulfire is magic: cooler light, softer edge, and it drifts rather than flying. */
+.gv-spark.is-soul { width: calc(0.72 * var(--gv-unit, 1%)); height: calc(0.72 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.36 * var(--gv-unit, 1%)) calc(-0.36 * var(--gv-unit, 1%));
+    background: #d59bff; box-shadow: 0 0 14px 5px rgba(170,70,255,0.9); }
+/* Steel off a shield arm. Pale and hard, the same family as the blocked number and the thorns. */
+.gv-spark.is-block { background: #e8f1ff; box-shadow: 0 0 8px 3px rgba(150,200,255,0.9); }
 /* Dust is bigger, slower and has no light of its own — it is displaced earth, not energy. */
 .gv-spark.is-dust { width: calc(1.1 * var(--gv-unit, 1%)); height: calc(1.1 * var(--gv-unit, 1%));
     margin: 0 0 calc(-0.55 * var(--gv-unit, 1%)) calc(-0.55 * var(--gv-unit, 1%));

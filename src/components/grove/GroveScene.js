@@ -240,6 +240,9 @@ const HERO_LOW_SHARE = 0.25;
 // while it is faint, so a thumb reaching into the fight cannot open a backpack by accident.
 const DOCK_QUIET_MS = 1600;
 const DOCK_FIGHT_OPACITY = 0.22;
+// How often a burning body throws embers. Not every frame: thirty bodies at sixty hertz would be
+// thousands of nodes a second to build and bin, and fire does not read any better for it.
+const EMBER_EVERY_MS = 150;
 const STUN_MS = 1400;
 // A freeze is a stun that holds longer -- the ring's own note calls it "the Runecaller's two seconds".
 const FREEZE_MS = 2000;
@@ -1520,6 +1523,12 @@ export default function GroveScene({
                     const hit = swing(stats, 0, w.rand);
                     if (surging) {
                         hit.dealt = Math.round(hit.dealt * (1 + Number(stats.surge)));
+                        // Counted, not rolled -- so it is the one proc the player can SEE coming, and it
+                        // should arrive like something that was building. A ring out of the hero and a
+                        // charge thrown off the blade.
+                        shockwave(w.hero.x, w.hero.y + w.hero.h * 0.5, "haste");
+                        burst(w.hero.x, w.hero.y + w.hero.h * 0.5, { kind: "haste", scale: 1.6 });
+                        w.shake.add(TRAUMA.crit);
                         procCall("SURGE", "haste");
                     }
 
@@ -1592,10 +1601,14 @@ export default function GroveScene({
                         foe.windUntil = 0;
                         // Filtered rather than removed by hand: React owns these nodes.
                         w.tels = w.tels.filter((t) => t.foeUid !== foe.uid);
-                        // ⚠️ procCall, NOT addPop. These were drawn at damage-number size while SURGE
-                        // and HASTE got the big tracked call-out with a ring -- so the most dramatic
-                        // things in the game were the quietest on screen. A freeze that stops a creature
-                        // dead for two seconds should not land softer than an attack-speed buff.
+                        // ── ⚠️ IT LANDS AS AN IMPACT, AND THE WORD IS THE SMALL PART ──────────
+                        // A caption is a label on an effect, not the effect. Ice arrives as a burst of
+                        // shards off the body with a ring going out through it; a stun arrives as a hot
+                        // white crack. The word rides on top for the half-second it takes to read, and
+                        // what sells the moment is everything underneath it.
+                        burst(foe.x, foe.y + foe.h * 0.5, { kind, scale: kind === "ice" ? 1.9 : 1.5 });
+                        shockwave(foe.x, foe.y + foe.h * 0.45, kind);
+                        w.shake.add(kind === "ice" ? TRAUMA.crit : TRAUMA.hit);
                         if (word) procCall(word, kind, null, 1.15, foe);
                         return true;
                     };
@@ -1627,6 +1640,7 @@ export default function GroveScene({
                     if ((stats?.soulfire || 0) > 0 && hit.dealt > 0 && foe.hp > 0) {
                         const soul = Math.max(1, Math.round(hit.dealt * stats.soulfire));
                         foe.hp -= soul;
+                        burst(foe.x, foe.y + foe.h * 0.55, { kind: "soul", scale: 0.9 });
                         addPop("soul", `${soul}`, foe.x, foe.y + foe.h * 0.8);
                     }
 
@@ -1646,6 +1660,12 @@ export default function GroveScene({
                         // can be refused.
                         // The rarest thing a Runecaller does -- one swing in twenty at a full tree, and
                         // it is both halves at once. It gets its own word and its own colour.
+                        // One swing in twenty at a full tree, and both halves at once -- it gets fire
+                        // AND ice off the same body, two rings, and the heaviest shake in the kit.
+                        burst(foe.x, foe.y + foe.h * 0.5, { kind: "burn", scale: 2.2 });
+                        burst(foe.x, foe.y + foe.h * 0.5, { kind: "ice", scale: 2.2 });
+                        shockwave(foe.x, foe.y + foe.h * 0.45, "cata");
+                        w.shake.add(TRAUMA.kill);
                         procCall("CATACLYSM", "cata", null, 1.3, foe);
                         lock(FREEZE_MS, null);
                     }
@@ -1703,6 +1723,10 @@ export default function GroveScene({
                         const one = Math.round(maxHp * (Number(stats?.guardSize) || 0));
                         if (one > 0 && (w.shield || 0) < one) {
                             w.shield = one;
+                            // The shield itself: a ring snapping out from the hero and steel coming off
+                            // him. The word is the receipt; this is the thing that happened.
+                            shockwave(w.hero.x, w.hero.y + w.hero.h * 0.45, "block");
+                            burst(w.hero.x, w.hero.y + w.hero.h * 0.4, { kind: "block", scale: 1.3 });
                             procCall("GUARD", "block", null, 1.1);
                         }
                     }
@@ -2176,6 +2200,9 @@ export default function GroveScene({
                     foe.hurtAt = now;
                     addPop("hit", `${riposte.dealt}`, foe.x, foe.y + foe.h * 0.7,
                         popWeight(riposte.dealt, foe.maxHp));
+                    burst(foe.x, foe.y + foe.h * 0.5,
+                        { kind: "block", scale: 1.4, crit: true, dir: Math.sign(foe.x - w.hero.x || 1) });
+                    shockwave(foe.x, foe.y + foe.h * 0.45, "block");
                     procCall("RIPOSTE", "block", null, 1.32);
                     if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
                 }
@@ -2183,8 +2210,14 @@ export default function GroveScene({
                 // THE GRUDGE banks what reached health and rides the next swing -- see the swing block.
                 if ((stats?.grudge || 0) > 0 && dealt > 0) w.banked = (w.banked || 0) + dealt;
 
-                if (guard.blocked) procCall(soaked > 0 ? "GUARDED" : "BLOCK", "block", null, 1.1);
-                else if (soaked > 0) procCall("GUARDED", "block", null, 1.1);
+                if (guard.blocked || soaked > 0) {
+                    // Steel off the shield arm, thrown back toward whatever swung. A block that only
+                    // prints a smaller number is a block nobody feels.
+                    burst(w.hero.x, w.hero.y + w.hero.h * 0.45,
+                        { kind: "block", scale: 1.1, dir: Math.sign(w.hero.x - tel.x || 1) });
+                    procCall(guard.blocked && soaked > 0 ? "GUARDED" : guard.blocked ? "BLOCK" : "GUARDED",
+                        "block", null, 1.1);
+                }
 
                 w.hp -= dealt;
                 w.hurtAt = now;
@@ -2552,6 +2585,15 @@ export default function GroveScene({
                 // ⚠️ WRITTEN ONLY WHEN IT CHANGES. This runs for every creature every frame -- thirty
                 // bodies at sixty hertz -- and assigning className unconditionally would dirty the style
                 // of every one of them on every tick for no reason. The cached string is the guard.
+                // ── ⚠️ BURNING THROWS EMBERS, IT DOES NOT JUST GLOW ────────────────────────────
+                // Luke: "the effects should be cool, not words, or not just words." A flickering tint is
+                // a colour; fire is something coming OFF the body. Embers are thrown on a cadence rather
+                // than per frame -- at sixty hertz across thirty bodies a per-frame emitter is thousands
+                // of nodes a second, and the look does not need them.
+                if (f.burn && now >= (f.emberAt || 0)) {
+                    f.emberAt = now + EMBER_EVERY_MS;
+                    burst(f.x, f.y + f.h * 0.45, { kind: "burn", scale: 0.4 });
+                }
                 if (f.statusNode) {
                     // ⚠️ A STUN IS NOT A FREEZE AND MUST NOT LOOK LIKE ONE. Both hold a creature still
                     // through the same lock, which is right mechanically and wrong visually: one is a
