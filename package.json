@@ -31,6 +31,7 @@
     "sim:classswap": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-classswap.mjs",
     "sim:skills": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-skills.mjs",
     "sim:boss-party": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-boss-party.mjs",
+    "watch:dupes": "node scripts/dupe-watch.mjs",
     "check:vercel": "node scripts/check-vercel-json.mjs",
     "check:collections": "node --import ./scripts/lib/register-loader.mjs scripts/check-collections.mjs",
     "check:polls": "node scripts/check-polls.mjs",
