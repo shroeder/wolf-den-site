@@ -709,11 +709,6 @@ for (const key of keys) {
             }
         }
         if (x1 < 0) { console.log(`  FAILED ${key}: nothing drawn`); continue; }
-        let run = 0, worst = 0;
-        for (let x = 0; x < info.width; x += 1) {
-            if (px[x * 4 + 3] > 6) { run += 1; worst = Math.max(worst, run); } else run = 0;
-        }
-        if (worst >= 40) console.log(`  ⚠️  ${key} IS STILL CLIPPED (${worst}px flat along the top) — reroll it`);
         const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
         const inner = Math.round(1024 * (1 - CREATURE_MARGIN * 2));
         const w = Math.max(1, Math.round(bw * (inner / bh)));
@@ -723,6 +718,17 @@ for (const key of keys) {
                 background: { r: 0, g: 0, b: 0, alpha: 0 } } })
             .composite([{ input: body, left: Math.round((1024 - w) / 2), top: Math.round(1024 * CREATURE_MARGIN) }])
             .webp({ quality: 92 }).toBuffer();
+
+        // ⚠️ CHECKED ON WHAT SHIPS, NOT ON WHAT CAME BACK. The first version ran this against the raw
+        // portrait and warned that the Shard King was clipped across its full 1024px width — it was not.
+        // The model had painted a background, which the trim above removes; the delivered sprite was
+        // perfect. A gate that fires on an intermediate is a gate that gets ignored.
+        const out = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+        let run = 0, worst = 0;
+        for (let x = 0; x < out.info.width; x += 1) {
+            if (out.data[x * 4 + 3] > 6) { run += 1; worst = Math.max(worst, run); } else run = 0;
+        }
+        if (worst >= 40) console.log(`  ⚠️  ${key} IS STILL CLIPPED (${worst}px flat along the top) — reroll it`);
     }
     if (kind === "hang" || kind === "sit") {
         const img = sharp(bytes).trim({ threshold: 6 });

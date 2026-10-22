@@ -502,6 +502,11 @@ const A = {
 
 // ⚠️ `hp` IS NOT SCALED BY scaledFoe. A boss is authored at the depth it stands at — the climb that turns a
 // zone-1 Thornling into a zone-5 Thornling would compound on a number that was already written for zone 5.
+// ⚠️ `art` IS OVERRIDABLE, AND THAT IS HOW A REDRAWN BOSS REACHES ANYBODY. A boss's picture is derived
+// from its id, which is right — until one of them is repainted. Same path plus new bytes means every
+// player who has been in that zone keeps the OLD picture for as long as their cache holds it, and there is
+// no ?v= anywhere in the Grove to turn. So a repainted boss ships under a new FILENAME and says so here.
+// See redrawn-art-must-be-versioned.
 const B = (id, name, o) => ({ id, name, art: `/images/grove/boss-${id}.webp`, boss: true, ...o });
 
 const MAP_ONE_BOSSES = {
