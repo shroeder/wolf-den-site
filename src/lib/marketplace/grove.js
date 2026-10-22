@@ -447,6 +447,12 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
     p.charm_id = charmOn?.id || null;
     p.charm_band = charmOn?.band || null;
 
+    // ⚠️ ARMED AT THE DOOR, AND RETURNED, BECAUSE THE CLIENT'S STATE IS FROM BEFORE THE DOOR. groveState
+    // was fetched when the Grove was opened; nothing refetches it on entry, so a belt armed here would not
+    // reach the scene until the first settle forty-five seconds into the dive -- which is after the fight
+    // it was armed for. The response carries it and GroveClient folds it into st.
+    const beltArmed = await armBeltIfEmpty(buyerId, p).catch(() => null);
+
     // ⚠️ THE SEED IS THE SERVER'S. A client-chosen seed is a client that can shop for one that drops well.
     const seed = Math.floor(Math.random() * 0x7fffffff);
     await db.query(
@@ -490,6 +496,8 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
             bossReady: kills >= zone.toUnlock && wait <= 0,
         },
         pop: GROVE_POP,
+        // What ended up on the belt, which may be something the player never chose — see armBeltIfEmpty.
+        belt: beltArmed,
         bonuses: bonusesFrom(emblems, p),
         // What is burning on this run, so the scene can show it and the player can see what they paid for.
         charm: charmOn ? { ...charmOn, ...GROVE_CHARMS[charmOn.id], value: charmValue(charmOn.id, charmOn.band) } : null,
@@ -698,10 +706,17 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     ).catch(() => {});
     await trackActivity(buyerId, "grove_settle", { zone: zoneId, kills: list.length }).catch(() => {});
 
+    // ⚠️ RE-ARMED AFTER THE FOOD IS DEBITED, NOT BEFORE. The belt empties mid-dive, and a player who
+    // crafted two kinds of poultice should carry on healing rather than discover at the bottom of a zone
+    // that the slot went empty forty kills ago. armBeltIfEmpty only fills an empty slot, so this is a
+    // no-op on every settle where there is still something to eat. The client picks it up on its refresh.
+    const beltNow = await armBeltIfEmpty(buyerId).catch(() => null);
+
     return {
         ok: true,
         parts: stored,
         overflow,
+        belt: beltNow,
         emblems: got.emblems,
         gold: got.gold,
         chests: got.chests,
@@ -1356,6 +1371,43 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
  * Luke: "a way to equip food or potions that auto heal you if you get below 60 percent hp." One belt, one
  * food — choosing WHICH is the decision, and a belt that held all four would not be one.
  */
+/**
+ * Put something on an empty belt, if there is anything to put on it.
+ *
+ * ⚠️ THE ONE-SLOT BELT MADE SENSE AND THE EMPTY BELT NEVER DID. Choosing WHICH food is a real decision;
+ * choosing whether to carry any is not, and the game was asking players to make it by doing nothing.
+ * Measured on the live owner account: thirty-five Moss Poultices in the bag and the belt empty, by the one
+ * person who built the feature. If HE never armed it, nobody will -- and everything the belt is for (the
+ * only craft that pays inside the Grove, the difference between walking out of a deep zone and being
+ * carried out) was switched off for everybody by default.
+ *
+ * ⚠️ THE WEAKEST FOOD HELD, NEVER THE BEST. This spends an item without being asked, so it must never be
+ * able to spend the good one: a Heartwood Draught heals 100% and a player saving it for a boss would come
+ * back to find the game had drunk it on a rootrat. The weakest is the one you have most of and miss least,
+ * and the player can still pick any of them by hand.
+ *
+ * ⚠️ AND IT ONLY EVER FILLS AN EMPTY SLOT. A belt the player chose -- including one they deliberately
+ * emptied -- is a decision, and a convenience that overrides a decision is a bug. Taking it off stays
+ * meaningful because nothing re-arms it until the thing on it runs out.
+ */
+export async function armBeltIfEmpty(buyerId, player = null) {
+    const p = player || await playerRow(buyerId);
+    if (p?.belt && GROVE_FOODS[p.belt]) return p.belt;
+    const held = await db.query(
+        `SELECT part_id, qty FROM mkt_grove_item WHERE buyer_id = $1 AND place = 'pack' AND qty > 0`,
+        [buyerId],
+    ).catch(() => []);
+    const foods = (held || [])
+        .filter((r) => GROVE_FOODS[r.part_id])
+        .sort((a, b) => (Number(GROVE_FOODS[a.part_id].heals) || 0) - (Number(GROVE_FOODS[b.part_id].heals) || 0));
+    if (!foods.length) return null;
+    const pick = foods[0].part_id;
+    await db.query(`UPDATE mkt_grove_player SET belt = $2, updated_at = NOW() WHERE buyer_id = $1`,
+        [buyerId, pick]).catch(() => {});
+    if (p) p.belt = pick;
+    return pick;
+}
+
 export async function groveBelt(buyerId, foodId) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     if (foodId && !GROVE_FOODS[foodId]) return { ok: false, error: "no_food" };

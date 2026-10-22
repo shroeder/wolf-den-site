@@ -172,6 +172,11 @@ export default function GroveClient({ initial }) {
         const d = await post({ action: "enter", zone: zone.id, charm: charmPick || undefined });
         if (!d?.ok) { setNote(d?.error === "locked" ? "That one is still closed." : "Couldn't go in."); return; }
         setCharmPick(null);
+        // ⚠️ FOLDED INTO st, BECAUSE st IS OLDER THAN THE DOOR. The server arms an empty belt on entry
+        // (armBeltIfEmpty) and this state was fetched before any of that happened, so without this line
+        // the scene dives with belt=null and the HUD offers to go and find some food the player is in
+        // fact already carrying. Merged rather than refetched: one request already answered this.
+        if (d.belt) setSt((prev) => (prev && prev.belt !== d.belt ? { ...prev, belt: d.belt } : prev));
         if (d.charm) setNote(`${d.charm.name} burning — ${CHARM_STAT_LABEL[d.charm.stat] || "bonus"} +${d.charm.value}%`);
         setSession({ zone: d.zone, seed: d.seed, bonuses: d.bonuses, charm: d.charm || null });
         // ⚠️ AND THE LAST ZONE'S CARDS GO WITH IT. Both of these are click-to-dismiss overlays owned by

@@ -140,7 +140,10 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
         // ⚠️ NO LIFESTEAL IN THE DEATH SCENE. A few percent of every swing out-heals anything a zone-three
         // creature does to you, so the hero stood among three of them getting healthier. The one scene
         // about dying has to be the one scene that cannot win. These are POINTS, not a share.
-        lifesteal: scene === "death" ? 0 : 16,
+        // ⚠️ NO LIFESTEAL IN THE EAT SCENE EITHER. Sixteen points of it out-heals a zone-three creature,
+        // so the hero climbs back over the 60% line on his own and never reaches for the belt -- the same
+        // reason the death scene has none, for the same beat one step earlier.
+        lifesteal: scene === "death" || scene === "eat" ? 0 : 16,
     }), [scene]);
 
     const onTravelLab = useCallback((n) => { say(`travel ${n}`); setTravelled(n); }, [say]);

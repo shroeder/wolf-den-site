@@ -660,7 +660,8 @@ export const GROVE_CSS = `
     /* The zone note is the one animation here that is NOT the readout -- the words are. It still has to
        appear, so the slide goes and the line stays. See animations-always-play for the house rule and
        why the bump on a kill count does not get this treatment. */
-    .gv-paper-trail .is-walked, .gv-node-pin, .gv-node.is-next img, .gv-note.is-zone { animation: none; }
+    .gv-paper-trail .is-walked, .gv-node-pin, .gv-node.is-next img, .gv-note.is-zone,
+    .gv-belt.is-eat, .gv-belt.is-eat i { animation: none; }
 }
 @keyframes gv-bossbeat { 0%, 100% { scale: 1; } 50% { scale: 1.07; } }
 
@@ -1080,6 +1081,38 @@ export const GROVE_CSS = `
     color: #9fe8ff;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(80,200,255,0.95), 0 0 36px rgba(40,140,255,0.6); }
 .gv-proc.is-haste { color: #9fe8ff; }
+/* ── ⚠️ THE HEAL IS GREEN, AND IT IS THE ONLY PROC THAT CARRIES AN OBJECT ─────────────────────
+   Luke: "when it gets used it should be clear. And sexy, showing it happens and the effect."
+
+   Haste is electric because it is a stat firing. This is a thing the player MADE being spent, so the
+   thing itself is in the call -- the same sprite that sits on the belt chip at the top of the screen,
+   which is what ties the two into one object rather than two notifications about one event.
+
+   Green rather than blue because it is the colour of the heal number it arrives with and of the ring it
+   throws, and because warm is damage in this game: the one moment the player gets something BACK must
+   not be in the palette of the thing taking it away. */
+/* ⚠️ CENTRED WITH THE translate PROPERTY, NOT INSIDE transform. The loop rewrites style.transform on
+   this node sixty times a second (world position, arrival punch, tilt), so a -50% folded in there would
+   be wiped on the next frame -- the same trap as a keyframe animation on a pop. translate is a separate
+   channel that composes with it and the loop never touches it.
+
+   ⚠️ AND NO BACKTICKS IN HERE. This block is inside a template literal; the first draft quoted the two
+   property names in backticks and ended the string mid-comment, which took the whole stylesheet out and
+   photographed as the zone failing to render at all. check:css is what said so.
+
+   Only the heal, deliberately: the haste proc is left-anchored, tuned and shipped, and moving it is not
+   this change's business. This one carries a sprite and a two-word name, so it is nearly three times as
+   wide and hangs off the hero's shoulder instead of sitting over him. */
+.gv-proc.is-heal { translate: -50% 0; color: #8dffb8; letter-spacing: 0.16em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(80,255,160,0.9), 0 0 36px rgba(30,200,110,0.6); }
+/* Sized off the type like the loot pop's, so the object scales with the number beside it rather than
+   being a fixed pixel count that is huge on a phone and lost on a desktop. */
+.gv-proc.is-heal img { width: 1.5em; height: 1.5em; margin-right: 0.34em; vertical-align: -0.4em;
+    object-fit: contain; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.85)); }
+.gv-boom.is-heal { border-color: rgba(125,255,175,0.95); }
+/* Motes rising off him rather than sparks flying off a blow: no gravity to fight, softer light, and the
+   green the rest of the beat is in. */
+.gv-spark.is-heal { background: #c8ffd8; box-shadow: 0 0 8px 3px rgba(110,255,165,0.8); }
 
 /* The ring a crit throws, and the one a proc throws. ⚠️ A CRIT'S IS THE ONLY THING AN ORDINARY HIT
    NEVER DOES -- everything else between them is a difference of degree, and degrees stop reading once
@@ -1940,6 +1973,41 @@ export const GROVE_CSS = `
     border: 1px solid rgba(255,209,102,0.42);
     text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
 .gv-belt.is-out:hover { border-color: rgba(255,209,102,0.8); }
+/* ── WHAT IS ON THE BELT, AS AN OBJECT ────────────────────────────────────────────────────────
+   The sprite is the same one the pop carries when it is eaten, which is the whole point: the thing that
+   leaves your belt and the thing that flies off your head are visibly one object. The count is its own
+   element so it can hold its weight next to a long name on a 320px phone. */
+.gv-belt { display: inline-flex; align-items: center; gap: 5px;
+    pointer-events: none; white-space: nowrap; }
+.gv-belt img { width: 18px; height: 18px; object-fit: contain; display: block;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); }
+.gv-belt i { font-style: normal; font-weight: 800; color: #fff6df;
+    padding: 1px 6px; border-radius: 999px; font-size: 0.72rem;
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.16); }
+/* ⚠️ THE FLASH IS ON MOUNT, AND THE ELEMENT IS REMOUNTED BY ITS KEY. No class is toggled and no timer
+   strips one, so the loop cannot race a render -- see the note by setBeltAte. The eye needs to be told
+   that something it owns was just spent; the count alone changes too quietly to notice in a fight. */
+.gv-belt.is-eat { animation: gvBeltAte 460ms ease-out both; }
+@keyframes gvBeltAte {
+    0% { transform: scale(1); }
+    22% { transform: scale(1.22); }
+    100% { transform: scale(1); }
+}
+/* ── ⚠️ THE NAME GIVES WAY FIRST ON A 320px PHONE ─────────────────────────────────────────────
+   Adding the sprite and the count pill took the chip from 89px to 122px, and the kill counter is
+   centred at the top of the same row: measured at 320x568 the two overlapped by 418 square pixels.
+   The NAME is what goes, because the sprite is already saying which food this is -- a picture and a
+   number is the whole readout, and the full name still arrives on the call-out every time one is drunk
+   and on the belt ladder in the backpack. Dropping the count instead would leave the thing the chip
+   exists to report. */
+@media (max-width: 400px) {
+    .gv-belt span { display: none; }
+}
+.gv-belt.is-eat i { animation: gvBeltAteN 460ms ease-out both; }
+@keyframes gvBeltAteN {
+    0% { background: rgba(159,224,138,0.85); color: #0c120d; }
+    100% { background: rgba(0,0,0,0.5); color: #fff6df; }
+}
 
 .gv-tablet ul { margin: 8px 0 0; padding-left: 18px; font-size: 0.82rem; color: #cfc6b6; }
 

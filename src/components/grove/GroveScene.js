@@ -50,7 +50,7 @@ import {
 import { footOf } from "@/components/grove/grove-foot.js";
 import {
     playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice, playDeath,
-    playPetHit,
+    playPetHit, playQuaff,
 } from "@/components/grove/grove-sfx.js";
 // ── ⚠️ THE GEOMETRY LIVES IN ITS OWN FILE SO IT CAN BE CHECKED ─────────────────────────────────────
 // Every distance that is really a SHARE OF THE FRAME is in grove-view.js, with the long version of why. The
@@ -206,6 +206,11 @@ const DOOR_NEAR = 11;
 // emblem is roughly one kill in four hundred. Long enough to register as the world pausing, short enough
 // that it never reads as a stutter.
 const EMBLEM_STOP_MS = 190;
+// ── DRINKING SOMETHING YOU MADE ─────────────────────────────────────────────────────────────────────────────
+// Longer than the hurt stop (70ms) that triggers it, because the heal has to outrank the hit: the player is
+// being bitten, and if the two freeze for the same length the hit is what they read. Shorter than an emblem,
+// which is a thousand times rarer. clock.stop never shortens a freeze already running, so the two compose.
+const QUAFF_STOP_MS = 110;
 // Thrown harder than ordinary loot so it hangs at the top of its arc while the ring and the sparks resolve
 // underneath it. LOOT_SPILL.up is 0.62; this is the one drop allowed to upstage the rest of the pile.
 const EMBLEM_THROW = 1.15;
@@ -324,6 +329,7 @@ export default function GroveScene({
     // ⚠️ COMPARED AGAINST w.foodLeft, WHICH IS THE SIMULATION'S OWN COUNT. That is the live truth -- the
     // loop decrements it on every bite -- and reading it here keeps the effect pure, rather than writing
     // a ref from inside a setState updater, which React is free to run twice.
+    const [beltAte, setBeltAte] = useState(0);
     const beltCount = Number(belt?.count) || 0;
     useEffect(() => {
         const w = worldRef.current;
@@ -968,16 +974,34 @@ export default function GroveScene({
         // This is its own object: it rides at the hero rather than at the target, it punches in wide and
         // snaps, it carries a ring out from him, and it has its own colour per proc so two different
         // procs are two different events rather than two words.
-        const procCall = (text, kind = "haste") => {
+        // ⚠️ art IS OPTIONAL AND THE EAT IS WHY. Luke: "when it gets used it should be clear, and sexy,
+        // showing it happens and the effect." A poultice leaving the belt is a proc in every way that
+        // matters -- it rides at the hero, it is his own kit doing something, and it is rare enough to
+        // deserve the screen -- the only difference is that the player MADE this one, so the object has
+        // to be in the frame rather than a word standing in for it. Same pipeline, same ring, same shake;
+        // one more child in the node. A second call-out function beside this one would drift from it.
+        // ⚠️ atY IS OPTIONAL AND THE HEAL IS WHY. A proc fires on the player's own swing and has the air
+        // over the hero to itself. The quaff does not: it is TRIGGERED by the blow that dropped him under
+        // the line, so the red number for that blow is in the frame at the same instant and at the same
+        // height, and the two drew through each other every single time. Haste keeps its tuned 0.9.
+        const procCall = (text, kind = "haste", art = null, atY = 0.9) => {
             const layer = fxRef.current;
             if (!layer) return;
             const el = document.createElement("b");
             el.className = `gv-proc is-${kind}`;
-            el.textContent = text;
+            if (art) {
+                // Built by hand rather than with innerHTML, same as the loot pop: a food name is authored
+                // data today and exactly the kind of string that later arrives from somewhere else.
+                const img = document.createElement("img");
+                img.src = art;
+                img.alt = "";
+                el.appendChild(img);
+            }
+            el.appendChild(document.createTextNode(text));
             layer.appendChild(el);
             // Positioned by the same pop pipeline so it rides the camera and is cleaned up with everything
             // else -- a hand-placed node here would be left behind by a zone swap.
-            const pr = makePop("proc", w.hero.x, w.hero.y + w.hero.h * 0.9, w.rand);
+            const pr = makePop("proc", w.hero.x, w.hero.y + w.hero.h * atY, w.rand);
             pr.born = w.sceneNow ? w.sceneNow() : performance.now();
             pr.weight = 1;
             pr.tilt = 0;
@@ -1805,8 +1829,49 @@ export default function GroveScene({
                     w.eaten[belt.id] = (w.eaten[belt.id] || 0) + 1;
                     const healed = Math.round(maxHp * (Number(belt.heals) || 0));
                     w.hp = Math.min(maxHp, w.hp + healed);
-                    addPop("heal", `+${healed}`, w.hero.x, w.hero.y + HERO_UNITS * 1.1);
+                    // ── ⚠️ THE ONLY THING YOU CRAFT THAT SPENDS ITSELF, AND IT DID SO INVISIBLY ──
+                    // Luke: "we should see the poultice stuff we have and when it gets used and how many
+                    // left." Eating popped a bare green +84, which is indistinguishable from any other
+                    // heal in the game -- so the one object a player made with their own parts was
+                    // consumed with nothing naming it. The sprite goes on the pop, so what you SEE
+                    // leaving the belt is the thing you made, and the chip at the top flashes as its
+                    // count drops. Same picture in both places, which is how the two read as one object.
+                    // ── ⚠️ THE WHOLE BEAT, NOT A GREEN NUMBER ────────────────────────────────
+                    // Luke: "when it gets used it should be clear. And sexy, showing it happens and the
+                    // effect." Two separate things to show and it was showing neither: WHAT was spent
+                    // (an object the player made out of their own parts) and WHAT IT DID.
+                    //
+                    // So the object goes up on the proc call -- the sprite and its name, riding at the
+                    // hero, punching in and snapping, exactly like a haste proc, because that is what
+                    // this is. The ring comes out of his chest, green rather than electric. Motes rise
+                    // off him instead of sparks flying off a blow. And the number is thrown BIG, because
+                    // a 25% heal in a fight you are losing is the largest single swing in the feature.
+                    //
+                    // ⚠️ AND IT STOPS THE WORLD FOR A BEAT. Everything else that matters here does --
+                    // a crit, a kill, an emblem, a boss noticing you -- and an event with no stop
+                    // behind it reads as scenery however loud it is drawn. Short: this interrupts a
+                    // fight the player is in the middle of losing, and a long hold there is a stutter.
+                    // The stack, bottom to top: the blow that landed (red, at his chest), the thing he
+                    // drank, the health it gave back. Three separate facts about one moment, each in
+                    // its own band of the frame so none of them has to be read through another.
+                    procCall(belt.name, "heal", groveArt(belt.id), 1.32);
+                    shockwave(w.hero.x, w.hero.y + w.hero.h * 0.45, "heal");
+                    burst(w.hero.x, w.hero.y + w.hero.h * 0.4, { kind: "heal", scale: 1.3 });
+                    // ⚠️ ABOVE THE CALL-OUT, NOT ON IT. Both ride at the hero and the proc sits at
+                    // 0.9 of his height, so at 1.1 the number landed across the middle of the word --
+                    // two things fighting for the same 40 pixels, which is the exact failure the proc
+                    // call was built to fix for HASTE. Stacked: the object he drank, the effect above it.
+                    addPop("heal", `+${healed}`, w.hero.x, w.hero.y + HERO_UNITS * 2.05,
+                        { scale: 1.35, big: true });
+                    playQuaff();
+                    w.clock.stop(now, QUAFF_STOP_MS);
                     setBeltLeft(w.foodLeft);
+                    // ⚠️ A COUNTER REMOUNTS THE CHIP RATHER THAN A CLASS BEING TOGGLED BY HAND. The chip
+                    // is React's node, so adding a class from the loop and stripping it on a timer races
+                    // the next render; keying it restarts the animation with no imperative DOM at all,
+                    // and an eat is rare enough that a one-element remount costs nothing. Zero on mount
+                    // means arriving in a zone does not flash a belt nobody has touched.
+                    setBeltAte((n) => n + 1);
                 }
                 // ── ⚠️ DYING HAD NO MOMENT, ONLY A CONSEQUENCE ─────────────────────────────────
                 // Hitting zero flipped a flag and a dark panel appeared over a zone that was still
@@ -2739,7 +2804,12 @@ export default function GroveScene({
                     way so the bench opens onto parts you actually own. Teaching by showing, at the one
                     moment it is wanted. */}
                 {belt?.id && beltLeft > 0 ? (
-                    <b className="gv-belt">{belt.name} x{beltLeft}</b>
+                    <b key={beltAte} className={`gv-belt${beltAte ? " is-eat" : ""}`}>
+                        {groveArt(belt.id)
+                            ? <img src={groveArt(belt.id)} alt="" width={18} height={18} />
+                            : null}
+                        <span>{belt.name}</span><i>{beltLeft}</i>
+                    </b>
                 ) : onPanel ? (
                     <button type="button" className="gv-belt is-out"
                         title={belt?.id
@@ -3026,6 +3096,30 @@ function setUpLabScene(w, scene) {
         // Hold him there: a hero with no target wanders, and he wandered out of their reach.
         if (biters[0]) w.target = biters[0];
         w.moveTo = null;
+    } else if (scene === "eat") {
+        // ── ⚠️ THE ONE BEAT THE BENCH COULD NOT PRODUCE ────────────────────────────────────────
+        // The eat fires below 60% of max health with food on the belt, which in ordinary play means
+        // being in genuine trouble -- and the death scene, the only one that gets a hero into trouble
+        // on purpose, sets foodLeft to 0 precisely so he CANNOT heal. So the one moment the whole belt
+        // exists for had no scene, and the first attempt to film it photographed a man dying with five
+        // poultices he was never allowed to drink.
+        //
+        // Same staging as death and the opposite outcome: hurt, surrounded, and carrying food. The
+        // creatures are fat so the fight lasts longer than the swallow, and the hero is parked just
+        // under the line so the first bite triggers it rather than the fortieth.
+        // 200 against the bench kit's 600, so he is well under the 60% line and the first bite eats.
+        // A literal for the same reason the death scene's 14 is one: this function is handed the world,
+        // not the stats, and the bench kit is right there in GroveLab.
+        w.hp = 200;
+        w.foodLeft = 5;
+        const nibblers = w.foes.filter((f) => !f.isBoss).slice(0, 2);
+        nibblers.forEach((f, i) => {
+            f.x = w.hero.x + (i % 2 ? 3.6 : -3.6);
+            f.y = 0;
+            f.vx = 0; f.vy = 0; f.grounded = true;
+            f.hp = 9999; f.maxHp = 9999;
+            f.hit = true; f.passive = false;
+        });
     } else if (scene === "emblem") {
         // One creature at the hero's elbow with enough health to still be dying when the camera starts.
         const victim = w.foes.filter((f) => !f.isBoss)[0];

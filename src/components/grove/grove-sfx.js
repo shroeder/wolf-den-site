@@ -231,6 +231,26 @@ export function playHurt() {
     } catch { /* ignore */ }
 }
 
+/**
+ * Drinking something off the belt.
+ *
+ * ⚠️ IT RISES, AND EVERY HURT SOUND IN THIS FILE FALLS. The quaff lands inside the same half second as
+ * playHurt (the hit that drops you under the line is what triggers the eat), so the two have to be telling
+ * the player opposite things or the heal is heard as more damage. A swallow, then three notes climbing a
+ * fifth -- short enough that a run of them in a bad fight does not turn into a melody.
+ */
+export function playQuaff() {
+    const a = audio();
+    if (!a) return;
+    try {
+        // The swallow: a soft low body, nothing like the sharp thud of a blow.
+        thud(a, { freq: 300, dur: 0.1, peak: 0.16, q: 1.1, type: "lowpass" });
+        note(a, 523.25, 0.02, 0.1, 0.085, "sine");
+        note(a, 659.25, 0.08, 0.1, 0.085, "sine");
+        note(a, 783.99, 0.14, 0.16, 0.075, "sine");
+    } catch { /* ignore */ }
+}
+
 /** Loot hitting the ground. Tiny — it fires several times per kill. */
 export function playDrop() {
     const a = audio();
