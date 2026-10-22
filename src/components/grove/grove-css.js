@@ -104,6 +104,36 @@ export const GROVE_CSS = `
 .gv-dock button.is-on { background: rgba(159,224,138,0.20); border-color: rgba(159,224,138,0.75);
     transform: scale(1.06); box-shadow: 0 0 18px rgba(159,224,138,0.35), 0 4px 14px rgba(0,0,0,0.5); }
 .gv-dock button:not(.is-on):hover { border-color: rgba(255,255,255,0.34); }
+/* ── ⚠️ ON A LANDSCAPE PHONE HALF THE SCREEN WAS PADDING ──────────────────────────────────────
+   52 above and 104 below is 156px of a 320px-tall viewport -- 49% of the screen reserved for a 40px
+   button in one corner and a dock in the other, leaving about two rows of the workbench visible. The
+   numbers are right for a tall screen and were never checked against a short one.
+
+
+   ⚠️ AND IT LIVES BELOW THE DOCK'S OWN RULES, NOT BESIDE .gv-sheet WHERE IT READS BETTER. A media query
+   adds no specificity, so the first placement -- forty lines above .gv-dock button { width: 56px } --
+   lost to it silently: the padding around the dock shrank while the dock itself stayed 74px tall on
+   every landscape phone. Nothing errored, and the only thing that caught it was the rig measuring the
+   dock's height rather than trusting the rule it had just written.
+
+   Keyed on HEIGHT, not width: this is about how little vertical room there is, and a 915x412 phone has
+   the same problem as a 568x320 one. The dock shrinks with it rather than the padding merely getting
+   tighter around it -- 46px buttons still clear the 44px a thumb needs, and that is what buys the room.
+   Everything above this breakpoint is untouched. */
+@media (max-height: 460px) {
+    .gv-sheet { padding-top: calc(48px + env(safe-area-inset-top));
+        padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+    /* The in-zone sheet pays the same tax for the same reason -- a close button in one corner -- and on
+       a 320px-tall screen 58 above and 24 below is a quarter of everything there is. */
+    .gv-zsheet { padding-top: calc(46px + env(safe-area-inset-top));
+        padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+    .gv-zsheet-x { width: 36px; height: 36px; top: calc(6px + env(safe-area-inset-top)); }
+    .gv-dock { bottom: calc(6px + env(safe-area-inset-bottom)); padding: 6px 10px; gap: 8px; }
+    .gv-dock button { width: 46px; height: 46px; }
+    .gv-dock button img { width: 32px; height: 32px; }
+    .gv-exit { width: 36px; height: 36px; top: calc(6px + env(safe-area-inset-top)); }
+}
+
 
 /* ── THE SAME DOCK, INSIDE A ZONE ─────────────────────────────────────────────────────────────
    Luke: "The buttons to access crafting and backpack and map should be available when in a node on the
@@ -628,7 +658,28 @@ export const GROVE_CSS = `
    chain rather than two rules fighting over the same box. */
 .gv-paper-wrap { position: relative; width: 100%; height: 100%; }
 .gv-paper-wrap > .gv-paper { height: 100%; }
-.gv-zsheet .gv-paper-wrap { height: min(68vh, 620px); min-height: 300px; }
+/* ── ⚠️ BOTH ENDS OF THE OLD min(68vh, 620px) WITH A 300px FLOOR WERE WRONG ───────────────────
+   Written for a phone held upright, and measured across every screen it was the only thing on this
+   panel that did not fit:
+
+     · the 300px FLOOR overflowed a 568x320 landscape phone. The sheet has 82px of padding, so 238px is
+       all there is -- ninety pixels of the chart sat below the fold, on a map you already have to scroll
+       sideways. A map you scroll in two directions to see at all is not a map.
+     · the 620px CAP shrank it everywhere above a laptop. Opened from inside a zone an ultrawide got 43%
+       of its height; the SAME map opened from the hub got 87%. One chart, two sizes, for no reason the
+       player could see.
+
+   The viewport is the right unit here and that part was always right -- the sheet is position:fixed over
+   the whole screen, so vh IS its height and no portal can take that away. What it needed was a share
+   rather than a ceiling, and a second term that knows about the padding instead of a floor that does
+   not. 78vh lands within a few pixels of what the hub gives the same chart at every size. */
+/* ⚠️ 140, AND IT IS MEASURED RATHER THAN DERIVED. The sheet's padding-top is 58, but the chart does not
+   start there -- measured live it begins at y=110 on most sizes, and the sheet pays more at the bottom.
+   A first cut at 92 was arithmetic off the padding alone and hung the map 25-54px below the fold on
+   three screens; 140 got that to 6-10px and no further, because the offset is not a constant -- the
+   short-screen media query below moves it. 152 is the measured worst case rather than a derivation, and
+   the rig is what settled it. The stylesheet reads as if 92 were obviously right. */
+.gv-zsheet .gv-paper-wrap { height: min(78vh, calc(100vh - 152px)); min-height: 164px; }
 
 /* THE PLATE. One object: name and arrows on top, the twelve places beneath. */
 .gv-paper-chrome { position: absolute; z-index: 4; top: 8px; left: 50%; transform: translateX(-50%);
@@ -2529,26 +2580,51 @@ export const GROVE_CSS = `
 .gv-recall-list li em { font-style: normal; font-size: 0.66rem; font-weight: 700; color: var(--band); }
 .gv-recall-list li b { color: #e0a83c; font-variant-numeric: tabular-nums; font-size: 0.74rem; }
 
-/* ── ⚠️ EVERY CONTROL IN THE GROVE IS AT LEAST 32px TALL ─────────────────────────────────────────────
-   Luke: "audit every detail of the grove on all screen sizes." Driving all nine viewports found no
-   overflow, no broken art and no console errors — the structure is sound — but five controls were under
-   the 32px a thumb can reliably hit, on every touch size, and two of them I had added myself this
-   session. None of it shows up on a laptop, which is where a mouse makes a 21px button feel fine.
+/* ── ⚠️ EVERY CONTROL IN THE GROVE IS AT LEAST 44px TALL ─────────────────────────────────────────────
+   Luke: "audit every detail of the grove on all screen sizes." The first pass of this block set the
+   floor at 32 and listed the five controls that were under it.
 
-     .gv-paper-arrow   22x22   the map-to-map arrows
-     .gv-temper-go     66x21   the Temper toggle
-     .gv-arm-go        _x27    forge a boss-armour piece
-     .gv-recchip       _x31    the recipe filter chips, one pixel short
-     .gv-em button     56x30   equip or unequip an emblem
+   ⚠️ THE NUMBER WAS WRONG AND THE MEASUREMENT WAS THE REASON. 32 is the smallest a control can be and
+   still be hit on purpose; 44 is the size a thumb actually covers, and it is the figure the rest of this
+   repo already works to. Re-audited with elementFromPoint rather than getBoundingClientRect -- "can a
+   thumb land on this" instead of "how big is the box" -- and the zone HUD, both close buttons, Craft,
+   Temper, Forge, the filter chips and both emblem buttons all came in under it on every phone size.
 
-   min-height rather than padding, so a control grows to the floor and no further — padding on the
-   already-tall ones would have pushed the panels out of a 441px phone. */
-.gv-paper-arrow { min-width: 32px; min-height: 32px; }
-.gv-temper-go { min-height: 32px; padding-inline: 12px; }
-.gv-arm-go { min-height: 32px; }
-.gv-recchip { min-height: 34px; }
-.gv-em button { min-height: 32px; }
-.gv-act-hit, .gv-rec-go, .gv-slot { min-height: 32px; }
+   ⚠️ AND TWO MECHANISMS, BECAUSE ONE DOES NOT COVER IT:
+
+   min-height, where the control can grow. Still min-height rather than padding, for the original
+   reason: a control grows to the floor and no further, and padding on the already-tall ones would push
+   the panels out of a 441px phone.
+
+   A transparent ::after, where it cannot. The zone HUD is a row of small pills over the game and the
+   close buttons are 40px circles in a corner -- growing those boxes would cost the screen real estate
+   the game is using, so the HIT AREA grows and the box does not.
+
+   ⚠️ THE EXPANDER COMES IN TWO SHAPES AND THAT IS NOT TIDINESS. Widening everything to 44 made adjacent
+   controls overlap: the ingredient chips sit six pixels apart, so each 54px chip grown to 44 wide stole
+   its neighbour's edge and a thumb aimed at one toggled the next. Isolated controls grow both ways;
+   anything that sits in a row grows in height only, which is the axis that was short anyway.
+
+   ⚠️ AND AN EXPANDER CANNOT LEAVE A SCROLLER. The filter row is overflow-x:auto, which computes
+   overflow-y to auto as well, so those chips clip their own ::after on all four sides -- they are in the
+   min-height list for that reason and no other.
+
+   ⚠️ THE INGREDIENT CHIPS STAY AT 32, DELIBERATELY. Three to a cost row across 129 rows, and Luke on
+   this exact screen: "cards are too big and verbose". They are a fine-grained shortcut whose job is now
+   done by the Find control in the same card's header, so 44px each would cost three rows of height on
+   every card to duplicate a button already sitting above them. */
+.gv-paper-arrow { min-width: 44px; min-height: 44px; }
+.gv-temper-go { min-height: 44px; padding-inline: 12px; }
+.gv-arm-go { min-height: 44px; }
+.gv-recchip { min-height: 44px; }
+.gv-em button, .gv-eslot button { min-height: 44px; }
+.gv-act-hit, .gv-rec-go, .gv-slot { min-height: 44px; }
+
+/* Isolated and small in both axes: nothing sits beside them, so they grow both ways. */
+.gv-leave, .gv-exit, .gv-zsheet-x, .gv-rec-want, .gv-wish-clear { position: relative; }
+.gv-leave::after, .gv-exit::after, .gv-zsheet-x::after, .gv-rec-want::after, .gv-wish-clear::after {
+    content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: max(100%, 44px); height: max(100%, 44px); border-radius: inherit; }
 
 /* ── ⚠️ AND THE PLANK TITLES STOP TRUNCATING AT 320px ────────────────────────────────────────────────
    "Backpack 11/20", "Workbench 7 ready", "Emblems 0/3 worn" and "Boss Armour 368 merits" all lost
