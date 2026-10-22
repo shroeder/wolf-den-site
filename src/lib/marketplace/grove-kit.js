@@ -105,6 +105,10 @@ function forGrove(f) {
         hasteBonus: Math.max(0, Number(f.hasteBonus) || 0),
         stun: Math.max(0, Number(f.stun) || 0),
         // Shares already.
+        // The Runecaller's whole first tier. Same shape as bleed below, because burn IS bleed lit.
+        burnChance: Math.max(0, Math.min(1, Number(f.burnChance) || 0)),
+        burnDamage: Math.max(0, Number(f.burnDamage) || 0),
+        burnLeech: Math.max(0, Number(f.burnLeech) || 0),
         bleedChance: Math.max(0, Math.min(1, Number(f.bleedChance) || 0)),
         bleedDamage: Math.max(0, Number(f.bleedDamage) || 0),
         bleedLeech: Math.max(0, Math.min(1, Number(f.bleedLeech) || 0)),

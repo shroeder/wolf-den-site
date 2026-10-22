@@ -333,8 +333,49 @@ export function swing(f, targetArmour, rand) {
             leech: Math.max(0, Math.min(0.9, Number(f?.bleedLeech) || 0)) }
         : null;
 
-    return { dealt, crit: stacks > 0, stacks, healed, bleed };
+    // ── BURN: THE SAME WOUND, LIT ──────────────────────────────────────────────────────────────────────
+    // ⚠️ IT IS BLEED'S MACHINE WITH DIFFERENT NUMBERS, DELIBERATELY. Kindle's own words are "a blow sets a
+    // burn, it ticks three times for a fifth of the blow and armour never sees it" -- which is a bleed
+    // that is on fire. A second damage-over-time system written beside this one would be two sets of
+    // rules for one idea, and the first time either was tuned they would stop agreeing.
+    //
+    // ⚠️ AND THE TWO CO-EXIST RATHER THAN REPLACING EACH OTHER. A Reaver bleeds, a Runecaller burns, and a
+    // member with both stats should get both -- folding them into one slot would silently make the
+    // commitment to one of those trees worthless the moment you touched the other.
+    const burns = (Number(f?.burnChance) || 0) > 0 && rand() < Number(f.burnChance);
+    const burn = burns
+        ? { dmg: Math.max(1, Math.round(dealt * (BURN_SHARE + (Number(f?.burnDamage) || 0)))),
+            leech: Math.max(0, Math.min(0.9, Number(f?.burnLeech) || 0)) }
+        : null;
+
+    return { dealt, crit: stacks > 0, stacks, healed, bleed, burn };
 }
+
+// ── FIRE IN A PLACE THAT HAS MORE THAN ONE ENEMY IN IT ──────────────────────────────────────────────────────
+// Luke: "consider aoe as well."
+//
+// ⚠️ THIS IS NOT NEW CONTENT, IT IS A NODE FINALLY BEING READ SOMEWHERE THAT CAN EXPRESS IT. Every Runecaller
+// node is written single-target -- burn, freeze, chill, soulfire -- because the ring only ever HAS one
+// target. Fire that cannot spread is the Arena's limitation leaking into a side-scroller with thirty
+// creatures standing in it, and the result is a Runecaller who is a Reaver with worse numbers.
+//
+// ⚠️ IT SPREADS ONCE AND NO FURTHER, WHICH IS THE WHOLE SAFETY. A burn that lights its neighbour, whose burn
+// lights ITS neighbour, is a chain reaction that clears a zone off one lucky roll -- so a burn carries
+// whether it may spread, and the one it starts never can. Worst case is two creatures alight, not thirty.
+//
+// ⚠️ AND IT COSTS THE ECONOMY NOTHING, WHICH IS WHY IT IS ALLOWED TO BE GENEROUS. killCeiling bounds a dive
+// by RESPAWN -- the population is 15-30 and refills every 45 seconds -- so killing faster does not mint
+// more, it just means more of the window spent waiting. AoE here buys feel and identity rather than income.
+// See [[gold-mint-rate-lever]] and [[economy-nerf-measure-daily-total]].
+export const BURN_SHARE = 0.20;
+export const BURN_TICK_MS = 620;
+export const BURN_TICKS = 3;
+// How far fire reaches for the next body, in world units. Deliberately close: it reads as the thing beside
+// it catching, not as a bolt travelling. About two hero-widths.
+export const BURN_SPREAD_UNITS = 5.5;
+// And how much of the original wound the caught one takes. Fire spreading weaker is both the obvious
+// physical reading and the second brake after the no-chaining rule.
+export const BURN_SPREAD_SHARE = 0.6;
 
 /** What one bleed tick is worth, before bleedDamage deepens it. A share of the blow that applied it. */
 export const BLEED_SHARE = 0.18;

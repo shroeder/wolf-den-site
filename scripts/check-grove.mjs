@@ -486,7 +486,8 @@ console.log(`  backdrops to draw: ${zones} (one per zone)`);
 // no Grove number must be named in NOT_IN_THE_GROVE with the mechanic it is waiting on; anything else fails
 // the build. So the gap is a list somebody chose rather than a thing nobody knew.
 const GROVE_FIELDS = ["damage", "critChance", "critMult", "tempo", "haste", "lifesteal", "lifestealBonus",
-    "hasteBonus", "stun", "bleedChance", "bleedDamage", "bleedLeech", "armor", "health", "dmgPct", "might"];
+    "hasteBonus", "stun", "bleedChance", "bleedDamage", "bleedLeech", "burnChance", "burnDamage",
+    "burnLeech", "armor", "health", "dmgPct", "might"];
 // The mechanic each one is waiting for. Shrinking this list is the work; adding to it is a decision.
 const NOT_IN_THE_GROVE = {
     counterBonus: "no counter-attack in a side-scroller yet",
@@ -495,7 +496,6 @@ const NOT_IN_THE_GROVE = {
     blockChance: "no block", blockReductionBonus: "no block",
     guardChance: "no guard", guardSize: "no guard",
     regen: "no heal-over-time on the hero", grudge: "no grudge", thorns: "no reflect",
-    burnChance: "no burn (the bleed machine could carry it)", burnDamage: "no burn", burnLeech: "no burn",
     freeze: "no freeze", chill: "no slow", iceThorns: "no reflect",
     ward: "no absorb shield", wardRefill: "no absorb shield",
     surge: "no surge", soulfire: "no soulfire", cataclysm: "no cataclysm",

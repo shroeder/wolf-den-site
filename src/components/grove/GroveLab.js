@@ -142,6 +142,12 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
         // Haste is POINTS, fed through procFrom() -- a big number here is a proc on nearly every swing.
         tempo: 1.1, haste: scene === "juice" ? 400 : 0,
         bleedChance: scene === "fight" ? 0.35 : 0, bleedDamage: 0, bleedLeech: 0,
+        // ⚠️ THE BURN SCENE PINS WHAT IS OTHERWISE A ROLL. Kindle's top rank is a 30% chance, so filming
+        // a spread off real odds is shooting sheets until one catches. Certainty here, the same reason
+        // the juice scene pins crit and haste: the lab exists to make the moment happen DURING the film.
+        burnChance: scene === "burn" ? 1 : 0,
+        burnDamage: scene === "burn" ? 0.2 : 0,
+        burnLeech: scene === "burn" ? 0.15 : 0,
         // ⚠️ NO LIFESTEAL IN THE DEATH SCENE. A few percent of every swing out-heals anything a zone-three
         // creature does to you, so the hero stood among three of them getting healthier. The one scene
         // about dying has to be the one scene that cannot win. These are POINTS, not a share.

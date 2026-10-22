@@ -1186,6 +1186,16 @@ export const GROVE_CSS = `
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 18px rgba(255,150,40,0.95), 0 0 34px rgba(255,110,20,0.6); }
 /* The loudest a hit gets without being a crit: a hit worth a seventh of the target. Same colour family as
    an ordinary hit, so the ladder still reads as one scale rather than as a third kind of event. */
+/* ── ⚠️ A BURN TICK IS NOT A SWORD TICK ───────────────────────────────────────────────────────
+   Bleed ticks wear the ordinary hit cream because a wound is the weapon still working. Fire is the
+   other tree's identity and the only way a Runecaller is visibly a Runecaller in a zone, so it gets its
+   own heat -- and it has to be legible against a forest of every green there is, hence the hard stroke
+   the rest of these carry rather than a glow doing the work. */
+.gv-num.is-burn { color: #ffb347;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,140,40,0.95), 0 0 32px rgba(255,90,10,0.6); }
+/* The motes thrown when fire catches the body beside it. Warmer and sparser than a blow's sparks --
+   this is something igniting, not something being struck. */
+.gv-spark.is-burn { background: #ffd9a0; box-shadow: 0 0 8px 3px rgba(255,150,50,0.85); }
 .gv-num.is-big { color: #fff3c4; text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,205,110,0.7); }
 /* ── ⚠️ THE PET'S NUMBER IS COOL AND SMALL, AND BOTH ARE LOAD-BEARING ─────────────────────────
    Warm is what the player's own damage looks like in this game -- cream for a hit, gold for a crit, pale

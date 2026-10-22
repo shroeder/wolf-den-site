@@ -12,7 +12,8 @@ import {
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
 import {
     UNITS_PER_SCREEN, zoneWidth, platformsFor, decorateLedges, swing, makeTelegraph, telegraphHits, mitigate,
-    BLEED_TICK_MS, BLEED_TICKS, petBite, petBiteCd,
+    BLEED_TICK_MS, BLEED_TICKS, BURN_TICK_MS, BURN_TICKS,
+    BURN_SPREAD_UNITS, BURN_SPREAD_SHARE, petBite, petBiteCd,
 } from "@/lib/marketplace/grove-world.js";
 // Pure files, both of them — no DB and no server-only, which is why a client scene may read them. The
 // alternative was a second haste curve that drifts from the ring's the first time either is touched.
@@ -940,6 +941,52 @@ export default function GroveScene({
         // than a rat does, and an option this function quietly ignored would have been a dead
         // parameter at the only call site that passes it. It moves the COUNT and the SPEED; the
         // particle size is set in CSS and stays put.
+        /**
+         * One tick of a damage-over-time on one creature. Returns true if it died, because the caller
+         * must then stop touching it -- killFoe sets `dying` and everything after that point in the loop
+         * is the behaviour of something still alive.
+         */
+        const tickDot = (wd, f, now, kind, everyMs) => {
+            const dot = f[kind];
+            if (!dot || now < dot.nextAt) return false;
+            const tick = Math.max(1, Math.round(dot.dmg));
+            f.hp -= tick;
+            f.hurtAt = now;
+            addPop(kind === "burn" ? "burn" : "hit", `${tick}`, f.x, f.y + f.h * 0.6,
+                popWeight(tick, f.maxHp) * 0.7);
+            if (dot.leech > 0) {
+                wd.hp = Math.min(maxHp, wd.hp + Math.max(1, Math.round(tick * dot.leech)));
+            }
+            // ── ⚠️ FIRE CATCHES WHAT IS STANDING NEXT TO IT, ONCE ───────────────────────────────
+            // The spread is the Grove's half of the Runecaller: every one of that tree's nodes is
+            // written for a ring that only ever has one enemy in it. It fires on the tick rather than
+            // on the blow so you SEE it jump, and `spread` is cleared on the child so a zone can never
+            // chain-ignite off one roll. See BURN_SPREAD_UNITS in grove-world.
+            if (kind === "burn" && dot.spread) {
+                dot.spread = false;
+                let best = null;
+                let bestD = BURN_SPREAD_UNITS;
+                for (const other of wd.foes) {
+                    if (other === f || other.burn || other.dying || other.hp <= 0) continue;
+                    const d = Math.hypot(other.x - f.x, (other.y - f.y) * 0.8);
+                    if (d < bestD) { bestD = d; best = other; }
+                }
+                if (best) {
+                    best.burn = { dmg: Math.max(1, Math.round(dot.dmg * BURN_SPREAD_SHARE)),
+                        leech: dot.leech, spread: false,
+                        left: BURN_TICKS, nextAt: now + everyMs };
+                    burst(best.x, best.y + best.h * 0.4, { kind: "burn", scale: 0.9 });
+                }
+            }
+            dot.left -= 1;
+            dot.nextAt = now + everyMs;
+            if (dot.left <= 0) f[kind] = null;
+            // TWO PATHS FOR ONE OUTCOME ALWAYS DRIFT -- this is the sword's own killFoe, not a second
+            // opinion about what dying means.
+            if (f.hp <= 0) { f.hp = 0; killFoe(wd, f, now); return true; }
+            return false;
+        };
+
         const burst = (x, y, { crit = false, dir = 0, kind = "spark", scale = 1 } = {}) => {
             const layer = fxRef.current;
             if (!layer) return;
@@ -1415,6 +1462,18 @@ export default function GroveScene({
                                 left: BLEED_TICKS, nextAt: now + BLEED_TICK_MS };
                         }
                     }
+                    // ── AND THE FIRE ───────────────────────────────────────────────────────────
+                    // Same refresh-rather-than-stack rule as the wound above, for the same reason: a
+                    // fast build must not get a whole new fire per swing. `spread: true` marks this as
+                    // one a player's own blow lit, so it is allowed to catch ONE neighbour; the burn it
+                    // starts is marked false and the chain stops there. See BURN_SPREAD_UNITS.
+                    if (hit.burn) {
+                        const better = !foe.burn || hit.burn.dmg >= foe.burn.dmg;
+                        if (better) {
+                            foe.burn = { dmg: hit.burn.dmg, leech: hit.burn.leech, spread: true,
+                                left: BURN_TICKS, nextAt: now + BURN_TICK_MS };
+                        }
+                    }
                     // When its bar was last struck. Drives whether the bar is up at all, and the flash,
                     // jolt and swell on it while it is. See drawFoeBar.
                     foe.hurtAt = now;
@@ -1697,34 +1756,23 @@ export default function GroveScene({
                 //
                 // Bleed PIERCES: it is dealt straight off hp without going through mitigate, which
                 // is the whole identity of the stat. See [[bleed-front-load-magnitude]].
-                if (f.bleed && now >= f.bleed.nextAt) {
-                    const tick = Math.max(1, Math.round(f.bleed.dmg));
-                    f.hp -= tick;
-                    f.hurtAt = now;
-                    addPop("hit", `${tick}`, f.x, f.y + f.h * 0.6, popWeight(tick, f.maxHp) * 0.7);
-                    if (f.bleed.leech > 0) {
-                        w.hp = Math.min(maxHp, w.hp + Math.max(1, Math.round(tick * f.bleed.leech)));
-                    }
-                    f.bleed.left -= 1;
-                    f.bleed.nextAt = now + BLEED_TICK_MS;
-                    if (f.bleed.left <= 0) f.bleed = null;
-                    // ── ⚠️ A BLEED KILL IS A KILL, AND THIS LINE USED TO JUST CLAMP IT TO ZERO ──
-                    // `if (f.hp <= 0) { f.hp = 0; }` and nothing else. The creature reached zero and then
-                    // STOOD THERE: no topple, no loot, no kill-log entry, and `bossBar` never cleared —
-                    // and because the hero only ever targets `hp > 0 && !dying`, it could not be hit
-                    // again either. An unkillable statue holding the boss bar.
-                    //
-                    // Luke, on the Crystal Stag: "i killed it but no drop no death now I cant attack."
-                    // The rare has 9,000 HP and is exactly the kind of thing you finish with a bleed
-                    // ticking, which is why it surfaced there first — but every bleed kill in the Grove
-                    // did this, on every creature, since bleed shipped.
-                    //
-                    // TWO PATHS FOR ONE OUTCOME ALWAYS DRIFT. The sword's path calls killFoe (see the hit
-                    // resolution above); this one has to be the SAME call, not a second opinion about what
-                    // dying means. `continue` because killFoe sets `dying`, and everything below here is
-                    // the behaviour of something still alive.
-                    if (f.hp <= 0) { f.hp = 0; killFoe(w, f, now); continue; }
-                }
+                // ── THE WOUND, AND THE FIRE, KEEP ARRIVING ──────────────────────────────────────
+                // ⚠️ ONE PIECE OF CODE FOR BOTH. Bleed and burn differ by a number, a colour and whether
+                // fire catches the thing standing next to it -- everything else about them is identical,
+                // and a second copy of "tick, leech, expire, and a tick can kill" is a second set of
+                // rules that stops agreeing with the first the day either is touched. The kill path in
+                // particular has already been paid for once: a bleed used to leave an unkillable statue
+                // holding the boss bar because it clamped hp to zero instead of calling killFoe.
+                //
+                // ⚠️ IT TICKS ON THE CREATURE'S OWN CLOCK, NOT ON YOUR SWINGS. A wound that only resolved
+                // when you hit again would be a worse version of the hit, and would pay nothing to the
+                // player who applies it and backs off -- the one playstyle it exists to reward.
+                //
+                // Both PIERCE: dealt straight off hp without going through mitigate, which is the whole
+                // identity of the pair. See [[bleed-front-load-magnitude]].
+                const dotKill = tickDot(w, f, now, "bleed", BLEED_TICK_MS)
+                    || tickDot(w, f, now, "burn", BURN_TICK_MS);
+                if (dotKill) continue;
 
                 // Passive early enemies never initiate — Luke: "the ones earlier in the game being fully
                 // passive. And later in the game attacking when they are attacked." A boss is passive until
@@ -3123,6 +3171,21 @@ function setUpLabScene(w, scene) {
         // Hold him there: a hero with no target wanders, and he wandered out of their reach.
         if (biters[0]) w.target = biters[0];
         w.moveTo = null;
+    } else if (scene === "burn") {
+        // ── ⚠️ A SPREAD NEEDS A CROWD, AND WANDER DOES NOT MAKE ONE ────────────────────────────
+        // Fire catches the nearest body within BURN_SPREAD_UNITS, and a zone's population wanders far
+        // enough apart that filming it off ordinary play is waiting for two creatures to drift together
+        // while a burn happens to be running. Three of them shoulder to shoulder, fat enough to outlive
+        // the ticks, and the hero already swinging at the middle one.
+        const row = w.foes.filter((f) => !f.isBoss).slice(0, 3);
+        row.forEach((f, i) => {
+            f.x = w.hero.x + 7 + i * 3.4;
+            f.y = 0;
+            f.vx = 0; f.vy = 0; f.grounded = true; f.face = -1;
+            f.hit = true; f.passive = false;
+            f.hp = 4000; f.maxHp = 4000;
+        });
+        if (row[0]) w.target = row[0];
     } else if (scene === "eat") {
         // ── ⚠️ THE ONE BEAT THE BENCH COULD NOT PRODUCE ────────────────────────────────────────
         // The eat fires below 60% of max health with food on the belt, which in ordinary play means
