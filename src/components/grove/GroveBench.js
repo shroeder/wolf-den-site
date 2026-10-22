@@ -121,7 +121,7 @@ const FILTERS = [
 
 export default function GroveBench({ st, known, partName, PartIcon, post, refresh, setNote }) {
     // The shopping list. Client-only on purpose — see useWishlist.
-    const { wish, toggle } = useWishlist();
+    const { wish, toggle, want } = useWishlist();
     const [result, setResult] = useState(null);
     const [busy, setBusy] = useState(null);
     // ── ⚠️ TEMPERING IS PER ROW, NOT A MODE THE SCREEN IS IN ────────────────────────────────────────
@@ -464,6 +464,11 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                     // and not on a rework (which is its own re-roll and is priced separately). Showing
                     // it on a finished vault would be a button that spends parts on nothing.
                     const canTemper = !built && !canRework;
+                    // What this row would put on the wishlist, and whether it is all there already.
+                    // ⚠️ SHORT PARTS ONLY. Wishing the ones you already hold would light creatures you have
+                    // no reason to walk to, which is the wishlist telling you something false.
+                    const shortParts = costs.filter((c) => c.short > 0).map((c) => c.part);
+                    const allWished = shortParts.length > 0 && shortParts.every((pt) => wish.includes(pt));
                     const temperOn = tempering === r.id;
                     const tmpCost = canTemper ? temperCost(r) : null;
                     const temperExtra = tmpCost ? Object.values(tmpCost).reduce((a, b) => a + b, 0) : 0;
@@ -496,6 +501,35 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     ) : built ? <em className="gv-tag is-done">Built</em>
                                         : ready ? <em className="gv-tag is-go">Ready</em>
                                             : <em className="gv-tag">{haveParts}/{costs.length} parts</em>}
+                                    {/* ── ⚠️ THE RECIPE PUTS ITS OWN PARTS ON THE LIST ───────────────
+                                        The chips below are already the wishlist control, and they are the
+                                        right one when you are looking at a PART. They are the wrong one
+                                        when you have looked at a recipe and decided to go and get it:
+                                        that was three taps on three chips, and nothing anywhere said
+                                        "this is the thing I am working on".
+
+                                        ⚠️ AND IT IS THE WHOLE POINT OF THE WISHLIST, WHICH NOBODY REACHES.
+                                        Wishing a part lights it over the creatures that drop it and pins
+                                        the maps that hold it -- the one mechanism that already connects
+                                        crafting to the zone where the session actually happens. It was
+                                        reachable only by tapping individual ingredients on a bench you
+                                        had to decide to open first, which is the wrong way round: the
+                                        feature that would make you want the workbench was hidden inside
+                                        the workbench.
+
+                                        Only on rows with something still to find -- on a Ready or a Built
+                                        row it would be a button that wishes nothing. */}
+                                    {!built && !ready && shortParts.length ? (
+                                        <button type="button"
+                                            className={`gv-rec-want${allWished ? " is-on" : ""}`}
+                                            aria-pressed={allWished}
+                                            title={allWished
+                                                ? "On your list - tap to take these off it"
+                                                : "Put what this still needs on your list, so it lights up over the creatures that drop it"}
+                                            onClick={() => want(shortParts)}>
+                                            {allWished ? "Listed" : "Find"}
+                                        </button>
+                                    ) : null}
                                 </div>
                                 {/* ⚠️ WHAT IT DOES, IN NUMBERS, ON ONE LINE. The blurb used to sit under this
                                     and it cost two more lines on every one of 129 rows — Luke: "cards are

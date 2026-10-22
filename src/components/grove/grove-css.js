@@ -249,6 +249,25 @@ export const GROVE_CSS = `
 .gv-node.is-locked .gv-node-label em, .gv-node.is-locked .gv-node-label u { color: #8d7f66; }
 .gv-note { margin: 0 0 10px; padding: 9px 13px; border-radius: 10px; font-size: 0.85rem;
     background: rgba(159,224,138,0.12); border: 1px solid rgba(159,224,138,0.35); color: #d8f5cc; }
+/* ── ⚠️ THE SAME NOTE, OVER A ZONE, WHERE IT IS THE ONLY ONE THAT EVER FIRES ───────────────────
+   Every setNote in this feature happens while the player is standing in a zone -- the settle, the boss,
+   the door -- and the zone had no .gv-note in it at all. The line existed, the string was correct, and
+   it was rendered into a panel the player had to go and open afterwards.
+
+   Bottom centre, above the dock: the top of the frame is taken by the belt, the kill count, the streak
+   and the boss bar, and the left edge by the haul list. 78 sits between the scene's full-screen layer
+   at 70 and the sheet at 80, so a panel covers it rather than fighting it. Opaque enough to read over
+   a lit forest, and it clears itself on a timer -- see the note effect in GroveClient. */
+.gv-note.is-zone { position: fixed; z-index: 78; margin: 0; cursor: pointer;
+    left: 50%; transform: translateX(-50%);
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    max-width: min(86vw, 420px); text-align: center;
+    font-weight: 700; color: #eafbe0;
+    background: rgba(10,16,10,0.88); border-color: rgba(159,224,138,0.55);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    animation: gvNoteIn 220ms cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes gvNoteIn { from { opacity: 0; transform: translate(-50%, 10px); }
+    to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* ── ⚠️ THE FIRST MAP'S RULES LIVED HERE AND OUTLIVED THE FIRST MAP BY TWO REDESIGNS ─────────────
    .gv-map, .gv-node, .gv-node-n, .gv-node-name, .gv-node-bar and .gv-node-lock styled a grid of
@@ -638,7 +657,10 @@ export const GROVE_CSS = `
 .gv-paper-trail .is-walked { animation: gv-ink 900ms ease-out both; }
 @keyframes gv-ink { from { stroke-dasharray: 0 400; } to { stroke-dasharray: 7 6; } }
 @media (prefers-reduced-motion: reduce) {
-    .gv-paper-trail .is-walked, .gv-node-pin, .gv-node.is-next img { animation: none; }
+    /* The zone note is the one animation here that is NOT the readout -- the words are. It still has to
+       appear, so the slide goes and the line stays. See animations-always-play for the house rule and
+       why the bump on a kill count does not get this treatment. */
+    .gv-paper-trail .is-walked, .gv-node-pin, .gv-node.is-next img, .gv-note.is-zone { animation: none; }
 }
 @keyframes gv-bossbeat { 0%, 100% { scale: 1; } 50% { scale: 1.07; } }
 
@@ -1514,6 +1536,7 @@ export const GROVE_CSS = `
     text-shadow: 0 0 10px rgba(0,0,0,1), 0 1px 4px rgba(0,0,0,0.95); }
 
 .gv-hud { position: absolute; display: flex; align-items: center; gap: 10px; pointer-events: none;
+    justify-content: flex-end;
     left: calc(10px + env(safe-area-inset-left));
     right: calc(10px + env(safe-area-inset-right));
     top: calc(10px + env(safe-area-inset-top)); }
@@ -1539,7 +1562,16 @@ export const GROVE_CSS = `
    full-screen toggle present the pair straddled the row and the toggle sat dead centre, where it
    collided with the kill count the moment that was added. Pushing only the first one sends the whole
    group right and keeps working whether the toggle is rendered or not. */
-.gv-hud > button:first-of-type { margin-left: auto; }
+/* ── THE PUSH BELONGS TO THE BELT, NOT TO THE FIRST BUTTON ────────────────────────────────────
+   This was .gv-hud > button:first-of-type { margin-left: auto }, which was correct for exactly as long
+   as the belt was a passive <b>. The belt is a BUTTON when it is empty -- the one that says where more
+   food comes from -- and a type selector cannot tell the two apart, so the push landed on the BELT and
+   shoved it to the right where it collided with the kill count. The row would have laid out correctly
+   in every screenshot of a stocked belt and wrongly in every screenshot of an empty one.
+
+   Pushing from the LEFT-hand item instead holds whether the belt is a b, a button, or absent: the row
+   is end-justified, so with no belt at all the group still sits right. */
+.gv-belt { margin-right: auto; }
 .gv-leave { pointer-events: auto; padding: 6px 14px; border-radius: 999px; cursor: pointer;
     font: inherit; font-size: 0.78rem; font-weight: 700; color: #efe7d8;
     background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.22); }
@@ -1895,7 +1927,19 @@ export const GROVE_CSS = `
 .gv-slot.is-on em { color: #9fe08a; }
 /* A tool not yet made: shown so the ladder is visible before you can climb it. */
 .gv-slot.is-dim { opacity: 0.55; }
+/* ⚠️ !important HERE ONLY BECAUSE IT IS ALREADY HERE. The base rule carries one, so a plain
+   .gv-belt.is-out colour would lose to it however specific it looks in the file -- the .btn-ghost
+   footgun, which is worth remembering every time one of these is written. Two importants, and the more
+   specific selector wins. */
 .gv-belt { color: #9fe08a !important; }
+/* The belt with nothing on it. Amber rather than green because it is a thing to go and do, and sized
+   and padded like the Leave button beside it because it is now the same kind of object. */
+.gv-belt.is-out { pointer-events: auto; cursor: pointer; font: inherit;
+    font-size: 0.78rem; font-weight: 700; padding: 6px 12px; border-radius: 999px;
+    color: #ffd166 !important; background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,209,102,0.42);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
+.gv-belt.is-out:hover { border-color: rgba(255,209,102,0.8); }
 
 .gv-tablet ul { margin: 8px 0 0; padding-left: 18px; font-size: 0.82rem; color: #cfc6b6; }
 
@@ -2128,6 +2172,18 @@ export const GROVE_CSS = `
 .gv-rec-body { min-width: 0; }
 .gv-rec-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .gv-rec-top b { font-size: 0.98rem; color: #fff6df; }
+/* ── THE ROW THAT PUTS ITS OWN PARTS ON THE LIST ──────────────────────────────────────────────
+   Sits with the name and the state tag because it belongs to the recipe rather than to any one
+   ingredient. Quiet until it is on: an outline on 129 rows is furniture, and the lit state is the only
+   thing on this screen that says which recipe you have decided to go after. */
+.gv-rec-want { margin-left: auto; flex: none; font: inherit; cursor: pointer;
+    font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 999px; color: #c8bda8;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14);
+    transition: color 140ms ease, border-color 140ms ease, background 140ms ease; }
+.gv-rec-want:hover { color: #efe7d8; border-color: rgba(255,255,255,0.3); }
+.gv-rec-want.is-on { color: #ffd166; background: rgba(224,168,60,0.2);
+    border-color: rgba(255,209,102,0.6); }
 .gv-tag { font-style: normal; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em;
     text-transform: uppercase; padding: 3px 7px; border-radius: 999px;
     background: rgba(255,255,255,0.08); color: #9aa08f; }

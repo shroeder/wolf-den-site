@@ -310,6 +310,27 @@ export default function GroveScene({
     // blocked -- it says its piece and leaves.
     const heraldTimer = useRef(null);
     const [beltLeft, setBeltLeft] = useState(Number(belt?.count) || 0);
+    // ── ⚠️ A CRAFT MID-DIVE HAS TO REACH THIS NUMBER ────────────────────────────────────────────────
+    // beltLeft was seeded once at mount and only ever written by the loop when something was eaten, so
+    // making poultices at the workbench and closing the panel left the HUD still saying x0. Harmless
+    // while the chip was a passive count; a lie the moment it became the control that says "go and make
+    // some", because it would still say so standing on a full belt.
+    //
+    // ⚠️ UPWARD ONLY. The server's count arrives on every settle and it is BEHIND the client -- the loop
+    // has been eating since the last one and sends `eaten` with the batch. Taking a lower number here
+    // would hand the player back food the simulation has already spent. A HIGHER number can only have
+    // come from crafting, which is the one case this exists for.
+    //
+    // ⚠️ COMPARED AGAINST w.foodLeft, WHICH IS THE SIMULATION'S OWN COUNT. That is the live truth -- the
+    // loop decrements it on every bite -- and reading it here keeps the effect pure, rather than writing
+    // a ref from inside a setState updater, which React is free to run twice.
+    const beltCount = Number(belt?.count) || 0;
+    useEffect(() => {
+        const w = worldRef.current;
+        if (!w || beltCount <= (Number(w.foodLeft) || 0)) return;
+        w.foodLeft = beltCount;
+        setBeltLeft(beltCount);
+    }, [beltCount, belt?.id]);
     // ── ⚠️ THE LIST IS STATE; THE POSITIONS ARE NOT ─────────────────────────────────────────────────
     // The first version pushed foes into world.foes imperatively and React was never told, so the zone
     // rendered with zero enemies in it while the simulation happily ran thirty of them. The split that
@@ -2705,7 +2726,29 @@ export default function GroveScene({
             </div>
 
             <div className="gv-hud" onPointerDown={(e) => e.stopPropagation()}>
-                {belt?.id ? <b className="gv-belt">{belt.name} x{Math.max(0, beltLeft)}</b> : null}
+                {/* ── ⚠️ THE ONE CRAFT THAT PAYS IN THIS ROOM, AND ONLY WHEN IT IS STOCKED ──────────
+                    Every tool the workbench makes pays a DIFFERENT feature -- 3% to fishing, to mining,
+                    to the farm -- so nothing a player crafts makes the next half hour of killing here any
+                    better. The belt is the exception and the only one: food auto-eats at 60% and is the
+                    difference between walking out of a deep zone and being carried out of it.
+
+                    Which made the empty state the worst line on the screen. It read "Moss Poultice x0" --
+                    a true sentence that teaches nothing, on the feature most worth teaching, at the exact
+                    moment the player is about to find out why it mattered. Now the thing that ran out
+                    says where more come from and takes you there, and openPanel banks the kills on the
+                    way so the bench opens onto parts you actually own. Teaching by showing, at the one
+                    moment it is wanted. */}
+                {belt?.id && beltLeft > 0 ? (
+                    <b className="gv-belt">{belt.name} x{beltLeft}</b>
+                ) : onPanel ? (
+                    <button type="button" className="gv-belt is-out"
+                        title={belt?.id
+                            ? "Nothing left to eat - the workbench makes more"
+                            : "Nothing on your belt - arm a poultice in your backpack"}
+                        onClick={() => openPanel(belt?.id ? "bench" : "bag")}>
+                        {belt?.id ? "Belt empty" : "No belt"}
+                    </button>
+                ) : null}
                 {canNative ? (
                     <button type="button" className="gv-leave" onClick={toggleNative}
                         aria-label={isNative ? "Leave full screen" : "Full screen"}>

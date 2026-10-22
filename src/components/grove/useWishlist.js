@@ -73,5 +73,26 @@ export function useWishlist() {
 
     const clear = useCallback(() => write([]), []);
 
-    return { wish, toggle, clear, has: (p) => wish.includes(p) };
+    // ── ⚠️ A WHOLE RECIPE AT ONCE, AND THE CAP LIVES HERE ──────────────────────────────────────────────────
+    // Wishing one part at a time is the right verb when you are looking at a part. It is the wrong one when
+    // you are looking at a RECIPE and have decided to go and get it: a three-part tool was three taps, and
+    // nothing on the bench ever said "this is the thing I am working on".
+    //
+    // ⚠️ IT IS A TOGGLE OVER THE SET, NOT N TOGGLES. Toggling each part in turn on a recipe whose parts are
+    // half-wished already flips the half that was on back off, which is the opposite of what the one tap
+    // asked for. So: if every part is already listed, drop them all; otherwise add whatever is missing and
+    // leave the rest alone.
+    //
+    // The WISH_MAX clamp is applied here rather than by the caller, for the same reason toggle() reads
+    // through read() -- three surfaces share this list and only one of them should know the rules.
+    const want = useCallback((parts) => {
+        const ask = (Array.isArray(parts) ? parts : [parts]).filter(Boolean);
+        if (!ask.length) return;
+        const cur = read();
+        const all = ask.every((p) => cur.includes(p));
+        write(all ? cur.filter((p) => !ask.includes(p))
+            : [...cur, ...ask.filter((p) => !cur.includes(p))].slice(0, WISH_MAX));
+    }, []);
+
+    return { wish, toggle, want, clear, has: (p) => wish.includes(p) };
 }

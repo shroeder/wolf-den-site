@@ -18,7 +18,7 @@ import Area from "@/components/grove/GroveArea.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
 import { GROVE_CHESTS, CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
 import {
-    GROVE_RECIPES, recipeById, canCraft, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
+    GROVE_RECIPES, recipeById, canCraft, newlyReady, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
 } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { MAP_LAYOUT, nodeArt, spotForDepth, trailForZones, trailPath } from "@/lib/marketplace/grove-map.js";
@@ -153,9 +153,14 @@ export default function GroveClient({ initial }) {
     const router = useRouter();
     const stripRef = useRef(null);
 
+    // ⚠️ IT RETURNS THE STATE IT FETCHED, AND THAT IS NOT A CONVENIENCE. setSt is asynchronous, so a
+    // caller that awaits refresh() and then reads `st` reads the bag from BEFORE the settle it just made.
+    // Anything comparing the two sides of a change -- which recipe became craftable, which part arrived --
+    // has to be handed the new one. See newlyReady.
     const refresh = useCallback(async () => {
         const d = await fetch("/api/marketplace/grove").then((r) => r.json()).catch(() => null);
         if (d?.ok) setSt(d);
+        return d?.ok ? d : null;
     }, []);
 
     // ── ENTER A ZONE ────────────────────────────────────────────────────────────────────────────────
@@ -198,15 +203,32 @@ export default function GroveClient({ initial }) {
     // server re-rolls from the same seed and grants what IT computes. See grove-roll.js.
     const settle = useCallback(async (kills, eaten) => {
         if (!kills?.length || !session) return;
+        const before = st;
         const d = await post({ action: "settle", zone: session.zone.id, kills, eaten: eaten || {} });
         if (!d?.ok) return;
-        if (d.newlySeen?.length) {
-            // The recipe moment. Luke: "The recipe unlock should be dopamine inducing and inspectsble with a
-            // call to action to craft it."
+        const after = await refresh();
+        // ── ⚠️ WHAT THE DROP FINISHED, NOT WHAT THE DROP WAS ───────────────────────────────────────
+        // Luke: "The recipe unlock should be dopamine inducing and inspectsble with a call to action to
+        // craft it." What this said instead was "Found Gnawed Root" -- the name of a twig, which tells a
+        // player nothing about why the last twenty minutes were worth anything.
+        //
+        // newlyReady has been sitting in grove-recipes.js since it was written and was never called by
+        // anything: the thing that knows a recipe just became craftable existed, and no screen asked it.
+        // It compares the two bags rather than asking "is it ready now", so a fifth root on a recipe that
+        // needed four does not announce the same rod on fifty consecutive kills -- the moment is the
+        // TRANSITION, and it is the only one worth a line.
+        //
+        // Ordered: a thing you can now MAKE beats a thing you have now SEEN. Both still fire the found
+        // line when nothing crossed, because first sight of a part is the other half of the tablet.
+        const made = before && after ? newlyReady(before, after) : [];
+        if (made.length) {
+            setNote(made.length === 1
+                ? `${made[0].name} is ready to craft`
+                : `${made[0].name} and ${made.length - 1} more ready to craft`);
+        } else if (d.newlySeen?.length) {
             setNote(`Found ${d.newlySeen.map(partName).join(", ")}`);
         }
-        await refresh();
-    }, [session, refresh]);
+    }, [session, refresh, st]);
 
     // ── THE BOSS ────────────────────────────────────────────────────────────────────────────────────
     // ⚠️ ITS OWN REQUEST, NOT A LINE IN THE SETTLE BATCH. The server checks the zone was cleared and that
@@ -225,8 +247,19 @@ export default function GroveClient({ initial }) {
         // ⚠️ THE POP IS DRIVEN FROM HERE NOW, NOT FROM SETTLE. The boss kill is what moves unlocked_n
         // (see openTheWay in grove.js), so it is the only response that can carry the new zone.
         if (d.unlocked) setUnlockedNow(d.unlocked);
-        await refresh();
-    }, [session, refresh]);
+        const before = st;
+        const after = await refresh();
+        // ⚠️ AND IT ANNOUNCES WHAT IT UNLOCKED TOO. A boss hands over the largest single pile of parts in
+        // the feature, so it is the likeliest thing to finish a recipe -- and the kill card lists what
+        // dropped without ever saying what that now lets you make. The card owns the celebration; this is
+        // the line that survives it, which is why it is not duplicated onto the card.
+        const made = before && after ? newlyReady(before, after) : [];
+        if (made.length) {
+            setNote(made.length === 1
+                ? `${made[0].name} is ready to craft`
+                : `${made[0].name} and ${made.length - 1} more ready to craft`);
+        }
+    }, [session, refresh, st]);
 
     const leave = useCallback(() => { setSession(null); setView("map"); setBossWon(null); refresh(); }, [refresh]);
 
@@ -902,6 +935,23 @@ export default function GroveClient({ initial }) {
                     unmounting it would hand out a free full heal — and the dock that opens this lives in
                     GroveScene, because the scene owns the unsettled kill log and has to bank it before a
                     backpack is worth looking at. */}
+                {/* ── ⚠️ THE NOTE HAD NO SCREEN IN THE ONE PLACE IT FIRES ───────────────────────────
+                    setNote is called from the settle, from the boss and from the door -- all of which
+                    happen while you are standing IN a zone -- and the zone branch rendered it nowhere.
+                    The only .gv-note in this view was inside the panel sheet, so the line appeared if you
+                    happened to open your backpack afterwards and never otherwise. "Found Gnawed Root" has
+                    been firing into nothing since it was written, which is most of why crafting is
+                    invisible from the zone: the game has been telling nobody.
+
+                    ⚠️ PORTALLED, FOR THE SAME REASON THE SHEET IS. GroveScene portals its full-screen
+                    layer to the body (or to its own host in native full screen), so anything rendered in
+                    the page tree paints UNDERNEATH the zone however high its z-index is set -- see the
+                    note on the sheet below, which cost a reload to discover. Sibling of the scene at 78:
+                    above the zone at 70, below the sheet at 80, so opening a panel covers it. */}
+                {note && mounted ? createPortal(
+                    <p className="gv-note is-zone" onClick={() => setNote(null)}>{note}</p>,
+                    fsHost || document.body,
+                ) : null}
                 {zonePanel && mounted ? createPortal((
                     <div className="gv-zsheet">
                         <button type="button" className="gv-zsheet-x" aria-label="Back to the zone"

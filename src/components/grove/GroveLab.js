@@ -38,6 +38,16 @@ const PET = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace
 // inline {} rebuilds the entire zone on every render of this component.
 const NO_BONUSES = {};
 const LAB_BELT = { id: "food_poultice", name: "Moss Poultice", count: 5, heals: 0.25 };
+// ── ⚠️ THE TWO BELT STATES THE BENCH COULD NOT REACH ────────────────────────────────────────────────────────
+// The HUD chip is a count while there is food and a way to GET food when there is not, and the second half
+// was unfilmable: the lab hero carries five poultices and the only way to spend them is to stand in a zone
+// being bitten for long enough. A state that needs ten minutes of play to see is a state nobody checks, and
+// this one is the single place the whole crafting loop touches the fight.
+//   belt    armed and empty  -> "Belt empty", which opens the workbench
+//   nobelt  nothing armed    -> "No belt", which opens the backpack
+const beltFor = (scene) => (scene === "nobelt" ? null
+    : scene === "belt" ? { ...LAB_BELT, count: 0 }
+    : LAB_BELT);
 
 export default function GroveLab({ scene = "wander", zoneN = 1 }) {
     // ── ⚠️ THE LOG IS A REF, AND EVERY HANDLER BELOW IS STABLE. THIS WAS TEARING THE LOOP DOWN ─────
@@ -167,7 +177,7 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
                 // replaced. 0.39 is a maxed eternal -- the top of the table, because the scene exists to
                 // judge the loudest the pet ever gets, which is where "too noisy" would show up.
                 petBite={scene === "pet" ? 0.39 : 0.13}
-                belt={LAB_BELT}
+                belt={beltFor(scene)}
                 labScene={scene}
                 // Locked while the boss stands, open once it falls — the one thing this change is about.
                 unlockedN={bossDown ? (travelled || zoneN) + 1 : (travelled || zoneN)}
