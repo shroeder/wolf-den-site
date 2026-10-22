@@ -589,6 +589,14 @@ export const GROVE_CSS = `
 .gv-node.is-next img { filter: drop-shadow(0 3px 5px rgba(60,44,20,0.45))
     drop-shadow(0 0 14px rgba(255,180,70,0.95)); animation: gv-bossbeat 2.2s ease-in-out infinite; }
 /* The pin: a dropped marker that lands once and then holds, so it reads as placed rather than throbbing. */
+/* ── ⚠️ THE BAG'S BADGE WARNS; THE BENCH'S INVITES ────────────────────────────────────────────
+   Same object, opposite meanings, so they cannot share a colour. The bench badge is gold because it
+   counts things you could go and make. This one counts the room you have left, and it only appears at
+   three or fewer -- amber while there is still time to do something about it, red at nought, which is
+   the state where loot is already being left on the floor. */
+.gv-zdock-n.is-room { background: linear-gradient(180deg, #e0a83c, #b4791f); color: #2a1c06; }
+.gv-zdock-n.is-room.is-full { background: linear-gradient(180deg, #e2594a, #a8301f); color: #fff0ec;
+    box-shadow: 0 0 10px rgba(226,89,74,0.65); }
 .gv-node-pin { position: absolute; top: -17px; left: 50%; width: 15px; height: 15px; margin-left: -7.5px;
     border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: linear-gradient(135deg, #ffd978, #d98b16);
     border: 1.5px solid #8a5607; box-shadow: 0 3px 7px rgba(60, 44, 20, 0.5);

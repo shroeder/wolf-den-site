@@ -60,7 +60,7 @@ import {
 // component would have told anyone.
 import {
     HERO_UNITS, PET_UNITS, SKY_PX, SKY_PY, SKY_TILE_COUNT,
-    viewFor, petFollow, cameraX, cameraY,
+    viewFor, petFollow, cameraX, cameraY, fetchRangeFor, bossNoticeFor, petLostFor,
 } from "@/lib/marketplace/grove-view.js";
 
 // ── THE ZONE, ON SCREEN ──────────────────────────────────────────────────────────────────────────────────────
@@ -181,7 +181,6 @@ const HAUL_ROWS = 5;             // oldest row falls off the bottom; five is wha
 // How close to its flanking spot counts as arrived. Loose enough that the pet is not nudging itself into
 // position for ever against a creature that wanders, tight enough that it actually crosses over.
 const PET_FLANK_SLACK = 1.6;
-const PET_FETCH_RANGE = 26;
 // And how close it has to get before the drop commits to it. Wider than the hero's LOOT_EAT_DIST because
 // the pet is 4.5 units tall against his 7 and reaching rather than walking over the top of it.
 const PET_FETCH_REACH = 3.2;
@@ -218,7 +217,6 @@ const EMBLEM_THROW = 1.15;
 // ── A BOSS NOTICING YOU ──────────────────────────────────────────────────────────────────────────────────────
 // Further out than its own reach (26) so the announcement lands while you are still deciding to approach,
 // not once you are already inside the fight.
-const BOSS_NOTICE = 34;
 // Matches the herald's CSS animation. A banner cleared on a timer rather than on animationend, because
 // animationend never fires if the element is not painted, and a banner that never clears is a word
 // sitting across the middle of a fight.
@@ -242,10 +240,9 @@ const DOOR_ART = {
 // How far above or below a creature the hero will still swing at it. A body one tier up is not in reach.
 const SWING_V_REACH = 6;
 // A pet that falls this far behind has lost the plot — see the rescue in the loop.
-const PET_LOST = 30;
 
 export default function GroveScene({
-    zone, seed, bonuses, stats, heroArt, petArt, belt, labScene,
+    zone, seed, bonuses, stats, heroArt, petArt, belt, labScene, bagRoom = null,
     // ⚠️ ONE NUMBER, ALREADY MULTIPLIED OUT, AND NOT THE RARITY AND LEVEL IT CAME FROM. The share of a
     // hero swing this member's companion bites for, computed on the server in heroLook (grove.js) off the
     // equipped pet's rarity and its pet-XP level. Handing the scene the two inputs instead would have put
@@ -1244,6 +1241,14 @@ export default function GroveScene({
             if (w.pauseAt) { w.pauseMs += raw - w.pauseAt; w.pauseAt = 0; }
             const now = raw - (w.pauseMs || 0);
 
+            // ── ⚠️ THE FRAME'S GEOMETRY, ONCE, AT THE TOP ───────────────────────────────────────
+            // This used to be computed down in the camera block, which is the last thing the frame does.
+            // Three of the intents ABOVE it are shares of what is visible now (fetch range, boss notice,
+            // pet rescue -- see grove-view.js), and an intent that reads the scale after deciding with it
+            // is reading last frame's. One read, at the top, used by everything including the camera.
+            const frameView = viewFor(host.clientWidth, host.clientHeight, w.topY);
+            w.view = frameView;
+
             // ⚠️ REAL MILLISECONDS AND SIMULATION dt ARE DIFFERENT CLOCKS, AND MIXING THEM DEADLOCKS.
             // Hit-stop scales dt toward zero; anything measured in simulation frames would itself be frozen
             // by the hit-stop and never end. So: dt drives the world, realMs drives every timer.
@@ -1546,7 +1551,7 @@ export default function GroveScene({
                 // between two equidistant piles for ever, which films as a pet having a seizure.
                 if (!w.petFetch) {
                     let best = null;
-                    let bestD = PET_FETCH_RANGE;
+                    let bestD = fetchRangeFor(frameView.visibleUnits);
                     for (const d of w.drops) {
                         if (d.state !== "rest") continue;
                         // Not the ones the hero is about to walk over himself. Letting the pet race him
@@ -1647,7 +1652,7 @@ export default function GroveScene({
             // under a ledge it mistimed, or on the wrong side of the zone after the hero climbed. Every game
             // with a companion does this and it is invisible when it works; without it the pet is simply
             // gone, which is the exact complaint Luke raised by name the last time ("my dude and pet").
-            if (Math.abs(w.hero.x - w.pet.x) > PET_LOST) {
+            if (Math.abs(w.hero.x - w.pet.x) > petLostFor(frameView.visibleUnits)) {
                 w.pet.x = w.hero.x - w.hero.face * pf.trail;
                 w.pet.y = w.hero.y;
                 w.pet.vx = 0; w.pet.vy = 0;
@@ -1724,7 +1729,7 @@ export default function GroveScene({
                 // only ever appeared when you TAPPED it. So the climax of a zone was a large animal you
                 // walked into, and the only thing that marked it was a health bar you had to start the
                 // fight to see. A boss that does not announce itself is scenery with a lot of hit points.
-                if (f.isBoss && !f.noticed && Math.abs(f.x - w.hero.x) < BOSS_NOTICE) {
+                if (f.isBoss && !f.noticed && Math.abs(f.x - w.hero.x) < bossNoticeFor(frameView.visibleUnits)) {
                     f.noticed = true;
                     w.bossBar = { hp: f.hp, maxHp: f.maxHp };
                     w.bossChase = makeChase(1);
@@ -1986,7 +1991,7 @@ export default function GroveScene({
             // locked to the player is what makes a scrolling game feel like it is shaking.
             const vw = host.clientWidth;
             const vh = host.clientHeight;
-            const view = viewFor(vw, vh, w.topY);
+            const view = frameView;
             const { unit, skyBoxH, groundPx, tileW } = view;
 
             // ⚠️ THE SPRITES SCALE WITH IT. Every body is sized in world units off this variable; a body
@@ -2843,7 +2848,10 @@ export default function GroveScene({
                     {ZONE_DOCK.map((d) => (
                         <button key={d.k} type="button" title={d.label}
                             aria-label={d.k === "bench" && benchReady > 0
-                                ? `${d.label}, ${benchReady} waiting` : d.label}
+                                ? `${d.label}, ${benchReady} waiting`
+                                : d.k === "bag" && bagRoom === 0 ? `${d.label}, full`
+                                : d.k === "bag" && bagRoom != null && bagRoom <= 3 ? `${d.label}, ${bagRoom} slots left`
+                                : d.label}
                             onClick={() => openPanel(d.k)}>
                             <img src={d.art} alt="" draggable={false} />
                             {/* ⚠️ A NUMBER ON A DOOR, NOT A PROMPT. The one thing standing between a
@@ -2854,6 +2862,20 @@ export default function GroveScene({
                                 and do" is one question from the player's side. */}
                             {d.k === "bench" && benchReady > 0 ? (
                                 <b className="gv-zdock-n" aria-hidden="true">{benchReady > 99 ? "99+" : benchReady}</b>
+                            ) : null}
+                            {/* ── ⚠️ THE CEILING, ON THE DOOR, BEFORE YOU HIT IT ────────────────
+                                The bag holds a fixed number of DISTINCT parts and anything new past
+                                that is not granted at all. Nothing in the zone said so, so the first
+                                a player knew of it was loot they watched land and never received.
+
+                                Same badge idiom as the bench count beside it -- a number on a door,
+                                which is the only kind of teaching this game does -- but only once the
+                                number is worth acting on. A permanent "15 free" is one more digit to
+                                ignore; three or fewer is a warning, and nought is the thing itself.
+                                See [[teach-by-showing-not-telling]]. */}
+                            {d.k === "bag" && bagRoom != null && bagRoom <= 3 ? (
+                                <b className={`gv-zdock-n is-room${bagRoom === 0 ? " is-full" : ""}`}
+                                    aria-hidden="true">{bagRoom}</b>
                             ) : null}
                         </button>
                     ))}

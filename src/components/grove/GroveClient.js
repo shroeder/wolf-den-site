@@ -225,8 +225,18 @@ export default function GroveClient({ initial }) {
         //
         // Ordered: a thing you can now MAKE beats a thing you have now SEEN. Both still fire the found
         // line when nothing crossed, because first sight of a part is the other half of the tablet.
+        // ── ⚠️ A FULL BAG OUTRANKS EVERY OTHER LINE ────────────────────────────────────────────────
+        // The server has been returning `overflow` from the settle since it was written and no screen
+        // has ever read it. A player with a full bag watches loot pop, hears it collected, and never
+        // receives it -- which is the single most confusing thing this feature can do, and it does it
+        // silently. It goes above the recipe line because it is the only one that is costing the player
+        // something RIGHT NOW and the only one with an action attached: the Bank is the answer, and it
+        // is the screen nobody opens.
+        const lost = Object.keys(d.overflow || {});
         const made = before && after ? newlyReady(before, after) : [];
-        if (made.length) {
+        if (lost.length) {
+            setNote(`Bag full — left ${lost.map(partName).join(", ")} behind. Bank something.`);
+        } else if (made.length) {
             setNote(made.length === 1
                 ? `${made[0].name} is ready to craft`
                 : `${made[0].name} and ${made.length - 1} more ready to craft`);
@@ -317,6 +327,21 @@ export default function GroveClient({ initial }) {
 
     // What the scene actually eats: the equipped food, its heal fraction, and how many are in the bag.
     // Resolved here rather than in the scene so the scene never has to know what a recipe is.
+    // ── ⚠️ HOW MUCH ROOM IS LEFT, BECAUSE THE ZONE DID NOT KNOW THERE WAS A CEILING ────────────────
+    // The bag holds a fixed number of DISTINCT parts (see storeParts). Past that, a part you do not
+    // already carry is simply not granted -- the server works this out, returns it as `overflow`, and
+    // until now the only screen that ever showed one was the chest opener. So in a zone: the drop pops,
+    // the haul list names it, the pickup sound plays, and the part is then quietly never given to you.
+    //
+    // packSlots existed in exactly one place in this whole feature and it was inside the bag panel, so
+    // the room the player was standing in had no idea the limit existed. This is the number that fixes
+    // that, and it goes to the dock, where the badge idiom already means "there is something to know".
+    const bagRoom = useMemo(() => {
+        const slots = Number(st?.packSlots) || 0;
+        if (!slots) return null;
+        return Math.max(0, slots - Object.keys(st?.pack || {}).length);
+    }, [st?.packSlots, st?.pack]);
+
     const beltNow = useMemo(() => {
         const id = st?.belt;
         if (!id || !GROVE_FOODS[id]) return null;
@@ -865,6 +890,7 @@ export default function GroveClient({ initial }) {
                     // still have shown it working. Declared but never mounted, in its purest form.
                     petBite={session.petBite ?? st?.petBite ?? 0}
                     benchReady={benchReady}
+                    bagRoom={bagRoom}
                     belt={beltNow} onSettle={settle} onBoss={bossKill} onLeave={leave}
                     onTravel={travel}
                     // ⚠️ THE ZONE IS FROZEN WHILE A PANEL IS OPEN, AND IT HAS TO BE. Crafting in front of

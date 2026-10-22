@@ -32,7 +32,7 @@ import { CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { DECORATIONS } from "@/lib/marketplace/decorations.js";
 import {
     HERO_UNITS, PET_UNITS, SKY_TILE_COUNT,
-    viewFor, petFollow, cameraX, cameraY, screenX,
+    viewFor, petFollow, cameraX, cameraY, screenX, fetchRangeFor, bossNoticeFor, petLostFor,
 } from "@/lib/marketplace/grove-view.js";
 
 const fail = [];
@@ -513,6 +513,26 @@ for (const [vw, vh, label] of VIEWPORTS) {
     if (v.plateUpscale > 1.7) fail.push(`${label} ${vw}x${vh}: the backdrop is stretched ${v.plateUpscale.toFixed(2)}x — it will look soft next to the sprites`);
     // A hero nobody can see is the bug this whole file is about.
     if (v.heroPx < 60) fail.push(`${label} ${vw}x${vh}: the hero is ${v.heroPx.toFixed(0)}px tall`);
+
+    // ── ⚠️ AND NOTHING MAY REACH SOMEWHERE THE PLAYER CANNOT SEE ──────────────────────────────────
+    // Three ranges were flat world constants tuned on a landscape screen -- the pet's fetch at 26, the
+    // boss's notice at 34, the pet rescue at 30 -- and every one of them was WIDER THAN A PORTRAIT
+    // PHONE'S WHOLE FRAME. The pet walked off the right edge to collect loot and came back; the boss
+    // announced itself, with a bar and a shake and a banner, while still nineteen units off camera.
+    // Neither errors, and both read to a player as the game being broken rather than badly framed.
+    //
+    // The camera settles the hero near the middle, so half the frame is what he can see in either
+    // direction. An errand that goes further than that happens off screen by definition.
+    const half = v.visibleUnits / 2;
+    const fetch = fetchRangeFor(v.visibleUnits);
+    if (fetch > half) fail.push(`${label} ${vw}x${vh}: the pet will fetch ${fetch.toFixed(1)} units away on a frame that only shows ${half.toFixed(1)} either side — it collects loot off screen`);
+    // The notice may land a little beyond the edge: the boss should be announced as it ARRIVES, which
+    // means the banner fires a moment before it is fully in shot, not a screen and a half earlier.
+    const notice = bossNoticeFor(v.visibleUnits);
+    if (notice > half * 1.35) fail.push(`${label} ${vw}x${vh}: the boss announces itself ${notice.toFixed(1)} units out with only ${half.toFixed(1)} visible — the banner fires at nothing`);
+    // And the rescue must not fire on a pet that is merely lagging, which is anything still in frame.
+    const lost = petLostFor(v.visibleUnits);
+    if (lost < half) fail.push(`${label} ${vw}x${vh}: the pet is teleported after ${lost.toFixed(1)} units while ${half.toFixed(1)} is still on screen — it vanishes in plain sight`);
 
     console.log(`    ${label.padEnd(16)}${v.unit.toFixed(1).padStart(4)}${v.visibleUnits.toFixed(0).padStart(8)}${v.heroPx.toFixed(0).padStart(9)}${v.heroOverGround.toFixed(2).padStart(10)}x${v.plateUpscale.toFixed(2).padStart(9)}x${v.visibleUnits.toFixed(0).padStart(8)}`);
 }

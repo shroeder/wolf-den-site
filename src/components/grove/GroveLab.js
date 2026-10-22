@@ -45,6 +45,11 @@ const LAB_BELT = { id: "food_poultice", name: "Moss Poultice", count: 5, heals: 
 // this one is the single place the whole crafting loop touches the fight.
 //   belt    armed and empty  -> "Belt empty", which opens the workbench
 //   nobelt  nothing armed    -> "No belt", which opens the backpack
+// ⚠️ AND THE BAG'S CEILING, WHICH IS UNREACHABLE ON ANY HEALTHY ACCOUNT. The dock badge only appears at
+// three slots or fewer, and filling a real bag to get there means moving a real player's parts around. Two
+// scenes instead: the warning, and the state where loot is already being left on the floor.
+const bagRoomFor = (scene) => (scene === "bagfull" ? 0 : scene === "bagtight" ? 2 : null);
+
 const beltFor = (scene) => (scene === "nobelt" ? null
     : scene === "belt" ? { ...LAB_BELT, count: 0 }
     : LAB_BELT);
@@ -181,6 +186,7 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
                 // judge the loudest the pet ever gets, which is where "too noisy" would show up.
                 petBite={scene === "pet" ? 0.39 : 0.13}
                 belt={beltFor(scene)}
+                bagRoom={bagRoomFor(scene)}
                 labScene={scene}
                 // Locked while the boss stands, open once it falls — the one thing this change is about.
                 unlockedN={bossDown ? (travelled || zoneN) + 1 : (travelled || zoneN)}

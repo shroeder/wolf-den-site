@@ -241,6 +241,41 @@ export function petFollow(visibleUnits) {
     return { trail, slack: Math.max(1.2, trail * 0.35) };
 }
 
+// ── ⚠️ THREE RANGES THAT WERE BARE CONSTANTS AND ARE REALLY SHARES OF THE FRAME ────────────────────────
+// Found by walking the Grove across every screen size: a portrait phone sees 24-30 world units and a
+// landscape one sees 56-68, and all three of these were written as flat numbers tuned on landscape. Each is
+// LARGER THAN A PORTRAIT PHONE'S ENTIRE FRAME, so on the orientation most people hold their phone in, each
+// one reaches somewhere the player cannot see. Exactly the failure this file's header describes, three more
+// times, which is why they now live here.
+//
+// Every share below is chosen to reproduce the tuned landscape number at 58 units, so nothing changes on the
+// screen they were tuned on and the portrait case stops reaching off-camera.
+
+// ⚠️ THE PET MUST FETCH WHAT YOU CAN SEE IT FETCH. 26 units against a 25-unit phone frame meant the pet
+// walked off the right-hand edge to collect a drop and came back, measured leaving the frame by 11-78px at
+// every portrait size and staying in it at every landscape one. 0.45 is 26/58 -- the landscape feel exactly
+// -- and on a phone it is 11 units against a half-frame of 12.5, so the errand happens on screen.
+export const PET_FETCH_OF_FRAME = 0.45;
+export const PET_FETCH_MIN_BODIES = 1.6;
+export const fetchRangeFor = (visibleUnits) =>
+    Math.max(HERO_UNITS * PET_FETCH_MIN_BODIES, visibleUnits * PET_FETCH_OF_FRAME);
+
+// ⚠️ A BOSS SHOULD BE NOTICED AS IT COMES INTO VIEW, NOT A SCREEN BEFORE IT. At 34 the bar, the shake, the
+// sound and the herald all fired with the boss still about nineteen units past the right edge on a portrait
+// phone -- the game announcing something the player cannot look at yet, which reads as a bug rather than as
+// a threat. 0.58 is 34/58, so landscape is untouched, and on a phone it lands just as the thing arrives.
+export const BOSS_NOTICE_OF_FRAME = 0.58;
+export const BOSS_NOTICE_MIN_BODIES = 2;
+export const bossNoticeFor = (visibleUnits) =>
+    Math.max(HERO_UNITS * BOSS_NOTICE_MIN_BODIES, visibleUnits * BOSS_NOTICE_OF_FRAME);
+
+// ⚠️ AND "THE PET HAS LOST THE PLOT" IS A VIEW DISTANCE BY DEFINITION -- it means off screen and not coming
+// back. At a flat 30 on a 25-unit phone the pet was gone for most of a screen before the rescue fired.
+export const PET_LOST_OF_FRAME = 0.55;
+export const PET_LOST_MIN_BODIES = 2.5;
+export const petLostFor = (visibleUnits) =>
+    Math.max(HERO_UNITS * PET_LOST_MIN_BODIES, visibleUnits * PET_LOST_OF_FRAME);
+
 // ── ⚠️ THE CAMERA MAY LOOK A LITTLE PAST THE ZONE'S EDGE ───────────────────────────────────────────────
 // Clamped hard at 0, the camera stops dead the moment the hero is within half a frame of the start of the
 // zone — so he keeps walking while the view does not, and at the far left he renders HALF OFF THE SCREEN.
