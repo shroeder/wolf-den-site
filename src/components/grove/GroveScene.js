@@ -224,6 +224,22 @@ const QUAFF_STOP_MS = 110;
 // Below this share of maximum health the hero himself shows it. A quarter, because the belt eats at
 // 60% -- a band that starts above the thing that is meant to save you would be lit most of a fight.
 const HERO_LOW_SHARE = 0.25;
+
+// ── ⚠️ THE DOCK STANDS IN THE BEST PART OF THE SCREEN ───────────────────────────────────────────────────────
+// Luke: "I dont like the floating buttons, wonder if there is a way to put them somewhere accessible but not
+// take up primo real estate."
+//
+// Moving them is the obvious answer and it is the wrong one: every edge of a side-scroller is carrying
+// something already -- the belt and the way out at the top, the haul list on the left, the kill count in the
+// middle -- and the bottom centre is where a right thumb actually rests, which is why they went there.
+//
+// The real observation is that you never want the backpack DURING a fight. So the dock gets out of the way
+// while you are swinging or being hit and comes back the moment you stop, which costs the player nothing and
+// hands the busiest part of the screen back for exactly as long as the fight lasts. It never fully
+// disappears -- a control that vanishes is a control people stop believing in -- and it stops taking taps
+// while it is faint, so a thumb reaching into the fight cannot open a backpack by accident.
+const DOCK_QUIET_MS = 1600;
+const DOCK_FIGHT_OPACITY = 0.22;
 const STUN_MS = 1400;
 // A freeze is a stun that holds longer -- the ring's own note calls it "the Runecaller's two seconds".
 const FREEZE_MS = 2000;
@@ -307,6 +323,8 @@ export default function GroveScene({
     const bossFillRef = useRef(null);
     const bossGhostRef = useRef(null);
     const comboRef = useRef(null);
+    // The in-zone dock, so the loop can get it out of the way during a fight. See the fade below.
+    const zdockRef = useRef(null);
     const vignRef = useRef(null);
     const worldRef = useRef(null);
     const camRef = useRef(0);
@@ -1514,7 +1532,14 @@ export default function GroveScene({
                     const avenged = grudgeShare > 0 && (w.banked || 0) > 0
                         ? Math.round(w.banked * grudgeShare) : 0;
                     if ((w.banked || 0) > 0) w.banked = 0;
-                    if (avenged > 0) hit.dealt += avenged;
+                    // ⚠️ AND IT SAYS SO. The banked share was folded into the blow and the only sign of
+                    // it was a number that happened to be bigger -- so the node a player spent five
+                    // points in looked exactly like a good roll. GRUDGE is the one word that explains
+                    // where the extra came from.
+                    if (avenged > 0) {
+                        hit.dealt += avenged;
+                        procCall(`GRUDGE +${avenged}`, "block", null, 1.5);
+                    }
 
                     foe.hp -= hit.dealt;
                     foe.hit = true;
@@ -2116,7 +2141,11 @@ export default function GroveScene({
                 if (guard.thornsBack > 0 && foe && !foe.dying && foe.hp > 0) {
                     foe.hp -= guard.thornsBack;
                     foe.hurtAt = now;
-                    addPop("hit", `${guard.thornsBack}`, foe.x, foe.y + foe.h * 0.6,
+                    // ⚠️ ITS OWN NUMBER, NOT A SWORD'S. Thorns print on the creature exactly where a
+                    // hit does, so in cream they were indistinguishable from the blow the player just
+                    // landed -- the one node whose whole appeal is "being attacked hurts them" and you
+                    // could not see it happen.
+                    addPop("thorn", `${guard.thornsBack}`, foe.x, foe.y + foe.h * 0.6,
                         popWeight(guard.thornsBack, foe.maxHp) * 0.7);
                     if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
                 }
@@ -2129,7 +2158,7 @@ export default function GroveScene({
                 if (iceBack > 0 && foe && !foe.dying && foe.hp > 0) {
                     foe.hp -= iceBack;
                     foe.hurtAt = now;
-                    addPop("hit", `${iceBack}`, foe.x, foe.y + foe.h * 0.6,
+                    addPop("thorn", `${iceBack}`, foe.x, foe.y + foe.h * 0.6,
                         popWeight(iceBack, foe.maxHp) * 0.7);
                     if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
                 }
@@ -2334,6 +2363,24 @@ export default function GroveScene({
                         rerender();
                         continue;
                     }
+                }
+            }
+
+            // ── THE DOCK GETS OUT OF THE WAY WHILE YOU FIGHT ────────────────────────────────────
+            // ⚠️ WRITTEN ONLY WHEN IT CHANGES, like every other per-frame style in here -- and that
+            // matters more than usual because there is a CSS transition on this one. Assigning the same
+            // opacity sixty times a second would restart the transition on every frame and it would
+            // never actually move.
+            if (zdockRef.current) {
+                const busy = now - Math.max(w.swingAt || -1e9, w.hurtAt || -1e9) < DOCK_QUIET_MS;
+                const want = busy ? DOCK_FIGHT_OPACITY : 1;
+                if (w.dockOpacity !== want) {
+                    zdockRef.current.style.opacity = String(want);
+                    // ⚠️ AND IT STOPS TAKING TAPS WHILE IT IS FAINT. A thumb reaching for a creature in
+                    // the bottom of the frame must not open a backpack because a ghost of a button was
+                    // still there to be pressed.
+                    zdockRef.current.style.pointerEvents = busy ? "none" : "auto";
+                    w.dockOpacity = want;
                 }
             }
 
@@ -3250,7 +3297,7 @@ export default function GroveScene({
                 the workbench to spend parts the server does not yet know you own. The scene is the only
                 thing holding that list, so it is the thing that flushes it. */}
             {onPanel ? (
-                <nav className="gv-zdock" aria-label="The Grove" onPointerDown={(e) => e.stopPropagation()}>
+                <nav className="gv-zdock" ref={zdockRef} aria-label="The Grove" onPointerDown={(e) => e.stopPropagation()}>
                     {ZONE_DOCK.map((d) => (
                         <button key={d.k} type="button" title={d.label}
                             aria-label={d.k === "bench" && benchReady > 0

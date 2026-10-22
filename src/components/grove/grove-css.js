@@ -148,6 +148,11 @@ export const GROVE_CSS = `
 
    ⚠️ AND IT CLEARS THE HOME INDICATOR. bottom is safe-area-inset plus a margin: on a gesture-bar phone a
    control flush to the bottom edge is a control that swipes the browser away instead of pressing. */
+/* ⚠️ THE TRANSITION BELONGS HERE AND THE VALUE IS WRITTEN BY THE LOOP. The dock fades back while you
+   are swinging or being hit and returns when you stop -- see DOCK_QUIET_MS. Easing it in CSS keeps the
+   loop writing one number instead of animating one, and the loop only writes it when it changes, or
+   the transition would restart every frame and never arrive. */
+.gv-zdock { transition: opacity 260ms ease; }
 .gv-zdock { position: absolute; z-index: 6;
     left: 50%; transform: translateX(-50%);
     bottom: calc(10px + env(safe-area-inset-bottom));
@@ -1244,6 +1249,12 @@ export const GROVE_CSS = `
 /* ⚠️ A BLOCKED BLOW HAS TO LOOK BLOCKED. Cream is what an ordinary blow landing on you looks like; a
    blow your shield turned aside is a different event and printing it in the same colour at a smaller
    size says only "that one hurt less", which a weak creature also says. */
+/* ⚠️ THORNS ARE NOT YOUR SWORD. They land on the creature in the same place a hit does, so in cream
+   they read as the blow the player just struck -- and the whole appeal of the node is that being
+   ATTACKED hurts them. Steel, because it is the shield doing it, and it is the same steel the blocked
+   number wears: one colour for "your defence did this", wherever it lands. */
+.gv-num.is-thorn { color: #a9c8ef; --gv-nb: 0.84;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.9), 0 0 12px rgba(150,200,255,0.8); }
 .gv-num.is-warded { color: #bcd8ff;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 14px rgba(150,200,255,0.85); }
 .gv-num.is-soul { color: #e3b8ff; --gv-nb: 0.9;
