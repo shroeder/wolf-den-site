@@ -221,6 +221,9 @@ const QUAFF_STOP_MS = 110;
 //
 // ⚠️ THE HERO HAS CARRIED STUN POINTS FROM GEAR SINCE THE GROVE SHIPPED AND NOTHING READ THEM. This is not
 // only the two class nodes: every weapon and jewel that ever granted stun was inert in here too.
+// Below this share of maximum health the hero himself shows it. A quarter, because the belt eats at
+// 60% -- a band that starts above the thing that is meant to save you would be lit most of a fight.
+const HERO_LOW_SHARE = 0.25;
 const STUN_MS = 1400;
 // A freeze is a stun that holds longer -- the ring's own note calls it "the Runecaller's two seconds".
 const FREEZE_MS = 2000;
@@ -2162,7 +2165,14 @@ export default function GroveScene({
                 impulse(w.hero, Math.sign(w.hero.x - tel.x || 1) * 0.42, 0.2);
                 // ⚠️ WHAT REACHED HEALTH, NOT WHAT WAS SWUNG. A blocked-and-soaked blow that took four
                 // off you must not print the thirty it started as, or the defence reads as broken.
-                if (dealt > 0) addPop("took", `-${dealt}`, w.hero.x, w.hero.y + HERO_UNITS * 0.9);
+                // ⚠️ A BLOCKED BLOW AND A WEAK BLOW PRINTED THE SAME NUMBER. Taking fifty percent off
+                // and showing a smaller figure tells the player nothing -- they cannot tell their shield
+                // worked from the creature having hit softly, which is the whole feedback a defensive
+                // build is buying. The number wears the block's own steel when it was turned aside.
+                if (dealt > 0) {
+                    addPop(guard.blocked || soaked > 0 ? "warded" : "took",
+                        `-${dealt}`, w.hero.x, w.hero.y + HERO_UNITS * 0.9);
+                }
                 burst(w.hero.x, w.hero.y + HERO_UNITS * 0.4, { crit: true, dir: Math.sign(w.hero.x - tel.x || 1) });
                 playHurt();
 
@@ -2325,6 +2335,18 @@ export default function GroveScene({
                         continue;
                     }
                 }
+            }
+
+            // ── WHAT IS TRUE OF THE HERO, ON THE HERO ───────────────────────────────────────────
+            // Same layer and the same once-only write as every creature. Two states, and they are the
+            // two a player needs at a glance in a fight they are losing: something is absorbing for me,
+            // and I am nearly dead.
+            if (w.hero.statusNode) {
+                const low = w.hp > 0 && w.hp <= maxHp * HERO_LOW_SHARE;
+                const cls = "gv-status"
+                    + ((w.shield || 0) > 0 ? " is-warded" : "")
+                    + (low ? " is-low" : "");
+                if (w.hero.statusCls !== cls) { w.hero.statusNode.className = cls; w.hero.statusCls = cls; }
             }
 
             // ── THE CAMERA ──────────────────────────────────────────────────────────────────────
@@ -3067,8 +3089,17 @@ export default function GroveScene({
                 <div className="gv-pet" style={{ "--gv-h": PET_UNITS }} ref={wire(world.pet)}>
                     {bodyArt(petArt, { claw: true })}
                 </div>
-                <div className="gv-hero" style={{ "--gv-h": HERO_UNITS }} ref={wire(world.hero)}>
+                <div className="gv-hero"
+                    style={{ "--gv-h": HERO_UNITS, "--gv-art-url": heroArt ? `url(${heroArt})` : undefined }}
+                    ref={wire(world.hero)}>
                     {bodyArt(heroArt, { swipe: true })}
+                    {/* ── ⚠️ THE HERO NEVER CHANGED, WHATEVER WAS TRUE OF HIM ─────────────────────
+                        Warded, guarded, hasted, or four hit points from the floor, he was the same
+                        sprite -- a shield that had just eaten 120 damage was invisible, and so was
+                        being about to die. The creature layer above solved exactly this problem for
+                        creatures; the hero had the same hole and it matters more, because he is the
+                        one body the player is actually watching. */}
+                    <i className="gv-status" aria-hidden="true" />
                     {/* ⚠️ THIS IS NOT THE BAR LUKE DELETED. That one was .gv-hp, a strip across the top of
                         the screen -- "I hate the kill display and red bar" -- and it is still gone. This is
                         the SAME over-head bar every creature in the zone already wears, on the one body that

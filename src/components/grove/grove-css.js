@@ -570,6 +570,25 @@ export const GROVE_CSS = `
 @keyframes gvStunReel { 0%, 100% { opacity: 0.44; } 50% { opacity: 0.68; } }
 /* Chill is the same colour at a fraction of the weight: a creature slowed, not stopped. */
 .gv-status.is-chilled { opacity: 0.3; background: linear-gradient(0deg, #6fb5ff 0%, #cdeaff 100%); }
+/* ── THE HERO'S OWN TWO ────────────────────────────────────────────────────────────────────────
+   ⚠️ BOTH ARE READOUTS, NOT DECORATION, so neither is subtle. A ward or a guard standing between the
+   player and the next blow is the single most useful thing to know in a fight they are losing, and so
+   is being a hit from the floor -- and until now the hero looked identical in both states and in
+   neither. Steel for the shield, because that is the Warden's colour everywhere else; red for the
+   last quarter of health, pulsing, because a static red hero reads as a palette rather than a warning. */
+/* ⚠️ LIGHTER THAN A CREATURE'S CONDITION, ON PURPOSE. A burning rootrat is one of thirty bodies and
+   has to be picked out of a crowd; the hero is the body you are already looking at and the one you
+   identify with. The first cut ran this at the creature weight and he stopped looking like himself --
+   and a Warden is warded for much of a fight, so that is most of the time. Enough to read as armour
+   standing in front of him, not enough to repaint him. */
+.gv-status.is-warded { opacity: 0.24; background: linear-gradient(0deg, #6f9fd8 0%, #cfe4ff 100%); }
+.gv-status.is-low { opacity: 0.5; background: linear-gradient(0deg, #e2594a 0%, #ff9a86 100%);
+    animation: gvLowPulse 760ms ease-in-out infinite; }
+@keyframes gvLowPulse { 0%, 100% { opacity: 0.34; } 50% { opacity: 0.6; } }
+/* Both at once is a guarded hero who is still nearly dead -- the red has to win, because it is the one
+   that decides whether they should be running. */
+.gv-status.is-warded.is-low { background: linear-gradient(0deg, #e2594a 0%, #cfe4ff 100%); }
+
 /* ⚠️ BURNING AND FROZEN AT ONCE IS CATACLYSM, and it must not look like either one alone -- that
    combination is one swing in twenty on a full tree and the rarest thing a Runecaller does. */
 .gv-status.is-burning.is-frozen { opacity: 0.8;
@@ -763,7 +782,7 @@ export const GROVE_CSS = `
     .gv-paper-trail .is-walked, .gv-node-pin, .gv-node.is-next img, .gv-note.is-zone,
     .gv-belt.is-eat, .gv-belt.is-eat i,
     /* The tint IS the readout; only the flicker on it is decoration. */
-    .gv-status.is-burning, .gv-status.is-stunned { animation: none; }
+    .gv-status.is-burning, .gv-status.is-stunned, .gv-status.is-low { animation: none; }
 }
 @keyframes gv-bossbeat { 0%, 100% { scale: 1; } 50% { scale: 1.07; } }
 
@@ -1222,6 +1241,11 @@ export const GROVE_CSS = `
     text-shadow: 0 2px 6px rgba(0,0,0,0.95), 0 0 18px rgba(255,150,60,0.95), 0 0 38px rgba(120,190,255,0.8); }
 .gv-boom.is-cata { border-color: rgba(255,200,140,0.95); }
 /* Soulfire is a second blow of pure magic off the first, so it is neither a hit colour nor a crit one. */
+/* ⚠️ A BLOCKED BLOW HAS TO LOOK BLOCKED. Cream is what an ordinary blow landing on you looks like; a
+   blow your shield turned aside is a different event and printing it in the same colour at a smaller
+   size says only "that one hurt less", which a weak creature also says. */
+.gv-num.is-warded { color: #bcd8ff;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 14px rgba(150,200,255,0.85); }
 .gv-num.is-soul { color: #e3b8ff; --gv-nb: 0.9;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(190,120,255,0.9); }
 
