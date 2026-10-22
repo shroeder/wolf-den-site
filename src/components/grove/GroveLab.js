@@ -160,6 +160,17 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
         // already in the air -- could not happen at all. Raised enough to land inside a film, low enough
         // that the creature still gets to swing in between.
         stunBonus: scene === "stun" ? 0.3 : 0,
+        // ⚠️ THE REAL MAXED NUMBERS, AND THE THIRD TIME THIS LESSON HAS BEEN PAID FOR TODAY. Freeze was
+        // pinned to 1 to prove LOCK_IMMUNE_MS works against the worst case -- it does: the creature was
+        // held 59% of frames across seven separate locks rather than permanently. But a hero facing a
+        // creature that is frozen six seconds in ten and chilled to the cap barely gets HIT, and ICE
+        // THORNS only answer damage that reached health, so the bench proving one thing had made another
+        // unprovable. Same shape as the Warden's grudge and the stun's cancel.
+        //
+        // Certainty belongs in a one-off test; the standing bench runs what a maxed tree actually grants.
+        freeze: scene === "cold" ? 0.1 : 0,
+        chill: scene === "cold" ? 0.1 : 0,
+        iceThorns: scene === "cold" ? 0.15 : 0,
         blockChance: scene === "warden" ? 0.15 : 0,
         blockReduction: scene === "warden" ? 0.5 : 0,
         guardChance: scene === "warden" ? 0.2 : 0,

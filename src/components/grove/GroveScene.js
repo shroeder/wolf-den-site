@@ -221,6 +221,31 @@ const QUAFF_STOP_MS = 110;
 // ⚠️ THE HERO HAS CARRIED STUN POINTS FROM GEAR SINCE THE GROVE SHIPPED AND NOTHING READ THEM. This is not
 // only the two class nodes: every weapon and jewel that ever granted stun was inert in here too.
 const STUN_MS = 1400;
+// A freeze is a stun that holds longer -- the ring's own note calls it "the Runecaller's two seconds".
+const FREEZE_MS = 2000;
+
+// ── ⚠️ A LOCK THAT RENEWS ITSELF IS NOT A CONTROL EFFECT, IT IS THE END OF THE FIGHT ────────────────────────
+// That sentence is the ring's, written after Luke reported "getting stunned and frozen to the point where i
+// just insta die". The Arena answers it with controlImmune: one beat off the board buys you the next one
+// through.
+//
+// The Grove shipped its stun without any such rule, and the bench proved the consequence immediately -- at a
+// pinned certainty the creature stood permanently stunned, never acting again. The locked party here is a
+// rootrat rather than a member, so it is not unfair; it is worse than that, it is the zone switching itself
+// off. A build that can perma-lock has removed the game it was bought to play.
+//
+// So a creature that has just been held cannot be held again until this has passed. Chill is deliberately
+// NOT covered: a slow is a degree, not a lost turn, and the ring draws the same line.
+const LOCK_IMMUNE_MS = 1100;
+
+// How long a chill takes to wear off, and what it does. The node says "slows their turn bar, and the cold
+// wears off over eight seconds; it stacks, and nothing caps it" -- the turn bar IS the attack cadence here,
+// so that is the thing it stretches. Movement is left alone on purpose: the solver owns it, and a creature
+// that walks in treacle reads as the game lagging rather than as the player having done something.
+const CHILL_FADE_MS = 8000;
+// A ceiling the node does not have, because the ring's turn bar cannot stall for ever and a cadence can.
+// At a maxed 10% a blow, this is reached after about seven landed blows.
+const CHILL_MAX = 0.75;
 
 // Thrown harder than ordinary loot so it hangs at the top of its arc while the ring and the sparks resolve
 // underneath it. LOOT_SPILL.up is 0.62; this is the one drop allowed to upstage the rest of the pile.
@@ -1507,14 +1532,39 @@ export default function GroveScene({
                     // reads as the stat doing nothing, which is exactly where this feature started.
                     // Filtered rather than removed by hand: these are React's nodes, and the loop only
                     // ever deletes what it created itself.
-                    const stunOdds = procFrom(stats?.stun || 0, STUN_PER_POINT)
-                        + Math.max(0, Number(stats?.stunBonus) || 0);
-                    if (stunOdds > 0 && !foe.isBoss && w.rand() < stunOdds) {
-                        foe.stunUntil = now + STUN_MS;
+                    // ⚠️ ONE LOCK FUNCTION FOR BOTH, because a freeze IS a stun -- the ring spends
+                    // them through the same `def.stunned` counter and the only differences here are the
+                    // duration and the word. A second copy would be the bleed/burn mistake again.
+                    const lock = (ms, word) => {
+                        if (foe.isBoss || now < (foe.lockImmuneUntil || 0)) return false;
+                        foe.stunUntil = now + ms;
+                        foe.lockImmuneUntil = foe.stunUntil + LOCK_IMMUNE_MS;
                         foe.nextAttack = Math.max(foe.nextAttack || 0, foe.stunUntil);
                         foe.windUntil = 0;
+                        // Filtered rather than removed by hand: React owns these nodes.
                         w.tels = w.tels.filter((t) => t.foeUid !== foe.uid);
-                        addPop("proc", "STUNNED", foe.x, foe.y + foe.h * 1.05);
+                        addPop("proc", word, foe.x, foe.y + foe.h * 1.05);
+                        return true;
+                    };
+
+                    const stunOdds = procFrom(stats?.stun || 0, STUN_PER_POINT)
+                        + Math.max(0, Number(stats?.stunBonus) || 0);
+                    const freezeOdds = Math.max(0, Number(stats?.freeze) || 0);
+                    // ⚠️ FREEZE IS OFFERED FIRST because it is the longer hold and the rarer stat; rolling
+                    // the stun first would let a 15% stun eat the roll a 10% freeze was going to win.
+                    if (freezeOdds > 0 && w.rand() < freezeOdds) lock(FREEZE_MS, "FROZEN");
+                    else if (stunOdds > 0 && w.rand() < stunOdds) lock(STUN_MS, "STUNNED");
+
+                    // ── THE COLD BUILDS UP ──────────────────────────────────────────────────────
+                    // Every landed blow adds another share and the whole thing fades over eight
+                    // seconds from the LAST one, so backing off thaws them. Capped, unlike the ring's,
+                    // because a turn bar cannot stall for ever and an attack cadence can.
+                    const chillPer = Math.max(0, Number(stats?.chill) || 0);
+                    if (chillPer > 0) {
+                        const was = foe.chill || 0;
+                        foe.chill = Math.min(CHILL_MAX, was + chillPer);
+                        foe.chillAt = now;
+                        if (was === 0) addPop("proc", "CHILLED", foe.x, foe.y + foe.h * 1.05);
                     }
 
                     // ── ⚠️ A GUARD IS RAISED ON YOUR OWN SWING ──────────────────────────────────
@@ -1860,6 +1910,12 @@ export default function GroveScene({
                 // lands, but a creature whose cadence had already elapsed would wind up on the very next
                 // frame; this is the gate that actually holds it still.
                 const stunned = now < (f.stunUntil || 0);
+                // The cold wearing off. Linear from the last blow that applied it -- a creature left
+                // alone is back to full speed eight seconds later.
+                if ((f.chill || 0) > 0) {
+                    const age = now - (f.chillAt || 0);
+                    if (age >= CHILL_FADE_MS) f.chill = 0;
+                }
                 if (angry && near && !stunned && now >= (f.nextAttack || 0)) {
                     if (f.isBoss && f.attacks?.length) {
                         // ⚠️ CYCLED IN ORDER, NOT PICKED AT RANDOM. A boss you can learn is the whole point
@@ -1872,7 +1928,11 @@ export default function GroveScene({
                         playTell(atk.kind);
                     } else {
                         w.tels.push(...makeTelegraph(f, w.hero.x, now));
-                        f.nextAttack = now + 1800 + w.rand() * 1600;
+                        // ⚠️ THE CHILL STRETCHES THE GAP, which is what "slows their turn bar" means in
+                        // a place with no turn bar. Applied to the gap rather than to the wind-up: a
+                        // longer wind-up would make the attack EASIER to dodge as well as rarer, paying
+                        // the stat twice.
+                        f.nextAttack = now + (1800 + w.rand() * 1600) * (1 + (f.chill || 0));
                         f.windUntil = now + (f.telegraph || 600);
                     }
                     rerender();
@@ -1960,6 +2020,19 @@ export default function GroveScene({
                     foe.hurtAt = now;
                     addPop("hit", `${guard.thornsBack}`, foe.x, foe.y + foe.h * 0.6,
                         popWeight(guard.thornsBack, foe.maxHp) * 0.7);
+                    if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
+                }
+
+                // ⚠️ ICE THORNS ANSWER WHAT GOT THROUGH, NOT WHAT WAS BLOCKED -- the opposite of
+                // Thornmail above, and the ring's own split. Thorns are a shield talent and pay only when
+                // the shield works; Rimeguard is a coat of frost that bites whatever actually hurt you.
+                const iceBack = (stats?.iceThorns || 0) > 0 && dealt > 0
+                    ? Math.round(dealt * stats.iceThorns) : 0;
+                if (iceBack > 0 && foe && !foe.dying && foe.hp > 0) {
+                    foe.hp -= iceBack;
+                    foe.hurtAt = now;
+                    addPop("hit", `${iceBack}`, foe.x, foe.y + foe.h * 0.6,
+                        popWeight(iceBack, foe.maxHp) * 0.7);
                     if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
                 }
 
@@ -3290,6 +3363,18 @@ function setUpLabScene(w, scene) {
             f.hp = 4000; f.maxHp = 4000;
         });
         if (row[0]) w.target = row[0];
+    } else if (scene === "cold") {
+        // One creature with enough health to outlive the film, angry and targeted, so the hero keeps
+        // landing the blows every cold effect is rolled on.
+        const [one] = w.foes.filter((f) => !f.isBoss);
+        if (one) {
+            one.x = w.hero.x + 6;
+            one.y = 0;
+            one.vx = 0; one.vy = 0; one.grounded = true; one.face = -1;
+            one.hit = true; one.passive = false;
+            one.hp = 20000; one.maxHp = 20000;
+            w.target = one;
+        }
     } else if (scene === "stun") {
         // One creature, fat enough to outlive the film, already angry and already targeted -- a stun is
         // rolled on the hero's LANDED blow, so the scene has to make him land one.

@@ -488,13 +488,13 @@ console.log(`  backdrops to draw: ${zones} (one per zone)`);
 const GROVE_FIELDS = ["damage", "critChance", "critMult", "tempo", "haste", "lifesteal", "lifestealBonus",
     "hasteBonus", "stun", "bleedChance", "bleedDamage", "bleedLeech", "burnChance", "burnDamage",
     "burnLeech", "armor", "health", "dmgPct", "might",
-    "blockChance", "blockReduction", "guardChance", "guardSize", "thorns", "grudge", "stunBonus"];
+    "blockChance", "blockReduction", "guardChance", "guardSize", "thorns", "grudge", "stunBonus",
+    "freeze", "chill", "iceThorns"];
 // The mechanic each one is waiting for. Shrinking this list is the work; adding to it is a decision.
 const NOT_IN_THE_GROVE = {
     counterBonus: "no counter-attack in a side-scroller yet",
     wildProc: "no wild proc",
     regen: "no heal-over-time on the hero",
-    freeze: "no freeze", chill: "no slow", iceThorns: "no cold reflect (thorns is in, this is its cold twin)",
     ward: "no absorb shield", wardRefill: "no absorb shield",
     surge: "no surge", soulfire: "no soulfire", cataclysm: "no cataclysm",
 };

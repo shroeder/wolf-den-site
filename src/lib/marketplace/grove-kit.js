@@ -107,6 +107,12 @@ function forGrove(f) {
         // The class half of a stun. `stun` above is raw POINTS off gear, fed through STUN_PER_POINT at
         // the swing; this is the flat share Concussive and Concussion pay, added after that curve.
         stunBonus: Math.max(0, Number(f.stunBonus) || 0),
+        // ── THE RUNECALLER'S COLD HALF ───────────────────────────────────────────────────────
+        // freeze is a lock, chill is a slow that stacks, iceThorns answers what actually hurt you.
+        // All three computed correctly by the ring and all three dropped on the way in here.
+        freeze: Math.max(0, Math.min(1, Number(f.freeze) || 0)),
+        chill: Math.max(0, Math.min(0.9, Number(f.chill) || 0)),
+        iceThorns: Math.max(0, Number(f.iceThorns) || 0),
         // Shares already.
         // The Runecaller's whole first tier. Same shape as bleed below, because burn IS bleed lit.
         burnChance: Math.max(0, Math.min(1, Number(f.burnChance) || 0)),
