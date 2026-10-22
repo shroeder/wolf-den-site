@@ -153,6 +153,13 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
         //
         // These are what a full Warden tree actually grants. Blocks are rarer to film and every one of
         // the four is reachable, which is the trade worth making.
+        // ⚠️ A SHARE, NOT POINTS. The hero's own `stun` is raw points through STUN_PER_POINT; this is
+        // the flat percentage the two Concussion nodes pay. 0.3 rather than certainty, and the first cut
+        // proved why: at 1 every landed blow re-stunned the creature before it could ever wind up, so it
+        // stood permanently stunned and the one path worth proving -- that a stun CANCELS an attack
+        // already in the air -- could not happen at all. Raised enough to land inside a film, low enough
+        // that the creature still gets to swing in between.
+        stunBonus: scene === "stun" ? 0.3 : 0,
         blockChance: scene === "warden" ? 0.15 : 0,
         blockReduction: scene === "warden" ? 0.5 : 0,
         guardChance: scene === "warden" ? 0.2 : 0,

@@ -17,7 +17,7 @@ import {
 } from "@/lib/marketplace/grove-world.js";
 // Pure files, both of them — no DB and no server-only, which is why a client scene may read them. The
 // alternative was a second haste curve that drifts from the ring's the first time either is touched.
-import { procFrom, HASTE_PER_POINT, defendBlow } from "@/lib/marketplace/arena-kit.js";
+import { procFrom, HASTE_PER_POINT, STUN_PER_POINT, defendBlow } from "@/lib/marketplace/arena-kit.js";
 
 /** What a haste proc is worth, and for how long. */
 const HASTE_MULT = 1.6;
@@ -211,6 +211,17 @@ const EMBLEM_STOP_MS = 190;
 // being bitten, and if the two freeze for the same length the hit is what they read. Shorter than an emblem,
 // which is a thousand times rarer. clock.stop never shortens a freeze already running, so the two compose.
 const QUAFF_STOP_MS = 110;
+
+// ── A CREATURE SEEING STARS ─────────────────────────────────────────────────────────────────────────────────
+// The ring spends a stun as "the defender loses their NEXT swing". A zone has no turns, so it is a duration --
+// and an ordinary creature's attack cadence is 1800-3400ms, which makes this a little under half of one. Long
+// enough to be worth the stat and to be clearly seen, short enough that a high-stun build does not simply
+// switch the zone off.
+//
+// ⚠️ THE HERO HAS CARRIED STUN POINTS FROM GEAR SINCE THE GROVE SHIPPED AND NOTHING READ THEM. This is not
+// only the two class nodes: every weapon and jewel that ever granted stun was inert in here too.
+const STUN_MS = 1400;
+
 // Thrown harder than ordinary loot so it hangs at the top of its arc while the ring and the sparks resolve
 // underneath it. LOOT_SPILL.up is 0.62; this is the one drop allowed to upstage the rest of the pile.
 const EMBLEM_THROW = 1.15;
@@ -1486,6 +1497,26 @@ export default function GroveScene({
                                 left: BURN_TICKS, nextAt: now + BURN_TICK_MS };
                         }
                     }
+                    // ── ⚠️ A STUN COSTS IT THE SWING IT WAS WINDING UP ──────────────────────────
+                    // Rolled on the landed blow, the same place and the same arithmetic as the ring:
+                    // points through STUN_PER_POINT, plus the tree's flat share on top.
+                    //
+                    // ⚠️ AND IT CANCELS WHAT IS ALREADY IN THE AIR. A telegraph that has been thrown
+                    // resolves on its own timer regardless of what happened to the thing that threw it,
+                    // so without this you stun a creature mid-wind-up and are hit by it anyway -- which
+                    // reads as the stat doing nothing, which is exactly where this feature started.
+                    // Filtered rather than removed by hand: these are React's nodes, and the loop only
+                    // ever deletes what it created itself.
+                    const stunOdds = procFrom(stats?.stun || 0, STUN_PER_POINT)
+                        + Math.max(0, Number(stats?.stunBonus) || 0);
+                    if (stunOdds > 0 && !foe.isBoss && w.rand() < stunOdds) {
+                        foe.stunUntil = now + STUN_MS;
+                        foe.nextAttack = Math.max(foe.nextAttack || 0, foe.stunUntil);
+                        foe.windUntil = 0;
+                        w.tels = w.tels.filter((t) => t.foeUid !== foe.uid);
+                        addPop("proc", "STUNNED", foe.x, foe.y + foe.h * 1.05);
+                    }
+
                     // ── ⚠️ A GUARD IS RAISED ON YOUR OWN SWING ──────────────────────────────────
                     // The ring rolls guardChance at the top of the acting fighter's turn. A side-scroller
                     // has no turns, and the closest honest analogue is the moment you commit to a blow --
@@ -1825,7 +1856,11 @@ export default function GroveScene({
                 const angry = f.isBoss ? (f === tgt || f.hit) : (!f.passive && (f === tgt || f.hit));
                 const near = Math.abs(f.x - w.hero.x) < (f.isBoss ? 26 : 15)
                     && Math.abs(f.y - w.hero.y) < SWING_V_REACH + 4;
-                if (angry && near && now >= (f.nextAttack || 0)) {
+                // ⚠️ AND IT CANNOT START A NEW ONE EITHER. nextAttack is pushed past the stun when it
+                // lands, but a creature whose cadence had already elapsed would wind up on the very next
+                // frame; this is the gate that actually holds it still.
+                const stunned = now < (f.stunUntil || 0);
+                if (angry && near && !stunned && now >= (f.nextAttack || 0)) {
                     if (f.isBoss && f.attacks?.length) {
                         // ⚠️ CYCLED IN ORDER, NOT PICKED AT RANDOM. A boss you can learn is the whole point
                         // of telegraphing; a random pick from three shapes is just noise with a wind-up.
@@ -3255,6 +3290,18 @@ function setUpLabScene(w, scene) {
             f.hp = 4000; f.maxHp = 4000;
         });
         if (row[0]) w.target = row[0];
+    } else if (scene === "stun") {
+        // One creature, fat enough to outlive the film, already angry and already targeted -- a stun is
+        // rolled on the hero's LANDED blow, so the scene has to make him land one.
+        const [one] = w.foes.filter((f) => !f.isBoss);
+        if (one) {
+            one.x = w.hero.x + 6;
+            one.y = 0;
+            one.vx = 0; one.vy = 0; one.grounded = true; one.face = -1;
+            one.hit = true; one.passive = false;
+            one.hp = 9000; one.maxHp = 9000;
+            w.target = one;
+        }
     } else if (scene === "warden") {
         // Surrounded and being hit, which is the only state a Warden's tree has anything to say about.
         // Fat creatures so the exchange outlives the film, and the hero already swinging so the guard
