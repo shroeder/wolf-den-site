@@ -489,25 +489,37 @@ const GROVE_FIELDS = ["damage", "critChance", "critMult", "tempo", "haste", "lif
     "hasteBonus", "stun", "bleedChance", "bleedDamage", "bleedLeech", "burnChance", "burnDamage",
     "burnLeech", "armor", "health", "dmgPct", "might",
     "blockChance", "blockReduction", "guardChance", "guardSize", "thorns", "grudge", "stunBonus",
-    "freeze", "chill", "iceThorns"];
+    "freeze", "chill", "iceThorns", "ward", "wardRefill", "counter", "surge", "soulfire",
+    "cataclysm", "wildProc", "regen",
+    // ⚠️ counterBonus RATHER THAN counter. fighterFrom emits the raw bonus; turning points-plus-share
+    // into one chance is arena-engine's prepare step, which the Grove does not run -- forGrove does that
+    // conversion itself now. This list names what forGrove READS, which is the bonus.
+    "counterBonus"];
 // The mechanic each one is waiting for. Shrinking this list is the work; adding to it is a decision.
-const NOT_IN_THE_GROVE = {
-    counterBonus: "no counter-attack in a side-scroller yet",
-    wildProc: "no wild proc",
-    regen: "no heal-over-time on the hero",
-    ward: "no absorb shield", wardRefill: "no absorb shield",
-    surge: "no surge", soulfire: "no soulfire", cataclysm: "no cataclysm",
-};
+// ⚠️ EMPTY, AND IT IS MEANT TO STAY THAT WAY. Every node of every class now moves a number in a zone.
+// A new one that does not will fail the build by name rather than sitting here being quietly worth
+// nothing, which is the state this whole list was written to make visible.
+const NOT_IN_THE_GROVE = {};
 {
     // A realistic build: a multiplier on a zero base looks inert and is not.
     const S = { might: 300, vitality: 250, armor: 180, crit_chance: 0.2, crit_power: 0.6,
         lifesteal: 12, ferocity: 40, tenacity: 30, haste: 25, stun: 10 };
-    const base = fighterFrom(S, {}, null);
+    // A token of every stat any tree grants, so a dependent stat is never probed against a zero it
+    // needs. Small enough not to swamp the node's own contribution in the comparison.
+    const BASE_PERKS = {};
+    for (const c of CLASSES) for (const n of treeFor(c.id)) if (n.stat) BASE_PERKS[n.stat] = 0.01;
+    const base = fighterFrom(S, BASE_PERKS, null);
     const inert = [];
     for (const c of CLASSES) {
         for (const n of treeFor(c.id)) {
             if (!n.stat) continue;
-            const f = fighterFrom(S, { [n.stat]: (n.per || 0) * (n.ranks || 1) || 1 }, null);
+            // ⚠️ PROBED ON TOP OF A BASELINE, BECAUSE SOME STATS GATE ON OTHERS. arena.js computes
+            // guardSize as `guardChance > 0 ? ... : 0`, so a one-stat-at-a-time probe sees Unbreakable
+            // move nothing and calls a perfectly good node dead. The tree makes that pairing for real --
+            // Unbreakable is a deeper tier than Bastion -- so the probe has to as well. A token of every
+            // stat underneath, then the node's own value on top, and the comparison is against the same
+            // baseline rather than against nothing.
+            const f = fighterFrom(S, { ...BASE_PERKS, [n.stat]: (BASE_PERKS[n.stat] || 0) + ((n.per || 0) * (n.ranks || 1) || 1) }, null);
             const moved = GROVE_FIELDS.some((k) => Math.abs((Number(f[k]) || 0) - (Number(base[k]) || 0)) > 1e-9);
             if (moved) continue;
             if (!NOT_IN_THE_GROVE[n.stat]) {

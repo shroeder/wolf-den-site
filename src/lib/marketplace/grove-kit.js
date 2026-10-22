@@ -6,6 +6,7 @@ import { treeEffects } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects } from "@/lib/marketplace/arena-upgrades.js";
 import { GROVE_EMBLEMS, emblemStars } from "@/lib/marketplace/grove-catalog.js";
 import { pieceById, setBonusFor, ARMOUR_SLOTS } from "@/lib/marketplace/grove-forge.js";
+import { procFrom, COUNTER_PER_POINT } from "@/lib/marketplace/arena-kit.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const logger = createServerLogger({ source: "api", subsystem: "grove-kit" });
@@ -113,6 +114,23 @@ function forGrove(f) {
         freeze: Math.max(0, Math.min(1, Number(f.freeze) || 0)),
         chill: Math.max(0, Math.min(0.9, Number(f.chill) || 0)),
         iceThorns: Math.max(0, Number(f.iceThorns) || 0),
+        // ── AND THE LAST OF THEM ─────────────────────────────────────────────────────────────
+        // ward is an absorb shield, which the hero already has one of (the Warden's guard) -- the two
+        // share the pool rather than each carrying their own, the way burn shares bleed's machine.
+        ward: Math.max(0, Number(f.ward) || 0),
+        wardRefill: Math.max(0, Number(f.wardRefill) || 0),
+        // ⚠️ counterBonus, AND THE PER-POINT CONVERSION, BECAUSE fighterFrom DOES NEITHER. It emits
+        // `counterBonus` raw; turning points-plus-share into one chance happens in arena-engine's own
+        // prepare step, which the Grove does not run. Reading `f.counter` here -- which is what the first
+        // cut did -- reads a field that does not exist at this layer, so Riposte and Retribution would
+        // have shipped dead. check-grove caught it by name before it ever ran.
+        counter: Math.max(0, Math.min(1, procFrom(Number(f.counter) || 0, COUNTER_PER_POINT)
+            + (Number(f.counterBonus) || 0))),
+        surge: Math.max(0, Number(f.surge) || 0),
+        soulfire: Math.max(0, Number(f.soulfire) || 0),
+        cataclysm: Math.max(0, Math.min(1, Number(f.cataclysm) || 0)),
+        wildProc: Math.max(0, Math.min(1, Number(f.wildProc) || 0)),
+        regen: Math.max(0, Number(f.regen) || 0),
         // Shares already.
         // The Runecaller's whole first tier. Same shape as bleed below, because burn IS bleed lit.
         burnChance: Math.max(0, Math.min(1, Number(f.burnChance) || 0)),

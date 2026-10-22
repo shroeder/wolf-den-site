@@ -12,12 +12,13 @@ import {
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
 import {
     UNITS_PER_SCREEN, zoneWidth, platformsFor, decorateLedges, swing, makeTelegraph, telegraphHits, mitigate,
-    BLEED_TICK_MS, BLEED_TICKS, BURN_TICK_MS, BURN_TICKS,
+    BLEED_TICK_MS, BLEED_TICKS, BURN_SHARE, BURN_TICK_MS, BURN_TICKS,
     BURN_SPREAD_UNITS, BURN_SPREAD_SHARE, petBite, petBiteCd,
 } from "@/lib/marketplace/grove-world.js";
 // Pure files, both of them — no DB and no server-only, which is why a client scene may read them. The
 // alternative was a second haste curve that drifts from the ring's the first time either is touched.
 import { procFrom, HASTE_PER_POINT, STUN_PER_POINT, defendBlow } from "@/lib/marketplace/arena-kit.js";
+import { SURGE_EVERY } from "@/lib/marketplace/arena-engine.js";
 
 /** What a haste proc is worth, and for how long. */
 const HASTE_MULT = 1.6;
@@ -1482,7 +1483,18 @@ export default function GroveScene({
                 } else {
                     // The whole fighter, not four hand-picked fields. Creatures carry no armour, so the
                     // 0 is honest rather than a placeholder — mitigation runs on what comes AT you.
+                    // ── ⚠️ SURGE IS COUNTED, NOT ROLLED, AND THAT IS THE WHOLE POINT OF IT ──────
+                    // Runic Overflow's own words: "every fifth swing of yours is a Surge -- counted,
+                    // not rolled, you can see it coming." Rolling it would make it a crit with extra
+                    // steps. The count is of LANDED blows, which is what the ring counts too.
+                    w.swings = (w.swings || 0) + 1;
+                    const surging = (stats?.surge || 0) > 0 && w.swings % SURGE_EVERY === 0;
+
                     const hit = swing(stats, 0, w.rand);
+                    if (surging) {
+                        hit.dealt = Math.round(hit.dealt * (1 + Number(stats.surge)));
+                        procCall("SURGE", "haste");
+                    }
 
                     // ── ⚠️ THE GRUDGE RIDES THE SWING THAT ANSWERS IT ───────────────────────────
                     // Grudge's own words: "a share of everything done to you since your last swing is
@@ -1535,6 +1547,7 @@ export default function GroveScene({
                     // ⚠️ ONE LOCK FUNCTION FOR BOTH, because a freeze IS a stun -- the ring spends
                     // them through the same `def.stunned` counter and the only differences here are the
                     // duration and the word. A second copy would be the bleed/burn mistake again.
+                    // `word` may be null when the caller has already announced itself -- see cataclysm.
                     const lock = (ms, word) => {
                         if (foe.isBoss || now < (foe.lockImmuneUntil || 0)) return false;
                         foe.stunUntil = now + ms;
@@ -1543,7 +1556,7 @@ export default function GroveScene({
                         foe.windUntil = 0;
                         // Filtered rather than removed by hand: React owns these nodes.
                         w.tels = w.tels.filter((t) => t.foeUid !== foe.uid);
-                        addPop("proc", word, foe.x, foe.y + foe.h * 1.05);
+                        if (word) addPop("proc", word, foe.x, foe.y + foe.h * 1.05);
                         return true;
                     };
 
@@ -1565,6 +1578,74 @@ export default function GroveScene({
                         foe.chill = Math.min(CHILL_MAX, was + chillPer);
                         foe.chillAt = now;
                         if (was === 0) addPop("proc", "CHILLED", foe.x, foe.y + foe.h * 1.05);
+                    }
+
+                    // ── ⚠️ SOULFIRE GOES PAST ARMOUR AND PAST SHIELDS BOTH ─────────────────────
+                    // Which is what makes it different from pierce: it is not a share of the blow that
+                    // ignores armour, it is a SECOND blow of pure magic off what the first one landed.
+                    // Dealt straight to health, exactly as the ring does it.
+                    if ((stats?.soulfire || 0) > 0 && hit.dealt > 0 && foe.hp > 0) {
+                        const soul = Math.max(1, Math.round(hit.dealt * stats.soulfire));
+                        foe.hp -= soul;
+                        addPop("proc", `${soul}`, foe.x, foe.y + foe.h * 0.8);
+                    }
+
+                    // ── CATACLYSM LIGHTS AND FREEZES AT ONCE, BOTH GUARANTEED ──────────────────
+                    // Rolled once rather than rolling each, so when it lands it lands whole. It goes
+                    // through the same two machines everything else uses -- the burn slot and the lock --
+                    // so it obeys the lock immunity like any other freeze.
+                    if ((stats?.cataclysm || 0) > 0 && foe.hp > 0 && w.rand() < stats.cataclysm) {
+                        foe.burn = { dmg: Math.max(1, Math.round(hit.dealt * BURN_SHARE)),
+                            leech: Math.max(0, Number(stats?.burnLeech) || 0), spread: true,
+                            left: BURN_TICKS, nextAt: now + BURN_TICK_MS };
+                        // ⚠️ THE WORD IS SAID WHETHER OR NOT THE FREEZE LANDS. lock() declines while a
+                        // creature is still inside its immunity window, and the first cut let that
+                        // swallow the announcement -- so a cataclysm would light a creature on fire and
+                        // tell the player nothing, which is the exact fault this whole pass has been
+                        // about. The burn is the half that always happens; the freeze is the half that
+                        // can be refused.
+                        addPop("proc", "CATACLYSM", foe.x, foe.y + foe.h * 1.05);
+                        lock(FREEZE_MS, null);
+                    }
+
+                    // ── ⚠️ THE WARD SHARES THE GUARD'S POOL ────────────────────────────────────
+                    // Both are absorb shields and a hero with two of them should not carry two separate
+                    // numbers -- that is the bleed/burn lesson again. The ward tops the pool up toward
+                    // its own ceiling on every swing; the guard slams it to a full guard's worth when it
+                    // rolls. Whichever is larger is what stands.
+                    if ((stats?.ward || 0) > 0) {
+                        const cap = Math.round(maxHp * stats.ward);
+                        const top = Math.round(maxHp * (Number(stats?.wardRefill) || 0));
+                        if ((w.shield || 0) < cap) w.shield = Math.min(cap, (w.shield || 0) + Math.max(1, top));
+                    }
+
+                    // ── MENDING, ON THE BEAT THE RING HEALS ON ─────────────────────────────────
+                    // The ring regenerates at the top of your turn. A swing is the nearest thing to one,
+                    // and it keeps the Warden's sustain tied to being in a fight rather than ticking
+                    // while standing still in an empty clearing -- the same call the guard makes.
+                    if ((stats?.regen || 0) > 0 && w.hp > 0 && w.hp < maxHp) {
+                        const healed = Math.max(1, Math.round(maxHp * stats.regen));
+                        w.hp = Math.min(maxHp, w.hp + healed);
+                        addPop("heal", `+${healed}`, w.hero.x, w.hero.y + HERO_UNITS * 1.3);
+                    }
+
+                    // ── ⚠️ ONE ROLL, THEN IT DECIDES WHICH OF THE THREE IT IS ──────────────────
+                    // Red Harvest's shape in the ring, kept: a single chance, and only once it lands does
+                    // it pick. "extra" is a free immediate blow, "haste" starts the haste buff, and
+                    // "counter" has no meaning on your OWN swing in a side-scroller -- there is nothing
+                    // to counter -- so it falls to the extra blow, which is the closest honest reading.
+                    if ((stats?.wildProc || 0) > 0 && w.rand() < stats.wildProc) {
+                        const pick = Math.floor(w.rand() * 3);
+                        if (pick === 2) {
+                            w.hasteUntil = now + HASTE_MS;
+                            procCall("HASTE", "haste");
+                        } else {
+                            const extra = swing(stats, 0, w.rand);
+                            foe.hp -= extra.dealt;
+                            addPop("hit", `${extra.dealt}`, foe.x, foe.y + foe.h * 0.7,
+                                popWeight(extra.dealt, foe.maxHp));
+                            procCall("WILD", "haste");
+                        }
                     }
 
                     // ── ⚠️ A GUARD IS RAISED ON YOUR OWN SWING ──────────────────────────────────
@@ -2033,6 +2114,23 @@ export default function GroveScene({
                     foe.hurtAt = now;
                     addPop("hit", `${iceBack}`, foe.x, foe.y + foe.h * 0.6,
                         popWeight(iceBack, foe.maxHp) * 0.7);
+                    if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
+                }
+
+                // ── ⚠️ THE COUNTER ANSWERS THE BODY THAT SWUNG ─────────────────────────────────
+                // Riposte and Retribution. Rolled when you are HIT, which is the only place a counter
+                // can mean anything, and it goes through swing() rather than doing its own arithmetic --
+                // Luke, on the ring: "when I counter attack why does it only do 1 damage", because the
+                // counter was the one blow in the game that skipped the shared damage path. It does not
+                // skip it here.
+                if ((stats?.counter || 0) > 0 && foe && !foe.dying && foe.hp > 0
+                    && w.rand() < stats.counter) {
+                    const riposte = swing(stats, 0, w.rand);
+                    foe.hp -= riposte.dealt;
+                    foe.hurtAt = now;
+                    addPop("hit", `${riposte.dealt}`, foe.x, foe.y + foe.h * 0.7,
+                        popWeight(riposte.dealt, foe.maxHp));
+                    procCall("RIPOSTE", "block", null, 1.32);
                     if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
                 }
 
@@ -3363,6 +3461,18 @@ function setUpLabScene(w, scene) {
             f.hp = 4000; f.maxHp = 4000;
         });
         if (row[0]) w.target = row[0];
+    } else if (scene === "kit") {
+        // One creature with a great deal of health, angry and targeted, and hitting back -- half of what
+        // is being proved here only fires when the hero is STRUCK.
+        const [one] = w.foes.filter((f) => !f.isBoss);
+        if (one) {
+            one.x = w.hero.x + 6;
+            one.y = 0;
+            one.vx = 0; one.vy = 0; one.grounded = true; one.face = -1;
+            one.hit = true; one.passive = false;
+            one.hp = 60000; one.maxHp = 60000;
+            w.target = one;
+        }
     } else if (scene === "cold") {
         // One creature with enough health to outlive the film, angry and targeted, so the hero keeps
         // landing the blows every cold effect is rolled on.

@@ -171,6 +171,20 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
         freeze: scene === "cold" ? 0.1 : 0,
         chill: scene === "cold" ? 0.1 : 0,
         iceThorns: scene === "cold" ? 0.15 : 0,
+        // ── THE WHOLE REMAINING KIT, FOR PROVING EACH PIECE FIRES ──────────────────────────────────
+        // ⚠️ REAL MAXED VALUES EXCEPT WHERE A RARE ROLL WOULD NOT LAND INSIDE A FILM. counter, cataclysm
+        // and wildProc are 10%, 5% and 5% on a full tree, which is a lot of waiting; surge is COUNTED
+        // rather than rolled so it needs no help, and ward, soulfire and regen fire on every swing.
+        // Pinning only the three that need it, and the rest honest -- the lesson from three benches that
+        // flattered what they were built to prove.
+        ward: scene === "kit" ? 0.1 : 0,
+        wardRefill: scene === "kit" ? 0.01 : 0,
+        counter: scene === "kit" ? 0.6 : 0,
+        surge: scene === "kit" ? 1 : 0,
+        soulfire: scene === "kit" ? 0.1 : 0,
+        cataclysm: scene === "kit" ? 0.3 : 0,
+        wildProc: scene === "kit" ? 0.4 : 0,
+        regen: scene === "kit" ? 0.025 : 0,
         blockChance: scene === "warden" ? 0.15 : 0,
         blockReduction: scene === "warden" ? 0.5 : 0,
         guardChance: scene === "warden" ? 0.2 : 0,
