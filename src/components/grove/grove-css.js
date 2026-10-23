@@ -1237,6 +1237,23 @@ export const GROVE_CSS = `
 .gv-proc.is-ice { translate: -50% 0; color: #cdeaff; letter-spacing: 0.22em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(140,210,255,0.95), 0 0 34px rgba(60,150,255,0.6); }
 .gv-boom.is-ice { border-color: rgba(190,230,255,0.95); }
+.gv-boom.is-surge { border-color: rgba(255,210,110,0.95); }
+.gv-boom.is-guard { border-color: rgba(175,215,255,0.95); }
+.gv-boom.is-riposte { border-color: rgba(255,225,160,0.95); }
+.gv-boom.is-grudge { border-color: rgba(255,120,100,0.95); }
+/* The call-outs each wear their own particle's colour, so the word and the burst are one event. */
+.gv-proc.is-chill { translate: -50% 0; color: #bfe8ff; letter-spacing: 0.2em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 14px rgba(120,190,255,0.8); }
+.gv-proc.is-surge { translate: -50% 0; color: #ffe9a8; letter-spacing: 0.26em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 18px rgba(255,190,60,0.95); }
+.gv-proc.is-guard { translate: -50% 0; color: #dcebff; letter-spacing: 0.2em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(130,185,255,0.9); }
+.gv-proc.is-riposte { translate: -50% 0; color: #fff2cf; letter-spacing: 0.22em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,210,120,0.95); }
+.gv-proc.is-grudge { translate: -50% 0; color: #ff8a7a; letter-spacing: 0.18em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 18px rgba(220,50,40,0.9); }
+.gv-proc.is-wild { translate: -50% 0; color: #c6ffb0; letter-spacing: 0.22em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(120,255,160,0.9); }
 /* Hot white, the stun's own. Warm because a blow landed; not gold, because a crit already owns gold. */
 .gv-proc.is-stun { translate: -50% 0; color: #fffdf2; letter-spacing: 0.22em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,235,170,0.95), 0 0 32px rgba(255,200,80,0.6); }
@@ -1406,6 +1423,35 @@ export const GROVE_CSS = `
     background: #d59bff; box-shadow: 0 0 14px 5px rgba(170,70,255,0.9); }
 /* Steel off a shield arm. Pale and hard, the same family as the blocked number and the thorns. */
 .gv-spark.is-block { background: #e8f1ff; box-shadow: 0 0 8px 3px rgba(150,200,255,0.9); }
+/* ── ⚠️ ONE LOOK PER ABILITY, BECAUSE SHARING ONE MAKES TWO NODES THE SAME NODE ───────────────
+   Luke: "every ability should have effects that are unique." Surge was wearing haste's particle, so
+   the one proc a player can SEE COMING looked identical to the one they cannot. Guard, block, riposte
+   and grudge were all one steel. Chill was wearing the freeze's, which made the cheap one look like
+   the rare one landing weakly. */
+/* Chill: the same family as ice and deliberately smaller and softer -- slowed, not stopped. */
+.gv-spark.is-chill { width: calc(0.5 * var(--gv-unit, 1%)); height: calc(0.5 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.25 * var(--gv-unit, 1%)) calc(-0.25 * var(--gv-unit, 1%));
+    background: #bfe8ff; box-shadow: 0 0 8px 3px rgba(120,190,255,0.6); }
+/* Surge: gold and square-edged, because it is charge rather than light. */
+.gv-spark.is-surge { width: calc(0.8 * var(--gv-unit, 1%)); height: calc(0.8 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.4 * var(--gv-unit, 1%)) calc(-0.4 * var(--gv-unit, 1%));
+    border-radius: 2px; background: #ffe9a8; box-shadow: 0 0 14px 5px rgba(255,190,60,0.95); }
+/* Guard: the shield seating. Wide, pale, and short-lived. */
+.gv-spark.is-guard { width: calc(0.85 * var(--gv-unit, 1%)); height: calc(0.85 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.42 * var(--gv-unit, 1%)) calc(-0.42 * var(--gv-unit, 1%));
+    background: #dcebff; box-shadow: 0 0 12px 5px rgba(130,185,255,0.9); }
+/* Riposte: the answer. Hot and narrow, because it is a point rather than a plate. */
+.gv-spark.is-riposte { width: calc(0.42 * var(--gv-unit, 1%)); height: calc(0.9 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.45 * var(--gv-unit, 1%)) calc(-0.21 * var(--gv-unit, 1%));
+    border-radius: 2px; background: #fff2cf; box-shadow: 0 0 12px 4px rgba(255,210,120,0.95); }
+/* Grudge: everything they did to you coming back at once. The only deep red in the kit. */
+.gv-spark.is-grudge { width: calc(0.9 * var(--gv-unit, 1%)); height: calc(0.9 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.45 * var(--gv-unit, 1%)) calc(-0.45 * var(--gv-unit, 1%));
+    background: #ff8a7a; box-shadow: 0 0 14px 5px rgba(220,50,40,0.9); }
+/* Wild: it picks one of three at random, so it is the one that is not a single colour. */
+.gv-spark.is-wild { width: calc(0.7 * var(--gv-unit, 1%)); height: calc(0.7 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.35 * var(--gv-unit, 1%)) calc(-0.35 * var(--gv-unit, 1%));
+    background: #c6ffb0; box-shadow: 0 0 12px 4px rgba(120,255,160,0.85); }
 /* Dust is bigger, slower and has no light of its own — it is displaced earth, not energy. */
 .gv-spark.is-dust { width: calc(1.1 * var(--gv-unit, 1%)); height: calc(1.1 * var(--gv-unit, 1%));
     margin: 0 0 calc(-0.55 * var(--gv-unit, 1%)) calc(-0.55 * var(--gv-unit, 1%));

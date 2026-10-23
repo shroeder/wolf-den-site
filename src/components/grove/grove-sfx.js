@@ -251,6 +251,151 @@ export function playQuaff() {
     } catch { /* ignore */ }
 }
 
+// ── ⚠️ A SOUND PER ABILITY, AND NOT ONE OF THEM IS A FILE ───────────────────────────────────────────────────
+// Luke: "every ability should have effects that are unique. Visual. And sound."
+//
+// Everything audible in the Grove is built from an oscillator and a noise burst -- there is not one .mp3 in
+// the feature, which is why adding a dozen sounds costs nothing to serve and nothing to download. That is
+// also the constraint worth respecting: these have to be CHARACTER rather than production, so each one is
+// built from the shape of the thing it describes.
+//
+// ⚠️ AND THEY HAVE TO SURVIVE EACH OTHER. Half of these fire in the same half-second as playHit, which is
+// already playing, and as whatever the creature is doing -- so every one of them is short, and none sits in
+// the same register as a landed blow (which is a mid thud at 200-900Hz). Cold is glass at the top, a stun is
+// a dull knock underneath, magic is a bell between them.
+
+/** A freeze: glass forming, then cracking. The one sound in here that goes UP and then stops dead. */
+export function playFreeze() {
+    const a = audio();
+    if (!a) return;
+    try {
+        note(a, 1318.5, 0.00, 0.10, 0.07, "sine");
+        note(a, 1760.0, 0.04, 0.12, 0.06, "sine");
+        note(a, 2093.0, 0.08, 0.16, 0.05, "sine");
+        // The crack. Bright, short, and filtered high so it never muddies the blow underneath it.
+        thud(a, { freq: 3200, dur: 0.05, peak: 0.1, q: 3.2, at: 0.1 });
+    } catch { /* ignore */ }
+}
+
+/** A stun: a knock on something hollow, and the ring it leaves behind. */
+export function playStun() {
+    const a = audio();
+    if (!a) return;
+    try {
+        thud(a, { freq: 240, dur: 0.1, peak: 0.26, q: 0.9, type: "lowpass" });
+        note(a, 880, 0.03, 0.18, 0.05, "sine");
+        note(a, 660, 0.07, 0.22, 0.04, "sine");
+    } catch { /* ignore */ }
+}
+
+/** A chill: cold arriving, with nothing hard in it. Quietest sound in the feature, because it stacks. */
+export function playChill() {
+    const a = audio();
+    if (!a) return;
+    try {
+        note(a, 1046.5, 0.00, 0.2, 0.035, "sine");
+        note(a, 784.0, 0.05, 0.24, 0.03, "sine");
+    } catch { /* ignore */ }
+}
+
+/** Cataclysm: both halves at once, so it is the only sound here with a floor AND a ceiling. */
+export function playCataclysm() {
+    const a = audio();
+    if (!a) return;
+    try {
+        thud(a, { freq: 150, dur: 0.3, peak: 0.34, q: 0.7, type: "lowpass" });
+        thud(a, { freq: 3400, dur: 0.14, peak: 0.14, q: 2.6, at: 0.02 });
+        note(a, 196.0, 0.00, 0.34, 0.1, "sawtooth");
+        note(a, 1567.98, 0.06, 0.26, 0.06, "sine");
+        note(a, 2093.0, 0.12, 0.3, 0.05, "sine");
+    } catch { /* ignore */ }
+}
+
+/** Soulfire: a struck bell with no attack on it, because it is not a blow. */
+export function playSoulfire() {
+    const a = audio();
+    if (!a) return;
+    try {
+        note(a, 1174.66, 0.00, 0.26, 0.055, "sine");
+        note(a, 1760.0, 0.03, 0.3, 0.04, "sine");
+    } catch { /* ignore */ }
+}
+
+/** A surge: counted, not rolled, so it is the one proc that gets to sound like it was coming. */
+export function playSurge() {
+    const a = audio();
+    if (!a) return;
+    try {
+        note(a, 261.63, 0.00, 0.1, 0.08, "sawtooth");
+        note(a, 392.00, 0.05, 0.1, 0.09, "sawtooth");
+        note(a, 523.25, 0.10, 0.14, 0.1, "sawtooth");
+        note(a, 783.99, 0.15, 0.2, 0.09, "square");
+        thud(a, { freq: 900, dur: 0.1, peak: 0.16, q: 1.4, at: 0.15 });
+    } catch { /* ignore */ }
+}
+
+/** A guard going up: metal seating, not metal struck. */
+export function playGuard() {
+    const a = audio();
+    if (!a) return;
+    try {
+        thud(a, { freq: 700, dur: 0.11, peak: 0.2, q: 2.2 });
+        note(a, 329.63, 0.02, 0.16, 0.07, "triangle");
+        note(a, 493.88, 0.07, 0.2, 0.06, "triangle");
+    } catch { /* ignore */ }
+}
+
+/** A block: one bright tick off the shield. It fires often, so it is the shortest sound in the file. */
+export function playBlock() {
+    const a = audio();
+    if (!a) return;
+    try { thud(a, { freq: 2100, dur: 0.045, peak: 0.13, q: 3.4 }); } catch { /* ignore */ }
+}
+
+/** A riposte: the answer, so it is a blow that arrives a beat late and sharper than yours. */
+export function playRiposte() {
+    const a = audio();
+    if (!a) return;
+    try {
+        thud(a, { freq: 1500, dur: 0.07, peak: 0.2, q: 2.6 });
+        note(a, 1318.5, 0.02, 0.1, 0.07, "square");
+        note(a, 1975.5, 0.06, 0.12, 0.05, "square");
+    } catch { /* ignore */ }
+}
+
+/** A grudge paid: everything they did to you, coming back at once. Low, and the only one that growls. */
+export function playGrudge() {
+    const a = audio();
+    if (!a) return;
+    try {
+        note(a, 110, 0.00, 0.2, 0.12, "sawtooth");
+        note(a, 146.83, 0.05, 0.22, 0.1, "sawtooth");
+        thud(a, { freq: 320, dur: 0.16, peak: 0.24, q: 0.8, type: "lowpass", at: 0.04 });
+    } catch { /* ignore */ }
+}
+
+/** Something catching fire. A hiss, and nothing tonal at all -- fire is the one effect with no note in it. */
+export function playIgnite() {
+    const a = audio();
+    if (!a) return;
+    try {
+        thud(a, { freq: 1800, dur: 0.22, peak: 0.12, q: 0.6, type: "bandpass" });
+        thud(a, { freq: 900, dur: 0.16, peak: 0.09, q: 0.5, at: 0.05 });
+    } catch { /* ignore */ }
+}
+
+/** The wild proc: it picks one of three at random, so the sound is the only one here that is unstable. */
+export function playWild(pick = 0) {
+    const a = audio();
+    if (!a) return;
+    try {
+        const base = [587.33, 698.46, 880.0][pick % 3];
+        note(a, base, 0.00, 0.08, 0.08, "square");
+        note(a, base * 1.5, 0.04, 0.1, 0.07, "square");
+        note(a, base * 2, 0.08, 0.12, 0.06, "square");
+    } catch { /* ignore */ }
+}
+
 /** Loot hitting the ground. Tiny — it fires several times per kill. */
 export function playDrop() {
     const a = audio();

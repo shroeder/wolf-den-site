@@ -53,6 +53,8 @@ import { footOf } from "@/components/grove/grove-foot.js";
 import {
     playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice, playDeath,
     playPetHit, playQuaff,
+    playFreeze, playStun, playChill, playCataclysm, playSoulfire, playSurge,
+    playGuard, playBlock, playRiposte, playGrudge, playIgnite, playWild,
 } from "@/components/grove/grove-sfx.js";
 // ── ⚠️ THE GEOMETRY LIVES IN ITS OWN FILE SO IT CAN BE CHECKED ─────────────────────────────────────
 // Every distance that is really a SHARE OF THE FRAME is in grove-view.js, with the long version of why. The
@@ -1526,10 +1528,13 @@ export default function GroveScene({
                         // Counted, not rolled -- so it is the one proc the player can SEE coming, and it
                         // should arrive like something that was building. A ring out of the hero and a
                         // charge thrown off the blade.
-                        shockwave(w.hero.x, w.hero.y + w.hero.h * 0.5, "haste");
-                        burst(w.hero.x, w.hero.y + w.hero.h * 0.5, { kind: "haste", scale: 1.6 });
+                        // ⚠️ SURGE IS NOT HASTE. They were sharing a particle and a colour, so the one
+                        // proc a player can SEE COMING looked identical to the one they cannot.
+                        shockwave(w.hero.x, w.hero.y + w.hero.h * 0.5, "surge");
+                        burst(w.hero.x, w.hero.y + w.hero.h * 0.5, { kind: "surge", scale: 1.7 });
                         w.shake.add(TRAUMA.crit);
-                        procCall("SURGE", "haste");
+                        procCall("SURGE", "surge");
+                        playSurge();
                     }
 
                     // ── ⚠️ THE GRUDGE RIDES THE SWING THAT ANSWERS IT ───────────────────────────
@@ -1547,7 +1552,9 @@ export default function GroveScene({
                     // where the extra came from.
                     if (avenged > 0) {
                         hit.dealt += avenged;
-                        procCall(`GRUDGE +${avenged}`, "block", null, 1.5);
+                        burst(foe.x, foe.y + foe.h * 0.5, { kind: "grudge", scale: 1.5 });
+                        procCall(`GRUDGE +${avenged}`, "grudge", null, 1.5, foe);
+                        playGrudge();
                     }
 
                     foe.hp -= hit.dealt;
@@ -1572,6 +1579,9 @@ export default function GroveScene({
                     // starts is marked false and the chain stops there. See BURN_SPREAD_UNITS.
                     if (hit.burn) {
                         const better = !foe.burn || hit.burn.dmg >= foe.burn.dmg;
+                        // Only when it CATCHES, not on every refresh -- a hiss on every swing of a
+                        // high-burn build is a kettle.
+                        if (better && !foe.burn) { playIgnite(); burst(foe.x, foe.y + foe.h * 0.45, { kind: "burn", scale: 1.2 }); }
                         if (better) {
                             foe.burn = { dmg: hit.burn.dmg, leech: hit.burn.leech, spread: true,
                                 left: BURN_TICKS, nextAt: now + BURN_TICK_MS };
@@ -1609,6 +1619,10 @@ export default function GroveScene({
                         burst(foe.x, foe.y + foe.h * 0.5, { kind, scale: kind === "ice" ? 1.9 : 1.5 });
                         shockwave(foe.x, foe.y + foe.h * 0.45, kind);
                         w.shake.add(kind === "ice" ? TRAUMA.crit : TRAUMA.hit);
+                        // ⚠️ ITS OWN SOUND, AND NOT IN THE BLOW'S REGISTER. A landed hit is a mid thud;
+                        // cold is glass above it and a stun is a knock underneath, so neither competes
+                        // with the swing that caused it -- they all land in the same half second.
+                        if (kind === "ice") playFreeze(); else playStun();
                         if (word) procCall(word, kind, null, 1.15, foe);
                         return true;
                     };
@@ -1630,7 +1644,20 @@ export default function GroveScene({
                         const was = foe.chill || 0;
                         foe.chill = Math.min(CHILL_MAX, was + chillPer);
                         foe.chillAt = now;
-                        if (was === 0) procCall("CHILLED", "ice", null, 1.15, foe);
+                        // ⚠️ ITS OWN LOOK, NOT THE FREEZE'S. Chill and freeze are different nodes doing
+                        // different things -- one slows, one stops -- and sharing a particle made the
+                        // cheaper one look like the rarer one landing weakly.
+                        //
+                        // ⚠️ AND THE PARTICLES FIRE ON EVERY STACK WHILE THE WORD FIRES ONCE. Chill
+                        // climbs to 75% over about seven blows, and the first cut announced only the
+                        // first one -- so the whole of it deepening was invisible and a player could not
+                        // see the stat working past the opening hit. A word per stack would be seven
+                        // CHILLED in a row, which is noise; frost per stack is the thing itself.
+                        burst(foe.x, foe.y + foe.h * 0.5, { kind: "chill", scale: 0.6 + foe.chill });
+                        if (was === 0) {
+                            procCall("CHILLED", "chill", null, 1.15, foe);
+                            playChill();
+                        }
                     }
 
                     // ── ⚠️ SOULFIRE GOES PAST ARMOUR AND PAST SHIELDS BOTH ─────────────────────
@@ -1641,6 +1668,7 @@ export default function GroveScene({
                         const soul = Math.max(1, Math.round(hit.dealt * stats.soulfire));
                         foe.hp -= soul;
                         burst(foe.x, foe.y + foe.h * 0.55, { kind: "soul", scale: 0.9 });
+                        playSoulfire();
                         addPop("soul", `${soul}`, foe.x, foe.y + foe.h * 0.8);
                     }
 
@@ -1667,6 +1695,7 @@ export default function GroveScene({
                         shockwave(foe.x, foe.y + foe.h * 0.45, "cata");
                         w.shake.add(TRAUMA.kill);
                         procCall("CATACLYSM", "cata", null, 1.3, foe);
+                        playCataclysm();
                         lock(FREEZE_MS, null);
                     }
 
@@ -1698,6 +1727,7 @@ export default function GroveScene({
                     // to counter -- so it falls to the extra blow, which is the closest honest reading.
                     if ((stats?.wildProc || 0) > 0 && w.rand() < stats.wildProc) {
                         const pick = Math.floor(w.rand() * 3);
+                        playWild(pick);
                         if (pick === 2) {
                             w.hasteUntil = now + HASTE_MS;
                             procCall("HASTE", "haste");
@@ -1706,7 +1736,8 @@ export default function GroveScene({
                             foe.hp -= extra.dealt;
                             addPop("hit", `${extra.dealt}`, foe.x, foe.y + foe.h * 0.7,
                                 popWeight(extra.dealt, foe.maxHp));
-                            procCall("WILD", "haste");
+                            burst(foe.x, foe.y + foe.h * 0.5, { kind: "wild", scale: 1.2 });
+                            procCall("WILD", "wild", null, 1.2, foe);
                         }
                     }
 
@@ -1725,9 +1756,10 @@ export default function GroveScene({
                             w.shield = one;
                             // The shield itself: a ring snapping out from the hero and steel coming off
                             // him. The word is the receipt; this is the thing that happened.
-                            shockwave(w.hero.x, w.hero.y + w.hero.h * 0.45, "block");
-                            burst(w.hero.x, w.hero.y + w.hero.h * 0.4, { kind: "block", scale: 1.3 });
-                            procCall("GUARD", "block", null, 1.1);
+                            shockwave(w.hero.x, w.hero.y + w.hero.h * 0.45, "guard");
+                            burst(w.hero.x, w.hero.y + w.hero.h * 0.4, { kind: "guard", scale: 1.3 });
+                            procCall("GUARD", "guard", null, 1.1);
+                            playGuard();
                         }
                     }
                     // When its bar was last struck. Drives whether the bar is up at all, and the flash,
@@ -2201,9 +2233,10 @@ export default function GroveScene({
                     addPop("hit", `${riposte.dealt}`, foe.x, foe.y + foe.h * 0.7,
                         popWeight(riposte.dealt, foe.maxHp));
                     burst(foe.x, foe.y + foe.h * 0.5,
-                        { kind: "block", scale: 1.4, crit: true, dir: Math.sign(foe.x - w.hero.x || 1) });
-                    shockwave(foe.x, foe.y + foe.h * 0.45, "block");
-                    procCall("RIPOSTE", "block", null, 1.32);
+                        { kind: "riposte", scale: 1.4, crit: true, dir: Math.sign(foe.x - w.hero.x || 1) });
+                    shockwave(foe.x, foe.y + foe.h * 0.45, "riposte");
+                    procCall("RIPOSTE", "riposte", null, 1.32, foe);
+                    playRiposte();
                     if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
                 }
 
@@ -2215,6 +2248,7 @@ export default function GroveScene({
                     // prints a smaller number is a block nobody feels.
                     burst(w.hero.x, w.hero.y + w.hero.h * 0.45,
                         { kind: "block", scale: 1.1, dir: Math.sign(w.hero.x - tel.x || 1) });
+                    playBlock();
                     procCall(guard.blocked && soaked > 0 ? "GUARDED" : guard.blocked ? "BLOCK" : "GUARDED",
                         "block", null, 1.1);
                 }
