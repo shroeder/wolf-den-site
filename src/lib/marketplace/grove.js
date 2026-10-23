@@ -17,6 +17,7 @@ import {
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { petBiteShare } from "@/lib/marketplace/grove-world.js";
+import { pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { reworkCost, temperCost, toolRecipeFor, repeatable, CRAFT_ALL_CAP
 } from "@/lib/marketplace/grove-recipes.js";
 import { rackFor, scatterFor, landingFor, bandAt, oddsForAim, rattle, qualityInBand,
@@ -150,12 +151,37 @@ async function heroLook(buyerId) {
     // game. It shipped exactly that way: the build does not run queries, the bench passes its own
     // fixtures, and the CDP probe read the bench — so every gate was green while the live Grove rendered
     // two coloured discs. Found only by signing in and looking at it. See [[postgres-landmines]].
+    // ── ⚠️ THE PET'S ART IS PICKED BY ITS LEVEL, LIKE EVERYWHERE ELSE ───────────────────────────────
+    // Luke: "I think my ladybug is not level 1. The sprite for it is level like 4, so I don't know why
+    // it's showing the level 1 sprite for my pet in the grove."
+    //
+    // Because this read `ps.url` — the row in mkt_pet_sprite, which is the Lv1 BASE — and stopped there.
+    // Every other screen in the game (the boss, the town, sailing, a profile, the card art) goes through
+    // pickPetSpriteForLevel; the Grove was the only caller that did not, so a level-six companion walked
+    // into a zone wearing the form it hatched in. PettingStand carries a comment warning about exactly
+    // this class of mistake, one layer up.
+    //
+    // ⚠️ STILL ONE ROUND TRIP. The evolved sprites, the chosen look and the enshrinement stone all join
+    // the query that was already being run rather than arriving as three more — round trips are the meter
+    // that bills, see CLAUDE.md. json_agg because a pet has up to six rungs and they are rows, not columns.
+    //
+    // ⚠️ ::text ON BOTH SIDES OF THE ENSHRINED JOIN. mkt_pet_enshrined.buyer_id is TEXT and mkt_buyer.id is
+    // UUID, and joining them raw is "operator does not exist" — which db.queryOne swallows, and the whole
+    // hero would quietly come back null. Exactly the trap cards.js documents at its own version of this.
     const row = await db.queryOne(
-        `SELECT b.avatar_sprite_url AS hero, ps.url AS pet, b.featured_collectible AS pet_id,
-                COALESCE(pl.xp, 0) AS pet_xp
+        `SELECT b.avatar_sprite_url AS hero, ps.url AS pet, ps.flip AS pet_flip,
+                b.featured_collectible AS pet_id,
+                COALESCE(pl.xp, 0) AS pet_xp, pl.look_level AS pet_look, e.stone AS pet_stone,
+                COALESCE((
+                    SELECT json_agg(json_build_object('level', sl.level, 'variant', sl.variant,
+                                                      'url', sl.url, 'flip', sl.flip))
+                      FROM mkt_pet_sprite_level sl
+                     WHERE sl.pet_id = b.featured_collectible AND sl.url IS NOT NULL
+                ), '[]'::json) AS pet_levels
            FROM mkt_buyer b
            LEFT JOIN mkt_pet_sprite ps ON ps.pet_id = b.featured_collectible
            LEFT JOIN mkt_pet_level pl ON pl.buyer_id = b.id::text AND pl.pet_id = b.featured_collectible
+           LEFT JOIN mkt_pet_enshrined e ON e.buyer_id::text = b.id::text AND e.pet_id = b.featured_collectible
           WHERE b.id = $1`, [buyerId],
     ).catch((error) => {
         // ⚠️ LOUD, THEN NULL. Falling back to "no art" is correct -- the Grove must open for somebody whose
@@ -179,9 +205,19 @@ async function heroLook(buyerId) {
     // server where the rest of the Grove's numbers live, and a tampered client cannot invent a rarity.
     const pet = row?.pet_id ? collectibleById(row.pet_id) : null;
     const petLevel = pet ? petLevelForXp(row?.pet_xp || 0, pet.rarity) : 0;
+    // The level map in the shape pickPetSpriteForLevel wants: a rung keys on its number, and level six keys
+    // as "6:light" / "6:dark" because which stone was spent is written on the animal for the rest of its life.
+    const levelMap = {};
+    for (const r of row?.pet_levels || []) {
+        levelMap[r.variant ? `${r.level}:${r.variant}` : String(r.level)] = { url: r.url, flip: r.flip === true };
+    }
+    const petPick = pet
+        ? pickPetSpriteForLevel(row?.pet ? { url: row.pet, flip: row.pet_flip === true } : null,
+            levelMap, petLevel, row?.pet_stone || null, row?.pet_look || null)
+        : null;
     return {
         heroArt: row?.hero || null,
-        petArt: row?.pet || null,
+        petArt: petPick?.url || row?.pet || null,
         // No pet equipped is a share of ZERO, which is the one case petBiteShare is never asked about: it
         // fails rarity UPWARD by design, so handing it a null rarity would arm an empty collar with a
         // primordial bite.

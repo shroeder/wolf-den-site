@@ -157,6 +157,15 @@ export const GROVE_CSS = `
     left: 50%; transform: translateX(-50%);
     bottom: calc(10px + env(safe-area-inset-bottom));
     display: flex; flex-direction: row; gap: 12px; pointer-events: auto; }
+/* ── THE SOUND SWITCH, IN THE DOCK ────────────────────────────────────────────────────────────
+   It sits with the map and the backpack rather than up beside Leave, where it was colliding with the
+   centred kill count. Slightly smaller and quieter than the four panel doors: it is a SETTING, and a
+   setting that draws the eye as hard as the workbench is a setting in the wrong place. It is also the
+   only button down here with no painted sprite, so the icon carries it. */
+.gv-zdock-sound { color: #cdd2d8; }
+.gv-zdock-sound[aria-pressed="true"] { color: #8d8f93; border-color: rgba(255,255,255,0.10); opacity: 0.78; }
+.gv-zdock-sound svg { width: 20px; height: 20px; }
+
 .gv-zdock button { width: 46px; height: 46px; border-radius: 50%; cursor: pointer; padding: 0;
     display: grid; place-items: center; font: inherit;
     background: rgba(8,12,8,0.62); border: 1px solid rgba(255,255,255,0.16);
@@ -1269,6 +1278,17 @@ export const GROVE_CSS = `
 .gv-boom.is-riposte { border-color: rgba(255,225,160,0.95); }
 .gv-boom.is-grudge { border-color: rgba(255,120,100,0.95); }
 /* The call-outs each wear their own particle's colour, so the word and the burst are one event. */
+/* ── REND ─────────────────────────────────────────────────────────────────────────────────────
+   The Reaver's word, and the only proc in the zone that had none. Arterial red, hotter than the
+   bleed ticks it starts so the CAUSE reads louder than its instalments. */
+.gv-proc.is-bleed { translate: -50% 0; color: #ff6b6b; letter-spacing: 0.2em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 14px rgba(255,70,70,0.9), 0 0 30px rgba(190,20,20,0.6); }
+
+/* And the instalments. Deeper than the call-out above and deliberately NOT the sword's cream:
+   a wound ticking is a different event from the blow that opened it. */
+.gv-num.is-bleed { color: #ff8b8b; --gv-nb: 0.88;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.9), 0 0 12px rgba(255,80,80,0.8); }
+
 .gv-proc.is-chill { translate: -50% 0; color: #bfe8ff; letter-spacing: 0.2em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 14px rgba(120,190,255,0.8); }
 .gv-proc.is-surge { translate: -50% 0; color: #ffe9a8; letter-spacing: 0.26em;

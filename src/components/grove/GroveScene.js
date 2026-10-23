@@ -1086,7 +1086,10 @@ export default function GroveScene({
             const tick = Math.max(1, Math.round(dot.dmg));
             f.hp -= tick;
             f.hurtAt = now;
-            addPop(kind === "burn" ? "burn" : "hit", `${tick}`, f.x, f.y + f.h * 0.6,
+            // ⚠️ A WOUND IS NOT A SWORD BLOW. This passed "hit" for bleed, so the damage a Reaver's
+            // whole build exists to produce arrived in the same cream as the swing that caused it —
+            // invisible as a separate thing. Burn already had its own colour; bleed now does too.
+            addPop(kind === "burn" ? "burn" : kind === "bleed" ? "bleed" : "hit", `${tick}`, f.x, f.y + f.h * 0.6,
                 popWeight(tick, f.maxHp) * 0.7);
             if (dot.leech > 0) {
                 wd.hp = Math.min(maxHp, wd.hp + Math.max(1, Math.round(tick * dot.leech)));
@@ -1664,6 +1667,23 @@ export default function GroveScene({
                     // stat worth having without making tempo pay twice.
                     if (hit.bleed) {
                         const better = !foe.bleed || hit.bleed.dmg >= foe.bleed.dmg;
+                        // ── ⚠️ AND IT SAYS SO. THE REAVER'S WHOLE IDENTITY WAS SILENT ───────────
+                        // Luke: "I'm also not seeing any of my abilities fire as a reaver ... I would
+                        // expect like cool skills to be firing. Is this like another fundamental
+                        // misalignment between you and me?"
+                        //
+                        // His class was firing the entire time — measured off his own account: bleed on
+                        // 32% of swings, crit 25%, counter 18%, and the tree worth +30% bleed chance and
+                        // +20% bleed damage. Thirteen procs in this file announce themselves with a word
+                        // (SURGE, GRUDGE, CHILLED, CATACLYSM, HASTE, WILD, GUARD, RIPOSTE, BLOCK...) and
+                        // bleed, the one a Reaver is BUILT around, was not one of them. Worse, its ticks
+                        // print through addPop("hit") — the same cream number as an ordinary sword blow.
+                        // So a third of his swings opened a wound that looked exactly like not opening one.
+                        //
+                        // ⚠️ ON THE CATCH, NOT ON THE REFRESH, and that is the same rule the fire below
+                        // already follows. A word on every swing of a 32% build is not a proc, it is a
+                        // label stuck to the screen.
+                        if (better && !foe.bleed) procCall("REND", "bleed", null, 1.2, foe);
                         if (better) {
                             foe.bleed = { dmg: hit.bleed.dmg, leech: hit.bleed.leech,
                                 left: BLEED_TICKS, nextAt: now + BLEED_TICK_MS };
@@ -3487,15 +3507,6 @@ export default function GroveScene({
                         {belt?.id ? "Belt empty" : "No belt"}
                     </button>
                 ) : null}
-                {/* ── ONE SWITCH FOR THE WHOLE ZONE ──────────────────────────────────────────────
-                    The music and the creatures are not two decisions a person wants to make — "is this
-                    forest making noise" is the whole of it — and the casino already proved that two
-                    remembered mutes in two keys can disagree across sessions with neither button saying
-                    so. So this is the arena's flag, finally reachable from the screen it silences. */}
-                <button type="button" className="gv-leave" onClick={toggleSound}
-                    aria-label={soundOff ? "Turn sound on" : "Turn sound off"} aria-pressed={soundOff}>
-                    {soundOff ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
-                </button>
                 {canNative ? (
                     <button type="button" className="gv-leave" onClick={toggleNative}
                         aria-label={isNative ? "Leave full screen" : "Full screen"}>
@@ -3517,6 +3528,26 @@ export default function GroveScene({
                 thing holding that list, so it is the thing that flushes it. */}
             {onPanel ? (
                 <nav className="gv-zdock" ref={zdockRef} aria-label="The Grove" onPointerDown={(e) => e.stopPropagation()}>
+                    {/* ── ⚠️ THE SOUND SWITCH LIVES DOWN HERE, NOT UP THERE ──────────────────────
+                        Luke: "the mute button is like conflicting with the kill count thing. And I feel
+                        like the mute button can be put somewhere else."
+
+                        It shipped in the top-right cluster next to full-screen and Leave — and that row
+                        also carries the zone's kill count, which is CENTRED on the viewport rather than
+                        laid out with them. On a phone the two met: "71 / FELLED HERE" ran under the
+                        buttons. Nothing was overlapping incorrectly, there was simply no room, and a
+                        centred thing and a right-aligned thing cannot be made to negotiate.
+
+                        The dock is where every other persistent control in the zone already is, it has
+                        room, and a mute belongs with the map and the backpack more than it belongs with
+                        the way out. */}
+                    <button type="button" className="gv-zdock-sound"
+                        title={soundOff ? "Sound off" : "Sound on"}
+                        aria-label={soundOff ? "Turn sound on" : "Turn sound off"}
+                        aria-pressed={soundOff}
+                        onClick={toggleSound}>
+                        {soundOff ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
+                    </button>
                     {ZONE_DOCK.map((d) => (
                         <button key={d.k} type="button" title={d.label}
                             aria-label={d.k === "bench" && benchReady > 0
