@@ -3064,6 +3064,71 @@ export const GROVE_CSS = `
     100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(0.35); }
 }
 
+/* ── THE COUNT-IN ─────────────────────────────────────────────────────────────────────────────
+   Over the coals, before the clock. Big, because its whole job is to be impossible to miss, and
+   it scales DOWN as it fades so the eye reads it as a beat landing rather than a thing appearing. */
+.gv-act-count { grid-area: 1 / 1; place-self: center; font-style: normal; z-index: 4;
+    font-size: 4.2rem; font-weight: 900; color: #ffe9a8; margin-top: -40px;
+    text-shadow: 0 4px 22px rgba(0,0,0,0.95), 0 0 36px rgba(255,180,60,0.6);
+    animation: gv-act-countin 560ms cubic-bezier(.2,.9,.3,1) both; }
+.gv-act-count.is-go { font-size: 2.6rem; letter-spacing: 0.16em; color: #ffd75e; }
+@keyframes gv-act-countin {
+    0%   { opacity: 0; transform: scale(1.9); }
+    28%  { opacity: 1; transform: scale(1); }
+    78%  { opacity: 1; transform: scale(0.98); }
+    100% { opacity: 0; transform: scale(0.86); }
+}
+
+/* ── HOW THAT STAGE WENT ──────────────────────────────────────────────────────────────────────
+   Luke: "every stage should let you know how you did with like colorful text and vibrations."
+   Colour IS the grade here — gold is flawless, green is clean, amber is scrappy, red is a miss —
+   so the word is legible at a glance without being read. The sub-line under it is the evidence:
+   the pump count, or three marks for three blows. */
+.gv-act-stageword { grid-area: 1 / 1; place-self: center; font-style: normal; z-index: 4;
+    display: grid; justify-items: center; gap: 2px; margin-top: -52px; white-space: nowrap;
+    font-size: 1.5rem; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase;
+    text-shadow: 0 3px 14px rgba(0,0,0,0.95);
+    animation: gv-act-stage 1700ms ease-out both; }
+.gv-act-stageword i { font-style: normal; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.22em;
+    opacity: 0.82; }
+.gv-act-stageword.is-perfect { color: #ffd75e; text-shadow: 0 3px 14px rgba(0,0,0,0.95), 0 0 30px rgba(255,200,70,0.75); }
+.gv-act-stageword.is-hit { color: #9df08a; }
+.gv-act-stageword.is-ok { color: #ffb347; }
+.gv-act-stageword.is-miss { color: #ff6b6b; }
+@keyframes gv-act-stage {
+    0%   { opacity: 0; transform: translateY(14px) scale(0.9); }
+    14%  { opacity: 1; transform: translateY(0) scale(1.06); }
+    24%  { transform: translateY(0) scale(1); }
+    76%  { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-16px); }
+}
+
+/* ── THE REVEAL ───────────────────────────────────────────────────────────────────────────────
+   Luke: "it rolled pristine, but I have no idea what that means ... should be like a huge
+   dopamine reveal of like what all of your efforts mounted up to."
+
+   ⚠️ THE MULTIPLIER IS THE HERO, NOT THE NAME. "Pristine" is an adjective; x1.60 is the thing you
+   wanted. So the number is the biggest text on the screen, the band name labels it, and the three
+   beats that earned it sit underneath — because after a good roll the question is "what did I do
+   right" and after a bad one it is "what do I fix", and those have the same answer. */
+.gv-act-reveal { display: grid; justify-items: center; gap: 1px; margin-top: 2px;
+    animation: gv-act-reveal-in 520ms cubic-bezier(.2,.9,.3,1) both; }
+.gv-act-reveal-mult { font-size: 3rem; font-weight: 900; line-height: 1; color: var(--band, #ffd75e);
+    letter-spacing: -0.02em;
+    text-shadow: 0 3px 18px rgba(0,0,0,0.9), 0 0 34px color-mix(in srgb, var(--band, #ffd75e) 60%, transparent); }
+.gv-act-reveal-band { font-size: 1.08rem; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--band, #ffd75e); }
+.gv-act-reveal-sub { font-size: 0.78rem; color: #cdd2d8; opacity: 0.85; margin-bottom: 6px; }
+.gv-act-reveal-run { display: flex; gap: 10px; margin-bottom: 9px; }
+.gv-act-reveal-run i { font-style: normal; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+    color: #cdd2d8; opacity: 0.7; padding: 3px 9px; border-radius: 999px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
+@keyframes gv-act-reveal-in {
+    0%   { opacity: 0; transform: scale(0.82); }
+    60%  { opacity: 1; transform: scale(1.04); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
 .gv-act-flash { grid-area: 1 / 1; display: grid; place-items: center; font-style: normal;
     white-space: nowrap; margin-top: -78px;
     font-size: 1.35rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; z-index: 2;

@@ -12,6 +12,10 @@ import { groveArt, toolArt } from "@/lib/marketplace/grove-catalog.js";
 // nothing to host, nothing to preload, nothing to 404 on one bar of signal — and every call is already
 // wrapped, so a blocked AudioContext is a silent craft rather than a broken screen.
 import { playHit, playPickup, playDrop, celebrateUnlock } from "@/components/grove/grove-sfx.js";
+// ⚠️ THE HAPTICS ARE THE ARENA'S, NOT A SECOND SET. Luke: "every stage should let you know how you did with
+// like colorful text and vibrations and stuff." Haptic.fire already swallows the unsupported case — iOS
+// Safari and every desktop are no-ops — so a pattern here is best-effort everywhere and never a thrown error.
+import { Haptic } from "@/components/arena/arena-audio.js";
 
 // ── THE THREE STAGES ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "its 3 separate stages with immersive background and sprite decorations, you seem to have combined it
@@ -83,6 +87,17 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     const [settled, setSettled] = useState(false);
     const [burst, setBurst] = useState(false);
     const [shake, setShake] = useState(false);
+    // ── THE COUNT-IN ────────────────────────────────────────────────────────────────────────────
+    // Luke: "the tapping mini game needs to have a little like countdown before it starts to let you
+    // know you need to tap super fast."
+    //
+    // The bellows clock used to start the instant the stage did, so the first thing a player learned
+    // about the fastest beat in the game was that a second of it had already gone. 3-2-1 is the oldest
+    // fix there is and the only honest one: the thing you are about to be judged on is announced before
+    // the judging starts. null means the count is over and the coals are live.
+    const [countIn, setCountIn] = useState(3);
+    // What the stage you just finished was worth, said out loud. Cleared when the next one begins.
+    const [stageSay, setStageSay] = useState(null);
 
     const raf = useRef(0);
     const posted = useRef(false);
@@ -101,13 +116,52 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     // ⚠️ rAF with the elapsed time read from the CLOCK, never counted in ticks. A backgrounded tab would
     // leave the bellows running, and the first frame can predate the start — see
     // [[negative-dt-first-frame]], which dropped every body in the Grove through the floor for a day.
+    // The stage word says its piece and goes. ⚠️ CLEARED ON A TIMER rather than an animation event: an
+    // animationend never fires if the element is not painted, and a verdict that never clears would sit
+    // across the anvil for the rest of the craft. Same reason the Grove's herald does it this way.
     useEffect(() => {
-        if (stage !== STAGE.fire) return undefined;
+        if (!stageSay) return undefined;
+        const t = setTimeout(() => setStageSay(null), 1700);
+        return () => clearTimeout(t);
+    }, [stageSay]);
+
+    // ⚠️ ITS OWN CLOCK, AND THE HEAT CLOCK WAITS ON IT. One tick a second, a rising blip and a pulse in the
+    // hand on each, then "TAP!" — which is the only word on the screen that is an instruction rather than a
+    // label. Running it inside the heat effect instead would mean the bellows were already burning down
+    // while the three was on screen, which is the exact bug this exists to fix.
+    useEffect(() => {
+        if (stage !== STAGE.fire || countIn == null) return undefined;
+        const t = setTimeout(() => {
+            setCountIn((n) => {
+                if (n == null) return null;
+                if (n <= 1) { Haptic.fire([0, 34]); playHit(7); return null; }
+                Haptic.fire([0, 12]); playHit(2 + (3 - n) * 2);
+                return n - 1;
+            });
+        }, countIn === 3 ? 450 : 620);
+        return () => clearTimeout(t);
+    }, [stage, countIn]);
+
+    useEffect(() => {
+        if (stage !== STAGE.fire || countIn != null) return undefined;
         const t0 = performance.now();
         const tick = () => {
             const left = Math.max(0, HEAT_MS - Math.max(0, performance.now() - t0));
             setHeatLeft(left);
             if (left <= 0) {
+                // ── HOW THE FIRE WENT, SAID OUT LOUD ────────────────────────────────────────────
+                // Luke: "every stage should let you know how you did with like colorful text and
+                // vibrations and stuff." The heat bar emptied and the room simply changed; whether
+                // you had pumped it to temperature or half-filled it was never stated, so there was
+                // nothing to do better next time. The word is graded off the same heatScore the
+                // plinko scatter is, so it cannot flatter you.
+                const h = heatScore(taps);
+                const g = h >= 0.99 ? { id: "perfect", word: "WHITE HOT" }
+                    : h >= 0.75 ? { id: "hit", word: "HOT ENOUGH" }
+                    : h >= 0.4 ? { id: "ok", word: "WARM" }
+                    : { id: "miss", word: "COLD" };
+                setStageSay({ ...g, sub: `${taps} pumps`, at: "fire" });
+                Haptic.fire(g.id === "perfect" ? [0, 26, 40, 26, 40, 60] : g.id === "miss" ? [0, 90] : [0, 30, 50, 20]);
                 setStage(STAGE.shaping);
                 setArmedAt(performance.now() + HAND_OFF_MS);
                 setArmed(false);
@@ -117,7 +171,7 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         };
         raf.current = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf.current);
-    }, [stage]);
+    }, [stage, countIn, taps]);
 
     // ── ⚠️ THE MARKER WAITS FOR THE HAND-OFF, AND SO DOES THE ANVIL ─────────────────────────────────
     // Parking the marker rather than only ignoring the tap is the half that makes it fair: a window
@@ -196,9 +250,27 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         const grade = strikeGrade(marker);
         const next = [...hits, grade];
         playHit(hits.length * 3, grade.id === "perfect");
+        // ⚠️ IN THE HAND, ON THE FRAME. Luke: "it just doesn't have the same pop that our other timing
+        // minigames have to, where you know right away when you hit the button whether you did good or
+        // bad." The flash and the sparks were already here; what was missing is the half of the feedback
+        // that arrives before your eyes have moved — a perfect is a double kick, a miss is one dead thud.
+        Haptic.fire(grade.id === "perfect" ? [0, 18, 30, 44]
+            : grade.id === "hit" ? [0, 26] : [0, 70]);
         setFlash({ ...grade, at: marker });
         setHits(next);
-        if (next.length >= STRIKES) setStage(STAGE.setting);
+        if (next.length >= STRIKES) {
+            // The shaping, graded as a whole: three blows, and what they came to.
+            const perfect = next.filter((h) => h.id === "perfect").length;
+            const missed = next.filter((h) => h.id === "miss").length;
+            const g = perfect === STRIKES ? { id: "perfect", word: "FLAWLESS" }
+                : missed === STRIKES ? { id: "miss", word: "ALL MISSED" }
+                : missed === 0 ? { id: "hit", word: "CLEAN" }
+                : { id: "ok", word: "ROUGH SHAPING" };
+            setStageSay({ ...g, at: "shaping",
+                sub: next.map((h) => (h.id === "perfect" ? "●" : h.id === "hit" ? "◐" : "○")).join(" ") });
+            Haptic.fire(g.id === "perfect" ? [0, 30, 40, 30, 40, 80] : g.id === "miss" ? [0, 110] : [0, 34, 50, 24]);
+            setStage(STAGE.setting);
+        }
         setTimeout(() => setFlash(null), 420);
     }, [stage, hits, marker, armedAt]);
 
@@ -280,6 +352,19 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                             } : undefined} />
                     ) : null}
                     {flash ? <em className={`gv-act-flash is-${flash.id}`}>{flash.label}</em> : null}
+                    {/* The count, over the coals, before anything is being measured. */}
+                    {stage === STAGE.fire && countIn != null ? (
+                        <em key={countIn} className="gv-act-count">{countIn}</em>
+                    ) : null}
+                    {stage === STAGE.fire && countIn == null && taps === 0 ? (
+                        <em className="gv-act-count is-go">TAP!</em>
+                    ) : null}
+                    {/* How the stage you just left went. Keyed so a repeat grade still re-animates. */}
+                    {stageSay ? (
+                        <em key={`${stageSay.at}-${stageSay.word}`} className={`gv-act-stageword is-${stageSay.id}`}>
+                            {stageSay.word}<i>{stageSay.sub}</i>
+                        </em>
+                    ) : null}
                     {/* Sparks off the anvil on every blow, in the colour the blow earned. */}
                     {stage === STAGE.shaping && flash ? (
                         <span className={`gv-act-sparks is-${flash.id}`} aria-hidden="true">
@@ -413,12 +498,43 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                         </p>
 
                         {settled && result ? (
-                            <button type="button"
-                                className={`gv-act-hit is-band is-${result.set.band}`}
-                                style={{ "--band": bandTint(result.set.band), "--band-ink": bandInk(result.set.band) }}
-                                onPointerDown={() => onClose(result)}>
-                                {QUALITY_BANDS.find((b) => b.id === result.set.band)?.name || "Done"}
-                            </button>
+                            // ── ⚠️ THE PAYOFF, AND IT USED TO BE A BUTTON WITH A WORD ON IT ─────────
+                            // Luke: "here you can see like it rolled pristine, but I have no idea what
+                            // that means. Like there's, this is the moment you're missing where it's a
+                            // huge, should be like a huge dopamine reveal of like what all of your
+                            // efforts mounted up to."
+                            //
+                            // Three beats of a craft -- a flurry on the bellows, three timed blows, an
+                            // aimed drop -- all landed on the word "Pristine" in a yellow pill, and
+                            // "Pristine" is an adjective. It never said the one number that makes it
+                            // worth wanting: a band is a MULTIPLIER on the piece's stats, and x1.60 is
+                            // a sentence anybody can read.
+                            //
+                            // So the reveal states the multiplier as the hero, names the band under it,
+                            // and shows the three beats that produced it -- because the question after a
+                            // good roll is "what did I do right", and after a bad one it is "what do I
+                            // fix", and both answers are the same three marks.
+                            <div className={`gv-act-reveal is-${result.set.band}`}
+                                style={{ "--band": bandTint(result.set.band), "--band-ink": bandInk(result.set.band) }}>
+                                <b className="gv-act-reveal-mult">
+                                    x{(QUALITY_BANDS.find((b) => b.id === result.set.band)?.mult || 1).toFixed(2)}
+                                </b>
+                                <span className="gv-act-reveal-band">
+                                    {QUALITY_BANDS.find((b) => b.id === result.set.band)?.name || "Done"}
+                                </span>
+                                <span className="gv-act-reveal-sub">to every stat on it</span>
+                                <span className="gv-act-reveal-run" aria-hidden="true">
+                                    <i>{taps} pumps</i>
+                                    <i>{hits.map((h) => (h.id === "perfect" ? "●" : h.id === "hit" ? "◐" : "○")).join(" ")}</i>
+                                    <i>{Math.round(score * 100)}% work</i>
+                                </span>
+                                <button type="button"
+                                    className={`gv-act-hit is-band is-${result.set.band}`}
+                                    style={{ "--band": bandTint(result.set.band), "--band-ink": bandInk(result.set.band) }}
+                                    onPointerDown={() => onClose(result)}>
+                                    Take it
+                                </button>
+                            </div>
                         ) : result ? (
                             <span className="gv-act-work">the work is {Math.round(score * 100)}%</span>
                         ) : (
