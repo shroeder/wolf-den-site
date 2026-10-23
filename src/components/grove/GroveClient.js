@@ -9,7 +9,7 @@ import {
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import {
-    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, groveArt, toolArt, zoneHasParts,
+    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, emblemArt, groveArt, toolArt, zoneHasParts,
 } from "@/lib/marketplace/grove-catalog.js";
 import { useWishlist } from "@/components/grove/useWishlist.js";
 import GroveBench from "@/components/grove/GroveBench";
@@ -925,13 +925,40 @@ export default function GroveClient({ initial }) {
                             {(st.emblems || []).filter((e) => e.count > 0).map((e) => {
                                 const meta = GROVE_EMBLEMS[e.id];
                                 const next = e.next;
+                                const face = emblemArt(e.id);
                                 return (
-                                    <div key={e.id} className="gv-em">
-                                        <b style={{ color: e.rung?.color || "#8d8577" }}>{e.stars ? "★".repeat(e.stars) : "—"}</b>
+                                    <div key={e.id} className={`gv-em${e.stars ? "" : " is-dormant"}`}>
+                                        {/* ── ⚠️ THE MONSTER, NOT A DASH ──────────────────────────────
+                                            Luke: "I want emblems to be the unique monster cards ... there
+                                            has to be like sprites associated with this stuff, because
+                                            otherwise I'm getting confused and we built it together."
+
+                                            Every emblem is named after a creature and every one of those
+                                            has been drawn — The Bristleback IS the badger. The panel was
+                                            showing a star count where the face should be, so a shelf of
+                                            collectibles read as a spreadsheet, which is most of why it was
+                                            being confused with the merits panel beneath it. The stars moved
+                                            onto the card as a corner, where a rung belongs. */}
+                                        <span className="gv-em-face">
+                                            {face ? <img src={face} alt="" width={46} height={46} loading="lazy" /> : null}
+                                            {e.stars ? (
+                                                <i style={{ color: e.rung?.color || "#8d8577" }}>{"★".repeat(e.stars)}</i>
+                                            ) : null}
+                                        </span>
                                         <div>
                                             <b>{meta?.name || e.id}</b>
-                                            <p>+{(meta?.per || 0) * (e.stars || 0)}{meta?.kind === "pct" ? "%" : ""} {String(meta?.stat || "").replace(/_/g, " ")}
-                                                {meta?.global ? <em> · everywhere</em> : null}</p>
+                                            {/* ⚠️ A DORMANT EMBLEM SAYS WHAT IT NEEDS, NOT "+0". Below the
+                                                first rung an emblem pays nothing, and printing "+0 armour"
+                                                on a thing you are WEARING reads as broken rather than as
+                                                not-yet-earned. The number appears when there is one. */}
+                                            {e.stars ? (
+                                                <p>+{(meta?.per || 0) * e.stars}{meta?.kind === "pct" ? "%" : ""} {String(meta?.stat || "").replace(/_/g, " ")}
+                                                    {meta?.global ? <em> · everywhere</em> : null}</p>
+                                            ) : (
+                                                <p className="gv-em-dormant">
+                                                    {next ? `${next.at - e.count} more to wake its ${String(meta?.stat || "bonus").replace(/_/g, " ")}` : "not yet earning"}
+                                                </p>
+                                            )}
                                             <small>{e.count} collected{next ? ` · ${next.at - e.count} to ${next.label}` : " · maxed"}</small>
                                         </div>
                                         <button type="button" disabled={e.slot !== null && e.slot !== undefined}

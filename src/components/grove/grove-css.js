@@ -2715,6 +2715,26 @@ export const GROVE_CSS = `
 .gv-elist { display: flex; flex-direction: column; gap: 8px; }
 .gv-em { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 11px;
     background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.10); }
+/* ── THE MONSTER CARD'S FACE ──────────────────────────────────────────────────────────────────
+   A framed plate with the creature in it and its rung in the corner — the shape of a collectible
+   rather than a row in a table. This is the single change that stops the emblem shelf reading as
+   the merits panel below it: one of them has pictures of animals on it. */
+.gv-em-face { position: relative; flex: 0 0 auto; width: 54px; height: 54px; border-radius: 10px;
+    display: grid; place-items: center; overflow: visible;
+    background: radial-gradient(120% 120% at 50% 15%, rgba(255,255,255,0.09), rgba(0,0,0,0.3) 70%);
+    border: 1px solid rgba(255,255,255,0.14); }
+.gv-em-face img { width: 46px; height: 46px; object-fit: contain;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.75)); }
+.gv-em-face i { position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%);
+    font-style: normal; font-size: 0.56rem; letter-spacing: -0.04em; white-space: nowrap;
+    padding: 1px 5px; border-radius: 999px; background: rgba(8,10,8,0.92);
+    border: 1px solid rgba(255,255,255,0.16); }
+
+/* Below the first rung an emblem pays nothing. It is DIMMED rather than marked wrong — it is not
+   broken, it is unfinished, and the line beside it says how much more. */
+.gv-em.is-dormant .gv-em-face { opacity: 0.55; filter: saturate(0.4); }
+.gv-em-dormant { color: #8d8577 !important; font-style: italic; }
+
 .gv-em > b { font-size: 0.9rem; letter-spacing: .04em; min-width: 62px; }
 .gv-em > div { flex: 1; min-width: 0; }
 .gv-em p { margin: 2px 0; font-size: 0.8rem; color: #cfc6b6; }

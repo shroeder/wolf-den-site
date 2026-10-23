@@ -213,6 +213,43 @@ export const GROVE_EMBLEMS = {
     ...Object.fromEntries(Object.entries(MAP_EMBLEMS).filter(([, e]) => mapIsBuilt(e.map))),
 };
 
+// ── ⚠️ AN EMBLEM IS A MONSTER CARD, SO IT HAS TO SHOW THE MONSTER ───────────────────────────────────────────
+// Luke: "I want emblems to be the unique monster cards ... there has to be like sprites associated with this
+// stuff, because otherwise I'm getting confused and we built it together."
+//
+// The panel listed them as text — "The Bristleback / +0 armour / 1 collected" — beside a dash where a
+// picture should be. Every one of them is NAMED AFTER A CREATURE and every one of those creatures has been
+// drawn: The Bristleback is the badger, The Warren Mother is the warren mother, The Crystal-Touched is the
+// Crystal Stag. A collectible you cannot look at is a row in a table, and a row in a table is why it was
+// being confused with the merits panel under it.
+//
+// ⚠️ DERIVED, NOT A SECOND TABLE. The link already exists in the other direction — a creature names the
+// emblem it drops — so this reads that rather than adding an `art` field to thirteen emblems that would be
+// one more thing to forget when a map ships. Wanderers win over bosses: an emblem is the thing you get for
+// killing the ordinary resident a thousand times, so the ordinary resident is its face.
+// ⚠️ BUILT ON FIRST ASK, NOT AT MODULE LOAD. The rosters it reads are declared further down this file, so
+// an IIFE here is a temporal-dead-zone crash on import — which took the whole catalogue down, and the
+// catalogue is imported by every screen in the game. Lazy also means the order of this file stays free to
+// change without this quietly becoming the thing that breaks.
+let EMBLEM_FACE = null;
+function emblemFaces() {
+    if (EMBLEM_FACE) return EMBLEM_FACE;
+    const out = {};
+    for (const e of Object.values(GROVE_ENEMIES || {})) {
+        if (e?.emblem && e.art && !out[e.emblem]) out[e.emblem] = e.art;
+    }
+    for (const b of Object.values(GROVE_BOSSES || {})) {
+        if (b?.emblem && b.art && !out[b.emblem]) out[b.emblem] = b.art;
+    }
+    // The rare spawn's emblem is the rare spawn.
+    if (GROVE_RARE?.emblem && GROVE_RARE.art) out[GROVE_RARE.emblem] = GROVE_RARE.art;
+    EMBLEM_FACE = out;
+    return out;
+}
+
+/** The creature on an emblem's card. Null when nothing has been drawn for it yet. */
+export const emblemArt = (id) => emblemFaces()[id] || null;
+
 // ── ⚠️ THE CURVE IS ANCHORED TO TWO REAL MEMBERS, AND THE HIGH ANCHOR IS MAP 12 ──────────────────────────
 // Luke: "Lets make it so eric would have a tough time with map 12 first zone. I say that to give you the
 // linear growth line. And consider that this is the grove, multiple enemies, different levels of aggression.
