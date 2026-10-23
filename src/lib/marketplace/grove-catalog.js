@@ -541,22 +541,22 @@ const B = (id, name, o) => ({ id, name, art: `/images/grove/boss-${id}.webp`, bo
 // fight; do not divide two numbers. See [[balance-real-bouts-not-sims]] for the other half of that rule.
 const MAP_ONE_BOSSES = {
     glutmaw: B("glutmaw", "Glutmaw, the Burrow King", {
-        hp: 59000, dmg: [191, 260], emblem: "em_rootrat", emblemChance: 0.09,
+        hp: 59000, dmg: [190, 260], emblem: "em_rootrat", emblemChance: 0.09,
         attacks: [A.slam, A.sweep],
         loot: [{ part: "gnawed_root", n: [4, 7] }, { part: "damp_moss", n: [3, 5] }],
     }),
     mossmother: B("mossmother", "The Mossmother", {
-        hp: 67700, dmg: [191, 269], emblem: "em_grub", emblemChance: 0.09,
+        hp: 67700, dmg: [190, 270], emblem: "em_grub", emblemChance: 0.09,
         attacks: [A.slam, A.volley],
         loot: [{ part: "grub_fat", n: [4, 7] }, { part: "damp_moss", n: [3, 6] }],
     }),
     thistlecrown: B("thistlecrown", "Thistlecrown", {
-        hp: 76800, dmg: [191, 269], emblem: "em_thornling", emblemChance: 0.10,
+        hp: 76800, dmg: [190, 270], emblem: "em_thornling", emblemChance: 0.10,
         attacks: [A.sweep, A.slam, A.volley],
         loot: [{ part: "thorn_barb", n: [4, 8] }, { part: "gnawed_root", n: [3, 6] }],
     }),
     grandfather_bristle: B("grandfather_bristle", "Grandfather Bristle", {
-        hp: 86300, dmg: [191, 280], emblem: "em_badger", emblemChance: 0.10,
+        hp: 86300, dmg: [190, 280], emblem: "em_badger", emblemChance: 0.10,
         attacks: [A.slam, A.sweep],
         loot: [{ part: "bristle_hide", n: [4, 7] }, { part: "split_antler", n: [2, 4] }],
     }),
@@ -571,32 +571,32 @@ const MAP_ONE_BOSSES = {
         loot: [{ part: "bound_straw", n: [5, 9] }, { part: "gourd_rind", n: [3, 6] }],
     }),
     barrow_warden: B("barrow_warden", "The Barrow Warden", {
-        hp: 118000, dmg: [200, 291], emblem: "em_barrowhound", emblemChance: 0.11,
+        hp: 118000, dmg: [200, 290], emblem: "em_barrowhound", emblemChance: 0.11,
         attacks: [A.slam, A.volley, A.sweep],
         loot: [{ part: "barrow_tooth", n: [5, 9] }, { part: "bristle_hide", n: [3, 6] }],
     }),
     great_weaver: B("great_weaver", "The Great Weaver", {
-        hp: 129000, dmg: [200, 291], emblem: "em_warren", emblemChance: 0.11,
+        hp: 129000, dmg: [200, 290], emblem: "em_warren", emblemChance: 0.11,
         attacks: [A.volley, A.sweep],
         loot: [{ part: "warren_silk", n: [5, 9] }, { part: "barrow_tooth", n: [3, 6] }],
     }),
     lanternwing: B("lanternwing", "The Lanternwing", {
-        hp: 141000, dmg: [211, 291], emblem: "em_voidmoth", emblemChance: 0.12,
+        hp: 141000, dmg: [210, 290], emblem: "em_voidmoth", emblemChance: 0.12,
         attacks: [A.volley, A.slam, A.sweep],
         loot: [{ part: "mothlight_dust", n: [5, 9] }, { part: "warren_silk", n: [3, 6] }],
     }),
     everburning: B("everburning", "The Everburning", {
-        hp: 154000, dmg: [211, 300], emblem: "em_ashwraith", emblemChance: 0.12,
+        hp: 154000, dmg: [210, 300], emblem: "em_ashwraith", emblemChance: 0.12,
         attacks: [A.sweep, A.volley, A.slam],
         loot: [{ part: "ash_ember", n: [5, 10] }, { part: "rotwood_knot", n: [3, 6] }],
     }),
     stakelord: B("stakelord", "Gorrak the Stakelord", {
-        hp: 167000, dmg: [211, 300], emblem: "em_goblin", emblemChance: 0.12,
+        hp: 167000, dmg: [210, 300], emblem: "em_goblin", emblemChance: 0.12,
         attacks: [A.slam, A.volley, A.sweep],
         loot: [{ part: "goblin_rivet", n: [6, 10] }, { part: "ash_ember", n: [3, 6] }],
     }),
     heartwood_elder: B("heartwood_elder", "The Heartwood Elder", {
-        hp: 180000, dmg: [220, 309], emblem: "em_elder", emblemChance: 0.14,
+        hp: 180000, dmg: [220, 310], emblem: "em_elder", emblemChance: 0.14,
         attacks: [A.sweep, A.slam, A.volley],
         loot: [{ part: "elder_heartwood", n: [4, 8] }, { part: "rotwood_knot", n: [4, 7] }],
     }),
