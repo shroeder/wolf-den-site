@@ -36,6 +36,7 @@ const PREVIEW_GUESTS = {
     // him, and revoking this is deleting one line.
     grove: new Set([
         "27da67c2-8548-453f-bda4-4349c0e4ef06", // Littlewolf
+        "9db11753-f826-4a4f-8ad9-41e19bc45fe4", // Adam Malz (smalz123@) — registered 2026-10-22
     ]),
 };
 
