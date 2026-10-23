@@ -141,8 +141,24 @@ export const actBias = (act) => actScore(clampAct(act)) * ACT_MAX_BIAS;
 // which is a far more legible punishment than a hole. Anything that scatters off either edge is a Rough,
 // the same as the band it was next to.
 
-/** How many rows of pegs the piece rattles through. Purely how long the fall LOOKS; it decides nothing. */
-export const PEG_ROWS = 9;
+// ── ⚠️ EIGHTEEN ROWS, AND THE FALL IS A RANDOM WALK NOW ──────────────────────────────────────────────────────
+// Luke: "the Plinko minigame needs to be like twice as many vertical pegs, because right now it basically just
+// deviates like 5% left or right ... it just feels like it drops basically straight down. So it kind of
+// defeats the whole point."
+//
+// He is right about what he SAW and the cause was not the odds. The landing has always been a real roll —
+// a Thornfield Hoe on screen read 11% Masterwork / 34% Pristine / 44% Fine / 11% Sound, which is a genuinely
+// wide spread — but `rattle` drew a straight LERP from the middle to that answer with a wobble that decayed
+// to nothing. So a piece that had rolled its way across a third of the rack was animated sliding politely
+// down the centre line. The fall contradicted the roll it was reporting.
+//
+// Nine rows made that worse: fewer pegs is less chance to be thrown, and the eye reads nine evenly-spaced
+// deflections as a ramp rather than as chaos.
+export const PEG_ROWS = 18;
+
+// How far one peg can throw the piece, as a share of the rack. The walk's spread at its widest is about
+// KICK x sqrt(ROWS) / 2 — roughly a seventh of the rack either way at these numbers, which is several slots.
+const PEG_KICK = 0.055;
 
 /**
  * The rack: symmetric, jackpot in the middle, value falling away to both edges.
@@ -260,12 +276,34 @@ export function rattle(at, seed) {
     const start = 0.5;
     let x = ((Math.floor(Number(seed) || 1) + 17) * 2246822519) >>> 0;
     const rnd = () => { x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+
+    // ── A BROWNIAN BRIDGE ────────────────────────────────────────────────────────────────────────────────
+    // Every peg throws the piece one way or the other — a free random walk, which is what a plinko board
+    // physically IS. Then the walk's own accumulated drift is subtracted back out in proportion to how far
+    // it has fallen, which pins it to the landing the server already chose WITHOUT straightening the middle.
+    //
+    // ⚠️ THAT IS THE WHOLE TRICK, AND IT IS WHY THIS IS NOT JUST A BIGGER WOBBLE. A wobble added to a line
+    // has to shrink as it approaches the end or it would miss; shrinking is exactly what made the old fall
+    // read as guided. A bridge wanders MOST in the middle of the drop and converges only because the walk
+    // is being corrected by a share that grows — so the piece is still being thrown about at row twelve and
+    // still lands on the millimetre at row eighteen.
+    const walk = [];
+    let w = 0;
+    for (let r = 0; r < PEG_ROWS; r += 1) {
+        w += (rnd() < 0.5 ? -PEG_KICK : PEG_KICK);
+        walk.push(w);
+    }
+    const drift = walk[walk.length - 1];
     const out = [];
     for (let r = 0; r < PEG_ROWS; r += 1) {
         const t = (r + 1) / PEG_ROWS;
-        const wobble = (rnd() - 0.5) * 0.2 * (1 - t) ** 1.25;
-        out.push(end * t + start * (1 - t) + wobble);
+        const bridge = walk[r] - drift * t;
+        // Held just inside the board: a piece that visibly leaves the pegs and comes back reads as a bug,
+        // and the rack's outermost band starts at the edge anyway.
+        out.push(Math.max(0.03, Math.min(0.97, start + (end - start) * t + bridge)));
     }
+    // ⚠️ THE LAST ROW IS THE LANDING, EXACTLY — never the clamp. check-craft-act asserts this to 1e-12 and
+    // it is the line that keeps the animation from ever contradicting the grant.
     out[out.length - 1] = end;
     return out;
 }
