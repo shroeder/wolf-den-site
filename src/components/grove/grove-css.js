@@ -1304,6 +1304,18 @@ export const GROVE_CSS = `
 .gv-num.is-soul { color: #e3b8ff; --gv-nb: 0.9;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(190,120,255,0.9); }
 
+/* ── MULTI-KILL ───────────────────────────────────────────────────────────────────────────────
+   ⚠️ IT IS NOT A DAMAGE NUMBER AND MUST NOT LOOK LIKE ONE. Every other number thrown off a creature
+   reports what came off its health; this one reports how much of the ZONE just closed, and it is thrown
+   from the same body on the same frame as the hit that caused it. Cream or gold here and the player
+   reads two damage numbers and wonders which is real.
+
+   So: green, which in this scene belongs to progress and pickup (the loot label and the pet's bite),
+   bigger than a crit, and the only number in the game that is wider than it is tall. */
+.gv-num.is-multi { color: #9df08a; --gv-nb: 1.72; font-weight: 900; letter-spacing: 0.06em;
+    -webkit-text-stroke: 0.07em rgba(10,20,8,0.92);
+    text-shadow: 0 2px 7px rgba(0,0,0,0.95), 0 0 18px rgba(120,255,110,0.85), 0 0 38px rgba(60,200,60,0.5); }
+
 /* ── THE WARDEN'S ANSWER ──────────────────────────────────────────────────────────────────────
    Steel rather than heat. Every other call-out in here is something the player DID to a creature --
    a crit, a haste proc, a poultice -- and this one is something that did not happen to them, which is

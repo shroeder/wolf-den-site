@@ -7,7 +7,7 @@ import { GiSoundOff, GiSoundOn } from "react-icons/gi";
 import { useWishlist } from "./useWishlist.js";
 
 import {
-    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, dropsAnyOf, HEAL_AT, scaledFoe, scaledRare, groveDepth, groveBoss, groveSize, grovePart,
+    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, dropsAnyOf, HEAL_AT, scaledFoe, scaledRare, killCredit, groveBoss, groveSize, grovePart,
     groveArt, groveEmblem, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
@@ -52,7 +52,7 @@ import {
 } from "@/lib/marketplace/grove-juice.js";
 import { footOf } from "@/components/grove/grove-foot.js";
 import {
-    playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice, playDeath,
+    playHit, playKill, playMulti, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice, playDeath,
     playPetHit, playQuaff,
     playFreeze, playStun, playChill, playCataclysm, playSoulfire, playSurge,
     playGuard, playBlock, playRiposte, playGrudge, playIgnite, playWild,
@@ -603,7 +603,17 @@ export default function GroveScene({
             sparks: [],
             pops: [],
             killLog: [],
+            // ── ⚠️ TWO NUMBERS, BECAUSE THEY ARE TWO FACTS ──────────────────────────────────────
+            // `killIndex` is how many creatures have died, and it is the LOOT STREAM'S INDEX: the server
+            // replays killRng(seed, i) against it to re-roll exactly what the scene showed falling, and
+            // the spawner derives the next body's seed from it too. It must count bodies and nothing else.
+            //
+            // `killCredit` is how much of the zone has been cleared, and multi-kill means it is no longer
+            // the same number — one blow worth four credits moves the door four steps and still rolls one
+            // drop. Keeping one counter for both would have made an overkill pay four times the loot, which
+            // is a drop-rate multiplier bolted to gear. See killCredit in grove-catalog.js.
             killIndex: 0,
+            killCredit: 0,
             target: null,
             moveTo: null,
             swingAt: null,
@@ -681,7 +691,7 @@ export default function GroveScene({
     // `gen` is a dependency because killIndex is a mutable field: the loop bumps gen on every kill, and
     // without it React has no reason to read the number again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const killsHere = useMemo(() => (Number(zone.kills) || 0) + (world.killIndex || 0), [zone.kills, world, gen]);
+    const killsHere = useMemo(() => (Number(zone.kills) || 0) + (world.killCredit || 0), [zone.kills, world, gen]);
 
     // ── SPAWNING ────────────────────────────────────────────────────────────────────────────────────
     // Luke: "15 to 30 enemies, fully replenishing every 45 seconds."
@@ -700,11 +710,21 @@ export default function GroveScene({
             const i = w.killIndex + w.foes.length;
             const isRare = rollRareSpawn(GROVE_RARE.spawnChance, seed, i, bonuses);
             const pickId = zone.enemies[Math.floor(w.rand() * zone.enemies.length)];
-            // ⚠️ DEPTH, NOT `zone.n` — see groveDepth. A zone number restarts on every map, so scaling
-            // against it would have made map 2 a second tutorial. `zone.map` is absent on map 1's zones and
-            // groveDepth reads that as map 1, which is why this is the same number today and the right one
-            // the day a second map lands. The rare climbs with everything else now.
-            const depth = groveDepth(zone.map, zone.n);
+            // ── ⚠️ `zone.n` IS ALREADY GLOBAL DEPTH. IT WAS BEING COUNTED TWICE ────────────────
+            // This read groveDepth(zone.map, zone.n) on the stated theory that "a zone number restarts on
+            // every map". That was true of the DESIGN and never true of the data: MAP_ZONES sets `n: depth`
+            // (grove-maps.js), and grove.js has always treated it that way — GROVE_ZONES[zone.n] for the
+            // next zone, `zone.n > unlocked_n` for the lock. Map one's twelve happen to equal their depth,
+            // which is exactly why it looked right for as long as there was only one map.
+            //
+            // So every map after the first added its own offset a second time. Map 7 zone 1 spawned at
+            // depth 145 instead of 73 — and the climb compounds at 4.48% a zone, so that is not a 2x error,
+            // it is 23x the health. The whole back half of the built game was a wall nobody designed.
+            //
+            // Luke, on the fix: "making it easier sounds good because it's too difficult." Bosses never had
+            // this — scaledFoe is the only caller and it refuses to touch a boss — so this moves wanderers
+            // and the rare spawn alone. groveDepth is gone with its last caller.
+            const depth = Math.max(1, Number(zone.n) || 1);
             const base = isRare ? scaledRare(depth) : scaledFoe(pickId, depth);
             const id = isRare ? GROVE_RARE.id : pickId;
             const size = groveSize(id);
@@ -745,7 +765,7 @@ export default function GroveScene({
         // Same arithmetic the server does, against the count that is actually running. The cooldown
         // still comes from the server, because a timer the client computes is a timer the client can
         // argue with — and `bossClaimed` still stops him standing back up inside one session.
-        const liveKills = (Number(zone.kills) || 0) + w.killIndex;
+        const liveKills = (Number(zone.kills) || 0) + w.killCredit;
         const bossReadyNow = liveKills >= zone.toUnlock && (Number(zone.bossWaitMs) || 0) <= 0;
         if (bd && bossReadyNow && !w.boss && !w.bossClaimed) {
             const bsz = groveSize(bd.id, { boss: true });
@@ -886,7 +906,11 @@ export default function GroveScene({
             // second one is the answer.
             window.__grove = w;
             if (labScene !== "wander") {
-                const named = setUpLabScene(w, labScene);
+                // ⚠️ THE BENCH'S OWN BLOW, HANDED IN. The "multi" scene sizes its creatures against what
+                // this fixture actually swings for, so the four rungs land wherever the kit is tuned
+                // rather than against a number copied out of here and left to drift.
+                const named = setUpLabScene(w, labScene,
+                    Math.round((Number(stats?.damage) || 34) * (1 + (Number(stats?.dmgPct) || 0))));
                 if (named) w.barName = named;
                 // ⚠️ AND THE CAMERA GOES WITH HIM, OR THE SCENE FILMS ITS OWN PAN. camRef eases toward the
                 // hero at about 5.5% a frame from wherever it was, and a lab scene teleports him — so
@@ -1184,7 +1208,9 @@ export default function GroveScene({
         // ── ⚠️ ONE FUNCTION PAYS A KILL, AND BOTH CALLERS GO THROUGH IT ───────────────────────────
         // Two paths for one payout always drift — see atomic-split-into-steps-drops-lines, which this repo
         // has now paid for twice.
-        const killFoe = (wd, foe, now) => {
+        // `dealt` is the damage of the blow that landed the kill — what multi-kill is measured against.
+        // A damage-over-time tick passes nothing, because the fifth tick of a bleed is not one strike.
+        const killFoe = (wd, foe, now, dealt = 0) => {
             const crit = foe.lastCrit;
             wd.clock.stop(now, HITSTOP_MS.kill);
             wd.shake.add(foe.isBoss ? TRAUMA.boss : TRAUMA.kill);
@@ -1259,9 +1285,33 @@ export default function GroveScene({
                 && (f.hit || !f.passive));
             wd.target = nextUp || null;
 
+            // ── MULTI-KILL ──────────────────────────────────────────────────────────────────────
+            // Luke: "if you kill an enemy in one strike, and it does over twice their health, then it
+            // counts for two kills... 4x overkill, and it counts for 4, etc."
+            //
+            // The rule itself is in grove-catalog.js, shared with the server — this is only the place that
+            // knows how hard the last blow hit. `c` rides on the kill log entry so the settle can credit
+            // the zone with it; it is left OFF an ordinary kill rather than written as 1, because the log
+            // is a payload sent every forty-five seconds and a field that is always the same value on
+            // ninety-odd percent of rows is bytes for nothing.
+            const credit = killCredit(dealt, foe.maxHp);
             const i = wd.killIndex;
             wd.killIndex += 1;
-            wd.killLog.push({ id: foe.id, i });
+            wd.killCredit += credit;
+            wd.killLog.push(credit > 1 ? { id: foe.id, i, c: credit } : { id: foe.id, i });
+
+            // ⚠️ AND IT HAS TO BE SEEN, OR IT IS A NUMBER CHANGING FASTER ON A DOOR. The door's readout
+            // would simply jump by four with nothing to say why, which reads as a counting bug rather than
+            // as a reward. Thrown straight up off the body, held a full second, with the kill chime pitched
+            // up the same way the combo pitches it — a louder version of the thing that already means
+            // "that one counted".
+            if (credit > 1) {
+                addPop("multi", `x${credit}`, foe.x, foe.y + foe.h * 0.95);
+                // ⚠️ NOT A SECOND playKill. The ordinary kill chime fires below for every kill and already
+                // climbs with the streak; another one on the same frame is two chimes, not a bigger one.
+                // playMulti plays one note per credit OVER it — see the note on it in grove-sfx.js.
+                playMulti(credit);
+            }
             // The counter is drawn from wd.killIndex, which the line above has just moved; this is what
             // tells React to look at it again. It is the same re-render the foe list needs anyway.
             rerender();
@@ -1292,7 +1342,7 @@ export default function GroveScene({
             // window. Fire and forget: the kills are spliced out of the log by the call, so a failure
             // cannot double-claim them and the next settle carries on.
             const way = wd.doors.find((d) => d.side === "on");
-            if (way && !wd.clearFlushed && (Number(zone.kills) || 0) + wd.killIndex >= zone.toUnlock) {
+            if (way && !wd.clearFlushed && (Number(zone.kills) || 0) + wd.killCredit >= zone.toUnlock) {
                 wd.clearFlushed = true;
                 if (wd.killLog.length) {
                     const ate = wd.eaten; wd.eaten = {};
@@ -1872,7 +1922,7 @@ export default function GroveScene({
                     }
                     if (foe.big || foe.rare) w.bossBar = { hp: Math.max(0, foe.hp), maxHp: foe.maxHp };
                     if (foe.isBoss || foe.big || foe.rare) w.bossHurtAt = now;
-                    if (foe.hp <= 0) killFoe(w, foe, now);
+                    if (foe.hp <= 0) killFoe(w, foe, now, hit.dealt);
                 }
             }
 
@@ -2044,7 +2094,7 @@ export default function GroveScene({
                     // and the loot, the kill log and the zone's banked count all hang off this one
                     // function. Two paths for one payout always drift — see
                     // [[atomic-split-into-steps-drops-lines]].
-                    if (foe.hp <= 0) killFoe(w, foe, now);
+                    if (foe.hp <= 0) killFoe(w, foe, now, bite.dealt);
                 }
             }
             // ⚠️ AND IT GETS RESCUED. A follower with real physics WILL eventually be left behind — stuck
@@ -2272,7 +2322,7 @@ export default function GroveScene({
                     // could not see it happen.
                     addPop("thorn", `${guard.thornsBack}`, foe.x, foe.y + foe.h * 0.6,
                         popWeight(guard.thornsBack, foe.maxHp) * 0.7);
-                    if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
+                    if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now, guard.thornsBack); }
                 }
 
                 // ⚠️ ICE THORNS ANSWER WHAT GOT THROUGH, NOT WHAT WAS BLOCKED -- the opposite of
@@ -2285,7 +2335,7 @@ export default function GroveScene({
                     foe.hurtAt = now;
                     addPop("thorn", `${iceBack}`, foe.x, foe.y + foe.h * 0.6,
                         popWeight(iceBack, foe.maxHp) * 0.7);
-                    if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
+                    if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now, iceBack); }
                 }
 
                 // ── ⚠️ THE COUNTER ANSWERS THE BODY THAT SWUNG ─────────────────────────────────
@@ -2306,7 +2356,7 @@ export default function GroveScene({
                     shockwave(foe.x, foe.y + foe.h * 0.45, "riposte");
                     procCall("RIPOSTE", "riposte", null, 1.32, foe);
                     playRiposte();
-                    if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now); }
+                    if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now, riposte.dealt); }
                 }
 
                 // THE GRUDGE banks what reached health and rides the next swing -- see the swing block.
@@ -3534,7 +3584,7 @@ export default function GroveScene({
 //
 // It lives here rather than in the lab because what makes a fight happen in the first second is the hero
 // standing NEXT TO something, which is a fact about the world and not a prop.
-function setUpLabScene(w, scene) {
+function setUpLabScene(w, scene, blow = 400) {
     const near = (foe, gap) => {
         const f = foe;
         // Clamped into the zone: a scene that places a creature at a negative x has it shoved back to the
@@ -3688,6 +3738,40 @@ function setUpLabScene(w, scene) {
             // Enough to take a couple of swings, not enough to outlast the sheet.
             f.hp = 60; f.maxHp = 60;
             // They must not kill the hero mid-film: this scene is about THEIR deaths.
+            f.dmg = [0, 0];
+        });
+        if (marks[0]) w.target = marks[0];
+        w.moveTo = null;
+    } else if (scene === "multi") {
+        // ── MULTI-KILL, ON DEMAND ───────────────────────────────────────────────────────────────────
+        // ⚠️ UNFILMABLE ANY OTHER WAY, WHICH IS THE WHOLE POINT OF THIS BENCH. An overkill needs a blow
+        // worth twice a creature's FULL health, and at your own frontier you are roughly matched — so the
+        // only way to see one in real play is to walk a geared account back into a zone it left behind.
+        // A moment that needs an hour of the right kind of play to reach is a moment nobody reviews.
+        //
+        // Four of them, each sized so the SAME swing lands on a different rung: x1, x2, x4 and the x8 cap.
+        // Four pops in one sheet is the only way to judge whether the number reads at a glance and whether
+        // it tangles with the damage number thrown off the same body on the same frame.
+        const marks = w.foes.filter((f) => !f.isBoss).slice(0, 4);
+        marks.forEach((f, i) => {
+            f.x = Math.max(6, w.hero.x + [3.0, -3.0, 6.2, -6.2][i]);
+            f.y = w.hero.y;
+            f.vx = 0; f.vy = 0;
+            f.grounded = true;
+            f.face = f.x > w.hero.x ? -1 : 1;
+            f.passive = false;
+            f.hit = true;
+            // ⚠️ maxHp IS WHAT killCredit READS, so it is the thing being set — hp just has to be at or
+            // below it. The last one is far over the cap on purpose: "does the cap hold" is half of what
+            // this scene is for.
+            //
+            // ⚠️ AND THE DIVISORS ARE 2.5 AND 5, NOT 2 AND 4. Sized exactly on the rung, an ordinary
+            // non-crit blow lands a hair UNDER it — the first cut of this fixture used 4 and filmed an x2,
+            // because 34 damage into a 9hp creature is 3.78x and the rule is a floor, correctly. Sitting
+            // each one between its rung and the next makes the scene show what it says it shows.
+            const ratio = [1, 2.5, 5, 20][i];
+            f.maxHp = Math.max(1, Math.round(Math.max(8, blow) / ratio));
+            f.hp = f.maxHp;
             f.dmg = [0, 0];
         });
         if (marks[0]) w.target = marks[0];

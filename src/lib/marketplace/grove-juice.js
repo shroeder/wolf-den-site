@@ -430,7 +430,9 @@ export const FOE_BAR_LINGER_MS = 2600;
 // The pet's number is the shortest-lived on the board: it fires twice as often as anything else here and it
 // describes the smaller half of the damage, so it has to clear out of the way of the number the player is
 // actually reading.
-export const POP_MS = { hit: 620, crit: 820, heal: 700, took: 760, loot: 850, proc: 900, pet: 520 };
+// `multi` is the longest-lived number in the game on purpose: an overkill worth four kills happens a few
+// times a zone, not sixty times a minute, and it is the only pop that reports PROGRESS rather than damage.
+export const POP_MS = { hit: 620, crit: 820, heal: 700, took: 760, loot: 850, proc: 900, pet: 520, multi: 1000 };
 export const POP_GRAVITY = 0.028;
 const POP_THROW = {
     hit: { vy: 0.38, vx: 0.17 },
@@ -444,6 +446,10 @@ const POP_THROW = {
     // climbing into the band the hero's number occupies; wider so two bites in a row do not stack into one
     // column. apex is vy squared over twice gravity: 1.6 units here against the hit's 2.6.
     pet: { vy: 0.30, vx: 0.26 },
+    // Straight up and higher than anything else, like the proc words: a multi-kill was not knocked loose by
+    // the blow, it IS the blow, and it has to clear the damage number thrown off the same body on the same
+    // frame rather than tangle with it.
+    multi: { vy: 0.56, vx: 0 },
 };
 
 export function makePop(kind, x, y, rand) {

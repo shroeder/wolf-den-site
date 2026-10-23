@@ -683,8 +683,44 @@ export const bossLoot = (map, zone) => zone.foes.slice(0, 2).map((idx, k) => ({
 /** Global depth: map one is zones 1-12, map two is 13-24, and the curve reads this and nothing else. */
 export const zoneDepth = (mapN, i) => (Number(mapN) - 1) * 12 + i + 1;
 
-/** Kills to open the next zone, climbing with depth the way map one's 20 -> 80 does. */
-export const zoneUnlock = (depth) => 20 + (depth - 1) * 5;
+// ── HOW MANY KILLS A ZONE COSTS ──────────────────────────────────────────────────────────────────────────────
+// Luke: "the difficulty curve isn't as important as the kill requirement curve, which should get... right now
+// it's not ramping up fast enough."
+//
+// ⚠️ THIS IS NOW THE WHOLE PROGRESSION GATE, AND IT USED TO BE ARITHMETIC. `20 + (d-1) * 5` adds the same
+// five kills at depth 2 as at depth 140 — so map one went 20, 25, 30, 35 and a zone was over in under a
+// minute from the second one onward. The grind had no shape because the only thing shaping it was enemy
+// toughness, and that is the half Luke has just said matters less.
+//
+// A POWER CURVE, NOT COMPOUNDING. The repo's own lesson from GROVE_SCALE is that reaching a big multiple over
+// many steps is only possible compounding — but that is for a span with a FIXED endpoint. This has none: at
+// 3% a zone, depth 144 would want 1,370 kills and depth 12 would still want 30, which is the flat start all
+// over again with an explosion at the end nobody will ever reach. d^1.3 climbs where it needs to and does not
+// run away: map one goes 20 -> 90, map seven's last zone wants 960, and the deepest zone in the design 1,925.
+//
+// ── ⚠️ THIS NUMBER IS WALL-CLOCK, NOT DIFFICULTY. PRICE IT IN MINUTES ────────────────────────────────────────
+// A zone spawns ONE body every spawnGapMs — forty-five seconds divided by thirty — so it sustains forty kills
+// a minute and not one more, however strong the member is. Once the depth fix made a deep wanderer die in
+// under a second, the requirement stopped being "how hard is this" and became "how long do you sit here":
+//
+//     depth 12   90 kills   ~2 min        depth 60   620   ~16 min
+//     depth 36  325         ~8 min        depth 84   960   ~24 min
+//
+// The first cut of this was d^1.4 * 3.2, which put depth 84 at 1,575 — thirty-nine minutes for ONE zone and
+// seven hours for map seven. That was priced on the assumption that multi-kill would halve it, and it will
+// not, which is the next paragraph.
+//
+// ⚠️ MULTI-KILL DOES NOT RESCUE THE ZONE YOU ARE STUCK ON. It needs a blow worth twice a creature's FULL
+// health, and at your own frontier you are roughly matched — the strongest member in the Den swings for about
+// 34,000 against a 31,000hp wanderer at depth 84, which is x1. It pays x8 at depth 24 and x4 at depth 48: it
+// fires when you are OVER-geared for a zone, so what it actually buys is catching up and backtracking, not
+// the climb itself. So this curve is priced at x1 credit and everything multi-kill gives back is on top.
+//
+// ⚠️ CEIL TO FIVE, NOT ROUND. It is a number a player reads on a door, so it wants to be a multiple of five —
+// but rounding produced ties (zone 2 and zone 3 both landing on 25), and a requirement that does not move
+// between two consecutive zones reads as the door being broken. Ceiling is strictly increasing everywhere.
+export const zoneUnlock = (depth) =>
+    Math.ceil((20 + Math.pow(Math.max(0, (Number(depth) || 1) - 1), 1.3) * 3.0) / 5) * 5;
 
 /** Every part of every generated map, flat, keyed by id — merged into GROVE_PARTS by the catalogue. */
 export const MAP_PARTS = Object.fromEntries(

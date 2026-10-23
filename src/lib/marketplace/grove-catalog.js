@@ -26,7 +26,7 @@
 
 import {
     MAP_PARTS, MAP_ENEMIES, MAP_BOSSES, MAP_ZONES, MAP_EMBLEMS, MAP_FOODS, MAP_CHARMS, mapIsBuilt,
-    RARE_CHANCE,
+    RARE_CHANCE, zoneUnlock,
 } from "@/lib/marketplace/grove-maps.js";
 
 // ── PARTS ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -730,6 +730,63 @@ export const slabArt = (biomeId) => `/images/grove/slab-${groveBiome(biomeId).sl
 export const hangArt = (id) => `/images/grove/hang-${id}.webp`;
 export const sitArt = (id) => `/images/grove/sit-${id}.webp`;
 
+// ── MULTI-KILL: WHAT AN OVERKILL IS WORTH ────────────────────────────────────────────────────────────────────
+// Luke: "if you kill an enemy in one strike, and it does over twice their health, then it counts for two
+// kills. And the same applies if you deal 4x overkill damage, and it counts for 4, etc."
+//
+// ⚠️ IT PAYS KILL COUNT AND NOTHING ELSE. This is the one line that has to be held: a kill worth four credits
+// still rolls ONE loot table, one chance at a rare, one chance at a chest, one lot of XP. Multiplying the
+// drop instead would be a four-times drop-rate multiplier bolted to gear, which is a faucet with a pedal on
+// it — the same reason the combo streak in grove-juice.js pays nothing at all, and the same reason awardXp is
+// called with gold: 0 next door. Progress is the reward here; loot is not.
+//
+// ⚠️ A SINGLE BLOW, NOT ACCUMULATED DAMAGE. "In one strike" is the whole rule: the damage of the killing hit
+// is compared against the creature's FULL health, so it can only ever trigger on something you could have
+// one-shot anyway. A bleed tick that happens to finish a rat is not a strike and passes nothing.
+//
+// POWERS OF TWO, because that is what Luke described and because it keeps the readout legible: a blow worth
+// 3.4x is "x2", not "x3.4". Nothing between the rungs.
+//
+// ⚠️ AND IT IS CAPPED. "Etc." left open, an end-game member one-shotting a rootrat for a thousand times its
+// health would bank a thousand kills a swing, which does not make map one fast — it deletes the kill
+// requirement curve entirely, including the one that was just steepened to matter. Eight is the ceiling: a
+// deep zone's 1,575 becomes about 200 swings for someone genuinely overpowered for it, which is the trade
+// the curve was priced for. One number, here, if it wants to move.
+export const MULTI_KILL_MAX = 8;
+
+/**
+ * What one killing blow is worth, in kills. 1 unless it overkilled.
+ *
+ * `dealt` is the damage of the blow that landed it; `maxHp` is the creature's full health. Both sides call
+ * this — the scene to show it and count it live, the server to bound what the scene claimed — because a
+ * second copy of this arithmetic would be a second opinion about how far the player got.
+ */
+export function killCredit(dealt, maxHp) {
+    const d = Number(dealt) || 0;
+    const hp = Math.max(1, Number(maxHp) || 1);
+    if (d < hp * 2) return 1;
+    // floor to the power of two at or below the ratio: 3.4x is two kills, 7.9x is four.
+    const rung = Math.pow(2, Math.floor(Math.log2(d / hp)));
+    return Math.max(1, Math.min(MULTI_KILL_MAX, rung));
+}
+
+/**
+ * ⚠️ THE SERVER'S VERSION, AND IT TAKES THE CLAIM RATHER THAN THE DAMAGE.
+ *
+ * Combat is the client's — the server does not track hit points and deliberately has never tried to, so it
+ * cannot recompute an overkill. What it CAN do is refuse anything that is not a rung this rule could have
+ * produced, which turns an arbitrary number into one of four values. What that bounds is zone progress and
+ * only zone progress: the loot roll is still one per claimed kill and the rolling kill window still counts
+ * claims, so the worst a forged credit buys is reaching a boss sooner, on the same trust model that already
+ * accepts the kill itself.
+ */
+export const safeCredit = (c) => {
+    const n = Math.floor(Number(c) || 1);
+    if (!(n > 1)) return 1;
+    const rung = Math.pow(2, Math.floor(Math.log2(n)));
+    return Math.max(1, Math.min(MULTI_KILL_MAX, rung));
+};
+
 // ── THE TWELVE ZONES ─────────────────────────────────────────────────────────────────────────────────────────
 // ⚠️ `toUnlock` IS A KILL COUNT, NOT A BOSS. The area opens on kills, exactly as Luke described it; the boss
 // is what ENDS the zone, not what gates the next one. Two different jobs.
@@ -740,22 +797,27 @@ export const sitArt = (id) => `/images/grove/sit-${id}.webp`;
 // `biome` is what the ledges in it are made of and what is allowed to grow on them. It is a required argument
 // rather than an option with a default, because a default here is a zone quietly dressed as the wrong place —
 // check-grove.mjs asserts every one of them names a biome that exists.
-const Z = (n, id, name, enemies, boss, toUnlock, biome, o = {}) =>
-    ({ n, id, name, enemies, boss, toUnlock, biome, bg: `/images/grove/zone-${id}.webp`, ...o });
+// ⚠️ toUnlock IS NOT PASSED ANY MORE. Map one used to carry twelve hand-written kill counts — 20, 25, 30,
+// 35 … 80 — while every other map derived its own from zoneUnlock(). Two curves for one rule, and the
+// moment the rule changed they disagreed: steepening zoneUnlock would have left map one, the map every
+// member actually plays, on the flat line it was written with in a file nobody would think to open.
+// Map one zone n IS depth n, so there is nothing to pass.
+const Z = (n, id, name, enemies, boss, biome, o = {}) =>
+    ({ n, id, name, enemies, boss, toUnlock: zoneUnlock(n), biome, bg: `/images/grove/zone-${id}.webp`, ...o });
 
 const MAP_ONE_ZONES = [
-    Z(1, "thicket", "Thicket Edge", ["rootrat"], "glutmaw", 20, "wood", { blurb: "Where the trees start. Nothing here has noticed you yet." }),
-    Z(2, "hollow", "Mossy Hollow", ["grub"], "mossmother", 25, "moss", { blurb: "Wet underfoot and quiet. Something is eating the deadfall." }),
-    Z(3, "fernway", "The Fernway", ["rootrat", "thornling"], "thistlecrown", 30, "wood", { blurb: "Head-high ferns, and the first thing that hits back." }),
-    Z(4, "oldstand", "The Old Stand", ["badger"], "grandfather_bristle", 35, "wood", { blurb: "Big trunks, old roots, and something that lives under them." }),
-    Z(5, "bramble", "Bramblewall", ["thornling", "gourdling"], "rattlerind", 40, "bramble", { blurb: "A wall of thorn somebody planted on purpose." }),
-    Z(6, "stubble", "The Stubble Field", ["husk"], "harvestman", 45, "field", { blurb: "Cut stalks to the horizon. Some of them walk." }),
-    Z(7, "barrows", "The Barrows", ["barrowhound", "husk"], "barrow_warden", 50, "stone", { blurb: "Mounds in rows. The rows are deliberate." }),
-    Z(8, "warren", "The Warren", ["warren_mother", "barrowhound"], "great_weaver", 55, "burrow", { blurb: "Down, and then further down. Something spins in the dark." }),
-    Z(9, "mothlight", "Mothlight", ["voidmoth"], "lanternwing", 60, "glow", { blurb: "A clearing lit from the air by wings." }),
-    Z(10, "rotwood", "Rotwood", ["ashwraith", "voidmoth"], "everburning", 65, "char", { blurb: "The trees burned a long time ago and never went out." }),
-    Z(11, "palisade", "The Palisade", ["goblin", "ashwraith"], "stakelord", 70, "plank", { blurb: "Sharpened stakes, facing outward. Somebody is keeping something in." }),
-    Z(12, "heartwood", "Heartwood", ["elderling", "goblin"], "heartwood_elder", 80, "heart", { blurb: "The middle of the forest, and the oldest thing in it." }),
+    Z(1, "thicket", "Thicket Edge", ["rootrat"], "glutmaw", "wood", { blurb: "Where the trees start. Nothing here has noticed you yet." }),
+    Z(2, "hollow", "Mossy Hollow", ["grub"], "mossmother", "moss", { blurb: "Wet underfoot and quiet. Something is eating the deadfall." }),
+    Z(3, "fernway", "The Fernway", ["rootrat", "thornling"], "thistlecrown", "wood", { blurb: "Head-high ferns, and the first thing that hits back." }),
+    Z(4, "oldstand", "The Old Stand", ["badger"], "grandfather_bristle", "wood", { blurb: "Big trunks, old roots, and something that lives under them." }),
+    Z(5, "bramble", "Bramblewall", ["thornling", "gourdling"], "rattlerind", "bramble", { blurb: "A wall of thorn somebody planted on purpose." }),
+    Z(6, "stubble", "The Stubble Field", ["husk"], "harvestman", "field", { blurb: "Cut stalks to the horizon. Some of them walk." }),
+    Z(7, "barrows", "The Barrows", ["barrowhound", "husk"], "barrow_warden", "stone", { blurb: "Mounds in rows. The rows are deliberate." }),
+    Z(8, "warren", "The Warren", ["warren_mother", "barrowhound"], "great_weaver", "burrow", { blurb: "Down, and then further down. Something spins in the dark." }),
+    Z(9, "mothlight", "Mothlight", ["voidmoth"], "lanternwing", "glow", { blurb: "A clearing lit from the air by wings." }),
+    Z(10, "rotwood", "Rotwood", ["ashwraith", "voidmoth"], "everburning", "char", { blurb: "The trees burned a long time ago and never went out." }),
+    Z(11, "palisade", "The Palisade", ["goblin", "ashwraith"], "stakelord", "plank", { blurb: "Sharpened stakes, facing outward. Somebody is keeping something in." }),
+    Z(12, "heartwood", "Heartwood", ["elderling", "goblin"], "heartwood_elder", "heart", { blurb: "The middle of the forest, and the oldest thing in it." }),
 ];
 
 // Map one's zones carry their map number here rather than in twelve literals.
@@ -780,9 +842,11 @@ export const GROVE_ZONES = [
 // ⚠️ THE CLIMB IS PER ZONE OF *GLOBAL DEPTH*, AND IT COMPOUNDS. Both halves of that were wrong before and
 // both were invisible inside one map:
 //
-//   · DEPTH, NOT ZONE-WITHIN-MAP. This read `zone.n`, which restarts at 1 on every map — so map 2 zone 1
-//     would have been exactly as hard as map 1 zone 1, and twenty maps would have been the same forest
-//     twenty times. `groveDepth()` is the only thing that should ever reach this function.
+//   · DEPTH, NOT ZONE-WITHIN-MAP. The fear was that `zone.n` restarts at 1 on every map, which would have
+//     made map 2 zone 1 exactly as hard as map 1 zone 1 and twenty maps the same forest twenty times. It
+//     does not restart — MAP_ZONES writes `n: depth` — so `zone.n` IS this argument and always was. The
+//     helper written to convert it did the conversion a second time and cost the back half of the game its
+//     difficulty curve; see the note where groveDepth used to be.
 //   · COMPOUNDING, NOT ADDITIVE. `1 + rate * z` and `(1 + rate) ** z` agree closely over eleven steps and
 //     disagree by a factor of SEVEN over a hundred and thirty-two. Luke's "linear growth line" is the
 //     anchored endpoint, not arithmetic growth: reaching x40 is only possible compounding.
@@ -816,8 +880,14 @@ export const GROVE_SCALE = { hpPerZone: 0.0448, dmgPerZone: 0.0199, zonesPerMap:
  * zone numbers happen to equal their depth, which is exactly why passing a bare zone number worked and would
  * have kept working right up until map 2 shipped reading as a second tutorial.
  */
-export const groveDepth = (mapN, zoneN) =>
-    (Math.max(1, Number(mapN) || 1) - 1) * GROVE_SCALE.zonesPerMap + Math.max(1, Number(zoneN) || 1);
+// ── ⚠️ groveDepth IS DELETED, AND IT WAS A TRAP ──────────────────────────────────────────────────────────────
+// It turned (map, zone-within-map) into global depth, and NOTHING in this codebase ever held a
+// zone-within-map number to give it: MAP_ZONES writes `n: depth` and map one's twelve equal their own depth.
+// Its single caller handed it `zone.n`, which is already the answer, so it added the map offset twice and
+// made every map after the first roughly 23x too hard by map seven.
+//
+// Removed rather than fixed. A helper whose correct argument does not exist anywhere in the program is not a
+// helper, it is a second definition of depth waiting for the next caller — and `zone.n` needs no helper.
 
 const depthMult = (rate, depth) => Math.pow(1 + rate, Math.max(0, (Number(depth) || 1) - 1));
 

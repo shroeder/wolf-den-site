@@ -12,7 +12,7 @@ import { canPreview } from "@/lib/marketplace/owner.js";
 import {
     GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_PARTS, GROVE_EMBLEMS, GROVE_POP,
     GROVE_FOODS, GROVE_CHARMS, HEAL_AT, emblemStars, groveZone,
-    GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, groveBoss as bossById,
+    GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, groveBoss as bossById, safeCredit,
 } from "@/lib/marketplace/grove-catalog.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
@@ -674,11 +674,21 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     }
 
     // ── ZONE PROGRESS, AND THE UNLOCK ───────────────────────────────────────────────────────────────
+    // ⚠️ CREDIT, NOT BODIES — AND ONLY HERE. A blow that overkilled by four times counts as four kills
+    // toward opening the zone and as ONE kill everywhere else: one loot roll (settleKills above walked
+    // `list`, which is untouched), one shot at a rare, one chest chance, one lot of XP, and one entry
+    // against the rolling window below. Luke asked for multi-kill against the kill REQUIREMENT, and
+    // letting it reach the loot would have made overkill a drop-rate multiplier that scales with gear.
+    //
+    // safeCredit rounds each claim down to a rung this rule could actually have produced and caps it, so
+    // the client cannot invent a number. See killCredit in grove-catalog.js for why that is the right
+    // amount of checking given the server does not simulate combat.
+    const credited = list.reduce((n, k) => n + safeCredit(k?.c), 0);
     const z = await db.queryOne(
         `INSERT INTO mkt_grove_zone (buyer_id, zone_id, kills) VALUES ($1, $2, $3)
          ON CONFLICT (buyer_id, zone_id) DO UPDATE SET kills = mkt_grove_zone.kills + $3
          RETURNING kills`,
-        [buyerId, zoneId, list.length],
+        [buyerId, zoneId, credited],
     ).catch(() => null);
 
     // ── ⚠️ SETTLE NO LONGER OPENS THE WAY. THE BOSS DOES. ──────────────────────────────────────────
