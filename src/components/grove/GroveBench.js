@@ -1,6 +1,7 @@
 "use client";
 
-import { ROMAN } from "@/lib/marketplace/grove-recipes.js";
+import { ROMAN, craftableTimes
+} from "@/lib/marketplace/grove-recipes.js";
 import { toolArt, recipeArt } from "@/lib/marketplace/grove-catalog.js";
 
 import { useWishlist } from "./useWishlist.js";
@@ -250,6 +251,34 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
         return d;
     };
 
+    // ── ⚠️ CRAFT ALL POSTS DIRECTLY AND OPENS NOTHING ───────────────────────────────────────────────
+    // Luke: "I also think you should be able to craft all if you're trying to make a bunch of something."
+    //
+    // The act is the ceremony and the batch is the relief from it, so there is no overlay here: one request,
+    // one note saying what came out. It deliberately does NOT reuse the result card -- that card shows a
+    // board, a landing and one band, and a batch has ten of each. Printing the last roll's card over ten
+    // crafts would be the same class of lie as a card announcing `recipe.makes` after a Masterwork.
+    const craftAll = async (r, times) => {
+        if (!times) return;
+        setBusy(`all-${r.id}`);
+        const d = await post({ action: "craftAll", recipe: r.id, temper: tempering === r.id, times });
+        setBusy(null);
+        if (!d?.ok) {
+            setNote(d?.error === "not_enough_parts" ? "Not enough parts for that."
+                : d?.error === "not_repeatable" ? "That one is made once."
+                : "That did not work.");
+            return;
+        }
+        // ⚠️ WHAT ACTUALLY LANDED, read off the server's totals. `makes` is the summed batch including every
+        // band's bonus, so a run of good rolls reads as the bigger number it really was.
+        const what = d.makes ? `${d.makes} × ${d.name}` : `${d.count} × ${d.name}`;
+        const short = d.stopped === "not_enough_parts" && d.count < d.asked
+            ? ` — parts ran out after ${d.count}` : "";
+        setNote(`Made ${what}${short}.${d.levelled ? " Crafting levelled up." : ""}`);
+        if (d.firstCraft) setNote(`Made ${what}. A Mossbound Cache went to your chests.`);
+        await refresh();
+    };
+
     /** Called when the act closes — with the finished craft, or with an error it could not complete. */
     const finishCraft = async (d) => {
         const r = acting?.recipe;
@@ -464,6 +493,10 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                     // and not on a rework (which is its own re-roll and is priced separately). Showing
                     // it on a finished vault would be a button that spends parts on nothing.
                     const canTemper = !built && !canRework;
+                    // ⚠️ RECOMPUTED AGAINST THIS ROW'S TOGGLE rather than taken from the row's own `times`,
+                    // which is the untempered count. Tempering adds parts, so turning it on must shrink the
+                    // batch the button offers -- otherwise it offers ten and the seventh runs out.
+                    const batch = craftableTimes(r, st.pack || {}, { temper: tempering === r.id });
                     // What this row would put on the wishlist, and whether it is all there already.
                     // ⚠️ SHORT PARTS ONLY. Wishing the ones you already hold would light creatures you have
                     // no reason to walk to, which is the wishlist telling you something false.
@@ -588,11 +621,38 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                         : `Rework · ${reworkShort} short`}
                                 </button>
                             ) : (
+                                /* ⚠️ A REAL BOX, NOT A FRAGMENT. gv-rec-main is a three-column grid
+                                   (art · body · action) and a fragment creates no box -- the two
+                                   buttons would be grid items four and five, and the second would
+                                   wrap onto a second row underneath the artwork. One wrapper keeps
+                                   the grid at three children and stacks the pair itself. Same
+                                   family as [[abspos-inside-grid-lands-in-a-cell]]. */
+                                <div className="gv-rec-acts">
                                 <button type="button" className="gv-rec-go"
                                     disabled={!ready || busy === r.id}
                                     onClick={() => craft(r)}>
                                     {busy === r.id ? "…" : built ? "Built" : ready ? "Craft" : `${missing} short`}
                                 </button>
+                                {/* ── ⚠️ ONLY WHERE THERE IS A SECOND ONE TO MAKE ─────────────────
+                                    Shown on a repeatable recipe you can afford at least TWICE —
+                                    offering "Craft all ×1" next to Craft is two buttons for one
+                                    action, and offering it on a backpack is a button for a thing
+                                    that cannot happen. `repeatable` is the shared rule, not a list
+                                    of kinds restated here; see ONE_OFF_KINDS.
+
+                                    ⚠️ AND IT SAYS WHAT IT COSTS YOU. Skipping the act means the
+                                    neutral rack, which is a real trade and must not be discovered
+                                    after the parts are gone. */}
+                                {ready && batch >= 2 ? (
+                                    <button type="button" className="gv-rec-all"
+                                        disabled={busy === `all-${r.id}`}
+                                        title={`Make ${batch} without playing the hammer work`
+                                            + " — base odds on every one"}
+                                        onClick={() => craftAll(r, batch)}>
+                                        {busy === `all-${r.id}` ? "…" : `All · ${batch}`}
+                                    </button>
+                                ) : null}
+                                </div>
                             )}
                             </div>
                             {/* ── ⚠️ THE ONE DECISION A CRAFT HAS EVER OFFERED ───────────────────

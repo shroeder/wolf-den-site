@@ -285,6 +285,57 @@ export const reachableRecipes = (taught) => {
 };
 
 // `st` is the groveState payload: { pack, seen, tools, packsBuilt, banksBuilt, plotsBuilt }.
+// ── ⚠️ WHICH KINDS ARE MADE ONCE, IN ONE PLACE ──────────────────────────────────────────────────────────────
+// Luke: "you shouldn't be able to craft more than one backpack, right? Because that's like a unique item.
+// All the expansion items are unique, aren't they?"
+//
+// They are, and groveCraft has always refused a second one -- `already_built` is checked before a single part
+// is spent, against packs_built / banks_built / plots_built and the tool's own tier row. What did NOT exist
+// was a name for the category. The server knew it four times over, the bench knew it a fifth time in its
+// `built` expression, and craft-all needed to know it a sixth. Six copies of a rule is six chances for the
+// seventh caller to get it wrong, so it is written here and read everywhere.
+// See [[reuse-the-rule-never-restate-it]].
+//
+//   pack / bank   a backpack or vault expansion: it adds slots, once, for ever
+//   plot          a farm plot, capped at GROVE_PLOT_CAP anyway
+//   tool          remade in place -- one row per slot holding the tier reached, so there is no second one
+//
+// Everything else is a thing you hold: food stacks, charms are consumed on a dive, decorations are objects.
+export const ONE_OFF_KINDS = new Set(["pack", "bank", "plot", "tool"]);
+
+/** Can this recipe be made more than once? The question craft-all asks. */
+export const repeatable = (recipe) => !!recipe && !ONE_OFF_KINDS.has(recipe.kind);
+
+// ── ⚠️ A CAP, BECAUSE EACH CRAFT IS ITS OWN SET OF ROUND TRIPS ──────────────────────────────────────────────
+// groveCraftMany loops the real groveCraft rather than reimplementing it -- see the note there -- and one
+// craft is roughly a dozen queries on a driver where every query is its own HTTPS request. Ten is plenty for
+// a pile of poultices and keeps the worst case about a hundred, which is a burst on a screen a player visits
+// in bursts rather than something that runs on a timer. See CLAUDE.md on Active CPU.
+export const CRAFT_ALL_CAP = 10;
+
+/**
+ * How many times this recipe could be made right now, from the parts in the bag.
+ *
+ * ⚠️ THE BINDING PART DECIDES IT, not the total. Twenty straw and one root makes ONE of a recipe wanting
+ * both, and a count that averaged or summed would offer a batch the bag cannot pay for -- which, on a driver
+ * with no transactions, is a half-spent craft rolled back by hand on the tenth iteration.
+ *
+ * Returns 0 for a one-off kind: "how many" is not a question a backpack has an answer to.
+ */
+export function craftableTimes(recipe, pack = {}, { temper = false } = {}) {
+    if (!repeatable(recipe)) return 0;
+    const cost = { ...recipe.parts };
+    if (temper) {
+        for (const [part, n] of Object.entries(temperCost(recipe) || {})) cost[part] = (cost[part] || 0) + n;
+    }
+    let times = CRAFT_ALL_CAP;
+    for (const [part, need] of Object.entries(cost)) {
+        if (need <= 0) continue;
+        times = Math.min(times, Math.floor(Number(pack[part] || 0) / need));
+    }
+    return Math.max(0, Math.min(CRAFT_ALL_CAP, times));
+}
+
 export function recipeRows(st = {}) {
     const pack = st.pack || {};
     const seen = st.seen instanceof Set ? st.seen : new Set(st.seen || []);
@@ -302,7 +353,10 @@ export function recipeRows(st = {}) {
         // Every recipe is readable now, so a row has to say whether you have even MET its parts —
         // that is what the discovery rule used to communicate by hiding the row entirely.
         const unmet = costs.filter((c) => !seen.has(c.part)).length;
-        return { r, built, costs, missing, haveParts, unmet, ready: missing === 0 && !built };
+        // ⚠️ `times` IS WITHOUT TEMPERING, because the bench recomputes it against the row's own toggle.
+        // It is here so the badge and the sort can see at a glance which rows are worth a batch.
+        return { r, built, costs, missing, haveParts, unmet, ready: missing === 0 && !built,
+            repeatable: repeatable(r), times: craftableTimes(r, pack) };
     });
 }
 

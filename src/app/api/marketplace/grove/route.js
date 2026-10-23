@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
-    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveRework, groveEquipEmblem, groveBelt, groveBoss, groveOpenChest,
+    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveCraftMany, groveRework, groveEquipEmblem, groveBelt, groveBoss, groveOpenChest,
     groveForgeArmour, groveWearArmour } from "@/lib/marketplace/grove.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -62,6 +62,13 @@ export async function POST(request) {
                     temper: Boolean(b.temper),
                     act: b.act && typeof b.act === "object" ? b.act : null,
                     aim: b.aim,
+                }));
+                // ⚠️ NO `act` AND NO `aim`. Craft-all skips the skill beats, so it must not accept a
+                // score for beats nobody played -- a client that could post a flawless act with a batch of
+                // ten would be buying the top of the rack ten times for one request. See groveCraftMany.
+                case "craftAll": return noStore(await groveCraftMany(buyer.id, String(b.recipe || ""), {
+                    temper: Boolean(b.temper),
+                    times: b.times,
                 }));
                 case "rework": return noStore(await groveRework(buyer.id, String(b.slot || "")));
                 // The Grove's own chest line, never chests.js. See the note on the boss grant.

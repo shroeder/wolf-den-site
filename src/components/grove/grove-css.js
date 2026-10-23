@@ -2563,13 +2563,35 @@ export const GROVE_CSS = `
 .gv-cost li em { font-style: normal; font-weight: 700; color: #ff9c8a; }
 .gv-cost :global(img) { width: 18px; height: 18px; object-fit: contain; }
 
-.gv-rec-go { flex: none; pointer-events: auto; cursor: pointer; font: inherit;
+.gv-rec-go { flex: none; pointer-events: auto; white-space: nowrap; cursor: pointer; font: inherit;
     padding: 11px 16px; border-radius: 999px; font-weight: 800; font-size: 0.84rem;
     color: #9aa08f; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); }
 .gv-rec.is-ready .gv-rec-go { color: #1a1403; border: none;
     background: linear-gradient(180deg, #ffd166, #e0a83c);
     box-shadow: 0 6px 18px rgba(224,168,60,0.34); }
 .gv-rec-go:disabled { cursor: default; }
+
+/* ── ⚠️ THE ACTION COLUMN IS ONE GRID CHILD HOLDING TWO BUTTONS ───────────────────────────────
+   gv-rec-main is a three-column auto / 1fr / auto grid, so whatever sits in the third column decides how much
+   width is left for the body -- and the body is about 250px on a 390px phone with the artwork
+   beside it. Hence the batch button is a SHORT secondary pill stacked under Craft rather than a
+   second full-width one beside it: "All · 10" costs the column nothing it was not already using
+   for "16 short".
+   And it is deliberately quiet. Playing the act is the better craft; this is the convenience. */
+/* ⚠️ min-content WIDTH, OR THE PILL BECOMES A COIN. The old single button carried a flex:none,
+   which is inert once its parent is a grid cell rather than a flex child -- so the action column
+   collapsed under the body's 1fr and "Craft" squashed from a pill into a circle. Sizing the wrapper
+   to its widest child restores the natural width and the body keeps exactly the room it had. */
+/* ⚠️ A FLOOR, BECAUSE max-content ALONE MAKES A COIN. "Craft" measures 29px of text; with the phone
+   media query's 13px side padding that is a 55px box, and the 44px tap-target floor added for touch
+   turns 55x44 at a 999px radius into a circle rather than a pill. The floor is the shortest label's
+   problem only -- "16 short" already measures past it, so nothing else on the list moves. */
+.gv-rec-acts { display: grid; gap: 6px; justify-items: stretch; min-width: 76px; }
+.gv-rec-all { pointer-events: auto; cursor: pointer; font: inherit;
+    padding: 7px 12px; border-radius: 999px; font-weight: 800; font-size: 0.74rem;
+    color: #cfe3c6; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(207,227,198,0.28); white-space: nowrap; }
+.gv-rec-all:disabled { cursor: default; opacity: 0.6; }
 
 /* ── THE RESULT ───────────────────────────────────────────────────────────────────────────────
    Both halves of the trade on one card: what arrived, and underneath it what left. A toast can
@@ -3050,6 +3072,18 @@ export const GROVE_CSS = `
     background: rgba(255,215,94,0.5); box-shadow: 0 0 14px rgba(255,215,94,0.5); }
 .gv-act-marker { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px;
     background: #fff6df; box-shadow: 0 0 12px rgba(255,246,223,0.95); }
+/* ── ⚠️ THE HAND-OFF HAS TO BE VISIBLE, NOT JUST ENFORCED ─────────────────────────────────────
+   A beat where the anvil refuses blows is only fair if the anvil looks like it is refusing them.
+   Photographed side by side, the waiting frame and the live frame were the same bright gold button
+   over the same bar, and the only difference was a word. Dim both while the piece is being set, and
+   bring them up together when the window opens -- the brightening IS the go signal. */
+.gv-act-hit.is-waiting { filter: saturate(0.45) brightness(0.72); cursor: default; }
+.gv-act-anvil.is-waiting { opacity: 0.62; }
+/* ⚠️ THE TRANSITION IS ON THE BASE RULE, NOT ON .is-waiting. A transition declared only on the
+   dimmed state animates going IN and snaps coming OUT, so the moment that matters -- the window
+   opening -- is the one that gets no animation at all. */
+.gv-act-hit.is-hammer, .gv-act-anvil { transition: filter 180ms ease-out, opacity 180ms ease-out; }
+
 .gv-act-hits { list-style: none; display: flex; gap: 6px; margin: 0; padding: 0; }
 .gv-act-hits li { flex: 1; text-align: center; padding: 6px 0; border-radius: 6px; font-size: 0.62rem;
     letter-spacing: 0.07em; text-transform: uppercase; color: #8b8375; background: rgba(0,0,0,0.5); }

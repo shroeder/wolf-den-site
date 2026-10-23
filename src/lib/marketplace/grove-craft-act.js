@@ -41,6 +41,19 @@ export const ACT_MAX_BIAS = 0.52;     // same units as TEMPER_BONUS, which is 0.
 // coals brighten. A player meeting this screen for the first time does the obvious thing and it works, which
 // is what the first of three beats is for.
 export const HEAT_MS = 2600;
+// ── ⚠️ A BEAT BETWEEN THE BELLOWS AND THE ANVIL ─────────────────────────────────────────────────────────────
+// Luke: "there should be like a delay between the tapping phase and then the timing phase, because after
+// you're done tapping, you waste one of your timing swings."
+//
+// The heat phase ends on a clock while the player is still mid-flurry -- seven taps a second is the whole
+// point of it -- so the first strike window opened underneath a thumb that was already coming down. The
+// opening swing was not a decision, it was the tail of the previous phase, and three strikes is few enough
+// that losing one to a hand-off is most of the beat.
+//
+// 650ms: long enough for a flurry to stop and an eye to find the new window, short enough that it reads as
+// the piece being moved to the anvil rather than as the game pausing.
+export const HAND_OFF_MS = 650;
+
 export const HEAT_TARGET = 18;        // taps for a full bar — about seven a second, brisk but not a drum roll
 /** 0..1. Over-tapping is capped: there is no prize for a hundred, so nobody has to find that out. */
 export const heatScore = (taps) => Math.max(0, Math.min(1, (Number(taps) || 0) / HEAT_TARGET));

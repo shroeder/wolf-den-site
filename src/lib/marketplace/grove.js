@@ -17,7 +17,8 @@ import {
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { petBiteShare } from "@/lib/marketplace/grove-world.js";
-import { reworkCost, temperCost, toolRecipeFor } from "@/lib/marketplace/grove-recipes.js";
+import { reworkCost, temperCost, toolRecipeFor, repeatable, CRAFT_ALL_CAP
+} from "@/lib/marketplace/grove-recipes.js";
 import { rackFor, scatterFor, landingFor, bandAt, oddsForAim, rattle, qualityInBand,
     clampAct, actScore } from "@/lib/marketplace/grove-craft-act.js";
 import { settleKills, rollBoss, rollGroveChest } from "@/lib/marketplace/grove-roll.js";
@@ -1469,6 +1470,81 @@ export { GROVE_RECIPES };
  * it would be an uncapped faucet on a loop that already has no daily cap. The reward for a rework is the
  * quality. See [[economy-nerf-measure-daily-total]].
  */
+// ── ⚠️ CRAFT ALL: THE SAME CRAFT, N TIMES, AND NOT A SECOND IMPLEMENTATION OF IT ────────────────────────────
+// Luke: "I also think you should be able to craft all if you're trying to make a bunch of something."
+//
+// Food is the recipe meant to be made constantly -- it is the worst-paying kind on the xp ladder for exactly
+// that reason -- and making it meant playing a three-beat minigame per poultice. That is the friction.
+//
+// ⚠️ IT LOOPS groveCraft. It does not inline a cheaper version of it, and the temptation to is strong: one
+// combined debit and one log row would be a third of the round trips. It would also be a SECOND PAYOUT PATH,
+// and the two would drift the first time either moved -- the first craft's chest, the band's merits, the xp
+// priced off part cost, the one-off guards, the tool tier's GREATEST, the hand-rolled rollback. Every one of
+// those is a rule that exists because it was once missing. See [[atomic-split-into-steps-drops-lines]]: two
+// paths for one payout always drift, so make it ONE function. Cost is bounded by CRAFT_ALL_CAP instead.
+//
+// ⚠️ EVERY ITERATION ROLLS ITS OWN BAND, and that is the point rather than a side effect. groveCraft seeds
+// off the player's running craft_xp, which this loop moves on every pass -- so ten poultices come out as ten
+// separate rolls with their own landings, not one roll applied ten times. A batch that rolled once would
+// make craft-all strictly better or strictly worse than crafting one at a time, and it is meant to be
+// neither: it is the same crafts, without the ceremony.
+//
+// ⚠️ AND IT PASSES NO ACT. The skill beats are not played, so the rack is the neutral one -- which is the
+// honest price of the convenience and the reason to still play the act when a roll matters. The bench says
+// so on the button rather than leaving it to be discovered.
+//
+// ⚠️ IT STOPS, IT DOES NOT FAIL. A batch that runs out of parts on the seventh has made six real things and
+// must report six -- returning an error would be a lie about a bag that has already changed. Only a refusal
+// on the FIRST pass is an error, because then nothing happened.
+export async function groveCraftMany(buyerId, recipeId, { temper = false, times = 1 } = {}) {
+    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
+    const recipe = recipeById(recipeId);
+    if (!recipe) return { ok: false, error: "no_recipe" };
+    // ⚠️ THE SHARED RULE, NOT A LOCAL LIST OF KINDS. A backpack has no "how many" -- see ONE_OFF_KINDS.
+    if (!repeatable(recipe)) return { ok: false, error: "not_repeatable" };
+
+    const want = Math.max(1, Math.min(CRAFT_ALL_CAP, Math.floor(Number(times) || 1)));
+    const made = [];
+    let stopped = null;
+    for (let i = 0; i < want; i += 1) {
+        const one = await groveCraft(buyerId, recipeId, { temper });
+        if (!one?.ok) {
+            // The first refusal is the whole answer; a later one just ends the batch.
+            if (!made.length) return one;
+            stopped = one.error || "stopped";
+            break;
+        }
+        made.push(one);
+    }
+
+    // ── WHAT THE SCREEN NEEDS TO SAY ────────────────────────────────────────────────────────────────
+    // Totalled from the real results, never from recipe.makes × n: a batch of ten rolls ten bands and the
+    // good ones hand over extra. The same rule as the single card -- report the totals, not the authored
+    // numbers.
+    const last = made[made.length - 1];
+    const spent = {};
+    for (const one of made) for (const x of one.spent || []) spent[x.part] = (spent[x.part] || 0) + x.n;
+    const bands = {};
+    for (const one of made) {
+        const id = one.set?.band?.id || one.bonus?.band || "?";
+        bands[id] = (bands[id] || 0) + 1;
+    }
+    return {
+        ok: true, made: recipe.id, kind: recipe.kind, name: recipe.name, count: made.length,
+        asked: want, stopped,
+        // Any pass could have been the account's first craft, though in practice only the first can be.
+        firstCraft: made.some((x) => x.firstCraft),
+        spent: Object.entries(spent).map(([part, n]) => ({ part, n })),
+        // How many things actually landed in the bag across the batch, bonuses included.
+        makes: recipe.makes ? made.reduce((a, x) => a + (Number(x.makes) || 0), 0) : null,
+        bands,
+        xpGained: made.reduce((a, x) => a + (Number(x.craft?.xpGained) || 0), 0),
+        craft: last?.craft || null,
+        levelled: made.some((x) => x.craft?.levelled),
+        tempered: Boolean(temper),
+    };
+}
+
 export async function groveRework(buyerId, slot) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const want = String(slot || "");

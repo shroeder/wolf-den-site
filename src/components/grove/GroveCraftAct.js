@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-    HEAT_MS, HEAT_TARGET, heatScore, STRIKES, STRIKE_MS, STRIKE_HIT, STRIKE_PERFECT,
+    HEAT_MS, HEAT_TARGET, HAND_OFF_MS, heatScore, STRIKES, STRIKE_MS, STRIKE_HIT, STRIKE_PERFECT,
     strikeGrade, actScore, rackFor, scatterFor, oddsForAim, PEG_ROWS, RACK_MIDDLE,
 } from "@/lib/marketplace/grove-craft-act.js";
 import { QUALITY_BANDS, bandTint, bandInk } from "@/lib/marketplace/grove-forge.js";
@@ -74,6 +74,9 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     const [marker, setMarker] = useState(0);
     const [hits, setHits] = useState([]);
     const [flash, setFlash] = useState(null);
+    // When the anvil starts accepting blows. Set on entering the shaping stage; see HAND_OFF_MS.
+    const [armedAt, setArmedAt] = useState(0);
+    const [armed, setArmed] = useState(false);
     const [aim, setAim] = useState(RACK_MIDDLE);
     const [result, setResult] = useState(null);
     const [fallRow, setFallRow] = useState(-1);
@@ -104,24 +107,39 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         const tick = () => {
             const left = Math.max(0, HEAT_MS - Math.max(0, performance.now() - t0));
             setHeatLeft(left);
-            if (left <= 0) { setStage(STAGE.shaping); return; }
+            if (left <= 0) {
+                setStage(STAGE.shaping);
+                setArmedAt(performance.now() + HAND_OFF_MS);
+                setArmed(false);
+                return;
+            }
             raf.current = requestAnimationFrame(tick);
         };
         raf.current = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf.current);
     }, [stage]);
 
+    // ── ⚠️ THE MARKER WAITS FOR THE HAND-OFF, AND SO DOES THE ANVIL ─────────────────────────────────
+    // Parking the marker rather than only ignoring the tap is the half that makes it fair: a window
+    // already sweeping while the game refuses input reads as a dropped tap, not as a pause. It sits
+    // still at the left, the room says "ready", and then it starts -- so the first strike is aimed.
     useEffect(() => {
         if (stage !== STAGE.shaping) return undefined;
-        const t0 = performance.now();
         const tick = () => {
-            const phase = (Math.max(0, performance.now() - t0) % STRIKE_MS) / STRIKE_MS;
+            const now = performance.now();
+            if (now < armedAt) {
+                setMarker(-1);
+                raf.current = requestAnimationFrame(tick);
+                return;
+            }
+            if (!armed) setArmed(true);
+            const phase = (Math.max(0, now - armedAt) % STRIKE_MS) / STRIKE_MS;
             setMarker(phase < 0.5 ? -1 + phase * 4 : 3 - phase * 4);
             raf.current = requestAnimationFrame(tick);
         };
         raf.current = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf.current);
-    }, [stage]);
+    }, [stage, armedAt, armed]);
 
     // ── THE FALL ────────────────────────────────────────────────────────────────────────────────────
     // Stepped a peg row at a time rather than transitioned to the floor: the rattle is the drama, and a
@@ -170,7 +188,11 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     // a POST during render and React said so; the screen worked perfectly and only the browser console ever
     // mentioned it. A state updater has to be pure.
     const strike = useCallback(() => {
+        // ⚠️ THE TAP THAT ENDED THE BELLOWS MUST NOT BECOME THE FIRST HAMMER BLOW. Both halves are
+        // needed: the marker is parked above so the window has not started, and this refuses the blow
+        // so a thumb already travelling cannot spend one of three strikes on nothing.
         if (stage !== STAGE.shaping || hits.length >= STRIKES) return;
+        if (performance.now() < armedAt) return;
         const grade = strikeGrade(marker);
         const next = [...hits, grade];
         playHit(hits.length * 3, grade.id === "perfect");
@@ -178,7 +200,7 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         setHits(next);
         if (next.length >= STRIKES) setStage(STAGE.setting);
         setTimeout(() => setFlash(null), 420);
-    }, [stage, hits, marker]);
+    }, [stage, hits, marker, armedAt]);
 
     // ── AIMING ──────────────────────────────────────────────────────────────────────────────────────
     // ⚠️ NO setPointerCapture. It is the obvious way to track a drag and it breaks MOUSE clicks outright —
@@ -300,13 +322,21 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 {/* ── STAGE TWO: THE SHAPING ────────────────────────────────────────────────────── */}
                 {stage === STAGE.shaping ? (
                     <div className="gv-act-stage">
-                        <p className="gv-act-say">Strike it &mdash; {STRIKES - hits.length} left</p>
-                        <div className="gv-act-anvil">
+                        <p className="gv-act-say">
+                            {armed ? <>Strike it &mdash; {STRIKES - hits.length} left</> : <>Ready&hellip;</>}
+                        </p>
+                        <div className={`gv-act-anvil${armed ? "" : " is-waiting"}`}>
                             <span className="gv-act-zone" style={{ width: `${STRIKE_HIT * 100}%` }} />
                             <span className="gv-act-core" style={{ width: `${STRIKE_PERFECT * 100}%` }} />
                             <span className="gv-act-marker" style={{ left: `${(marker + 1) * 50}%` }} />
                         </div>
-                        <button type="button" className="gv-act-hit is-hammer" onPointerDown={strike}>STRIKE</button>
+                        {/* ⚠️ IT MUST LOOK LIKE IT REFUSES. The hand-off was invisible on film: a
+                            full-bright gold STRIKE sitting over a parked marker, taking taps and
+                            doing nothing. A control that ignores input while looking identical to one
+                            that accepts it reads as a dropped tap -- which is the bug, wearing the
+                            fix's clothes. Dimmed here and lit the moment the window opens. */}
+                        <button type="button" className={`gv-act-hit is-hammer${armed ? "" : " is-waiting"}`}
+                            aria-disabled={!armed} onPointerDown={strike}>STRIKE</button>
                         <ul className="gv-act-hits">
                             {Array.from({ length: STRIKES }, (_, i) => (
                                 <li key={i} className={hits[i] ? `is-${hits[i].id}` : ""}>{hits[i]?.label || "—"}</li>
