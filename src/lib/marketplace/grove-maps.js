@@ -72,14 +72,18 @@ export const tierCount = (slot, i, mapN) => Math.round(BASE_COUNTS[i] * (1 + (Ma
 //
 // The archetype is how it FIGHTS, which is the half a biome should decide: a cave swarms, a steppe charges,
 // a frozen mere waits for you to come to it.
+// ⚠️ ON THE SAME SCALE AS MAP ONE'S TWELVE IN grove-catalog.js, OR THE SEAM SHOWS. These are the generated
+// maps' creature baselines and map one's are hand-written somewhere else — so when the floor was re-cut for
+// beginners (see BOSS_HP_D1) and only one of the two tables moved, map 1 zone 12 got 2.65x easier and map 2
+// zone 1 did not. A step like that at a map boundary reads as the game breaking, not as it getting harder.
 const ARCH = {
     //                       passive  hp    dmg          telegraph
-    swarm: { passive: true, hp: 760, dmg: [60, 94], telegraph: 0 },
-    grazer: { passive: true, hp: 980, dmg: [66, 100], telegraph: 0 },
-    striker: { passive: false, hp: 880, dmg: [78, 116], telegraph: 620 },
-    stalker: { passive: false, hp: 940, dmg: [84, 124], telegraph: 700 },
-    brute: { passive: false, hp: 1320, dmg: [96, 142], telegraph: 900 },
-    caster: { passive: false, hp: 820, dmg: [88, 130], telegraph: 820 },
+    swarm: { passive: true, hp: 286, dmg: [33, 52], telegraph: 0 },
+    grazer: { passive: true, hp: 369, dmg: [36, 55], telegraph: 0 },
+    striker: { passive: false, hp: 331, dmg: [43, 64], telegraph: 620 },
+    stalker: { passive: false, hp: 354, dmg: [46, 68], telegraph: 700 },
+    brute: { passive: false, hp: 497, dmg: [53, 78], telegraph: 900 },
+    caster: { passive: false, hp: 309, dmg: [48, 71], telegraph: 820 },
 };
 
 const P = (id, name, role, tier, blurb) => ({ id, name, role, tier, blurb });
@@ -770,15 +774,45 @@ export const MAP_ENEMIES = Object.fromEntries(
 //
 // Run continuously instead and map two's last boss lands at 108,000 against map one's 180,000 — the game
 // getting easier as you go deeper, which no screen would ever tell you.
-const BOSS_HP_D1 = 59000;
+// ── ⚠️ RE-ANCHORED ON A BEGINNER, 2026-10-23. THIS IS THE FIFTH TIME LUKE HAS RAISED IT ──────────────────────
+// Luke: "the first two maps need to be approachable for beginners. Like, they should be able to get through it
+// pretty easily. And then they start having problems around maps 3 and 4 ... This is probably the fourth or
+// fifth time I've told you about this."
+//
+// THE DISAGREEMENT WAS ONE LINE, AND IT WAS IN THE TOOL. grove-curve.mjs sizes these so the LOW ANCHOR takes
+// 35 to 80 seconds, and the low anchor is Littlewolf — whom the tool's own output labels "can a newcomer
+// finish the forest?". Littlewolf is the Grove's TESTER at 1,803 dps. There was no anchor anywhere for
+// somebody who had just arrived, so map one was priced for a player who already had a kit.
+//
+// WHAT THAT COST, measured against every member who has ever swung in the Grove (only three have):
+//
+//                        zone-1 boss   survives   swings per wanderer
+//   Adam        lv 3          227s      3 hits          8.0            <- the only real beginner
+//   Littlewolf  lv 28          33s      9 hits          2.3            <- the anchor
+//   The Wolf Den lv 45         16s     12 hits          1.4
+//   Eric D      lv 70           1s     43 hits          0.1
+//
+// A four-minute fight you die in three hits of, as the FIRST boss in the game. The Crystal Stag's note a few
+// hundred lines up says "it is now 28 swings against a rootrat's 9" — nine swings for the first trash mob in
+// the game was written down as the healthy baseline and nobody argued with it.
+//
+// So the floor is set against Adam instead: 9,000 is thirty-five seconds of his 260 dps, he survives six of
+// its blows, and a rootrat dies in three swings. The top is unchanged — Eric still needs 38 seconds on map 8
+// zone 1, which is the anchor he asked for — so the SPAN is steeper (x2.25 a map, not x1.372) and that is
+// what puts the wall at maps 3-4 instead of at map 1.
+//
+// ⚠️ TRASH IS NOT ON THIS CURVE. See GROVE_SCALE in grove-catalog.js: wanderers climb slower so they stay
+// about three swings at every depth, and the BOSS is the thing that stops you. The first cut of this had them
+// matching, which put Eric at thirteen swings per wanderer on map 7 — that is not difficulty, it is chores.
+const BOSS_HP_D1 = 9000;
 // ⚠️ ANCHORED TO MAP ONE'S HAND-AUTHORED TWELVE IN grove-catalog.js, so the two move together or map two's
 // first boss out-hits map one's last. Briefly 105-143, cut for a difficulty complaint that turned out to be
 // forGrove() dropping lifestealBonus -- see the long note beside MAP_ONE_BOSSES.
-const BOSS_DMG_D1 = [190, 260];
-const MAP_STEP_HP = 1.372;     // the hero's power step per map
-const MAP_STEP_DMG = 1.172;    // the hero's durability step per map
-const MAP_RAMP_HP = 3.05;      // 59,000 -> 180,000 across map one's twelve
-const MAP_RAMP_DMG = 1.16;     // 190 -> 220 across the same twelve
+const BOSS_DMG_D1 = [70, 96];
+const MAP_STEP_HP = 2.25;      // was 1.372 — the span from a beginner to Eric, over seven maps
+const MAP_STEP_DMG = 1.47;     // likewise for durability: Adam's 469 effective HP to Eric's 9,580
+const MAP_RAMP_HP = 3.05;      // 9,000 -> 27,450 across map one's twelve. The within-map ramp is unchanged.
+const MAP_RAMP_DMG = 1.16;     // 70 -> 81 across the same twelve
 const bossHp = (mapN, i) =>
     BOSS_HP_D1 * MAP_STEP_HP ** (mapN - 1) * MAP_RAMP_HP ** (i / 11);
 const bossDmg = (mapN, i, k) =>

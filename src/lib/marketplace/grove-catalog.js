@@ -289,73 +289,73 @@ const E = (id, name, art, o) => ({ id, name, art, ...o });
 // what is coming rather than more of what you already have. See the rare row in grove-roll.js.
 const MAP_ONE_ENEMIES = {
     rootrat: E("rootrat", "Rootrat", "/images/delves/foe-rootrat.webp", {
-        passive: true, hp: 770, dmg: [62, 96], telegraph: 0,
+        passive: true, hp: 290, dmg: [34, 53], telegraph: 0,
         emblem: "em_rootrat", emblemChance: 0.0026,
         rareChance: RARE_CHANCE, rareLoot: { part: "thorn_barb", n: [1, 2] },
         loot: [{ part: "gnawed_root", n: [1, 2], w: 70 }, { part: "damp_moss", n: [1, 1], w: 30 }],
     }),
     grub: E("grub", "Pale Grub", "/images/delves/foe-grub.webp", {
-        passive: true, hp: 810, dmg: [67, 101], telegraph: 0,
+        passive: true, hp: 305, dmg: [37, 55], telegraph: 0,
         emblem: "em_grub", emblemChance: 0.0026,
         rareChance: RARE_CHANCE, rareLoot: { part: "bristle_hide", n: [1, 2] },
         loot: [{ part: "grub_fat", n: [1, 2], w: 75 }, { part: "damp_moss", n: [1, 2], w: 25 }],
     }),
     thornling: E("thornling", "Thornling", "/images/delves/foe-thornling.webp", {
-        passive: false, hp: 900, dmg: [75, 111], telegraph: 650,
+        passive: false, hp: 339, dmg: [41, 61], telegraph: 650,
         emblem: "em_thornling", emblemChance: 0.0024,
         rareChance: RARE_CHANCE, rareLoot: { part: "bound_straw", n: [1, 2] },
         loot: [{ part: "thorn_barb", n: [1, 3], w: 65 }, { part: "gnawed_root", n: [1, 2], w: 35 }],
     }),
     badger: E("badger", "Bristleback", "/images/delves/foe-badger.webp", {
-        passive: false, hp: 920, dmg: [79, 115], telegraph: 700,
+        passive: false, hp: 346, dmg: [43, 63], telegraph: 700,
         emblem: "em_badger", emblemChance: 0.0022,
         rareChance: RARE_CHANCE, rareLoot: { part: "barrow_tooth", n: [1, 2] },
         loot: [{ part: "bristle_hide", n: [1, 2], w: 60 }, { part: "split_antler", n: [1, 1], w: 40 }],
     }),
     gourdling: E("gourdling", "Gourdling", "/images/delves/foe-gourdling.webp", {
-        passive: false, hp: 1040, dmg: [83, 120], telegraph: 620,
+        passive: false, hp: 392, dmg: [46, 66], telegraph: 620,
         emblem: "em_gourdling", emblemChance: 0.0022,
         rareChance: RARE_CHANCE, rareLoot: { part: "warren_silk", n: [1, 2] },
         loot: [{ part: "gourd_rind", n: [1, 2], w: 70 }, { part: "thorn_barb", n: [1, 2], w: 30 }],
     }),
     husk: E("husk", "Straw Walker", "/images/grove/foe-husk.webp", {
-        passive: false, hp: 1060, dmg: [86, 134], telegraph: 750,
+        passive: false, hp: 399, dmg: [47, 73], telegraph: 750,
         emblem: "em_husk", emblemChance: 0.002,
         rareChance: RARE_CHANCE, rareLoot: { part: "mothlight_dust", n: [1, 2] },
         loot: [{ part: "bound_straw", n: [1, 3], w: 70 }, { part: "gourd_rind", n: [1, 1], w: 30 }],
     }),
     barrowhound: E("barrowhound", "Barrow Hound", "/images/delves/foe-barrowhound.webp", {
-        passive: false, hp: 1080, dmg: [90, 138], telegraph: 520,
+        passive: false, hp: 407, dmg: [49, 76], telegraph: 520,
         emblem: "em_barrowhound", emblemChance: 0.002,
         rareChance: RARE_CHANCE, rareLoot: { part: "rotwood_knot", n: [1, 2] },
         loot: [{ part: "barrow_tooth", n: [1, 2], w: 65 }, { part: "bristle_hide", n: [1, 2], w: 35 }],
     }),
     warren_mother: E("warren_mother", "Warren Mother", "/images/delves/foe-warren-mother.webp", {
-        passive: false, hp: 1200, dmg: [94, 142], telegraph: 820,
+        passive: false, hp: 452, dmg: [52, 78], telegraph: 820,
         emblem: "em_warren", emblemChance: 0.0018,
         rareChance: RARE_CHANCE, rareLoot: { part: "ash_ember", n: [1, 2] },
         loot: [{ part: "warren_silk", n: [1, 2], w: 70 }, { part: "barrow_tooth", n: [1, 2], w: 30 }],
     }),
     voidmoth: E("voidmoth", "Mothlight", "/images/delves/foe-voidmoth.webp", {
-        passive: false, hp: 1210, dmg: [98, 146], telegraph: 600,
+        passive: false, hp: 456, dmg: [54, 80], telegraph: 600,
         emblem: "em_voidmoth", emblemChance: 0.0018,
         rareChance: RARE_CHANCE, rareLoot: { part: "goblin_rivet", n: [1, 2] },
         loot: [{ part: "mothlight_dust", n: [1, 2], w: 72 }, { part: "warren_silk", n: [1, 1], w: 28 }],
     }),
     ashwraith: E("ashwraith", "Ash Wraith", "/images/delves/foe-ashwraith.webp", {
-        passive: false, hp: 1230, dmg: [102, 150], telegraph: 700,
+        passive: false, hp: 463, dmg: [56, 82], telegraph: 700,
         emblem: "em_ashwraith", emblemChance: 0.0016,
         rareChance: RARE_CHANCE, rareLoot: { part: "elder_heartwood", n: [1, 2] },
         loot: [{ part: "ash_ember", n: [1, 2], w: 68 }, { part: "rotwood_knot", n: [1, 2], w: 32 }],
     }),
     goblin: E("goblin", "Palisade Goblin", "/images/grove/foe-goblin.webp", {
-        passive: false, hp: 1290, dmg: [110, 159], telegraph: 560,
+        passive: false, hp: 486, dmg: [60, 87], telegraph: 560,
         emblem: "em_goblin", emblemChance: 0.0016,
         rareChance: RARE_CHANCE, rareLoot: { part: "elder_heartwood", n: [1, 2] },
         loot: [{ part: "goblin_rivet", n: [1, 3], w: 70 }, { part: "ash_ember", n: [1, 1], w: 30 }],
     }),
     elderling: E("elderling", "Elderling", "/images/grove/foe-elderling.webp", {
-        passive: false, hp: 1460, dmg: [118, 182], telegraph: 880,
+        passive: false, hp: 550, dmg: [65, 100], telegraph: 880,
         emblem: "em_elder", emblemChance: 0.0014,
         rareChance: RARE_CHANCE, rareLoot: { part: "crystal_shard", n: [1, 1] },
         loot: [{ part: "elder_heartwood", n: [1, 2], w: 60 }, { part: "rotwood_knot", n: [1, 2], w: 40 }],
@@ -456,8 +456,8 @@ export const GROVE_RARE = {
     //
     // Against that same account it is now 28 swings against a rootrat's 9 -- the longest fight on map
     // one by a distance, which is what a rare SHOULD be -- and it kills him in 3-5 rather than 2.
-    hp: 2600,
-    dmg: [85, 130],
+    hp: 1000,
+    dmg: [48, 73],
     telegraph: 900,
     // Per enemy spawned, before the rare_spawn emblem bonus is applied.
     spawnChance: 0.004,
@@ -541,62 +541,62 @@ const B = (id, name, o) => ({ id, name, art: `/images/grove/boss-${id}.webp`, bo
 // fight; do not divide two numbers. See [[balance-real-bouts-not-sims]] for the other half of that rule.
 const MAP_ONE_BOSSES = {
     glutmaw: B("glutmaw", "Glutmaw, the Burrow King", {
-        hp: 59000, dmg: [190, 260], emblem: "em_rootrat", emblemChance: 0.09,
+        hp: 9000, dmg: [70, 96], emblem: "em_rootrat", emblemChance: 0.09,
         attacks: [A.slam, A.sweep],
         loot: [{ part: "gnawed_root", n: [4, 7] }, { part: "damp_moss", n: [3, 5] }],
     }),
     mossmother: B("mossmother", "The Mossmother", {
-        hp: 67700, dmg: [190, 270], emblem: "em_grub", emblemChance: 0.09,
+        hp: 10327, dmg: [70, 99], emblem: "em_grub", emblemChance: 0.09,
         attacks: [A.slam, A.volley],
         loot: [{ part: "grub_fat", n: [4, 7] }, { part: "damp_moss", n: [3, 6] }],
     }),
     thistlecrown: B("thistlecrown", "Thistlecrown", {
-        hp: 76800, dmg: [190, 270], emblem: "em_thornling", emblemChance: 0.10,
+        hp: 11715, dmg: [70, 99], emblem: "em_thornling", emblemChance: 0.10,
         attacks: [A.sweep, A.slam, A.volley],
         loot: [{ part: "thorn_barb", n: [4, 8] }, { part: "gnawed_root", n: [3, 6] }],
     }),
     grandfather_bristle: B("grandfather_bristle", "Grandfather Bristle", {
-        hp: 86300, dmg: [190, 280], emblem: "em_badger", emblemChance: 0.10,
+        hp: 13164, dmg: [70, 103], emblem: "em_badger", emblemChance: 0.10,
         attacks: [A.slam, A.sweep],
         loot: [{ part: "bristle_hide", n: [4, 7] }, { part: "split_antler", n: [2, 4] }],
     }),
     rattlerind: B("rattlerind", "Rattlerind", {
-        hp: 96300, dmg: [200, 280], emblem: "em_gourdling", emblemChance: 0.10,
+        hp: 14690, dmg: [74, 103], emblem: "em_gourdling", emblemChance: 0.10,
         attacks: [A.volley, A.slam, A.sweep],
         loot: [{ part: "gourd_rind", n: [4, 8] }, { part: "thorn_barb", n: [3, 6] }],
     }),
     harvestman: B("harvestman", "The Harvestman", {
-        hp: 107000, dmg: [200, 280], emblem: "em_husk", emblemChance: 0.11,
+        hp: 16322, dmg: [74, 103], emblem: "em_husk", emblemChance: 0.11,
         attacks: [A.sweep, A.slam],
         loot: [{ part: "bound_straw", n: [5, 9] }, { part: "gourd_rind", n: [3, 6] }],
     }),
     barrow_warden: B("barrow_warden", "The Barrow Warden", {
-        hp: 118000, dmg: [200, 290], emblem: "em_barrowhound", emblemChance: 0.11,
+        hp: 18000, dmg: [74, 107], emblem: "em_barrowhound", emblemChance: 0.11,
         attacks: [A.slam, A.volley, A.sweep],
         loot: [{ part: "barrow_tooth", n: [5, 9] }, { part: "bristle_hide", n: [3, 6] }],
     }),
     great_weaver: B("great_weaver", "The Great Weaver", {
-        hp: 129000, dmg: [200, 290], emblem: "em_warren", emblemChance: 0.11,
+        hp: 19678, dmg: [74, 107], emblem: "em_warren", emblemChance: 0.11,
         attacks: [A.volley, A.sweep],
         loot: [{ part: "warren_silk", n: [5, 9] }, { part: "barrow_tooth", n: [3, 6] }],
     }),
     lanternwing: B("lanternwing", "The Lanternwing", {
-        hp: 141000, dmg: [210, 290], emblem: "em_voidmoth", emblemChance: 0.12,
+        hp: 21508, dmg: [77, 107], emblem: "em_voidmoth", emblemChance: 0.12,
         attacks: [A.volley, A.slam, A.sweep],
         loot: [{ part: "mothlight_dust", n: [5, 9] }, { part: "warren_silk", n: [3, 6] }],
     }),
     everburning: B("everburning", "The Everburning", {
-        hp: 154000, dmg: [210, 300], emblem: "em_ashwraith", emblemChance: 0.12,
+        hp: 23491, dmg: [77, 111], emblem: "em_ashwraith", emblemChance: 0.12,
         attacks: [A.sweep, A.volley, A.slam],
         loot: [{ part: "ash_ember", n: [5, 10] }, { part: "rotwood_knot", n: [3, 6] }],
     }),
     stakelord: B("stakelord", "Gorrak the Stakelord", {
-        hp: 167000, dmg: [210, 300], emblem: "em_goblin", emblemChance: 0.12,
+        hp: 25475, dmg: [77, 111], emblem: "em_goblin", emblemChance: 0.12,
         attacks: [A.slam, A.volley, A.sweep],
         loot: [{ part: "goblin_rivet", n: [6, 10] }, { part: "ash_ember", n: [3, 6] }],
     }),
     heartwood_elder: B("heartwood_elder", "The Heartwood Elder", {
-        hp: 180000, dmg: [220, 310], emblem: "em_elder", emblemChance: 0.14,
+        hp: 27458, dmg: [81, 114], emblem: "em_elder", emblemChance: 0.14,
         attacks: [A.sweep, A.slam, A.volley],
         loot: [{ part: "elder_heartwood", n: [4, 8] }, { part: "rotwood_knot", n: [4, 7] }],
     }),
@@ -871,7 +871,12 @@ export const GROVE_ZONES = [
 // ⚠️ grove-curve.mjs's DEFAULT MUST MATCH THIS. The tool prints a recommended GROVE_SCALE for whatever anchor
 // it is asked about, and a default that disagrees with the shipped constant means the next person to run it
 // reads a table describing a game that is not this one.
-export const GROVE_SCALE = { hpPerZone: 0.0448, dmgPerZone: 0.0199, zonesPerMap: 12 };
+// ⚠️ RE-CUT 2026-10-23, AND WANDERERS DELIBERATELY NO LONGER MATCH THE BOSSES. A boss climbs x2.25 a map
+// (see BOSS_HP_D1); trash climbs x1.0504 a zone, which is x1.81 a map. The gap is the design: a correctly
+// geared player kills a wanderer in about three swings at EVERY depth — Adam at map 1, Eric at map 8 — so
+// walking deeper changes what the BOSS costs you rather than how long each rat takes. Setting these equal
+// put Eric at thirteen swings per wanderer on map 7, which is a wall of chores wearing difficulty's coat.
+export const GROVE_SCALE = { hpPerZone: 0.0504, dmgPerZone: 0.0325, zonesPerMap: 12 };
 
 /**
  * How deep in the whole Grove a zone is, counting across maps — the ONE number difficulty scales against.
