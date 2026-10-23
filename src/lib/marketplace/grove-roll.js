@@ -171,7 +171,7 @@ const XP_PER_FOE_HP = 96;    // 770hp -> 8 xp,  1460hp -> 15 xp
 const XP_PER_BOSS_HP = 200;  // 59k   -> 295,   180k   -> 900
 
 import { bossChestChance, bossMerits, chestForZone } from "@/lib/marketplace/grove-forge.js";
-import { wandererHyperChance } from "@/lib/marketplace/grove-catalog.js";
+import { wandererHyperChance, safeCredit } from "@/lib/marketplace/grove-catalog.js";
 
 export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = null) {
     // ⚠️ zoneN AND hyperTable DEFAULT TO OFF, and that is a safety property rather than tidiness. Both
@@ -389,6 +389,43 @@ export function rollRareSpawn(baseChance, seed, index, bonus = {}) {
  * does not get to say what fell out. That is the entire anti-cheat budget of this design and it costs one
  * request instead of two hundred.
  */
+// ── ⚠️ A MULTI-KILL ROLLS THE LOOT THAT MANY TIMES ───────────────────────────────────────────────────────────
+// Luke: "when you multi-kill an enemy, whether it's 2x, 4x, blah blah blah, like, that should multiply the
+// loot drops too for you. So it should drop, it would be as if you killed 4 or 16 or however many your
+// multi-kill was of that. It would make that many rolls."
+//
+// ⚠️ I ARGUED AGAINST THIS AND HE OVERRULED IT, which is the right record to leave: multi-kill originally
+// paid progress and nothing else, precisely so drop rate could not scale with gear. It does now. The faucet
+// this opens is real and bounded by the same two things that already bound ordinary kills — the rolling kill
+// window in grove.js, which counts CLAIMS and is untouched by credit, and safeCredit's cap of eight.
+//
+// ⚠️ ONE FUNCTION, CALLED BY BOTH SIDES. The scene spills loot the instant a creature falls and the server
+// re-rolls the identical answer at settle; two loops over rollKill written in two files is the exact shape
+// check-grove-roll exists to catch. See [[atomic-split-into-steps-drops-lines]].
+//
+// ⚠️ AND THE EXTRA ROLLS NEED THEIR OWN STREAMS. Every roll is keyed on the kill INDEX, so four rolls of one
+// kill asking for index `i` four times would return the same drop four times — a multi-kill paying 4x of
+// exactly one thing rather than four rolls of the table. The seed is mixed with the roll number instead, and
+// roll zero mixes with zero, so a single kill is byte-identical to what it was before this existed.
+export function rollKillTimes(foe, seed, index, bonus, zoneN, hyperTable, times = 1) {
+    const n = Math.max(1, Math.floor(Number(times) || 1));
+    const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0, band: null, rare: null, hyper: null,
+        chests: [], hypers: [], emblems: {} };
+    for (let r = 0; r < n; r += 1) {
+        const got = rollKill(foe, (Number(seed) || 0) ^ Math.imul(r, 0x85EBCA6B), index, bonus, zoneN, hyperTable);
+        for (const [p, c] of Object.entries(got.parts)) out.parts[p] = (out.parts[p] || 0) + c;
+        out.gold += got.gold;
+        out.xp += got.xp;
+        if (got.chest) out.chests.push(got.chest);
+        if (got.hyper) out.hypers.push(got.hyper);
+        if (got.emblem) out.emblems[got.emblem] = (out.emblems[got.emblem] || 0) + 1;
+        // The FIRST roll is the one the scene draws a band and a rare off — those are presentation for the
+        // body that just fell, and there is only ever one body.
+        if (r === 0) { out.emblem = got.emblem; out.chest = got.chest; out.band = got.band; out.rare = got.rare; out.hyper = got.hyper; }
+    }
+    return out;
+}
+
 export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTable = null) {
     const parts = {};
     const emblems = {};
@@ -405,13 +442,15 @@ export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTab
     for (const k of kills || []) {
         const foe = lookup(k.id);
         if (!foe) continue;
-        const got = rollKill(foe, seed, k.i, bonus, zoneN, hyperTable);
+        // `c` is the multi-kill credit the scene claimed, rounded down to a rung this rule could have
+        // produced and capped — see safeCredit. Absent means one, which is every ordinary kill.
+        const got = rollKillTimes(foe, seed, k.i, bonus, zoneN, hyperTable, safeCredit(k?.c));
         for (const [p, n] of Object.entries(got.parts)) parts[p] = (parts[p] || 0) + n;
-        if (got.emblem) emblems[got.emblem] = (emblems[got.emblem] || 0) + 1;
+        for (const [em, n] of Object.entries(got.emblems)) emblems[em] = (emblems[em] || 0) + n;
         gold += got.gold;
         xp += got.xp;
-        if (got.chest) chests.push(got.chest);
-        if (got.hyper) hypers.push(got.hyper);
+        for (const c of got.chests) chests.push(c);
+        for (const h of got.hypers) hypers.push(h);
     }
     return { parts, emblems, gold, xp, chests, hypers };
 }

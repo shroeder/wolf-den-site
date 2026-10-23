@@ -10,7 +10,7 @@ import {
     GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, dropsAnyOf, HEAL_AT, scaledFoe, scaledRare, killCredit, groveBoss, groveSize, grovePart,
     groveArt, groveEmblem, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
-import { rngFrom, rollKill, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
+import { rngFrom, rollKillTimes, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
 import {
     UNITS_PER_SCREEN, zoneWidth, platformsFor, decorateLedges, swing, makeTelegraph, telegraphHits, mitigate,
     BLEED_TICK_MS, BLEED_TICKS, BURN_SHARE, BURN_TICK_MS, BURN_TICKS,
@@ -1361,8 +1361,12 @@ export default function GroveScene({
             // ⚠️ zone.n AND GROVE_HYPER ARE PASSED ON BOTH SIDES OR NEITHER. The server replays this exact
             // call to verify the settle (see settleKills), so an argument present here and absent there is
             // a client that celebrates a Power Scroll the settle then declines to hand over.
-            const got = rollKill(foe.rare ? GROVE_RARE : GROVE_ENEMIES[foe.id], seed, i, bonuses,
-                zone.n, GROVE_HYPER);
+            // ⚠️ AS MANY ROLLS AS THE BLOW WAS WORTH, THROUGH THE SHARED FUNCTION. A multi-kill pays the
+            // loot table that many times (Luke's call — see the note on rollKillTimes), and the server
+            // replays this exact call at settle. The credit is the one computed for this kill above, so
+            // the spill on screen and the grant in the database cannot disagree.
+            const got = rollKillTimes(foe.rare ? GROVE_RARE : GROVE_ENEMIES[foe.id], seed, i, bonuses,
+                zone.n, GROVE_HYPER, credit);
             // ⚠️ LAB ONLY, AND ONCE. An emblem is roughly one kill in four hundred, so the rarest moment in
             // the Grove could otherwise only be reviewed by killing four hundred things and hoping — which
             // is the same reason the boss and the climb have scenes. Guarded by labScene, which is null in
