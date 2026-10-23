@@ -520,64 +520,88 @@ const A = {
 // zone-1 Thornling into a zone-5 Thornling would compound on a number that was already written for zone 5.
 const B = (id, name, o) => ({ id, name, art: `/images/grove/boss-${id}.webp`, boss: true, ...o });
 
+// ── ⚠️ THE 35 SECONDS WAS CHECKED AND THE DAMAGE OVER THOSE 35 SECONDS WAS NOT ──────────────────────────────
+// Luke: "the bosses are still way too hard, even for the first map. My son can't get past the first map,
+// first zone's boss."
+//
+// The HP side is correct and always was. Measured against Littlewolf's real kit on the live database --
+// 1,677 dps -- Glutmaw dies in 35 seconds, exactly the target in GROVE_SCALE. Nothing is wrong with the
+// health curve, and the first instinct of lowering it would have been wrong.
+//
+// But a boss swings about every 1.9 seconds, so a 35-second fight is NINETEEN blows -- and at 190-260
+// against his 1,229 health and his armour it killed him in NINE. He had to survive more than twice as long
+// as he could. The target priced how long a boss LIVES and nobody priced how hard it HITS across that same
+// window, which is the only half of it the player actually experiences.
+//
+// ⚠️ AND THE FIRST BOSS IN THE GAME WAS THE WORST ONE. Damage is near-flat across map one (190 to 220) while
+// health triples (59,000 to 180,000), so zone one carries the highest damage-per-health on the map: the very
+// first boss anybody ever meets is the one most likely to kill them.
+//
+// 0.55x leaves him dying in about sixteen of the nineteen -- a fight he loses by standing still and wins by
+// dodging a couple of telegraphs or reaching for the belt, which is what a boss is for. Health untouched, so
+// every fight is exactly as long as it was designed to be.
+//
+// ⚠️ APPLIED HERE *AND* TO BOSS_DMG_D1 IN grove-maps.js. Map one is hand-authored in this file and maps two
+// to seven are generated from that constant, which is anchored to these numbers -- changing one without the
+// other makes map two's first boss hit harder than map one's last.
 const MAP_ONE_BOSSES = {
     glutmaw: B("glutmaw", "Glutmaw, the Burrow King", {
-        hp: 59000, dmg: [190, 260], emblem: "em_rootrat", emblemChance: 0.09,
+        hp: 59000, dmg: [105, 143], emblem: "em_rootrat", emblemChance: 0.09,
         attacks: [A.slam, A.sweep],
         loot: [{ part: "gnawed_root", n: [4, 7] }, { part: "damp_moss", n: [3, 5] }],
     }),
     mossmother: B("mossmother", "The Mossmother", {
-        hp: 67700, dmg: [190, 270], emblem: "em_grub", emblemChance: 0.09,
+        hp: 67700, dmg: [105, 148], emblem: "em_grub", emblemChance: 0.09,
         attacks: [A.slam, A.volley],
         loot: [{ part: "grub_fat", n: [4, 7] }, { part: "damp_moss", n: [3, 6] }],
     }),
     thistlecrown: B("thistlecrown", "Thistlecrown", {
-        hp: 76800, dmg: [190, 270], emblem: "em_thornling", emblemChance: 0.10,
+        hp: 76800, dmg: [105, 148], emblem: "em_thornling", emblemChance: 0.10,
         attacks: [A.sweep, A.slam, A.volley],
         loot: [{ part: "thorn_barb", n: [4, 8] }, { part: "gnawed_root", n: [3, 6] }],
     }),
     grandfather_bristle: B("grandfather_bristle", "Grandfather Bristle", {
-        hp: 86300, dmg: [190, 280], emblem: "em_badger", emblemChance: 0.10,
+        hp: 86300, dmg: [105, 154], emblem: "em_badger", emblemChance: 0.10,
         attacks: [A.slam, A.sweep],
         loot: [{ part: "bristle_hide", n: [4, 7] }, { part: "split_antler", n: [2, 4] }],
     }),
     rattlerind: B("rattlerind", "Rattlerind", {
-        hp: 96300, dmg: [200, 280], emblem: "em_gourdling", emblemChance: 0.10,
+        hp: 96300, dmg: [110, 154], emblem: "em_gourdling", emblemChance: 0.10,
         attacks: [A.volley, A.slam, A.sweep],
         loot: [{ part: "gourd_rind", n: [4, 8] }, { part: "thorn_barb", n: [3, 6] }],
     }),
     harvestman: B("harvestman", "The Harvestman", {
-        hp: 107000, dmg: [200, 280], emblem: "em_husk", emblemChance: 0.11,
+        hp: 107000, dmg: [110, 154], emblem: "em_husk", emblemChance: 0.11,
         attacks: [A.sweep, A.slam],
         loot: [{ part: "bound_straw", n: [5, 9] }, { part: "gourd_rind", n: [3, 6] }],
     }),
     barrow_warden: B("barrow_warden", "The Barrow Warden", {
-        hp: 118000, dmg: [200, 290], emblem: "em_barrowhound", emblemChance: 0.11,
+        hp: 118000, dmg: [110, 160], emblem: "em_barrowhound", emblemChance: 0.11,
         attacks: [A.slam, A.volley, A.sweep],
         loot: [{ part: "barrow_tooth", n: [5, 9] }, { part: "bristle_hide", n: [3, 6] }],
     }),
     great_weaver: B("great_weaver", "The Great Weaver", {
-        hp: 129000, dmg: [200, 290], emblem: "em_warren", emblemChance: 0.11,
+        hp: 129000, dmg: [110, 160], emblem: "em_warren", emblemChance: 0.11,
         attacks: [A.volley, A.sweep],
         loot: [{ part: "warren_silk", n: [5, 9] }, { part: "barrow_tooth", n: [3, 6] }],
     }),
     lanternwing: B("lanternwing", "The Lanternwing", {
-        hp: 141000, dmg: [210, 290], emblem: "em_voidmoth", emblemChance: 0.12,
+        hp: 141000, dmg: [116, 160], emblem: "em_voidmoth", emblemChance: 0.12,
         attacks: [A.volley, A.slam, A.sweep],
         loot: [{ part: "mothlight_dust", n: [5, 9] }, { part: "warren_silk", n: [3, 6] }],
     }),
     everburning: B("everburning", "The Everburning", {
-        hp: 154000, dmg: [210, 300], emblem: "em_ashwraith", emblemChance: 0.12,
+        hp: 154000, dmg: [116, 165], emblem: "em_ashwraith", emblemChance: 0.12,
         attacks: [A.sweep, A.volley, A.slam],
         loot: [{ part: "ash_ember", n: [5, 10] }, { part: "rotwood_knot", n: [3, 6] }],
     }),
     stakelord: B("stakelord", "Gorrak the Stakelord", {
-        hp: 167000, dmg: [210, 300], emblem: "em_goblin", emblemChance: 0.12,
+        hp: 167000, dmg: [116, 165], emblem: "em_goblin", emblemChance: 0.12,
         attacks: [A.slam, A.volley, A.sweep],
         loot: [{ part: "goblin_rivet", n: [6, 10] }, { part: "ash_ember", n: [3, 6] }],
     }),
     heartwood_elder: B("heartwood_elder", "The Heartwood Elder", {
-        hp: 180000, dmg: [220, 310], emblem: "em_elder", emblemChance: 0.14,
+        hp: 180000, dmg: [121, 170], emblem: "em_elder", emblemChance: 0.14,
         attacks: [A.sweep, A.slam, A.volley],
         loot: [{ part: "elder_heartwood", n: [4, 8] }, { part: "rotwood_knot", n: [4, 7] }],
     }),

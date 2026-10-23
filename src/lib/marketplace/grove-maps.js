@@ -735,7 +735,27 @@ export const MAP_ENEMIES = Object.fromEntries(
 // Run continuously instead and map two's last boss lands at 108,000 against map one's 180,000 — the game
 // getting easier as you go deeper, which no screen would ever tell you.
 const BOSS_HP_D1 = 59000;
-const BOSS_DMG_D1 = [190, 260];
+// ── ⚠️ THE 35 SECONDS WAS CHECKED AND THE DAMAGE OVER THOSE 35 SECONDS WAS NOT ──────────────────────────────
+// Luke: "the bosses are still way too hard, even for the first map. My son can't get past the first map,
+// first zone's boss."
+//
+// The HP side is correct and always has been. Measured against Littlewolf's real kit on the live database --
+// 1,677 dps -- the first boss dies in 35 seconds, exactly the target above. Nothing is wrong with BOSS_HP_D1.
+//
+// But a boss swings about every 1.9 seconds, so a 35-second fight is NINETEEN blows, and at 190-260 against
+// his 1,229 health and his armour it killed him in NINE. He had to survive more than twice as long as he
+// could. The target priced how long the boss LIVES and nobody priced how hard it HITS over that same window,
+// which is the only half the player experiences.
+//
+// ⚠️ AND THE FIRST BOSS IN THE GAME WAS THE WORST OF THEM. Damage is near-flat across a map (190 to 220)
+// while health triples (59,000 to 180,000), so zone one has the highest damage-per-health on map one -- the
+// very first boss anybody meets is the one most likely to kill them.
+//
+// 105-143 is 0.55x, which leaves him dying in about sixteen of the nineteen: a fight he loses by standing
+// still and wins by dodging a couple of telegraphs or reaching for the belt, which is what a boss should be.
+// Every other boss moves with it -- all 84 are generated from this one pair -- so the shape across maps and
+// across each map's twelve is untouched. Only the level drops.
+const BOSS_DMG_D1 = [105, 143];
 const MAP_STEP_HP = 1.372;     // the hero's power step per map
 const MAP_STEP_DMG = 1.172;    // the hero's durability step per map
 const MAP_RAMP_HP = 3.05;      // 59,000 -> 180,000 across map one's twelve
