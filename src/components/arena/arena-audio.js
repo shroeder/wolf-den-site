@@ -93,6 +93,23 @@ export function subBus(gain = 1) {
     return g;
 }
 
+/**
+ * The context and the shared noise buffer, for a feature building its OWN nodes.
+ *
+ * `tone` and `noise` cover transients — they have a sub-20ms attack, which is exactly right for an impact
+ * and exactly wrong for a bowed drone or a wind swell that has to arrive over a second and a half. A feature
+ * that needs those has to build the oscillator and the filter itself, and the one thing it must NOT do is
+ * build a second AudioContext to do it in: Chrome allows about six per document and the arena already paid
+ * for that lesson (see the top of this file). So it borrows this one, and hangs the result on a `subBus` so
+ * it still lands on the shared limiter and the shared mute.
+ *
+ * `noiseBuf` is one second of white noise, built once; loop a BufferSource over it rather than making another.
+ */
+export function audioParts() {
+    const c = ensure();
+    return c ? { ctx: c, noiseBuf } : null;
+}
+
 /** Silence a sub-bus and let it go. The disconnect is delayed past the fade or it cuts with a click. */
 export function killBus(g, fade = 0.14) {
     if (!g || !ctx) return;

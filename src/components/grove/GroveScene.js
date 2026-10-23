@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { GiSoundOff, GiSoundOn } from "react-icons/gi";
 
 import { useWishlist } from "./useWishlist.js";
 
@@ -56,6 +57,17 @@ import {
     playFreeze, playStun, playChill, playCataclysm, playSoulfire, playSurge,
     playGuard, playBlock, playRiposte, playGrudge, playIgnite, playWild,
 } from "@/components/grove/grove-sfx.js";
+// ── THE ZONE'S MUSIC ────────────────────────────────────────────────────────────────────────────────
+// A bed per zone, synthesised from the map's mode, the biome's voices and the depth — see grove-music.js
+// for the long version. Three things reach it from here: which zone we are standing in, how badly it is
+// going, and whether something large has noticed. Nothing else in this file needs to know it exists.
+import {
+    duckGroveMusic, setGroveBoss, setGroveDanger, startGroveMusic, stopGroveMusic,
+} from "@/components/grove/grove-music.js";
+// The room's one sound switch, and it is the ARENA's flag rather than a second one — the casino learned
+// that two mutes which can disagree is a worse bug than no mute at all, and the Grove had no way to find
+// out the sound had been turned off on another screen weeks ago, let alone turn it back on.
+import { isMuted, setMuted, unlock } from "@/components/arena/arena-audio.js";
 // ── ⚠️ THE GEOMETRY LIVES IN ITS OWN FILE SO IT CAN BE CHECKED ─────────────────────────────────────
 // Every distance that is really a SHARE OF THE FRAME is in grove-view.js, with the long version of why. The
 // short version: three such distances were written here as bare constants tuned for a 100-unit frame, and all
@@ -446,6 +458,41 @@ export default function GroveScene({
     // depending on ancestors it does not own. See filter-creates-containing-block.
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); }, []);
+
+    // ── THE MUSIC ────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ KEYED ON THE ZONE AND NOTHING ELSE. The loop effect below depends on the world, the stats, the
+    // bonuses and a rerender counter, so it tears down and rebuilds many times a session — hanging the bed
+    // off that would restart the music every time a panel opened. Walking through a gate changes zone.id
+    // and swaps the bed; nothing else here touches it.
+    //
+    // ⚠️ THE FIELDS, NOT THE OBJECT. `zone` is a prop and nothing promises it is the same object between
+    // renders — depending on its identity would fade the bed out and back in on any render that happened to
+    // rebuild it. These five are everything grove-music reads.
+    useEffect(() => {
+        if (!mounted) return undefined;
+        startGroveMusic({ id: zone.id, name: zone.name, map: zone.map, biome: zone.biome, n: zone.n });
+        return () => stopGroveMusic();
+    }, [mounted, zone.id, zone.name, zone.map, zone.biome, zone.n]);
+
+    // Behind a panel the scene is paused, so the forest drops back rather than stopping — see
+    // duckGroveMusic for why that is a gain ramp and not a stop.
+    useEffect(() => { duckGroveMusic(paused); }, [paused]);
+
+    // ── THE SOUND SWITCH ─────────────────────────────────────────────────────────────────────────
+    // Read after mount, never during render: it lives in localStorage and the server has no idea what it
+    // says, so touching it while rendering is a hydration mismatch.
+    const [soundOff, setSoundOff] = useState(false);
+    useEffect(() => { setSoundOff(isMuted()); }, []);
+    const toggleSound = useCallback(() => {
+        setSoundOff((was) => {
+            const next = !was;
+            setMuted(next);
+            // A confirming sound, but only on the way ON. A sound to tell you the sound is off is a joke
+            // that lands once.
+            if (!next) { unlock(); playPickup(false); }
+            return next;
+        });
+    }, []);
 
     // The browser's own full screen, where it exists. ⚠️ NOT RELIED ON: iOS Safari refuses
     // requestFullscreen for anything that is not a <video>, which is a large share of the phones that will
@@ -2818,6 +2865,21 @@ export default function GroveScene({
                 vignRef.current.style.opacity = String(Math.min(0.92, hurt * 0.55 + low));
             }
 
+            // ── AND THE MUSIC REACTS TOO ────────────────────────────────────────────────────────
+            // The same two facts the screen is already drawing — how much health is left, and whether a
+            // boss is up — handed to the bed, which turns layers on with them. Four times a second rather
+            // than per frame: these are two numbers a scheduler reads at the top of a bar, so sixty writes
+            // a second would be fifty-nine thrown away.
+            if (now - (w.musicAt || 0) > 250) {
+                w.musicAt = now;
+                const hpFrac = Math.max(0, w.hp) / maxHp;
+                setGroveDanger(w.hp > 0 ? 1 - hpFrac : 1);
+                // `noticed` is the boss's own flag, set when it first sees you (see the notice above) and
+                // gone with the world when the zone is. Read rather than pushed, so there is no transition
+                // to miss: walking out of a zone mid-fight cannot leave the music hunting you.
+                setGroveBoss(Boolean(w.boss && w.boss.noticed && w.boss.hp > 0));
+            }
+
             // ── AUTOSAVE ────────────────────────────────────────────────────────────────────────
             if (now - lastSettle > SETTLE_EVERY_MS && w.killLog.length) {
                 lastSettle = now;
@@ -3375,6 +3437,15 @@ export default function GroveScene({
                         {belt?.id ? "Belt empty" : "No belt"}
                     </button>
                 ) : null}
+                {/* ── ONE SWITCH FOR THE WHOLE ZONE ──────────────────────────────────────────────
+                    The music and the creatures are not two decisions a person wants to make — "is this
+                    forest making noise" is the whole of it — and the casino already proved that two
+                    remembered mutes in two keys can disagree across sessions with neither button saying
+                    so. So this is the arena's flag, finally reachable from the screen it silences. */}
+                <button type="button" className="gv-leave" onClick={toggleSound}
+                    aria-label={soundOff ? "Turn sound on" : "Turn sound off"} aria-pressed={soundOff}>
+                    {soundOff ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
+                </button>
                 {canNative ? (
                     <button type="button" className="gv-leave" onClick={toggleNative}
                         aria-label={isNative ? "Leave full screen" : "Full screen"}>
