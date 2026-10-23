@@ -2085,6 +2085,28 @@ export default function GroveScene({
                 const angry = f.isBoss ? (f === tgt || f.hit) : (!f.passive && (f === tgt || f.hit));
                 const near = Math.abs(f.x - w.hero.x) < (f.isBoss ? 26 : 15)
                     && Math.abs(f.y - w.hero.y) < SWING_V_REACH + 4;
+                // ── ⚠️ A BOSS FIGHT IS A DUEL, AND IT WAS A DUEL IN A CROWD ────────────────────
+                // Luke: "he's on the Everburning and it's kicking his ass, and it shouldn't be."
+                //
+                // It was not the boss. Measured against his real kit, The Everburning alone deals 136 a
+                // second and he heals 232 -- he cannot lose that fight. But it is an 88-SECOND fight, and
+                // a zone holds 15-30 creatures: with four of them also on him he starts losing ground, at
+                // six he is dead in fourteen seconds, at eight in eight. He was never losing to the boss.
+                //
+                // ⚠️ AND THE CROWD IS SUPPOSED TO BE THE THREAT -- that is this mode's whole design, "the
+                // threat here is three things closing at once". It just cannot ALSO be true during the one
+                // fight you are not allowed to walk away from. Every boss he has ever reached is still
+                // standing: ten zones, not one kill.
+                //
+                // So while the boss is awake, the rest of the zone loses interest. Nothing despawns --
+                // they are still there, still killable, still carrying loot -- they simply stop swinging,
+                // which makes the climax of a zone a fight with the thing the zone is about.
+                //
+                // ⚠️ AND IT CANNOT BE FARMED. A passive creature is still a kill, so this looks like free
+                // safe farming -- it buys nothing. killCeiling bounds a dive by respawn rather than by
+                // kill speed (see gold-mint-rate-lever), and the boss is on a thirty-minute cooldown, so
+                // standing in a boss arena killing trash is strictly slower than leaving and coming back.
+                const bossAwake = w.foes.some((x) => x.isBoss && x.noticed && !x.dying && x.hp > 0);
                 // ⚠️ AND IT CANNOT START A NEW ONE EITHER. nextAttack is pushed past the stun when it
                 // lands, but a creature whose cadence had already elapsed would wind up on the very next
                 // frame; this is the gate that actually holds it still.
@@ -2095,7 +2117,7 @@ export default function GroveScene({
                     const age = now - (f.chillAt || 0);
                     if (age >= CHILL_FADE_MS) f.chill = 0;
                 }
-                if (angry && near && !stunned && now >= (f.nextAttack || 0)) {
+                if (angry && near && !stunned && (f.isBoss || !bossAwake) && now >= (f.nextAttack || 0)) {
                     if (f.isBoss && f.attacks?.length) {
                         // ⚠️ CYCLED IN ORDER, NOT PICKED AT RANDOM. A boss you can learn is the whole point
                         // of telegraphing; a random pick from three shapes is just noise with a wind-up.

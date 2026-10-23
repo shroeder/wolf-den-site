@@ -394,6 +394,33 @@ export const GROVE_CSS = `
     aspect-ratio: auto; border-radius: 0; border: 0;
     overscroll-behavior: none; }
 /* The page behind it must not scroll while it is up. */
+/* ── ⚠️ AN iPAD TREATS A FAST DOUBLE TAP AS TEXT SELECTION ────────────────────────────────────
+   Luke: "when he double taps a lot on the iPad, it like selects all and comes up with a context
+   menu." Which is exactly what a browser is supposed to do with a double tap on a page -- select the
+   word under it -- and exactly wrong inside a game where a double tap is two attacks.
+
+   Three different behaviours have to be turned off and they are not the same switch:
+     user-select         the selection itself, and the blue wash that comes with it
+     touch-callout       the long-press menu Safari raises over anything it thinks is content
+     touch-action        the double-tap-to-zoom gesture, which also costs every tap a 300ms wait
+                         while the browser decides whether a second one is coming
+
+   ⚠️ ON THE WHOLE SURFACE, NOT ON THE BUTTONS. Some controls already carried touch-action, which is
+   why the dock felt fine and the zone did not -- the taps that matter most in this feature land on
+   the scene itself, on creatures, and on empty floor. */
+.gv, .gv-scene, .gv-zsheet, .gv-full-lock {
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation; }
+/* ⚠️ touch-action IS NOT INHERITED, AND THE THINGS HE TAPS ARE CHILDREN. Setting it on .gv-scene left
+   every creature and the hero on auto -- so the double-tap gesture and its 300ms wait were still live
+   on precisely the elements a player hits, which is the whole complaint. Verified with the computed
+   style rather than by reading the rule: the parent said manipulation and .gv-foe said auto. */
+.gv-scene *, .gv *, .gv-zsheet * { touch-action: manipulation; }
+/* ⚠️ THE PANELS ARE THE EXCEPTION. A player reading a recipe or an item name should still be able to
+   select the text of it; nothing in a panel is a double-tap target. */
+.gv-sheet { -webkit-user-select: text; user-select: text; }
+
 .gv-full-lock { overflow: hidden; }
 /* ⚠️ AND THE SITE’S OWN FLOATING CHROME HAS TO GO WITH IT. The social bubble and the DM bubble are
    fixed to the bottom-right corner, which in a full-screen zone is INSIDE the play area and on top of it —
