@@ -440,8 +440,24 @@ export const GROVE_RARE = {
     id: "crystal_stag",
     name: "The Crystal Stag",
     art: "/images/grove/foe-crystal_stag.webp",
-    hp: 9000,
-    dmg: [240, 360],
+    // ── ⚠️ TUNED AGAINST A BEGINNER, BECAUSE MAP ONE IS WHERE IT IS FIRST MET ────────────────────────
+    // Luke: "the crystal stag is too hard, the first map is supposed to be for beginners."
+    //
+    // At 9,000 and 240-360 it was ELEVEN TIMES an ordinary creature's health and nearly FOUR TIMES its
+    // damage -- and the proportion held at every depth, so it was never mis-scaled, it was simply built
+    // for somebody with a kit. Measured against the newest account on the live database (95 damage, 375
+    // health) it took NINETY-FIVE swings to kill and put him down in TWO blows. That is not a hard
+    // fight, it is a wall with a 0.4% chance of appearing.
+    //
+    // ⚠️ THE DAMAGE WAS THE KILLER, NOT THE HEALTH. A player's health is tuned against the ordinary
+    // roster, so a creature hitting for four times the local average one-shots whoever it is standing
+    // in front of, whatever its health bar says. 85-130 is 1.4x a rootrat: clearly the dangerous thing
+    // on the screen, and survivable for the four or five blows it takes to reach the belt's 60% heal.
+    //
+    // Against that same account it is now 28 swings against a rootrat's 9 -- the longest fight on map
+    // one by a distance, which is what a rare SHOULD be -- and it kills him in 3-5 rather than 2.
+    hp: 2600,
+    dmg: [85, 130],
     telegraph: 900,
     // Per enemy spawned, before the rare_spawn emblem bonus is applied.
     spawnChance: 0.004,
