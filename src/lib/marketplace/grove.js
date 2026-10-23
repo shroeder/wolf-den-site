@@ -230,7 +230,7 @@ async function heroLook(buyerId) {
 export async function groveState(buyerId) {
     if (!buyerId || !groveOpen(buyerId)) return { ok: false, error: "closed" };
 
-    const [p, zones, items, seen, emblems, tools, chests, craftLog, armour, charms, look, hero] = await Promise.all([
+    const [p, zones, items, seen, emblems, tools, chests, craftLog, everMade, armour, charms, look, hero] = await Promise.all([
         playerRow(buyerId),
         // ⚠️ THE COOLDOWN IS COMPUTED IN SQL, ON THE QUERY THIS ALREADY RAN. Two reasons. It costs nothing
         // — no extra round trip, and round trips are the meter that bills. And the comparison happens where
@@ -256,6 +256,21 @@ export async function groveState(buyerId) {
                FROM mkt_grove_craft_log WHERE buyer_id = $1
               ORDER BY created_at DESC LIMIT 12`, [buyerId],
         ).catch(() => []),
+        // ── ⚠️ EVERYTHING EVER MADE, NOT THE LAST TWELVE ────────────────────────────────────────
+        // Luke: "if you already have a harvesting hoe, then you ... can make another one because it's
+        // random rolls, but we should definitely know that we already have one. And it shouldn't be
+        // like giving us the uncrafted bubble for things like that ... you can like never get rid of
+        // the bubbles."
+        //
+        // The dock's badge counted every recipe you COULD make, and most recipes are repeatable — so for
+        // anyone with a stocked bag it was permanently lit and no action could clear it. That is the
+        // Gear pill's bug exactly (see badgeInfo in GameNav): a badge is a TO-DO, not an inventory
+        // count, and one that never clears teaches you to stop reading every other badge in the game.
+        //
+        // `recent` above is LIMIT 12 for the history panel and cannot answer "have I ever", so this
+        // asks the question it is actually being asked. Distinct ids only — in the same Promise.all,
+        // which is where this file already puts an extra read rather than paying a round trip for it.
+        db.query(`SELECT DISTINCT recipe_id FROM mkt_grove_craft_log WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT piece_id, worn FROM mkt_grove_armour WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         // ⚠️ IN THE SAME Promise.all, NOT A FOURTEENTH ROUND TRIP. Round trips are the meter that
         // bills — see CLAUDE.md — and this is one more row set on a query set that is already in flight.
@@ -417,6 +432,8 @@ export async function groveState(buyerId) {
             && (!r.taughtBy || (p?.taught || []).includes(r.id))).map((r) => r.id),
         // What the bosses have taught, so the bench can run the same filter the server just ran.
         taught: p?.taught || [],
+        // Every recipe this member has ever finished, for the badge rule in recipeRows. Ids only.
+        made: (everMade || []).map((r) => r.recipe_id).filter(Boolean),
         // ── THE CHARMS IN HAND ──────────────────────────────────────────────────────────────────────
         // ⚠️ ONE ENTRY PER (charm, quality), BECAUSE THAT IS WHAT A STACK IS HERE. Two Rootwood Seekings
         // rolled Rough and Masterwork are different objects and the player picks between them at the

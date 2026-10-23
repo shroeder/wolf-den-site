@@ -355,13 +355,28 @@ export function recipeRows(st = {}) {
         const unmet = costs.filter((c) => !seen.has(c.part)).length;
         // ⚠️ `times` IS WITHOUT TEMPERING, because the bench recomputes it against the row's own toggle.
         // It is here so the badge and the sort can see at a glance which rows are worth a batch.
-        return { r, built, costs, missing, haveParts, unmet, ready: missing === 0 && !built,
+        // ⚠️ `made` IS NOT `built`. `built` means you cannot make another — a pack, a bank, a plot, a
+        // tool you already hold at that tier. `made` means you have finished one BEFORE and may freely
+        // make more, which is most of the book: gear rolls its quality, so a second Thornfield Hoe is a
+        // real reason to craft. The two answer different questions and only one of them gates the badge.
+        const made = (st.made || []).includes(r.id);
+        return { r, built, made, costs, missing, haveParts, unmet, ready: missing === 0 && !built,
+            // What the dock's badge counts: something you have never finished and can finish now.
+            // See the long note on the `made` query in grove.js for why it is not `ready`.
+            fresh: missing === 0 && !built && !made,
             repeatable: repeatable(r), times: craftableTimes(r, pack) };
     });
 }
 
-/** How many recipes could be made RIGHT NOW. What the zone dock's badge counts. */
-export const readyCount = (st) => recipeRows(st).filter((x) => x.ready).length;
+/**
+ * What the zone dock's badge counts: recipes you have NEVER finished and could finish right now.
+ *
+ * ⚠️ NOT `ready`. Most of the book is repeatable, so "could be made right now" is permanently true for
+ * anyone with a stocked bag — the badge sat lit and no action cleared it. Luke: "you can like never get
+ * rid of the bubbles." A badge is a to-do; one that cannot be completed is decoration that teaches you
+ * to ignore the rest. Same rule the Gear pill already learned in GameNav.
+ */
+export const readyCount = (st) => recipeRows(st).filter((x) => x.fresh).length;
 
 /**
  * Did this part just put a recipe within reach that was not before?

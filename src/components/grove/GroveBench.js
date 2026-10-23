@@ -464,7 +464,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
             ) : null}
 
             <ul className="gv-recs">
-                {rows.map(({ r, built, costs, missing, haveParts, ready }) => {
+                {rows.map(({ r, built, made, costs, missing, haveParts, ready }) => {
                     const Icon = (r.kind === "tool" && SLOT_ICON[r.slot]) || KIND_ICON[r.kind] || GiStoneCrafting;
                     // A tool recipe shows the rung it would make, not a generic slot icon — the whole point
                     // of drawing twelve of each was that tier VII is a different object, and a workbench that
@@ -506,7 +506,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                     const tmpCost = canTemper ? temperCost(r) : null;
                     const temperExtra = tmpCost ? Object.values(tmpCost).reduce((a, b) => a + b, 0) : 0;
                     return (
-                        <li key={r.id} className={`gv-rec${ready ? " is-ready" : ""}${built ? " is-built" : ""}`}>
+                        <li key={r.id} className={`gv-rec${ready ? " is-ready" : ""}${built ? " is-built" : ""}${made && !built ? " is-made" : ""}`}>
                             {/* ⚠️ THE THREE COLUMNS LIVE IN THEIR OWN ROW. The temper strip used to be a
                                 fourth child of this grid spanning 1 / -1, and a spanning item's
                                 min-content is distributed into the tracks it crosses: measured live, the
@@ -525,6 +525,18 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                             <div className="gv-rec-body">
                                 <div className="gv-rec-top">
                                     <b>{r.name}</b>
+                                    {/* ── ⚠️ "YOU HAVE ONE OF THESE" IS NOT "YOU CANNOT MAKE ANOTHER" ──
+                                        Luke: "if you already have a harvesting hoe, then you ... can make
+                                        another one because it's random rolls, but we should definitely
+                                        know that we already have one."
+
+                                        `built` is the hard stop — a pack, a bank, a plot, a tool at that
+                                        tier — and those rows already say so by going grey. This is the
+                                        soft case the bench had no word for: finished before, freely
+                                        repeatable, and worth re-rolling for a better band. Without it the
+                                        only difference between a recipe you have never seen and one you
+                                        have made nine times was nothing at all. */}
+                                    {made && !built ? <em className="gv-tag is-made">made</em> : null}
                                     {built && r.kind === "tool" && st.toolQuality?.[r.slot] != null ? (
                                         // The thing the level BUYS, on the thing it was spent on.
                                         <em className={`gv-tag is-q is-${qualityBand(st.toolQuality[r.slot]).id}`}

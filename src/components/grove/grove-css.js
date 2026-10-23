@@ -2572,6 +2572,13 @@ export const GROVE_CSS = `
 .gv-rec-want:hover { color: #efe7d8; border-color: rgba(255,255,255,0.3); }
 .gv-rec-want.is-on { color: #ffd166; background: rgba(224,168,60,0.2);
     border-color: rgba(255,209,102,0.6); }
+/* "You have made one of these before." Deliberately the quietest tag on the row — it is a fact to
+   recognise at a glance, not a call to action, and anything louder would compete with the parts you
+   are actually short of. The row stays fully craftable: gear rolls its quality, so a second one is a
+   real reason to spend. */
+.gv-rec.is-made .gv-tag.is-made { color: #b9ae99; background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.14); }
+
 .gv-tag { font-style: normal; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em;
     text-transform: uppercase; padding: 3px 7px; border-radius: 999px;
     background: rgba(255,255,255,0.08); color: #9aa08f; }
