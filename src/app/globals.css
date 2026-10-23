@@ -202,6 +202,24 @@ main.content {
     border-top: 1px solid var(--line);
 }
 
+/* ── THE IN-GAME HEADER ───────────────────────────────────────────────────────────────────────
+   Luke: "when you are in the game, there should be one menu ... I would think we would have
+   clarity when inside the game."
+
+   Inside /marketplace the shop's nav collapses to the brand and the account button (see
+   SiteHeader), and this makes it physically thin so the game nav underneath reads as THE menu
+   rather than as the second of two. Half the vertical padding and a smaller mark: about 34px of
+   chrome instead of 76px, which on a 667px phone is a tenth of the screen handed back to the game.
+
+   ⚠️ SPECIFICITY, NOT ORDER. The mobile breakpoint far below sets .brand-mark to 50px square;
+   these are two classes deep so they win there without needing their own media query or an
+   !important. Moving this block is safe; weakening its selectors is not. */
+.site-header.is-slim .top-row { padding: 0.4rem 0; gap: 0.6rem; flex-wrap: nowrap; }
+.site-header.is-slim .brand { font-size: 1rem; margin-right: auto; min-width: 0; }
+.site-header.is-slim .brand > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.site-header.is-slim .brand-mark { height: 26px; width: 26px; object-fit: cover; }
+.site-header.is-slim .top-right { gap: 0.6rem; flex-wrap: nowrap; margin-left: auto; }
+
 .nav-inner {
     display: flex;
     flex-wrap: wrap;

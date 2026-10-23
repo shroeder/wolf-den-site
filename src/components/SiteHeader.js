@@ -2,9 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { borderClass } from "@/lib/marketplace/borders.js";
+import { isGamePath } from "@/lib/marketplace/game-paths.js";
 import { memberSession } from "@/lib/member-session-client";
 import { useTvMode } from "@/lib/tv-mode-client";
 
@@ -31,7 +33,29 @@ function initialsOf(customer) {
     return chars.toUpperCase();
 }
 
+// ── ⚠️ TWO MENUS IS THE FIRST THING A NEW MEMBER MEETS ───────────────────────────────────────────────────────
+// Luke: "when you are in the game, there should be one menu. Because its confusing people with the top middle
+// menu and top left menu. I would think we would have clarity when inside the game."
+//
+// /marketplace/* lives inside the PUBLIC layout, so a game screen was served this header — brand, nine shop
+// links, Discord, a hamburger, TV mode, cart, account — AND GameNav underneath it, which is itself a
+// twenty-two pill strip over a seven-section grid. Roughly forty destinations stacked in the top two inches,
+// in two different visual languages, on the screen somebody opens for the first time.
+//
+// Neither bar is wrong where it belongs. The shop nav is right on /shop; the game nav is right in the game.
+// They are only wrong TOGETHER, so the fix is about where, not about what: inside the game this collapses to
+// the brand and the account button, and GameNav is the only menu on the screen.
+//
+// ⚠️ THE BRAND STAYS, AND IT IS LOAD-BEARING. It is the way back to the shop. GameNav has no exit — seven
+// sections, forty-odd entries, and not one of them leaves /marketplace — so a header with no brand would
+// leave the browser button as the only way out of the game. Same trap game-paths.js documents five times
+// over, one level up.
 export default function SiteHeader() {
+    const pathname = usePathname() || "";
+    // ⚠️ THE SAME PREDICATE THE NAV AND THE PATHFINDER USE. A second list of "what counts as the game" would
+    // drift on the first new area, and the symptom would be this bar reappearing in one room and not its
+    // neighbour — see the note at the top of game-paths.js.
+    const slim = isGamePath(pathname);
     const [open, setOpen] = useState(false);
     const [tvMode, setTvMode] = useTvMode();
     const [cartCount, setCartCount] = useState(null);
@@ -134,6 +158,45 @@ export default function SiteHeader() {
         }
     };
 
+    // ⚠️ ONE COPY, BECAUSE BOTH HEADERS DRAW IT. The slim in-game bar and the full shop bar show the same
+    // account control, and two copies of it would disagree the first time either the border, the fallback
+    // initials or the signed-out destination changed.
+    const accountButton = mktAuthed ? (
+        <Link href="/marketplace/profile" className="nav-account" title="Your account" aria-label="Your account" onClick={() => setOpen(false)}>
+            {mktAvatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className={`nav-account-avatar nav-account-avatar-img ${borderClass(mktBorder)}`.trim()} src={mktAvatar} alt="Your account" />
+            ) : (
+                <span className={`nav-account-avatar ${borderClass(mktBorder)}`.trim()}>{initialsOf({ name: mktName })}</span>
+            )}
+        </Link>
+    ) : (
+        <Link href="/marketplace/login" className="pill nav-signin" onClick={() => setOpen(false)}>Sign In</Link>
+    );
+
+    // ── THE IN-GAME BAR ──────────────────────────────────────────────────────────────────────────────
+    // The brand, and the account. Nothing else: no shop links, no Discord, no cart, no hamburger, no TV
+    // mode. Those all belong to the shop, and inside the game every one of them is a door competing with
+    // the forty GameNav already offers.
+    //
+    // ⚠️ RETURNED AFTER EVERY HOOK, NOT BEFORE. All of this component's state and effects are declared
+    // above — branching earlier would call a different number of hooks on a game page than on a shop page,
+    // which is the one thing React will not forgive.
+    if (slim) {
+        return (
+            <header className="site-header is-slim">
+                <div className="shell top-row">
+                    <Link href="/" className="brand" title="Back to the shop">
+                        <Image className="brand-mark" src="/logo/logo.png" alt="The Wolf Den logo"
+                            width={1536} height={1024} sizes="34px" priority />
+                        <span>The Wolf Den</span>
+                    </Link>
+                    <div className="top-right">{accountButton}</div>
+                </div>
+            </header>
+        );
+    }
+
     // Nav links (+ Discord) shared by the desktop inline bar and the mobile dropdown.
     const navContent = (
         <>
@@ -208,18 +271,7 @@ export default function SiteHeader() {
                             {Number(cartCount || 0) > 0 ? <span className="nav-cart-badge">{cartCount > 99 ? "99+" : cartCount}</span> : null}
                         </Link>
                     )}
-                    {mktAuthed ? (
-                        <Link href="/marketplace/profile" className="nav-account" title="Your account" aria-label="Your account" onClick={() => setOpen(false)}>
-                            {mktAvatar ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img className={`nav-account-avatar nav-account-avatar-img ${borderClass(mktBorder)}`.trim()} src={mktAvatar} alt="Your account" />
-                            ) : (
-                                <span className={`nav-account-avatar ${borderClass(mktBorder)}`.trim()}>{initialsOf({ name: mktName })}</span>
-                            )}
-                        </Link>
-                    ) : (
-                        <Link href="/marketplace/login" className="pill nav-signin" onClick={() => setOpen(false)}>Sign In</Link>
-                    )}
+                    {accountButton}
                 </div>
             </div>
             <nav
