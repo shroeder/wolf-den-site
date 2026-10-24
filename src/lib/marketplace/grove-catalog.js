@@ -247,8 +247,23 @@ function emblemFaces() {
     return out;
 }
 
-/** The creature on an emblem's card. Null when nothing has been drawn for it yet. */
-export const emblemArt = (id) => emblemFaces()[id] || null;
+/**
+ * The face on an emblem's card.
+ *
+ * ── ⚠️ THE DRAWN EMBLEM FIRST. I MISSED NINETEEN SPRITES THAT WERE ALREADY ON DISK ──────────────────────────
+ * The first cut of this derived the face from the emblem's CREATURE, on the reading that nothing had been
+ * drawn for emblems. That was wrong: `public/images/grove/emblem-em_*.webp` holds nineteen purpose-drawn
+ * emblem sprites — one per emblem, exactly the set — and `groveArt` has returned that path for an emblem id
+ * since it was written. What was actually broken is that the PANEL never asked for a picture at all; it drew
+ * a star count where the art goes, so a shelf of nineteen drawn collectibles rendered as a column of dashes.
+ *
+ * That is [[check-existing-sprites-first]] in its second form. The rule is usually "do not draw a duplicate";
+ * this was the other half — do not build a substitute for art you already own because you did not look.
+ *
+ * So the drawn emblem wins, and the creature stays as the FALLBACK: a map that ships an emblem before its
+ * sprite is generated still gets a face rather than a hole, and that face is at least the right animal.
+ */
+export const emblemArt = (id) => (GROVE_EMBLEMS[id] ? `/images/grove/emblem-${id}.webp` : null) || emblemFaces()[id] || null;
 
 // ── ⚠️ THE CURVE IS ANCHORED TO TWO REAL MEMBERS, AND THE HIGH ANCHOR IS MAP 12 ──────────────────────────
 // Luke: "Lets make it so eric would have a tough time with map 12 first zone. I say that to give you the
@@ -839,8 +854,13 @@ export const safeCredit = (c) => {
 // moment the rule changed they disagreed: steepening zoneUnlock would have left map one, the map every
 // member actually plays, on the flat line it was written with in a file nobody would think to open.
 // Map one zone n IS depth n, so there is nothing to pass.
+// ⚠️ `node` IS SET HERE NOW, AND THE TWELVE FILES WERE ALWAYS THERE. MAP_ZONES gives every generated zone a
+// chart symbol via biomeNode(); map one's twelve — the ones the symbols were DRAWN FOR, and named after:
+// node-thicket, node-hollow, node-fernway … node-heartwood — were the only zones in the game without the
+// field, so the map rendered them with nothing. The id is the filename, same as the backdrop above it.
 const Z = (n, id, name, enemies, boss, biome, o = {}) =>
-    ({ n, id, name, enemies, boss, toUnlock: zoneUnlock(n), biome, bg: `/images/grove/zone-${id}.webp`, ...o });
+    ({ n, id, name, enemies, boss, toUnlock: zoneUnlock(n), biome,
+        bg: `/images/grove/zone-${id}.webp`, node: `/images/grove/node-${id}.webp`, ...o });
 
 const MAP_ONE_ZONES = [
     Z(1, "thicket", "Thicket Edge", ["rootrat"], "glutmaw", "wood", { blurb: "Where the trees start. Nothing here has noticed you yet." }),
@@ -1064,6 +1084,25 @@ export const groveArt = (id) => {
     if (GROVE_EMBLEMS[id]) return `/images/grove/emblem-${id}.webp`;
     // A generated map's food borrows map one's picture for its heal tier, so the path is on the food.
     if (GROVE_FOODS[id]) return GROVE_FOODS[id].art || `/images/grove/food-${id}.webp`;
+    // ── ⚠️ THE REST OF THE BOOK HAD NO PICTURE AND THE PICTURES WERE ALREADY ON DISK ─────────────
+    // Luke: "Use sprites for merit and all things in the grove."
+    //
+    // An audit of every art reference in the feature came back with 141 misses, and the largest families
+    // in it were not undrawn — they were UNWIRED. A charm, a backpack, a vault and a plot all rendered as
+    // an empty frame on the workbench while charm-rarityFind.webp, ui-bag.webp, ui-vault.webp and
+    // slab-field.webp sat in public/images/grove the whole time. That is exactly the failure
+    // [[check-existing-sprites-first]] is about, one layer along: not drawing a duplicate, but not
+    // REACHING for the one that exists.
+    //
+    // ⚠️ A CHARM IS DRAWN BY ITS STAT, NOT BY ITS MAP. There are seven charms across three effects, and the
+    // three effects are what was drawn — a Rootwood Seeking and a Saltwrack Seeking do the same thing in
+    // different forests, so they wear the same mark. That is the same reasoning BIOME_NODE uses for map
+    // symbols, and it is why seven rows cost nothing.
+    if (GROVE_CHARMS[id]) return `/images/grove/charm-${GROVE_CHARMS[id].stat}.webp`;
+    if (/^pack_/.test(id)) return "/images/grove/ui-bag.webp";
+    if (/^bank_/.test(id)) return "/images/grove/ui-vault.webp";
+    // "Cleared Ground" is literally a patch of cut field, which is the one slab already painted as exactly that.
+    if (/^plot_/.test(id)) return "/images/grove/slab-field.webp";
     return null;
 };
 
