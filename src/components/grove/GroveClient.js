@@ -881,6 +881,9 @@ export default function GroveClient({ initial }) {
                             <button type="button" role="tab" aria-selected={embTab === "armour"}
                                 className={embTab === "armour" ? "is-on" : ""}
                                 onClick={() => setEmbTab("armour")}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src="/images/grove/ui-merit.webp" alt="" width={16} height={16}
+                                    style={{ objectFit: "contain", verticalAlign: "-0.2em" }} />
                                 Boss Armour<i>{Number(st.merits) || 0}</i>
                             </button>
                         </div>

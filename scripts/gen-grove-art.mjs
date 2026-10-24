@@ -47,7 +47,18 @@ const Q = quality();
 // So the house style IS gpt-image-1. It costs more (4.2c against 1.3c) and it ignores the frame
 // instruction about a quarter of the time, and both of those are worth paying. The clipping is handled
 // below instead of by changing the model.
-const MODEL = "gpt-image-1";
+// ⚠️ 2026-10-23: gpt-image-1 IS GONE FROM THE GENERATIONS ENDPOINT. /v1/models still lists it, and
+// /v1/images/generations answers 400 "The model 'gpt-image-1' does not exist." Verified directly, three
+// times, with a one-cent grey-dot probe. The house style's model has been retired under us.
+//
+// The default stays gpt-image-1 ON PURPOSE even though it now fails: this constant is where the rule
+// lives, and silently repointing it at whichever model happens to work is precisely the swap the note
+// below forbids. A run that needs a different model must say so out loud with --model, so the choice
+// appears in the shell history of whoever made it.
+const MODEL = (() => {
+    const i = process.argv.indexOf("--model");
+    return i > 0 ? process.argv[i + 1] : "gpt-image-1";
+})();
 
 // ⚠️ THE REPAIR MODEL IS A DIFFERENT QUESTION. 2.5's headline feature is "precise editing and subject
 // preservation", and it is genuinely good at it: handed a finished sprite and asked to change one thing, it
@@ -291,6 +302,55 @@ const DOCK = {
     "ui-emblems": "A single ornate MEDALLION hanging from a short leather thong, a thick gold disc with a raised scalloped rim and a smooth polished centre catching a bright highlight, one small green gem set at the top of the rim. Rich warm gold, deep shadow in the relief, green gem. No markings or letters on the face.",
 };
 for (const [id, subject] of Object.entries(DOCK)) ART[id] = [`${ITEM} ${subject}`, "item"];
+
+// ── THE MERIT: THE CURRENCY'S FACE ──────────────────────────────────────────────────────────────
+// Luke: "Use sprites for merit and all things in the grove." Then, asked what a merit looks like:
+// "Its a currency, figure it out."
+//
+// It had no face at all — "512 merits" was a word beside a number, which is the same thing the arena's
+// laurels were before gen-armoury-art.mjs drew them, and the note there is right: the currencies people
+// talk about are the ones with a face.
+//
+// ⚠️ IT MUST NOT BE GOLD'S COIN AND IT MUST NOT BE THE ARENA'S WREATH. The Den already has a round gold
+// coin and a laurel ring, and a third round gold thing is a currency nobody can tell apart in a row of
+// numbers. A merit is won off a BOSS and spent on BOSS ARMOUR, so it is struck from the thing you killed:
+// bronze gone green with age, an antler mark raised on its face, one corner chipped. Cold green-bronze
+// reads instantly against gold's warm yellow at 16px, which is the only size that matters.
+ART["ui-merit"] = [`${ITEM} A single struck BRONZE MERIT TOKEN, a thick round coin of dark bronze gone `
+    + `green-black with age, a heavy raised rim, and on its face a bold raised ANTLER mark — two simple `
+    + `curved forest antlers — standing proud of the surface and catching the light. One small chip out of `
+    + `the rim. Cold verdigris green-bronze with warm copper highlights on the raised antler. No lettering, `
+    + `no numerals, no runes, no inscription of any kind on the face.`, "item"];
+
+// ── THE BOSS ARMOUR: FIVE SETS OF THREE ─────────────────────────────────────────────────────────
+// Fifteen pieces and not one of them had an art field, so the Armoury listed its whole ladder as text while
+// every tool in the game has 156 sprites. Each set is named for the place its boss rules, so each is built
+// out of that place's materials rather than being the same helmet five times in different metals — the same
+// reasoning the tool ladder uses, where tier VII is a rod made of a different forest, not a better rod.
+const ARMOUR_LOOK = {
+    common: ["Rootbound", "living pale tree ROOTS and dark bark bound with twine, green moss in the crevices",
+        "mossy green, pale root-wood, twine brown"],
+    uncommon: ["Barrowplate", "slabs of grey grave-STONE and tarnished iron banding, carved with the barrows' blunt lines",
+        "cold grey stone, tarnished iron, faint lichen"],
+    rare: ["Warrenweave", "layered SPIDER-SILK and chitin plating, pale woven silk stretched over dark segmented shell",
+        "bone-white silk, blue-black chitin, deep shadow"],
+    epic: ["Rotwood", "CHARRED black timber still glowing with embers in its cracks, ash-grey grain, iron rivets",
+        "burnt black, ember orange, ash grey"],
+    legendary: ["Heartwrought", "golden HEARTWOOD grain shot through with amber sap that glows from within, gold-leaf edging",
+        "deep amber, honey gold, warm glowing sap"],
+};
+const ARMOUR_SHAPE = {
+    head: ["CROWN-HELM", "an open circlet-helm rising into points, worn on the head"],
+    body: ["MANTLE", "a shoulder-and-chest piece with a hanging cloak-like drape, no head, no arms, no legs"],
+    feet: ["TREADS", "a matched pair of heavy boots standing side by side"],
+};
+for (const [setId, [setName, material, palette]] of Object.entries(ARMOUR_LOOK)) {
+    for (const [slot, [shape, desc]] of Object.entries(ARMOUR_SHAPE)) {
+        ART[`armour-${setId}_${slot}`] = [`${ITEM} A single piece of fantasy BOSS ARMOUR: the ${setName} `
+            + `${shape} — ${desc} — made of ${material}. Empty armour with nobody wearing it. ${palette}. `
+            + `No character, no body, no face, no head inside the helm, no mannequin, no stand.`, "item"];
+    }
+}
 
 // ── THE MAP ITSELF ──────────────────────────────────────────────────────────────────────────────
 // Luke: "The map should be nodes on a paper map. The paper map should have color, as if a skilled scribe

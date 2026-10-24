@@ -66,6 +66,17 @@ export default function GroveArmoury({ st, partName, PartIcon, post, refresh, se
 
     return (
         <Area id="armoury" icon="ui-vault" title="Boss Armour" count={`${merits} merits`}>
+            {/* ── THE CURRENCY HAS A FACE NOW ────────────────────────────────────────────────────
+                Luke: "Use sprites for merit and all things in the grove." It was a word beside a number,
+                which is what the arena's laurels were before they were drawn — and the note there is
+                right: the currencies people talk about are the ones with a face. Struck bronze gone
+                verdigris with an antler raised on it, so it cannot be confused with gold's warm coin in
+                a row of numbers. */}
+            <p className="gv-arm-purse">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/grove/ui-merit.webp" alt="" width={26} height={26} />
+                <b>{merits.toLocaleString()}</b><span>merits</span>
+            </p>
             {/* ⚠️ NO CAPTION HERE EITHER. "Won from bosses. Three pieces to a set, and the set pays
                 more than its parts." — where the merits are spent is the header's own count, the three
                 pieces are three drawn slots, and the set bonus is printed on the set. See the note in
@@ -98,6 +109,16 @@ export default function GroveArmoury({ st, partName, PartIcon, post, refresh, se
                                 return (
                                     <div key={piece.id}
                                         className={`gv-arm-piece${on ? " is-on" : ""}${have ? " is-have" : ""}`}>
+                                        {/* ⚠️ THE PIECE, DRAWN. Fifteen rows of stat text with no picture
+                                            was the one shelf in the Grove with nothing to look at, next to
+                                            a tool ladder carrying 156 sprites. Luke: "Use sprites for merit
+                                            and all things in the grove." */}
+                                        <span className="gv-arm-face">
+                                            {piece.art ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={piece.art} alt="" width={52} height={52} loading="lazy" />
+                                            ) : null}
+                                        </span>
                                         <b>{piece.name.replace(`${set.name} `, "")}</b>
                                         <ul>
                                             {Object.entries(piece.stats).map(([k, v]) => (

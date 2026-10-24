@@ -1084,25 +1084,6 @@ export const groveArt = (id) => {
     if (GROVE_EMBLEMS[id]) return `/images/grove/emblem-${id}.webp`;
     // A generated map's food borrows map one's picture for its heal tier, so the path is on the food.
     if (GROVE_FOODS[id]) return GROVE_FOODS[id].art || `/images/grove/food-${id}.webp`;
-    // ── ⚠️ THE REST OF THE BOOK HAD NO PICTURE AND THE PICTURES WERE ALREADY ON DISK ─────────────
-    // Luke: "Use sprites for merit and all things in the grove."
-    //
-    // An audit of every art reference in the feature came back with 141 misses, and the largest families
-    // in it were not undrawn — they were UNWIRED. A charm, a backpack, a vault and a plot all rendered as
-    // an empty frame on the workbench while charm-rarityFind.webp, ui-bag.webp, ui-vault.webp and
-    // slab-field.webp sat in public/images/grove the whole time. That is exactly the failure
-    // [[check-existing-sprites-first]] is about, one layer along: not drawing a duplicate, but not
-    // REACHING for the one that exists.
-    //
-    // ⚠️ A CHARM IS DRAWN BY ITS STAT, NOT BY ITS MAP. There are seven charms across three effects, and the
-    // three effects are what was drawn — a Rootwood Seeking and a Saltwrack Seeking do the same thing in
-    // different forests, so they wear the same mark. That is the same reasoning BIOME_NODE uses for map
-    // symbols, and it is why seven rows cost nothing.
-    if (GROVE_CHARMS[id]) return `/images/grove/charm-${GROVE_CHARMS[id].stat}.webp`;
-    if (/^pack_/.test(id)) return "/images/grove/ui-bag.webp";
-    if (/^bank_/.test(id)) return "/images/grove/ui-vault.webp";
-    // "Cleared Ground" is literally a patch of cut field, which is the one slab already painted as exactly that.
-    if (/^plot_/.test(id)) return "/images/grove/slab-field.webp";
     return null;
 };
 

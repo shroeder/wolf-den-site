@@ -7,7 +7,7 @@ import {
     strikeGrade, actScore, rackFor, scatterFor, oddsForAim, PEG_ROWS, RACK_MIDDLE,
 } from "@/lib/marketplace/grove-craft-act.js";
 import { QUALITY_BANDS, bandTint, bandInk } from "@/lib/marketplace/grove-forge.js";
-import { groveArt, toolArt } from "@/lib/marketplace/grove-catalog.js";
+import { recipeArt, toolArt } from "@/lib/marketplace/grove-catalog.js";
 // ⚠️ THE SOUND IS THE KIT THE GROVE ALREADY HAS. grove-sfx.js synthesises every note from an oscillator —
 // nothing to host, nothing to preload, nothing to 404 on one bar of signal — and every call is already
 // wrapped, so a blocked AudioContext is a silent craft rather than a broken screen.
@@ -110,7 +110,16 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     const rack = useMemo(() => rackFor(level, { temper }), [level, temper]);
     const scatter = scatterFor(act);
     const odds = useMemo(() => oddsForAim(rack, aim, scatter), [rack, aim, scatter]);
-    const art = recipe?.kind === "tool" ? toolArt(recipe.slot, recipe.tier) : groveArt(recipe?.id);
+    // ── ⚠️ recipeArt, NOT groveArt. THE ACT WAS ASKING THE WRONG FUNCTION ───────────────────────────
+    // groveArt answers "what does this LOOSE ITEM look like" — a part, an emblem, a food — and returns null
+    // for everything else. recipeArt answers "what does this RECIPE look like" and has known about packs,
+    // vaults, plots, decorations and charms since it was written. The act asked the first one, so forging a
+    // Backpack III or a Rootwood Seeking ran the whole three-stage ceremony around an EMPTY FRAME, while the
+    // workbench row that launched it showed the sprite correctly two inches away.
+    //
+    // Found by auditing art coverage with groveArt and getting 23 false positives: the audit was asking the
+    // same wrong question this line was, which is the only reason it surfaced.
+    const art = recipe?.kind === "tool" ? toolArt(recipe.slot, recipe.tier) : recipeArt(recipe);
 
     // ── THE HEAT CLOCK ──────────────────────────────────────────────────────────────────────────────
     // ⚠️ rAF with the elapsed time read from the CLOCK, never counted in ticks. A backgrounded tab would

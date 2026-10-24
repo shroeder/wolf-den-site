@@ -505,6 +505,11 @@ export const ARMOUR_PIECES = GROVE_SET_ORDER.flatMap((rid) => {
         id: `${rid}_${s.slot}`,
         setId: rid,
         slot: s.slot,
+        // ⚠️ DERIVED, LIKE EVERY OTHER PATH IN THIS FEATURE. gen-grove-art.mjs names the file by family
+        // and id — armour-common_head.webp — so the id IS the path, and fifteen literals would be fifteen
+        // chances to disagree with the file on disk. Same rule and reason as groveArt and toolArt.
+        // Drawn 2026-10-23: five sets of three, one material per set, so the ladder reads at a glance.
+        art: `/images/grove/armour-${rid}_${s.slot}.webp`,
         name: `${set.name} ${s.noun}`,
         rarity: rid,
         rarityName: SET_RARITY.find((r) => r.id === rid)?.name || rid,

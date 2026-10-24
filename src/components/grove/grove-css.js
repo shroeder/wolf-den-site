@@ -2715,6 +2715,24 @@ export const GROVE_CSS = `
 .gv-elist { display: flex; flex-direction: column; gap: 8px; }
 .gv-em { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 11px;
     background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.10); }
+/* ── THE ARMOURY, WITH PICTURES ───────────────────────────────────────────────────────────────
+   Fifteen pieces of stat text with nothing to look at, beside a tool ladder carrying 156 sprites.
+   The face sits left of the name the way every other tile in the Grove is laid out. */
+.gv-arm-face { flex: 0 0 auto; width: 56px; height: 56px; display: grid; place-items: center;
+    border-radius: 10px; margin-bottom: 4px;
+    background: radial-gradient(120% 120% at 50% 15%, rgba(255,255,255,0.07), rgba(0,0,0,0.28) 72%);
+    border: 1px solid rgba(255,255,255,0.12); }
+.gv-arm-face img { width: 52px; height: 52px; object-fit: contain;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.7)); }
+
+/* The purse. A currency with a face is a currency people talk about — see the note in GroveArmoury. */
+.gv-arm-purse { display: flex; align-items: center; gap: 8px; margin: 0 0 12px;
+    padding: 8px 12px; border-radius: 10px; width: fit-content;
+    background: rgba(90,140,110,0.12); border: 1px solid rgba(140,200,160,0.3); }
+.gv-arm-purse img { width: 26px; height: 26px; object-fit: contain; }
+.gv-arm-purse b { font-size: 1.05rem; font-weight: 900; color: #b8e6c6; }
+.gv-arm-purse span { font-size: 0.76rem; letter-spacing: 0.1em; text-transform: uppercase; color: #8fae98; }
+
 /* ── THE TWO HALVES OF THE PANEL ──────────────────────────────────────────────────────────────
    Luke: "I'm looking at the card equipment area and I'm getting confused with the merit area. And
    they should be separate." A shelf of earned collectibles and a till that spends a currency were
