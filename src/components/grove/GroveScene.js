@@ -1221,6 +1221,192 @@ export default function GroveScene({
             w.sparks.push({ x, y, vx: 0, vy: 0, g: 0, born: w.sceneNow ? w.sceneNow() : performance.now(), life: 380, node: el, ring: true });
         };
 
+        // ── ⚠️ THE SKILL ENGINE: SIX PRIMITIVES, THIRTY-SIX SKILLS ──────────────────────────────────
+        // Luke: "what's going to be the most fun for people is having skills that do AoE ... the most
+        // important thing for me is that the AoE and the being able to see the AoE happen."
+        //
+        // The table lives in grove-skills.js and says WHAT each node does here; this is the half that makes
+        // it happen on screen. Six shapes, composed — nova, corpse, cleave, spread, aura, self — because
+        // thirty-six bespoke branches in this file is how a scene becomes unmaintainable.
+        //
+        // ⚠️ THE RING IS SIZED TO THE REAL RADIUS, and that is the whole point of it. An AoE you cannot see
+        // the edge of is a number appearing on things you did not hit; the ring is drawn at exactly the
+        // world radius the damage used, so the area IS the picture. Everything else that reads as a hit —
+        // the flash, the pop, the shake — is reused here rather than reinvented.
+        const novaRing = (x, y, r, kind) => {
+            const layer = fxRef.current;
+            if (!layer) return;
+            const el = document.createElement("i");
+            el.className = `gv-nova is-${kind}`;
+            el.style.setProperty("--r", String(Math.max(0.5, r)));
+            layer.appendChild(el);
+            w.sparks.push({ x, y, vx: 0, vy: 0, g: 0,
+                born: w.sceneNow ? w.sceneNow() : performance.now(), life: 520, node: el, ring: true });
+        };
+
+        // ⚠️ A NOVA MAY NOT CHAIN OFF ITS OWN KILLS FOR EVER. Bloodletting at rank five detonates every
+        // corpse for 60% of its health, and in a thirty-body zone the first tap would otherwise cascade to
+        // a white screen and a cleared map. Two deep: a blow kills, the corpse bursts, that burst's kills
+        // burst once more, and the third generation is silent. Luke: "we don't really have to worry so much
+        // about balance" — this is not balance, it is a termination condition.
+        const NOVA_MAX_DEPTH = 2;
+        let novaDepth = 0;
+
+        // ── ⚠️ ONE WORD PER CHAIN, NOT ONE PER BODY ─────────────────────────────────────────────────
+        // Filmed on the bench: eight corpses bursting fired eight BLOODLETTINGs and eight RENDs into the
+        // same patch of screen on the same frame, and the sheet came back reading
+        // "REBLOODLETTINGNGNGNG" — three words deep in places. A call-out exists to tell you a thing
+        // happened; sixteen of them tell you nothing and bury the damage numbers underneath.
+        //
+        // So a skill announces itself ONCE per cascade: at depth zero (the blow you actually struck), and
+        // never again for the kills that blow caused. Plus a short lockout per word, because two separate
+        // swings a tenth of a second apart are still one event as far as the eye is concerned.
+        const PROC_LOCKOUT_MS = 520;
+        const procSaid = new Map();
+        const sayOnce = (word, kind, art, atY, on, nowMs) => {
+            if (novaDepth > 0) return;
+            if (nowMs - (procSaid.get(word) || -1e9) < PROC_LOCKOUT_MS) return;
+            procSaid.set(word, nowMs);
+            procCall(word, kind, art, atY, on);
+        };
+
+        const skillNova = (now, x, y, r, dmg, o = {}) => {
+            if (!(r > 0)) return 0;
+            const kind = o.kind || "nova";
+            novaRing(x, y, r, kind);
+            w.shake.add(TRAUMA.kill * Math.min(1.5, 0.45 + r / 9));
+            // ⚠️ A SNAPSHOT, NOT THE LIVE ARRAY. killFoe can set `dying` and the respawn pass can splice,
+            // and mutating what you are iterating is how one body in a crowd silently gets skipped.
+            const targets = w.foes.slice();
+            let struck = 0;
+            for (const f of targets) {
+                if (!f || f.dying || f.hp <= 0) continue;
+                if (o.not && f === o.not) continue;
+                const dx = f.x - x;
+                const dy = (f.y + f.h * 0.45) - y;
+                if (dx * dx + dy * dy > r * r) continue;
+                struck += 1;
+                if (o.stunMs > 0 && !(now < (f.lockImmuneUntil || 0))) {
+                    f.stunUntil = Math.max(f.stunUntil || 0, now + o.stunMs);
+                    f.nextAttack = Math.max(f.nextAttack || 0, f.stunUntil);
+                }
+                if (o.knock > 0) impulse(f, Math.sign(f.x - x || 1) * o.knock * 6, 2);
+                if (!(dmg > 0)) continue;
+                // Deep Cuts: anything already bleeding takes more from every source, this included.
+                const vuln = f.bleed && (stats?.groveVuln || 0) > 0 ? 1 + stats.groveVuln : 1;
+                const tick = Math.max(1, Math.round(dmg * vuln));
+                f.hp -= tick;
+                f.hurtAt = now;
+                f.flash = 1;
+                if (f.big || f.rare) { w.bossBar = { hp: Math.max(0, f.hp), maxHp: f.maxHp }; w.bossHurtAt = now; }
+                // ⚠️ A NUMBER ON THE FIRST FEW ONLY. A nova catching nine bodies printed nine numbers into
+                // one ellipse and they overlapped into a smear — the ring already says how many were
+                // caught, and the health bars say it again. Four is enough to read the magnitude; the rest
+                // get the flash and the shake, which is what tells you they were hit.
+                // ⚠️ A BOSS ALWAYS GETS ITS NUMBER, whatever order it came back in: that one is the fight.
+                if (struck <= 4 || f.big || f.rare || f.isBoss) {
+                    addPop("nova", `${tick}`, f.x, f.y + f.h * 0.62, popWeight(tick, f.maxHp));
+                }
+                if (f.hp <= 0) {
+                    f.hp = 0;
+                    if (novaDepth < NOVA_MAX_DEPTH) { novaDepth += 1; killFoe(w, f, now, tick); novaDepth -= 1; }
+                    else killFoe(w, f, now, 0);
+                }
+            }
+            return struck;
+        };
+
+        /** The n nearest living foes to a point, excluding one. For cleave and the seeking bolts. */
+        const nearestFoes = (x, y, n, not = null) => w.foes
+            .filter((f) => f && !f.dying && f.hp > 0 && f !== not)
+            .map((f) => ({ f, d: (f.x - x) ** 2 + ((f.y + f.h * 0.45) - y) ** 2 }))
+            .sort((a, b) => a.d - b.d).slice(0, Math.max(0, n)).map((e) => e.f);
+
+        /**
+         * Fire every skill registered for a trigger.
+         *
+         * `ctx` carries whatever that moment knows — the corpse, the blow that landed, the hero's own swing
+         * — and each primitive reads what it needs. Unknown fields are simply absent, which is why a skill
+         * that wants a corpse does nothing on a `hit`.
+         */
+        const fireSkills = (now, at, ctx = {}) => {
+            const list = stats?.skills;
+            if (!list?.length) return;
+            for (const sk of list) {
+                if (sk.at !== at) continue;
+                const n = sk.rank;
+                if (sk.chance != null && w.rand() > sk.chance * n) continue;
+                const foe = ctx.foe || null;
+                if (sk.kind === "corpse") {
+                    if (!foe) continue;
+                    if (sk.onlyCrit && !ctx.crit) continue;
+                    if (sk.onlyBurn && !ctx.wasBurning) continue;
+                    if (sk.onlyFrozen && !ctx.wasFrozen) continue;
+                    // ⚠️ OFF THE BODY'S OWN HEALTH, which is what makes this scale with the ZONE instead of
+                    // with the player. A rootrat pops; an Elderling levels the clearing. Luke's own example.
+                    skillNova(now, foe.x, foe.y + foe.h * 0.45, sk.radius * n,
+                        Math.max(1, foe.maxHp * sk.share * n),
+                        { kind: sk.onlyFrozen ? "frost" : "corpse", not: foe });
+                    sayOnce(sk.name.toUpperCase(), "nova", null, 1.25, foe, now);
+                } else if (sk.kind === "nova") {
+                    const src = sk.atHero ? w.hero : (foe || w.hero);
+                    const base = ctx.dealt || stats?.damage || 0;
+                    const dmg = sk.banked ? (w.banked || 0) : base * (sk.share || 0) * n;
+                    if (sk.banked) w.banked = 0;
+                    const strikes = sk.strikes ? Math.min(9, sk.strikes + n - 1) : 1;
+                    for (let i = 0; i < strikes; i += 1) {
+                        // A multi-strike WALKS the zone rather than stacking on one spot — the difference
+                        // between "a storm" and "a big circle".
+                        const ox = strikes > 1 ? (i - (strikes - 1) / 2) * (sk.radius * 0.45) : 0;
+                        skillNova(now, src.x + ox, src.y + src.h * 0.45, sk.radius * (sk.atHero ? 1 : n), dmg,
+                            { kind: sk.id.startsWith("rc_") ? "frost" : "nova",
+                                stunMs: (sk.stunMs || 0) * n, knock: (sk.knock || 0) * n });
+                    }
+                    sayOnce(sk.name.toUpperCase(), "nova", null, 1.3, sk.atHero ? null : foe, now);
+                } else if (sk.kind === "cleave") {
+                    const base = ctx.dealt || stats?.damage || 0;
+                    const from = nearestFoes(ctx.x ?? w.hero.x, ctx.y ?? w.hero.y, Math.min(6, sk.n + n - 1), foe);
+                    for (const t of from) {
+                        const tick = Math.max(1, Math.round(base * sk.share * n));
+                        t.hp -= tick; t.hurtAt = now; t.flash = 1;
+                        addPop("nova", `${tick}`, t.x, t.y + t.h * 0.62, popWeight(tick, t.maxHp));
+                        burst(t.x, t.y + t.h * 0.5, { kind: "spark", crit: true });
+                        if (t.hp <= 0) {
+                            t.hp = 0;
+                            if (novaDepth < NOVA_MAX_DEPTH) { novaDepth += 1; killFoe(w, t, now, tick); novaDepth -= 1; }
+                        }
+                    }
+                    if (from.length) sayOnce(sk.name.toUpperCase(), "nova", null, 1.2, from[0], now);
+                } else if (sk.kind === "spread") {
+                    if (!foe) continue;
+                    const src = sk.dot === "burn" ? foe.burn : sk.dot === "chill" ? { dmg: 1, leech: 0 } : foe.bleed;
+                    if (!src) continue;
+                    const r = sk.radius * n;
+                    novaRing(foe.x, foe.y + foe.h * 0.45, r, sk.dot === "burn" ? "burn" : "corpse");
+                    for (const t of w.foes.slice()) {
+                        if (!t || t === foe || t.dying || t.hp <= 0) continue;
+                        const dx = t.x - foe.x;
+                        const dy = (t.y + t.h * 0.45) - (foe.y + foe.h * 0.45);
+                        if (dx * dx + dy * dy > r * r) continue;
+                        if (sk.dot === "chill") { t.chillUntil = Math.max(t.chillUntil || 0, now + 1200); continue; }
+                        const per = Math.max(1, Math.round((src.dmg || 1) * sk.share * n));
+                        t[sk.dot] = { dmg: per, leech: src.leech || 0, spread: false,
+                            left: sk.dot === "burn" ? BURN_TICKS : BLEED_TICKS,
+                            nextAt: now + (sk.dot === "burn" ? BURN_TICK_MS : BLEED_TICK_MS) };
+                        burst(t.x, t.y + t.h * 0.4, { kind: sk.dot === "burn" ? "burn" : "spark", scale: 0.8 });
+                    }
+                    sayOnce(sk.name.toUpperCase(), sk.dot === "burn" ? "ignite" : "bleed", null, 1.2, foe, now);
+                } else if (sk.kind === "self") {
+                    if (sk.tempo) w.hasteUntil = Math.max(w.hasteUntil || 0, now + (sk.ms || 2000));
+                    if (sk.healShare && foe?.bleed) {
+                        const heal = Math.max(1, Math.round((foe.bleed.dmg || 0) * (foe.bleed.left || 0) * sk.healShare * n));
+                        w.hp = Math.min(maxHp, w.hp + heal);
+                        addPop("heal", `+${heal}`, w.hero.x, w.hero.y + HERO_UNITS * 1.3);
+                    }
+                }
+            }
+        };
+
         // ── ⚠️ ONE FUNCTION PAYS A KILL, AND BOTH CALLERS GO THROUGH IT ───────────────────────────
         // Two paths for one payout always drift — see atomic-split-into-steps-drops-lines, which this repo
         // has now paid for twice.
@@ -1310,6 +1496,11 @@ export default function GroveScene({
             // the zone with it; it is left OFF an ordinary kill rather than written as 1, because the log
             // is a payload sent every forty-five seconds and a field that is always the same value on
             // ninety-odd percent of rows is bytes for nothing.
+            // ⚠️ READ THE STATUS BEFORE THE BODY IS CLEANED UP. Emberheart wants to know it was burning
+            // and Frostbite wants to know it was frozen, and both flags belong to a creature that is about
+            // to stop existing. Captured here, handed to the skills below.
+            const wasBurning = Boolean(foe.burn);
+            const wasFrozen = now < (foe.stunUntil || 0);
             const credit = killCredit(dealt, foe.maxHp);
             const i = wd.killIndex;
             wd.killIndex += 1;
@@ -1364,6 +1555,20 @@ export default function GroveScene({
                     const ate = wd.eaten; wd.eaten = {};
                     Promise.resolve(onSettle?.(wd.killLog.splice(0), ate)).catch(() => {});
                 }
+            }
+
+            // ── THE CLASS ANSWERS THE KILL ──────────────────────────────────────────────────────
+            // After the log and the credit, before the loot: a corpse that bursts and takes three more
+            // bodies with it must have those three counted as their own kills, which is what calling
+            // killFoe recursively (depth-guarded) through skillNova gives for free.
+            fireSkills(now, "kill", { foe, crit, dealt, wasBurning, wasFrozen });
+            wd.killStreak = (wd.killStreak || 0) + 1;
+            for (const sk of stats?.skills || []) {
+                if (sk.at !== "killN") continue;
+                const every = Math.max(6, (sk.every || 14) - sk.rank * 2);
+                if (wd.killStreak % every) continue;
+                fireSkills(now, "killN", { foe, dealt });
+                break;   // one call fires every killN skill; the loop only picks the cadence
             }
 
             wd.combo = now < wd.comboUntil ? wd.combo + 1 : 1;
@@ -1959,6 +2164,21 @@ export default function GroveScene({
                     }
                     if (foe.big || foe.rare) w.bossBar = { hp: Math.max(0, foe.hp), maxHp: foe.maxHp };
                     if (foe.isBoss || foe.big || foe.rare) w.bossHurtAt = now;
+                    // ── THE CLASS ANSWERS THE BLOW ──────────────────────────────────────────────
+                    // Before the kill check, because Runic Might's little blast and Killing Edge's cleave
+                    // are part of the SAME swing — resolving them after the body falls would make a lethal
+                    // hit quietly skip them, which is the one hit they most obviously belong on.
+                    fireSkills(now, "hit", { foe, dealt: hit.dealt, crit: hit.crit, x: foe.x, y: foe.y + foe.h * 0.45 });
+                    if (hit.crit) fireSkills(now, "crit", { foe, dealt: hit.dealt, crit: true, x: foe.x, y: foe.y + foe.h * 0.45 });
+                    // ── AND EVERY NTH SWING ─────────────────────────────────────────────────────
+                    w.swingCount = (w.swingCount || 0) + 1;
+                    for (const sk of stats?.skills || []) {
+                        if (sk.at !== "swingN") continue;
+                        const every = Math.max(2, (sk.every || 6) - sk.rank);
+                        if (w.swingCount % every) continue;
+                        fireSkills(now, "swingN", { foe, dealt: hit.dealt, x: foe.x, y: foe.y + foe.h * 0.45 });
+                        break;
+                    }
                     if (foe.hp <= 0) killFoe(w, foe, now, hit.dealt);
                 }
             }
@@ -2399,6 +2619,23 @@ export default function GroveScene({
                 // THE GRUDGE banks what reached health and rides the next swing -- see the swing block.
                 if ((stats?.grudge || 0) > 0 && dealt > 0) w.banked = (w.banked || 0) + dealt;
 
+                // ── THE WARDEN'S TWO MOMENTS ────────────────────────────────────────────────────
+                // `block` is a shield turning a blow aside; `guardBreak` is the absorb pool finally running
+                // out. Bastion, Unbreakable and Aether Ward all hang off the second one and it is the
+                // Warden's whole payoff — absorb, then spend what you absorbed across the crowd — so a
+                // Warden with no trigger here would have read exactly like the Reaver did before today:
+                // working perfectly, saying nothing.
+                //
+                // ⚠️ `soaked` IS WHAT THE POOL ATE THIS BLOW, and it is the number Bastion pays out. Passed
+                // as `dealt` so the nova scales off what was actually absorbed rather than off a swing.
+                if (guard.blocked) fireSkills(now, "block", { foe, dealt: soaked || dealt, x: w.hero.x, y: w.hero.y + w.hero.h * 0.45 });
+                // ⚠️ w.shield IS THE POOL, not w.ward. Both the Warden's guard and the Runecaller's ward
+                // share ONE absorb pool by design (see the note at the top of the guard block) — there is no
+                // separate w.ward and a check against one would never have fired, which is the quietest
+                // possible way for a headline skill to do nothing.
+                if (soaked > 0 && (w.shield || 0) <= 0) {
+                    fireSkills(now, "guardBreak", { foe, dealt: soaked, x: w.hero.x, y: w.hero.y + w.hero.h * 0.45 });
+                }
                 if (guard.blocked || soaked > 0) {
                     // Steel off the shield arm, thrown back toward whatever swung. A block that only
                     // prints a smaller number is a block nobody feels.
@@ -2410,6 +2647,11 @@ export default function GroveScene({
                 }
 
                 w.hp -= dealt;
+                // ── THE CLASS ANSWERS BEING HIT ─────────────────────────────────────────────────
+                // Thornmail hits EVERY attacker rather than the one that connected, Rimeguard sets off a
+                // frost nova, Bloodscent turns you below half. `foe` is whatever swung, so a nova centred
+                // on it catches the crowd that closed in with it.
+                fireSkills(now, "hurt", { foe, dealt, x: w.hero.x, y: w.hero.y + w.hero.h * 0.45 });
                 w.hurtAt = now;
                 w.clock.stop(now, HITSTOP_MS.hurt);
                 w.shake.add(TRAUMA.hurt);
@@ -3765,6 +4007,29 @@ function setUpLabScene(w, scene, blow = 400) {
             f.dmg = [0, 0];
         });
         if (marks[0]) w.target = marks[0];
+        w.moveTo = null;
+    } else if (scene === "aoe") {
+        // ── A CROWD, AND ONE OF THEM ABOUT TO DIE ────────────────────────────────────────────────────
+        // ⚠️ THE WHOLE POINT IS THE SECOND RING, NOT THE FIRST. A corpse bursting is one circle; a corpse
+        // bursting and taking three neighbours with it, each of those bursting in turn, is the thing Luke
+        // is describing — and it only reads if the bodies are standing close enough to be inside each
+        // other's radius. Eight of them, packed within a Bloodletting radius of the first, the nearest on
+        // one hit point so the chain starts on the opening swing.
+        const mob = w.foes.filter((f) => !f.isBoss).slice(0, 8);
+        mob.forEach((f, i) => {
+            f.x = Math.max(6, w.hero.x + 3 + (i % 4) * 2.6 + (i > 3 ? 1.3 : 0));
+            f.y = w.hero.y;
+            f.vx = 0; f.vy = 0;
+            f.grounded = true;
+            f.face = -1;
+            f.passive = false;
+            f.hit = true;
+            // Enough health that the BURST is what kills them, not the sword — otherwise the sheet shows
+            // eight ordinary kills in a row and no chain at all.
+            f.hp = i === 0 ? 1 : Math.max(2, Math.round(f.maxHp * 0.3));
+            f.dmg = [0, 0];
+        });
+        if (mob[0]) w.target = mob[0];
         w.moveTo = null;
     } else if (scene === "kill") {
         // ⚠️ THE OPPOSITE PROBLEM TO THE FIGHT SCENE. That one gives its creatures 2,000 health so the

@@ -134,6 +134,24 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
     const stats = useMemo(() => ({
         maxHp: 600, armour: 20, moveSpeed: 0,
         damage: scene === "loot" ? 9999 : 34, dmgPct: 0,
+        // ── ⚠️ THE AoE SCENE CARRIES A REAL CLASS, OR THERE IS NOTHING TO FILM ───────────────────────
+        // Luke: "Up until now, we really haven't been able to show skill effects in a way that I'm
+        // satisfied with. So I'd like to see you give it a shot." A skill effect cannot be judged from a
+        // still and cannot be reached without a class, spent points and a crowd standing close enough to
+        // be caught — which in real play means walking a geared Reaver into a packed zone and hoping.
+        //
+        // This is a rank-5 Reaver: Bloodletting detonates every corpse for 60% of its health, Rend sprays
+        // wounds off a bleeding kill, Red Harvest novas the zone. Exactly the build whose effects Luke
+        // described wanting to see.
+        ...(scene === "aoe" ? {
+            skills: [
+                { id: "rv_letting", name: "Bloodletting", at: "kill", kind: "corpse", rank: 5, radius: 1.5, share: 0.12 },
+                { id: "rv_rend", name: "Rend", at: "kill", kind: "spread", rank: 5, radius: 1.4, share: 0.18, dot: "bleed" },
+                { id: "rv_harvest", name: "Red Harvest", at: "killN", kind: "nova", rank: 5, every: 14, radius: 11, share: 1.3, atHero: true },
+            ],
+            groveVuln: 0.25,
+            bleedChance: 1,
+        } : {}),
         // ⚠️ THE JUICE SCENE FORCES WHAT IS OTHERWISE RARE. A crit at 22% and a haste proc at a few
         // percent cannot be filmed on demand -- you shoot twenty sheets and hope. The whole reason the
         // lab exists is to make a moment happen DURING the film, so this scene pins both to certainty.

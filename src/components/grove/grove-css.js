@@ -1518,6 +1518,45 @@ export const GROVE_CSS = `
 
 /* The ring an attack leaves when it resolves. It is the difference between damage arriving and damage
    LANDING somewhere — the player needs to see the place the thing they dodged went off. */
+/* ── THE AoE RING ─────────────────────────────────────────────────────────────────────────────
+   Luke: "the most important thing for me is that the AoE and the being able to see the AoE happen.
+   Up until now, we really haven't been able to show skill effects in a way that I'm satisfied with."
+
+   ⚠️ SIZED FROM THE REAL RADIUS, PASSED IN AS --r IN WORLD UNITS. Every other ring in this scene is a
+   fixed 9-unit ellipse, which is fine for "something happened here" and useless for an area: an AoE
+   whose edge you cannot see is just numbers appearing on things you did not aim at. This one is drawn
+   at exactly the radius the damage used, so the picture IS the hitbox.
+
+   It expands from nothing to full over 520ms and fades — a ring that appears at full size reads as a
+   decal, a ring that GROWS reads as a shockwave leaving the body. Flat ellipse rather than a circle
+   because the stage is side-on: a true circle reads as a sphere hanging in the air. */
+.gv-nova { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    width: calc(var(--r, 4) * 2 * var(--gv-unit, 1%));
+    height: calc(var(--r, 4) * 0.8 * var(--gv-unit, 1%));
+    margin-left: calc(var(--r, 4) * -1 * var(--gv-unit, 1%));
+    margin-bottom: calc(var(--r, 4) * -0.4 * var(--gv-unit, 1%));
+    border-radius: 50%; pointer-events: none; will-change: transform, opacity;
+    border: 3px solid rgba(255,120,90,0.95);
+    box-shadow: 0 0 26px 6px rgba(255,90,60,0.45), inset 0 0 34px 10px rgba(255,120,70,0.3);
+    animation: gv-nova-grow 520ms cubic-bezier(.12,.75,.3,1) both; }
+.gv-nova.is-corpse { border-color: rgba(255,70,70,0.95);
+    box-shadow: 0 0 30px 8px rgba(220,30,30,0.5), inset 0 0 40px 12px rgba(200,20,20,0.34); }
+.gv-nova.is-frost { border-color: rgba(150,225,255,0.95);
+    box-shadow: 0 0 30px 8px rgba(90,190,255,0.5), inset 0 0 40px 12px rgba(120,200,255,0.3); }
+.gv-nova.is-burn { border-color: rgba(255,190,80,0.95);
+    box-shadow: 0 0 30px 8px rgba(255,150,40,0.5), inset 0 0 40px 12px rgba(255,170,60,0.32); }
+@keyframes gv-nova-grow {
+    0%   { transform: scale(0.12); opacity: 0; }
+    18%  { opacity: 1; }
+    70%  { opacity: 0.85; }
+    100% { transform: scale(1); opacity: 0; }
+}
+
+/* The numbers an area deals. Distinct from a sword's cream and a wound's red: an AoE tick is neither
+   of those, and several of them land on the same frame. */
+.gv-num.is-nova { color: #ffbf7a; --gv-nb: 1.04; font-weight: 900;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.95), 0 0 16px rgba(255,140,60,0.85); }
+
 .gv-boom { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
     width: calc(9 * var(--gv-unit, 1%)); height: calc(3 * var(--gv-unit, 1%));
     margin: 0 0 calc(-1.5 * var(--gv-unit, 1%)) calc(-4.5 * var(--gv-unit, 1%));

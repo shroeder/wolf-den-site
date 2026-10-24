@@ -359,6 +359,9 @@ export default function GroveClient({ initial }) {
             // The names the member actually bought, keyed by the stat they feed — so a proc can announce
             // BLOODSCENT instead of HASTE. See procNames in grove-kit.js.
             procNames: h.procNames || {},
+            // What the class DOES here, as opposed to what it adds. See grove-skills.js.
+            skills: h.skills || [],
+            groveVuln: h.groveVuln || 0,
         };
     }, [st?.hero]);
 

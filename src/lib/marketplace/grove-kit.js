@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db.js";
 import { combatStats, fighterFrom } from "@/lib/marketplace/arena.js";
 import { treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
+import { groveSkills } from "@/lib/marketplace/grove-skills.js";
 import { upgradeEffects } from "@/lib/marketplace/arena-upgrades.js";
 import { GROVE_EMBLEMS, emblemStars } from "@/lib/marketplace/grove-catalog.js";
 import { pieceById, setBonusFor, ARMOUR_SLOTS } from "@/lib/marketplace/grove-forge.js";
@@ -272,6 +273,15 @@ export async function groveFighter(buyerId) {
         const mine = forGrove(fighterFrom(stats, perks, classId));
         // Carried beside the stats rather than through forGrove: it is a LABEL, not a number the engine reads.
         mine.procNames = procNames;
+        // ── ⚠️ WHAT THE CLASS DOES IN A FOREST, NOT WHAT IT ADDS TO A SWING ─────────────────────────
+        // The percentages above are the arena's reading of these nodes and they still apply. This is the
+        // Grove's, and it is a different list on purpose — see the header of grove-skills.js. Same spent
+        // points, so nothing is re-earned and there is no second tree to drift.
+        mine.skills = groveSkills(classId, takenNodes);
+        // Deep Cuts is the one skill that is not an EVENT — it makes everything else hit a bleeding thing
+        // harder, so the scene reads it as a multiplier rather than firing it. Pulled out of the same list
+        // so there is still only one place the rank is read.
+        mine.groveVuln = (mine.skills.find((x) => x.id === "rv_deep")?.rank || 0) * 0.05;
 
         // ── ⚠️ WHAT THE CLASS IS WORTH HERE, ASKED OF THE ENGINE RATHER THAN DESCRIBED ────────────
         // The obvious readout is a list of the nodes you have taken, and it would be wrong: the three
