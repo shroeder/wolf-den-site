@@ -2715,14 +2715,39 @@ export const GROVE_CSS = `
 .gv-elist { display: flex; flex-direction: column; gap: 8px; }
 .gv-em { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 11px;
     background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.10); }
+/* ── THE TWO HALVES OF THE PANEL ──────────────────────────────────────────────────────────────
+   Luke: "I'm looking at the card equipment area and I'm getting confused with the merit area. And
+   they should be separate." A shelf of earned collectibles and a till that spends a currency were
+   in one continuous scroll in matching painted planks. Now you can only be looking at one.
+
+   The count on each tab is the thing that half is about — how many cards you hold, how many merits
+   you have to spend — so the tab answers the question before you press it. */
+.gv-etabs { display: flex; gap: 8px; margin: 0 0 12px; }
+.gv-etabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 9px 10px; border-radius: 10px; cursor: pointer; font: inherit;
+    font-size: 0.82rem; font-weight: 800; letter-spacing: 0.02em; color: #b9ae99;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); }
+.gv-etabs button i { font-style: normal; font-size: 0.72rem; font-weight: 900; padding: 1px 7px;
+    border-radius: 999px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12); }
+.gv-etabs button.is-on { color: #ffe9a8; background: rgba(255,215,94,0.13);
+    border-color: rgba(255,215,94,0.5); }
+.gv-etabs button.is-on i { color: #ffd75e; }
+
 /* ── THE MONSTER CARD'S FACE ──────────────────────────────────────────────────────────────────
    A framed plate with the creature in it and its rung in the corner — the shape of a collectible
    rather than a row in a table. This is the single change that stops the emblem shelf reading as
    the merits panel below it: one of them has pictures of animals on it. */
+/* ⚠️ THE FRAME IS THE RUNG'S COLOUR, so the shelf is readable at arm's length. Luke: the monster
+   cards "need to be way more colorful". Worn is steel, Marked green, Etched blue, Sealed violet,
+   Crowned gold, Ascendant pink — the same ladder EMBLEM_STARS already paints the stars with, which
+   means the colour is information rather than decoration. A dormant card keeps the neutral frame. */
 .gv-em-face { position: relative; flex: 0 0 auto; width: 54px; height: 54px; border-radius: 10px;
     display: grid; place-items: center; overflow: visible;
-    background: radial-gradient(120% 120% at 50% 15%, rgba(255,255,255,0.09), rgba(0,0,0,0.3) 70%);
-    border: 1px solid rgba(255,255,255,0.14); }
+    background:
+        radial-gradient(120% 120% at 50% 15%, color-mix(in srgb, var(--rung, #8d8577) 26%, transparent), transparent 72%),
+        radial-gradient(120% 120% at 50% 15%, rgba(255,255,255,0.09), rgba(0,0,0,0.3) 70%);
+    border: 1px solid color-mix(in srgb, var(--rung, #8d8577) 55%, rgba(255,255,255,0.14));
+    box-shadow: 0 0 14px -4px color-mix(in srgb, var(--rung, #8d8577) 70%, transparent); }
 .gv-em-face img { width: 46px; height: 46px; object-fit: contain;
     filter: drop-shadow(0 2px 5px rgba(0,0,0,0.75)); }
 .gv-em-face i { position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%);

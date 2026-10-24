@@ -144,6 +144,9 @@ export default function GroveClient({ initial }) {
     // choice about the run you are about to take, and a choice that survived a reload would be spent on
     // a dive the player had forgotten they armed it for.
     const [charmPick, setCharmPick] = useState(null);
+    // Which half of the emblems panel is showing: the shelf of monster cards, or the merit till.
+    // See the note where the tabs are rendered for why these stopped sharing one scroll.
+    const [embTab, setEmbTab] = useState("cards");
     // Which panel is open OVER the zone, or null for none. Separate from `view`, which stays "zone" the
     // whole time you are in one — see the hoist note above the panels.
     const [zonePanel, setZonePanel] = useState(null);
@@ -853,6 +856,34 @@ export default function GroveClient({ initial }) {
                 {/* ── EMBLEMS ──────────────────────────────────────────────────────────────────────── */}
                 {panel === "emblems" ? (
                     <div className="gv-emblems">
+                        {/* ── ⚠️ TWO THINGS LIVED IN ONE SCROLL AND READ AS ONE THING ──────────────
+                            Luke: "it just feels like things are in the wrong place. Like, I'm looking at
+                            the card equipment area and I'm getting confused with the merit area. And they
+                            should be separate."
+
+                            He is right and the old comment under the Armoury explains exactly how it
+                            happened: "this panel is the answer to 'what am I wearing', so both live here".
+                            True, and it put a COLLECTION of monster cards directly above a SHOP that
+                            spends a currency, in matching painted planks, in one continuous scroll. Both
+                            halves are about wearing something, which is precisely why they blur — the
+                            distinction that matters to a player is that one is a shelf of things you have
+                            earned and the other is a till.
+
+                            Tabs rather than a sixth dock button: the dock is five controls wide already
+                            and a 375px phone has no room for another, and these two genuinely are two
+                            views of one subject rather than two destinations. */}
+                        <div className="gv-etabs" role="tablist" aria-label="Emblems and armour">
+                            <button type="button" role="tab" aria-selected={embTab === "cards"}
+                                className={embTab === "cards" ? "is-on" : ""}
+                                onClick={() => setEmbTab("cards")}>
+                                Monster Cards<i>{(st.emblems || []).filter((e) => e.count > 0).length}</i>
+                            </button>
+                            <button type="button" role="tab" aria-selected={embTab === "armour"}
+                                className={embTab === "armour" ? "is-on" : ""}
+                                onClick={() => setEmbTab("armour")}>
+                                Boss Armour<i>{Number(st.merits) || 0}</i>
+                            </button>
+                        </div>
                         {/* ── ⚠️ YOUR CLASS HAS BEEN COUNTING IN HERE ALL ALONG ────────────────────
                             grove-kit folds the class tree into the Grove fighter -- a Reaver's Rend and
                             a Warden's Bulwark genuinely change how a dive goes -- and nothing anywhere
@@ -896,7 +927,8 @@ export default function GroveClient({ initial }) {
                             )}
                         </Area>
 
-                        <Area id="emblems" icon="ui-emblems" title="Emblems"
+                        {embTab === "cards" ? (
+                        <Area id="emblems" icon="ui-emblems" title="Monster Cards"
                             count={`${(st.emblems || []).filter((e) => e.slot != null).length}/3 worn`}>
                         {/* ⚠️ NO CAPTION HERE. It read "Three may be worn. Three more are sealed." —
                             above three slots, under a header already counting "1/3 worn", with the
@@ -939,7 +971,8 @@ export default function GroveClient({ initial }) {
                                             collectibles read as a spreadsheet, which is most of why it was
                                             being confused with the merits panel beneath it. The stars moved
                                             onto the card as a corner, where a rung belongs. */}
-                                        <span className="gv-em-face">
+                                        <span className="gv-em-face"
+                                            style={{ "--rung": e.rung?.color || "#8d8577" }}>
                                             {face ? <img src={face} alt="" width={46} height={46} loading="lazy" /> : null}
                                             {e.stars ? (
                                                 <i style={{ color: e.rung?.color || "#8d8577" }}>{"★".repeat(e.stars)}</i>
@@ -975,10 +1008,12 @@ export default function GroveClient({ initial }) {
                             {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">No emblems yet. They fall rarely.</p> : null}
                         </div>
                         </Area>
-                        {/* The second thing you wear, under the first. This panel is the answer to "what
-                            am I wearing", so both live here rather than one here and one at the bench. */}
-                        <GroveArmoury st={st} partName={partName} PartIcon={PartIcon}
-                            post={post} refresh={refresh} setNote={setNote} />
+                        ) : null}
+                        {/* The till. Behind its own tab now — see the note at the top of this panel. */}
+                        {embTab === "armour" ? (
+                            <GroveArmoury st={st} partName={partName} PartIcon={PartIcon}
+                                post={post} refresh={refresh} setNote={setNote} />
+                        ) : null}
                     </div>
                 ) : null}
 
