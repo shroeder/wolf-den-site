@@ -1170,6 +1170,19 @@ export default function GroveScene({
         // opposite: a freeze, a stun, a chill happen to a CREATURE, and announcing them over the hero
         // tells the player the one thing they already know (it was them) instead of the thing they need
         // (which of thirty bodies it landed on). `on` is the body it belongs to.
+        // ── ⚠️ THE NODE'S NAME IF THE PLAYER BOUGHT ONE, ELSE THE MECHANIC'S ───────────────────────────
+        // Luke, twice: "I don't see my skills firing." They were firing; the zone was calling them something
+        // else. Every Reaver node is a passive percentage with an ability's name — Rend is +6% bleedChance,
+        // Bloodscent is +2% hasteBonus — so a member who spent five points in Bloodscent watched the word
+        // HASTE come off their hero with nothing connecting the two.
+        //
+        // `stats.procNames` is stat -> the node they actually have ranks in (grove-kit builds it; only nodes
+        // with points spent are in there, because a word you never bought appearing over your head is worse
+        // than the generic one). Falls back to the mechanic for gear-granted procs and for anyone with no
+        // class at all, which is the common case and must keep working.
+        const procWord = (stat, fallback) =>
+            String(stats?.procNames?.[stat] || fallback).toUpperCase();
+
         const procCall = (text, kind = "haste", art = null, atY = 0.9, on = null) => {
             const layer = fxRef.current;
             if (!layer) return;
@@ -1637,7 +1650,7 @@ export default function GroveScene({
                         shockwave(w.hero.x, w.hero.y + w.hero.h * 0.5, "surge");
                         burst(w.hero.x, w.hero.y + w.hero.h * 0.5, { kind: "surge", scale: 1.7 });
                         w.shake.add(TRAUMA.crit);
-                        procCall("SURGE", "surge");
+                        procCall(procWord("surge", "Surge"), "surge");
                         playSurge();
                     }
 
@@ -1687,7 +1700,7 @@ export default function GroveScene({
                         // ⚠️ ON THE CATCH, NOT ON THE REFRESH, and that is the same rule the fire below
                         // already follows. A word on every swing of a 32% build is not a proc, it is a
                         // label stuck to the screen.
-                        if (better && !foe.bleed) procCall("REND", "bleed", null, 1.2, foe);
+                        if (better && !foe.bleed) procCall(procWord("bleedChance", "Rend"), "bleed", null, 1.2, foe);
                         if (better) {
                             foe.bleed = { dmg: hit.bleed.dmg, leech: hit.bleed.leech,
                                 left: BLEED_TICKS, nextAt: now + BLEED_TICK_MS };
@@ -1776,7 +1789,7 @@ export default function GroveScene({
                         // CHILLED in a row, which is noise; frost per stack is the thing itself.
                         burst(foe.x, foe.y + foe.h * 0.5, { kind: "chill", scale: 0.6 + foe.chill });
                         if (was === 0) {
-                            procCall("CHILLED", "chill", null, 1.15, foe);
+                            procCall(procWord("chill", "Chilled"), "chill", null, 1.15, foe);
                             playChill();
                         }
                     }
@@ -1815,7 +1828,7 @@ export default function GroveScene({
                         burst(foe.x, foe.y + foe.h * 0.5, { kind: "ice", scale: 2.2 });
                         shockwave(foe.x, foe.y + foe.h * 0.45, "cata");
                         w.shake.add(TRAUMA.kill);
-                        procCall("CATACLYSM", "cata", null, 1.3, foe);
+                        procCall(procWord("cataclysm", "Cataclysm"), "cata", null, 1.3, foe);
                         playCataclysm();
                         lock(FREEZE_MS, null);
                     }
@@ -1851,14 +1864,14 @@ export default function GroveScene({
                         playWild(pick);
                         if (pick === 2) {
                             w.hasteUntil = now + HASTE_MS;
-                            procCall("HASTE", "haste");
+                            procCall(procWord("hasteBonus", "Haste"), "haste");
                         } else {
                             const extra = swing(stats, 0, w.rand);
                             foe.hp -= extra.dealt;
                             addPop("hit", `${extra.dealt}`, foe.x, foe.y + foe.h * 0.7,
                                 popWeight(extra.dealt, foe.maxHp));
                             burst(foe.x, foe.y + foe.h * 0.5, { kind: "wild", scale: 1.2 });
-                            procCall("WILD", "wild", null, 1.2, foe);
+                            procCall(procWord("wildProc", "Wild"), "wild", null, 1.2, foe);
                         }
                     }
 
@@ -1879,7 +1892,7 @@ export default function GroveScene({
                             // him. The word is the receipt; this is the thing that happened.
                             shockwave(w.hero.x, w.hero.y + w.hero.h * 0.45, "guard");
                             burst(w.hero.x, w.hero.y + w.hero.h * 0.4, { kind: "guard", scale: 1.3 });
-                            procCall("GUARD", "guard", null, 1.1);
+                            procCall(procWord("guardChance", "Guard"), "guard", null, 1.1);
                             playGuard();
                         }
                     }
@@ -1930,7 +1943,7 @@ export default function GroveScene({
                         // proc to near-certainty and the collision happens every other swing.
                         const wasHasted = now < (w.hasteUntil || 0);
                         w.hasteUntil = now + HASTE_MS;
-                        if (!wasHasted) procCall("HASTE", "haste");
+                        if (!wasHasted) procCall(procWord("hasteBonus", "Haste"), "haste");
                     }
                     if (hit.healed > 0) {
                         w.hp = Math.min(maxHp, w.hp + hit.healed);
@@ -2378,7 +2391,7 @@ export default function GroveScene({
                     burst(foe.x, foe.y + foe.h * 0.5,
                         { kind: "riposte", scale: 1.4, crit: true, dir: Math.sign(foe.x - w.hero.x || 1) });
                     shockwave(foe.x, foe.y + foe.h * 0.45, "riposte");
-                    procCall("RIPOSTE", "riposte", null, 1.32, foe);
+                    procCall(procWord("counterBonus", "Riposte"), "riposte", null, 1.32, foe);
                     playRiposte();
                     if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now, riposte.dealt); }
                 }

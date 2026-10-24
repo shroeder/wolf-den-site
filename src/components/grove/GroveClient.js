@@ -356,6 +356,9 @@ export default function GroveClient({ initial }) {
             lifesteal: h.lifesteal, stun: h.stun,
             bleedChance: h.bleedChance, bleedDamage: h.bleedDamage, bleedLeech: h.bleedLeech,
             armour: h.armor, maxHp: h.health, moveSpeed: h.moveSpeed || 0,
+            // The names the member actually bought, keyed by the stat they feed — so a proc can announce
+            // BLOODSCENT instead of HASTE. See procNames in grove-kit.js.
+            procNames: h.procNames || {},
         };
     }, [st?.hero]);
 

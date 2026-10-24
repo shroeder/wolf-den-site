@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db.js";
 import { combatStats, fighterFrom } from "@/lib/marketplace/arena.js";
-import { treeEffects } from "@/lib/marketplace/arena-classes.js";
+import { treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects } from "@/lib/marketplace/arena-upgrades.js";
 import { GROVE_EMBLEMS, emblemStars } from "@/lib/marketplace/grove-catalog.js";
 import { pieceById, setBonusFor, ARMOUR_SLOTS } from "@/lib/marketplace/grove-forge.js";
@@ -229,6 +229,30 @@ export async function groveFighter(buyerId) {
         ).catch(() => null);
         const classId = prog?.arena_class || null;
         const tree = treeEffects(classId, prog?.skill_tree || {});
+        // ── ⚠️ WHAT THE PLAYER CALLS IT, NOT WHAT THE ENGINE CALLS IT ───────────────────────────────
+        // Luke, twice: "I don't see my skills firing ... as a reaver, I would expect like cool skills to
+        // be firing."
+        //
+        // They were firing and the zone was announcing them under the wrong name. A Reaver's twelve nodes
+        // are all PASSIVE PERCENTAGES with ability-sounding names -- Rend is +6% bleedChance, Bloodscent is
+        // +2% hasteBonus, Red Harvest is +1% wildProc -- so the engine only ever knew "bleedChance" and the
+        // screen printed the MECHANIC. A member who spent five points on Bloodscent watched the word HASTE
+        // come off their hero and had no way to connect the two.
+        //
+        // So the fighter carries the node NAMES, keyed by the stat they feed. Only nodes with ranks
+        // actually spent: a word you never bought appearing over your head would be worse than the generic
+        // one. Where two nodes feed one stat (Quickblade and Frenzy both pay tempoBonus) the deeper
+        // investment wins, because that is the one the player would say they are built around.
+        const takenNodes = prog?.skill_tree || {};
+        const procNames = {};
+        {
+            const best = {};
+            for (const n of treeFor(classId)) {
+                const ranks = Number(takenNodes[n.id]) || 0;
+                if (!ranks || !n.stat || !n.name) continue;
+                if (!best[n.stat] || ranks > best[n.stat]) { best[n.stat] = ranks; procNames[n.stat] = n.name; }
+            }
+        }
         const ups = upgradeEffects(prog?.upgrades || {});
         const perks = {};
         for (const k of new Set([...Object.keys(tree || {}), ...Object.keys(ups || {})])) {
@@ -246,6 +270,8 @@ export async function groveFighter(buyerId) {
         // upgrade's number to the class would be a readout that lies in the player's favour -- the exact
         // kind of wrong that nobody reports because it flatters them. The upgrades have their own screen.
         const mine = forGrove(fighterFrom(stats, perks, classId));
+        // Carried beside the stats rather than through forGrove: it is a LABEL, not a number the engine reads.
+        mine.procNames = procNames;
 
         // ── ⚠️ WHAT THE CLASS IS WORTH HERE, ASKED OF THE ENGINE RATHER THAN DESCRIBED ────────────
         // The obvious readout is a list of the nodes you have taken, and it would be wrong: the three
