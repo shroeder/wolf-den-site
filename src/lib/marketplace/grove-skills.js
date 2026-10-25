@@ -208,7 +208,18 @@ export function groveSkills(classId, taken = {}) {
     for (const s of skillsForClass(classId)) {
         const rank = Math.max(0, Math.min(5, Math.floor(Number(taken?.[s.id]) || 0)));
         if (!rank) continue;
-        out.push({ ...s, rank, text: s.grove(rank) });
+        // ⚠️ `grove` IS DROPPED HERE, NOT SPREAD THROUGH. It is a formatter, and `text` below is everything
+        // it has to say — but a plain `{ ...s }` carried the live function into the returned row, which
+        // grove-kit hangs on the fighter as `hero.skills` and the Grove page passes to GroveClient. React cannot
+        // serialize a function across that boundary, so the WHOLE PAGE threw in the RSC render:
+        //
+        //   Functions cannot be passed directly to Client Components ... {id: "rv_rend", grove: function grove}
+        //
+        // In production that surfaces as a bare digest with the message stripped, and only for a member who
+        // has actually spent a point — so it read as "the Grove crashes for Luke" while every client-side
+        // gate stayed green, because nothing client-side ever got to run. Keep this a destructure.
+        const { grove, ...data } = s;
+        out.push({ ...data, rank, text: grove(rank) });
     }
     return out;
 }
