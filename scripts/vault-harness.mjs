@@ -75,6 +75,27 @@ const SQUARE_TOKEN =
 if (!DB_URL) throw new Error("No DATABASE_URL (checked env, .env.local, accounting_app/.env).");
 if (!SQUARE_TOKEN) throw new Error("No SQUARE_ACCESS_TOKEN (checked env, accounting_app/local.properties).");
 
+// ⚠️ EXPORT THEM, because `cycle` imports the APP'S OWN code and db.js / consignment/square.js read
+// process.env directly — as they should. Reading the files into local constants is enough for the harness's
+// own queries and silently useless for the thing it is actually testing: the first cycle run refused with
+// "insufficient_credit" because openPack() could not reach the database to see the balance we had just
+// granted. The harness must set up the same environment the server has, not a private one.
+process.env.DATABASE_URL = DB_URL;
+process.env.SQUARE_ACCESS_TOKEN = SQUARE_TOKEN;
+
+// The app logs a JSON line per query and per Square call, which buries the assertions this script exists to
+// show. `--verbose` puts them back.
+if (!process.argv.includes("--verbose")) {
+    const quiet = () => {};
+    console.info = quiet;
+    console.debug = quiet;
+    const realLog = console.log;
+    console.log = (...a) => {
+        if (typeof a[0] === "string" && a[0].startsWith("{\"timestamp\"")) return;
+        realLog(...a);
+    };
+}
+
 const sql = neon(DB_URL);
 const SQUARE_API = "https://connect.squareup.com";
 
@@ -278,6 +299,20 @@ async function cmdRestore() {
 
         let variationId = liveId;
         if (!live || live.is_deleted) {
+            // ⚠️ HEAL A THIN SNAPSHOT RATHER THAN REFUSING. An entry adopted mid-cycle may have been captured
+            //    without its parent item, and a restore that throws leaves a real bag sold with no variation —
+            //    the worst possible failure mode for an undo. The deleted object is still retrievable, so the
+            //    missing pieces are re-read here instead of giving up.
+            if (!bag.object || !bag.parentItemId) {
+                const recovered = live || (await fetchVariation(bag.variationId));
+                bag.object = bag.object || recovered;
+                bag.parentItemId = bag.parentItemId || recovered?.item_variation_data?.item_id || null;
+                bag.sku = bag.sku || recovered?.item_variation_data?.sku || null;
+            }
+            if (!bag.parentItemId) {
+                bad(`${bag.row.card_name}: no parent item recoverable — left sold, fix by hand`);
+                continue;
+            }
             const data = bag.object?.item_variation_data || {};
             const made = await square("/v2/catalog/object", {
                 method: "POST",
@@ -461,7 +496,145 @@ for (let i = 1; i < argv.length; i += 1) {
     if (argv[i].startsWith("--")) { args[argv[i].slice(2)] = argv[i + 1]?.startsWith("--") ? true : argv[++i]; }
 }
 
-const commands = { snapshot: cmdSnapshot, status: cmdStatus, restore: cmdRestore, selftest: cmdSelftest };
+// ── CYCLE ───────────────────────────────────────────────────────────────────────────────────────────────────
+// The real thing, end to end: openPack() → choose → assert the books → restore. It imports the app's OWN
+// functions rather than reimplementing them, because a harness that reimplements the path under test proves
+// only that two pieces of code agree with each other.
+//
+//   node --import ./scripts/lib/register-loader.mjs scripts/vault-harness.mjs cycle [--choice sell|vault]
+
+async function cmdCycle(args) {
+    const state = loadState();
+    if (!state) throw new Error("snapshot first: node scripts/vault-harness.mjs snapshot --bags 1 --buyer <id>");
+    const choice = args.choice === "vault" ? "vault" : "sell";
+
+    const { openPack, choosePackOutcome, packPriceCents, splitPriceForTax } = await import("@/lib/marketplace/packs.js");
+    const { getShopSalesTaxRate } = await import("@/lib/consignment/square");
+
+    const price = await packPriceCents();
+    log(`\n   pack price ${usd(price)}`);
+
+    // Fund it. Recorded as one of ours so restore takes it back out.
+    const before = (await sql`SELECT store_credit_cents FROM mkt_buyer WHERE id = ${state.buyer.id}`)[0];
+    if (before.store_credit_cents < price) {
+        const topUp = price - before.store_credit_cents + 500;
+        const granted = await sql`
+            UPDATE mkt_buyer SET store_credit_cents = store_credit_cents + ${topUp}, updated_at = NOW()
+            WHERE id = ${state.buyer.id} RETURNING store_credit_cents`;
+        const ev = await sql`
+            INSERT INTO mkt_store_credit_event (buyer_id, delta_cents, balance_after_cents, reason, ref)
+            VALUES (${state.buyer.id}, ${topUp}, ${granted[0].store_credit_cents}, 'adjust', 'harness:grant')
+            RETURNING id`;
+        state.created.creditEventIds.push(Number(ev[0].id));
+        saveState(state);
+        ok(`granted ${usd(topUp)}, balance ${usd(granted[0].store_credit_cents)}`);
+    }
+
+    log("\n1) openPack()");
+    const result = await openPack({ buyerId: state.buyer.id });
+    if (!result.ok) throw new Error(`open refused: ${result.error}`);
+    const open = result.open;
+    state.created.packOpenIds.push(open.id);
+    saveState(state);
+    ok(`pulled ${open.card.name} — ${usd(open.card.valueCents)} (${open.tier})`);
+    ok(`balance now ${usd(open.balanceCents)}`);
+
+    // ⚠️ THE BAG THAT WAS PULLED IS ALMOST CERTAINLY NOT THE ONE WE SNAPSHOTTED — the pool picks at random
+    //    from all 79. So capture whatever it actually took, or restore puts back a bag nobody broke and
+    //    leaves the real one sold.
+    const pulled = (await sql`
+        SELECT id, card_id, card_name, market_value, status, square_variation_id, packed_variation_id,
+               variation_sku, channel, cost_cents, cost_basis
+        FROM mystery_bag_cards WHERE id = ${open.card.id}`)[0];
+    if (!state.bags.some((b) => b.row.id === pulled.id)) {
+        // ⚠️ ADOPTION IS THE NORMAL PATH, NOT THE EXCEPTION — the pool picks at random from all 79, so the bag
+        //    that gets opened is almost never the one we snapshotted. Which means the capture here has to be
+        //    as complete as the one in `snapshot`, and the first version was not: it stored `object: null` and
+        //    `parentItemId: null`, so restore tried to recreate a variation with no parent and Square refused
+        //    with "Item Variation with id #restored has no item_id".
+        //
+        //    It is recoverable precisely because SQUARE STILL RETURNS DELETED OBJECTS. The open has already
+        //    deleted this variation by the time we get here, and `include_deleted_objects` hands the whole
+        //    thing back — parent item, price, SKU, custom attributes and all.
+        const deleted = await fetchVariation(pulled.packed_variation_id);
+        state.bags.push({
+            row: { ...pulled, status: "active" },
+            variationId: pulled.packed_variation_id,
+            parentItemId: deleted?.item_variation_data?.item_id || null,
+            sku: deleted?.item_variation_data?.sku || pulled.variation_sku,
+            object: deleted,
+            inStock: 1,
+        });
+        saveState(state);
+        log(`   (adopted ${pulled.card_name} — the pool chose it, not us; recovered its deleted object)`);
+        if (!deleted?.item_variation_data?.item_id) bad("could not recover the parent item — restore will fail");
+    }
+
+    log("\n2) the books");
+    const row = (await sql`
+        SELECT price_cents, revenue_cents, tax_cents, cogs_cents, cogs_basis, tier, preview, outcome
+        FROM mkt_pack_open WHERE id = ${open.id}`)[0];
+    const rate = await getShopSalesTaxRate().catch(() => 0);
+    const expected = splitPriceForTax(row.price_cents, rate);
+    let pass = true;
+    const check = (label, got, want) => {
+        if (String(got) === String(want)) ok(`${label}: ${got}`);
+        else { bad(`${label}: got ${got}, wanted ${want}`); pass = false; }
+    };
+    log(`   tax rate ${(rate * 100).toFixed(3)}%`);
+    check("revenue + tax === price", row.revenue_cents + row.tax_cents, row.price_cents);
+    check("revenue", row.revenue_cents, expected.revenueCents);
+    check("tax", row.tax_cents, expected.taxCents);
+    check("preview stamped", row.preview, true);
+    log(`   cogs ${usd(row.cogs_cents)} basis=${row.cogs_basis}`);
+    if (row.cogs_cents === null) { bad("cogs is null"); pass = false; }
+
+    const task = (await sql`
+        SELECT bag_sku, status FROM mkt_pack_pull_task WHERE pack_open_id = ${open.id}`)[0];
+    if (task) { ok(`pull task raised for bag ${task.bag_sku}`); state.created.pullTaskIds.push(task.id); }
+    else { bad("no pull task raised"); pass = false; }
+
+    const sold = (await sql`
+        SELECT id FROM mystery_sold_events WHERE idempotency_key LIKE 'vpo:%' ORDER BY created_at DESC LIMIT 1`)[0];
+    if (sold) state.created.soldEventIds.push(sold.id);
+    saveState(state);
+
+    log(`\n3) choose "${choice}"`);
+    const chosen = await choosePackOutcome({ buyerId: state.buyer.id, openId: open.id, choice });
+    if (!chosen.ok) throw new Error(`choose refused: ${chosen.error}`);
+    if (choice === "sell") {
+        ok(`credited ${usd(chosen.creditedCents)}, balance ${usd(chosen.balanceCents)}`);
+        check("sell-back pays 100% of value", chosen.creditedCents, open.card.valueCents);
+        const after = (await sql`SELECT status FROM mkt_pack_pull_task WHERE pack_open_id = ${open.id}`)[0];
+        check("pull task cancelled (card never left)", after?.status, "done");
+    } else {
+        state.created.vaultCardIds.push(chosen.vaultCardId);
+        saveState(state);
+        const v = (await sql`
+            SELECT card_name, set_name, card_number, condition, tier, current_value_cents, releasable_at
+            FROM mkt_vault_card WHERE id = ${chosen.vaultCardId}`)[0];
+        ok(`vaulted "${v.card_name}" ${[v.set_name, v.card_number, v.condition].filter(Boolean).join(" · ")}`);
+        check("vault value matches the pull", v.current_value_cents, open.card.valueCents);
+        check("never shows the placeholder set", v.set_name === "Square" ? "Square" : "real", "real");
+    }
+
+    // A second tap must not pay twice.
+    const again = await choosePackOutcome({ buyerId: state.buyer.id, openId: open.id, choice });
+    check("double-tap refused", again.ok === false && again.error, "already_chosen");
+
+    log("\n4) restore");
+    await cmdRestore();
+
+    const finalBalance = (await sql`SELECT store_credit_cents FROM mkt_buyer WHERE id = ${state.buyer.id}`)[0];
+    const activeNow = (await sql`SELECT COUNT(*)::int n FROM mystery_bag_cards WHERE status='active'`)[0];
+    check("credit back to snapshot", finalBalance.store_credit_cents, state.buyer.creditCentsBefore);
+    log(`   active pool: ${activeNow.n}`);
+
+    log(pass ? "\n   CYCLE PASSED — the real path runs and reverts.\n" : "\n   CYCLE FAILED.\n");
+    if (!pass) process.exitCode = 1;
+}
+
+const commands = { snapshot: cmdSnapshot, status: cmdStatus, restore: cmdRestore, selftest: cmdSelftest, cycle: cmdCycle };
 if (!commands[cmd]) {
     log("usage: node scripts/vault-harness.mjs <snapshot|status|selftest|restore> [--bags N] [--buyer <id>]");
     process.exit(1);
