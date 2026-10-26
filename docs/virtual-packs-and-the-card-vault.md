@@ -1391,4 +1391,43 @@ rows, SKU and unit cost preserved across both cycles.
 
 ## Build log
 
-*(nothing built yet)*
+**Built 2026-10-26, owner-gated behind `VAULT_PUBLIC = false`. Nothing is reachable by a member.**
+
+| Step | Commit | What landed |
+|---|---|---|
+| 0+1 | `d9012eab` | mig 484 (pool `channel`/`condition`/`cost_cents`/`cost_basis`, `mkt_pack_open`, `mkt_pack_pull_task`, `mkt_vault_card`, `mkt_vault_event`), `vault-gate.js`, `pack-card-name.js` |
+| — | `5fdc6e31` | `scripts/vault-harness.mjs` — snapshot / selftest / cycle / adopt / restore |
+| 2 | `690cecbf` | `openPack` / `choosePackOutcome`, the three member APIs, `pack-rarity.js` |
+| 3 | `3dba9e15` | the reveal: bag cut-out, `pack-audio.js`, `PackOpenClient`, wired into `/mystery-bags` |
+| 4 | `90b3e661` | `getVault` / `sellVaultCards`, `vault-restock.js`, the vault screen |
+| 5 | `3181b62f` | mig 485, vault orders through `shop_orders`, EasyPost insurance, self-cancel + re-file |
+| 6 | `f7ffc1f6` | `pack-telemetry.js`, `/marketplace/admin/packs`, the staff pull queue |
+| 7 | `4ec0c747` | the Card Vault in the member menu |
+
+**Still to do:** step 8 — announce it, which only happens when `VAULT_PUBLIC` flips. And the Android half of
+§16.3: the pull queue and the pack telemetry need adding to **both** drawer lists in `LedgerApp.kt`, or they
+are screens that exist, work, and cannot be reached.
+
+### What the build found that the design did not
+
+Every one of these came from running the thing, not from reading it:
+
+- **A 2.4-second dead pause after the tap.** The reveal awaited the server before starting. Fixed by the
+  observation that falls out of the colourless-glow rule: nothing before the flip may carry information about
+  the result, so nothing before the flip needs to WAIT for it. §3 updated in spirit; the code carries the note.
+- **The pack price was chargeable when it was a guess.** The board's fallback chain ends at a hard-coded $25
+  and the real Square price is $20. Fine for a board, not for something that debits credit. `packPrice()`
+  labels its source and an open refuses on the default.
+- **A buy-back overwrote an existing unit cost.** `wolfden_item_cost` holds what we recorded PAYING, and a
+  buy-back prices one unit at 100% of market — writing it variation-wide repriced every other copy on the
+  shelf. It gap-fills only now. One real row was damaged in testing and has been restored.
+- **The vault's bottom sheet rendered off-screen**, because `.reveal > *` leaves a persistent
+  `transform: translateY(0)` and a transformed element is a containing block for `position: fixed`.
+- **A permission key that does not exist fails CLOSED**, so the pull queue would have been shut to every staff
+  account while looking correct in the diff.
+- **The admin page gate and the admin API gate are different auth systems.** The screen rendered and sat on
+  "Loading…" forever.
+
+---
+
+
