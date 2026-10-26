@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { withRequestLogging } from "@/lib/server-logger";
 import { arenaNav } from "@/lib/marketplace/arena.js";
 import { MINING_UNLOCKED, miningNav } from "@/lib/marketplace/mining.js";
@@ -53,7 +54,7 @@ export async function GET(request) {
         if (!id) {
             return noStore({
                 signedIn: false, arena: { unlocked: false }, mine: { unlocked: false }, delves: { unlocked: false },
-                jeweller: false, casino: false, kitchen: false, cards: false, grove: false, chests: 0, spins: 0, bossStrikes: 0, questsReady: 0,
+                jeweller: false, casino: false, kitchen: false, cards: false, grove: false, vault: false, chests: 0, spins: 0, bossStrikes: 0, questsReady: 0,
                 sailing: { attention: false, casts: 0, forgeable: 0, fishing: false }, featureClaims: {},
                 townTodo: null, farm: { cropsReady: 0, petNudge: 0 },
             });
@@ -86,6 +87,10 @@ export async function GET(request) {
             signedIn: true,
             // Four booleans that used to cost four full feature builds between them.
             jeweller: true,
+            // The Card Vault, gated while virtual packs are owner-only. The gate is IMPORTED rather than
+            // re-written as isOwner(id): on launch VAULT_PUBLIC flips in one place, and a second copy of the
+            // rule in the menu would keep the entry hidden for everyone after the feature had opened.
+            vault: vaultOpenFor(id),
             casino: true,
             // Unclaimed free chips today — drives the nav badge on /marketplace/casino.
             casinoChips: Boolean(freeChips),

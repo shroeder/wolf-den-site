@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { isGamePath } from "@/lib/marketplace/game-paths.js";
 import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
-import { GiCardPlay, GiOakLeaf } from "react-icons/gi";
+import { GiCardPickup, GiCardPlay, GiOakLeaf } from "react-icons/gi";
 
 import FishingLaunch from "@/components/FishingLaunch";
 import MiningLaunch from "@/components/MiningLaunch";
@@ -168,6 +168,7 @@ export default function GameNav() {
     const arena = Boolean(hud?.arena?.unlocked);
     const arenaFights = Number(hud?.arena?.fightsLeft) || 0;
     const jeweller = Boolean(hud?.jeweller);
+    const vault = Boolean(hud?.vault);
     const casino = Boolean(hud?.casino);
     const cards = Boolean(hud?.cards);
     const grove = Boolean(hud?.grove);
@@ -373,6 +374,11 @@ export default function GameNav() {
             { href: "/marketplace/trade", emoji: "🤝", label: "Trades", sub: "Swap gear & gold" },
             { href: "/marketplace/auction", emoji: "🏛️", label: "Auction House", sub: "List & buy gear" },
             { href: "/marketplace/credit", emoji: "💳", label: "Store Credit", sub: "Credit + coins" },
+            // Door 3 of 9 (docs/virtual-packs-and-the-card-vault.md §16.2). A Gi glyph rather than an emoji:
+            // emoji are the OS's artwork sitting in the middle of hand-painted game art.
+            // ⚠️ It rides the EXISTING batched HUD read — this component is mounted in the layout, so a fetch
+            // of its own would bill a request on every navigation by every member forever (check:chrome).
+            ...(vault ? [{ href: "/marketplace/vault", Icon: GiCardPickup, label: "Card Vault", sub: "Cards you pulled" }] : []),
         ] },
         { title: "Progress & Social", items: [
             { href: "/marketplace/track", emoji: "🏆", label: "Rewards", sub: "Reward track" },
