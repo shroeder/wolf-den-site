@@ -52,14 +52,29 @@ export function splitPriceForTax(priceCents, rate) {
     return { revenueCents: revenue, taxCents: price - revenue };
 }
 
-/** The live pack price, in cents. Square is the source; the env override and the default are the fallbacks. */
-export async function packPriceCents() {
+/**
+ * The live pack price, in cents, WITH where it came from.
+ *
+ * ⚠️ THE SOURCE MATTERS BECAUSE THIS NUMBER IS CHARGED, NOT JUST DISPLAYED. The /mystery-bags board has a
+ * fallback chain ending in a hard-coded $25, which is harmless for a board and is not harmless here: the real
+ * Square price is $20, so a Square outage would silently take $25 of someone's credit for a $20 pack. Caught
+ * in dev, where SQUARE_ACCESS_TOKEN is absent and the page cheerfully advertised "a $25.00 pack".
+ *
+ * So the default is still returned — a board that shows nothing is worse than one showing a stale price — but
+ * it is LABELLED, and openPack() refuses to charge on it.
+ */
+export async function packPrice() {
     const info = await getMysteryBagPriceInfoFromSquare().catch(() => null);
     const fromSquare = Number(info?.price || 0);
-    if (fromSquare > 0) return Math.round(fromSquare * 100);
+    if (fromSquare > 0) return { cents: Math.round(fromSquare * 100), source: "square" };
     const fromEnv = Number(process.env.MYSTERY_BAG_PRICE || 0);
-    if (fromEnv > 0) return Math.round(fromEnv * 100);
-    return DEFAULT_PRICE_CENTS;
+    if (fromEnv > 0) return { cents: Math.round(fromEnv * 100), source: "env" };
+    return { cents: DEFAULT_PRICE_CENTS, source: "fallback_default" };
+}
+
+/** Just the number, for the places that only display it. */
+export async function packPriceCents() {
+    return (await packPrice()).cents;
 }
 
 function toPoolCard(row) {
@@ -85,15 +100,16 @@ function toPoolCard(row) {
  * stays honest about a pool the shelf is draining at the same time, so it is never cached across a session.
  */
 export async function packPoolSummary() {
-    const [rows, priceCents] = await Promise.all([
+    const [rows, price] = await Promise.all([
         db.query(
             `SELECT id, card_name, condition, market_value, image_url, item_type
              FROM mystery_bag_cards
              WHERE status = 'active'
              ORDER BY market_value DESC`
         ),
-        packPriceCents(),
+        packPrice(),
     ]);
+    const priceCents = price.cents;
 
     const cards = rows.map(toPoolCard);
     const totalCents = cards.reduce((sum, c) => sum + c.valueCents, 0);
@@ -102,6 +118,9 @@ export async function packPoolSummary() {
 
     return {
         priceCents,
+        // The client disables the button on this, so a Square outage reads as "not right now" rather than as
+        // a surprise charge.
+        priceTrusted: price.source !== "fallback_default",
         remaining: cards.length,
         poolValueCents: totalCents,
         evCents: cards.length ? Math.round(totalCents / cards.length) : 0,
@@ -123,8 +142,23 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
     const pending = await resumePendingOpen(buyerId);
     if (pending) return { ok: true, open: pending, resumed: true };
 
-    const priceCents = await packPriceCents();
-    const balanceCents = await getStoreCredit(buyerId);
+    // ⚠️ IN PARALLEL, because each of these is its own HTTPS round trip and the member is watching a bag.
+    //    Filming the reveal showed the whole open taking 2.4s; chaining three awaits that do not depend on
+    //    each other is a third of that for nothing. The tax rate is needed later but asked for here so it is
+    //    already in flight — it is cached per instance, so this is usually free.
+    const [price, balanceCents, taxRate] = await Promise.all([
+        packPrice(),
+        getStoreCredit(buyerId),
+        getShopSalesTaxRate().catch(() => 0),
+    ]);
+
+    // ⚠️ Never charge a guessed price. If Square cannot be reached and nothing overrides it, the member is
+    //    told to come back rather than being billed a number we invented.
+    if (price.source === "fallback_default") {
+        logger.error("packs.open.no_price", new Error("No authoritative pack price"), { buyerId });
+        return { ok: false, error: "no_price" };
+    }
+    const priceCents = price.cents;
     if (balanceCents < priceCents) {
         return { ok: false, error: "insufficient_credit", priceCents, balanceCents };
     }
@@ -201,7 +235,6 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
     // From here the result EXISTS and is owed to the member, whatever happens to their browser.
     const valueCents = toCents(claimed.market_value);
     const tier = tierForCents(valueCents);
-    const taxRate = await getShopSalesTaxRate().catch(() => 0);
     const { revenueCents, taxCents } = splitPriceForTax(priceCents, taxRate);
     const cogs = await resolvePackCost(claimed);
 

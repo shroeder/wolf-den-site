@@ -634,7 +634,85 @@ async function cmdCycle(args) {
     if (!pass) process.exitCode = 1;
 }
 
-const commands = { snapshot: cmdSnapshot, status: cmdStatus, restore: cmdRestore, selftest: cmdSelftest, cycle: cmdCycle };
+// ── ADOPT ───────────────────────────────────────────────────────────────────────────────────────────────────
+// Pull every pack open this buyer has made since the snapshot into the snapshot's undo list.
+//
+// ⚠️ THIS IS WHAT MAKES DRIVING THE REAL UI SAFE. `cycle` adopts the bag it opened because it called openPack()
+// itself and knows the answer. A browser clicking the button does not tell the harness anything — so without
+// this, filming the reveal leaves a real bag sold with its Square variation deleted and nothing recorded that
+// could put it back.
+//
+// It is still scoped: only opens belonging to this buyer, only ones created after the snapshot was taken, and
+// only ones not already adopted. It never sweeps "anything that looks like a test".
+
+async function cmdAdopt() {
+    const state = loadState();
+    if (!state) throw new Error("snapshot first");
+
+    const opens = await sql`
+        SELECT o.id, o.outcome, o.created_at, c.id AS card_id, c.card_name, c.card_id AS card_sku,
+               c.market_value, c.square_variation_id, c.packed_variation_id, c.variation_sku, c.channel,
+               c.cost_cents, c.cost_basis
+        FROM mkt_pack_open o
+        JOIN mystery_bag_cards c ON c.id = o.mystery_card_id
+        WHERE o.buyer_id = ${state.buyer.id} AND o.created_at >= ${state.takenAt}::timestamptz
+        ORDER BY o.created_at`;
+
+    let added = 0;
+    for (const open of opens) {
+        if (!state.created.packOpenIds.includes(open.id)) {
+            state.created.packOpenIds.push(open.id);
+            added += 1;
+        }
+        if (!state.bags.some((b) => b.row.id === open.card_id)) {
+            const deleted = await fetchVariation(open.packed_variation_id);
+            state.bags.push({
+                row: {
+                    id: open.card_id, card_id: open.card_sku, card_name: open.card_name,
+                    market_value: open.market_value, status: "active",
+                    square_variation_id: open.square_variation_id,
+                    packed_variation_id: open.packed_variation_id,
+                    variation_sku: open.variation_sku, channel: open.channel,
+                    cost_cents: open.cost_cents, cost_basis: open.cost_basis,
+                },
+                variationId: open.packed_variation_id,
+                parentItemId: deleted?.item_variation_data?.item_id || null,
+                sku: deleted?.item_variation_data?.sku || open.variation_sku,
+                object: deleted,
+                inStock: 1,
+            });
+            log(`   adopted bag: ${open.card_name} (${open.outcome})`);
+        }
+    }
+
+    const tasks = await sql`
+        SELECT id FROM mkt_pack_pull_task WHERE pack_open_id = ANY(${state.created.packOpenIds}::uuid[])`;
+    for (const t of tasks) if (!state.created.pullTaskIds.includes(t.id)) state.created.pullTaskIds.push(t.id);
+
+    const vault = await sql`
+        SELECT id FROM mkt_vault_card WHERE pack_open_id = ANY(${state.created.packOpenIds}::uuid[])`;
+    for (const v of vault) if (!state.created.vaultCardIds.includes(v.id)) state.created.vaultCardIds.push(v.id);
+
+    const sold = await sql`
+        SELECT id FROM mystery_sold_events
+        WHERE source = 'virtual_open' AND created_at >= ${state.takenAt}::timestamptz`;
+    for (const s of sold) if (!state.created.soldEventIds.includes(s.id)) state.created.soldEventIds.push(s.id);
+
+    // Credit movements the UI made. Scoped to this buyer and to reasons this feature owns.
+    const credit = await sql`
+        SELECT id FROM mkt_store_credit_event
+        WHERE buyer_id = ${state.buyer.id} AND created_at >= ${state.takenAt}::timestamptz
+          AND reason IN ('pack_open', 'vault_sellback')`;
+    for (const c of credit) if (!state.created.creditEventIds.includes(Number(c.id))) state.created.creditEventIds.push(Number(c.id));
+
+    saveState(state);
+    ok(`adopted ${added} open(s); ${state.created.vaultCardIds.length} vault card(s), ${state.created.creditEventIds.length} credit event(s) tracked`);
+}
+
+const commands = {
+    snapshot: cmdSnapshot, status: cmdStatus, restore: cmdRestore,
+    selftest: cmdSelftest, cycle: cmdCycle, adopt: cmdAdopt,
+};
 if (!commands[cmd]) {
     log("usage: node scripts/vault-harness.mjs <snapshot|status|selftest|restore> [--bags N] [--buyer <id>]");
     process.exit(1);

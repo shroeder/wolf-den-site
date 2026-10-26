@@ -1,6 +1,11 @@
 import MysteryBagShowcaseClient from "@/components/MysteryBagShowcaseClient";
+import PackOpenClient from "@/components/packs/PackOpenClient";
 import { getMysteryBagDashboardData } from "@/lib/mystery-bags";
 import { getMarketingQrCodes } from "@/lib/marketing-qr";
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { packPoolSummary, resumePendingOpen } from "@/lib/marketplace/packs.js";
+import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
+import { VAULT_PUBLIC, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -71,8 +76,40 @@ export default async function MysteryBagsPage() {
     const remainingPacks = data?.remainingPacks ?? null;
     const marketTotal = metrics.marketTotal || 0;
 
+    // ── DOOR 1 OF 9 (docs/virtual-packs-and-the-card-vault.md §16.2) ─────────────────────────────────────────
+    // ⚠️ ONLY THE OPEN-ONLINE SURFACE IS GATED. The board below has listed this pool card by card for months
+    // and is not part of this feature — hiding it would be a regression in something unrelated. A visitor who
+    // cannot open a pack sees exactly the page they saw yesterday.
+    const buyer = await getAuthenticatedBuyer().catch(() => null);
+    const canSeeOpening = Boolean(buyer && vaultOpenFor(buyer.id));
+
+    let openingProps = null;
+    if (canSeeOpening) {
+        const [pool, balanceCents, pending] = await Promise.all([
+            packPoolSummary().catch(() => null),
+            getStoreCredit(buyer.id).catch(() => 0),
+            resumePendingOpen(buyer.id).catch(() => null),
+        ]);
+        if (pool) openingProps = { pool, balanceCents, pending };
+    }
+
     return (
         <div className="mb-page">
+            {openingProps ? <PackOpenClient initial={openingProps} /> : null}
+
+            {/* The register CTA appears only once the feature is actually open to register FOR. While it is
+                owner-gated, advertising it to the Den would be selling a door that is locked. */}
+            {VAULT_PUBLIC && !buyer ? (
+                <section className="card" style={{ textAlign: "center" }}>
+                    <h2 style={{ marginTop: 0 }}>Open a pack from here</h2>
+                    <p className="muted">
+                        Members can open mystery packs online, sell the card straight back for store credit, or
+                        keep it in their vault.
+                    </p>
+                    <a className="pk-btn pk-btn-primary" href="/marketplace/login">Create an account</a>
+                </section>
+            ) : null}
+
             <MysteryBagShowcaseClient
                 cards={cards}
                 bagPrice={bagPrice}

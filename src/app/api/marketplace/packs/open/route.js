@@ -28,6 +28,7 @@ const MESSAGES = {
     pool_empty: "We're out of packs right now — check back soon.",
     insufficient_credit: "You don't have enough store credit to open a pack.",
     unavailable: "That pack just went to someone at the counter. Try again.",
+    no_price: "We can't confirm the pack price right now — try again shortly.",
 };
 
 export async function POST(request) {

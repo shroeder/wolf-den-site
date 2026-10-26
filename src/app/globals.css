@@ -24825,3 +24825,506 @@ body.cas-seated .social-fab { display: none; }
 .ph-start-body b { display: block; font-size: 1rem; color: #fff; }
 .ph-start-body em { display: block; font-style: normal; font-size: 0.8rem; color: #cbc2b0; line-height: 1.35; margin-top: 3px; }
 .ph-start-go { flex: none; font-size: 1.4rem; font-weight: 900; color: #ffd75e; }
+
+/* ── OPENING A MYSTERY PACK ──────────────────────────────────────────────────────────────────────────────────
+   docs/virtual-packs-and-the-card-vault.md section 3. The reveal, in eight phases.
+
+   SIZED AGAINST 375x667 WITH ABOUT 226px OF BROWSER CHROME, which leaves roughly 441px of usable height — the
+   number that has caught this repo before. So the stage is dimensioned in dvh and the bag and the card are
+   capped as a share of it, rather than being given pixel heights that happen to fit a desktop.
+
+   And the caps are on the BAG and the CARD, never on the buttons: if it does not fit, the artwork shrinks and
+   the controls stay reachable. A reveal you cannot act on is worse than a small one. */
+.pk-stage {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: calc(100dvh - 210px);
+    padding: 10px 0 18px;
+    overflow: hidden;
+}
+
+.pk-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.pk-bal {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.pk-bal-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.pk-bal-value {
+    font-size: 1.5rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    transition: text-shadow 0.25s ease;
+}
+
+.pk-committing .pk-bal-value,
+.pk-readout .pk-bal-value {
+    text-shadow: 0 0 18px rgba(212, 175, 55, 0.65);
+}
+
+.pk-shelf-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-secondary);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.pk-shelf-btn:hover {
+    border-color: var(--ring);
+    color: var(--ink);
+}
+
+/* The stage the bag sits on. Centred, with the flood filling it from behind. */
+.pk-arena {
+    position: relative;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 230px;
+}
+
+/* A PERCENTAGE NEEDS A REAL BOX. This is absolutely positioned inside .pk-arena, which is a flex item
+   carrying a min-height, so it has one. */
+.pk-flood {
+    position: absolute;
+    inset: -40% -50%;
+    border-radius: 50%;
+    opacity: 0;
+    background: radial-gradient(circle, var(--tier-glow) 0%, transparent 62%);
+    transition: opacity 0.42s ease;
+    pointer-events: none;
+}
+
+.pk-slam .pk-flood,
+.pk-readout .pk-flood {
+    opacity: 0.3;
+}
+
+.pk-bagwrap {
+    position: relative;
+    width: min(92vw, 460px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* The bag. object-fit contain so it is never distorted, and a dvh cap so it cannot push the controls off a
+   short phone. */
+.pk-bag {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    max-height: 46dvh;
+    object-fit: contain;
+    display: block;
+    border-radius: 14px;
+    filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.55));
+    animation: pk-breathe 6s ease-in-out infinite;
+}
+
+/* It breathes at rest. Once the pack is committed it holds still, because the card is the thing moving now. */
+.pk-committing .pk-bag,
+.pk-zip .pk-bag,
+.pk-rise .pk-bag,
+.pk-flip .pk-bag,
+.pk-slam .pk-bag,
+.pk-readout .pk-bag {
+    animation: none;
+}
+
+@keyframes pk-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.015); }
+}
+
+.pk-committing .pk-bag {
+    animation: pk-shudder 0.42s ease-in-out;
+}
+
+@keyframes pk-shudder {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px) rotate(-0.4deg); }
+    55% { transform: translateX(5px) rotate(0.5deg); }
+    80% { transform: translateX(-2px); }
+}
+
+/* The seam of light along the top edge once the seal is open. Colourless, same rule as the card. */
+.pk-mouth {
+    position: absolute;
+    z-index: 3;
+    top: 6%;
+    left: 12%;
+    right: 12%;
+    height: 3px;
+    border-radius: 999px;
+    background: #FFFFFF;
+    opacity: 0;
+    filter: blur(2px);
+    pointer-events: none;
+}
+
+.pk-zip .pk-mouth {
+    animation: pk-unzip 0.4s ease-out forwards;
+}
+
+.pk-rise .pk-mouth,
+.pk-flip .pk-mouth {
+    opacity: 0.85;
+    box-shadow: 0 0 26px 7px rgba(255, 255, 255, 0.45);
+}
+
+@keyframes pk-unzip {
+    from { opacity: 0; transform: scaleX(0.1); }
+    to { opacity: 0.85; transform: scaleX(1); }
+}
+
+/* ── THE CARD ────────────────────────────────────────────────────────────────────────────────────────────────
+   IT RISES BEHIND THE BAG — z-index 1 against the bag's 2 — so it genuinely comes out of the bag rather than
+   sliding across the front of it.
+
+   AND THE LIGHT AROUND IT IS WHITE UNTIL THE FLIP. Not a stylistic choice: a tier-coloured rise is a near-miss
+   mechanic. The player learns to read it, and then every common deflates before the card has even turned over.
+   The colour arrives at the slam, with the truth. */
+.pk-card {
+    position: absolute;
+    z-index: 1;
+    bottom: 22%;
+    width: 42%;
+    max-width: 210px;
+    aspect-ratio: 5 / 7;
+    transform: translateY(26%) scale(0.92);
+    opacity: 0;
+    perspective: 1000px;
+    pointer-events: none;
+}
+
+.pk-rise .pk-card {
+    animation: pk-rise 1.6s cubic-bezier(0.33, 0.02, 0.2, 1) forwards;
+}
+
+@keyframes pk-rise {
+    0% { opacity: 0; transform: translateY(26%) scale(0.92); }
+    12% { opacity: 1; }
+    100% { opacity: 1; transform: translateY(-74%) scale(1); }
+}
+
+.pk-flip .pk-card {
+    opacity: 1;
+    transform: translateY(-74%) scale(1);
+}
+
+/* The slam. Down, hard, with a touch of overshoot. The shake amplitude is the tier's own. */
+.pk-slam .pk-card,
+.pk-readout .pk-card {
+    opacity: 1;
+    z-index: 4;
+    bottom: 50%;
+    width: 38%;
+    max-width: 168px;
+    transform: translateY(50%) scale(1.02);
+}
+
+.pk-slam .pk-card {
+    animation: pk-slam 0.22s cubic-bezier(0.6, 0, 0.9, 0.4) forwards;
+}
+
+.pk-slam .pk-arena {
+    animation: pk-shake 0.34s ease-out;
+}
+
+@keyframes pk-slam {
+    0% { transform: translateY(14%) scale(1.2); }
+    100% { transform: translateY(50%) scale(1.02); }
+}
+
+@keyframes pk-shake {
+    0%, 100% { transform: translate(0, 0); }
+    15% { transform: translate(calc(var(--tier-shake) * -1), var(--tier-shake)); }
+    35% { transform: translate(var(--tier-shake), calc(var(--tier-shake) * -0.6)); }
+    60% { transform: translate(calc(var(--tier-shake) * -0.5), 0); }
+    85% { transform: translate(calc(var(--tier-shake) * 0.25), 0); }
+}
+
+.pk-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 10px;
+}
+
+.pk-card-face .pk-card-inner {
+    transform: rotateY(180deg);
+}
+
+.pk-card-back,
+.pk-card-front {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* The back was near-black on a near-black backdrop and the rise barely read on film. It needs a visible
+   edge and a halo of its own — colourless, so it still says nothing about the card. */
+.pk-card-back {
+    background:
+        radial-gradient(circle at 50% 36%, rgba(212, 175, 55, 0.3), transparent 60%),
+        linear-gradient(150deg, #262626, #101010);
+    border: 2px solid rgba(212, 175, 55, 0.55);
+    box-shadow: 0 0 46px 10px rgba(255, 255, 255, 0.3), inset 0 0 26px rgba(0, 0, 0, 0.6);
+}
+
+.pk-card-front {
+    transform: rotateY(180deg);
+    background: #0B0B0B;
+    border: 2px solid var(--tier-edge);
+    box-shadow: 0 0 40px 4px var(--tier-glow), 0 16px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* contain, always. A card sprite stretched to fill is the one thing that makes a real card look fake. */
+.pk-card-front img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.pk-card-noart {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 10px;
+    text-align: center;
+    font-size: 0.86rem;
+    color: var(--ink-secondary);
+}
+
+.pk-skip {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 0.74rem;
+    color: var(--muted);
+    margin: 0;
+    animation: pk-fadein 0.5s ease;
+}
+
+@keyframes pk-fadein {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ── THE READOUT ─────────────────────────────────────────────────────────────────────────────────────────────
+   NAMED .pk-result, NOT .pk-readout, AND THAT MATTERS. The stage carries the phase as a class, so in the final
+   phase it is `.pk-stage .pk-readout` — and a rule written as `.pk-readout > *` then matched the STAGE's own
+   children and animated the header, the bag and everything else from opacity 0. Filming it frame by frame
+   caught it: one frame, 3035ms in, was completely blank. A class that names a phase and a class that names a
+   block must never be the same word. */
+.pk-result {
+    text-align: center;
+}
+
+.pk-result > * {
+    animation: pk-up 0.4s ease both;
+}
+
+/* ── MAKING ROOM FOR THE RESULT ──────────────────────────────────────────────────────────────────────────────
+   At 375x667 the card, the readout and the two buttons do not all fit while the bag is still at full size —
+   the first film put the value and both buttons below the fold, which is the one thing the reveal cannot do.
+   So once the card is face-up the bag RECEDES: it has done its job, and the card is the subject now. */
+.pk-slam .pk-bag,
+.pk-readout .pk-bag {
+    opacity: 0.12;
+    transition: opacity 0.35s ease;
+}
+
+.pk-readout .pk-arena {
+    flex: 0 0 auto;
+    min-height: 196px;
+    transition: min-height 0.3s ease;
+}
+
+.pk-tier { margin: 0; font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase; animation-delay: 0.02s; }
+.pk-result .pk-name { margin-top: 2px; }
+.pk-name { margin: 2px 0 0; font-size: 1.22rem; line-height: 1.25; animation-delay: 0.08s; }
+.pk-sub { margin: 2px 0 0; font-size: 0.82rem; color: var(--ink-secondary); animation-delay: 0.14s; }
+
+.pk-value {
+    margin: 6px 0 0;
+    font-size: 2.1rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    animation-delay: 0.2s;
+}
+
+.pk-big { margin: 2px 0 0; font-size: 0.84rem; color: var(--accent-hover); animation-delay: 0.26s; }
+
+@keyframes pk-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.pk-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+    animation-delay: 0.3s;
+}
+
+.pk-done-line { margin: 10px 0 0; color: var(--ink-secondary); }
+
+.pk-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 11px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    font-size: 0.98rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.pk-btn:active { transform: translateY(1px); }
+.pk-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* The text colour is set together with the background, every time. A gold button with inherited light text is
+   this site's oldest footgun. */
+.pk-btn-primary {
+    background: linear-gradient(135deg, var(--accent), #B8912B);
+    border-color: transparent;
+    color: #1A1A1A;
+    font-weight: 600;
+}
+
+.pk-btn-primary:hover:not(:disabled) {
+    box-shadow: 0 0 22px rgba(212, 175, 55, 0.4);
+}
+
+.pk-btn-ghost {
+    background: var(--elevated);
+    color: var(--ink);
+}
+
+.pk-btn-ghost:hover:not(:disabled) { border-color: var(--ring); }
+
+.pk-btn-open {
+    background: linear-gradient(135deg, var(--accent), #B8912B);
+    border-color: transparent;
+    color: #1A1A1A;
+    font-weight: 700;
+    font-size: 1.06rem;
+    min-height: 54px;
+    box-shadow: 0 10px 28px rgba(212, 175, 55, 0.22);
+}
+
+.pk-foot {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+}
+
+.pk-need { margin: 0; color: var(--ink-secondary); }
+.pk-error { margin: 0; color: #FCA5A5; }
+.pk-fine { margin: 0; font-size: 0.74rem; color: var(--muted); }
+
+/* ── WHAT IS IN THE PACKS ────────────────────────────────────────────────────────────────────────────────────
+   A sheet on a phone, a panel on a desktop. It reads live every time it opens: the shop counter is selling out
+   of this same pool, so a cached list would quietly start lying. */
+.pk-shelf {
+    position: fixed;
+    inset: auto 0 0 0;
+    max-height: 78dvh;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    border-radius: 16px 16px 0 0;
+    padding: 14px;
+    box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.6);
+    animation: pk-sheet 0.28s ease;
+}
+
+@keyframes pk-sheet {
+    from { transform: translateY(14%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.pk-shelf-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.pk-shelf-note { margin: 6px 0 10px; font-size: 0.8rem; color: var(--muted); }
+
+.pk-shelf-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 2px 10px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pk-shelf-list li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    align-items: center;
+    padding: 9px 11px;
+    border-radius: 10px;
+    background: var(--elevated);
+    border-left: 3px solid var(--row-edge);
+}
+
+.pk-shelf-name { grid-column: 1; font-size: 0.92rem; }
+.pk-shelf-sub { grid-column: 1; grid-row: 2; font-size: 0.74rem; color: var(--muted); }
+.pk-shelf-value { grid-column: 2; grid-row: 1 / span 2; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+
+@media (min-width: 760px) {
+    .pk-shelf {
+        inset: 50% auto auto 50%;
+        transform: translate(-50%, -50%);
+        width: min(560px, 92vw);
+        max-height: 76dvh;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+    }
+
+    .pk-actions { flex-direction: row; justify-content: center; }
+    .pk-btn { min-width: 190px; }
+}
