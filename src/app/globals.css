@@ -25659,3 +25659,107 @@ body.cas-seated .social-fab { display: none; }
 
     .vt-sheet-actions { flex-direction: row; justify-content: center; }
 }
+
+/* ── GETTING THE CARDS OUT ───────────────────────────────────────────────────────────────────────────────── */
+.vt-bar-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.vt-bar-actions .pk-btn {
+    min-height: 38px;
+    padding: 8px 13px;
+    font-size: 0.86rem;
+}
+
+.vt-order-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.vt-cancel {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 11px;
+    font-size: 0.78rem;
+    color: var(--ink-secondary);
+    cursor: pointer;
+}
+
+.vt-cancel:hover:not(:disabled) { border-color: #FCA5A5; color: #FCA5A5; }
+.vt-cancel:disabled { opacity: 0.5; cursor: default; }
+
+.vt-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+    text-align: left;
+}
+
+/* Address and name want the full width; city/state/zip sit happily side by side. */
+.vt-form label:nth-child(1),
+.vt-form label:nth-child(2),
+.vt-form label:nth-child(3) {
+    grid-column: 1 / -1;
+}
+
+.vt-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 0.74rem;
+    color: var(--muted);
+}
+
+/* 16px, deliberately. Anything smaller makes iOS Safari zoom the whole page on focus, which on a bottom
+   sheet means the member loses sight of the thing they were filling in. */
+.vt-form input {
+    min-height: 42px;
+    padding: 9px 11px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: var(--elevated);
+    color: var(--ink);
+    font-size: 16px;
+}
+
+.vt-form input:focus {
+    outline: none;
+    border-color: var(--ring);
+}
+
+.vt-rates {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+}
+
+.vt-rates label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    border-radius: 10px;
+    background: var(--elevated);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    font-size: 0.88rem;
+}
+
+.vt-rates label:has(input:checked) {
+    border-color: var(--ring);
+    background: rgba(212, 175, 55, 0.1);
+}
+
+.vt-rates input { width: 17px; height: 17px; accent-color: var(--accent); }
+.vt-rates span { flex: 1 1 auto; min-width: 0; }
+.vt-rates strong { font-variant-numeric: tabular-nums; }

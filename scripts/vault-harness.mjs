@@ -241,7 +241,7 @@ async function cmdSnapshot(args) {
         //    has to be able to find.
         created: {
             packOpenIds: [], vaultCardIds: [], pullTaskIds: [], creditEventIds: [], soldEventIds: [],
-            tradeIds: [], restocked: [],
+            tradeIds: [], restocked: [], orderIds: [],
         },
     };
     saveState(state);
@@ -287,6 +287,11 @@ async function cmdRestore() {
         await sql`DELETE FROM mystery_sold_events WHERE id = ${id}`;
     }
     ok(`removed ${state.created.packOpenIds.length} open(s), ${state.created.vaultCardIds.length} vault card(s)`);
+
+    for (const orderId of state.created.orderIds || []) {
+        await sql`UPDATE mkt_vault_card SET order_id = NULL WHERE order_id = ${orderId}`;
+        await sql`DELETE FROM shop_orders WHERE id = ${orderId} AND vault_order = TRUE`;
+    }
 
     // ── Sell-back side effects ──────────────────────────────────────────────────────────────────────────────
     for (const tradeId of state.created.tradeIds || []) {
@@ -752,6 +757,13 @@ async function cmdAdopt() {
     const trades = await sql`
         SELECT id FROM trade WHERE source = 'vault_buyback' AND created_at >= ${state.takenAt}::timestamptz`;
     for (const t of trades) if (!state.created.tradeIds.includes(t.id)) state.created.tradeIds.push(t.id);
+
+    // Vault orders are rows in shop_orders, so they outlive the vault cards that restore deletes.
+    if (!state.created.orderIds) state.created.orderIds = [];
+    const orders = await sql`
+        SELECT id FROM shop_orders
+        WHERE vault_order = TRUE AND created_at >= ${state.takenAt}::timestamptz`;
+    for (const o of orders) if (!state.created.orderIds.includes(o.id)) state.created.orderIds.push(o.id);
 
     const sellBacks = await sql`
         SELECT square_variation_id FROM mkt_vault_card

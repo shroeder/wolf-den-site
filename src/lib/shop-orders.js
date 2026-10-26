@@ -29,6 +29,13 @@ export function serializeShopOrderForAdmin(o) {
         shippingService: o.shipping_service || null,
         shippingLabelUrl: o.shipping_label_url || null,
         hasShipment: Boolean(o.easypost_shipment_id && o.easypost_rate_id),
+        // ⚠️ A VAULT ORDER IS PICKED FROM THE VAULT BOX, NOT OFF THE SHELF. The orders screen needs to know
+        //    so it can show a pull list rather than a picking list — the line items are cards somebody
+        //    already owns, at zero price, and treating them like merchandise would have staff looking for
+        //    stock that is deliberately not in stock.
+        vaultOrder: Boolean(o.vault_order),
+        // What was charged for insurance, so the label purchase buys the cover the member paid for.
+        insuranceCents: o.insurance_cents ?? 0,
         customerName: o.customer_name || o.shipping_name || null,
         customerEmail: o.customer_email || o.shipping_email || null,
         squareCustomerId: o.square_customer_id || null,

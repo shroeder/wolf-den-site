@@ -159,6 +159,11 @@ export async function POST(request, { params }) {
                 label = await buyShippingLabel({
                     shipmentId: order.easypost_shipment_id,
                     rateId: order.easypost_rate_id,
+                    // ⚠️ A vault shipment quoted insurance to the member and stored what it charged. Buying
+                    //    the label without it would mean collecting for cover we never actually bought —
+                    //    on exactly the high-value cards the cover exists for. Ordinary shop orders carry 0
+                    //    here and behave exactly as before.
+                    insuranceCents: Number(order.insurance_cents) || 0,
                 });
             }
 

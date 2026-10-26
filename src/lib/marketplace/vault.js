@@ -3,10 +3,11 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { db } from "@/lib/db";
+import { INSURE_OVER_CENTS, getShippingRates, insuranceCostCents, isEasyPostEnabled } from "@/lib/shipping/easypost";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { tierByKey } from "@/lib/marketplace/pack-rarity.js";
 import { releasableAt } from "@/lib/marketplace/packs.js";
-import { addCredit } from "@/lib/marketplace/store-credit.js";
+import { addCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
 import { restockBoughtBackCard } from "@/lib/marketplace/vault-restock.js";
 import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { createServerLogger } from "@/lib/server-logger";
@@ -260,4 +261,242 @@ export async function refreshReleaseHold(buyerId) {
         .query(`UPDATE mkt_vault_card SET releasable_at = $2, updated_at = NOW() WHERE buyer_id = $1 AND status = 'held'`,
             [buyerId, at])
         .catch(() => {});
+}
+
+// ── GETTING THE CARDS OUT OF THE BUILDING ────────────────────────────────────────────────────────────────────
+// A vault shipment is a row in `shop_orders`, not a parallel order system. That one decision is what puts it
+// on the admin and employee orders screens that already exist, with no new screen to build.
+
+const PICKUP = "pickup";
+const SHIPPING = "shipping";
+
+/**
+ * Quote a shipment before the member commits to it.
+ *
+ * ⚠️ THE QUOTE INCLUDES INSURANCE AND THE RATE DOES NOT. EasyPost bills insurance when the LABEL IS BOUGHT,
+ * so a price built from the rate alone is short by exactly that much — and we would absorb the difference on
+ * precisely the shipments where it is largest. The estimate is added here and the figure is remembered on the
+ * order so the label purchase charges what the member was told.
+ */
+export async function quoteVaultShipping({ buyerId, cardIds, toAddress }) {
+    if (!vaultOpenFor(buyerId)) return { ok: false, error: "closed" };
+
+    const { ready, held } = await releasableCards(buyerId, cardIds || []);
+    if (!ready.length) return { ok: false, error: held.length ? "on_hold" : "nothing_selected", held };
+
+    const declaredCents = ready.reduce((sum, c) => sum + money(c.current_value_cents), 0);
+    const insured = declaredCents >= INSURE_OVER_CENTS;
+    const insuranceCents = insured ? insuranceCostCents(declaredCents) : 0;
+
+    if (!isEasyPostEnabled()) {
+        return { ok: false, error: "shipping_unavailable" };
+    }
+
+    // One parcel: cards are light and flat, so the existing weight model is already right for them.
+    const quote = await getShippingRates({
+        toAddress,
+        items: ready.map(() => ({ quantity: 1, catalogObjectId: "vault-card" })),
+    }).catch(() => null);
+    if (!quote?.rates?.length) return { ok: false, error: "no_rates" };
+
+    return {
+        ok: true,
+        shipmentId: quote.shipmentId,
+        declaredCents,
+        insured,
+        insuranceCents,
+        cardCount: ready.length,
+        heldBack: held.map((h) => ({ id: h.id, name: h.card_name, releasableAt: h.releasable_at })),
+        rates: quote.rates.map((r) => ({
+            ...r,
+            // What the member will actually be charged, which is the only number worth showing them.
+            totalCents: r.amountCents + insuranceCents,
+        })),
+    };
+}
+
+/**
+ * Create the order. Pickup is free; shipping is paid in store credit or left for a card charge.
+ *
+ * ⚠️ THE CARDS ARE CLAIMED BEFORE ANYTHING IS CHARGED, and the claim is a guarded UPDATE on status='held'.
+ * A card that is already on another order, or already sold back, simply is not claimed — so two taps cannot
+ * put one card on two orders.
+ */
+export async function createVaultOrder({
+    buyerId, cardIds, mode, shipping = null, shipmentId = null, rateId = null,
+    shippingCents = 0, insuranceCents = 0, payWithCredit = true,
+}) {
+    if (!vaultOpenFor(buyerId)) return { ok: false, error: "closed" };
+    const fulfillment = mode === SHIPPING ? SHIPPING : PICKUP;
+    const ids = (Array.isArray(cardIds) ? cardIds : []).filter(Boolean).slice(0, 50);
+    if (!ids.length) return { ok: false, error: "nothing_selected" };
+
+    const { ready, held } = await releasableCards(buyerId, ids);
+    if (!ready.length) {
+        return { ok: false, error: held.length ? "on_hold" : "nothing_selected", held: held.map((h) => h.card_name) };
+    }
+
+    const costCents = fulfillment === SHIPPING ? money(shippingCents) + money(insuranceCents) : 0;
+
+    // Shipping is charged BEFORE the order exists, so a failed payment leaves nothing half-made.
+    if (costCents > 0 && payWithCredit) {
+        const spent = await spendCredit(buyerId, costCents, "spend_online", `vault-ship:${buyerId}`, {
+            cards: ready.length,
+        });
+        if (!spent.ok) return { ok: false, error: "insufficient_credit", neededCents: costCents };
+    }
+
+    const itemsJson = ready.map((c) => ({
+        catalogObjectId: c.square_variation_id || "vault-card",
+        name: c.card_name,
+        quantity: 1,
+        // ⚠️ ZERO. The card was paid for when the pack was opened; a vault shipment carries no merchandise
+        //    revenue, and billing it again would charge a member twice for one card.
+        unitPriceCents: 0,
+        vaultCardId: c.id,
+    }));
+
+    const order = await db.queryOne(
+        `INSERT INTO shop_orders
+            (catalog_object_id, item_name, quantity, subtotal_cents, online_fee_cents, tax_cents,
+             shipping_cents, insurance_cents, total_cents, idempotency_key, items_json, fulfillment_mode,
+             shipping_name, shipping_email, shipping_phone, shipping_address_line1, shipping_address_line2,
+             shipping_city, shipping_state, shipping_postal_code, shipping_country,
+             easypost_shipment_id, easypost_rate_id, customer_email, vault_order, status, square_status)
+         VALUES ('VAULT', $1, $2, 0, 0, $3, $4, $5, $6, $7, $8::jsonb, $9,
+                 $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $11, TRUE, 'completed', 'VAULT')
+         RETURNING id, created_at`,
+        [
+            `Vault ${fulfillment === PICKUP ? "pickup" : "shipment"} (${ready.length} card${ready.length === 1 ? "" : "s"})`,
+            ready.length,
+            // ⚠️ subtotal is 0, so the taxable base is the SHIPPING alone (§7.4). Tax on the cards was taken
+            //    at the open; charging it again here would tax one card twice.
+            0,
+            money(shippingCents),
+            money(insuranceCents),
+            costCents,
+            `vault-${randomUUID()}`,
+            JSON.stringify(itemsJson),
+            fulfillment,
+            shipping?.name || null, shipping?.email || null, shipping?.phone || null,
+            shipping?.addressLine1 || null, shipping?.addressLine2 || null, shipping?.city || null,
+            shipping?.state || null, shipping?.postalCode || null, shipping?.country || "US",
+            shipmentId, rateId,
+        ]
+    );
+
+    const claimed = await db.query(
+        `UPDATE mkt_vault_card
+         SET status = 'on_order', order_id = $3, updated_at = NOW()
+         WHERE buyer_id = $1 AND id = ANY($2::uuid[]) AND status = 'held'
+         RETURNING id, card_name, mystery_card_id`,
+        [buyerId, ready.map((r) => r.id), order.id]
+    );
+
+    // ⚠️ AN ORDER ON AN UN-PULLED BAG JUMPS THE QUEUE. There is no deadline on the pull queue (Luke's call),
+    //    so the order IS the signal that somebody is about to turn up for a card still sealed in a bag.
+    //    Without this, "no deadline" becomes a member at the counter while someone digs through a tub.
+    await db
+        .query(
+            `UPDATE mkt_pack_pull_task
+             SET promoted = TRUE
+             WHERE status = 'open'
+               AND mystery_card_id = ANY($1::uuid[])`,
+            [claimed.map((c) => c.mystery_card_id).filter(Boolean)]
+        )
+        .catch(() => {});
+
+    await db
+        .query(
+            `INSERT INTO mkt_vault_event (buyer_id, action, credit_delta_cents, meta)
+             VALUES ($1, 'ordered', $2, $3)`,
+            [buyerId, -costCents, JSON.stringify({ orderId: order.id, mode: fulfillment, cards: claimed.length })]
+        )
+        .catch(() => {});
+
+    await trackActivity(buyerId, "vault_order", { mode: fulfillment, cards: claimed.length }).catch(() => {});
+    logger.info("vault.order.created", { buyerId, orderId: order.id, mode: fulfillment, cards: claimed.length });
+
+    return {
+        ok: true,
+        orderId: order.id,
+        mode: fulfillment,
+        cardCount: claimed.length,
+        chargedCents: costCents,
+        heldBack: held.map((h) => h.card_name),
+    };
+}
+
+/**
+ * The member cancels their own pickup order.
+ *
+ * ⚠️ ALLOWED RIGHT UP UNTIL PICKUP, INCLUDING AFTER STAFF HAVE PREPARED IT (Luke's call). Which means a
+ * cancelled order can leave sleeved cards sitting in a holding bag that the system now believes are back in
+ * the vault — so a prepared order raises a RE-FILE task on the same queue as the pulls. Without that, the tub
+ * and the database quietly part company and nobody finds out until somebody goes looking for a card.
+ *
+ * Shipping orders are not self-cancellable: a bought label is real money, and that falls back to the existing
+ * request-cancel review.
+ */
+export async function cancelVaultOrder({ buyerId, orderId }) {
+    if (!vaultOpenFor(buyerId)) return { ok: false, error: "closed" };
+
+    const order = await db.queryOne(
+        `SELECT id, fulfillment_mode, fulfillment_status, shipping_cents, insurance_cents, total_cents
+         FROM shop_orders WHERE id = $1 AND vault_order = TRUE`,
+        [orderId]
+    );
+    if (!order) return { ok: false, error: "not_found" };
+    if (order.fulfillment_mode !== PICKUP) return { ok: false, error: "shipping_order" };
+    if (["picked_up", "cancelled"].includes(order.fulfillment_status)) {
+        return { ok: false, error: "too_late" };
+    }
+
+    const wasPrepared = order.fulfillment_status === "ready";
+
+    const returned = await db.query(
+        `UPDATE mkt_vault_card
+         SET status = 'held', order_id = NULL, updated_at = NOW()
+         WHERE buyer_id = $1 AND order_id = $2 AND status = 'on_order'
+         RETURNING id, card_name, mystery_card_id`,
+        [buyerId, orderId]
+    );
+    if (!returned.length) return { ok: false, error: "nothing_to_cancel" };
+
+    await db.query(
+        `UPDATE shop_orders
+         SET fulfillment_status = 'cancelled', status = 'canceled', updated_at = NOW()
+         WHERE id = $1`,
+        [orderId]
+    );
+
+    if (wasPrepared) {
+        for (const card of returned) {
+            await db
+                .query(
+                    `INSERT INTO mkt_pack_pull_task (pack_open_id, mystery_card_id, bag_sku, kind, note)
+                     SELECT o.id, $1, COALESCE(c.variation_sku, c.card_id), 'refile',
+                            'Pickup order cancelled after it was prepared — put this card back'
+                     FROM mkt_vault_card v
+                     JOIN mystery_bag_cards c ON c.id = v.mystery_card_id
+                     JOIN mkt_pack_open o ON o.id = v.pack_open_id
+                     WHERE v.id = $2
+                     LIMIT 1`,
+                    [card.mystery_card_id, card.id]
+                )
+                .catch((error) => logger.warn("vault.cancel.refile_failed", { message: error?.message }));
+        }
+        logger.info("vault.cancel.refile_raised", { orderId, cards: returned.length });
+    }
+
+    await db
+        .query(
+            `INSERT INTO mkt_vault_event (buyer_id, action, credit_delta_cents, meta)
+             VALUES ($1, 'cancelled', 0, $2)`,
+            [buyerId, JSON.stringify({ orderId, cards: returned.length, wasPrepared })]
+        )
+        .catch(() => {});
+
+    logger.info("vault.order.cancelled", { buyerId, orderId, cards: returned.length, wasPrepared });
+    return { ok: true, returnedCount: returned.length, wasPrepared };
 }

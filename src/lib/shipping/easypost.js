@@ -259,7 +259,26 @@ export async function getShipment(shipmentId) {
     };
 }
 
-export async function buyShippingLabel({ shipmentId, rateId }) {
+/**
+ * How much EasyPost charges to insure a parcel, in cents.
+ *
+ * ⚠️ INSURANCE IS BILLED WHEN THE LABEL IS BOUGHT, NOT INSIDE THE RATE. So a quote built from the rate alone
+ * is short by exactly this much, and we would silently absorb the difference on precisely the shipments where
+ * it is largest. Any caller that offers insurance has to add this to the price it shows.
+ *
+ * ~1% of declared value with a floor, which is EasyPost's published shape. It is an ESTIMATE and labelled as
+ * one; the real charge is reconciled from the bought label.
+ */
+export function insuranceCostCents(declaredValueCents) {
+    const value = Math.max(0, Math.round(Number(declaredValueCents) || 0));
+    if (!value) return 0;
+    return Math.max(100, Math.round(value * 0.01));
+}
+
+/** Above this declared value a vault shipment is insured and signature-required. See design doc §6. */
+export const INSURE_OVER_CENTS = 20000;
+
+export async function buyShippingLabel({ shipmentId, rateId, insuranceCents = 0 }) {
     if (!isEasyPostEnabled()) {
         throw new Error("EasyPost is not configured.");
     }
@@ -269,7 +288,12 @@ export async function buyShippingLabel({ shipmentId, rateId }) {
 
     const bought = await easyPostFetch(`/shipments/${encodeURIComponent(shipmentId)}/buy`, {
         method: "POST",
-        body: JSON.stringify({ rate: { id: String(rateId) } }),
+        body: JSON.stringify({
+            rate: { id: String(rateId) },
+            // EasyPost takes the declared value as a decimal string of DOLLARS on the buy call. Omitted
+            // entirely when zero — sending "0.00" is not the same as not insuring and some carriers reject it.
+            ...(insuranceCents > 0 ? { insurance: (insuranceCents / 100).toFixed(2) } : {}),
+        }),
     });
 
     const selectedRate = bought?.selected_rate || null;
