@@ -235,7 +235,14 @@ async function cmdSnapshot(args) {
         bags: captured,
         // Everything the test creates gets its id written here as it happens, so restore deletes exactly
         // what the test made and nothing that merely resembles it.
-        created: { packOpenIds: [], vaultCardIds: [], pullTaskIds: [], creditEventIds: [], soldEventIds: [] },
+        // ⚠️ tradeIds and restocked ARE NOT OPTIONAL EXTRAS. The first vault test ran the sell-back path, which
+        //    writes a trade and pushes a unit back into Square — neither of which the snapshot knew about, so
+        //    restore left three trades and a phantom unit behind. Anything the feature can WRITE, the undo
+        //    has to be able to find.
+        created: {
+            packOpenIds: [], vaultCardIds: [], pullTaskIds: [], creditEventIds: [], soldEventIds: [],
+            tradeIds: [], restocked: [],
+        },
     };
     saveState(state);
     log(`\n   snapshot saved: ${captured.length} bag(s), buyer ${owner[0].display_name} at ${usd(owner[0].store_credit_cents)}`);
@@ -280,6 +287,40 @@ async function cmdRestore() {
         await sql`DELETE FROM mystery_sold_events WHERE id = ${id}`;
     }
     ok(`removed ${state.created.packOpenIds.length} open(s), ${state.created.vaultCardIds.length} vault card(s)`);
+
+    // ── Sell-back side effects ──────────────────────────────────────────────────────────────────────────────
+    for (const tradeId of state.created.tradeIds || []) {
+        await sql`DELETE FROM trade_line WHERE trade_id = ${tradeId}`;
+        await sql`DELETE FROM trade WHERE id = ${tradeId}`;
+    }
+    // Gap-filled cost rows only — the live code can no longer overwrite an existing one, so anything this
+    // test created is a row that did not exist before and is safe to drop.
+    for (const variationId of state.created.restocked || []) {
+        await sql`DELETE FROM wolfden_item_cost WHERE variation_id = ${variationId} AND source = 'vault_buyback'`;
+        const have = await inventoryCount(variationId);
+        if (have > 0 && state.locationId) {
+            await square("/v2/inventory/changes/batch-create", {
+                method: "POST",
+                body: JSON.stringify({
+                    idempotency_key: randomUUID(),
+                    changes: [{
+                        type: "ADJUSTMENT",
+                        adjustment: {
+                            catalog_object_id: variationId,
+                            location_id: state.locationId,
+                            from_state: "IN_STOCK",
+                            to_state: "NONE",
+                            quantity: "1",
+                            occurred_at: new Date().toISOString(),
+                        },
+                    }],
+                }),
+            }).catch((e) => bad(`un-restock ${variationId}: ${e.message}`));
+        }
+    }
+    if ((state.created.tradeIds || []).length || (state.created.restocked || []).length) {
+        ok(`reversed ${(state.created.tradeIds || []).length} trade(s), ${(state.created.restocked || []).length} restock(s)`);
+    }
 
     // 2 — the credit ledger. The balance is restored to the snapshot value outright and only the events the
     //     test wrote are deleted; the ledger stays append-only for everybody else.
@@ -704,6 +745,21 @@ async function cmdAdopt() {
         WHERE buyer_id = ${state.buyer.id} AND created_at >= ${state.takenAt}::timestamptz
           AND reason IN ('pack_open', 'vault_sellback')`;
     for (const c of credit) if (!state.created.creditEventIds.includes(Number(c.id))) state.created.creditEventIds.push(Number(c.id));
+
+    // Sell-backs: a trade per buy-back, and a unit pushed back into Square per card.
+    if (!state.created.tradeIds) state.created.tradeIds = [];
+    if (!state.created.restocked) state.created.restocked = [];
+    const trades = await sql`
+        SELECT id FROM trade WHERE source = 'vault_buyback' AND created_at >= ${state.takenAt}::timestamptz`;
+    for (const t of trades) if (!state.created.tradeIds.includes(t.id)) state.created.tradeIds.push(t.id);
+
+    const sellBacks = await sql`
+        SELECT square_variation_id FROM mkt_vault_card
+        WHERE buyer_id = ${state.buyer.id} AND status = 'sold_back'
+          AND sold_back_at >= ${state.takenAt}::timestamptz AND square_variation_id IS NOT NULL`;
+    for (const r of sellBacks) {
+        if (!state.created.restocked.includes(r.square_variation_id)) state.created.restocked.push(r.square_variation_id);
+    }
 
     saveState(state);
     ok(`adopted ${added} open(s); ${state.created.vaultCardIds.length} vault card(s), ${state.created.creditEventIds.length} credit event(s) tracked`);
