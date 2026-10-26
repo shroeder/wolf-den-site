@@ -38,6 +38,14 @@ const PREVIEW_GUESTS = {
         "27da67c2-8548-453f-bda4-4349c0e4ef06", // Littlewolf
         "9db11753-f826-4a4f-8ad9-41e19bc45fe4", // Adam Malz (smalz123@) — registered 2026-10-22
     ]),
+    // Opening a mystery pack online + the Card Vault. Luke, 2026-10-26: "for now I would prefer it only show
+    // up for me." Owners pass without being listed, so this stays empty until somebody is invited.
+    //
+    // ⚠️ A GUEST HERE SPENDS REAL MONEY AND REAL STOCK. Unlike the Grove, a preview of this feature is not a
+    // sandbox: every open consumes a real sealed bag, deletes a real Square variation and debits real store
+    // credit. Inviting somebody is inviting them to spend their own balance on inventory that leaves the
+    // shelf. See docs/virtual-packs-and-the-card-vault.md §16.4.
+    vault: new Set([]),
 };
 
 /**
