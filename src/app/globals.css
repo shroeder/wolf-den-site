@@ -25763,3 +25763,241 @@ body.cas-seated .social-fab { display: none; }
 .vt-rates input { width: 17px; height: 17px; accent-color: var(--accent); }
 .vt-rates span { flex: 1 1 auto; min-width: 0; }
 .vt-rates strong { font-variant-numeric: tabular-nums; }
+
+/* ── VIRTUAL PACK TELEMETRY ──────────────────────────────────────────────────────────────────────────────────
+   docs/virtual-packs-and-the-card-vault.md section 8. Owner view: the money, the pool guardrail, the pull
+   queue, and per-member net position. */
+.pt-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.pt-range {
+    display: flex;
+    gap: 6px;
+}
+
+.pt-error { color: #FCA5A5; }
+
+/* The guardrail box. It goes red when the pool is worth more than a pack costs, because at that point every
+   pack sold loses money and that is not something to leave in a row of grey statistics. */
+.pt-guard {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 14px;
+    border-radius: 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+}
+
+.pt-guard > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pt-guard-bad {
+    border-color: #F87171;
+    background: rgba(248, 113, 113, 0.08);
+}
+
+.pt-big {
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.pt-sub {
+    font-size: 0.74rem;
+    color: var(--muted);
+}
+
+.pt-alarm {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 9px 11px;
+    border-radius: 9px;
+    background: rgba(248, 113, 113, 0.14);
+    color: #FCA5A5;
+    font-size: 0.84rem;
+}
+
+.pt-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.pt-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 10px 12px;
+    border-radius: 11px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    min-width: 0;
+}
+
+.pt-stat strong {
+    font-size: 1.16rem;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.pt-note {
+    padding: 10px 12px;
+    border-radius: 11px;
+    background: var(--elevated);
+    border: 1px solid var(--line);
+    font-size: 0.82rem;
+    color: var(--ink-secondary);
+    line-height: 1.45;
+}
+
+.pt-basis {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.72rem;
+    color: var(--muted);
+}
+
+.pt-h {
+    margin: 4px 0 0;
+    font-size: 1rem;
+}
+
+.pt-tiers,
+.pt-queue,
+.pt-members {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pt-tiers li {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    gap: 9px;
+    align-items: center;
+    font-size: 0.84rem;
+}
+
+.pt-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+}
+
+.pt-tier-label { min-width: 74px; }
+
+.pt-tier-bar {
+    height: 7px;
+    border-radius: 999px;
+    background: var(--elevated);
+    overflow: hidden;
+}
+
+.pt-tier-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+}
+
+.pt-tier-n {
+    font-size: 0.76rem;
+    color: var(--muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.pt-queue li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border-radius: 11px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+}
+
+/* An order is waiting on this one. There is no deadline on the queue, so this is the thing that replaces one. */
+.pt-urgent {
+    border-color: var(--ring);
+    background: rgba(212, 175, 55, 0.08);
+}
+
+.pt-q-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1 1 180px;
+}
+
+.pt-q-main strong { font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+.pt-q-main > span { font-size: 0.8rem; overflow-wrap: anywhere; }
+.pt-q-sub { font-size: 0.72rem; color: var(--muted); }
+
+.pt-q-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.pt-q-actions .pk-btn {
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 0.84rem;
+}
+
+.pt-members li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    font-size: 0.82rem;
+}
+
+.pt-m-name { grid-column: 1; font-size: 0.9rem; overflow-wrap: anywhere; }
+.pt-m-cell { grid-column: 1; font-size: 0.74rem; color: var(--muted); display: inline; }
+.pt-m-net { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 1.02rem; font-variant-numeric: tabular-nums; }
+
+@media (min-width: 720px) {
+    .pt-stats { grid-template-columns: repeat(4, 1fr); }
+    .pt-guard { grid-template-columns: repeat(3, 1fr); }
+
+    .pt-members li {
+        grid-template-columns: 1.6fr repeat(3, 1fr) auto;
+        align-items: center;
+    }
+
+    .pt-m-name { grid-column: auto; }
+    .pt-m-cell { grid-column: auto; text-align: right; }
+    .pt-m-net { grid-column: auto; grid-row: auto; text-align: right; }
+}
+
+.pt-keybox {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    align-items: flex-start;
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    max-width: 420px;
+}
+
+.pt-keybox label { display: flex; flex-direction: column; gap: 3px; width: 100%; font-size: 0.76rem; color: var(--muted); }
+.pt-keybox input { min-height: 42px; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line); background: var(--elevated); color: var(--ink); font-size: 16px; }

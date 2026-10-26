@@ -63,13 +63,35 @@ export function splitPriceForTax(priceCents, rate) {
  * So the default is still returned — a board that shows nothing is worse than one showing a stale price — but
  * it is LABELLED, and openPack() refuses to charge on it.
  */
+// ⚠️ MEMOISED FOR A MINUTE, AND IT IS THE IN-FLIGHT PROMISE THAT IS CACHED, NOT THE VALUE. Every call here is
+// a live Square catalog lookup — a TLS handshake and a JSON parse, which is real Active CPU — and the price
+// of a pack does not change between two requests a second apart. Caching the promise rather than the result
+// is what makes concurrent callers inside a Promise.all share ONE round trip instead of all missing an empty
+// value cache and firing their own.
+//
+// A minute is short enough that a price change in Square reaches members almost immediately, and long enough
+// that a page doing three reads does one lookup.
+let priceCache = { at: 0, promise: null };
+const PRICE_TTL_MS = 60_000;
+
 export async function packPrice() {
-    const info = await getMysteryBagPriceInfoFromSquare().catch(() => null);
-    const fromSquare = Number(info?.price || 0);
-    if (fromSquare > 0) return { cents: Math.round(fromSquare * 100), source: "square" };
-    const fromEnv = Number(process.env.MYSTERY_BAG_PRICE || 0);
-    if (fromEnv > 0) return { cents: Math.round(fromEnv * 100), source: "env" };
-    return { cents: DEFAULT_PRICE_CENTS, source: "fallback_default" };
+    const now = Date.now();
+    if (priceCache.promise && now - priceCache.at < PRICE_TTL_MS) return priceCache.promise;
+
+    const promise = (async () => {
+        const info = await getMysteryBagPriceInfoFromSquare().catch(() => null);
+        const fromSquare = Number(info?.price || 0);
+        if (fromSquare > 0) return { cents: Math.round(fromSquare * 100), source: "square" };
+        const fromEnv = Number(process.env.MYSTERY_BAG_PRICE || 0);
+        if (fromEnv > 0) return { cents: Math.round(fromEnv * 100), source: "env" };
+        return { cents: DEFAULT_PRICE_CENTS, source: "fallback_default" };
+    })();
+
+    priceCache = { at: now, promise };
+    // A failed lookup must not be cached as "the price for the next minute" — it would turn one Square blip
+    // into a minute of refused opens.
+    promise.catch(() => { priceCache = { at: 0, promise: null }; });
+    return promise;
 }
 
 /** Just the number, for the places that only display it. */
