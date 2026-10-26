@@ -1315,6 +1315,80 @@ A third common, a third uncommon, and **~23% landing rare-or-better** instead of
 
 ---
 
+## 18. Testing it without spending the shop's stock
+
+Luke, 2026-10-26: *"Store credit is a balance you have full control over as it's just a virtual ledger. And
+bags are also effectively just virtual cards delineated by their presence in Square, and source cost linkage.
+All of which you should be able to revert back to its not-destroyed state after testing."*
+
+Correct, and now proven. `scripts/vault-harness.mjs` (`npm run harness:vault`).
+
+### 18.1 What Square will and will not give back
+
+Probed against the live catalog on a throwaway object, 2026-10-26 — measured, not assumed:
+
+| | |
+|---|---|
+| `DELETE /v2/catalog/object/{id}` | ✅ works |
+| `batch-retrieve` with `include_deleted_objects` | ✅ **returns the whole object, SKU and all** |
+| upsert that id again with `is_deleted: false` | ❌ **400 — "Received request to update nonexistent object"** |
+| create a NEW variation with the SAME SKU | ✅ 200, new id |
+
+**A deleted Square id is gone for good.** So restore means **re-creating the variation under its original
+SKU**, and that is a true restore of everything that matters: **the SKU is what is printed on the bag**
+(`buildPackedMysteryVariationSku`). Staff find bag `MP-0391` because it says `MP-0391` on it; the catalog id
+is invisible to the physical world. `card_id` and `variation_sku` never change, because they *are* the SKU.
+
+### 18.2 ⚠️ Two things the restore must carry that are easy to miss
+
+- **`wolfden_unit_cost`, the custom attribute.** This is the cost the COGS resolver actually reads — the
+  65%-of-market stamp from §7.3. A rebuild that drops it silently re-creates the bag as a pack that **cost
+  nothing**, and the margin on its next sale is fiction. Confirmed restoring correctly: `0.65` on a $1.00
+  card, which is also the first live confirmation of the 65% rule.
+- **The on-hand count.** A rebuilt variation starts at zero. Without putting the unit back, the pool row
+  claims a bag that Square says does not exist.
+
+Native unit cost (`item_variation_vendor_infos`) is **absent on these bags entirely** — the 65% stamp lives
+only in the custom attribute. Worth knowing before anyone goes looking for it in Square's own COGS report.
+
+### 18.3 The harness runs the real path
+
+It does not mock the delete, stub the credit spend, or branch the code under test on a flag. **The Square
+delete is the step that takes a bag off the register (§1.1)** — the single most important thing to exercise —
+so it is broken for real and put back for real.
+
+Restore only ever touches **what the snapshot named**: every row it deletes is one whose id it wrote down
+first. It never cleans up "anything that looks like a test". An undo that guesses its own scope is how a
+harness eats production data.
+
+```
+npm run harness:vault snapshot --bags 1 --buyer <id>    capture bags + balance
+npm run harness:vault selftest                          break it and put it back, asserting each field
+npm run harness:vault status                            snapshot vs live
+npm run harness:vault restore                           undo everything the snapshot named
+```
+
+### 18.4 ⚠️ Two bugs the first green run was hiding
+
+Both are the house lesson that a green gate is not evidence, and both were only visible by reading the
+output rather than the exit code:
+
+- **"credit restored to $9.00" could not have failed.** The balance was below the pack price, so the spend
+  was skipped entirely and the restore restored nothing. The harness now **tops the balance up** so the
+  credit half genuinely runs, and records the grant as one of its own events so restore removes it too.
+- **"native unit cost ✓" was `undefined === undefined`.** The bag had none and the rebuild had none, so a
+  tick appeared where no check existed. Vacuous comparisons now print **SKIP** and are counted separately —
+  a check that cannot fail is worse than no check, because it occupies the space where a real one would go.
+
+A third surfaced on the second run: the snapshot's variation id goes **stale** after a restore, because the
+rebuild has a new id. Selftest now re-reads the live id before breaking anything, which is what makes it
+repeatable.
+
+**Verified end to end, twice in a row:** pool back to 79 active, credit back to $9.00, zero stray ledger
+rows, SKU and unit cost preserved across both cycles.
+
+---
+
 ## Build log
 
 *(nothing built yet)*
