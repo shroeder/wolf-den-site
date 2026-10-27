@@ -12,7 +12,7 @@ a Card Vault they can ship, collect, or cash out whenever they want.**
 - **V1 draws from the real sealed bags**, with a staff task per open. §1.
 - **Later**, the pool becomes **every card in our possession** — not just what is bagged. §1.4.
 - **The glow during the rise is colourless** until the flip. §3.1.
-- **Sell-back pays 100% of current market value**, in store credit. §5.
+- **Sell-back pays the counter's trade rate — 60% of current market value**, in store credit. §5.
 - **Pool EV is set during manual procurement of the bags** — not a policy this feature chooses. §9.
 - **The pull queue has no deadline**, and the vault says nothing about it — a pulled card just shows as
   theirs. §1.3, §4.
@@ -343,8 +343,41 @@ worst thing this feature could do to someone.
 
 ## 5. Selling back
 
-**The price is the card's current market value, 100%, paid as store credit.** Shown live in the vault, with
-the pulled-at value also shown when it differs ("pulled at $38 · worth $42 now").
+### ⚠️ RESOLVED 2026-10-27 — Q4 is settled: 60%, the counter's rate
+
+Luke: *"I think we should buy back cards at 60 percent store credit so it matched what we do in store, when
+selling the card."* The 100% below was a placeholder that made the first build's arithmetic simple and was
+never the shop's rate. **The live `trade` table has been running at `buy_rate_percent = 60.00` the whole
+time** — real rows read `rate 60.00 | market 409.47 offer 245.68` — so this is not a new policy, it is the
+online path finally matching the counter. Two prices for one transaction is a thing somebody finds out, and
+the one they find out about is whichever is worse for them.
+
+**`src/lib/marketplace/buyback.js` is the only place the rate exists.** Four paths touch the number — selling
+at the reveal, selling from the vault, what the card costs us once it is re-shelved, and the buttons on two
+screens — and they must never disagree. The clients are *handed* `sellBackCents` with the card rather than
+multiplying a price by a rate, so there is exactly one implementation and none of it is in a bundle somebody
+is still running from cache.
+
+- **$1 floor.** 60% of a $1.00 common is sixty cents, which does not read as a transaction. Three cards in
+  the live pool sit under the line.
+- **Rounds UP to a quarter, never down.** $2.40 pays $2.50. Measured across the real 78-card pool, the floor
+  and the round-up together cost **0.6 of a percentage point** — effective 60.6%, about 11¢ a pack — and
+  every payout lands on a clean quarter at or above the stated rate.
+
+**⚠️ What this does to the pack, stated plainly.** Pool EV is **$17.56** market against a $20 price. Open-and-
+always-sell now returns **$10.65** per $20 — the pack is only worth its price if you *keep* what you pull.
+That is the honest shape of the feature now, and the screen is built to say so: the sell button carries the
+payout and the keep button carries the card's full value.
+
+**⚠️ And the cost basis is no longer the shelf price.** `restockBoughtBackCard` has always taken both a price
+and a cost; `completeBuyBack` collapsed them, which was invisibly correct only at 100%. At 60% they diverge,
+and getting it wrong goes wrong twice at once — the card goes back on the shelf at 60% of its worth *and* the
+books record it as having cost full market, so every re-sale reports roughly zero margin.
+
+---
+
+**The price is the card's current market value, 100%, paid as store credit.** ~~(Superseded — see above.)~~
+Shown live in the vault, with the pulled-at value also shown when it differs ("pulled at $38 · worth $42 now").
 
 "Current" has a real source: **`tcg_cards.market_price`**, refreshed by the existing `tcg-catalog-sync` cron.
 A vault card therefore needs a `tcg_card_id` link, resolved at pull time (name + set + number, via the

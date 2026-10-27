@@ -17,7 +17,8 @@
         "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/113773_200w.jpg",
         "valueCents": 140,
         "tier": "common",
-        "itemType": "card"
+        "itemType": "card",
+        "sellBackCents": 100
       },
       "tier": "common",
       "bigHit": false,

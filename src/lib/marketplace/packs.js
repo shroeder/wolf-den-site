@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { deleteSquareCatalogObject, getMysteryBagPriceInfoFromSquare, getShopSalesTaxRate } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { buyBackCents } from "@/lib/marketplace/buyback.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { packCardSubtitle, parsePackCardName } from "@/lib/marketplace/pack-card-name.js";
 import { BIG_HIT_CENTS, tierForCents } from "@/lib/marketplace/pack-rarity.js";
@@ -116,6 +117,11 @@ function toPoolCard(row) {
         condition: parsed.condition || row.condition || null,
         imageUrl: row.image_url || null,
         valueCents,
+        // ⚠️ SENT, NOT DERIVED. The sell button has to show what the member will actually be paid, and the
+        //    moment a client multiplies a price by a rate there are two implementations of one number — one
+        //    of which is in a bundle somebody is still running from cache. buyBackCents lives on the server
+        //    and the answer travels with the card.
+        sellBackCents: buyBackCents(valueCents),
         tier: tierForCents(valueCents).key,
         itemType: row.item_type || "card",
     };
@@ -400,7 +406,7 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
             id: row.id,
             priceCents,
             balanceCents: spent.balanceCents,
-            card: { ...toPoolCard(claimed), valueCents },
+            card: { ...toPoolCard(claimed), valueCents, sellBackCents: buyBackCents(valueCents) },
             tier: tier.key,
             bigHit: valueCents >= BIG_HIT_CENTS,
             outcome: "pending",
@@ -488,7 +494,11 @@ export async function resumePendingOpen(buyerId) {
         id: row.id,
         priceCents: row.price_cents,
         balanceCents: await getStoreCredit(buyerId),
-        card: { ...toPoolCard({ ...row, id: row.card_id }), valueCents: row.card_value_cents },
+        card: {
+            ...toPoolCard({ ...row, id: row.card_id }),
+            valueCents: row.card_value_cents,
+            sellBackCents: buyBackCents(row.card_value_cents),
+        },
         tier: row.tier,
         bigHit: row.card_value_cents >= BIG_HIT_CENTS,
         outcome: "pending",
@@ -498,8 +508,14 @@ export async function resumePendingOpen(buyerId) {
 /**
  * Sell it back on the spot, or keep it. The two-button moment the whole reveal builds to.
  *
- * Sell-back pays 100% of the card's value as credit (§5). It is a guarded single transition: the conditional
- * UPDATE on outcome='pending' is what stops a double-tap paying twice.
+ * Sell-back pays the counter's trade rate — buyBackCents(), 60% rounded up to a quarter with a $1 floor.
+ *
+ * ⚠️ THE PAYOUT IS NOT THE CARD'S VALUE ANY MORE, AND THE TWO ARE NEVER INTERCHANGEABLE BELOW THIS LINE.
+ * card_value_cents is what the card is WORTH — what the vault holds, what it is re-listed at. payoutCents is
+ * what we hand over. Every row written here has to be told which one it wants, and the one that gets it wrong
+ * is either a member underpaid or a shelf priced at 60% of market.
+ *
+ * It is a guarded single transition: the conditional UPDATE on outcome='pending' stops a double-tap paying twice.
  */
 export async function choosePackOutcome({ buyerId, openId, choice }) {
     if (!vaultOpenFor(buyerId)) return { ok: false, error: "closed" };
@@ -521,6 +537,7 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
         [open.mystery_card_id]
     );
     const valueCents = open.card_value_cents;
+    const payoutCents = buyBackCents(valueCents);
 
     if (choice === "sell") {
         // ⚠️ THE BAG STILL HAS TO BE OPENED, AND CANCELLING THE TASK LOSES THE CARD.
@@ -543,8 +560,8 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
             )
             .catch(() => {});
 
-        const balanceCents = await addCredit(buyerId, valueCents, "vault_sellback", open.id, {
-            card: card?.card_name, immediate: true,
+        const balanceCents = await addCredit(buyerId, payoutCents, "vault_sellback", open.id, {
+            card: card?.card_name, immediate: true, marketCents: valueCents,
         });
 
         // ⚠️ THE SAME BUY-BACK AS THE VAULT'S, THROUGH THE SAME FUNCTION. Selling at the reveal and selling
@@ -562,6 +579,8 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
                 cardNumber: parsedCard.number,
                 condition: parsedCard.condition || card?.condition || null,
                 imageUrl: card?.image_url || null,
+                // ⚠️ MARKET, NOT THE PAYOUT. completeBuyBack re-rates this into what we paid; the card goes
+                //    back on the shelf at what it is WORTH, which is the whole reason there is a margin.
                 valueCents,
             }],
         }).catch((error) => logger.error("packs.sell_at_reveal.buyback_failed", error, { openId: open.id }));
@@ -569,11 +588,11 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
             .query(
                 `INSERT INTO mkt_vault_event (buyer_id, pack_open_id, action, credit_delta_cents, meta)
                  VALUES ($1, $2, 'sold_back', $3, $4)`,
-                [buyerId, open.id, valueCents, JSON.stringify({ card: card?.card_name, atReveal: true })]
+                [buyerId, open.id, payoutCents, JSON.stringify({ card: card?.card_name, marketCents: valueCents, atReveal: true })]
             )
             .catch(() => {});
-        await trackActivity(buyerId, "pack_sellback", { valueCents }).catch(() => {});
-        return { ok: true, choice, creditedCents: valueCents, balanceCents };
+        await trackActivity(buyerId, "pack_sellback", { valueCents, payoutCents }).catch(() => {});
+        return { ok: true, choice, creditedCents: payoutCents, balanceCents };
     }
 
     const parsed = parsePackCardName(card?.card_name || "");

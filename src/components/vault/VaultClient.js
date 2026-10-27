@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import { BUYBACK_PERCENT } from "@/lib/marketplace/buyback.js";
+
 const usd = (cents) => `$${((Number(cents) || 0) / 100).toFixed(2)}`;
 
 const TABS = [
@@ -47,7 +49,13 @@ export default function VaultClient({ initial }) {
         () => held.filter((c) => selected.has(c.id)),
         [held, selected]
     );
-    const selectedTotal = selectedCards.reduce((sum, c) => sum + c.valueCents, 0);
+    // ⚠️ WHAT WE WILL PAY, NOT WHAT THEY ARE WORTH. This was summing valueCents while the Sell back button
+    //    handed over the 60% trade rate, so the bar and the confirm sheet would both have quoted a figure
+    //    the sale was never going to produce. sellBackCents is sent per card by the server; nothing here
+    //    multiplies money by a rate, and summing the per-card payouts is also what the server does — rating
+    //    a basket once rounds once and pays less than selling the same cards one at a time.
+    const selectedTotal = selectedCards.reduce((sum, c) => sum + c.sellBackCents, 0);
+    const selectedMarket = selectedCards.reduce((sum, c) => sum + c.valueCents, 0);
 
     const refresh = useCallback(async () => {
         const res = await fetch("/api/marketplace/vault", { cache: "no-store" }).catch(() => null);
@@ -174,6 +182,15 @@ export default function VaultClient({ initial }) {
                     <span className="vt-head-label">Cards</span>
                     <strong className="vt-head-value">{vault.totals?.heldCount ?? 0}</strong>
                 </div>
+                {/* ⚠️ ONLY ONCE IT HAS A NUMBER IN IT. A fourth stat reading "$0.00" on the day somebody
+                    opens their first pack is a reminder that they have never had anything, on the screen
+                    built to make the vault feel like an account. It appears the moment it can brag. */}
+                {vault.totals?.earnedBackCents > 0 ? (
+                    <div>
+                        <span className="vt-head-label">Earned back</span>
+                        <strong className="vt-head-value vt-gold">{usd(vault.totals.earnedBackCents)}</strong>
+                    </div>
+                ) : null}
                 <div>
                     <span className="vt-head-label">Store credit</span>
                     <strong className="vt-head-value vt-gold">{usd(vault.balanceCents)}</strong>
@@ -234,6 +251,11 @@ export default function VaultClient({ initial }) {
                                             <span className="vt-tile-sub">{card.subtitle}</span>
                                             <span className="vt-tile-value" style={{ color: card.glow }}>
                                                 {usd(card.valueCents)}
+                                            </span>
+                                            {/* Both numbers, always, because they are different numbers.
+                                                The value is what the card is; the trade is what it pays. */}
+                                            <span className="vt-tile-trade">
+                                                trades for {usd(card.sellBackCents)}
                                             </span>
                                             {card.valueCents !== card.pulledValueCents ? (
                                                 <span className="vt-tile-was">pulled at {usd(card.pulledValueCents)}</span>
@@ -365,6 +387,9 @@ export default function VaultClient({ initial }) {
                     <h2 className="vt-sheet-name">{detail.name}</h2>
                     <p className="vt-sheet-sub">{detail.subtitle}</p>
                     <p className="vt-sheet-value">{usd(detail.valueCents)}</p>
+                    <p className="vt-sheet-trade">
+                        {`Trades back for ${usd(detail.sellBackCents)} — ${BUYBACK_PERCENT}% store credit, the same rate we pay at the counter.`}
+                    </p>
                     {!detail.releasable ? (
                         <p className="vt-hold">
                             Ready to ship or collect from {shortDate(detail.releasableAt)} — new store credit
@@ -377,7 +402,7 @@ export default function VaultClient({ initial }) {
                             className="pk-btn pk-btn-sell"
                             onClick={() => { setSelected(new Set([detail.id])); setConfirming(true); }}
                         >
-                            Sell back — {usd(detail.valueCents)}
+                            Sell back — {usd(detail.sellBackCents)}
                             <span className="pk-btn-shine" aria-hidden="true" />
                         </button>
                         <button type="button" className="pk-btn pk-btn-ghost" onClick={() => setDetail(null)}>
@@ -394,7 +419,7 @@ export default function VaultClient({ initial }) {
                             <h2 className="vt-sheet-name">
                                 Get {selectedCards.length} card{selectedCards.length === 1 ? "" : "s"}
                             </h2>
-                            <p className="vt-sheet-sub">{usd(selectedTotal)} of cards</p>
+                            <p className="vt-sheet-sub">{usd(selectedMarket)} of cards</p>
                             {selectedCards.some((c) => !c.releasable) ? (
                                 <p className="vt-hold">
                                     Some of these aren&apos;t ready to leave yet — new store credit settles
@@ -494,7 +519,7 @@ export default function VaultClient({ initial }) {
                         {selectedCards.map((c) => (
                             <li key={c.id}>
                                 <span>{c.name}</span>
-                                <span style={{ color: c.glow }}>{usd(c.valueCents)}</span>
+                                <span style={{ color: c.glow }}>{usd(c.sellBackCents)}</span>
                             </li>
                         ))}
                     </ul>

@@ -8,6 +8,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { tierByKey } from "@/lib/marketplace/pack-rarity.js";
 import { releasableAt } from "@/lib/marketplace/packs.js";
 import { addCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
+import { buyBackCents } from "@/lib/marketplace/buyback.js";
 import { completeBuyBack } from "@/lib/marketplace/vault-restock.js";
 import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { createServerLogger } from "@/lib/server-logger";
@@ -38,6 +39,9 @@ function toVaultCard(row) {
         glow: tier.glow,
         edge: tier.edge,
         valueCents: money(row.current_value_cents),
+        // ⚠️ SENT, NOT DERIVED — the same rule as the pack payload. Two numbers live on a vault card now and
+        //    they are not interchangeable: what it is WORTH, and what we would PAY for it.
+        sellBackCents: buyBackCents(money(row.current_value_cents)),
         pulledValueCents: money(row.pulled_value_cents),
         status: row.status,
         orderId: row.order_id || null,
@@ -52,7 +56,7 @@ function toVaultCard(row) {
 export async function getVault(buyerId) {
     if (!vaultOpenFor(buyerId)) return null;
 
-    const [cards, events, order] = await Promise.all([
+    const [cards, events, order, lifetime] = await Promise.all([
         db.query(
             `SELECT id, card_name, set_name, card_number, condition, image_url, tier,
                     pulled_value_cents, current_value_cents, status, order_id, releasable_at, created_at
@@ -79,6 +83,20 @@ export async function getVault(buyerId) {
              GROUP BY o.id
              ORDER BY o.created_at DESC
              LIMIT 25`,
+            [buyerId]
+        ),
+        // ── ⚠️ ITS OWN AGGREGATE, NOT A SUM OVER `events` ───────────────────────────────────────────────
+        // The obvious move is to add up the sold_back rows already in hand and save a round trip. That list
+        // is `LIMIT 60`, so the lifetime figure would be right for everybody until somebody's sixty-first
+        // event and then silently start shrinking — a number that goes DOWN when you sell another card.
+        // A quiet wrong answer costs more than a query on a page a member opened on purpose.
+        //
+        // It cannot come from mkt_vault_card.sold_back_cents either: selling at the reveal never creates a
+        // vault card, so half the history lives only in the event table.
+        db.queryOne(
+            `SELECT COALESCE(SUM(credit_delta_cents), 0)::int AS cents
+             FROM mkt_vault_event
+             WHERE buyer_id = $1 AND action = 'sold_back' AND credit_delta_cents > 0`,
             [buyerId]
         ),
     ]);
@@ -116,13 +134,20 @@ export async function getVault(buyerId) {
         totals: {
             heldCount: held.length,
             heldValueCents: held.reduce((sum, c) => sum + c.valueCents, 0),
+            // ⚠️ SUMMED PER CARD, NEVER RATED ON THE TOTAL. buyBackCents rounds up to a quarter, so rating a
+            //    basket once pays less than rating each card — selling five together would quietly be worth
+            //    less than selling them one at a time.
+            heldSellBackCents: held.reduce((sum, c) => sum + c.sellBackCents, 0),
             onOrderCount: onOrder.length,
+            // Everything this member has ever taken back in credit. It only goes up, which is the point:
+            // it is the one number on this screen that always reads as winning, and it is simply true.
+            earnedBackCents: Number(lifetime?.cents || 0),
         },
     };
 }
 
 /**
- * Sell cards back to us for store credit, at 100% of their current value.
+ * Sell cards back to us for store credit, at the counter's trade rate — see buyback.js.
  *
  * ⚠️ THE CREDIT GOES OUT FIRST, AND THE SQUARE RESTOCK IS BEST-EFFORT AFTER IT. That ordering is deliberate:
  * the member's money is the part that has to be right, and a Square outage must not leave somebody holding
@@ -138,7 +163,7 @@ export async function sellVaultCards({ buyerId, cardIds }) {
     // claim — two taps can only win once.
     const claimed = await db.query(
         `UPDATE mkt_vault_card
-         SET status = 'sold_back', sold_back_at = NOW(), sold_back_cents = current_value_cents, updated_at = NOW()
+         SET status = 'sold_back', sold_back_at = NOW(), updated_at = NOW()
          WHERE buyer_id = $1 AND id = ANY($2::uuid[]) AND status = 'held'
          RETURNING id, card_name, set_name, card_number, condition, image_url,
                    square_variation_id, current_value_cents, tier`,
@@ -146,7 +171,22 @@ export async function sellVaultCards({ buyerId, cardIds }) {
     );
     if (!claimed.length) return { ok: false, error: "nothing_sellable" };
 
-    const totalCents = claimed.reduce((sum, c) => sum + money(c.current_value_cents), 0);
+    // ⚠️ sold_back_cents IS WHAT WE PAID, NOT WHAT THE CARD WAS WORTH. It used to be set to
+    //    current_value_cents inside the claiming UPDATE, which was correct only while the rate was 100%.
+    //    Written here instead, from buyBackCents, so the column cannot silently keep meaning "market" —
+    //    the History tab reads it back as "sold back for $X" and would have been off by 40% forever.
+    //
+    // ⚠️ AND IT IS RATED PER CARD, NEVER ON THE TOTAL. buyBackCents rounds up to a quarter, so rating a
+    //    basket once pays less than rating each card and adding them up — the member would be quietly
+    //    charged for selling two cards together instead of one at a time.
+    const payouts = new Map(claimed.map((c) => [c.id, buyBackCents(money(c.current_value_cents))]));
+    for (const card of claimed) {
+        await db
+            .query(`UPDATE mkt_vault_card SET sold_back_cents = $2 WHERE id = $1`, [card.id, payouts.get(card.id)])
+            .catch(() => {});
+    }
+
+    const totalCents = claimed.reduce((sum, c) => sum + payouts.get(c.id), 0);
     const ref = `vault:${randomUUID()}`;
     const balanceCents = await addCredit(buyerId, totalCents, "vault_sellback", ref, {
         cards: claimed.map((c) => c.card_name),
@@ -157,7 +197,12 @@ export async function sellVaultCards({ buyerId, cardIds }) {
             .query(
                 `INSERT INTO mkt_vault_event (buyer_id, vault_card_id, action, credit_delta_cents, meta)
                  VALUES ($1, $2, 'sold_back', $3, $4)`,
-                [buyerId, card.id, money(card.current_value_cents), JSON.stringify({ card: card.card_name })]
+                [
+                    buyerId,
+                    card.id,
+                    payouts.get(card.id),
+                    JSON.stringify({ card: card.card_name, marketCents: money(card.current_value_cents) }),
+                ]
             )
             .catch(() => {});
     }
@@ -176,6 +221,8 @@ export async function sellVaultCards({ buyerId, cardIds }) {
             cardNumber: card.card_number,
             condition: card.condition,
             imageUrl: card.image_url,
+            // ⚠️ MARKET, NOT THE PAYOUT — completeBuyBack re-rates it into what we paid. The card goes back
+            //    on the shelf at what it is worth.
             valueCents: money(card.current_value_cents),
             vaultCardId: card.id,
         })),

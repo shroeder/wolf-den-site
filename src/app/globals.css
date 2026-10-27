@@ -25443,7 +25443,59 @@ body.cas-seated .social-fab { display: none; }
     animation-delay: 0.3s;
 }
 
+/* ── THE PAYOUT LANDING ──────────────────────────────────────────────────────────────────
+   "Sold back for $2.50." in body text was the flattest possible end to the loudest screen in the Den. The
+   number that just arrived in somebody's balance should look like it arrived. */
+.pk-paid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    margin: 8px 0 0;
+    animation: pk-paid-in 0.5s cubic-bezier(0.2, 1.2, 0.35, 1) both;
+}
+
+.pk-paid-amount {
+    font-size: 2.1rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: #F0D27A;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 26px rgba(212, 175, 55, 0.55);
+}
+
+.pk-paid-label {
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    color: #8A8A8A;
+}
+
+@keyframes pk-paid-in {
+    from { opacity: 0; transform: translateY(14px) scale(0.86); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .pk-done-line { margin: 10px 0 0; color: var(--ink-secondary); }
+
+/* ── THE TRADE-IN FIGURE, BESIDE THE VALUE ────────────────────────────────────────────────────
+   ⚠️ BOTH NUMBERS, ALWAYS, EVERYWHERE A CARD IS SHOWN. What it is worth and what it trades for are different
+   numbers now, and a screen that shows only one of them is a screen somebody can be surprised by at the
+   moment they tap a button. Quiet type, because the value is still the headline — but never absent. */
+.vt-tile-trade {
+    font-size: 0.68rem;
+    color: #8A8A8A;
+    line-height: 1.3;
+}
+
+.vt-sheet-trade {
+    margin: 6px 0 0;
+    font-size: 0.78rem;
+    color: #8A8A8A;
+    line-height: 1.4;
+}
 /* ── THE TWO CHOICES ─────────────────────────────────────────────────────────────────────────────────────────
    Luke: "Buttons to sell should be super sexy, and the take should be cta for add to card vault."
 
@@ -25506,7 +25558,10 @@ body.cas-seated .social-fab { display: none; }
     white-space: nowrap;
 }
 
+/* ⚠️ The sell button is DARK TEXT ON GOLD, where 0.64 is a wash. Lifted on that one so the rate stays
+   legible — a disclosed rate nobody can read is not disclosed. */
 .pk-cta-sub { font-size: 0.62rem; opacity: 0.64; line-height: 1.2; }
+.pk-cta-sell .pk-cta-sub { opacity: 0.82; font-weight: 600; }
 
 /* CASH. Warm metal, lit from the top left, with a bright rim where a struck edge would catch the light.
    ⚠️ The text colour is set with the background, every time — a gold button with inherited light text is
@@ -25540,6 +25595,26 @@ body.cas-seated .social-fab { display: none; }
     box-shadow:
         0 8px 24px rgba(90, 70, 190, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+/* ── "THAT'S MORE THAN THE PACK COST" ──────────────────────────────────────────────────────
+   The sell-back pays the counter's 60%, which on most pulls is a small number — and on the pulls that matter
+   is still several times what the pack cost. This class is added only when the payout beats the price, so
+   the screen gets loud about the one fact that is worth being loud about and stays quiet the rest of the
+   time. A button that celebrates every outcome is a button nobody believes on the good one. */
+.pk-cta-bank {
+    animation: pk-bank 2.2s ease-in-out infinite;
+}
+
+.pk-cta-bank .pk-cta-sub {
+    opacity: 1;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+}
+
+@keyframes pk-bank {
+    0%, 100% { box-shadow: 0 8px 24px rgba(212, 175, 55, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.75), inset 0 -2px 6px rgba(140, 100, 20, 0.3); }
+    50% { box-shadow: 0 10px 40px rgba(255, 215, 94, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -2px 6px rgba(140, 100, 20, 0.3); }
 }
 
 .pk-cta-vault .pk-cta-main { color: #E9DCFF; }
@@ -25794,10 +25869,14 @@ body.cas-seated .social-fab { display: none; }
     gap: 12px;
 }
 
+/* ⚠️ auto-fit, NOT repeat(3). "Earned back" appears only once a member has sold something, so this grid
+   holds three stats for some people and four for others — hard-coded at three, the fourth dropped onto a
+   second row on its own and the panel read as broken for exactly the people who had used the feature most.
+   auto-fit lays out whatever it is given: three across, or two-by-two once there are four. */
 .vt-head {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 8px 10px;
     padding: 12px;
     border-radius: 14px;
     background: var(--surface);

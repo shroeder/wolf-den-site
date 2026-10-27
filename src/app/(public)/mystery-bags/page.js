@@ -1,7 +1,10 @@
 import MysteryBagShowcaseClient from "@/components/MysteryBagShowcaseClient";
 import PackOpenClient from "@/components/packs/PackOpenClient";
+import { cookies } from "next/headers";
+
 import { getMysteryBagDashboardData } from "@/lib/mystery-bags";
 import { getMarketingQrCodes } from "@/lib/marketing-qr";
+import { devFixture } from "@/lib/dev-fixture.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { packPoolSummary, resumePendingOpen } from "@/lib/marketplace/packs.js";
 import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
@@ -91,6 +94,18 @@ export default async function MysteryBagsPage() {
             resumePendingOpen(buyer.id).catch(() => null),
         ]);
         if (pool) openingProps = { pool, balanceCents, pending };
+
+        // ── ⚠️ THE REVEAL CANNOT BE PHOTOGRAPHED WITHOUT SPENDING A PACK, AND THAT IS WHY THIS IS HERE ──
+        // Everything this screen draws is a server-rendered prop, so --mock cannot reach it: filming the
+        // sell-or-keep moment meant opening a real $20 bag out of real stock on a real account, every single
+        // time. The states that cost money are exactly the states that go unlooked-at — the first film of
+        // this feature put the value and both buttons below the fold, and it took a live pull to find out.
+        //
+        // devFixture is a hard no-op in production (its first line), so a forged cookie does nothing live.
+        //
+        //   document.cookie = "wolfden-fixture=mythic"   → scripts/fixtures/.live/packs.mythic.json
+        const fixture = devFixture("packs", (await cookies()).get("wolfden-fixture")?.value);
+        if (fixture) openingProps = { ...openingProps, ...fixture };
     }
 
     return (

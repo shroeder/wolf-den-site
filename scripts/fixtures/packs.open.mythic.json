@@ -17,7 +17,8 @@
         "imageUrl": "https://items-images-production.s3.us-west-2.amazonaws.com/files/68e2dfce6855cd28a7b192231835850a318e9d56/original.jpeg",
         "valueCents": 25800,
         "tier": "mythic",
-        "itemType": "card"
+        "itemType": "card",
+        "sellBackCents": 15500
       },
       "tier": "mythic",
       "bigHit": true,

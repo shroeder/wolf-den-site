@@ -99,6 +99,7 @@ if (!process.argv.includes("--force") && (recent.pending > 0 || recent.opens > 0
 
 const { openPack, choosePackOutcome, packPrice, splitPriceForTax, resumePendingOpen } =
     await import("@/lib/marketplace/packs.js");
+const { buyBackCents } = await import("../src/lib/marketplace/buyback.js");
 const { getVault, sellVaultCards, createVaultOrder, cancelVaultOrder, quoteVaultShipping } =
     await import("@/lib/marketplace/vault.js");
 const { restockBoughtBackCard } = await import("@/lib/marketplace/vault-restock.js");
@@ -199,7 +200,13 @@ const srcVar = (await sql`SELECT square_variation_id FROM mystery_bag_cards WHER
 const stockBefore = await onHand(srcVar);
 const sold = await choosePackOutcome({ buyerId: BUYER, openId: open1.id, choice: "sell" });
 ok("sell succeeded", sold.ok);
-is("paid 100% of value", sold.creditedCents, open1.card.valueCents);
+// ⚠️ ASSERTED AGAINST buyBackCents, NOT A LITERAL. This used to read `is("paid 100% of value", ...)` against
+//    the card's own value, and the day the rate moved to the counter's 60% that assertion would have been
+//    the only thing in the repo still claiming the old number — passing or failing for reasons that had
+//    nothing to do with whether the payout was right. The suite now checks the SAME function the payout
+//    uses, so it proves the two agree rather than re-stating one of them.
+is("paid the trade rate", sold.creditedCents, buyBackCents(open1.card.valueCents));
+is("the card payload agrees with the server", open1.card.sellBackCents, buyBackCents(open1.card.valueCents));
 await new Promise((r) => setTimeout(r, 1800));
 is("card went back into Square stock", await onHand(srcVar), stockBefore + 1);
 const task1b = (await sql`SELECT kind, status FROM mkt_pack_pull_task WHERE pack_open_id=${open1.id}`)[0];
@@ -254,11 +261,19 @@ is("re-file tasks raised", (await sql`SELECT COUNT(*)::int n FROM mkt_pack_pull_
 // ── 7. SELL FROM THE VAULT ──────────────────────────────────────────────────────────────────────────────────
 head(7, "Sell from the vault");
 const vaultNow = await getVault(BUYER);
-const toSell = vaultNow.held.slice(0, 1).map((c) => c.id);
+const sellCards = vaultNow.held.slice(0, 1);
+const toSell = sellCards.map((c) => c.id);
 const creditBefore = await credit();
 const sellRes = await sellVaultCards({ buyerId: BUYER, cardIds: toSell });
+// ⚠️ SUMMED PER CARD. Rating a basket once rounds once and pays less than selling the same cards one at a
+//    time, so this is also the assertion that stops a future "optimisation" collapsing the two.
+is(
+    "the vault payout is the per-card trade rate",
+    sellRes.creditedCents,
+    sellCards.reduce((sum, c) => sum + buyBackCents(c.valueCents), 0),
+);
 ok("sell succeeded", sellRes.ok, sellRes.ok ? usd(sellRes.creditedCents) : sellRes.error);
-is("credit went up by exactly the value", (await credit()) - creditBefore, sellRes.creditedCents);
+is("credit went up by exactly what was paid", (await credit()) - creditBefore, sellRes.creditedCents);
 const again = await sellVaultCards({ buyerId: BUYER, cardIds: toSell });
 is("selling the same card twice refused", again.error, "nothing_sellable");
 

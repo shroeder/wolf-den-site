@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { restockInventoryForCancel, squareFetch } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
+import { BUYBACK_PERCENT, buyBackCents } from "@/lib/marketplace/buyback.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const logger = createServerLogger({ source: "api", subsystem: "vault-restock" });
@@ -274,16 +275,23 @@ async function recordOurCost(variationId, paidCents, name) {
 export async function completeBuyBack({ buyerId, cards }) {
     const results = [];
     for (const card of cards) {
-        const paidCents = Math.max(0, Math.round(Number(card.valueCents) || 0));
+        // ── ⚠️ TWO DIFFERENT NUMBERS, AND THEY USED TO BE ONE ────────────────────────────────────────────
+        // `valueCents` from the caller is MARKET. restockBoughtBackCard has always taken both a shelf price
+        // and a cost — it was this function that collapsed them, which was invisibly correct only while
+        // sell-back paid 100%. At the counter's 60% they diverge, and getting it wrong goes wrong in both
+        // directions at once: the card goes back on the shelf at 60% of its worth AND the books record it
+        // as having cost us full market, so every re-sale reports roughly zero margin.
+        const marketCents = Math.max(0, Math.round(Number(card.valueCents) || 0));
+        const paidCents = buyBackCents(marketCents);
         const result = await restockBoughtBackCard({
             squareVariationId: card.squareVariationId,
             name: card.name,
             subtitle: card.subtitle,
             imageUrl: card.imageUrl,
-            valueCents: paidCents,
+            valueCents: marketCents,
             paidCents,
         });
-        results.push({ card, result });
+        results.push({ card, result, marketCents, paidCents });
     }
     await recordBuybackTrade(buyerId, results).catch((error) =>
         logger.error("vault_restock.trade_ledger_failed", error, { buyerId })
@@ -298,43 +306,52 @@ export async function completeBuyBack({ buyerId, cards }) {
  * credit", and trade reporting, cost capture and the consignment hooks all read it. A vault buy-back that
  * invented its own table would be invisible to every one of them.
  *
- * buy_rate_percent is 100 because that is literally what was paid. The rate is RECORDED rather than assumed,
- * which is the rule that keeps traded-single costs honest.
+ * ⚠️ buy_rate_percent IS 60 AND market_total AND offer_total ARE DIFFERENT NUMBERS, which is how every
+ * counter trade in this table already looks — the live rows read `rate 60.00 | market 409.47 offer 245.68`,
+ * with each line carrying its MARKET figure and the rate applied once at the trade level. This posts the
+ * same shape, so a vault buy-back and a counter trade are the same row to every report that reads them.
+ *
+ * ⚠️ offer_total IS THE SUM OF THE ACTUAL PAYOUTS, NOT market × 0.6. buyBackCents rounds up to a quarter and
+ * floors at a dollar, so the two differ by pennies — and the ledger has to say what was handed over, not
+ * what a formula would have handed over. The rate is RECORDED rather than assumed, which is the rule that
+ * keeps traded-single costs honest.
  */
 async function recordBuybackTrade(buyerId, results) {
-    const rows = results.filter((r) => Math.round(Number(r.card.valueCents) || 0) > 0);
+    const rows = results.filter((r) => r.marketCents > 0);
     if (!rows.length) return;
 
     const tradeId = `vault-${randomUUID()}`;
-    const total = rows.reduce((sum, r) => sum + Math.round(Number(r.card.valueCents) || 0), 0) / 100;
+    const market = rows.reduce((sum, r) => sum + r.marketCents, 0) / 100;
+    const paid = rows.reduce((sum, r) => sum + r.paidCents, 0) / 100;
 
     await db.tx(async (client) => {
         await client.query(
             `INSERT INTO trade
                 (id, traded_at, buy_rate_percent, market_total, offer_total, credit_total,
                  cash_total, gift_card_total, cash_in_total, net_total, notes, created_by, source)
-             VALUES ($1, NOW(), 100, $2, $2, $2, 0, 0, 0, $2, $3, 'vault', 'vault_buyback')`,
-            [tradeId, total, `Card Vault buy-back (member ${buyerId})`]
+             VALUES ($1, NOW(), $2, $3, $4, $4, 0, 0, 0, $4, $5, 'vault', 'vault_buyback')`,
+            [tradeId, BUYBACK_PERCENT, market, paid, `Card Vault buy-back (member ${buyerId})`]
         );
         let sort = 0;
-        for (const { card, result } of rows) {
-            const value = Math.round(Number(card.valueCents) || 0) / 100;
+        for (const { card, result, marketCents } of rows) {
+            const value = marketCents / 100;
             await client.query(
                 `INSERT INTO trade_line
                     (trade_id, direction, item_name, quantity, unit_market, line_total, buy_rate_percent,
                      square_variation_id, set_name, card_number, condition, image_url, sort_order)
-                 VALUES ($1, 'IN', $2, 1, $3, $3, 100, $4, $5, $6, $7, $8, $9)`,
+                 VALUES ($1, 'IN', $2, 1, $3, $3, $10, $4, $5, $6, $7, $8, $9)`,
                 [
                     tradeId, card.name, value, result.variationId || card.squareVariationId,
                     card.setName || null, card.cardNumber || null, card.condition || null,
-                    card.imageUrl || null, sort += 1,
+                    card.imageUrl || null, sort += 1, BUYBACK_PERCENT,
                 ]
             );
         }
         await client.query(
+            // What went the other way: the credit we handed over, which is the PAID figure, not market.
             `INSERT INTO trade_line (trade_id, direction, item_name, quantity, line_total, sort_order)
              VALUES ($1, 'OUT', 'Store credit', 1, $2, $3)`,
-            [tradeId, total, sort + 1]
+            [tradeId, paid, sort + 1]
         );
     });
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Haptic } from "@/components/arena/arena-audio.js";
+import { BUYBACK_PERCENT, packsWorth } from "@/lib/marketplace/buyback.js";
 import { PACK_TIERS, tierByKey } from "@/lib/marketplace/pack-rarity.js";
 import { burst, coinIn, coinOut, fanfare, rumble, shimmer, stopPackAudio, tierChord } from "@/components/packs/pack-audio.js";
 
@@ -342,6 +343,8 @@ export default function PackOpenClient({ initial }) {
     // because four different things key off it and they must not be able to disagree.
     const blown = phase === PHASE.burst || phase === PHASE.reveal || phase === PHASE.readout;
     const showCard = Boolean(open) && blown;
+    // null unless the sell-back beats what the pack cost — see packsWorth.
+    const multiple = packsWorth(open?.card?.sellBackCents, open?.priceCents ?? priceCents);
     // The × exists only where a dismiss cannot strand a paid-for card. See closeModal().
     const closable = phase === PHASE.idle || Boolean(choice);
 
@@ -526,9 +529,18 @@ export default function PackOpenClient({ initial }) {
 
                     {choice ? (
                         <div className="pk-done">
+                            {/* The payout gets its own moment. "Sold back for $2.50." in body text was the
+                                flattest possible end to the loudest screen in the Den — the number that
+                                just landed in somebody's balance should look like it landed. */}
+                            {choice === "sell" ? (
+                                <p className="pk-paid">
+                                    <span className="pk-paid-amount">+{usd(open.card.sellBackCents)}</span>
+                                    <span className="pk-paid-label">in store credit</span>
+                                </p>
+                            ) : null}
                             <p className="pk-done-line">
                                 {choice === "sell"
-                                    ? `Sold back for ${usd(open.card.valueCents)}.`
+                                    ? "Spends like cash here — no fees, no waiting."
                                     : "Added to your vault."}
                             </p>
                             <div className="pk-actions">
@@ -554,15 +566,26 @@ export default function PackOpenClient({ initial }) {
                             Both are CTAs now, and they are DIFFERENT ANIMALS: gold is cash, the vault is
                             jewel-toned and says what it does. Each carries its own second line so the choice
                             is legible without reading either label twice. */}
+                            {/* ⚠️ THE BUTTON SHOWS WHAT WE WILL ACTUALLY PAY, AND THE SERVER SENT IT.
+                                Sell-back is the counter's 60% trade rate, so the card's value and the
+                                payout are two different numbers now — putting the value on the sell button
+                                would be the screen quoting a price it is not going to honour. sellBackCents
+                                arrives with the card; nothing here multiplies money by a rate. */}
                             <button
                                 type="button"
-                                className="pk-cta pk-cta-sell"
+                                className={`pk-cta pk-cta-sell${multiple ? " pk-cta-bank" : ""}`}
                                 onClick={() => choose("sell")}
                                 disabled={busy}
                             >
                                 <span className="pk-cta-kick">Sell back</span>
-                                <span className="pk-cta-main">{usd(open.card.valueCents)}</span>
-                                <span className="pk-cta-sub">straight to credit</span>
+                                <span className="pk-cta-main">{usd(open.card.sellBackCents)}</span>
+                                {/* ⚠️ THE CELEBRATION ONLY FIRES WHEN THERE IS SOMETHING TO CELEBRATE.
+                                    packsWorth returns null below 1×, so a card that paid less than the pack
+                                    cost gets the plain line instead of "0.4× your pack" read back to
+                                    somebody at the moment they are deciding what to do about it. */}
+                                <span className="pk-cta-sub">
+                                    {multiple ? `${multiple}× your pack` : `${BUYBACK_PERCENT}% trade-in · instant`}
+                                </span>
                                 <span className="pk-cta-shine" aria-hidden="true" />
                             </button>
                             <button
@@ -573,7 +596,9 @@ export default function PackOpenClient({ initial }) {
                             >
                                 <span className="pk-cta-kick">Keep it</span>
                                 <span className="pk-cta-main">Card Vault</span>
-                                <span className="pk-cta-sub">ship or collect later</span>
+                                {/* The full value lives on THIS button, because keeping is the path that
+                                    gets it. Saying so is both the honest comparison and the better one. */}
+                                <span className="pk-cta-sub">worth {usd(open.card.valueCents)}</span>
                                 <span className="pk-cta-shine" aria-hidden="true" />
                             </button>
                         </div>
