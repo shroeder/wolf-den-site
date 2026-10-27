@@ -996,15 +996,38 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                             {`${(chosen.beatsBp / 100).toFixed(0)}% of cards in here are worth ${usd(priceCents)} or more.`}
                         </p>
                     ) : null}
+                    {/* ── THE CARD, NOT A ROW OF TEXT ──────────────────────────────────────────────────
+                        Luke, 2026-10-27: "the modal isnt dopamine enough it should show sprites and
+                        rarity colors". It was a price list — a name, a grey line, a figure — for a screen
+                        whose only job is to make you want to open the pack. The art is already on every
+                        row (inventory_feed.image_url, which the carousel face never had room for), and
+                        the rarity colour was already computed and was being thrown at a 3px left edge.
+                        Both now carry their weight: a real thumbnail lit by its own tier, and the tier
+                        named in words next to the price so the colour means something.
+
+                        ⚠️ `tierByKey` FALLS BACK TO COMMON ON UNDEFINED. That is why every shelf-pool
+                        card was grey — see the note in shelfPoolCards. If a row here is the wrong
+                        colour, the card's `tier` is missing on the server, not broken here. */}
                     <ul className="pk-shelf-list">
                         {((chosen && pools.length > 1 ? chosen.cards : pool.cards) || []).map((card) => {
                             const t = tierByKey(card.tier);
                             return (
-                                <li key={card.id} style={{ "--row-edge": t.edge }}>
-                                    <span className="pk-shelf-name">{card.name}</span>
-                                    <span className="pk-shelf-sub">{card.subtitle}</span>
-                                    <span className="pk-shelf-value" style={{ color: t.glow }}>
-                                        {usd(card.valueCents)}
+                                <li key={card.id} style={{ "--row-edge": t.edge, "--row-glow": t.glow }}>
+                                    <span className="pk-shelf-art">
+                                        {card.imageUrl ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={card.imageUrl} alt="" loading="lazy" decoding="async" />
+                                        ) : (
+                                            <span className="pk-shelf-art-none" aria-hidden="true" />
+                                        )}
+                                    </span>
+                                    <span className="pk-shelf-text">
+                                        <span className="pk-shelf-name">{card.name}</span>
+                                        {card.subtitle ? <span className="pk-shelf-sub">{card.subtitle}</span> : null}
+                                    </span>
+                                    <span className="pk-shelf-right">
+                                        <span className="pk-shelf-value">{usd(card.valueCents)}</span>
+                                        <span className="pk-shelf-tier">{t.label}</span>
                                     </span>
                                 </li>
                             );

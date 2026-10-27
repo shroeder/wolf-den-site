@@ -26077,20 +26077,107 @@ body.cas-seated .social-fab { display: none; }
     gap: 6px;
 }
 
+/* ── A ROW IS A CARD, NOT A LINE ITEM ─────────────────────────────────────────────────────────────────────
+   Luke: "the modal isnt dopamine enough it should show sprites and rarity colors". The art was already on
+   every row and the tier colour was already computed — the row spent both on a 3px left edge and a price in
+   plain white. Now the thumbnail is lit by its own rarity and the price is painted in it.
+
+   ⚠️ --row-glow AND --row-edge ARE SET INLINE FROM THE TIER TABLE. Never hard-code a rarity colour here; a
+   second copy of that palette is the exact thing pack-rarity.js exists to prevent. */
 .pk-shelf-list li {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 2px 10px;
+    display: flex;
     align-items: center;
-    padding: 9px 11px;
-    border-radius: 10px;
+    gap: 11px;
+    padding: 8px 11px 8px 8px;
+    border-radius: 12px;
     background: var(--elevated);
     border-left: 3px solid var(--row-edge);
+    /* The rarity bleeding in from the left edge, so the colour reads as the row's rather than as a hairline. */
+    background-image: linear-gradient(90deg, color-mix(in srgb, var(--row-glow) 16%, transparent), transparent 42%);
 }
 
-.pk-shelf-name { grid-column: 1; font-size: 0.92rem; }
-.pk-shelf-sub { grid-column: 1; grid-row: 2; font-size: 0.74rem; color: var(--muted); }
-.pk-shelf-value { grid-column: 2; grid-row: 1 / span 2; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+/* The thumbnail. object-fit: contain because card scans are not all the same aspect and a cover crop eats
+   the art box on the tall ones — the same rule the sprites follow everywhere else in this game. */
+.pk-shelf-art {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 58px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.35);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--row-glow) 45%, transparent),
+                0 0 12px color-mix(in srgb, var(--row-glow) 28%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pk-shelf-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* A card with no scan on file still gets a lit box, so the list never develops a ragged hole. */
+.pk-shelf-art-none {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(145deg,
+        color-mix(in srgb, var(--row-glow) 22%, transparent),
+        rgba(0, 0, 0, 0.25));
+}
+
+.pk-shelf-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* ⚠️ min-width: 0 ABOVE PLUS THE ELLIPSIS HERE. A long promo name is the common case, not the edge one, and
+   a flex child defaults to min-width: auto — without both of these the name shoves the price off the row. */
+.pk-shelf-name {
+    font-size: 0.92rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pk-shelf-sub {
+    font-size: 0.74rem;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pk-shelf-right {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+}
+
+.pk-shelf-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--row-glow);
+}
+
+/* The tier NAMED, not just coloured. A colour alone is a code the player has to learn, and it is also the
+   whole accessibility story for the eight percent of them who cannot separate the green from the grey. */
+.pk-shelf-tier {
+    font-size: 0.64rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--row-glow) 78%, white);
+    opacity: 0.85;
+}
 
 /* 375x667 with browser chrome is the tightest real screen this has to work on, and the card, the readout and
    both buttons have to coexist there.
@@ -27258,17 +27345,34 @@ body.cas-seated .social-fab { display: none; }
     color: #F0D27A;
 }
 
+/* ── THE WAY IN HAS TO LOOK LIKE A WAY IN ─────────────────────────────────────────────────────────────────
+   Luke, 2026-10-27: "It isnt clear the whats inside button is easily missed". It was a 1px grey hairline
+   holding grey text on a black header — indistinguishable from the label beside it, on a screen where it is
+   the ONLY thing standing between a member and knowing what they are buying. The whole argument for the
+   carousel was "you can still evaluate what's inside"; a control nobody sees does not deliver that.
+
+   Gold fill, gold text, and a slow breath so it catches the eye in peripheral vision without becoming a
+   second call to action competing with Open. */
 .pk-shelf-btn {
-    border-color: rgba(255, 255, 255, 0.12);
-    color: #C9C9C9;
-    font-weight: 500;
+    border-color: rgba(212, 175, 55, 0.55);
+    background: rgba(212, 175, 55, 0.10);
+    color: #F0D27A;
+    font-weight: 700;
     letter-spacing: 0.01em;
+    animation: pk-peek-breathe 2.8s ease-in-out infinite;
+}
+
+/* ⚠️ ANIMATIONS IN THIS GAME ALWAYS PLAY — the house does not honour prefers-reduced-motion here, so keep
+   anything added to this screen to opacity and shadow. No movement, nothing that shifts layout. */
+@keyframes pk-peek-breathe {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
+    50% { box-shadow: 0 0 14px 1px rgba(212, 175, 55, 0.28); }
 }
 
 .pk-shelf-btn:hover {
-    border-color: rgba(212, 175, 55, 0.55);
-    color: #F2F2F2;
-    background: rgba(212, 175, 55, 0.06);
+    border-color: rgba(212, 175, 55, 0.85);
+    color: #FFE9A8;
+    background: rgba(212, 175, 55, 0.18);
 }
 
 /* ── THE FOOT ─────────────────────────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { packCardSubtitle, parsePackCardName } from "@/lib/marketplace/pack-card-name.js";
+import { tierForCents } from "@/lib/marketplace/pack-rarity.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const logger = createServerLogger({ source: "api", subsystem: "pack-pools" });
@@ -144,12 +146,26 @@ export async function shelfPoolCards(pool, { limit = 40 } = {}) {
             [pool.category, limit]
         )
         .catch(() => []);
-    return rows.map((r) => ({
-        id: r.name,
-        name: r.name,
-        valueCents: Math.round(Number(r.price || 0) * 100),
-        imageUrl: r.image_url || null,
-    }));
+    // ── ⚠️ SHAPE THIS THE SAME WAY A BAG'S CARD IS SHAPED ───────────────────────────────────────────────
+    // This used to return name/value/image and nothing else, while a bag's card came out of toPoolCard with
+    // a `tier` and a `subtitle` as well. The sheet reads `tierByKey(card.tier)` to colour each row, and
+    // tierByKey falls back to COMMON when it is handed undefined — so every card in a shelf pool rendered
+    // grey slate, a $258 Jirachi and a $1 bulk rare side by side in the same dead colour, under a blank
+    // second line. No error anywhere; the rarity colours simply never applied to the new pools.
+    //
+    // ⚠️ SO IF YOU ADD A THIRD KIND OF POOL, SHAPE ITS CARDS HERE OR IN toPoolCard — not a third time.
+    return rows.map((r) => {
+        const valueCents = Math.round(Number(r.price || 0) * 100);
+        const parsed = parsePackCardName(r.name || "");
+        return {
+            id: r.name,
+            name: parsed.name || r.name,
+            subtitle: packCardSubtitle(r.name || ""),
+            valueCents,
+            tier: tierForCents(valueCents).key,
+            imageUrl: r.image_url || null,
+        };
+    });
 }
 
 /**
