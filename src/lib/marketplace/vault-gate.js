@@ -58,7 +58,14 @@ export function vaultOpenFor(buyerId) {
 // ⚠️ AND IT IS AND-ED WITH THE VAULT GATE, NOT OR-ED. Everything a category pack does afterwards — the
 // reveal, the sell-back, the vault, shipping — is the vault feature. Somebody who could open a shelf pack
 // while the vault was shut would be buying a card into a room they cannot enter.
-export const SHELF_PACKS_PUBLIC = false;
+// `true` since 2026-10-27 — Luke: "Ungate mystery bags, the new stuff we've just been working on, so it's
+// not owner gated anymore." Pokémon Singles and Magic Singles are open to every member; Yu-Gi-Oh stays shut
+// by its own concentration rule, not by this, and opens itself when the shelf allows.
+//
+// ⚠️ THE FLAG STAYS rather than being deleted with its call sites — the same argument as VAULT_PUBLIC above.
+// It is the only way back if the shelf runs thin or Square plays up, and re-deriving the gate under pressure
+// is how a feature gets half-closed.
+export const SHELF_PACKS_PUBLIC = true;
 
 export function shelfPacksOpenFor(buyerId) {
     if (!buyerId) return false;
