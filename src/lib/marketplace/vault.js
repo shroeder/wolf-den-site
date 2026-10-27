@@ -10,6 +10,7 @@ import { releasableAt } from "@/lib/marketplace/packs.js";
 import { addCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
 import { buyBackCents } from "@/lib/marketplace/buyback.js";
 import { completeBuyBack } from "@/lib/marketplace/vault-restock.js";
+import { poolByKey } from "@/lib/marketplace/pack-pools.js";
 import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -166,7 +167,7 @@ export async function sellVaultCards({ buyerId, cardIds }) {
          SET status = 'sold_back', sold_back_at = NOW(), updated_at = NOW()
          WHERE buyer_id = $1 AND id = ANY($2::uuid[]) AND status = 'held'
          RETURNING id, card_name, set_name, card_number, condition, image_url,
-                   square_variation_id, current_value_cents, tier`,
+                   square_variation_id, current_value_cents, tier, mystery_card_id`,
         [buyerId, ids]
     );
     if (!claimed.length) return { ok: false, error: "nothing_sellable" };
@@ -207,6 +208,19 @@ export async function sellVaultCards({ buyerId, cardIds }) {
             .catch(() => {});
     }
 
+    // ── ⚠️ WHICH POOL EACH CARD CAME OUT OF ─────────────────────────────────────────────────────────────
+    // A vault card does not carry its pool; the pool row it was pulled from does. One lookup rather than a
+    // column, because this is the only place that needs it — and it is the place the category bug lived:
+    // without it a Magic single re-created on this path comes back as a Pokémon one.
+    const poolByCard = new Map();
+    const poolRowIds = claimed.map((c) => c.mystery_card_id).filter(Boolean);
+    if (poolRowIds.length) {
+        const rows = await db
+            .query(`SELECT id, pool FROM mystery_bag_cards WHERE id = ANY($1::uuid[])`, [poolRowIds])
+            .catch(() => []);
+        for (const r of rows) poolByCard.set(r.id, r.pool);
+    }
+
     // ── The card becomes sellable again, and the trade ledger learns we bought it ──────────────────────────
     // ⚠️ THE SAME FUNCTION THE REVEAL'S SELL BUTTON CALLS. Those two were separate once and immediately
     //    disagreed: selling at the reveal restocked nothing, recorded no cost and posted no trade. One
@@ -221,6 +235,11 @@ export async function sellVaultCards({ buyerId, cardIds }) {
             cardNumber: card.card_number,
             condition: card.condition,
             imageUrl: card.image_url,
+            // ⚠️ A VAULT CARD REMEMBERS WHICH POOL IT CAME OUT OF, through the pool row it was pulled from.
+            //    This is the path the category bug actually lived on: hold a Magic single, let its sold-out
+            //    item get deleted, sell it back a week later, and the restock re-creates it — as Pokémon,
+            //    unless somebody says otherwise. See categoryForVariation in vault-restock.js.
+            categoryName: poolByKey(poolByCard.get(card.mystery_card_id))?.category || null,
             // ⚠️ MARKET, NOT THE PAYOUT — completeBuyBack re-rates it into what we paid. The card goes back
             //    on the shelf at what it is worth.
             valueCents: money(card.current_value_cents),

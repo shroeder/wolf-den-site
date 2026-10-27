@@ -70,6 +70,39 @@ async function liveVariation(variationId) {
     return { object, deleted: Boolean(object.is_deleted) };
 }
 
+/**
+ * ── ⚠️ WHAT CATEGORY DOES A BOUGHT-BACK CARD BELONG IN ───────────────────────────────────────────────────────
+ * Luke, 2026-10-27: "I want to ensure when we sell back the items they land back whereas they should for
+ * pokemon magic singles."
+ *
+ * He was right to ask. `restockBoughtBackCard` took `categoryName = "Pokemon Single Card"` as a DEFAULT and
+ * neither caller passed one — so a Magic single whose Square item had been deleted came back as a POKÉMON
+ * single. It never bit while the only pool was a bag of Pokémon cards; the moment Magic Singles exists it is
+ * a card filed under the wrong game, in the wrong report, found by nobody looking for it.
+ *
+ * ⚠️ AND IT ONLY BITES ON THE CREATE BRANCH, WHICH IS WHY IT WOULD HAVE HIDDEN. A card sold straight back at
+ * the reveal still has its variation — we only decremented it — so it takes the `+1` path and keeps
+ * everything about itself. The broken path is the slow one: keep the card, the sold-out item gets deleted
+ * from the catalogue, sell it back from the vault a week later, and it is re-created from scratch. That is
+ * the path nobody would have tested by hand.
+ *
+ * Resolution order, most-authoritative first:
+ *   1. what the caller said, if it said anything
+ *   2. what the SHELF last knew about this variation — `inventory_feed` keeps its row and its category when
+ *      a card goes to zero (1,935 out-of-stock rows carry one today, 133 of them Magic)
+ *   3. the old default, so a card with no history anywhere still lands somewhere sensible
+ */
+async function categoryForVariation(variationId, given) {
+    if (given) return given;
+    if (variationId) {
+        const row = await db
+            .queryOne(`SELECT category_names FROM inventory_feed WHERE variation_id = $1`, [variationId])
+            .catch(() => null);
+        if (row?.category_names) return row.category_names;
+    }
+    return "Pokemon Single Card";
+}
+
 /** The category a bought-back single belongs in, resolved from the catalog by name. */
 async function resolveCategoryId(name) {
     const found = await squareFetch("/v2/catalog/search", {
@@ -182,7 +215,9 @@ export async function restockBoughtBackCard({
     imageUrl,
     valueCents,
     paidCents,
-    categoryName = "Pokemon Single Card",
+    // ⚠️ NO DEFAULT HERE ANY MORE — see categoryForVariation. A default on this parameter is what made
+    //    "Pokémon" the answer for every card nobody had an opinion about, including the Magic ones.
+    categoryName = null,
 }) {
     // ⚠️ THE COST GOES DOWN FIRST, BEFORE ANY SQUARE CALL CAN FAIL.
     //
@@ -212,7 +247,7 @@ export async function restockBoughtBackCard({
             imageUrl,
             priceCents: valueCents,
             costCents: paidCents,
-            categoryName,
+            categoryName: await categoryForVariation(squareVariationId, categoryName),
         });
         if (!variationId) throw new Error("Square did not return a variation id");
 
@@ -290,6 +325,9 @@ export async function completeBuyBack({ buyerId, cards }) {
             imageUrl: card.imageUrl,
             valueCents: marketCents,
             paidCents,
+            // Passed when the caller knows — a category pack knows its own pool's category for certain.
+            // Everything else falls through to the shelf's own memory of the variation.
+            categoryName: card.categoryName || null,
         });
         results.push({ card, result, marketCents, paidCents });
     }

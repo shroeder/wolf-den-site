@@ -622,7 +622,7 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
     if (!open) return { ok: false, error: "already_chosen" };
 
     const card = await db.queryOne(
-        `SELECT id, card_name, condition, image_url, market_value, square_variation_id, channel
+        `SELECT id, card_name, condition, image_url, market_value, square_variation_id, channel, pool
          FROM mystery_bag_cards WHERE id = $1`,
         [open.mystery_card_id]
     );
@@ -687,6 +687,9 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
                 cardNumber: parsedCard.number,
                 condition: parsedCard.condition || card?.condition || null,
                 imageUrl: card?.image_url || null,
+                // ⚠️ THE POOL KNOWS ITS CATEGORY FOR CERTAIN, so it says so rather than leaving the restock
+                //    to infer it. A Magic single must come back as a Magic single — see categoryForVariation.
+                categoryName: poolByKey(card?.pool)?.category || null,
                 // ⚠️ MARKET, NOT THE PAYOUT. completeBuyBack re-rates this into what we paid; the card goes
                 //    back on the shelf at what it is WORTH, which is the whole reason there is a margin.
                 valueCents,
