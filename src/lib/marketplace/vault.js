@@ -8,7 +8,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { tierByKey } from "@/lib/marketplace/pack-rarity.js";
 import { releasableAt } from "@/lib/marketplace/packs.js";
 import { addCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
-import { restockBoughtBackCard } from "@/lib/marketplace/vault-restock.js";
+import { completeBuyBack } from "@/lib/marketplace/vault-restock.js";
 import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -163,80 +163,40 @@ export async function sellVaultCards({ buyerId, cardIds }) {
     }
 
     // ── The card becomes sellable again, and the trade ledger learns we bought it ──────────────────────────
-    const restocked = [];
-    for (const card of claimed) {
-        const result = await restockBoughtBackCard({
+    // ⚠️ THE SAME FUNCTION THE REVEAL'S SELL BUTTON CALLS. Those two were separate once and immediately
+    //    disagreed: selling at the reveal restocked nothing, recorded no cost and posted no trade. One
+    //    payout, one path.
+    const restocked = await completeBuyBack({
+        buyerId,
+        cards: claimed.map((card) => ({
             squareVariationId: card.square_variation_id,
             name: card.card_name,
             subtitle: [card.set_name, card.card_number, card.condition].filter(Boolean).join(" · "),
+            setName: card.set_name,
+            cardNumber: card.card_number,
+            condition: card.condition,
             imageUrl: card.image_url,
             valueCents: money(card.current_value_cents),
-            paidCents: money(card.current_value_cents),
-        });
-        restocked.push({ card, result });
-        if (result.variationId && result.variationId !== card.square_variation_id) {
+            vaultCardId: card.id,
+        })),
+    }).catch((error) => {
+        logger.error("vault.sell.buyback_failed", error, { buyerId });
+        return [];
+    });
+
+    for (const { card, result } of restocked) {
+        if (result?.variationId && result.variationId !== card.squareVariationId) {
             await db
-                .query(`UPDATE mkt_vault_card SET square_variation_id = $2 WHERE id = $1`, [card.id, result.variationId])
+                .query(`UPDATE mkt_vault_card SET square_variation_id = $2 WHERE id = $1`,
+                    [card.vaultCardId, result.variationId])
                 .catch(() => {});
         }
     }
-
-    await recordBuybackTrade(buyerId, restocked).catch((error) =>
-        logger.error("vault.sell.trade_ledger_failed", error, { buyerId })
-    );
 
     await trackActivity(buyerId, "vault_sellback", { cents: totalCents, count: claimed.length }).catch(() => {});
     logger.info("vault.sell.success", { buyerId, count: claimed.length, totalCents });
 
     return { ok: true, soldCount: claimed.length, creditedCents: totalCents, balanceCents };
-}
-
-/**
- * Put the buy-back through the SAME pipe as a counter trade.
- *
- * ⚠️ NOT A NEW LEDGER. `trade` + `trade_line` already model "we bought cards from a person and paid them in
- * credit", and trade reporting, cost capture and the consignment hooks all read it. A vault buy-back that
- * invented its own table would be invisible to every one of them.
- *
- * buy_rate_percent is 100 because that is literally what was paid — see §5. The rate is RECORDED rather than
- * assumed, which is the rule that keeps traded-single costs honest.
- */
-async function recordBuybackTrade(buyerId, restocked) {
-    const rows = restocked.filter((r) => money(r.card.current_value_cents) > 0);
-    if (!rows.length) return;
-
-    const tradeId = `vault-${randomUUID()}`;
-    const total = rows.reduce((sum, r) => sum + money(r.card.current_value_cents), 0) / 100;
-
-    await db.tx(async (client) => {
-        await client.query(
-            `INSERT INTO trade
-                (id, traded_at, buy_rate_percent, market_total, offer_total, credit_total,
-                 cash_total, gift_card_total, cash_in_total, net_total, notes, created_by, source)
-             VALUES ($1, NOW(), 100, $2, $2, $2, 0, 0, 0, $2, $3, 'vault', 'vault_buyback')`,
-            [tradeId, total, `Card Vault buy-back (member ${buyerId})`]
-        );
-        let sort = 0;
-        for (const { card, result } of rows) {
-            const value = money(card.current_value_cents) / 100;
-            await client.query(
-                `INSERT INTO trade_line
-                    (trade_id, direction, item_name, quantity, unit_market, line_total, buy_rate_percent,
-                     square_variation_id, set_name, card_number, condition, image_url, sort_order)
-                 VALUES ($1, 'IN', $2, 1, $3, $3, 100, $4, $5, $6, $7, $8, $9)`,
-                [
-                    tradeId, card.card_name, value, result.variationId || card.square_variation_id,
-                    card.set_name, card.card_number, card.condition, card.image_url, sort += 1,
-                ]
-            );
-        }
-        // The credit side, so the trade balances the way a counter trade does.
-        await client.query(
-            `INSERT INTO trade_line (trade_id, direction, item_name, quantity, line_total, sort_order)
-             VALUES ($1, 'OUT', 'Store credit', 1, $2, $3)`,
-            [tradeId, total, sort + 1]
-        );
-    });
 }
 
 /** Cards eligible to leave the building right now — the hold in §12 is applied here, not in the UI. */

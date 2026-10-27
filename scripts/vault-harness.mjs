@@ -192,7 +192,9 @@ async function setInventory(variationId, quantity, locationId) {
 // ── SNAPSHOT ────────────────────────────────────────────────────────────────────────────────────────────────
 
 async function cmdSnapshot(args) {
-    const count = Number(args.bags || 1);
+    // ⚠️ `??`, NOT `||`. `begin` passes 0 deliberately, and `0 || 1` is 1 — so the baseline quietly captured
+    //    a bag nobody asked it to.
+    const count = Number(args.bags ?? 1);
     const buyerId = args.buyer || (await sql`SELECT id FROM mkt_buyer ORDER BY created_at LIMIT 1`)[0]?.id;
 
     const owner = await sql`
@@ -200,13 +202,15 @@ async function cmdSnapshot(args) {
     if (!owner.length) throw new Error(`No such buyer: ${buyerId}`);
 
     // Cheapest active bags first: a test that goes wrong should cost the least it possibly can.
-    const bags = await sql`
+    // ⚠️ Zero is a normal, expected count — `begin` takes a baseline and nothing else, because `undo` adopts
+    //    whichever bags actually got opened. Naming bags up front only matters for the lower-level selftest.
+    const bags = count > 0 ? await sql`
         SELECT id, card_id, card_name, market_value, status, square_variation_id, packed_variation_id,
                variation_sku, channel, cost_cents, cost_basis
         FROM mystery_bag_cards
         WHERE status = 'active' AND packed_variation_id IS NOT NULL
         ORDER BY market_value ASC
-        LIMIT ${count}`;
+        LIMIT ${count}` : [];
     if (bags.length < count) throw new Error(`Only ${bags.length} active bags available.`);
 
     const locationId = await firstLocationId();
@@ -302,25 +306,25 @@ async function cmdRestore() {
     // test created is a row that did not exist before and is safe to drop.
     for (const variationId of state.created.restocked || []) {
         await sql`DELETE FROM wolfden_item_cost WHERE variation_id = ${variationId} AND source = 'vault_buyback'`;
+        // ⚠️ AN ABSOLUTE PHYSICAL_COUNT, NOT AN ADJUSTMENT TO `NONE`.
+        //
+        //    Square refuses `IN_STOCK -> NONE` outright — "Unsupported adjustment state transition" — which
+        //    is the same family of restriction as `SOLD -> IN_STOCK` that the restock path already works
+        //    around. The first version of this used it anyway and the failure was invisible: the undo
+        //    cheerfully reported success while a real unit stayed on the shelf.
+        //
+        //    A recount down by one is the honest description of what happened: a unit that was put back by a
+        //    test was never really there. It is also one of the two ways stock legitimately leaves without a
+        //    sale, so the FIFO reconciler already understands it.
         const have = await inventoryCount(variationId);
         if (have > 0 && state.locationId) {
-            await square("/v2/inventory/changes/batch-create", {
-                method: "POST",
-                body: JSON.stringify({
-                    idempotency_key: randomUUID(),
-                    changes: [{
-                        type: "ADJUSTMENT",
-                        adjustment: {
-                            catalog_object_id: variationId,
-                            location_id: state.locationId,
-                            from_state: "IN_STOCK",
-                            to_state: "NONE",
-                            quantity: "1",
-                            occurred_at: new Date().toISOString(),
-                        },
-                    }],
-                }),
-            }).catch((e) => bad(`un-restock ${variationId}: ${e.message}`));
+            const applied = await setInventory(variationId, have - 1, state.locationId)
+                .catch((e) => { bad(`un-restock ${variationId}: ${e.message}`); return false; });
+            // Read it back. A 200 from Square is not the same as the number having changed.
+            if (applied) {
+                const now = await inventoryCount(variationId);
+                if (now !== have - 1) bad(`un-restock ${variationId}: still ${now}, wanted ${have - 1}`);
+            }
         }
     }
     if ((state.created.tradeIds || []).length || (state.created.restocked || []).length) {
@@ -765,10 +769,20 @@ async function cmdAdopt() {
         WHERE vault_order = TRUE AND created_at >= ${state.takenAt}::timestamptz`;
     for (const o of orders) if (!state.created.orderIds.includes(o.id)) state.created.orderIds.push(o.id);
 
+    // ⚠️ TWO SOURCES, BECAUSE THERE ARE TWO WAYS TO SELL A CARD BACK AND ONLY ONE MAKES A VAULT CARD.
+    //    Selling from the VAULT leaves an `mkt_vault_card` row to find. Selling at the REVEAL never creates
+    //    one — the card goes straight back — and that path restocks Square just the same. Looking only at
+    //    vault cards reported "0 restock(s)" and left a real unit sitting on the shelf, which is the exact
+    //    kind of quiet inventory drift this harness exists to prevent.
     const sellBacks = await sql`
         SELECT square_variation_id FROM mkt_vault_card
         WHERE buyer_id = ${state.buyer.id} AND status = 'sold_back'
-          AND sold_back_at >= ${state.takenAt}::timestamptz AND square_variation_id IS NOT NULL`;
+          AND sold_back_at >= ${state.takenAt}::timestamptz AND square_variation_id IS NOT NULL
+        UNION
+        SELECT c.square_variation_id FROM mkt_pack_open o
+        JOIN mystery_bag_cards c ON c.id = o.mystery_card_id
+        WHERE o.buyer_id = ${state.buyer.id} AND o.outcome = 'sold_back'
+          AND o.created_at >= ${state.takenAt}::timestamptz AND c.square_variation_id IS NOT NULL`;
     for (const r of sellBacks) {
         if (!state.created.restocked.includes(r.square_variation_id)) state.created.restocked.push(r.square_variation_id);
     }
@@ -777,12 +791,75 @@ async function cmdAdopt() {
     ok(`adopted ${added} open(s); ${state.created.vaultCardIds.length} vault card(s), ${state.created.creditEventIds.length} credit event(s) tracked`);
 }
 
+// ── THE TWO COMMANDS A PERSON ACTUALLY NEEDS ────────────────────────────────────────────────────────────────
+//
+//     npm run harness:vault begin     before you start clicking
+//     ...test the feature in the browser, as much as you like...
+//     npm run harness:vault undo      afterwards
+//
+// `begin` takes the baseline — WHO is testing and what their credit balance was — and nothing else. It does
+// not need to name any bags up front, because `undo` finds every bag that was opened after that moment and
+// adopts it before putting it back.
+//
+// ⚠️ `begin` IS NOT OPTIONAL. Everything `undo` reverses is scoped to "after the baseline timestamp, by this
+// buyer". With no baseline there is no window and no credit figure to restore to, so undo would either do
+// nothing or have to guess — and an undo that guesses its own scope is how a test harness eats real data.
+
+async function cmdBegin(args) {
+    await cmdSnapshot({ ...args, bags: args.bags ?? 0 });
+    log("");
+    log("   Baseline taken. Go and test — open packs, sell them back, vault them, order a pickup.");
+    log("   When you are done:  npm run harness:vault undo");
+    log("");
+}
+
+async function cmdUndo() {
+    const state = loadState();
+    if (!state) throw new Error("No baseline. Run `npm run harness:vault begin --buyer <id>` BEFORE testing.");
+    log("");
+    log("1) finding everything that happened since the baseline");
+    await cmdAdopt();
+    log("");
+    log("2) putting it all back");
+    await cmdRestore();
+
+    log("");
+    log("3) checking");
+    const bal = (await sql`SELECT store_credit_cents FROM mkt_buyer WHERE id = ${state.buyer.id}`)[0];
+    const left = (await sql`
+        SELECT (SELECT COUNT(*)::int FROM mkt_pack_open WHERE buyer_id = ${state.buyer.id}) opens,
+               (SELECT COUNT(*)::int FROM mkt_vault_card WHERE buyer_id = ${state.buyer.id}) vault,
+               (SELECT COUNT(*)::int FROM mkt_pack_pull_task) tasks,
+               (SELECT COUNT(*)::int FROM shop_orders WHERE vault_order) orders,
+               (SELECT COUNT(*)::int FROM mystery_bag_cards WHERE status='active') pool`)[0];
+    let pass = true;
+    const check = (label, got, want) => {
+        if (String(got) === String(want)) ok(`${label}: ${got}`);
+        else { bad(`${label}: ${got}, expected ${want}`); pass = false; }
+    };
+    check("credit back to baseline", bal.store_credit_cents, state.buyer.creditCentsBefore);
+    check("pack opens left", left.opens, 0);
+    check("vault cards left", left.vault, 0);
+    check("pull tasks left", left.tasks, 0);
+    check("vault orders left", left.orders, 0);
+    log(`   active pool: ${left.pool}`);
+    log("");
+    log(pass ? "   UNDONE — nothing from your testing is left." : "   SOMETHING IS LEFT OVER — see above.");
+    log("");
+    if (!pass) process.exitCode = 1;
+}
+
 const commands = {
+    begin: cmdBegin, undo: cmdUndo,
     snapshot: cmdSnapshot, status: cmdStatus, restore: cmdRestore,
     selftest: cmdSelftest, cycle: cmdCycle, adopt: cmdAdopt,
 };
 if (!commands[cmd]) {
-    log("usage: node scripts/vault-harness.mjs <snapshot|status|selftest|restore> [--bags N] [--buyer <id>]");
+    log("usage: npm run harness:vault <begin|undo|status> [--buyer <id>]");
+    log("       begin --buyer <id>   take a baseline BEFORE testing");
+    log("       undo                 put everything back afterwards");
+    log("       status               what is outstanding right now");
+    log("  (selftest | cycle | snapshot | adopt | restore are the lower-level pieces)");
     process.exit(1);
 }
 await commands[cmd](args);

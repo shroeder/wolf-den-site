@@ -9,6 +9,7 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { packCardSubtitle, parsePackCardName } from "@/lib/marketplace/pack-card-name.js";
 import { BIG_HIT_CENTS, tierForCents } from "@/lib/marketplace/pack-rarity.js";
 import { addCredit, getStoreCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
+import { completeBuyBack } from "@/lib/marketplace/vault-restock.js";
 import { isPreviewOpen, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -445,19 +446,48 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
     const valueCents = open.card_value_cents;
 
     if (choice === "sell") {
-        // Sold straight back without ever entering the vault. The physical card never moved, so there is no
-        // pull task to honour — cancel it rather than sending somebody to the tub for a card we just re-bought.
+        // ⚠️ THE BAG STILL HAS TO BE OPENED, AND CANCELLING THE TASK LOSES THE CARD.
+        //
+        // The first version cancelled it, reasoning that the card never moved so nobody needs to fetch it.
+        // That is wrong, and it is a straight inventory loss on the commonest path: the bag's Square
+        // variation was DELETED the moment the pack was opened, so the sealed bag now sitting in the tub has
+        // no SKU and cannot be sold at the register — and the card inside it is one we have just paid full
+        // market value for. Cancel the task and nobody is ever told to go and get it; the bag stays sealed
+        // in the tub forever with a bought card inside.
+        //
+        // So the task survives and changes job: pull the bag, open it, put the card back on the shelf.
         await db
             .query(
-                `UPDATE mkt_pack_pull_task SET status = 'done', done_at = NOW(), done_by = 'auto:sold_back',
-                        note = 'sold back before leaving the shop'
+                `UPDATE mkt_pack_pull_task
+                 SET kind = 'reshelve',
+                     note = 'Sold straight back — open the bag and re-shelve the card'
                  WHERE pack_open_id = $1 AND status = 'open'`,
                 [open.id]
             )
             .catch(() => {});
+
         const balanceCents = await addCredit(buyerId, valueCents, "vault_sellback", open.id, {
             card: card?.card_name, immediate: true,
         });
+
+        // ⚠️ THE SAME BUY-BACK AS THE VAULT'S, THROUGH THE SAME FUNCTION. Selling at the reveal and selling
+        // from the vault are the same event and the same money; they had already drifted into two different
+        // sets of consequences once (this path restocked nothing, recorded no cost and posted no trade), and
+        // two paths for one payout always drift again.
+        const parsedCard = parsePackCardName(card?.card_name || "");
+        await completeBuyBack({
+            buyerId,
+            cards: [{
+                squareVariationId: card?.square_variation_id || null,
+                name: card?.card_name || parsedCard.name,
+                subtitle: packCardSubtitle(card?.card_name || ""),
+                setName: parsedCard.setCode,
+                cardNumber: parsedCard.number,
+                condition: parsedCard.condition || card?.condition || null,
+                imageUrl: card?.image_url || null,
+                valueCents,
+            }],
+        }).catch((error) => logger.error("packs.sell_at_reveal.buyback_failed", error, { openId: open.id }));
         await db
             .query(
                 `INSERT INTO mkt_vault_event (buyer_id, pack_open_id, action, credit_delta_cents, meta)

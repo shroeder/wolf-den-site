@@ -262,3 +262,81 @@ async function recordOurCost(variationId, paidCents, name) {
         )
         .catch((error) => logger.error("vault_restock.cost_write_failed", error, { variationId }));
 }
+
+/**
+ * ── EVERYTHING THAT HAPPENS WHEN WE BUY A CARD BACK ──────────────────────────────────────────────────────────
+ * ONE function, called by BOTH the sell-at-the-reveal path and the sell-from-the-vault path.
+ *
+ * ⚠️ IT IS ONE FUNCTION ON PURPOSE. Two paths for one payout always drift, and these two had already drifted
+ * before this existed: selling from the vault restocked Square, recorded the cost and posted a trade, while
+ * selling at the reveal did none of the three. Same event, same money, two different sets of consequences.
+ *
+ * Returns the per-card results so the caller can re-point any stored variation id.
+ */
+export async function completeBuyBack({ buyerId, cards }) {
+    const results = [];
+    for (const card of cards) {
+        const paidCents = Math.max(0, Math.round(Number(card.valueCents) || 0));
+        const result = await restockBoughtBackCard({
+            squareVariationId: card.squareVariationId,
+            name: card.name,
+            subtitle: card.subtitle,
+            imageUrl: card.imageUrl,
+            valueCents: paidCents,
+            paidCents,
+        });
+        results.push({ card, result });
+    }
+    await recordBuybackTrade(buyerId, results).catch((error) =>
+        logger.error("vault_restock.trade_ledger_failed", error, { buyerId })
+    );
+    return results;
+}
+
+/**
+ * Put the buy-back through the SAME pipe as a counter trade.
+ *
+ * ⚠️ NOT A NEW LEDGER. `trade` + `trade_line` already model "we bought cards from a person and paid them in
+ * credit", and trade reporting, cost capture and the consignment hooks all read it. A vault buy-back that
+ * invented its own table would be invisible to every one of them.
+ *
+ * buy_rate_percent is 100 because that is literally what was paid. The rate is RECORDED rather than assumed,
+ * which is the rule that keeps traded-single costs honest.
+ */
+async function recordBuybackTrade(buyerId, results) {
+    const rows = results.filter((r) => Math.round(Number(r.card.valueCents) || 0) > 0);
+    if (!rows.length) return;
+
+    const tradeId = `vault-${randomUUID()}`;
+    const total = rows.reduce((sum, r) => sum + Math.round(Number(r.card.valueCents) || 0), 0) / 100;
+
+    await db.tx(async (client) => {
+        await client.query(
+            `INSERT INTO trade
+                (id, traded_at, buy_rate_percent, market_total, offer_total, credit_total,
+                 cash_total, gift_card_total, cash_in_total, net_total, notes, created_by, source)
+             VALUES ($1, NOW(), 100, $2, $2, $2, 0, 0, 0, $2, $3, 'vault', 'vault_buyback')`,
+            [tradeId, total, `Card Vault buy-back (member ${buyerId})`]
+        );
+        let sort = 0;
+        for (const { card, result } of rows) {
+            const value = Math.round(Number(card.valueCents) || 0) / 100;
+            await client.query(
+                `INSERT INTO trade_line
+                    (trade_id, direction, item_name, quantity, unit_market, line_total, buy_rate_percent,
+                     square_variation_id, set_name, card_number, condition, image_url, sort_order)
+                 VALUES ($1, 'IN', $2, 1, $3, $3, 100, $4, $5, $6, $7, $8, $9)`,
+                [
+                    tradeId, card.name, value, result.variationId || card.squareVariationId,
+                    card.setName || null, card.cardNumber || null, card.condition || null,
+                    card.imageUrl || null, sort += 1,
+                ]
+            );
+        }
+        await client.query(
+            `INSERT INTO trade_line (trade_id, direction, item_name, quantity, line_total, sort_order)
+             VALUES ($1, 'OUT', 'Store credit', 1, $2, $3)`,
+            [tradeId, total, sort + 1]
+        );
+    });
+}
