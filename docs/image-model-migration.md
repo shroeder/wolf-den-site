@@ -136,7 +136,92 @@ What this does change:
   sprite handed in alongside the DiceBear identity render would make this a real edit and buy back the
   style protection — but that is a change to the recipe, not a migration, and belongs in its own decision.
 
-## 5. What a migration actually touches
+## 5. Outside OpenAI
+
+Luke: *"Are there other models we can try outside of open ai"*
+
+⚠️ **Dated knowledge warning.** This section is written from training knowledge with a May 2026 cutoff; it is
+now late October. Names, availability and prices in this space change monthly, so treat every specific below
+as a lead to verify rather than a fact. The *shapes* of the options are stable; the details are not.
+
+⚠️ **And we hold no key for any of them.** `OPENAI_API_KEY` is the only image credential in
+`accounting_app/local.properties`. Anything here needs an account before it can be tried.
+
+### 5.1 The thing that changes the answer: we own a corpus
+
+| | |
+|---|---|
+| pet level sprites | 852 |
+| gear | 501 |
+| badges | 294 |
+| decorations | 208 |
+| town art | 173 |
+| dishes | 160 |
+| pets | 144 |
+| hero sprites | 111 |
+| consumables | 51 |
+| **total** | **2,494 finished images, all in one hand** |
+
+That is a training set, and an unusually good one: consistent, captioned by the prompts that made them, and
+already judged acceptable. Most shops arguing about image models do not have this.
+
+It matters because the problem is not "which model draws nearest our style" — it is that **our style is
+currently rented**. It lives in gpt-image-1's hand, which is why a vendor retiring that model restyles the
+whole game. Training on our own corpus converts the style from something we rent into something we own, and
+a model whose weights we hold cannot be shut down on four days' notice.
+
+### 5.2 The three shapes of option
+
+**A — Another hosted prompt-to-image API.** Swaps one rented hand for another. Fastest to try, solves
+nothing structurally.
+
+- **Google Imagen** (Gemini/Vertex) — the nearest peer to what we use, with image editing.
+- **Black Forest Labs FLUX** — the Kontext line is purpose-built for image-to-image with reference
+  preservation, which is exactly the lever that worked for us. Reachable via BFL directly, fal.ai or
+  Replicate, and the weights are obtainable.
+- **Recraft** — aimed squarely at flat vector and illustration styles, with style references and
+  transparent output. On paper the closest out-of-the-box fit for cel-shaded sprites.
+- **Ideogram** — strong on flat graphic work.
+
+**B — Game-asset platforms that train on your art.** Built for this exact job.
+
+- **Scenario** — generate game assets from a model trained on your own library. The most on-the-nose
+  description of our situation I know of.
+- **Leonardo** — custom model training, game-art oriented.
+
+**C — Train our own LoRA on open weights.** The structural fix.
+
+A LoRA typically wants 20–100 images and we have 2,494 to choose from. Training runs in the tens of dollars
+on Replicate or fal; inference afterwards is cents. The output is a file we keep.
+
+⚠️ **This is the only option that removes the recurring risk rather than resetting its clock.** Every hosted
+API in group A can retire a model on us exactly as OpenAI just did — 1.5 and mini are already dated
+2026-12-01.
+
+### 5.3 Two practical constraints that will decide this faster than style will
+
+- **Transparent backgrounds.** OpenAI returns real alpha, and `editOnce` asks for it explicitly because the
+  edits endpoint does not inherit it. FLUX and Stable Diffusion generally do not — they need a background
+  removal pass. We have some of that machinery already (`deHalo`, `sprite-cleanup.js`), but it is a real
+  cost on a sprite game where everything is a cut-out.
+- **Our abstraction is OpenAI-shaped.** `scripts/lib/draw-image.mjs` picks a MODEL, not a PROVIDER, and
+  `editOnce` builds an OpenAI multipart form. Trying anything in group B or C means an adapter, not a
+  string change — worth knowing before scoping it as an afternoon.
+
+### 5.4 What I would try first, and why
+
+1. **FLUX Kontext via fal or Replicate**, with the same three-image setup that worked here — subject, gear
+   art, style sheet. It is the group-A option whose strength is precisely the lever we proved matters, and
+   it doubles as the dress rehearsal for group C, because it is the same family we would train a LoRA on.
+2. **A LoRA on 60–100 curated hero sprites**, judged against the same contact sheet. If it holds, the style
+   stops being a vendor's property.
+
+Recraft is the wildcard worth one afternoon, because flat cel-shaded illustration is its stated speciality
+and that is the exact axis every OpenAI model has failed on.
+
+---
+
+## 6. What a migration actually touches
 
 1. **One constant, five call sites.** The model chain belongs in `src/lib/marketplace/` where both halves of
    the repo can import it — the scripts' `scripts/lib/draw-image.mjs` already has the logic and the
