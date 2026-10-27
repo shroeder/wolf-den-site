@@ -66,6 +66,13 @@ export async function POST(request) {
                         // Appended after the standing rules — see generateBuyerSprite. For tuning a
                         // candidate model back toward the house look without editing the live recipe.
                         promptExtra: body.promptExtra || null,
+                        // Style references, as base64 PNG/WebP. Converted to PNG here because the edits
+                        // endpoint is fussy and a caller should not have to be. Sent in the body rather
+                        // than by URL so a sheet can be trialled without first publishing it anywhere.
+                        styleRefs: await Promise.all((body.styleRefs || []).slice(0, 4).map(async (b64) => {
+                            const sharp = (await import("sharp")).default;
+                            return sharp(Buffer.from(String(b64).replace(/^data:image\/\w+;base64,/, ""), "base64")).png().toBuffer();
+                        })),
                     }),
                 });
             }

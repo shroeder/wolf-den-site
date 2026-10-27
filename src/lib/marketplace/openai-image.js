@@ -465,10 +465,26 @@ export async function generateWideSceneImage(prompt, { pathPrefix = "marketplace
  * One call to the edits endpoint. Returns the raw PNG buffer; storage and logging are the caller's job so a
  * rejected draw can be thrown away without leaving an orphan blob behind.
  */
-async function editOnce(imageBuffer, prompt, { size, quality, key, model }) {
+async function editOnce(imageBuffer, prompt, { size, quality, key, model, styleRefs = [] }) {
     const form = new FormData();
     form.append("model", model);
-    form.append("image", new Blob([imageBuffer], { type: "image/png" }), "avatar.png");
+    // ── ⚠️ SHOWING THE STYLE INSTEAD OF DESCRIBING IT ────────────────────────────────────────────────────
+    // The edits endpoint takes `image[]` — the first entry is the subject, the rest are references the model
+    // may look at. Measured on the hero sprite: four separate wordings (simplicity clauses, neutralising the
+    // rarity adjectives, locking the palette, starving the token budget) ALL left edge density at ~29%
+    // against gpt-image-1's 22%. Prose could not reach it.
+    //
+    // ⚠️ THE FIELD NAME CHANGES WHEN THERE IS MORE THAN ONE, AND ONLY THEN. A single image stays on the
+    // plain `image` field exactly as before — every existing caller draws a byte-identical request, so this
+    // cannot quietly restyle the paths that did not ask for it.
+    if (styleRefs.length) {
+        form.append("image[]", new Blob([imageBuffer], { type: "image/png" }), "subject.png");
+        styleRefs.forEach((buf, i) => {
+            form.append("image[]", new Blob([buf], { type: "image/png" }), `style-${i}.png`);
+        });
+    } else {
+        form.append("image", new Blob([imageBuffer], { type: "image/png" }), "avatar.png");
+    }
     form.append("prompt", prompt);
     form.append("size", size);
     form.append("quality", quality);
@@ -500,7 +516,7 @@ async function editOnce(imageBuffer, prompt, { size, quality, key, model }) {
  * Returns the stored URL, unchanged from before the gate existed, so the four callers that don't validate
  * carry on working. A caller that wants the verdict of the KEPT image closes over it from `validate`.
  */
-export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", model = "gpt-image-1", faceRight = false, deHalo = false, frameSprite = false, resizeTo = null, validate = null, attempts = 1, meta = {} } = {}) {
+export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", model = "gpt-image-1", faceRight = false, deHalo = false, frameSprite = false, resizeTo = null, validate = null, attempts = 1, styleRefs = [], meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -510,7 +526,7 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
 
     for (let attempt = 1; attempt <= tries; attempt += 1) {
         try {
-            buffer = await editOnce(imageBuffer, prompt, { size, quality, key, model });
+            buffer = await editOnce(imageBuffer, prompt, { size, quality, key, model, styleRefs });
         } catch (error) {
             await logGeneration({ model, size, quality, edit: true, source: pathPrefix, prompt, ok: false, error: String(error.message).slice(0, 300), ...meta });
             throw error;

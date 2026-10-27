@@ -315,7 +315,7 @@ export async function setBuyerSprite(buyerId, base64) {
  * reference went in WITHOUT the member's beard — so a model comparison that looked clean was actually
  * comparing two different inputs. Anything worth measuring is worth measuring on the real rails.
  */
-export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, model = null, quality = null, promptExtra = null } = {}) {
+export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, model = null, quality = null, promptExtra = null, styleRefs = [] } = {}) {
     const row = await db.queryOne(`SELECT avatar_config, avatar_sprite_prompt, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]);
     if (!row || !row.avatar_config) throw new Error("No avatar to draw");
     const gear = await getEquippedGearPhrase(buyerId).catch(() => "");
@@ -349,7 +349,7 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, mo
     const url = await editImage(png, prompt + SPRITE_RULES + (promptExtra || ""), {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
         model: model || SPRITE_MODEL, quality: quality || SPRITE_QUALITY,
-        attempts: SPRITE_ATTEMPTS,
+        attempts: SPRITE_ATTEMPTS, styleRefs,
         validate: async (buf) => { verdict = spriteVerdict(await inspectSprite(buf)); return verdict; },
         meta: { origin: "member", buyerId, buyerLabel: who?.alias ? `@${who.alias}` : (who?.display_name || null), label: "Hero sprite redraw" },
     });
