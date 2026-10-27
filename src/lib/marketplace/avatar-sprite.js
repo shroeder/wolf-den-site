@@ -10,6 +10,7 @@ import { getEquippedGearPhrase, getEquippedGearPhrasesForMembers } from "@/lib/m
 import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
 import { avatarConfigToQuery, DEFAULT_AVATAR, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { inspectSprite, spriteVerdict } from "@/lib/marketplace/sprite-cleanup.js";
+import { IMAGE_MODEL, HOUSE_CHARACTER_TAIL, houseStyleRefs } from "@/lib/marketplace/image-model.js";
 
 // The ONE shared default sprite used for members who haven't built their own avatar — so we don't spend
 // AI generating a unique sprite for everyone. Generated once from the default avatar, stored in settings.
@@ -34,7 +35,9 @@ const MAX_SPRITE_ATTEMPTS = 6;
 // measured step at a time with the art compared each time. Measured on the identical prompt and reference:
 // gpt-image-1-mini at medium is $0.0100 a head against $0.0484 — same class of art to my eye, but that is a
 // judgement for a human looking at it, not for me.
-const SPRITE_MODEL = "gpt-image-1";
+// ⚠️ gpt-image-1 UNTIL 2026-10-27, WHEN IT WAS RETIRED OUT FROM UNDER US. The name now lives in one place
+// (image-model.js) and the sprite path just uses the house model. See docs/art/house-style-decisions.md.
+const SPRITE_MODEL = IMAGE_MODEL;
 const SPRITE_QUALITY = "medium";
 
 // Redraw-on-bad-art is OFF (1 = draw once, keep it). The check still RUNS on every draw and records what it
@@ -133,7 +136,18 @@ export const DEFAULT_SPRITE_PROMPT = buildSpritePrompt(DEFAULT_AVATAR);
 // Which is exactly what this is: appended to every request from now on, applied to the next draw a member
 // earns on their own (a gear change or an avatar edit), and charged to nobody in the meantime. It is kept out
 // of buildSpritePrompt because that function doubles as the change detector — see the note above it.
-export const SPRITE_RULES = " ONE WEAPON PER HAND AND NO DUPLICATES: draw each piece of equipment exactly once "
+// ── ⚠️ THE HOUSE STYLE IS NOW IN THE PROMPT, NOT IN THE MODEL ───────────────────────────────────────────────
+// For two years the style was whatever gpt-image-1 did with a short prompt — the model's hand WAS the style
+// guide, and it was never written down. When it was retired the replacements looked wrong in ways nobody
+// could name, because there was nothing to compare them against.
+//
+// HOUSE_CHARACTER_TAIL is that style, reverse-engineered out of the retired model's own output and stated
+// explicitly. Its most important half is the COUNTABLE limits: "keep it simple" and "a few large shapes" sat
+// in this prompt for four tuning rounds and moved measured detail density by 0.2 points, while "at most
+// three gems" and a named ban-list moved it by ~3,500 distinct colours in one step. Do not soften those
+// counts back into adjectives.
+export const SPRITE_RULES = HOUSE_CHARACTER_TAIL
+    + " ONE WEAPON PER HAND AND NO DUPLICATES: draw each piece of equipment exactly once "
     + "and only where it belongs — a one-handed weapon is held in ONE hand and does not also appear sheathed, "
     + "floating, or duplicated in the other hand; a shield goes on the arm that is not holding the weapon; "
     + "never draw two of the same sword, axe or shield on one figure.";
@@ -349,7 +363,9 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, mo
     const url = await editImage(png, prompt + SPRITE_RULES + (promptExtra || ""), {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
         model: model || SPRITE_MODEL, quality: quality || SPRITE_QUALITY,
-        attempts: SPRITE_ATTEMPTS, styleRefs,
+        // ⚠️ THE SHEET IS A DEFAULT, NOT A CONSTANT. An explicit styleRefs from the admin route wins, so a
+        //    prompt experiment can swap the reference; everything else gets the house sheet.
+        attempts: SPRITE_ATTEMPTS, styleRefs: styleRefs.length ? styleRefs : houseStyleRefs(),
         validate: async (buf) => { verdict = spriteVerdict(await inspectSprite(buf)); return verdict; },
         meta: { origin: "member", buyerId, buyerLabel: who?.alias ? `@${who.alias}` : (who?.display_name || null), label: "Hero sprite redraw" },
     });
@@ -388,7 +404,7 @@ export async function generateDefaultSprite() {
     const png = await renderAvatarPng(DEFAULT_AVATAR, 1024);
     const url = await editImage(png, prompt + SPRITE_RULES, {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
-        model: SPRITE_MODEL, quality: SPRITE_QUALITY,
+        model: SPRITE_MODEL, quality: SPRITE_QUALITY, styleRefs: houseStyleRefs(),
         attempts: SPRITE_ATTEMPTS,
         validate: async (buf) => spriteVerdict(await inspectSprite(buf)),
         meta: { origin: "admin", label: "Default hero sprite" },

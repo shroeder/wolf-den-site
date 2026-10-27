@@ -53,7 +53,7 @@ export async function detectPetSpriteFacings(limit = 6) {
 export async function generatePetSprite(petId) {
     const pet = COLLECTIBLES.find((p) => p.id === petId);
     if (!pet) throw new Error("Unknown pet");
-    const url = await generateImage(buildPetSpritePrompt(pet), { size: "1024x1024", pathPrefix: "marketplace/pet", quality: "high", faceRight: true, deHalo: true, meta: { origin: "cron", subject: pet?.id || null, label: `Pet sprite — ${pet?.name || pet?.id || "?"}` } });
+    const url = await generateImage(buildPetSpritePrompt(pet), { size: "1024x1024", pathPrefix: "marketplace/pet", quality: "medium", faceRight: true, deHalo: true, meta: { origin: "cron", subject: pet?.id || null, label: `Pet sprite — ${pet?.name || pet?.id || "?"}` } });
     // Freshly generated art is already right-facing, so stamp it oriented — the repair sweep skips it.
     await db.query(
         `INSERT INTO mkt_pet_sprite (pet_id, url, updated_at, oriented_at) VALUES ($1, $2, NOW(), NOW())
@@ -215,13 +215,13 @@ export async function generatePetSpriteLevel(petId, level) {
             // never did, so an evolved sprite kept the die-cut rim every other sprite has cleaned off and had
             // nothing enforcing which way it faced.
             url = await editImage(buf, buildPetSpriteLevelEditPrompt(pet, lv), {
-                size: "1024x1024", pathPrefix: "marketplace/pet", quality: "high", faceRight: true, deHalo: true,
+                size: "1024x1024", pathPrefix: "marketplace/pet", quality: "medium", faceRight: true, deHalo: true,
                 meta: { ...meta, label: `${meta.label} (from Lv1)` },
             });
         } catch { url = null; }
     }
     if (!url) {
-        url = await generateImage(buildPetSpriteLevelPrompt(pet, lv), { size: "1024x1024", pathPrefix: "marketplace/pet", quality: "high", faceRight: true, deHalo: true, meta });
+        url = await generateImage(buildPetSpriteLevelPrompt(pet, lv), { size: "1024x1024", pathPrefix: "marketplace/pet", quality: "medium", faceRight: true, deHalo: true, meta });
     }
     // ── THE CONFLICT TARGET IS THREE COLUMNS, NOT TWO ────────────────────────────────────────────────
     // The primary key on this table is (pet_id, level, VARIANT) -- variant arrived later and this upsert was

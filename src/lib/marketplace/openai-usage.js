@@ -2,6 +2,7 @@ import "server-only";
 
 import { list } from "@vercel/blob";
 import { db } from "@/lib/db";
+import { isImageModel } from "@/lib/marketplace/image-model.js";
 
 // OpenAI cost/usage insight — reads the REAL spend from OpenAI's Organization Costs API (admin-key only) and
 // aggregates it into a by-source + by-day breakdown for the admin app's "AI Costs" screen. No estimates.
@@ -185,7 +186,7 @@ async function _getAiCosts({ days = 30 } = {}) {
     //
     // So the gap is published instead of quietly absorbed. A breakdown that silently accounts for 40% of the
     // invoice is worse than one that says it accounts for 40%.
-    const imageReal = round2((byModel.find((m) => String(m.label || "").startsWith("gpt-image-1"))?.cost) || 0);
+    const imageReal = round2((byModel.find((m) => isImageModel(m.label))?.cost) || 0);
     const explained = imageReal > 0 ? Math.round((features.estTotal / imageReal) * 100) : null;
     features.realImageTotal = imageReal;
     features.explainedPct = explained;
@@ -306,7 +307,7 @@ async function _getFullAccounting({ days = 30 } = {}) {
             cur.tokensIn += Number(r.input_tokens) || 0;
             cur.tokensOut += Number(r.output_tokens) || 0;
             models.set(m, cur);
-            if (String(m).startsWith("gpt-image-1")) {
+            if (isImageModel(m)) {
                 const d = imageDays.get(day) || { requests: 0, tokensOut: 0 };
                 d.requests += Number(r.num_model_requests) || 0;
                 d.tokensOut += Number(r.output_tokens) || 0;
@@ -315,13 +316,13 @@ async function _getFullAccounting({ days = 30 } = {}) {
         }
     }
 
-    const isImage = (k) => k.startsWith("gpt-image-1");
+    const isImage = (k) => isImageModel(k);
     let imageUsd = 0;
     let textUsd = 0;
     for (const [k, v] of items) (isImage(k) ? (imageUsd += v.usd) : (textUsd += v.usd));
 
-    const imageRequests = [...models].filter(([m]) => m.startsWith("gpt-image-1")).reduce((s, [, v]) => s + v.requests, 0);
-    const textRequests = [...models].filter(([m]) => !m.startsWith("gpt-image-1")).reduce((s, [, v]) => s + v.requests, 0);
+    const imageRequests = [...models].filter(([m]) => isImageModel(m)).reduce((s, [, v]) => s + v.requests, 0);
+    const textRequests = [...models].filter(([m]) => !isImageModel(m)).reduce((s, [, v]) => s + v.requests, 0);
 
     // What we can still put a name to.
     const named = await db.queryOne(
@@ -347,7 +348,7 @@ async function _getFullAccounting({ days = 30 } = {}) {
         text: {
             usd: round2(textUsd),
             requests: textRequests,
-            byModel: [...models].filter(([m]) => !m.startsWith("gpt-image-1"))
+            byModel: [...models].filter(([m]) => !isImageModel(m))
                 .map(([model, v]) => ({
                     model,
                     requests: v.requests,

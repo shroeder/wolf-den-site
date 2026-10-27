@@ -5,6 +5,15 @@ const nextConfig = {
     // this against /api/build-id is how the client finds that out.
     env: { NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_DEPLOYMENT_ID || "dev" },
     trailingSlash: false,
+    // ⚠️ THE HOUSE DESIGN SHEET IS READ OFF DISK AT RUNTIME, SO IT HAS TO BE TRACED IN.
+    // image-model.js reads public/images/art/house-design-sheet.png with a path built at runtime, and Next's
+    // file tracer only follows paths it can see statically — so without this the file is simply absent in the
+    // deployed function and every sprite silently loses its style reference. houseStyleSheet() returns null
+    // rather than throwing in that case, which means the failure looks like "the art went back to being wrong"
+    // and nothing else. Name it explicitly.
+    outputFileTracingIncludes: {
+        "/**": ["./public/images/art/house-design-sheet.png"],
+    },
     images: {
         remotePatterns: [
             // tcgcsv product imagery (the "Looking For" card thumbnails) is served from

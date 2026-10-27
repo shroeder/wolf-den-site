@@ -19,8 +19,8 @@ const TOKENS = {
 // Output-token price per model, $/1M. gpt-image-1-mini bills output at a fifth of gpt-image-1 for the same
 // token counts, which is what makes a medium-quality mini draw cheaper than a LOW-quality full-model one —
 // measured at $0.0099 vs $0.0171 on the same prompt and reference.
-const OUT_PER_M = { "gpt-image-1": 40, "gpt-image-1-mini": 8 };
-const IN_PER_M = { "gpt-image-1": 10, "gpt-image-1-mini": 2.5 };
+const OUT_PER_M = { "gpt-image-1": 40, "gpt-image-1-mini": 8, "gpt-image-2.5-sunburst": 40, "gpt-image-2.5-flare": 40 };
+const IN_PER_M = { "gpt-image-1": 10, "gpt-image-1-mini": 2.5, "gpt-image-2.5-sunburst": 10, "gpt-image-2.5-flare": 10 };
 // The reference image fed back in on an edit/outpaint pass. Measured at 625 input tokens, and it does NOT
 // scale with the reference we send — a 512px and a 1024px reference both bill 625, so shrinking it saves
 // nothing.

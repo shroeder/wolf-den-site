@@ -2,6 +2,7 @@ import "server-only";
 
 import { put } from "@vercel/blob";
 import { logGeneration, logText, estimateImageCost } from "@/lib/marketplace/ai-ledger.js";
+import { IMAGE_MODEL } from "@/lib/marketplace/image-model.js";
 import { reframeSprite } from "@/lib/marketplace/sprite-cleanup.js";
 import sharp from "sharp";
 
@@ -287,7 +288,7 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     const resp = await fetch(IMAGES_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size, background: "transparent", quality, n: 1 }),
+        body: JSON.stringify({ model: IMAGE_MODEL, prompt, size, background: "transparent", quality, n: 1 }),
     });
     if (!resp.ok) {
         const text = await resp.text().catch(() => "");
@@ -330,7 +331,7 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
 // Opaque landscape scene (no transparency) — used for boss battle backgrounds. Returns the Blob URL.
 // Scenes are full-screen backdrops generated a handful of times a year. Cost control here saves pennies and
 // costs the one thing you actually look at, so the default is HIGH and callers have to opt down deliberately.
-export async function generateSceneImage(prompt, { pathPrefix = "marketplace/boss-bg", quality = "high", meta = {} } = {}) {
+export async function generateSceneImage(prompt, { pathPrefix = "marketplace/boss-bg", quality = "medium", meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -339,7 +340,7 @@ export async function generateSceneImage(prompt, { pathPrefix = "marketplace/bos
     const resp = await fetch(IMAGES_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", background: "opaque", quality, n: 1 }),
+        body: JSON.stringify({ model: IMAGE_MODEL, prompt, size: "1536x1024", background: "opaque", quality, n: 1 }),
     });
     if (!resp.ok) {
         const text = await resp.text().catch(() => "");
@@ -364,7 +365,7 @@ export async function generateOutpaintedSceneImage(basePrompt, contPrompt, { pat
     const W = 1536, H = 1024, SEED = 800, NEW = W - SEED;
     const genBase = async () => {
         const r = await fetch(IMAGES_URL, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-            body: JSON.stringify({ model: "gpt-image-1", prompt: basePrompt, size: `${W}x${H}`, background: "opaque", quality, n: 1 }) });
+            body: JSON.stringify({ model: IMAGE_MODEL, prompt: basePrompt, size: `${W}x${H}`, background: "opaque", quality, n: 1 }) });
         if (!r.ok) throw new Error(`OpenAI base ${r.status}: ${(await r.text().catch(() => "")).slice(0, 200)}`);
         const b64 = (await r.json().catch(() => null))?.data?.[0]?.b64_json;
         if (!b64) throw new Error("OpenAI returned no image");
@@ -378,7 +379,7 @@ export async function generateOutpaintedSceneImage(basePrompt, contPrompt, { pat
         const seed = await sharp(panorama).extract({ left: panoW - SEED, top: 0, width: SEED, height: H }).toBuffer();
         const canvas = await sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: seed, left: 0, top: 0 }]).png().toBuffer();
         const form = new FormData();
-        form.append("model", "gpt-image-1");
+        form.append("model", IMAGE_MODEL);
         form.append("image", new Blob([canvas], { type: "image/png" }), "canvas.png");
         form.append("mask", new Blob([maskPng], { type: "image/png" }), "mask.png");
         form.append("prompt", contPrompt);
@@ -429,7 +430,7 @@ export async function generateWideSceneImage(prompt, { pathPrefix = "marketplace
         const resp = await fetch(IMAGES_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-            body: JSON.stringify({ model: "gpt-image-1", prompt: p, size: `${W}x${H}`, background: "opaque", quality: "low", n: 1 }),
+            body: JSON.stringify({ model: IMAGE_MODEL, prompt: p, size: `${W}x${H}`, background: "opaque", quality: "low", n: 1 }),
         });
         if (!resp.ok) { const t = await resp.text().catch(() => ""); throw new Error(`OpenAI wide-scene ${resp.status}: ${t.slice(0, 200)}`); }
         const b64 = (await resp.json().catch(() => null))?.data?.[0]?.b64_json;
@@ -516,7 +517,7 @@ async function editOnce(imageBuffer, prompt, { size, quality, key, model, styleR
  * Returns the stored URL, unchanged from before the gate existed, so the four callers that don't validate
  * carry on working. A caller that wants the verdict of the KEPT image closes over it from `validate`.
  */
-export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", model = "gpt-image-1", faceRight = false, deHalo = false, frameSprite = false, resizeTo = null, validate = null, attempts = 1, styleRefs = [], meta = {} } = {}) {
+export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", model = IMAGE_MODEL, faceRight = false, deHalo = false, frameSprite = false, resizeTo = null, validate = null, attempts = 1, styleRefs = [], meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
