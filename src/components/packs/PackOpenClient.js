@@ -355,6 +355,18 @@ export default function PackOpenClient({ initial }) {
     //
     // The glimmer is a shine that crosses the button every few seconds. It is the only animated thing on the
     // page at rest, which is the entire point: it is what the eye lands on.
+    //
+    // ⚠️ DARK WITH A GOLD EDGE, NOT A SOLID GOLD SLAB. The first cut was a filled gold bar and Luke's read
+    // was immediate — "Button looks very off and not proffessional". Three things were wrong with it and
+    // they compound: a saturated fill that size is a banner ad rather than a control; its gradient went
+    // muddy olive across the dead space on the right; and it sat directly above the Live Chase Board's warm
+    // brown panel, so the top of the page was one undifferentiated field of yellow. That last one is the
+    // same complaint as "I really dont like the slight yellow bg" — gold has to be the ACCENT on this site,
+    // never the ground, or it stops reading as gold at all.
+    //
+    // So this is built in the idiom .ph-start already proved on the hub: dark gradient, gold hairline, art
+    // left, body centre, value right. The price on the right is also what fixes the emptiness — a row with
+    // something at both ends is balanced; one with a label floating at the left is a slab with text on it.
     if (!modalOpen) {
         return (
             <section className="pk-launch-wrap">
@@ -372,12 +384,15 @@ export default function PackOpenClient({ initial }) {
                     />
                     <span className="pk-launch-body">
                         <span className="pk-launch-kick">Mystery packs</span>
-                        <span className="pk-launch-line">
-                            {priceTrusted && pool?.remaining
-                                ? `Open one — ${usd(priceCents)}`
-                                : "Open one with store credit"}
+                        <span className="pk-launch-line">Open a pack</span>
+                        <span className="pk-launch-sub">
+                            {pool?.remaining ? `${pool.remaining} left · pays with store credit` : "Back soon"}
                         </span>
                     </span>
+                    {priceTrusted && pool?.remaining ? (
+                        <span className="pk-launch-price">{usd(priceCents)}</span>
+                    ) : null}
+                    <span className="pk-launch-go" aria-hidden="true">&#8250;</span>
                     <span className="pk-glimmer" aria-hidden="true" />
                 </button>
             </section>

@@ -25435,9 +25435,13 @@ body.cas-seated .social-fab { display: none; }
 .pk-foot {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 8px;
     text-align: center;
 }
+
+/* Full width on a phone, where that IS the thumb target; capped on anything wider. */
+.pk-foot .pk-btn { width: min(100%, 420px); }
 
 .pk-need { margin: 0; color: var(--ink-secondary); }
 .pk-error { margin: 0; color: #FCA5A5; }
@@ -25550,6 +25554,9 @@ body.cas-seated .social-fab { display: none; }
 
     .pk-actions { flex-direction: row; justify-content: center; }
     .pk-btn { min-width: 190px; }
+    /* The modal is the whole window on a desktop, and a .pk-foot column stretches its children edge to
+       edge — a 1250px-wide "Open a pack" button reads as a page banner rather than as a control. */
+    .pk-bagwrap { width: min(40vw, 320px); }
 }
 
 /* ── THE CARD VAULT ──────────────────────────────────────────────────────────────────────────────────────────
@@ -26254,67 +26261,107 @@ body.cas-seated .social-fab { display: none; }
     margin: 0 0 14px;
 }
 
+/* ⚠️ DARK WITH A GOLD EDGE, NOT A SOLID GOLD SLAB. The first cut was a filled gold bar; Luke: "Button
+   looks very off and not proffessional". A saturated fill that size reads as a banner ad rather than a
+   control, its gradient went muddy olive across the dead space on the right, and it sat directly above the
+   Live Chase Board's warm brown panel so the whole top of the page was one field of yellow — which is the
+   same complaint as "I really dont like the slight yellow bg". Gold is the ACCENT on this site. The moment
+   it becomes the ground it stops reading as gold.
+
+   Built in the idiom .ph-start already proved on the hub, with the price doing the job the emptiness on the
+   right was failing at: a row with something at BOTH ends is balanced; one with a label floating at the left
+   is a slab with text on it. */
 .pk-launch {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 13px;
     width: 100%;
-    padding: 13px 18px 13px 13px;
+    padding: 13px 14px;
     border-radius: 16px;
-    border: 1.5px solid #E6C45C;
-    background: linear-gradient(118deg, #F3D978 0%, #D4AF37 46%, #B8912B 100%);
-    /* ⚠️ Set with the background, every time. A gold button with inherited light text is this site's oldest
-       footgun. */
-    color: #1A1A1A;
+    border: 1.5px solid rgba(212, 175, 55, 0.5);
+    background:
+        linear-gradient(118deg, rgba(212, 175, 55, 0.17) 0%, rgba(212, 175, 55, 0.05) 44%, transparent 74%),
+        linear-gradient(180deg, #151515 0%, #0B0B0B 100%);
+    color: var(--ink);
     cursor: pointer;
     text-align: left;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(212, 175, 55, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.45);
-    transition: transform 0.12s ease, box-shadow 0.2s ease;
+    box-shadow: 0 0 34px -14px #D4AF37, inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition: transform 0.12s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.pk-launch:hover { box-shadow: 0 12px 36px rgba(212, 175, 55, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.45); }
+.pk-launch:hover {
+    border-color: rgba(212, 175, 55, 0.9);
+    box-shadow: 0 0 40px -10px #D4AF37, inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
 .pk-launch:active { transform: translateY(1px); }
 
+/* The art is lit from its own gold rather than sitting flat, so it reads as an object on the card instead
+   of a sticker. No border-radius — the die-cut PNG has its own corners and its corner alpha measures 0. */
 .pk-launch-bag {
     flex: none;
     width: 46px;
-    height: 58px;
+    height: 60px;
     object-fit: contain;
     display: block;
-    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 14px rgba(212, 175, 55, 0.3));
 }
 
-.pk-launch-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pk-launch-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 
 .pk-launch-kick {
-    font-size: 0.66rem;
+    font-size: 0.6rem;
     font-weight: 800;
-    letter-spacing: 0.17em;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: rgba(26, 26, 26, 0.62);
+    color: #D4AF37;
 }
 
-.pk-launch-line { font-size: 1.12rem; font-weight: 800; letter-spacing: -0.01em; }
+.pk-launch-line { font-size: 1.04rem; font-weight: 700; letter-spacing: -0.01em; color: #FFFFFF; line-height: 1.2; }
+.pk-launch-sub { font-size: 0.73rem; color: #8A8A8A; line-height: 1.3; }
 
-/* THE GLIMMER. A shine crossing the button every few seconds — at rest it is the only thing moving on the
+.pk-launch-price {
+    flex: none;
+    font-size: 1.22rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: #F0D27A;
+}
+
+/* A chevron, not an arrow glyph with a colour of its own. It says "this goes somewhere" and then gets out
+   of the way. */
+.pk-launch-go {
+    flex: none;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: rgba(212, 175, 55, 0.65);
+    margin-left: -3px;
+}
+
+/* THE GLIMMER. A highlight crossing the card every few seconds — at rest it is the only thing moving on the
    page, which is the whole job: it is what the eye lands on.
-   ⚠️ It is a CHILD, not a ::after on .pk-launch. The button already takes a transform of its own on :active,
-   and two transforms that have to disagree cannot share an element. */
+   ⚠️ Kept well below the filled button's value. On a bright gold ground a sweep had to be near-white to
+   show at all; on this one the same brightness would be a flashbulb. A dark surface is what lets a highlight
+   read as polish rather than as a notification.
+   ⚠️ And it is a CHILD, not a ::after on .pk-launch — the button already takes a transform of its own on
+   :active, and two transforms that have to disagree cannot share an element. */
 .pk-glimmer {
     position: absolute;
     top: -60%;
     bottom: -60%;
     left: 0;
-    width: 42%;
+    width: 38%;
     pointer-events: none;
     background: linear-gradient(
         100deg,
         transparent 0%,
-        rgba(255, 255, 255, 0.1) 32%,
-        rgba(255, 255, 255, 0.72) 50%,
-        rgba(255, 255, 255, 0.1) 68%,
+        rgba(255, 255, 255, 0.03) 32%,
+        rgba(255, 240, 200, 0.17) 50%,
+        rgba(255, 255, 255, 0.03) 68%,
         transparent 100%
     );
     transform: translateX(-180%) skewX(-14deg);
@@ -26325,7 +26372,7 @@ body.cas-seated .social-fab { display: none; }
     /* The sweep is the first fifth; the rest of the cycle is the wait, which is what stops it reading as a
        loading bar. */
     0% { transform: translateX(-180%) skewX(-14deg); }
-    22%, 100% { transform: translateX(420%) skewX(-14deg); }
+    22%, 100% { transform: translateX(430%) skewX(-14deg); }
 }
 
 /* ── THE WAY OUT ───────────────────────────────────────────────────────────────────────────

@@ -1453,9 +1453,18 @@ The reveal already took the screen; the split was at the wrong seam. An inline p
 the site header, the XP bar and the Live Chase Board, and it shares the member's attention with all of them.
 **Everything from the bag onward is one modal now, and the page keeps exactly one thing.**
 
-- `.pk-launch` is the whole page surface: the bag art inside a gold button, `MYSTERY PACKS / Open one —
-  $20.00`, with `.pk-glimmer` — a shine crossing it every 3.6s. At rest it is the only moving thing on the
-  page, which is the job.
+- `.pk-launch` is the whole page surface: bag art, `MYSTERY PACKS / Open a pack / 79 left · pays with store
+  credit`, the price and a chevron, with `.pk-glimmer` — a highlight crossing it every 3.6s. At rest it is
+  the only moving thing on the page, which is the job.
+- ⚠️ **Dark with a gold edge, not a solid gold slab.** The first cut was a filled gold bar; Luke: *"Button
+  looks very off and not proffessional."* Three things compounded — a saturated fill that size is a banner
+  ad rather than a control, its gradient went muddy olive across the dead space on the right, and it sat
+  directly above the Live Chase Board's warm brown panel so the top of the page was one undifferentiated
+  field of yellow. That last one is the same complaint as *"I really dont like the slight yellow bg"*:
+  **gold is the accent on this site, and the moment it becomes the ground it stops reading as gold.** Rebuilt
+  in the idiom `.ph-start` already proved on the hub. The price on the right is also what fixed the
+  emptiness — a row with something at both ends is balanced; one with a label floating at the left is a slab
+  with text on it.
 - ⚠️ **ONE.** The panel it replaces put four things on the page at once: a balance, a "79 packs left · see
   what's inside" pill, the open button and a line of fine print. A screen with four things on it has no call
   to action, it has a menu. All four still exist — inside the modal, read by somebody who has already decided.
