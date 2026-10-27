@@ -15,6 +15,7 @@ import Ladder from "@/components/casino/Ladder.js";
 import WinTally from "@/components/casino/WinTally";
 import Leaderboard from "@/components/casino/Leaderboard.js";
 import Gachapon from "@/components/casino/Gachapon.js";
+import PackOpenClient from "@/components/packs/PackOpenClient.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
 import { callFor, letterFor, lineName, nearLinesOf } from "@/lib/marketplace/bingo-kit.js";
 import { payoutFor } from "@/lib/marketplace/casino-payout.js";
@@ -173,6 +174,41 @@ const MACHINES = [
 // while the event is up and simply is not there when it is not — see the page, which answers halloweenOn on
 // the server so the floor paints with the right number of cabinets on the first frame.
 const GACHA_MACHINE = { id: "gacha", x: 86.7, label: "The Gachapon", kind: "Tickets", live: true, v: 2 };
+
+// ── THE PACK STALL ───────────────────────────────────────────────────────────────────────────────────────────
+// Luke, 2026-10-27: "I want to have vendor in the casino who sells mystery packs." Store credit, at the pack's
+// real price — the same $20 and the same opening as /mystery-bags.
+//
+// ⚠️ HE TAKES REAL MONEY AND HE DOES NOT TOUCH GOLD, AND THAT IS THE WHOLE DESIGN. The standing rule in
+// casino-counter.js is that nothing on the floor converts back to gold, because chips were built as a one-way
+// door OUT of the gold economy and that door is what lets the machines pay what they pay. A pack is worse than
+// gold in exactly that direction: the card inside it sells back for store credit, which is real money. A
+// vendor who took the floor's purse would therefore turn gold — grindable, and already the subject of an
+// alt-farming incident — into real money at a fixed rate, and no cap makes that shape safe. He takes credit,
+// so he is a shop in a room, not an exchange.
+//
+// WHY HE STANDS WHERE HE STANDS. One bay past the Gachapon, at the far end with the Counter. The note above
+// MACHINES already names the principle: the Counter and the Gachapon standing together read "as a prize
+// corner rather than as a tenth slot machine somebody ran out of room for", and he is the third thing down
+// there that is not a game of chance you bet gold on.
+//
+// ⚠️ AND HE COULD NOT HAVE GONE IN THE GAP BETWEEN THEM. `machines.find` takes the FIRST station within
+// REACH, not the nearest — so a stall at 83 would be shadowed by the Counter's reach from 79 and simply
+// never be the thing you are standing at. There is no free bay in the row for the same reason: every
+// cabinet is one spacing from the next, and REACH is over half a spacing.
+//
+// ⚠️ NOT IN MACHINES, FOR THE REASON THE GACHAPON IS NOT EITHER. That array is the permanent floor. This
+// stall exists only for a member the vault gate is open for (owner-only today), and a cabinet everybody can
+// see and nobody can use is the ownerOnly landmine written down in vault-gate.js.
+//
+// ART: the bag he sells, standing in for a drawn stall. The cabinets in this room were "a gradient and a
+// border for as long as the floor plan was still being argued about, which was the right order to do it in —
+// art costs money to get wrong", and the same order applies here: the stall gets drawn once its place in the
+// room is settled, and until then it must not be a 404 — a browser caches those as happily as an image.
+const PACK_VENDOR = {
+    id: "packs", x: 94.4, label: "The Pack Stall", kind: "Mystery packs", live: true,
+    vendor: true, art: "/images/packs/mystery-bag-drawn-600.webp",
+};
 
 // Where the rope is: on the wall's SECOND arch, which lands at 11.8% of the world once both the world and
 // the wall tile are sized off --room (see .cas-world). Not a free choice — it is where an arch actually is.
@@ -521,12 +557,22 @@ function Card({ card, delay = 0, flip = false, dead = false }) {
 // else entirely and seeing it sitting at the top of the frame. Delete the SCREEN before the endpoint, or at
 // the very least in the same commit.
 
-export default function CasinoClient({ initial, halloween = false }) {
+export default function CasinoClient({ initial, halloween = false, packs = null }) {
     // ⚠️ ONE DERIVED LIST, READ BY ALL THREE. MACHINES is consulted in three places — the walk-to lookup, the
     // "what am I standing next to" check and the render — and a seasonal cabinet appended in only the render
     // would draw a machine you could see, walk past, and never arrive at. useMemo rather than a bare concat
     // so the array identity is stable and the proximity effect does not re-run every frame.
-    const machines = useMemo(() => (halloween ? [...MACHINES, GACHA_MACHINE] : MACHINES), [halloween]);
+    // ⚠️ THE STALL JOINS THE SAME LIST, because the note above is about all three readers and the stall needs
+    // every one of them: you walk to it, you stand at it, and it is drawn. Appended after the gachapon so the
+    // row stays in floor order.
+    const machines = useMemo(() => {
+        const row = halloween ? [...MACHINES, GACHA_MACHINE] : [...MACHINES];
+        if (packs) row.push(PACK_VENDOR);
+        return row;
+    }, [halloween, packs]);
+    // Bumped by the stall, read by PackOpenClient. A counter rather than a boolean: the modal closes itself,
+    // and a flag this would have to lower again is a stall that only works once.
+    const [packSignal, setPackSignal] = useState(0);
     const [st, setSt] = useState(initial);
     // ── WALKING IN FACING SOMETHING ──────────────────────────────────────────────────────────────────────
     // `?at=blackjack` starts you at that cabinet instead of at the door. The floor is six machines wide and
@@ -1876,6 +1922,11 @@ export default function CasinoClient({ initial, halloween = false }) {
                             unlock();
                             Cas.bet();
                             Haptic.hit(0.4);
+                            // ⚠️ A VENDOR IS NOT SAT AT. `seated` takes the whole screen over with a cabinet
+                            // panel, and the stall's screen is the pack modal — which owns its own takeover,
+                            // its own close and its own scroll lock. Two of those at once is a modal behind a
+                            // modal with one × between them.
+                            if (m.vendor) { setPackSignal((n) => n + 1); return; }
                             setSeated(true);
                         }}>
                         {/* The cabinet, drawn rather than approximated. It was a gradient and a border for
@@ -1888,7 +1939,7 @@ export default function CasinoClient({ initial, halloween = false }) {
                                 browser caches a 404 as happily as it caches an image. Everybody who opened the casino
                                 in that window keeps a broken picture until it expires, and deploying the file does not
                                 fix it. Same rule as a redrawn sprite: new bytes at an old path need a new path. */}
-                            <img src={`/images/casino/${m.id}.webp${m.v ? `?v=${m.v}` : ""}`} alt="" draggable="false" />
+                            <img src={m.art || `/images/casino/${m.id}.webp${m.v ? `?v=${m.v}` : ""}`} alt="" draggable="false" />
                         </span>
                         <b>{m.label}</b>
                         {/* Only when there is something to warn about. On a working machine this repeated
@@ -2870,6 +2921,23 @@ export default function CasinoClient({ initial, halloween = false }) {
                         <Leaderboard onClose={() => setBoardOpen(false)} />
                     </div>
                 </div>
+            ) : null}
+
+            {/* ── THE STALL'S SCREEN ───────────────────────────────────────────────────────────────────────
+                The pack opening itself, unchanged and unduplicated — see the note at the top of
+                PackOpenClient. `hideLaunch` because the vendor on the floor is the call to action; the
+                signal is what his tap bumps.
+
+                ⚠️ A DIRECT CHILD OF .cas, NEVER INSIDE .cas-world. The modal is `position: fixed`, and a
+                fixed element inside a transformed or filtered ancestor positions against that ancestor
+                instead of the viewport — which is how the vault's bottom sheet once rendered off-screen, and
+                the world is the element this room scrolls.
+
+                ⚠️ AND IT IS MOUNTED WHENEVER THE GATE IS OPEN, not only once the stall has been tapped. A
+                member who bought a pack here and closed the tab is owed the card wherever they come back to,
+                and `initial.pending` is what hands it to them — unmounted, there is nobody to hand it over. */}
+            {packs ? (
+                <PackOpenClient initial={packs} hideLaunch openSignal={packSignal} />
             ) : null}
         </section>
     );

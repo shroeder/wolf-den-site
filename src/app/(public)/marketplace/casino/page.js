@@ -8,6 +8,9 @@ import { getCasinoState } from "@/lib/marketplace/casino.js";
 import { vipShadows, vipStanding } from "@/lib/marketplace/vip.js";
 import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { leaderboard } from "@/lib/marketplace/casino-leaderboard.js";
+import { packPoolSummary, resumePendingOpen } from "@/lib/marketplace/packs.js";
+import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
+import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -59,11 +62,39 @@ export default async function CasinoPage() {
     // Answered here rather than fetched, so the floor paints with the right number of machines on the FIRST
     // frame — a cabinet that appears a beat after the room does is a cabinet that looks like a bug.
     const hw = halloweenOn(buyer.id);
+
+    // ── THE PACK VENDOR, AND WHY HE COSTS THE FLOOR NOTHING ──────────────────────────────────────────────
+    // Luke: "I want to have vendor in the casino who sells mystery packs." He takes STORE CREDIT at the pack's
+    // real price — the same $20 and the same opening as /mystery-bags, in the room people are already standing
+    // in. Nothing he does touches gold: see the note on the vendor in CasinoClient, and the standing rule in
+    // casino-counter.js that the floor's currency is a one-way door.
+    //
+    // ⚠️ THE GATE IS CHECKED BEFORE THE QUERIES, NOT AFTER. Three round trips on every casino load for a
+    // feature that is owner-only today would be three round trips nobody could use — and this repo's cost
+    // rule is queries-per-request, not invocations. Gated here, the floor pays for the vendor only once the
+    // vendor exists for that member. Door 10 of 9, and it is the same door as the page at /mystery-bags:
+    // vaultOpenFor is the ONE answer to "can this person open a pack", never a second condition that agrees
+    // with it today.
+    //
+    // ⚠️ AND A PENDING OPEN FOLLOWS THE MEMBER. resumePendingOpen is read here as well as on the bags page
+    // because a card that has been paid for is owed to whoever is standing wherever they are standing — the
+    // modal presents it finished, at the choice. A member who bought at the vendor and closed the tab must
+    // not have to find their way back to a different page to be given it.
+    let packs = null;
+    if (vaultOpenFor(buyer.id)) {
+        const [pool, balanceCents, pending] = await Promise.all([
+            packPoolSummary().catch(() => null),
+            getStoreCredit(buyer.id).catch(() => 0),
+            resumePendingOpen(buyer.id).catch(() => null),
+        ]);
+        if (pool) packs = { pool, balanceCents, pending };
+    }
+
     return (
         <CasinoClient initial={{
             ...floor, blackjack: table, bingo: hall,
             vip: { allowed: standing.vip, shadows },
             boardTop: board?.top?.[0] || null,
-        }} halloween={hw} />
+        }} halloween={hw} packs={packs} />
     );
 }

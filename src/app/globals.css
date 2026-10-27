@@ -18906,6 +18906,18 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* The flip lives here rather than on the sprite — see the note in the component. */
 .cas-you { position: absolute; bottom: 3%; transform: translateX(-50%) scaleX(var(--face, 1)); text-align: center; }
 .cas-other, .cas-you { text-align: center;
+    /* ── ⚠️ PEOPLE DO NOT EAT TAPS ───────────────────────────────────────────────────────────────────
+       You stand at the SAME x as the thing you walked to, and both of these sit above the cabinets in the
+       stacking order — so your own sprite covers the middle of whatever you are standing in front of, and
+       a tap there hits a picture of yourself with no handler on it. Measured: elementFromPoint at the dead
+       centre of a station answered `.cas-you`, not the station.
+
+       It hid on the cabinets because they are half a room tall and you are not: tapping the art above your
+       head works, so the bottom third of every machine has quietly been dead and nobody could say why. On
+       anything shorter than a slot cabinet there is no part left to hit.
+
+       Same rule the decor already follows — "a decoration you can tap is a machine that does nothing". */
+    pointer-events: none;
     /* The walk moves in sixteen small hops a second; this smooths the gaps between them into a stride. */
     transition: left 62ms linear; }
 .cas-other { opacity: .8; }

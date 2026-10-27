@@ -169,7 +169,28 @@ function PackBank({ fromCents, toCents, payoutCents, cardName }) {
     );
 }
 
-export default function PackOpenClient({ initial }) {
+/**
+ * ── ⚠️ THE OPENING HAS EXACTLY ONE IMPLEMENTATION, AND NOW IT HAS TWO DOORS ──────────────────────────────
+ * Luke, 2026-10-27: "I want to have vendor in the casino who sells mystery packs."
+ *
+ * The casino is the second place a member can buy a pack, and it is NOT a second pack feature. Everything
+ * about an open — the price, the gate, the shake, the server deciding the card as the credit is spent, the
+ * sell-or-keep — is the same event in both rooms, and this file is where it lives. The vendor on the floor is
+ * a DOOR to it, not a copy of it: the whole lesson of sell-at-the-reveal versus sell-from-the-vault, which
+ * drifted into two different sets of consequences before being merged, is that two paths for one transaction
+ * always drift.
+ *
+ * So the component grew two props and nothing else:
+ *
+ *   `hideLaunch`  — the room already has a call to action (a vendor you walk up to), so this one renders
+ *                   nothing at rest. ⚠️ IT STILL RENDERS THE MODAL. Hiding the launcher is not the same as
+ *                   not mounting: a member resumed into a pending open must get their card wherever they
+ *                   are standing, and that is driven by `initial.pending` below.
+ *   `openSignal`  — a counter the room bumps to open the modal. A number rather than a boolean because the
+ *                   modal closes itself, and a boolean the parent has to remember to lower is a door that
+ *                   will not open twice.
+ */
+export default function PackOpenClient({ initial, hideLaunch = false, openSignal = 0 }) {
     const [pool, setPool] = useState(initial?.pool || null);
     const [balanceCents, setBalanceCents] = useState(initial?.balanceCents || 0);
     // An open the member walked away from mid-reveal is presented FINISHED, at the choice — the card is
@@ -241,6 +262,25 @@ export default function PackOpenClient({ initial }) {
         setPool(data.pool);
         setBalanceCents(data.balanceCents);
     }, []);
+
+    /**
+     * The room opening the door from outside.
+     *
+     * ⚠️ IT IGNORES THE FIRST VALUE, AND HAS TO. Effects run on mount, so reading the signal unconditionally
+     * would open the modal on every casino page load for anybody standing anywhere — the member arrives in
+     * the room and a pack-buying screen takes the whole display before they have touched anything. Only a
+     * CHANGE is a tap; the value it changed from is just where the counter happened to start.
+     *
+     * The pool is re-read on the way in for the same reason the launcher does it: the shop counter sells out
+     * of this pool all day, and a casino tab left open overnight would otherwise offer a bag that is gone.
+     */
+    const lastSignal = useRef(openSignal);
+    useEffect(() => {
+        if (openSignal === lastSignal.current) return;
+        lastSignal.current = openSignal;
+        setModalOpen(true);
+        refreshPool();
+    }, [openSignal, refreshPool]);
 
     /**
      * Everything from the detonation onward, which is the only part that needs the server's answer.
@@ -477,6 +517,11 @@ export default function PackOpenClient({ initial }) {
     // So this is built in the idiom .ph-start already proved on the hub: dark gradient, gold hairline, art
     // left, body centre, value right. The price on the right is also what fixes the emptiness — a row with
     // something at both ends is balanced; one with a label floating at the left is a slab with text on it.
+    // ── THE ROOM IS THE CALL TO ACTION ───────────────────────────────────────────────────────────────────
+    // On the casino floor the member walks up to a vendor; a second gold banner on the page under him would
+    // be two doors to one room. ⚠️ null AT REST, NEVER AN UNMOUNTED COMPONENT — see the note on hideLaunch.
+    if (!modalOpen && hideLaunch) return null;
+
     if (!modalOpen) {
         return (
             <section className="pk-launch-wrap">
