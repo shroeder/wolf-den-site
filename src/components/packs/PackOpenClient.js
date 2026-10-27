@@ -1107,6 +1107,20 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                             aria-label={peek.name}
                             onClick={() => setPeek(null)}
                         >
+                            {/* ⚠️ THE WAY OUT CANNOT BE BELOW THE FOLD. The only close was the button at the
+                                bottom of the card, and on a tall card photo that sits off-screen — Luke,
+                                2026-10-27: "No way to close without scrolling down." Tapping the backdrop
+                                worked, but the card fills nearly the whole sheet, so there was barely any
+                                backdrop left to hit. This X is pinned to the OVERLAY rather than to the
+                                card, so it cannot scroll away with the card's contents. */}
+                            <button
+                                type="button"
+                                className="pk-peek-close"
+                                onClick={(e) => { e.stopPropagation(); setPeek(null); }}
+                                aria-label="Close card"
+                            >
+                                ×
+                            </button>
                             <div
                                 className="pk-peek-card"
                                 style={{ "--row-glow": tierByKey(peek.tier).glow }}
@@ -1145,13 +1159,13 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                             </div>
                                         ) : null}
                                     </div>
+                                    {/* The bottom Close is GONE, not moved. It was the tallest thing below the
+                                        figures and therefore the thing pushing itself off-screen; the pinned
+                                        X above replaces it and costs no height at all. */}
                                     <p className="pk-peek-note">
                                         Photographed in the shop. Pull it and it is yours — keep it or sell it
                                         straight back for store credit.
                                     </p>
-                                    <button type="button" className="pk-btn pk-btn-ghost" onClick={() => setPeek(null)}>
-                                        Close
-                                    </button>
                                 </div>
                             </div>
                         </div>
