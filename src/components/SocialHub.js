@@ -11,6 +11,7 @@ import MemberHeroCard from "@/components/MemberHeroCard";
 // so a new channel is added HERE and in channelsFor on the server, and nothing else has to be remembered.
 const ROOM_TABS = ["global", "announce", "bugs", "vip", "staff", "testing"];
 import { borderClass } from "@/lib/marketplace/borders.js";
+import { isGamePath } from "@/lib/marketplace/game-paths.js";
 import NoticeBody from "@/components/NoticeBody";
 
 // ── STICK TO THE BOTTOM, BUT ONLY IF YOU WERE ALREADY THERE ──────────────────────────────────────────────────
@@ -211,7 +212,30 @@ function ActionButton({ member, busy, onAdd, onMessage, onRespond }) {
     return <button type="button" className="social-mini-btn is-primary" disabled={busy} onClick={() => onAdd(member)}>+ Add</button>;
 }
 
+// ── THE CHAT BUBBLE BELONGS TO THE GAME ──────────────────────────────────────────────────────────────────────
+// Luke: "I think the global chat button should only be visible when inside the game."
+//
+// It was mounted in the ROOT layout, so a gold bubble floated over the shop, a product page, the Live Chase
+// Board and the Card Vault — and it kept landing on things. The film caught it parked on top of "Keep it" in
+// the pack reveal and on "Sell back" in the vault's action bar: in both cases sitting on the one control a
+// member had come to press, on a page that has nothing to do with chat.
+//
+// ⚠️ A SEPARATE GATE COMPONENT, NOT AN EARLY RETURN INSIDE THE HUB. Hooks run before any return, so a
+// `return null` at the bottom of the hub would hide the bubble and keep every poll, fetch and listener alive
+// on every page of the site — the cost stays and only the pixels go. Not rendering the hub at all is what
+// actually stops it.
+//
+// ⚠️ AND IT USES isGamePath, THE ONE DEFINITION THE NAV AND THE PATHFINDER ALREADY SHARE. A second list of
+// "what counts as the game" drifts on the first new area, and the symptom would be chat appearing in one
+// room and not its neighbour — see the note at the top of game-paths.js, which documents five pages that
+// fell into exactly that.
 export default function SocialHub() {
+    const pathname = usePathname() || "";
+    if (!isGamePath(pathname)) return null;
+    return <SocialHubInner />;
+}
+
+function SocialHubInner() {
     const [authed, setAuthed] = useState(false);
     const [unread, setUnread] = useState(0);
     // Plaza chatter, kept apart from `unread` — see /api/marketplace/unread for why it isn't folded in.
