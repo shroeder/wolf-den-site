@@ -658,12 +658,46 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                     pack — provably the same, it is the same pixels — and a different colour
                                     of foil, so the carousel reads as a product line rather than as four
                                     names under one picture. */}
-                                <img
-                                    className="pk-pick-bag"
-                                    src={p.art || "/images/packs/mystery-bag-drawn-600.webp"}
-                                    alt=""
-                                    aria-hidden="true"
-                                />
+                                {/* ── TAP THE BAG TO SEE INSIDE IT ────────────────────────────────────
+                                    Luke, 2026-10-27: "i want to simply click a bag to get to this modal."
+                                    The pill in the header still works and is still the obvious affordance,
+                                    but the bag is the biggest thing on the screen and the thing a thumb
+                                    goes to — asking somebody to look at the bag and then tap a pill
+                                    somewhere else is a step that earns nothing.
+
+                                    ⚠️ IT ALSO SELECTS. Tapping a NEIGHBOUR bag used to be impossible, so
+                                    the sheet could only ever be opened for the centred pool. Now it centres
+                                    that pool first and opens its sheet — otherwise tapping the Pokémon bag
+                                    at the edge would open the bags' card list, which is the one thing this
+                                    sheet must never get wrong. */}
+                                <button
+                                    type="button"
+                                    className="pk-pick-bag-btn"
+                                    onClick={() => {
+                                        Haptic.tap();
+                                        if (i !== picked) {
+                                            setPicked(i);
+                                            const track = trackRef.current;
+                                            const card = track?.children?.[i];
+                                            if (track && card) {
+                                                track.scrollTo({
+                                                    left: card.offsetLeft - (track.clientWidth - card.clientWidth) / 2,
+                                                    behavior: "smooth",
+                                                });
+                                            }
+                                        }
+                                        setShelfOpen(true);
+                                    }}
+                                    aria-label={`See what is inside ${p.brand}`}
+                                >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        className="pk-pick-bag"
+                                        src={p.art || "/images/packs/mystery-bag-drawn-600.webp"}
+                                        alt=""
+                                        aria-hidden="true"
+                                    />
+                                </button>
                                 <h3 className="pk-pick-name">{p.brand}</h3>
                                 {p.open ? (
                                     /* ── ⚠️ NOT THEIR STAT ROW ────────────────────────────────────────

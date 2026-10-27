@@ -25514,13 +25514,32 @@ body.cas-seated .social-fab { display: none; }
    already computes the index for the PRICE, so the look reads the same number. */
 .pk-pick-on { opacity: 1; transform: scale(1); }
 
+/* The bag is now a tap target — see the note in PackOpenClient. The button is a bare wrapper: it contributes
+   no box of its own, so the carousel's existing layout is untouched and only the image is hit-tested.
+   ⚠️ touch-action: manipulation, NOT a pointer handler. The track is a scroll-snap carousel and the bag fills
+   most of each card; anything that captures the pointer here would eat the swipe that moves between packs. */
+.pk-pick-bag-btn {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pk-pick-bag-btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 6px; border-radius: 12px; }
+
 .pk-pick-bag {
     display: block;
     width: auto;
     height: min(34dvh, 260px);
     object-fit: contain;
     filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6));
+    transition: transform 120ms ease;
 }
+
+.pk-pick-bag-btn:active .pk-pick-bag { transform: scale(0.97); }
 
 .pk-pick-name {
     margin: 2px 0 0;
@@ -26091,6 +26110,14 @@ body.cas-seated .social-fab { display: none; }
     /* The rarity bleeding in from the left edge, so the colour reads as the row's rather than as a hairline. */
     background-image: linear-gradient(90deg, color-mix(in srgb, var(--row-glow) 16%, transparent), transparent 42%);
     overflow: hidden;
+    /* ⚠️ flex: 0 0 auto IS LOAD-BEARING AND THE `overflow: hidden` ABOVE IS WHY.
+       .pk-shelf-list is a scrolling flex COLUMN, so every li is a flex item. A flex item normally refuses to
+       shrink below its content because `min-height: auto` resolves to min-content — but the moment an item
+       gets an overflow other than `visible`, that automatic minimum becomes 0. The overflow was added to clip
+       the row button's hover tint to the rounded corners, and it silently gave the whole list permission to
+       squash forty rows into forty hairlines rather than scroll. Shipped exactly that way, live.
+       If you ever remove the overflow, LEAVE THIS — a scrolling flex column wants it regardless. */
+    flex: 0 0 auto;
 }
 
 /* ⚠️ THE LAYOUT LIVES ON THE BUTTON, NOT THE <li>. The row became tappable, and a button inside a flex <li>
