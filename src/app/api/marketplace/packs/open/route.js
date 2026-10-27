@@ -33,6 +33,9 @@ const MESSAGES = {
     // mystery. "Not right now" rather than an error, because nothing is wrong: we decided not to sell it.
     pool_closed: "That pack is resting — check back soon.",
     no_such_pool: "That pack doesn't exist.",
+    // Not "we're out" — the pool is full and we could not take a card out of it. Says so, because the two
+    // get fixed in completely different places.
+    claim_failed: "We couldn't pull a card just then. Nothing was charged — try again.",
 };
 
 export async function POST(request) {

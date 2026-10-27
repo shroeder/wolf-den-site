@@ -712,10 +712,19 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                         size it lands on top of the controls. */}
                     {!blown && !showPicker ? (
                         // eslint-disable-next-line @next/next/no-img-element
+                        /* ⚠️ THE BAG THAT SHAKES IS THE ONE THAT WAS PICKED. Filmed on the first live open:
+                           a crimson Pokémon pack was chosen and a BLACK bag shook apart — the arena art was
+                           hardcoded to the house bag from back when there was only one. The carousel had
+                           just spent a swipe teaching which pack this is, and the reveal contradicted it.
+
+                           ⚠️ AND THE srcSet GOES WITH IT. The 900w variant only exists for the house bag;
+                           pointing a recoloured pool at it would silently serve the black one on any screen
+                           that chose the wide source. */
                         <img
                             className="pk-bag"
-                            src="/images/packs/mystery-bag-drawn-600.webp"
-                            srcSet="/images/packs/mystery-bag-drawn-600.webp 600w, /images/packs/mystery-bag-drawn-900.webp 900w"
+                            src={chosen?.art || "/images/packs/mystery-bag-drawn-600.webp"}
+                            srcSet={chosen?.art ? undefined
+                                : "/images/packs/mystery-bag-drawn-600.webp 600w, /images/packs/mystery-bag-drawn-900.webp 900w"}
                             sizes="(max-width: 640px) 52vw, 240px"
                             alt="A Wolf Den mystery pack"
                         />

@@ -299,7 +299,12 @@ export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey =
             return null;
         });
 
-    if (!claimed) return { ok: false, error: "pool_empty" };
+    // ⚠️ AN EMPTY POOL AND A FAILED CLAIM ARE DIFFERENT FACTS AND MUST NOT SHARE A MESSAGE. The bags only
+    // ever fail this one way — the tub is empty — so one error covered it. A shelf claim can also fail with
+    // 910 cards sitting right there: Square unreachable, the candidate sold at the register, or a write that
+    // threw. The first live open hit exactly that and the screen said "we're out of packs right now", which
+    // sent me looking at the pool instead of at the insert.
+    if (!claimed) return { ok: false, error: shelf ? "claim_failed" : "pool_empty" };
 
     const release = async (reason) => {
         await db
@@ -340,7 +345,7 @@ export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey =
              RETURNING id, created_at`,
             [
                 buyerId, claimed.id, priceCents, valueCents, tier.key,
-                revenueCents, taxCents, cogs.cents, cogs.basis, key, isPreviewOpen(buyerId), pool.key,
+                revenueCents, taxCents, cogs.cents, cogs.basis, key, isPreviewOpen(buyerId, pool.key), pool.key,
             ]
         );
     } catch (error) {
@@ -617,7 +622,7 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
     if (!open) return { ok: false, error: "already_chosen" };
 
     const card = await db.queryOne(
-        `SELECT id, card_name, condition, image_url, market_value, square_variation_id
+        `SELECT id, card_name, condition, image_url, market_value, square_variation_id, channel
          FROM mystery_bag_cards WHERE id = $1`,
         [open.mystery_card_id]
     );
@@ -635,12 +640,30 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
         // in the tub forever with a bought card inside.
         //
         // So the task survives and changes job: pull the bag, open it, put the card back on the shelf.
+        // ── ⚠️ A SHELF CARD SOLD STRAIGHT BACK IS NOT A JOB AT ALL ──────────────────────────────────────
+        // For a BAG this task has to survive and change meaning: the bag is sealed in the tub with a card
+        // inside it that we have just paid for, and cancelling would mean nobody is ever told to go and get
+        // it.
+        //
+        // A shelf single never moved. It is still in the case, and the buy-back has already put the count
+        // back in Square — so there is nothing to pull, nothing to re-shelve and nothing to find. The live
+        // test produced a task reading "Sold straight back — open the bag and re-shelve the card" against a
+        // card that was never in a bag, which is a staff member sent to look for an object that does not
+        // exist.
+        //
+        // Closed rather than deleted, so the queue's history still shows the task was raised and why it
+        // went away.
         await db
             .query(
-                `UPDATE mkt_pack_pull_task
-                 SET kind = 'reshelve',
-                     note = 'Sold straight back — open the bag and re-shelve the card'
-                 WHERE pack_open_id = $1 AND status = 'open'`,
+                card?.channel === "shelf"
+                    ? `UPDATE mkt_pack_pull_task
+                          SET status = 'done', done_at = NOW(), done_by = 'system',
+                              note = 'Sold straight back before it was pulled — the card never left the case'
+                        WHERE pack_open_id = $1 AND status = 'open'`
+                    : `UPDATE mkt_pack_pull_task
+                          SET kind = 'reshelve',
+                              note = 'Sold straight back — open the bag and re-shelve the card'
+                        WHERE pack_open_id = $1 AND status = 'open'`,
                 [open.id]
             )
             .catch(() => {});

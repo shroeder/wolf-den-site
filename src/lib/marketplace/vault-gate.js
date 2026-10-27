@@ -77,7 +77,15 @@ export function shelfPacksOpenFor(buyerId) {
  * plays the floor to test it, and one owner with a test panel outweighs the whole membership) and included in
  * the BOOKS, because the bag really did leave the shelf. Those are different questions.
  */
-export function isPreviewOpen(buyerId) {
+export function isPreviewOpen(buyerId, poolKey = "bags") {
+    // ── ⚠️ A GATED POOL IS A PREVIEW EVEN THOUGH THE BAGS ARE PUBLIC ────────────────────────────────────
+    // This read VAULT_PUBLIC alone, which was right while there was one feature behind one flag. The first
+    // live category-pack open came out stamped `preview = false` — a real member open, in the averages —
+    // because the BAGS had gone public. The category packs are owner-only and every open of them is a test.
+    //
+    // §16.4's argument is unchanged and is the reason this matters: one owner with a test panel outweighs
+    // the whole membership, and the telemetry split by pool makes polluting one pool's numbers easy.
+    if (poolKey && poolKey !== "bags") return !SHELF_PACKS_PUBLIC && shelfPacksOpenFor(buyerId);
     // ⚠️ NOTHING IS A PREVIEW ANY MORE, AND THAT INCLUDES LUKE'S OWN TEST OPENS. Once the feature is public
     // there is no gated cohort to exclude, so from here the telemetry averages count every open including
     // his. That is correct — he is a member on a public feature now — but it does mean a run of test opens

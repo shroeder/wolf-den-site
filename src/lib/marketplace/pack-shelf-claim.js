@@ -81,6 +81,20 @@ export async function claimShelfCard({ pool, reservationKey }) {
         const parsed = parsePackCardName(candidate.name || "");
         const marketValue = Number(candidate.price || 0);
 
+        // ── ⚠️ set_name IS NOT NULL, AND THE PARSER RETURNS NULL FOR MOST SHELF NAMES ───────────────────
+        // A bag's row always had a set because intake wrote one. A shelf single's set has to be read out of
+        // whatever the card is called in Square, and most of them do not carry it: "Kieran - 206/167 Ultra
+        // Rare NM" parses to a number and a condition and no set at all. Two of the first three sampled
+        // came back null.
+        //
+        // That violated the NOT NULL, the insert's .catch() swallowed it, and the claim returned null —
+        // which the caller reports as `pool_empty`. So a 910-card pool told the member "we're out of packs
+        // right now" and the only trace was one log line. See the error split in packs.js.
+        //
+        // The category is the truest thing we know when the name will not say: this card came off the
+        // Pokémon Single Card shelf, which is a fact rather than a guess at a set code.
+        const setName = parsed.setCode || pool.category;
+
         // ⚠️ status 'reserved', NOT 'sold'. The caller marks it sold only once the credit is spent and Square
         //    has actually been decremented; if anything between here and there fails, this row is released
         //    exactly like an abandoned bag reservation and the stale-reservation window reclaims it.
@@ -94,7 +108,7 @@ export async function claimShelfCard({ pool, reservationKey }) {
                            square_variation_id, packed_variation_id, variation_sku, channel, pool,
                            cost_cents, cost_basis`,
                 [
-                    candidate.variation_id, candidate.name, parsed.setCode, parsed.number,
+                    candidate.variation_id, candidate.name, setName, parsed.number,
                     parsed.condition, marketValue, candidate.image_url, candidate.variation_id,
                     pool.key, reservationKey,
                 ]
