@@ -24920,9 +24920,11 @@ body.cas-seated .social-fab { display: none; }
     opacity: 0.3;
 }
 
+/* ⚠️ PORTRAIT, AND NARROW. The bag is 2:3 standing up, so its WIDTH is the thing to constrain — a wrapper
+   sized for the old landscape art made it enormous. */
 .pk-bagwrap {
     position: relative;
-    width: min(92vw, 460px);
+    width: min(58vw, 260px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -24934,11 +24936,12 @@ body.cas-seated .social-fab { display: none; }
     position: relative;
     z-index: 2;
     width: 100%;
-    max-height: 46dvh;
+    max-height: 50dvh;
     object-fit: contain;
     display: block;
-    border-radius: 14px;
-    filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.55));
+    /* The art is a die-cut PNG whose corner alpha measures 0, so the shadow follows the pouch's real
+       silhouette rather than casting a box. No border-radius — the drawing has its own corners. */
+    filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.6));
     animation: pk-breathe 6s ease-in-out infinite;
 }
 
@@ -24969,12 +24972,13 @@ body.cas-seated .social-fab { display: none; }
 }
 
 /* The seam of light along the top edge once the seal is open. Colourless, same rule as the card. */
+/* Sits in the drawn zip seal across the top of the pouch. */
 .pk-mouth {
     position: absolute;
     z-index: 3;
-    top: 6%;
-    left: 12%;
-    right: 12%;
+    top: 9%;
+    left: 16%;
+    right: 16%;
     height: 3px;
     border-radius: 999px;
     background: #FFFFFF;
@@ -25005,14 +25009,15 @@ body.cas-seated .social-fab { display: none; }
    AND THE LIGHT AROUND IT IS WHITE UNTIL THE FLIP. Not a stylistic choice: a tier-coloured rise is a near-miss
    mechanic. The player learns to read it, and then every common deflates before the card has even turned over.
    The colour arrives at the slam, with the truth. */
+/* Narrower than the pouch, because it is INSIDE it. Starts low and hidden, rises up through the seal. */
 .pk-card {
     position: absolute;
     z-index: 1;
-    bottom: 22%;
-    width: 42%;
-    max-width: 210px;
+    bottom: 14%;
+    width: 72%;
+    max-width: 190px;
     aspect-ratio: 5 / 7;
-    transform: translateY(26%) scale(0.92);
+    transform: translateY(18%) scale(0.94);
     opacity: 0;
     perspective: 1000px;
     pointer-events: none;
@@ -25023,14 +25028,14 @@ body.cas-seated .social-fab { display: none; }
 }
 
 @keyframes pk-rise {
-    0% { opacity: 0; transform: translateY(26%) scale(0.92); }
-    12% { opacity: 1; }
-    100% { opacity: 1; transform: translateY(-74%) scale(1); }
+    0% { opacity: 0; transform: translateY(18%) scale(0.94); }
+    10% { opacity: 1; }
+    100% { opacity: 1; transform: translateY(-58%) scale(1); }
 }
 
 .pk-flip .pk-card {
     opacity: 1;
-    transform: translateY(-74%) scale(1);
+    transform: translateY(-58%) scale(1);
 }
 
 /* The slam. Down, hard, with a touch of overshoot. The shake amplitude is the tier's own. */
@@ -25053,7 +25058,7 @@ body.cas-seated .social-fab { display: none; }
 }
 
 @keyframes pk-slam {
-    0% { transform: translateY(14%) scale(1.2); }
+    0% { transform: translateY(26%) scale(1.2); }
     100% { transform: translateY(50%) scale(1.02); }
 }
 
@@ -25160,14 +25165,31 @@ body.cas-seated .social-fab { display: none; }
    So once the card is face-up the bag RECEDES: it has done its job, and the card is the subject now. */
 .pk-slam .pk-bag,
 .pk-readout .pk-bag {
-    opacity: 0.12;
+    opacity: 0.1;
     transition: opacity 0.35s ease;
 }
 
+/* ⚠️ THE ARENA'S HEIGHT IS THE BAG'S HEIGHT, so shrinking the arena alone does nothing — the portrait bag
+   kept it 333px tall and pushed the Sell button clean off a 667px phone. The BAG is what has to come down.
+   It has done its job by now; the card is the subject. */
+/* ⚠️ min-height 0 was wrong in the other direction: the arena shrank to the dimmed bag's height while the
+   CARD stayed absolutely positioned, so the card hung out of the top of the arena and over the header. The
+   arena has to be tall enough to hold the card, not the bag. */
 .pk-readout .pk-arena {
     flex: 0 0 auto;
     min-height: 196px;
-    transition: min-height 0.3s ease;
+}
+
+.pk-readout .pk-bag {
+    max-height: 21dvh;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+/* Smaller in the readout than mid-slam: at full size it leaves no room for the two buttons underneath, and
+   the buttons are the half that must never be cut. */
+.pk-readout .pk-card {
+    width: 100%;
+    max-width: 136px;
 }
 
 .pk-tier { margin: 0; font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase; animation-delay: 0.02s; }
@@ -25314,6 +25336,20 @@ body.cas-seated .social-fab { display: none; }
 .pk-shelf-name { grid-column: 1; font-size: 0.92rem; }
 .pk-shelf-sub { grid-column: 1; grid-row: 2; font-size: 0.74rem; color: var(--muted); }
 .pk-shelf-value { grid-column: 2; grid-row: 1 / span 2; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+
+/* 375x667 with browser chrome is the tightest real screen this has to work on, and the card, the readout and
+   both buttons have to coexist there. Everything here gives up a few pixels so the buttons never do. */
+@media (max-height: 740px) {
+    .pk-name { font-size: 1.08rem; }
+    .pk-sub { font-size: 0.78rem; }
+    .pk-value { font-size: 1.7rem; margin-top: 2px; }
+    .pk-actions { margin-top: 10px; gap: 7px; }
+    .pk-btn { min-height: 44px; }
+    .pk-fine { font-size: 0.7rem; }
+    .pk-readout .pk-arena { min-height: 168px; }
+    .pk-readout .pk-bag { max-height: 15dvh; }
+    .pk-readout .pk-card { max-width: 112px; }
+}
 
 @media (min-width: 760px) {
     .pk-shelf {

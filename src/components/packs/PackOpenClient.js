@@ -271,8 +271,8 @@ export default function PackOpenClient({ initial }) {
                 <div className="pk-flood" aria-hidden="true" />
 
                 <div className="pk-bagwrap">
-                    {/* The card rises from BEHIND the bag — see the note in make-pack-art.mjs about why the
-                        bag stays landscape with its logo upright rather than being rotated zip-up. */}
+                    {/* The card rises OUT OF THE BAG'S OPENING now that the bag is portrait with its zip
+                        across the top. It used to rise from behind a landscape bag and pretend. */}
                     {/* ⚠️ THE CARD EXISTS FROM THE ZIP ONWARD, BEFORE THE SERVER HAS ANSWERED. It rises
                         showing its BACK, which is identical for every card — so there is nothing to know yet.
                         Gating this on `open` is what made the first version wait 2.4s before moving. */}
@@ -295,9 +295,9 @@ export default function PackOpenClient({ initial }) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         className="pk-bag"
-                        src="/images/packs/mystery-bag-800.webp"
-                        srcSet="/images/packs/mystery-bag-800.webp 800w, /images/packs/mystery-bag-1200.webp 1200w"
-                        sizes="(max-width: 640px) 92vw, 460px"
+                        src="/images/packs/mystery-bag-drawn-600.webp"
+                        srcSet="/images/packs/mystery-bag-drawn-600.webp 600w, /images/packs/mystery-bag-drawn-900.webp 900w"
+                        sizes="(max-width: 640px) 58vw, 260px"
                         alt="A Wolf Den mystery pack"
                     />
                     <div className="pk-mouth" aria-hidden="true" />

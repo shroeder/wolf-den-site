@@ -11,16 +11,16 @@
 //
 //   · BLACK MATTE, not glossy. The real pouch is dead flat and that is most of its character.
 //   · THE GOLD WOLF-IN-MOON, centred, big — a howling wolf's head in profile inside a gold crescent moon.
-//   · LANDSCAPE, around 1.4:1, with the zip seam running down one side.
+//   · VERTICAL. Taller than it is wide, zip across the top.
 //
 // ⚠️ THE EMBLEM IS DESCRIBED AS DRAWN ARTWORK, NEVER AS "A LOGO". NEGATIVE_STYLE bans logos and watermarks —
 // correctly, because that is how a model smuggles a signature into the corner — so asking for "the Wolf Den
 // logo" asks for the one thing the style forbids. The medallion in gen-bingo-art.mjs has the same problem and
 // solves it the same way: describe the mark as a struck emblem and it draws it happily.
 //
-// ⚠️ AND IT STAYS LANDSCAPE. The real bag's zip is down its left edge, so rotating it to put the opening at
-// the top would lay the wolf on its side. The reveal has the card rise from BEHIND the bag for exactly this
-// reason — see the note in make-pack-art.mjs.
+// ⚠️ THE PHOTOGRAPH IS NOT THE ORIENTATION. In mystery_bag.jpg the bag is LYING ON ITS SIDE on a carpet, and
+// the first version of this script read that as landscape and built the whole reveal around it. Luke: "The
+// bags are supposed to be vertical." A reference photo shows you the object, not how it stands.
 //
 // THREE TAKES, because three on a contact sheet is how this gets judged, and because the difference between
 // them is a real question nobody can answer by reading a prompt: how much does a flat matte pouch want to be
@@ -38,12 +38,19 @@ import "./lib/ai-trace.mjs";
 
 const ARGV = process.argv.slice(2);
 const PUBLISH = ARGV.includes("--publish");
-const PICK = ARGV.find((a) => a.startsWith("--pick="))?.slice(6) || null;
+const PICK = ARGV.find((a) => a.startsWith("--pick="))?.slice("--pick=".length) || null;
 const Q = quality();
 
-// Landscape, because the bag is. 1536x1024 is 1.5:1 against the real bag's 1.416 — the closest canvas on
-// offer, and far closer than a square one. A square plate is what clipped 44 Grove sprites.
-const SIZE = "1536x1024";
+// ⚠️ PORTRAIT. Luke: "The bags are supposed to be vertical."
+//
+// The photograph this was first drawn from has the bag LYING ON ITS SIDE on a carpet, and I read that as the
+// bag's orientation. It is not — the pouch stands upright with its zip across the TOP, which is how a card
+// bag is actually sealed and how it hangs.
+//
+// This is not a cosmetic correction. The whole reveal is built on a card rising vertically out of the bag,
+// and with a landscape bag the card had to rise from BEHIND it and pretend. A vertical bag means the card
+// comes out of the actual opening, which is what the design asked for in the first place.
+const SIZE = "1024x1536";
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const key = props.match(/^OPENAI_API_KEY=(.+)$/m)?.[1]?.trim();
@@ -53,81 +60,128 @@ const OUT = path.join(process.cwd(), ".pack-art");
 const DEST = path.join(process.cwd(), "public", "images", "packs");
 
 // Shared across all three, so they come back as three takes on ONE bag rather than three different bags.
-const BAG = "A sealed resealable foil pouch for trading cards, seen straight on, flat and face-up, in "
-    + "landscape orientation about 1.4 times wider than it is tall. The pouch is DEAD MATTE BLACK — no gloss, "
-    + "no shine on the plastic itself. A plastic zip seam runs vertically down the left-hand edge. Printed "
-    + "large and centred on the face is an emblem in flat metallic gold: the head of a howling wolf in "
-    + "profile, facing left, set inside a thick gold crescent moon that rings it.";
+const BAG = "A sealed resealable foil pouch for trading cards, standing UPRIGHT and seen straight on, in "
+    + "PORTRAIT orientation — clearly TALLER THAN IT IS WIDE, roughly 3 units tall to 2 units across, the "
+    + "proportions of a card sleeve. A horizontal plastic zip seal runs across the TOP of the pouch. The "
+    + "pouch is DEAD MATTE BLACK. Printed large and centred on the face is an emblem in flat gold: the head "
+    + "of a howling wolf in profile, facing LEFT, set inside a thick gold crescent moon that rings it, with "
+    + "the emblem upright the same way up as the bag.";
 
-const COMMON = "The pouch must stay MATTE BLACK and the emblem FLAT GOLD — those two things are what make it "
-    + "this bag and not a generic loot sack. Keep the wolf's head in profile inside the crescent, centred, "
-    + "and large enough to read at 300 pixels wide. Absolutely no lettering, numerals, brand marks, barcodes "
-    + "or symbols of any kind anywhere on the pouch — the wolf-and-crescent emblem is the only marking.";
+// ⚠️ THE FIRST RUN CAME BACK AS GLOSSY 3D PRODUCT RENDERS. NEGATIVE_STYLE already says "not 3D-rendered" and
+// gpt-image-1.5 ignored it there — a ban buried in a long tail of negatives carries much less weight than the
+// same instruction stated positively in the subject. So the drawing medium is now part of the brief rather
+// than a footnote, and the gloss is named as the specific thing to avoid.
+const COMMON = "DRAWING MEDIUM, AND THIS MATTERS MOST: a hand-drawn 2D VIDEO GAME ITEM SPRITE — the sort of "
+    + "object that sits in an inventory slot beside a treasure chest or a potion. A bold dark near-black INK "
+    + "OUTLINE around the whole silhouette and around each major fold, like comic line art. Shading in two or "
+    + "three FLAT HARD-EDGED steps of value, painted by hand. "
+    + "It must NOT look like a photograph, a 3D render, a studio product shot or shiny packaging mock-up. No "
+    + "glossy highlights across the plastic, no specular sheen, no realistic reflections, no blue colour cast "
+    + "— the pouch is flat matte black with drawn creases. "
+    + "The emblem is FLAT GOLD with no bevel, no gradient chrome and no 3D depth. Keep the wolf's head in "
+    + "profile inside the crescent, centred and large enough to read at 300 pixels wide. Absolutely no "
+    + "lettering, numerals, brand marks or barcodes anywhere — the wolf-and-crescent is the only marking.";
 
 const JOBS = {
-    // 1 — closest to the photograph. The safe one: if the drawn bag has to sit next to the real product in a
-    //     shop photo, this is the one that survives the comparison.
+    // 1 — sealed and flat. The reference pose: this is the bag at rest on the reveal screen before a tap.
     flat: {
         file: "bag-flat",
         prompt: housePrompt(
-            `${BAG} The pouch lies completely flat and smooth with only the faintest creasing, lit evenly from `
-            + "the front so the black face reads as one clean matte plane.",
-            { framing: "sprite", extra: `${COMMON} Minimal sculpting: this should read as a flat printed pouch, `
-                + "not a pillow. A restrained dark ink contour only." }),
+            `${BAG} The pouch is sealed and hangs flat and still, with a few soft drawn creases running down `
+            + "from the top seal, lit evenly from the front.",
+            { framing: "sprite", extra: `${COMMON} Sealed shut along the top. Minimal volume — a flat hanging `
+                + "pouch, not a pillow." }),
     },
 
-    // 2 — the house look applied properly. Faceted cel shading, a real rim light, the bag as an OBJECT with
-    //     volume, the way an item sprite in this game is drawn.
+    // 2 — the same bag with a card's worth of thickness in it, so it reads as holding something.
     sculpted: {
         file: "bag-sculpted",
         prompt: housePrompt(
-            `${BAG} The pouch has real volume — gently swollen in the middle where a card sits inside it, with `
-            + "crisp faceted creases running out from the centre toward the corners, and a cool specular rim "
-            + "light catching the upper and left edges against the matte black.",
-            { framing: "sprite", extra: `${COMMON} Lean into the house look: bold dark ink contour, two or `
-                + "three hard-edged value steps across the black, cool-toned shadow and a warm gold bounce "
-                + "from the emblem. Still matte — the rim light is on the EDGES, not across the face." }),
+            `${BAG} The pouch is gently swollen in the middle where a single card sits inside it, with crisp `
+            + "drawn creases fanning out from that bulge toward the corners, and a cool rim light along the "
+            + "left edge and the top seal.",
+            { framing: "sprite", extra: `${COMMON} The rim light is a thin drawn line on the EDGES only — it `
+                + "must not spread across the face or turn the black grey." }),
     },
 
-    // 3 — the one with a bit of theatre in it. The same bag, caught with the seal just parted and a sliver of
-    //     warm light escaping, which is the exact moment the reveal animates.
+    // 3 — the moment the reveal animates: the top seal parted, warm light escaping, nothing visible inside.
     opening: {
         file: "bag-opening",
         prompt: housePrompt(
-            `${BAG} The top seam has just been parted a little, and a thin sliver of warm golden light escapes `
-            + "from inside the opening, spilling faintly up over the top edge of the pouch.",
-            { framing: "sprite", extra: `${COMMON} The glow is a thin warm line at the opening only — it must `
-                + "not wash over the face of the pouch or turn the black grey, and nothing may be visible "
-                + "inside the bag. No card, no object, no shape in the gap." }),
+            `${BAG} The zip seal across the top has just been pulled part-way open, the two lips of the `
+            + "opening parted into a narrow dark gap, with a thin sliver of warm golden light escaping "
+            + "upward from inside it.",
+            { framing: "sprite", extra: `${COMMON} The glow is a thin warm line at the opening only. Nothing `
+                + "whatsoever is visible inside the gap — no card, no object, no shape, just dark." }),
     },
 };
 
 const picked = PICK ? { [PICK]: JOBS[PICK] } : JOBS;
 if (PICK && !JOBS[PICK]) throw new Error(`no such take: ${PICK}. One of: ${Object.keys(JOBS).join(", ")}`);
 
-// ⚠️ THE BILL, BEFORE A SINGLE CALL. A number nobody checks is worse than no number.
-priceRun({ count: Object.keys(picked).length, size: SIZE, quality: Q });
+// ⚠️ THE BILL, BEFORE A SINGLE CALL. A number nobody checks is worse than no number — and it is NOT printed
+//    on --publish, which draws nothing. Quoting a price for a run that spends nothing is exactly how a number
+//    stops being read.
+if (!PUBLISH) priceRun({ count: Object.keys(picked).length, size: SIZE, quality: Q });
+
+// ── THE MODEL, AND WHY THERE IS A LIST ──────────────────────────────────────────────────────────────────────
+// Luke: "Use the old model, the new ones are just a fallback."
+//
+// gpt-image-1 IS the house style and stays first, tried on every single image. Everything in the game was
+// drawn by it, and a model swap silently restyles every sprite made from here on — which is why it is a
+// decision rather than a default, and why this never quietly settles on a newer one.
+//
+// ⚠️ AS OF 2026-10-27 IT RETURNS 400 AND THE FALLBACK FIRES EVERY TIME. The message is "The model
+// 'gpt-image-1' does not exist", which is misleading: /v1/models/gpt-image-1 resolves fine and the key is
+// healthy — gpt-image-1-mini and gpt-image-1.5 both draw on it. It is retired for generation and still
+// listed. The moment OpenAI restores it, this file goes back to using it with no change at all.
+//
+// It also records WHICH model drew each image, because a picture whose provenance is unrecorded is one
+// nobody can explain the look of six months later.
+const MODELS = ["gpt-image-1", "gpt-image-1.5", "gpt-image-1-mini"];
+let usedModel = null;
+let tokensUsed = 0;
 
 async function draw(name, job) {
-    const res = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-            model: "gpt-image-1",
-            prompt: job.prompt,
-            size: SIZE,
-            quality: Q,
-            background: "transparent",
-            n: 1,
-        }),
-    });
-    const body = await res.json();
-    if (!res.ok) throw new Error(`${name}: ${JSON.stringify(body?.error || body).slice(0, 300)}`);
+    let res = null;
+    let body = null;
+    let model = null;
+
+    for (const candidate of MODELS) {
+        model = candidate;
+        res = await fetch("https://api.openai.com/v1/images/generations", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: candidate,
+                prompt: job.prompt,
+                size: SIZE,
+                quality: Q,
+                background: "transparent",
+                n: 1,
+            }),
+        });
+        body = await res.json();
+        if (res.ok) break;
+
+        // Only a MISSING model falls through. Anything else — a bad prompt, a rate limit, a billing problem —
+        // throws, because silently retrying a real error on three models just pays for it three times.
+        const msg = String(body?.error?.message || "");
+        const missing = res.status === 400 && /does not exist|not have access|deprecated|retired/i.test(msg);
+        if (!missing) throw new Error(`${name} (${candidate}): ${JSON.stringify(body?.error || body).slice(0, 300)}`);
+        console.log(`  ${candidate} unavailable — falling back`);
+    }
+    if (!res?.ok) throw new Error(`${name}: every model refused`);
+
+    if (usedModel && usedModel !== model) console.log(`  ⚠️ ${name} drawn by ${model}, not ${usedModel} — MIXED SET`);
+    usedModel = model;
+    tokensUsed += Number(body?.usage?.output_tokens || 0);
+
     const buf = Buffer.from(body.data[0].b64_json, "base64");
     fs.mkdirSync(OUT, { recursive: true });
     const file = path.join(OUT, `${job.file}.png`);
     fs.writeFileSync(file, buf);
-    console.log(`  drew ${name} -> ${file}`);
+    console.log(`  drew ${name} (${model}) -> ${file}`);
     return file;
 }
 
@@ -144,6 +198,12 @@ if (!PUBLISH) {
         .composite(tiles.map((input, i) => ({ input, left: i * W, top: 0 })))
         .png()
         .toFile(path.join(OUT, "contact-sheet.png"));
+    // ⚠️ THE REAL BILL, FROM THE API'S OWN USAGE FIGURES. The estimate printed up front uses gpt-image-1's
+    //    token table, and a fallback model need not price the same — so what gets reported afterwards is what
+    //    was actually billed, never what was predicted.
+    if (tokensUsed) {
+        console.log(`\n  drawn by ${usedModel} · ${tokensUsed} output tokens · $${(tokensUsed * 40 / 1e6).toFixed(3)} at the gpt-image-1 rate`);
+    }
     console.log(`\n  contact sheet: ${path.join(OUT, "contact-sheet.png")}`);
     console.log("  Look at it. Then:  node scripts/gen-pack-bag.mjs --publish --pick=<take>");
 } else {
@@ -151,7 +211,7 @@ if (!PUBLISH) {
     const src = path.join(OUT, `${JOBS[PICK].file}.png`);
     if (!fs.existsSync(src)) throw new Error(`no preview at ${src} — draw it first.`);
     fs.mkdirSync(DEST, { recursive: true });
-    for (const width of [1200, 800]) {
+    for (const width of [900, 600]) {
         const out = path.join(DEST, `mystery-bag-drawn-${width}.webp`);
         await sharp(src).resize(width).webp({ quality: 88 }).toFile(out);
         console.log(`  published ${out}`);
