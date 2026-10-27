@@ -43,6 +43,26 @@ export const BUYBACK_MIN_CENTS = 100;
  */
 export const BUYBACK_ROUND_CENTS = 25;
 
+/**
+ * Did the FLOOR decide this payout rather than the rate?
+ *
+ * ⚠️ THE SCREEN CANNOT SAY "60% of $1.40" OVER A $1.00 BUTTON. It is the one place the stated rate and the
+ * paid figure visibly fail to multiply — $1.40 × 0.6 is $0.84 — and a disclosure whose own arithmetic does
+ * not check out is worse than none: it reads as the rate being made up. Three cards in the live pool sit
+ * under the line, so it is a case somebody sees.
+ *
+ * ⚠️ AND IT LIVES HERE, NOT IN THE BUTTON. Working it out client-side means a fourth copy of the rate, the
+ * rounding and the floor, which is precisely what the note at the top of this file says never to do. The
+ * quarter round-up is NOT reported — it moves the payout by at most 24¢, always upward, and "60% of $38.00"
+ * over $23.00 reads as rounding in the member's favour, which is what it is.
+ */
+export function buyBackIsFloored(marketCents) {
+    const market = Math.max(0, Math.round(Number(marketCents) || 0));
+    if (market <= 0) return false;
+    const rounded = Math.ceil(((market * BUYBACK_PERCENT) / 100) / BUYBACK_ROUND_CENTS) * BUYBACK_ROUND_CENTS;
+    return rounded < BUYBACK_MIN_CENTS;
+}
+
 /** What we pay, in cents, for a card whose market value is `marketCents`. */
 export function buyBackCents(marketCents) {
     const market = Math.max(0, Math.round(Number(marketCents) || 0));

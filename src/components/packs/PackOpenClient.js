@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Haptic } from "@/components/arena/arena-audio.js";
-import { BUYBACK_PERCENT, packsWorth } from "@/lib/marketplace/buyback.js";
+import { BUYBACK_MIN_CENTS, BUYBACK_PERCENT, buyBackIsFloored, packsWorth } from "@/lib/marketplace/buyback.js";
 import { PACK_TIERS, tierByKey } from "@/lib/marketplace/pack-rarity.js";
 import { burst, coinIn, coinOut, fanfare, rumble, shimmer, stopPackAudio, tally, tierChord } from "@/components/packs/pack-audio.js";
 
@@ -440,6 +440,18 @@ export default function PackOpenClient({ initial }) {
     const showCard = Boolean(open) && blown && !bank;
     // null unless the sell-back beats what the pack cost — see packsWorth.
     const multiple = packsWorth(open?.card?.sellBackCents, open?.priceCents ?? priceCents);
+    // ── ⚠️ THE LINE HAS TO SURVIVE BEING CHECKED ON A CALCULATOR ─────────────────────────────────────────
+    // Both numbers it talks about are on screen to the cent, inches apart, so "60% of $1.40" over a $1.00
+    // button is a sum that visibly does not come out — and a disclosure whose own arithmetic fails reads as
+    // the rate being invented. The payout is never plain 60%: it rounds UP to a quarter and floors at a
+    // dollar, both in the member's favour, and the line says which one did it.
+    //
+    //   $258.00 → $155.00   "60% of $258.00, rounded up"   154.80 rounded to 155.00  ✓
+    //     $1.40 →   $1.00   "60% of $1.40, rounded up"       0.84 rounded to   1.00  ✓
+    //     $1.20 →   $1.00   "60% · $1.00 minimum"            0.72 is under the floor ✓
+    const rateLine = buyBackIsFloored(open?.card?.valueCents)
+        ? `${BUYBACK_PERCENT}% · ${usd(BUYBACK_MIN_CENTS)} minimum`
+        : `${BUYBACK_PERCENT}% of ${usd(open?.card?.valueCents)}, rounded up`;
     // The × exists only where a dismiss cannot strand a paid-for card. See closeModal().
     const closable = phase === PHASE.idle || Boolean(choice);
 
@@ -715,11 +727,29 @@ export default function PackOpenClient({ initial }) {
                                 <span className="pk-cta-main">{usd(open.card.sellBackCents)}</span>
                                 {/* ⚠️ THE CELEBRATION ONLY FIRES WHEN THERE IS SOMETHING TO CELEBRATE.
                                     packsWorth returns null below 1×, so a card that paid less than the pack
-                                    cost gets the plain line instead of "0.4× your pack" read back to
-                                    somebody at the moment they are deciding what to do about it. */}
-                                <span className="pk-cta-sub">
-                                    {multiple ? `${multiple}× your pack` : `${BUYBACK_PERCENT}% trade-in · instant`}
-                                </span>
+                                    cost says nothing here rather than reading "0.4× your pack" back to
+                                    somebody at the moment they decide what to do about it. */}
+                                {multiple ? (
+                                    <span className="pk-cta-bank-line">{`${multiple}× your pack`}</span>
+                                ) : null}
+                                {/* ── ⚠️ THE RATE IS ON THIS BUTTON ON EVERY PULL, WITH NO EXCEPTIONS ──────
+                                    Luke, 2026-10-27, looking at a $38.00 Victini offering $23.00: "The
+                                    selling value should be clear that its 60 percent of the value."
+
+                                    It used to be — until the pull was good enough to say "1.2× your pack",
+                                    which REPLACED the rate line. So the disclosure vanished on exactly the
+                                    cards where the gap between $38.00 and $23.00 is largest and the member
+                                    is most likely to wonder about it, and the loudest, most celebratory
+                                    version of this screen was the one that said least about what it was
+                                    paying. The two facts are not alternatives: the multiple is the
+                                    celebration and the rate is the disclosure, and the disclosure does not
+                                    get to lose a fight with it for one line of space.
+
+                                    ⚠️ AND IT NAMES THE FIGURE, not just the percentage — "60% of $38.00" is
+                                    the arithmetic done where the member can check it. The payout rounds up
+                                    to a quarter and floors at a dollar (see buyback.js), so what lands is
+                                    always at or above what this line says. */}
+                                <span className="pk-cta-sub">{rateLine}</span>
                                 <span className="pk-cta-shine" aria-hidden="true" />
                             </button>
                             <button

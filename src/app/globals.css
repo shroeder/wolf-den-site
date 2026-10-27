@@ -25758,10 +25758,16 @@ body.cas-seated .social-fab { display: none; }
     animation: pk-bank 2.2s ease-in-out infinite;
 }
 
-.pk-cta-bank .pk-cta-sub {
-    opacity: 1;
+/* ── THE MULTIPLE AND THE RATE ARE TWO DIFFERENT LINES, AND THE RATE IS NOT NEGOTIABLE ──────────────────
+   They shared one line and the multiple won it whenever there was a multiple to show, so the 60% disclosure
+   disappeared on precisely the pulls where the gap between the value and the payout is biggest. The
+   celebration sits directly under the amount where it is loud; the rate sits at the bottom in fine print
+   where a disclosure belongs. Both, always, on a button that pays real money. */
+.pk-cta-bank-line {
+    font-size: 0.62rem;
     font-weight: 800;
     letter-spacing: 0.01em;
+    line-height: 1.2;
 }
 
 @keyframes pk-bank {
@@ -25957,7 +25963,8 @@ body.cas-seated .social-fab { display: none; }
     .pk-actions { margin-top: 10px; gap: 7px; flex-direction: row; }
     .pk-cta { min-height: 56px; padding: 7px 6px 8px; }
     .pk-cta-main { font-size: 1.02rem; }
-    .pk-cta-sub { font-size: 0.58rem; }
+    .pk-cta-sub,
+    .pk-cta-bank-line { font-size: 0.58rem; }
 
     /* ── THE 441px BUDGET, RE-CUT FOR TWO FULL CTAs ────────────────────────────────────────────
        Promoting "Keep it" from a 44px ghost to a 56px three-line CTA cost 12px, and keeping the balance on
@@ -26291,6 +26298,15 @@ body.cas-seated .social-fab { display: none; }
     border-radius: 9px;
     background: var(--elevated);
     font-size: 0.86rem;
+}
+
+/* The rate, stated on the screen that commits the sale. Quiet type — it is a disclosure, not an argument —
+   but above the total rather than below it, because a line under the number is a line already scrolled past. */
+.vt-confirm-rate {
+    margin: 10px 0 0;
+    font-size: 0.78rem;
+    color: #8A8A8A;
+    line-height: 1.4;
 }
 
 .vt-confirm-total {

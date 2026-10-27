@@ -523,6 +523,13 @@ export default function VaultClient({ initial }) {
                             </li>
                         ))}
                     </ul>
+                    {/* ⚠️ THE RATE IS ON THE SCREEN WHERE THE MONEY MOVES, not only on the card sheet one tap
+                        back. A list of payouts and a total is a screen somebody can agree to without ever
+                        having been told what the figures are a share OF — and this is the bulk path, where
+                        the sum is largest and the per-card arithmetic is hardest to do in your head. */}
+                    <p className="vt-confirm-rate">
+                        {`${BUYBACK_PERCENT}% of market value — the same rate we pay at the counter.`}
+                    </p>
                     <p className="vt-confirm-total">
                         <span>Store credit</span>
                         <strong className="vt-gold">+{usd(selectedTotal)}</strong>
