@@ -1,0 +1,27 @@
+{
+  "/api/marketplace/packs/open": {
+    "json": {
+      "ok": true,
+      "resumed": false,
+      "id": "film-mythic-0000-0000-000000000001",
+      "priceCents": 2000,
+      "balanceCents": 900,
+      "card": {
+        "id": "0c6ce342-fe44-453f-a970-207399141542",
+        "name": "Jirachi",
+        "subtitle": "XYPROMO · XY67a · NM",
+        "setCode": "XYPROMO",
+        "number": "XY67a",
+        "printedRarity": null,
+        "condition": "NM",
+        "imageUrl": "https://items-images-production.s3.us-west-2.amazonaws.com/files/68e2dfce6855cd28a7b192231835850a318e9d56/original.jpeg",
+        "valueCents": 25800,
+        "tier": "mythic",
+        "itemType": "card"
+      },
+      "tier": "mythic",
+      "bigHit": true,
+      "outcome": "pending"
+    }
+  }
+}

@@ -24853,6 +24853,13 @@ body.cas-seated .social-fab { display: none; }
     flex-wrap: wrap;
 }
 
+/* ⚠️ THE `hidden` ATTRIBUTE ALONE DOES NOTHING HERE, AND THE FILM IS HOW THAT GOT CAUGHT. The user-agent
+   sheet's `[hidden] { display: none }` is a type-selector-strength rule, so the `display: flex` on the line
+   above outranks it and the header sat there through the entire explosion — balance, pack count and all —
+   while the markup said hidden and the component believed it. Any element given `hidden` in JSX that also
+   carries a `display` of its own needs this partner rule. */
+.pk-top[hidden] { display: none; }
+
 .pk-bal {
     display: flex;
     flex-direction: column;
@@ -24873,7 +24880,6 @@ body.cas-seated .social-fab { display: none; }
     transition: text-shadow 0.25s ease;
 }
 
-.pk-committing .pk-bal-value,
 .pk-readout .pk-bal-value {
     text-shadow: 0 0 18px rgba(212, 175, 55, 0.65);
 }
@@ -24893,14 +24899,51 @@ body.cas-seated .social-fab { display: none; }
     color: var(--ink);
 }
 
-/* The stage the bag sits on. Centred, with the flood filling it from behind. */
+/* ── THE OPENING TAKES THE SCREEN ────────────────────────────────────────────────────────────────────────────
+   From the tap until the member has chosen, this is the only thing on the page.
+
+   ⚠️ IT IS NOT DECORATION, IT IS THE ONLY WAY THE NUMBERS WORK. The stage sits BELOW the site header — the
+   avatar row, the XP bar, the coin count — which is about 90px, and the fold check caught what that costs:
+   on a 441px viewport the value landed at y=464 and both buttons at y=540, with a card already shrunk to
+   make room. Every pixel the reveal gives to a navigation bar it is not using comes straight off the card.
+
+   Fixed, inset 0, for the shake through the readout; the idle state goes back to being an inline panel on a
+   normal page. ⚠️ The shelf is `position: fixed` INSIDE this, which survives a fixed ancestor but would not
+   survive a transformed one — so nothing here may put a transform or a filter on .pk-stage.
+
+   ⚠️ Specificity, not order: .pk-stage.pk-burst is 0-2-0 against the panel's own 0-1-0 .pk-stage further
+   down the file, so these win wherever either block ends up. */
+.pk-stage.pk-shake,
+.pk-stage.pk-burst,
+.pk-stage.pk-reveal,
+.pk-stage.pk-readout {
+    position: fixed;
+    inset: 0;
+    /* ⚠️ ABOVE .social-fab, WHICH IS 900. At 70 the chat bubble floated over the "Keep it" button and ate
+       half its label — the film caught it sitting right on top of the one control that is not reversible.
+       An opaque full-screen panel above it hides it for the two seconds this lasts without any cross-
+       component coupling to go stale. */
+    z-index: 950;
+    min-height: 0;
+    justify-content: center;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* The stage the bag sits on. Centred, with the flood filling it from behind.
+
+   ⚠️ NOTHING IN THIS SECTION MAY PUT A transform OR A filter ON .pk-stage ITSELF. The shelf is
+   `position: fixed` inside the stage, and a transformed or filtered ancestor turns a fixed element into one
+   positioned against that ancestor — which is exactly how the vault's bottom sheet ended up rendering
+   off-screen. Camera shake goes on .pk-arena. */
 .pk-arena {
     position: relative;
     flex: 1 1 auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 230px;
+    min-height: 250px;
 }
 
 /* A PERCENTAGE NEEDS A REAL BOX. This is absolutely positioned inside .pk-arena, which is a flex item
@@ -24915,13 +24958,71 @@ body.cas-seated .social-fab { display: none; }
     pointer-events: none;
 }
 
-.pk-slam .pk-flood,
-.pk-readout .pk-flood {
-    opacity: 0.3;
+/* ⚠️ ZERO DURING THE SHAKE, AND THAT IS THE IDENTICAL-SHAKE RULE IN CSS. The flood is tier-coloured, and
+   before the server answers `tier` is only a default — so lighting it early would either leak the result or
+   lie about it. It comes up with the bang. */
+.pk-burst .pk-flood { opacity: 0.5; }
+.pk-reveal .pk-flood,
+.pk-readout .pk-flood { opacity: 0.3; }
+
+/* ── THE FLASH ───────────────────────────────────────────────────────────────────────────────────────────────
+   One frame of white-out at the instant of detonation. It is what sells a bang — and it does a second,
+   duller job: the bag is removed and the card mounted on the same render, and the flash is what covers that
+   swap so the two are never both on screen. */
+.pk-flash {
+    position: absolute;
+    inset: -60%;
+    z-index: 6;
+    border-radius: 50%;
+    background: radial-gradient(circle, #FFFFFF 0%, rgba(255, 255, 255, 0.8) 26%, transparent 64%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.pk-burst .pk-flash {
+    animation: pk-flash 420ms ease-out forwards;
+}
+
+@keyframes pk-flash {
+    0% { opacity: 0; transform: scale(0.25); }
+    7% { opacity: 1; transform: scale(0.85); }
+    100% { opacity: 0; transform: scale(1.6); }
+}
+
+/* ── THE SHOCKWAVE ───────────────────────────────────────────────────────────────────────────────────────────
+   A ring leaving the blast, tier-coloured, because by now the answer is known. It starts as a thick stub and
+   ends as a thin line nine times the size, which is what reads as pressure rather than as a growing circle. */
+.pk-shock {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+    z-index: 5;
+    border-radius: 50%;
+    border: 3px solid var(--tier-edge);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.pk-burst .pk-shock {
+    animation: pk-shock 640ms cubic-bezier(0.14, 0.72, 0.28, 1) forwards;
+}
+
+@keyframes pk-shock {
+    0% { opacity: 0.95; transform: scale(0.2); border-width: 12px; }
+    100% { opacity: 0; transform: scale(9); border-width: 1px; }
 }
 
 /* ⚠️ PORTRAIT, AND NARROW. The bag is 2:3 standing up, so its WIDTH is the thing to constrain — a wrapper
-   sized for the old landscape art made it enormous. */
+   sized for the old landscape art made it enormous.
+
+   ⚠️ AND IT COLLAPSES TO ZERO HEIGHT THE MOMENT THE BAG IS REMOVED, WHICH IS DELIBERATE AND LOAD-BEARING.
+   Everything after the burst — the debris, the card — is absolutely positioned against the CENTRE of this
+   box, and a zero-height flex item under the arena's `align-items: center` sits exactly at the arena's
+   vertical middle. So the explosion and the card land where the bag was without either one having to know how
+   tall the bag happened to be on this screen. */
 .pk-bagwrap {
     position: relative;
     width: min(58vw, 260px);
@@ -24945,172 +25046,224 @@ body.cas-seated .social-fab { display: none; }
     animation: pk-breathe 6s ease-in-out infinite;
 }
 
-/* It breathes at rest. Once the pack is committed it holds still, because the card is the thing moving now. */
-.pk-committing .pk-bag,
-.pk-zip .pk-bag,
-.pk-rise .pk-bag,
-.pk-flip .pk-bag,
-.pk-slam .pk-bag,
-.pk-readout .pk-bag {
-    animation: none;
-}
-
 @keyframes pk-breathe {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.015); }
 }
 
-.pk-committing .pk-bag {
-    animation: pk-shudder 0.42s ease-in-out;
+/* ── THE SHAKE ───────────────────────────────────────────────────────────────────────────────────────────────
+   The held breath, and the only phase the player actually waits through. It ESCALATES — amplitude, rotation
+   and scale all climb across the 950ms and end with the bag swollen to 1.18, caught at the top of a breath
+   it does not get to finish.
+
+   ⚠️ IDENTICAL FOR EVERY CARD. Not one keyframe, duration or colour here may depend on the tier. The whole
+   reason this phase can start on the tap, before the server has answered, is that it has nothing to say. */
+.pk-shake .pk-bag {
+    animation:
+        pk-rattle 950ms cubic-bezier(0.4, 0, 0.6, 1) both,
+        pk-charge 950ms ease-in both;
 }
 
-@keyframes pk-shudder {
-    0%, 100% { transform: translateX(0); }
-    20% { transform: translateX(-4px) rotate(-0.4deg); }
-    55% { transform: translateX(5px) rotate(0.5deg); }
-    80% { transform: translateX(-2px); }
+@keyframes pk-rattle {
+    0%   { transform: translate(0, 0) rotate(0deg) scale(1); }
+    8%   { transform: translate(-2px, 2px) rotate(-0.6deg) scale(1.01); }
+    16%  { transform: translate(4px, -2px) rotate(0.9deg) scale(1.02); }
+    24%  { transform: translate(-5px, 3px) rotate(-1.3deg) scale(1.03); }
+    32%  { transform: translate(6px, -4px) rotate(1.7deg) scale(1.04); }
+    40%  { transform: translate(-8px, 4px) rotate(-2.2deg) scale(1.05); }
+    48%  { transform: translate(9px, -6px) rotate(2.7deg) scale(1.06); }
+    56%  { transform: translate(-12px, 6px) rotate(-3.4deg) scale(1.075); }
+    64%  { transform: translate(13px, -8px) rotate(3.9deg) scale(1.09); }
+    72%  { transform: translate(-16px, 8px) rotate(-4.6deg) scale(1.1); }
+    80%  { transform: translate(18px, -10px) rotate(5.2deg) scale(1.12); }
+    88%  { transform: translate(-21px, 10px) rotate(-6deg) scale(1.15); }
+    94%  { transform: translate(13px, -6px) rotate(3.4deg) scale(1.2); }
+    100% { transform: translate(0, 0) rotate(0deg) scale(1.26); }
 }
 
-/* The seam of light along the top edge once the seal is open. Colourless, same rule as the card. */
-/* Sits in the drawn zip seal across the top of the pouch. */
-.pk-mouth {
+/* Light building up inside the pouch. WHITE — see the rule above. It stacks a second drop-shadow onto the
+   first rather than replacing it, so the bag keeps the ground shadow it is standing on. */
+@keyframes pk-charge {
+    0% { filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 0 rgba(255, 255, 255, 0)); }
+    60% { filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 22px rgba(255, 255, 255, 0.5)); }
+    100% { filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 60px rgba(255, 255, 255, 1)) drop-shadow(0 0 22px rgba(255, 220, 140, 0.9)); }
+}
+
+/* The camera, kicked. On the ARENA, never on the stage — see the warning at the top of this section. */
+.pk-burst .pk-arena {
+    animation: pk-quake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes pk-quake {
+    0%, 100% { transform: translate(0, 0); }
+    12% { transform: translate(-9px, 6px); }
+    26% { transform: translate(8px, -7px); }
+    42% { transform: translate(-6px, 4px); }
+    58% { transform: translate(5px, -3px); }
+    74% { transform: translate(-3px, 2px); }
+    88% { transform: translate(2px, -1px); }
+}
+
+/* ── THE DEBRIS ──────────────────────────────────────────────────────────────────────────────────────────────
+   Sixteen shards of bag and twenty-eight sparks, each with its own angle, distance, spin and delay, rolled
+   once per open in the component.
+
+   --blast IS THE BLAST RADIUS AND IT LIVES HERE, NOT IN JAVASCRIPT. Each piece carries a unitless --d
+   fraction and multiplies this by it, so the explosion is the same SHAPE on a 375px phone and a 1440px
+   desktop — a px radius chosen for one is a timid puff on the other or lands off-screen.
+
+   ⚠️ AND IT IS DERIVED FROM --card-h, NOT FROM THE VIEWPORT. A viewport-relative radius was right on a phone
+   and wrong on a desktop in the one way that is hard to spot: min(42vw, 200px) caps at 200px, so against a
+   470px card the shards all landed INSIDE the card's own footprint and the explosion read as a shimmer. The
+   thing being blown apart is the card-sized object in the middle, so that is what the radius should follow. */
+.pk-debris {
     position: absolute;
-    z-index: 3;
-    top: 9%;
-    left: 16%;
-    right: 16%;
-    height: 3px;
-    border-radius: 999px;
-    background: #FFFFFF;
-    opacity: 0;
-    filter: blur(2px);
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    z-index: 5;
     pointer-events: none;
+    --blast: calc(var(--card-h) * 0.68);
 }
 
-.pk-zip .pk-mouth {
-    animation: pk-unzip 0.4s ease-out forwards;
+/* ⚠️ DARK WITH A GOLD EDGE, BECAUSE THAT IS WHAT THE BAG IS MADE OF. Debris that does not match the object
+   it came from reads as confetti, and confetti is a party rather than an explosion. */
+.pk-shard {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--sz);
+    height: var(--sz);
+    margin: calc(var(--sz) / -2) 0 0 calc(var(--sz) / -2);
+    border-radius: 2px;
+    /* ⚠️ THE GOLD EDGE IS THE WHOLE SHARD, NOT A DETAIL ON IT. The first cut used the bag's own near-black
+       with a 50%-opacity gold hairline, which is honest about the material and completely invisible against
+       a #0C0C0C panel — the film showed sixteen pieces of nothing. A torn edge catching the light is both
+       truer to a bag bursting and the only version that reads. */
+    background: linear-gradient(140deg, #4A4036, #121212 55%);
+    border: 1.5px solid rgba(240, 210, 122, 0.95);
+    box-shadow: 0 0 9px 1px rgba(240, 210, 122, 0.55);
+    opacity: 0;
+    animation: pk-shard 780ms cubic-bezier(0.1, 0.72, 0.28, 1) var(--delay) forwards;
 }
 
-.pk-rise .pk-mouth,
-.pk-flip .pk-mouth {
-    opacity: 0.85;
-    box-shadow: 0 0 26px 7px rgba(255, 255, 255, 0.45);
+/* The leading rotate() aims the piece; translateY() throws it along that heading; the trailing rotate() is
+   the piece tumbling about its own centre. Order matters — the spin must come last or it steers the throw. */
+@keyframes pk-shard {
+    0% { opacity: 1; transform: rotate(var(--a)) translateY(0) rotate(0deg) scale(1.4); }
+    55% { opacity: 1; }
+    100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--blast) * var(--d) * -1)) rotate(var(--spin)) scale(0.45); }
 }
 
-@keyframes pk-unzip {
-    from { opacity: 0; transform: scaleX(0.1); }
-    to { opacity: 0.85; transform: scaleX(1); }
+/* The sparkles. Tier-coloured with a white core, so a mythic throws gold and a common throws grey — this is
+   after the bang, so it is allowed to say how good the pull was. */
+.pk-spark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--sz);
+    height: var(--sz);
+    margin: calc(var(--sz) / -2) 0 0 calc(var(--sz) / -2);
+    border-radius: 50%;
+    background: radial-gradient(circle, #FFFFFF 0%, #FFFFFF 28%, var(--tier-glow) 60%, transparent 78%);
+    box-shadow: 0 0 16px 4px var(--tier-glow), 0 0 5px 1px rgba(255, 255, 255, 0.9);
+    opacity: 0;
+    animation: pk-spark var(--life) ease-out var(--delay) forwards;
+}
+
+@keyframes pk-spark {
+    0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(0.35); }
+    14% { opacity: 1; transform: rotate(var(--a)) translateY(calc(var(--blast) * var(--d) * -0.34)) scale(1.15); }
+    100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--blast) * var(--d) * -1)) scale(0.25); }
 }
 
 /* ── THE CARD ────────────────────────────────────────────────────────────────────────────────────────────────
-   IT RISES BEHIND THE BAG — z-index 1 against the bag's 2 — so it genuinely comes out of the bag rather than
-   sliding across the front of it.
+   Luke, 2026-10-27: "The card should be big."
 
-   AND THE LIGHT AROUND IT IS WHITE UNTIL THE FLIP. Not a stylistic choice: a tier-coloured rise is a near-miss
-   mechanic. The player learns to read it, and then every common deflates before the card has even turned over.
-   The colour arrives at the slam, with the truth. */
-/* Narrower than the pouch, because it is INSIDE it. Starts low and hidden, rises up through the seal. */
+   ⚠️ SIZED BY HEIGHT AND NOT BY WIDTH, which is the opposite of the obvious way round and is what makes it
+   both big and safe. Height in dvh with aspect-ratio deriving the width means the card can be as large as
+   the screen's SHORT axis allows and still cannot push the buttons under the fold. A width in vw gets this
+   wrong on exactly the screen that matters: 70vw of a 375px phone is a card 294px wide and 411px tall, and
+   411px is the entire usable height.
+
+   ⚠️ AND THE HEIGHT IS ONE TOKEN, --card-h, BECAUSE THE ARENA HAS TO KNOW IT TOO. The card is absolutely
+   positioned, so it contributes NOTHING to its arena's height — a card larger than the arena silently hangs
+   out of it and lands on top of the readout. That bug has been fixed here once already, from the other
+   direction, and the only way it stops recurring is if the two numbers cannot disagree. The arena sizes
+   itself from this. */
 .pk-card {
     position: absolute;
-    z-index: 1;
-    bottom: 14%;
-    width: 72%;
-    max-width: 190px;
-    aspect-ratio: 5 / 7;
-    transform: translateY(18%) scale(0.94);
-    opacity: 0;
-    perspective: 1000px;
-    pointer-events: none;
-}
-
-.pk-rise .pk-card {
-    animation: pk-rise 1.6s cubic-bezier(0.33, 0.02, 0.2, 1) forwards;
-}
-
-@keyframes pk-rise {
-    0% { opacity: 0; transform: translateY(18%) scale(0.94); }
-    10% { opacity: 1; }
-    100% { opacity: 1; transform: translateY(-58%) scale(1); }
-}
-
-.pk-flip .pk-card {
-    opacity: 1;
-    transform: translateY(-58%) scale(1);
-}
-
-/* The slam. Down, hard, with a touch of overshoot. The shake amplitude is the tier's own. */
-.pk-slam .pk-card,
-.pk-readout .pk-card {
-    opacity: 1;
+    top: 50%;
+    left: 50%;
     z-index: 4;
-    bottom: 50%;
-    width: 38%;
-    max-width: 168px;
-    transform: translateY(50%) scale(1.02);
+    height: var(--card-h);
+    aspect-ratio: 5 / 7;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transition: height 0.36s cubic-bezier(0.3, 0, 0.2, 1);
+    animation: pk-punch 560ms cubic-bezier(0.16, 1.08, 0.3, 1) both;
 }
 
-.pk-slam .pk-card {
-    animation: pk-slam 0.22s cubic-bezier(0.6, 0, 0.9, 0.4) forwards;
+/* It arrives out of nothing at a quarter size and overshoots. The flash is still white-hot for the first
+   third of this, so what the eye actually sees is the card already there as the light clears. */
+@keyframes pk-punch {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2) rotate(-9deg); }
+    35% { opacity: 1; }
+    70% { transform: translate(-50%, -50%) scale(1.07) rotate(1.5deg); }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
 }
 
-.pk-slam .pk-arena {
-    animation: pk-shake 0.34s ease-out;
+/* ── THE RAYS ────────────────────────────────────────────────────────────────────────────────────────────────
+   A slow fan turning behind the card. It is the one effect that states the tier outright: --tier-rank drives
+   its opacity, so a common gets a hint of light and a mythic gets a sunburst.
+
+   z-index -1 inside .pk-card, which has a z-index of its own and therefore a stacking context — so the fan
+   goes behind the card's face without escaping to behind the whole arena. */
+.pk-rays {
+    position: absolute;
+    inset: -58%;
+    z-index: -1;
+    border-radius: 50%;
+    background: repeating-conic-gradient(from 0deg, var(--tier-glow) 0deg 5deg, transparent 5deg 17deg);
+    -webkit-mask-image: radial-gradient(circle, transparent 26%, #000 48%, transparent 80%);
+    mask-image: radial-gradient(circle, transparent 26%, #000 48%, transparent 80%);
+    opacity: 0;
+    pointer-events: none;
+    animation:
+        pk-rays-in 760ms ease-out 180ms forwards,
+        pk-spin 22s linear infinite;
 }
 
-@keyframes pk-slam {
-    0% { transform: translateY(26%) scale(1.2); }
-    100% { transform: translateY(50%) scale(1.02); }
+@keyframes pk-rays-in {
+    from { opacity: 0; }
+    to { opacity: calc(0.1 + var(--tier-rank) * 0.085); }
 }
 
-@keyframes pk-shake {
-    0%, 100% { transform: translate(0, 0); }
-    15% { transform: translate(calc(var(--tier-shake) * -1), var(--tier-shake)); }
-    35% { transform: translate(var(--tier-shake), calc(var(--tier-shake) * -0.6)); }
-    60% { transform: translate(calc(var(--tier-shake) * -0.5), 0); }
-    85% { transform: translate(calc(var(--tier-shake) * 0.25), 0); }
+@keyframes pk-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
-.pk-card-inner {
+/* ── THE FACE ────────────────────────────────────────────────────────────────────────────────────────────────
+   THE SHININESS IS THE RARITY, ARITHMETICALLY. The glow's blur and spread are both calc()s on --tier-rank,
+   so a common sits in an 18px halo and a mythic in an 88px one. One expression, six tiers, nothing to keep
+   in sync when a tier is added. */
+.pk-card-face {
     position: relative;
     width: 100%;
     height: 100%;
-    transform-style: preserve-3d;
-    transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 10px;
-}
-
-.pk-card-face .pk-card-inner {
-    transform: rotateY(180deg);
-}
-
-.pk-card-back,
-.pk-card-front {
-    position: absolute;
-    inset: 0;
-    backface-visibility: hidden;
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
-}
-
-/* The back was near-black on a near-black backdrop and the rise barely read on film. It needs a visible
-   edge and a halo of its own — colourless, so it still says nothing about the card. */
-.pk-card-back {
-    background:
-        radial-gradient(circle at 50% 36%, rgba(212, 175, 55, 0.3), transparent 60%),
-        linear-gradient(150deg, #262626, #101010);
-    border: 2px solid rgba(212, 175, 55, 0.55);
-    box-shadow: 0 0 46px 10px rgba(255, 255, 255, 0.3), inset 0 0 26px rgba(0, 0, 0, 0.6);
-}
-
-.pk-card-front {
-    transform: rotateY(180deg);
     background: #0B0B0B;
     border: 2px solid var(--tier-edge);
-    box-shadow: 0 0 40px 4px var(--tier-glow), 0 16px 30px rgba(0, 0, 0, 0.6);
+    box-shadow:
+        0 0 calc(18px + var(--tier-rank) * 14px) calc(2px + var(--tier-rank) * 2px) var(--tier-glow),
+        0 18px 34px rgba(0, 0, 0, 0.65);
 }
 
 /* contain, always. A card sprite stretched to fill is the one thing that makes a real card look fake. */
-.pk-card-front img {
+.pk-card-face img {
     width: 100%;
     height: 100%;
     object-fit: contain;
@@ -25128,21 +25281,30 @@ body.cas-seated .social-fab { display: none; }
     color: var(--ink-secondary);
 }
 
-.pk-skip {
+/* Foil. A hard specular band crossing the face, ONCE for a common and six times for a mythic — the
+   iteration count is calc(var(--tier-rank) + 1).
+   ⚠️ If a browser refuses a calc() in animation-iteration-count it falls back to the initial value, 1, so
+   the worst case is that a mythic gets a common's single sheen. That is a graceful loss, not a broken card,
+   which is why it is safe to express it this way. */
+.pk-sheen {
     position: absolute;
-    bottom: 4px;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 0.74rem;
-    color: var(--muted);
-    margin: 0;
-    animation: pk-fadein 0.5s ease;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+        104deg,
+        transparent 36%,
+        rgba(255, 255, 255, 0.4) 46%,
+        rgba(255, 255, 255, 0.85) 50%,
+        rgba(255, 255, 255, 0.4) 54%,
+        transparent 64%
+    );
+    transform: translateX(-130%);
+    animation: pk-sheen 1150ms ease-in-out 320ms calc(var(--tier-rank) + 1) both;
 }
 
-@keyframes pk-fadein {
-    from { opacity: 0; }
-    to { opacity: 1; }
+@keyframes pk-sheen {
+    0% { transform: translateX(-130%); }
+    100% { transform: translateX(130%); }
 }
 
 /* ── THE READOUT ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -25160,39 +25322,57 @@ body.cas-seated .social-fab { display: none; }
 }
 
 /* ── MAKING ROOM FOR THE RESULT ──────────────────────────────────────────────────────────────────────────────
-   At 375x667 the card, the readout and the two buttons do not all fit while the bag is still at full size —
-   the first film put the value and both buttons below the fold, which is the one thing the reveal cannot do.
-   So once the card is face-up the bag RECEDES: it has done its job, and the card is the subject now. */
-.pk-slam .pk-bag,
-.pk-readout .pk-bag {
-    opacity: 0.1;
-    transition: opacity 0.35s ease;
-}
+   At 375x667 — about 441px of usable height — the card, the readout and the two buttons do not all fit at
+   the card's full reveal size. The first film of the old version put the value and both buttons below the
+   fold, which is the one thing the reveal cannot do.
 
-/* ⚠️ THE ARENA'S HEIGHT IS THE BAG'S HEIGHT, so shrinking the arena alone does nothing — the portrait bag
-   kept it 333px tall and pushed the Sell button clean off a 667px phone. The BAG is what has to come down.
-   It has done its job by now; the card is the subject. */
-/* ⚠️ min-height 0 was wrong in the other direction: the arena shrank to the dimmed bag's height while the
-   CARD stayed absolutely positioned, so the card hung out of the top of the arena and over the header. The
-   arena has to be tall enough to hold the card, not the bag. */
+   So the card SETTLES rather than shrinking: 46dvh at the reveal, 38dvh once the readout is under it. The
+   transition on .pk-card above makes that a movement instead of a jump, and the settle is the beat where the
+   card hands the screen over to the decision.
+
+   ⚠️ THE CAP IS ON THE CARD, NEVER ON THE BUTTONS. If something has to give it is the artwork. A reveal you
+   cannot act on is worse than a small one — and the header is already hidden by this point, which is where
+   the first 56px came from. */
+/* ⚠️ dvh, AND MEASURED AGAINST THE SMALL ONE. With the browser's own chrome on screen a 667px iPhone hands
+   the page about 441px, and 100dvh IS that 441 — not the 667 the spec sheet says. A share that looks generous
+   against 667 is a stamp against 441, which is the only number a member ever actually sees. */
+/* ── THE BUDGET, AT THE ONLY SIZE THAT MATTERS ───────────────────────────────────────────────────────────────
+   375x667 with the browser's chrome on screen is 441px of dvh, and the takeover above means all 441 are the
+   reveal's. At the readout:
+
+     stage padding      34     (14 top + 20 bottom)
+     the card          238     54dvh of 441
+     arena breathing    10
+     stage gap          10
+     tier + name + sub  47
+     the value          29
+     the buttons        54     a 44px row plus its 10px margin
+     ----------------------
+     total             422     against 441
+
+   ⚠️ THE CARD IS THE LINE WITH GIVE IN IT. If something has to shrink it is --card-h; the buttons never move.
+   And before the readout exists there is nothing under the card, so it gets 68dvh — the biggest it is ever
+   going to be is the frame the member actually gasps at. */
+.pk-stage { --card-h: min(68dvh, 470px); }
+.pk-stage.pk-readout { --card-h: min(54dvh, 380px); }
+
 .pk-readout .pk-arena {
     flex: 0 0 auto;
-    min-height: 196px;
+    /* The +10 is the card's breathing room; its glow would otherwise sit flush against the tier line. */
+    min-height: 0;
+    height: calc(var(--card-h) + 10px);
 }
 
-.pk-readout .pk-bag {
-    max-height: 21dvh;
-    transition: max-height 0.3s ease, opacity 0.3s ease;
+/* The tier name sits on top of its own rays, so it needs a shadow of its own or it dissolves into them. */
+.pk-tier {
+    margin: 0;
+    font-size: 0.78rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 700;
+    text-shadow: 0 0 16px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9);
+    animation-delay: 0.02s;
 }
-
-/* Smaller in the readout than mid-slam: at full size it leaves no room for the two buttons underneath, and
-   the buttons are the half that must never be cut. */
-.pk-readout .pk-card {
-    width: 100%;
-    max-width: 136px;
-}
-
-.pk-tier { margin: 0; font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase; animation-delay: 0.02s; }
 .pk-result .pk-name { margin-top: 2px; }
 .pk-name { margin: 2px 0 0; font-size: 1.22rem; line-height: 1.25; animation-delay: 0.08s; }
 .pk-sub { margin: 2px 0 0; font-size: 0.82rem; color: var(--ink-secondary); animation-delay: 0.14s; }
@@ -25287,7 +25467,9 @@ body.cas-seated .social-fab { display: none; }
     position: fixed;
     inset: auto 0 0 0;
     max-height: 78dvh;
-    z-index: 60;
+    /* Above .social-fab (900), for the same reason the takeover is — a chat bubble parked over a dialog's
+       close button is a dialog you cannot leave. */
+    z-index: 960;
     display: flex;
     flex-direction: column;
     background: var(--surface);
@@ -25338,17 +25520,39 @@ body.cas-seated .social-fab { display: none; }
 .pk-shelf-value { grid-column: 2; grid-row: 1 / span 2; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
 
 /* 375x667 with browser chrome is the tightest real screen this has to work on, and the card, the readout and
-   both buttons have to coexist there. Everything here gives up a few pixels so the buttons never do. */
+   both buttons have to coexist there.
+
+   HERE IS THE WHOLE BUDGET, BECAUSE IT IS THE ONLY WAY TO KNOW THIS FITS. 667px minus about 226px of browser
+   chrome leaves 441px:
+
+     panel padding      34     (14 top + 20 bottom)
+     the card          253     min(38dvh, 340px) at 38% of 667
+     stage gap          10
+     tier + name + sub  47
+     the value          29
+     the buttons        54     a 44px row plus its 10px margin
+     ----------------------
+     total             427     against 441 available
+
+   Fourteen pixels of slack, and the header is hidden by this point, which is where the 56px that made it
+   possible came from. ⚠️ THE CARD IS THE LINE WITH GIVE IN IT; the buttons are not. If something has to go,
+   drop the card's dvh share — never the controls.
+
+   ⚠️ AND THE BUTTONS GO SIDE BY SIDE HERE, which is what bought the card its size. Stacked they cost 108px
+   instead of 54, and 54px of a 441px screen is 13% of the whole reveal spent on a second row. */
 @media (max-height: 740px) {
     .pk-name { font-size: 1.08rem; }
     .pk-sub { font-size: 0.78rem; }
     .pk-value { font-size: 1.7rem; margin-top: 2px; }
-    .pk-actions { margin-top: 10px; gap: 7px; }
-    .pk-btn { min-height: 44px; }
+    .pk-actions { margin-top: 10px; gap: 7px; flex-direction: row; }
     .pk-fine { font-size: 0.7rem; }
-    .pk-readout .pk-arena { min-height: 168px; }
-    .pk-readout .pk-bag { max-height: 15dvh; }
-    .pk-readout .pk-card { max-width: 112px; }
+
+    /* ⚠️ SCOPED TO .pk-actions, NOT BARE .pk-btn. The foot is a COLUMN flex container, so `flex: 1 1 0` on a
+       bare .pk-btn would size the "Open a pack" button's HEIGHT to the whole remaining stage. */
+    .pk-actions .pk-btn { min-height: 44px; padding: 10px 8px; font-size: 0.9rem; flex: 1 1 0; min-width: 0; }
+    /* Selling carries a dollar figure and "Keep it" carries two words, so they do not deserve equal room. */
+    .pk-actions .pk-btn-primary { flex: 1.7 1 0; }
+    .pk-btn-open { min-height: 50px; }
 }
 
 @media (min-width: 760px) {

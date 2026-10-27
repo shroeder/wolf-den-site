@@ -1398,11 +1398,52 @@ rows, SKU and unit cost preserved across both cycles.
 | 0+1 | `d9012eab` | mig 484 (pool `channel`/`condition`/`cost_cents`/`cost_basis`, `mkt_pack_open`, `mkt_pack_pull_task`, `mkt_vault_card`, `mkt_vault_event`), `vault-gate.js`, `pack-card-name.js` |
 | — | `5fdc6e31` | `scripts/vault-harness.mjs` — snapshot / selftest / cycle / adopt / restore |
 | 2 | `690cecbf` | `openPack` / `choosePackOutcome`, the three member APIs, `pack-rarity.js` |
-| 3 | `3dba9e15` | the reveal: bag cut-out, `pack-audio.js`, `PackOpenClient`, wired into `/mystery-bags` |
+| 3 | `3dba9e15` | the reveal: bag cut-out, `pack-audio.js`, `PackOpenClient`, wired into `/mystery-bags` (choreography replaced 2026-10-27, below) |
 | 4 | `90b3e661` | `getVault` / `sellVaultCards`, `vault-restock.js`, the vault screen |
 | 5 | `3181b62f` | mig 485, vault orders through `shop_orders`, EasyPost insurance, self-cancel + re-file |
 | 6 | `f7ffc1f6` | `pack-telemetry.js`, `/marketplace/admin/packs`, the staff pull queue |
 | 7 | `4ec0c747` | the Card Vault in the member menu |
+
+### The reveal, rebuilt (2026-10-27)
+
+Step 3's choreography — zip the bag, raise the card out of it, flip, slam — was replaced wholesale after Luke
+saw it on a phone: *"it looks awful the card is clearly not inside the bag, there is a white horizontal bar
+just floating. I think lets have the bag shake then explode and reveal the card. The card should be big."*
+
+He is right about the cause. The card rose from BEHIND the bag, so on screen it was a rectangle sliding up
+past a drawing, and the "seam of light" sold as the pack opening was a 3px white bar hanging in mid-air
+attached to nothing. The illusion asked a flat PNG to contain an object, which no flat PNG can do.
+
+**Now: shake (950ms) → burst (420ms) → reveal (560ms) → readout.** A bag that destroys itself never has to
+contain anything — it is there, then it is debris, then the card is where it was.
+
+| Piece | Where |
+|---|---|
+| `rumble` / `burst` / `shimmer`, and `zip`/`rise`/`flip`/`slam` deleted | `src/components/packs/pack-audio.js` |
+| phases, `rollDebris()`, `Haptic.chestShake()` + a tier-scaled buzz on the bang | `src/components/packs/PackOpenClient.js` |
+| `.pk-flash`, `.pk-shock`, `.pk-debris`/`.pk-shard`/`.pk-spark`, `.pk-rays`, `.pk-sheen`, the takeover | `src/app/globals.css` |
+| `packs.open.mythic.json`, `packs.open.common.json` — film it without spending a bag | `scripts/fixtures/` |
+
+**What the identical-shake rule bought, again.** Nothing before the burst may hint at the tier — no colour,
+no chord, no longer shake for a better pull — which is the old colourless-glow decision under a new name. It
+pays the same dividend: since nothing before the burst depends on the answer, nothing before the burst has to
+wait for it, so the request hides inside the shake and the tap is never followed by a dead screen.
+
+**Four things only the film could have found,** all at 375x441 (a 667px iPhone with its chrome showing):
+
+1. **`hidden` in JSX does nothing to an element with a `display` of its own.** The UA sheet's
+   `[hidden] { display: none }` loses to `.pk-top { display: flex }`, so the header sat there through the
+   whole explosion while the component believed it was gone. Needs the partner rule `.pk-top[hidden]`.
+2. **The reveal had to take the screen.** The stage sits under ~90px of site header, and with that in place
+   the value landed at y=464 and both buttons at y=540 on a 441px viewport — off-screen, with a card already
+   shrunk to pay for it. Fixed/inset-0 from the shake through the readout; `z-index: 950`, above
+   `.social-fab`'s 900, which the film caught parked on top of the "Keep it" button.
+3. **An absolutely-positioned card contributes nothing to its arena's height,** so a card bigger than the
+   arena silently lands on top of the readout. The card's height is now one token, `--card-h`, that the arena
+   sizes itself from — the two cannot disagree.
+4. **Debris in the bag's own colours is invisible.** Near-black shards with a 50%-opacity gold hairline on a
+   `#0C0C0C` panel filmed as sixteen pieces of nothing. A torn edge catching the light is both truer and the
+   only version that reads.
 
 **Still to do:** step 8 — announce it, which only happens when `VAULT_PUBLIC` flips. And the Android half of
 §16.3: the pull queue and the pack telemetry need adding to **both** drawer lists in `LedgerApp.kt`, or they

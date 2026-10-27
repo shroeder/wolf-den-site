@@ -1,0 +1,27 @@
+{
+  "/api/marketplace/packs/open": {
+    "json": {
+      "ok": true,
+      "resumed": false,
+      "id": "film-common-0000-0000-000000000002",
+      "priceCents": 2000,
+      "balanceCents": 900,
+      "card": {
+        "id": "0c6ce342-fe44-453f-a970-207399141542",
+        "name": "Hoppip",
+        "subtitle": "SV3 · 004/197 · NM",
+        "setCode": "XYPROMO",
+        "number": "XY67a",
+        "printedRarity": null,
+        "condition": "NM",
+        "imageUrl": "https://tcgplayer-cdn.tcgplayer.com/product/113773_200w.jpg",
+        "valueCents": 140,
+        "tier": "common",
+        "itemType": "card"
+      },
+      "tier": "common",
+      "bigHit": false,
+      "outcome": "pending"
+    }
+  }
+}
