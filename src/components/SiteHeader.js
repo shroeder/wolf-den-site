@@ -67,6 +67,8 @@ export default function SiteHeader() {
     const [mktName, setMktName] = useState(null);
     const [mktBorder, setMktBorder] = useState("none");
     const [mktAuthed, setMktAuthed] = useState(false);
+    // Luke: "Need a way to get to vard vault from menu." Door 8 of 9 — see the note on the nav list below.
+    const [mktVault, setMktVault] = useState(false);
 
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 
@@ -84,6 +86,7 @@ export default function SiteHeader() {
                 setMktAvatar(b.avatarUrl || null);
                 setMktName(b.displayLabel || null);
                 setMktBorder(b.border || "none");
+                setMktVault(Boolean(b.vault));
             }
         })();
         return () => {
@@ -197,10 +200,27 @@ export default function SiteHeader() {
         );
     }
 
+    // ── THE CARD VAULT IN THE SITE MENU ──────────────────────────────────────────────────────────────────
+    // Luke, with a card already in it: "Need a way to get to vard vault from menu."
+    //
+    // It was reachable from the game nav and from the end of a reveal, and neither of those is where you
+    // look for a thing you own. The site menu is the one list that is on every page.
+    //
+    // ⚠️ GATED ON THE SAME PREDICATE AS EVERY OTHER DOOR, carried on the auth/me reply this component was
+    // already reading (door 8 of 9, docs/virtual-packs-and-the-card-vault.md §16.2). Not isOwner — a bare
+    // owner check is a gate that does not open when the feature does, and this feature has nine of them.
+    //
+    // Placed straight after Mystery Bags because that is where a card in it came from.
+    const links = mktVault
+        ? navItems.flatMap((item) => (item.href === "/mystery-bags"
+            ? [item, { href: "/marketplace/vault", label: "Card Vault" }]
+            : [item]))
+        : navItems;
+
     // Nav links (+ Discord) shared by the desktop inline bar and the mobile dropdown.
     const navContent = (
         <>
-            {navItems.map((item) => (
+            {links.map((item) => (
                 <Link key={item.href} href={item.href} className="nav-link" onClick={() => setOpen(false)}>
                     {item.label}
                 </Link>

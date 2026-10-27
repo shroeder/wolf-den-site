@@ -96,6 +96,28 @@ export default function RewardNudge() {
                         <span className="coin-hud-plus" aria-hidden="true">+</span>
                     </Link>
                 ) : null}
+                {/* ── STORE CREDIT, SITE-WIDE ─────────────────────────────────────────────────────────────
+                    Luke: "We should show current store credit in the top, and clicking it takes you to
+                    purchase store credit."
+
+                    ⚠️ IT DOES NOT LOOK LIKE THE COIN CHIP, AND THAT IS THE POINT. Coins are the game's
+                    currency and credit is real money a member has actually paid in — two gold pills side by
+                    side would teach people they are the same thing, and they are not: one buys a pack, the
+                    other buys coins. Dark with a gold hairline reads as a wallet rather than as loot.
+
+                    ⚠️ AND IT COSTS NO REQUEST. The figure rides the mkt_buyer row nextUnlockPayload was
+                    already selecting. This component is mounted in the ROOT LAYOUT — a fetch added here
+                    bills on every navigation by every member, forever, which is what check:chrome is for. */}
+                {typeof data.creditCents === "number" ? (
+                    <Link
+                        href="/marketplace/credit"
+                        className="credit-hud"
+                        aria-label={`$${(data.creditCents / 100).toFixed(2)} store credit — tap to add more`}
+                    >
+                        <span className="credit-hud-label">Credit</span>
+                        <span className="credit-hud-amt">${(data.creditCents / 100).toFixed(2)}</span>
+                    </Link>
+                ) : null}
                 {hasProgress ? (
                     <Link href="/marketplace/track" className="reward-nudge" aria-label={`Level ${data.level} — ${data.xpToGo} XP to your next unlock, ${data.label}`}>
                         {data.level ? <span className="reward-nudge-lv">Lv {data.level}</span> : null}

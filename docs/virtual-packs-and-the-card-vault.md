@@ -1475,6 +1475,46 @@ the site header, the XP bar and the Live Chase Board, and it shares the member's
 - The body scroll lock restores the previous value rather than setting `""` — it is a shared global, and
   writing an empty string on the way out is how one screen's lock silently unlocks another's.
 
+### The choice screen, after a real pull (2026-10-27)
+
+Luke opened a live pack — a $4.00 Magikarp — and found four things in a row that a fixture never would.
+
+**"Weird edging going on the card."** A `box-shadow` SPREAD is not a softer glow: it is a hard-edged copy of
+the box, scaled up, which is *then* blurred. `0 0 32px 4px green` draws a crisp green rectangle 4px larger
+than the card before it blurs anything, and under a 2px `--tier-edge` border that made a two-tone rim — dark
+green line, bright green band, abrupt stop. It read as a sticker pasted on. Zero spread, no border, layered
+blurs (tight near-white core, then the tier colour wide); the only hard line left is a 1px inset hairline,
+inside the card where a card's own edge belongs.
+
+**"I cant see how much store credit i have here."** The header was hidden outright from the burst onward to
+buy the card height — wrong at exactly the wrong moment. "Sell back — $4.00" is a number with no meaning
+unless you can see what it is being added TO, and sell-or-keep is the one decision on this screen where the
+balance is load-bearing. It now COLLAPSES to a 20px line instead of disappearing.
+
+**"Buttons to sell should be super sexy, and the take should be cta for add to card vault."**
+⚠️ **"Keep it" on a ghost button was the bug, not the styling.** A grey outline beside a filled gold one is
+the shape of a *cancel* — this site has trained people that the quiet one is the way out. So the screen was
+quietly arguing for the sell on every pull, including the ones somebody actually wants to own, and the vault
+— the entire second half of this feature — was the button that looked like "no thanks". Both are CTAs now and
+they are different animals: gold is cash, the vault is jewel-toned. Three lines each (`SELL BACK / $4.00 /
+straight to credit` · `KEEP IT / Card Vault / ship or collect later`), equal width, neither below 56px.
+
+**"Need a way to get to vard vault from menu."** Door 8 of 9. It was reachable from the game nav and from the
+end of a reveal, and neither is where you look for a thing you own. Added to `SiteHeader` after Mystery Bags,
+gated on `vaultOpenFor` carried on the `auth/me` reply that component was already reading — ⚠️ not `isOwner`,
+which is a gate that does not open when the feature does.
+
+**And the HUD.** *"We should show current store credit in the top, and clicking it takes you to purchase store
+credit."* `.credit-hud` sits beside the coin chip in `RewardNudge` and links to `/marketplace/credit`.
+⚠️ It deliberately does NOT match the coin chip: coins are the game's currency, credit is real money a member
+paid in, and two gold pills side by side teach people they are the same thing. ⚠️ And it costs no request —
+`store_credit_cents` rides the `mkt_buyer` row `nextUnlockPayload` was already selecting. That component is in
+the root layout, which is what `check:chrome` exists to protect.
+
+The 441px budget was re-cut for all of it: two 56px CTAs plus a 20px balance line cost 32px, and the card
+paid for them (50dvh → 44dvh). The fold check found both overflows at once — the balance at y=-11 and the
+buttons ending at 446 on a 441px viewport.
+
 **Still to do:** step 8 — announce it, which only happens when `VAULT_PUBLIC` flips. And the Android half of
 §16.3: the pull queue and the pack telemetry need adding to **both** drawer lists in `LedgerApp.kt`, or they
 are screens that exist, work, and cannot be reached.

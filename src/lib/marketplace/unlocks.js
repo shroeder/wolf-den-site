@@ -65,14 +65,24 @@ export async function nextUnlockPayload(buyerId) {
     if (!buyerId) return { authed: false };
     const { db } = await import("@/lib/db");
     const { levelForXp } = await import("@/lib/marketplace/xp.js");
-    const row = await db.queryOne(`SELECT xp, COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    // ⚠️ store_credit_cents RIDES THE ROW THAT WAS ALREADY BEING READ. The HUD strip wanted to show a
+    //    member's store credit, and the obvious way to get it there is a call to getStoreCredit() — which is
+    //    a second round trip, from a component mounted in the ROOT LAYOUT, on every page of the site. That is
+    //    the family-A mistake CLAUDE.md is about, and check:chrome exists to catch it. One more column on a
+    //    SELECT that is already happening costs nothing.
+    const row = await db.queryOne(
+        `SELECT xp, COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS credit_cents
+         FROM mkt_buyer WHERE id = $1`,
+        [buyerId],
+    ).catch(() => null);
     const xp = Math.max(0, Math.floor(Number(row?.xp) || 0));
     const gold = Math.max(0, Math.floor(Number(row?.gold) || 0));
+    const creditCents = Math.max(0, Math.floor(Number(row?.credit_cents) || 0));
     const lv = levelForXp(xp);
     const level = lv.level;
     const next = nextUnlock(level);
     const pct = Math.round(lv.progress * 100);
     const xpToGo = lv.xpToNext;
-    if (!next) return { authed: true, maxed: true, xp, gold, level, pct, xpToGo };
-    return { authed: true, xp, gold, level, icon: next.icon, label: next.label, unlockLevel: next.level, xpToGo, pct };
+    if (!next) return { authed: true, maxed: true, xp, gold, creditCents, level, pct, xpToGo };
+    return { authed: true, xp, gold, creditCents, level, icon: next.icon, label: next.label, unlockLevel: next.level, xpToGo, pct };
 }

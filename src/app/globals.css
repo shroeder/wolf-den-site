@@ -11602,6 +11602,35 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .coin-hud.is-low { animation: coinLowGlow 1.6s ease-in-out infinite; }
 @keyframes coinLowGlow { 0%, 100% { box-shadow: 0 2px 9px rgba(240,160,40,0.5), inset 0 1px 0 rgba(255,255,255,0.65); } 50% { box-shadow: 0 0 16px 2px rgba(255,150,40,0.95), inset 0 1px 0 rgba(255,255,255,0.65); } }
 .coin-hud.is-low .coin-hud-plus { animation-duration: 1.1s; }
+/* ── STORE CREDIT, BESIDE THE COINS AND DELIBERATELY NOT MATCHING THEM ────────────────────────────
+   Luke: "We should show current store credit in the top, and clicking it takes you to purchase store credit."
+   ⚠️ Coins are the game's currency; credit is real money a member has actually paid in. Two gold pills side
+   by side would teach people they are the same thing — one buys a pack, the other buys coins. Dark with a
+   gold hairline reads as a wallet rather than as loot, and it stays quiet next to the coin chip's shimmer,
+   which is right: this number should be legible, not shouted. */
+.credit-hud { flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 5px; text-decoration: none;
+    padding: 4px 10px; border-radius: 999px; line-height: 1.1;
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid rgba(212,175,55,0.42); }
+.credit-hud:hover { border-color: rgba(212,175,55,0.9); background: rgba(212,175,55,0.1); }
+.credit-hud:active { transform: scale(0.97); }
+.credit-hud-label { font-size: 0.56rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #8A8A8A; }
+.credit-hud-amt { font-size: 0.9rem; font-weight: 800; letter-spacing: -0.01em; color: #F0D27A; font-variant-numeric: tabular-nums; }
+/* On a 375px strip the coin chip, the credit chip, the level and the bar all have to fit. The bar is the one
+   with give in it — it is a progress indicator, not a number anyone reads. */
+@media (max-width: 420px) {
+    .hud-strip { gap: 6px; padding: 6px 9px; }
+    .hud-strip .reward-nudge-bar { min-width: 26px; }
+    .hud-strip .reward-nudge-togo { font-size: 0.74rem; }
+    .credit-hud { padding: 4px 8px; gap: 4px; }
+    /* ⚠️ TWO WORDS DROP SO THE XP COUNT SURVIVES. A 375px strip has about 357px of usable width and the
+       five chips wanted 407 — the shot showed "10,862 XP" clipped at the right edge and the progress bar
+       squeezed to a stub. The "CREDIT" label and the next-unlock glyph are the two pieces that carry the
+       least: a leading "$" already says the figure is money rather than coins, and the glyph is decoration
+       for a label that lives on the track page. */
+    .credit-hud-label { display: none; }
+    .hud-strip .reward-nudge-next { display: none; }
+}
 .boss2-sub { font-size: 0.78rem; text-align: center; margin: 2px 0 8px; }
 
 /* Active-heroes mini cards: dressed in each member's signature color + their equipped profile background,
@@ -24873,7 +24902,26 @@ body.cas-seated .social-fab { display: none; }
    above outranks it and the header sat there through the entire explosion — balance, pack count and all —
    while the markup said hidden and the component believed it. Any element given `hidden` in JSX that also
    carries a `display` of its own needs this partner rule. */
-.pk-top[hidden] { display: none; }
+/* ── THE BALANCE NEVER LEAVES THE SCREEN ───────────────────────────────────────────────
+   Luke, standing at the choice on a real pull: "I cant see how much store credit i have here."
+
+   The header used to be hidden outright from the burst onward, to buy the card its height. That was wrong at
+   exactly the wrong moment: "Sell back — $4.00" is a number with no meaning unless you can see what it is
+   being added TO, and sell-or-keep is the one decision on this screen where the balance is load-bearing.
+
+   So it does not disappear, it COLLAPSES — label and figure onto one line, no rule, no padding, and the
+   packs-left pill dropped entirely. About 20px instead of about 56, which the card gives back by moving from
+   54dvh to 50dvh at the readout. */
+.pk-top-slim {
+    padding-bottom: 0;
+    padding-right: 44px;
+    border-bottom: 0;
+    margin-bottom: 0;
+}
+
+.pk-top-slim .pk-bal { flex-direction: row; align-items: baseline; gap: 7px; }
+.pk-top-slim .pk-bal-label { font-size: 0.56rem; }
+.pk-top-slim .pk-bal-value { font-size: 1rem; }
 
 .pk-bal {
     display: flex;
@@ -25229,9 +25277,20 @@ body.cas-seated .social-fab { display: none; }
 }
 
 /* ── THE FACE ────────────────────────────────────────────────────────────────────────────────────────────────
-   THE SHININESS IS THE RARITY, ARITHMETICALLY. The glow's blur and spread are both calc()s on --tier-rank,
-   so a common sits in an 18px halo and a mythic in an 88px one. One expression, six tiers, nothing to keep
-   in sync when a tier is added. */
+   THE SHININESS IS THE RARITY, ARITHMETICALLY. The glow's blur is a calc() on --tier-rank, so a common sits
+   in a 26px halo and a mythic in a 126px one. One expression, six tiers, nothing to keep in sync when a tier
+   is added.
+
+   ⚠️ NO SPREAD ON THE GLOW, AND NO BORDER. Luke, on a real pull: "Weird edging going on the card."
+
+   A box-shadow SPREAD is not a softer glow — it is a hard-edged copy of the box, scaled up, which is THEN
+   blurred. So `0 0 32px 4px green` draws a crisp green rectangle 4px larger than the card before it blurs
+   anything, and on an uncommon that sat under a 2px #16a34a border: dark green line, bright green band,
+   abrupt stop. It reads as a sticker cut out and pasted on.
+
+   Blur with ZERO spread falls off from the card's own edge, which is what light does. Layered — a tight
+   near-white core, then the tier colour wide — so the card looks LIT rather than outlined. The 1px inset
+   hairline is the only hard line left, and it is inside the card, where a card's own edge belongs. */
 .pk-card-face {
     position: relative;
     width: 100%;
@@ -25239,10 +25298,11 @@ body.cas-seated .social-fab { display: none; }
     border-radius: 12px;
     overflow: hidden;
     background: #0B0B0B;
-    border: 2px solid var(--tier-edge);
     box-shadow:
-        0 0 calc(18px + var(--tier-rank) * 14px) calc(2px + var(--tier-rank) * 2px) var(--tier-glow),
-        0 18px 34px rgba(0, 0, 0, 0.65);
+        inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+        0 0 calc(9px + var(--tier-rank) * 5px) rgba(255, 255, 255, 0.25),
+        0 0 calc(26px + var(--tier-rank) * 20px) var(--tier-glow),
+        0 18px 34px rgba(0, 0, 0, 0.7);
 }
 
 /* contain, always. A card sprite stretched to fill is the one thing that makes a real card look fake. */
@@ -25337,7 +25397,7 @@ body.cas-seated .social-fab { display: none; }
    And before the readout exists there is nothing under the card, so it gets 68dvh — the biggest it is ever
    going to be is the frame the member actually gasps at. */
 .pk-stage { --card-h: min(68dvh, 470px); }
-.pk-stage.pk-readout { --card-h: min(54dvh, 380px); }
+.pk-stage.pk-readout { --card-h: min(46dvh, 340px); }
 
 .pk-readout .pk-arena {
     flex: 0 0 auto;
@@ -25384,6 +25444,142 @@ body.cas-seated .social-fab { display: none; }
 }
 
 .pk-done-line { margin: 10px 0 0; color: var(--ink-secondary); }
+/* ── THE TWO CHOICES ─────────────────────────────────────────────────────────────────────────────────────────
+   Luke: "Buttons to sell should be super sexy, and the take should be cta for add to card vault."
+
+   ⚠️ "KEEP IT" ON A GHOST BUTTON WAS THE BUG, NOT THE STYLING. A grey outline beside a filled gold one is the
+   shape of a cancel — this site has trained people that the quiet one is the way out. So the screen was
+   quietly arguing for the sell on every pull, including the ones somebody actually wants to own, and the
+   vault, which is the entire second half of this feature, was the button that looked like "no thanks".
+
+   Both are CTAs now. They are not the same CTA twice: gold is cash and the vault is jewel-toned, so the eye
+   can tell them apart before it reads a word. Three lines each — what it does, the headline, and the
+   consequence — because at this moment a member is deciding what happens to something they already own, and
+   "Keep it" alone does not say that the card gets stored, shipped or collected.
+
+   ⚠️ EQUAL WIDTH. flex: 1 1 0 on both, with min-width: 0 so a long card value cannot push the vault narrow.
+   Asymmetry here is an argument, and the screen is not supposed to be making one. */
+.pk-actions-choice {
+    display: flex;
+    flex-direction: row;
+    gap: 9px;
+    margin-top: 14px;
+}
+
+.pk-cta {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 9px 8px 10px;
+    min-height: 62px;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    overflow: hidden;
+    text-align: center;
+    transition: transform 0.12s ease, box-shadow 0.22s ease, filter 0.22s ease;
+}
+
+.pk-cta:active { transform: translateY(1px) scale(0.985); }
+.pk-cta:disabled { opacity: 0.5; cursor: default; }
+
+.pk-cta-kick {
+    font-size: 0.56rem;
+    font-weight: 800;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    opacity: 0.72;
+    line-height: 1;
+}
+
+.pk-cta-main {
+    font-size: 1.14rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.pk-cta-sub { font-size: 0.62rem; opacity: 0.64; line-height: 1.2; }
+
+/* CASH. Warm metal, lit from the top left, with a bright rim where a struck edge would catch the light.
+   ⚠️ The text colour is set with the background, every time — a gold button with inherited light text is
+   this site's oldest footgun. */
+.pk-cta-sell {
+    background: linear-gradient(152deg, #FFE9A8 0%, #F0CF66 28%, #D4AF37 62%, #B8912B 100%);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #1F1703;
+    box-shadow:
+        0 8px 24px rgba(212, 175, 55, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.75),
+        inset 0 -2px 6px rgba(140, 100, 20, 0.3);
+}
+
+.pk-cta-sell:hover:not(:disabled) {
+    box-shadow:
+        0 10px 32px rgba(212, 175, 55, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.85),
+        inset 0 -2px 6px rgba(140, 100, 20, 0.3);
+}
+
+/* THE VAULT. Deep indigo with a violet core and a gold hairline, so it belongs to the same set as the sell
+   without competing with it for the same colour. It is the considered choice and it should look expensive,
+   not quiet. */
+.pk-cta-vault {
+    background:
+        radial-gradient(ellipse 120% 90% at 50% 0%, rgba(167, 139, 250, 0.42), transparent 62%),
+        linear-gradient(165deg, #2A2250 0%, #171331 55%, #0F0C22 100%);
+    border-color: rgba(212, 175, 55, 0.45);
+    color: #F3F0FF;
+    box-shadow:
+        0 8px 24px rgba(90, 70, 190, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.pk-cta-vault .pk-cta-main { color: #E9DCFF; }
+.pk-cta-vault .pk-cta-kick { color: #D4AF37; opacity: 1; }
+
+.pk-cta-vault:hover:not(:disabled) {
+    border-color: rgba(212, 175, 55, 0.85);
+    box-shadow:
+        0 10px 32px rgba(120, 95, 230, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* A slow highlight across both, offset so they do not flash in unison — two buttons shining on the same beat
+   read as one animated bar rather than as two things you can choose between. */
+.pk-cta-shine {
+    position: absolute;
+    top: -70%;
+    bottom: -70%;
+    left: 0;
+    width: 44%;
+    pointer-events: none;
+    background: linear-gradient(
+        100deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.06) 34%,
+        rgba(255, 255, 255, 0.4) 50%,
+        rgba(255, 255, 255, 0.06) 66%,
+        transparent 100%
+    );
+    transform: translateX(-200%) skewX(-16deg);
+    animation: pk-cta-shine 4.2s ease-in-out infinite;
+}
+
+.pk-cta-vault .pk-cta-shine { animation-delay: 1.6s; opacity: 0.55; }
+
+@keyframes pk-cta-shine {
+    0% { transform: translateX(-200%) skewX(-16deg); }
+    20%, 100% { transform: translateX(400%) skewX(-16deg); }
+}
+
 
 .pk-btn {
     display: inline-flex;
@@ -25532,6 +25728,35 @@ body.cas-seated .social-fab { display: none; }
     .pk-sub { font-size: 0.78rem; }
     .pk-value { font-size: 1.7rem; margin-top: 2px; }
     .pk-actions { margin-top: 10px; gap: 7px; flex-direction: row; }
+    .pk-cta { min-height: 56px; padding: 7px 6px 8px; }
+    .pk-cta-main { font-size: 1.02rem; }
+    .pk-cta-sub { font-size: 0.58rem; }
+
+    /* ── THE 441px BUDGET, RE-CUT FOR TWO FULL CTAs ────────────────────────────────────────────
+       Promoting "Keep it" from a 44px ghost to a 56px three-line CTA cost 12px, and keeping the balance on
+       screen cost another 20. The fold check found both at once: the balance sat at y=-11 and the buttons
+       ended at 446 on a 441px viewport. So everything here gives up a few pixels:
+
+         stage padding      22     (10 top + 12 bottom)
+         the balance line   20
+         the card          194     44dvh of 441
+         arena breathing    10
+         two stage gaps     20
+         tier + name + sub  44
+         the value          26
+         the buttons        66     56px row plus its 10px margin
+         ----------------------
+         total             402     against 441
+
+       ⚠️ THE CARD IS STILL THE LINE WITH GIVE IN IT. Neither CTA shrinks below 56px — they are the two
+       irreversible actions on the screen and a member taps one of them with a thumb. */
+    .pk-stage { padding-top: 10px; padding-bottom: 12px; gap: 8px; }
+    .pk-stage.pk-readout { --card-h: min(44dvh, 340px); }
+    .pk-top-slim .pk-bal-value { font-size: 0.94rem; }
+    .pk-value { font-size: 1.56rem; margin-top: 0; }
+    .pk-name { font-size: 1.02rem; }
+    .pk-sub { font-size: 0.74rem; }
+    .pk-tier { font-size: 0.7rem; }
     .pk-fine { font-size: 0.7rem; }
 
     /* ⚠️ SCOPED TO .pk-actions, NOT BARE .pk-btn. The foot is a COLUMN flex container, so `flex: 1 1 0` on a
@@ -26398,6 +26623,11 @@ body.cas-seated .social-fab { display: none; }
 }
 
 .pk-close:hover { border-color: rgba(212, 175, 55, 0.55); color: #F2F2F2; }
+
+/* ⚠️ THE `hidden` ATTRIBUTE ALONE DOES NOTHING TO AN ELEMENT WITH ITS OWN `display`, and the film is how
+   that got caught. The user-agent sheet's `[hidden] { display: none }` is type-selector strength, so the
+   `display: flex` above outranks it — the modal header once sat there through an entire explosion while the
+   markup said hidden and the component believed it. Any element given `hidden` in JSX needs this partner. */
 .pk-close[hidden] { display: none; }
 
 /* ── THE HEADER ROW ───────────────────────────────────────────────────────────────────────────────────────────

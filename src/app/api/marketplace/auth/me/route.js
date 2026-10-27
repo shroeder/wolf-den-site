@@ -3,6 +3,7 @@ import { after, NextResponse } from "next/server";
 import { syncEarnedBadgesHourly } from "@/lib/marketplace/badges.js";
 import { getAccountLinkedVendorId, getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
 import { awardXp, claimPendingPurchases, dailyKey } from "@/lib/marketplace/xp.js";
 import { getAuthenticatedVendor } from "@/lib/marketplace/vendor-session.js";
@@ -31,7 +32,14 @@ export async function GET(request) {
                 // Enrich with the first-class profile (name/alias/avatar/badges) so every surface can
                 // show it. Keep displayName for back-compat with existing consumers.
                 const profile = await getProfile(account.id);
-                const buyer = { ...account, ...(profile || {}), displayName: profile?.displayLabel || account.displayName || null, owner: isOwner(account.id) };
+                // ⚠️ `vault` RIDES THIS REPLY (door 8 of 9, docs/virtual-packs-and-the-card-vault.md §16.2).
+                //    SiteHeader needs to know whether to offer the Card Vault in the site menu, and it is
+                //    mounted in the ROOT LAYOUT — a second endpoint there bills on every navigation by every
+                //    visitor, for ever, which is what check:chrome exists to catch. vaultOpenFor() is a pure
+                //    in-process predicate, so this costs nothing but a boolean on a reply already being sent.
+                //    And it is the SAME predicate as every other door, so the day VAULT_PUBLIC flips, this
+                //    one opens with the rest instead of being the gate somebody forgot.
+                const buyer = { ...account, ...(profile || {}), displayName: profile?.displayLabel || account.displayName || null, owner: isOwner(account.id), vault: vaultOpenFor(account.id) };
                 const vendorId = await getAccountLinkedVendorId(account.id);
                 if (vendorId) {
                     const vendor = await getVendorById(vendorId);

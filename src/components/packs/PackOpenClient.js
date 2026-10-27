@@ -409,10 +409,6 @@ export default function PackOpenClient({ initial }) {
             }}
             onClick={phase === PHASE.shake ? skip : undefined}
         >
-            {/* ⚠️ HIDDEN THE MOMENT THE BAG GOES, and that is a layout decision as much as a visual one: on a
-                375×667 phone the card has to be big AND both buttons have to be above the fold, and the
-                header was the row that made that impossible. While a card is on screen nothing else should be
-                asking for the eye anyway. */}
             <button
                 type="button"
                 className="pk-close"
@@ -423,12 +419,19 @@ export default function PackOpenClient({ initial }) {
                 &#215;
             </button>
 
-            <header className="pk-top" hidden={blown}>
+            {/* ⚠️ IT COLLAPSES ONCE THE BAG GOES, IT DOES NOT DISAPPEAR. The first cut hid this outright to
+                buy the card its height, and Luke found the hole standing at the choice on a real pull: "I
+                cant see how much store credit i have here." "Sell back — $4.00" is a number with no meaning
+                unless you can see what it is being added TO, and sell-or-keep is the one decision on this
+                screen where the balance is load-bearing. So the label and the figure collapse onto one line
+                and the packs-left pill goes — about 20px instead of about 56 — and the card pays for it by
+                settling to 50dvh instead of 54. */}
+            <header className={`pk-top${blown ? " pk-top-slim" : ""}`}>
                 <div className="pk-bal">
                     <span className="pk-bal-label">Store credit</span>
                     <strong className="pk-bal-value">{usd(rolledBalance)}</strong>
                 </div>
-                {pool ? (
+                {pool && !blown ? (
                     <button type="button" className="pk-shelf-btn" onClick={() => setShelfOpen(true)}>
                         {/* JSX eats the whitespace between an expression and the text after it, which
                             rendered as "79packs left". A template string keeps the space it was written with. */}
@@ -536,24 +539,42 @@ export default function PackOpenClient({ initial }) {
                             </div>
                         </div>
                     ) : (
-                        <div className="pk-actions">
-                            {/* Deliberately not symmetrical: selling is the filled one because it is the
-                                instant, legible reward; keeping is the quieter, more considered choice. */}
+                        <div className="pk-actions pk-actions-choice">
+                        {/* ── TWO CHOICES, BOTH OF THEM WANTED ────────────────────────────────────────────
+                            Luke: "Buttons to sell should be super sexy, and the take should be cta for add
+                            to card vault."
+
+                            ⚠️ "Keep it" ON A GHOST BUTTON WAS THE BUG, NOT THE STYLING. A grey outline next
+                            to a filled gold one is the shape of a cancel — this site has trained people that
+                            the quiet one is the way out. So the screen was quietly arguing for the sell on
+                            every pull, including the ones somebody actually wants to own, and the vault —
+                            the entire second half of this feature — was the button that looked like "no
+                            thanks".
+
+                            Both are CTAs now, and they are DIFFERENT ANIMALS: gold is cash, the vault is
+                            jewel-toned and says what it does. Each carries its own second line so the choice
+                            is legible without reading either label twice. */}
                             <button
                                 type="button"
-                                className="pk-btn pk-btn-primary"
+                                className="pk-cta pk-cta-sell"
                                 onClick={() => choose("sell")}
                                 disabled={busy}
                             >
-                                Sell back — {usd(open.card.valueCents)}
+                                <span className="pk-cta-kick">Sell back</span>
+                                <span className="pk-cta-main">{usd(open.card.valueCents)}</span>
+                                <span className="pk-cta-sub">straight to credit</span>
+                                <span className="pk-cta-shine" aria-hidden="true" />
                             </button>
                             <button
                                 type="button"
-                                className="pk-btn pk-btn-ghost"
+                                className="pk-cta pk-cta-vault"
                                 onClick={() => choose("vault")}
                                 disabled={busy}
                             >
-                                Keep it
+                                <span className="pk-cta-kick">Keep it</span>
+                                <span className="pk-cta-main">Card Vault</span>
+                                <span className="pk-cta-sub">ship or collect later</span>
+                                <span className="pk-cta-shine" aria-hidden="true" />
                             </button>
                         </div>
                     )}
