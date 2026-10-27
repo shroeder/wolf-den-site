@@ -25539,13 +25539,30 @@ body.cas-seated .social-fab { display: none; }
     margin-top: 2px;
     font-variant-numeric: tabular-nums;
 }
+/* ── ⚠️ EQUAL COLUMNS, AND LABELS THAT MAY NOT WRAP ──────────────────────────────────────────────────────
+   Luke: "290 max pull alignment". The columns were sized by their own content, so each one was a different
+   width and the dividers landed wherever the text ended — and worse, "MAX PULL" and "CARDS INSIDE" wrapped
+   to two lines while "TYPICAL" stayed on one, which made the three figures sit at different heights and the
+   rules between them run past the short column.
+
+   `flex: 1 1 0` makes the three columns identical regardless of what is in them, so the dividers are evenly
+   spaced by construction rather than by luck. `nowrap` on the labels is what keeps all three the same
+   height — without it the longest label decides, and which label is longest changes with the pool. */
+.pk-pick-stats {
+    width: 100%;
+    justify-content: center;
+}
 .pk-pick-stats span {
     display: flex;
+    flex: 1 1 0;
     flex-direction: column;
-    gap: 1px;
-    padding: 0 12px;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
     min-width: 0;
 }
+.pk-pick-stats b,
+.pk-pick-stats i { white-space: nowrap; }
 .pk-pick-stats span + span { border-left: 1px solid rgba(255, 255, 255, 0.12); }
 .pk-pick-stats b {
     font-size: 1.02rem;

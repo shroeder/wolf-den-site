@@ -677,7 +677,12 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                         </span>
                                         <span>
                                             <b>{p.units}</b>
-                                            <i>Cards inside</i>
+                                            {/* ⚠️ "Cards inside" was 68px against a 68px column — it
+                                                filled its own cell exactly and ran under the dividers
+                                                either side. The card is 220px wide (78% of a track already
+                                                inset 11%), so the label has to be short enough to live in a
+                                                third of that. "910" above it carries the meaning anyway. */}
+                                            <i>Cards</i>
                                         </span>
                                         {p.medianCents ? (
                                             <span>
