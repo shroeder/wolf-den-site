@@ -25,7 +25,7 @@ gate. Everything new here is a second channel standing beside them.
 
 ## 1. The shelf, measured (2026-10-27, prod)
 
-Every number below is from `inventory_feed`, in stock, quantity > 0, **consigned excluded** (§7).
+Every number below is from `inventory_feed`, in stock, quantity > 0, **consigned excluded** (§8).
 
 | category | lines | units | mean | **median** | max | stock value |
 |---|---|---|---|---|---|---|
@@ -114,9 +114,76 @@ treatment `priceTrusted` already gets, for the same reason.
 
 ---
 
-## 4. Pricing
+## 4. Bulk is a different animal
 
-### 4.1 The rule as asked
+Luke, 2026-10-27: *"Bulk cards should be under their own category, mind making me a bulk category?"*
+
+**The Square category already exists** and holds exactly two lines: `Magic Bulk` (862 units) and
+`Pokemon Bulk` (593 units), both listed at $0.25, both costed at **$0.01** in `wolfden_item_cost`. So there
+is nothing to create in the catalogue — what has to be built is a pool *shape* that bulk fits, and bulk does
+not fit the one in §2.
+
+### 4.1 ⚠️ The sell-back floor pays 400% on a bulk card
+
+This is the blocker, and it is not a tail risk — it is what a rational member does every time.
+
+| card value | sells back for | share of value |
+|---|---|---|
+| **$0.25 (bulk)** | **$1.00** | **400%** |
+| $0.50 | $1.00 | 200% |
+| $1.00 | $1.00 | 100% |
+| $1.67 | $1.25 | 75% |
+
+`BUYBACK_MIN_CENTS` is $1.00 and it exists for a good reason — *"sixty cents does not read as a transaction,
+it reads as being brushed off"* — but it quietly assumes a card worth at least about $1.67. Bulk is worth a
+quarter.
+
+Run the arithmetic on a 25-card pack priced by the §5 rule: list value $6.25, price $10, our cost $0.25.
+A member pays **$10**, sells the handful back a card at a time, and collects **$25**. We are down $15 on
+every pack sold, deterministically, and the cards come back to the shelf so we are not even short of stock.
+No cap fixes that; the shape is wrong.
+
+### 4.2 The fix is the unit: a bulk pool's unit is a **handful**, not a card
+
+Everything awkward about bulk comes from trying to treat one 25¢ card as a pull, and all of it dissolves if
+the thing you buy, reveal, hold and sell back is **N cards of one game**:
+
+- **The reveal** has nothing to reveal per card — one SKU, no identity, no art, no market value. A handful
+  can be revealed as what it is: a count, a game, and a fan of card backs.
+- **The vault row** is one row saying "25 Pokémon bulk", not 25 rows.
+- **Sell-back prices the handful once**, at 60% of the handful — $3.75 on a $6.25 scoop — and the $1 floor
+  applies to the transaction rather than to each card, which closes §4.1 completely.
+- **The pull task** is "scoop 25 Pokémon bulk", which is the easiest job in the queue rather than the
+  hardest: no hunting a named card in a case, and `not_found` effectively cannot happen.
+- **Square** decrements the bulk variation by N in one adjustment.
+
+### 4.3 ⚠️ And the EV pricing rule does not apply to bulk
+
+The §5 rule works because for singles the list price and what we paid are related — 46% across the shelf.
+For bulk they are not related at all: list is $0.25, cost is **$0.01**, a 4% ratio. "Price = EV rounded up
+to $5" against a 25¢ list just reproduces the counter price, because 25¢ divides into $5 exactly: 20 cards
+is $5.00 of list and prices at $5, 40 cards is $10.00 and prices at $10.
+
+That is not wrong — it is counter parity, which is the right answer — but it means **N is the lever and the
+price follows**, rather than the price being derived from value. Bulk should be priced the way the counter
+prices it and sanity-checked against cost, not run through the EV machine.
+
+### 4.4 So: is it a mystery pack at all?
+
+Honestly, no — and this is the one category where "they'll always be mystery packs" strains. There is no
+mystery in a scoop of bulk: the member knows exactly what they are getting, which is *volume*. The appeal of
+bulk elsewhere in the hobby is that it is unsorted and might hide a hit, and ours cannot promise that
+because it is a single undifferentiated SKU with no per-card identity behind it.
+
+It is a **grab bag**, and it is a perfectly good product — it just sells on quantity rather than on the
+opening. Branding it as a mystery pack would be promising a reveal the data cannot deliver, which is the
+fastest way to make the real mystery packs look like they are lying too.
+
+---
+
+## 5. Pricing
+
+### 5.1 The rule as asked
 
 `price = ceil(EV / 5) * 5`, where EV is the mean market value of the pool as it stands.
 
@@ -132,9 +199,9 @@ target 0.75 both of those become $20 and the relationship is deliberate.
 Of 1,140 single-card lines, **578 carry a real recorded cost** in `wolfden_item_cost`, and across those the
 cost is **46% of list** — not the 60% buy rate, because the trade rate and what we actually paid are
 different numbers. So the true margin at EV pricing is ~54%, not ~40%. For the other half of the shelf we
-have no cost record at all and would be pricing against an assumption. See the question in §10.
+have no cost record at all and would be pricing against an assumption. See the question in §11.
 
-### 4.2 Where EV comes from, and when
+### 5.2 Where EV comes from, and when
 
 EV must be computed from the **live pool**, on a schedule, and stored on the pool row — never computed at
 open time. A price that moves between the screen quoting it and the member tapping it is the bug
@@ -146,9 +213,9 @@ new price, and let the screen read it. A pack whose price moved mid-session is a
 
 ---
 
-## 5. The platform
+## 6. The platform
 
-### 5.1 A pool registry, in code
+### 6.1 A pool registry, in code
 
 Pools are **definitions**, not content: a handful of objects with a key, a brand, a category, a band and a
 gate. They belong in code beside `COUNTER_STORE` and `CHANGELOG`, for the reason written over the latter —
@@ -170,13 +237,13 @@ is a second source of truth about what is on the shelf, and it is wrong the mome
 `category_id` stores nothing that reaches a sale, and a pool keyed off it would match nothing while looking
 perfectly correct in the diff.
 
-### 5.2 What `mkt_pack_open` needs
+### 6.2 What `mkt_pack_open` needs
 
 One column: `pool` (text, default `'bags'`). Everything downstream — the reveal, the vault, the sell-back,
 the trade ledger, the telemetry — already keys off the open row and does not care which pool it came from.
 Backfilling existing rows to `'bags'` is the whole migration.
 
-### 5.3 What inherits for free
+### 6.3 What inherits for free
 
 This is the part that makes the work worth doing, and it is most of the feature:
 
@@ -188,13 +255,13 @@ This is the part that makes the work worth doing, and it is most of the feature:
 - the **casino vendor** — he becomes a vendor with a *shelf* of packs rather than one button
 
 The UI work is therefore mostly **choosing** a pack rather than opening one: a picker, and a brand on the
-bag. See §8.
+bag. See §9.
 
 ---
 
-## 6. What is genuinely different from a bag, and must be built
+## 7. What is genuinely different from a bag, and must be built
 
-### 6.1 ⚠️ The race with the register is much worse
+### 7.1 ⚠️ The race with the register is much worse
 
 A bag is a sealed object in a tub that nobody sells by mistake. **A shelf single is in a binder in a case and
 is for sale right now, at the counter, to somebody standing in the shop.** §1.2 of the parent doc solved the
@@ -205,7 +272,7 @@ The honest sequence is: **claim in Square first, reveal second.** Decrement the 
 open, and only then show the card. If the decrement fails because the register won, the member is refunded
 before anything is revealed, and has seen nothing.
 
-### 6.2 ⚠️ Decrement, never delete
+### 7.2 ⚠️ Decrement, never delete
 
 The bag path **deletes** the packed variation — correct there, because a sealed bag is a one-off SKU. A shelf
 single is a real catalogue line with history, a cost record and possibly more copies. Deleting it would
@@ -217,14 +284,14 @@ the shelf side of it is currently *nothing*. That nothing has to become a `-1` i
 ⚠️ And it must adjust **exactly once**: itemised Square orders decrement themselves, and a second adjustment
 on our side reads as theft in the counts (`square-decrements-twice`).
 
-### 6.3 The pull task is a different job
+### 7.3 The pull task is a different job
 
 "Open the bag in the tub and re-shelve the card" becomes "**find this card in the case**". That is slower,
 needs the card's set, number and condition in the task, and fails more often. The `not_found` path — which
 refunds the member in full and is the only detector that the shelf has drifted from the table — stops being
 an edge case and becomes a normal weekly event.
 
-### 6.4 Condition is part of the product
+### 7.4 Condition is part of the product
 
 Shelf singles carry condition in the name (`NM`, `LP`). The bags mostly do not. A member who pulls an LP card
 at a NM price has a legitimate complaint, so either condition is **shown on the reveal** (it already is —
@@ -232,7 +299,7 @@ at a NM price has a legitimate complaint, so either condition is **shown on the 
 
 ---
 
-## 7. ⚠️ Consignment is excluded, and it is not close
+## 8. ⚠️ Consignment is excluded, and it is not close
 
 Four of the deepest categories on the shelf are **consignors**, not products: `Eric D` (209 units), `Pedro
 Painting` (96), `Josh comics` (91), `Justin's cards` (84) — all 100% `consigned`. Selling a consigned card
@@ -244,7 +311,7 @@ should live in the pool membership function where it cannot be forgotten — not
 
 ---
 
-## 8. Branding
+## 9. Branding
 
 Each pool is a pack with a name, a colour and a bag. The existing art is one black foil bag with a gold
 crescent; per-pool branding means **one bag sprite per pool**, which is real money and a real decision
@@ -259,7 +326,7 @@ The pack **picker** is new UI: a shelf of bags with a name, a price and "what's 
 
 ---
 
-## 9. The gate
+## 10. The gate
 
 A **second flag**, `SHELF_PACKS_PUBLIC`, and a second `shelfPacksOpenFor(buyerId)` beside the existing pair.
 
@@ -274,7 +341,7 @@ single readable fact.
 
 ---
 
-## 10. Questions for Luke
+## 11. Questions for Luke
 
 1. **Bands — yes?** Everything above hangs on cutting each category into price bands. Without them a
    Pokémon pack is $15 for a typical $6 card. Are the boundaries right — $2–10 / $10–25 / $25–60 / $60+ —
@@ -300,12 +367,23 @@ single readable fact.
 7. **How many pools at launch, and what are they called?** "Pokémon Singles" and "Pokémon Chase" are
    placeholders. The names are the branding and I would rather use yours.
 
-8. **Bulk Cards** — 1,455 units at 25¢ across 2 lines. Not a pack by the bar above, but it is the only pool
-   deep enough to never run out. Is there a product in there (a 10-card grab bag?) or is it just bulk?
+8. **Bulk: how many cards, at what price?** N is the lever and the price follows (§4.3). 20 cards for $5
+   is counter parity. 40 for $10 and 100 for $25 are the same ratio at bigger sizes. One size or a ladder?
+
+9. **Bulk: one pool per game, or one mixed?** There are two SKUs — `Magic Bulk` and `Pokemon Bulk` — so
+   "Pokémon Bulk, 20 cards" and "Magic Bulk, 20 cards" is free. A mixed scoop would be a third thing we do
+   not stock and would have to be made by hand.
+
+10. **Bulk: does it sell back at all?** §4.2 makes the handful the unit, which closes the 400% hole. The
+    other option is simpler: bulk is keep-or-collect only and never trades back, on the grounds that we do
+    not buy bulk back one card at a time at the counter either. Which?
+
+11. **Does bulk ship?** Twenty loose cards in an envelope is a different postage and packing job from one
+    card in a sleeve, and the vault's shipping quote assumes the latter.
 
 ---
 
-## 11. Build order (if the above survives)
+## 12. Build order (if the above survives)
 
 1. `pool` column on `mkt_pack_open`, backfilled to `'bags'`; the registry; `shelfPacksOpenFor`.
 2. Pool membership + EV from `inventory_feed`, consigned excluded, nightly price recompute.
