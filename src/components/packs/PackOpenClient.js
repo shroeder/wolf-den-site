@@ -650,9 +650,13 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                 className={`pk-pick${i === picked ? " pk-pick-on" : ""}${p.open ? "" : " pk-pick-shut"}`}
                             >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
+                                {/* ⚠️ THE POOL'S OWN BAG, falling back to the house one. Same crest on every
+                                    pack — provably the same, it is the same pixels — and a different colour
+                                    of foil, so the carousel reads as a product line rather than as four
+                                    names under one picture. */}
                                 <img
                                     className="pk-pick-bag"
-                                    src="/images/packs/mystery-bag-drawn-600.webp"
+                                    src={p.art || "/images/packs/mystery-bag-drawn-600.webp"}
                                     alt=""
                                     aria-hidden="true"
                                 />

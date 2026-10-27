@@ -41,13 +41,19 @@ export const PACK_POOLS = [
         // priced by it.
         pricedBySquare: true,
         public: true,
+        // The house bag, untouched. Every other art below is a RECOLOUR of this file — same crest,
+        // different foil — made by scripts/gen-pack-bag-colours.mjs rather than drawn again.
+        art: "/images/packs/mystery-bag-drawn-600.webp",
     },
-    { key: "pkmn", brand: "Pokémon Singles", channel: "shelf", category: "Pokemon Single Card" },
-    { key: "mtg", brand: "Magic Singles", channel: "shelf", category: "Magic Single Card" },
+    { key: "pkmn", brand: "Pokémon Singles", channel: "shelf", category: "Pokemon Single Card",
+        art: "/images/packs/mystery-bag-pkmn-600.webp" },
+    { key: "mtg", brand: "Magic Singles", channel: "shelf", category: "Magic Single Card",
+        art: "/images/packs/mystery-bag-mtg-600.webp" },
     // Defined and expected to be CLOSED on concentration — one Ancient Fairy Dragon is a third of this pool's
     // value. It is here rather than omitted so that it opens by itself the day the shelf allows, instead of
     // waiting for somebody to remember it exists.
-    { key: "ygo", brand: "Yu-Gi-Oh Singles", channel: "shelf", category: "Yu-Gi-Oh Single" },
+    { key: "ygo", brand: "Yu-Gi-Oh Singles", channel: "shelf", category: "Yu-Gi-Oh Single",
+        art: "/images/packs/mystery-bag-ygo-600.webp" },
 ];
 
 export const poolByKey = (key) => PACK_POOLS.find((p) => p.key === key) || null;
@@ -261,6 +267,7 @@ export async function poolStates() {
             key: pool.key,
             brand: pool.brand,
             channel: pool.channel,
+            art: pool.art || null,
             priceCents: s?.price_cents ?? 0,
             evCents: s?.ev_cents ?? 0,
             units: s?.units ?? 0,

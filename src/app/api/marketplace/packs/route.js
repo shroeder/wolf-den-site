@@ -40,6 +40,7 @@ export async function GET(request) {
             const pools = [
                 {
                     key: "bags", brand: "Wolf Den Mystery Bag", priceCents: pool.priceCents,
+                    art: poolByKey("bags")?.art || null,
                     units: pool.remaining, open: pool.remaining > 0 && pool.priceTrusted !== false,
                     closedReason: pool.remaining > 0 ? null : "empty",
                     maxCents: pool.cards?.[0]?.valueCents ?? 0,
@@ -47,7 +48,7 @@ export async function GET(request) {
                     cards: pool.cards || [],
                 },
                 ...(await Promise.all(shelf.map(async (p) => ({
-                    key: p.key, brand: p.brand, priceCents: p.priceCents, units: p.units,
+                    key: p.key, brand: p.brand, priceCents: p.priceCents, units: p.units, art: p.art,
                     open: p.open, closedReason: p.closedReason,
                     maxCents: p.maxCents, medianCents: p.medianCents,
                     // ⚠️ EACH POOL CARRIES ITS OWN CONTENTS. The sheet used to read one global card list
