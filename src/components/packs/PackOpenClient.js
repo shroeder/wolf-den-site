@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Haptic } from "@/components/arena/arena-audio.js";
 import { BUYBACK_PERCENT, packsWorth } from "@/lib/marketplace/buyback.js";
 import { PACK_TIERS, tierByKey } from "@/lib/marketplace/pack-rarity.js";
-import { burst, coinIn, coinOut, fanfare, rumble, shimmer, stopPackAudio, tierChord } from "@/components/packs/pack-audio.js";
+import { burst, coinIn, coinOut, fanfare, rumble, shimmer, stopPackAudio, tally, tierChord } from "@/components/packs/pack-audio.js";
 
 // ── THE PACK OPENING ─────────────────────────────────────────────────────────────────────────────────────────
 // Design doc §3, rebuilt 2026-10-27. The rule the gachapon set still holds unchanged:
@@ -41,17 +41,23 @@ const PHASE = {
 };
 
 // Milliseconds. The shake is the held breath; everything after it gets out of the card's way.
-const T = { shake: 950, burst: 420, reveal: 560 };
+// `sold` is how long the card takes to leave, and `tally` is the count-up that replaces it.
+const T = { shake: 950, burst: 420, reveal: 560, sold: 420, tally: 1150 };
 
 const usd = (cents) => `$${((Number(cents) || 0) / 100).toFixed(2)}`;
 
 /**
  * A number that rolls rather than jumping. The balance moving is the second most dopamine-dense thing on this
  * screen after the value, so it is never allowed to simply change.
+ *
+ * `startAt` is for a figure that MOUNTS already needing to move — the count-up after a sale, which appears on
+ * screen for the first time showing the old balance and then climbs to the new one. Without it the hook
+ * initialises to the target, and a counter that is born holding its answer has nothing left to count.
  */
-function useRolling(target, ms = 650) {
-    const [shown, setShown] = useState(target);
-    const from = useRef(target);
+function useRolling(target, ms = 650, startAt = null) {
+    const begin = startAt === null ? target : startAt;
+    const [shown, setShown] = useState(begin);
+    const from = useRef(begin);
     useEffect(() => {
         const start = performance.now();
         const a = from.current;
@@ -114,6 +120,55 @@ function rollDebris() {
     return { shards, sparks };
 }
 
+/**
+ * The card turning into money. Rolled in the tap handler and parked in state for the two reasons spelled out
+ * over rollDebris — fresh angles on every render teleport the pieces mid-flight, and Math.random() during a
+ * render fails the purity rule the build enforces.
+ *
+ * Fewer pieces than the burst, all of them gold, and thrown a shorter distance. This is a payout landing, not
+ * a bag coming apart: it should read as the card being counted out rather than destroyed.
+ */
+function rollCoins() {
+    return Array.from({ length: 14 }, (_, i) => ({
+        id: `c${i}`,
+        angle: (360 / 14) * i + (Math.random() * 18 - 9),
+        distance: 0.3 + Math.random() * 0.6,
+        size: 9 + Math.random() * 13,
+        spin: Math.random() * 520 - 260,
+        delay: Math.random() * 130,
+    }));
+}
+
+/**
+ * ── WHAT A SALE LEAVES ON THE SCREEN ─────────────────────────────────────────────────────────────────────
+ * Luke, 2026-10-27, on the sold screen: "When u sell, it should move on from the card you no longer own. And
+ * it should do a count up animation on the store credit in the middle of the screen."
+ *
+ * The screen he was looking at kept everything: the card at full size, its rays still turning, its tier, its
+ * name and its market value — a reveal still celebrating an object that now belongs to the shop — with the
+ * payout added underneath as a line of text. The member's own money was the small print on somebody else's
+ * card.
+ *
+ * So the sale gets the stage. The card collapses into coins, and what rises where it was is the only thing
+ * the member now owns: the balance, counting from what it was to what it is. ⚠️ THE COUNT STARTS AT THE OLD
+ * FIGURE — a number that merely appears is a fact, and a number that climbs is a payout. That is the whole
+ * difference, and it is why the balance write is held back until this component exists to spend it.
+ */
+function PackBank({ fromCents, toCents, payoutCents, cardName }) {
+    const shown = useRolling(toCents, T.tally, fromCents);
+    return (
+        <div className="pk-bank">
+            <p className="pk-bank-plus">+{usd(payoutCents)}</p>
+            <p className="pk-bank-label">Store credit</p>
+            <p className="pk-bank-total">{usd(shown)}</p>
+            {/* The receipt, and deliberately the quietest line here. The card is named because somebody
+                selling eight packs in a row should be able to see WHICH one just paid — but it is named in
+                grey body text, not shown, because the point of this screen is that we have moved on. */}
+            {cardName ? <p className="pk-bank-what">{`${cardName} sold back`}</p> : null}
+        </div>
+    );
+}
+
 export default function PackOpenClient({ initial }) {
     const [pool, setPool] = useState(initial?.pool || null);
     const [balanceCents, setBalanceCents] = useState(initial?.balanceCents || 0);
@@ -142,6 +197,11 @@ export default function PackOpenClient({ initial }) {
     // Null until a pack is opened. A member resumed into the readout never had a burst on this page load, so
     // there is nothing to throw — see the guard on the render.
     const [debris, setDebris] = useState(null);
+    // The sale, in its two beats. `sellOut` is the card leaving; `bank` is the count-up that replaces it and
+    // carries the two figures it counts between. See PackBank.
+    const [sellOut, setSellOut] = useState(false);
+    const [bank, setBank] = useState(null);
+    const [coins, setCoins] = useState(null);
     const timers = useRef([]);
     const rolledBalance = useRolling(balanceCents);
 
@@ -284,8 +344,20 @@ export default function PackOpenClient({ initial }) {
         at(Math.max(0, T.shake - (performance.now() - startedAt)), () => detonate(data));
     }
 
+    /**
+     * Sell it or keep it.
+     *
+     * ⚠️ SELLING IS TWO BEATS, NOT ONE REPAINT. The card has to be gone before the money arrives, or the
+     * screen is asking the member to look at a card and a balance at the same time and the balance loses —
+     * see PackBank for the whole argument. So the tap starts the card leaving, and T.sold later the counter
+     * takes the stage it vacated.
+     *
+     * ⚠️ AND THE BALANCE IS NOT WRITTEN UNTIL THAT MOMENT. Setting it on the response rolls the header figure
+     * during the card's exit: two numbers moving in two places, and the little one wins because it moves
+     * first. The refresh is held back with it for the same reason — it carries a balance of its own.
+     */
     async function choose(which) {
-        if (busy || !open) return;
+        if (busy || !open || choice) return;
         setBusy(true);
         try {
             const res = await fetch(`/api/marketplace/packs/${open.id}/choose`, {
@@ -299,13 +371,30 @@ export default function PackOpenClient({ initial }) {
                 setError(data.error || "Couldn't do that.");
                 return;
             }
-            if (which === "sell") {
-                coinIn();
-                Haptic.fire([0, 14, 40, 26]);
-                if (typeof data.balanceCents === "number") setBalanceCents(data.balanceCents);
-            }
             setChoice(which);
-            refreshPool();
+            if (which !== "sell") {
+                refreshPool();
+                return;
+            }
+
+            const fromCents = balanceCents;
+            // ⚠️ THE 409 PATH CARRIES NO FIGURE. "already_chosen" is an error body — it has a code and
+            //    nothing else — so the count-up has to be able to work out where it is going on its own, or
+            //    a double-tap renders NaN in 3rem type across the middle of the screen.
+            const toCents = typeof data.balanceCents === "number"
+                ? data.balanceCents
+                : fromCents + (open.card.sellBackCents || 0);
+
+            coinIn();
+            Haptic.fire([0, 14, 40, 26]);
+            setCoins(rollCoins());
+            setSellOut(true);
+            at(T.sold, () => {
+                setBalanceCents(toCents);
+                setBank({ fromCents, toCents, payoutCents: Math.max(0, toCents - fromCents) });
+                tally(T.tally);
+                refreshPool();
+            });
         } finally {
             setBusy(false);
         }
@@ -316,6 +405,9 @@ export default function PackOpenClient({ initial }) {
         setOpen(null);
         setChoice(null);
         setDebris(null);
+        setSellOut(false);
+        setBank(null);
+        setCoins(null);
         setPhase(PHASE.idle);
     }
 
@@ -342,7 +434,10 @@ export default function PackOpenClient({ initial }) {
     // "Blown" is every phase after the bag is gone. It is one derived flag rather than three comparisons
     // because four different things key off it and they must not be able to disagree.
     const blown = phase === PHASE.burst || phase === PHASE.reveal || phase === PHASE.readout;
-    const showCard = Boolean(open) && blown;
+    // ⚠️ THE CARD GOES WHEN THE COUNTER ARRIVES, AND NOT ONE RENDER EITHER SIDE OF IT. Unmounting it on the
+    // tap kills the exit animation mid-flight; leaving it mounted past the bank puts a sold card behind the
+    // balance. Both halves key off the same piece of state so they cannot disagree.
+    const showCard = Boolean(open) && blown && !bank;
     // null unless the sell-back beats what the pack cost — see packsWorth.
     const multiple = packsWorth(open?.card?.sellBackCents, open?.priceCents ?? priceCents);
     // The × exists only where a dismiss cannot strand a paid-for card. See closeModal().
@@ -404,7 +499,7 @@ export default function PackOpenClient({ initial }) {
 
     return (
         <section
-            className={`pk-stage pk-${phase}`}
+            className={`pk-stage pk-${phase}${sellOut && !bank ? " pk-selling" : ""}${bank ? " pk-banked" : ""}`}
             style={{
                 "--tier-glow": tier.glow,
                 "--tier-edge": tier.edge,
@@ -504,6 +599,10 @@ export default function PackOpenClient({ initial }) {
                                 good the pull was — the fan gets brighter and wider with the tier. */}
                             <div className="pk-rays" aria-hidden="true" />
                             <div className="pk-card-face">
+                                {/* The gold wash that crosses the face as it is sold. It is on the FACE and
+                                    not on .pk-card, because the card itself is carrying the shrink — a
+                                    second transform on the same element would overwrite the first. */}
+                                <span className="pk-card-cash" aria-hidden="true" />
                                 {open.card.imageUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={open.card.imageUrl} alt={open.card.name} />
@@ -516,10 +615,58 @@ export default function PackOpenClient({ initial }) {
                             </div>
                         </div>
                     ) : null}
+
+                    {/* The card counted out into coins. Same container as the burst's debris, so it inherits
+                        --blast and is thrown the same way on every screen size. */}
+                    {coins ? (
+                        <div className="pk-debris" aria-hidden="true">
+                            {coins.map((c) => (
+                                <span
+                                    key={c.id}
+                                    className="pk-coin"
+                                    style={{
+                                        "--a": `${c.angle}deg`,
+                                        "--d": c.distance,
+                                        "--sz": `${c.size}px`,
+                                        "--spin": `${c.spin}deg`,
+                                        "--delay": `${c.delay}ms`,
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    ) : null}
+
+                    {/* The balance, where the card was. */}
+                    {bank ? (
+                        <PackBank
+                            fromCents={bank.fromCents}
+                            toCents={bank.toCents}
+                            payoutCents={bank.payoutCents}
+                            cardName={open?.card?.name}
+                        />
+                    ) : null}
                 </div>
             </div>
 
-            {phase === PHASE.readout && open ? (
+            {/* ⚠️ THE SOLD SCREEN IS A DIFFERENT SCREEN, NOT THIS ONE WITH A LINE ADDED. Everything above the
+                buttons here — the tier, the name, the market value — describes a card the member has just
+                stopped owning, and none of it survives the sale. What takes its place is in the arena above:
+                the payout, and the balance counting up to meet it. */}
+            {phase === PHASE.readout && open && bank ? (
+                <div className="pk-result pk-result-sold">
+                    <div className="pk-done">
+                        <p className="pk-done-line">Spends like cash here — no fees, no waiting.</p>
+                        <div className="pk-actions">
+                            <button type="button" className="pk-btn pk-btn-primary" onClick={reset} disabled={!canOpen}>
+                                {canOpen ? "Open another" : "Done"}
+                            </button>
+                            <a className="pk-btn pk-btn-ghost" href="/marketplace/vault">Go to the vault</a>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {phase === PHASE.readout && open && !bank ? (
                 <div className="pk-result">
                     <p className="pk-tier" style={{ color: tier.glow }}>{tier.label}</p>
                     <h2 className="pk-name">{open.card.name}</h2>
@@ -527,22 +674,9 @@ export default function PackOpenClient({ initial }) {
                     <p className="pk-value">{usd(open.card.valueCents)}</p>
                     {open.bigHit ? <p className="pk-big">That&apos;s going on the board.</p> : null}
 
-                    {choice ? (
+                    {choice === "vault" ? (
                         <div className="pk-done">
-                            {/* The payout gets its own moment. "Sold back for $2.50." in body text was the
-                                flattest possible end to the loudest screen in the Den — the number that
-                                just landed in somebody's balance should look like it landed. */}
-                            {choice === "sell" ? (
-                                <p className="pk-paid">
-                                    <span className="pk-paid-amount">+{usd(open.card.sellBackCents)}</span>
-                                    <span className="pk-paid-label">in store credit</span>
-                                </p>
-                            ) : null}
-                            <p className="pk-done-line">
-                                {choice === "sell"
-                                    ? "Spends like cash here — no fees, no waiting."
-                                    : "Added to your vault."}
-                            </p>
+                            <p className="pk-done-line">Added to your vault.</p>
                             <div className="pk-actions">
                                 <button type="button" className="pk-btn pk-btn-primary" onClick={reset} disabled={!canOpen}>
                                     {canOpen ? "Open another" : "Done"}
@@ -575,7 +709,7 @@ export default function PackOpenClient({ initial }) {
                                 type="button"
                                 className={`pk-cta pk-cta-sell${multiple ? " pk-cta-bank" : ""}`}
                                 onClick={() => choose("sell")}
-                                disabled={busy}
+                                disabled={busy || Boolean(choice)}
                             >
                                 <span className="pk-cta-kick">Sell back</span>
                                 <span className="pk-cta-main">{usd(open.card.sellBackCents)}</span>
@@ -592,7 +726,7 @@ export default function PackOpenClient({ initial }) {
                                 type="button"
                                 className="pk-cta pk-cta-vault"
                                 onClick={() => choose("vault")}
-                                disabled={busy}
+                                disabled={busy || Boolean(choice)}
                             >
                                 <span className="pk-cta-kick">Keep it</span>
                                 <span className="pk-cta-main">Card Vault</span>

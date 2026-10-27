@@ -44,6 +44,28 @@ export function coinIn() {
 }
 
 /**
+ * The balance counting up after a sale. A run of clicks under a number that is climbing, then the landing.
+ *
+ * ⚠️ THE CLICKS ARE SPACED ON THE DIGITS' EASING, NOT EVENLY. The counter runs on easeOutCubic — fast off the
+ * mark, settling at the end — so an evenly spaced tick is already out of step with it by the halfway point
+ * and sounds like a second, slower thing happening nearby. Inverting the ease here is what makes the sound
+ * feel attached to the number: the ticks crowd where the digits are flying and thin out as they settle.
+ */
+export function tally(durationMs = 1150, ticks = 18) {
+    const b = ensure();
+    if (!b) return;
+    const d = durationMs / 1000;
+    for (let i = 1; i <= ticks; i += 1) {
+        const p = i / ticks;
+        const at = d * (1 - (1 - p) ** (1 / 3));
+        tone({ freq: 1160 + p * 820, type: "triangle", at, dur: 0.03, gain: 0.028, bus: b });
+    }
+    // It lands. Two notes up, because the number ended higher than it started.
+    tone({ freq: 784, to: 1175, type: "triangle", at: d, dur: 0.22, gain: 0.07, bus: b });
+    tone({ freq: 1568, type: "sine", at: d + 0.06, dur: 0.28, gain: 0.038, bus: b });
+}
+
+/**
  * The bag shaking itself apart. A low rumble that RISES across the whole shake, so the ear knows something
  * is building before the eye is sure — which is the entire job of this phase.
  *

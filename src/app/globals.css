@@ -24927,6 +24927,9 @@ body.cas-seated .social-fab { display: none; }
     display: flex;
     flex-direction: column;
     line-height: 1.15;
+    /* It stands down during a sale — see .pk-banked .pk-top .pk-bal. Declared here rather than there so the
+       fade works in both directions; a transition that only exists in the after-state cannot animate back. */
+    transition: opacity 0.3s ease;
 }
 
 .pk-bal-label {
@@ -25443,39 +25446,188 @@ body.cas-seated .social-fab { display: none; }
     animation-delay: 0.3s;
 }
 
-/* ── THE PAYOUT LANDING ──────────────────────────────────────────────────────────────────
-   "Sold back for $2.50." in body text was the flattest possible end to the loudest screen in the Den. The
-   number that just arrived in somebody's balance should look like it arrived. */
-.pk-paid {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1px;
-    margin: 8px 0 0;
-    animation: pk-paid-in 0.5s cubic-bezier(0.2, 1.2, 0.35, 1) both;
+/* ── THE SALE ─────────────────────────────────────────────────────────────────
+   Luke, 2026-10-27: "When u sell, it should move on from the card you no longer own. And it should do a count
+   up animation on the store credit in the middle of the screen."
+
+   What he was looking at was the reveal with a line added to it. The card stayed at full size with its rays
+   still turning, under its tier, its name and its market value — every large thing on the screen describing
+   an object that had just become the shop's — and the money the member had actually earned was "+$1.25" in
+   the gap underneath. The screen had not noticed the sale.
+
+   So selling is its own beat now. The card flares, collapses and is thrown out as coins; the readout fades
+   with it rather than a moment later; and the balance rises where the card was and COUNTS up to its new
+   figure. The count is the whole point: a number that appears is a fact, and a number that climbs is a
+   payout.
+
+   ⚠️ THE CARD'S EXIT REPLACES ITS ENTRANCE RATHER THAN LAYERING ON IT. .pk-card already carries pk-punch,
+   and a second `animation` shorthand on the same element overwrites the first. That is exactly what is wanted
+   here — punch finished seconds ago — but anybody adding a third needs to know it, because the version that
+   layers them is written `animation: a, b` and silently restarts the first. */
+.pk-selling .pk-card {
+    animation: pk-card-sold 420ms cubic-bezier(0.42, 0, 0.72, 0.18) forwards;
 }
 
-.pk-paid-amount {
-    font-size: 2.1rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1;
+/* It swells for a moment, goes white-hot and is gone: the shape of something being converted rather than
+   something being dropped. The coins leave on the frame it starts to shrink, so the eye reads one event. */
+@keyframes pk-card-sold {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); filter: brightness(1); }
+    26% { opacity: 1; transform: translate(-50%, -50%) scale(1.05) rotate(-1.6deg); filter: brightness(1.5); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.22) rotate(6deg); filter: brightness(2.3); }
+}
+
+/* The gold wash crossing the artwork as it goes.
+   ⚠️ IT IS ON THE FACE AND NOT ON .pk-card, because the card is carrying the shrink and a transform on the
+   same element would overwrite it. Same reason .pk-sheen lives here. */
+.pk-card-cash {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    background: linear-gradient(150deg, rgba(240, 210, 122, 0) 0%, rgba(240, 210, 122, 0.82) 50%, rgba(240, 210, 122, 0) 100%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.pk-selling .pk-card-cash {
+    animation: pk-card-cash 420ms ease-out forwards;
+}
+
+@keyframes pk-card-cash {
+    0% { opacity: 0; }
+    35% { opacity: 0.9; }
+    100% { opacity: 0.25; }
+}
+
+/* The readout leaves WITH the card. Two exits a quarter of a second apart read as a glitch, not a sequence. */
+.pk-selling .pk-result {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.24s ease, transform 0.24s ease;
+    pointer-events: none;
+}
+
+/* ── THE COINS ────────────────────────────────────────────────────────────
+   Round and gold with a lit rim, not the burst's dark shards: the card is being counted out, not destroyed.
+   They ride in the same .pk-debris container the burst uses, so they inherit --blast and throw the same
+   distance on a phone and on a desktop. */
+.pk-coin {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--sz);
+    height: var(--sz);
+    margin: calc(var(--sz) / -2) 0 0 calc(var(--sz) / -2);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #FFF4CE 0%, #F0D27A 38%, #9A7B22 100%);
+    box-shadow: 0 0 12px 2px rgba(240, 210, 122, 0.55);
+    opacity: 0;
+    animation: pk-coin 720ms cubic-bezier(0.12, 0.72, 0.3, 1) var(--delay) forwards;
+}
+
+/* The leading rotate() aims it, translateY() throws it, the trailing rotate() is the coin tumbling. Order
+   matters — the spin must come last or it steers the throw. Same rule as pk-shard. */
+@keyframes pk-coin {
+    0% { opacity: 1; transform: rotate(var(--a)) translateY(0) rotate(0deg) scale(0.55); }
+    45% { opacity: 1; }
+    100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--blast) * var(--d) * -1)) rotate(var(--spin)) scale(0.4); }
+}
+
+/* ── THE COUNT-UP ──────────────────────────────────────────────────────────
+   It stands exactly where the card stood, in the centre of the arena — which is the spot this screen has just
+   spent four seconds teaching the eye to watch. Anywhere else and the payout is something the member has to
+   go and find. */
+.pk-bank {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 4;
+    width: min(86vw, 420px);
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    animation: pk-bank-in 0.46s cubic-bezier(0.2, 1.15, 0.33, 1) both;
+}
+
+@keyframes pk-bank-in {
+    from { opacity: 0; transform: translate(-50%, calc(-50% + 18px)) scale(0.9); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* The payout, and the one figure here that is NOT the balance — so it is a pill rather than a number, sitting
+   above the total it was just added to. It lands a beat before the count starts, which is the order the two
+   things actually happened in. */
+.pk-bank-plus {
+    display: inline-block;
+    margin: 0 0 10px;
+    padding: 5px 15px 6px;
+    border-radius: 999px;
+    border: 1px solid rgba(240, 210, 122, 0.5);
+    background: linear-gradient(180deg, rgba(240, 210, 122, 0.18), rgba(240, 210, 122, 0.06));
     color: #F0D27A;
+    font-size: 1.12rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
     font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 26px rgba(212, 175, 55, 0.55);
+    box-shadow: 0 0 28px rgba(212, 175, 55, 0.28);
+    animation: pk-bank-plus 0.52s cubic-bezier(0.2, 1.25, 0.35, 1) 0.06s both;
 }
 
-.pk-paid-label {
+@keyframes pk-bank-plus {
+    from { opacity: 0; transform: translateY(14px) scale(0.8); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.pk-bank-label {
+    margin: 0;
     font-size: 0.64rem;
     font-weight: 800;
-    letter-spacing: 0.17em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: #8A8A8A;
 }
 
-@keyframes pk-paid-in {
-    from { opacity: 0; transform: translateY(14px) scale(0.86); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+/* ⚠️ tabular-nums IS LOAD-BEARING ON A COUNTER, NOT A POLISH. Proportional digits are different widths, so a
+   number counting through 1, 4 and 7 twitches sideways on every frame — and at 3.6rem the eye reads the
+   jitter instead of the number. */
+.pk-bank-total {
+    margin: 2px 0 0;
+    font-size: clamp(2.6rem, 13vw, 3.6rem);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+    color: #F0D27A;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 34px rgba(212, 175, 55, 0.48);
+}
+
+/* The receipt, and deliberately the quietest line on the screen. It names the card so somebody selling eight
+   packs in a row can see which one just paid — in grey body text, because the point of this screen is that we
+   have moved on from it. */
+.pk-bank-what {
+    margin: 8px 0 0;
+    font-size: 0.78rem;
+    color: #8A8A8A;
+}
+
+/* The light in the room follows the money. The flood is tier-coloured because the tier belonged to the card,
+   and the card has gone. */
+.pk-banked .pk-flood {
+    opacity: 0.28;
+    background: radial-gradient(circle, #D4AF37 0%, transparent 62%);
+}
+
+/* ⚠️ THE HEADER FIGURE STANDS DOWN, AND THIS IS NOT "I cant see how much store credit i have here" COMING
+   BACK. The balance has not left the screen — it IS the screen now, three times the size, in the middle. What
+   would actually be broken is two copies of one number animating at once: the small one finishes first, so
+   for half a second the header and the counter disagree about how much money the member has. */
+/* ⚠️ AND IT STANDS DOWN ON THE TAP, NOT WHEN THE COUNTER ARRIVES. Filmed, the later version put the header
+   at $42.13 and the counter at $42.07 in the same frame: two rolls of different lengths over the same money,
+   both on screen, disagreeing. Starting the fade with the card's exit means the header is gone before the
+   count begins and there is only ever one figure moving. */
+.pk-selling .pk-top .pk-bal,
+.pk-banked .pk-top .pk-bal {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .pk-done-line { margin: 10px 0 0; color: var(--ink-secondary); }
@@ -25827,6 +25979,8 @@ body.cas-seated .social-fab { display: none; }
        irreversible actions on the screen and a member taps one of them with a thumb. */
     .pk-stage { padding-top: 10px; padding-bottom: 12px; gap: 8px; }
     .pk-stage.pk-readout { --card-h: min(44dvh, 340px); }
+    .pk-bank-total { font-size: clamp(2.2rem, 11.5vw, 2.9rem); }
+    .pk-bank-plus { font-size: 1rem; margin-bottom: 8px; }
     .pk-top-slim .pk-bal-value { font-size: 0.94rem; }
     .pk-value { font-size: 1.56rem; margin-top: 0; }
     .pk-name { font-size: 1.02rem; }
