@@ -269,37 +269,40 @@ single readable fact.
 
 ---
 
-## 10. Questions for Luke
+## 10. Decided
 
-Answered already, recorded here so they stay answered: **no bands, one pack per category** (§2);
-**price = EV rounded up to $5** (§4.1); **bulk is out of scope** (§1).
+All of it, 2026-10-27. Recorded here so none of it gets re-opened by accident.
 
-1. **Does Yu-Gi-Oh ship at launch?** One card is 32% of that pool's value and the pack is priced on it
-   (§3). I would hold Yu-Gi-Oh until the concentration drops — which makes launch **two** pools, Pokémon
-   and Magic, both at $15. Hold it, or ship all three and accept that one?
+| | decision |
+|---|---|
+| **Pools** | One per category. **No price bands** — §2 argued for them and lost; the numbers did not need them. |
+| **Price** | `ceil(EV / 5) * 5` off the live pool's mean market value. |
+| **Launch** | **Pokémon Singles $15** and **Magic Singles $15**. Two pools. |
+| **Yu-Gi-Oh** | **Defined but closed.** One card is 32% of its value (§3). It opens itself when the shelf allows — nobody has to remember to come back to it. |
+| **Value ceiling** | **None.** The $290 Pokémon card stays in the pool. It is 2.2% of pool value, the EV already accounts for it, and a real chase card is most of what makes a $15 pack worth opening twice. |
+| **Pull SLA** | **No deadline.** Rides the existing queue exactly as the bags do, with an order promoting its task to the top. Nothing new to build. |
+| **Naming** | "Pokémon Singles", "Magic Singles". Descriptive, flat beside "Wolf Den Mystery Bag". |
+| **Bulk** | Out of scope. A Square catch-all, not a product (§1). |
+| **Vault** | *Assumed, not asked:* shelf cards land in the same Card Vault with the same shipping, the same seven-day hold and the same 60% sell-back. Say so if not. |
+| **Gate** | Owner-only, on its own flag. The bags stay public (§9). |
 
-2. **Who pulls the card, and how fast?** A single lives in a binder in a case, not sealed in a tub, so it
-   is a slower find and it can be sold at the register first. Same-day job, or does it ride the existing
-   queue with no deadline the way the bags do?
-
-3. **Do shelf cards go in the same Card Vault?** I have assumed yes — same vault, same shipping, same
-   seven-day hold, same sell-back at 60%. The alternative is a separate shelf, which I would not build.
-
-4. **What are they called?** "Pokémon Singles" and "Magic Singles" are placeholders and the names are the
-   branding. Two bags to draw at roughly $0.06 each, so the cost is choosing them rather than drawing them.
-
-5. **Does the $290 Pokémon card stay in the pool?** It is only 2.2% of pool value so it passes every test,
-   and a real chase card is most of what makes a pack worth opening twice. But it is a $290 card going out
-   for $15, and that is a decision rather than a calculation.
+⚠️ **The one that will come back.** Pokémon's EV is fifteen cents under the $15 boundary, so an ordinary
+shift in the shelf's mix reprices that pack to $20 — a third, with nothing announcing it. §4.2's minimum
+hold is what stops a member watching it move; it does not stop the move itself.
 
 ---
 
-## 11. Build order (if the above survives)
+## 11. Build order
 
-1. `pool` column on `mkt_pack_open`, backfilled to `'bags'`; the registry; `shelfPacksOpenFor`.
-2. Pool membership + EV from `inventory_feed`, consigned excluded, nightly price recompute.
-3. The shelf branch of the open path: claim → **decrement** → reveal, with the refund-before-reveal rule.
-4. The pull task carrying set, number and condition; `not_found` as a normal path.
-5. The picker UI and one recoloured bag per pool.
-6. Owner-gated end-to-end test on one pool — ⚠️ which spends real money and takes a real card off the shelf,
-   exactly as §16.4 says. There is no dry run that is also a true test.
+1. `pool` column on `mkt_pack_open`, backfilled to `'bags'`; the `PACK_POOLS` registry; `shelfPacksOpenFor`
+   on its own flag, with §9's door enumeration repeated for the new surfaces.
+2. Pool membership and EV from `inventory_feed` — **`NOT consigned` in the membership function itself**, not
+   in the callers — plus the nightly recompute, the minimum price hold, and the 15%-concentration close that
+   keeps Yu-Gi-Oh shut until it is ready.
+3. The shelf branch of the open path: claim → **decrement by one, never delete** → reveal, with the refund
+   landing before anything is shown.
+4. The pull task carrying set, number and condition, on the existing queue with no deadline; `not_found`
+   promoted from an edge case to a normal weekly path.
+5. The picker — a shelf of bags with a name, a price and "what's inside" — and one recoloured bag per pool.
+6. Owner-gated end-to-end on Pokémon Singles. ⚠️ Which spends real money and takes a real card off the
+   shelf, exactly as §16.4 of the parent says. There is no dry run that is also a true test.
