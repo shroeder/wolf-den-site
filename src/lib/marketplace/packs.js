@@ -509,8 +509,21 @@ export async function resolvePackCost(poolRow) {
             return { cents: Number(known.unit_cost_cents), basis: `item_cost:${known.source || "unknown"}` };
         }
     }
+    // ── ⚠️ THE ESTIMATE IS PER CHANNEL, BECAUSE THE TWO CHANNELS COST DIFFERENT THINGS ──────────────────────
+    // 65% is the BAG's number: a bag carries `wolfden_unit_cost` at 65% of its card's market, and when no
+    // real cost was captured that is the closest thing to a figure we have for it.
+    //
+    // A shelf single is not that. Measured 2026-10-27 across the 578 single-card lines that DO carry a
+    // recorded cost, we paid 45.3% of list — not the 60% trade rate, because what we actually paid and what
+    // we quote at the counter are different numbers. Costing a shelf card at 65% understates every margin it
+    // appears in by about a fifth.
+    //
+    // ⚠️ AND IT STILL ERRS HIGH ON PURPOSE. An estimate that overstates cost reports less profit than is
+    // really there; one that understates it reports money we never made. Of the two directions to be wrong
+    // in, only one of them ever gets shipped.
     const market = toCents(poolRow.market_value);
-    return { cents: Math.round(market * 0.65), basis: "estimate_65" };
+    const rate = poolRow.channel === "shelf" ? 0.46 : 0.65;
+    return { cents: Math.round(market * rate), basis: poolRow.channel === "shelf" ? "estimate_shelf_46" : "estimate_65" };
 }
 
 /** Mirror an online pull into the existing sold-event trail so every reader sees it like a counter sale. */

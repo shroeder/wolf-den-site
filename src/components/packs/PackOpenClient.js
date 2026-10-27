@@ -969,6 +969,15 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                         Every card still in the pool, best first. This is the same pool the shop counter is
                         selling from, so it moves.
                     </p>
+                    {/* ── THE ODDS, WHERE THE HOUSE ALREADY DECIDED ODDS GO ────────────────────────────
+                        Not on the carousel face, where it would read as a disclaimer — one tap in, on the
+                        way to spending, for somebody who has asked. Same rule the chests follow, and it is
+                        computed off the same pool query the pull uses rather than typed. */}
+                    {chosen?.beatsBp != null ? (
+                        <p className="pk-shelf-odds">
+                            {`${(chosen.beatsBp / 100).toFixed(0)}% of cards in here are worth ${usd(priceCents)} or more.`}
+                        </p>
+                    ) : null}
                     <ul className="pk-shelf-list">
                         {((chosen && pools.length > 1 ? chosen.cards : pool.cards) || []).map((card) => {
                             const t = tierByKey(card.tier);

@@ -4,7 +4,7 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { packPoolSummary, resumePendingOpen } from "@/lib/marketplace/packs.js";
 import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
 import { shelfPacksOpenFor, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
-import { poolByKey, poolStates, shelfPoolCards } from "@/lib/marketplace/pack-pools.js";
+import { beatsPriceBp, poolByKey, poolStates, shelfPoolCards } from "@/lib/marketplace/pack-pools.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -59,6 +59,8 @@ export async function GET(request) {
                     //    resting is secret, and a member who can see the fifty-one cards can see for
                     //    themselves that the pack is worth coming back for.
                     cards: await shelfPoolCards(poolByKey(p.key)),
+                    // §9.2 — the real figure, one tap in behind "what's inside", never on the carousel face.
+                    beatsBp: await beatsPriceBp(poolByKey(p.key), p.priceCents),
                 })))),
             ];
 

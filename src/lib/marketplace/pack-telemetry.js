@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { packPrice } from "@/lib/marketplace/packs.js";
 import { PACK_TIERS, tierForCents } from "@/lib/marketplace/pack-rarity.js";
+import { poolByKey } from "@/lib/marketplace/pack-pools.js";
 
 // ── WHAT THE PACKS ARE DOING ─────────────────────────────────────────────────────────────────────────────────
 // Design doc §8. One read, because this is a screen somebody opens to check a number, not a dashboard anybody
@@ -17,7 +18,7 @@ import { PACK_TIERS, tierForCents } from "@/lib/marketplace/pack-rarity.js";
 const money = (v) => Math.round(Number(v) || 0);
 
 export async function getPackTelemetry({ days = 30 } = {}) {
-    const [price, headline, byDay, tierSplit, members, pool, tasks, vault, basis] = await Promise.all([
+    const [price, headline, byDay, tierSplit, members, pool, tasks, vault, basis, byPool] = await Promise.all([
         packPrice(),
 
         // Money. Revenue and tax are stamped per open; COGS carries the basis it was resolved on.
@@ -102,6 +103,28 @@ export async function getPackTelemetry({ days = 30 } = {}) {
              GROUP BY 1 ORDER BY 2 DESC`,
             [String(days)]
         ),
+        // ── ⚠️ MONEY, SPLIT BY POOL, BECAUSE AVERAGING THEM IS A LIE ───────────────────────────────────
+        // Every figure above is `FROM mkt_pack_open` with no pool filter, which was exactly right while
+        // there was one pool. A $15 Pokémon pack and a $20 bag have different prices, different costs and
+        // different margins, and one blended margin across both is a number that describes neither — it
+        // moves when the MIX moves, so a good week of bag sales reads as the category packs improving.
+        //
+        // migration 486 added (pool, created_at) for this and nothing used it until now.
+        db.query(
+            `SELECT pool,
+                    COUNT(*)::int AS opens,
+                    COALESCE(SUM(price_cents), 0)::bigint AS credit_spent,
+                    COALESCE(SUM(revenue_cents), 0)::bigint AS revenue,
+                    COALESCE(SUM(cogs_cents), 0)::bigint AS cogs,
+                    COALESCE(SUM(card_value_cents), 0)::bigint AS pulled_value,
+                    COUNT(*) FILTER (WHERE outcome = 'sold_back')::int AS sold_back,
+                    COUNT(*) FILTER (WHERE outcome = 'vaulted')::int AS vaulted
+             FROM mkt_pack_open
+             WHERE preview = FALSE AND created_at >= NOW() - ($1 || ' days')::interval
+             GROUP BY pool
+             ORDER BY opens DESC`,
+            [String(days)]
+        ),
     ]);
 
     // ── The pool guardrail ──────────────────────────────────────────────────────────────────────────────────
@@ -115,7 +138,10 @@ export async function getPackTelemetry({ days = 30 } = {}) {
     for (const row of pool) {
         const key = tierForCents(money(Number(row.market_value) * 100)).key;
         poolTiers[key] = (poolTiers[key] || 0) + 1;
-        if (row.cost_cents !== null && row.cost_basis && row.cost_basis !== "estimate_65") costed += 1;
+        // ⚠️ ANY estimate_* BASIS IS NOT A REAL COST. This read `!== "estimate_65"` and would have counted
+        //    the new shelf estimate as a captured figure the moment one existed — a guess promoted to a fact
+        //    by a string comparison that was exhaustive when it was written and stopped being so.
+        if (row.cost_cents !== null && row.cost_basis && !String(row.cost_basis).startsWith("estimate_")) costed += 1;
     }
 
     const revenue = Number(headline?.revenue || 0);
@@ -125,6 +151,27 @@ export async function getPackTelemetry({ days = 30 } = {}) {
         days,
         priceCents: price.cents,
         priceTrusted: price.source !== "fallback_default",
+
+        // ⚠️ THE BLENDED HEADLINE IS KEPT AS WELL AS SPLIT, NOT REPLACED BY IT. "What did this feature take
+        // this week" is a real question with one answer; "is the Pokémon pack priced right" is a different
+        // one, and conflating them is what this split exists to stop.
+        byPool: byPool.map((r) => {
+            const rev = Number(r.revenue || 0);
+            const cost = Number(r.cogs || 0);
+            return {
+                pool: r.pool,
+                brand: poolByKey(r.pool)?.brand || r.pool,
+                opens: r.opens || 0,
+                creditSpentCents: Number(r.credit_spent || 0),
+                revenueCents: rev,
+                cogsCents: cost,
+                marginCents: rev - cost,
+                marginPercent: rev > 0 ? Math.round(((rev - cost) / rev) * 1000) / 10 : null,
+                pulledValueCents: Number(r.pulled_value || 0),
+                soldBack: r.sold_back || 0,
+                vaulted: r.vaulted || 0,
+            };
+        }),
 
         headline: {
             opens: headline?.opens || 0,

@@ -26040,7 +26040,15 @@ body.cas-seated .social-fab { display: none; }
     gap: 10px;
 }
 
-.pk-shelf-note { margin: 6px 0 10px; font-size: 0.8rem; color: var(--muted); }
+.pk-shelf-note { margin: 6px 0 4px; font-size: 0.8rem; color: var(--muted); }
+/* The one number on this sheet a member can act on, so it is the one thing on it that is not grey. */
+.pk-shelf-odds {
+    margin: 0 0 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #F0D27A;
+    font-variant-numeric: tabular-nums;
+}
 
 .pk-shelf-list {
     list-style: none;
@@ -26959,6 +26967,29 @@ body.cas-seated .social-fab { display: none; }
     gap: 6px;
     flex-shrink: 0;
 }
+
+/* The per-pool money table. One row per pack, because the blended headline above it answers a different
+   question — see the note in PackTelemetryClient. */
+.pt-pools { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pt-pools li {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    align-items: baseline;
+    gap: 10px;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    font-size: 0.86rem;
+}
+.pt-pool-name { font-weight: 700; min-width: 0; }
+.pt-pool-opens { color: var(--muted); font-size: 0.78rem; }
+.pt-pool-margin, .pt-pool-sold { display: flex; flex-direction: column; text-align: right; line-height: 1.15; }
+.pt-pool-margin { color: #F0D27A; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pt-pool-margin i, .pt-pool-sold i {
+    font-style: normal; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted);
+}
+.pt-pool-sold { font-variant-numeric: tabular-nums; }
 
 .pt-q-actions .pk-btn {
     min-height: 36px;

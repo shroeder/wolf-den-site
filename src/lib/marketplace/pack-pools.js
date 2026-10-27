@@ -146,6 +146,33 @@ export async function shelfPoolCards(pool, { limit = 40 } = {}) {
     }));
 }
 
+/**
+ * What share of this pool's cards are worth at least what the pack costs, in basis points.
+ *
+ * ⚠️ IT IS WEIGHTED BY QUANTITY, NOT BY LINE, because that is how the pull works. Four copies of a $20 card
+ * are four chances at beating a $15 pack, and counting the LINE once would quietly under-report exactly the
+ * cards a member most wants to know about.
+ *
+ * ⚠️ AND IT COMES OFF THE SAME QUERY THE PULL DOES. The house settled where a real number belongs when it
+ * built the chest inspect card: "asked for, on the way to spending, off the same table the roll uses". A
+ * hand-maintained odds figure is a figure that drifts from the thing it describes; this one cannot.
+ */
+export async function beatsPriceBp(pool, priceCents) {
+    if (!pool?.category || !(priceCents > 0)) return null;
+    const row = await db
+        .queryOne(
+            `SELECT COALESCE(SUM(quantity), 0)::int AS units,
+                    COALESCE(SUM(quantity) FILTER (WHERE price * 100 >= $2), 0)::int AS beats
+               FROM inventory_feed
+              WHERE in_stock AND quantity > 0 AND NOT consigned
+                AND category_names = $1`,
+            [pool.category, priceCents]
+        )
+        .catch(() => null);
+    if (!row || !row.units) return null;
+    return Math.round((row.beats / row.units) * 10000);
+}
+
 /** Why a pool is shut, in words a screen can show — or null when it is open. */
 export function closedReason(stats) {
     if (!stats || !stats.units) return "empty";

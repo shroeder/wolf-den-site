@@ -155,18 +155,50 @@ export default function PackTelemetryClient() {
                 <Stat label="Pull queue" value={data.queue.open} sub={data.queue.promoted ? `${data.queue.promoted} urgent` : "none urgent"} />
             </section>
 
-            {/* ⚠️ A margin built mostly on the 65% estimate is a guess wearing a number's clothes. 37% of the
-                pool had a real cost when this was measured, so the share is stated rather than implied. */}
+            {/* ⚠️ A margin built mostly on an estimate is a guess wearing a number's clothes. 37% of the pool
+                had a real cost when this was measured, so the share is stated rather than implied. The
+                estimate is per channel now — 65% for a bag, 46% for a shelf single — so this line names
+                neither and points at the basis breakdown instead. */}
             <section className="pt-note">
                 <strong>{pct(g.costedPercent)}</strong> of the pool has a real recorded cost
-                ({g.costedCount} of {g.remaining}). The rest falls back to the 65% estimate, and any margin
-                above is only as good as that mix.
+                ({g.costedCount} of {g.remaining}). The rest falls back to an estimate, and any margin above
+                is only as good as that mix.
                 {data.cogsBasis.length ? (
                     <span className="pt-basis">
                         {data.cogsBasis.map((b) => `${b.basis}: ${b.n}`).join(" · ")}
                     </span>
                 ) : null}
             </section>
+
+            {/* ── ⚠️ THE HEADLINE ABOVE IS BLENDED, AND BLENDED IS A DIFFERENT QUESTION, NOT A WRONG ONE ──
+                "What did this feature take this week" has one answer and the row above is it. "Is the
+                Pokémon pack priced right" does not: a $15 category pack and a $20 bag have different
+                prices, costs and margins, so one average across both moves when the MIX moves — a good week
+                of bag sales would read as the category packs improving.
+
+                Shown only once more than one pool has opens in it. Before that this table is the headline
+                again with a label on it. */}
+            {(data.byPool || []).length > 1 ? (
+                <>
+                    <h3 className="pt-h">By pack</h3>
+                    <ul className="pt-pools">
+                        {data.byPool.map((p) => (
+                            <li key={p.pool}>
+                                <span className="pt-pool-name">{p.brand}</span>
+                                <span className="pt-pool-opens">{p.opens} opens</span>
+                                <span className="pt-pool-margin">
+                                    {usd(p.marginCents)}
+                                    <i>{pct(p.marginPercent)} margin</i>
+                                </span>
+                                <span className="pt-pool-sold">
+                                    {p.opens ? pct(Math.round((p.soldBack / p.opens) * 1000) / 10) : "—"}
+                                    <i>sold back</i>
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            ) : null}
 
             <h3 className="pt-h">What people are pulling</h3>
             <ul className="pt-tiers">
