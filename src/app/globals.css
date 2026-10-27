@@ -26149,3 +26149,82 @@ body.cas-seated .social-fab { display: none; }
     letter-spacing: 0.01em;
     box-shadow: 0 10px 26px rgba(212, 175, 55, 0.26);
 }
+
+/* ── THE BUTTON ───────────────────────────────────────────────────────────────────────────────────────────────
+   Luke: "I hate thr button its so muted."
+
+   It was linear-gradient(135deg, #D4AF37, #B8912B) — a gold that gets DARKER as it falls, which on a black
+   panel lands as flat mustard. The site already has a brighter one in .mb2-cta-primary (#ffd585 -> #ffb35f),
+   and that is the energy to match.
+
+   Three things make the difference, and the gradient is only the first:
+     · it lightens at the TOP, the way a lit physical object does, instead of darkening diagonally
+     · an inset white highlight along the top edge and an inset shadow along the bottom, so it has a body
+     · a warm outer glow, so it throws light onto the panel rather than sitting on it as a sticker
+
+   ⚠️ The text colour is set together with the background every time. A gold button that inherits light text
+   is this site's oldest footgun. */
+.pk-btn-primary,
+.pk-btn-open {
+    background: linear-gradient(180deg, #FFE39B 0%, #FFC95C 45%, #F0A830 100%);
+    border: 1px solid rgba(255, 226, 160, 0.75);
+    color: #35200A;
+    font-weight: 700;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.65),
+        inset 0 -2px 0 rgba(140, 86, 12, 0.35),
+        0 6px 18px rgba(255, 180, 60, 0.3),
+        0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.pk-btn-open {
+    font-size: 1.1rem;
+    letter-spacing: 0.005em;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.7),
+        inset 0 -2px 0 rgba(140, 86, 12, 0.38),
+        0 8px 26px rgba(255, 180, 60, 0.4),
+        0 2px 5px rgba(0, 0, 0, 0.45);
+}
+
+.pk-btn-primary:hover:not(:disabled),
+.pk-btn-open:hover:not(:disabled) {
+    background: linear-gradient(180deg, #FFEBB4 0%, #FFD372 45%, #F7B341 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.75),
+        inset 0 -2px 0 rgba(140, 86, 12, 0.3),
+        0 10px 30px rgba(255, 185, 70, 0.5),
+        0 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+/* Pressed: it sinks. The inset highlight flips to an inset shadow, which is what makes a button feel like a
+   button rather than a rectangle that changes colour. */
+.pk-btn-primary:active:not(:disabled),
+.pk-btn-open:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow:
+        inset 0 2px 5px rgba(120, 72, 8, 0.45),
+        0 2px 8px rgba(255, 180, 60, 0.25);
+}
+
+/* "Keep it" sat so dark it read as disabled next to the gold. It is a real choice — half the point of the
+   reveal — so it gets a visible edge and a lighter face without competing for the eye. */
+.pk-btn-ghost {
+    background: linear-gradient(180deg, #2A2A2A 0%, #1E1E1E 100%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #EDEDED;
+    font-weight: 600;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.pk-btn-ghost:hover:not(:disabled) {
+    background: linear-gradient(180deg, #343434 0%, #262626 100%);
+    border-color: rgba(255, 226, 160, 0.45);
+    color: #FFFFFF;
+}
+
+.pk-btn-ghost:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
