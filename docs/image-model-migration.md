@@ -221,7 +221,70 @@ and that is the exact axis every OpenAI model has failed on.
 
 ---
 
-## 6. What a migration actually touches
+## 6. What the contact sheets decided
+
+Luke, on the tuning sheet: *"this is the best hero ive seen yet outside of the retired one"* — the tile
+labelled **2 · + proportions, shadow**. And on the new-asset sheet: *"the remaining items prefer the left
+side due to its style"* — the left column is **gpt-image-1-mini**.
+
+Two picks, two different models. That is the finding: **there is no single replacement, there is a model per
+job.**
+
+| path | model | what it is given |
+|---|---|---|
+| **hero sprites** | `gpt-image-1.5` | DiceBear avatar + the six-rule tail |
+| **items, enemies, bosses, decorations** | `gpt-image-1-mini` | the design sheet + the house prompt |
+
+### 6.1 The tail is the real product, and it belongs in the recipe
+
+The hero he chose was drawn with `extra2` — six rules, in this order, and the order matters because the
+first one is the one the model kept breaking:
+
+1. **the no-shadow rule, stated first and with its reason** — a cast shadow ruins a cut-out sprite
+2. **proportions** — stocky chibi, head about a third of height
+3. **rendering** — flat cel, two or three tone steps, bold dark outline
+4. **background** — transparent, nothing but the character
+5. **effects** — discrete wisps, no unnamed elemental effects
+6. **weapons** — a maul is a hammer, drawn large and readable
+
+⚠️ **Every one of those is a thing gpt-image-1 supplied for free and the prompt never said.** That is why a
+model swap restyled the game: the house style was never written down, it was inherited. The tail is the
+first time it exists as text, and it belongs in `SPRITE_RULES` — not in `promptExtra`, which is a trial hook.
+
+### 6.2 ⚠️ The hero he picked is the one that ignores his gear
+
+That draw had the avatar and nothing else. The crown, the purple orb shield and the gold maul are
+**invented from the item NAMES**. His actual loadout is black with orange fire runes, a teal crystal maul
+and a spiral shield — the pass that matched all of that (pass 9, with the gear art attached) is not the one
+he chose.
+
+So the choice on the table is a real trade and should be made deliberately rather than discovered later:
+
+- **look** — the ornate, royal, invented version, which reads better as a character
+- **truth** — the version that draws what the member is actually wearing, which is what makes gear worth
+  equipping
+
+They are not necessarily exclusive: the pass-2 tail has never been run WITH the gear art and the design
+sheet. That combination is untested and is the obvious next draw.
+
+### 6.3 ⚠️ And both chosen models die on 2026-12-01
+
+`gpt-image-1.5` and `gpt-image-1-mini` are both on the December shutdown list. This decision is therefore a
+**five-week answer, not a migration** — it unblocks members now and buys time, nothing more.
+
+The only option with no end date that drew acceptably is `gpt-image-2.5-sunburst`, which also matched the
+real gear best. `gpt-image-2` is permanently out: it refuses transparent backgrounds, and every asset in
+this game is a cut-out.
+
+So the plan has two horizons, and conflating them is how December arrives unprepared:
+
+- **now** — ship 1.5 for heroes and 1-mini for objects, with the tail promoted into the recipe
+- **before December** — re-run this same comparison on 2.5, with the tail and the sheets already written
+  down, so the question is only "does this model obey our rules" rather than "what are our rules"
+
+---
+
+## 7. What a migration actually touches
 
 1. **One constant, five call sites.** The model chain belongs in `src/lib/marketplace/` where both halves of
    the repo can import it — the scripts' `scripts/lib/draw-image.mjs` already has the logic and the
