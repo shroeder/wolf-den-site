@@ -201,13 +201,20 @@ const GACHA_MACHINE = { id: "gacha", x: 86.7, label: "The Gachapon", kind: "Tick
 // stall exists only for a member the vault gate is open for (owner-only today), and a cabinet everybody can
 // see and nobody can use is the ownerOnly landmine written down in vault-gate.js.
 //
-// ART: the bag he sells, standing in for a drawn stall. The cabinets in this room were "a gradient and a
-// border for as long as the floor plan was still being argued about, which was the right order to do it in —
-// art costs money to get wrong", and the same order applies here: the stall gets drawn once its place in the
-// room is settled, and until then it must not be a 404 — a browser caches those as happily as an image.
+// ── HE IS A PERSON, NOT A FLOATING BAG ───────────────────────────────────────────────────────────────────
+// Luke, on the placeholder: "Lol we need a thematic vendor in the casino that sends these packs, not a
+// floating pack lol." The placeholder was mystery-bag-drawn-600.webp, which at cabinet size against a dark
+// room is a black slab — it is a picture of a black foil bag, and a bag is not a vendor.
+//
+// So he is drawn: a raccoon showman at a railed stall with the sealed bags hung along its front, emerald and
+// gold so he separates from the Counter's warm gold at one shoulder and the Gachapon's primaries at the
+// other. See scripts/gen-pack-stall.mjs for the prompt and for why he is not a second fox.
+//
+// ⚠️ NO `v` CACHE-BUST ON THE FIRST SHIP, AND THAT IS ONLY SAFE BECAUSE THE PATH IS NEW. The gachapon's `v`
+// exists because its cabinet shipped a release BEFORE its sprite and the 404 got cached. The rule for the
+// NEXT redraw still stands: new bytes need a new path.
 const PACK_VENDOR = {
-    id: "packs", x: 94.4, label: "The Pack Stall", kind: "Mystery packs", live: true,
-    vendor: true, art: "/images/packs/mystery-bag-drawn-600.webp",
+    id: "packs", x: 94.4, label: "The Pack Stall", kind: "Mystery packs", live: true, vendor: true,
 };
 
 // Where the rope is: on the wall's SECOND arch, which lands at 11.8% of the world once both the world and
