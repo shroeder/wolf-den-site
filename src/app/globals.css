@@ -25918,13 +25918,19 @@ body.cas-seated .social-fab { display: none; }
 .vt-tile-was { font-size: 0.68rem; color: var(--muted); }
 
 /* The selection bar. Sticky at the bottom so a long vault never hides the action. */
-/* ⚠️ ABOVE .social-fab, WHICH IS 900. The film caught the chat bubble parked on top of "Sell back" in
-   this bar — the same collision the pack modal hit, in the other place a member commits to something. The
-   bubble is reachable again the moment nothing is selected. */
+/* ⚠️ 20, NOT 910, AND THE SHEET'S 70 IS THE WHOLE REASON.
+   This briefly sat at 910 to out-rank .social-fab, which was parking the chat bubble on top of "Sell back".
+   That fixed one overlap by causing a worse one: at 910 the bar also out-ranked .vt-sheet, so tapping "Get
+   them" opened the order sheet with the bar painted across the middle of it. Luke: "Z indexing izzue or
+   somethint."
+
+   The real fix was elsewhere — the chat bubble is game-only now and does not exist on this page at all — so
+   this goes back to being what it actually is: page furniture, above the content it floats over and BELOW
+   every dialog. A sticky bar must never out-rank a sheet; the sheet is the thing the member just asked for. */
 .vt-bar {
     position: sticky;
     bottom: 8px;
-    z-index: 910;
+    z-index: 20;
     display: flex;
     align-items: center;
     justify-content: space-between;
