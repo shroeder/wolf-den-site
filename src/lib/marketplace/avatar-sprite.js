@@ -315,7 +315,7 @@ export async function setBuyerSprite(buyerId, base64) {
  * reference went in WITHOUT the member's beard — so a model comparison that looked clean was actually
  * comparing two different inputs. Anything worth measuring is worth measuring on the real rails.
  */
-export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, model = null, quality = null } = {}) {
+export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, model = null, quality = null, promptExtra = null } = {}) {
     const row = await db.queryOne(`SELECT avatar_config, avatar_sprite_prompt, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]);
     if (!row || !row.avatar_config) throw new Error("No avatar to draw");
     const gear = await getEquippedGearPhrase(buyerId).catch(() => "");
@@ -338,7 +338,15 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, mo
     // A draw that came back cropped or full of holes is thrown away and redrawn rather than shipped. See
     // sprite-cleanup.js for why these are detected-and-redrawn instead of repaired.
     let verdict = { ok: true, problems: [] };
-    const url = await editImage(png, prompt + SPRITE_RULES, {
+    // ⚠️ `promptExtra` IS A TRIAL TAIL, APPENDED AFTER THE RULES, AND IT NEVER REPLACES ANYTHING. Same
+    //    reason model and quality are overridable here: a candidate recipe has to be judged on art drawn by
+    //    the real pipeline, with the real DiceBear reference and the real gear phrase, or the comparison is
+    //    between two different inputs and tells you nothing.
+    //
+    //    It goes LAST because the end of a long prompt is the part a model weights most, and everything it
+    //    corrects — proportions, flatness, no cast shadow — is a correction TO the standing recipe rather
+    //    than a replacement for it.
+    const url = await editImage(png, prompt + SPRITE_RULES + (promptExtra || ""), {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
         model: model || SPRITE_MODEL, quality: quality || SPRITE_QUALITY,
         attempts: SPRITE_ATTEMPTS,
@@ -353,7 +361,10 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, mo
         `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3,
                               avatar_sprite_flip = FALSE, avatar_facing_checked_at = NULL,
                               avatar_sprite_attempts = 0, avatar_sprite_error = $4 WHERE id = $1`,
-        [buyerId, url, prompt, verdict.ok ? null : `art quality: ${verdict.problems.join("; ")}`.slice(0, 500)]
+        // ⚠️ THE STORED PROMPT INCLUDES THE TRIAL TAIL. skipIfUnchanged compares this string to decide
+        //    whether a redraw is needed; storing the base prompt after drawing with an extended one would
+        //    make the next ordinary redraw look unnecessary and leave trial art in place for ever.
+        [buyerId, url, prompt + (promptExtra || ""), verdict.ok ? null : `art quality: ${verdict.problems.join("; ")}`.slice(0, 500)]
     );
     return url;
 }

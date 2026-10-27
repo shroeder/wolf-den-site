@@ -63,6 +63,9 @@ export async function POST(request) {
                     spriteUrl: await generateBuyerSprite(body.buyerId, {
                         model: body.model || null,
                         quality: body.quality || null,
+                        // Appended after the standing rules — see generateBuyerSprite. For tuning a
+                        // candidate model back toward the house look without editing the live recipe.
+                        promptExtra: body.promptExtra || null,
                     }),
                 });
             }
