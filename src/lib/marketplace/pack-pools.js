@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { buyBackCents } from "@/lib/marketplace/buyback.js";
 import { packCardSubtitle, parsePackCardName } from "@/lib/marketplace/pack-card-name.js";
 import { tierForCents } from "@/lib/marketplace/pack-rarity.js";
 import { createServerLogger } from "@/lib/server-logger";
@@ -163,6 +164,11 @@ export async function shelfPoolCards(pool, { limit = 40 } = {}) {
             subtitle: packCardSubtitle(r.name || ""),
             valueCents,
             tier: tierForCents(valueCents).key,
+            // ⚠️ SENT, NOT DERIVED — the same rule toPoolCard states at length. The card detail sheet shows
+            //    what a member would actually be paid, and the moment a client multiplies a price by a rate
+            //    there are two implementations of one number, one of them in a bundle somebody is still
+            //    running from cache. The rate lives in buyback.js and the answer travels with the card.
+            sellBackCents: buyBackCents(valueCents),
             imageUrl: r.image_url || null,
         };
     });

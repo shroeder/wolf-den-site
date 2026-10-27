@@ -210,6 +210,10 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
     const [error, setError] = useState(null);
     const [choice, setChoice] = useState(null);
     const [shelfOpen, setShelfOpen] = useState(false);
+    // The card a member tapped in the sheet, shown full-size over it. Held as the CARD OBJECT rather than an
+    // index, because the sheet re-reads `chosen.cards` whenever the pool refreshes and an index would start
+    // pointing at a different card mid-look.
+    const [peek, setPeek] = useState(null);
     // ── THE PAGE IS NOT THE PLACE FOR THIS ───────────────────────────────────────────────────────────────
     // Luke, 2026-10-27, looking at it on his phone: "This should be a modal, there should be one call to
     // action that glimmers."
@@ -979,7 +983,11 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                 ? `${chosen.brand} — ${chosen.units} inside`
                                 : `${pool.remaining} packs left`}
                         </strong>
-                        <button type="button" className="pk-btn pk-btn-ghost" onClick={() => setShelfOpen(false)}>
+                        <button
+                            type="button"
+                            className="pk-btn pk-btn-ghost"
+                            onClick={() => { setShelfOpen(false); setPeek(null); }}
+                        >
                             Close
                         </button>
                     </div>
@@ -1013,6 +1021,16 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                             const t = tierByKey(card.tier);
                             return (
                                 <li key={card.id} style={{ "--row-edge": t.edge, "--row-glow": t.glow }}>
+                                    {/* ⚠️ A BUTTON, NOT AN onClick ON THE <li>. The row is the tap target and
+                                        it has to be reachable by keyboard and announce itself; a clickable
+                                        list item is neither. The button fills the row and the layout above
+                                        moves onto it unchanged. */}
+                                    <button
+                                        type="button"
+                                        className="pk-shelf-row"
+                                        onClick={() => { Haptic.tap(); setPeek(card); }}
+                                        aria-label={`${card.name}, ${usd(card.valueCents)}, ${t.label}`}
+                                    >
                                     <span className="pk-shelf-art">
                                         {card.imageUrl ? (
                                             // eslint-disable-next-line @next/next/no-img-element
@@ -1029,10 +1047,81 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                         <span className="pk-shelf-value">{usd(card.valueCents)}</span>
                                         <span className="pk-shelf-tier">{t.label}</span>
                                     </span>
+                                    </button>
                                 </li>
                             );
                         })}
                     </ul>
+
+                    {/* ── THE CARD, BIG ───────────────────────────────────────────────────────────────
+                        Luke, 2026-10-27: "I need to be able to click the cards and have it show me
+                        details and a better view of the card."
+
+                        It sits INSIDE .pk-shelf rather than beside it, so closing the sheet closes this
+                        too and there is never a card floating over a dismissed list. Tap anywhere to
+                        close — the whole backdrop is the target, because a 44px × on a phone held
+                        one-handed is a worse answer than "tap it again".
+
+                        ⚠️ THE ART IS THE SAME URL THE ROW USED. inventory_feed.image_url is Square's
+                        own photo of the actual card in the case, not a stock scan — which is the point:
+                        condition is a number on a row and a thing you can SEE here. It is served at its
+                        native size, so object-fit: contain and no upscaling beyond it. */}
+                    {peek ? (
+                        <div
+                            className="pk-peek"
+                            role="dialog"
+                            aria-label={peek.name}
+                            onClick={() => setPeek(null)}
+                        >
+                            <div
+                                className="pk-peek-card"
+                                style={{ "--row-glow": tierByKey(peek.tier).glow }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="pk-peek-art">
+                                    {peek.imageUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={peek.imageUrl} alt={peek.name} />
+                                    ) : (
+                                        <div className="pk-peek-none">No photo on file</div>
+                                    )}
+                                </div>
+                                <div className="pk-peek-body">
+                                    <h4 className="pk-peek-name">{peek.name}</h4>
+                                    {peek.subtitle ? <p className="pk-peek-sub">{peek.subtitle}</p> : null}
+                                    <div className="pk-peek-rows">
+                                        <div>
+                                            <span>Shelf price</span>
+                                            <strong>{usd(peek.valueCents)}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Rarity in this pack</span>
+                                            <strong style={{ color: tierByKey(peek.tier).glow }}>
+                                                {tierByKey(peek.tier).label}
+                                            </strong>
+                                        </div>
+                                        {/* ⚠️ SENT BY THE SERVER, NEVER MULTIPLIED HERE. The sell-back rate
+                                            lives in buyback.js and the moment a client works it out there
+                                            are two implementations of one number, one of them in a bundle
+                                            somebody is still running from cache. */}
+                                        {peek.sellBackCents != null ? (
+                                            <div>
+                                                <span>Sells back for</span>
+                                                <strong>{usd(peek.sellBackCents)}</strong>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                    <p className="pk-peek-note">
+                                        Photographed in the shop. Pull it and it is yours — keep it or sell it
+                                        straight back for store credit.
+                                    </p>
+                                    <button type="button" className="pk-btn pk-btn-ghost" onClick={() => setPeek(null)}>
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
         </section>

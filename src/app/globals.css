@@ -26085,16 +26085,135 @@ body.cas-seated .social-fab { display: none; }
    ⚠️ --row-glow AND --row-edge ARE SET INLINE FROM THE TIER TABLE. Never hard-code a rarity colour here; a
    second copy of that palette is the exact thing pack-rarity.js exists to prevent. */
 .pk-shelf-list li {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    padding: 8px 11px 8px 8px;
     border-radius: 12px;
     background: var(--elevated);
     border-left: 3px solid var(--row-edge);
     /* The rarity bleeding in from the left edge, so the colour reads as the row's rather than as a hairline. */
     background-image: linear-gradient(90deg, color-mix(in srgb, var(--row-glow) 16%, transparent), transparent 42%);
+    overflow: hidden;
 }
+
+/* ⚠️ THE LAYOUT LIVES ON THE BUTTON, NOT THE <li>. The row became tappable, and a button inside a flex <li>
+   would be a single flex CHILD holding three collapsed spans. The <li> is now just the painted shell; this is
+   the row. width: 100% because a button does not stretch to its parent on its own. */
+.pk-shelf-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 8px 11px 8px 8px;
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pk-shelf-row:hover { background: rgba(255, 255, 255, 0.04); }
+.pk-shelf-row:active { background: rgba(255, 255, 255, 0.07); }
+.pk-shelf-row:focus-visible { outline: 2px solid var(--row-glow); outline-offset: -2px; }
+
+/* ── THE CARD, FULL SIZE ──────────────────────────────────────────────────────────────────────────────────
+   Luke: "I need to be able to click the cards and have it show me details and a better view of the card."
+
+   ⚠️ position: absolute INSIDE .pk-shelf, NOT fixed. The note on .pk-stage spells out why fixed is a trap in
+   this component — a transformed or filtered ancestor re-parents a fixed element and the vault's bottom sheet
+   ended up off-screen that way. Scoped to the sheet also means dismissing the sheet dismisses this. */
+.pk-peek {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(3px);
+    animation: pk-peek-in 160ms ease-out;
+}
+
+@keyframes pk-peek-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.pk-peek-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: min(100%, 340px);
+    max-height: 100%;
+    overflow-y: auto;
+    padding: 16px;
+    border-radius: 16px;
+    background: var(--elevated);
+    border: 1px solid color-mix(in srgb, var(--row-glow) 45%, transparent);
+    box-shadow: 0 0 34px color-mix(in srgb, var(--row-glow) 22%, transparent);
+}
+
+/* The photo gets the room.
+   ⚠️ flex: 0 0 auto, AND NOT min-height: 0. This box had `min-height: 0` so it could shrink inside the
+   scrolling card — but a flex child shrinking does NOT shrink the <img> inside it, and an image is not
+   clipped by its parent unless the parent says so. At 375x441 the box collapsed to nothing and the card
+   photo rendered straight through the name, the price rows and the fine print. Measured on the real
+   short-screen budget, not guessed: see the 667px note further down this file.
+   The card itself scrolls, so the honest answer is to let this keep its height. */
+.pk-peek-art {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.pk-peek-art img {
+    max-width: 100%;
+    /* min() so a short screen gets a proportionally smaller card rather than one fixed slab that does not
+       fit. 38dvh of a 441px viewport is 168px, which still reads. */
+    max-height: min(38dvh, 300px);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.6);
+}
+
+.pk-peek-none {
+    padding: 36px 18px;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.pk-peek-body { display: flex; flex-direction: column; gap: 10px; }
+
+/* ⚠️ A LONG PROMO NAME WRAPS HERE RATHER THAN ELLIPSING. The row truncates because it is one line in a list;
+   this is the screen you opened to read the whole name, so truncating it here would defeat the tap. */
+.pk-peek-name {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.pk-peek-sub { margin: 0; font-size: 0.8rem; color: var(--muted); }
+
+.pk-peek-rows { display: flex; flex-direction: column; gap: 6px; }
+
+.pk-peek-rows div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.pk-peek-rows span { font-size: 0.78rem; color: var(--muted); }
+.pk-peek-rows strong { font-size: 0.98rem; font-variant-numeric: tabular-nums; }
+
+.pk-peek-note { margin: 0; font-size: 0.74rem; line-height: 1.45; color: var(--muted); }
 
 /* The thumbnail. object-fit: contain because card scans are not all the same aspect and a cover crop eats
    the art box on the tall ones — the same rule the sprites follow everywhere else in this game. */
