@@ -749,10 +749,19 @@ async function cmdAdopt() {
     for (const s of sold) if (!state.created.soldEventIds.includes(s.id)) state.created.soldEventIds.push(s.id);
 
     // Credit movements the UI made. Scoped to this buyer and to reasons this feature owns.
+    //
+    // ⚠️ 'refund' BELONGS IN THIS LIST AND WAS MISSING. The pack feature writes refunds in two places — the
+    //    "can't find it" queue action and an open whose Square delete failed — and leaving them untracked
+    //    meant restore put the BALANCE back while those rows stayed in the ledger. The append-only ledger
+    //    then no longer summed to the balance: $73.00 of events against a $29.00 balance, $44.00 adrift,
+    //    from an account whose ledger reconciled to the cent before any of this started.
+    //
+    //    Every reason this feature can write has to be here, or the undo quietly breaks double-entry — which
+    //    is far worse than leaving a test row behind, because nothing downstream questions a balance.
     const credit = await sql`
         SELECT id FROM mkt_store_credit_event
         WHERE buyer_id = ${state.buyer.id} AND created_at >= ${state.takenAt}::timestamptz
-          AND reason IN ('pack_open', 'vault_sellback')`;
+          AND reason IN ('pack_open', 'vault_sellback', 'refund')`;
     for (const c of credit) if (!state.created.creditEventIds.includes(Number(c.id))) state.created.creditEventIds.push(Number(c.id));
 
     // Sell-backs: a trade per buy-back, and a unit pushed back into Square per card.
@@ -838,6 +847,13 @@ async function cmdUndo() {
         else { bad(`${label}: ${got}, expected ${want}`); pass = false; }
     };
     check("credit back to baseline", bal.store_credit_cents, state.buyer.creditCentsBefore);
+
+    // ⚠️ THE LEDGER MUST STILL SUM TO THE BALANCE. This is the check that would have caught the missing
+    //    'refund' reason the day it was written, instead of four hours later by accident.
+    const ledger = (await sql`
+        SELECT COALESCE(SUM(delta_cents), 0)::int AS total
+        FROM mkt_store_credit_event WHERE buyer_id = ${state.buyer.id}`)[0];
+    check("ledger still sums to the balance", ledger.total, bal.store_credit_cents);
     check("pack opens left", left.opens, 0);
     check("vault cards left", left.vault, 0);
     check("pull tasks left", left.tasks, 0);
