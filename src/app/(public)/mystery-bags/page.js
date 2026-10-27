@@ -94,8 +94,14 @@ export default async function MysteryBagsPage() {
     }
 
     return (
-        <div className="mb-page">
+        <>
+            {/* ⚠️ OUTSIDE .mb-page ON PURPOSE. That class is the Live Chase Board's own panel and it carries two
+                warm radial gradients — which washed the whole pack opening in a yellow-brown tint and killed
+                the contrast the gold is supposed to have. The opening gets its own neutral panel instead;
+                the board keeps the look it always had. */}
             {openingProps ? <PackOpenClient initial={openingProps} /> : null}
+
+        <div className="mb-page">
 
             {/* The register CTA appears only once the feature is actually open to register FOR. While it is
                 owner-gated, advertising it to the Den would be selling a door that is locked. */}
@@ -118,5 +124,6 @@ export default async function MysteryBagsPage() {
                 qrCodes={qrCodes}
             />
         </div>
+        </>
     );
 }

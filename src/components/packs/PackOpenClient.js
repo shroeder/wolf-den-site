@@ -360,8 +360,11 @@ export default function PackOpenClient({ initial }) {
                     {error ? <p className="pk-error">{error}</p> : null}
                     {shortfall > 0 && priceTrusted ? (
                         <>
+                            {/* The two numbers are the whole sentence. They carry their own weight rather
+                                than being buried in a line of flat grey. */}
                             <p className="pk-need">
-                                You&apos;re {usd(shortfall)} short of a {usd(priceCents)} pack.
+                                You&apos;re <strong>{usd(shortfall)}</strong> short of a{" "}
+                                <strong>{usd(priceCents)}</strong> pack.
                             </p>
                             <a className="pk-btn pk-btn-primary" href="/marketplace/credit">Add store credit</a>
                         </>

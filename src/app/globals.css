@@ -26037,3 +26037,115 @@ body.cas-seated .social-fab { display: none; }
 
 .pt-keybox label { display: flex; flex-direction: column; gap: 3px; width: 100%; font-size: 0.76rem; color: var(--muted); }
 .pt-keybox input { min-height: 42px; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line); background: var(--elevated); color: var(--ink); font-size: 16px; }
+
+/* ── THE OPENING'S OWN PANEL ──────────────────────────────────────────────────────────────────────────────────
+   Luke: "I really dont like the slight yellow bg, the text doesnt pop or look professional either."
+
+   The yellow was inherited. This used to sit inside .mb-page, the Live Chase Board's panel, which carries two
+   warm radial gradients — fine behind a board of card thumbnails, wrong behind a black pouch with a gold
+   emblem on it. Gold on warm brown has almost no separation, so the one colour that is supposed to be the
+   accent read as part of the background.
+
+   So the opening gets a NEUTRAL, nearly black panel of its own, and the gold is the only warm thing on it. */
+.pk-stage {
+    background:
+        radial-gradient(ellipse 80% 55% at 50% 30%, rgba(255, 255, 255, 0.035), transparent 70%),
+        linear-gradient(180deg, #121212 0%, #0C0C0C 100%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 18px;
+    padding: 14px 14px 20px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+
+/* ── THE HEADER ROW ───────────────────────────────────────────────────────────────────────────────────────────
+   It was a muted grey label over a gold number, floating. Now it is a proper stat with a rule under it, so the
+   top of the panel has a structure instead of two stray pieces of text. */
+.pk-top {
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 4px;
+}
+
+.pk-bal-label {
+    font-size: 0.64rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #8A8A8A;
+    font-weight: 600;
+}
+
+.pk-bal-value {
+    font-size: 1.7rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: #F0D27A;
+}
+
+.pk-shelf-btn {
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #C9C9C9;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+.pk-shelf-btn:hover {
+    border-color: rgba(212, 175, 55, 0.55);
+    color: #F2F2F2;
+    background: rgba(212, 175, 55, 0.06);
+}
+
+/* ── THE FOOT ─────────────────────────────────────────────────────────────────────────────────────────────────
+   "You're $11.00 short of a $20.00 pack" was one flat grey sentence with the two numbers that matter buried in
+   it. The numbers carry now and the sentence recedes. */
+.pk-need {
+    font-size: 0.95rem;
+    color: #C9C9C9;
+    line-height: 1.45;
+}
+
+.pk-need strong {
+    color: #F0D27A;
+    font-weight: 700;
+}
+
+.pk-fine {
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    color: #6E6E6E;
+}
+
+/* ── THE READOUT ──────────────────────────────────────────────────────────────────────────────────────────────
+   Tighter tracking on the name, more on the tier, and real weight on the value. The point of this block is a
+   hierarchy you read in one glance: what it is, what it is worth. */
+.pk-tier {
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    font-weight: 700;
+}
+
+.pk-name {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #F7F7F7;
+}
+
+.pk-sub {
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    color: #9A9A9A;
+}
+
+.pk-value {
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #F0D27A;
+    text-shadow: 0 2px 18px rgba(240, 210, 122, 0.22);
+}
+
+.pk-btn-open {
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 26px rgba(212, 175, 55, 0.26);
+}
