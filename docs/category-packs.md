@@ -25,14 +25,18 @@ gate. Everything new here is a second channel standing beside them.
 
 ## 1. The shelf, measured (2026-10-27, prod)
 
-Every number below is from `inventory_feed`, in stock, quantity > 0, **consigned excluded** (§8).
+Every number below is from `inventory_feed`, in stock, quantity > 0, **consigned excluded** (§7).
 
-| category | lines | units | mean | **median** | max | stock value |
+| category | lines | units | mean (EV) | **median** | max | stock value |
 |---|---|---|---|---|---|---|
 | Pokémon Single Card | 876 | 910 | $14.75 | **$6.00** | $290 | $13,104 |
 | Magic Single Card | 181 | 198 | $13.23 | **$8.00** | $136 | $2,454 |
 | Yu-Gi-Oh Single | 51 | 51 | $9.61 | **$4.00** | $157 | $490 |
-| Bulk Cards | 2 | 1,455 | $0.25 | — | — | $364 |
+
+⚠️ **`Bulk Cards` is not a candidate and is not in this table.** Luke: *"That is an outlier, it's a catch
+all category in Square with no bearing on the mystery feature."* It is two undifferentiated SKUs — `Magic
+Bulk` and `Pokemon Bulk`, 25¢ each — with no per-card identity to reveal, no per-card value and nothing the
+pack machine can act on. The catch-all stays a catch-all.
 
 For comparison, **the bags as they stand today**: 76 packs, mean $17.50, **median $4.00**, max $258, price
 $25.
@@ -46,204 +50,128 @@ mis-sells the product.
 
 ---
 
-## 2. The core proposal: a pool is **(category × value band)**, not a category
+## 2. A pool is a **category**
 
-Cut the same shelf into bands and the skew disappears, because within a band the mean and the median
-converge. Pokémon singles, banded:
+**Decided (Luke, 2026-10-27): one pack per category, no price bands.**
 
-| band | units | mean (EV) | median | price = ⌈EV/5⌉×5 | margin vs real COGS |
-|---|---|---|---|---|---|
-| $2–$10 | 539 | $4.21 | $4.00 | **$5** | ~61% |
-| $10–$25 | 209 | $14.85 | $14.00 | **$15** | ~54% |
-| $25–$60 | 94 | $36.47 | $35.50 | **$40** | ~58% |
-| $60+ | 35 | $121.80 | $95.00 | **$125** | ~55% |
+I argued for cutting each category into value bands, because within a band the mean and the median converge
+and the headline skew disappears. Luke's call is one pack per category, and the numbers say he is right that
+it does not need the extra machinery:
 
-Mean and median are within 10% of each other in every band bar the last. **That is the product working**: a
-$15 Pokémon pack whose typical card is $14 is a fair-feeling thing to buy twice, where a $15 pack whose
-typical card is $6 is a thing you buy once.
+| pool | units | lines | EV | **price** | median | median as a share of price | margin vs recorded cost |
+|---|---|---|---|---|---|---|---|
+| Pokémon Singles | 910 | 876 | $14.75 | **$15** | $6.00 | 40% | 44% |
+| Magic Singles | 198 | 181 | $13.23 | **$15** | $8.00 | 53% | 45% |
+| Yu-Gi-Oh Singles | 51 | 51 | $9.61 | **$10** | $4.00 | 40% | not costed |
 
-Banding also gives the brand ladder for free. The same category becomes several packs at several prices —
-a cheap one you open for fun and a chase one you save for — which is what "branded differently per category"
-wants anyway, and it is the shape the Counter's chest ladder already proved.
+**The bags you are selling today are $25 against a $4 median — 16%.** An unbanded Pokémon pack is 40% and
+Magic is 53%, so both are two to three times kinder than the product already on the shelf, at a 44–45%
+margin against what we actually paid. The band argument was about making a good number better, not about
+rescuing a bad one.
 
-Magic and Yu-Gi-Oh banded the same way:
+Two consequences worth keeping in view rather than fixing now:
 
-| pool | units | lines | EV | price |
+- **Pokémon and Magic both price at $15** off different EVs ($14.75 and $13.23), because the $5 rounding
+  collapses them. That reads well — two games, same price, pick your game — and it is luck rather than
+  design, so it will not survive the shelf moving.
+- The tail is still a tail. A $290 card sits in a 910-unit Pokémon pool, which is 2.2% of pool value and
+  entirely healthy. Yu-Gi-Oh is a different story — see §3.
+
+---
+
+## 3. "Enough of" — and the one pool that fails
+
+With whole categories as pools, unit depth stops being the interesting test: 910 and 198 units are plenty,
+and the pool refills every time we buy a collection. What still bites is **concentration** — one card
+carrying the pool's value:
+
+| pool | units | biggest card | share of pool value | verdict |
 |---|---|---|---|---|
-| Magic $2–$10 | 111 | 94 | $3.96 | $5 |
-| Magic $10–$25 | 59 | 59 | $15.32 | **$20** |
-| Magic $25+ | 28 | 28 | $39.93 | $40 |
-| Yu-Gi-Oh $2–$10 | 42 | 42 | $3.71 | $5 |
-| Yu-Gi-Oh $10–$25 | **4** | 4 | $12.50 | — |
-| Yu-Gi-Oh $25+ | **5** | 5 | $56.80 | — |
+| Pokémon Singles | 910 | $290 | 2.2% | healthy |
+| Magic Singles | 198 | $136 | 5.5% | healthy |
+| Yu-Gi-Oh Singles | 51 | **$157** | **32.0%** | ⚠️ |
 
-**Yu-Gi-Oh only has a bottom band.** That answers "categories we have enough of" with a number rather than a
-feeling — see §3.
+⚠️ **A third of the Yu-Gi-Oh pool's value is one Ancient Fairy Dragon.** Its EV of $9.61 is only above $5
+because that card is in it — take it out and the remaining 50 cards average $6.66. So the pack is priced at
+$10 on the strength of a single card, and the first member to pull it leaves a materially worse product
+behind at the same price until the nightly recompute catches up. It is also the only pool with **no cost
+records at all**, so there is nothing to check the margin against.
 
----
+Proposed rule: **a pool opens only while no single line exceeds 15% of its value.** Pokémon and Magic pass
+comfortably and would have to change a great deal to stop passing; Yu-Gi-Oh fails today and would open by
+itself once there is more of it, or once that one card sells at the counter.
 
-## 3. "Enough of" — a depth bar, written down
-
-A pool that is too thin fails in three separate ways, and only the first is obvious:
-
-1. It **empties**, and a pack with nothing in it is a dead button.
-2. It becomes **readable** — 5 cards means the fourth buyer knows what is left, and a mystery pack whose
-   contents are known is a vending machine with worse odds.
-3. Its **EV is noise**. The $60+ Pokémon band is 35 units with a mean of $121.80 and a median of $95; one
-   $290 card leaving moves the EV by 5%, so the price the pricing rule produces wobbles with the stock.
-
-Proposed bar, to be argued with: **≥ 60 units AND ≥ 40 distinct lines AND no single line > 15% of pool
-value.** Run against today's shelf:
-
-| pool | units | lines | biggest line | verdict |
-|---|---|---|---|---|
-| Pokémon $2–10 | 539 | 508 | 1.6% | **pass** |
-| Pokémon $10–25 | 209 | 206 | 1.4% | **pass** |
-| Magic $2–10 | 111 | 94 | 6.9% | **pass** |
-| Magic $10–25 | **59** | 59 | 2.5% | **fails by one unit** |
-| Yu-Gi-Oh $10–25 | 4 | 4 | — | fails |
-| Yu-Gi-Oh $25+ | 5 | 5 | — | fails |
-
-⚠️ **Magic $10–25 failing on 59 units against a bar of 60 is the bar admitting it is a guess.** The
-concentration test does real work — it is what would catch a pool carried by one expensive card — but the
-unit count is a number I picked, and one unit either side of it is not a difference anybody can defend. It
-wants your judgement, not my rounding: see question 4.
-
-A pool that drops under the bar **closes itself** and says "back soon" rather than erroring — the same
-treatment `priceTrusted` already gets, for the same reason.
+A pool that fails **closes itself** and says "back soon" rather than erroring — the same treatment
+`priceTrusted` already gets, for the same reason.
 
 ---
 
-## 4. Bulk is a different animal
+## 4. Pricing
 
-Luke, 2026-10-27: *"Bulk cards should be under their own category, mind making me a bulk category?"*
+### 4.1 The rule
 
-**The Square category already exists** and holds exactly two lines: `Magic Bulk` (862 units) and
-`Pokemon Bulk` (593 units), both listed at $0.25, both costed at **$0.01** in `wolfden_item_cost`. So there
-is nothing to create in the catalogue — what has to be built is a pool *shape* that bulk fits, and bulk does
-not fit the one in §2.
+**Decided: `price = ceil(EV / 5) * 5`, where EV is the mean market value of the pool as it stands.**
 
-### 4.1 ⚠️ The sell-back floor pays 400% on a bulk card
+Against today's shelf that is Pokémon $15, Magic $15, Yu-Gi-Oh $10, at a 44–45% margin against what the
+cards actually cost us where we have a record (578 of 1,140 single lines carry one; across them we paid
+**46% of list** — not the 60% trade rate, because what we pay and what we trade at are different numbers).
 
-This is the blocker, and it is not a tail risk — it is what a rational member does every time.
+⚠️ **The $5 boundary is a cliff, and it is worth knowing where the pools sit on it.** Pokémon at EV $14.75
+is fifteen cents under the line: a modest shift in the shelf's mix pushes it to $20, a 33% price rise with
+no announcement attached to it. Magic at $13.23 has $1.77 of headroom. The rule is simple and sayable, which
+is why it was chosen — but a pool sitting just under a boundary will cross it eventually, and the screen
+must not quietly reprice mid-session. See §4.2.
 
-| card value | sells back for | share of value |
-|---|---|---|
-| **$0.25 (bulk)** | **$1.00** | **400%** |
-| $0.50 | $1.00 | 200% |
-| $1.00 | $1.00 | 100% |
-| $1.67 | $1.25 | 75% |
+### 4.2 Where EV comes from, and when
 
-`BUYBACK_MIN_CENTS` is $1.00 and it exists for a good reason — *"sixty cents does not read as a transaction,
-it reads as being brushed off"* — but it quietly assumes a card worth at least about $1.67. Bulk is worth a
-quarter.
-
-Run the arithmetic on a 25-card pack priced by the §5 rule: list value $6.25, price $10, our cost $0.25.
-A member pays **$10**, sells the handful back a card at a time, and collects **$25**. We are down $15 on
-every pack sold, deterministically, and the cards come back to the shelf so we are not even short of stock.
-No cap fixes that; the shape is wrong.
-
-### 4.2 The fix is the unit: a bulk pool's unit is a **handful**, not a card
-
-Everything awkward about bulk comes from trying to treat one 25¢ card as a pull, and all of it dissolves if
-the thing you buy, reveal, hold and sell back is **N cards of one game**:
-
-- **The reveal** has nothing to reveal per card — one SKU, no identity, no art, no market value. A handful
-  can be revealed as what it is: a count, a game, and a fan of card backs.
-- **The vault row** is one row saying "25 Pokémon bulk", not 25 rows.
-- **Sell-back prices the handful once**, at 60% of the handful — $3.75 on a $6.25 scoop — and the $1 floor
-  applies to the transaction rather than to each card, which closes §4.1 completely.
-- **The pull task** is "scoop 25 Pokémon bulk", which is the easiest job in the queue rather than the
-  hardest: no hunting a named card in a case, and `not_found` effectively cannot happen.
-- **Square** decrements the bulk variation by N in one adjustment.
-
-### 4.3 ⚠️ And the EV pricing rule does not apply to bulk
-
-The §5 rule works because for singles the list price and what we paid are related — 46% across the shelf.
-For bulk they are not related at all: list is $0.25, cost is **$0.01**, a 4% ratio. "Price = EV rounded up
-to $5" against a 25¢ list just reproduces the counter price, because 25¢ divides into $5 exactly: 20 cards
-is $5.00 of list and prices at $5, 40 cards is $10.00 and prices at $10.
-
-That is not wrong — it is counter parity, which is the right answer — but it means **N is the lever and the
-price follows**, rather than the price being derived from value. Bulk should be priced the way the counter
-prices it and sanity-checked against cost, not run through the EV machine.
-
-### 4.4 So: is it a mystery pack at all?
-
-Honestly, no — and this is the one category where "they'll always be mystery packs" strains. There is no
-mystery in a scoop of bulk: the member knows exactly what they are getting, which is *volume*. The appeal of
-bulk elsewhere in the hobby is that it is unsorted and might hide a hit, and ours cannot promise that
-because it is a single undifferentiated SKU with no per-card identity behind it.
-
-It is a **grab bag**, and it is a perfectly good product — it just sells on quantity rather than on the
-opening. Branding it as a mystery pack would be promising a reveal the data cannot deliver, which is the
-fastest way to make the real mystery packs look like they are lying too.
-
----
-
-## 5. Pricing
-
-### 5.1 The rule as asked
-
-`price = ceil(EV / 5) * 5`, where EV is the mean market value of the pool as it stands.
-
-It works, and the margins in §2 are healthy. Two things about it are worth a decision rather than a default.
-
-**⚠️ The $5 boundary is a cliff, and two near-identical pools can land on opposite sides of it.** Pokémon
-$10–25 has EV $14.85 → **$15**. Magic $10–25 has EV $15.32 → **$20**. Forty-seven cents of EV difference
-becomes a 33% price difference, and the member sees two packs that look the same priced a third apart. The
-alternative is to price off a **target margin** and round after: `price = ceil((EV / target) / 5) * 5`. At
-target 0.75 both of those become $20 and the relationship is deliberate.
-
-**⚠️ "Rounding up guarantees we make money" is true against market value, but market value is not our cost.**
-Of 1,140 single-card lines, **578 carry a real recorded cost** in `wolfden_item_cost`, and across those the
-cost is **46% of list** — not the 60% buy rate, because the trade rate and what we actually paid are
-different numbers. So the true margin at EV pricing is ~54%, not ~40%. For the other half of the shelf we
-have no cost record at all and would be pricing against an assumption. See the question in §11.
-
-### 5.2 Where EV comes from, and when
-
-EV must be computed from the **live pool**, on a schedule, and stored on the pool row — never computed at
-open time. A price that moves between the screen quoting it and the member tapping it is the bug
+EV is computed from the **live pool**, on a schedule, and stored on the pool row — never computed at open
+time. A price that moves between the screen quoting it and the member tapping it is exactly the bug
 `priceTrusted` exists to prevent, and §7 of the parent doc is explicit that the member is charged what they
 were shown.
 
-A price change should also be **announced to nobody and visible to everybody**: recompute nightly, write the
-new price, and let the screen read it. A pack whose price moved mid-session is a pack somebody screenshots.
+⚠️ **And a price CHANGE needs a floor on how often it can happen.** Recompute nightly, but hold a new price
+for at least a week — a pack that was $15 on Tuesday and $20 on Wednesday because two expensive cards came
+in is a pack somebody screenshots, and the explanation ("the average went up") is true and will not help.
 
 ---
 
-## 6. The platform
+## 5. The platform
 
-### 6.1 A pool registry, in code
+### 5.1 A pool registry, in code
 
-Pools are **definitions**, not content: a handful of objects with a key, a brand, a category, a band and a
-gate. They belong in code beside `COUNTER_STORE` and `CHANGELOG`, for the reason written over the latter —
-*"a CMS for a dozen paragraphs a month is a database call pretending to be a feature"*.
+Pools are **definitions**, not content: a handful of objects with a key, a brand, a category and a gate.
+They belong in code beside `COUNTER_STORE` and `CHANGELOG`, for the reason written over the latter — *"a CMS
+for a dozen paragraphs a month is a database call pretending to be a feature"*.
 
 ```js
 export const PACK_POOLS = [
-    { key: "bags",       brand: "Wolf Den Mystery Bag", channel: "bagged",                              public: true  },
-    { key: "pkmn-base",  brand: "Pokémon Singles",      channel: "shelf", category: "Pokemon Single Card", band: [200, 1000]  },
-    { key: "pkmn-chase", brand: "Pokémon Chase",        channel: "shelf", category: "Pokemon Single Card", band: [1000, 2500] },
-    { key: "mtg-base",   brand: "Magic Singles",        channel: "shelf", category: "Magic Single Card",   band: [200, 1000]  },
+    { key: "bags",   brand: "Wolf Den Mystery Bag", channel: "bagged",                                  public: true },
+    { key: "pkmn",   brand: "Pokémon Singles",      channel: "shelf", category: "Pokemon Single Card" },
+    { key: "mtg",    brand: "Magic Singles",        channel: "shelf", category: "Magic Single Card"   },
+    // Yu-Gi-Oh is defined but closed on concentration — see §3. It opens itself when the shelf allows.
+    { key: "ygo",    brand: "Yu-Gi-Oh Singles",     channel: "shelf", category: "Yu-Gi-Oh Single"     },
 ];
 ```
 
-Membership is **computed live** from the category and band — never a copied list of card ids. A copied list
-is a second source of truth about what is on the shelf, and it is wrong the moment the register sells one.
+⚠️ **A pool carries no price and no card list.** Both are derived: the price from the nightly EV recompute
+(§4.2), membership live from the category. A copied list of card ids would be a second source of truth about
+what is on the shelf, and it is wrong the moment the register sells one.
+
+⚠️ **There is no `band` field, and leaving the door open for one would be a mistake.** Bands were considered
+and rejected (§2); a vestigial range sitting unused in the registry is the kind of thing that gets filled in
+later by somebody who assumes it was meant to be used.
 
 ⚠️ **`category` means Square's `reporting_category`, not `category_id`.** This house has already been bitten:
 `category_id` stores nothing that reaches a sale, and a pool keyed off it would match nothing while looking
 perfectly correct in the diff.
 
-### 6.2 What `mkt_pack_open` needs
+### 5.2 What `mkt_pack_open` needs
 
 One column: `pool` (text, default `'bags'`). Everything downstream — the reveal, the vault, the sell-back,
 the trade ledger, the telemetry — already keys off the open row and does not care which pool it came from.
 Backfilling existing rows to `'bags'` is the whole migration.
 
-### 6.3 What inherits for free
+### 5.3 What inherits for free
 
 This is the part that makes the work worth doing, and it is most of the feature:
 
@@ -255,13 +183,13 @@ This is the part that makes the work worth doing, and it is most of the feature:
 - the **casino vendor** — he becomes a vendor with a *shelf* of packs rather than one button
 
 The UI work is therefore mostly **choosing** a pack rather than opening one: a picker, and a brand on the
-bag. See §9.
+bag. See §8.
 
 ---
 
-## 7. What is genuinely different from a bag, and must be built
+## 6. What is genuinely different from a bag, and must be built
 
-### 7.1 ⚠️ The race with the register is much worse
+### 6.1 ⚠️ The race with the register is much worse
 
 A bag is a sealed object in a tub that nobody sells by mistake. **A shelf single is in a binder in a case and
 is for sale right now, at the counter, to somebody standing in the shop.** §1.2 of the parent doc solved the
@@ -272,7 +200,7 @@ The honest sequence is: **claim in Square first, reveal second.** Decrement the 
 open, and only then show the card. If the decrement fails because the register won, the member is refunded
 before anything is revealed, and has seen nothing.
 
-### 7.2 ⚠️ Decrement, never delete
+### 6.2 ⚠️ Decrement, never delete
 
 The bag path **deletes** the packed variation — correct there, because a sealed bag is a one-off SKU. A shelf
 single is a real catalogue line with history, a cost record and possibly more copies. Deleting it would
@@ -284,14 +212,14 @@ the shelf side of it is currently *nothing*. That nothing has to become a `-1` i
 ⚠️ And it must adjust **exactly once**: itemised Square orders decrement themselves, and a second adjustment
 on our side reads as theft in the counts (`square-decrements-twice`).
 
-### 7.3 The pull task is a different job
+### 6.3 The pull task is a different job
 
 "Open the bag in the tub and re-shelve the card" becomes "**find this card in the case**". That is slower,
 needs the card's set, number and condition in the task, and fails more often. The `not_found` path — which
 refunds the member in full and is the only detector that the shelf has drifted from the table — stops being
 an edge case and becomes a normal weekly event.
 
-### 7.4 Condition is part of the product
+### 6.4 Condition is part of the product
 
 Shelf singles carry condition in the name (`NM`, `LP`). The bags mostly do not. A member who pulls an LP card
 at a NM price has a legitimate complaint, so either condition is **shown on the reveal** (it already is —
@@ -299,7 +227,7 @@ at a NM price has a legitimate complaint, so either condition is **shown on the 
 
 ---
 
-## 8. ⚠️ Consignment is excluded, and it is not close
+## 7. ⚠️ Consignment is excluded, and it is not close
 
 Four of the deepest categories on the shelf are **consignors**, not products: `Eric D` (209 units), `Pedro
 Painting` (96), `Josh comics` (91), `Justin's cards` (84) — all 100% `consigned`. Selling a consigned card
@@ -311,7 +239,7 @@ should live in the pool membership function where it cannot be forgotten — not
 
 ---
 
-## 9. Branding
+## 8. Branding
 
 Each pool is a pack with a name, a colour and a bag. The existing art is one black foil bag with a gold
 crescent; per-pool branding means **one bag sprite per pool**, which is real money and a real decision
@@ -326,7 +254,7 @@ The pack **picker** is new UI: a shelf of bags with a name, a price and "what's 
 
 ---
 
-## 10. The gate
+## 9. The gate
 
 A **second flag**, `SHELF_PACKS_PUBLIC`, and a second `shelfPacksOpenFor(buyerId)` beside the existing pair.
 
@@ -341,49 +269,32 @@ single readable fact.
 
 ---
 
-## 11. Questions for Luke
+## 10. Questions for Luke
 
-1. **Bands — yes?** Everything above hangs on cutting each category into price bands. Without them a
-   Pokémon pack is $15 for a typical $6 card. Are the boundaries right — $2–10 / $10–25 / $25–60 / $60+ —
-   and do you want all four, or just a cheap one and a chase one to start?
+Answered already, recorded here so they stay answered: **no bands, one pack per category** (§2);
+**price = EV rounded up to $5** (§4.1); **bulk is out of scope** (§1).
 
-2. **The $5 cliff.** Pokémon $10–25 prices at $15 and Magic $10–25 at $20, on 47¢ of EV difference. Live
-   with it, or price off a target margin and round after (both become $20 at a 75% target)?
+1. **Does Yu-Gi-Oh ship at launch?** One card is 32% of that pool's value and the pack is priced on it
+   (§3). I would hold Yu-Gi-Oh until the concentration drops — which makes launch **two** pools, Pokémon
+   and Magic, both at $15. Hold it, or ship all three and accept that one?
 
-3. **Price against market, or against what we paid?** Half the shelf has a real cost record and across it we
-   paid 46% of list. Pricing off real cost would be exact where we know it and an assumption where we do
-   not. Pricing off market is uniform and ignores what the card actually cost us.
+2. **Who pulls the card, and how fast?** A single lives in a binder in a case, not sealed in a tub, so it
+   is a slower find and it can be sold at the register first. Same-day job, or does it ride the existing
+   queue with no deadline the way the bags do?
 
-4. **Is the depth bar right?** ≥60 units, ≥40 lines, no line over 15% of pool value. That gives Pokémon two
-   pools, Magic two, and Yu-Gi-Oh **one** — is a single $5 Yu-Gi-Oh pack worth shipping, or does Yu-Gi-Oh
-   wait until there is more of it?
+3. **Do shelf cards go in the same Card Vault?** I have assumed yes — same vault, same shipping, same
+   seven-day hold, same sell-back at 60%. The alternative is a separate shelf, which I would not build.
 
-5. **Who pulls the card, and how fast?** A single in a case is a slower find than a bag in a tub, and the
-   "can't find it" refund stops being rare. Is that a same-day job, or does it ride the existing queue with
-   no deadline like the bags do?
+4. **What are they called?** "Pokémon Singles" and "Magic Singles" are placeholders and the names are the
+   branding. Two bags to draw at roughly $0.06 each, so the cost is choosing them rather than drawing them.
 
-6. **Do shelf cards go in the same Card Vault?** I have assumed yes — same vault, same shipping, same hold.
-
-7. **How many pools at launch, and what are they called?** "Pokémon Singles" and "Pokémon Chase" are
-   placeholders. The names are the branding and I would rather use yours.
-
-8. **Bulk: how many cards, at what price?** N is the lever and the price follows (§4.3). 20 cards for $5
-   is counter parity. 40 for $10 and 100 for $25 are the same ratio at bigger sizes. One size or a ladder?
-
-9. **Bulk: one pool per game, or one mixed?** There are two SKUs — `Magic Bulk` and `Pokemon Bulk` — so
-   "Pokémon Bulk, 20 cards" and "Magic Bulk, 20 cards" is free. A mixed scoop would be a third thing we do
-   not stock and would have to be made by hand.
-
-10. **Bulk: does it sell back at all?** §4.2 makes the handful the unit, which closes the 400% hole. The
-    other option is simpler: bulk is keep-or-collect only and never trades back, on the grounds that we do
-    not buy bulk back one card at a time at the counter either. Which?
-
-11. **Does bulk ship?** Twenty loose cards in an envelope is a different postage and packing job from one
-    card in a sleeve, and the vault's shipping quote assumes the latter.
+5. **Does the $290 Pokémon card stay in the pool?** It is only 2.2% of pool value so it passes every test,
+   and a real chase card is most of what makes a pack worth opening twice. But it is a $290 card going out
+   for $15, and that is a decision rather than a calculation.
 
 ---
 
-## 12. Build order (if the above survives)
+## 11. Build order (if the above survives)
 
 1. `pool` column on `mkt_pack_open`, backfilled to `'bags'`; the registry; `shelfPacksOpenFor`.
 2. Pool membership + EV from `inventory_feed`, consigned excluded, nightly price recompute.
