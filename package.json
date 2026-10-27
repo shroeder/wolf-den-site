@@ -48,6 +48,7 @@
     "mine:report": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/mine-report.mjs",
     "sheet:islands": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/island-sheet.mjs",
     "harness:vault": "node scripts/vault-harness.mjs",
+    "prove:vault": "node --import ./scripts/lib/register-loader.mjs scripts/prove-vault.mjs",
     "check:craft-act": "node --import ./scripts/lib/register-loader.mjs scripts/check-craft-act.mjs"
   },
   "keywords": [],

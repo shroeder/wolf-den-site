@@ -21,10 +21,20 @@ const logger = createServerLogger({ source: "api", subsystem: "vault-restock" })
 // ("Unsupported adjustment state transition"). The existing cancel path already learned this; the note is
 // repeated here because the obvious reading of "undo the sale" is the one Square refuses.
 //
-// ⚠️ AND THE COST GOES IN AT CREATE OR NEVER. Square's native unit cost
-// (item_variation_vendor_infos.price_money) is WRITE-AT-CREATE ONLY — every update shape returns 200 and
-// stores nothing. So a newly created card carries its cost in the create payload, and `wolfden_item_cost` is
-// written either way because that table is our own and survives the item being deleted.
+// ⚠️ SQUARE'S NATIVE UNIT COST IS NOT WRITABLE FROM THE API AT ALL, AND THAT IS MEASURED, NOT ASSUMED.
+//
+// The received wisdom here was "write-at-CREATE only" — that an update returns 200 and stores nothing, but a
+// create does stick. Probed again on 2026-10-27 against the live catalog, both ways, on a throwaway item:
+//
+//     item_variation_vendor_infos nested in an ITEM create   -> ABSENT on read-back
+//     item_variation_vendor_infos on a standalone VARIATION  -> ABSENT on read-back
+//
+// Neither stores. So the field is not sent at all rather than left in the payload pretending to do something.
+// (Costs set through Square's own dashboard are still there — this is about the API, not about the field.)
+//
+// What DOES persist is the `wolfden_unit_cost` custom attribute and our own `wolfden_item_cost` table, and the
+// latter is the one the COGS resolver reads. That table also survives Square deleting the item, which is the
+// whole reason it exists.
 
 const UNIT_COST_ATTR = "wolfden_unit_cost";
 
@@ -89,18 +99,6 @@ async function createCardItem({ name, description, imageUrl, priceCents, costCen
         pricing_type: "FIXED_PRICING",
         price_money: { amount: Math.max(0, Math.round(priceCents)), currency: "USD" },
         track_inventory: true,
-        // Write-at-create only. This is the single opportunity to give Square its own cost figure.
-        ...(costCents > 0
-            ? {
-                item_variation_vendor_infos: [{
-                    type: "ITEM_VARIATION_VENDOR_INFO",
-                    id: "#vault-card-vendor",
-                    item_variation_vendor_info_data: {
-                        price_money: { amount: Math.round(costCents), currency: "USD" },
-                    },
-                }],
-            }
-            : {}),
     };
 
     const made = await squareFetch("/v2/catalog/object", {

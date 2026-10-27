@@ -35,6 +35,9 @@ const logger = createServerLogger({ source: "api", subsystem: "packs" });
 
 const DEFAULT_PRICE_CENTS = 2500;
 
+/** How long a reservation may sit before the pool treats it as abandoned. A live open takes under a second. */
+const STALE_RESERVATION_MINUTES = 10;
+
 /** Dollars-numeric out of Postgres into cents, once, at the edge. Nothing downstream sees a float. */
 const toCents = (v) => Math.round(Number(v || 0) * 100);
 
@@ -124,10 +127,13 @@ function toPoolCard(row) {
  */
 export async function packPoolSummary() {
     const [rows, price] = await Promise.all([
+        // Stale reservations count as available, because the next open will reclaim them (see the note on the
+        // claim). Leaving them out would show members "72 packs left" for a pool that actually holds 74.
         db.query(
             `SELECT id, card_name, condition, market_value, image_url, item_type
              FROM mystery_bag_cards
              WHERE status = 'active'
+                OR (status = 'reserved' AND reserved_at < NOW() - INTERVAL '${STALE_RESERVATION_MINUTES} minutes')
              ORDER BY market_value DESC`
         ),
         packPrice(),
@@ -150,6 +156,31 @@ export async function packPoolSummary() {
         byTier,
         cards,
     };
+}
+
+/**
+ * Delete a packed variation, retrying the rate limiter.
+ *
+ * ⚠️ SQUARE SERIALISES CATALOG WRITES. Five opens at once produced `429 Catalog locked by prior request` for
+ * four of them — not an error in any meaningful sense, just Square asking us to wait our turn. Without a
+ * retry that is four members told "that pack just went to someone at the counter" when nothing of the sort
+ * happened. Short backoff, few attempts: a member is watching a bag, so this cannot wait long.
+ */
+async function deleteWithRetry(variationId, attempts = 3) {
+    for (let i = 0; i < attempts; i += 1) {
+        try {
+            await deleteSquareCatalogObject(variationId);
+            return true;
+        } catch (error) {
+            const rateLimited = error?.squareStatus === 429 || error?.squareCode === "RATE_LIMITED";
+            if (!rateLimited || i === attempts - 1) {
+                logger.error("packs.open.square_delete_failed", error, { variationId, attempt: i + 1 });
+                return false;
+            }
+            await new Promise((resolve) => { setTimeout(resolve, 180 * (i + 1)); });
+        }
+    }
+    return false;
 }
 
 /**
@@ -189,6 +220,18 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
     // ── 1. CLAIM A BAG ──────────────────────────────────────────────────────────────────────────────────────
     // Inside a transaction, because FOR UPDATE SKIP LOCKED means nothing outside one. Two members tapping at
     // the same moment cannot take the same bag; the loser simply draws a different one.
+    //
+    // ⚠️ A STALE RESERVATION IS ALSO CLAIMABLE, AND IT HAS TO BE — THERE IS NOTHING ELSE TO RESCUE IT.
+    //
+    // `reserved` is a transient state that only persists if the open died between claiming a bag and marking
+    // it sold: a crash, a timeout, a deploy mid-request. Nothing sweeps it. And because every pool query
+    // filters on `status = 'active'`, a stranded reservation is INVISIBLE — the bag silently leaves the pool
+    // forever and the board quietly counts one fewer pack with no error anywhere.
+    //
+    // Two stranded this way during testing, from a single crash. In production that is a pool that shrinks by
+    // itself. Rather than add a cron to sweep them, the claim simply treats a reservation older than the
+    // window as abandoned, which makes the pool self-healing with no new moving part. The window is long
+    // enough that it can never race a live open — those complete in under a second.
     const key = idempotencyKey || `vpo:${randomUUID()}`;
     const claimed = await db.tx(async (client) => {
         const picked = await client.query(
@@ -197,11 +240,13 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
              WHERE id = (
                  SELECT id FROM mystery_bag_cards
                  WHERE status = 'active'
+                    OR (status = 'reserved' AND reserved_at < NOW() - INTERVAL '${STALE_RESERVATION_MINUTES} minutes')
                  ORDER BY random()
                  LIMIT 1
                  FOR UPDATE SKIP LOCKED
              )
-             AND status = 'active'
+             AND (status = 'active'
+                  OR (status = 'reserved' AND reserved_at < NOW() - INTERVAL '${STALE_RESERVATION_MINUTES} minutes'))
              RETURNING id, card_id, card_name, condition, market_value, image_url, item_type,
                        square_variation_id, packed_variation_id, variation_sku, channel,
                        cost_cents, cost_basis`,
@@ -227,52 +272,84 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
         logger.warn("packs.open.released", { buyerId, cardId: claimed.id, reason });
     };
 
-    // ── 2. TAKE THE BAG OFF THE REGISTER, AND WAIT FOR IT ───────────────────────────────────────────────────
-    // ⚠️ BEFORE THE CREDIT IS SPENT, AND AWAITED. This is what stops the bag being sold at the counter to
-    // somebody else — the SKU is gone, so the POS refuses the scan. If it fails we have taken nothing from the
-    // member and the bag goes back in the pool: a bag we could not un-list must not be sold twice.
+    // ── 2. TAKE THE PENDING SLOT, AND TAKE IT FIRST ────────────────────────────────────────────────────────
     //
-    // A 'shelf' row (§1.4) has no packed variation and nothing to delete — its single stays on the shelf and
-    // is decremented by its own path. Never delete on that branch: the fallback would resolve to the card's
-    // own source single and take a real catalogue item with it.
-    if (claimed.channel === "bagged" && claimed.packed_variation_id) {
-        try {
-            await deleteSquareCatalogObject(claimed.packed_variation_id);
-        } catch (error) {
-            await release("square_delete_failed");
-            logger.error("packs.open.square_delete_failed", error, { buyerId, cardId: claimed.id });
-            return { ok: false, error: "unavailable" };
-        }
-    }
-
-    // ── 3. SPEND THE CREDIT ─────────────────────────────────────────────────────────────────────────────────
-    // Guarded and atomic — two concurrent spends cannot overdraw. If the balance moved underneath us the bag
-    // goes back; the member is never charged for a pack they did not get.
-    const spent = await spendCredit(buyerId, priceCents, "pack_open", key, { packOpen: true });
-    if (!spent.ok) {
-        await release("credit_spend_failed");
-        return { ok: false, error: "insufficient_credit", priceCents, balanceCents };
-    }
-
-    // ── 4. BOOK IT ──────────────────────────────────────────────────────────────────────────────────────────
-    // From here the result EXISTS and is owed to the member, whatever happens to their browser.
+    // ⚠️ THE UNIQUE INDEX IS THE LOCK, AND IT HAS TO BE GRABBED BEFORE ANYTHING IS SPENT OR DESTROYED.
+    //
+    // `resumePendingOpen` at the top of this function is a READ, and between that read and this insert a
+    // second request can create a pending open. The first version wrote this row LAST — after the credit was
+    // spent and after the bag's Square variation was deleted — so losing that race threw an unhandled unique
+    // violation with the member already charged and the bag already gone. Five concurrent opens reproduced it
+    // immediately.
+    //
+    // Writing the row first turns the race into a clean resume: nothing has been taken, so the loser simply
+    // gets the open that already exists.
     const valueCents = toCents(claimed.market_value);
     const tier = tierForCents(valueCents);
     const { revenueCents, taxCents } = splitPriceForTax(priceCents, taxRate);
     const cogs = await resolvePackCost(claimed);
 
-    const row = await db.queryOne(
-        `INSERT INTO mkt_pack_open
-            (buyer_id, mystery_card_id, price_cents, card_value_cents, tier,
-             revenue_cents, tax_cents, cogs_cents, cogs_basis, idempotency_key, preview)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-         RETURNING id, created_at`,
-        [
-            buyerId, claimed.id, priceCents, valueCents, tier.key,
-            revenueCents, taxCents, cogs.cents, cogs.basis, key, isPreviewOpen(buyerId),
-        ]
-    );
+    let row;
+    try {
+        row = await db.queryOne(
+            `INSERT INTO mkt_pack_open
+                (buyer_id, mystery_card_id, price_cents, card_value_cents, tier,
+                 revenue_cents, tax_cents, cogs_cents, cogs_basis, idempotency_key, preview)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             RETURNING id, created_at`,
+            [
+                buyerId, claimed.id, priceCents, valueCents, tier.key,
+                revenueCents, taxCents, cogs.cents, cogs.basis, key, isPreviewOpen(buyerId),
+            ]
+        );
+    } catch (error) {
+        await release("lost_the_pending_race");
+        if (String(error?.dbCode || error?.code) === "23505") {
+            const existing = await resumePendingOpen(buyerId);
+            if (existing) return { ok: true, open: existing, resumed: true };
+            return { ok: false, error: "busy" };
+        }
+        logger.error("packs.open.book_failed", error, { buyerId, cardId: claimed.id });
+        return { ok: false, error: "unavailable" };
+    }
 
+    const unbook = async (reason) => {
+        await db.query(`DELETE FROM mkt_pack_open WHERE id = $1`, [row.id]).catch(() => {});
+        await release(reason);
+    };
+
+    // ── 3. SPEND THE CREDIT ─────────────────────────────────────────────────────────────────────────────────
+    // Guarded and atomic — two concurrent spends cannot overdraw. Nothing has been destroyed yet, so a
+    // failure here unwinds completely.
+    const spent = await spendCredit(buyerId, priceCents, "pack_open", key, { packOpen: true });
+    if (!spent.ok) {
+        await unbook("credit_spend_failed");
+        return { ok: false, error: "insufficient_credit", priceCents, balanceCents };
+    }
+
+    // ── 4. TAKE THE BAG OFF THE REGISTER ────────────────────────────────────────────────────────────────────
+    // The SKU is deleted, so the POS refuses the scan and the bag cannot be sold to somebody at the counter.
+    //
+    // ⚠️ THIS IS AFTER THE SPEND, NOT BEFORE IT, AND THE REASON IS SQUARE'S RATE LIMITER. Catalog writes
+    // SERIALISE: five simultaneous opens produce `429 Catalog locked by prior request` for most of them. With
+    // the delete first, every one of those rate-limited opens had to unwind a bag it had already claimed. With
+    // it here, the common failure refunds cleanly instead — and `release` is guarded on our own reservation
+    // key, so if the register genuinely won the bag in between, the release is a no-op and the member simply
+    // gets their money back.
+    //
+    // A 'shelf' row (§1.4) has no packed variation and nothing to delete. Never delete on that branch: the
+    // fallback would resolve to the card's own source single and take a real catalogue item with it.
+    if (claimed.channel === "bagged" && claimed.packed_variation_id) {
+        const deleted = await deleteWithRetry(claimed.packed_variation_id);
+        if (!deleted) {
+            await addCredit(buyerId, priceCents, "refund", key, { reason: "square_delete_failed" }).catch(() => {});
+            await unbook("square_delete_failed");
+            return { ok: false, error: "unavailable" };
+        }
+    }
+
+    // ── 5. IT IS THEIRS ─────────────────────────────────────────────────────────────────────────────────────
+    // From here the result EXISTS and is owed to the member, whatever happens to their browser.
     // The pool row is spent. mystery_sold_events / _assignments are written too so the existing audit trail,
     // the public hits board and the in-store tooling all see an online pull the same way they see a counter
     // one — one sold event, one assignment, one audit line.
