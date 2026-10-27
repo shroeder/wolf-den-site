@@ -25836,31 +25836,6 @@ body.cas-seated .social-fab { display: none; }
     font-size: 0.9rem;
 }
 
-.vt-tabs {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-}
-
-.vt-tab {
-    flex: 1 1 auto;
-    min-height: 40px;
-    padding: 8px 12px;
-    border-radius: 10px;
-    border: 1px solid var(--line);
-    background: var(--elevated);
-    color: var(--ink-secondary);
-    font-size: 0.9rem;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.vt-tab-on {
-    border-color: var(--ring);
-    color: var(--ink);
-    background: rgba(212, 175, 55, 0.1);
-}
-
 .vt-empty {
     display: flex;
     flex-direction: column;
@@ -25902,6 +25877,7 @@ body.cas-seated .social-fab { display: none; }
 }
 
 .vt-tile-art {
+    position: relative;
     display: block;
     width: 100%;
     aspect-ratio: 5 / 7;
@@ -25941,22 +25917,14 @@ body.cas-seated .social-fab { display: none; }
 .vt-tile-value { font-size: 1.05rem; font-variant-numeric: tabular-nums; margin-top: 2px; }
 .vt-tile-was { font-size: 0.68rem; color: var(--muted); }
 
-.vt-pick {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 8px 10px 10px;
-    font-size: 0.78rem;
-    color: var(--ink-secondary);
-    cursor: pointer;
-}
-
-.vt-pick input { width: 17px; height: 17px; accent-color: var(--accent); }
-
 /* The selection bar. Sticky at the bottom so a long vault never hides the action. */
+/* ⚠️ ABOVE .social-fab, WHICH IS 900. The film caught the chat bubble parked on top of "Sell back" in
+   this bar — the same collision the pack modal hit, in the other place a member commits to something. The
+   bubble is reachable again the moment nothing is selected. */
 .vt-bar {
     position: sticky;
     bottom: 8px;
+    z-index: 910;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -26127,6 +26095,204 @@ body.cas-seated .social-fab { display: none; }
     padding: 8px 13px;
     font-size: 0.86rem;
 }
+/* ── THE SELL BUTTON, EVERYWHERE ─────────────────────────────────────────────────────────────────────────────
+   Luke: "always sell button needs super sexy."
+
+   The reveal's own sell CTA got the warm-metal treatment and every other sell on the site stayed a flat gold
+   .pk-btn-primary — the vault's action bar, the card sheet, the confirm sheet. That is three places a member
+   does exactly the same thing and sees three different levels of enthusiasm about it.
+
+   ⚠️ A NEW CLASS RATHER THAN A CHANGE TO .pk-btn-primary. That class is the site's generic filled button and
+   it sits on dozens of screens that have nothing to do with selling a card; upgrading it would repaint all
+   of them. This is the SELL button, so it is the one that carries the shine.
+
+   ⚠️ And the text colour is set with the background, every time — a gold button with inherited light text is
+   this site's oldest footgun. */
+.pk-btn-sell {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(152deg, #FFE9A8 0%, #F0CF66 28%, #D4AF37 62%, #B8912B 100%);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #1F1703;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    box-shadow:
+        0 8px 24px rgba(212, 175, 55, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.75),
+        inset 0 -2px 6px rgba(140, 100, 20, 0.3);
+}
+
+/* Take-delivery, matching the reveal's vault CTA so the pair means the same thing in both places. */
+.pk-btn-vault {
+    background:
+        radial-gradient(ellipse 120% 90% at 50% 0%, rgba(167, 139, 250, 0.42), transparent 62%),
+        linear-gradient(165deg, #2A2250 0%, #171331 55%, #0F0C22 100%);
+    border-color: rgba(212, 175, 55, 0.45);
+    color: #E9DCFF;
+    font-weight: 700;
+}
+
+.pk-btn-vault:hover:not(:disabled) {
+    border-color: rgba(212, 175, 55, 0.85);
+    box-shadow: 0 8px 26px rgba(120, 95, 230, 0.42);
+}
+
+.pk-btn-sell:hover:not(:disabled) {
+    box-shadow:
+        0 10px 32px rgba(212, 175, 55, 0.62),
+        inset 0 1px 0 rgba(255, 255, 255, 0.85),
+        inset 0 -2px 6px rgba(140, 100, 20, 0.3);
+}
+
+/* The specular pass. Same gesture as .pk-cta-shine, sized for a single-line button.
+   ⚠️ A CHILD, NOT A ::after — .pk-btn already takes a transform of its own on :active, and two transforms
+   that have to disagree cannot share an element. */
+.pk-btn-shine {
+    position: absolute;
+    top: -80%;
+    bottom: -80%;
+    left: 0;
+    width: 40%;
+    pointer-events: none;
+    background: linear-gradient(
+        100deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.06) 34%,
+        rgba(255, 255, 255, 0.45) 50%,
+        rgba(255, 255, 255, 0.06) 66%,
+        transparent 100%
+    );
+    transform: translateX(-220%) skewX(-16deg);
+    animation: pk-btn-shine 4.4s ease-in-out infinite;
+}
+
+@keyframes pk-btn-shine {
+    0% { transform: translateX(-220%) skewX(-16deg); }
+    18%, 100% { transform: translateX(420%) skewX(-16deg); }
+}
+
+/* ── THE TABS ────────────────────────────────────────────────────────────────────────────────────────────────
+   Luke: "tabs need sexy appeal."
+
+   They were three separate bordered boxes, which is what you build when you think of a tab as a button. A
+   tab is not a button — it is one position of a single control, and three outlines say "three unrelated
+   things to press". One recessed track with a lit segment inside it says "you are here, and there are two
+   other heres", which is the thing that actually needs communicating. */
+.vt-tabs {
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 13px;
+    background: rgba(0, 0, 0, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+    overflow-x: auto;
+}
+
+.vt-tab {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 38px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 0;
+    background: transparent;
+    color: #8A8A8A;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.18s ease, background 0.18s ease;
+}
+
+.vt-tab:hover:not(.vt-tab-on) { color: #C9C9C9; background: rgba(255, 255, 255, 0.04); }
+
+/* The lit segment. Gold wash rather than gold fill — a filled gold tab beside a gold sell button is two
+   things shouting the same colour, and only one of them is an action. */
+.vt-tab-on {
+    color: #1F1703;
+    font-weight: 800;
+    background: linear-gradient(170deg, #F3D978 0%, #D4AF37 58%, #C09B2E 100%);
+    box-shadow: 0 2px 10px rgba(212, 175, 55, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* ── PICKING A CARD ──────────────────────────────────────────────────────────────────────────────────────────
+   Luke: "Checkbook ghetto."
+
+   ⚠️ A NATIVE CHECKBOX IS THE ONE CONTROL THAT CANNOT BE STYLED INTO A DARK THEME. accent-color paints the
+   tick and the fill and nothing else — the box keeps the platform's own white chrome, its own corner radius
+   and its own size, so it stays a bright system square sitting on a card worth real money. Same family as
+   never shipping a native <select> on this site.
+
+   The replacement is a button with aria-pressed, which is the correct semantic for a toggle that is not part
+   of a form submission, plus a tick badge on the art so a selected card is readable across the whole grid
+   rather than one label at a time. */
+.vt-pick {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 9px 10px 11px;
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: transparent;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #8A8A8A;
+    cursor: pointer;
+    text-align: left;
+    transition: color 0.16s ease, background 0.16s ease;
+}
+
+.vt-pick:hover { background: rgba(255, 255, 255, 0.03); color: #C9C9C9; }
+
+.vt-pick-box {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1.5px solid rgba(255, 255, 255, 0.22);
+    background: rgba(0, 0, 0, 0.4);
+    color: transparent;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.vt-pick-box svg { width: 13px; height: 13px; display: block; }
+
+.vt-pick[aria-pressed="true"] { color: #F0D27A; }
+
+.vt-pick[aria-pressed="true"] .vt-pick-box {
+    background: linear-gradient(160deg, #F3D978, #C09B2E);
+    border-color: #F3D978;
+    color: #1F1703;
+    box-shadow: 0 0 12px rgba(212, 175, 55, 0.55);
+}
+
+/* The badge on the art. Scales in so selecting reads as something happening, not as a state flipping. */
+.vt-tile-check {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(160deg, #F3D978, #C09B2E);
+    color: #1F1703;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6), 0 0 16px rgba(212, 175, 55, 0.5);
+    animation: vt-check-in 0.22s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+
+.vt-tile-check svg { width: 15px; height: 15px; display: block; }
+
+@keyframes vt-check-in {
+    from { opacity: 0; transform: scale(0.3); }
+    to { opacity: 1; transform: scale(1); }
+}
+
 
 .vt-order-right {
     display: flex;

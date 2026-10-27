@@ -1515,6 +1515,31 @@ The 441px budget was re-cut for all of it: two 56px CTAs plus a 20px balance lin
 paid for them (50dvh → 44dvh). The fold check found both overflows at once — the balance at y=-11 and the
 buttons ending at 446 on a 441px viewport.
 
+### The vault screen (2026-10-27)
+
+*"Checkbook ghetto and tabs need sexy appeal, always sell button needs super sexy."*
+
+⚠️ **A native checkbox is the one control that cannot be styled into a dark theme.** `accent-color` paints the
+tick and the fill and nothing else — the box keeps the platform's own chrome, corner radius and size, so it
+stays a bright system square sitting on a card worth real money. Replaced with a `<button aria-pressed>`,
+which is the correct semantic for a toggle outside a form, plus a gold tick badge on the art so a selected
+card is readable across the whole grid instead of one label at a time. Same family as never shipping a
+native `<select>` here.
+
+**The tabs were three buttons; a tab is not a button.** It is one position of a single control, and three
+separate outlines say "three unrelated things to press". One recessed track with a lit segment says "you are
+here, and there are two other heres", which is the thing that needed communicating.
+
+**`.pk-btn-sell` — the sell button, everywhere.** The reveal's CTA got the warm-metal treatment and the other
+three sells (vault bar, card sheet, confirm sheet) stayed flat gold: the same action at three different
+levels of enthusiasm. ⚠️ A new class rather than a change to `.pk-btn-primary`, which is the site's generic
+filled button and sits on dozens of unrelated screens. `.pk-btn-vault` is its partner, so gold-is-cash /
+jewel-is-take-delivery means the same thing in the reveal and in the vault — "Get them" on a ghost button
+read as the way to back out of selecting.
+
+⚠️ And `.vt-bar` got `z-index: 910`, above `.social-fab`'s 900 — the film caught the chat bubble parked on
+"Sell back", the same collision the pack modal hit, in the other place a member commits to something.
+
 **Still to do:** step 8 — announce it, which only happens when `VAULT_PUBLIC` flips. And the Android half of
 §16.3: the pull queue and the pack telemetry need adding to **both** drawer lists in `LedgerApp.kt`, or they
 are screens that exist, work, and cannot be reached.

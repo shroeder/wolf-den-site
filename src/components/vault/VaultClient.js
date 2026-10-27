@@ -219,6 +219,15 @@ export default function VaultClient({ initial }) {
                                             ) : (
                                                 <span className="vt-noart">{card.name}</span>
                                             )}
+                                            {/* Readable from across the grid. The row of "Selected" labels
+                                                underneath tells you the same thing one tile at a time. */}
+                                            {on ? (
+                                                <span className="vt-tile-check" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M4 12.6 9.2 18 20 6.4" />
+                                                    </svg>
+                                                </span>
+                                            ) : null}
                                         </button>
                                         <div className="vt-tile-body">
                                             <span className="vt-tile-name">{card.name}</span>
@@ -230,10 +239,28 @@ export default function VaultClient({ initial }) {
                                                 <span className="vt-tile-was">pulled at {usd(card.pulledValueCents)}</span>
                                             ) : null}
                                         </div>
-                                        <label className="vt-pick">
-                                            <input type="checkbox" checked={on} onChange={() => toggle(card.id)} />
-                                            <span>{on ? "Selected" : "Select"}</span>
-                                        </label>
+                                        {/* ⚠️ NOT A NATIVE CHECKBOX. Luke: "Checkbook ghetto". A browser
+                                            checkbox is the one control that cannot be styled into the rest
+                                            of a dark theme — accent-color paints the tick and nothing else,
+                                            so it stays a bright system square in the corner of a card worth
+                                            real money. Same rule as never shipping a native <select>.
+
+                                            A button with aria-pressed is the correct semantic for a toggle
+                                            that is not part of a form submission, and it gets the whole tile
+                                            as its hit area via the tick badge on the art. */}
+                                        <button
+                                            type="button"
+                                            className="vt-pick"
+                                            aria-pressed={on}
+                                            onClick={() => toggle(card.id)}
+                                        >
+                                            <span className="vt-pick-box" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M4 12.6 9.2 18 20 6.4" />
+                                                </svg>
+                                            </span>
+                                            <span className="vt-pick-label">{on ? "Selected" : "Select"}</span>
+                                        </button>
                                     </li>
                                 );
                             })}
@@ -245,19 +272,23 @@ export default function VaultClient({ initial }) {
                                     {selectedCards.length} selected · {usd(selectedTotal)}
                                 </span>
                                 <div className="vt-bar-actions">
+                                    {/* The same pair as the reveal's, so they mean the same thing in both
+                                        places: gold is cash out, jewel-toned is take delivery. A ghost
+                                        button here read as the way to back out of selecting. */}
                                     <button
                                         type="button"
-                                        className="pk-btn pk-btn-ghost"
+                                        className="pk-btn pk-btn-vault"
                                         onClick={() => { setOrdering("choose"); setQuote(null); }}
                                     >
                                         Get them
                                     </button>
                                     <button
                                         type="button"
-                                        className="pk-btn pk-btn-primary"
+                                        className="pk-btn pk-btn-sell"
                                         onClick={() => setConfirming(true)}
                                     >
                                         Sell back
+                                        <span className="pk-btn-shine" aria-hidden="true" />
                                     </button>
                                 </div>
                             </div>
@@ -343,10 +374,11 @@ export default function VaultClient({ initial }) {
                     <div className="vt-sheet-actions">
                         <button
                             type="button"
-                            className="pk-btn pk-btn-primary"
+                            className="pk-btn pk-btn-sell"
                             onClick={() => { setSelected(new Set([detail.id])); setConfirming(true); }}
                         >
                             Sell back — {usd(detail.valueCents)}
+                            <span className="pk-btn-shine" aria-hidden="true" />
                         </button>
                         <button type="button" className="pk-btn pk-btn-ghost" onClick={() => setDetail(null)}>
                             Close
@@ -471,7 +503,7 @@ export default function VaultClient({ initial }) {
                         <strong className="vt-gold">+{usd(selectedTotal)}</strong>
                     </p>
                     <div className="vt-sheet-actions">
-                        <button type="button" className="pk-btn pk-btn-primary" onClick={sellSelected} disabled={busy}>
+                        <button type="button" className="pk-btn pk-btn-sell" onClick={sellSelected} disabled={busy}>
                             {busy ? "Selling…" : `Sell for ${usd(selectedTotal)}`}
                         </button>
                         <button type="button" className="pk-btn pk-btn-ghost" onClick={() => setConfirming(false)}>
