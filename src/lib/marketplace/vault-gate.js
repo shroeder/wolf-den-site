@@ -21,12 +21,19 @@ import { canPreview } from "@/lib/marketplace/owner.js";
 // inside an act path.
 
 /**
- * The launch switch. Flip to `true` and everything below opens at once, for everybody.
+ * The launch switch. `true` since 2026-10-27 — Luke: "Ok I think we can remove the owner gate from that
+ * feature." Everything behind it opened at once, for everybody.
  *
- * ⚠️ Flipping this is not the whole launch — see docs/virtual-packs-and-the-card-vault.md §16.5. A feature
- * nobody is told about reads as a feature that is switched off.
+ * ⚠️ THE FLAG IS KEPT RATHER THAN DELETED ALONG WITH ITS CALL SITES. It is the only way back: a pool that
+ * empties, a Square problem or a pull queue nobody is working is closed by one line here, and the
+ * alternative — re-deriving eleven door checks under pressure — is how a feature gets half-closed.
+ *
+ * Checked before flipping, per §16.2, because this is where it goes wrong: every door asks vaultOpenFor
+ * (ten of them now, the casino's pack vendor being the one the doc's table does not have), there is no bare
+ * isOwner anywhere in the pack or vault subsystem, and no second `OPEN =` or `*OpenFor` shadows it. The
+ * casino launch failed that check and worked for exactly one person for twenty minutes.
  */
-export const VAULT_PUBLIC = false;
+export const VAULT_PUBLIC = true;
 
 /**
  * May this member open packs online and use the Card Vault?
@@ -52,5 +59,10 @@ export function vaultOpenFor(buyerId) {
  * the BOOKS, because the bag really did leave the shelf. Those are different questions.
  */
 export function isPreviewOpen(buyerId) {
+    // ⚠️ NOTHING IS A PREVIEW ANY MORE, AND THAT INCLUDES LUKE'S OWN TEST OPENS. Once the feature is public
+    // there is no gated cohort to exclude, so from here the telemetry averages count every open including
+    // his. That is correct — he is a member on a public feature now — but it does mean a run of test opens
+    // moves the numbers, where before they could not. The rows stamped `preview` before today keep that
+    // stamp, because it was written at open time and is a fact about the row rather than about the flag.
     return !VAULT_PUBLIC && vaultOpenFor(buyerId);
 }

@@ -12,6 +12,14 @@
 
 export const CHANGELOG = [
     {
+        key: "virtual-packs-and-the-card-vault",
+        date: "2026-10-27",
+        tag: "new",
+        title: "Open a mystery pack from your phone",
+        blurb: "The mystery bags on the Live Chase Board are not just a thing you can buy at the counter any more — you can open one here, with store credit, and the card you pull is a real card sitting in a real bag in this shop. Twenty dollars a pack, and it comes out of the same pool the board has been listing all along, so what you are opening is the same stock somebody else could walk in and buy this afternoon. The pool moves because of that: there are seventy-six left as this goes up. When the bag comes apart you get one of two things to decide, and the card is yours either way. SELL IT BACK and the money is in your balance before the animation finishes — sixty percent of what the card is worth, which is the same rate we pay at the counter for a card you carry in, rounded up to the nearest quarter and never less than a dollar. Or KEEP IT, and it goes in your Card Vault: a shelf of everything you have pulled, with what each one is worth now rather than what it was worth the day you got it. Cards in the vault are really yours. You can have them shipped, or set them aside to collect next time you are in, and you can change your mind and trade one back at any point. There is a seven-day wait before a card can leave the building if you have topped up store credit recently, which is about card fraud and not about you. There is also a fellow at the far end of the casino, past the gachapon, who sells the same packs for the same price if you would rather buy one without leaving the floor.",
+        href: "/mystery-bags",
+    },
+    {
         key: "chips-and-tokens",
         date: "2026-09-09",
         tag: "new",
