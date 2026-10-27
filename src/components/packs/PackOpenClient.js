@@ -126,6 +126,18 @@ export default function PackOpenClient({ initial }) {
     const [error, setError] = useState(null);
     const [choice, setChoice] = useState(null);
     const [shelfOpen, setShelfOpen] = useState(false);
+    // ── THE PAGE IS NOT THE PLACE FOR THIS ───────────────────────────────────────────────────────────────
+    // Luke, 2026-10-27, looking at it on his phone: "This should be a modal, there should be one call to
+    // action that glimmers."
+    //
+    // He is right, and it is the same problem the reveal already had one answer to. An inline panel has to
+    // share the screen with the site header, the XP bar, the cart and the Live Chase Board below it, so it
+    // competes with all of them for attention AND loses most of the height to them. A modal has one job and
+    // the whole screen to do it in. The page keeps exactly one thing — the CTA that opens this.
+    //
+    // ⚠️ A member resumed into a pending choice opens STRAIGHT into the modal. The card is already theirs
+    //    and already paid for; the one thing they cannot be shown is a page that looks like nothing happened.
+    const [modalOpen, setModalOpen] = useState(Boolean(initial?.pending));
     // Null until a pack is opened. A member resumed into the readout never had a burst on this page load, so
     // there is nothing to throw — see the guard on the render.
     const [debris, setDebris] = useState(null);
@@ -146,6 +158,20 @@ export default function PackOpenClient({ initial }) {
     }, []);
 
     useEffect(() => () => { clearTimers(); stopPackAudio(); }, [clearTimers]);
+
+    /**
+     * Hold the page still behind the modal.
+     *
+     * ⚠️ IT RESTORES WHAT WAS THERE RATHER THAN SETTING "", because this is a shared global and another
+     * component may own it. Writing an empty string on the way out is how a scroll lock from one screen
+     * silently unlocks another's.
+     */
+    useEffect(() => {
+        if (!modalOpen) return undefined;
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = previous; };
+    }, [modalOpen]);
 
     const refreshPool = useCallback(async () => {
         const res = await fetch("/api/marketplace/packs", { cache: "no-store" }).catch(() => null);
@@ -288,7 +314,23 @@ export default function PackOpenClient({ initial }) {
         clearTimers();
         setOpen(null);
         setChoice(null);
+        setDebris(null);
         setPhase(PHASE.idle);
+    }
+
+    /**
+     * ⚠️ THERE IS NO CLOSE DURING AN OPEN, AND THAT IS NOT AN OVERSIGHT. Between the tap and the choice the
+     * member has spent credit on a card that is already theirs; a dismiss at that point would leave a pending
+     * row with nobody looking at it. The × only exists at idle, and once a choice has been made.
+     */
+    function closeModal() {
+        clearTimers();
+        stopPackAudio();
+        reset();
+        setError(null);
+        setShelfOpen(false);
+        setModalOpen(false);
+        refreshPool();
     }
 
     const shortfall = Math.max(0, priceCents - balanceCents);
@@ -300,6 +342,47 @@ export default function PackOpenClient({ initial }) {
     // because four different things key off it and they must not be able to disagree.
     const blown = phase === PHASE.burst || phase === PHASE.reveal || phase === PHASE.readout;
     const showCard = Boolean(open) && blown;
+    // The × exists only where a dismiss cannot strand a paid-for card. See closeModal().
+    const closable = phase === PHASE.idle || Boolean(choice);
+
+    // ── THE ONE CALL TO ACTION ───────────────────────────────────────────────────────────────────────────
+    // Luke: "there should be one call to action that glimmers."
+    //
+    // ⚠️ ONE. The panel this replaces put four things on the page at once — a balance, a "79 packs left · see
+    // what's inside" pill, the open button and a line of fine print — and a screen with four things on it has
+    // no call to action, it has a menu. All three of the others still exist; they are inside the modal, where
+    // somebody who has already decided to open a pack will read them.
+    //
+    // The glimmer is a shine that crosses the button every few seconds. It is the only animated thing on the
+    // page at rest, which is the entire point: it is what the eye lands on.
+    if (!modalOpen) {
+        return (
+            <section className="pk-launch-wrap">
+                <button
+                    type="button"
+                    className="pk-launch"
+                    onClick={() => { setModalOpen(true); refreshPool(); }}
+                >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        className="pk-launch-bag"
+                        src="/images/packs/mystery-bag-drawn-600.webp"
+                        alt=""
+                        aria-hidden="true"
+                    />
+                    <span className="pk-launch-body">
+                        <span className="pk-launch-kick">Mystery packs</span>
+                        <span className="pk-launch-line">
+                            {priceTrusted && pool?.remaining
+                                ? `Open one — ${usd(priceCents)}`
+                                : "Open one with store credit"}
+                        </span>
+                    </span>
+                    <span className="pk-glimmer" aria-hidden="true" />
+                </button>
+            </section>
+        );
+    }
 
     return (
         <section
@@ -315,6 +398,16 @@ export default function PackOpenClient({ initial }) {
                 375×667 phone the card has to be big AND both buttons have to be above the fold, and the
                 header was the row that made that impossible. While a card is on screen nothing else should be
                 asking for the eye anyway. */}
+            <button
+                type="button"
+                className="pk-close"
+                onClick={closeModal}
+                hidden={!closable}
+                aria-label="Close"
+            >
+                &#215;
+            </button>
+
             <header className="pk-top" hidden={blown}>
                 <div className="pk-bal">
                     <span className="pk-bal-label">Store credit</span>

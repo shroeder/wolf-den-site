@@ -24835,13 +24835,28 @@ body.cas-seated .social-fab { display: none; }
 
    And the caps are on the BAG and the CARD, never on the buttons: if it does not fit, the artwork shrinks and
    the controls stay reachable. A reveal you cannot act on is worse than a small one. */
+/* ── THE STAGE IS A MODAL, IN EVERY PHASE ────────────────────────────────────────────────────────────────
+   Luke, 2026-10-27: "This should be a modal, there should be one call to action that glimmers."
+
+   It began as an inline panel on /mystery-bags and the reveal alone took the screen. That split was the
+   wrong seam: an inline panel shares its height with the site header, the XP bar and the Live Chase Board,
+   and it shares the member's attention with all of them. Everything from the bag onward is now one modal,
+   and the page keeps exactly one thing — .pk-launch, below.
+
+   ⚠️ NOTHING HERE MAY PUT A transform OR A filter ON .pk-stage. The shelf is `position: fixed` inside it,
+   which survives a fixed ancestor and does not survive a transformed one — that is how the vault's bottom
+   sheet ended up rendering off-screen. Camera shake goes on .pk-arena.
+
+   ⚠️ z-index ABOVE .social-fab, WHICH IS 900. At 70 the chat bubble floated over the "Keep it" button and
+   ate half its label; the film caught it sitting on top of the one control that is not reversible. */
 .pk-stage {
-    position: relative;
+    position: fixed;
+    inset: 0;
+    z-index: 950;
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: 10px;
-    min-height: calc(100dvh - 210px);
-    padding: 10px 0 18px;
     overflow: hidden;
 }
 
@@ -24897,38 +24912,6 @@ body.cas-seated .social-fab { display: none; }
 .pk-shelf-btn:hover {
     border-color: var(--ring);
     color: var(--ink);
-}
-
-/* ── THE OPENING TAKES THE SCREEN ────────────────────────────────────────────────────────────────────────────
-   From the tap until the member has chosen, this is the only thing on the page.
-
-   ⚠️ IT IS NOT DECORATION, IT IS THE ONLY WAY THE NUMBERS WORK. The stage sits BELOW the site header — the
-   avatar row, the XP bar, the coin count — which is about 90px, and the fold check caught what that costs:
-   on a 441px viewport the value landed at y=464 and both buttons at y=540, with a card already shrunk to
-   make room. Every pixel the reveal gives to a navigation bar it is not using comes straight off the card.
-
-   Fixed, inset 0, for the shake through the readout; the idle state goes back to being an inline panel on a
-   normal page. ⚠️ The shelf is `position: fixed` INSIDE this, which survives a fixed ancestor but would not
-   survive a transformed one — so nothing here may put a transform or a filter on .pk-stage.
-
-   ⚠️ Specificity, not order: .pk-stage.pk-burst is 0-2-0 against the panel's own 0-1-0 .pk-stage further
-   down the file, so these win wherever either block ends up. */
-.pk-stage.pk-shake,
-.pk-stage.pk-burst,
-.pk-stage.pk-reveal,
-.pk-stage.pk-readout {
-    position: fixed;
-    inset: 0;
-    /* ⚠️ ABOVE .social-fab, WHICH IS 900. At 70 the chat bubble floated over the "Keep it" button and ate
-       half its label — the film caught it sitting right on top of the one control that is not reversible.
-       An opaque full-screen panel above it hides it for the two seconds this lasts without any cross-
-       component coupling to go stale. */
-    z-index: 950;
-    min-height: 0;
-    justify-content: center;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
 }
 
 /* The stage the bag sits on. Centred, with the flood filling it from behind.
@@ -26250,22 +26233,133 @@ body.cas-seated .social-fab { display: none; }
    emblem on it. Gold on warm brown has almost no separation, so the one colour that is supposed to be the
    accent read as part of the background.
 
-   So the opening gets a NEUTRAL, nearly black panel of its own, and the gold is the only warm thing on it. */
+   So the opening gets a NEUTRAL, nearly black ground of its own, and the gold is the only warm thing on it.
+   It is a full-screen modal now rather than a panel, so the border, the radius and the drop shadow that made
+   it read as a card on a page are gone — there is no page behind it to sit on. */
 .pk-stage {
     background:
         radial-gradient(ellipse 80% 55% at 50% 30%, rgba(255, 255, 255, 0.035), transparent 70%),
-        linear-gradient(180deg, #121212 0%, #0C0C0C 100%);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 18px;
+        linear-gradient(180deg, #121212 0%, #0A0A0A 100%);
     padding: 14px 14px 20px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 44px rgba(0, 0, 0, 0.55);
 }
+
+/* ── ONE CALL TO ACTION, AND IT GLIMMERS ──────────────────────────────────────────────────────────
+   What the page keeps. Luke: "there should be one call to action that glimmers."
+
+   The bag art is INSIDE the button rather than above it, because a picture beside a button is two things and
+   a picture on a button is one. It is alt="" and aria-hidden: the label already says what this is, and a
+   screen reader reading "A Wolf Den mystery pack / Mystery packs / Open one" is the same noise twice. */
+.pk-launch-wrap {
+    display: block;
+    margin: 0 0 14px;
+}
+
+.pk-launch {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 13px 18px 13px 13px;
+    border-radius: 16px;
+    border: 1.5px solid #E6C45C;
+    background: linear-gradient(118deg, #F3D978 0%, #D4AF37 46%, #B8912B 100%);
+    /* ⚠️ Set with the background, every time. A gold button with inherited light text is this site's oldest
+       footgun. */
+    color: #1A1A1A;
+    cursor: pointer;
+    text-align: left;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(212, 175, 55, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    transition: transform 0.12s ease, box-shadow 0.2s ease;
+}
+
+.pk-launch:hover { box-shadow: 0 12px 36px rgba(212, 175, 55, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.45); }
+.pk-launch:active { transform: translateY(1px); }
+
+.pk-launch-bag {
+    flex: none;
+    width: 46px;
+    height: 58px;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+}
+
+.pk-launch-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
+.pk-launch-kick {
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    color: rgba(26, 26, 26, 0.62);
+}
+
+.pk-launch-line { font-size: 1.12rem; font-weight: 800; letter-spacing: -0.01em; }
+
+/* THE GLIMMER. A shine crossing the button every few seconds — at rest it is the only thing moving on the
+   page, which is the whole job: it is what the eye lands on.
+   ⚠️ It is a CHILD, not a ::after on .pk-launch. The button already takes a transform of its own on :active,
+   and two transforms that have to disagree cannot share an element. */
+.pk-glimmer {
+    position: absolute;
+    top: -60%;
+    bottom: -60%;
+    left: 0;
+    width: 42%;
+    pointer-events: none;
+    background: linear-gradient(
+        100deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.1) 32%,
+        rgba(255, 255, 255, 0.72) 50%,
+        rgba(255, 255, 255, 0.1) 68%,
+        transparent 100%
+    );
+    transform: translateX(-180%) skewX(-14deg);
+    animation: pk-glimmer 3.6s ease-in-out infinite;
+}
+
+@keyframes pk-glimmer {
+    /* The sweep is the first fifth; the rest of the cycle is the wait, which is what stops it reading as a
+       loading bar. */
+    0% { transform: translateX(-180%) skewX(-14deg); }
+    22%, 100% { transform: translateX(420%) skewX(-14deg); }
+}
+
+/* ── THE WAY OUT ───────────────────────────────────────────────────────────────────────────
+   ⚠️ ABSENT BETWEEN THE TAP AND THE CHOICE, which the component decides and this only has to not fight.
+   A dismiss mid-open would leave a pending row holding a card the member has already paid for. */
+.pk-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 8;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    color: #C9C9C9;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.pk-close:hover { border-color: rgba(212, 175, 55, 0.55); color: #F2F2F2; }
+.pk-close[hidden] { display: none; }
 
 /* ── THE HEADER ROW ───────────────────────────────────────────────────────────────────────────────────────────
    It was a muted grey label over a gold number, floating. Now it is a proper stat with a rule under it, so the
    top of the panel has a structure instead of two stray pieces of text. */
 .pk-top {
     padding-bottom: 12px;
+    /* Clears the close button in the corner. */
+    padding-right: 44px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     margin-bottom: 4px;
 }

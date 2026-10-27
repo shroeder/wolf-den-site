@@ -1445,6 +1445,27 @@ wait for it, so the request hides inside the shake and the tap is never followed
    `#0C0C0C` panel filmed as sixteen pieces of nothing. A torn edge catching the light is both truer and the
    only version that reads.
 
+### And then a modal (2026-10-27)
+
+Luke, on the idle screen: *"This should be a modal, there should be one call to action that glimmers."*
+
+The reveal already took the screen; the split was at the wrong seam. An inline panel shares its height with
+the site header, the XP bar and the Live Chase Board, and it shares the member's attention with all of them.
+**Everything from the bag onward is one modal now, and the page keeps exactly one thing.**
+
+- `.pk-launch` is the whole page surface: the bag art inside a gold button, `MYSTERY PACKS / Open one —
+  $20.00`, with `.pk-glimmer` — a shine crossing it every 3.6s. At rest it is the only moving thing on the
+  page, which is the job.
+- ⚠️ **ONE.** The panel it replaces put four things on the page at once: a balance, a "79 packs left · see
+  what's inside" pill, the open button and a line of fine print. A screen with four things on it has no call
+  to action, it has a menu. All four still exist — inside the modal, read by somebody who has already decided.
+- ⚠️ **There is no close between the tap and the choice.** The × exists at idle and once a choice is made,
+  and nowhere else: a dismiss mid-open strands a pending row holding a card the member has already paid for.
+- A member resumed into a pending choice opens **straight into the modal**. The one thing they cannot be
+  shown is a page that looks like nothing happened.
+- The body scroll lock restores the previous value rather than setting `""` — it is a shared global, and
+  writing an empty string on the way out is how one screen's lock silently unlocks another's.
+
 **Still to do:** step 8 — announce it, which only happens when `VAULT_PUBLIC` flips. And the Android half of
 §16.3: the pull queue and the pack telemetry need adding to **both** drawer lists in `LedgerApp.kt`, or they
 are screens that exist, work, and cannot be reached.
