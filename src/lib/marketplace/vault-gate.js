@@ -47,6 +47,25 @@ export function vaultOpenFor(buyerId) {
     return VAULT_PUBLIC || canPreview("vault", buyerId);
 }
 
+// ── ── CATEGORY PACKS GET THEIR OWN SWITCH ── ───────────────────────────────────────────────────────────────
+// Luke, 2026-10-27: "this will be owner gated. We won't regress and owner gate the mystery packs, but for all
+// the extended features that we're about to develop, it will be gated, owner only."
+//
+// ⚠️ SO IT CANNOT REUSE VAULT_PUBLIC, WHICH IS NOW `true`. Reusing it would open the shelf pools to everybody
+// the moment they deploy, and the only way to prevent that afterwards would be putting the BAGS back behind a
+// gate — which is the one thing the instruction rules out. Two features, two switches.
+//
+// ⚠️ AND IT IS AND-ED WITH THE VAULT GATE, NOT OR-ED. Everything a category pack does afterwards — the
+// reveal, the sell-back, the vault, shipping — is the vault feature. Somebody who could open a shelf pack
+// while the vault was shut would be buying a card into a room they cannot enter.
+export const SHELF_PACKS_PUBLIC = false;
+
+export function shelfPacksOpenFor(buyerId) {
+    if (!buyerId) return false;
+    if (!vaultOpenFor(buyerId)) return false;
+    return SHELF_PACKS_PUBLIC || canPreview("vault", buyerId);
+}
+
 /**
  * Is this open a gated PREVIEW rather than a real member's? Stamped onto `mkt_pack_open.preview` at open time.
  *

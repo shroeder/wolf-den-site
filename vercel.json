@@ -57,6 +57,10 @@
       "schedule": "30 7 * * *"
     },
     {
+      "path": "/api/jobs/pack-pool-prices",
+      "schedule": "15 8 * * *"
+    },
+    {
       "path": "/api/jobs/tcg-catalog-sync",
       "schedule": "0 6 * * *"
     },
