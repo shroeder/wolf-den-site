@@ -192,6 +192,13 @@ function PackBank({ fromCents, toCents, payoutCents, cardName }) {
  */
 export default function PackOpenClient({ initial, hideLaunch = false, openSignal = 0 }) {
     const [pool, setPool] = useState(initial?.pool || null);
+    // ── THE PICKER (docs/category-packs.md §9) ───────────────────────────────────────────────────────────
+    // `pool` above is the BAGS pool summary and always has been. `pools` is the shelf of packs a member may
+    // choose between — the bags plus every category pool their gate allows — and `picked` is the one
+    // currently centred in the carousel. A member with one pool never sees any of it.
+    const [pools, setPools] = useState(initial?.pools || []);
+    const [picked, setPicked] = useState(0);
+    const trackRef = useRef(null);
     const [balanceCents, setBalanceCents] = useState(initial?.balanceCents || 0);
     // An open the member walked away from mid-reveal is presented FINISHED, at the choice — the card is
     // already theirs and already paid for, so replaying a moment they have already had would be theatre over
@@ -226,7 +233,15 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
     const timers = useRef([]);
     const rolledBalance = useRolling(balanceCents);
 
-    const priceCents = pool?.priceCents ?? 0;
+    // ⚠️ EVERY FIGURE ON THE IDLE SCREEN COMES FROM THE SELECTED POOL, NOT FROM THE BAGS. The shortfall, the
+    // button's price and whether it is openable at all are the picked pack's, or the whole carousel quotes
+    // one price and charges another.
+    const chosen = pools[picked] || null;
+    // ⚠️ ONE FLAG, THREE READERS. The carousel, the arena's height and the idle bag all key off this. The
+    // first cut had the picker's condition written out at each site and the ARENA BAG kept rendering
+    // underneath — a second full-size bag overflowing a zero-height box, straight over the buttons.
+    const showPicker = phase === PHASE.idle && pools.length > 1;
+    const priceCents = chosen ? chosen.priceCents : (pool?.priceCents ?? 0);
     const tier = useMemo(() => tierByKey(open?.tier), [open?.tier]);
     const tierIndex = useMemo(() => PACK_TIERS.findIndex((t) => t.key === tier.key), [tier.key]);
 
@@ -260,6 +275,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
         if (!res?.ok) return;
         const data = await res.json();
         setPool(data.pool);
+        setPools(data.pools || []);
         setBalanceCents(data.balanceCents);
     }, []);
 
@@ -361,7 +377,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
             const res = await fetch("/api/marketplace/packs/open", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}),
+                body: JSON.stringify({ pool: chosen?.key || "bags" }),
             });
             data = await res.json();
             if (!res.ok || !data.ok) {
@@ -470,7 +486,9 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
     // ⚠️ A price we could not confirm must not be chargeable. See packPrice() — the hard-coded fallback is
     //    fine for a board and would quietly bill $25 for a $20 pack.
     const priceTrusted = pool?.priceTrusted !== false;
-    const canOpen = (pool?.remaining || 0) > 0 && shortfall === 0 && priceTrusted;
+    const canOpen = chosen
+        ? chosen.open && shortfall === 0 && priceCents > 0
+        : (pool?.remaining || 0) > 0 && shortfall === 0 && priceTrusted;
     // "Blown" is every phase after the bag is gone. It is one derived flag rather than three comparisons
     // because four different things key off it and they must not be able to disagree.
     const blown = phase === PHASE.burst || phase === PHASE.reveal || phase === PHASE.readout;
@@ -586,16 +604,96 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                     <span className="pk-bal-label">Store credit</span>
                     <strong className="pk-bal-value">{usd(rolledBalance)}</strong>
                 </div>
-                {pool && !blown ? (
+                {/* ⚠️ IT COUNTS THE PACK YOU ARE LOOKING AT. With a carousel this pill read "76 packs left"
+                    over a Pokémon pack holding 910 cards — the bags' number, under somebody else's pack. */}
+                {(chosen || pool) && !blown ? (
                     <button type="button" className="pk-shelf-btn" onClick={() => setShelfOpen(true)}>
                         {/* JSX eats the whitespace between an expression and the text after it, which
                             rendered as "79packs left". A template string keeps the space it was written with. */}
-                        {`${pool.remaining} packs left · see what's inside`}
+                        {chosen && pools.length > 1
+                            ? `${chosen.units} inside · see what's inside`
+                            : `${pool.remaining} packs left · see what's inside`}
                     </button>
                 ) : null}
             </header>
 
-            <div className="pk-arena">
+            {/* ── THE PICKER ──────────────────────────────────────────────────────────────────────────────
+                Luke, on the PrizePicks Packs screen: "I like how prize picks does it where you swipe left
+                and right between pack types and its sleek and simple yet you can still evaluate what's
+                inside." A snap track with the neighbours showing at both edges, so it is obvious there are
+                more without a dot row or an arrow explaining it.
+
+                ⚠️ IT REPLACES THE ARENA RATHER THAN SITTING ABOVE IT, and only while idle. The bag standing
+                in the arena IS the pack you are about to open, so showing a carousel of packs over a
+                different single bag would be two answers to the same question.
+
+                ⚠️ AND IT IS ABSENT ENTIRELY FOR ONE POOL. A member whose gate allows only the bags gets the
+                screen exactly as it was — a carousel of one is a control that does nothing. */}
+            {showPicker ? (
+                <div className="pk-picker">
+                    <div
+                        className="pk-pick-track"
+                        ref={trackRef}
+                        onScroll={(e) => {
+                            // The centred card, from the scroll offset. No observer and no rAF: one
+                            // division against the track's own child width, which cannot drift from the
+                            // snap points because it IS the snap point.
+                            const el = e.currentTarget;
+                            const w = el.firstChild?.offsetWidth || 1;
+                            const i = Math.max(0, Math.min(pools.length - 1, Math.round(el.scrollLeft / w)));
+                            if (i !== picked) setPicked(i);
+                        }}
+                    >
+                        {pools.map((p, i) => (
+                            <article
+                                key={p.key}
+                                className={`pk-pick${i === picked ? " pk-pick-on" : ""}${p.open ? "" : " pk-pick-shut"}`}
+                            >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    className="pk-pick-bag"
+                                    src="/images/packs/mystery-bag-drawn-600.webp"
+                                    alt=""
+                                    aria-hidden="true"
+                                />
+                                <h3 className="pk-pick-name">{p.brand}</h3>
+                                {p.open ? (
+                                    /* ── ⚠️ NOT THEIR STAT ROW ────────────────────────────────────────
+                                       PrizePicks leads with "Min pull", which works for them because
+                                       theirs is 30% of the price. Ours is $1.00 on a $15 pack — seven
+                                       percent — so leading with it would put our weakest fact in our
+                                       largest type. Max pull is real and in the pool right now, the count
+                                       is what makes a pool read as a shelf rather than a short list, and
+                                       the median is unflattering on purpose: printing it is what makes the
+                                       other two believable. */
+                                    <div className="pk-pick-stats">
+                                        <span>
+                                            <b>{usd(p.maxCents)}</b>
+                                            <i>Max pull</i>
+                                        </span>
+                                        <span>
+                                            <b>{p.units}</b>
+                                            <i>Cards inside</i>
+                                        </span>
+                                        {p.medianCents ? (
+                                            <span>
+                                                <b>{usd(p.medianCents)}</b>
+                                                <i>Typical</i>
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                ) : (
+                                    /* A closed pool is LISTED, not hidden — a pack somebody saw yesterday
+                                       that silently vanished is a pack they think they imagined. */
+                                    <p className="pk-pick-shut-line">Resting — back soon</p>
+                                )}
+                            </article>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
+
+            <div className={`pk-arena${showPicker ? " pk-arena-picked" : ""}`}>
                 {/* Behind everything, and only ever coloured AFTER the burst. */}
                 <div className="pk-flood" aria-hidden="true" />
                 {/* The white-out at the instant of detonation. One frame of nothing is what sells a bang —
@@ -605,7 +703,10 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                 <div className="pk-shock" aria-hidden="true" />
 
                 <div className="pk-bagwrap">
-                    {!blown ? (
+                    {/* ⚠️ NOT WHILE THE PICKER IS UP. The bag in the carousel is the pack you are choosing;
+                        a second one standing in the arena is the same question answered twice, and at this
+                        size it lands on top of the controls. */}
+                    {!blown && !showPicker ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                             className="pk-bag"
@@ -835,21 +936,31 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                             onClick={doOpen}
                             disabled={!canOpen || busy}
                         >
+                            {/* ⚠️ A RESTING POOL IS NOT AN EMPTY ONE. Yu-Gi-Oh is shut because one card
+                                carries its value, not because we ran out — and "Out of packs" told a member
+                                the shelf was bare when it holds fifty-one cards. The card behind this button
+                                says "Resting — back soon"; the button has to agree with it. */}
                             {!priceTrusted
                                 ? "Pack pricing unavailable"
-                                : pool?.remaining
-                                    ? `Open a pack — ${usd(priceCents)}`
-                                    : "Out of packs"}
+                                : chosen && !chosen.open
+                                    ? "Resting — back soon"
+                                    : canOpen || shortfall > 0
+                                        ? `Open ${chosen && pools.length > 1 ? chosen.brand : "a pack"} — ${usd(priceCents)}`
+                                        : "Out of packs"}
                         </button>
                     )}
                     <p className="pk-fine">Opens are final. The card is yours either way.</p>
                 </div>
             ) : null}
 
-            {shelfOpen && pool ? (
+            {shelfOpen && (chosen || pool) ? (
                 <div className="pk-shelf" role="dialog" aria-label="What is in the packs">
                     <div className="pk-shelf-head">
-                        <strong>{pool.remaining} packs left</strong>
+                        <strong>
+                            {chosen && pools.length > 1
+                                ? `${chosen.brand} — ${chosen.units} inside`
+                                : `${pool.remaining} packs left`}
+                        </strong>
                         <button type="button" className="pk-btn pk-btn-ghost" onClick={() => setShelfOpen(false)}>
                             Close
                         </button>
@@ -859,7 +970,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                         selling from, so it moves.
                     </p>
                     <ul className="pk-shelf-list">
-                        {pool.cards.map((card) => {
+                        {((chosen && pools.length > 1 ? chosen.cards : pool.cards) || []).map((card) => {
                             const t = tierByKey(card.tier);
                             return (
                                 <li key={card.id} style={{ "--row-edge": t.edge }}>

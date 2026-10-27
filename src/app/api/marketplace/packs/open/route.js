@@ -29,6 +29,10 @@ const MESSAGES = {
     insufficient_credit: "You don't have enough store credit to open a pack.",
     unavailable: "That pack just went to someone at the counter. Try again.",
     no_price: "We can't confirm the pack price right now — try again shortly.",
+    // A category pack whose pool shut itself — one card carrying its value, or too little left to be a
+    // mystery. "Not right now" rather than an error, because nothing is wrong: we decided not to sell it.
+    pool_closed: "That pack is resting — check back soon.",
+    no_such_pool: "That pack doesn't exist.",
 };
 
 export async function POST(request) {
@@ -39,9 +43,14 @@ export async function POST(request) {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return noStore({ error: "Sign in to open a pack." }, { status: 401 });
+            // The per-pool gate lives in openPack; this one keeps a signed-in non-member off the door at all.
             if (!vaultOpenFor(buyer.id)) return noStore({ error: "Not found." }, { status: 404 });
 
-            const result = await openPack({ buyerId: buyer.id });
+            // ⚠️ THE POOL IS A KEY AND NOTHING ELSE. openPack resolves it against the registry and asks
+            //    that pool's own gate; an unknown key is refused rather than defaulting to the bags, because
+            //    a typo that silently charges somebody for a different product is worse than an error.
+            const body = await request.json().catch(() => ({}));
+            const result = await openPack({ buyerId: buyer.id, pool: String(body?.pool || "bags") });
 
             if (!result.ok) {
                 logger.info("packs.open.refused", { buyerId: buyer.id, reason: result.error });

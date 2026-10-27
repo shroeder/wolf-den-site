@@ -25458,6 +25458,126 @@ body.cas-seated .social-fab { display: none; }
     animation-delay: 0.3s;
 }
 
+/* ── THE PICKER ──────────────────────────────────────────────────────────────────────────────────────────────
+   docs/category-packs.md §9. Luke: "I like how prize picks does it where you swipe left and right between
+   pack types and its sleek and simple yet you can still evaluate what's inside."
+
+   ⚠️ THE NEIGHBOURS HAVE TO SHOW. A full-width card with nothing either side of it is a page, not a
+   carousel — there is no dot row here and no arrows, so the ONLY thing saying "there are more of these" is
+   the edge of the next one. That is what the 78% width and the symmetric padding buy.
+
+   ⚠️ AND THE SNAP IS MANDATORY, NOT PROXIMITY. `proximity` leaves a track resting between two cards, and
+   the component reads the centred index off scrollLeft — a resting position halfway between two snap points
+   is a picker that has selected neither. */
+.pk-picker {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+
+.pk-pick-track {
+    display: flex;
+    width: 100%;
+    gap: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    /* The first and last cards have to be able to reach the middle. Without this the end cards snap to the
+       track's edge and can never be the centred one. */
+    padding: 0 11%;
+}
+.pk-pick-track::-webkit-scrollbar { display: none; }
+
+.pk-pick {
+    flex: 0 0 78%;
+    scroll-snap-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 4px 8px;
+    text-align: center;
+    /* The card either side is dimmed and slightly back, so the centred one is unmistakably the subject. It
+       is a transition rather than a scroll-driven animation because the snap already does the timing. */
+    opacity: 0.38;
+    transform: scale(0.88);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+/* ⚠️ THE CENTRED CARD IS MARKED FROM JS, AND IT HAS TO BE. There is no CSS selector for "the child the snap
+   settled on" — :hover is a mouse, :focus-within is a keyboard, and a finger is neither. The first cut relied
+   on those and every card rendered at 0.38 on a phone: a carousel where nothing is selected. The component
+   already computes the index for the PRICE, so the look reads the same number. */
+.pk-pick-on { opacity: 1; transform: scale(1); }
+
+.pk-pick-bag {
+    display: block;
+    width: auto;
+    height: min(34dvh, 260px);
+    object-fit: contain;
+    filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6));
+}
+
+.pk-pick-name {
+    margin: 2px 0 0;
+    font-size: 1.12rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #F2F2F2;
+}
+
+/* ⚠️ tabular-nums, FOR THE REASON THE COUNTER NEEDED IT. Three figures side by side in a row that slides
+   under a finger will visibly jitter on proportional digits. */
+.pk-pick-stats {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+}
+.pk-pick-stats span {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 0 12px;
+    min-width: 0;
+}
+.pk-pick-stats span + span { border-left: 1px solid rgba(255, 255, 255, 0.12); }
+.pk-pick-stats b {
+    font-size: 1.02rem;
+    font-weight: 800;
+    color: #F0D27A;
+    line-height: 1.1;
+}
+.pk-pick-stats i {
+    font-style: normal;
+    font-size: 0.56rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #8A8A8A;
+}
+
+/* A pool that has shut itself. Still on the shelf, plainly not for sale — see the note in the component. */
+.pk-pick-shut .pk-pick-bag { filter: grayscale(0.85) brightness(0.5); }
+.pk-pick-shut-line {
+    margin: 4px 0 0;
+    font-size: 0.74rem;
+    color: #8A8A8A;
+}
+
+/* With a picker on screen the arena has nothing to hold — the bag is in the carousel. It collapses rather
+   than being removed so the flood, the flash and the shockwave keep the box they are positioned against. */
+.pk-arena-picked {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: 0;
+}
+
 /* ── THE SALE ─────────────────────────────────────────────────────────────────
    Luke, 2026-10-27: "When u sell, it should move on from the card you no longer own. And it should do a count
    up animation on the store credit in the middle of the screen."

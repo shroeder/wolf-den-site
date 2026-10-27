@@ -11,7 +11,10 @@ import { packCardSubtitle, parsePackCardName } from "@/lib/marketplace/pack-card
 import { BIG_HIT_CENTS, tierForCents } from "@/lib/marketplace/pack-rarity.js";
 import { addCredit, getStoreCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
 import { completeBuyBack } from "@/lib/marketplace/vault-restock.js";
-import { isPreviewOpen, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
+import { isPreviewOpen, shelfPacksOpenFor, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
+import { poolByKey, poolStates } from "@/lib/marketplace/pack-pools.js";
+import { claimShelfCard } from "@/lib/marketplace/pack-shelf-claim.js";
+import { adjustInventoryForSale } from "@/lib/consignment/square";
 import { createServerLogger } from "@/lib/server-logger";
 
 const logger = createServerLogger({ source: "api", subsystem: "packs" });
@@ -194,8 +197,20 @@ async function deleteWithRetry(variationId, attempts = 3) {
  *
  * ⚠️ READ THE ORDER OF THE STEPS BEFORE CHANGING ANY OF THEM.
  */
-export async function openPack({ buyerId, idempotencyKey = null } = {}) {
-    if (!vaultOpenFor(buyerId)) return { ok: false, error: "closed" };
+export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey = "bags" } = {}) {
+    // ── ⚠️ ONE FUNCTION, TWO POOLS, AND THE BRANCHES ARE DELIBERATELY TINY ──────────────────────────────────
+    // docs/category-packs.md. A category pack differs from a bag in exactly three places — where the card is
+    // claimed, what the price comes from, and whether the register copy is DELETED or DECREMENTED — and
+    // everything else below is the same event. Forking this into openShelfPack() would have been easier to
+    // write and would have drifted within a month; sell-at-the-reveal and sell-from-the-vault already taught
+    // this house that lesson at the cost of two different sets of consequences for one payout.
+    const pool = poolByKey(poolKey);
+    if (!pool) return { ok: false, error: "no_such_pool" };
+    const shelf = pool.channel === "shelf";
+
+    // Each pool asks its OWN gate. The bags are public; the category packs are owner-only and additionally
+    // require the vault gate — see shelfPacksOpenFor.
+    if (shelf ? !shelfPacksOpenFor(buyerId) : !vaultOpenFor(buyerId)) return { ok: false, error: "closed" };
 
     // A stuck open is RESUMED, never charged for twice. The partial unique index on (buyer_id) where
     // outcome='pending' is what makes this a guarantee rather than a hope.
@@ -206,19 +221,32 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
     //    Filming the reveal showed the whole open taking 2.4s; chaining three awaits that do not depend on
     //    each other is a third of that for nothing. The tax rate is needed later but asked for here so it is
     //    already in flight — it is cached per instance, so this is usually free.
-    const [price, balanceCents, taxRate] = await Promise.all([
-        packPrice(),
+    const [price, balanceCents, taxRate, states] = await Promise.all([
+        shelf ? Promise.resolve(null) : packPrice(),
         getStoreCredit(buyerId),
         getShopSalesTaxRate().catch(() => 0),
+        shelf ? poolStates() : Promise.resolve([]),
     ]);
 
     // ⚠️ Never charge a guessed price. If Square cannot be reached and nothing overrides it, the member is
     //    told to come back rather than being billed a number we invented.
-    if (price.source === "fallback_default") {
+    if (!shelf && price.source === "fallback_default") {
         logger.error("packs.open.no_price", new Error("No authoritative pack price"), { buyerId });
         return { ok: false, error: "no_price" };
     }
-    const priceCents = price.cents;
+
+    // ⚠️ A SHELF POOL'S PRICE IS READ, NEVER COMPUTED HERE. It is set by the nightly recompute and held — see
+    //    pack-pools.js. Deriving it at open time is how the figure on the screen and the figure charged come
+    //    to differ, which is the whole reason `priceTrusted` exists on the bag side.
+    //
+    // ⚠️ AND A CLOSED POOL REFUSES RATHER THAN FALLING BACK. A pool shuts because one card carries its value
+    //    or because it has run thin; either way the honest answer is "not right now", and a fallback price
+    //    would sell from a pool we have just decided is not fit to sell from.
+    const state = shelf ? states.find((p) => p.key === pool.key) : null;
+    if (shelf && (!state || !state.open || !(state.priceCents > 0))) {
+        return { ok: false, error: "pool_closed", reason: state?.closedReason || "not_computed" };
+    }
+    const priceCents = shelf ? state.priceCents : price.cents;
     if (balanceCents < priceCents) {
         return { ok: false, error: "insufficient_credit", priceCents, balanceCents };
     }
@@ -239,7 +267,14 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
     // window as abandoned, which makes the pool self-healing with no new moving part. The window is long
     // enough that it can never race a live open — those complete in under a second.
     const key = idempotencyKey || `vpo:${randomUUID()}`;
-    const claimed = await db.tx(async (client) => {
+
+    // ⚠️ A SHELF POOL HAS NO ROWS TO LOCK, so there is nothing for SKIP LOCKED to do: the cards live in
+    //    Square and `inventory_feed` is a mirror of them. claimShelfCard picks a candidate, confirms it with
+    //    a LIVE Square count, and writes the one row it drew — which from the next line onward is a pool row
+    //    indistinguishable from a bag. See pack-shelf-claim.js for the window it cannot close.
+    const claimed = shelf
+        ? await claimShelfCard({ pool, reservationKey: key })
+        : await db.tx(async (client) => {
         const picked = await client.query(
             `UPDATE mystery_bag_cards
              SET status = 'reserved', reservation_key = $1, reserved_at = NOW(), updated_at = NOW()
@@ -258,11 +293,11 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
                        cost_cents, cost_basis`,
             [key]
         );
-        return picked.rows[0] || null;
-    }).catch((error) => {
-        logger.error("packs.open.claim_failed", error, { buyerId });
-        return null;
-    });
+            return picked.rows[0] || null;
+        }).catch((error) => {
+            logger.error("packs.open.claim_failed", error, { buyerId });
+            return null;
+        });
 
     if (!claimed) return { ok: false, error: "pool_empty" };
 
@@ -300,12 +335,12 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
         row = await db.queryOne(
             `INSERT INTO mkt_pack_open
                 (buyer_id, mystery_card_id, price_cents, card_value_cents, tier,
-                 revenue_cents, tax_cents, cogs_cents, cogs_basis, idempotency_key, preview)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                 revenue_cents, tax_cents, cogs_cents, cogs_basis, idempotency_key, preview, pool)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              RETURNING id, created_at`,
             [
                 buyerId, claimed.id, priceCents, valueCents, tier.key,
-                revenueCents, taxCents, cogs.cents, cogs.basis, key, isPreviewOpen(buyerId),
+                revenueCents, taxCents, cogs.cents, cogs.basis, key, isPreviewOpen(buyerId), pool.key,
             ]
         );
     } catch (error) {
@@ -352,6 +387,30 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
             await unbook("square_delete_failed");
             return { ok: false, error: "unavailable" };
         }
+    } else if (claimed.channel === "shelf" && claimed.square_variation_id) {
+        // ── ⚠️ DECREMENT, NEVER DELETE ──────────────────────────────────────────────────────────────────
+        // A bag's SKU is a one-off and deleting it is correct. A shelf single is a real catalogue line with
+        // sales history, a cost record and possibly more copies behind it — deleting it would destroy the
+        // COGS of every past sale of that card, which has happened here before and is why the cost table is
+        // ours rather than Square's.
+        //
+        // ⚠️ AND EXACTLY ONCE. An itemised Square ORDER decrements its own lines; this open is not an order
+        // — it is store credit moving inside our ledger — so Square never sees it and we must do it
+        // ourselves. Doing it where Square also does it is how counts read as theft.
+        const adjusted = await adjustInventoryForSale(
+            [{ catalogObjectId: claimed.square_variation_id, quantity: 1 }],
+            { idempotencyKey: `pack-open-${row.id}` }
+        ).catch((error) => {
+            logger.error("packs.open.decrement_failed", error, { buyerId, openId: row.id });
+            return null;
+        });
+        if (!adjusted) {
+            // ⚠️ REFUNDED BEFORE ANYTHING IS REVEALED. §6.1: the member has seen nothing yet, so losing the
+            // card to the register costs them a moment rather than a card they already watched arrive.
+            await addCredit(buyerId, priceCents, "refund", key, { reason: "square_decrement_failed" }).catch(() => {});
+            await unbook("square_decrement_failed");
+            return { ok: false, error: "unavailable" };
+        }
     }
 
     // ── 5. IT IS THEIRS ─────────────────────────────────────────────────────────────────────────────────────
@@ -381,15 +440,24 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
     // A real sealed bag in a real tub. No deadline (Luke's call) — what replaces one is that an ORDER for this
     // card promotes its task to the top of the queue, because an order is the signal somebody is about to turn
     // up for a card still sealed in a bag.
-    if (claimed.channel === "bagged") {
-        await db
-            .query(
-                `INSERT INTO mkt_pack_pull_task (pack_open_id, mystery_card_id, bag_sku)
-                 VALUES ($1, $2, $3)`,
-                [row.id, claimed.id, claimed.variation_sku || claimed.card_id]
-            )
-            .catch((error) => logger.warn("packs.open.pull_task_failed", { message: error?.message }));
-    }
+    // ⚠️ BOTH CHANNELS RAISE ONE, AND THEY ARE DIFFERENT JOBS. A bag is "open the bag in the tub"; a shelf
+    // single is "find this card in the case", which is slower, needs the card named well enough to find, and
+    // fails often enough that `not_found` is a normal weekly path rather than an edge case (§6.3).
+    //
+    // No deadline on either, per Luke — it rides the existing queue exactly as the bags do, and an ORDER for
+    // the card is what promotes its task to the top.
+    await db
+        .query(
+            `INSERT INTO mkt_pack_pull_task (pack_open_id, mystery_card_id, bag_sku, kind, note)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [
+                row.id, claimed.id,
+                claimed.variation_sku || claimed.card_id,
+                claimed.channel === "shelf" ? "find" : "pull",
+                claimed.channel === "shelf" ? `Find in the case — ${claimed.card_name}` : null,
+            ]
+        )
+        .catch((error) => logger.warn("packs.open.pull_task_failed", { message: error?.message }));
 
     await Promise.all([
         trackActivity(buyerId, "pack_open", { valueCents, tier: tier.key }).catch(() => {}),
@@ -404,6 +472,7 @@ export async function openPack({ buyerId, idempotencyKey = null } = {}) {
         ok: true,
         open: {
             id: row.id,
+            pool: pool.key,
             priceCents,
             balanceCents: spent.balanceCents,
             card: { ...toPoolCard(claimed), valueCents, sellBackCents: buyBackCents(valueCents) },
@@ -479,7 +548,7 @@ async function flagBigHit(buyerId) {
 export async function resumePendingOpen(buyerId) {
     const row = await db
         .queryOne(
-            `SELECT o.id, o.price_cents, o.card_value_cents, o.tier,
+            `SELECT o.id, o.price_cents, o.card_value_cents, o.tier, o.pool,
                     c.card_name, c.condition, c.image_url, c.item_type, c.market_value, c.id AS card_id
              FROM mkt_pack_open o
              JOIN mystery_bag_cards c ON c.id = o.mystery_card_id
@@ -492,6 +561,9 @@ export async function resumePendingOpen(buyerId) {
     if (!row) return null;
     return {
         id: row.id,
+        // ⚠️ CARRIED SO A RESUMED REVEAL KNOWS WHICH PACK IT CAME OUT OF. The modal brands itself from this;
+        //    without it a member who walked away mid-pull comes back to a Pokémon card in a mystery bag.
+        pool: row.pool || "bags",
         priceCents: row.price_cents,
         balanceCents: await getStoreCredit(buyerId),
         card: {

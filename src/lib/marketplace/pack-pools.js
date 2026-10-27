@@ -117,6 +117,35 @@ export async function shelfPoolStats(pool) {
     };
 }
 
+/**
+ * What is actually in a shelf pool, best first — the "what's inside" sheet.
+ *
+ * ⚠️ IT IS A REAL LIST OFF THE REAL POOL, NOT A SAMPLE AND NOT A BRAG. Luke's whole reason for the carousel
+ * was that "you can still evaluate what's inside", and the bags' sheet has listed every card in the pool
+ * since the day it shipped. Capped only because 910 rows is a scroll nobody finishes — the cap is on the
+ * SHEET, and the cards below it are still in the pool and still pullable.
+ */
+export async function shelfPoolCards(pool, { limit = 40 } = {}) {
+    if (!pool?.category) return [];
+    const rows = await db
+        .query(
+            `SELECT name, price, image_url
+               FROM inventory_feed
+              WHERE in_stock AND quantity > 0 AND NOT consigned
+                AND category_names = $1
+              ORDER BY price DESC
+              LIMIT $2`,
+            [pool.category, limit]
+        )
+        .catch(() => []);
+    return rows.map((r) => ({
+        id: r.name,
+        name: r.name,
+        valueCents: Math.round(Number(r.price || 0) * 100),
+        imageUrl: r.image_url || null,
+    }));
+}
+
 /** Why a pool is shut, in words a screen can show — or null when it is open. */
 export function closedReason(stats) {
     if (!stats || !stats.units) return "empty";
