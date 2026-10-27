@@ -96,31 +96,45 @@ Whatever model is chosen, these files have to be opened anyway. **Fix the qualit
 
 ---
 
-## 4. The one insight worth planning around: edits ≠ generations
+## 4. Edits ≠ generations — but ⚠️ ONLY WHEN THE REFERENCE IS OUR OWN ART
 
-The style objection to the newer models is about **drawing from nothing** — asked for a creature, they
-produce hundreds of individually outlined marks where gpt-image-1 laid down large smooth forms.
+**Corrected 2026-10-27.** The first version of this section said the hero sprite was the safest path to
+move because `editImage` hands over a reference and the reference carries the style. Luke: *"explicit if we
+are passing in an object to reference that is clipping. In this case we are passing in items but not the
+hero."* He is right, and the conclusion was backwards.
 
-`editImage` does not ask them to draw from nothing. It hands over **our own finished art** and asks for one
-change, and the input carries the style. [[gpt-image-1-is-the-house-style]] already found this and uses
-2.5 for exactly that job today:
+The general principle holds: handing a model our own finished art and asking for one change is far less
+style-exposed than asking it to draw from nothing, and [[gpt-image-1-is-the-house-style]] already relies on
+that for the Grove's crown repairs.
 
-> *"2.5's headline feature is 'precise editing and subject preservation' and it is genuinely good at it:
-> handed a finished sprite and asked to change ONE thing, it returns the same drawing with the crown
-> restored."*
+**But it only holds if the reference IS our own finished art.** Checking what each `editImage` caller
+actually hands over:
 
-So the migration splits cleanly, and the halves have different risk:
+| path | reference handed over | is it house art? |
+|---|---|---|
+| `avatar-sprite.js` — the hero | **a DiceBear `avataaars` render** of the member's avatar config | ❌ **no** |
+| `stockade.js` | the member's stored `avatar_sprite_url` | ✅ yes |
+| `boss-trophy.js` | the boss's finished sprite, fetched by url | ✅ yes |
 
-- **`editImage` (2 of the 6 member paths — the hero sprite and the stockade)** can likely go to **2.5**
-  with little style risk, because the member's existing sprite is the reference. This is also the path with
-  **231 of the 258 failures**, so it is both the most broken and the least risky to move.
-- **`generateImage` / scene functions** are the genuine style problem and the one that needs your eye on a
-  contact sheet before anything ships.
+⚠️ **THE HERO IS THE ONE THAT IS NOT PROTECTED, AND IT IS THE BIGGEST PATH.** `renderAvatarPng` builds a
+flat DiceBear vector cartoon — a different art tradition entirely — and the **gear is not an image at all**:
+`getEquippedGearPhrase` returns a *phrase*, which goes into the prompt as words. So the reference carries
+the member's **identity** (skin, hair, eyes, clothing colour) and nothing about how the Den draws. The house
+style comes entirely from the model's own hand, exactly as in a from-scratch generation.
 
-⚠️ **The hero redraw is not a from-scratch generation at all** — `avatar-sprite.js` imports `editImage` and
-nothing else. Worth knowing before choosing a model for "the hero sprite".
+So the hero sprite is **the most style-exposed path in the whole system, not the least** — and it is 231 of
+the 258 failures. Swapping its model without looking at the output will restyle every hero in the Den.
 
----
+What this does change:
+
+- `stockade.js` and `boss-trophy.js` **are** genuinely low-risk — their references are house art, and they
+  are also low-volume and non-member-facing.
+- The hero belongs in the **same bucket as `generateImage`**: it needs a contact sheet and your eye before
+  anything ships, not a model swap.
+- There is a third option for the hero that the others do not have, and it is worth considering precisely
+  because the reference is already not house art: **give it a house-art reference.** A finished Den hero
+  sprite handed in alongside the DiceBear identity render would make this a real edit and buy back the
+  style protection — but that is a change to the recipe, not a migration, and belongs in its own decision.
 
 ## 5. What a migration actually touches
 
@@ -130,7 +144,9 @@ nothing else. Worth knowing before choosing a model for "the hero sprite".
 2. The chain keeps **gpt-image-1 at the head** so the day it is un-retired nothing has to change, and falls
    through only on a missing-model 400. That is already how `gen-pack-bag.mjs` works, on your call:
    *"Use the old model, the new ones are just a fallback."*
-3. **Decide per endpoint, not globally** (§4).
+3. **Decide per reference, not per endpoint** (§4). Two of the three `editImage` callers hand over house
+   art and can move with little risk. The hero does not, and has to be judged on a contact sheet like any
+   from-scratch draw.
 4. **Sweep the three `high` call sites** while the files are open (§3).
 5. Before December, put 2.x in front of a contact sheet for the generate path. There is no version of this
    where that evaluation does not have to happen.
