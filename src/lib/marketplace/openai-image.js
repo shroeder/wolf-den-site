@@ -304,6 +304,7 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
         throw new Error("OpenAI returned no image");
     }
 
+    const genUsage = data?.usage || null;
     let buffer = Buffer.from(b64, "base64");
     // Enforce a consistent right-facing orientation (e.g. pets/companions that fight toward the boss).
     if (faceRight) buffer = (await orientFacingRight(buffer, key)).buffer;
@@ -324,7 +325,7 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     // badges at ~24px) still wins; everything else lands on the SPRITE_MAX_PX cap instead of shipping the raw
     // 1024px PNG. Transparency is preserved either way.
     const url = await storeImage(buffer, pathPrefix, { maxWidth: resizeTo || SPRITE_MAX_PX });
-    await logGeneration({ size, quality, source: pathPrefix, prompt, url, ...meta });
+    await logGeneration({ size, quality, source: pathPrefix, prompt, url, usage: genUsage, ...meta });
     return url;
 }
 
@@ -504,7 +505,11 @@ async function editOnce(imageBuffer, prompt, { size, quality, key, model, styleR
     const data = await resp.json().catch(() => null);
     const b64 = data?.data?.[0]?.b64_json;
     if (!b64) throw new Error("OpenAI returned no image");
-    return Buffer.from(b64, "base64");
+    // ⚠️ RETURN THE USAGE, NOT JUST THE PIXELS. The ledger used to price every draw off a token table, and
+    //    that table was measured on gpt-image-1 — wrong for 2.5 on BOTH sides (output 439 tokens at medium
+    //    rather than 1,056, and image input that scales with the reference's area instead of a flat 625).
+    //    The response states what was actually billed; there is no reason to estimate over the top of it.
+    return { buffer: Buffer.from(b64, "base64"), usage: data?.usage || null };
 }
 
 /**
@@ -523,11 +528,12 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
 
     const tries = Math.max(1, validate ? attempts : 1);
     let buffer = null;
+    let usage = null;
     let problems = [];
 
     for (let attempt = 1; attempt <= tries; attempt += 1) {
         try {
-            buffer = await editOnce(imageBuffer, prompt, { size, quality, key, model, styleRefs });
+            ({ buffer, usage } = await editOnce(imageBuffer, prompt, { size, quality, key, model, styleRefs }));
         } catch (error) {
             await logGeneration({ model, size, quality, edit: true, source: pathPrefix, prompt, ok: false, error: String(error.message).slice(0, 300), ...meta });
             throw error;
@@ -542,7 +548,7 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
         if (attempt < tries) {
             await logGeneration({
                 model, size, quality, edit: true, source: pathPrefix, prompt, ok: false,
-                error: `rejected (attempt ${attempt}/${tries}): ${problems.join("; ")}`.slice(0, 300), ...meta,
+                error: `rejected (attempt ${attempt}/${tries}): ${problems.join("; ")}`.slice(0, 300), usage, ...meta,
             });
         }
     }
@@ -552,8 +558,8 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
     // Consistent margin — see the note on the same line in generateImage.
     if (frameSprite) buffer = (await reframeSprite(buffer, { margin: 0.08 }).catch(() => ({ buffer }))).buffer;
     const url = await storeImage(buffer, pathPrefix, { maxWidth: resizeTo || SCENE_MAX_PX });
-    // An edit bills the reference image back in as input on top of the output, so it costs more than a fresh
-    // draw of the same size — estimateImageCost() adds that when edit is true.
-    await logGeneration({ model, size, quality, edit: true, source: pathPrefix, prompt, url, ...meta });
+    // An edit bills every attached image back in as input on top of the output. That used to be a flat
+    // estimate; `usage` is what was actually charged, references, prompt tail and all.
+    await logGeneration({ model, size, quality, edit: true, source: pathPrefix, prompt, url, usage, ...meta });
     return url;
 }

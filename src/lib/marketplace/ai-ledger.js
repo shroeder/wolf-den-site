@@ -8,9 +8,21 @@ import { db } from "@/lib/db";
 // Writes are ALWAYS best-effort. Bookkeeping must never be the reason a sprite fails to save — a lost ledger
 // row is an accounting gap, a thrown error would be a broken feature.
 
-// gpt-image-1 output-token counts per image, times $40/1M output tokens. These are the real billed numbers,
-// not list-price guesses: a 1024x1024 is 272 tokens at low, 1,056 at medium, 4,160 at high, which is why
-// "high" costs ~4x "medium" and dominates the bill.
+// ── ⚠️ THIS TABLE IS A FALLBACK NOW, NOT THE ANSWER ─────────────────────────────────────────────────────────
+// It was measured on gpt-image-1 and it is WRONG for the model that draws the game today. Measured
+// 2026-10-27 on gpt-image-2.5-sunburst at 1024x1024: 196 output tokens at low and 439 at medium, against the
+// 272 and 1,056 recorded below. Pricing a 2.5 draw off this table overstates its output cost by ~2.4x.
+//
+// So `logGeneration` now prefers the `usage` object the images endpoint returns, and this table is used only
+// when a caller cannot supply one. Treat any row with cost_basis 'estimate' as approximate.
+//
+// ⚠️ AND THE INPUT SIDE CHANGED SHAPE ENTIRELY. On gpt-image-1 a reference image billed a FLAT 625 tokens
+// whatever its size — the note below EDIT_INPUT_TOKENS says so, and it was right. On 2.5 image input tokens
+// SCALE WITH AREA, at roughly one token per 1,024 pixels: the 1536x1024 house style sheet bills 1,536 tokens,
+// the same sheet at 1024 wide bills 704. Shrinking a reference used to save nothing; now it saves real money.
+//
+// gpt-image-1 output-token counts per image, times $40/1M output tokens. These were the real billed numbers
+// for THAT model: a 1024x1024 is 272 tokens at low, 1,056 at medium, 4,160 at high.
 const TOKENS = {
     "1024x1024": { low: 272, medium: 1056, high: 4160 },
     "1024x1536": { low: 408, medium: 1584, high: 6240 },
@@ -25,6 +37,22 @@ const IN_PER_M = { "gpt-image-1": 10, "gpt-image-1-mini": 2.5, "gpt-image-2.5-su
 // scale with the reference we send — a 512px and a 1024px reference both bill 625, so shrinking it saves
 // nothing.
 const EDIT_INPUT_TOKENS = 625;
+
+/**
+ * The exact cost of a draw from the usage OpenAI returned with it. Prefer this over estimateImageCost
+ * everywhere the response is to hand — it is arithmetic on billed tokens rather than a lookup.
+ *
+ * Returns null for a usage object that carries no tokens, so the caller can fall back rather than book a
+ * confident $0.00.
+ */
+export function imageCostFromUsage(usage, model = "gpt-image-1") {
+    const tokensOut = Number(usage?.output_tokens ?? 0) || 0;
+    const tokensIn = Number(usage?.input_tokens ?? 0) || 0;
+    if (!tokensOut && !tokensIn) return null;
+    const out = (OUT_PER_M[model] ?? OUT_PER_M["gpt-image-1"]) / 1_000_000;
+    const inp = (IN_PER_M[model] ?? IN_PER_M["gpt-image-1"]) / 1_000_000;
+    return Math.round((tokensOut * out + tokensIn * inp) * 100000) / 100000;
+}
 
 export function estimateImageCost({ size = "1024x1024", quality = "low", edit = false, model = "gpt-image-1" } = {}) {
     const row = TOKENS[size] || TOKENS["1024x1024"];
@@ -110,12 +138,20 @@ export async function logGeneration({
     model = "gpt-image-1", size, quality, edit = false,
     source, label, subject, prompt, url, bytes,
     origin = "unknown", batchId, batchLabel, buyerId, buyerLabel,
-    ok = true, error, costUsd, costBasis = "measured",
+    ok = true, error, costUsd, costBasis = "measured", usage = null,
 } = {}) {
     try {
-        // Pass the model through — mini bills at a fifth, and pricing it as gpt-image-1 would overstate the
-        // sprite line on the AI Costs screen by ~5x.
-        const cost = costUsd != null ? costUsd : estimateImageCost({ size, quality, edit, model });
+        // ── PREFER THE BILL TO THE GUESS ────────────────────────────────────────────────────────────────
+        // An explicit costUsd still wins (a caller that did its own arithmetic). Then the usage object off
+        // the response, which is the actual billed tokens. The token table is the last resort, and a row
+        // priced that way is marked so on the AI Costs screen rather than passing as measured.
+        //
+        // ⚠️ THE TEXT PROMPT IS PART OF THE BILL AND WAS NEVER COUNTED. The estimate only ever charged for
+        // the reference image, so the house style tail — 902 input tokens of it — was free as far as this
+        // ledger was concerned. usage.input_tokens includes it.
+        const measured = costUsd != null ? costUsd : imageCostFromUsage(usage, model);
+        const cost = measured != null ? measured : estimateImageCost({ size, quality, edit, model });
+        if (measured == null) costBasis = "estimate";
         await db.query(
             `INSERT INTO mkt_ai_generation
                 (model, size, quality, edit, source, label, subject, prompt, url, bytes,
