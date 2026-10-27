@@ -249,12 +249,68 @@ Cheapest path that still reads as different products: **one bag silhouette, reco
 game's own mark on it.** The reveal already takes `--tier-glow` and `--tier-edge` as custom properties, so a
 pool palette costs nothing to apply.
 
-The pack **picker** is new UI: a shelf of bags with a name, a price and "what's in it" on each. The existing
-"see what's inside" sheet generalises directly.
+---
+
+## 9. The picker
+
+Luke, 2026-10-27, on the PrizePicks Packs screen: *"I like how prize picks does it where you swipe left and
+right between pack types and its sleek and simple yet you can still evaluate what's inside."*
+
+That screen is one pack filling the view with its neighbours peeking in at both edges, a category pill at
+the top, the balance top-right with a plus on it, a "What's inside" eye below the art, a three-stat row, and
+exactly one button at the bottom. It is the right shape and most of it already exists here:
+
+| their screen | ours today |
+|---|---|
+| balance top-right, plus to add | `.pk-bal` in the modal header |
+| "What's inside" | `.pk-shelf-btn` → the shelf sheet, "every card still in the pool, best first" |
+| one CTA at the bottom | `.pk-btn-open`, and `shortfall` already turns it into "add store credit" |
+| swipe between pack types | **new** — the only genuinely new piece |
+
+So the picker is the carousel and nothing else: a horizontal snap track of pools, neighbours visible at the
+edges so it is obvious there are more, and the existing modal underneath it.
+
+### 9.1 ⚠️ Not their three stats
+
+They lead with **Min pull $1.50** on a $5 pack — a floor worth 30% of the price, which is a real promise and
+a good reason to put it first. Ours is not that:
+
+| pool | price | min pull | share of price | pulls that beat the price |
+|---|---|---|---|---|
+| Pokémon Singles | $15 | **$1.00** | **7%** | 222/910 = 24% |
+| Magic Singles | $15 | $2.00 | 13% | 55/198 = 28% |
+
+**A "Min pull $1.00" badge on a $15 pack advertises the worst thing that can happen.** Copying the row
+without checking the numbers would have put our weakest fact in our largest type. Three honest stats that
+are actually ours:
+
+- **Max pull** — $290 and $136. Real, in the pool right now, and the reason to open one.
+- **Cards inside** — 910 and 198. Depth reads as "many outcomes" and it is the number that makes the pool
+  feel like a shelf rather than a short list.
+- **Typical pull** — $6 and $8. The median. It is not flattering, and printing it anyway is what makes the
+  other two believable.
+
+### 9.2 Where the odds live
+
+Behind **"What's inside"**, not on the face — and the house already settled this argument for the chests:
+
+> *"The odds are still available and still exact: tap the chest and the inspect card lists every rarity and
+> its real percentage, generated from CHEST_TIERS rather than typed. That is the right place for a number —
+> asked for, on the way to spending, off the same table the roll uses. The shelf gets to be the shelf."*
+
+So the sheet gains one line the bags' version does not need: **"24% of packs beat $15"**, computed from the
+same pool query the pull uses. Not on the carousel face, where it would be a disclaimer; one tap in, where
+somebody deciding has asked for it.
+
+### 9.3 The CTA already knows
+
+`shortfall` turns "Open a pack — $15.00" into "You're $4.13 short of a $15.00 pack" plus **Add store
+credit**, which is the same move PrizePicks makes with "Deposit to buy for $5.00". Nothing to build; it just
+has to survive into the picker.
 
 ---
 
-## 9. The gate
+## 10. The gate
 
 A **second flag**, `SHELF_PACKS_PUBLIC`, and a second `shelfPacksOpenFor(buyerId)` beside the existing pair.
 
@@ -269,7 +325,7 @@ single readable fact.
 
 ---
 
-## 10. Decided
+## 11. Decided
 
 All of it, 2026-10-27. Recorded here so none of it gets re-opened by accident.
 
@@ -284,7 +340,10 @@ All of it, 2026-10-27. Recorded here so none of it gets re-opened by accident.
 | **Naming** | "Pokémon Singles", "Magic Singles". Descriptive, flat beside "Wolf Den Mystery Bag". |
 | **Bulk** | Out of scope. A Square catch-all, not a product (§1). |
 | **Vault** | *Assumed, not asked:* shelf cards land in the same Card Vault with the same shipping, the same seven-day hold and the same 60% sell-back. Say so if not. |
-| **Gate** | Owner-only, on its own flag. The bags stay public (§9). |
+| **Gate** | Owner-only, on its own flag. The bags stay public (§10). |
+| **Picker** | A horizontal swipe carousel with the neighbours peeking at the edges, after PrizePicks Packs (§9). |
+| **Stats shown** | **Max pull / Cards inside / Typical pull.** ⚠️ Deliberately *not* their "Min pull" — ours is $1.00 on a $15 pack, 7% of price, and putting it first would advertise the worst outcome. |
+| **Odds** | Real, exact, and one tap in behind "What's inside" — "24% of packs beat $15" — never on the carousel face. Same rule the chests already follow. |
 
 ⚠️ **The one that will come back.** Pokémon's EV is fifteen cents under the $15 boundary, so an ordinary
 shift in the shelf's mix reprices that pack to $20 — a third, with nothing announcing it. §4.2's minimum
@@ -292,7 +351,7 @@ hold is what stops a member watching it move; it does not stop the move itself.
 
 ---
 
-## 11. Build order
+## 12. Build order
 
 1. `pool` column on `mkt_pack_open`, backfilled to `'bags'`; the `PACK_POOLS` registry; `shelfPacksOpenFor`
    on its own flag, with §9's door enumeration repeated for the new surfaces.
@@ -303,6 +362,7 @@ hold is what stops a member watching it move; it does not stop the move itself.
    landing before anything is shown.
 4. The pull task carrying set, number and condition, on the existing queue with no deadline; `not_found`
    promoted from an edge case to a normal weekly path.
-5. The picker — a shelf of bags with a name, a price and "what's inside" — and one recoloured bag per pool.
+5. The picker (§9): a horizontal snap carousel with the neighbours peeking, three honest stats per
+   pool, the odds line inside the sheet, and one recoloured bag per pool.
 6. Owner-gated end-to-end on Pokémon Singles. ⚠️ Which spends real money and takes a real card off the
    shelf, exactly as §16.4 of the parent says. There is no dry run that is also a true test.
