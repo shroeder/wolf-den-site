@@ -252,6 +252,13 @@ main.content {
 
 .nav-scrim { display: none; }
 
+/* WARNING: OFF BY DEFAULT, AND THIS RULE IS LOAD-BEARING. navContent is rendered twice -- in the drawer
+   and in the desktop inline bar -- so the drawer's close button exists in the shop header too, where it
+   showed up as a stray 16px x wedged between the wolf and "About". The rule that turns it on lives in the
+   phone block beside the drawer, which is the only place it means anything; a hide rule written down there
+   could not reach the desktop header, because that block never applies at 1280px. */
+.nav-drawer-close { display: none; }
+
 
 
 /* ── THE IN-GAME HEADER ───────────────────────────────────────────────────────────────────────
@@ -28494,6 +28501,12 @@ body.cas-seated .social-fab { display: none; }
     box-shadow: 14px 0 50px rgba(0, 0, 0, 0.75);
     overflow-y: auto;
     overscroll-behavior: contain;
+    /* WARNING: THIS IS HALF OF SWIPE-TO-DISMISS AND THE JS DOES NOT WORK WITHOUT IT. Deleting it does not
+       break the gesture visibly on every device -- it leaves the browser free to claim the horizontal drag
+       as a scroll or a back-navigation partway through, so the panel follows the thumb and then stops.
+       pan-y keeps vertical scrolling native (this panel is a twelve-row scroller) and leaves horizontal to
+       the handler in SiteHeader, which is why that handler never has to call preventDefault. */
+    touch-action: pan-y;
     /* Parked off-screen rather than display:none, so it SLIDES. A drawer that pops into existence is a
        dropdown wearing a drawer's clothes. */
     transform: translateX(-100%);
@@ -28550,6 +28563,34 @@ body.cas-seated .social-fab { display: none; }
 .nav-drawer .nav-inner a .nav-sprite { margin-left: 0; }
 .nav-drawer .nav-inner a:not(:has(.nav-sprite)) > span { padding-left: 35px; }
 
+/* -- THE DRAWER'S OWN EXIT ------------------------------------------------------------------------
+   The swipe is the phone gesture and the scrim is the thumb's reflex; this is the one a MOUSE can use.
+   The panel covers the wolf that opened it, so without this the only clickable dismiss was the strip of
+   scrim beside the panel -- discoverable only by accident.
+
+   WARNING: navContent is rendered TWICE, once in the drawer and once in the desktop inline bar, so this
+   button exists in the shop header too and must be hidden there (below). */
+/* WARNING: scoped through .nav-inner on purpose. `.nav-drawer .nav-inner > *` sets width: 100% on every
+   child, and it out-specifies a bare .nav-drawer-close -- an x stretched the full width of the panel. */
+.nav-drawer .nav-inner .nav-drawer-close {
+    align-self: flex-end !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    margin: -4px -2px 2px 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    cursor: pointer;
+}
+.nav-drawer .nav-inner .nav-drawer-close svg { width: 19px; height: 19px; }
+.nav-drawer .nav-inner .nav-drawer-close:hover,
+.nav-drawer .nav-inner .nav-drawer-close:active { background: rgba(255, 255, 255, 0.1); }
+
 /* The scrim: covers the page, and tapping it closes -- what a thumb tries first and what every phone
    app does. */
 .nav-scrim {
@@ -28562,6 +28603,10 @@ body.cas-seated .social-fab { display: none; }
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(2px);
     animation: nav-scrim-in 200ms ease-out;
+    /* The scrim carries the dismiss swipe too, and nothing behind it should move: without this a drag that
+       starts on the scrim scrolls the page underneath while the drawer slides, so two things move at once
+       and the page is somewhere else when the menu closes. */
+    touch-action: none;
 }
 
 @keyframes nav-scrim-in { from { opacity: 0; } to { opacity: 1; } }
@@ -28596,6 +28641,8 @@ body.cas-seated .social-fab { display: none; }
         padding-top: max(10px, env(safe-area-inset-top)) !important;
         padding-bottom: 14px !important;
     }
+    /* The close button is not a destination, so it spans both columns rather than taking a link's slot. */
+    .nav-drawer .nav-inner .nav-drawer-close { grid-column: 1 / -1; justify-self: end; }
     .nav-drawer .nav-inner a { padding: 9px 12px !important; font-size: 0.92rem; gap: 9px; }
     .nav-drawer .nav-inner a .nav-sprite { width: 21px; height: 21px; }
     /* The reserved sprite column narrows with the sprites, or an undrawn row wraps its label. */

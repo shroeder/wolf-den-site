@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { borderClass } from "@/lib/marketplace/borders.js";
 import { isGamePath } from "@/lib/marketplace/game-paths.js";
@@ -87,6 +87,98 @@ export default function SiteHeader() {
     const [mktAuthed, setMktAuthed] = useState(false);
     // Luke: "Need a way to get to vard vault from menu." Door 8 of 9 — see the note on the nav list below.
     const [mktVault, setMktVault] = useState(false);
+
+    // ── ⚠️ SWIPE THE DRAWER AWAY ─────────────────────────────────────────────────────────────────────────
+    // Luke: "The slide out menu should be easily dismissable with a swipe."
+    //
+    // A panel that slid in from the left and could only be closed by tapping is the tell that it is a web
+    // menu wearing a drawer's clothes — a thumb that pushed it open expects to be able to push it back, and
+    // on a phone that thumb is nowhere near the wolf it opened with.
+    //
+    // THE PANEL FOLLOWS THE FINGER. A gesture that only fires on release, with no movement under the thumb,
+    // reads as a tap that happened to work; the drag has to be visible or nobody learns it is there.
+    //
+    // ⚠️ TOUCH EVENTS, NOT POINTER EVENTS, AND NO setPointerCapture. Capture retargets the pointerup, so the
+    // click lands on the capturing element instead of the link under the thumb — the bug that made every
+    // button in Town unclickable with a mouse. This gesture is touch-only by nature, so it has no reason to
+    // reach for pointer capture at all, and the links keep working exactly as they did.
+    //
+    // ⚠️ AND THE DRAWER STILL SCROLLS. It is a full-height overflow-y panel with twelve rows in it, so the
+    // axis is decided once, at the 10px threshold, and a vertical decision drops the gesture entirely rather
+    // than fighting the scroller. `touch-action: pan-y` in the stylesheet is the other half: it leaves
+    // vertical panning native and horizontal to us, so nothing here needs preventDefault (React's touchmove
+    // listener is passive — a preventDefault call there does nothing but log a warning).
+    const drawerRef = useRef(null);
+    const swipe = useRef(null);
+
+    const onSwipeStart = useCallback((e) => {
+        if (e.touches.length !== 1) { swipe.current = null; return; }
+        const t = e.touches[0];
+        swipe.current = { x: t.clientX, y: t.clientY, dx: 0, axis: null, at: e.timeStamp };
+    }, []);
+
+    const onSwipeMove = useCallback((e) => {
+        const s = swipe.current;
+        if (!s || e.touches.length !== 1) return;
+        const dx = e.touches[0].clientX - s.x;
+        const dy = e.touches[0].clientY - s.y;
+        if (!s.axis) {
+            if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+            s.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+            if (s.axis === "y") { swipe.current = null; return; } // it is a scroll — let the panel have it
+        }
+        // Leftward only. Dragging RIGHT must not peel the drawer off its own edge and leave a gap.
+        s.dx = Math.min(0, dx);
+        const el = drawerRef.current;
+        if (el) {
+            el.style.transition = "none";
+            el.style.transform = `translateX(${s.dx}px)`;
+        }
+    }, []);
+
+    const onSwipeEnd = useCallback((e) => {
+        const s = swipe.current;
+        swipe.current = null;
+        const el = drawerRef.current;
+        if (!s || s.axis !== "x" || !el) {
+            if (el) { el.style.transition = ""; el.style.transform = ""; }
+            return;
+        }
+        // A flick counts as much as a long drag: a third of the panel OR 0.4px/ms of the way out. Without
+        // the velocity half, a fast confident swipe that only travels 60px snaps back, which reads as the
+        // gesture not working rather than as not having swiped far enough.
+        const width = el.offsetWidth || 320;
+        const speed = -s.dx / Math.max(1, e.timeStamp - s.at);
+        el.style.transition = "";
+        if (-s.dx > width * 0.3 || speed > 0.4) {
+            // Drive it the rest of the way out EXPLICITLY rather than clearing the inline transform and
+            // letting the class removal do it. Clearing first puts the panel back at 0 for a frame, and if
+            // React commits the close on a later frame that frame is visible as a snap-back-then-leave.
+            el.style.transform = "translateX(-100%)";
+            setOpen(false);
+        } else {
+            el.style.transform = ""; // short of the threshold — slide back and stay open
+        }
+    }, []);
+
+    // Hand the box back to the stylesheet once the gesture is over, or the inline transform left behind by a
+    // swipe would pin the drawer off-screen the next time it opens.
+    useEffect(() => {
+        const el = drawerRef.current;
+        if (!el) return undefined;
+        if (open) { el.style.transition = ""; el.style.transform = ""; return undefined; }
+        const id = setTimeout(() => { el.style.transition = ""; el.style.transform = ""; }, 300);
+        return () => clearTimeout(id);
+    }, [open]);
+
+    // Escape closes it too — the same dismissal for a keyboard that the swipe is for a thumb, and the one
+    // every drawer on the web is expected to answer.
+    useEffect(() => {
+        if (!open) return undefined;
+        const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [open]);
 
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 
@@ -238,6 +330,27 @@ export default function SiteHeader() {
     // Nav links (+ Discord) shared by the desktop inline bar and the mobile dropdown.
     const navContent = (
         <>
+            {/* ── ⚠️ A CLOSE BUTTON, BECAUSE THE SWIPE IS NOT FOR EVERYONE ────────────────────────────
+                Luke: "We probably need a way to dismiss it for clickers too."
+
+                The drawer is 82vw wide and sits ON TOP of the wolf that opened it, so the only thing left
+                to click was the sliver of scrim down the right-hand side — which works, and which nobody
+                who has not been told about it will try. A mouse has no swipe and a narrow desktop window
+                gets this same drawer, so the panel has to carry its own exit.
+
+                ⚠️ IT LIVES IN navContent, WHICH THE DESKTOP INLINE BAR ALSO RENDERS, so it is hidden there
+                by .nav-inline .nav-drawer-close — an × floating in the middle of the shop header would be
+                a control that closes nothing. Same split as .nav-sprite, which that bar also hides. */}
+            <button
+                type="button"
+                className="nav-drawer-close"
+                aria-label="Close menu"
+                onClick={() => setOpen(false)}
+            >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+            </button>
             {links.map((item) => (
                 <Link key={item.href} href={item.href} className="nav-link" onClick={() => setOpen(false)}>
                     {/* ⚠️ The sprite is DECORATION, so it is aria-hidden with an empty alt and the label stays
@@ -370,8 +483,27 @@ export default function SiteHeader() {
                 control that opened it is the thing that makes a web menu feel like a web menu. Tapping
                 anywhere outside closes it, which is what every phone app does and what a thumb tries
                 first. aria-hidden because it is a dismiss target, not content. */}
-            {open ? <button type="button" className="nav-scrim" aria-hidden="true" tabIndex={-1} onClick={() => setOpen(false)} /> : null}
+            {open ? (
+                <button
+                    type="button"
+                    className="nav-scrim"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                    onClick={() => setOpen(false)}
+                    /* The scrim takes the swipe as well: a thumb that starts on the page beside the panel
+                       and pushes left is making the same gesture, and it drags the same drawer. */
+                    onTouchStart={onSwipeStart}
+                    onTouchMove={onSwipeMove}
+                    onTouchEnd={onSwipeEnd}
+                    onTouchCancel={onSwipeEnd}
+                />
+            ) : null}
             <nav
+                ref={drawerRef}
+                onTouchStart={onSwipeStart}
+                onTouchMove={onSwipeMove}
+                onTouchEnd={onSwipeEnd}
+                onTouchCancel={onSwipeEnd}
                 /* ⚠️ nav-drawer IS ITS OWN CLASS ON PURPOSE. Styling the drawer through .nav-row meant
                    inheriting a pile of header rules written for a dropdown — one of which pinned the
                    height to 70px, so a panel with top:0 and bottom:0 still rendered as a stub. A new
