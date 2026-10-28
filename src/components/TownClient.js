@@ -1207,10 +1207,12 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // Null for every account that predates gating, and TownClient then behaves exactly as it always has:
     // the cobbles, the whole street, no travel bar. See the branch in town.js.
     const town = state?.town || null;
+    // The stockade belongs to the Den, not to each street: the default town (no gating) or town 1.
+    const townHasStocks = !town || town.n === 1;
     // ⚠️ BUMP THIS WHEN A TOWN LAYER IS REDRAWN. Static assets under /public are served with a day of
     // max-age, so a redrawn sky keeps rendering as the old one — which cost a full round of "the art did not
     // change" before anyone looked at the file on disk and found that it had. Same scar the sprites carry.
-    const TOWN_ART_V = 5;
+    const TOWN_ART_V = 6;
     const townArt = (suffix) => `/images/town/ground/${town.id}${suffix}.webp?v=${TOWN_ART_V}`;
     // ⚠️ PER LAYER, NOT PER TOWN. `town.layers` says which of the three are actually drawn; anything
     // missing falls back to the default street's version of that layer rather than to nothing. A town
@@ -2766,7 +2768,16 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         exactly the three days nobody could see it, because a sentence runs for three — and the
                         first thing that happened was a player hunting the plaza for a booth that had silently
                         gone. A shut booth with a sign is a schedule; an absent booth is a bug. */}
-                    {stockade?.election?.phase === "voting" ? (
+                    {/* ── ⚠️ THE STOCKADE AND ITS BALLOT LIVE IN TOWN 1 ONLY ─────────────────────────────
+                        Luke: "the stockade and voting booth should only be in the first town. It shouldn't
+                        be in any of the other towns."
+
+                        There is one stockade and one election in the Den — it is a single shared thing, not
+                        a fixture every street gets a copy of. Drawing it in all seven made it read as scenery
+                        rather than as the one place the pack puts somebody. Town 1 is where everybody passes
+                        through, so that is where it stands; the default street keeps it for the members who
+                        never see towns at all. */}
+                    {townHasStocks && stockade?.election?.phase === "voting" ? (
                         <button type="button" className="tw-npc-btn tw-votebooth"
                             style={{ left: stockade?.occupant ? `${NPC_X.boothHeld}%` : `${NPC_X.booth}%`, top: `${GROUND + 6}%` }}
                             onClick={(e) => { e.stopPropagation(); setVoteOpen(true); }} aria-label="The voting booth">
@@ -2775,7 +2786,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             <img className="tw-booth-art" src="/images/town/vote-booth.png" alt="" draggable="false" />
                         </button>
                     ) : null}
-                    {stockade?.occupant ? (
+                    {townHasStocks && stockade?.occupant ? (
                         <button type="button" className="tw-npc-btn tw-stockade" style={{ left: "76%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setStockOpen(true); }} aria-label={`The Stockade — ${stockade.occupant.name}`}>
                             {/* THE CHARGE, not just the name. The plaque said who was in it and left the funniest
                                 half of the feature — what they are accused of — hidden behind a tap. The crime is
