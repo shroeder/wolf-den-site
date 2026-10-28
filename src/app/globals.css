@@ -207,7 +207,10 @@ main.content {
    phone (the block above) they swap. Two elements rather than one with a conditional handler: a link that
    sometimes does not navigate breaks middle-click and open-in-new-tab, and reads as a bug to anyone who
    tries it. */
-.brand-menu {
+/* ⚠️ .brand.brand-menu, NOT .brand-menu. A single class ties with `.brand { display: inline-flex }` further
+   down the file and LOSES on source order, which put a second wolf logo next to the first on every desktop
+   page. Doubling the class wins on specificity so no later edit can resurrect it. */
+.brand.brand-menu {
     display: none;
     background: none;
     border: 0;
@@ -216,6 +219,35 @@ main.content {
     font: inherit;
     color: inherit;
     align-items: center;
+    gap: 8px;
+}
+
+/* The bars, attached to the wolf. A logo is the one element everybody is trained to read as "home", so
+   merging the menu into it without a visible mark hides the menu. Boxed so it reads as pressable rather
+   than as decoration sitting next to a logo. */
+.brand-menu-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--ink);
+    flex: 0 0 auto;
+}
+
+.brand-menu-glyph svg { width: 17px; height: 17px; }
+.brand-menu-open .brand-menu-glyph { border-color: rgba(212, 175, 55, 0.6); color: #F0D27A; background: rgba(212, 175, 55, 0.12); }
+
+/* The word is the belt to the glyph's braces: on anything but the narrowest phone there is room to simply
+   SAY it, and a labelled control needs no learning at all. */
+.brand-menu-word {
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink-secondary);
 }
 
 .nav-scrim { display: none; }
@@ -1173,94 +1205,6 @@ textarea {
         display: none;
     }
 
-    /* -- THE LEFT DRAWER ------------------------------------------------------------------------------
-       Luke, 2026-10-28: "the menu on the phone should be part of the Wolf icon, and it should be a left
-       drawer that overlaps, as you would expect in a phone app."
-
-       It used to be a dropdown that PUSHED the page down, which is the most web-page-shaped thing a mobile
-       menu can do: content jumps, what you were reading moves, closing it jumps everything back. A drawer
-       that overlaps leaves the page exactly where it was.
-
-       WARNING: SCOPED TO .nav-drawer, NOT .nav-row. Styling it as .nav-row inherited a stack of header
-       rules written for the old dropdown, one of which pinned the height so a panel with top:0 AND
-       bottom:0 still rendered 70px tall. Its own class owns the whole box.
-
-       WARNING: position: fixed is only safe because .site-header has no transformed or filtered ancestor.
-       A transformed ancestor re-parents a fixed element to itself -- the bug that put the vault's bottom
-       sheet off-screen. Check before copying this inside the game shell. */
-    .nav-drawer {
-        position: fixed;
-        inset: 0 auto 0 0;
-        height: 100dvh;
-        width: min(82vw, 320px);
-        z-index: 1001;
-        display: block;
-        border-top: none;
-        border-right: 1px solid var(--line);
-        /* Lifted off the page colour deliberately: a drawer the same shade as what it covers reads as the
-           page reflowing rather than as a panel sliding over it. */
-        background: #15151a;
-        box-shadow: 14px 0 50px rgba(0, 0, 0, 0.75);
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        /* Parked off-screen rather than display:none, so it SLIDES. A drawer that pops into existence is a
-           dropdown wearing a drawer's clothes. */
-        transform: translateX(-100%);
-        transition: transform 240ms cubic-bezier(0.2, 0.9, 0.3, 1);
-        /* WARNING: not interactive while closed, or the off-screen panel swallows taps along the left edge
-           of every page -- an invisible dead strip nobody could explain. */
-        visibility: hidden;
-    }
-
-    .nav-drawer.nav-open { transform: translateX(0); visibility: visible; }
-
-    /* WARNING: the drawer OWNS its content layout. .nav-inner is the shop header's inline-nav wrapper and
-       lays out multi-column; dropped into a 320px panel it reads as a jumbled grid rather than a menu. */
-    .nav-drawer .nav-inner {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 2px !important;
-        width: 100% !important;
-        max-width: none !important;
-        height: auto !important;
-        padding: max(18px, env(safe-area-inset-top)) 10px 24px !important;
-    }
-
-    .nav-drawer .nav-inner > * { width: 100%; }
-
-    .nav-drawer .nav-inner a {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 13px 14px !important;
-        border-radius: 12px;
-        font-size: 1rem;
-    }
-
-    .nav-drawer .nav-inner a:hover { background: rgba(255, 255, 255, 0.05); }
-
-    /* The scrim: covers the page, and tapping it closes -- what a thumb tries first and what every phone
-       app does. */
-    .nav-scrim {
-        position: fixed;
-        inset: 0;
-        z-index: 1000;
-        display: block;
-        border: 0;
-        padding: 0;
-        background: rgba(0, 0, 0, 0.55);
-        backdrop-filter: blur(2px);
-        animation: nav-scrim-in 200ms ease-out;
-    }
-
-    @keyframes nav-scrim-in { from { opacity: 0; } to { opacity: 1; } }
-
-    /* The wolf IS the menu button here, so the separate hamburger is redundant chrome. */
-    .nav-menu { display: none !important; }
-    .brand-link { display: none !important; }
-    .brand-menu { display: inline-flex !important; }
-
     .nav-inner {
         flex-direction: column;
         align-items: stretch;
@@ -1283,8 +1227,12 @@ textarea {
         flex: 0 0 auto;
     }
 
-    /* Mobile: logo only — drop the wordmark so it never wraps or crowds the bar. */
-    .brand span {
+    /* Mobile: logo only — drop the wordmark so it never wraps or crowds the bar.
+       ⚠️ IT MUST EXCLUDE THE MENU AFFORDANCE. This was `.brand span`, a descendant selector, which hid the
+       wordmark AND the hamburger glyph AND the word "Menu" the moment those moved inside the same button —
+       so the control meant to advertise the menu rendered as nothing at all. Anything added inside .brand
+       from here on is caught by this rule unless it is named. */
+    .brand > span:not(.brand-menu-glyph):not(.brand-menu-word) {
         display: none;
     }
 }
@@ -9327,8 +9275,25 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    Mobile: the menu button opens the dropdown row and the inline nav hides. */
 .nav-inline { display: none; align-items: center; gap: 2px; margin-left: 1.25rem; min-width: 0; flex-wrap: wrap; }
 .nav-inline .nav-link { padding: 0.4rem 0.7rem; }
+
+/* -- NAV SPRITES ---------------------------------------------------------------------------------------
+   The same die-cut art GameNav uses, at the size the drawer reads it. Hidden in the desktop inline bar on
+   purpose: that strip already drops its padding twice (1100px and 980px) to keep nine links on one line, so
+   nine 24px icons would push it to wrap. */
+.nav-sprite {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    flex: 0 0 auto;
+    display: block;
+}
+
+.nav-inline .nav-sprite { display: none; }
+
 .nav-link-discord { display: inline-flex; align-items: center; gap: 6px; }
 .nav-link-discord svg { width: 16px; height: 16px; flex: 0 0 auto; }
+/* In the drawer it sits in the sprite column, so it matches their weight rather than looking shrunken. */
+.nav-drawer .nav-link-discord svg { width: 22px; height: 22px; }
 
 @media (min-width: 701px) {
     .nav-inline { display: flex; }
@@ -9341,7 +9306,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     .tv-toggle { display: none; }
 }
 @media (max-width: 380px) {
-    .brand > span { display: none; }
+    .brand > span:not(.brand-menu-glyph):not(.brand-menu-word) { display: none; }
+    /* On the narrowest phones the glyph carries it alone — the word is what gives first, never the mark. */
+    .brand-menu-word { display: none; }
 }
 
 /* ---- Web Push: opt-in prompt + account toggle ---- */
@@ -17726,7 +17693,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 @media (min-width: 701px) and (max-height: 860px) {
     .top-row { padding: 0.35rem 0; }
     .nav-inline .nav-link { padding: 0.3rem 0.44rem; font-size: 0.88rem; }
-    .brand span { display: none; }
+    /* ⚠️ Excludes the menu affordance, like every other .brand span rule. This one reads as safely
+       desktop-only (min-width: 701px) but a phone in LANDSCAPE is 760x390 — it matches both halves, and
+       unqualified this hid the hamburger and the word "Menu" on exactly the viewport that needs them. */
+    .brand > span:not(.brand-menu-glyph):not(.brand-menu-word) { display: none; }
     .brand-mark { height: 28px; }
 }
 
@@ -28470,3 +28440,174 @@ body.cas-seated .social-fab { display: none; }
     color: #4ade80;
     font-weight: 800;
 }
+
+/* ══ PHONE CHROME ═════════════════════════════════════════════════════════════════════════════════════════
+   ⚠️ THE CONDITION IS WIDTH **OR** A SHORT LANDSCAPE VIEWPORT, AND THE SECOND HALF IS NOT OPTIONAL.
+
+   Luke, 2026-10-28: "ensure all screen sizes and orientations look good."
+
+   A phone on its side is ~760x390 — WIDER than the 700px phone breakpoint, so it fell through to the desktop
+   header and got the full inline nav. Eleven links do not fit on one line at 760px, so the bar wrapped to two
+   rows and ate ~90px of a viewport that only has 390px to give. Filmed at 760x390 it is unmistakable; no
+   portrait screenshot at any width could ever have shown it, which is why orientation has to be tested as its
+   own axis rather than assumed to follow from width.
+
+   520px is the cut because landscape phones top out around 430px tall and the shortest tablet in landscape
+   (iPad mini, 744px) clears it comfortably — a tablet has the room for the inline bar and should keep it.
+
+   ⚠️ IT MUST SIT AFTER `@media (min-width: 701px) { .nav-row { display: none } }`. That rule is how the drawer
+   stays hidden on desktop, and at 760px landscape it would otherwise hide the drawer the menu button opens —
+   a button that visibly does nothing. Source order is what beats it, so do not move this block upward. */
+/* 860px, not 700px: measured, not guessed. The inline bar is eleven links plus Discord, and `node
+   scripts/film.mjs --eval` counting row tops gives 3 rows at 768 (iPad portrait, an 96px header) against 2
+   rows from 860 all the way to 1920 -- the shell caps at 1100px, so every desktop width has identical space
+   and identical wrapping. A tablet was the only size paying a third row, and a drawer is what a tablet
+   expects anyway. Nothing above 860 changes. */
+@media (max-width: 860px), (max-height: 520px) and (orientation: landscape) {
+/* -- THE LEFT DRAWER ------------------------------------------------------------------------------
+   Luke, 2026-10-28: "the menu on the phone should be part of the Wolf icon, and it should be a left
+   drawer that overlaps, as you would expect in a phone app."
+
+   It used to be a dropdown that PUSHED the page down, which is the most web-page-shaped thing a mobile
+   menu can do: content jumps, what you were reading moves, closing it jumps everything back. A drawer
+   that overlaps leaves the page exactly where it was.
+
+   WARNING: SCOPED TO .nav-drawer, NOT .nav-row. Styling it as .nav-row inherited a stack of header
+   rules written for the old dropdown, one of which pinned the height so a panel with top:0 AND
+   bottom:0 still rendered 70px tall. Its own class owns the whole box.
+
+   WARNING: position: fixed is only safe because .site-header has no transformed or filtered ancestor.
+   A transformed ancestor re-parents a fixed element to itself -- the bug that put the vault's bottom
+   sheet off-screen. Check before copying this inside the game shell. */
+.nav-drawer {
+    position: fixed;
+    inset: 0 auto 0 0;
+    height: 100dvh;
+    width: min(82vw, 320px);
+    z-index: 1001;
+    display: block;
+    border-top: none;
+    border-right: 1px solid var(--line);
+    /* Lifted off the page colour deliberately: a drawer the same shade as what it covers reads as the
+       page reflowing rather than as a panel sliding over it. */
+    background: #15151a;
+    box-shadow: 14px 0 50px rgba(0, 0, 0, 0.75);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Parked off-screen rather than display:none, so it SLIDES. A drawer that pops into existence is a
+       dropdown wearing a drawer's clothes. */
+    transform: translateX(-100%);
+    transition: transform 240ms cubic-bezier(0.2, 0.9, 0.3, 1);
+    /* WARNING: not interactive while closed, or the off-screen panel swallows taps along the left edge
+       of every page -- an invisible dead strip nobody could explain. */
+    visibility: hidden;
+}
+
+.nav-drawer.nav-open { transform: translateX(0); visibility: visible; }
+
+/* WARNING: the drawer OWNS its content layout. .nav-inner is the shop header's inline-nav wrapper and
+   lays out multi-column; dropped into a 320px panel it reads as a jumbled grid rather than a menu. */
+.nav-drawer .nav-inner {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 2px !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    padding: max(18px, env(safe-area-inset-top)) 10px 24px !important;
+}
+
+.nav-drawer .nav-inner > * { width: 100%; }
+
+/* ⚠️ border-bottom: none IS THE FIX, NOT TIDYING ──────────────────────────────────────────────────
+   Luke, 2026-10-28: "the menu items have a bad border."
+
+   .nav-link still carries `border-radius: 0; border-bottom: 1px solid var(--line)` from the old
+   full-width dropdown, where an edge-to-edge rule between flush rows was right. Inside the drawer the
+   rows are inset rounded pills, so that rule drew a hairline that stopped short of each corner — a
+   broken-looking line floating under every item, which is exactly what the screenshot showed.
+
+   A drawer separates rows by SPACING, not by rules. Keep this explicit: deleting the .nav-link border
+   instead would change the dropdown that other breakpoints still use. */
+.nav-drawer .nav-inner a {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 12px 13px !important;
+    border-radius: 12px;
+    border-bottom: none !important;
+    font-size: 1rem;
+}
+
+.nav-drawer .nav-inner a:hover,
+.nav-drawer .nav-inner a:active { background: rgba(255, 255, 255, 0.06); }
+
+/* Reserved whether or not a drawing exists, so the labels of the three undrawn rows line up with the
+   drawn ones instead of hanging 35px to their left. A ragged left edge reads as broken long before
+   anyone notices an icon is missing. */
+.nav-drawer .nav-inner a > span { min-width: 0; }
+.nav-drawer .nav-inner a .nav-sprite { margin-left: 0; }
+.nav-drawer .nav-inner a:not(:has(.nav-sprite)) > span { padding-left: 35px; }
+
+/* The scrim: covers the page, and tapping it closes -- what a thumb tries first and what every phone
+   app does. */
+.nav-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: block;
+    border: 0;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+    animation: nav-scrim-in 200ms ease-out;
+}
+
+@keyframes nav-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* The wolf IS the menu button here, so the separate hamburger is redundant chrome. */
+.nav-menu { display: none !important; }
+.brand-link { display: none !important; }
+.brand-menu { display: inline-flex !important; }
+
+/* -- LANDSCAPE ------------------------------------------------------------------------------------
+   WARNING: a phone on its side is ~390px TALL, and the drawer is a full-height scroller with eleven
+   links in it. Untested it either clipped the last few or pushed them under the browser chrome. The
+   panel is already overflow-y: auto, so the fix is to stop it eating the whole width as well: 82vw
+   of a 760px landscape viewport is a 620px menu over a 760px page, which reads as a takeover rather
+   than a drawer. */
+@media (orientation: landscape) and (max-height: 520px) {
+    /* -- TWO COLUMNS, BECAUSE TWELVE ROWS DO NOT FIT IN 390px ---------------------------------------
+       Filmed at 844x390 the single column ran out of screen at "Events", leaving Sell Your Cards and
+       Join Discord below the fold of a panel most people will never think to scroll -- a menu that
+       silently drops its last two destinations. This stylesheet already made the same call once for the
+       old dropdown ("App-style 2-column menu instead of a ~660px-tall single column"); a short landscape
+       viewport has the same problem and the same answer. Six rows fit with room to spare.
+
+       Wider than the portrait drawer so it can carry two columns, but still under half of an 844px
+       screen, so it stays a drawer rather than becoming a takeover. */
+    .nav-drawer { width: min(72vw, 430px); }
+    .nav-drawer .nav-inner {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        align-content: start !important;
+        gap: 2px 6px !important;
+        padding-top: max(10px, env(safe-area-inset-top)) !important;
+        padding-bottom: 14px !important;
+    }
+    .nav-drawer .nav-inner a { padding: 9px 12px !important; font-size: 0.92rem; gap: 9px; }
+    .nav-drawer .nav-inner a .nav-sprite { width: 21px; height: 21px; }
+    /* The reserved sprite column narrows with the sprites, or an undrawn row wraps its label. */
+    .nav-drawer .nav-inner a:not(:has(.nav-sprite)) > span { padding-left: 30px; }
+}
+    /* The three switches that turn the desktop header into a phone header. !important because the desktop
+       block above sets each of these for min-width: 701px, which a 760px landscape phone still matches. */
+    .nav-inline { display: none !important; }
+    .brand.brand-link { display: none !important; }
+    .brand.brand-menu { display: inline-flex !important; }
+    .nav-drawer { display: block !important; }
+    /* Fullscreen/TV toggle is only useful on an in-store display. */
+    .tv-toggle { display: none; }
+}
+

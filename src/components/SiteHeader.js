@@ -10,18 +10,34 @@ import { isGamePath } from "@/lib/marketplace/game-paths.js";
 import { memberSession } from "@/lib/member-session-client";
 import { useTvMode } from "@/lib/tv-mode-client";
 
+// ── ⚠️ A SPRITE PER DESTINATION, AND NOT ONE EMOJI ──────────────────────────────────────────────────────────
+// Luke, 2026-10-28, looking at the open drawer: "we should have a custom sprite per."
+//
+// Two of these rows carried 🎮 and 💳 inside the label STRING, which is how emoji survive a no-emoji rule —
+// they are not markup, so nothing greps them. They render as Apple's art on one phone and Google's on the
+// next, and sitting in a drawer beside the Den's own drawings they read as borrowed clipart. GameNav settled
+// this for the game menu already; this is the same fix for the site menu.
+//
+// ⚠️ THESE ARE THE SAME FILES GameNav USES, NOT A SECOND SET. /public/images/nav is drawn by
+// scripts/gen-nav-icons.mjs in the house style, and a parallel icon set for the same destination is how two
+// menus start disagreeing about what the Marketplace looks like.
+//
+// `sprite: null` means NO DRAWING EXISTS YET and the row deliberately renders label-only — About, Mystery
+// Bags and Events have no die-cut icon in that folder. A near-enough stand-in is worse than a gap: it quietly
+// becomes the permanent answer and nobody remembers it was a placeholder.
 const navItems = [
-    { href: "/about", label: "About" },
-    { href: "/shop", label: "Shop" },
+    { href: "/about", label: "About", sprite: null },
+    { href: "/shop", label: "Shop", sprite: "store" },
     // The whole RPG game (boss/spin/pets/gear/quests/…) lives behind ONE entry now, so it stops competing
     // with real commerce in the nav. Its own dopamine menu is at /marketplace/play.
-    { href: "/marketplace/play", label: "🎮 Game" },
-    { href: "/marketplace/credit", label: "💳 Store Credit" },
-    { href: "/looking-for", label: "Looking For" },
-    { href: "/marketplace", label: "Marketplace" },
-    { href: "/mystery-bags", label: "Mystery Bags" },
-    { href: "/events", label: "Events" },
-    { href: "/sell-cards", label: "Sell Your Cards" },
+    // "home" is the sprite GameNav already maps to /marketplace/play — the game's own front door.
+    { href: "/marketplace/play", label: "Game", sprite: "home" },
+    { href: "/marketplace/credit", label: "Store Credit", sprite: "credit" },
+    { href: "/looking-for", label: "Looking For", sprite: "bounties" },
+    { href: "/marketplace", label: "Marketplace", sprite: "market" },
+    { href: "/mystery-bags", label: "Mystery Bags", sprite: null },
+    { href: "/events", label: "Events", sprite: null },
+    { href: "/sell-cards", label: "Sell Your Cards", sprite: "trades" },
 ];
 
 // Initials for the account avatar, from the customer's name or email.
@@ -213,7 +229,7 @@ export default function SiteHeader() {
     // Placed straight after Mystery Bags because that is where a card in it came from.
     const links = mktVault
         ? navItems.flatMap((item) => (item.href === "/mystery-bags"
-            ? [item, { href: "/marketplace/vault", label: "Card Vault" }]
+            ? [item, { href: "/marketplace/vault", label: "Card Vault", sprite: "cards" }]
             : [item]))
         : navItems;
 
@@ -222,7 +238,16 @@ export default function SiteHeader() {
         <>
             {links.map((item) => (
                 <Link key={item.href} href={item.href} className="nav-link" onClick={() => setOpen(false)}>
-                    {item.label}
+                    {/* ⚠️ The sprite is DECORATION, so it is aria-hidden with an empty alt and the label stays
+                        real text beside it. An icon-only row is unreadable to a screen reader and ambiguous to
+                        everyone else; the drawing is there to make the row findable at a glance, not to
+                        replace the word. CSS hides it in the desktop inline bar, where nine icons would
+                        overflow a strip that already squeezes its own padding twice to fit. */}
+                    {item.sprite ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="nav-sprite" src={`/images/nav/${item.sprite}.png`} alt="" aria-hidden="true" width={24} height={24} />
+                    ) : null}
+                    <span>{item.label}</span>
                 </Link>
             ))}
             <a className="nav-link nav-link-discord" href="https://discord.gg/Pad8U2KVsD" target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
@@ -253,7 +278,7 @@ export default function SiteHeader() {
                         own. Phones get the drawer, which contains that same way out. */}
                     <button
                         type="button"
-                        className="brand brand-menu"
+                        className={`brand brand-menu${open ? " brand-menu-open" : ""}`}
                         aria-label={open ? "Close menu" : "Open menu"}
                         aria-expanded={open}
                         onClick={() => setOpen((v) => !v)}
@@ -267,7 +292,21 @@ export default function SiteHeader() {
                             sizes="50px"
                             priority
                         />
-                        <span>The Wolf Den</span>
+                        {/* ── ⚠️ THE WOLF ALONE DOES NOT READ AS A BUTTON ────────────────────────────
+                            Luke: "ensure its apparant how to open the menu." A logo is the one thing on a
+                            page everybody has been trained NOT to expect a menu behind — it is the way
+                            home. Merging the two without a mark means the menu is, in practice, hidden.
+
+                            So the bars stay, just attached to the wolf instead of floating three inches
+                            away as their own button. It is still "part of the Wolf icon" as asked; it is
+                            simply legible. The glyph flips to an × when open, which is the other half of
+                            the affordance — the control that opened it is visibly the one that closes it. */}
+                        <span className="brand-menu-glyph" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                                {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+                            </svg>
+                        </span>
+                        <span className="brand-menu-word">Menu</span>
                     </button>
                     <Link href="/" className="brand brand-link" onClick={() => setOpen(false)}>
                         <Image
