@@ -781,10 +781,23 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                        PrizePicks leads with "Min pull", which works for them because
                                        theirs is 30% of the price. Ours is $1.00 on a $15 pack — seven
                                        percent — so leading with it would put our weakest fact in our
-                                       largest type. Max pull is real and in the pool right now, the count
-                                       is what makes a pool read as a shelf rather than a short list, and
-                                       the median is unflattering on purpose: printing it is what makes the
-                                       other two believable. */
+                                       largest type. Max pull is real and in the pool right now, and the
+                                       count is what makes a pool read as a shelf rather than a short list.
+
+                                       ⚠️ "Typical" USED TO SIT HERE AND IS GONE — Luke, 2026-10-27: "Get
+                                       rid of typical pull its not a good idea to show that." It was added
+                                       for an honest reason (an unflattering median is what made the other
+                                       two figures believable) and for a structural one: before the tiers
+                                       had their own bands and their own bag colours, the median was the
+                                       ONLY thing on this face that differed between a $5 and a $15 pack
+                                       off the same shelf.
+
+                                       Neither reason survives. Max pull now differs per tier because each
+                                       tier is banded ($25 / $60 / $279) and the bags are coloured on the
+                                       rarity ramp, so the face separates them without it. And the honesty
+                                       job is done far better one tap in, where the odds board shows every
+                                       band with its real range and chance — a full distribution beats a
+                                       single number that reads as "you will probably get $2". */
                                     <div className="pk-pick-stats">
                                         <span>
                                             <b>{usd(p.maxCents)}</b>
@@ -799,12 +812,6 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                                 third of that. "910" above it carries the meaning anyway. */}
                                             <i>Cards</i>
                                         </span>
-                                        {p.medianCents ? (
-                                            <span>
-                                                <b>{usd(p.medianCents)}</b>
-                                                <i>Typical</i>
-                                            </span>
-                                        ) : null}
                                     </div>
                                 ) : (
                                     /* A closed pool is LISTED, not hidden — a pack somebody saw yesterday
