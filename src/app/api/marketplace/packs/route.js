@@ -59,6 +59,8 @@ export async function GET(request) {
                     key: p.key, brand: p.brand, priceCents: p.priceCents, units: p.units, art: p.art,
                     open: p.open, closedReason: p.closedReason,
                     maxCents: p.maxCents, medianCents: p.medianCents,
+                    // The odds board — the only thing that honestly separates three tiers off one shelf.
+                    bandOdds: p.bandOdds || [],
                     // ⚠️ EACH POOL CARRIES ITS OWN CONTENTS. The sheet used to read one global card list
                     //    because there was one pool; with a carousel that would show the BAGS' cards under a
                     //    Pokémon pack — the one screen on this feature whose entire job is being accurate

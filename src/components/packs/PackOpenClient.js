@@ -409,11 +409,24 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
         // reused rather than re-authored so the two never drift apart.
         Haptic.chestShake();
 
+        // ── ⚠️ A FAILED OPEN PUTS THE REAL BALANCE BACK, NOT THE REMEMBERED ONE ────────────────────────
+        // Luke, 2026-10-27: "its showing a bug and store credit after the purchase but after refreshing it
+        // corrected. We should have a failure catch to revert it back right away so users don't panic."
+        //
+        // The optimistic restore below is kept because it is INSTANT — the number must stop being wrong in
+        // the same frame the error appears. But restoring a remembered figure only works if that figure was
+        // right, and `balanceBefore` is a snapshot from before a network round trip during which a sell-back
+        // on another tab, a credit top-up, or a concurrent open could have moved it.
+        //
+        // So the snapshot is the first move and a server read is the second. The server is the only thing
+        // that knows, and on this screen a balance that is quietly wrong reads as money taken for nothing —
+        // which is exactly the panic this is here to prevent.
         const abort = (message) => {
             clearTimers();
             setBalanceCents(balanceBefore);
             setPhase(PHASE.idle);
             setError(message);
+            refreshPool().catch(() => {});
         };
 
         let data = null;
@@ -500,6 +513,22 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
         }
     }
 
+    /**
+     * ⚠️ "Open another" OPENS ANOTHER. It used to call reset(), which dropped the member back on the
+     * carousel with the Open button to press again — Luke: "Clicking open another should open another of
+     * that class, not take you back to selection." Two taps for a thing whose whole appeal is the next one.
+     *
+     * The pool is NOT re-chosen: `picked` is untouched, so it reopens the same tier. And it goes through
+     * doOpen like any other open, so the credit check, the pending guard and the first-open logic all still
+     * apply — this is a shortcut through the UI, never around the rules.
+     */
+    function openAgain() {
+        reset();
+        if (!canOpen) return;
+        // After reset() the phase is idle; doOpen drives the whole sequence again from there.
+        doOpen();
+    }
+
     function reset() {
         clearTimers();
         setOpen(null);
@@ -551,9 +580,17 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
     //   $258.00 → $155.00   "60% of $258.00, rounded up"   154.80 rounded to 155.00  ✓
     //     $1.40 →   $1.00   "60% of $1.40, rounded up"       0.84 rounded to   1.00  ✓
     //     $1.20 →   $1.00   "60% · $1.00 minimum"            0.72 is under the floor ✓
+    // ── ⚠️ THE RATE LINE IS DELIBERATELY GONE ───────────────────────────────────────────────────────────
+    // It existed to make a 60% payout defensible: "60% of $5.00, rounded up" is an argument, and a member
+    // seeing $3.00 against a $5.00 card deserves one. At 100% there is nothing to defend. "100% of $5.00,
+    // rounded up" over a $5.00 button is a sentence explaining that five equals five — it reads as small
+    // print where there is no catch, which is exactly how you make somebody go looking for one.
+    //
+    // The FLOOR still gets a line, because that is the one case where the figures genuinely do not
+    // multiply: $1.00 paid on a $0.40 common is us rounding in their favour and is worth saying out loud.
     const rateLine = buyBackIsFloored(open?.card?.valueCents)
-        ? `${BUYBACK_PERCENT}% · ${usd(BUYBACK_MIN_CENTS)} minimum`
-        : `${BUYBACK_PERCENT}% of ${usd(open?.card?.valueCents)}, rounded up`;
+        ? `${usd(BUYBACK_MIN_CENTS)} minimum`
+        : null;
     // The × exists only where a dismiss cannot strand a paid-for card. See closeModal().
     const closable = phase === PHASE.idle || Boolean(choice);
 
@@ -910,7 +947,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                 <div className="pk-result pk-result-sold">
                     <div className="pk-done">
                         <p className="pk-done-line">Spends like cash here — no fees, no waiting.</p>
-                        <PackAgain canOpen={canOpen} shortfallCents={shortfall} priceCents={priceCents} onAgain={reset} priceTrusted={priceTrusted} />
+                        <PackAgain canOpen={canOpen} shortfallCents={shortfall} priceCents={priceCents} onAgain={openAgain} priceTrusted={priceTrusted} />
                     </div>
                 </div>
             ) : null}
@@ -926,7 +963,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                     {choice === "vault" ? (
                         <div className="pk-done">
                             <p className="pk-done-line">Added to your vault.</p>
-                            <PackAgain canOpen={canOpen} shortfallCents={shortfall} priceCents={priceCents} onAgain={reset} priceTrusted={priceTrusted} />
+                            <PackAgain canOpen={canOpen} shortfallCents={shortfall} priceCents={priceCents} onAgain={openAgain} priceTrusted={priceTrusted} />
                         </div>
                     ) : (
                         <div className="pk-actions pk-actions-choice">
@@ -981,7 +1018,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                     the arithmetic done where the member can check it. The payout rounds up
                                     to a quarter and floors at a dollar (see buyback.js), so what lands is
                                     always at or above what this line says. */}
-                                <span className="pk-cta-sub">{rateLine}</span>
+                                {rateLine ? <span className="pk-cta-sub">{rateLine}</span> : null}
                                 <span className="pk-cta-shine" aria-hidden="true" />
                             </button>
                             <button
@@ -1116,6 +1153,49 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                         ⚠️ `tierByKey` FALLS BACK TO COMMON ON UNDEFINED. That is why every shelf-pool
                         card was grey — see the note in shelfPoolCards. If a row here is the wrong
                         colour, the card's `tier` is missing on the server, not broken here. */}
+                    {/* ── ⚠️ THE ODDS BOARD IS WHAT MAKES THE TIERS DIFFERENT ────────────────────────
+                        Luke, 2026-10-27, showing a competitor's pack screen: "We should do something
+                        like this, otherwise all the packs seem the same."
+
+                        He is right, and it falls straight out of how the ladder is built: all three
+                        Pokémon tiers draw from ONE shelf, so their card list is identical. The band and
+                        the odds are the only honest difference, and the odds were the one thing the
+                        screen never showed.
+
+                        ⚠️ THE NAMES AND COLOURS ARE pack-rarity.js, NOT A NEW SET. The house already
+                        teaches Common..Mythic through the reveal flash and the vault; a second vocabulary
+                        here would mean the colour a member learns while CHOOSING is not the colour that
+                        flashes when the card lands.
+
+                        ⚠️ AND IT IS STILL BEHIND "what's inside", NOT ON THE CAROUSEL FACE. §9.2 settled
+                        that: odds belong one tap in, on the way to spending, asked for rather than
+                        disclaimed at somebody. */}
+                    {(chosen?.bandOdds || []).length ? (
+                        <div className="pk-odds">
+                            <h4 className="pk-odds-h">What you&apos;ll probably pull</h4>
+                            {chosen.bandOdds.map((b) => (
+                                <div className="pk-odds-row" key={b.key} style={{ "--band": b.glow }}>
+                                    <div className="pk-odds-head">
+                                        <span className="pk-odds-range">
+                                            {b.minCents === b.maxCents
+                                                ? usd(b.minCents)
+                                                : `${usd(b.minCents)} – ${usd(b.maxCents)}`}
+                                        </span>
+                                        <span className="pk-odds-name">{b.label}</span>
+                                        {/* ⚠️ Sub-1% bands print one decimal rather than rounding to "0%",
+                                            which is the row most worth reading accurately. */}
+                                        <span className="pk-odds-pct">
+                                            {b.bp >= 100 ? `${Math.round(b.bp / 100)}%` : `${(b.bp / 100).toFixed(1)}%`}
+                                        </span>
+                                    </div>
+                                    <div className="pk-odds-bar">
+                                        <span style={{ width: `${Math.max(1.5, b.bp / 100)}%` }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
+
                     <ul className="pk-shelf-list">
                         {((chosen && pools.length > 1 ? chosen.cards : pool.cards) || []).map((card) => {
                             const t = tierByKey(card.tier);

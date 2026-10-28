@@ -26127,6 +26127,48 @@ body.cas-seated .social-fab { display: none; }
     font-variant-numeric: tabular-nums;
 }
 
+/* ── THE ODDS BOARD ──────────────────────────────────────────────────────────────────────────────────────
+   One row per rarity band: the value range it covers IN THIS PACK, its name, its chance, and a bar.
+   --band is the tier colour from pack-rarity.js, set inline — never hard-code a rarity colour here, that
+   table exists precisely so the choosing screen and the reveal cannot disagree. */
+.pk-odds { margin: 2px 2px 12px; display: flex; flex-direction: column; gap: 9px; }
+
+.pk-odds-h {
+    margin: 0 0 2px;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.pk-odds-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.pk-odds-range { font-size: 0.9rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pk-odds-name { font-size: 0.78rem; color: var(--band); font-weight: 600; }
+/* margin-left: auto rather than a spacer, so a long range never pushes the percentage off the row. */
+.pk-odds-pct { margin-left: auto; font-size: 0.86rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.pk-odds-bar {
+    height: 12px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+}
+
+/* ⚠️ min width 1.5% on the fill (set inline), because a 0.3% Mythic band is the row a member most wants to
+   see and a hairline reads as "none". It is a floor on the DRAWING, never on the number beside it. */
+.pk-odds-bar span {
+    display: block;
+    height: 100%;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--band), color-mix(in srgb, var(--band) 55%, transparent));
+}
+
 .pk-shelf-list {
     list-style: none;
     margin: 0;

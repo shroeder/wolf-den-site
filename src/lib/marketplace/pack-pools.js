@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { buyBackCents } from "@/lib/marketplace/buyback.js";
 import { packCardSubtitle, parsePackCardName } from "@/lib/marketplace/pack-card-name.js";
 import { tierForCents } from "@/lib/marketplace/pack-rarity.js";
-import { poolUnits, solveAlpha, weightedEvCents, weightedMedianCents } from "@/lib/marketplace/pack-weights.js";
+import { bandOdds, poolUnits, solveAlpha, weightedEvCents, weightedMedianCents } from "@/lib/marketplace/pack-weights.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const logger = createServerLogger({ source: "api", subsystem: "pack-pools" });
@@ -61,18 +61,38 @@ export const PACK_POOLS = [
     // ⚠️ priceCents IS FIXED HERE AND alpha IS DERIVED. That is the inverse of how this file worked
     // yesterday, when price came from EV. Do not reintroduce priceForEvCents for a tiered pool: it would
     // quietly move a $5 pack to $15 the week a collection comes in.
+    //
+    // ── ⚠️ floorMult / ceilMult: THE BAND, ON TOP OF THE WEIGHTING ──────────────────────────────────────
+    // Luke, 2026-10-27: "for the 5 and 10 dollar respectively their ceiling should be much lower relative
+    // to the spend. And the 10 and 15 floor should be slightly higher respectively."
+    //
+    // Weighting alone left every card in every pack, which is lovely for the dream and wrong for the
+    // product: a $5 pack could hand over a $279 Tyranitar. That is not a nice surprise, it is a $5 pack
+    // that occasionally costs us $279 — all of the variance measured in pack-odds-100.mjs lives in exactly
+    // those pulls — and it makes the $15 tier pointless, because the cheap one could already do everything.
+    //
+    // So each tier is a BAND as well as a curve. Multiples of the pack price rather than fixed dollars, so
+    // the ladder keeps its shape if prices ever move:
+    //
+    //   $5   floor 0.00x   ceiling  5x  ($25)   — cheap, capped, the volume pack
+    //   $10  floor 0.20x   ceiling  6x  ($60)   — a real minimum, a bigger roof
+    //   $15  floor 0.25x   ceiling 20x  ($300)  — the only pack that can hit the top of the shelf
+    //
+    // ⚠️ THE CEILING IS WHAT MAKES THE TIERS WORTH DIFFERENT MONEY, and the floor is what makes the dearer
+    // ones feel safe. Alpha still does the EV work INSIDE the band; the band decides what is reachable at
+    // all. Both are solved together in recomputePools — change one and the other re-solves.
     { key: "pkmn5", brand: "Pokémon $5", channel: "shelf", category: "Pokemon Single Card",
-        priceCents: 500, art: "/images/packs/mystery-bag-pkmn-600.webp" },
+        priceCents: 500, floorMult: 0, ceilMult: 5, art: "/images/packs/mystery-bag-pkmn-600.webp" },
     { key: "pkmn10", brand: "Pokémon $10", channel: "shelf", category: "Pokemon Single Card",
-        priceCents: 1000, art: "/images/packs/mystery-bag-pkmn-600.webp" },
+        priceCents: 1000, floorMult: 0.2, ceilMult: 6, art: "/images/packs/mystery-bag-pkmn-600.webp" },
     { key: "pkmn15", brand: "Pokémon $15", channel: "shelf", category: "Pokemon Single Card",
-        priceCents: 1500, art: "/images/packs/mystery-bag-pkmn-600.webp" },
+        priceCents: 1500, floorMult: 0.25, ceilMult: 20, art: "/images/packs/mystery-bag-pkmn-600.webp" },
     { key: "mtg5", brand: "Magic $5", channel: "shelf", category: "Magic Single Card",
-        priceCents: 500, art: "/images/packs/mystery-bag-mtg-600.webp" },
+        priceCents: 500, floorMult: 0, ceilMult: 5, art: "/images/packs/mystery-bag-mtg-600.webp" },
     { key: "mtg10", brand: "Magic $10", channel: "shelf", category: "Magic Single Card",
-        priceCents: 1000, art: "/images/packs/mystery-bag-mtg-600.webp" },
+        priceCents: 1000, floorMult: 0.2, ceilMult: 6, art: "/images/packs/mystery-bag-mtg-600.webp" },
     { key: "mtg15", brand: "Magic $15", channel: "shelf", category: "Magic Single Card",
-        priceCents: 1500, art: "/images/packs/mystery-bag-mtg-600.webp" },
+        priceCents: 1500, floorMult: 0.25, ceilMult: 20, art: "/images/packs/mystery-bag-mtg-600.webp" },
     // ⚠️ YU-GI-OH IS DELIBERATELY ABSENT, AND NOT BECAUSE IT BROKE. Luke, 2026-10-27: "3 for pokemon and
     // magic lets remove yu gi oh." The numbers agree: 52 units averaging $6.58, so a $15 Yu-Gi-Oh pack
     // clears a 56% margin — not a win, a figure somebody works out and resents. It returns when the shelf
@@ -286,7 +306,14 @@ export async function recomputePools({ now = null } = {}) {
         if (!priceCents) { logger.error("pack_pools.no_price", new Error("tiered pool without priceCents"), { pool: pool.key }); continue; }
         const targetEv = Math.round((priceCents * (10000 - TARGET_MARGIN_BP)) / 10000);
 
-        const units = await poolUnits(pool);
+        // ⚠️ THE BAND IS APPLIED BEFORE ANYTHING ELSE. alpha, the EV, the median, the odds board and the
+        //    claim all have to describe the SAME population, and that population is the banded one. Solving
+        //    alpha on the full shelf and then drawing from a band would put the EV off by the whole weight
+        //    of everything the band excluded.
+        const allUnits = await poolUnits(pool);
+        const bandLo = Math.round(priceCents * (Number(pool.floorMult) || 0));
+        const bandHi = pool.ceilMult ? Math.round(priceCents * Number(pool.ceilMult)) : Infinity;
+        const units = allUnits.filter((u) => u.cents >= bandLo && u.cents <= bandHi);
         const alpha = solveAlpha(units, targetEv);
         // ⚠️ null means even alpha 6 cannot hold the margin — the pool is too rich for this price point.
         //    That CLOSES the tier rather than selling it at a loss, and says so.
@@ -297,7 +324,9 @@ export async function recomputePools({ now = null } = {}) {
         // Drop the duds, re-solve on what is left, land on the SAME EV. The pack is not more generous on
         // the first open, it is less disappointing — which is the only version of this that cannot be
         // farmed, because the mean never moves. See the long note in pack-weights.js.
-        const floorCents = Math.round((priceCents * FIRST_OPEN_FLOOR_BP) / 10000);
+        // The first-open floor stacks ON the band floor — whichever is higher wins, so a tier that already
+        // guarantees $2.00 does not get a "no duds" promise that is weaker than its ordinary pack.
+        const floorCents = Math.max(bandLo, Math.round((priceCents * FIRST_OPEN_FLOOR_BP) / 10000));
         const noDuds = units.filter((u) => u.cents >= floorCents);
         const firstAlpha = noDuds.length >= MIN_UNITS ? solveAlpha(noDuds, targetEv) : null;
         // ⚠️ BOTH OR NEITHER. A floor without its matching alpha is a straight EV giveaway; storing 0/0
@@ -308,14 +337,25 @@ export async function recomputePools({ now = null } = {}) {
         //    figure, and the flat version is the same number for all three tiers off one shelf — which on
         //    the carousel face reads as a pricing mistake rather than a ladder.
         const medianCents = unreachable ? stats.medianCents : weightedMedianCents(units, alpha);
+        // The odds board. Computed here because recomputePools already holds every unit in memory to solve
+        // alpha; doing it per request would be a 900-row scan on the busiest screen in the feature.
+        const bands = unreachable ? [] : bandOdds(units, alpha);
+
+        // ⚠️ max/min DESCRIBE THE BAND, NOT THE SHELF. stats comes from shelfPoolStats, which measures the
+        //    whole category — so a $5 pack capped at $25 was advertising "MAX PULL $279" on the carousel
+        //    face. That is not a stretch, it is a number the pack cannot produce, printed in the largest
+        //    type on the screen. The band is the product; the band's extremes are what may be claimed.
+        const bandMaxCents = units.length ? Math.max(...units.map((u) => u.cents)) : 0;
+        const bandMinCents = units.length ? Math.min(...units.map((u) => u.cents)) : 0;
 
         await db
             .query(
                 `INSERT INTO mkt_pack_pool_state
                     (pool, price_cents, ev_cents, uniform_ev_cents, alpha, first_open_floor_cents,
                      first_open_alpha, units, lines, median_cents, min_cents, max_cents,
-                     top_share_bp, open, closed_reason, computed_at)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, NOW())
+                     top_share_bp, open, closed_reason, band_odds, band_lo_cents, band_hi_cents,
+                     computed_at)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18, NOW())
                  ON CONFLICT (pool) DO UPDATE SET
                      price_cents = EXCLUDED.price_cents, ev_cents = EXCLUDED.ev_cents,
                      uniform_ev_cents = EXCLUDED.uniform_ev_cents, alpha = EXCLUDED.alpha,
@@ -324,13 +364,17 @@ export async function recomputePools({ now = null } = {}) {
                      units = EXCLUDED.units, lines = EXCLUDED.lines, median_cents = EXCLUDED.median_cents,
                      min_cents = EXCLUDED.min_cents, max_cents = EXCLUDED.max_cents,
                      top_share_bp = EXCLUDED.top_share_bp, open = EXCLUDED.open,
-                     closed_reason = EXCLUDED.closed_reason, computed_at = NOW()`,
+                     closed_reason = EXCLUDED.closed_reason, band_odds = EXCLUDED.band_odds,
+                     band_lo_cents = EXCLUDED.band_lo_cents, band_hi_cents = EXCLUDED.band_hi_cents,
+                     computed_at = NOW()`,
                 [
                     pool.key, priceCents, evCents, stats.evCents, unreachable ? 0 : alpha,
                     firstOk ? floorCents : 0, firstOk ? firstAlpha : 0,
                     stats.units, stats.lines, medianCents,
-                    stats.minCents, stats.maxCents, stats.topShareBp,
+                    unreachable ? stats.minCents : bandMinCents, unreachable ? stats.maxCents : bandMaxCents, stats.topShareBp,
                     !reason && !unreachable, unreachable ? "too_rich_for_price" : reason,
+                    JSON.stringify(bands),
+                    bandLo, Number.isFinite(bandHi) ? bandHi : 0,
                 ]
             )
             .catch((error) => logger.error("pack_pools.write_failed", error, { pool: pool.key }));
@@ -362,6 +406,10 @@ export async function poolStates() {
             // ⚠️ THE ODDS LINE NEEDS THIS. Three tiers share one shelf, so alpha is the ONLY thing that
             //    distinguishes them — any figure computed without it describes the $15 pack.
             alpha: Number(s?.alpha ?? 0),
+            // The odds board the picker shows. Already JSON in the column; never recomputed per request.
+            bandOdds: Array.isArray(s?.band_odds) ? s.band_odds : [],
+            bandLoCents: Number(s?.band_lo_cents ?? 0),
+            bandHiCents: Number(s?.band_hi_cents ?? 0),
             units: s?.units ?? 0,
             lines: s?.lines ?? 0,
             medianCents: s?.median_cents ?? 0,

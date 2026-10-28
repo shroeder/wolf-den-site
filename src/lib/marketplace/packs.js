@@ -284,7 +284,7 @@ export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey =
     const weights = shelf
         ? await db
             .queryOne(
-                `SELECT alpha, first_open_floor_cents, first_open_alpha
+                `SELECT alpha, first_open_floor_cents, first_open_alpha, band_lo_cents, band_hi_cents
                    FROM mkt_pack_pool_state WHERE pool = $1`,
                 [poolKey]
             )
@@ -293,10 +293,15 @@ export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey =
     // Both or neither: the floor and its alpha were solved together and are meaningless apart.
     const useMagic = firstOpen && Number(weights?.first_open_floor_cents) > 0;
     const drawAlpha = Number((useMagic ? weights?.first_open_alpha : weights?.alpha) || 0);
-    const drawFloor = useMagic ? Number(weights?.first_open_floor_cents || 0) : 0;
+    // ⚠️ THE BAND FLOOR APPLIES ON EVERY OPEN, the first-open floor only on the first — and the first-open
+    //    floor was already solved to sit at or above the band floor, so the max() is belt and braces rather
+    //    than arithmetic that matters. The CEILING is unconditional: it is what the tier is.
+    const bandLo = Number(weights?.band_lo_cents || 0);
+    const drawFloor = Math.max(bandLo, useMagic ? Number(weights?.first_open_floor_cents || 0) : 0);
+    const drawCeil = Number(weights?.band_hi_cents || 0);
 
     const claimed = shelf
-        ? await claimShelfCard({ pool, reservationKey: key, alpha: drawAlpha, floorCents: drawFloor })
+        ? await claimShelfCard({ pool, reservationKey: key, alpha: drawAlpha, floorCents: drawFloor, ceilCents: drawCeil })
         : await db.tx(async (client) => {
         const picked = await client.query(
             `UPDATE mystery_bag_cards

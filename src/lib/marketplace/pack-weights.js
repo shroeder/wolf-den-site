@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { buyBackCents } from "@/lib/marketplace/buyback.js";
+import { PACK_TIERS } from "@/lib/marketplace/pack-rarity.js";
 
 // ── HOW A WEIGHTED PULL WORKS ────────────────────────────────────────────────────────────────────────────────
 // docs: scripts/pack-weights.mjs is the model this came out of and the thing to run before retuning anything.
@@ -115,7 +116,7 @@ export async function poolUnits(pool) {
  * must pass the matching first_open_alpha, which was solved against the SAME filtered set. Passing one
  * without the other quietly changes the EV of the pack.
  */
-export async function pickWeightedVariation({ pool, alpha, floorCents = 0 }) {
+export async function pickWeightedVariation({ pool, alpha, floorCents = 0, ceilCents = 0 }) {
     if (!pool?.category) return null;
     const a = Number.isFinite(Number(alpha)) ? Number(alpha) : 0;
     const row = await db
@@ -125,9 +126,12 @@ export async function pickWeightedVariation({ pool, alpha, floorCents = 0 }) {
               WHERE in_stock AND quantity > 0 AND NOT consigned
                 AND category_names = $1
                 AND price * 100 >= $2
+                -- ⚠️ 0 MEANS NO CEILING, not a ceiling of zero. A tier with ceilMult unset must still be
+                --    able to draw the top of the shelf; writing this as a plain <= would empty the pool.
+                AND ($4 <= 0 OR price * 100 <= $4)
               ORDER BY power(random(), 1.0 / GREATEST(quantity * power(GREATEST(price, 0.01), -$3::float), 1e-9)) DESC
               LIMIT 1`,
-            [pool.category, Math.max(0, Math.round(floorCents)), a]
+            [pool.category, Math.max(0, Math.round(floorCents)), a, Math.max(0, Math.round(ceilCents))]
         )
         .catch(() => null);
     return row || null;
@@ -183,4 +187,55 @@ export function weightedMedianCents(cards, alpha) {
         if (run >= total / 2) return c.cents;
     }
     return sorted[sorted.length - 1].cents;
+}
+
+/**
+ * ── WHAT THIS PACK ACTUALLY PAYS, BY RARITY BAND ─────────────────────────────────────────────────────────────
+ * The probability of landing in each pack-rarity tier under these weights, plus the value range that tier
+ * covers IN THIS POOL.
+ *
+ * ⚠️ THIS IS THE ONLY HONEST DIFFERENCE BETWEEN THE TIERS. All three Pokémon packs draw from one shelf, so
+ * their unit count, their best card and their card list are identical — a screen without these numbers shows
+ * three identical packs at three prices and looks like a pricing mistake. Luke, seeing a competitor do it:
+ * "otherwise all the packs seem the same."
+ *
+ * ⚠️ THE BANDS ARE pack-rarity.js AND THE COLOURS COME WITH THEM. The house already teaches those six names
+ * and colours through the reveal flash and the vault; a second vocabulary here would mean the colour a
+ * member learns while choosing is not the colour that flashes when the card lands.
+ *
+ * ⚠️ AND THE RANGE IS THE REAL ONE, not the band's definition. A tier whose table says "$60+" but whose
+ * richest card in this pool is $114 should say $60–$114. Printing the open-ended definition invites a
+ * member to imagine a ceiling the shelf does not have.
+ */
+export function bandOdds(cards, alpha) {
+    if (!cards.length) return [];
+    let wsum = 0;
+    for (const c of cards) wsum += c.qty * Math.pow(Math.max(0.01, c.cents / 100), -alpha);
+    if (!wsum) return [];
+
+    return PACK_TIERS.map((tier, i) => {
+        const next = PACK_TIERS[i + 1];
+        const lo = tier.min;
+        const hi = next ? next.min - 1 : Infinity;
+        let w = 0;
+        let min = Infinity;
+        let max = 0;
+        for (const c of cards) {
+            if (c.cents < lo || c.cents > hi) continue;
+            w += c.qty * Math.pow(Math.max(0.01, c.cents / 100), -alpha);
+            if (c.cents < min) min = c.cents;
+            if (c.cents > max) max = c.cents;
+        }
+        return {
+            key: tier.key,
+            label: tier.label,
+            glow: tier.glow,
+            // Basis points, so a 1-in-900 band is not rounded away to "0%".
+            bp: Math.round((w / wsum) * 10000),
+            minCents: Number.isFinite(min) ? min : 0,
+            maxCents: max,
+        };
+    // ⚠️ EMPTY BANDS ARE DROPPED, not shown at 0%. A row reading "Mythic 0%" is a promise the pool cannot
+    //    keep, and it is the row a member's eye goes to first.
+    }).filter((b) => b.bp > 0);
 }
