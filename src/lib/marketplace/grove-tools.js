@@ -1,4 +1,5 @@
 import "server-only";
+import { actPerks } from "@/lib/marketplace/act-board.js";
 
 import { db } from "@/lib/db";
 import { equipMemo } from "@/lib/marketplace/equip-cache.js";
@@ -39,8 +40,20 @@ export async function groveTools(buyerId) {
  * behave exactly as it did before, and `+0%` is the honest way to say that.
  */
 export async function groveToolPct(buyerId, slot) {
-    const tools = await groveTools(buyerId).catch(() => ({}));
-    return toolBonusPct(tools?.[slot] || 0);
+    const [tools, perks] = await Promise.all([
+        groveTools(buyerId).catch(() => ({})),
+        actPerks(buyerId).catch(() => ({})),
+    ]);
+    // ── ⚠️ ACT QUEST PERKS ARE SUMMED IN HERE, AND THAT IS THE WHOLE POINT ──────────────────────────────
+    // The act boards reward "relevant passive buffs to each system that they're all about". This function is
+    // already read by arena, boss, cooking, crafting, delves, delve-floors, mining, farm, fishing and
+    // sailing — a dozen live call sites that each ask one question: what percentage does this member get in
+    // this system. Adding the perk HERE means every one of them picks it up unchanged.
+    //
+    // The alternative was a second per-player bonus source read beside this one at each site, which is the
+    // shape this codebase has been burned by: combat already reads four stat sources, and a fifth is a
+    // bonus that silently applies in the half of the game somebody remembered to wire.
+    return toolBonusPct(tools?.[slot] || 0) + (Number(perks?.[slot]) || 0);
 }
 
 /** The same thing as a multiplier, for the many callers that want to scale a yield. */

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PERK_SYSTEM } from "@/lib/marketplace/acts.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Gi from "react-icons/gi";
 
@@ -1209,6 +1210,32 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     const town = state?.town || null;
     // The stockade belongs to the Den, not to each street: the default town (no gating) or town 1.
     const townHasStocks = !town || town.n === 1;
+
+    // ── THE ACT BOARD ───────────────────────────────────────────────────────────────────────────────
+    // Luke: "in each town, there'd be a building you can click to see what your quests are for that act
+    // ... how you open the quests is going to be something thematically that fits in the town."
+    //
+    // A notice board on the street, beside the NPCs. Read only when it is OPENED — getTownState is the
+    // highest-volume request in the app and this would otherwise bill two queries per town load for
+    // every member whether or not they ever tap it.
+    const [actOpen, setActOpen] = useState(false);
+    const [actBoard, setActBoard] = useState(null);
+    const [actBusy, setActBusy] = useState("");
+    const openActBoard = async () => {
+        setActOpen(true);
+        const r = await fetch(`/api/marketplace/acts?town=${encodeURIComponent(town?.id || "")}`, { cache: "no-store" })
+            .then((x) => x.json()).catch(() => null);
+        setActBoard(r?.board || null);
+    };
+    const claimAct = async (key) => {
+        setActBusy(key);
+        const r = await fetch("/api/marketplace/acts", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ quest: key, town: town?.id || "" }),
+        }).then((x) => x.json()).catch(() => null);
+        setActBusy("");
+        if (r?.board) setActBoard(r.board);
+    };
     // ⚠️ BUMP THIS WHEN A TOWN LAYER IS REDRAWN. Static assets under /public are served with a day of
     // max-age, so a redrawn sky keeps rendering as the old one — which cost a full round of "the art did not
     // change" before anyone looked at the file on disk and found that it had. Same scar the sprites carry.
@@ -2858,6 +2885,20 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             <img src={art.questgiver.url} alt="Quest Giver" draggable={false} />
                         ) : <span className="tw-npc-emoji">📜</span>}
                     </button>
+                    {/* ── THE ACT BOARD ────────────────────────────────────────────────────────────
+                        A notice board, tapped to read what this act is asking of you. It stands in the
+                        town rather than living on a menu because the act's quests are about the systems
+                        that act just unlocked, and the town is where you are standing when they unlock.
+
+                        Biome towns only: the default street is every feature at once and has no act. */}
+                    {town ? (
+                        <button type="button" className="tw-npc-btn tw-actboard"
+                            style={{ left: "22%", top: `${GROUND + 6}%` }}
+                            onClick={(e) => { e.stopPropagation(); openActBoard(); }} aria-label="The act board">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/images/town/actboard.png" alt="" draggable={false} />
+                        </button>
+                    ) : null}
                     {/* Traveling Merchant — tap to browse wares */}
                     <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.merchant}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
                         <span className="tw-npc-bubble">🧳 Wares for sale!</span>
@@ -3040,6 +3081,46 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         <div className="hw-fog hw-fog-3" aria-hidden="true" />
                     </>
                 ) : null}
+            {/* ── THE ACT LADDER ───────────────────────────────────────────────────────────────────────
+                One rung open at a time, the rest visible but shut — the order IS the teaching, so a player
+                can read where this act is going without being able to skip to the end of it. */}
+            {actOpen ? (
+                <div className="tw-roster" role="dialog" aria-label="Act quests" onClick={() => setActOpen(false)}>
+                    <div className="tw-roster-panel tw-actsheet" onClick={(e) => e.stopPropagation()}>
+                        {/* The same head every other town sheet uses — a panel that closes differently
+                            from its neighbours is a panel people get stuck in. */}
+                        <div className="tw-roster-head">
+                            <strong>{actBoard?.name || "The board"}</strong>
+                            <button type="button" onClick={() => setActOpen(false)} aria-label="Close">✕</button>
+                        </div>
+                        {!actBoard ? <p className="tw-act-empty">Reading the board&hellip;</p> : (
+                            <>
+                                <p className="tw-act-blurb">{actBoard.blurb}</p>
+                                <ol className="tw-act-list">
+                                    {actBoard.rungs.map((r) => (
+                                        <li key={r.key} className={`tw-act-rung${r.claimed ? " is-done" : ""}${!r.open ? " is-shut" : ""}${r.claimable ? " is-ready" : ""}`}>
+                                            <div className="tw-act-main">
+                                                <b>{r.title}</b>
+                                                <span>{r.desc}</span>
+                                                {r.perk ? <i>+{r.perk.pct}% to {PERK_SYSTEM[r.perk.slot] || r.perk.slot}</i> : null}
+                                            </div>
+                                            <div className="tw-act-side">
+                                                {r.claimed ? <span className="tw-act-tick">Done</span>
+                                                    : !r.open ? <span className="tw-act-lock">Locked</span>
+                                                    : r.claimable ? (
+                                                        <button type="button" className="tw-act-claim" disabled={actBusy === r.key}
+                                                            onClick={() => claimAct(r.key)}>{actBusy === r.key ? "..." : "Claim"}</button>
+                                                    ) : <span className="tw-act-count">{r.have}/{r.need}</span>}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </>
+                        )}
+                    </div>
+                </div>
+            ) : null}
+
             </div>
 
             <section className="card tw-chatbar">
@@ -4129,6 +4210,33 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-building.is-shuttered .tw-b-label { filter: none; opacity: 1; }
 .tw-building.is-shuttered .tw-b-soon { display: block; font-size: 10px; letter-spacing: 0.04em;
     color: #ffd75e; opacity: 1; margin-top: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+
+/* ── THE ACT BOARD AND ITS LADDER ─────────────────────────────────────────────────────────────────
+   A notice board on the street, and the sheet behind it. One rung is open at a time; the rest stay
+   VISIBLE and shut, because a posted board you can read ahead on is the whole difference between a
+   ramp and a daily quest. */
+.tw-npc-btn.tw-actboard img { height: 92px; width: auto; }
+.tw-actsheet { max-width: 520px; }
+.tw-act-title { margin: 0 0 2px; font-size: 1.02rem; color: #f3ecda; }
+.tw-act-blurb { margin: 0 0 12px; font-size: 0.84rem; color: #a99f88; font-style: italic; }
+.tw-act-empty { color: #a99f88; font-size: 0.88rem; }
+.tw-act-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.tw-act-rung { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
+.tw-act-rung.is-ready { border-color: #ffd75e; background: rgba(255,215,94,0.08); }
+.tw-act-rung.is-done { opacity: 0.55; }
+.tw-act-rung.is-shut { opacity: 0.38; }
+.tw-act-main { display: flex; flex-direction: column; gap: 1px; flex: 1 1 auto; min-width: 0; }
+.tw-act-main b { font-size: 0.9rem; color: #f0e9d8; }
+.tw-act-main span { font-size: 0.8rem; color: #a99f88; }
+.tw-act-main i { font-style: normal; font-size: 0.74rem; color: #8fc08d; margin-top: 2px; }
+.tw-act-side { flex: 0 0 auto; }
+.tw-act-count { font-size: 0.8rem; color: #a99f88; font-variant-numeric: tabular-nums; }
+.tw-act-tick { font-size: 0.76rem; color: #8fc08d; }
+.tw-act-lock { font-size: 0.76rem; color: #7b7466; }
+.tw-act-claim { padding: 6px 14px; border-radius: 999px; border: 0; cursor: pointer;
+    background: linear-gradient(180deg, #ffd978, #f0a81f); color: #1a1206; font-weight: 800; font-size: 0.8rem; }
+
 .tw-cobble img:nth-child(even) { transform: scaleX(-1); }
 /* Softer, taller shadow where the street meets the buildings behind it — dissolves the seam. */
 .tw-cobble::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 68px; background: linear-gradient(180deg, rgba(26,17,40,0.9), rgba(26,17,40,0.28) 55%, transparent); pointer-events: none; }
