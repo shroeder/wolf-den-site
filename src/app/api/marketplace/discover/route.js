@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { discoverOpenFor } from "@/lib/marketplace/discover-gate.js";
 import { DISCOVER_ERAS, DISCOVER_PRICES, discoverPage, discoverRows } from "@/lib/marketplace/discover.js";
+import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -42,6 +43,10 @@ export async function GET(request) {
             return noStore({
                 open: true,
                 rows: await discoverRows(filters),
+                // ⚠️ SENT, NOT DERIVED. The Buy-with-credit button disables itself when the balance cannot
+                //    cover the card; a client guessing at the balance would offer a purchase the server is
+                //    about to refuse.
+                creditCents: await getStoreCredit(buyer.id).catch(() => 0),
                 eras: DISCOVER_ERAS,
                 prices: DISCOVER_PRICES,
             });

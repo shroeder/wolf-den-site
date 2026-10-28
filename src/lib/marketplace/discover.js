@@ -20,7 +20,20 @@ import { db } from "@/lib/db";
 // deal that has nothing to do with our pricing.
 
 const MAX_ROWS = 10;
-const MIN_ITEMS = 6;
+
+// ── ⚠️ THE MINIMUM ROW SIZE IS FOR BROWSING AND IS WRONG FOR SEARCHING ──────────────────────────────────────
+// Six is right for the unfiltered deck: a category holding two cards is a dead end two swipes in, and
+// offering it promises depth the shelf does not have.
+//
+// It is exactly backwards the moment somebody filters. Luke typed "perfect order" and saw NOTHING — it
+// matches one booster pack, and a one-item row was dropped on the floor by a rule written for a different
+// situation. "charizard" was worse, because it looked like it worked: 20 matches across four categories,
+// of which only the 16-item Pokémon row survived, so the Plush, the Accessories and the Sealed quietly
+// vanished and nobody could tell.
+//
+// Narrowing to a handful IS the point of a search. When any filter is on, one match is a row.
+const MIN_ITEMS_BROWSE = 6;
+const MIN_ITEMS_FILTERED = 1;
 
 /** How many items a row ships with, and how many each top-up fetches. */
 export const PAGE = 24;
@@ -96,6 +109,12 @@ const toItem = (r) => ({
  */
 export async function discoverRows(filters = {}) {
     const [where, params] = baseWhere(filters);
+    const filtering = Boolean(
+        (filters.q && String(filters.q).trim())
+        || (filters.era && filters.era !== "any")
+        || (filters.price && filters.price !== "any")
+    );
+    const minItems = filtering ? MIN_ITEMS_FILTERED : MIN_ITEMS_BROWSE;
     const rows = await db
         .query(
             `WITH pool AS (
@@ -114,7 +133,7 @@ export async function discoverRows(filters = {}) {
              )
              SELECT variation_id, name, price, image_url, category_names, quantity, n
                FROM ranked
-              WHERE rn <= ${PAGE} AND n >= ${MIN_ITEMS}
+              WHERE rn <= ${PAGE} AND n >= ${minItems}
               ORDER BY n DESC, category_names, rn`,
             params
         )

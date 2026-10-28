@@ -28345,3 +28345,30 @@ body.cas-seated .social-fab { display: none; }
 .shop-try-new:hover { border-color: rgba(212, 175, 55, 0.8); background: rgba(212, 175, 55, 0.12); }
 .shop-try-new strong { color: #F0D27A; font-size: 0.98rem; }
 .shop-try-new span { color: var(--muted); font-size: 0.82rem; }
+
+/* -- BUY WITH CREDIT -----------------------------------------------------------------------------------------
+   WARNING: deliberately the SECONDARY button. It spends real money with no confirmation step and no cart to
+   reconsider in, so it must never be the thing a thumb lands on by accident. Add to cart keeps the gold;
+   this is an outline, quieter, and it disables itself when the balance cannot cover the card. */
+.dv-buy {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(212, 175, 55, 0.4);
+    color: #F0D27A;
+    font-size: 0.86rem;
+    padding: 10px 16px;
+    text-decoration: none;
+    text-align: center;
+    display: block;
+}
+
+.dv-buy:disabled { opacity: 0.4; cursor: default; border-color: rgba(255, 255, 255, 0.1); color: var(--muted); }
+
+/* Bought: green like the cart confirmation, and it becomes a LINK to the vault rather than a dead state —
+   the card is already theirs and the only useful next move is going to look at it. */
+.dv-buy-done {
+    background: rgba(74, 222, 128, 0.14);
+    border-color: rgba(74, 222, 128, 0.4);
+    color: #4ade80;
+    font-weight: 800;
+}

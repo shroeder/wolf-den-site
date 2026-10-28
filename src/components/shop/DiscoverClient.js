@@ -60,6 +60,11 @@ export default function DiscoverClient() {
     const [detail, setDetail] = useState(null);
     const [adding, setAdding] = useState("");
     const [added, setAdded] = useState({});
+    // Bought outright with credit. Kept separate from `added` because they are different outcomes: one is
+    // in a cart you still have to check out, the other is already yours and sitting in the vault.
+    const [bought, setBought] = useState({});
+    const [buying, setBuying] = useState("");
+    const [credit, setCredit] = useState(null);
     const [rowIndex, setRowIndex] = useState(0);
     const [itemIndex, setItemIndex] = useState({});
 
@@ -85,6 +90,7 @@ export default function DiscoverClient() {
             const data = await res.json();
             if (!res.ok || !data.open) throw new Error("closed");
             setRows(data.rows || []);
+            setCredit(typeof data.creditCents === "number" ? data.creditCents : null);
             setEras(data.eras || []);
             setPrices(data.prices || []);
             setItemIndex({});
@@ -144,6 +150,51 @@ export default function DiscoverClient() {
             }));
         } catch { /* a failed top-up just means the member reaches the end of what is loaded */ }
     }, [applied]);
+
+    /**
+     * ⚠️ THE IDEMPOTENCY KEY IS MINTED PER ATTEMPT AND SENT BY THE CLIENT. A double-tap, a flaky retry or a
+     * backgrounded tab resuming must not charge twice, and the server cannot tell those apart from two
+     * deliberate purchases of two copies unless it is told.
+     */
+    async function buyNow(item) {
+        if (buying || bought[item.id]) return;
+        setBuying(item.id);
+        setError(null);
+        try {
+            const res = await fetch("/api/marketplace/discover/buy", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    variationId: item.id,
+                    idempotencyKey: `dbuy:${item.id}:${Date.now()}`,
+                }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data?.ok) {
+                // Each of these is a genuinely different situation and the member deserves to know which
+                // one happened — especially "your credit was not touched", which is the one that decides
+                // whether they go looking for a refund.
+                const msg = data?.error === "insufficient"
+                    ? "Not enough store credit for that one."
+                    : data?.error === "gone"
+                        ? "That just sold at the counter."
+                        : data?.error === "stock_failed"
+                            ? "Could not reserve it. Your credit was not touched."
+                            : "Could not buy that just then.";
+                setError(msg);
+                return;
+            }
+            Haptic.tap();
+            setBought((b) => ({ ...b, [item.id]: true }));
+            if (typeof data.balanceCents === "number") setCredit(data.balanceCents);
+            // The header shows store credit too; it must not sit stale after money moved.
+            window.dispatchEvent(new CustomEvent("wolfden-shop-cart-updated"));
+        } catch {
+            setError("Could not buy that just then.");
+        } finally {
+            setBuying("");
+        }
+    }
 
     async function addToCart(item) {
         setAdding(item.id);
@@ -260,14 +311,42 @@ export default function DiscoverClient() {
                                                 <span className="dv-price">{usd(item.priceCents)}</span>
                                                 {item.last ? <span className="dv-last">last one</span> : null}
                                             </p>
+                                            {/* ── ⚠️ TWO WAYS TO BUY, AND THE INSTANT ONE IS THE QUIET ONE ──
+                                                Luke asked for store credit straight into the vault. It is
+                                                deliberately the SECONDARY button: it spends real money with
+                                                no confirmation step and no cart to reconsider in, so it must
+                                                never be the thing a thumb lands on by accident. Add to cart
+                                                keeps the gold. */}
                                             <button
                                                 type="button"
                                                 className={`dv-btn dv-add${added[item.id] ? " dv-add-done" : ""}`}
-                                                disabled={adding === item.id || added[item.id]}
+                                                disabled={adding === item.id || added[item.id] || bought[item.id]}
                                                 onClick={() => addToCart(item)}
                                             >
                                                 {added[item.id] ? "In your cart" : adding === item.id ? "Adding…" : "Add to cart"}
                                             </button>
+                                            {bought[item.id] ? (
+                                                <a className="dv-btn dv-buy dv-buy-done" href="/marketplace/vault">
+                                                    In your vault &rarr;
+                                                </a>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    className="dv-btn dv-buy"
+                                                    disabled={
+                                                        buying === item.id
+                                                        || added[item.id]
+                                                        || (credit != null && credit < item.priceCents)
+                                                    }
+                                                    onClick={() => buyNow(item)}
+                                                >
+                                                    {buying === item.id
+                                                        ? "Buying\u2026"
+                                                        : credit != null && credit < item.priceCents
+                                                            ? "Not enough credit"
+                                                            : `Buy with credit \u00B7 ${usd(item.priceCents)}`}
+                                                </button>
+                                            )}
                                         </div>
                                     </article>
                                 ))}
