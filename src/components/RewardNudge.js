@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { nudgeFeed } from "@/lib/nudge-feed";
 import Coin from "@/components/Coin";
 import Glyph from "@/components/Glyph";
+import { isGamePath } from "@/lib/marketplace/game-paths.js";
 
 // A slim, site-wide "next unlock" strip for signed-in members — the always-on engagement carrot. Shows
 // the next reward + a progress bar + XP to go, linking to the full rewards track. Renders nothing for
@@ -12,6 +14,7 @@ import Glyph from "@/components/Glyph";
 const XP_KEY = "wolfden-last-xp";
 
 export default function RewardNudge() {
+    const pathname = usePathname() || "";
     const [data, setData] = useState(null);
     const [toast, setToast] = useState(null);
 
@@ -81,6 +84,18 @@ export default function RewardNudge() {
         };
     }, []);
 
+    // ── ⚠️ THE GAME BAR BELONGS TO THE GAME ─────────────────────────────────────────────────────────
+    // Luke, 2026-10-28: "In mystery packs and any other area that isnt explicitly in the game, the game
+    // bar should be gone."
+    //
+    // Gold, store credit, level and an XP bar are the game's furniture. On the shop, on Discover and on
+    // the mystery-pack screens they are a second status bar competing with the thing the member actually
+    // came for — and on a phone they cost a tenth of the screen to say nothing that page needs.
+    //
+    // ⚠️ IT USES THE SHARED isGamePath, NEVER ITS OWN LIST. GameNav and GuideStrip already self-hide on
+    // this exact rule, and game-paths.js records four separate occasions where a new room fell out of one
+    // list and silently lost its shell. A third copy here would be the fifth.
+    if (!isGamePath(pathname)) return null;
     if (!data || !data.authed) return null;
 
     const hasProgress = !data.maxed && data.label;

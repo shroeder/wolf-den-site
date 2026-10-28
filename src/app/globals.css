@@ -202,6 +202,26 @@ main.content {
     border-top: 1px solid var(--line);
 }
 
+/* -- THE BRAND, TWO WAYS -------------------------------------------------------------------------------
+   On a desktop the mark is a LINK home and the menu is inline, so the button form is never rendered. On a
+   phone (the block above) they swap. Two elements rather than one with a conditional handler: a link that
+   sometimes does not navigate breaks middle-click and open-in-new-tab, and reads as a bug to anyone who
+   tries it. */
+.brand-menu {
+    display: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    align-items: center;
+}
+
+.nav-scrim { display: none; }
+
+
+
 /* ── THE IN-GAME HEADER ───────────────────────────────────────────────────────────────────────
    Luke: "when you are in the game, there should be one menu ... I would think we would have
    clarity when inside the game."
@@ -1153,15 +1173,93 @@ textarea {
         display: none;
     }
 
-    .nav-row {
-        display: none;
+    /* -- THE LEFT DRAWER ------------------------------------------------------------------------------
+       Luke, 2026-10-28: "the menu on the phone should be part of the Wolf icon, and it should be a left
+       drawer that overlaps, as you would expect in a phone app."
+
+       It used to be a dropdown that PUSHED the page down, which is the most web-page-shaped thing a mobile
+       menu can do: content jumps, what you were reading moves, closing it jumps everything back. A drawer
+       that overlaps leaves the page exactly where it was.
+
+       WARNING: SCOPED TO .nav-drawer, NOT .nav-row. Styling it as .nav-row inherited a stack of header
+       rules written for the old dropdown, one of which pinned the height so a panel with top:0 AND
+       bottom:0 still rendered 70px tall. Its own class owns the whole box.
+
+       WARNING: position: fixed is only safe because .site-header has no transformed or filtered ancestor.
+       A transformed ancestor re-parents a fixed element to itself -- the bug that put the vault's bottom
+       sheet off-screen. Check before copying this inside the game shell. */
+    .nav-drawer {
+        position: fixed;
+        inset: 0 auto 0 0;
+        height: 100dvh;
+        width: min(82vw, 320px);
+        z-index: 1001;
+        display: block;
         border-top: none;
+        border-right: 1px solid var(--line);
+        /* Lifted off the page colour deliberately: a drawer the same shade as what it covers reads as the
+           page reflowing rather than as a panel sliding over it. */
+        background: #15151a;
+        box-shadow: 14px 0 50px rgba(0, 0, 0, 0.75);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        /* Parked off-screen rather than display:none, so it SLIDES. A drawer that pops into existence is a
+           dropdown wearing a drawer's clothes. */
+        transform: translateX(-100%);
+        transition: transform 240ms cubic-bezier(0.2, 0.9, 0.3, 1);
+        /* WARNING: not interactive while closed, or the off-screen panel swallows taps along the left edge
+           of every page -- an invisible dead strip nobody could explain. */
+        visibility: hidden;
     }
 
-    .nav-row.nav-open {
-        display: block;
-        border-top: 1px solid var(--line);
+    .nav-drawer.nav-open { transform: translateX(0); visibility: visible; }
+
+    /* WARNING: the drawer OWNS its content layout. .nav-inner is the shop header's inline-nav wrapper and
+       lays out multi-column; dropped into a 320px panel it reads as a jumbled grid rather than a menu. */
+    .nav-drawer .nav-inner {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 2px !important;
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        padding: max(18px, env(safe-area-inset-top)) 10px 24px !important;
     }
+
+    .nav-drawer .nav-inner > * { width: 100%; }
+
+    .nav-drawer .nav-inner a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 14px !important;
+        border-radius: 12px;
+        font-size: 1rem;
+    }
+
+    .nav-drawer .nav-inner a:hover { background: rgba(255, 255, 255, 0.05); }
+
+    /* The scrim: covers the page, and tapping it closes -- what a thumb tries first and what every phone
+       app does. */
+    .nav-scrim {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: block;
+        border: 0;
+        padding: 0;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(2px);
+        animation: nav-scrim-in 200ms ease-out;
+    }
+
+    @keyframes nav-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+
+    /* The wolf IS the menu button here, so the separate hamburger is redundant chrome. */
+    .nav-menu { display: none !important; }
+    .brand-link { display: none !important; }
+    .brand-menu { display: inline-flex !important; }
 
     .nav-inner {
         flex-direction: column;

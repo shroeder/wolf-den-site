@@ -238,7 +238,38 @@ export default function SiteHeader() {
         <header className="site-header">
             <div className="shell top-row">
                 <div className="top-left">
-                    <Link href="/" className="brand" onClick={() => setOpen(false)}>
+                    {/* ── ⚠️ THE WOLF IS THE MENU ON A PHONE ─────────────────────────────────────────
+                        Luke, 2026-10-28: "the menu on the phone should be part of the Wolf icon, and it
+                        should be a left drawer that overlaps, as you would expect in a phone app."
+
+                        So on a phone the mark is a BUTTON that opens the drawer, and on a desktop it stays
+                        a LINK home. Two elements, one visible at a time, rather than one element with a
+                        conditional handler: a link that sometimes does not navigate is the kind of thing
+                        that breaks middle-click, breaks "open in new tab", and reads as a bug to anyone
+                        who tries it.
+
+                        ⚠️ THE DESKTOP LINK HOME STAYS, AND IT IS LOAD-BEARING. The note on the slim header
+                        records it: the brand is the way back to the shop, and GameNav has no exit of its
+                        own. Phones get the drawer, which contains that same way out. */}
+                    <button
+                        type="button"
+                        className="brand brand-menu"
+                        aria-label={open ? "Close menu" : "Open menu"}
+                        aria-expanded={open}
+                        onClick={() => setOpen((v) => !v)}
+                    >
+                        <Image
+                            className="brand-mark"
+                            src="/logo/logo.png"
+                            alt=""
+                            width={1536}
+                            height={1024}
+                            sizes="50px"
+                            priority
+                        />
+                        <span>The Wolf Den</span>
+                    </button>
+                    <Link href="/" className="brand brand-link" onClick={() => setOpen(false)}>
                         <Image
                             className="brand-mark"
                             src="/logo/logo.png"
@@ -294,8 +325,17 @@ export default function SiteHeader() {
                     {accountButton}
                 </div>
             </div>
+            {/* ⚠️ THE SCRIM IS NOT DECORATION. A drawer with no way to dismiss it except the exact
+                control that opened it is the thing that makes a web menu feel like a web menu. Tapping
+                anywhere outside closes it, which is what every phone app does and what a thumb tries
+                first. aria-hidden because it is a dismiss target, not content. */}
+            {open ? <button type="button" className="nav-scrim" aria-hidden="true" tabIndex={-1} onClick={() => setOpen(false)} /> : null}
             <nav
-                className={`nav-row${open ? " nav-open" : ""}`}
+                /* ⚠️ nav-drawer IS ITS OWN CLASS ON PURPOSE. Styling the drawer through .nav-row meant
+                   inheriting a pile of header rules written for a dropdown — one of which pinned the
+                   height to 70px, so a panel with top:0 and bottom:0 still rendered as a stub. A new
+                   class owns the whole box and nothing else in the sheet can reach it. */
+                className={`nav-row nav-drawer${open ? " nav-open" : ""}`}
                 aria-label="Main navigation"
             >
                 <div className="shell nav-inner">{navContent}</div>
