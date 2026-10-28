@@ -52,26 +52,58 @@ no grid of thumbnails — not the gamble.
 **And a left-swipe should still teach it something.** Skipping ten $200 sealed boxes in a row is the clearest
 signal in the session about what this person is not shopping for.
 
-## 4. ⚠️ The assistant is the risky half
+## 4. The assistant — registered only, and that is a feature
 
-An assistant that answers *"do you have Charizard in stock"* is a support surface, and the failure mode is not
-"unhelpful", it is **confidently wrong about stock**, which puts somebody in the car. Non-negotiables:
+Luke, 2026-10-27, first: *"Ideally its as accessible as possible but maybe with limits so people cant abuse.
+But if they are committed and have are logged in we can probably have a longer leash."* Then: *"Or actually it
+should prompt them to register before they can even use it."*
 
-- It answers stock questions **only** from a live `inventory_feed` read passed in as context — never from the
-  model's own memory, and never from a cached list older than the page.
-- Hours and events come from **one** source the shop already edits, not a second copy typed into a prompt.
-- It says "I don't know, here's how to ask" rather than guessing. A wrong answer about a $400 box is worse
-  than no answer.
-- It never quotes a price it was not handed.
+**Those two sit on different halves of this feature, and both are right:**
 
-**Cost is unbounded by default.** Every other AI call in this repo is one draw for one member on a cooldown;
-an open chat box on a public shop page is a stranger with a text field. It needs a per-session message cap, a
-daily spend ceiling, and the same `mkt_ai_generation` ledger row every other call writes — see
-`ai-ledger.js`, and note it now prices from real usage.
+| | who | why |
+|---|---|---|
+| **The deck** (browse, inspect, buy) | **fully public** | it IS the shop. It has to be linkable, indexable, and frictionless — a registration wall on browsing is a wall on selling. |
+| **The assistant** (chat) | **registered** | it costs money per use, it can be scripted against, and a signed-in turn is attributable to a person. |
 
-**Open question I cannot answer from the repo:** whether this is for logged-in members only. That decides
-whether abuse control is "a rate limit per buyer" (easy, we know who they are) or "a rate limit per IP on a
-public page" (much harder, and the thing that attracts scrapers).
+So the chat is not a wall on the shop; it is a reason to make an account. Asked at the right moment —
+*"sign in and I'll help you find it"* — it converts, and the account it creates feeds `game_interests`,
+product alerts, store credit and the vault. A registration prompt on the ONE surface that costs us per use is
+the cheapest wall in the building.
+
+### ⚠️ Retrieval is the cost lever, not the message count
+
+Priced off this repo's own table (`ai-ledger.js`, gpt-4o-mini at $0.15/M in, $0.60/M out):
+
+| what we put in the prompt | per turn | 1,600 turns/day | a scripted abuser, 1 hour |
+|---|---|---|---|
+| system + **20 matched items** + history | **$0.00038** | $0.60/day · ~$18/mo | $13.50 |
+| 100 items of context | $0.00075 | $1.20/day · ~$36/mo | $27.00 |
+| **the whole catalogue (~3,100 items)** | $0.00945 | $15.12/day · **~$454/mo** | **$340.20** |
+
+**A 25× swing, and message limits do not touch it.** Search `inventory_feed` first, pass the handful of rows
+that matched, and the feature is an $18/month line. Stuff the catalogue into the context and the same traffic
+is $454. I overstated the risk earlier by calling it unbounded without saying what actually drives it: it is
+the context, every time.
+
+### What still has to be true
+
+- Stock answers come **only** from a live `inventory_feed` read passed in as context — never the model's own
+  memory, never a cached list older than the page. Being confidently wrong about a $400 box puts somebody in
+  the car.
+- It never quotes a price it was not handed, and says "I don't know, here's how to ask" rather than guessing.
+- Hours and events read from **one** source the shop already edits, not a second copy typed into a prompt.
+- Every turn writes a `mkt_ai_generation` row like every other AI call here — and that ledger now prices from
+  real usage rather than a token table.
+- Per-buyer daily cap, plus a **global daily spend ceiling with a kill switch**. The per-user cap handles the
+  honest heavy user; only the global ceiling handles a compromised account.
+
+### ⚠️ One thing that would have bitten us
+
+Had the assistant stayed public, the obvious control is a per-IP rate limit — and **everyone standing in the
+shop is on the shop's wifi, which is one IP**. An IP limit would have throttled the whole store first,
+precisely where an assistant is most useful: a customer at the case asking whether you have something.
+Registration sidesteps this entirely. If any IP limiting is ever added to the public deck, the shop's own
+egress IP needs an exemption.
 
 ## 5. ⚠️ The quiz is a gate, and gates lose people
 
@@ -120,7 +152,11 @@ is linkable, is indexed, and is how people actually find a specific card.
 1. **Does a swipe ever buy, or is buying always a deliberate button?** I argue button-only above.
 2. **Cart or instant buy?** The packs spend store credit instantly. The shop has a real cart and a real
    checkout. Does Discover add to that cart, or is it its own fast lane?
-3. **Members only, or public?** Decides abuse control for the assistant and whether taste can be persisted.
+3. ~~Members only, or public?~~ **ANSWERED 2026-10-27:** deck public, assistant requires registration. See §4.
 4. **Is the assistant in v1, or does the deck ship alone first?**
+7. **What does the deck remember for a signed-OUT shopper?** The deck is public, so most of its taste signal
+   comes from people we cannot write a profile row for. A session cookie covers one visit; anything longer
+   needs the account. Worth deciding whether the registration prompt appears when the deck has learned enough
+   to be worth saving — "I've got a read on you, want me to keep it?" — which is a warmer ask than a wall.
 5. **What is the source of truth for hours and events** that the assistant should read?
 6. **Does the quiz write back to `game_interests`**, i.e. is it the same taste the rest of the site uses?
