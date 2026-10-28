@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import GroveAtlas from "@/components/grove/GroveAtlas";
+import { TOWNS } from "@/lib/marketplace/towns.js";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -548,94 +550,26 @@ export default function GroveClient({ initial }) {
                     // scrolled anywhere. A readout that travels with the thing it describes is a readout
                     // nobody can read.
                     <div className="gv-paper-wrap">
-                    <div className="gv-paper" ref={stripRef}>
-                        <div className="gv-paper-in">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img className="gv-paper-plate" src="/images/grove/map-plate.webp" alt="" />
+                    {/* ── ⚠️ THE ATLAS REPLACED THE PAPER CHART ──────────────────────────────────
+                        Luke: "we switched to this whole ancient map scroll looking, paper scroll looking
+                        kind of design, which I just hate. So I want to go back to a vertical horizontal
+                        scroll... each vertical layer is one of the maps and each horizontal layer is one
+                        of the zones, and the town for each map would be the leftmost one."
 
-                            {/* The trail, under the places so it runs behind them rather than across them.
-                                Two passes: the whole route faint, then the part you have actually opened
-                                drawn over it in confident ink. preserveAspectRatio none because the viewBox is
-                                in percent and has to stretch with the paper. */}
-                            {/* Which paper this is. Only maps you have opened are reachable from here --
-                                the arrows are a way back to work you have done, not a preview of what is
-                                coming. */}
-                            <svg className="gv-paper-trail" viewBox="0 0 100 100"
-                                preserveAspectRatio="none" aria-hidden="true">
-                                <path className="is-ghost" d={trailPath()} />
-                                <path className="is-walked" d={trailForZones(walkedZones)} />
-                            </svg>
+                        The chart drew twelve symbols on parchment with an inked trail between them. The
+                        atlas draws the PLACES: every zone already ships its own backdrop, 84 of them, made
+                        when the maps were built and until now only ever seen once you were standing in it.
 
-                            {shownZones.map((z) => {
-                                const spot = spotForDepth(z.n);
-                                if (!spot) return null;
-                                // ── ⚠️ "CLEARED" WAS A LIE, AND IT WAS THE MOST CONFUSING THING ON
-                                //        THE SCREEN ────────────────────────────────────────────────
-                                // Luke's own account, live: The Old Stand read "Cleared" at 50/35 kills
-                                // while Bramblewall next to it read "Locked", and nothing anywhere said
-                                // why. The kill quota earns the RIGHT TO FIGHT the boss; the boss is what
-                                // opens the way. So a zone at quota with its boss still standing is the
-                                // opposite of cleared -- it is the one place the player should be going,
-                                // and the map was telling them they were finished there.
-                                //
-                                // The in-zone door has always said it properly ("defeat Grandfather
-                                // Bristle to open"), but only once you have walked to the far end of a
-                                // zone you have been told you have finished. Measured on the live
-                                // database, the player who has gone deepest had never fought a single
-                                // boss -- and with no boss there are no merits, and with no merits there
-                                // is no armour, which is most of why crafting felt pointless too.
-                                const { bossStands, done } = zoneState(z);
-                                const isNext = frontier?.id === z.id;
-                                // ⚠️ THE BOSS NAME ONLY ON THE FRONTIER. Everywhere else it blew the
-                                // label out to three wrapped lines -- "Mossy Hollow / The Mossmother" in
-                                // a box the width of a shrub. The name is flavour and it is worth having
-                                // exactly where the player is being asked to act; behind them a short
-                                // word does the job and the full name stays in the button's label.
-                                const state = !z.unlocked ? "Locked"
-                                    : done ? "Cleared"
-                                    : bossStands ? (isNext ? (z.bossDef?.name || "Boss waits") : "Boss alive")
-                                    : `${z.kills}/${z.toUnlock}`;
-                                return (
-                                    <button key={z.id} type="button" data-n={z.n}
-                                        className={`gv-node${z.unlocked ? "" : " is-locked"}${done ? " is-clear" : ""}`
-                                            + `${bossStands ? " is-boss" : ""}${isNext ? " is-next" : ""}`}
-                                        style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
-                                        disabled={!z.unlocked} onClick={() => enter(z)}
-                                        aria-label={`${z.name} — ${z.unlocked ? (done ? "cleared"
-                                            : bossStands ? `${z.bossDef?.name || "boss"} still standing`
-                                            : `${z.kills} of ${z.toUnlock} cleared`) : "locked"}${isNext ? ", go here next" : ""}`}>
-                                        {isNext ? <span className="gv-node-pin" aria-hidden="true" /> : null}
-                                        {/* ── ⚠️ WHERE THE THING ON YOUR LIST ACTUALLY IS ─────────────
-                                            Luke: "see on the map where to find". The pictures ARE the
-                                            answer -- a count would say "3 here" and leave the player to
-                                            work out which three, which is the question they arrived
-                                            with. Capped at three, because a node is a thumbnail and a
-                                            fourth sprite would be below the size it reads at; the
-                                            overflow is a plain +n rather than a half-drawn part. */}
-                                        {z.unlocked && wish.length ? (() => {
-                                            const here = zoneHasParts(z, wish);
-                                            if (!here.length) return null;
-                                            return (
-                                                <span className="gv-node-wish" aria-hidden="true">
-                                                    {here.slice(0, 3).map((pt) => (
-                                                        /* eslint-disable-next-line @next/next/no-img-element */
-                                                        <img key={pt} src={groveArt(pt)} alt="" width={18} height={18} />
-                                                    ))}
-                                                    {here.length > 3 ? <i>+{here.length - 3}</i> : null}
-                                                </span>
-                                            );
-                                        })() : null}
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={z.node || nodeArt(z.id)} alt="" />
-                                        <span className="gv-node-label">
-                                            <em>{z.name}</em>
-                                            <u>{state}</u>
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
+                        The carousel mechanics are lifted from the pack picker rather than reinvented; see
+                        the notes in GroveAtlas and on .pk-pick-track. */}
+                    <GroveAtlas
+                        zones={st.zones || []}
+                        towns={TOWNS}
+                        zoneState={zoneState}
+                        frontier={frontier}
+                        onEnter={enter}
+                        onTown={() => { window.location.href = "/marketplace/town"; }}
+                    />
                     {/* ── ⚠️ ONE PLATE, NOT TWO ──────────────────────────────────────────────────
                         Luke: "Two things on top compete and seem redundant." They did, and they were:
                         a parchment pill reading "3/12 cleared" sitting directly on top of a second
@@ -648,20 +582,19 @@ export default function GroveClient({ initial }) {
                         places on the second. The pips are kept rather than the count because they say
                         strictly more — per zone, cleared or boss or locked, and which one is next —
                         and the count rides along as the quick version of the same fact. */}
+                    {/* ⚠️ ONLY WHEN IT HAS SOMETHING IN IT. The plate used to hold the map name, the
+                        arrows and the pips, so it always had content; with those gone it is just the
+                        wishlist, and on a save with an empty wishlist it rendered as a bare parchment
+                        dot floating over the first row — a control with nothing in it. */}
+                    {wish.length ? (
                     <div className="gv-paper-chrome">
-                        <div className="gv-paper-head">
-                            <button type="button" className="gv-paper-arrow" disabled={mapIdx <= 0}
-                                onClick={() => setPaperMap(openMaps[mapIdx - 1])} aria-label="Previous map">&lsaquo;</button>
-                            <b>{shownName}</b>
-                            <i>{clearedCount}/{shownZones.length}</i>
-                            <button type="button" className="gv-paper-arrow" disabled={mapIdx < 0 || mapIdx >= openMaps.length - 1}
-                                onClick={() => setPaperMap(openMaps[mapIdx + 1])} aria-label="Next map">&rsaquo;</button>
-                        </div>
-                        <ol className="gv-paper-pips" aria-label={`${clearedCount} of ${shownZones.length} zones cleared`}>
-                            {progress.map((kind, i) => (
-                                <li key={i} className={`is-${kind}${frontier && frontier.n % 12 === (i + 1) % 12 ? " is-next" : ""}`} />
-                            ))}
-                        </ol>
+                        {/* ── ⚠️ THE PAPER HEAD AND PIPS CAME OUT WITH THE CHART ─────────────────
+                            They were the map's name, two arrows to page between maps, and twelve pips
+                            of progress — a floating plate that made sense when the chart showed ONE map
+                            at a time. The atlas shows every map at once with its name and count on its
+                            own row, so the plate was a second, disagreeing answer to the same question
+                            (it counted CLEARED zones while the row counts UNLOCKED ones) parked on top
+                            of the first row. One place says how far you are now. */}
                         {/* ── THE LIST ITSELF, AND THE ONE WAY OFF IT ──────────────────────────────
                             Luke: "you can tap to remove similar to how yoi add. And an abikity to clear
                             your wishlist."
@@ -692,6 +625,7 @@ export default function GroveClient({ initial }) {
                             </div>
                         ) : null}
                     </div>
+                    ) : null}
                     </div>
                 ) : null}
 

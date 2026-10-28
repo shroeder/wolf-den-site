@@ -3395,4 +3395,66 @@ export const GROVE_CSS = `
     color: var(--band-ink, #2a1f05); }
 .gv-act-hit.is-band.is-masterwork { box-shadow: 0 0 32px color-mix(in srgb, var(--band) 70%, transparent); }
 
+
+/* ── THE ATLAS: MAPS DOWN, ZONES ACROSS ───────────────────────────────────────────────────────────────
+   Luke wanted the paper-scroll chart gone and this instead — a vertical stack of maps, each a horizontal
+   scroll of its zones, the town leftmost. The carousel mechanics are the pack picker's (.pk-pick-track),
+   because that one already solved end-cards-can-never-centre and there-is-no-selector-for-snapped. */
+.ga-atlas { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 10px; }
+
+.ga-row { display: flex; flex-direction: column; gap: 7px; }
+.ga-row.is-shut { opacity: 0.5; }
+.ga-row-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 12px; }
+.ga-row-head b { font-size: 0.96rem; letter-spacing: 0.01em; color: #f0e9d8; }
+.ga-row-head i { font-style: normal; font-size: 0.76rem; color: #9b937f; font-variant-numeric: tabular-nums; }
+
+/* ⚠️ THE PADDING IS LOAD-BEARING. Without it the first and last cards snap to the track's edge and can
+   never become the centred one — the same bug the pack picker's note records. */
+.ga-track {
+    display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    padding: 2px 32%;
+}
+.ga-track::-webkit-scrollbar { display: none; }
+.ga-cell { flex: 0 0 auto; scroll-snap-align: center; }
+
+.ga-card {
+    position: relative; flex: 0 0 auto; width: 188px; height: 118px; padding: 0; border: 0;
+    border-radius: 13px; overflow: hidden; cursor: pointer; background: #14170f;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5); scroll-snap-align: center;
+    /* Off-centre cards sit back, so the one you are on is unmistakably the subject — a transition rather
+       than a scroll-driven animation, because the snap already does the timing. */
+    opacity: 0.52; transform: scale(0.92); transition: opacity .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.ga-cell.ga-on .ga-card, .ga-card.ga-town { opacity: 1; transform: scale(1); }
+.ga-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ga-card.is-locked { cursor: default; filter: grayscale(0.9) brightness(0.45); }
+.ga-card.is-clear { box-shadow: 0 0 0 2px rgba(120,190,120,0.55), 0 2px 10px rgba(0,0,0,0.5); }
+.ga-card.is-boss  { box-shadow: 0 0 0 2px rgba(226,120,60,0.75), 0 2px 10px rgba(0,0,0,0.5); }
+.ga-card.is-next  { box-shadow: 0 0 0 2px #ffd75e, 0 0 18px rgba(255,215,94,0.35); }
+
+/* The plate sits ON the picture rather than under it — a caption bar under every card turns the row into
+   a spreadsheet, and the art is the thing worth looking at. */
+.ga-card-plate {
+    position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 1px;
+    padding: 16px 9px 7px; text-align: left;
+    background: linear-gradient(180deg, rgba(10,12,8,0) 0%, rgba(10,12,8,0.82) 55%, rgba(10,12,8,0.94) 100%);
+}
+.ga-card-plate em { font-style: normal; font-weight: 700; font-size: 0.83rem; color: #f3eee0; line-height: 1.15; }
+.ga-card-plate u { text-decoration: none; font-size: 0.7rem; color: #b9b19a; font-variant-numeric: tabular-nums; }
+.ga-card.is-next .ga-card-plate u { color: #ffd75e; }
+
+.ga-card-pin {
+    position: absolute; top: 7px; right: 7px; padding: 2px 7px; border-radius: 999px;
+    background: #ffd75e; color: #241c05; font-size: 0.64rem; font-weight: 800; letter-spacing: 0.04em;
+}
+/* The town card reads as a place you return to rather than a place you fight in. */
+.ga-card.ga-town { width: 132px; }
+.ga-card.ga-town .ga-card-plate em { color: #ffd98a; }
+
+@media (max-width: 560px) {
+    .ga-track { padding: 2px 24%; }
+    .ga-card { width: 164px; height: 104px; }
+    .ga-card.ga-town { width: 118px; }
+}
 `;
