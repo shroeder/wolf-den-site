@@ -1207,6 +1207,11 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // Null for every account that predates gating, and TownClient then behaves exactly as it always has:
     // the cobbles, the whole street, no travel bar. See the branch in town.js.
     const town = state?.town || null;
+    // ⚠️ BUMP THIS WHEN A TOWN LAYER IS REDRAWN. Static assets under /public are served with a day of
+    // max-age, so a redrawn sky keeps rendering as the old one — which cost a full round of "the art did not
+    // change" before anyone looked at the file on disk and found that it had. Same scar the sprites carry.
+    const TOWN_ART_V = 2;
+    const townArt = (suffix) => `/images/town/ground/${town.id}${suffix}.webp?v=${TOWN_ART_V}`;
     // Every door in the plaza, with the spot it stands on. Buildings sit on the ground line (their art is
     // anchored at GROUND - 4 and is 176px tall, so the pail goes at their foot); the NPCs stand a little
     // nearer the camera at GROUND + 6 and their pails go in front of them, hence the higher z.
@@ -2292,7 +2297,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                         {tiles(11).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img key={k} src={(town?.id ? `/images/town/ground/${town.id}-sky.webp` : art.sky.url)} alt="" draggable={false} />
+                            <img key={k} src={(town?.id ? townArt("-sky") : art.sky.url)} alt="" draggable={false} />
                         ))}
                     </div>
                 ) : (!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null)}
@@ -2384,11 +2389,25 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                 {/* MIDGROUND skyline band (parallax between the far sky and the street) — a nearer row of town
                     rooftops that sits on the horizon. Transparent-topped PNG, buildings along its bottom edge.
                     This is what "Grow the Plaza" deepens over time (future depth tiers swap richer art in). */}
-                {layered && art.mid?.url ? (
+                {/* ── ⚠️ A BIOME TOWN HAS NO MIDGROUND BAND, AND THAT IS THE FIX RATHER THAN A SHORTCUT ──────
+                    Three generated attempts at a per-biome skyline all failed the same way: the model paints
+                    a floor into it (so the street gets a second ground with a hard edge), paints a figure
+                    into it despite being told not to, and drifts the subject — the mine wall came back as a
+                    cathedral. Prompting did not fix any of those, and transparency only fixed the first.
+
+                    But the band was never load-bearing. The default town needs it because its sky is open
+                    daylight and something has to sit between the sky and the street. A biome town's SKY *is*
+                    its architecture — the cavern vault, the swamp canopy, the volcanic ridge — and the
+                    feature buildings are the structures standing on the floor. A second painted row of
+                    buildings behind the real ones is exactly what was competing with them.
+
+                    So: two generated layers per town instead of three, no conflicting bands, and the art
+                    budget drops by a third. */}
+                {layered && !town && art.mid?.url ? (
                     <div className="tw-mid" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.55}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                         {tiles(13).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img key={k} src={(town?.id ? `/images/town/ground/${town.id}-back.webp` : ((spooky && art.hw_mid?.url) || art.mid.url))} alt="" draggable={false} />
+                            <img key={k} src={(town?.id ? townArt("-back") : ((spooky && art.hw_mid?.url) || art.mid.url))} alt="" draggable={false} />
                         ))}
                     </div>
                 ) : null}
@@ -2467,14 +2486,14 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 the everyday cobbles on purpose, so the one night filter treats both alike. */}
                             {tiles(19).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img key={k} src={(town?.id ? `/images/town/ground/${town.id}.webp` : ((spooky && art.hw_cobble?.url) || art.cobble.url))} alt="" draggable={false} />
+                                <img key={k} src={(town?.id ? townArt("") : ((spooky && art.hw_cobble?.url) || art.cobble.url))} alt="" draggable={false} />
                             ))}
                         </div>
                     ) : art.background ? (
                         <div className="tw-bg" aria-hidden="true">
                             {[0, 1, 2, 3].map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img key={k} src={(town?.id ? `/images/town/ground/${town.id}-back.webp` : art.background.url)} alt="" draggable={false} />
+                                <img key={k} src={(town?.id ? townArt("-back") : art.background.url)} alt="" draggable={false} />
                             ))}
                         </div>
                     ) : null}
@@ -4056,13 +4075,23 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 /* ── A SHUTTERED BUILDING ─────────────────────────────────────────────────────────────────────────
    The next town's doors, standing on this street with the lights off. Dimmed and desaturated rather
    than hidden: a member who cannot see what is coming has no reason to walk toward it. */
-/* ⚠️ TUNED AGAINST THE DARKEST TOWN, NOT THE BRIGHTEST. At opacity .4 and brightness .75 a shuttered
-   building was invisible in the cave — the dimming that reads as "shut" on a sunny street reads as
-   "missing asset" on a dark one. Greyscale carries the meaning; the opacity only has to soften it. */
-.tw-building.is-shuttered { opacity: 0.62; filter: grayscale(1) brightness(0.9); cursor: default;
-    pointer-events: none; text-align: center; }
+/* ── ⚠️ A SHUTTERED BUILDING HAS TO READ AS SHUT, NOT AS SCENERY ──────────────────────────────────
+   Two wrong answers before this one. At opacity .4 it vanished into a dark town and read as a missing
+   asset. At .62 greyscale it came back as pale ghostly architecture — I mistook the shuttered Farm's
+   own pumpkins and scarecrow for leftover Halloween props in a screenshot, which is the clearest
+   possible evidence that it no longer read as a building.
+
+   So: DARKENED rather than faded. It keeps its colour relationships and its edges, sits in shadow like
+   a place with the lights off, and stands a little smaller and further back. The eye reads "closed",
+   not "half-deleted". */
+.tw-building.is-shuttered { cursor: default; pointer-events: none; text-align: center;
+    opacity: 0.9; filter: grayscale(0.55) brightness(0.42) contrast(1.05);
+    transform: scale(0.88); transform-origin: 50% 100%; }
+/* The label is the only part that stays bright — it is the advertisement, and a dark building with a
+   legible "Opens at Fenhollow" under it is the whole point of showing it at all. */
+.tw-building.is-shuttered .tw-b-label { filter: none; opacity: 1; }
 .tw-building.is-shuttered .tw-b-soon { display: block; font-size: 10px; letter-spacing: 0.04em;
-    color: #ffd75e; opacity: 0.9; margin-top: 2px; }
+    color: #ffd75e; opacity: 1; margin-top: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
 .tw-cobble img:nth-child(even) { transform: scaleX(-1); }
 /* Softer, taller shadow where the street meets the buildings behind it — dissolves the seam. */
 .tw-cobble::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 68px; background: linear-gradient(180deg, rgba(26,17,40,0.9), rgba(26,17,40,0.28) 55%, transparent); pointer-events: none; }

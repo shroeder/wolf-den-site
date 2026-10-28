@@ -92,18 +92,67 @@ const SKIES = {
     ashfall: "A dark red-black volcanic sky choked with ash cloud, faint orange glow along the underside",
 };
 
-const BACK_BAN = "A wide background scene filling the frame. NO ground, floor or path across the bottom — the "
-    + "bottom of the image is the base of whatever stands in it. No characters, no creatures, no text, no "
-    + "signage, no user interface. The left and right edges must be able to sit beside a MIRRORED copy of this "
-    + "same image without an obvious seam, so keep the composition even rather than leaning to one side.";
+// ⚠️ AND THE MIDGROUND IS DRAWN ON TRANSPARENCY, which is the other half of the fix. Asking for "no floor"
+// in words did not work twice; asking for a transparent background removes the floor by construction, because
+// there is nothing for the model to stand its scenery on. What comes back is a die-cut silhouette of cave
+// mouths and scaffolding with real emptiness between them, so the ground band shows THROUGH it instead of
+// being covered by a second one.
+const BACK_BAN = "A row of structures standing against a FULLY TRANSPARENT background — the alpha channel is "
+    + "empty everywhere they are not. Absolutely NO ground, floor, paving, grass, path or baseline across the "
+    + "bottom, and no sky or backdrop behind them: only the structures themselves, with transparency around "
+    + "and between them. No characters, no creatures, no text, no signage. The left and right edges must sit "
+    + "beside a MIRRORED copy of this image without an obvious seam, so keep the composition even.";
 
-const STYLE = "Painterly cel-shaded 2D video-game art with clean dark outlines, rich saturated colour and "
-    + "soft dusk lighting. Seen straight on from the side as a flat horizontal GROUND BAND filling the whole "
+// ⚠️ THE STYLE LINE WAS SHARED BY ALL THREE LAYERS AND IT SAID "GROUND BAND".
+// Which is why the midground skyline came back with cobbled paving and a strip of grass baked across its
+// bottom: the prompt asked for a floor every single time, then BACK_BAN asked for no floor in the next
+// sentence, and the picture won. That paved strip then sat on top of the real ground band as a second floor
+// with a hard edge — exactly the "layers conflicting with sheer cutoffs" Luke is looking at.
+//
+// So the two jobs get two descriptions. Nothing shared between them but the house look.
+const LOOK = "Painterly cel-shaded 2D video-game art with clean dark outlines, rich saturated colour and "
+    + "soft dusk lighting.";
+const STYLE = `${LOOK} Seen straight on from the side as a flat horizontal GROUND BAND filling the whole `
     + "frame edge to edge.";
+const STYLE_SCENE = `${LOOK} Seen straight on from the side, as a flat backdrop with no perspective floor.`;
 // ⚠️ EVERY ONE OF THESE BANS IS A THING THAT WOULD PUT A SECOND TOWN BEHIND THE REAL ONE.
 const BAN = "The image must be GROUND ONLY, filling the entire frame: no sky, no horizon line, no buildings, "
     + "no houses, no walls, no characters, no creatures, no signage, no text. Nothing stands up out of it. "
     + "The left and right edges must MATCH so the image can be tiled seamlessly side by side.";
+
+// The far sky IS opaque — it is the backmost thing there is — but it still must not paint a floor, or the
+// horizon lands halfway up the street.
+const SKY_BAN = "A distant backdrop filling the whole frame. NO ground, floor, paving or path anywhere, and "
+    + "nothing in the foreground: only the far distance. No characters, no creatures, no text, no signage. "
+    + "The left and right edges must sit beside a MIRRORED copy of this image without an obvious seam.";
+
+/**
+ * Fade one edge of an image out to full transparency over `frac` of its height.
+ *
+ * ⚠️ dest-in, NOT a drawn gradient. Compositing a black-to-clear PNG over the picture would darken it on the
+ * way out; dest-in multiplies the ALPHA and leaves every colour untouched, so the layer thins rather than
+ * dimming. The mask is built as a raw buffer because a linear-gradient SVG renders at its own gamma and the
+ * fade comes out visibly banded at this size.
+ */
+async function feather(buf, edge, frac) {
+    const img = sharp(buf).ensureAlpha();
+    const { width, height } = await img.metadata();
+    const band = Math.max(1, Math.round(height * frac));
+    const mask = Buffer.alloc(width * height * 4, 0);
+    for (let y = 0; y < height; y += 1) {
+        const d = edge === "bottom" ? height - 1 - y : y;
+        const a = d >= band ? 255 : Math.round((d / band) * 255);
+        for (let x = 0; x < width; x += 1) {
+            const i = (y * width + x) * 4;
+            mask[i] = mask[i + 1] = mask[i + 2] = 255;
+            mask[i + 3] = a;
+        }
+    }
+    return img
+        .composite([{ input: mask, raw: { width, height, channels: 4 }, blend: "dest-in" }])
+        .png()
+        .toBuffer();
+}
 
 const want = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const preview = process.argv.includes("--preview");
@@ -138,19 +187,33 @@ console.log(`drawing ${todo.length}: ${todo.join(", ")}  —  ${IMAGE_MODEL}, me
 const BACK = process.argv.includes("--back");
 const SKY = process.argv.includes("--sky");
 for (const key of todo) {
-    const prompt = SKY ? `${SKIES[key]}. ${STYLE} ${BACK_BAN}`
-        : BACK ? `${BACKDROPS[key]}. ${STYLE} ${BACK_BAN}`
+    const prompt = SKY ? `${SKIES[key]}. ${STYLE_SCENE} ${SKY_BAN}`
+        : BACK ? `${BACKDROPS[key]}. ${STYLE_SCENE} ${BACK_BAN}`
         : `${GROUNDS[key]}. ${STYLE} ${BAN}`;
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
-        body: JSON.stringify({ model: IMAGE_MODEL, prompt, size: SIZE, quality: "medium", n: 1 }),
+        body: JSON.stringify({
+            model: IMAGE_MODEL, prompt, size: SIZE, quality: "medium", n: 1,
+            // Transparency is what removes the baked floor from the midground by construction.
+            ...(BACK ? { background: "transparent" } : {}),
+        }),
     });
     if (!resp.ok) { console.log(`✗ ${key}: ${resp.status} ${(await resp.text()).slice(0, 160)}`); continue; }
     const b64 = (await resp.json())?.data?.[0]?.b64_json;
     if (!b64) { console.log(`✗ ${key}: no image back`); continue; }
     const file = path.join(OUT, `${key}${SKY ? "-sky" : BACK ? "-back" : ""}.webp`);
-    fs.writeFileSync(file, await sharp(Buffer.from(b64, "base64")).webp({ quality: 90 }).toBuffer());
+    let buf = Buffer.from(b64, "base64");
+    // ── ⚠️ FEATHER THE EDGE WHERE THIS LAYER MEETS THE NEXT ──────────────────────────────────────────────
+    // Luke: "you have layers that are completely conflicting with each other with sheer cutoffs... you might
+    // have to do some alpha cutting out to make things blend together properly."
+    //
+    // Right. Three opaque rectangles stacked make two hard horizontal lines across the street, and no amount
+    // of prompting fixes a straight edge — it is a property of the canvas, not the picture. So the bottom of
+    // the midground fades to nothing over the last fifth of its height, and the TOP of the ground band fades
+    // in over its first tenth. Where they overlap, each is half there, and the join stops being a line.
+    if (BACK || !SKY) buf = await feather(buf, BACK ? "bottom" : "top", BACK ? 0.22 : 0.10);
+    fs.writeFileSync(file, await sharp(buf).webp({ quality: 90, alphaQuality: 100 }).toBuffer());
     console.log(`✓ ${key} (${Math.round(fs.statSync(file).size / 1024)}kb)`);
 }
 console.log("\nnow: node scripts/gen-town-ground.mjs --preview   and look at the joins");
