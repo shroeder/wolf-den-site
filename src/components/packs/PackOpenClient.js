@@ -233,6 +233,8 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
     const [pools, setPools] = useState(initial?.pools || []);
     // {cards, valueCents} for the vault CTA, or null when the member holds nothing / the vault is shut.
     const [vault, setVault] = useState(initial?.vault || null);
+    // Has this member never completed an open? Drives the stated first-pack promise below.
+    const [firstOpen, setFirstOpen] = useState(Boolean(initial?.firstOpen));
     const [picked, setPicked] = useState(0);
     const trackRef = useRef(null);
     const [balanceCents, setBalanceCents] = useState(initial?.balanceCents || 0);
@@ -317,6 +319,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
         setPool(data.pool);
         setPools(data.pools || []);
         setVault(data.vault || null);
+        setFirstOpen(Boolean(data.firstOpen));
         setBalanceCents(data.balanceCents);
     }, []);
 
@@ -1032,6 +1035,25 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                         : "Out of packs"}
                         </button>
                     )}
+                    {/* ── ⚠️ THE PROMISE IS STATED, NOT APPLIED SILENTLY ──────────────────────────────
+                        The first open really does draw from a different set — the duds are removed and
+                        the curve re-solved so the EV is unchanged (pack-weights.js). We could have done
+                        that quietly. We do not, for two reasons that both matter more than the surprise:
+
+                        1. A hidden rate difference in a gambling-adjacent product is checkable. Somebody
+                           eventually compares their first pull to their tenth, works it out, and posts
+                           about it — and at that point a good thing we did reads as a thing we hid.
+                        2. Said out loud it is a better hook than it is a secret. "Your first pack: no
+                           duds" is a reason to open one. A silent boost is a reason for nothing.
+
+                        It disappears the moment it is spent, because a promise still on screen after it
+                        has been used is just a lie with good intentions. */}
+                    {firstOpen ? (
+                        <p className="pk-first-promise">
+                            <strong>Your first pack: no duds.</strong> We take the filler out — same odds
+                            on everything else.
+                        </p>
+                    ) : null}
                     <p className="pk-fine">Opens are final. The card is yours either way.</p>
                     {/* ── THE WAY BACK TO WHAT YOU ALREADY PULLED ──────────────────────────────────
                         Luke, 2026-10-27: "I need a cta for my card vault from here as well." The

@@ -26047,6 +26047,17 @@ body.cas-seated .social-fab { display: none; }
 .pk-error { margin: 0; color: #FCA5A5; }
 .pk-fine { margin: 0; font-size: 0.74rem; color: var(--muted); }
 
+/* The stated first-pack promise. Sits above the fine print and reads warmer than it, because it is
+   an offer rather than a disclaimer — but it is still quieter than the Open button it explains. */
+.pk-first-promise {
+    margin: 0 0 6px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--ink-secondary);
+}
+
+.pk-first-promise strong { color: #F0D27A; }
+
 /* ── THE VAULT CTA ───────────────────────────────────────────────────────────────────────────────────────
    Quiet on purpose. It sits directly under the one button this screen exists to get pressed, so it is a
    link that states a fact ("6 cards in your vault, $412.00") rather than a second gold button arguing with
@@ -27285,7 +27296,14 @@ body.cas-seated .social-fab { display: none; }
     border-radius: 9px;
     font-size: 0.86rem;
 }
-.pt-pool-name { font-weight: 700; min-width: 0; }
+.pt-pool-name { font-weight: 700; min-width: 0; display: flex; flex-direction: column; }
+/* The solved odds curve, under the pack name. It is the one number that explains why two tiers off
+   the same shelf behave differently, so it belongs beside the name rather than in a tooltip. */
+.pt-alpha { font-style: normal; font-weight: 500; font-size: 0.7rem; color: var(--muted); }
+/* ⚠️ A realised figure under 30 sell-backs is greyed, not hidden. Hiding it invites someone to assume
+   there is no data; greying it says there is data and it does not mean anything yet. */
+.pt-thin { opacity: 0.45; }
+.pt-warn { margin: 6px 0 0; font-size: 0.78rem; color: #FCA5A5; }
 .pt-pool-opens { color: var(--muted); font-size: 0.78rem; }
 .pt-pool-margin, .pt-pool-sold { display: flex; flex-direction: column; text-align: right; line-height: 1.15; }
 .pt-pool-margin { color: #F0D27A; font-weight: 800; font-variant-numeric: tabular-nums; }

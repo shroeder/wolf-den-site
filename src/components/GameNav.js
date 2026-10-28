@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { isGamePath } from "@/lib/marketplace/game-paths.js";
 import { useEffect, useState } from "react";
-import { FaDharmachakra, FaChartColumn } from "react-icons/fa6";
+import { FaDharmachakra } from "react-icons/fa6";
 import { GiCardPickup, GiCardPlay, GiOakLeaf } from "react-icons/gi";
 
 import FishingLaunch from "@/components/FishingLaunch";
@@ -169,7 +169,6 @@ export default function GameNav() {
     const arenaFights = Number(hud?.arena?.fightsLeft) || 0;
     const jeweller = Boolean(hud?.jeweller);
     const vault = Boolean(hud?.vault);
-    const owner = Boolean(hud?.owner);
     const casino = Boolean(hud?.casino);
     const cards = Boolean(hud?.cards);
     const grove = Boolean(hud?.grove);
@@ -380,11 +379,6 @@ export default function GameNav() {
             // ⚠️ It rides the EXISTING batched HUD read — this component is mounted in the layout, so a fetch
             // of its own would bill a request on every navigation by every member forever (check:chrome).
             ...(vault ? [{ href: "/marketplace/vault", Icon: GiCardPickup, label: "Card Vault", sub: "Cards you pulled" }] : []),
-            // ⚠️ THE PACK TELEMETRY EXISTED FOR WEEKS WITH NO DOOR. /marketplace/admin/packs is a full
-            //    report — margin, COGS, sell-back rate, tier split, per-pool and per-member — and NOTHING
-            //    in the site linked to it, so the only way in was typing the URL from memory. Luke asked
-            //    for pack telemetry that already existed. A screen with no door is not shipped.
-            ...(owner ? [{ href: "/marketplace/admin/packs", Icon: FaChartColumn, label: "Pack telemetry", sub: "Opens, margin, queue", owner: true }] : []),
         ] },
         { title: "Progress & Social", items: [
             { href: "/marketplace/track", emoji: "🏆", label: "Rewards", sub: "Reward track" },

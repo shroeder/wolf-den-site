@@ -18,7 +18,7 @@ import { poolByKey } from "@/lib/marketplace/pack-pools.js";
 const money = (v) => Math.round(Number(v) || 0);
 
 export async function getPackTelemetry({ days = 30 } = {}) {
-    const [price, headline, byDay, tierSplit, members, pool, tasks, vault, basis, byPool] = await Promise.all([
+    const [price, headline, byDay, tierSplit, members, pool, tasks, vault, basis, byPool, modelled] = await Promise.all([
         packPrice(),
 
         // Money. Revenue and tax are stamped per open; COGS carries the basis it was resolved on.
@@ -118,12 +118,29 @@ export async function getPackTelemetry({ days = 30 } = {}) {
                     COALESCE(SUM(cogs_cents), 0)::bigint AS cogs,
                     COALESCE(SUM(card_value_cents), 0)::bigint AS pulled_value,
                     COUNT(*) FILTER (WHERE outcome = 'sold_back')::int AS sold_back,
-                    COUNT(*) FILTER (WHERE outcome = 'vaulted')::int AS vaulted
+                    COUNT(*) FILTER (WHERE outcome = 'vaulted')::int AS vaulted,
+                    -- ⚠️ WHAT WE ACTUALLY PAID OUT, not what the card was worth. At 100% sell-back these
+                    --    are nearly the same figure, but not identical: the quarter round-up and the $1
+                    --    floor in buyback.js both run in the member's favour, and on a $0.75 margin that
+                    --    difference is a material slice of the whole business.
+                    COALESCE(SUM(buy_back_cents) FILTER (WHERE outcome = 'sold_back'), 0)::bigint AS paid_out
              FROM mkt_pack_open
              WHERE preview = FALSE AND created_at >= NOW() - ($1 || ' days')::interval
              GROUP BY pool
              ORDER BY opens DESC`,
             [String(days)]
+        ),
+        // ── ⚠️ WHAT WE *MODELLED*, SO THE SCREEN CAN COMPARE IT TO WHAT HAPPENED ────────────────────────
+        // At 100% sell-back the entire business is one inequality: price > EV. The margin is no longer
+        // something that merely gets reported — it is the only thing standing between this feature and a
+        // loss, and it is a PREDICTION made by recomputePools solving an alpha. A screen that shows the
+        // realised number without the modelled one cannot answer the only question worth asking, which is
+        // whether the model is holding.
+        db.query(
+            `SELECT pool, price_cents, ev_cents, uniform_ev_cents, alpha,
+                    first_open_floor_cents, units, open, closed_reason, computed_at
+               FROM mkt_pack_pool_state`,
+            []
         ),
     ]);
 
@@ -155,23 +172,67 @@ export async function getPackTelemetry({ days = 30 } = {}) {
         // ⚠️ THE BLENDED HEADLINE IS KEPT AS WELL AS SPLIT, NOT REPLACED BY IT. "What did this feature take
         // this week" is a real question with one answer; "is the Pokémon pack priced right" is a different
         // one, and conflating them is what this split exists to stop.
+        // ── ⚠️ MODELLED VS REALISED, WHICH IS THE ONLY QUESTION AT 100% SELL-BACK ──────────────────────
+        // While sell-back paid 60% the pack had two margins and the reported one was a summary. At 100%
+        // there is one — price minus EV — and it is a PREDICTION, made nightly by recomputePools solving
+        // an alpha per tier. Reporting what happened without what was predicted cannot answer whether the
+        // model is holding, which is the thing that decides if this feature makes money at all.
+        //
+        // ⚠️ AND A SMALL SAMPLE IS NOT A VERDICT. The payout distribution is heavy-tailed: one $279 card
+        // erases fifty good pulls, and the house measured a 17.7% chance of being DOWN after a hundred
+        // Pokémon opens while still being correctly priced. So the trustworthy flag gates the comparison rather
+        // than letting a red number three opens in read as a broken model.
         byPool: byPool.map((r) => {
             const rev = Number(r.revenue || 0);
             const cost = Number(r.cogs || 0);
+            const opens = r.opens || 0;
+            const m = (modelled || []).find((x) => x.pool === r.pool) || null;
+            const paidOut = Number(r.paid_out || 0);
+            const creditIn = Number(r.credit_spent || 0);
+            // Realised margin on the SELL-BACK path specifically: credit taken in against credit handed
+            // back. A keep is a different kind of event (we gave up a card, not credit) and blending the
+            // two is how a good week of keeps hides a sell-back pool that is underwater.
+            const soldBack = r.sold_back || 0;
+            const soldCredit = soldBack > 0 && opens > 0 ? Math.round((creditIn / opens) * soldBack) : 0;
+            const modelledMarginCents = m ? Number(m.price_cents) - Number(m.ev_cents) : null;
             return {
                 pool: r.pool,
                 brand: poolByKey(r.pool)?.brand || r.pool,
-                opens: r.opens || 0,
-                creditSpentCents: Number(r.credit_spent || 0),
+                opens,
+                creditSpentCents: creditIn,
                 revenueCents: rev,
                 cogsCents: cost,
                 marginCents: rev - cost,
                 marginPercent: rev > 0 ? Math.round(((rev - cost) / rev) * 1000) / 10 : null,
                 pulledValueCents: Number(r.pulled_value || 0),
-                soldBack: r.sold_back || 0,
+                soldBack,
                 vaulted: r.vaulted || 0,
+
+                // The model.
+                priceCents: m ? Number(m.price_cents) : null,
+                modelledEvCents: m ? Number(m.ev_cents) : null,
+                uniformEvCents: m ? Number(m.uniform_ev_cents) : null,
+                alpha: m ? Number(m.alpha) : null,
+                modelledMarginCents,
+                modelledMarginPercent: m && Number(m.price_cents) > 0
+                    ? Math.round((modelledMarginCents / Number(m.price_cents)) * 1000) / 10
+                    : null,
+
+                // What actually happened on the sell-back path.
+                paidOutCents: paidOut,
+                sellBackMarginCents: soldBack > 0 ? soldCredit - paidOut : null,
+                sellBackMarginPerOpenCents: soldBack > 0 ? Math.round((soldCredit - paidOut) / soldBack) : null,
+                // ⚠️ 30 opens is not a real confidence interval, it is a line in the sand that stops a
+                //    three-open sample being read as a trend. Treat it as "worth looking at", not "proven".
+                trustworthy: soldBack >= 30,
             };
         }),
+
+        // ⚠️ A 'sold_back' ROW WITH NO RECORDED PAYOUT IS A BOOKKEEPING HOLE, AND IT IS SURFACED RATHER
+        // THAN PATCHED OVER. It means the stamp after the guarded outcome update did not land (see
+        // choosePackOutcome). The number is missing, not zero, and the screen should say so.
+        missingPayouts: byPool.reduce((n, r) => n + Math.max(0, (r.sold_back || 0)
+            - (Number(r.paid_out) > 0 ? (r.sold_back || 0) : 0)), 0),
 
         headline: {
             opens: headline?.opens || 0,

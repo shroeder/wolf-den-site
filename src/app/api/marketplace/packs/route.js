@@ -4,6 +4,7 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { packPoolSummary, resumePendingOpen } from "@/lib/marketplace/packs.js";
 import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
 import { vaultSummary } from "@/lib/marketplace/vault.js";
+import { hasOpenedBefore } from "@/lib/marketplace/pack-weights.js";
 import { shelfPacksOpenFor, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { beatsPriceBp, poolByKey, poolStates, shelfPoolCards } from "@/lib/marketplace/pack-pools.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -28,7 +29,7 @@ export async function GET(request) {
             // ⚠️ THE PICKER'S POOLS ARE FETCHED ONLY FOR SOMEBODY WHO MAY SEE THEM. A shelf pool is
             //    owner-gated; listing them to everybody and refusing the tap is the ownerOnly landmine —
             //    leaky one way, dead the other. shelfPacksOpenFor is asked once, here.
-            const [pool, balanceCents, pending, shelf, vault] = await Promise.all([
+            const [pool, balanceCents, pending, shelf, vault, opened] = await Promise.all([
                 packPoolSummary(),
                 getStoreCredit(buyer.id),
                 resumePendingOpen(buyer.id),
@@ -36,6 +37,9 @@ export async function GET(request) {
                 // For the vault CTA. One aggregate — it rides the existing Promise.all rather than
                 // adding a round trip to a screen that already does four.
                 vaultSummary(buyer.id),
+                // Whether the first-open promise is still theirs to claim. It is STATED on the screen
+                // rather than applied silently — see the note where it renders.
+                hasOpenedBefore(buyer.id),
             ]);
 
             // The carousel (§9): the bags first because they are the house product, then every shelf pool
@@ -80,6 +84,7 @@ export async function GET(request) {
                 // for; the only thing outstanding is which of the two buttons they press.
                 pending,
                 vault,
+                firstOpen: !opened,
             });
         } catch (error) {
             return internalError(error, { event: "packs.list.failure" });

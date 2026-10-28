@@ -644,6 +644,23 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
         .catch(() => null);
     if (!open) return { ok: false, error: "already_chosen" };
 
+    // ── ⚠️ RECORD THE PAYOUT, DO NOT LET A REPORT RE-DERIVE IT ──────────────────────────────────────────
+    // The P&L needs what we actually paid, and that cannot ride in the guarded UPDATE above because the
+    // card's value only comes back FROM that update. So it is a second statement — the guard has already
+    // fired by this point, so there is no double-pay risk; the only exposure is a crash in between, which
+    // leaves a 'sold_back' row with a NULL payout. That is DETECTABLE and the screen flags it, which is
+    // the right failure: a missing number you can see beats a reconstructed one you cannot.
+    //
+    // ⚠️ AND IT IS buyBackCents(), NOT ARITHMETIC IN SQL. Re-implementing the rate, the quarter round-up
+    // and the $1 floor in the query would be the fifth copy of a number buyback.js exists to keep single —
+    // and a derived payout is wrong in the HOUSE's favour on every open that hits the round-up or floor.
+    if (choice === "sell") {
+        await db
+            .query(`UPDATE mkt_pack_open SET buy_back_cents = $2 WHERE id = $1`,
+                [open.id, buyBackCents(open.card_value_cents)])
+            .catch((error) => logger.error("packs.payout_stamp_failed", error, { openId }));
+    }
+
     // ── ⚠️ THE FIRST OPEN IS SPENT HERE, NOT AT THE OPEN ────────────────────────────────────────────────
     // A member who opens a pack and walks away mid-reveal leaves the row in 'pending'. Marking the magic
     // used at open time would burn it on a pack they never actually saw resolve — which is the one case

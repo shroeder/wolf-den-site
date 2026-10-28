@@ -180,23 +180,48 @@ export default function PackTelemetryClient() {
                 again with a label on it. */}
             {(data.byPool || []).length > 1 ? (
                 <>
-                    <h3 className="pt-h">By pack</h3>
+                    {/* ── ⚠️ MODELLED BESIDE REALISED, BECAUSE AT 100% SELL-BACK THE MARGIN IS A
+                        PREDICTION ──────────────────────────────────────────────────────────────────
+                        Each tier's price is fixed and its odds are solved nightly to hit a target EV.
+                        That target IS the business — so the question this screen has to answer is not
+                        "what did we make" but "is the model holding". Realised alone cannot answer it.
+
+                        ⚠️ AND IT REFUSES TO JUDGE A SMALL SAMPLE. The payout distribution is
+                        heavy-tailed — one $279 card erases fifty good pulls, and a correctly priced
+                        Pokémon pool still has a 17.7% chance of being down after a HUNDRED opens. Under
+                        30 sell-backs the realised column is shown greyed with "need more", because a red
+                        number three opens in is noise and treating it as a signal is how somebody
+                        retunes a model that was never wrong. */}
+                    <h3 className="pt-h">By pack — modelled vs realised</h3>
                     <ul className="pt-pools">
                         {data.byPool.map((p) => (
                             <li key={p.pool}>
-                                <span className="pt-pool-name">{p.brand}</span>
+                                <span className="pt-pool-name">
+                                    {p.brand}
+                                    {p.alpha != null ? <i className="pt-alpha">odds curve {Number(p.alpha).toFixed(2)}</i> : null}
+                                </span>
                                 <span className="pt-pool-opens">{p.opens} opens</span>
                                 <span className="pt-pool-margin">
-                                    {usd(p.marginCents)}
-                                    <i>{pct(p.marginPercent)} margin</i>
+                                    {p.modelledMarginCents != null ? usd(p.modelledMarginCents) : "—"}
+                                    <i>{p.modelledMarginPercent != null ? `${p.modelledMarginPercent}% modelled` : "no model"}</i>
                                 </span>
-                                <span className="pt-pool-sold">
-                                    {p.opens ? pct(Math.round((p.soldBack / p.opens) * 1000) / 10) : "—"}
-                                    <i>sold back</i>
+                                <span className={`pt-pool-sold${p.trustworthy ? "" : " pt-thin"}`}>
+                                    {p.sellBackMarginPerOpenCents != null
+                                        ? usd(p.sellBackMarginPerOpenCents)
+                                        : "—"}
+                                    <i>{p.trustworthy
+                                        ? `realised / open (${p.soldBack})`
+                                        : `need more (${p.soldBack})`}</i>
                                 </span>
                             </li>
                         ))}
                     </ul>
+                    {data.missingPayouts > 0 ? (
+                        <p className="pt-warn">
+                            {data.missingPayouts} sell-back{data.missingPayouts === 1 ? "" : "s"} with no recorded
+                            payout — the figure is missing, not zero.
+                        </p>
+                    ) : null}
                 </>
             ) : null}
 
