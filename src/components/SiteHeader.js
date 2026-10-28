@@ -22,11 +22,12 @@ import { useTvMode } from "@/lib/tv-mode-client";
 // scripts/gen-nav-icons.mjs in the house style, and a parallel icon set for the same destination is how two
 // menus start disagreeing about what the Marketplace looks like.
 //
-// `sprite: null` means NO DRAWING EXISTS YET and the row deliberately renders label-only — About, Mystery
-// Bags and Events have no die-cut icon in that folder. A near-enough stand-in is worse than a gap: it quietly
-// becomes the permanent answer and nobody remembers it was a placeholder.
+// `sprite: null` means NO DRAWING EXISTS YET and the row deliberately renders label-only. A near-enough
+// stand-in is worse than a gap: it quietly becomes the permanent answer and nobody remembers it was a
+// placeholder. 2026-10-28: the last three gaps — About, Mystery Bags and Events — are drawn, so every row in
+// this menu now carries its own sprite and there are no nulls left.
 const navItems = [
-    { href: "/about", label: "About", sprite: null },
+    { href: "/about", label: "About", sprite: "about" },
     { href: "/shop", label: "Shop", sprite: "store" },
     // The whole RPG game (boss/spin/pets/gear/quests/…) lives behind ONE entry now, so it stops competing
     // with real commerce in the nav. Its own dopamine menu is at /marketplace/play.
@@ -35,8 +36,9 @@ const navItems = [
     { href: "/marketplace/credit", label: "Store Credit", sprite: "credit" },
     { href: "/looking-for", label: "Looking For", sprite: "bounties" },
     { href: "/marketplace", label: "Marketplace", sprite: "market" },
-    { href: "/mystery-bags", label: "Mystery Bags", sprite: null },
-    { href: "/events", label: "Events", sprite: null },
+    // "mystery", not "mystery-bags" — the key is the filename in /public/images/nav, not the route.
+    { href: "/mystery-bags", label: "Mystery Bags", sprite: "mystery" },
+    { href: "/events", label: "Events", sprite: "events" },
     { href: "/sell-cards", label: "Sell Your Cards", sprite: "trades" },
 ];
 

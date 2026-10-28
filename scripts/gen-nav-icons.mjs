@@ -8,6 +8,7 @@
 // Sets is deliberately absent: it already reuses the real Warplate Helm item sprite, which beats a new drawing.
 //
 // Usage:  node scripts/gen-nav-icons.mjs [key ...]     (no args = every missing icon; pass keys to force-redo)
+import { register } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -16,7 +17,20 @@ import sharp from "sharp";
 import { housePrompt, SMALL_ICON_EXTRA } from "../src/lib/marketplace/art-style.js";
 import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 
-// gpt-image-1 returns a 1024² transparent PNG — around 1.8MB each. These are drawn at 18px in the strip and
+// ── ⚠️ THE MODEL NAME IS NOT WRITTEN DOWN HERE, ON PURPOSE ───────────────────────────────────────────────────
+// This script hardcoded `gpt-image-1`, which OpenAI retired on 2026-10-23 while leaving it listed and
+// resolvable — so the three undrawn site-menu icons came back as nine 400s reading "The model 'gpt-image-1'
+// does not exist" and the run looked like a key or quota problem rather than a dead model. The live app had
+// already moved to IMAGE_MODEL in src/lib/marketplace/image-model.js; this script had not, because its copy of
+// the name was its own. A second place that decides which model draws is how the menu icons end up in a
+// different style from everything else in the game.
+//
+// image-model.js is `server-only`, which plain node cannot resolve — app-loader stubs that guard out (and maps
+// `@/`), and registering it here keeps `node scripts/gen-nav-icons.mjs` working with no wrapper flag.
+register("./lib/app-loader.mjs", import.meta.url);
+const { IMAGE_MODEL } = await import("@/lib/marketplace/image-model.js");
+
+// The model returns a 1024² transparent PNG — around 1.8MB each. These are drawn at 18px in the strip and
 // 28px in the grid, so shipping the raw output would have put ~43MB of art in the repo to render thumbnails.
 // 128px covers 28px at 4× DPI with room to spare.
 const ICON_PX = 128;
@@ -117,9 +131,9 @@ const ICONS = {
     cards: "A single upright playing CARD standing face-on with a thick cream border and a bold dark wolf-head crest in its centre, a short neat stack of face-down cards sitting just behind and beside it",
     casino: "A small ornate slot machine cabinet seen straight on, its glass showing three glowing symbols in a row, a fat red-knobbed lever on the right side, gold trim around the frame and a lit marquee arch on top",
 
-    // ── THE SITE MENU'S THREE GAPS ──────────────────────────────────────────────────────────────────────
+    // ── THE SITE MENU'S LAST THREE GAPS ─────────────────────────────────────────────────────────────────
     // SiteHeader's drawer draws a sprite per destination from this same folder, and these three had none, so
-    // those rows ship label-only. NOT YET DRAWN — adding a prompt here costs nothing; run the script to spend.
+    // those rows shipped label-only. Drawn 2026-10-28; the drawer has no `sprite: null` rows left.
     //
     // Each avoids a shape already in this folder: "store" is a market stall and "town" is cottages, so About
     // is the HANGING SIGN rather than a third building; "rewards" and "trophies" already own cups, so Events
@@ -142,7 +156,10 @@ async function one(k) {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
                 // medium, not high: "high" is ~4x the price and the extra detail dies in the downscale (see art-style.js).
-                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "low", n: 1 }),
+                // Medium rather than the old "low" as well — low was tuned against gpt-image-1, where it cost a
+                // quarter of medium; on 2.5 medium is 439 output tokens against gpt-image-1's 1,056, so the house
+                // tier is cheaper here than low used to be and there is nothing left to buy by thinning it.
+                body: JSON.stringify({ model: IMAGE_MODEL, prompt, size: "1024x1024", background: "transparent", quality: "medium", n: 1 }),
             });
             if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
             const b64 = (await resp.json())?.data?.[0]?.b64_json;
