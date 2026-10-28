@@ -206,10 +206,39 @@ Everything downstream then works with no changes at all:
 - there is no new catalogue to draw art for, which is the difference between a feature that ships and one
   that waits on 240 images
 
-⚠️ **The one thing to watch is SET pieces.** Seven collections pay bonuses for being owned, and some of
-those pieces are deliberately hard to get. If the Grove drops set pieces at its own rate, it quietly becomes
-the fastest way to complete sets and the collection economy re-prices itself. Either exclude set pieces from
-Grove tables, or include them deliberately at a rate chosen for that purpose — but not by accident.
+### Set pieces: in, and deliberately the hardest route
+
+Luke: *"If you're using [set pieces], then make it extremely hard to get in the Grove as well."* So they drop
+— at a rate solved against what the game already produces, not guessed.
+
+**Measured first.** There are **13 collection sets and 71 distinct pieces**. Across the game's history
+(2026-07-27 → 2026-10-13, ~2.6 months): **209 grants, 38 of the 71 pieces ever seen, held by 27 members** —
+about **80 pieces a month** entering the game Den-wide, from raids, delves, chests and the wheel.
+
+⚠️ *A note on how that was measured, because the obvious way is wrong:* collection pieces are **not**
+`mkt_user_item` rows. Querying inventory returns **zero copies owned**, which reads as "nobody has any" and
+is completely false. They live in `mkt_item_collected` — the ownership ledger the collections contract pays
+off. Anything sizing set-piece scarcity has to read that table.
+
+**The rate.** The Grove produces ~1,486 gear drops a month at the frontier (§3e). Against today's 80 a
+month, a set piece at:
+
+| share of Grove gear drops | set pieces/mo from the Grove | one per … of farming | vs the game's 80/mo |
+|---|---|---|---|
+| 0.269% | 4 | 19 hours | 5% |
+| **0.135%** | **2** | **39 hours** | **2.5%** |
+| 0.067% | 1 | 77 hours | 1.2% |
+
+**Decided: 0.135% — two a month, one per ~39 hours of frontier farming.** That makes the Grove the
+single hardest route to a set piece in the game while keeping it *possible*, which is the shape Luke asked
+for. It adds 2.5% to the existing flow, so the collection economy does not re-price.
+
+**And only from map 5 onward.** A set piece is a frontier reward, not something to stumble into on the
+on-ramp — which also means it cannot be farmed by a new account grinding map 1, where the gear rate is three
+times higher.
+
+⚠️ Like the step-up tail, this is **not set-and-forget**: it scales with how much the Den farms, and gets
+re-measured by daily total once the Grove has real traffic. `scripts/grove-set-rate.mjs` re-solves it.
 
 ### What makes a lucky drop lucky
 
@@ -636,8 +665,8 @@ Still open:
    against the chest ladder's budget; re-measure once the Grove has real traffic.
 2. ~~Is Grove gear tradeable?~~ **Yes — it is the game's own gear, under the game's own rules.** No new
    item pool, no per-copy identity, nothing to migrate.
-3. **Do set pieces drop in the Grove?** Seven collections pay for being owned. Excluded, or included at a
-   rate chosen on purpose — see §3e.
+3. ~~Do set pieces drop in the Grove?~~ **Yes, at 0.135% of gear drops from map 5 on** — two a month
+   Den-wide, the hardest route to one in the game. §3e.
 4. ~~Does a new account get a starter kit?~~ **Largely answered by gear drops** — a common kit is exactly the
    100 dps the floor needs, so the question narrows to whether they survive the first sixty seconds before
    anything has dropped.
