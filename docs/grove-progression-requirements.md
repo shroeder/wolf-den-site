@@ -15,6 +15,11 @@ is started. This is the requirements list, with what already exists underneath e
 the town plan most of that game is locked on day one, so the guide becomes a list of doors that do not open
 — the single most discouraging thing a new account could be handed.
 
+⚠️ **AND IT COMES OUT ONLY WHEN THE GROVE OPENS, NOT BEFORE.** Luke: *"we need to retire the onboarding
+guide, but only once the gate for the Grove opens."* Until then nobody is gated, every door the guide points
+at is open, and the guide is doing its job — pulling it early would delete a working ramp and leave nothing
+in its place. It retires in the same deploy as `GATING_LIVE`, beside the Act boards that replace it.
+
 **What exists:** `src/lib/marketplace/guide.js`, `guide-chapters.js`, `/marketplace/guide`, and a
 `guide_step` / `guide_chapter` gold payout already wired into the coin ledger and the mint reasons.
 
@@ -24,21 +29,69 @@ leaves members who were mid-guide with a dead balance. Check both before deletin
 
 ---
 
-## 2. Achievements replace it — system by system, beginner → competent
+## 2. The Act quest boards — the ramp, and NOT the badges
 
-> *"Instead we'll have achievements that are trying to teach you the systems and get you from a beginner to
-> knowledgeable to super competent in the system. So the achievements are going to be system based."*
+⚠️ **The first version of this section was wrong, and the way it was wrong matters.** It said achievements
+*are* badges with a flag, and proposed folding the two together. Luke, correcting it:
 
-So the ramp stops being a linear chapter list and becomes **per-system ladders** that a player meets when
-that system unlocks — which is exactly what the towns do. Town 2 opens the mine; the mine's achievement
-ladder is how you learn the mine.
+> *"Right now the badges are a system to help engage you, but they're not a ramp to explain how the system
+> works. It's a hidden achievement system, and that's fine. We can keep that, leave that alone. But what we
+> want is in each town, there'd be a building you can click to see what your quests are for that act."*
 
-**What exists, and it is most of the machinery:** `mkt_badge` already holds **298 badges, 140 of them with
-an `auto_rule` and a threshold** — automatic, measured, tiered achievements in everything but name. The
-question to answer first is whether achievements ARE badges with a new flag, or a parallel system. One
-system with a filter is almost certainly right; two systems that both say "you did a thing" will drift.
+So they are two different jobs and they stay apart:
 
----
+| | badges | Act quests |
+|---|---|---|
+| what it is for | engagement — a reason to keep playing | **teaching** — how a system works |
+| visibility | **hidden**; you find out you earned it | **posted**; the whole act's list is readable up front |
+| shape | 298 of them, 140 automatic on a threshold | a short, ordered ladder per act |
+| when | whenever you happen to qualify | while you are in that act, about the systems that act just unlocked |
+| change needed | **none — leave it alone** | new |
+
+### Acts, not towns
+
+Luke: *"let's start calling them acts. Act 1, 2, all the way up to 7."* The seven towns and the seven acts
+are the same seven things named from two sides — the town is the place, the act is the chapter. The
+vocabulary should settle on **Act N** wherever a player can see it.
+
+### The board is a building
+
+Each town gets a building you tap, the same way the Forge or the Mine is a building. Behind it is **that
+act's quest list**: what to do, what it teaches, what is done.
+
+That placement is the design, not decoration. The quests for an act are about the systems that act just
+unlocked, and the town is where you stand when they unlock — so the board is in the room where the answer
+is useful, rather than on a menu screen somewhere else.
+
+### ⚠️ This is a THIRD quest system, and the other two must not be confused with it
+
+The repo already has two, and neither is this:
+
+| exists | what it is | why it is not the ramp |
+|---|---|---|
+| `quests.js` | daily quests | repeatable, rotating, a reason to log in today |
+| `town-quests.js` | the Quartermaster's daily town bounties — rally, social, civic, patron, well, merchant | also daily, also rotating, and about the plaza rather than about learning a system |
+
+Act quests are **one-time, ordered and permanent**: you do them once, in roughly the order given, and they
+are done forever. Building them as a variant of either daily system would make the ramp reset every
+morning, which is the opposite of a ramp.
+
+⚠️ And they must not pay like a daily either. A teaching quest's reward is the thing it taught plus a
+nudge; `gold-rate.js` holds the mint reasons and a new earner has to be added to that set deliberately, or
+it quietly pays full rate and shows up as an outlier.
+
+### What a ladder looks like
+
+Act 2 opens the Mine and the Forge, so Act 2's board teaches those:
+
+1. *Send a mining trip* — the loop exists
+2. *Smelt an ore into a bar* — raw material becomes useful
+3. *Enhance a piece of gear once* — the bar has a purpose
+4. *Enhance a piece to +3* — the cost curve is real
+5. *Salvage something you will not wear* — the other direction
+
+Beginner → knowledgeable → competent, in five steps, about one pair of systems. The last rung of an act
+should be the thing a player who has "got it" would do without being asked.
 
 ## 3. A world currency, and a world shop
 
@@ -138,4 +191,8 @@ Needs, in rough order:
 1. the loot rework ✅ (`afc988c5`)
 2. the town rework + feature gating ← **in progress**
 3. then this file, roughly §7 → §2 → §3 → §4 → §6 → §5, because the gear UI is a live gap the loot work just
-   widened, and the achievements ladder is what replaces a guide that is about to stop making sense
+   widened, and the Act boards are what replace a guide that is about to stop making sense
+
+⚠️ **Three things move together in one deploy and must not be separated:** `GATING_LIVE` flips, the Grove
+opens, and the onboarding guide retires. Any two of those without the third leaves either an unplayable new
+account or a ramp pointing at locked doors.
