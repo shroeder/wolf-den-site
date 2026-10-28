@@ -130,6 +130,12 @@ const ICONS = {
     // and cannot be mistaken for the Compendium's tome (a book is wider than it is tall and has a spine).
     cards: "A single upright playing CARD standing face-on with a thick cream border and a bold dark wolf-head crest in its centre, a short neat stack of face-down cards sitting just behind and beside it",
     casino: "A small ornate slot machine cabinet seen straight on, its glass showing three glowing symbols in a row, a fat red-knobbed lever on the right side, gold trim around the frame and a lit marquee arch on top",
+    // The Card Vault — the REAL cards a member pulled from a virtual pack. It cannot reuse `cards`: that is
+    // the card GAME, and both tiles sit in the same "Where to?" grid, where one drawing for two rooms is the
+    // store-awning mistake again. So this one is the STRONGBOX rather than the card: a squat iron box with a
+    // step of card edges standing out of it is a silhouette nothing else in the folder has, and it says
+    // "kept safe" rather than "played", which is the difference between the two rooms.
+    vault: "A squat iron-banded wooden strongbox with a heavy brass lock plate, its lid open and tilted back, with the top edges of four trading cards standing upright inside it like files in a drawer, one of them showing a sliver of a wolf-head crest",
 
     // ── THE SITE MENU'S LAST THREE GAPS ─────────────────────────────────────────────────────────────────
     // SiteHeader's drawer draws a sprite per destination from this same folder, and these three had none, so

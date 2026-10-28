@@ -323,7 +323,8 @@ export default function SiteHeader() {
     // Placed straight after Mystery Bags because that is where a card in it came from.
     const links = mktVault
         ? navItems.flatMap((item) => (item.href === "/mystery-bags"
-            ? [item, { href: "/marketplace/vault", label: "Card Vault", sprite: "cards" }]
+            // "vault", not "cards" — the card game owns `cards`, and these two menus must not disagree.
+            ? [item, { href: "/marketplace/vault", label: "Card Vault", sprite: "vault" }]
             : [item]))
         : navItems;
 

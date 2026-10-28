@@ -53,6 +53,11 @@ const NAV_SPRITE = {
     "/marketplace/trophies": "trophies",
     "/marketplace/casino": "casino",
     "/marketplace/cards": "cards",
+    // ⚠️ ITS OWN DRAWING, NOT `cards`. /marketplace/cards is the card GAME and the Vault is the real cards a
+    // member pulled — two rooms, both in this grid, so one sprite for both would be the store-awning mistake.
+    // Until this line existed the tile fell through to a GiCardPickup glyph: a flat monochrome line drawing
+    // beside twenty painted sprites, which is the tell that nobody mapped it rather than a design choice.
+    "/marketplace/vault": "vault",
 };
 
 // One icon, with the old emoji/react-icon kept as the fallback: a missing or not-yet-generated PNG degrades to
