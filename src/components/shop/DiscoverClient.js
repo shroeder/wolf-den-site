@@ -5,93 +5,83 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Haptic } from "@/components/arena/arena-audio.js";
 
 // ── DISCOVER ─────────────────────────────────────────────────────────────────────────────────────────────────
-// docs/shop-discover-view.md. A second way to browse the shop, beside the existing one rather than replacing
-// it. One item at a time, full-bleed, swipe for the next.
+// docs/shop-discover-view.md. Luke, 2026-10-27, on the first build:
 //
-// ── ⚠️ A SWIPE NEVER BUYS, AND THIS IS THE LOAD-BEARING DECISION ─────────────────────────────────────────────
-// The pack picker can treat a swipe casually: every pack is $20 and the outcome is a surprise either way.
-// The shop is $1 to $500 against live single-copy stock, so the Tinder reading of this feature — right to
-// buy, left to skip — is the one shape that must not ship. A mis-swipe that buys a $258 Jirachi is a refund,
-// a restock and a phone call.
+//   "I want the new view to be horizontally scrollable, just like mystery packs where you quickly swipe left
+//    and right. Also it's putting me in a category before I even get a chance to say what I'm into. You
+//    should be able to switch category by just scrolling up and down... and that should be clear that you
+//    can swipe up or down to change categories."
 //
-//   swipe = move on, with no consequence
-//   tap   = inspect
-//   a deliberate button = Add to cart
+// ── ⚠️ TWO AXES, AND THEY MEAN DIFFERENT THINGS ──────────────────────────────────────────────────────────────
 //
-// ⚠️ AND IT ADDS TO THE SHOP'S EXISTING CART, not a fast lane of its own. Luke chose the cart, and the real
-// win is what it rules out: a Buy-now path would be a SECOND way to decrement the same single-copy stock
-// next to the cart's, which is the exact shape that produced the Square double-decrement that read as theft.
-// One purchase path, one decrement path. It also means four cards ship on one shipping charge.
+//     ←  →   ITEMS inside a category   — the mystery-pack picker's gesture, applied to real stock
+//     ↑  ↓   CATEGORIES
 //
-// ── ⚠️ VERTICAL SNAP, NOT A DRAG HANDLER ─────────────────────────────────────────────────────────────────────
-// The whole deck is one `scroll-snap-type: y mandatory` column. The browser owns the physics, which means
-// momentum, rubber-banding and accessibility all come free and correct — and, more to the point, nothing
-// here captures the pointer, so there is no gesture to collide with a tap. Every bespoke swipe handler this
-// house has written eventually ate a click.
+// ⚠️ THE QUIZ IS GONE, NOT MOVED. The first cut asked two questions and used the answers to decide which
+// category you landed in, so anyone who had not answered was dropped somewhere arbitrary with no way out.
+// Vertical navigation makes the categories the chooser — you are never trapped in one, so there is nothing
+// to ask. A question the interface can answer by being used should not be asked.
+//
+// ── ⚠️ A SWIPE NEVER BUYS ────────────────────────────────────────────────────────────────────────────────────
+// The pack picker can be casual about a swipe: every pack is $20 and the outcome is a surprise either way.
+// The shop is $1 to $500 against live single-copy stock, so the Tinder reading — right to buy — is the one
+// shape that must not ship. Swipe moves, tap inspects, a deliberate button adds to cart. And it adds to the
+// SHOP'S cart, not a fast lane: a second purchase path would be a second way to decrement the same
+// single-copy stock, which is the exact shape behind the Square double-decrement that once read as theft.
+//
+// ── ⚠️ NESTED SCROLL-SNAP, NOT A GESTURE LIBRARY ─────────────────────────────────────────────────────────────
+// Vertical snap on the outer scroller, horizontal snap inside each row. The browser routes a gesture by its
+// dominant axis, gives momentum and rubber-banding for free, and — because nothing captures the pointer — a
+// tap is still a tap. Every hand-rolled swipe handler in this codebase has eventually eaten a click.
 
 const usd = (cents) => `$${((Number(cents) || 0) / 100).toFixed(2)}`;
 
 export default function DiscoverClient() {
-    const [items, setItems] = useState([]);
-    const [games, setGames] = useState([]);
-    const [budgets, setBudgets] = useState([]);
-    const [asked, setAsked] = useState(true);
-    const [picked, setPicked] = useState([]);
-    const [budget, setBudget] = useState("any");
+    const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [detail, setDetail] = useState(null);
     const [adding, setAdding] = useState("");
     const [added, setAdded] = useState({});
-    // ⚠️ A REF, NOT STATE. Skipped ids feed the NEXT fetch and nothing renders from them; as state every
-    //    swipe would re-render the whole deck mid-scroll, which is exactly when a re-render is most visible.
-    const seen = useRef([]);
-    // ── ⚠️ THE DECK IS NOT 100dvh, IT IS WHAT IS LEFT ──────────────────────────────────────────────────
-    // This page renders under the site header and the HUD bar, so a card sized to the full viewport pushes
-    // its own name, price and Add-to-cart button below the fold — which is the entire bottom half of the
-    // feature. Shipped exactly that way for one build.
-    //
-    // Measured rather than hard-coded: the chrome above differs between signed-in and signed-out, and will
-    // differ again the next time a bar is added. A magic number here is a number that is wrong later.
-    const trackRef = useRef(null);
-    const [deckH, setDeckH] = useState(null);
-    useEffect(() => {
-        const measure = () => {
-            const top = trackRef.current?.getBoundingClientRect().top ?? 0;
-            setDeckH(Math.max(320, Math.round(window.innerHeight - top)));
-        };
-        measure();
-        window.addEventListener("resize", measure);
-        // Mobile browsers change innerHeight as the URL bar hides; orientation change fires resize too.
-        return () => window.removeEventListener("resize", measure);
-    }, []);
+    const [rowIndex, setRowIndex] = useState(0);
 
-    const load = useCallback(async (opts = {}) => {
+    // ── ⚠️ THE DECK IS NOT 100dvh, IT IS WHAT IS LEFT ──────────────────────────────────────────────────
+    // This page renders under the site header and the HUD bar. A card sized to the full viewport pushes its
+    // own name, price and Add-to-cart below the fold — the entire bottom half of the feature, which is how
+    // the first build shipped. Measured rather than hard-coded: the chrome differs signed-in vs out and
+    // will differ again the next time a bar is added.
+    const deckRef = useRef(null);
+    const [deckH, setDeckH] = useState(null);
+
+    const load = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const qs = new URLSearchParams();
-            const g = opts.games ?? picked;
-            if (g.length) qs.set("games", g.join(","));
-            qs.set("budget", opts.budget ?? budget);
-            if (seen.current.length) qs.set("skip", seen.current.slice(-300).join(","));
-            const res = await fetch(`/api/marketplace/discover?${qs}`, { cache: "no-store" });
+            const res = await fetch("/api/marketplace/discover", { cache: "no-store" });
             const data = await res.json();
             if (!res.ok || !data.open) throw new Error("closed");
-            setItems(data.items || []);
-            setGames(data.games || []);
-            setBudgets(data.budgets || []);
-            setAsked(Boolean(data.asked));
-            if (!picked.length && (data.knownGames || []).length) setPicked(data.knownGames);
+            setRows(data.rows || []);
         } catch {
             setError("Couldn't load the shop just then.");
         } finally {
             setLoading(false);
         }
-    }, [picked, budget]);
+    }, []);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- first load only; filters call load() themselves
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [load]);
+
+    // Re-measured once the deck actually exists, and on resize — mobile browsers change innerHeight as the
+    // URL bar hides.
+    useEffect(() => {
+        if (loading) return undefined;
+        const measure = () => {
+            const top = deckRef.current?.getBoundingClientRect().top ?? 0;
+            setDeckH(Math.max(360, Math.round(window.innerHeight - top)));
+        };
+        measure();
+        window.addEventListener("resize", measure);
+        return () => window.removeEventListener("resize", measure);
+    }, [loading]);
 
     async function addToCart(item) {
         setAdding(item.id);
@@ -114,143 +104,87 @@ export default function DiscoverClient() {
         }
     }
 
-    // ── THE QUIZ ────────────────────────────────────────────────────────────────────────────────────────
-    // ⚠️ SKIPPABLE FROM THE FIRST FRAME, and pre-filled from the profile. Four questions before anybody
-    //    sees a card is four chances to leave; this is two, and "Show me everything" is always present.
-    if (!asked && !loading) {
-        return (
-            <div className="dv-quiz">
-                <h2 className="dv-quiz-h">What are you into?</h2>
-                <p className="dv-quiz-sub">Two questions, then we&apos;ll stop asking.</p>
+    if (loading && !rows.length) return <p className="dv-empty">Loading the shelf…</p>;
+    if (error && !rows.length) return <p className="dv-error">{error}</p>;
+    if (!rows.length) return <p className="dv-empty">Nothing on the shelf with a photo right now.</p>;
 
-                <div className="dv-quiz-group">
-                    {games.map((g) => (
-                        <button
-                            key={g.key}
-                            type="button"
-                            className={`dv-chip${picked.includes(g.key) ? " dv-chip-on" : ""}`}
-                            onClick={() => setPicked((p) => (p.includes(g.key) ? p.filter((x) => x !== g.key) : [...p, g.key]))}
-                        >
-                            {g.label}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="dv-quiz-group">
-                    {budgets.map((b) => (
-                        <button
-                            key={b.key}
-                            type="button"
-                            className={`dv-chip${budget === b.key ? " dv-chip-on" : ""}`}
-                            onClick={() => setBudget(b.key)}
-                        >
-                            {b.label}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="dv-quiz-actions">
-                    <button
-                        type="button"
-                        className="dv-btn dv-btn-primary"
-                        onClick={async () => {
-                            // Written to the profile the whole site uses, never a Discover-only copy.
-                            if (picked.length) {
-                                await fetch("/api/marketplace/discover", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ games: picked }),
-                                }).catch(() => {});
-                            }
-                            setAsked(true);
-                            load({ games: picked, budget });
-                        }}
-                    >
-                        Start
-                    </button>
-                    <button
-                        type="button"
-                        className="dv-btn dv-btn-ghost"
-                        onClick={() => { setAsked(true); load({ games: [], budget: "any" }); }}
-                    >
-                        Just show me everything
-                    </button>
-                </div>
-            </div>
-        );
-    }
+    const nextRow = rows[rowIndex + 1] || null;
 
     return (
-        <div className="dv-wrap">
-            {error ? <p className="dv-error">{error}</p> : null}
+        <div className="dv-wrap" ref={deckRef} style={deckH ? { height: `${deckH}px` } : undefined}>
+            {error ? <p className="dv-error dv-error-float">{error}</p> : null}
 
-            {loading && !items.length ? <p className="dv-empty">Loading the shelf…</p> : null}
-            {!loading && !items.length ? (
-                <div className="dv-empty">
-                    <p>Nothing matches that yet.</p>
-                    <button type="button" className="dv-btn dv-btn-ghost" onClick={() => { setAsked(false); }}>
-                        Change what you&apos;re after
-                    </button>
+            {/* ── THE VERTICAL AXIS: CATEGORIES ──────────────────────────────────────────────────────────
+                ⚠️ onScroll DERIVES the index from scrollTop; it never drives the scrolling. Driving it
+                   would fight the browser's own snap physics mid-gesture. Reading is free and always
+                   agrees with what is actually on screen. */}
+            <div
+                className="dv-rows"
+                onScroll={(e) => {
+                    const el = e.currentTarget;
+                    const h = el.clientHeight || 1;
+                    const i = Math.max(0, Math.min(rows.length - 1, Math.round(el.scrollTop / h)));
+                    if (i !== rowIndex) setRowIndex(i);
+                }}
+            >
+                {rows.map((row) => (
+                    <section className="dv-row" key={row.key}>
+                        <header className="dv-row-head">
+                            <h2 className="dv-row-name">{row.label}</h2>
+                            <span className="dv-row-count">{row.total} in stock</span>
+                        </header>
+
+                        {/* The horizontal axis: items. */}
+                        <div className="dv-items">
+                            {row.items.map((item) => (
+                                <article className="dv-item" key={item.id}>
+                                    <button
+                                        type="button"
+                                        className="dv-art"
+                                        onClick={() => { Haptic.tap(); setDetail(item); }}
+                                        aria-label={`${item.name}, ${usd(item.priceCents)} — see details`}
+                                    >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={item.imageUrl} alt="" loading="lazy" decoding="async" />
+                                    </button>
+                                    <div className="dv-meta">
+                                        <h3 className="dv-name">{item.name}</h3>
+                                        <p className="dv-sub">
+                                            <span className="dv-price">{usd(item.priceCents)}</span>
+                                            {item.last ? <span className="dv-last">last one</span> : null}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            className="dv-btn dv-btn-primary dv-add"
+                                            disabled={adding === item.id || added[item.id]}
+                                            onClick={() => addToCart(item)}
+                                        >
+                                            {added[item.id] ? "In your cart" : adding === item.id ? "Adding…" : "Add to cart"}
+                                        </button>
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+                    </section>
+                ))}
+            </div>
+
+            {/* ── ⚠️ THE UP/DOWN AFFORDANCE, WHICH IS THE WHOLE RISK OF THIS LAYOUT ───────────────────────
+                Luke: "that should be clear that you can swipe up or down to change categories." A second
+                axis nobody discovers is a second axis that does not exist — horizontal swiping is familiar
+                enough that nobody will think to try vertical unless told.
+
+                So it is said two ways at once, and NAMING THE NEXT CATEGORY is the strongest of them.
+                "Magic Single Card ▾" is a reason to swipe; a bare chevron is only an instruction.
+
+                ⚠️ pointer-events: none in the CSS — it sits over the scroller and must never swallow the
+                   gesture it is advertising. */}
+            {nextRow ? (
+                <div className="dv-next" aria-hidden="true">
+                    <span className="dv-next-arrow">▾</span>
+                    <span className="dv-next-label">{nextRow.label}</span>
                 </div>
             ) : null}
-
-            {/* ⚠️ scroll-snap on the TRACK, and every card is exactly one viewport. The browser owns the
-                physics; nothing here captures the pointer, so a tap is still a tap. */}
-            <div className="dv-track" ref={trackRef} style={deckH ? { height: `${deckH}px` } : undefined}>
-                {items.map((item) => (
-                    <article className="dv-card" key={item.id}>
-                        <button
-                            type="button"
-                            className="dv-art"
-                            onClick={() => { Haptic.tap(); setDetail(item); }}
-                            aria-label={`${item.name}, ${usd(item.priceCents)} — see details`}
-                        >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={item.imageUrl} alt="" loading="lazy" decoding="async" />
-                        </button>
-                        <div className="dv-meta">
-                            <h3 className="dv-name">{item.name}</h3>
-                            <p className="dv-sub">
-                                <span className="dv-price">{usd(item.priceCents)}</span>
-                                {item.last ? <span className="dv-last">last one</span> : null}
-                            </p>
-                            <button
-                                type="button"
-                                className="dv-btn dv-btn-primary dv-add"
-                                disabled={adding === item.id || added[item.id]}
-                                onClick={() => addToCart(item)}
-                            >
-                                {added[item.id] ? "In your cart" : adding === item.id ? "Adding…" : "Add to cart"}
-                            </button>
-                        </div>
-                    </article>
-                ))}
-
-                {/* ── ⚠️ AN EXPLICIT "more", NOT INFINITE SCROLL ──────────────────────────────────────
-                    Infinite scroll in a snap deck means fetching while the user is mid-gesture, and a
-                    list that grows under a scroll-snap container drags the snap point out from under
-                    the card they are looking at. A card at the end of the deck is also the one honest
-                    place to let somebody change their mind about the filters. */}
-                {items.length ? (
-                    <article className="dv-card dv-card-end">
-                        <h3 className="dv-name">That&apos;s the batch.</h3>
-                        <button
-                            type="button"
-                            className="dv-btn dv-btn-primary"
-                            onClick={() => {
-                                // Everything just shown is now "seen", so the next batch is genuinely new.
-                                seen.current = [...seen.current, ...items.map((i) => i.id)];
-                                load();
-                            }}
-                        >
-                            Show me more
-                        </button>
-                        <button type="button" className="dv-btn dv-btn-ghost" onClick={() => setAsked(false)}>
-                            Change what you&apos;re after
-                        </button>
-                    </article>
-                ) : null}
-            </div>
 
             {detail ? (
                 <div className="dv-detail" role="dialog" aria-label={detail.name} onClick={() => setDetail(null)}>

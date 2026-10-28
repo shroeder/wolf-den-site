@@ -3,85 +3,93 @@ import "server-only";
 import { db } from "@/lib/db";
 
 // ── THE DECK ─────────────────────────────────────────────────────────────────────────────────────────────────
-// docs/shop-discover-view.md §6. One item at a time, full-bleed, swipe for the next. Which makes the ORDER
-// the whole feature: a grid forgives a bad sort because the eye skips ahead, and a deck does not — it is
-// judged entirely on what it shows third.
+// docs/shop-discover-view.md. Luke, 2026-10-27, after the first build:
 //
-// ⚠️ A PHOTO IS A HARD REQUIREMENT, NOT A RANKING SIGNAL. An item with no image is unshowable in a full-bleed
-// deck — it is a blank screen with a price on it — so it is filtered out rather than demoted. The ordinary
-// shop still lists those; this view simply cannot render them.
+//   "I want the new view to be horizontally scrollable, just like mystery packs where you quickly swipe left
+//    and right. Also it's putting me in a category before I even get a chance to say what I'm into. You
+//    should be able to switch category by just scrolling up and down."
 //
-// ⚠️ AND `NOT consigned`, for the same reason every other pool query carries it: consigned stock is somebody
-// else's, sold under a deal that has nothing to do with our pricing.
+// ── ⚠️ TWO AXES, AND THEY MEAN DIFFERENT THINGS ──────────────────────────────────────────────────────────────
+//
+//     ←  →   move between ITEMS inside a category   (the mystery-pack picker's gesture, applied to real stock)
+//     ↑  ↓   move between CATEGORIES
+//
+// ⚠️ WHICH IS WHY THE QUIZ IS GONE. The first build asked two questions before showing anything, and the
+// answer decided which category you landed in — so a member who had not answered got dropped somewhere
+// arbitrary and had no way out. With vertical navigation the categories ARE the chooser: you are never
+// trapped in one, so there is nothing to ask. A question whose answer the interface can discover by being
+// used is a question that should not be asked.
+//
+// ⚠️ A PHOTO IS A HARD REQUIREMENT, NOT A RANKING SIGNAL. An item with no image is a blank screen with a
+// price on it, so it is filtered out rather than demoted. The ordinary shop still lists those.
+//
+// ⚠️ AND `NOT consigned`, same as every other pool query: consigned stock is somebody else's, sold under a
+// deal that has nothing to do with our pricing.
 
-/** The taste answers Discover asks for. Deliberately two — see the doc on why four is a toll. */
-export const DISCOVER_GAMES = [
-    { key: "pokemon", label: "Pokémon", categories: ["Pokemon Single Card", "Pokemon Sealed"] },
-    { key: "magic", label: "Magic", categories: ["Magic Single Card", "Magic Sealed"] },
-    { key: "yugioh", label: "Yu-Gi-Oh", categories: ["Yu-Gi-Oh Single", "Yu-Gi-Oh Sealed"] },
-];
+/** How many categories the deck offers, and how deep each one goes. */
+const MAX_ROWS = 10;
+const PER_ROW = 24;
 
 /**
- * Price bands, as a rough "what do you spend" rather than a filter anybody has to think about.
+ * Categories worth their own row, best-stocked first, each with its items.
  *
- * ⚠️ THE TOP BAND HAS NO CEILING AND THE BOTTOM NO FLOOR. A band that excludes the $400 box is a band that
- * makes the shop look smaller than it is to the one member most likely to buy it.
+ * ⚠️ BUILT FROM WHAT IS ACTUALLY ON THE SHELF, never a hand-written list. A fixed set of rows is a set that
+ * shows an empty "Yu-Gi-Oh Sealed" the week we sell out of it, and misses the category that arrives when
+ * somebody buys a collection. The shop's own `category_names` is the truth.
+ *
+ * ⚠️ AND A ROW NEEDS ENOUGH ITEMS TO BE WORTH SWIPING. A category holding two cards is a dead end the
+ * member hits two swipes in; MIN_ITEMS keeps those out of the deck rather than letting the format promise
+ * depth it does not have.
  */
-export const DISCOVER_BUDGETS = [
-    { key: "cheap", label: "Under $10", maxCents: 1000 },
-    { key: "mid", label: "$10 – $50", minCents: 1000, maxCents: 5000 },
-    { key: "high", label: "$50+", minCents: 5000 },
-    { key: "any", label: "Show me everything" },
-];
+const MIN_ITEMS = 6;
 
-const gameByKey = (k) => DISCOVER_GAMES.find((g) => g.key === k) || null;
-const budgetByKey = (k) => DISCOVER_BUDGETS.find((b) => b.key === k) || null;
-
-/**
- * A page of the deck.
- *
- * `skipIds` is what the session has already swiped past — passed up by the client rather than stored,
- * because a swipe is not a decision worth a database row and a member who reloads should get a fresh deck
- * rather than the tail of yesterday's.
- *
- * ⚠️ ORDERED BY ARRIVAL, NOT BY PRICE OR RANDOM. Random makes the deck feel like it has no opinion and
- * price-descending turns the first ten cards into a wall of things most people are not buying. Newest first
- * is the one order that is both defensible and genuinely what a regular wants — it is the same instinct the
- * Discord drop alerts already serve.
- */
-export async function discoverDeck({ games = [], budget = "any", skipIds = [], limit = 30 } = {}) {
-    const cats = games.flatMap((k) => gameByKey(k)?.categories || []);
-    const band = budgetByKey(budget) || {};
-
-    const where = ["in_stock", "quantity > 0", "NOT consigned", "image_url IS NOT NULL", "price > 0"];
-    const params = [];
-    if (cats.length) { params.push(cats); where.push(`category_names = ANY($${params.length})`); }
-    if (band.minCents) { params.push(band.minCents / 100); where.push(`price >= $${params.length}`); }
-    if (band.maxCents) { params.push(band.maxCents / 100); where.push(`price < $${params.length}`); }
-    // ⚠️ Capped so a long session cannot grow the parameter into something Postgres refuses to plan.
-    const skips = (skipIds || []).filter(Boolean).slice(0, 300);
-    if (skips.length) { params.push(skips); where.push(`variation_id <> ALL($${params.length})`); }
-    params.push(Math.min(60, Math.max(1, limit)));
+export async function discoverRows({ skipIds = [] } = {}) {
+    const skips = (skipIds || []).filter(Boolean).slice(0, 400);
 
     const rows = await db
         .query(
-            `SELECT variation_id, name, price, image_url, category_names, quantity
-               FROM inventory_feed
-              WHERE ${where.join(" AND ")}
-              ORDER BY COALESCE(last_change_at, updated_at) DESC NULLS LAST
-              LIMIT $${params.length}`,
-            params
+            `WITH pool AS (
+                 SELECT variation_id, name, price, image_url, category_names, quantity,
+                        COALESCE(last_change_at, updated_at) AS seen_at
+                   FROM inventory_feed
+                  WHERE in_stock AND quantity > 0 AND NOT consigned
+                    AND image_url IS NOT NULL AND price > 0
+                    AND category_names IS NOT NULL AND category_names <> ''
+                    ${skips.length ? "AND variation_id <> ALL($1)" : ""}
+             ),
+             ranked AS (
+                 SELECT *,
+                        -- Newest first INSIDE a category: random reads as having no opinion, and
+                        -- price-descending makes every row open on things most people are not buying.
+                        ROW_NUMBER() OVER (PARTITION BY category_names ORDER BY seen_at DESC NULLS LAST) AS rn,
+                        COUNT(*)    OVER (PARTITION BY category_names) AS n
+                   FROM pool
+             )
+             SELECT variation_id, name, price, image_url, category_names, quantity, n
+               FROM ranked
+              WHERE rn <= ${PER_ROW} AND n >= ${MIN_ITEMS}
+              ORDER BY n DESC, category_names, rn`,
+            skips.length ? [skips] : []
         )
         .catch(() => []);
 
-    return (rows || []).map((r) => ({
-        id: r.variation_id,
-        name: r.name,
-        priceCents: Math.round(Number(r.price || 0) * 100),
-        imageUrl: r.image_url,
-        category: r.category_names,
-        // ⚠️ SHOWN ONLY WHEN IT IS LOW. "12 in stock" is noise; "last one" is a reason to decide now, and
-        //    it is true — these are single-copy singles far more often than not.
-        last: Number(r.quantity) === 1,
-    }));
+    const byCat = new Map();
+    for (const r of rows || []) {
+        const key = r.category_names;
+        if (!byCat.has(key)) {
+            if (byCat.size >= MAX_ROWS) continue;
+            byCat.set(key, { key, label: key, total: Number(r.n) || 0, items: [] });
+        }
+        byCat.get(key).items.push({
+            id: r.variation_id,
+            name: r.name,
+            priceCents: Math.round(Number(r.price || 0) * 100),
+            imageUrl: r.image_url,
+            category: r.category_names,
+            // ⚠️ SHOWN ONLY WHEN IT IS LOW. "12 in stock" is noise; "last one" is a reason to decide now,
+            //    and on a shelf of singles it is true far more often than not.
+            last: Number(r.quantity) === 1,
+        });
+    }
+    return [...byCat.values()];
 }

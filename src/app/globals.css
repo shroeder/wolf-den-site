@@ -27769,47 +27769,86 @@ body.cas-seated .social-fab { display: none; }
     box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
 }
 
-/* ── DISCOVER — THE EXPERIMENTAL SWIPE SHOP ───────────────────────────────────────────────────────────────
-   docs/shop-discover-view.md. One item per screen, swipe for the next.
+/* -- DISCOVER: THE EXPERIMENTAL SWIPE SHOP -----------------------------------------------------------------
+   docs/shop-discover-view.md. Two axes: left/right moves between ITEMS, up/down between CATEGORIES.
 
-   ⚠️ THE TRACK OWNS THE SCROLLING, NOT THE PAGE. scroll-snap-type on a container whose children are each
-   exactly one viewport tall is the whole interaction — the browser gives momentum, rubber-banding and
-   keyboard/accessibility behaviour for free, and because nothing captures the pointer a tap is still a tap.
-   Every hand-rolled swipe handler in this codebase has eventually eaten a click. */
-.dv-wrap { position: relative; }
+   WARNING: nested scroll-snap, and the old one-axis rules are DELETED rather than left underneath. The first
+   build was a single vertical deck of items; keeping those rules around a layout that now means something
+   else is how somebody later spends an hour on a selector that stopped applying. */
+.dv-wrap { position: relative; overflow: hidden; }
 
-.dv-track {
-    /* Fallback only — the real height is measured and set inline, because this page sits under the site
-       header and the HUD bar and a full-viewport card pushes its own buttons off the screen. */
-    height: 100dvh;
+/* The vertical axis. Each child is exactly one deck-height, so snapping lands on whole categories. */
+.dv-rows {
+    height: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
     scroll-snap-type: y mandatory;
-    /* Stops a fast flick skating past three cards — one deliberate gesture, one item. */
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
 }
 
-.dv-card {
-    /* 100% of the TRACK, which is measured — never of the viewport. See the note on .dv-track. */
+.dv-row {
     height: 100%;
     scroll-snap-align: start;
-    /* ⚠️ scroll-snap-stop: always is what makes it a DECK rather than a long page. Without it a hard swipe
-       flies through several items and the member never actually sees the ones in between. */
+    /* WARNING: scroll-snap-stop: always is what makes this a DECK rather than a long page. Without it a hard
+       flick flies past three categories and the member never sees the ones between. */
     scroll-snap-stop: always;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    padding: 18px;
+    min-height: 0;
 }
 
-/* The photo is the product. object-fit: contain because the shelf holds sealed boxes and single cards in
-   wildly different aspects, and a cover crop eats the art on the tall ones. */
+.dv-row-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 16px 6px;
+}
+
+.dv-row-name { margin: 0; font-size: 1.05rem; font-weight: 800; }
+.dv-row-count { font-size: 0.74rem; color: var(--muted); white-space: nowrap; }
+
+/* -- THE HORIZONTAL AXIS ------------------------------------------------------------------------------------
+   WARNING: touch-action is pan-x pan-y, NOT pan-x. Locking this track to one axis would trap the vertical
+   gesture that changes category: the member would swipe up on a card and nothing would happen, which is the
+   exact failure the affordance below exists to prevent. Let the browser pick the dominant axis. */
+.dv-items {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+    /* WARNING: the bottom padding RESERVES THE NEXT-CATEGORY PILL'S ROW. The pill is absolutely
+       positioned over this scroller, and at 14px it landed directly on top of the Add to cart
+       button: the affordance for one gesture covering the control for the other. Shipped that way
+       for one shot. If the pill ever grows, grow this with it. */
+    padding: 0 16px 48px;
+    scrollbar-width: none;
+}
+
+.dv-items::-webkit-scrollbar { display: none; }
+
+/* One item per screen-ish with the neighbours peeking at both edges: the pack carousel's trick, and the
+   cheapest possible way to say "there are more of these sideways". */
+.dv-item {
+    flex: 0 0 86%;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+}
+
 .dv-art {
     flex: 1 1 auto;
     min-height: 0;
-    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -27820,21 +27859,23 @@ body.cas-seated .social-fab { display: none; }
     -webkit-tap-highlight-color: transparent;
 }
 
+/* object-fit: contain because the shelf holds sealed boxes and single cards in wildly different aspects,
+   and a cover crop eats the art on the tall ones. */
 .dv-art img {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
     border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.65);
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
 }
 
-.dv-meta { flex: 0 0 auto; width: min(100%, 420px); text-align: center; display: flex; flex-direction: column; gap: 8px; }
+.dv-meta { flex: 0 0 auto; text-align: center; display: flex; flex-direction: column; gap: 7px; }
 
-/* ⚠️ The name WRAPS and is clamped rather than ellipsed on one line: this is the only place the full name
-   appears, and a promo name truncated to "Pikachu & Zekrom GX (Full A…" is the half that matters cut off. */
+/* WARNING: the name WRAPS to two lines rather than ellipsing on one. This is the only place the full name
+   appears, and a one-line truncation cuts off the half that matters on a long promo name. */
 .dv-name {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: 0.95rem;
     line-height: 1.3;
     overflow-wrap: anywhere;
     display: -webkit-box;
@@ -27843,25 +27884,25 @@ body.cas-seated .social-fab { display: none; }
     overflow: hidden;
 }
 
-.dv-sub { margin: 0; display: flex; align-items: baseline; justify-content: center; gap: 10px; }
-.dv-price { font-size: 1.5rem; font-weight: 800; color: #F0D27A; font-variant-numeric: tabular-nums; }
+.dv-sub { margin: 0; display: flex; align-items: baseline; justify-content: center; gap: 9px; }
+.dv-price { font-size: 1.35rem; font-weight: 800; color: #F0D27A; font-variant-numeric: tabular-nums; }
 
-/* Shown only when quantity is 1 — "12 in stock" is noise, "last one" is a reason to decide. */
+/* Shown only when quantity is 1. "12 in stock" is noise; "last one" is a reason to decide now. */
 .dv-last {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: #FCA5A5;
     border: 1px solid rgba(252, 165, 165, 0.4);
     border-radius: 999px;
-    padding: 2px 8px;
+    padding: 2px 7px;
 }
 
 .dv-btn {
     border-radius: 999px;
-    padding: 12px 18px;
+    padding: 11px 18px;
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     cursor: pointer;
     border: 1px solid transparent;
 }
@@ -27869,34 +27910,51 @@ body.cas-seated .social-fab { display: none; }
 .dv-btn-primary { background: linear-gradient(180deg, #F3D27C, #D4AF37); color: #1a1507; border-color: rgba(0,0,0,0.25); }
 .dv-btn-primary:disabled { opacity: 0.55; cursor: default; }
 .dv-btn-ghost { background: rgba(255,255,255,0.04); border-color: var(--line); color: var(--ink-secondary); }
-.dv-add { width: 100%; }
 
-.dv-card-end { gap: 16px; }
 .dv-empty, .dv-error { text-align: center; padding: 24px 18px; color: var(--muted); }
 .dv-error { color: #FCA5A5; }
+.dv-error-float { position: absolute; left: 0; right: 0; top: 0; z-index: 3; padding: 8px; background: rgba(0,0,0,0.75); }
 
-/* ── THE QUIZ ─────────────────────────────────────────────────────────────────────────────────────────────
-   Two questions and a way past both. See the component — a gate people cannot skip is a gate they leave at. */
-.dv-quiz { padding: 28px 18px; display: flex; flex-direction: column; gap: 14px; max-width: 460px; margin: 0 auto; }
-.dv-quiz-h { margin: 0; font-size: 1.4rem; }
-.dv-quiz-sub { margin: 0; color: var(--muted); font-size: 0.9rem; }
-.dv-quiz-group { display: flex; flex-wrap: wrap; gap: 8px; }
+/* -- THE UP/DOWN AFFORDANCE ---------------------------------------------------------------------------------
+   A second axis nobody discovers is a second axis that does not exist. Horizontal swiping is familiar enough
+   that nobody tries vertical unless told, so the NEXT CATEGORY IS NAMED: that is a reason to swipe, where a
+   bare chevron is only an instruction.
 
-.dv-chip {
+   WARNING: pointer-events: none. It sits over the scroller and must never swallow the gesture it advertises. */
+.dv-next {
+    position: absolute;
+    left: 50%;
+    bottom: 6px;
+    transform: translateX(-50%);
+    z-index: 2;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 13px;
     border-radius: 999px;
-    padding: 9px 15px;
-    border: 1px solid var(--line);
-    background: rgba(255,255,255,0.03);
-    color: var(--ink-secondary);
-    font-size: 0.9rem;
-    cursor: pointer;
+    background: rgba(12, 12, 15, 0.86);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    max-width: calc(100% - 28px);
 }
 
-.dv-chip-on { border-color: rgba(212,175,55,0.6); background: rgba(212,175,55,0.12); color: #F0D27A; font-weight: 700; }
-.dv-quiz-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+/* Animations in this game always play, so keep it to opacity/transform and small. */
+.dv-next-arrow { color: #F0D27A; font-size: 0.8rem; animation: dv-nudge 2.2s ease-in-out infinite; }
+.dv-next-label {
+    font-size: 0.76rem;
+    color: var(--ink-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
-/* ⚠️ position: fixed is SAFE here and not in the pack modal, because Discover has no transformed or
-   filtered ancestor — it is a bare page. Check before copying this pattern anywhere else. */
+@keyframes dv-nudge {
+    0%, 100% { transform: translateY(0); opacity: 0.75; }
+    50% { transform: translateY(2px); opacity: 1; }
+}
+
+/* WARNING: position: fixed is SAFE here and not in the pack modal, because Discover has no transformed or
+   filtered ancestor; it is a bare page. Check before copying this pattern anywhere else. */
 .dv-detail {
     position: fixed;
     inset: 0;
@@ -27922,10 +27980,10 @@ body.cas-seated .social-fab { display: none; }
     text-align: center;
 }
 
-.dv-detail-card img { max-width: 100%; max-height: 46dvh; object-fit: contain; border-radius: 10px; align-self: center; }
+.dv-detail-card img { max-width: 100%; max-height: 42dvh; object-fit: contain; border-radius: 10px; align-self: center; }
 .dv-detail-card h3 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
 .dv-detail-cat { margin: 0; font-size: 0.78rem; color: var(--muted); }
-.dv-detail-price { margin: 0; font-size: 1.6rem; font-weight: 800; color: #F0D27A; }
+.dv-detail-price { margin: 0; font-size: 1.5rem; font-weight: 800; color: #F0D27A; }
 
 /* The Discover invitation on /shop. Owner-only for now. Deliberately a card rather than a nav link: it is
    an experiment somebody is being invited into, and it has to read that way or it reads as a broken
