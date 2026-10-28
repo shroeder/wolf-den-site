@@ -97,6 +97,36 @@ const SKIES = {
 // there is nothing for the model to stand its scenery on. What comes back is a die-cut silhouette of cave
 // mouths and scaffolding with real emptiness between them, so the ground band shows THROUGH it instead of
 // being covered by a second one.
+// ── THE FOREGROUND TERRACE — THE ONE LAYER I MISSED, AND THE ONE THAT BROKE IT ───────────────────────────────
+// .tw-fg sits at bottom:37.5% height:34%, between the ground band and the sky: the back edge of the street,
+// the retaining wall the buildings stand behind. The default town's is warm sandstone paving with ornate
+// lampposts — dropped into a cave it was a bright, pale terrace directly above a near-black mine floor, which
+// is the contrast break Luke called out before anything else.
+//
+// ⚠️ SO IT IS TONE-MATCHED TO ITS GROUND, NOT JUST THEMED. The prompt names the ground's own value range,
+// because "a stone wall" drawn without that instruction comes back lit like a courtyard at noon.
+const FOREGROUNDS = {
+    rootwood: "A low dry-stone retaining wall edging a woodland path, moss in the joints, a few timber posts "
+        + "and a leaning wooden lantern, warm earth tones in the SAME muted range as fallen leaves at dusk",
+    deepdelve: "A rough hewn-rock retaining wall at the edge of a mine floor, heavy timber pit props and "
+        + "braces along it, iron ore buckets, two dim hanging miner's lanterns. DARK grey-brown stone, the "
+        + "same near-black value as an unlit mine, lit only by the lanterns",
+    fenhollow: "A low weathered boardwalk edge and mossy stone kerb at a swamp's margin, reed clumps, a "
+        + "leaning lantern post, dark damp greens in a muted low-light range",
+    saltwrack: "A harbour quay edge of tide-stained stone and timber, mooring bollards, coiled rope, crab "
+        + "pots, cool grey-green in a flat overcast range",
+    drownedquay: "A broken quay wall of pale cracked masonry half in shallow water, toppled column drums, "
+        + "creeping weed, cold desaturated blue-grey",
+    gilded: "A low sandstone retaining wall half-buried in drifted sand, broken pilasters, dry scrub, warm "
+        + "bleached ochre in a hot flat range",
+    ashfall: "A retaining wall of black basalt blocks at the edge of an ash field, iron braces, a thin seam "
+        + "of glowing orange between the stones, near-black with ember light only",
+};
+const FG_BAN = "A long low horizontal band standing against a FULLY TRANSPARENT background — the alpha "
+    + "channel is empty above and below it. No sky, no backdrop, no floor extending away behind it, no "
+    + "characters, no creatures, no text. It reads as the near edge of a street seen from the side. The left "
+    + "and right edges must tile seamlessly against a copy of themselves.";
+
 const BACK_BAN = "A row of structures standing against a FULLY TRANSPARENT background — the alpha channel is "
     + "empty everywhere they are not. Absolutely NO ground, floor, paving, grass, path or baseline across the "
     + "bottom, and no sky or backdrop behind them: only the structures themselves, with transparency around "
@@ -185,9 +215,11 @@ if (todo.length > 3) { console.error(`${todo.length} is more than three. Luke's 
 console.log(`drawing ${todo.length}: ${todo.join(", ")}  —  ${IMAGE_MODEL}, medium, ${SIZE}`);
 
 const BACK = process.argv.includes("--back");
+const FG = process.argv.includes("--fg");
 const SKY = process.argv.includes("--sky");
 for (const key of todo) {
-    const prompt = SKY ? `${SKIES[key]}. ${STYLE_SCENE} ${SKY_BAN}`
+    const prompt = FG ? `${FOREGROUNDS[key]}. ${STYLE_SCENE} ${FG_BAN}`
+        : SKY ? `${SKIES[key]}. ${STYLE_SCENE} ${SKY_BAN}`
         : BACK ? `${BACKDROPS[key]}. ${STYLE_SCENE} ${BACK_BAN}`
         : `${GROUNDS[key]}. ${STYLE} ${BAN}`;
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
@@ -196,13 +228,13 @@ for (const key of todo) {
         body: JSON.stringify({
             model: IMAGE_MODEL, prompt, size: SIZE, quality: "medium", n: 1,
             // Transparency is what removes the baked floor from the midground by construction.
-            ...(BACK ? { background: "transparent" } : {}),
+            ...(BACK || FG ? { background: "transparent" } : {}),
         }),
     });
     if (!resp.ok) { console.log(`✗ ${key}: ${resp.status} ${(await resp.text()).slice(0, 160)}`); continue; }
     const b64 = (await resp.json())?.data?.[0]?.b64_json;
     if (!b64) { console.log(`✗ ${key}: no image back`); continue; }
-    const file = path.join(OUT, `${key}${SKY ? "-sky" : BACK ? "-back" : ""}.webp`);
+    const file = path.join(OUT, `${key}${FG ? "-fg" : SKY ? "-sky" : BACK ? "-back" : ""}.webp`);
     let buf = Buffer.from(b64, "base64");
     // ── ⚠️ FEATHER THE EDGE WHERE THIS LAYER MEETS THE NEXT ──────────────────────────────────────────────
     // Luke: "you have layers that are completely conflicting with each other with sheer cutoffs... you might
@@ -212,7 +244,8 @@ for (const key of todo) {
     // of prompting fixes a straight edge — it is a property of the canvas, not the picture. So the bottom of
     // the midground fades to nothing over the last fifth of its height, and the TOP of the ground band fades
     // in over its first tenth. Where they overlap, each is half there, and the join stops being a line.
-    if (BACK || !SKY) buf = await feather(buf, BACK ? "bottom" : "top", BACK ? 0.22 : 0.10);
+    if (BACK) buf = await feather(buf, "bottom", 0.22);
+    else if (!SKY && !FG) buf = await feather(buf, "top", 0.10);
     fs.writeFileSync(file, await sharp(buf).webp({ quality: 90, alphaQuality: 100 }).toBuffer());
     console.log(`✓ ${key} (${Math.round(fs.statSync(file).size / 1024)}kb)`);
 }

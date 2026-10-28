@@ -1210,7 +1210,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // ⚠️ BUMP THIS WHEN A TOWN LAYER IS REDRAWN. Static assets under /public are served with a day of
     // max-age, so a redrawn sky keeps rendering as the old one — which cost a full round of "the art did not
     // change" before anyone looked at the file on disk and found that it had. Same scar the sprites carry.
-    const TOWN_ART_V = 2;
+    const TOWN_ART_V = 3;
     const townArt = (suffix) => `/images/town/ground/${town.id}${suffix}.webp?v=${TOWN_ART_V}`;
     // Every door in the plaza, with the spot it stands on. Buildings sit on the ground line (their art is
     // anchored at GROUND - 4 and is 176px tall, so the pail goes at their foot); the NPCs stand a little
@@ -2375,7 +2375,12 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     hills → distant castles). Farther layers scroll slower + sit hazier, so the town grows deeper
                     as it's invested in. Painted high-N-first so the nearest funded layer sits on top. */}
                 {/* depth2 (the pale hills/mountains band) is intentionally skipped — it read as a washed-out white layer. */}
-                {layered ? [6, 5, 4, 3, 1].filter((n) => effDepth >= n && art[`depth${n}`]?.url).map((n) => {
+                {/* ⚠️ THE DEPTH BANDS ARE A CITY SKYLINE, AND A CAVE HAS NO CITY. Six parallax silhouette
+                    layers of towers and rooftops, on by default, drawn between the sky and the street. In
+                    the default town they are the distance. In Deepdelve they put a lit city on the far side
+                    of a cavern wall, which is the "those two things conflict" Luke is pointing at. The
+                    biome's SKY carries its own depth, so these are simply off. */}
+                {layered && !town ? [6, 5, 4, 3, 1].filter((n) => effDepth >= n && art[`depth${n}`]?.url).map((n) => {
                     const factor = Math.max(0.3, 0.47 - (n - 1) * 0.03); // farther back → slower parallax
                     return (
                         <div key={n} className="tw-depth" aria-hidden="true" style={{ opacity: Math.max(0.5, 0.92 - (n - 1) * 0.08), transform: `translateX(${-cameraPx * factor}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
@@ -2503,7 +2508,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         <div className="tw-fg" aria-hidden="true">
                             {tiles(24).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img key={k} src={((spooky && art.hw_fg?.url) || art.fg.url)} alt="" draggable={false} />
+                                <img key={k} src={(town?.id ? townArt("-fg") : ((spooky && art.hw_fg?.url) || art.fg.url))} alt="" draggable={false} />
                             ))}
                         </div>
                     ) : null}
