@@ -18,7 +18,8 @@ import { poolByKey } from "@/lib/marketplace/pack-pools.js";
 const money = (v) => Math.round(Number(v) || 0);
 
 export async function getPackTelemetry({ days = 30 } = {}) {
-    const [price, headline, byDay, tierSplit, members, pool, tasks, vault, basis, byPool, modelled] = await Promise.all([
+    const [price, headline, byDay, tierSplit, members, pool, tasks, vault, basis, byPool, modelled,
+        creditTotals, creditRecent] = await Promise.all([
         packPrice(),
 
         // Money. Revenue and tax are stamped per open; COGS carries the basis it was resolved on.
@@ -141,6 +142,31 @@ export async function getPackTelemetry({ days = 30 } = {}) {
                     first_open_floor_cents, units, open, closed_reason, computed_at
                FROM mkt_pack_pool_state`,
             []
+        ),
+        // ── ⚠️ CARDS BOUGHT OUTRIGHT WITH STORE CREDIT ──────────────────────────────────────────────────
+        // These never create a Square order, so NOTHING in the normal sales reporting can see them — the
+        // business report's scope is Square + Plaid + cash by design. A card leaves the building and the
+        // member is charged; without this they are invisible everywhere.
+        //
+        // ⚠️ AND THEY ARE REPORTED SEPARATELY FROM PACK OPENS, never summed into them. A pack open is a
+        // gamble with a modelled margin; a direct buy is a straight sale at the shelf price. One blended
+        // "online margin" across both is a number that describes neither and moves when the MIX moves.
+        db.queryOne(
+            `SELECT COUNT(*)::int AS sales,
+                    COALESCE(SUM(price_cents), 0)::bigint AS revenue,
+                    COALESCE(SUM(cogs_cents), 0)::bigint AS cogs,
+                    COUNT(*) FILTER (WHERE cogs_basis = 'captured')::int AS real_cost
+               FROM mkt_credit_sale
+              WHERE created_at >= NOW() - ($1 || ' days')::interval`,
+            [String(days)]
+        ),
+        db.query(
+            `SELECT item_name, price_cents, cogs_cents, cogs_basis, created_at
+               FROM mkt_credit_sale
+              WHERE created_at >= NOW() - ($1 || ' days')::interval
+              ORDER BY created_at DESC
+              LIMIT 20`,
+            [String(days)]
         ),
     ]);
 
@@ -296,6 +322,29 @@ export async function getPackTelemetry({ days = 30 } = {}) {
         })),
 
         cogsBasis: basis.map((b) => ({ basis: b.basis, n: b.n })),
+
+        // Cards bought outright with store credit (Discover's Buy-with-credit). Separate line, never
+        // folded into the pack figures — see the note on the query.
+        creditSales: {
+            sales: creditTotals?.sales || 0,
+            revenueCents: Number(creditTotals?.revenue || 0),
+            cogsCents: Number(creditTotals?.cogs || 0),
+            marginCents: Number(creditTotals?.revenue || 0) - Number(creditTotals?.cogs || 0),
+            marginPercent: Number(creditTotals?.revenue || 0) > 0
+                ? Math.round(((Number(creditTotals.revenue) - Number(creditTotals.cogs)) / Number(creditTotals.revenue)) * 1000) / 10
+                : null,
+            // ⚠️ HOW MUCH OF THAT MARGIN IS REAL. cogs_basis 'captured' means we had a recorded cost;
+            //    anything else was estimated at 46% of shelf. A margin built on a mix is only as good as
+            //    the mix, and a screen that hides the mix quotes a confident number that is partly invented.
+            realCostCount: creditTotals?.real_cost || 0,
+            recent: (creditRecent || []).map((r) => ({
+                name: r.item_name,
+                priceCents: Number(r.price_cents || 0),
+                cogsCents: Number(r.cogs_cents || 0),
+                estimated: r.cogs_basis !== "captured",
+                at: r.created_at,
+            })),
+        },
 
         queue: {
             open: tasks?.open_tasks || 0,
