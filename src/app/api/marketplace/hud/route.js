@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { withRequestLogging } from "@/lib/server-logger";
 import { arenaNav } from "@/lib/marketplace/arena.js";
 import { MINING_UNLOCKED, miningNav } from "@/lib/marketplace/mining.js";
@@ -92,6 +93,9 @@ export async function GET(request) {
             // rule in the menu would keep the entry hidden for everyone after the feature had opened.
             vault: vaultOpenFor(id),
             casino: true,
+            // The owner's own tools, so the admin pages stop being URLs you have to remember. Rides this
+            // existing batched read — a nav mounted in layout.js may read at most ONE endpoint (check:chrome).
+            owner: isOwner(id),
             // Unclaimed free chips today — drives the nav badge on /marketplace/casino.
             casinoChips: Boolean(freeChips),
             kitchen: COOK_UNLOCKED(id),
