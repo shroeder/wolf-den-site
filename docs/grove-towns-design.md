@@ -358,16 +358,58 @@ the rarity scar):
 | 6 Gilded | ascendant · eternal | ~1,800–3,700 | level |
 | 7 Ashen | eternal | ~3,700–10,000 | **stops here** |
 
-### ⚠️ Where the Grove's ladder stops, and why it must
+### The top tiers: rare, but possible
 
-**Celestial and primordial should stay chest-only.** Nine primordial chests have ever been opened in the
-history of the Den; those two tiers are the prestige chase the entire chest economy hangs off. A Grove that
-drops them turns the rarest thing in the game into a farm, and the chest ladder — 15 ascendant, 9 eternal, 5
-celestial and 1 primordial a month, Den-wide, deliberately — stops meaning anything.
+Luke, asked whether the ladder should stop at eternal: *"No, it's rare, but possible."* So celestial and
+primordial **do** drop in the Grove — and the only honest way to say "rare" is to pick how many the Den
+should see in a month and solve backwards for the roll. A 6% step-up *feels* rare and produces **thirty
+celestials a month**; the number has to be derived, not guessed.
 
-Capping the Grove at **eternal** keeps both economies alive: the Grove is where you *earn* a good kit, the
-chests remain where the impossible things come from. **This is Luke's call, and it is the one that decides
-whether the chest economy survives the feature.**
+**One mechanism, no special cases.** Every gear drop rolls its depth's band, then has a small chance to step
+**up one rung**, and a much smaller chance to step up **two**:
+
+| map | band | one up | two up |
+|---|---|---|---|
+| 1 Rootwood | common | rare | epic |
+| 2 Undercave | rare | epic | legendary |
+| 3 Fen | epic | legendary | mythic |
+| 4 Saltwrack | legendary | mythic | ascendant |
+| 5 Drowned | mythic | ascendant | eternal |
+| 6 Gilded | ascendant | eternal | **celestial** |
+| 7 Ashen | eternal | **celestial** | **primordial** |
+
+The shallow end is then safe **for free** — two rungs above map 1 is an epic. Nothing has to know which tier
+is the precious one, and no map needs a rule of its own. (The band lookup must still fail *upward*: an
+unknown tier means newer and rarer, never cheaper.)
+
+### Solving the two rates
+
+The Grove is sized against the chest ladder's own deliberate budget — **5 celestial and 1 primordial a month,
+Den-wide** — so it roughly doubles the supply of the top tiers rather than flooding them. At the steady-state
+0.8% gear rate, a player at the frontier sees **19 drops an hour**. Modelling six people farming the deep end
+three hours a week (≈77 frontier hours, ≈1,486 drops a month):
+
+| | rate | in player terms |
+|---|---|---|
+| **step up one rung** | **0.34%** | one per ~15 hours of farming |
+| **step up two rungs** | **0.067%** | one per ~77 hours of farming |
+
+Which is the shape "rare, but possible" actually describes: a dedicated player turns up a celestial every
+couple of weeks and a primordial maybe twice a year.
+
+⚠️ **And it scales with how much the Den plays, which is the thing to watch:**
+
+| farmers | h/week | celestial/mo | primordial/mo |
+|---|---|---|---|
+| 3 | 2 | 1.7 | 0.3 |
+| **6** | **3** | **5.0** | **1.0** ← the model |
+| 10 | 4 | 11.1 | 2.2 |
+| 20 | 5 | 27.8 | 5.6 |
+
+Twenty people farming five hours a week would put out 28 celestials a month against the chest ladder's five.
+**So these two numbers are not set-and-forget** — they are the dial to re-measure once the Grove has real
+traffic, by daily total, the way every other faucet in this game gets nerfed. `scripts/grove-tail.mjs`
+re-solves them for any target.
 
 ### The rate across the curve
 
@@ -585,9 +627,8 @@ boss or kill count → the boss, and it already works that way.
 
 Still open:
 
-1. **Does the Grove's gear ladder stop at eternal?** §3e. If celestial and primordial drop here, the chest
-   economy — 9 primordial chests opened in the Den's entire history — stops meaning anything. This is the
-   decision that most affects the rest of the game.
+1. ~~Does the Grove's ladder stop at eternal?~~ **No — rare but possible.** Sized at 0.34% / 0.067% step-up
+   against the chest ladder's budget; re-measure once the Grove has real traffic.
 2. **Is Grove gear tradeable?** Tradeable makes the market real; bound contains the faucet completely. The
    two-rate curve in §3e assumes tradeable.
 3. ~~Does a new account get a starter kit?~~ **Largely answered by gear drops** — a common kit is exactly the
