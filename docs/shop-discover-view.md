@@ -40,11 +40,18 @@ outcome is a surprise either way. The shop is $1 to $500 against a live, single-
 that buys a $258 Jirachi is a refund, a restock, and a conversation. The Tinder reading of this feature — right
 to buy, left to skip — is the one shape that should not ship.
 
-Proposed instead:
+**DECIDED 2026-10-27 — Luke chose the cart.** Discover is a nicer way to browse; buying is the shop's
+existing cart and checkout, unchanged.
 
 - **swipe = move on.** Horizontal is navigation and nothing else, with no consequence.
 - **tap = inspect.** The detail sheet already built, now with Add to cart.
-- **a deliberate button = buy.** Never a gesture.
+- **Add to cart = the only purchase action.** No Buy-now, no store-credit fast lane, no gesture.
+
+⚠️ **AND THAT RULES OUT A SECOND STOCK PATH, WHICH IS THE REAL WIN.** A Buy-now lane would have been a second
+way to decrement the same single-copy inventory, next to the cart's. This shop has already been bitten by
+exactly that shape — `square-decrements-twice`, where itemised orders decremented themselves on top of our
+own adjustment and it read as theft. One purchase path means one decrement path. It also means one shipping
+charge for four cards instead of four, which is the thing a customer actually notices.
 
 The thing worth keeping from the pack feel is the *pace* and the *art* — one item at a time, full-bleed photo,
 no grid of thumbnails — not the gamble.
@@ -149,14 +156,13 @@ is linkable, is indexed, and is how people actually find a specific card.
 
 ## 9. Questions
 
-1. **Does a swipe ever buy, or is buying always a deliberate button?** I argue button-only above.
-2. **Cart or instant buy?** The packs spend store credit instantly. The shop has a real cart and a real
-   checkout. Does Discover add to that cart, or is it its own fast lane?
+1. ~~Does a swipe ever buy?~~ **ANSWERED:** never. Swipe navigates, tap inspects, Add to cart buys.
+2. ~~Cart or instant buy?~~ **ANSWERED:** the existing cart and checkout. No fast lane.
 3. ~~Members only, or public?~~ **ANSWERED 2026-10-27:** deck public, assistant requires registration. See §4.
 4. **Is the assistant in v1, or does the deck ship alone first?**
-7. **What does the deck remember for a signed-OUT shopper?** The deck is public, so most of its taste signal
-   comes from people we cannot write a profile row for. A session cookie covers one visit; anything longer
-   needs the account. Worth deciding whether the registration prompt appears when the deck has learned enough
-   to be worth saving — "I've got a read on you, want me to keep it?" — which is a warmer ask than a wall.
+7. ~~What does the deck remember for a signed-out shopper?~~ **ANSWERED:** it asks once it has a read —
+   roughly six items in — offering to save what it has learned rather than demanding an account at the door.
+   The deck is its own pitch. ⚠️ It must ask **once per visit and never again if dismissed**; a prompt that
+   returns every six swipes is the thing that makes people leave.
 5. **What is the source of truth for hours and events** that the assistant should read?
 6. **Does the quiz write back to `game_interests`**, i.e. is it the same taste the rest of the site uses?
