@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { discoverOpenFor } from "@/lib/marketplace/discover-gate.js";
-import { discoverRows } from "@/lib/marketplace/discover.js";
+import { DISCOVER_ERAS, DISCOVER_PRICES, discoverPage, discoverRows } from "@/lib/marketplace/discover.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -13,19 +13,38 @@ const noStore = (body, init = {}) =>
 
 // Stage one of the rollout: owner only. See discover-gate.js — the condition is IMPORTED, never re-derived.
 //
-// ⚠️ NO TASTE PARAMETERS AND NO POST. The first cut asked two questions and used the answers to pick which
-// category you landed in. With vertical navigation the categories ARE the chooser, so there is nothing to
-// ask and nothing to persist — see the note at the top of discover.js.
+// Two shapes on one route:
+//   no `row`  -> the whole deck, first page of every category
+//   `row=X`   -> the next page of ONE category, for the load-ahead
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/marketplace/discover", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer || !discoverOpenFor(buyer.id)) return noStore({ open: false }, { status: 403 });
 
-            const skipIds = (new URL(request.url).searchParams.get("skip") || "")
-                .split(",").map((s) => s.trim()).filter(Boolean);
+            const sp = new URL(request.url).searchParams;
+            const filters = {
+                era: sp.get("era") || "any",
+                price: sp.get("price") || "any",
+                q: sp.get("q") || "",
+            };
 
-            return noStore({ open: true, rows: await discoverRows({ skipIds }) });
+            const row = sp.get("row");
+            if (row) {
+                const items = await discoverPage({
+                    ...filters,
+                    category: row,
+                    offset: Number(sp.get("offset")) || 0,
+                });
+                return noStore({ open: true, items });
+            }
+
+            return noStore({
+                open: true,
+                rows: await discoverRows(filters),
+                eras: DISCOVER_ERAS,
+                prices: DISCOVER_PRICES,
+            });
         } catch (error) {
             return internalError(error, { event: "discover.list.failure" });
         }

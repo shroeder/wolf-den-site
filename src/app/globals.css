@@ -27862,7 +27862,7 @@ body.cas-seated .social-fab { display: none; }
     /* WARNING: the bottom padding RESERVES the next-category pill's row. The pill is positioned over this
        scroller and at 14px it landed directly on the Add to cart button: the affordance for one gesture
        covering the control for the other. If the pill grows, grow this with it. */
-    padding-bottom: 52px;
+    padding-bottom: 76px;
 }
 
 .dv-items::-webkit-scrollbar { display: none; }
@@ -28039,23 +28039,36 @@ body.cas-seated .social-fab { display: none; }
 
 /* Position inside the current row. "3 of 24" is the cheapest way to say the sideways axis has depth, and it
    moves as you swipe, which is what makes it feel alive rather than decorative. */
-/* WARNING: BOTTOM-LEFT, NOT TOP-RIGHT. It sat at top:18/right:22 and landed directly on the stock-count
-   pill in the row header, rendering as "1 8724" — two unrelated numbers overprinted into a third that means
-   nothing. The corners are spoken for: centre-bottom is the next-category pill, right is the category
-   pager, top-right is the stock pill. Bottom-left is the only free one. */
-.dv-count {
+/* -- THE LEFT/RIGHT PAGER ----------------------------------------------------------------------------------
+   Luke liked the vertical pips and asked for the same sideways. The difference is COUNT: ten categories
+   versus up to nine hundred items, and nine hundred dots is a grey smear that says nothing. So it is
+   windowed around the current card with the outer pips shrunk -- the iOS page-dots idiom -- which keeps the
+   row a constant width whatever the length, so it does not twitch as you swipe. See windowPips().
+
+   WARNING: pointer-events: none. It sits over the scroller and must never eat the gesture. */
+.dv-hpager {
     position: absolute;
-    left: max(20px, calc(50% - 250px));
-    bottom: 16px;
+    left: 50%;
+    bottom: 48px;
+    transform: translateX(-50%);
     z-index: 3;
     pointer-events: none;
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 10px;
 }
 
-.dv-count i { font-style: normal; opacity: 0.55; margin: 0 1px; }
+.dv-hpip {
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.24);
+    transition: all 200ms ease;
+}
+
+.dv-hpip-md { width: 5px; height: 5px; }
+.dv-hpip-sm { width: 4px; height: 4px; opacity: 0.7; }
+.dv-hpip-xs { width: 3px; height: 3px; opacity: 0.45; }
+.dv-hpip-on { background: #D4AF37; width: 16px; height: 5px; opacity: 1; }
 
 /* -- THE UP/DOWN AFFORDANCE ---------------------------------------------------------------------------------
    A second axis nobody discovers is a second axis that does not exist. Horizontal swiping is familiar enough
@@ -28096,6 +28109,128 @@ body.cas-seated .social-fab { display: none; }
 @keyframes dv-nudge {
     0%, 100% { transform: translateY(0); opacity: 0.7; }
     50% { transform: translateY(3px); opacity: 1; }
+}
+
+/* -- THE FILTER CONTROL ------------------------------------------------------------------------------------
+   Luke: "an optional filter control, but not ghetto. It has to be really easy to use, appified, and just
+   quick." So it is one chip in the row header rather than a bar that eats a line of the deck, and it
+   carries the live count so the member can see the filter working without opening anything. */
+.dv-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--ink-secondary);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    padding: 5px 7px 5px 12px;
+    cursor: pointer;
+    transition: all 160ms ease;
+}
+
+.dv-filter:hover { border-color: rgba(212, 175, 55, 0.5); color: var(--ink); }
+.dv-filter-on { color: #F0D27A; border-color: rgba(212, 175, 55, 0.55); background: rgba(212, 175, 55, 0.1); }
+
+.dv-filter-n {
+    font-variant-numeric: tabular-nums;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+}
+
+.dv-none { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 60px 24px; color: var(--muted); }
+.dv-none p { margin: 0; }
+.dv-none .dv-add { width: auto; padding: 11px 22px; }
+
+/* A bottom sheet, because this is a phone-first view and a centred dialog on a phone is a web page.
+   align-items: flex-end does the whole job. */
+.dv-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 75;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(3px);
+    animation: dv-fade 150ms ease-out;
+}
+
+.dv-sheet-card {
+    width: min(100%, 520px);
+    max-height: 86dvh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px 18px 22px;
+    border-radius: 22px 22px 0 0;
+    background: var(--elevated);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 0;
+    box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.7);
+    animation: dv-rise 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+@keyframes dv-rise { from { transform: translateY(14px); } to { transform: translateY(0); } }
+
+/* The grab handle. Pure signal: it is what makes a panel read as a sheet you can dismiss rather than a
+   dialog you are stuck in. */
+.dv-sheet-grip {
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.2);
+    align-self: center;
+    margin-bottom: 2px;
+}
+
+.dv-sheet-h { margin: 0; font-size: 1.05rem; font-weight: 800; }
+
+/* 16px minimum: anything smaller makes iOS Safari zoom the whole page on focus, which on a snap deck
+   leaves the member somewhere they did not ask to be. */
+.dv-search {
+    width: 100%;
+    font-size: 16px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--ink);
+}
+
+.dv-search:focus { outline: none; border-color: rgba(212, 175, 55, 0.55); }
+.dv-sheet-group { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.dv-chip {
+    border-radius: 999px;
+    padding: 9px 15px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink-secondary);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.dv-chip-on {
+    border-color: rgba(212, 175, 55, 0.6);
+    background: rgba(212, 175, 55, 0.14);
+    color: #F0D27A;
+    font-weight: 800;
+}
+
+.dv-sheet-clear {
+    background: none;
+    border: 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+    cursor: pointer;
+    padding: 4px;
 }
 
 /* WARNING: position: fixed is SAFE here and not in the pack modal, because Discover has no transformed or
@@ -28181,7 +28316,7 @@ body.cas-seated .social-fab { display: none; }
 @media (max-height: 620px) {
     .dv-row-head { padding: 8px 20px 4px; }
     .dv-row-name { font-size: 1rem; }
-    .dv-items { padding-bottom: 42px; }
+    .dv-items { padding-bottom: 64px; }
     .dv-item { gap: 8px; }
     .dv-meta { gap: 6px; }
     /* One line, because two lines of name is the single biggest block of height down here. */
@@ -28190,7 +28325,7 @@ body.cas-seated .social-fab { display: none; }
     .dv-btn { padding: 10px 16px; font-size: 0.88rem; }
     .dv-next { bottom: 6px; padding: 4px 12px; }
     .dv-next-label { font-size: 0.72rem; }
-    .dv-count { bottom: 10px; font-size: 0.68rem; }
+    .dv-hpager { bottom: 40px; }
 }
 
 /* The Discover invitation on /shop. Owner-only for now. Deliberately a card rather than a nav link: it is
