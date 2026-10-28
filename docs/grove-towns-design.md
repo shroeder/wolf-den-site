@@ -262,6 +262,151 @@ talking about.
 
 ---
 
+## 3e. Re-cutting the loot tables, all 84 zones
+
+Luke: *"I like the crafting with all the parts and stuff, but we also want loot to drop."* So parts stay the
+backbone exactly as they are, and gear lands **on top** — across the whole Grove, not just the on-ramp.
+
+### What a table looks like today
+
+All 84+ residents share one shape, and `loot` pays **parts only**:
+
+```js
+rootrat: { hp: 290, dmg: [34, 53], telegraph: 0,
+           emblem: "em_rootrat", emblemChance: 0.0026,      // an independent roll
+           rareChance: RARE_CHANCE, rareLoot: { part: … },  // another
+           loot: [ { part: "gnawed_root", n: [1,2], w: 70 },
+                   { part: "damp_moss",   n: [1,1], w: 30 } ] }   // ← weighted, parts only
+```
+
+### ⚠️ Gear is a NEW independent roll, never a row in `loot`
+
+This is the single most important structural decision, and it is not a style preference — it is the chest
+chain's scar applied one level down. **`loot` is weighted and sums to a whole.** Put gear in it at `w: 20`
+and every gear drop is a part that did *not* drop; tune gear up later and crafting silently gets worse, with
+nothing in the diff to say so. The Grove already has two independent rolls sitting beside the weighted
+array — `emblemChance` and `rareChance` — and gear is a third:
+
+```js
+gearChance: 0.012,              // its own roll. Parts are untouched by it, forever.
+gearBias:  "attack_speed",      // see below
+```
+
+**Parts keep their exact weights and counts.** Nothing about crafting changes.
+
+### Every enemy already owns a stat — use it
+
+The hook is sitting there unused. Each resident has an **emblem**, and every emblem is one stat:
+
+| enemy | its stat | so its gear rolls toward |
+|---|---|---|
+| Rootrat | might | raw damage |
+| Pale Grub | vitality | health |
+| Thornling | attack speed | tempo |
+| Bristleback | armour | mitigation |
+| Gourdling | life steal | sustain |
+| Barrow Hound | crit rate | crits |
+| Ash Wraith | crit damage | crit size |
+| Warren Mother | emblem find | more emblems |
+| Mothlight | rarity find | better rolls |
+
+Weight each enemy's gear toward **its own stat**, and *"farm Thornlings for attack speed"* becomes a true
+sentence. That is what gives 84 zones 84 different answers to **why here** — which is the actual request
+behind "something to farm for". It needs no new data: the mapping already exists in `GROVE_EMBLEMS`.
+
+### Three dials, tuned independently
+
+| dial | what it controls | tuned for |
+|---|---|---|
+| `gearChance` | how often gear falls at all | the faucet (§3d) |
+| the **rarity band** for that depth | what tier falls | the power curve |
+| the **roll range** on each affix | how good this one is | the chase |
+
+Separating these is what lets the top of the Grove drop *rarely but excellently* while the on-ramp drops
+*often and modestly*, without either one fighting the other.
+
+### The bands, against where players actually are
+
+Measured dps for a full kit at each tier, beside the Grove depth where a player needs roughly that much:
+
+| tier | full-kit dps | comfortable around |
+|---|---|---|
+| common | 100 | map 1 |
+| rare | 146 | map 1–2 |
+| epic | 294 | map 2–3 |
+| legendary | 474 | map 3–4 |
+| mythic | 343* | map 3–4 |
+| ascendant | 918 | map 4–5 |
+| eternal | 1,512 | map 5–6 |
+| celestial | 2,443 | map 6–7 |
+| primordial | 5,036 | map 7+ |
+
+\* mythic reading below legendary is a build-mix artifact of picking the highest stat-total piece per slot,
+not a ladder inversion — the authored stat totals climb cleanly (epic 90 → legendary 115 → mythic 143 →
+ascendant 167).
+
+Proposed band per map, each with a small chance to roll **one band up** (and the lookup must fail *upward* —
+the rarity scar):
+
+| map | drops | a player there has | so the band is |
+|---|---|---|---|
+| 1 Rootwood | common · rare | nothing → ~100 | the kit itself |
+| 2 Undercave | rare · epic | ~150–300 | one step ahead |
+| 3 Fen | epic · legendary | ~300–500 | level |
+| 4 Saltwrack | legendary · mythic | ~500–900 | level |
+| 5 Drowned | mythic · ascendant | ~900–1,800 | level |
+| 6 Gilded | ascendant · eternal | ~1,800–3,700 | level |
+| 7 Ashen | eternal | ~3,700–10,000 | **stops here** |
+
+### ⚠️ Where the Grove's ladder stops, and why it must
+
+**Celestial and primordial should stay chest-only.** Nine primordial chests have ever been opened in the
+history of the Den; those two tiers are the prestige chase the entire chest economy hangs off. A Grove that
+drops them turns the rarest thing in the game into a farm, and the chest ladder — 15 ascendant, 9 eternal, 5
+celestial and 1 primordial a month, Den-wide, deliberately — stops meaning anything.
+
+Capping the Grove at **eternal** keeps both economies alive: the Grove is where you *earn* a good kit, the
+chests remain where the impossible things come from. **This is Luke's call, and it is the one that decides
+whether the chest economy survives the feature.**
+
+### The rate across the curve
+
+Two regimes, for the reason §3d measured — one flat number cannot serve a new player and a veteran at once:
+
+| depth | `gearChance` | why |
+|---|---|---|
+| map 1–2 (the on-ramp) | **2.5%** | ~15 pieces across map 1 — a kit with dupes. One-time per account. |
+| map 3–7 (steady state) | **0.8%** falling to **0.5%** | ~20 an hour at the frontier, against the Den's 82 a day |
+
+The on-ramp cannot be farmed repeatedly — you pass through it once — which is what makes a generous rate
+there safe when the same rate would be ruinous at depth.
+
+### What a drop actually is
+
+Generated, never drawn from the 652 authored items (§3d). Rolled **server-side from the session seed**, the
+way every other Grove drop already settles — the client computes the same roll locally so the item appears
+the instant the body falls, but what the player keeps is what the server computed.
+
+```
+base      ← a slot + archetype, from the enemy's table
+rarity    ← the depth's band, small chance to step up
+stats     ← scaled on DEPTH, weighted toward the enemy's own stat
+affixes   ← each line rolls inside a range  ← the chase lives here
+```
+
+⚠️ **And the rolled row must be fresh, not a reference.** Reward tables are shared module objects in this
+codebase; a roller that writes the rolled values back onto the table row decays the table for every
+subsequent kill, server-wide, until the process restarts. Build a new object every time.
+
+### The three scars this is standing on
+
+1. **The chest chain** — first match wins, so a new row steals from its neighbours. Hence gear as an
+   independent roll, not a weighted entry.
+2. **Reward tables are shared objects** — never write to the row you rolled from.
+3. **Rarity lookups must fail upward** — "never heard of this tier" means newer and rarer, never cheaper.
+
+---
+
 ## 4. The seven towns
 
 The biomes do most of the assignment work — each town's ground names the feature it should open.
@@ -440,17 +585,19 @@ boss or kill count → the boss, and it already works that way.
 
 Still open:
 
-1. **How is the gear faucet held?** Two rates, thinning rarity bands, or bound items — §3d. The measured
-   figure that forces the question: one veteran farming an hour at 2% produces 0.6× the Den's entire daily
-   gear income.
-2. ~~Does a new account get a starter kit?~~ **Largely answered by gear drops** — a common kit is exactly the
+1. **Does the Grove's gear ladder stop at eternal?** §3e. If celestial and primordial drop here, the chest
+   economy — 9 primordial chests opened in the Den's entire history — stops meaning anything. This is the
+   decision that most affects the rest of the game.
+2. **Is Grove gear tradeable?** Tradeable makes the market real; bound contains the faucet completely. The
+   two-rate curve in §3e assumes tradeable.
+3. ~~Does a new account get a starter kit?~~ **Largely answered by gear drops** — a common kit is exactly the
    100 dps the floor needs, so the question narrows to whether they survive the first sixty seconds before
    anything has dropped.
-3. **Does the gate apply to shop-side game features?** The daily spin is a counter-scan reward in store. If a
+4. **Does the gate apply to shop-side game features?** The daily spin is a counter-scan reward in store. If a
    customer scans a code at the till on day one, does it work?
-4. **Card game (Spire)** is already pet-gated, and pets are now town 1. Does it come with them, or wait for
+5. **Card game (Spire)** is already pet-gated, and pets are now town 1. Does it come with them, or wait for
    town 5 with the dungeons?
-5. **Does the day-one pet fight, and at what power?** With pets in town 1 the companion is now part of the
+6. **Does the day-one pet fight, and at what power?** With pets in town 1 the companion is now part of the
    floor calculation in §3a, not a separate feature — a pet that contributes real damage changes what the
    on-ramp has to be.
 
@@ -464,8 +611,9 @@ In order, because each one is useless without the one above it:
    so enemy *health* may be left alone — but enemy **damage** in the opening zones still has to come down, or
    a new player dies before the first piece drops. Measure with `grove-reach.mjs` and `grove-gear-floor.mjs`
    against a 7 dps / 60 hp account.
-2. **Gear drops** — the rolled generator, server-side, on the existing stat pipeline. This is what makes the
-   Grove worth farming and what carries the early curve.
+2. **Gear drops** — the rolled generator, server-side, on the existing stat pipeline, as an independent roll
+   beside `emblemChance` so parts are never touched. This is what makes the Grove worth farming and what
+   carries the early curve. §3e.
 2. **`gated_at` and `featureUnlocked()`** — one column, one helper, read by both the menu and the route.
 3. **Town 1**, with four visibly locked buildings. One town proves the whole design.
 5. **The unlock moment** — clearing a map lights a building. This is the payoff the entire system exists to

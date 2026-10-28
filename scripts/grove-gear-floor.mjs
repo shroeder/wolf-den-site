@@ -65,7 +65,7 @@ console.log(`zone 1 as shipped — rootrat ${ratHp} hp / ${ratDmg[0]}-${ratDmg[1
 console.log("kit            pieces   dps      hp    s/rat   rat hits   boss time   boss hits");
 
 const rows = [["nothing", []]];
-for (const r of ["common", "rare", "epic", "legendary"]) rows.push([r, kitFor(r)]);
+for (const r of ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal", "celestial", "primordial"]) rows.push([r, kitFor(r)]);
 
 for (const [label, kit] of rows) {
     const f = fighterFrom(statsOf(kit), {}, null);
