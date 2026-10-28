@@ -188,23 +188,28 @@ rootrat still two-shots them before the first drop lands. So the one piece of §
 **enemy DAMAGE in the opening zones** — health can be left alone, damage cannot. Survive first; gear does the
 rest.
 
-### Rolled, not drawn from the catalogue
+### It is the game's own gear — the same items, from a new place
 
-Grove gear should be **generated per drop** — base + rarity + depth + rolled affix values — rather than pulled
-from the 652 authored items.
+Luke: *"The gear you get from the Grove is the exact same gear you get from the rest of the game."*
 
-⚠️ **And the game already does this.** `ITEMS` in `items.js` is not what the game hands out: four passes
-rewrite every item's stats at import, keyed on rarity tier and slot weight — intrinsics, affix counts, dedupe.
-The Grove's roller is that same pipeline with two extra inputs, **depth and a seed**, and a range instead of a
-fixed value. This is an extension, not a second stat system.
+So there is no Grove item pool and no generated stat blocks. The Grove drops **the 652 catalogue items the
+game already has**, and the "random rolls on a curve" are rolls over **which item falls** — the band, the
+weighting, the step-up — not over an item's stats. A Rootwood Blade from a Thornling is the same row as a
+Rootwood Blade from a chest.
 
-Three reasons it must not draw from the authored pool:
+Everything downstream then works with no changes at all:
 
-1. **The catalogue is finite and spoken for.** Those items back the compendium, the sets and the collections.
-   A faucet pouring into them floods "collect them all" and decays seven set bonuses at once.
-2. **A generated item scales forever.** Maps 8–12 are designed and undrawn; a rolled item just takes a
-   higher depth. An authored pool would need 60 new items per map.
-3. **The chase needs a range.** You cannot roll well on a fixed stat block.
+- **trade, auction, the forge, the compendium, collections and sets** keep treating gear as a type, which is
+  what they are built on
+- **the Grove feeds the compendium.** A player filling it by killing things is a genuinely good side effect
+  — it is the one screen that rewards breadth, and the Grove is the broadest source in the game
+- there is no new catalogue to draw art for, which is the difference between a feature that ships and one
+  that waits on 240 images
+
+⚠️ **The one thing to watch is SET pieces.** Seven collections pay bonuses for being owned, and some of
+those pieces are deliberately hard to get. If the Grove drops set pieces at its own rate, it quietly becomes
+the fastest way to complete sets and the collection economy re-prices itself. Either exclude set pieces from
+Grove tables, or include them deliberately at a rate chosen for that purpose — but not by accident.
 
 ### What makes a lucky drop lucky
 
@@ -310,9 +315,12 @@ The hook is sitting there unused. Each resident has an **emblem**, and every emb
 | Warren Mother | emblem find | more emblems |
 | Mothlight | rarity find | better rolls |
 
-Weight each enemy's gear toward **its own stat**, and *"farm Thornlings for attack speed"* becomes a true
-sentence. That is what gives 84 zones 84 different answers to **why here** — which is the actual request
-behind "something to farm for". It needs no new data: the mapping already exists in `GROVE_EMBLEMS`.
+Weight each enemy's gear table toward **catalogue items carrying its own stat**, and *"farm Thornlings for
+attack speed"* becomes a true sentence. That is what gives 84 zones 84 different answers to **why here** —
+the actual request behind "something to farm for".
+
+It needs no new data on either side: the enemy→stat mapping already exists in `GROVE_EMBLEMS`, and every
+catalogue item already has a stat block to weight against.
 
 ### Three dials, tuned independently
 
@@ -425,65 +433,17 @@ there safe when the same rate would be ruinous at depth.
 
 ### What a drop actually is
 
-Generated, never drawn from the 652 authored items (§3d). Rolled **server-side from the session seed**, the
-way every other Grove drop already settles — the client computes the same roll locally so the item appears
-the instant the body falls, but what the player keeps is what the server computed.
+A pick from the catalogue, rolled **server-side from the session seed** the way every other Grove drop
+already settles — the client computes the same roll locally so the item appears the instant the body falls,
+but what the player keeps is what the server computed.
 
 ```
-base      ← a slot + archetype, from the enemy's table
-rarity    ← the depth's band, small chance to step up
-stats     ← scaled on DEPTH, weighted toward the enemy's own stat
-affixes   ← each line rolls inside a range  ← the chase lives here
+rarity   ← the depth's band, with the step-up rolls below
+item     ← picked from the catalogue at that rarity, weighted toward
+           the enemy's own stat (its emblem's stat)
 ```
 
-⚠️ **And the rolled row must be fresh, not a reference.** Reward tables are shared module objects in this
-codebase; a roller that writes the rolled values back onto the table row decays the table for every
-subsequent kill, server-wide, until the process restarts. Build a new object every time.
-
-### ⚠️ Tradeable collides with rolled, and the collision is structural
-
-Luke: *"Yes, it's tradable"* — *"follows the same trade regulations we have on gear today."* That is the
-right instinct and it exposes the one genuine blocker in this design, because **today's gear economy is
-type-based, not instance-based.**
-
-Checked against production:
-
-| | what it stores | meaning |
-|---|---|---|
-| `mkt_user_item` | a per-copy uuid, but `item_id` is a **text catalogue key** | 76 copies of `leather_armor` exist as 76 indistinguishable rows |
-| `mkt_auction.item_id` | **text** — `"bone_charm"`, `"scale_mail"` | a listing says *"a scale mail"*, never *"this scale mail"* |
-| `mkt_item_enhance` | keyed `(buyer_id, item_id)` | your forge level belongs to the **type**, not the copy |
-
-So two copies of an item are interchangeable **by design**, and the auction, the forge and the compendium
-are all built on that assumption. **Random rolls break it at the root**: if a Rootwood Blade can roll
-differently each time, "a Rootwood Blade" stops being a thing you can list, enhance, or hand over.
-
-The failure mode is the quiet kind this codebase keeps getting bitten by — nothing errors. Somebody buys the
-perfect-roll blade they saw on the auction and receives a different one, and the bug report is *"the auction
-gave me the wrong item"* months later.
-
-**Two honest ways out, and this needs Luke:**
-
-**(a) Make gear instance-based.** Rolled stats live on the copy (`mkt_user_item` gains a stat column), and
-the auction, trades, the forge and equipping all move from the type key to the instance uuid. This is what
-"random rolls" really means and it is the right long-term shape for a loot game.
-⚠️ **28 files touch `mkt_user_item`** — the auction, crafting, compendium, collections, chests, delves, the
-farm, badges. Changing the identity of gear underneath all of them is the largest structural change this
-game has had, and the rarity-ladder scar is the precedent for what happens when a core lookup changes and
-its consumers do not follow.
-
-**(b) Quantise the roll into named grades.** Each Grove base ships as a small set of real catalogue entries
-— *Rootwood Blade*, *Keen* Rootwood Blade, *Savage* Rootwood Blade — each with its own stat block and its own
-`item_id`. The roll picks a grade.
-Trade, forge, compendium and collections keep working **completely unchanged**, which is the literal reading
-of *"the same trade regulations we have on gear today."* The chase survives — *"I pulled a Pristine one"* is
-braggable and legible — at the cost of granularity: five grades rather than a continuous range.
-
-**Recommendation: (b) for the first build, (a) as a later migration if the granularity is missed.** Not
-because (a) is wrong — it is the better endgame — but because the loudest rule in this repo is that a change
-to a core lookup goes wrong *silently* in the consumers that did not follow it, and gear identity is read in
-28 places. (b) delivers the farm, the curve, the bands and the step-up tail with zero blast radius, and
-leaves (a) available once the feature has proven it is worth the migration.
+Two rolls, both over tables that already exist. No generator, no new items, no migration.
 
 ### The three scars this is standing on
 
@@ -674,10 +634,10 @@ Still open:
 
 1. ~~Does the Grove's ladder stop at eternal?~~ **No — rare but possible.** Sized at 0.34% / 0.067% step-up
    against the chest ladder's budget; re-measure once the Grove has real traffic.
-2. ~~Is Grove gear tradeable?~~ **Yes, under the same rules as gear today** — which forces the next one.
-3. **Rolled stats need per-copy identity, and gear today has none.** Instance-based gear (28 files) or
-   quantised named grades (zero blast radius)? See the end of §3e. This is now the decision that gates the
-   build.
+2. ~~Is Grove gear tradeable?~~ **Yes — it is the game's own gear, under the game's own rules.** No new
+   item pool, no per-copy identity, nothing to migrate.
+3. **Do set pieces drop in the Grove?** Seven collections pay for being owned. Excluded, or included at a
+   rate chosen on purpose — see §3e.
 4. ~~Does a new account get a starter kit?~~ **Largely answered by gear drops** — a common kit is exactly the
    100 dps the floor needs, so the question narrows to whether they survive the first sixty seconds before
    anything has dropped.
