@@ -48,6 +48,19 @@ const LAB_BELT = { id: "food_poultice", name: "Moss Poultice", count: 5, heals: 
 // ⚠️ AND THE BAG'S CEILING, WHICH IS UNREACHABLE ON ANY HEALTHY ACCOUNT. The dock badge only appears at
 // three slots or fewer, and filling a real bag to get there means moving a real player's parts around. Two
 // scenes instead: the warning, and the state where loot is already being left on the floor.
+// ── ⚠️ A REAL GEAR SPRITE, BECAUSE THE BENCH HAS NO DATABASE ───────────────────────────────────────────────
+// In the game these urls come from mkt_item_sprite with the session (see grove.js). They are opaque blob
+// hashes and cannot be derived from an item id, so the bench carries one real row rather than a placeholder:
+// the whole question `?scene=gear` exists to answer is "does the actual item sprite land on the ground", and
+// a stand-in square would answer it falsely. This is the Thicket rootrat's super-rare slot — the loudest case.
+const LAB_GEAR = {
+    battle_staff: {
+        name: "Battle Staff",
+        url: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/art/mkt_item_sprite/"
+            + "battle-staff-fzOmKsQr5lbrHFgWQBWOM730Lp7Jz8-l6xFFmBuhBayf063bsqCtEuN3SDS3c.webp",
+    },
+};
+
 const bagRoomFor = (scene) => (scene === "bagfull" ? 0 : scene === "bagtight" ? 2 : null);
 
 const beltFor = (scene) => (scene === "nobelt" ? null
@@ -258,6 +271,7 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
                 belt={beltFor(scene)}
                 bagRoom={bagRoomFor(scene)}
                 labScene={scene}
+                gearArt={LAB_GEAR}
                 // Locked while the boss stands, open once it falls — the one thing this change is about.
                 unlockedN={bossDown ? (travelled || zoneN) + 1 : (travelled || zoneN)}
                 // ⚠️ THE LAB TRAVELS FOR REAL, or the transition cannot be filmed at all. onTravel was

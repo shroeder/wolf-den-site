@@ -969,7 +969,7 @@ export default function GroveClient({ initial }) {
         return (
             <div className="gv">
                 <GroveScene
-                    zone={session.zone} seed={session.seed} bonuses={session.bonuses}
+                    zone={session.zone} seed={session.seed} bonuses={session.bonuses} gearArt={session.gearArt}
                     // ⚠️ THE DOOR'S GATE IS THE SERVER'S, NOT THE CLIENT'S KILL COUNT. groveEnter refuses
                     // any zone past unlocked_n, and the door used to decide for itself from local kills --
                     // so a count the server had not banked yet (the settle still in flight, or trimmed by

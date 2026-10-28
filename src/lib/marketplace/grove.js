@@ -1,4 +1,6 @@
 import "server-only";
+import { itemById } from "@/lib/marketplace/items.js";
+import { GROVE_GEAR, SET_PIECE } from "@/lib/marketplace/grove-loot.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 
 import { db } from "@/lib/db";
@@ -537,9 +539,40 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
     const kills = Number(zrow?.kills) || 0;
     const wait = Math.max(0, Number(zrow?.wait_ms) || 0);
 
+    // ── ⚠️ THE SPRITES FOR WHAT THIS ZONE CAN DROP, SENT WITH THE SESSION ───────────────────────────
+    // Luke: "when items drop, like loot, does the actual sprite drop for it? If not, please make it do
+    // that."
+    //
+    // It did not. Parts and emblems spilled on the ground with their art; GEAR was granted silently at
+    // settle, so a player killed something, got a sword, and saw nothing fall. A reward nobody watches
+    // land is a reward nobody knows they got.
+    //
+    // The scene cannot look a sprite up — it has no database and must not make a request per kill, which
+    // is the whole architecture of this feature. So the art rides the session: a zone has at most two
+    // residents and each has three slots, so this is SIX rows, once, on a request that was already
+    // happening. Nothing per kill, nothing per drop.
+    const gearIds = [...new Set([
+        ...(zone.enemies || []).flatMap((fid) => {
+            const row = GROVE_GEAR[`${zone.id}|${fid}`];
+            return row ? [row.normal, row.rare, row.sup].filter(Boolean) : [];
+        }),
+        // ⚠️ AND THE SET POOL, ONCE THE DEPTH CAN ROLL ONE. A set piece does NOT come from the creature's
+        // table — rollKill replaces the gear with a draw from the 71-piece pool — so sizing this list off
+        // the table alone would leave the single rarest drop in the feature with no art, and a drop with
+        // no art spills nothing at all. The rarest thing in the Grove would be the one thing you never
+        // see land. Only below the depth that can roll it, so the on-ramp payload stays at six rows.
+        ...((zone.map || 0) >= SET_PIECE.fromMap ? SET_PIECE.pool : []),
+    ])];
+    const gearArt = gearIds.length
+        ? Object.fromEntries((await db.query(
+            `SELECT item_id AS k, url FROM mkt_item_sprite WHERE item_id = ANY($1)`, [gearIds],
+        ).catch(() => [])).map((r) => [r.k, { url: r.url, name: itemById(r.k)?.name || r.k }]))
+        : {};
+
     return {
         ok: true,
         seed,
+        gearArt,
         zone: {
             ...zone,
             kills,

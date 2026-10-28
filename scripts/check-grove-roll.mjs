@@ -120,6 +120,25 @@ ok(exclusive.length === 0,
     `${exclusive.length} EXCLUSIVE items are in the gear tables (${exclusive.slice(0, 3).map((i) => i.id).join(", ")}) `
     + "— forged twins, elite, owner-only and seasonal gear must never drop");
 
+// ⚠️ 7a-ii. EVERY GEAR ITEM MUST HAVE A SPRITE, or the drop is invisible.
+// Gear spills on the ground like a part does, and the scene draws it from mkt_item_sprite. An item with no
+// row there spills nothing — the kill pays out at settle and the player sees no reason why. Silent, and
+// indistinguishable from "it did not drop". Checked against the database because that is where the art is.
+{
+    const { readFileSync } = await import("node:fs");
+    const pick = (f, k) => readFileSync(f, "utf8").split("\n")
+        .find((l) => l.startsWith(k + "="))?.slice(k.length + 1).trim();
+    const url = process.env.DATABASE_URL || pick("C:/Users/Luke/Projects/accounting_app/.env", "DATABASE_URL");
+    if (url) {
+        process.env.DATABASE_URL = url;
+        const { db } = await import("@/lib/db.js");
+        const ids = [...gearItems];
+        const have = new Set((await db.query(`SELECT item_id FROM mkt_item_sprite WHERE item_id = ANY($1)`, [ids]).catch(() => [])).map((r) => r.item_id));
+        const noArt = ids.filter((i) => !have.has(i));
+        ok(noArt.length === 0, `${noArt.length} gear item(s) have no sprite, so they would drop invisibly: ${noArt.slice(0, 5).join(", ")}`);
+    }
+}
+
 // 7b. a creature's three slots are three different items.
 const dupRows = Object.entries(GROVE_GEAR).filter(([, r]) => new Set([r.normal, r.rare, r.sup]).size < 3);
 ok(dupRows.length === 0, `${dupRows.length} rows repeat an item across their own slots (${dupRows.slice(0, 3).map(([k]) => k).join(", ")})`);

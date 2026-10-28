@@ -316,7 +316,7 @@ const SWING_V_REACH = 6;
 // A pet that falls this far behind has lost the plot — see the rescue in the loop.
 
 export default function GroveScene({
-    zone, seed, bonuses, stats, heroArt, petArt, belt, labScene, bagRoom = null,
+    zone, seed, bonuses, stats, heroArt, petArt, belt, labScene, bagRoom = null, gearArt = null,
     // ⚠️ ONE NUMBER, ALREADY MULTIPLIED OUT, AND NOT THE RARITY AND LEVEL IT CAME FROM. The share of a
     // hero swing this member's companion bites for, computed on the server in heroLook (grove.js) off the
     // equipped pet's rarity and its pet-XP level. Handing the scene the two inputs instead would have put
@@ -404,6 +404,12 @@ export default function GroveScene({
     // a ref from inside a setState updater, which React is free to run twice.
     const [beltAte, setBeltAte] = useState(0);
     const beltCount = Number(belt?.count) || 0;
+    // ⚠️ A REF, NOT THE PROP. The kill handler runs inside the animation loop's closure, which is created
+    // once — reading `gearArt` directly there would capture whatever it was when the scene mounted and keep
+    // using it after a zone change. Same reason every other live value in this file is a ref.
+    const gearArtRef = useRef(gearArt || {});
+    useEffect(() => { gearArtRef.current = gearArt || {}; }, [gearArt]);
+
     useEffect(() => {
         const w = worldRef.current;
         if (!w || beltCount <= (Number(w.foodLeft) || 0)) return;
@@ -1593,8 +1599,25 @@ export default function GroveScene({
                 wd.emblemForced = true;
                 got.emblem = GROVE_ENEMIES[foe.id]?.emblem || "em_grub";
             }
+            // ⚠️ AND THE SAME DOOR FOR GEAR, FOR THE SAME REASON. Gear is one kill in forty on the on-ramp
+            // and one in two hundred at the frontier, so "does the sword actually land on the ground" is a
+            // question nobody can answer by playing. Forced from whatever this zone's table holds — the
+            // first id in gearArt, which is exactly what the session says can drop here — so the lab tests
+            // the real payload rather than a made-up item that would have art in no build.
+            // EVERY kill, not the first one. The scene is running before a camera can be attached, so a
+            // once-only force had already been spent by frame zero of every film — the sheet showed the
+            // staff in the TALLY and never on the ground. Repeating it is also simply better for review:
+            // several in flight at once is how you judge whether they read against the floor.
+            if (labScene === "gear") {
+                const first = Object.keys(gearArtRef.current || {})[0] || null;
+                if (first) { got.gear = first; got.gearTier = "sup"; }
+            }
             const rows = Object.entries(got.parts);
-            const total = rows.length + (got.emblem ? 1 : 0);
+            // ⚠️ GEAR COUNTS TOWARD THE FAN. spillVelocity spreads n drops across an arc using `total`, so a
+            // count that omits the gear aims every piece as though there were one fewer — the pieces bunch
+            // and the last one leaves the arc. The spill looked right only because gear is rare enough that
+            // the mis-aimed case is the one nobody happens to be watching.
+            const total = rows.length + (got.emblem ? 1 : 0) + (got.gear ? 1 : 0);
             let n = 0;
             const spill = (uid, part, label, opts = {}) => {
                 const v = spillVelocity(n, total, wd.rand);
@@ -1612,6 +1635,27 @@ export default function GroveScene({
                     vx: v.vx, vy: v.vy, ...opts,
                 });
             };
+            // ── ⚠️ GEAR FALLS ON THE GROUND LIKE EVERYTHING ELSE ────────────────────────────────
+            // It is the best thing a wanderer can drop and it was the only drop with nothing to watch.
+            // Spilled through the same path as a part so it arcs, lands, waits to be walked over and
+            // pops the same way — a second drop pipeline would be a second set of bugs.
+            //
+            // `art` comes off the session payload (see the note in grove.js), never a lookup here: the
+            // scene has no database and a request per kill is the one thing this feature cannot do.
+            if (got.gear) {
+                const g = gearArtRef.current?.[got.gear] || null;
+                if (g?.url) {
+                    spill(`gear-${i}-${got.gear}`, got.gear, g.name || got.gear, {
+                        art: g.url,
+                        // The rarest slot throws higher and lands slower, so a super-rare reads as an
+                        // event rather than as another root.
+                        // "set" is rarer than "sup" and must not fall through to the quiet case —
+                        // a collection piece is the rarest thing a creature drops in the whole feature.
+                        band: got.gearTier === "sup" || got.gearTier === "set" ? "rare"
+                            : got.gearTier === "rare" ? "band" : null,
+                    });
+                }
+            }
             for (const [part, count] of rows) {
                 const meta = grovePart(part);
                 // ⚠️ WHAT MADE IT SPECIAL RIDES THE DROP. A twelve-fold windfall that lands looking like a
@@ -3944,7 +3988,10 @@ function setUpLabScene(w, scene, blow = 400) {
                 grounded: true, tier: 1, rare: i === 3,
             });
         }
-    } else if (scene === "loot") {
+    } else if (scene === "loot" || scene === "gear") {
+        // ⚠️ "gear" SHARES THE LOOT STAGING ON PURPOSE. What it changes is one roll, not the scene: the
+        // forced gear above needs a kill to ride on, and this is the arrangement that already produces one
+        // inside the first second of film. A separate staging would be a second thing to keep in step.
         // One hit point, so the first swing kills and the spill, the rest and the draw-in all land inside
         // three seconds of film.
         // ⚠️ THE WHOLE POPULATION, NOT FOUR OF THEM. Four creatures at one hit point die inside the first
@@ -3953,7 +4000,12 @@ function setUpLabScene(w, scene, blow = 400) {
         // produce a kill for as long as the camera is running.
         const weak = w.foes.filter((x) => !x.isBoss);
         weak.forEach((f, i) => {
-            f.hp = 1;
+            // ⚠️ THE GEAR SCENE CANNOT USE ONE HIT POINT. At 1hp the first creature dies during mount, before
+            // a camera is running — so the forced gear drop had already been spilled, landed and collected
+            // by frame zero, and the sheet showed the tally with a Battle Staff in it and no picture of the
+            // staff. The thing being reviewed is the ARC and the LANDING, which means the kill has to happen
+            // on camera. Three swings at the bench kit puts it about a second in, with the camera rolling.
+            f.hp = scene === "gear" ? 150 : 1;
             f.hit = true;
             f.passive = false;
             if (i < 6) near(f, (i % 2 ? 1 : -1) * (6 + f.h + i * 2));
