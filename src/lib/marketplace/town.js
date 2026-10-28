@@ -1,4 +1,6 @@
 import "server-only";
+import path from "node:path";
+import fsSync from "node:fs";
 import { TOWNS, NEVER_GATED } from "@/lib/marketplace/towns.js";
 import { gateStateFor } from "@/lib/marketplace/town-gate.js";
 
@@ -415,6 +417,26 @@ export async function getTownState(buyerId, { previewTown = null } = {}) {
     const preview = previewTown && isOwner(buyerId) ? Math.max(1, Math.min(TOWNS.length, Number(previewTown))) : null;
     const town = preview || (gate.exempt ? null : gate.town);
 
+    // ── ⚠️ A TOWN MUST NEVER RENDER AS A VOID ───────────────────────────────────────────────────────
+    // Biome towns switch off the midground and the six depth bands, because a cavern has no city skyline.
+    // That is right — but it means a town whose own sky and foreground have not been DRAWN yet has nothing
+    // between the ground and the top of the frame, and renders as a floor floating in empty purple. Six of
+    // the seven looked like that, including the first screen a new account would ever see.
+    //
+    // So existence is checked HERE, on the server, where the filesystem is: each layer resolves to the
+    // town's art if the file is on disk, and to the default town's otherwise. A half-drawn town degrades to
+    // the old street instead of to nothing, and the art can land one town at a time without a broken window
+    // in between.
+    const townLayers = town ? (() => {
+        const t = TOWNS.find((x) => x.n === town);
+        const has = (suffix) => {
+            try {
+                return fsSync.existsSync(path.join(process.cwd(), "public", "images", "town", "ground", `${t.id}${suffix}.webp`));
+            } catch { return false; }
+        };
+        return { id: t.id, sky: has("-sky"), fg: has("-fg"), ground: has("") };
+    })() : null;
+
     const [art, petSprites, petSpriteLevels, friends, projects, bonuses, event, quests, chestArt, eventsLive, chatLog, defaultSprite] = await Promise.all([
         shared("town:art", TTL.ART, () => getTownArt()),
         shared("town:petSprites", TTL.ART, () => getPetSpriteData().catch(() => ({}))),
@@ -599,6 +621,8 @@ export async function getTownState(buyerId, { previewTown = null } = {}) {
                 // and TownClient draws its usual single street when it is null.
                 town: town ? {
                     n: town,
+                    // Which of this town's three layers actually exist. The client falls back per layer.
+                    layers: townLayers,
                     ...TOWNS.find((t) => t.n === town),
                     reached: TOWNS.filter((t) => t.n <= town).map((t) => ({ n: t.n, id: t.id, name: t.name, biome: t.biome })),
                 } : null,

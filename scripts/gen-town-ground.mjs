@@ -244,8 +244,10 @@ for (const key of todo) {
     // of prompting fixes a straight edge — it is a property of the canvas, not the picture. So the bottom of
     // the midground fades to nothing over the last fifth of its height, and the TOP of the ground band fades
     // in over its first tenth. Where they overlap, each is half there, and the join stops being a line.
-    if (BACK) buf = await feather(buf, "bottom", 0.22);
-    else if (!SKY && !FG) buf = await feather(buf, "top", 0.10);
+    // ⚠️ ONE SOFT EDGE PER JOINT. The foreground fades out at its bottom; the GROUND stays solid. Feathering
+    // both sides of the same joint leaves a band where the page shows through two half-transparent layers,
+    // which drew a dark bar across all seven towns at once.
+    if (BACK || FG) buf = await feather(buf, "bottom", 0.22);
     fs.writeFileSync(file, await sharp(buf).webp({ quality: 90, alphaQuality: 100 }).toBuffer());
     console.log(`✓ ${key} (${Math.round(fs.statSync(file).size / 1024)}kb)`);
 }

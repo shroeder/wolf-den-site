@@ -1210,8 +1210,12 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // ⚠️ BUMP THIS WHEN A TOWN LAYER IS REDRAWN. Static assets under /public are served with a day of
     // max-age, so a redrawn sky keeps rendering as the old one — which cost a full round of "the art did not
     // change" before anyone looked at the file on disk and found that it had. Same scar the sprites carry.
-    const TOWN_ART_V = 3;
+    const TOWN_ART_V = 5;
     const townArt = (suffix) => `/images/town/ground/${town.id}${suffix}.webp?v=${TOWN_ART_V}`;
+    // ⚠️ PER LAYER, NOT PER TOWN. `town.layers` says which of the three are actually drawn; anything
+    // missing falls back to the default street's version of that layer rather than to nothing. A town
+    // half-way through being drawn looks like the old town, never like a void.
+    const L = town?.layers || {};
     // Every door in the plaza, with the spot it stands on. Buildings sit on the ground line (their art is
     // anchored at GROUND - 4 and is 176px tall, so the pail goes at their foot); the NPCs stand a little
     // nearer the camera at GROUND + 6 and their pails go in front of them, hence the higher z.
@@ -2297,7 +2301,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                         {tiles(11).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img key={k} src={(town?.id ? townArt("-sky") : art.sky.url)} alt="" draggable={false} />
+                            <img key={k} src={(L.sky ? townArt("-sky") : art.sky.url)} alt="" draggable={false} />
                         ))}
                     </div>
                 ) : (!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null)}
@@ -2380,7 +2384,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     the default town they are the distance. In Deepdelve they put a lit city on the far side
                     of a cavern wall, which is the "those two things conflict" Luke is pointing at. The
                     biome's SKY carries its own depth, so these are simply off. */}
-                {layered && !town ? [6, 5, 4, 3, 1].filter((n) => effDepth >= n && art[`depth${n}`]?.url).map((n) => {
+                {layered && (!town || !L.sky) ? [6, 5, 4, 3, 1].filter((n) => effDepth >= n && art[`depth${n}`]?.url).map((n) => {
                     const factor = Math.max(0.3, 0.47 - (n - 1) * 0.03); // farther back → slower parallax
                     return (
                         <div key={n} className="tw-depth" aria-hidden="true" style={{ opacity: Math.max(0.5, 0.92 - (n - 1) * 0.08), transform: `translateX(${-cameraPx * factor}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
@@ -2408,7 +2412,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
 
                     So: two generated layers per town instead of three, no conflicting bands, and the art
                     budget drops by a third. */}
-                {layered && !town && art.mid?.url ? (
+                {layered && (!town || !L.sky) && art.mid?.url ? (
                     <div className="tw-mid" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.55}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                         {tiles(13).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -2417,7 +2421,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     </div>
                 ) : null}
                 {/* The wide world that scrolls under a fixed camera */}
-                <div className="tw-world" style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
+                <div className={`tw-world${town ? " is-town" : ""}`} style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                     {/* THE HIDDEN GLIMMER — lives INSIDE the world, so its x/y pin it to a real spot in the town
                         that you have to walk to and spot. It used to sit outside this container, which meant it
                         was positioned against the viewport and slid along with the screen: it could never be
@@ -2491,7 +2495,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 the everyday cobbles on purpose, so the one night filter treats both alike. */}
                             {tiles(19).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img key={k} src={(town?.id ? townArt("") : ((spooky && art.hw_cobble?.url) || art.cobble.url))} alt="" draggable={false} />
+                                <img key={k} src={(L.ground ? townArt("") : ((spooky && art.hw_cobble?.url) || art.cobble.url))} alt="" draggable={false} />
                             ))}
                         </div>
                     ) : art.background ? (
@@ -2508,7 +2512,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         <div className="tw-fg" aria-hidden="true">
                             {tiles(24).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img key={k} src={(town?.id ? townArt("-fg") : ((spooky && art.hw_fg?.url) || art.fg.url))} alt="" draggable={false} />
+                                <img key={k} src={(L.fg ? townArt("-fg") : ((spooky && art.hw_fg?.url) || art.fg.url))} alt="" draggable={false} />
                             ))}
                         </div>
                     ) : null}
@@ -4074,8 +4078,25 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 /* Foreground plaza border wall — ground-locked, sits over the sky/street seam. */
 .tw-fg { position: absolute; left: 0; bottom: 37.5%; height: 34%; display: flex; z-index: 90; pointer-events: none; }
 .tw-fg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
+/* ⚠️ MIRROR EVERY OTHER COPY. A band repeated nineteen times reads as wallpaper — you can count the
+   bays. The wide backdrop already does this (.tw-bg img:nth-child(even)); the foreground and the far
+   sky never did, so their repeat was the most obvious thing on the street. Flipping alternate copies
+   doubles the apparent period and breaks the rhythm for free. */
+.tw-fg img:nth-child(even) { transform: scaleX(-1); }
+.tw-far img:nth-child(even) { transform: scaleX(-1); }
 .tw-fg img:nth-child(even) { transform: scaleX(-1); }
 .tw-cobble { position: absolute; left: 0; bottom: 0; height: 44%; display: flex; overflow: hidden; z-index: 1; box-shadow: inset 0 12px 26px rgba(0,0,0,0.35); }
+/* ⚠️ NO INSET SHADOW ON A FEATHERED GROUND. That shadow exists to tuck an OPAQUE cobble band under the
+   street; a town ground now fades out over its top tenth, so the shadow painted a dark horizontal bar
+   straight across the fade — the one artefact visible in all seven towns at once. The feather is the
+   tuck now, and it does the job without drawing a line. */
+.tw-world.is-town .tw-cobble { box-shadow: none; }
+/* ⚠️ AND THE FOREGROUND HAS TO SPAN THE GAP THE MIDGROUND USED TO FILL. The default street stacks sky →
+   midground treeline → ground, and the treeline is what covers the middle third. A biome town drops the
+   midground on purpose, which left a flat strip of bare sky between the foreground's painted top and the
+   ground — the one artefact that measured identically in all seven towns (a 44-89 luma step at the same
+   row every time). Taller, and seated where the sky stops, so the three layers actually meet. */
+.tw-world.is-town .tw-fg { bottom: 33%; height: 42%; }
 .tw-cobble img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
 /* ── A SHUTTERED BUILDING ─────────────────────────────────────────────────────────────────────────
    The next town's doors, standing on this street with the lights off. Dimmed and desaturated rather
