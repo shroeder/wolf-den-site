@@ -440,6 +440,51 @@ affixes   ← each line rolls inside a range  ← the chase lives here
 codebase; a roller that writes the rolled values back onto the table row decays the table for every
 subsequent kill, server-wide, until the process restarts. Build a new object every time.
 
+### ⚠️ Tradeable collides with rolled, and the collision is structural
+
+Luke: *"Yes, it's tradable"* — *"follows the same trade regulations we have on gear today."* That is the
+right instinct and it exposes the one genuine blocker in this design, because **today's gear economy is
+type-based, not instance-based.**
+
+Checked against production:
+
+| | what it stores | meaning |
+|---|---|---|
+| `mkt_user_item` | a per-copy uuid, but `item_id` is a **text catalogue key** | 76 copies of `leather_armor` exist as 76 indistinguishable rows |
+| `mkt_auction.item_id` | **text** — `"bone_charm"`, `"scale_mail"` | a listing says *"a scale mail"*, never *"this scale mail"* |
+| `mkt_item_enhance` | keyed `(buyer_id, item_id)` | your forge level belongs to the **type**, not the copy |
+
+So two copies of an item are interchangeable **by design**, and the auction, the forge and the compendium
+are all built on that assumption. **Random rolls break it at the root**: if a Rootwood Blade can roll
+differently each time, "a Rootwood Blade" stops being a thing you can list, enhance, or hand over.
+
+The failure mode is the quiet kind this codebase keeps getting bitten by — nothing errors. Somebody buys the
+perfect-roll blade they saw on the auction and receives a different one, and the bug report is *"the auction
+gave me the wrong item"* months later.
+
+**Two honest ways out, and this needs Luke:**
+
+**(a) Make gear instance-based.** Rolled stats live on the copy (`mkt_user_item` gains a stat column), and
+the auction, trades, the forge and equipping all move from the type key to the instance uuid. This is what
+"random rolls" really means and it is the right long-term shape for a loot game.
+⚠️ **28 files touch `mkt_user_item`** — the auction, crafting, compendium, collections, chests, delves, the
+farm, badges. Changing the identity of gear underneath all of them is the largest structural change this
+game has had, and the rarity-ladder scar is the precedent for what happens when a core lookup changes and
+its consumers do not follow.
+
+**(b) Quantise the roll into named grades.** Each Grove base ships as a small set of real catalogue entries
+— *Rootwood Blade*, *Keen* Rootwood Blade, *Savage* Rootwood Blade — each with its own stat block and its own
+`item_id`. The roll picks a grade.
+Trade, forge, compendium and collections keep working **completely unchanged**, which is the literal reading
+of *"the same trade regulations we have on gear today."* The chase survives — *"I pulled a Pristine one"* is
+braggable and legible — at the cost of granularity: five grades rather than a continuous range.
+
+**Recommendation: (b) for the first build, (a) as a later migration if the granularity is missed.** Not
+because (a) is wrong — it is the better endgame — but because the loudest rule in this repo is that a change
+to a core lookup goes wrong *silently* in the consumers that did not follow it, and gear identity is read in
+28 places. (b) delivers the farm, the curve, the bands and the step-up tail with zero blast radius, and
+leaves (a) available once the feature has proven it is worth the migration.
+
 ### The three scars this is standing on
 
 1. **The chest chain** — first match wins, so a new row steals from its neighbours. Hence gear as an
@@ -629,16 +674,18 @@ Still open:
 
 1. ~~Does the Grove's ladder stop at eternal?~~ **No — rare but possible.** Sized at 0.34% / 0.067% step-up
    against the chest ladder's budget; re-measure once the Grove has real traffic.
-2. **Is Grove gear tradeable?** Tradeable makes the market real; bound contains the faucet completely. The
-   two-rate curve in §3e assumes tradeable.
-3. ~~Does a new account get a starter kit?~~ **Largely answered by gear drops** — a common kit is exactly the
+2. ~~Is Grove gear tradeable?~~ **Yes, under the same rules as gear today** — which forces the next one.
+3. **Rolled stats need per-copy identity, and gear today has none.** Instance-based gear (28 files) or
+   quantised named grades (zero blast radius)? See the end of §3e. This is now the decision that gates the
+   build.
+4. ~~Does a new account get a starter kit?~~ **Largely answered by gear drops** — a common kit is exactly the
    100 dps the floor needs, so the question narrows to whether they survive the first sixty seconds before
    anything has dropped.
-4. **Does the gate apply to shop-side game features?** The daily spin is a counter-scan reward in store. If a
+5. **Does the gate apply to shop-side game features?** The daily spin is a counter-scan reward in store. If a
    customer scans a code at the till on day one, does it work?
-5. **Card game (Spire)** is already pet-gated, and pets are now town 1. Does it come with them, or wait for
+6. **Card game (Spire)** is already pet-gated, and pets are now town 1. Does it come with them, or wait for
    town 5 with the dungeons?
-6. **Does the day-one pet fight, and at what power?** With pets in town 1 the companion is now part of the
+7. **Does the day-one pet fight, and at what power?** With pets in town 1 the companion is now part of the
    floor calculation in §3a, not a separate feature — a pet that contributes real damage changes what the
    on-ramp has to be.
 
