@@ -21,6 +21,17 @@ From Luke, 2026-10-28 — these are settled, not open:
 - **The existing town splits.** Today's town has a house per feature. Those houses distribute across the
   seven towns — town 1 keeps only the first few, and each new town brings its own.
 
+### Decided 2026-10-28, answering the open questions
+
+- **Pets open in full in town 1.** Not a starter pet with the systems held back — the whole feature, day one.
+  It is the best attachment hook the game has, and it goes where it does the most work.
+- **Seven separate streets, with fast travel between unlocked towns.** Each town is its own place with its
+  own biome art and its own few buildings, rather than one street that accumulates.
+- **Bosses are required to advance.** Luke: *"this was a bug, bosses should be required to move to the next
+  stage."* **Already true in the shipped code** — see §3b.
+- **The curve gets rethought, not patched.** Luke: *"make the boss way easier, along with many in the forest
+  and second maps, and the enemies too."* The measured case is §3a; the proposal is §3c.
+
 ---
 
 ## 2. What the numbers actually say
@@ -67,42 +78,85 @@ the farm for a week.
 
 ---
 
-## 3. ⚠️ The blocker: the Grove has no floor
+## 3. ⚠️ The blocker: a new account dies to two rats
 
-**This is the one thing that must be fixed before any of the rest ships.**
+**This must be fixed before any of the rest ships**, and the first pass understated it.
 
-The Grove's difficulty is anchored at the bottom to **Littlewolf — an established member with gear, pets and
-badges, doing 1,830 dps.** That was correct when the Grove was the newest room in a game you were already
-strong in. The town plan inverts it: the Grove becomes the *first* thing a new account touches, with every
-other source of power still locked.
+### 3a. What a new account actually is
 
-A bare account does **2 dps**. Against the shipped zone 1:
+Not a guess, and not one unlucky member. Profiling the **forty lowest-XP accounts on the server**, thirty-nine
+sit under 50 dps and the overwhelming default is exactly **7 dps and 60 health**. That is what the game hands
+somebody at hero creation, and under the town plan it is the whole of what they bring to the Grove.
 
-| | health | at 2 dps | at 100 dps |
-|---|---|---|---|
-| Rootrat (zone 1's only resident) | 290 | 119 seconds | 3 seconds |
-| Glutmaw (zone 1 boss) | 9,000 | **61 minutes** | 90 seconds |
+Against zone 1 **as shipped**:
 
-The catalogue already carries the evidence, in Luke's own words: *"my son can't get past the first map,
-first zone's boss."* That was with an account that had played other systems. A post-launch account will have
-less.
+| | value | at 7 dps / 60 hp |
+|---|---|---|
+| Rootrat health | 290 | **41 seconds** to kill one |
+| Rootrat damage | 34–53 | **dies in 1.4 hits** |
+| Glutmaw health | 9,000 | **21 minutes** |
+| Glutmaw damage | 70–96 | **dies in 0.7 hits — one-shot** |
 
-**The spec that falls out of it:** a new account needs roughly **100 dps on arrival** and should leave map 1
-at **300–400 dps**, entirely from starter kit plus the Grove's own drops. At 400 dps the Heartwood Elder
-(27,458 hp) is a 70-second fight, which is a finale rather than a wall.
+So the problem was never only "the boss takes too long". **The first ordinary enemy in the game two-shots a
+new player, and the first boss one-shots them.** Damage is the number nobody had looked at: the difficulty
+work to date tuned health against veterans, for whom incoming damage is close to irrelevant.
 
-Three ways to get there, in order of preference:
+The catalogue already carries the symptom in Luke's own words — *"my son can't get past the first map, first
+zone's boss"* — and that was an account that had played the other systems.
 
-1. **Starter kit at hero creation** — a weapon and two armour pieces that total ~100 dps and enough health to
-   survive a rootrat. Cheapest to build, easiest to tune, and it gives the player something to *replace*,
-   which is the whole early loop.
-2. **Re-anchor map 1 to a bare account** — rerun `grove:curve` with the low anchor set to a fresh profile
-   instead of Littlewolf. Correct, but it moves 84 zones of shipped numbers.
-3. Both, which is probably the answer: a small kit, and map 1 re-anchored to it.
+### 3b. The boss gate is already closed
 
-Until this is decided, everything below is a plan for a door nobody can walk through.
+Luke: *"this was a bug, bosses should be required to move to the next stage."* **It was a bug, and it is
+already fixed.** Littlewolf once reached zone ten having killed no bosses at all; `openTheWay()` is now the
+only thing that moves `unlocked_n`, and the boss kill is its only caller. Clearing a zone earns the *right to
+fight* its boss; killing the boss is what opens the next zone. Nothing to build.
 
----
+⚠️ **Which is why §3a is urgent rather than merely bad.** Every zone boss is a hard gate. A boss that
+one-shots a new player does not make the Grove difficult — it makes the Grove, and therefore the whole game
+behind these towns, impossible to enter.
+
+### 3c. The proposal: an on-ramp segment, not a flatter game
+
+The shipped climb is `hpPerZone 5.04%` and `dmgPerZone 3.25%`, compounding on global depth — a x67.6 span in
+enemy health across the 83 steps from map 1 to the end of map 7. Dropping zone 1 to something a new account
+can fight *while holding the far end fixed* would need **8.12% per zone**, which makes every mid-game zone
+sharply harder and walls today's members earlier than they wall now. That is the wrong trade.
+
+So: **give depths 1–24 their own segment**, rejoining the shipped curve at depth 25. Maps 1 and 2 become the
+on-ramp — the two maps Luke named — and **nothing from map 3 onward moves at all**.
+
+| anchor | foe health | boss health |
+|---|---|---|
+| depth 1, today | 290 | 9,000 |
+| **depth 1, proposed** | **30** | **500** |
+| depth 25 — unchanged, where the segment rejoins | 944 | 29,292 |
+
+That is +15.5% a zone on wanderers and +18.5% on bosses across the on-ramp. Steep on paper, and the right
+shape in practice, because the player's own power climbs fastest exactly here. Assuming roughly +17% a zone
+from the Grove's own drops and emblems, **the feel stays flat**:
+
+| depth | foe hp | boss hp | per wanderer | boss fight |
+|---|---|---|---|---|
+| 1 | 30 | 500 | 4.3 s | 71 s |
+| 6 | 62 | 1,168 | 4.0 s | 76 s |
+| 12 — end of map 1 | 146 | 3,230 | 3.7 s | 82 s |
+| 18 | 345 | 8,936 | 3.4 s | 88 s |
+| 24 — end of map 2 | 818 | 24,723 | 3.2 s | 95 s |
+
+**Four seconds a wanderer and a 70–95 second boss, for twenty-four zones.** That is a game, not a wall.
+
+⚠️ **Damage needs the same treatment, separately.** Health decides whether the fight is long; damage decides
+whether it is survivable, and at 60 hp a new player can afford roughly **6–8 hits**. That puts the zone-1
+wanderer near **5–8 damage** (today 34–53) and the zone-1 boss near **8–12** (today 70–96), scaled across the
+same segment.
+
+Two things to settle before this is built:
+
+1. **Does a new account stay at 7 dps, or get a starter kit?** The table assumes it stays at 7 and the Grove's
+   own drops carry the entire early ramp. A kit would let the on-ramp start less extreme — but having nothing
+   to begin with is also what makes the first drop matter.
+2. **The +17%-a-zone player ramp is an assumption, not a measurement.** Every figure in the feel table rests
+   on it, so it should be measured off the real drop tables before these numbers are committed.
 
 ## 4. The seven towns
 
@@ -110,9 +164,9 @@ The biomes do most of the assignment work — each town's ground names the featu
 
 | # | Town | Opens onto | What it unlocks | ~when |
 |---|---|---|---|---|
-| 1 | **Rootwood Waystation** | The Grove (forest) | The Grove · bag & equipment · hero screen · daily quests · the Tavern · General Store | day one |
+| 1 | **Rootwood Waystation** | The Grove (forest) | The Grove · bag & equipment · hero screen · **pets** · daily quests · the Tavern · General Store | day one |
 | 2 | **Deepdelve Camp** | The Undercave (cave) | The Mine · the Forge · the Compendium | ~30 min |
-| 3 | **Fenhollow** | The Sunken Fen (swamp) | The Farm · pets · the Kitchen | ~2 h |
+| 3 | **Fenhollow** | The Sunken Fen (swamp) | The Farm · the Kitchen · pet food & stones | ~2 h |
 | 4 | **Saltwrack Landing** | The Coast | The Docks & sailing · fishing · the bounty board | ~4.5 h |
 | 5 | **Drowned Quay** | The Drowned Ruins | Dungeons · the Jeweller · sets & collections | ~8.5 h |
 | 6 | **Gilded Exchange** | The Gilded Waste (gold) | The Market · Auction House · trades · the Casino · the daily Spin | ~14 h |
@@ -120,8 +174,10 @@ The biomes do most of the assignment work — each town's ground names the featu
 
 ### Town 1 — Rootwood Waystation
 
-*What a hero is, and nothing else.* One road out of town and into the trees. Six buildings, four of them
-visibly shuttered with a line saying which map opens them.
+*What a hero is, and who walks with them.* One road out of town and into the trees. Six buildings, four of
+them visibly shuttered with a line saying which map opens them.
+
+**Pets open here in full** — the companion fights beside you from the first zone.
 
 The **Tavern is the deliberate inclusion.** Global chat is where the Den's helpers live — graykitsune wrote a
 brand-new player the entire game unprompted last week. Locking a newcomer out of the one room where somebody
@@ -143,10 +199,13 @@ materials and enhances a Grove drop has just closed the game's central loop for 
 *Things that grow.* Farm, Kitchen and **pets** in one town, because they feed each other: the farm grows the
 crops, the kitchen cooks them, the dishes level the pet, and the pet fights beside you in the Grove.
 
-⚠️ **Pets are the biggest single argument against this schedule.** A pet that fights with you is the best
-companion-attachment hook in the game, and two hours is late for it. The alternative is granting a starter
-pet in town 1 and opening the *pet systems* (stones, enshrinement, the farm's pet stand) in town 3. Worth
-deciding deliberately rather than by omission — see §8.
+**Pets went to town 1** (decided 2026-10-28), so Fenhollow is the farm and the kitchen — the things that
+*feed* the pet the player has had since the first zone. That is the better order anyway: the companion
+arrives when it is a companion, and the means of growing it arrive when there is food to grow it with.
+
+⚠️ The cost of that call is two progression systems inside the first twenty minutes. The beat sheet in §7 has
+to absorb it — the pet should arrive as a **character walking beside you**, not as a second screen of
+numbers.
 
 ### Town 4 — Saltwrack Landing
 
@@ -272,17 +331,20 @@ node-map design already specced as locked.
 
 ## 9. Open questions for Luke
 
-1. **Pets in town 1 or town 3?** A fighting companion two hours in is late for the best attachment hook in
-   the game. Starter pet early, pet *systems* in town 3?
-2. **Does the Grove gate the SHOP's game features too** — the daily spin is a counter-scan reward in-store.
-   If a customer scans a code at the till on day one, does the spin work?
-3. **What happens to a town once you pass it?** Fast travel between all unlocked towns, or does the street
-   simply accumulate buildings in one place as today?
-4. **Card game (Spire):** it is already pet-gated. Town 3 with pets, or town 5 with the dungeons?
-5. **Does clearing a map gate on the boss, or on the kill count?** Today the zone unlocks on kills and the
-   boss is optional. If the town is a reward, the boss should probably be the key.
-6. **The starter kit's shape** — see §3. One weapon and two armour pieces, or a full set the player
-   immediately starts replacing?
+**Answered 2026-10-28:** pets → town 1, in full · passed towns → seven separate streets with fast travel ·
+boss or kill count → the boss, and it already works that way.
+
+Still open:
+
+1. **Does a new account get a starter kit, or stay at 7 dps?** §3c assumes it stays at 7 and the Grove's
+   drops carry the ramp. This changes every number in that table.
+2. **Does the gate apply to shop-side game features?** The daily spin is a counter-scan reward in store. If a
+   customer scans a code at the till on day one, does it work?
+3. **Card game (Spire)** is already pet-gated, and pets are now town 1. Does it come with them, or wait for
+   town 5 with the dungeons?
+4. **Does the day-one pet fight, and at what power?** With pets in town 1 the companion is now part of the
+   floor calculation in §3a, not a separate feature — a pet that contributes real damage changes what the
+   on-ramp has to be.
 
 ---
 
@@ -290,8 +352,8 @@ node-map design already specced as locked.
 
 In order, because each one is useless without the one above it:
 
-1. **The floor.** Starter kit, map 1 re-anchored, measured with `grove-reach.mjs` against a zero account.
-   Nothing else matters until a new account can kill a rootrat.
+1. **The floor.** The on-ramp segment of §3c — health *and* damage — measured with `grove-reach.mjs` against
+   a 7 dps / 60 hp account. Nothing else matters until a new account can kill a rootrat without dying to it.
 2. **`gated_at` and `featureUnlocked()`** — one column, one helper, read by both the menu and the route.
 3. **Town 1**, with four visibly locked buildings. One town proves the whole design.
 4. **The unlock moment** — clearing a map lights a building. This is the payoff the entire system exists to
