@@ -8,6 +8,8 @@ import { listShopInventoryShared } from "@/lib/consignment/square";
 import { TTL } from "@/lib/marketplace/shared-cache.js";
 import { listRecentChanges } from "@/lib/inventory-feed/feed";
 import { attachSetNames } from "@/lib/shop-set-tags";
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { discoverOpenFor } from "@/lib/marketplace/discover-gate.js";
 
 export const metadata = {
     title: "Pokemon, MTG & Accessories",
@@ -46,11 +48,31 @@ export default async function ShopPage() {
         categories = await attachSetNames(categories).catch(() => categories);
     }
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
+
+    // ── ⚠️ THE DOOR TO DISCOVER ─────────────────────────────────────────────────────────────────────────
+    // Built the deck, shipped it, and linked it from nowhere — Luke: "Where is the experimental at I don't
+    // see the try the new view." That is the SECOND time in one day a finished screen had no way in (the
+    // pack telemetry was the first). A feature reachable only by typing its URL does not exist.
+    //
+    // ⚠️ IT IS A try/catch AROUND AN AUTH READ ON A PUBLIC, CACHED PAGE. /shop renders for signed-out
+    // visitors and for crawlers; a session lookup that throws must degrade to "no toggle", never to a 500
+    // on the storefront. Worth more than the toggle it controls.
+    const viewer = await getAuthenticatedBuyer().catch(() => null);
+    const canDiscover = Boolean(viewer && discoverOpenFor(viewer.id));
     const hasContent = (categories && categories.length > 0) || (justInItems && justInItems.length > 0);
 
     return (
         <div className="stack reveal">
             <ViewPing event="view_shop" />
+            {canDiscover ? (
+                /* Stage one of the rollout, so only the owner sees this at all (discover-gate.js). Phrased
+                   as an invitation rather than a nav item, because it IS experimental and the honest frame
+                   is "try it", not "here is a section of the site". */
+                <Link href="/shop/discover" className="shop-try-new">
+                    <strong>Try the new view</strong>
+                    <span>Swipe through the shop one card at a time</span>
+                </Link>
+            ) : null}
             {paymentsEnabled ? <><RewardsCallout /><StoreCreditCallout /></> : null}
             {hasContent ? (
                 <section className="card">

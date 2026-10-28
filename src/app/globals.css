@@ -27926,3 +27926,21 @@ body.cas-seated .social-fab { display: none; }
 .dv-detail-card h3 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
 .dv-detail-cat { margin: 0; font-size: 0.78rem; color: var(--muted); }
 .dv-detail-price { margin: 0; font-size: 1.6rem; font-weight: 800; color: #F0D27A; }
+
+/* The Discover invitation on /shop. Owner-only for now. Deliberately a card rather than a nav link: it is
+   an experiment somebody is being invited into, and it has to read that way or it reads as a broken
+   section of the site. */
+.shop-try-new {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(212, 175, 55, 0.45);
+    background: rgba(212, 175, 55, 0.07);
+    text-decoration: none;
+}
+
+.shop-try-new:hover { border-color: rgba(212, 175, 55, 0.8); background: rgba(212, 175, 55, 0.12); }
+.shop-try-new strong { color: #F0D27A; font-size: 0.98rem; }
+.shop-try-new span { color: var(--muted); font-size: 0.82rem; }
