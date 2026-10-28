@@ -13,8 +13,10 @@
 //   · the rare spawn's chance is roughly what the table says
 //
 //   node --import ./scripts/lib/register-loader.mjs scripts/check-grove-roll.mjs
-import { GROVE_ENEMIES, GROVE_RARE } from "@/lib/marketplace/grove-catalog.js";
+import { GROVE_ENEMIES, GROVE_RARE, GROVE_ZONES } from "@/lib/marketplace/grove-catalog.js";
 import { rollKill, settleKills, rollRareSpawn, killRng } from "@/lib/marketplace/grove-roll.js";
+import { GROVE_GEAR, GEAR_CHEST, SET_PIECE } from "@/lib/marketplace/grove-loot.js";
+import { itemById, isForgedItem, isRealMoneyItem, isOwnerOnlyItem, isSeasonItem, isHalloweenItem } from "@/lib/marketplace/items.js";
 
 const fail = [];
 const ok = (c, m) => { if (!c) fail.push(m); };
@@ -99,6 +101,65 @@ console.log(`  chest leak      ${leakedChest}`);
 console.log(`  rare spawn      ${(rate * 100).toFixed(3)}% measured vs ${(GROVE_RARE.spawnChance * 100).toFixed(2)}% designed`);
 console.log(`  rare payout     ${Math.round(rareGold / 2000)} gold avg, ${(rareChests / 20).toFixed(1)}% chest`);
 console.log(`  emblem_find     ${base} -> ${buffed} per 20k kills at +100%`);
+
+// ── 7. THE GEAR TABLES ───────────────────────────────────────────────────────────────────────────────
+// ⚠️ THE LOOP IN §4 CANNOT SEE ANY OF THIS. It calls rollKill with no zoneN, so the zone lookup returns
+// null and the gear block never runs — which is correct for what §4 asserts and means the gear rules are
+// untested unless they get their own sweep. They are the rules most likely to be broken by a later
+// hand-edit of grove-loot.js, because that file is DATA and edits to it look harmless.
+const gearItems = new Set();
+for (const row of Object.values(GROVE_GEAR)) for (const k of ["normal", "rare", "sup"]) if (row[k]) gearItems.add(row[k]);
+
+// 7a. every id resolves, and nothing exclusive leaked in.
+const unresolved = [...gearItems].filter((id) => !itemById(id));
+ok(unresolved.length === 0, `${unresolved.length} gear ids resolve to nothing: ${unresolved.slice(0, 4).join(", ")}`);
+
+const exclusive = [...gearItems].map((id) => itemById(id)).filter(Boolean).filter((it) =>
+    isForgedItem(it) || isRealMoneyItem(it) || isOwnerOnlyItem(it) || isSeasonItem(it) || isHalloweenItem(it));
+ok(exclusive.length === 0,
+    `${exclusive.length} EXCLUSIVE items are in the gear tables (${exclusive.slice(0, 3).map((i) => i.id).join(", ")}) `
+    + "— forged twins, elite, owner-only and seasonal gear must never drop");
+
+// 7b. a creature's three slots are three different items.
+const dupRows = Object.entries(GROVE_GEAR).filter(([, r]) => new Set([r.normal, r.rare, r.sup]).size < 3);
+ok(dupRows.length === 0, `${dupRows.length} rows repeat an item across their own slots (${dupRows.slice(0, 3).map(([k]) => k).join(", ")})`);
+
+// 7c. the depth floors hold: no top-tier chest above the on-ramp, no set piece before map 5.
+let earlyChest = 0;
+let earlySet = 0;
+let gearSeen = 0;
+for (const z of GROVE_ZONES) {
+    const map = z.map || 1;
+    if (map > 5) continue;                       // only the shallow half is being policed here
+    for (const foeId of z.enemies) {
+        for (let i = 0; i < 400; i += 1) {
+            const got = rollKill(GROVE_ENEMIES[foeId], SEED + i, i, {}, z.n, null);
+            if (got.gear) gearSeen += 1;
+            if (got.chest) earlyChest += 1;
+            if (got.setPiece && map < 5) earlySet += 1;
+        }
+    }
+}
+ok(earlyChest === 0, `${earlyChest} top-tier chests fell above map 5 — the tail is a frontier reward`);
+ok(earlySet === 0, `${earlySet} collection pieces fell before map 5`);
+ok(gearSeen > 0, "no gear dropped anywhere in maps 1-5 — the tables are not wired in");
+
+// 7d. the rate follows the curve rather than one flat number.
+const rateAt = (zone, n = 20000) => {
+    let hits = 0;
+    for (let i = 0; i < n; i += 1) if (rollKill(GROVE_ENEMIES[zone.enemies[0]], SEED + i, i, {}, zone.n, null).gear) hits += 1;
+    return hits / n;
+};
+const onramp = rateAt(GROVE_ZONES[0]);
+const deep = rateAt(GROVE_ZONES[83]);
+ok(onramp > deep * 2,
+    `the on-ramp (${(onramp * 100).toFixed(2)}%) is not meaningfully more generous than the frontier `
+    + `(${(deep * 100).toFixed(2)}%) — a new account needs a kit from map 1 and a veteran must not mint one an hour`);
+
+console.log("── THE GEAR ─────────────────────────────────────────────────────────────────");
+console.log(`  tables          ${Object.keys(GROVE_GEAR).length} rows, ${gearItems.size} distinct items, 0 exclusives`);
+console.log(`  on-ramp rate    ${(onramp * 100).toFixed(2)}%  vs frontier ${(deep * 100).toFixed(2)}%`);
+console.log(`  depth floors    chest from map ${GEAR_CHEST.fromMap}, set piece from map ${SET_PIECE.fromMap} — nothing early`);
 
 if (fail.length) {
     console.log(`\n── ${fail.length} PROBLEM(S) ──────────────────────────────────────────────────`);

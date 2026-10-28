@@ -171,14 +171,15 @@ const XP_PER_FOE_HP = 96;    // 770hp -> 8 xp,  1460hp -> 15 xp
 const XP_PER_BOSS_HP = 200;  // 59k   -> 295,   180k   -> 900
 
 import { bossChestChance, bossMerits, chestForZone } from "@/lib/marketplace/grove-forge.js";
-import { wandererHyperChance, safeCredit } from "@/lib/marketplace/grove-catalog.js";
+import { GROVE_ZONES, wandererHyperChance, safeCredit } from "@/lib/marketplace/grove-catalog.js";
+import { GROVE_GEAR, GEAR_CHEST, SET_PIECE, SLOT_SPLIT, gearChanceFor } from "@/lib/marketplace/grove-loot.js";
 
 export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = null) {
     // ⚠️ zoneN AND hyperTable DEFAULT TO OFF, and that is a safety property rather than tidiness. Both
     // sides of the wire have to pass the same arguments or the replay disagrees; defaulting to "no hyper
     // roll" means a caller that has not been updated is merely missing a feature instead of quietly
     // rolling a different stream and handing the player a drop the server then declines.
-    const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0, band: null, rare: null, hyper: null };
+    const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0, band: null, rare: null, hyper: null, gear: null, gearTier: null, setPiece: null };
     if (!foe) return out;
     const r = killRng(seed, index);
 
@@ -251,6 +252,68 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
     // ⚠️ Whoever grants this MUST pass `gold: 0` to awardXp — it pays gold 1:1 with points otherwise, which
     // on a repeatable kill loop is a money printer. See awardxp-gold-tracks-xp-landmine.
     out.xp = Math.max(1, Math.round((foe.hp || 10) / XP_PER_FOE_HP));
+    // ── GEAR ────────────────────────────────────────────────────────────────────────────────────────
+    // Luke: "gear drops on enemies throughout the entirety of the grove. That way there's something to
+    // farm for... every enemy still has a loot table of items that it can drop, manicured so every enemy
+    // has something different to drop, but its power is relative to the zone and enemy you're facing."
+    //
+    // ⚠️ IT IS AN INDEPENDENT ROLL, NOT A ROW IN `foe.loot`. That array is WEIGHTED and sums to a whole:
+    // a gear row at w:20 would mean every gear drop is a part that did not drop, and tuning gear up later
+    // would silently nerf crafting with nothing in the diff to say so. Same shape as emblemChance and
+    // rareChance above, for the same reason. Parts are untouched by anything here.
+    //
+    // ⚠️ AND IT IS LAST IN THE FUNCTION ON PURPOSE. Every r() call shifts the stream for everything after
+    // it, and both sides replay this function from the same seed — so appending at the end leaves parts,
+    // the rare row, the emblem, gold, the chest and the hyper byte-identical to what they rolled before
+    // gear existed. A session in flight across the deploy sees the same loot it would have seen.
+    //
+    // The zone is looked up from zoneN rather than passed in, which is what keeps the signature — and
+    // therefore the client and the server — unchanged.
+    const zone = zoneN ? GROVE_ZONES[zoneN - 1] : null;
+    const table = zone && foe?.id ? GROVE_GEAR[`${zone.id}|${foe.id}`] : null;
+    if (table) {
+        const map = zone.map || 1;
+        // "increased rarity of items found in this feature" reads here as MORE OFTEN, the same way it
+        // reads on the parts table — the slot split below is what decides how good the piece is.
+        const find = 1 + (Number(bonus.rarityFind) || 0) / 100;
+        if (r() < gearChanceFor(map) * find) {
+            const slot = r();
+            if (slot < SLOT_SPLIT.sup) { out.gear = table.sup; out.gearTier = "sup"; }
+            else if (slot < SLOT_SPLIT.sup + SLOT_SPLIT.rare) { out.gear = table.rare; out.gearTier = "rare"; }
+            else { out.gear = table.normal; out.gearTier = "normal"; }
+
+            // ── THE TAIL ────────────────────────────────────────────────────────────────────────────
+            // Luke, on celestial and primordial: "no, it's rare, but possible." They cannot drop as items
+            // — every tier above mythic is elite-sourced — so the drop becomes a top-tier CHEST instead,
+            // granted through addChests at the call site like the rare spawn's. One place still decides
+            // how often elite gear enters the game, and the chest open is already a moment the game
+            // celebrates. Deep maps only: this is a frontier reward.
+            if (map >= GEAR_CHEST.fromMap) {
+                const t = r();
+                if (t < GEAR_CHEST.primordial) { out.chest = "primordial"; out.gear = null; out.gearTier = null; }
+                else if (t < GEAR_CHEST.primordial + GEAR_CHEST.celestial) { out.chest = "celestial"; out.gear = null; out.gearTier = null; }
+            }
+
+            // ── A COLLECTION PIECE ──────────────────────────────────────────────────────────────────
+            // Luke: "make it extremely hard to get in the Grove as well." Two a month Den-wide, one per
+            // ~39 hours of farming — 2.5% of the flow the game already produces, which makes this the
+            // hardest route to a set piece in the game while keeping it possible. Map 5 on, so it cannot
+            // be farmed on the on-ramp where the gear rate is three times higher.
+            if (map >= SET_PIECE.fromMap && out.gear && r() < SET_PIECE.chance) {
+                // ⚠️ IT REPLACES THE PIECE THAT DROPPED, and it picks a REAL id rather than setting a
+                // flag — a flag leaves the caller to decide which piece, which is a second place that
+                // decides loot and the exact shape that drifts. The pool is emitted into grove-loot.js
+                // beside the tables so the client and the server pick the same one from the same seed.
+                const pool = SET_PIECE.pool || [];
+                if (pool.length) {
+                    out.gear = pool[Math.min(pool.length - 1, Math.floor(r() * pool.length))];
+                    out.gearTier = "set";
+                    out.setPiece = out.gear;
+                }
+            }
+        }
+    }
+
     return out;
 }
 
@@ -352,6 +415,7 @@ export function rollGroveChest(chest, seed, index, bonus = {}, hyperTable = null
     if (hyperTable && chest.hyperChance && r() < chest.hyperChance * (1 + rarity / 100)) {
         out.hyper = pickHyper(chest.hyperFloor || 1, r(), hyperTable);
     }
+
     return out;
 }
 
@@ -410,7 +474,7 @@ export function rollRareSpawn(baseChance, seed, index, bonus = {}) {
 export function rollKillTimes(foe, seed, index, bonus, zoneN, hyperTable, times = 1) {
     const n = Math.max(1, Math.floor(Number(times) || 1));
     const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0, band: null, rare: null, hyper: null,
-        chests: [], hypers: [], emblems: {} };
+        chests: [], hypers: [], emblems: {}, gear: null, gearTier: null, gears: [], setPieces: 0 };
     for (let r = 0; r < n; r += 1) {
         const got = rollKill(foe, (Number(seed) || 0) ^ Math.imul(r, 0x85EBCA6B), index, bonus, zoneN, hyperTable);
         for (const [p, c] of Object.entries(got.parts)) out.parts[p] = (out.parts[p] || 0) + c;
@@ -418,10 +482,14 @@ export function rollKillTimes(foe, seed, index, bonus, zoneN, hyperTable, times 
         out.xp += got.xp;
         if (got.chest) out.chests.push(got.chest);
         if (got.hyper) out.hypers.push(got.hyper);
+        // Gear is collected like chests are — a multi-kill of four bodies rolls the table four times, so
+        // four pieces is the honest answer, not one.
+        if (got.gear) out.gears.push({ id: got.gear, tier: got.gearTier });
+        if (got.setPiece) out.setPieces += 1;
         if (got.emblem) out.emblems[got.emblem] = (out.emblems[got.emblem] || 0) + 1;
         // The FIRST roll is the one the scene draws a band and a rare off — those are presentation for the
         // body that just fell, and there is only ever one body.
-        if (r === 0) { out.emblem = got.emblem; out.chest = got.chest; out.band = got.band; out.rare = got.rare; out.hyper = got.hyper; }
+        if (r === 0) { out.emblem = got.emblem; out.chest = got.chest; out.band = got.band; out.rare = got.rare; out.hyper = got.hyper; out.gear = got.gear; out.gearTier = got.gearTier; }
     }
     return out;
 }
@@ -438,6 +506,10 @@ export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTab
     // this file is about. The caller grants these through grantHyper, the same function the boss uses --
     // one payout, one path. See [[atomic-split-into-steps-drops-lines]].
     const hypers = [];
+    // Same contract as hypers: collected and RETURNED, or the scene spills a sword on the floor and the
+    // settle hands over nothing.
+    const gears = [];
+    let setPieces = 0;
 
     for (const k of kills || []) {
         const foe = lookup(k.id);
@@ -451,6 +523,8 @@ export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTab
         xp += got.xp;
         for (const c of got.chests) chests.push(c);
         for (const h of got.hypers) hypers.push(h);
+        for (const g of got.gears) gears.push(g);
+        setPieces += got.setPieces || 0;
     }
-    return { parts, emblems, gold, xp, chests, hypers };
+    return { parts, emblems, gold, xp, chests, hypers, gears, setPieces };
 }

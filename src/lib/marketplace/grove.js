@@ -1,4 +1,5 @@
 import "server-only";
+import { grantItem } from "@/lib/marketplace/inventory.js";
 
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
@@ -714,6 +715,21 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     }
     for (const tier of got.chests) {
         await addChests(buyerId, { [tier]: 1 }, { source: "grove_rare" }).catch(() => {});
+    }
+
+    // ── GEAR ────────────────────────────────────────────────────────────────────────────────────────
+    // Luke: "gear drops on enemies throughout the entirety of the grove. That way there's something to
+    // farm for."
+    //
+    // ⚠️ THROUGH grantItem, THE FUNCTION EVERY OTHER SOURCE USES. The chest, the delve, the raid and
+    // fishing all hand gear over the same way; a second INSERT here would be a second path for one
+    // payout, which this repo has paid for twice already. `via` is "grove" so the ledger can tell the
+    // Grove's contribution from the chests' — which is the number the faucet gets re-measured on.
+    const gearGot = [];
+    for (const g of got.gears || []) {
+        if (!g?.id) continue;
+        const ok = await grantItem(buyerId, g.id, "grove").catch(() => null);
+        if (ok !== null) gearGot.push(g);
     }
     // ── ⚠️ THE HYPER-RARES, THROUGH THE BOSS'S OWN grantHyper ───────────────────────────────────────
     // Ordinary kills can now pay the hyper table at about one in two thousand. This grants them with the
