@@ -1,4 +1,6 @@
 import "server-only";
+import { TOWNS, NEVER_GATED } from "@/lib/marketplace/towns.js";
+import { gateStateFor } from "@/lib/marketplace/town-gate.js";
 
 import { db } from "@/lib/db";
 import { isOwner, isPrimaryOwner } from "@/lib/marketplace/owner.js";
@@ -95,34 +97,68 @@ const ONLINE_WINDOW = "90 seconds";
 // All nine are on by default. The Vault + Festival Stage used to be community-funded unlocks; they're now
 // standing fixtures on the (widened) street, so the plaza always feels full. x is a % of the WIDE world.
 export const TOWN_BUILDINGS = [
-    { id: "tavern", emoji: "🍺", label: "The Tavern", href: "/marketplace/friends", x: 4 },
-    { id: "boss", emoji: "⚔️", label: "Boss Arena", href: "/marketplace/boss", x: 15 },
-    { id: "forge", emoji: "⚒️", label: "The Forge", href: "/marketplace/blacksmith", x: 26 },
-    { id: "auction", emoji: "🏛️", label: "Auction House", href: "/marketplace/auction", x: 37 },
-    { id: "shop", emoji: "🛒", label: "General Store", href: "/marketplace/store", x: 48 },
-    { id: "docks", emoji: "⛵", label: "The Docks", href: "/marketplace/sailing", x: 59 },
-    { id: "farm", emoji: "🌾", label: "The Farm", href: "/marketplace/farm", x: 70 },
-    { id: "vault", emoji: "🏦", label: "The Vault", href: "/marketplace/credit", x: 81 },
-    { id: "festival", emoji: "🎪", label: "Festival Stage", href: "/marketplace/track", x: 92 },
-    { id: "mine", emoji: "⛏️", label: "The Mine", href: "/marketplace/mining", x: 103 },
+    { id: "tavern", emoji: "🍺", label: "The Tavern", href: "/marketplace/friends", x: 4, feature: "tavern" },
+    { id: "boss", emoji: "⚔️", label: "Boss Arena", href: "/marketplace/boss", x: 15, feature: "boss" },
+    { id: "forge", emoji: "⚒️", label: "The Forge", href: "/marketplace/blacksmith", x: 26, feature: "blacksmith" },
+    { id: "auction", emoji: "🏛️", label: "Auction House", href: "/marketplace/auction", x: 37, feature: "auction" },
+    { id: "shop", emoji: "🛒", label: "General Store", href: "/marketplace/store", x: 48, feature: "store" },
+    { id: "docks", emoji: "⛵", label: "The Docks", href: "/marketplace/sailing", x: 59, feature: "sailing" },
+    { id: "farm", emoji: "🌾", label: "The Farm", href: "/marketplace/farm", x: 70, feature: "farm" },
+    { id: "vault", emoji: "🏦", label: "The Vault", href: "/marketplace/credit", x: 81, feature: "credit" },
+    { id: "festival", emoji: "🎪", label: "Festival Stage", href: "/marketplace/track", x: 92, feature: "track" },
+    { id: "mine", emoji: "⛏️", label: "The Mine", href: "/marketplace/mining", x: 103, feature: "mining" },
 ];
 
 // Buildings that only some members can see. The Kitchen is owner-gated while the design settles, and the town
 // is the one place a new feature has to appear or nobody will find it — so the gate lives here rather than the
 // building being quietly absent from the list.
 export const GATED_BUILDINGS = [
-    { id: "kitchen", emoji: "🍳", label: "The Kitchen", href: "/marketplace/cooking", x: 86 },
+    { id: "kitchen", emoji: "🍳", label: "The Kitchen", href: "/marketplace/cooking", x: 86, feature: "cooking" },
     // gate: "owner" is load-bearing — the filter below is `b.gate !== "owner" || isOwner(...)`, so an entry
     // WITHOUT it is shown to everybody. The Kitchen has none because the Kitchen is public now.
-    { id: "delves", emoji: "🗝️", label: "Dungeons", href: "/marketplace/dungeons", x: 30 },
-    { id: "arena", emoji: "⚔️", label: "The Arena", href: "/marketplace/arena", x: 34, gate: "owner" },
+    { id: "delves", emoji: "🗝️", label: "Dungeons", href: "/marketplace/dungeons", x: 30, feature: "dungeons" },
+    { id: "arena", emoji: "⚔️", label: "The Arena", href: "/marketplace/arena", x: 34, gate: "owner", feature: "arena" },
     // No `gate` — the Market is public. (An entry WITHOUT it is shown to everybody, per the note above.)
-    { id: "market", emoji: "🏪", label: "The Market", href: "/marketplace/market", x: 40 },
+    { id: "market", emoji: "🏪", label: "The Market", href: "/marketplace/market", x: 40, feature: "market" },
     // No `gate` — the Casino opened to the whole Den on 2026-08-26. The VIP lounge behind it keeps its own
     // door (the bouncer reads the VIP role or a pass), which is a rope INSIDE a public room rather than a
     // second gate on the street.
-    { id: "casino", emoji: "🎰", label: "The Casino", href: "/marketplace/casino", x: 46 },
+    { id: "casino", emoji: "🎰", label: "The Casino", href: "/marketplace/casino", x: 46, feature: "casino" },
 ];
+
+// ── ⚠️ ONE STREET PER TOWN ───────────────────────────────────────────────────────────────────────────────────
+// Luke: "the existing town will end up changing and encompass only the first few features that you have
+// unlocked. Every additional town will have those new features."
+//
+// So a town is not the whole street with some doors dark — each town is its own short street carrying only
+// ITS features, and fast travel moves between the ones you have reached. Town 1 is a waystation with two
+// buildings on it, and that is correct: it is a trailhead, not a city.
+//
+// ⚠️ AND IT SHOWS THE NEXT TOWN'S BUILDINGS, SHUTTERED. A street with two lit doors and nothing else reads as
+// an empty game. The next town's buildings stand on it dark, named, saying which map opens them — which is
+// the only advertisement the late game gets, and the reason the design says a locked feature is VISIBLE
+// rather than hidden. They are not reachable; they are a horizon.
+//
+// Nothing here decides which features belong to which town — towns.js does, and this reads it.
+export function townStreet(townN) {
+    const all = [...TOWN_BUILDINGS, ...GATED_BUILDINGS];
+    const forTown = (n) => {
+        const t = TOWNS.find((x) => x.n === n);
+        if (!t) return [];
+        return all.filter((b) => b.feature && t.features.includes(b.feature));
+    };
+    // ⚠️ THE TILL TRAVELS WITH YOU. The Vault is store credit and towns.js never gates it, so it stands on
+    // every street rather than only the one whose town happens to list it. Two reasons, and the second is the
+    // real one: a way to give the Den money must be reachable from wherever the member is standing, and a
+    // town with two buildings on it reads as an unfinished game rather than a waystation.
+    const fixtures = all.filter((b) => b.feature && NEVER_GATED.has(b.feature));
+    const mine = forTown(townN);
+    const here = [...mine, ...fixtures.filter((f) => !mine.some((m) => m.id === f.id))]
+        .map((b) => ({ ...b, locked: false }));
+    const next = TOWNS.find((x) => x.n === townN + 1);
+    const soon = forTown(townN + 1).map((b) => ({ ...b, locked: true, opensAt: next?.name, opensPast: next?.opens }));
+    return [...here, ...soon];
+}
 
 // Lay the street out evenly for however many buildings the viewer can actually see.
 //
@@ -317,7 +353,7 @@ export async function getTownTodo(buyerId) {
     };
 }
 
-export async function getTownState(buyerId) {
+export async function getTownState(buyerId, { previewTown = null } = {}) {
     const owner = isOwner(buyerId);
 
     // This is the highest-volume request in the app — every viewer runs it on a timer — and it used to open
@@ -370,6 +406,15 @@ export async function getTownState(buyerId) {
     // in town. Uncached, fifteen concurrent viewers ran the same queries fifteen times every four seconds; at
     // 300 members that would be sixty. They go through the shared cache — the per-viewer four (friends, event,
     // quests, chat) do not. See shared-cache.js for why each TTL is what it is.
+    // Which town this member stands in. Null for everyone who predates gating — see the branch below.
+    const gate = await gateStateFor(buyerId).catch(() => ({ exempt: true, town: 1 }));
+    // ⚠️ THE PREVIEW IS OWNER-ONLY AND IT IS NOT SCAFFOLDING. Gating is off, so every account is exempt and
+    // the seven towns are unreachable — including for the person who has to decide whether they look right.
+    // `?town=3` lets the owner stand in any of them. Checked against isOwner here rather than trusted from
+    // the query string, because a town override that anyone could type is a way to walk past the gate.
+    const preview = previewTown && isOwner(buyerId) ? Math.max(1, Math.min(TOWNS.length, Number(previewTown))) : null;
+    const town = preview || (gate.exempt ? null : gate.town);
+
     const [art, petSprites, petSpriteLevels, friends, projects, bonuses, event, quests, chestArt, eventsLive, chatLog, defaultSprite] = await Promise.all([
         shared("town:art", TTL.ART, () => getTownArt()),
         shared("town:petSprites", TTL.ART, () => getPetSpriteData().catch(() => ({}))),
@@ -535,12 +580,28 @@ export async function getTownState(buyerId) {
         // Forge, and its badge collided with the Forge's label. Laying it out WITH the buildings means it can
         // never overlap one no matter how many are visible (the owner sees two more than everyone else).
         ...(() => {
-            const visible = [...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))];
+            // ── ⚠️ ONE STREET, OR SEVEN ─────────────────────────────────────────────────────────────
+            // While gating is off — which is every account today — the town is exactly what it has always
+            // been: every building on one street. The moment an account is gated, the same payload carries
+            // that account's town instead, and nothing else in TownClient has to know which world it is in.
+            //
+            // The branch is on the MEMBER, not on a deploy flag, because the two kinds of account coexist
+            // forever: a member from before gating keeps the whole street for good.
+            const visible = town
+                ? townStreet(town).filter((b) => b.gate !== "owner" || isOwner(buyerId))
+                : [...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))];
             const mid = Math.ceil(visible.length / 2);
             const laid = spaceOut([...visible.slice(0, mid), { id: "__well" }, ...visible.slice(mid)]);
             return {
                 buildings: laid.filter((b) => b.id !== "__well"),
                 wellX: laid.find((b) => b.id === "__well")?.x ?? 20,
+                // Which town this is, and which ones the member can travel to. Null for an ungated account,
+                // and TownClient draws its usual single street when it is null.
+                town: town ? {
+                    n: town,
+                    ...TOWNS.find((t) => t.n === town),
+                    reached: TOWNS.filter((t) => t.n <= town).map((t) => ({ n: t.n, id: t.id, name: t.name, biome: t.biome })),
+                } : null,
             };
         })(),
         art,

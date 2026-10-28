@@ -1204,6 +1204,9 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // reads it — a hook that depends on a value declared under it is the temporal-dead-zone trap check:hook-deps
     // exists to catch. The well rides in the same layout as the buildings, hence the +1.
     const buildings = state?.buildings || [];
+    // Null for every account that predates gating, and TownClient then behaves exactly as it always has:
+    // the cobbles, the whole street, no travel bar. See the branch in town.js.
+    const town = state?.town || null;
     // Every door in the plaza, with the spot it stands on. Buildings sit on the ground line (their art is
     // anchored at GROUND - 4 and is 176px tall, so the pail goes at their foot); the NPCs stand a little
     // nearer the camera at GROUND + 6 and their pails go in front of them, hence the higher z.
@@ -1224,7 +1227,13 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // so the plaza could be decorated while the Gourdfather standing in it did not exist, which is exactly
     // what Luke hit. `halloween` is halloweenOn(buyerId): HALLOWEEN_PUBLIC, or an invited preview. See
     // owner.js. There is nothing to toggle any more, so there is nothing that can disagree.
-    const spooky = halloween;
+    // ⚠️ THE SEVEN TOWNS DO NOT DRESS FOR HALLOWEEN. Luke: "I don't think we need to do the Halloween theme
+    // for any of the towns, since this is likely to launch after Halloween event is finished."
+    //
+    // And it is not only a calendar argument: the dressing paints its own verge, cobbles and props over the
+    // street, which is exactly the layer that makes a town a swamp rather than a cave. A Fenhollow buried in
+    // pumpkins is not Fenhollow. The old single street keeps the dressing — it is the one everybody knows.
+    const spooky = halloween && !town;
     const [panExtra, setPanExtra] = useState(0); // manual drag-to-pan offset on top of the follow-camera
     // Remember where you were standing + looking, so hitting Back from a building drops you right where you left
     // off (not reset to spawn). Restored post-mount from sessionStorage; re-saved on every hero/camera change.
@@ -1658,7 +1667,9 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     }, [anyTownModal]);
 
     const load = useCallback(async () => {
-        const r = await fetch("/api/marketplace/town", { cache: "no-store" }).catch(() => null);
+        // Carry ?town=N through the refresh — see the note in the route. Owner-only, checked server-side.
+        const pv = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("town") : null;
+        const r = await fetch(`/api/marketplace/town${pv ? `?town=${encodeURIComponent(pv)}` : ""}`, { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
         if (!d) return;
         setState(d);
@@ -2281,7 +2292,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                         {tiles(11).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img key={k} src={art.sky.url} alt="" draggable={false} />
+                            <img key={k} src={(town?.id ? `/images/town/ground/${town.id}-sky.webp` : art.sky.url)} alt="" draggable={false} />
                         ))}
                     </div>
                 ) : (!art.background ? <><div className="tw-sky" aria-hidden="true" /><div className="tw-ground" aria-hidden="true" /></> : null)}
@@ -2377,7 +2388,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     <div className="tw-mid" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.55}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
                         {tiles(13).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img key={k} src={((spooky && art.hw_mid?.url) || art.mid.url)} alt="" draggable={false} />
+                            <img key={k} src={(town?.id ? `/images/town/ground/${town.id}-back.webp` : ((spooky && art.hw_mid?.url) || art.mid.url))} alt="" draggable={false} />
                         ))}
                     </div>
                 ) : null}
@@ -2456,14 +2467,14 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 the everyday cobbles on purpose, so the one night filter treats both alike. */}
                             {tiles(19).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img key={k} src={((spooky && art.hw_cobble?.url) || art.cobble.url)} alt="" draggable={false} />
+                                <img key={k} src={(town?.id ? `/images/town/ground/${town.id}.webp` : ((spooky && art.hw_cobble?.url) || art.cobble.url))} alt="" draggable={false} />
                             ))}
                         </div>
                     ) : art.background ? (
                         <div className="tw-bg" aria-hidden="true">
                             {[0, 1, 2, 3].map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img key={k} src={art.background.url} alt="" draggable={false} />
+                                <img key={k} src={(town?.id ? `/images/town/ground/${town.id}-back.webp` : art.background.url)} alt="" draggable={false} />
                             ))}
                         </div>
                     ) : null}
@@ -2500,6 +2511,31 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     ) : null}
                     {/* Buildings — locked (no entry) while a raid is on: defend the plaza first! */}
                     {buildings.map((b) => {
+                        // ── ⚠️ A SHUTTERED BUILDING IS NOT A DOOR ───────────────────────────────────
+                        // Luke: "when features are locked, they are visible in the menu, but clearly
+                        // locked." Same on the street: the next town's buildings stand here dark, named,
+                        // saying which town opens them — so the street has a horizon instead of ending in
+                        // nothing. Rendered as a <div>, because a link that refuses to navigate teaches a
+                        // member that the game is broken rather than that the door is shut.
+                        if (b.locked) {
+                            // ⚠️ IT DRAWS THE REAL BUILDING, DIMMED — not a label where a building should be.
+                            // The first cut rendered an emoji and two lines of text, which on a street of
+                            // painted houses reads as a missing asset rather than a shut door. Same sprite as
+                            // the lit version, desaturated: you can see exactly what you are working toward.
+                            const shutArt = art[b.id];
+                            return (
+                                <div key={b.id} className={`tw-building is-shuttered${shutArt ? " has-art" : ""}`}
+                                    style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }}
+                                    title={`${b.label} — opens at ${b.opensAt}`}>
+                                    {shutArt ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img className="tw-b-art" src={shutArt.url} alt="" draggable={false} />
+                                    ) : <span className="tw-b-emoji" aria-hidden="true">{b.emoji}</span>}
+                                    <span className="tw-b-label">{b.label}</span>
+                                    <span className="tw-b-soon">Opens at {b.opensAt}</span>
+                                </div>
+                            );
+                        }
                         // The dressed twin when the flag is up, falling back to the everyday building if that
                         // one was never drawn — so a half-generated set degrades to a plain street, not a gap.
                         const dressed = Boolean(spooky && art[`hw_bld_${b.id}`]);
@@ -4017,6 +4053,16 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-fg img:nth-child(even) { transform: scaleX(-1); }
 .tw-cobble { position: absolute; left: 0; bottom: 0; height: 44%; display: flex; overflow: hidden; z-index: 1; box-shadow: inset 0 12px 26px rgba(0,0,0,0.35); }
 .tw-cobble img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
+/* ── A SHUTTERED BUILDING ─────────────────────────────────────────────────────────────────────────
+   The next town's doors, standing on this street with the lights off. Dimmed and desaturated rather
+   than hidden: a member who cannot see what is coming has no reason to walk toward it. */
+/* ⚠️ TUNED AGAINST THE DARKEST TOWN, NOT THE BRIGHTEST. At opacity .4 and brightness .75 a shuttered
+   building was invisible in the cave — the dimming that reads as "shut" on a sunny street reads as
+   "missing asset" on a dark one. Greyscale carries the meaning; the opacity only has to soften it. */
+.tw-building.is-shuttered { opacity: 0.62; filter: grayscale(1) brightness(0.9); cursor: default;
+    pointer-events: none; text-align: center; }
+.tw-building.is-shuttered .tw-b-soon { display: block; font-size: 10px; letter-spacing: 0.04em;
+    color: #ffd75e; opacity: 0.9; margin-top: 2px; }
 .tw-cobble img:nth-child(even) { transform: scaleX(-1); }
 /* Softer, taller shadow where the street meets the buildings behind it — dissolves the seam. */
 .tw-cobble::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 68px; background: linear-gradient(180deg, rgba(26,17,40,0.9), rgba(26,17,40,0.28) 55%, transparent); pointer-events: none; }

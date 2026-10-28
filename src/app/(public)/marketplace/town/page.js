@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Wolf Den Town | The Wolf Den", robots: { index: false } };
 
 // The persistent social overworld — LIVE for all signed-in members. Logged-out visitors get a sign-in nudge.
-export default async function TownPage() {
+export default async function TownPage({ searchParams }) {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) {
         return (
@@ -24,7 +24,9 @@ export default async function TownPage() {
             </div>
         );
     }
-    const initial = await getTownState(buyer.id).catch(() => null);
+    // ?town=N — owner-only, so the seven towns can be looked at before gating is live. See getTownState.
+    const sp = await searchParams;
+    const initial = await getTownState(buyer.id, { previewTown: sp?.town || null }).catch(() => null);
     // ── THE HALLOWE'EN FLAG ──────────────────────────────────────────────────────────────────────────────
     // One question, answered on the server — never a client check, or the whole plaza gets the seasonal art
     // the moment somebody sets a localStorage key by hand. Answered HERE rather than fetched after mount so

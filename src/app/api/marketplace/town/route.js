@@ -26,7 +26,12 @@ export async function GET(request) {
             if (new URL(request.url).searchParams.get("todo")) {
                 return NextResponse.json({ todo: await getTownTodo(buyer.id) }, { headers: { "Cache-Control": "no-store" } });
             }
-            return NextResponse.json(await getTownState(buyer.id), { headers: { "Cache-Control": "no-store" } });
+            // ⚠️ THE PREVIEW HAS TO BE HONOURED HERE TOO, or it lasts about two seconds. TownClient
+            // re-fetches this route on mount and on a timer and replaces its state wholesale, so an SSR
+            // render that knew about ?town=3 is overwritten by a reply that does not. The param rides the
+            // fetch; isOwner is still checked inside getTownState, so this cannot be typed past the gate.
+            const previewTown = new URL(request.url).searchParams.get("town");
+            return NextResponse.json(await getTownState(buyer.id, { previewTown }), { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.town.state.failure" });
         }
