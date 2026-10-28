@@ -81,18 +81,27 @@ export const PACK_POOLS = [
     // ⚠️ THE CEILING IS WHAT MAKES THE TIERS WORTH DIFFERENT MONEY, and the floor is what makes the dearer
     // ones feel safe. Alpha still does the EV work INSIDE the band; the band decides what is reachable at
     // all. Both are solved together in recomputePools — change one and the other re-solves.
+    // ── ⚠️ THE ART IS KEYED ON PRICE, NOT ON GAME ───────────────────────────────────────────────────────
+    // Luke: "the pack color should differ using rarity colors to easily understand which ones are awesome
+    // and which are a little less awesome." So Pokémon $5 and Magic $5 share a bag, and the two $15s share
+    // a different one. That looks like a loss of distinction and is not: the brand name sits in large type
+    // directly under the bag, so the game was never the ambiguous part — which of six packs is the GOOD one
+    // was. The colour is spent on the question the screen could not already answer.
+    //
+    // Green / blue / purple is the uncommon-rare-epic ramp from pack-rarity.js. It deliberately stops short
+    // of legendary gold: the crest is gold, and a gold bag turns the wolf into a sticker.
     { key: "pkmn5", brand: "Pokémon $5", channel: "shelf", category: "Pokemon Single Card",
-        priceCents: 500, floorMult: 0, ceilMult: 5, art: "/images/packs/mystery-bag-pkmn-600.webp" },
+        priceCents: 500, floorMult: 0, ceilMult: 5, art: "/images/packs/mystery-bag-t5-600.webp" },
     { key: "pkmn10", brand: "Pokémon $10", channel: "shelf", category: "Pokemon Single Card",
-        priceCents: 1000, floorMult: 0.2, ceilMult: 6, art: "/images/packs/mystery-bag-pkmn-600.webp" },
+        priceCents: 1000, floorMult: 0.2, ceilMult: 6, art: "/images/packs/mystery-bag-t10-600.webp" },
     { key: "pkmn15", brand: "Pokémon $15", channel: "shelf", category: "Pokemon Single Card",
-        priceCents: 1500, floorMult: 0.25, ceilMult: 20, art: "/images/packs/mystery-bag-pkmn-600.webp" },
+        priceCents: 1500, floorMult: 0.25, ceilMult: 20, art: "/images/packs/mystery-bag-t15-600.webp" },
     { key: "mtg5", brand: "Magic $5", channel: "shelf", category: "Magic Single Card",
-        priceCents: 500, floorMult: 0, ceilMult: 5, art: "/images/packs/mystery-bag-mtg-600.webp" },
+        priceCents: 500, floorMult: 0, ceilMult: 5, art: "/images/packs/mystery-bag-t5-600.webp" },
     { key: "mtg10", brand: "Magic $10", channel: "shelf", category: "Magic Single Card",
-        priceCents: 1000, floorMult: 0.2, ceilMult: 6, art: "/images/packs/mystery-bag-mtg-600.webp" },
+        priceCents: 1000, floorMult: 0.2, ceilMult: 6, art: "/images/packs/mystery-bag-t10-600.webp" },
     { key: "mtg15", brand: "Magic $15", channel: "shelf", category: "Magic Single Card",
-        priceCents: 1500, floorMult: 0.25, ceilMult: 20, art: "/images/packs/mystery-bag-mtg-600.webp" },
+        priceCents: 1500, floorMult: 0.25, ceilMult: 20, art: "/images/packs/mystery-bag-t15-600.webp" },
     // ⚠️ YU-GI-OH IS DELIBERATELY ABSENT, AND NOT BECAUSE IT BROKE. Luke, 2026-10-27: "3 for pokemon and
     // magic lets remove yu gi oh." The numbers agree: 52 units averaging $6.58, so a $15 Yu-Gi-Oh pack
     // clears a 56% margin — not a win, a figure somebody works out and resents. It returns when the shelf

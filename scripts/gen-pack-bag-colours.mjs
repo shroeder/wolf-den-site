@@ -43,6 +43,23 @@ const POOLS = [
     { key: "pkmn", shadow: [14, 6, 10], highlight: [168, 38, 52] },    // crimson — Pokémon's own red, dulled
     { key: "mtg", shadow: [6, 13, 11], highlight: [36, 132, 96] },     // deep green
     { key: "ygo", shadow: [12, 8, 20], highlight: [104, 66, 180] },    // violet
+
+    // ── ⚠️ THE TIER RAMP: COLOUR MEANS PRICE, NOT GAME ──────────────────────────────────────────────────
+    // Luke, 2026-10-27: "the pack color should differ using rarity colors to easily understand which ones
+    // are awesome and which are a little less awesome."
+    //
+    // So one colour per PRICE TIER, shared by Pokémon and Magic. Which looks like a loss of distinction and
+    // is not: the brand name sits in large type directly under the bag, so the game is never in doubt —
+    // what a member genuinely cannot tell at a glance is which of six packs is the good one. The colour is
+    // spent on the question the screen could not already answer.
+    //
+    // ⚠️ AND THE RAMP STOPS SHORT OF GOLD, deliberately. Legendary in pack-rarity.js is #fbbf24 and the
+    // crest is gold — this file's own header says gold only reads as gold against something not competing
+    // with it. A legendary-gold bag would turn the wolf into a sticker. Uncommon green, rare blue, epic
+    // purple: the quality ramp every player already knows, and all three leave the crest alone.
+    { key: "t5", shadow: [6, 14, 9], highlight: [46, 150, 92] },       // uncommon green  (#4ade80, dulled)
+    { key: "t10", shadow: [6, 11, 20], highlight: [48, 108, 186] },    // rare blue       (#60a5fa, dulled)
+    { key: "t15", shadow: [13, 7, 20], highlight: [126, 72, 196] },    // epic purple     (#c084fc, dulled)
 ];
 
 /** Is this the crest? Gold is the only strongly saturated warm thing in the frame; the foil is grey. */
