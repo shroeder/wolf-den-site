@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { getInventoryCounts } from "@/lib/consignment/square";
 import { parsePackCardName } from "@/lib/marketplace/pack-card-name.js";
+import { pickWeightedVariation } from "@/lib/marketplace/pack-weights.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const logger = createServerLogger({ source: "api", subsystem: "pack-shelf-claim" });
@@ -44,23 +45,23 @@ const MAX_TRIES = 3;
  * weekly event, and this is the reason. Closing it properly means holding a lock across a Square write, and
  * Square's catalog writes serialise under load; that trade is worse than the refund.
  */
-export async function claimShelfCard({ pool, reservationKey }) {
+export async function claimShelfCard({ pool, reservationKey, alpha = 0, floorCents = 0 }) {
     if (!pool?.category) return null;
 
     for (let attempt = 0; attempt < MAX_TRIES; attempt += 1) {
         // ⚠️ `NOT consigned` AGAIN, AND IT IS NOT BELT AND BRACES. This query does not go through
         //    shelfPoolStats, so leaving it out here would mean a pool that is PRICED off our own stock and
         //    PULLS from a consignor's.
-        const candidate = await db
-            .queryOne(
-                `SELECT variation_id, name, price, image_url
-                   FROM inventory_feed
-                  WHERE in_stock AND quantity > 0 AND NOT consigned
-                    AND category_names = $1
-                  ORDER BY random()
-                  LIMIT 1`,
-                [pool.category]
-            )
+        // ── ⚠️ WEIGHTED, NOT random() ───────────────────────────────────────────────────────────────
+        // This was ORDER BY random() — a flat draw, which is the only thing that works when one pool has
+        // one price. With a $5, a $10 and a $15 pack over the SAME shelf, the draw is the only thing that
+        // separates them, so the odds live in `alpha` (solved per tier by recomputePools) and the roll
+        // happens in Postgres against the live row set rather than over a snapshot taken a moment earlier.
+        //
+        // `floorCents` is the first-open magic: it removes the duds from the candidate set. It must only
+        // ever arrive paired with the first-open alpha that was solved against that same filtered set —
+        // a floor on its own is a straight EV giveaway. See pack-weights.js.
+        const candidate = await pickWeightedVariation({ pool, alpha, floorCents })
             .catch((error) => {
                 logger.error("pack_shelf.candidate_failed", error, { pool: pool.key });
                 return null;

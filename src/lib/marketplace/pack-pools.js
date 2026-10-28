@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { buyBackCents } from "@/lib/marketplace/buyback.js";
 import { packCardSubtitle, parsePackCardName } from "@/lib/marketplace/pack-card-name.js";
 import { tierForCents } from "@/lib/marketplace/pack-rarity.js";
+import { poolUnits, solveAlpha, weightedEvCents, weightedMedianCents } from "@/lib/marketplace/pack-weights.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const logger = createServerLogger({ source: "api", subsystem: "pack-pools" });
@@ -48,16 +49,47 @@ export const PACK_POOLS = [
         // different foil — made by scripts/gen-pack-bag-colours.mjs rather than drawn again.
         art: "/images/packs/mystery-bag-drawn-600.webp",
     },
-    { key: "pkmn", brand: "Pokémon Singles", channel: "shelf", category: "Pokemon Single Card",
-        art: "/images/packs/mystery-bag-pkmn-600.webp" },
-    { key: "mtg", brand: "Magic Singles", channel: "shelf", category: "Magic Single Card",
-        art: "/images/packs/mystery-bag-mtg-600.webp" },
-    // Defined and expected to be CLOSED on concentration — one Ancient Fairy Dragon is a third of this pool's
-    // value. It is here rather than omitted so that it opens by itself the day the shelf allows, instead of
-    // waiting for somebody to remember it exists.
-    { key: "ygo", brand: "Yu-Gi-Oh Singles", channel: "shelf", category: "Yu-Gi-Oh Single",
-        art: "/images/packs/mystery-bag-ygo-600.webp" },
+    // ── ⚠️ ONE SHELF, THREE PRICES, AND THE DRAW IS WHAT DIFFERS ────────────────────────────────────────
+    // All three Pokémon tiers pull from the SAME 900-odd cards. They are not three bands of stock; they
+    // are three sets of ODDS over one set of stock, which is the entire reason this beat banding.
+    //
+    // Banding by ceiling was modelled first (scripts/pack-odds-100.mjs §4) and it works on paper and is a
+    // bad product: to hold a margin, the $5 pack's ceiling lands at $11, so its best possible pull is $10
+    // and there is nothing in it to chase. Weighted, the $279 Tyranitar sits in the $5 pack at 1 in 46,605
+    // and in the $15 pack at 1 in 930 — same card, same promise, different odds.
+    //
+    // ⚠️ priceCents IS FIXED HERE AND alpha IS DERIVED. That is the inverse of how this file worked
+    // yesterday, when price came from EV. Do not reintroduce priceForEvCents for a tiered pool: it would
+    // quietly move a $5 pack to $15 the week a collection comes in.
+    { key: "pkmn5", brand: "Pokémon $5", channel: "shelf", category: "Pokemon Single Card",
+        priceCents: 500, art: "/images/packs/mystery-bag-pkmn-600.webp" },
+    { key: "pkmn10", brand: "Pokémon $10", channel: "shelf", category: "Pokemon Single Card",
+        priceCents: 1000, art: "/images/packs/mystery-bag-pkmn-600.webp" },
+    { key: "pkmn15", brand: "Pokémon $15", channel: "shelf", category: "Pokemon Single Card",
+        priceCents: 1500, art: "/images/packs/mystery-bag-pkmn-600.webp" },
+    { key: "mtg5", brand: "Magic $5", channel: "shelf", category: "Magic Single Card",
+        priceCents: 500, art: "/images/packs/mystery-bag-mtg-600.webp" },
+    { key: "mtg10", brand: "Magic $10", channel: "shelf", category: "Magic Single Card",
+        priceCents: 1000, art: "/images/packs/mystery-bag-mtg-600.webp" },
+    { key: "mtg15", brand: "Magic $15", channel: "shelf", category: "Magic Single Card",
+        priceCents: 1500, art: "/images/packs/mystery-bag-mtg-600.webp" },
+    // ⚠️ YU-GI-OH IS DELIBERATELY ABSENT, AND NOT BECAUSE IT BROKE. Luke, 2026-10-27: "3 for pokemon and
+    // magic lets remove yu gi oh." The numbers agree: 52 units averaging $6.58, so a $15 Yu-Gi-Oh pack
+    // clears a 56% margin — not a win, a figure somebody works out and resents. It returns when the shelf
+    // is deep enough to float a ladder, and since a pool carries no copied card list that is one entry here
+    // plus a recompute. Its retired state row is kept (migration 487) so past opens still report.
 ];
+
+// ── THE MARGIN THE LADDER IS TUNED TO ────────────────────────────────────────────────────────────────────────
+// Every tier solves its alpha against this. 15% is not a guess: at 100% sell-back the ONLY margin left is
+// price − EV, so this number IS the business. Raising it makes packs meaner; lowering it eats the only
+// cushion there is. Model any change with scripts/pack-weights.mjs before touching it.
+export const TARGET_MARGIN_BP = 1500;
+
+// ⚠️ THE FIRST OPEN RESHAPES THE DRAW BUT NEVER THE MEAN. Cards below this fraction of the pack price are
+// dropped from a member's FIRST open and alpha is re-solved on what remains, landing on the same EV. See the
+// long note on solveAlpha — the constraint is alt-farming, which this game has already lived through.
+export const FIRST_OPEN_FLOOR_BP = 2500;
 
 export const poolByKey = (key) => PACK_POOLS.find((p) => p.key === key) || null;
 export const shelfPools = () => PACK_POOLS.filter((p) => p.channel === "shelf");
@@ -185,20 +217,31 @@ export async function shelfPoolCards(pool, { limit = 40 } = {}) {
  * built the chest inspect card: "asked for, on the way to spending, off the same table the roll uses". A
  * hand-maintained odds figure is a figure that drifts from the thing it describes; this one cannot.
  */
-export async function beatsPriceBp(pool, priceCents) {
+export async function beatsPriceBp(pool, priceCents, alpha = 0) {
     if (!pool?.category || !(priceCents > 0)) return null;
     const row = await db
         .queryOne(
-            `SELECT COALESCE(SUM(quantity), 0)::int AS units,
-                    COALESCE(SUM(quantity) FILTER (WHERE price * 100 >= $2), 0)::int AS beats
+            // ── ⚠️ WEIGHTED BY THE DRAW, NOT BY STOCK ───────────────────────────────────────────────────
+            // This counted units: "what share of the cards on the shelf beat the price". That was exactly
+            // right while every unit was equally likely. It is WRONG the moment a tier has an alpha —
+            // the $5 pack and the $15 pack share one shelf, so an unweighted count would print the SAME
+            // odds on both, and the figure it printed would be the $15 pack's. On the $5 pack that is a
+            // member-facing claim that overstates their chances by roughly a factor of three.
+            //
+            // The weight here is the same expression the claim rolls on (pack-weights.js). If one of them
+            // ever changes, change both — a shown probability that does not match the draw is the worst
+            // kind of wrong, because it is checkable.
+            `SELECT COALESCE(SUM(quantity * power(GREATEST(price, 0.01), -$3::float)), 0)::float AS wsum,
+                    COALESCE(SUM(quantity * power(GREATEST(price, 0.01), -$3::float))
+                             FILTER (WHERE price * 100 >= $2), 0)::float AS beats
                FROM inventory_feed
               WHERE in_stock AND quantity > 0 AND NOT consigned
                 AND category_names = $1`,
-            [pool.category, priceCents]
+            [pool.category, priceCents, alpha]
         )
         .catch(() => null);
-    if (!row || !row.units) return null;
-    return Math.round((row.beats / row.units) * 10000);
+    if (!row || !row.wsum) return null;
+    return Math.round((row.beats / row.wsum) * 10000);
 }
 
 /** Why a pool is shut, in words a screen can show — or null when it is open. */
@@ -233,37 +276,61 @@ export async function recomputePools({ now = null } = {}) {
         if (!stats) continue;
 
         const reason = closedReason(stats);
-        const wanted = priceForEvCents(stats.evCents);
-        const prior = await db
-            .queryOne(`SELECT price_cents, held_until FROM mkt_pack_pool_state WHERE pool = $1`, [pool.key])
-            .catch(() => null);
 
-        // The hold only ever blocks an INCREASE. See the note above.
-        const held = prior?.held_until && new Date(prior.held_until) > (now || new Date());
-        const rising = prior && wanted > prior.price_cents;
-        const priceCents = held && rising ? prior.price_cents : wanted;
-        // A price that actually moved starts a fresh hold; one that did not keeps the clock it was on, so a
-        // pool hovering on a boundary cannot reset its own hold every night and float anyway.
-        const moved = !prior || priceCents !== prior.price_cents;
+        // ── ⚠️ THE PRICE IS GIVEN; alpha IS WHAT THIS FUNCTION SOLVES FOR ──────────────────────────────
+        // This used to be the other way round — price = ceil(EV / $5) * $5, with a hold so it could not
+        // climb on a member mid-session. A tiered pool has a FIXED price, so the hold has nothing to hold
+        // and the lever moved to the draw. If you ever see priceForEvCents() reappear on a tiered pool it
+        // will silently reprice a $5 pack to $15 the week a collection lands.
+        const priceCents = Number(pool.priceCents) || 0;
+        if (!priceCents) { logger.error("pack_pools.no_price", new Error("tiered pool without priceCents"), { pool: pool.key }); continue; }
+        const targetEv = Math.round((priceCents * (10000 - TARGET_MARGIN_BP)) / 10000);
+
+        const units = await poolUnits(pool);
+        const alpha = solveAlpha(units, targetEv);
+        // ⚠️ null means even alpha 6 cannot hold the margin — the pool is too rich for this price point.
+        //    That CLOSES the tier rather than selling it at a loss, and says so.
+        const unreachable = alpha === null;
+        const evCents = unreachable ? stats.evCents : Math.round(weightedEvCents(units, alpha));
+
+        // ── THE FIRST-OPEN MAGIC, SOLVED THE SAME WAY ─────────────────────────────────────────────────
+        // Drop the duds, re-solve on what is left, land on the SAME EV. The pack is not more generous on
+        // the first open, it is less disappointing — which is the only version of this that cannot be
+        // farmed, because the mean never moves. See the long note in pack-weights.js.
+        const floorCents = Math.round((priceCents * FIRST_OPEN_FLOOR_BP) / 10000);
+        const noDuds = units.filter((u) => u.cents >= floorCents);
+        const firstAlpha = noDuds.length >= MIN_UNITS ? solveAlpha(noDuds, targetEv) : null;
+        // ⚠️ BOTH OR NEITHER. A floor without its matching alpha is a straight EV giveaway; storing 0/0
+        //    turns the magic off cleanly and the first open just behaves like any other.
+        const firstOk = firstAlpha !== null;
+
+        // ⚠️ THE MEDIAN STORED IS THE WEIGHTED ONE, overwriting the pool-wide flat median. It is a DISPLAY
+        //    figure, and the flat version is the same number for all three tiers off one shelf — which on
+        //    the carousel face reads as a pricing mistake rather than a ladder.
+        const medianCents = unreachable ? stats.medianCents : weightedMedianCents(units, alpha);
 
         await db
             .query(
                 `INSERT INTO mkt_pack_pool_state
-                    (pool, price_cents, ev_cents, units, lines, median_cents, min_cents, max_cents,
-                     top_share_bp, open, closed_reason, held_until, computed_at)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
-                         CASE WHEN $12 THEN NOW() + INTERVAL '${PRICE_HOLD_DAYS} days' ELSE $13 END, NOW())
+                    (pool, price_cents, ev_cents, uniform_ev_cents, alpha, first_open_floor_cents,
+                     first_open_alpha, units, lines, median_cents, min_cents, max_cents,
+                     top_share_bp, open, closed_reason, computed_at)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, NOW())
                  ON CONFLICT (pool) DO UPDATE SET
                      price_cents = EXCLUDED.price_cents, ev_cents = EXCLUDED.ev_cents,
+                     uniform_ev_cents = EXCLUDED.uniform_ev_cents, alpha = EXCLUDED.alpha,
+                     first_open_floor_cents = EXCLUDED.first_open_floor_cents,
+                     first_open_alpha = EXCLUDED.first_open_alpha,
                      units = EXCLUDED.units, lines = EXCLUDED.lines, median_cents = EXCLUDED.median_cents,
                      min_cents = EXCLUDED.min_cents, max_cents = EXCLUDED.max_cents,
                      top_share_bp = EXCLUDED.top_share_bp, open = EXCLUDED.open,
-                     closed_reason = EXCLUDED.closed_reason, held_until = EXCLUDED.held_until,
-                     computed_at = NOW()`,
+                     closed_reason = EXCLUDED.closed_reason, computed_at = NOW()`,
                 [
-                    pool.key, priceCents, stats.evCents, stats.units, stats.lines, stats.medianCents,
-                    stats.minCents, stats.maxCents, stats.topShareBp, !reason, reason,
-                    moved, prior?.held_until || null,
+                    pool.key, priceCents, evCents, stats.evCents, unreachable ? 0 : alpha,
+                    firstOk ? floorCents : 0, firstOk ? firstAlpha : 0,
+                    stats.units, stats.lines, medianCents,
+                    stats.minCents, stats.maxCents, stats.topShareBp,
+                    !reason && !unreachable, unreachable ? "too_rich_for_price" : reason,
                 ]
             )
             .catch((error) => logger.error("pack_pools.write_failed", error, { pool: pool.key }));
@@ -292,6 +359,9 @@ export async function poolStates() {
             art: pool.art || null,
             priceCents: s?.price_cents ?? 0,
             evCents: s?.ev_cents ?? 0,
+            // ⚠️ THE ODDS LINE NEEDS THIS. Three tiers share one shelf, so alpha is the ONLY thing that
+            //    distinguishes them — any figure computed without it describes the $15 pack.
+            alpha: Number(s?.alpha ?? 0),
             units: s?.units ?? 0,
             lines: s?.lines ?? 0,
             medianCents: s?.median_cents ?? 0,

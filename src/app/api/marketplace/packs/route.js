@@ -65,7 +65,7 @@ export async function GET(request) {
                     //    themselves that the pack is worth coming back for.
                     cards: await shelfPoolCards(poolByKey(p.key)),
                     // §9.2 — the real figure, one tap in behind "what's inside", never on the carousel face.
-                    beatsBp: await beatsPriceBp(poolByKey(p.key), p.priceCents),
+                    beatsBp: await beatsPriceBp(poolByKey(p.key), p.priceCents, p.alpha),
                 })))),
             ];
 

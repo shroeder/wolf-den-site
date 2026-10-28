@@ -14,6 +14,7 @@ import { completeBuyBack } from "@/lib/marketplace/vault-restock.js";
 import { isPreviewOpen, shelfPacksOpenFor, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { poolByKey, poolStates } from "@/lib/marketplace/pack-pools.js";
 import { claimShelfCard } from "@/lib/marketplace/pack-shelf-claim.js";
+import { hasOpenedBefore, markFirstOpen } from "@/lib/marketplace/pack-weights.js";
 import { adjustInventoryForSale } from "@/lib/consignment/square";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -272,8 +273,30 @@ export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey =
     //    Square and `inventory_feed` is a mirror of them. claimShelfCard picks a candidate, confirms it with
     //    a LIVE Square count, and writes the one row it drew — which from the next line onward is a pool row
     //    indistinguishable from a bag. See pack-shelf-claim.js for the window it cannot close.
+    // ── THE ODDS THIS PARTICULAR OPEN IS DRAWN ON ───────────────────────────────────────────────────
+    // ⚠️ READ FROM THE STORED STATE, NEVER SOLVED HERE. recomputePools does the solving on a schedule;
+    //    doing it per open would put a 900-row scan and a bisection in the hot path of the one request a
+    //    member is watching a spinner for, and would let two opens a second apart draw on different odds.
+    //
+    // ⚠️ AND A MISSING STATE ROW MEANS alpha 0 — a UNIFORM draw, which is the generous direction. Failing
+    //    the other way (a steep curve by default) would quietly sell a worse pack than the one advertised.
+    const firstOpen = shelf ? !(await hasOpenedBefore(buyerId)) : false;
+    const weights = shelf
+        ? await db
+            .queryOne(
+                `SELECT alpha, first_open_floor_cents, first_open_alpha
+                   FROM mkt_pack_pool_state WHERE pool = $1`,
+                [poolKey]
+            )
+            .catch(() => null)
+        : null;
+    // Both or neither: the floor and its alpha were solved together and are meaningless apart.
+    const useMagic = firstOpen && Number(weights?.first_open_floor_cents) > 0;
+    const drawAlpha = Number((useMagic ? weights?.first_open_alpha : weights?.alpha) || 0);
+    const drawFloor = useMagic ? Number(weights?.first_open_floor_cents || 0) : 0;
+
     const claimed = shelf
-        ? await claimShelfCard({ pool, reservationKey: key })
+        ? await claimShelfCard({ pool, reservationKey: key, alpha: drawAlpha, floorCents: drawFloor })
         : await db.tx(async (client) => {
         const picked = await client.query(
             `UPDATE mystery_bag_cards
@@ -615,11 +638,21 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
         .queryOne(
             `UPDATE mkt_pack_open SET outcome = $3
              WHERE id = $1 AND buyer_id = $2 AND outcome = 'pending'
-             RETURNING id, mystery_card_id, card_value_cents, tier`,
+             RETURNING id, mystery_card_id, card_value_cents, tier, pool`,
             [openId, buyerId, choice === "sell" ? "sold_back" : "vaulted"]
         )
         .catch(() => null);
     if (!open) return { ok: false, error: "already_chosen" };
+
+    // ── ⚠️ THE FIRST OPEN IS SPENT HERE, NOT AT THE OPEN ────────────────────────────────────────────────
+    // A member who opens a pack and walks away mid-reveal leaves the row in 'pending'. Marking the magic
+    // used at open time would burn it on a pack they never actually saw resolve — which is the one case
+    // where they would feel cheated and be right. This runs on the guarded transition that proves the
+    // reveal completed, and it is idempotent (ON CONFLICT DO NOTHING) so a double-tap cannot double-write.
+    // ⚠️ AWAITED, NOT FIRE-AND-FORGET. Vercel freezes the instance the moment the response is returned,
+    //    so a detached promise here is a write that lands on a warm instance and silently does not on a
+    //    cold one — the house has been bitten by exactly this before. It is one INSERT on a primary key.
+    await markFirstOpen({ buyerId, packOpenId: openId, pool: open.pool });
 
     const card = await db.queryOne(
         `SELECT id, card_name, condition, image_url, market_value, square_variation_id, channel, pool
