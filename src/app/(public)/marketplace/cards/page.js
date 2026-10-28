@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import CardEvent from "@/components/cards/CardEvent";
 import CardFightClient from "@/components/cards/CardFightClient";
@@ -34,6 +35,8 @@ export const metadata = {
 // health, no run touched. That is the replay link you hand somebody to argue about a specific turn, and a run
 // would make it a different fight every time.
 export default async function CardsPage({ searchParams }) {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("cards");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/cards");
     // Signed in is the whole gate now (CARDS_UNLOCKED). The bounce stays: a signed-out visitor is sent to

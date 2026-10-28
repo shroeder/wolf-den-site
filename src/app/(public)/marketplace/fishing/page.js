@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import FishingHome from "@/components/FishingHome";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -17,6 +18,8 @@ export const metadata = {
 // Owner-gated like the rest of fishing: getSailingState returns `fishing: null` for anyone else (see
 // fishingUnlocked), and without it there is nothing to show, so this 404s rather than rendering an empty shell.
 export default async function FishingPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("fishing");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) return notFound();
 

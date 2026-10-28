@@ -1,4 +1,5 @@
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 import ViewPing from "@/components/ViewPing";
 import CreationTokensClient from "@/components/CreationTokensClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -14,6 +15,8 @@ export const metadata = {
 };
 
 export default async function CreationTokensPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("creations");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
 
     // Not signed in → show the marketplace login/register surface (same pattern as the store-credit page).

@@ -1,4 +1,5 @@
 import BountyBoardClient from "@/components/BountyBoardClient";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 import ViewPing from "@/components/ViewPing";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,9 @@ export const metadata = {
     alternates: { canonical: "/marketplace/bounties" },
 };
 
-export default function BountiesPage() {
+export default async function BountiesPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("bounties");
     return (
         <>
             <ViewPing event="view_bounties" />

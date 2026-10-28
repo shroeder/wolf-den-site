@@ -177,6 +177,26 @@ export default function GameNav() {
     const casino = Boolean(hud?.casino);
     const cards = Boolean(hud?.cards);
     const grove = Boolean(hud?.grove);
+
+    // ── THE TOWN GATE ───────────────────────────────────────────────────────────────────────────────
+    // Luke: "when features are locked, they are visible in the menu, but clearly locked."
+    //
+    // A hidden feature teaches nothing. A visible locked one is the only advertisement the late game
+    // gets — so the tile stays, dimmed, and says which town opens it.
+    //
+    // ⚠️ EMPTY FOR EVERY ACCOUNT THAT PREDATES GATING, which is almost all of them: `locked` comes back
+    // {} and every expression below is false, so an existing member's menu renders exactly as it did.
+    const lockedMap = hud?.gate?.locked || {};
+    // href → the feature key towns.js gates it under. Only the gated ones need a line; anything absent
+    // is ungated, which is the permissive default towns.js is built around.
+    const lockKey = (href) => String(href || "").replace("/marketplace/", "");
+    const lockedFor = (href) => {
+        const key = lockKey(href);
+        // The handful whose route name and feature key differ.
+        const alias = { inventory: "inventory", blacksmith: "blacksmith", dungeons: "dungeons",
+            leaderboard: "leaderboard", track: "track", trade: "trade" }[key] || key;
+        return lockedMap[alias] || null;
+    };
     const delves = Boolean(hud?.delves?.unlocked);
     const delveRuns = Number(hud?.delves?.runs) || 0;
     const chests = Number(hud?.chests) || 0;
@@ -465,6 +485,21 @@ export default function GameNav() {
                                         {sec.items.map((it) => {
                                             const { badge, title } = badgeInfo(it.href);
                                             const dot = dotFor(it.href);
+                                            const shut = lockedFor(it.href);
+                                            // ⚠️ A LOCKED TILE IS NOT A LINK. Rendering it as one and
+                                            // relying on the route to bounce them is the pair-of-gates
+                                            // mistake wearing a different hat: the page flashes, the
+                                            // redirect lands, and the member learns the menu lies.
+                                            if (shut) {
+                                                return (
+                                                    <div key={it.href} className="gm-tile is-locked"
+                                                        title={`${it.label} — opens at ${shut.name}, past ${shut.opens}`}>
+                                                        <span className="gm-tile-ico">{renderBigIcon(it)}</span>
+                                                        <span className="gm-tile-label">{it.label}</span>
+                                                        <span className="gm-tile-sub">Opens at {shut.name}</span>
+                                                    </div>
+                                                );
+                                            }
                                             return (
                                                 <Link key={it.href} href={it.href} className={`gm-tile${isOn(pathname, it.href) ? " is-active" : ""}${it.owner ? " is-owner" : ""}`} onClick={() => setMenuOpen(false)}>
                                                     <span className="gm-tile-ico">{renderBigIcon(it)}</span>
@@ -535,6 +570,18 @@ body.in-game .game-nav { position: sticky; top: var(--gnav-top, 0px); z-index: 8
     background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.09); color: #eef2f7; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
 .gm-tile:hover { transform: translateY(-2px); border-color: rgba(255,215,110,0.5); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
 .gm-tile.is-active { border-color: #ffd75e; background: linear-gradient(180deg, rgba(255,215,94,0.16), rgba(255,215,94,0.05)); }
+/* ── A LOCKED TILE ────────────────────────────────────────────────────────────────────────────────
+   Luke: "when features are locked, they are visible in the menu, but clearly locked."
+
+   So it keeps its sprite and its name and loses its colour — dimmed and desaturated, not hidden and
+   not wearing a padlock glyph. The sprite dimmed IS the lock; a padlock would be the one icon in a
+   grid of twenty paintings that came from a font.
+
+   It is a <div>, not an <a>, so there is nothing to hover and nothing to click. */
+.gm-tile.is-locked { opacity: 0.42; filter: grayscale(0.85); cursor: default; border-style: dashed;
+    border-color: rgba(255,255,255,0.14); background: rgba(255,255,255,0.02); }
+.gm-tile.is-locked:hover { transform: none; box-shadow: none; border-color: rgba(255,255,255,0.14); }
+.gm-tile.is-locked .gm-tile-sub { color: #ffd75e; opacity: 0.85; }
 .gm-tile.is-owner { border-color: rgba(255,150,60,0.5); }
 .gm-tile-ico { font-size: 26px; line-height: 1; height: 30px; display: grid; place-items: center; }
 .gm-tile-ico svg { width: 26px; height: 26px; }

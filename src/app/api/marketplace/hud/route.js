@@ -9,6 +9,7 @@ import { DELVES_UNLOCKED, getDelveState } from "@/lib/marketplace/delves.js";
 import { COOK_UNLOCKED } from "@/lib/marketplace/cooking.js";
 import { CARDS_UNLOCKED } from "@/lib/marketplace/cards.js";
 import { groveOpen } from "@/lib/marketplace/grove.js";
+import { gateForMenu } from "@/lib/marketplace/town-gate.js";
 import { getChests } from "@/lib/marketplace/chests.js";
 import { getSpinState } from "@/lib/marketplace/spin.js";
 import { getDailyQuests } from "@/lib/marketplace/quests.js";
@@ -60,7 +61,7 @@ export async function GET(request) {
             });
         }
 
-        const [arena, mining, delves, chests, spin, quests, strikes, attention, casts, featureClaims, townTodo, farm, freeChips] =
+        const [arena, mining, delves, chests, spin, quests, strikes, attention, casts, featureClaims, townTodo, farm, freeChips, gate] =
             await Promise.all([
                 safe(arenaNav(id), { unlocked: false, fightsLeft: 0 }),
                 MINING_UNLOCKED(id) ? safe(miningNav(id), null) : null,
@@ -74,6 +75,16 @@ export async function GET(request) {
                 safe(getFeatureClaimCounts(id), {}),
                 safe(getTownTodo(id), null),
                 safe(farmNav(id), null),
+                // ── THE TOWN GATE ────────────────────────────────────────────────────────────────────
+                // ⚠️ IN THIS BATCH, NOT BESIDE IT. GameNav lives in the marketplace layout, so it renders
+                // on every navigation by every member — check:chrome exists because a component mounted
+                // there may read at most one endpoint. One LEFT JOIN folded into the batch the menu was
+                // already making is the whole cost; a call of its own would bill the gate on every page
+                // view for the entire Den, forever.
+                //
+                // Returns an empty `locked` for any account that predates gating, which is almost all of
+                // them — so an existing member's menu is byte-identical to what it renders today.
+                safe(gateForMenu(id), { town: 1, exempt: true, locked: {}, towns: [] }),
                 // ── THE FREE CHIPS, AS ONE BOOLEAN ───────────────────────────────────────────────────
                 // Luke: "casino should show a badge if you havent claimed your free chips."
                 // dailyChipsReady is a single indexed read of one column on mkt_buyer — deliberately NOT
@@ -103,6 +114,9 @@ export async function GET(request) {
             // groveOpen changes in one place, and a second copy of the rule in the menu would keep the door
             // shut for everyone after the page had opened. Same reason as the cards gate above.
             grove: groveOpen(id),
+            // What is shut, and which town opens it. The menu dims these; the ROUTES check for themselves
+            // through requireFeature — a dimmed row whose URL still serves the page is not locked.
+            gate,
             arena: { unlocked: Boolean(arena?.unlocked), fightsLeft: Number(arena?.fightsLeft) || 0 },
             // The High Seas prototype. A field on THIS request, never a call of its own — the menu is one
             // request for the whole thing, and a nav entry that fetches its own feature bills that feature on

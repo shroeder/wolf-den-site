@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import CookingClient from "@/components/CookingClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -11,6 +12,8 @@ export const metadata = {
 };
 
 export default async function CookingPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("cooking");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/cooking");
 

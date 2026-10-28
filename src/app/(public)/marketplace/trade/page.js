@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 import { GiCardExchange } from "react-icons/gi";
 
 import TradeInbox from "@/components/TradeInbox";
@@ -12,6 +13,8 @@ export const metadata = { title: "Your trades | Wolf Den", robots: { index: fals
 const RC = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b061ff", legendary: "#ffb020", mythic: "#33e0a1", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 
 export default async function TradesPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("trade");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     const items = buyer ? await listTradeableItems(buyer.id, { limit: 120 }).catch(() => []) : [];
     return (

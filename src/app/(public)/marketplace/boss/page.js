@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import BossFightClient from "@/components/BossFightClient";
 import HappyHour from "@/components/HappyHour";
@@ -19,6 +20,8 @@ export const metadata = {
 
 // The weekly community boss event — real, shared, persistent HP.
 export default async function BossPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("boss");
     // The same gate as the plaza, the sea, the dig, the farm and the mine — the member's own town_halloween
     // behind halloweenOn. Resolved here rather than added to the boss API, because the API answer is shared
     // and cached across everybody and this is a per-member preference.

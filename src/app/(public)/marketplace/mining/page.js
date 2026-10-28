@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 import { redirect } from "next/navigation";
 
 import MiningClient from "@/components/MiningClient";
@@ -15,6 +16,8 @@ export const metadata = {
 };
 
 export default async function MiningPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("mining");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/mining");
 

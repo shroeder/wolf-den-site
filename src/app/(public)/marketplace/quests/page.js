@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import QuestsClient from "@/components/QuestsClient";
 import ViewPing from "@/components/ViewPing";
@@ -14,6 +15,8 @@ export const metadata = {
 
 // A dedicated home for daily quests so members can always get back to them (also surfaced on the boss page).
 export default async function QuestsPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("quests");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     return (
         <div className="stack reveal">

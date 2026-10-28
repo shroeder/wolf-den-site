@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import GroveClient from "@/components/grove/GroveClient.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -14,6 +15,8 @@ export const dynamic = "force-dynamic";
 // unobtainable one way and leaky the other. This sends anybody else back to the marketplace rather than
 // showing them a screen full of locked nodes they cannot ever open.
 export default async function GrovePage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("grove");
     const buyer = await getAuthenticatedBuyer();
     if (!buyer?.id) redirect("/marketplace");
     if (!groveOpen(buyer.id)) redirect("/marketplace");

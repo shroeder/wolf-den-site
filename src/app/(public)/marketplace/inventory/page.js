@@ -1,4 +1,5 @@
 import ConsumablesClient from "@/components/ConsumablesClient";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 import EquipmentClient from "@/components/EquipmentClient";
 import ViewPing from "@/components/ViewPing";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
@@ -15,6 +16,8 @@ export const metadata = {
 };
 
 export default async function InventoryPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("inventory");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) {
         return (

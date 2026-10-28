@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import SailingClient from "@/components/SailingClient";
 import SailingLanding from "@/components/SailingLanding";
@@ -21,6 +22,8 @@ export const metadata = {
 };
 
 export default async function SailingPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("sailing");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     // Cold ad traffic lands here logged-out — show a hook + signup that returns them to sailing, not a 404.
     if (!buyer) return <SailingLanding />;

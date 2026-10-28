@@ -1,4 +1,5 @@
 import "server-only";
+import { GATING_LIVE } from "@/lib/marketplace/towns.js";
 
 import { createHash, randomBytes, randomInt } from "node:crypto";
 
@@ -84,11 +85,20 @@ export async function createBuyer({ email, password, displayName = null, firstNa
             [existing.id, passwordHash, displayClean, firstClean, lastClean]
         );
     } else {
+        // ── THE TOWN GATE'S BIRTHMARK ───────────────────────────────────────────────────────────
+        // An account created while gating is live carries the date it was created under it; every
+        // account from before carries NULL and is exempt forever. That is the whole grandfather
+        // clause — no backfill, no flag to flip on 200 rows, and nothing to get wrong in the gap
+        // between a migration and a deploy.
+        //
+        // ⚠️ GATED ONLY WHEN GATING_LIVE. While the Grove is owner-only there is no way to open a
+        // town, so stamping this early would mint unplayable accounts. See the note on the constant.
         row = await db.queryOne(
-            `INSERT INTO mkt_buyer (email, email_normalized, password_hash, display_name, first_name, last_name)
-             VALUES ($1, $2, $3, $4, $5, $6)
+            `INSERT INTO mkt_buyer (email, email_normalized, password_hash, display_name, first_name, last_name, gated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING id, email, display_name`,
-            [String(email).trim(), normalized, passwordHash, displayClean, firstClean, lastClean]
+            [String(email).trim(), normalized, passwordHash, displayClean, firstClean, lastClean,
+                GATING_LIVE ? new Date() : null]
         );
     }
     // Redeem any in-store/online purchases parked for this email before they had an account — their XP

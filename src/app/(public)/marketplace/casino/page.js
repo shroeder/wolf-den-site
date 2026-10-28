@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import CasinoClient from "@/components/CasinoClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -20,6 +21,8 @@ export const metadata = {
 };
 
 export default async function CasinoPage() {
+    // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
+    await gatePage("casino");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/casino");
 
