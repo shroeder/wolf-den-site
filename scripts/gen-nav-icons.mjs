@@ -116,6 +116,17 @@ const ICONS = {
     // and cannot be mistaken for the Compendium's tome (a book is wider than it is tall and has a spine).
     cards: "A single upright playing CARD standing face-on with a thick cream border and a bold dark wolf-head crest in its centre, a short neat stack of face-down cards sitting just behind and beside it",
     casino: "A small ornate slot machine cabinet seen straight on, its glass showing three glowing symbols in a row, a fat red-knobbed lever on the right side, gold trim around the frame and a lit marquee arch on top",
+
+    // ── THE SITE MENU'S THREE GAPS ──────────────────────────────────────────────────────────────────────
+    // SiteHeader's drawer draws a sprite per destination from this same folder, and these three had none, so
+    // those rows ship label-only. NOT YET DRAWN — adding a prompt here costs nothing; run the script to spend.
+    //
+    // Each avoids a shape already in this folder: "store" is a market stall and "town" is cottages, so About
+    // is the HANGING SIGN rather than a third building; "rewards" and "trophies" already own cups, so Events
+    // is a pennant rather than a fourth prize.
+    about: "A carved wooden shop sign hanging from a wrought-iron bracket on two short chains, a wolf's head in profile carved into the plank and picked out in gold",
+    mystery: "A plump closed cloth drawstring pouch with a corded tie, bulging at the sides, two trading-card corners just visible poking out of the gathered neck",
+    events: "A tall triangular pennant flag on a polished wooden pole, the fabric deep red with a gold border, caught mid-flutter",
 };
 
 const want = process.argv.slice(2);
