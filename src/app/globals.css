@@ -26044,6 +26044,33 @@ body.cas-seated .social-fab { display: none; }
 .pk-error { margin: 0; color: #FCA5A5; }
 .pk-fine { margin: 0; font-size: 0.74rem; color: var(--muted); }
 
+/* ── THE VAULT CTA ───────────────────────────────────────────────────────────────────────────────────────
+   Quiet on purpose. It sits directly under the one button this screen exists to get pressed, so it is a
+   link that states a fact ("6 cards in your vault, $412.00") rather than a second gold button arguing with
+   the first. The component only renders it when the count is non-zero — see the note there. */
+.pk-vault-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    margin-top: 10px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.03);
+    text-decoration: none;
+    color: var(--ink-secondary);
+}
+
+.pk-vault-cta:hover {
+    border-color: rgba(212, 175, 55, 0.45);
+    background: rgba(212, 175, 55, 0.07);
+    color: var(--ink);
+}
+
+.pk-vault-cta-main { font-size: 0.86rem; font-weight: 600; }
+.pk-vault-cta-sub { font-size: 0.72rem; color: var(--muted); }
+
 /* ── WHAT IS IN THE PACKS ────────────────────────────────────────────────────────────────────────────────────
    A sheet on a phone, a panel on a desktop. It reads live every time it opens: the shop counter is selling out
    of this same pool, so a cached list would quietly start lying. */

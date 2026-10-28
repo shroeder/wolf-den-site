@@ -526,3 +526,26 @@ export async function cancelVaultOrder({ buyerId, orderId }) {
     logger.info("vault.order.cancelled", { buyerId, orderId, cards: returned.length, wasPrepared });
     return { ok: true, returnedCount: returned.length, wasPrepared };
 }
+
+/**
+ * How many cards the member is holding, and what they are worth — for a CTA that has to earn its place.
+ *
+ * ⚠️ THE SAME PREDICATE getVault USES, deliberately: status IN ('held','on_order'). A count that disagrees
+ * with the screen it links to is worse than no count, and 'held' alone would drop cards already on their way
+ * to the member — who would read that as the vault losing them.
+ *
+ * Cheap on purpose (one aggregate, no rows) because it is read on a screen that is not the vault.
+ */
+export async function vaultSummary(buyerId) {
+    if (!buyerId || !vaultOpenFor(buyerId)) return null;
+    const row = await db
+        .queryOne(
+            `SELECT COUNT(*)::int AS cards, COALESCE(SUM(current_value_cents), 0)::bigint AS cents
+               FROM mkt_vault_card
+              WHERE buyer_id = $1 AND status IN ('held', 'on_order')`,
+            [buyerId]
+        )
+        .catch(() => null);
+    if (!row) return null;
+    return { cards: Number(row.cards) || 0, valueCents: Number(row.cents) || 0 };
+}

@@ -197,6 +197,8 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
     // choose between — the bags plus every category pool their gate allows — and `picked` is the one
     // currently centred in the carousel. A member with one pool never sees any of it.
     const [pools, setPools] = useState(initial?.pools || []);
+    // {cards, valueCents} for the vault CTA, or null when the member holds nothing / the vault is shut.
+    const [vault, setVault] = useState(initial?.vault || null);
     const [picked, setPicked] = useState(0);
     const trackRef = useRef(null);
     const [balanceCents, setBalanceCents] = useState(initial?.balanceCents || 0);
@@ -280,6 +282,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
         const data = await res.json();
         setPool(data.pool);
         setPools(data.pools || []);
+        setVault(data.vault || null);
         setBalanceCents(data.balanceCents);
     }, []);
 
@@ -1006,6 +1009,23 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                         </button>
                     )}
                     <p className="pk-fine">Opens are final. The card is yours either way.</p>
+                    {/* ── THE WAY BACK TO WHAT YOU ALREADY PULLED ──────────────────────────────────
+                        Luke, 2026-10-27: "I need a cta for my card vault from here as well." The
+                        only links to the vault on this screen appear AFTER an open, so a member
+                        arriving with ten cards already in there had no way through.
+
+                        ⚠️ IT ONLY APPEARS WHEN THERE IS SOMETHING IN IT. A "Card Vault" link over an
+                        empty vault is a dead end dressed as a reward, and it would sit directly under
+                        the one button this screen exists to get pressed. The count and the value are
+                        what make it worth the room. */}
+                    {vault?.cards ? (
+                        <a className="pk-vault-cta" href="/marketplace/vault">
+                            <span className="pk-vault-cta-main">
+                                {vault.cards === 1 ? "1 card in your vault" : `${vault.cards} cards in your vault`}
+                            </span>
+                            <span className="pk-vault-cta-sub">{usd(vault.valueCents)} &middot; keep or sell</span>
+                        </a>
+                    ) : null}
                 </div>
             ) : null}
 
