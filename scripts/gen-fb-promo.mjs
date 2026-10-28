@@ -104,7 +104,7 @@ const CLUSTERS = {
 for (const list of Object.values(CLUSTERS)) {
     for (const s of list) s.uri = await inlineSprite(path.join("images", s.src), s.w);
 }
-const logoUri = await inlineSprite("logo/logo.png", 104);
+const logoUri = await inlineSprite("logo/logo.png", 168);
 
 const sprites = (key, box) => `
   <div class="cluster ${key}" style="${box}">
@@ -144,7 +144,10 @@ const html = `<!doctype html>
     background: radial-gradient(58% 48% at 50% 50%, rgba(10,11,16,0.94) 0%, rgba(10,11,16,0.86) 38%, rgba(10,11,16,0.30) 62%, rgba(10,11,16,0) 78%); }
   .middle { position: absolute; inset: 0; z-index: 60; display: flex; flex-direction: column;
             align-items: center; justify-content: center; text-align: center; padding: 0 128px; }
-  .mark { width: 104px; height: 104px; margin-bottom: 14px;
+  /* ⚠️ WIDTH ONLY. logo.png is 1536x1024 — a 3:2 mark. Giving it a square box squashed the wolf by a
+     third, which reads as a slightly wrong logo rather than as an obvious bug, and nothing in a contact
+     sheet or a thumbnail would have caught it. Never set both axes on this file. */
+  .mark { width: 168px; height: auto; margin-bottom: 10px;
           filter: drop-shadow(0 0 26px rgba(255,196,84,0.45)); }
   .eyebrow { font-family: "Space Grotesk", Manrope, sans-serif; font-weight: 700; font-size: 25px;
              letter-spacing: 0.34em; text-transform: uppercase; color: #ffc85a; margin-bottom: 16px; }
