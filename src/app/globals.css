@@ -26041,6 +26041,9 @@ body.cas-seated .social-fab { display: none; }
 .pk-foot .pk-btn { width: min(100%, 420px); }
 
 .pk-need { margin: 0; color: var(--ink-secondary); }
+/* On an END screen the shortfall sits under a payout the member is still looking at, so it is quieter
+   than the idle screen's version — it explains the button below it rather than competing with it. */
+.pk-need-end { font-size: 0.86rem; text-align: center; margin-bottom: 10px; }
 .pk-error { margin: 0; color: #FCA5A5; }
 .pk-fine { margin: 0; font-size: 0.74rem; color: var(--muted); }
 

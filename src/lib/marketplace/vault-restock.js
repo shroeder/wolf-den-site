@@ -215,6 +215,10 @@ export async function restockBoughtBackCard({
     imageUrl,
     valueCents,
     paidCents,
+    // ⚠️ WHAT THE CARD COST US ORIGINALLY — NOT what we just paid to take it back. The two are different
+    //    events and conflating them is how a card books in at full market. 0 means "we do not know", and
+    //    "we do not know" is written as NOTHING rather than as a plausible wrong number.
+    originCostCents = 0,
     // ⚠️ NO DEFAULT HERE ANY MORE — see categoryForVariation. A default on this parameter is what made
     //    "Pokémon" the answer for every card nobody had an opinion about, including the Magic ones.
     categoryName = null,
@@ -226,7 +230,7 @@ export async function restockBoughtBackCard({
     // no row at all — for a card we had just paid real credit for. That table is OUR copy and the only thing
     // that survives Square deleting the item; losing it is how a past sale came to report $0.00 cost and
     // ~100% profit. A failed restock leaves a card to re-shelve by hand. A lost cost leaves a lie in a report.
-    if (squareVariationId) await recordOurCost(squareVariationId, paidCents, name);
+    if (squareVariationId) await recordOurCost(squareVariationId, originCostCents, name);
 
     try {
         const existing = await liveVariation(squareVariationId);
@@ -253,7 +257,7 @@ export async function restockBoughtBackCard({
 
         // The new item's own id — the cost above was keyed to an id that no longer exists (or to none at
         // all), so it is recorded again against the thing that will actually be sold.
-        await recordOurCost(variationId, paidCents, name);
+        await recordOurCost(variationId, originCostCents, name);
         await restockInventoryForCancel([{ catalogObjectId: variationId, quantity: 1 }], {
             idempotencyKey: `vault-buyback-new-${variationId}`,
         });
@@ -285,14 +289,31 @@ export async function restockBoughtBackCard({
  *      $53. The per-transaction truth belongs in the TRADE LEDGER, which records it with its own rate and is
  *      exactly where `capture-trade-costs.mjs` already looks.
  */
-async function recordOurCost(variationId, paidCents, name) {
-    if (!variationId || !(paidCents > 0)) return;
+// ── ⚠️ 2026-10-27: A BUY-BACK NO LONGER SETS A COST AT ALL ──────────────────────────────────────────────────
+// Luke: "if sellback occurs, we should just keep the initial unit cost from buying the item in store and
+// ignore the sellback as the unit cost."
+//
+// The DO NOTHING below already protected a cost we HAD. What it did not protect was the empty case: with no
+// row for a variation, the buy-back figure became that variation's cost for ever. At 60% that was merely
+// wrong. At 100% it is catastrophic — the card books in at full market, so every future sale of every copy
+// of it reports ZERO margin, and the error is invisible because the number looks plausible.
+//
+// A buy-back is not a purchase at a cost; it is a REDEMPTION at market, against a card we already owned and
+// already paid for. The cost of that card is whatever we paid the day it came through the door — which is in
+// the trade ledger if we bought it, and in mkt_pack_open.cogs_cents for the open that sent it out. If neither
+// knows, the honest answer is that we do not know, and a gap in COGS is a gap we can see and fix. A
+// confident wrong number is not.
+//
+// `costCents` is therefore an EXPLICIT original basis, never the payout. Callers that do not have one pass
+// nothing and no row is written.
+async function recordOurCost(variationId, costCents, name) {
+    if (!variationId || !(costCents > 0)) return;
     await db
         .query(
             `INSERT INTO wolfden_item_cost (variation_id, unit_cost_cents, source, item_name, updated_at)
-             VALUES ($1, $2, 'vault_buyback', $3, NOW())
+             VALUES ($1, $2, 'pack_origin', $3, NOW())
              ON CONFLICT (variation_id) DO NOTHING`,
-            [variationId, Math.round(paidCents), name || null]
+            [variationId, Math.round(costCents), name || null]
         )
         .catch((error) => logger.error("vault_restock.cost_write_failed", error, { variationId }));
 }
@@ -318,6 +339,21 @@ export async function completeBuyBack({ buyerId, cards }) {
         // as having cost us full market, so every re-sale reports roughly zero margin.
         const marketCents = Math.max(0, Math.round(Number(card.valueCents) || 0));
         const paidCents = buyBackCents(marketCents);
+        // ── ⚠️ THE CARD'S REAL COST LIVES ON THE OPEN THAT SENT IT OUT ──────────────────────────────────
+        // mkt_pack_open.cogs_cents is what we booked this exact card as having cost when it left the
+        // building, and it is the only per-unit basis we hold for it. Reading it back on the way IN keeps
+        // one number across both directions, instead of inventing a second one from the payout.
+        //
+        // Null is a legitimate answer (a card from before this path, or an open with no basis) and it means
+        // no cost row gets written. A COGS gap is visible and fixable; a wrong cost is neither.
+        const originCostCents = card.id
+            ? Number(
+                (await db
+                    .queryOne(`SELECT cogs_cents FROM mkt_pack_open WHERE mystery_card_id = $1 ORDER BY created_at DESC LIMIT 1`,
+                        [card.id])
+                    .catch(() => null))?.cogs_cents || 0
+            )
+            : 0;
         const result = await restockBoughtBackCard({
             squareVariationId: card.squareVariationId,
             name: card.name,
@@ -325,6 +361,7 @@ export async function completeBuyBack({ buyerId, cards }) {
             imageUrl: card.imageUrl,
             valueCents: marketCents,
             paidCents,
+            originCostCents,
             // Passed when the caller knows — a category pack knows its own pool's category for certain.
             // Everything else falls through to the shelf's own memory of the variation.
             categoryName: card.categoryName || null,

@@ -1,11 +1,23 @@
 // ── WHAT WE PAY FOR A CARD BACK ──────────────────────────────────────────────────────────────────────────────
-// Luke, 2026-10-27: "I think we should buy back cards at 60 percent store credit so it matched what we do in
-// store, when selling the card."
+// Luke, 2026-10-27, twice in one day. First: "I think we should buy back cards at 60 percent store credit so
+// it matched what we do in store." Then, after opening packs on his phone: "change to 100 percent sellback."
 //
-// Sell-back used to pay 100% of market, which was never the shop's rate — it was a placeholder that happened
-// to make the first build's maths simple. The counter pays 60% in trade credit, and a different rate online
-// is two prices for one transaction: somebody finds out, and the one they find out about is whichever is
-// worse for them.
+// ⚠️ 100% IS A DIFFERENT PRODUCT, NOT A BETTER RATE. At 60% the pack had two independent margins — the gap
+// between price and pool EV, AND the 40% we clipped on every card that came back. At 100% the second one is
+// gone and the ONLY thing standing between this feature and a loss is EV < price.
+//
+//   expected margin per open = price − EV(pool)
+//
+// That is it. The whole business case now rests on one inequality, which priceForEvCents() enforces by
+// rounding the price UP to the next $5 above EV. If that rounding ever becomes rounding-to-nearest, or an EV
+// recompute lags a pool that got richer, the feature starts losing money with no second line of defence.
+//
+// ⚠️ AND THE PER-EVENT DOWNSIDE IS UNCAPPED. A member who pays $20, pulls a $258 Jirachi and sells it back
+// takes $258 of credit out of a $20 bet. The expectation is still positive; the VARIANCE is what needs
+// watching, which is why the telemetry tracks realised margin and not just the modelled one.
+//
+// What 100% buys is the promise on the tin — "the card is yours either way, and it is worth what we say it
+// is worth". There is no spread for a member to discover and resent.
 //
 // ── ⚠️ ONE FUNCTION, CALLED BY EVERY PATH THAT TOUCHES THE NUMBER ────────────────────────────────────────────
 // There are FOUR of them and they must never disagree:
@@ -24,8 +36,8 @@
 // re-list it at = market) and `paidCents` (what it cost us = this). They were equal while the rate was 100%,
 // which hid the distinction; collapsing them now would book every re-sold buy-back at zero margin.
 
-/** The counter's rate, in percent. Shown to members — the number is the argument for its own fairness. */
-export const BUYBACK_PERCENT = 60;
+/** The rate, in percent. Shown to members — the number is the argument for its own fairness. */
+export const BUYBACK_PERCENT = 100;
 
 /**
  * ⚠️ NOTHING PAYS LESS THAN A DOLLAR. 60% of a $1.00 common is sixty cents, and sixty cents does not read as

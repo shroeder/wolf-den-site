@@ -128,6 +128,40 @@ function rollDebris() {
  * Fewer pieces than the burst, all of them gold, and thrown a shorter distance. This is a payout landing, not
  * a bag coming apart: it should read as the card being counted out rather than destroyed.
  */
+/**
+ * What a member can do NEXT, on both end screens.
+ *
+ * ⚠️ THIS EXISTS BECAUSE "Open another" SILENTLY BECAME "Done". The button was already conditional on
+ * canOpen, so a member who had just spent down below the pack price got a dead "Done" and a link to the
+ * vault — Luke, 2026-10-27: "Dead end needs cta for continued play." The screen knew exactly why they could
+ * not continue and said nothing about it, which is the worst of both: it neither lets them go on nor tells
+ * them what would.
+ *
+ * The idle screen has told the truth about this the whole time — "You're $8.75 short of a $20.00 pack" over
+ * an Add store credit button. The end screens never got it. Same answer, same words, and ONE component so
+ * there is no third copy of this to drift.
+ */
+function PackAgain({ canOpen, shortfallCents, priceCents, onAgain, priceTrusted }) {
+    const short = canOpen ? 0 : Math.max(0, Number(shortfallCents) || 0);
+    return (
+        <>
+            {short > 0 && priceTrusted ? (
+                <p className="pk-need pk-need-end">
+                    You&apos;re <strong>{usd(short)}</strong> short of a <strong>{usd(priceCents)}</strong> pack.
+                </p>
+            ) : null}
+            <div className="pk-actions">
+                {canOpen ? (
+                    <button type="button" className="pk-btn pk-btn-primary" onClick={onAgain}>Open another</button>
+                ) : (
+                    <a className="pk-btn pk-btn-primary" href="/marketplace/credit">Add store credit</a>
+                )}
+                <a className="pk-btn pk-btn-ghost" href="/marketplace/vault">Go to the vault</a>
+            </div>
+        </>
+    );
+}
+
 function rollCoins() {
     return Array.from({ length: 14 }, (_, i) => ({
         id: `c${i}`,
@@ -873,12 +907,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                 <div className="pk-result pk-result-sold">
                     <div className="pk-done">
                         <p className="pk-done-line">Spends like cash here — no fees, no waiting.</p>
-                        <div className="pk-actions">
-                            <button type="button" className="pk-btn pk-btn-primary" onClick={reset} disabled={!canOpen}>
-                                {canOpen ? "Open another" : "Done"}
-                            </button>
-                            <a className="pk-btn pk-btn-ghost" href="/marketplace/vault">Go to the vault</a>
-                        </div>
+                        <PackAgain canOpen={canOpen} shortfallCents={shortfall} priceCents={priceCents} onAgain={reset} priceTrusted={priceTrusted} />
                     </div>
                 </div>
             ) : null}
@@ -894,12 +923,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                     {choice === "vault" ? (
                         <div className="pk-done">
                             <p className="pk-done-line">Added to your vault.</p>
-                            <div className="pk-actions">
-                                <button type="button" className="pk-btn pk-btn-primary" onClick={reset} disabled={!canOpen}>
-                                    {canOpen ? "Open another" : "Done"}
-                                </button>
-                                <a className="pk-btn pk-btn-ghost" href="/marketplace/vault">Go to the vault</a>
-                            </div>
+                            <PackAgain canOpen={canOpen} shortfallCents={shortfall} priceCents={priceCents} onAgain={reset} priceTrusted={priceTrusted} />
                         </div>
                     ) : (
                         <div className="pk-actions pk-actions-choice">
