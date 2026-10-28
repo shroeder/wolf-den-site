@@ -27768,3 +27768,161 @@ body.cas-seated .social-fab { display: none; }
     transform: translateY(2px);
     box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
 }
+
+/* ── DISCOVER — THE EXPERIMENTAL SWIPE SHOP ───────────────────────────────────────────────────────────────
+   docs/shop-discover-view.md. One item per screen, swipe for the next.
+
+   ⚠️ THE TRACK OWNS THE SCROLLING, NOT THE PAGE. scroll-snap-type on a container whose children are each
+   exactly one viewport tall is the whole interaction — the browser gives momentum, rubber-banding and
+   keyboard/accessibility behaviour for free, and because nothing captures the pointer a tap is still a tap.
+   Every hand-rolled swipe handler in this codebase has eventually eaten a click. */
+.dv-wrap { position: relative; }
+
+.dv-track {
+    /* Fallback only — the real height is measured and set inline, because this page sits under the site
+       header and the HUD bar and a full-viewport card pushes its own buttons off the screen. */
+    height: 100dvh;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    /* Stops a fast flick skating past three cards — one deliberate gesture, one item. */
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.dv-card {
+    /* 100% of the TRACK, which is measured — never of the viewport. See the note on .dv-track. */
+    height: 100%;
+    scroll-snap-align: start;
+    /* ⚠️ scroll-snap-stop: always is what makes it a DECK rather than a long page. Without it a hard swipe
+       flies through several items and the member never actually sees the ones in between. */
+    scroll-snap-stop: always;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 18px;
+}
+
+/* The photo is the product. object-fit: contain because the shelf holds sealed boxes and single cards in
+   wildly different aspects, and a cover crop eats the art on the tall ones. */
+.dv-art {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.dv-art img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.65);
+}
+
+.dv-meta { flex: 0 0 auto; width: min(100%, 420px); text-align: center; display: flex; flex-direction: column; gap: 8px; }
+
+/* ⚠️ The name WRAPS and is clamped rather than ellipsed on one line: this is the only place the full name
+   appears, and a promo name truncated to "Pikachu & Zekrom GX (Full A…" is the half that matters cut off. */
+.dv-name {
+    margin: 0;
+    font-size: 1.05rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.dv-sub { margin: 0; display: flex; align-items: baseline; justify-content: center; gap: 10px; }
+.dv-price { font-size: 1.5rem; font-weight: 800; color: #F0D27A; font-variant-numeric: tabular-nums; }
+
+/* Shown only when quantity is 1 — "12 in stock" is noise, "last one" is a reason to decide. */
+.dv-last {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #FCA5A5;
+    border: 1px solid rgba(252, 165, 165, 0.4);
+    border-radius: 999px;
+    padding: 2px 8px;
+}
+
+.dv-btn {
+    border-radius: 999px;
+    padding: 12px 18px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.dv-btn-primary { background: linear-gradient(180deg, #F3D27C, #D4AF37); color: #1a1507; border-color: rgba(0,0,0,0.25); }
+.dv-btn-primary:disabled { opacity: 0.55; cursor: default; }
+.dv-btn-ghost { background: rgba(255,255,255,0.04); border-color: var(--line); color: var(--ink-secondary); }
+.dv-add { width: 100%; }
+
+.dv-card-end { gap: 16px; }
+.dv-empty, .dv-error { text-align: center; padding: 24px 18px; color: var(--muted); }
+.dv-error { color: #FCA5A5; }
+
+/* ── THE QUIZ ─────────────────────────────────────────────────────────────────────────────────────────────
+   Two questions and a way past both. See the component — a gate people cannot skip is a gate they leave at. */
+.dv-quiz { padding: 28px 18px; display: flex; flex-direction: column; gap: 14px; max-width: 460px; margin: 0 auto; }
+.dv-quiz-h { margin: 0; font-size: 1.4rem; }
+.dv-quiz-sub { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.dv-quiz-group { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.dv-chip {
+    border-radius: 999px;
+    padding: 9px 15px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,0.03);
+    color: var(--ink-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.dv-chip-on { border-color: rgba(212,175,55,0.6); background: rgba(212,175,55,0.12); color: #F0D27A; font-weight: 700; }
+.dv-quiz-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+
+/* ⚠️ position: fixed is SAFE here and not in the pack modal, because Discover has no transformed or
+   filtered ancestor — it is a bare page. Check before copying this pattern anywhere else. */
+.dv-detail {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(0,0,0,0.86);
+}
+
+.dv-detail-card {
+    width: min(100%, 380px);
+    max-height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    border-radius: 16px;
+    background: var(--elevated);
+    border: 1px solid var(--line);
+    text-align: center;
+}
+
+.dv-detail-card img { max-width: 100%; max-height: 46dvh; object-fit: contain; border-radius: 10px; align-self: center; }
+.dv-detail-card h3 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.dv-detail-cat { margin: 0; font-size: 0.78rem; color: var(--muted); }
+.dv-detail-price { margin: 0; font-size: 1.6rem; font-weight: 800; color: #F0D27A; }
