@@ -362,74 +362,83 @@ catalogue item already has a stat block to weight against.
 Separating these is what lets the top of the Grove drop *rarely but excellently* while the on-ramp drops
 *often and modestly*, without either one fighting the other.
 
-### The bands, against where players actually are
+### Three slots per enemy, on a curve
 
-Measured dps for a full kit at each tier, beside the Grove depth where a player needs roughly that much:
+Luke: *"Every enemy still has a loot table of items that it can drop — manicured by you so every enemy has
+something different to drop, but its power is relative to the zone and enemy you're facing. Maybe every
+enemy has a normal drop, a rare drop and a super-rare drop — three assigned pieces you elect."*
 
-| tier | full-kit dps | comfortable around |
-|---|---|---|
-| common | 100 | map 1 |
-| rare | 146 | map 1–2 |
-| epic | 294 | map 2–3 |
-| legendary | 474 | map 3–4 |
-| mythic | 343* | map 3–4 |
-| ascendant | 918 | map 4–5 |
-| eternal | 1,512 | map 5–6 |
-| celestial | 2,443 | map 6–7 |
-| primordial | 5,036 | map 7+ |
+So each of the 84 zones' residents gets **three named items**, hand-assigned, and the **rarity of each slot
+comes from the depth**, never from the item being nice:
 
-\* mythic reading below legendary is a build-mix artifact of picking the highest stat-total piece per slot,
-not a ladder inversion — the authored stat totals climb cleanly (epic 90 → legendary 115 → mythic 143 →
-ascendant 167).
-
-Proposed band per map, each with a small chance to roll **one band up** (and the lookup must fail *upward* —
-the rarity scar):
-
-| map | drops | a player there has | so the band is |
+| map | normal | rare | super-rare |
 |---|---|---|---|
-| 1 Rootwood | common · rare | nothing → ~100 | the kit itself |
-| 2 Undercave | rare · epic | ~150–300 | one step ahead |
-| 3 Fen | epic · legendary | ~300–500 | level |
-| 4 Saltwrack | legendary · mythic | ~500–900 | level |
-| 5 Drowned | mythic · ascendant | ~900–1,800 | level |
-| 6 Gilded | ascendant · eternal | ~1,800–3,700 | level |
-| 7 Ashen | eternal | ~3,700–10,000 | **stops here** |
+| 1 Rootwood | common | common → rare | **rare** — "the best thing off a mob is a magic item" |
+| 2 Undercave | common → rare | rare | rare → epic |
+| 3 Fen | rare | epic | epic → **legendary** — the third or fourth tier |
+| 4 Saltwrack | rare → epic | epic → legendary | legendary |
+| 5 Drowned | epic | legendary | legendary → mythic |
+| 6 Gilded | epic → legendary | legendary | **mythic** |
+| 7 Ashen | legendary | mythic | **mythic** |
 
-### The top tiers: rare, but possible
+Each map shifts at its halfway point, so the climb reads as a curve rather than seven steps.
 
-Luke, asked whether the ladder should stop at eternal: *"No, it's rare, but possible."* So celestial and
-primordial **do** drop in the Grove — and the only honest way to say "rare" is to pick how many the Den
-should see in a month and solve backwards for the roll. A 6% step-up *feels* rare and produces **thirty
-celestials a month**; the number has to be derived, not guessed.
+`scripts/grove-loot-draft.mjs` drafts the whole thing — 84 zones, every resident, three picks each — holding
+three rules: the picks stay distinct (**243 distinct items across 252 slots**), the rarity comes from the
+curve, and each pick leans toward **the creature's own stat**, the one its emblem already names. A Thornling
+is attack speed, so a Thornling drops the attack-speed pieces. That is what makes 84 zones worth telling
+apart.
 
-**One mechanism, no special cases.** Every gear drop rolls its depth's band, then has a small chance to step
-**up one rung**, and a much smaller chance to step up **two**:
+### ⚠️ The ladder stops at mythic, and the catalogue decides that — not us
 
-| map | band | one up | two up |
+Filtering the item pool down to what may actually drop produced a result that overrides an earlier decision
+in this document:
+
+| rarity | items | droppable | what the rest are |
 |---|---|---|---|
-| 1 Rootwood | common | rare | epic |
-| 2 Undercave | rare | epic | legendary |
-| 3 Fen | epic | legendary | mythic |
-| 4 Saltwrack | legendary | mythic | ascendant |
-| 5 Drowned | mythic | ascendant | eternal |
-| 6 Gilded | ascendant | eternal | **celestial** |
-| 7 Ashen | eternal | **celestial** | **primordial** |
+| common–legendary | 213 | **213** | — |
+| mythic | 49 | **49** | chest 29, xp shop 18, gourdfather 2 |
+| ascendant | 297 | **0** | 260 **forged twins**, 37 elite |
+| eternal | 31 | **0** | 30 elite, 1 season |
+| celestial | 30 | **0** | 30 elite |
+| primordial | 26 | **0** | 25 elite, 1 season |
 
-The shallow end is then safe **for free** — two rungs above map 1 is an epic. Nothing has to know which tier
-is the precious one, and no map needs a rule of its own. (The band lookup must still fail *upward*: an
-unknown tier means newer and rarer, never cheaper.)
+**Everything above mythic is elite or forged.** There is no droppable celestial item to put in a loot table —
+which means the earlier "celestial and primordial drop in the Grove, rare but possible" cannot be built the
+way it was written. Luke's own curve — *"maybe even a mythic or two"* — is exactly what the catalogue allows.
 
-### Solving the two rates
+⚠️ **And 260 of the 297 ascendant items are forged twins**, the thing a player makes by spending a Prismatic
+Stone. An unfiltered draw at depth would hit one almost nine times in ten and hand out the forge's entire
+reason to exist. `items.js` says it in as many words: *"every random reward path builds its pool by filtering
+ITEMS, so an exclusive that is merely 'not granted anywhere else' is an exclusive the fishing rod hands
+out."* The Grove is a new random reward path, so it restates **all six** predicates — forged, real-money,
+owner-only, season, Halloween, gourdfather.
+
+### So the top tail pays a CHEST, not an item
+
+"Rare, but possible" survives — through the door the game already has. The deepest zones' super-rare roll
+can, very rarely, pay a **top-tier chest** rather than a piece of gear, and the chest then grants the elite
+item through the path that already meters it.
+
+That is better than a second elite faucet in three ways: there is one place that decides how often elite gear
+enters the game, the chest open is already a moment the game celebrates, and the Grove's rare spawn already
+sets this precedent — its "possible chest" is granted through `addChests`, deliberately, and is the one
+exception in the whole feature.
+
+The rates solved below are what that chest roll should be.
+
+### Solving the chest tail
 
 The Grove is sized against the chest ladder's own deliberate budget — **5 celestial and 1 primordial a month,
-Den-wide** — so it roughly doubles the supply of the top tiers rather than flooding them. At the steady-state
+Den-wide** — so it roughly doubles the supply of the top tiers rather than flooding them. These are now the
+odds of the super-rare slot paying a **chest** instead of its item, at the deepest zones only. At the steady-state
 0.8% gear rate, a player at the frontier sees **19 drops an hour**. Modelling six people farming the deep end
 three hours a week (≈77 frontier hours, ≈1,486 drops a month):
 
 | | rate | in player terms |
 |---|---|---|
-| **step up one rung** | **0.34%** | one per ~15 hours of farming |
-| **step up two rungs** | **0.067%** | one per ~77 hours of farming |
+| **a celestial chest** | **0.34%** | one per ~15 hours of farming |
+| **a primordial chest** | **0.067%** | one per ~77 hours of farming |
 
 Which is the shape "rare, but possible" actually describes: a dedicated player turns up a celestial every
 couple of weeks and a primordial maybe twice a year.
@@ -661,8 +670,9 @@ boss or kill count → the boss, and it already works that way.
 
 Still open:
 
-1. ~~Does the Grove's ladder stop at eternal?~~ **No — rare but possible.** Sized at 0.34% / 0.067% step-up
-   against the chest ladder's budget; re-measure once the Grove has real traffic.
+1. ~~Does the Grove's ladder stop at eternal?~~ **The item ladder stops at MYTHIC — the catalogue has no
+   droppable item above it.** "Rare but possible" is kept by the super-rare slot occasionally paying a
+   top-tier CHEST instead, at the same 0.34% / 0.067%. Needs a nod that the chest route is the right shape.
 2. ~~Is Grove gear tradeable?~~ **Yes — it is the game's own gear, under the game's own rules.** No new
    item pool, no per-copy identity, nothing to migrate.
 3. ~~Do set pieces drop in the Grove?~~ **Yes, at 0.135% of gear drops from map 5 on** — two a month
