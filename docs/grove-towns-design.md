@@ -158,6 +158,110 @@ Two things to settle before this is built:
 2. **The +17%-a-zone player ramp is an assumption, not a measurement.** Every figure in the feel table rests
    on it, so it should be measured off the real drop tables before these numbers are committed.
 
+## 3d. Gear drops — the Grove becomes the loot game
+
+Luke, 2026-10-28: *"Gear drops on enemies throughout the entirety of the Grove. That way there's something to
+farm for. So we can improve their loot tables using a bunch of different gear on a curve with random rolls so
+that you can get lucky and get good shit."*
+
+This is a bigger change than the floor fix it started as, and a better one: it gives the Grove the thing it
+currently lacks, which is a reason to keep killing things after the parts you need have dropped.
+
+### It also mostly solves §3a on its own
+
+A full kit of the **cheapest tier in the game** — Rusty Sword, Wooden Shield, Leather Cap — measured through
+the real `swing()`:
+
+| kit | dps | hp | per rootrat | rootrat hits survived | zone-1 boss |
+|---|---|---|---|---|---|
+| nothing (today's new account) | 2 | 0 | 119 s | **1.4** | 62 min |
+| **common, all 9 slots** | **100** | **299** | **2.9 s** | **6.9** | **90 s** |
+| rare | 146 | 423 | 2.0 s | 9.7 | 62 s |
+| epic | 294 | 399 | 1.0 s | 9.2 | 31 s |
+| legendary | 474 | 546 | 0.6 s | 12.6 | 19 s |
+
+**A common kit lands exactly on the 100 dps the floor needs.** So the drastic on-ramp rewrite in §3c may not
+be necessary at all — the player climbs to meet the curve instead of the curve coming down to meet them.
+
+⚠️ **One thing gear cannot fix: the first sixty seconds.** They arrive wearing nothing, and at 60 hp a
+rootrat still two-shots them before the first drop lands. So the one piece of §3c that stays mandatory is
+**enemy DAMAGE in the opening zones** — health can be left alone, damage cannot. Survive first; gear does the
+rest.
+
+### Rolled, not drawn from the catalogue
+
+Grove gear should be **generated per drop** — base + rarity + depth + rolled affix values — rather than pulled
+from the 652 authored items.
+
+⚠️ **And the game already does this.** `ITEMS` in `items.js` is not what the game hands out: four passes
+rewrite every item's stats at import, keyed on rarity tier and slot weight — intrinsics, affix counts, dedupe.
+The Grove's roller is that same pipeline with two extra inputs, **depth and a seed**, and a range instead of a
+fixed value. This is an extension, not a second stat system.
+
+Three reasons it must not draw from the authored pool:
+
+1. **The catalogue is finite and spoken for.** Those items back the compendium, the sets and the collections.
+   A faucet pouring into them floods "collect them all" and decays seven set bonuses at once.
+2. **A generated item scales forever.** Maps 8–12 are designed and undrawn; a rolled item just takes a
+   higher depth. An authored pool would need 60 new items per map.
+3. **The chase needs a range.** You cannot roll well on a fixed stat block.
+
+### What makes a lucky drop lucky
+
+Three independent rolls, so the tail is genuinely rare without any single number being tiny:
+
+- **the base** — which slot and archetype fell
+- **the rarity** — the band for that depth, with a small chance to roll one band *up* (the band must fail
+  upward; see the rarity-ladder scar)
+- **the affix values** — each stat rolls inside a range, so two identical bases differ. A near-perfect roll is
+  the thing worth bragging about in global chat
+
+⚠️ **The roll happens on the SERVER.** `grove.js` already settles by re-running the same pure roll from the
+session seed — the client may compute the same roll locally so the item appears the instant the body drops,
+but what the player *keeps* is what the server computed. A client that can name its own stats is a client
+that rolls perfect items.
+
+### ⚠️ The economy collision, which is the real risk
+
+Measured today: **82 pieces of gear enter the Den per day**, 282 a week of it from chests — the dominant
+source by a wide margin.
+
+| drop rate | a new player's map 1 (620 kills) | a veteran farming one hour (2,400 kills) |
+|---|---|---|
+| 5% | 31 pieces | 120 — **1.5× the whole Den's daily income** |
+| 2% | 12 pieces (a kit, with dupes) | 48 — 0.6× |
+| 1% | 6 pieces | 24 — 0.3× |
+| 0.5% | 3 pieces | 12 — 0.1× |
+
+One player, one hour, at 2%, produces most of a day's gear for the entire Den. **So a single flat rate cannot
+serve both ends.** The on-ramp wants ~2–3% to kit somebody out inside map 1; the steady state wants ~0.5–1%
+or the Grove becomes the only gear source in the game and the chests, the delves, the raid and the auction
+all stop mattering.
+
+Three ways to hold that line, and this needs Luke's call:
+
+1. **Two rates** — generous through maps 1–2, lean from map 3 on. Simple, and the on-ramp is a one-time
+   stretch per account so it cannot be farmed repeatedly.
+2. **Rate falls as rarity rises** — commons stay common at depth, the good bands get rare. Natural, and it is
+   how the chest ladder already behaves.
+3. **Grove gear is bound** — equippable and salvageable but never auctioned. Contains the faucet completely,
+   at the cost of the trading loop Luke built the market for.
+
+My recommendation is **1 + 2**: two rates, with the band rarity thinning as it climbs, and Grove gear fully
+tradeable. The chase lives in the *roll*, not the volume — which is also what keeps a lucky drop worth
+talking about.
+
+### Two smaller collisions worth naming now
+
+- **The bag.** Backpack I is 16 slots and the design's own tension is that carrying food costs you carrying
+  loot. Gear drops compete for the same slots, and a player who cannot pick up the good roll because they are
+  full of rootrat parts will feel robbed. The bag expansions may need to arrive earlier, or gear may need to
+  stack separately from parts.
+- **Salvage.** Commons melt to Cinder Scrap. A veteran farming map 1 at 40 kills a minute is also running a
+  Cinder faucet; that is small today, but it is the kind of thing that is small until somebody notices.
+
+---
+
 ## 4. The seven towns
 
 The biomes do most of the assignment work — each town's ground names the feature it should open.
@@ -336,13 +440,17 @@ boss or kill count → the boss, and it already works that way.
 
 Still open:
 
-1. **Does a new account get a starter kit, or stay at 7 dps?** §3c assumes it stays at 7 and the Grove's
-   drops carry the ramp. This changes every number in that table.
-2. **Does the gate apply to shop-side game features?** The daily spin is a counter-scan reward in store. If a
+1. **How is the gear faucet held?** Two rates, thinning rarity bands, or bound items — §3d. The measured
+   figure that forces the question: one veteran farming an hour at 2% produces 0.6× the Den's entire daily
+   gear income.
+2. ~~Does a new account get a starter kit?~~ **Largely answered by gear drops** — a common kit is exactly the
+   100 dps the floor needs, so the question narrows to whether they survive the first sixty seconds before
+   anything has dropped.
+3. **Does the gate apply to shop-side game features?** The daily spin is a counter-scan reward in store. If a
    customer scans a code at the till on day one, does it work?
-3. **Card game (Spire)** is already pet-gated, and pets are now town 1. Does it come with them, or wait for
+4. **Card game (Spire)** is already pet-gated, and pets are now town 1. Does it come with them, or wait for
    town 5 with the dungeons?
-4. **Does the day-one pet fight, and at what power?** With pets in town 1 the companion is now part of the
+5. **Does the day-one pet fight, and at what power?** With pets in town 1 the companion is now part of the
    floor calculation in §3a, not a separate feature — a pet that contributes real damage changes what the
    on-ramp has to be.
 
@@ -352,10 +460,14 @@ Still open:
 
 In order, because each one is useless without the one above it:
 
-1. **The floor.** The on-ramp segment of §3c — health *and* damage — measured with `grove-reach.mjs` against
-   a 7 dps / 60 hp account. Nothing else matters until a new account can kill a rootrat without dying to it.
+1. **The floor, now mostly a damage problem.** §3d shows a common kit reaches the 100 dps target on its own,
+   so enemy *health* may be left alone — but enemy **damage** in the opening zones still has to come down, or
+   a new player dies before the first piece drops. Measure with `grove-reach.mjs` and `grove-gear-floor.mjs`
+   against a 7 dps / 60 hp account.
+2. **Gear drops** — the rolled generator, server-side, on the existing stat pipeline. This is what makes the
+   Grove worth farming and what carries the early curve.
 2. **`gated_at` and `featureUnlocked()`** — one column, one helper, read by both the menu and the route.
 3. **Town 1**, with four visibly locked buildings. One town proves the whole design.
-4. **The unlock moment** — clearing a map lights a building. This is the payoff the entire system exists to
+5. **The unlock moment** — clearing a map lights a building. This is the payoff the entire system exists to
    deliver, and it should be the loudest thing in the game.
-5. Towns 2–7, which are then content rather than engineering.
+6. Towns 2–7, which are then content rather than engineering.
