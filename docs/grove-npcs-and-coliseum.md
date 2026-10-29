@@ -79,6 +79,21 @@ One zone per map holds a Coliseum. A **fourth NPC** stands outside it — themat
 - The outside NPC gives **one free key a day**.
 - His own one-time chain pays extra keys, and his asks are about **how far you get inside** ("reach wave 7").
 
+### ⚠️ It is a CONTAINED SCREEN, not the scrolling Grove
+
+Luke, clarifying: *"when you go in it, it renders a whole new platformer that's just contained within one
+screen. So you don't do any like wandering left and right. It's, for the most part, an abbreviated scene...
+each Coliseum will be a little different in terms of where the platform locations are, but for the most part
+it's a pretty easily traversable scene where you can kill enemies as fast as possible."*
+
+So the Coliseum does **not** reuse the Grove's scrolling world:
+
+- **One screen. No camera.** Everything is reachable without travelling, because the clock is the opponent
+  and walking is not the game.
+- **Its own platform layout per map**, so seven arenas feel like seven places rather than one with a repaint.
+- **Laid out for speed**, not for navigation — short hops, nothing to fall off, no dead ends to be stuck in
+  while the timer runs.
+
 ### The run
 
 - Waves of that map's own creatures, **zone 1's roster first, then zone 2's**, up to the boss and some rares.

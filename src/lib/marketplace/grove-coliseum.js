@@ -20,6 +20,7 @@ import { GROVE_ZONES, GROVE_BOSSES, scaledFoe, scaledRare } from "@/lib/marketpl
 import { bossHpAt, bossDmgAt } from "@/lib/marketplace/grove-maps.js";
 import { GROVE_CHEST_ORDER } from "@/lib/marketplace/grove-forge.js";
 import { COLISEUM_ZONE } from "@/lib/marketplace/grove-npcs.js";
+import { arenaFor, arenaArt, ARENA_W } from "@/lib/marketplace/grove-arena.js";
 
 /** How long a run gets. Luke said about two minutes; the clock is the whole tension so it is one number. */
 export const RUN_MS = 120_000;
@@ -80,6 +81,10 @@ export function runPlan(mapN) {
         map,
         zone: COLISEUM_ZONE[map] ? (map - 1) * 12 + COLISEUM_ZONE[map] : null,
         runMs: RUN_MS,
+        // ⚠️ THE ARENA IS A CONTAINED SCREEN, which is why its width travels with the plan. The Grove's
+        // zones are several screens wide and scroll; a Coliseum is 26 units and does not. A scene handed
+        // the zone's width here would put bodies off the side of a room with no camera to follow them.
+        arena: { width: ARENA_W, platforms: arenaFor(map), art: arenaArt(map) },
         waves: wavesFor(map).map((w) => ({
             ...w,
             bodies: w.foes.map((id) => scaledFoe(id, w.depth)).filter(Boolean),
