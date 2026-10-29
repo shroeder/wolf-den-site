@@ -91,7 +91,7 @@ async function snatcherScene() {
 // ⚠️ IT BUILDS THE STATE THE REAL PAGE BUILDS, from the same functions. A lab that assembles a plausible town
 // by hand proves the renderer and nothing else; the fault that got shipped lived in townLayers, so the lab
 // has to call townLayers. Anything hand-written here is a thing this rig cannot catch.
-async function townScene(n) {
+async function townScene(n, at) {
     const { TOWNS } = await import("@/lib/marketplace/towns.js");
     const { townStreet, getTownArt } = await import("@/lib/marketplace/town.js");
     const fsSync = await import("node:fs");
@@ -117,8 +117,14 @@ async function townScene(n) {
     const spread = laid.filter((b) => b.id !== "__well");
     const wellX = laid.find((b) => b.id === "__well")?.x ?? 50;
 
+    // ⚠️ THE CAMERA HAS TO BE PARKED SOMEWHERE ON PURPOSE. The street is ~4,800px and the viewport shows a
+    // slice; a lab that does not say where you are standing photographs whatever the default happens to be,
+    // which for the first seven sheets was a stretch of empty wall. `?at=` is a percentage along the street.
+    const standAt = Number.isFinite(at) ? at : (spread[0]?.x ?? 20);
+
     const initial = {
         me: { id: "lab", name: "You", gold: 12345, sprite: null },
+        you: { x: standAt, y: 80, facing: 1 },
         art,
         buildings: spread,
         wellX,
@@ -134,7 +140,7 @@ export default async function TownLabPage({ searchParams }) {
     // part of this feature keys on — towns.js, the gate, the act board — and a second vocabulary for the same
     // seven places is a second thing to keep in step.
     const townN = Number((await searchParams)?.town) || 0;
-    if (townN >= 1 && townN <= 7) return townScene(townN);
+    if (townN >= 1 && townN <= 7) return townScene(townN, Number((await searchParams)?.at));
     const rows = await db.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key LIKE 'foe_goblin_%' OR art_key = 'goblin'`)
         .catch(() => []);
     const art = Object.fromEntries((rows || []).map((r) => [r.art_key, { url: r.url }]));

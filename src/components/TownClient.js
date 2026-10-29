@@ -2620,12 +2620,18 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             // The first cut rendered an emoji and two lines of text, which on a street of
                             // painted houses reads as a missing asset rather than a shut door. Same sprite as
                             // the lit version, desaturated: you can see exactly what you are working toward.
-                            const shutArt = art[b.id];
+                            // ⚠️ THE PREVIEW SHOWS THE BUILDING AS IT WILL LOOK WHERE IT LIVES, not as it
+                            // would look here. A shuttered Forge standing in Rootwood is a picture of
+                            // Deepdelve's forge — that is the whole point of a preview, and theming it to
+                            // the town it is being previewed FROM would be drawing somewhere that does not
+                            // exist. So it asks for the piece by the OWNING town, falling back to the shared
+                            // art for anything not yet drawn.
+                            const shutArt = { url: themed(b.id) };
                             return (
-                                <div key={b.id} className={`tw-building is-shuttered${shutArt ? " has-art" : ""}`}
+                                <div key={b.id} className={`tw-building is-shuttered${shutArt.url ? " has-art" : ""}`}
                                     style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }}
                                     title={`${b.label} — opens at ${b.opensAt}`}>
-                                    {shutArt ? (
+                                    {shutArt.url ? (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img className="tw-b-art" src={shutArt.url} alt="" draggable={false} />
                                     ) : <span className="tw-b-emoji" aria-hidden="true">{b.emoji}</span>}
@@ -2636,8 +2642,12 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         }
                         // The dressed twin when the flag is up, falling back to the everyday building if that
                         // one was never drawn — so a half-generated set degrades to a plain street, not a gap.
+                        // ⚠️ SEASON BEATS PLACE. A Hallowe'en twin is a deliberate, time-boxed costume over
+                        // the whole game and it has to win; the town's own version is the everyday look
+                        // underneath it. Getting this order wrong would mean the one week a year the shop
+                        // dresses up, six of seven towns quietly refused to.
                         const dressed = Boolean(spooky && art[`hw_bld_${b.id}`]);
-                        const bart = (dressed && art[`hw_bld_${b.id}`]) || art[b.id];
+                        const bart = (dressed && art[`hw_bld_${b.id}`]?.url) || themed(b.id);
                         const shopOpen = marketDay && b.id === "shop"; // the real store's building lights up when the shop is open
                         return (
                             <Link key={b.id} href={raidActive ? "#" : b.href} className={`tw-building${bart ? " has-art" : ""}${dressed ? " is-dressed" : ""}${raidActive ? " is-locked" : ""}${shopOpen ? " is-openshop" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }} onClick={raidActive ? (e) => { e.preventDefault(); e.stopPropagation(); } : b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()} aria-disabled={raidActive || undefined}>
@@ -2660,9 +2670,14 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                         <i>${(state.vaultOffer.priceCents / 100).toFixed(0)}</i>
                                     </span>
                                 ) : null}
+                                {/* ⚠️ bart IS A URL NOW, NOT THE ART ROW. themed() returns the string, so
+                                    `flip` has to be read from the row it came from — and ONLY the shared row
+                                    carries one. A town's own piece is drawn facing the way it should and
+                                    never needs mirroring. (This comment sits ABOVE the ternary: a comment
+                                    and an element are two children, and a ternary branch holds one.) */}
                                 {bart ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img className="tw-building-art" src={bart.url} alt={b.label} draggable={false} style={bart.flip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
+                                    <img className="tw-building-art" src={bart} alt={b.label} draggable={false} style={(!dressed && !art[`${town?.id}_${b.id}`] && art[b.id]?.flip) ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
                                 ) : (
                                     <span className="tw-building-card"><span className="tw-building-emoji"><Glyph value={b.emoji} size={28} /></span></span>
                                 )}

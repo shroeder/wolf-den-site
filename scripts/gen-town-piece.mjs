@@ -129,6 +129,42 @@ const PIECES = {
             + "sash, a wrapped headcloth, a heavy ledger held against the chest, small brass trade scales "
             + "hanging from the belt, dark eyes above a weathered smile",
     },
+
+    // ── THE BUILDINGS ────────────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ ONE VERSION EACH, BECAUSE A BUILDING IS UNLOCKED IN EXACTLY ONE TOWN. townStreet() gives a town its
+    // OWN features plus the NEXT town's as dimmed previews — so the Forge stands lit in Deepdelve and appears
+    // greyed in Rootwood as a thing to come. Drawing a second Rootwood Forge would be paying to theme a
+    // preview of somewhere else. Fourteen owned buildings, not thirty-three.
+    //
+    // The Vault is the exception and gets one per town: towns.js never gates store credit, so it really does
+    // stand lit on all seven streets — a stone counting-house in a bog is the clash Luke actually pointed at.
+
+    rootwood_tavern: { kind: "building", prompt: "A timber-framed roadside inn with a mossy shingle roof and a stone chimney, warm amber light in its small windows, a carved wolf's-head sign hanging on an iron bracket, autumn ivy up one wall" },
+    rootwood_shop: { kind: "building", prompt: "A timber trading post with a russet canvas awning over its counter, barrels and grain sacks stacked outside, a rack of antlers above the door, weathered oak boards" },
+    rootwood_vault: { kind: "building", prompt: "A stout little strongroom of oak beams and grey fieldstone with an iron-banded door and a brass wolf-head boss, moss along its footing, autumn leaves at its base" },
+
+    deepdelve_forge: { kind: "building", prompt: "A smithy built into a cave wall from dark stone and heavy timber, the forge mouth glowing orange, a tin chimney venting upward, tongs and horseshoes hung along the frontage" },
+    deepdelve_mine: { kind: "building", prompt: "A timbered mine head: a heavy wooden headframe over a black shaft mouth, an iron ore cart on rails, a hanging carbide lantern, props braced with iron straps" },
+    deepdelve_vault: { kind: "building", prompt: "A strongroom hewn directly into living grey rock with a riveted iron door and a brass wolf-head boss, pale blue crystal veins threading the stone around it" },
+
+    fenhollow_farm: { kind: "building", prompt: "A stilted bog farmhouse of weathered planks on tarred piles, raised planting beds of reed and black peat beside it, a crooked drying rack, duckboards leading to its door" },
+    fenhollow_kitchen: { kind: "building", prompt: "A stilted cookhouse of lashed poles and thatch with smoke curling from a roof vent, bundles of herbs and split fish hung along its eaves, a clay oven glowing at one end" },
+    fenhollow_vault: { kind: "building", prompt: "A small strongroom of tarred black timber raised on stone piles above still water, an iron-banded door with a brass wolf-head boss, a dark waterline stain along its base" },
+
+    saltwrack_docks: { kind: "building", prompt: "A weathered timber jetty-house with a net loft above, a crane boom jutting from its gable, tarred planking, coils of rope and crab pots stacked at its side" },
+    saltwrack_vault: { kind: "building", prompt: "A squat harbour counting-house of salt-bleached grey stone with a slate roof and a brass-bound door carrying a wolf-head boss, barnacles along its lowest course" },
+
+    drownedquay_delves: { kind: "building", prompt: "A drowned ruin entrance: a cracked pale stone arch half-sunk, steps descending into dark still water, heavy chains and a rusted winch, pale weed along the stones" },
+    drownedquay_vault: { kind: "building", prompt: "A pale stone strongroom standing half-sunk in still water, its bronze door green with verdigris and marked with a wolf-head boss, weed and barnacles at the waterline" },
+
+    gilded_auction: { kind: "building", prompt: "A sandstone auction hall with a short columned porch and a striped saffron awning, gold-leaf trim along its cornice, a brass gavel emblem above the doors" },
+    gilded_market: { kind: "building", prompt: "A sandstone bazaar frontage under layered cloth canopies in saffron and deep indigo, hanging brass lamps, low tables of spice jars and bolts of cloth" },
+    gilded_casino: { kind: "building", prompt: "A sandstone gaming house with a low gilded dome, tall brass doors, strings of small lanterns across its front, carved dice and suit motifs in the stonework" },
+    gilded_vault: { kind: "building", prompt: "A sandstone treasury with a heavy brass door bearing a wolf-head boss, gold inlay banding its walls, a ribbed palm casting shade across one corner" },
+
+    ashfall_boss: { kind: "building", prompt: "A basalt challenge-gate: a black stone arch with heavy chained iron doors, molten runnels glowing in the channels beneath it, two scorched iron braziers flanking the way in" },
+    ashfall_festival: { kind: "building", prompt: "A tiered basalt stand with iron railings and tall standing braziers, deep red banners hanging between black stone pillars, embers drifting across it" },
+    ashfall_arena: { kind: "building", prompt: "A small basalt colosseum of black volcanic stone with arched openings, glowing molten seams between its courses, crossed iron swords mounted above the entrance, red pennants on its rim" },
 };
 
 // The house look, reverse-engineered from the town art that shipped: painterly cel-shade, heavy dark ink
