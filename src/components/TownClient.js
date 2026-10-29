@@ -1209,6 +1209,26 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // the cobbles, the whole street, no travel bar. See the branch in town.js.
     const town = state?.town || null;
     // The stockade belongs to the Den, not to each street: the default town (no gating) or town 1.
+    // ── ⚠️ AN NPC STANDS WHERE HIS TRADE DOES ─────────────────────────────────────────────────────
+    // Luke, looking at all seven streets side by side: "I don't like the fact that that same vendor is in
+    // every town ... no town should share the same things."
+    //
+    // He was right and the cause was an inconsistency rather than a taste call. townStreet() filters
+    // BUILDINGS by the town's features, so the buildings already differ per town — but the NPCs were drawn
+    // unconditionally at fixed positions in NPC_X, so every street got the same four people standing in the
+    // same four places regardless of what that town was for. The biome changed and the cast did not.
+    //
+    // They now read the same feature list the buildings do. The Blacksmith stands in Deepdelve because that
+    // is where smithing opens; the Auctioneer in Gilded Exchange; the Merchant where the store is.
+    //
+    // ⚠️ AN UNGATED ACCOUNT KEEPS EVERY ONE OF THEM. `town` is null for the single original street and for
+    // every member who predates gating, and this returns true for all of them — the plaza they have used for
+    // months must not quietly lose its people the day the towns ship.
+    // ⚠️ useCallback, NOT A BARE ARROW. A fresh closure every render makes the React Compiler give up on
+    // memoising every block that reads it — twelve "existing memoization could not be preserved" bails on
+    // the busiest screen in the game, which is a real cost for a one-line helper.
+    const npcHere = useCallback((feature) => !town || (town.features || []).includes(feature), [town]);
+
     const townHasStocks = !town || town.n === 1;
 
     // ── THE ACT BOARD ───────────────────────────────────────────────────────────────────────────────
@@ -2149,6 +2169,21 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     const you = state?.you;
     const art = state?.art || {};
 
+    // ── ⚠️ ART CAN BE THEMED PER TOWN, AND FALLS BACK WHEN IT IS NOT ──────────────────────────────
+    // Luke: "we need to redo them all to have them all thematically match where they're at so they don't
+    // clash so much with the environment."
+    //
+    // A gold wolf fountain is right for Rootwood and absurd on a lava flat. So every themeable piece asks
+    // for `<townId>_<key>` first and falls back to the shared one — which means the seven towns can be
+    // redressed ONE PIECE AT A TIME without a broken window in between, exactly the way the per-layer
+    // ground fallback already works. The same pattern the Hallowe'en dressing uses (hw_bld_*), pointed at
+    // place instead of season.
+    const themed = useCallback(
+        (key) => (town ? art[`${town.id}_${key}`]?.url : null) || art[key]?.url || null,
+        [town, art],
+    );
+
+
     // ⚠️ BELOW `art`, AND THAT IS NOT A STYLE CHOICE. Sitting above it this read `art` in its own
     // dependency array during render, which is a temporal-dead-zone access: every visit to the plaza
     // threw "Cannot access 'art' before initialization" and rendered nothing at all. The build and all
@@ -2277,7 +2312,13 @@ export default function TownClient({ initial, frozen = false, halloween = false,
         <div className="stack reveal">
             <section className="tw-hdr">
                 <div className="tw-hdr-top">
-                    <h1 className="tw-hdr-title">🏘️ Wolf Den Town</h1>
+                    {/* ⚠️ THE TOWN SAYS WHICH TOWN IT IS. This was hardcoded, which was correct while there
+                        was exactly one — and silently wrong the moment seven biome towns existed: you walk
+                        into Ashfall Bastion, the street is lava, and the heading insists it is Wolf Den Town.
+                        Nothing errors, and it is invisible until somebody is actually standing there, which
+                        nobody could be while gating was off. Falls back to the original name for every
+                        ungated account, which is still almost all of them. */}
+                    <h1 className="tw-hdr-title">🏘️ {town?.name || "Wolf Den Town"}</h1>
                     {state?.store ? (
                         <span className={`tw-openchip${state.store.open ? " is-open" : ""}`} title="The physical shop's hours">
                             {state.store.open ? `Open til ${state.store.closesLabel}` : `Closed · opens ${state.store.nextOpenLabel}`}
@@ -2547,7 +2588,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     ) : null}
                     {/* Plaza centerpiece — the wolf fountain, which doubles as the Wishing Well once the town funds
                         it. Tap to claim the daily blessing; a coin badge + shimmer invites the wish when it's ready. */}
-                    {art.centerpiece?.url ? (
+                    {themed("centerpiece") ? (
                         well ? (
                             <button
                                 type="button"
@@ -2558,12 +2599,12 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 aria-label={canWish ? `Make a wish — claim ${well.gold} gold` : "Wishing Well — already wished today"}
                             >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={art.centerpiece.url} alt="" draggable={false} />
+                                <img src={themed("centerpiece")} alt="" draggable={false} />
                                 {canWish ? <span className="tw-well-badge"><Coin /> Make a wish!</span> : <span className="tw-well-badge is-spent">✓ Wished today</span>}
                             </button>
                         ) : (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: `${wellX}%`, top: `${GROUND}%` }} />
+                            <img className="tw-centerpiece" src={themed("centerpiece")} alt="" draggable={false} style={{ left: `${wellX}%`, top: `${GROUND}%` }} />
                         )
                     ) : null}
                     {/* Buildings — locked (no entry) while a raid is on: defend the plaza first! */}
@@ -2782,12 +2823,14 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     {!raidActive ? (
                       <>
                     {/* Blacksmith NPC by the Forge — tap for a tip + a shortcut in */}
+                    {npcHere("blacksmith") ? (
                     <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.smith}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
                         {art.smith?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={art.smith.url} alt="Blacksmith" draggable={false} />
                         ) : <span className="tw-npc-emoji">⚒️</span>}
                     </button>
+                    ) : null}
                     {/* Town Crier — shouts rotating live news; tap to open the Town Hall */}
                     {/* The Stockade — only stands while someone is actually in it */}
                     {/* THE VOTING BOOTH. Jinxx's idea; the town decides who goes in the pillory.
@@ -2842,6 +2885,11 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             ) : <span className="tw-npc-emoji">⛓️</span>}
                         </button>
                     ) : null}
+                    {/* ⚠️ THE CRIER IS THE CAPITAL'S, NOT EVERY TOWN'S. He shouts the Den's live news and
+                        opens the Town Hall — one civic voice for the whole game, so seven of him reads as
+                        seven copies of one man rather than seven places. Same call Luke already made for the
+                        stockade and the voting booth: those belong to the first town only. */}
+                    {townHasStocks ? (
                     <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.crier}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
                         {crierLines.length ? <span className="tw-npc-bubble">📣 {crierLines[crierMsg % crierLines.length]}</span> : null}
                         {art.crier?.url ? (
@@ -2849,6 +2897,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             <img src={art.crier.url} alt="Town Crier" draggable={false} />
                         ) : <span className="tw-npc-emoji">📣</span>}
                     </button>
+                    ) : null}
                     {/* ── THE GOURDFATHER ──────────────────────────────────────────────────────────────
                         Only while the event is up — `gourd` is null otherwise and the plaza has never heard
                         of him. He is DELIBERATELY BIGGER than the other NPCs: he is a pumpkin the size of a
@@ -2899,7 +2948,10 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             <img src="/images/town/actboard.png" alt="" draggable={false} />
                         </button>
                     ) : null}
-                    {/* Traveling Merchant — tap to browse wares */}
+                    {/* Traveling Merchant — he SELLS, so he stands where the store does. He was in all
+                        seven towns with the same bubble, which is the single thing Luke picked out of the
+                        contact sheet: "that same vendor is in every town". */}
+                    {npcHere("store") ? (
                     <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.merchant}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
                         <span className="tw-npc-bubble">🧳 Wares for sale!</span>
                         {art.merchant?.url ? (
@@ -2907,7 +2959,9 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             <img src={art.merchant.url} alt="Traveling Merchant" draggable={false} />
                         ) : <span className="tw-npc-emoji">🧳</span>}
                     </button>
-                    {/* Auctioneer — links out to the Auction House */}
+                    ) : null}
+                    {/* Auctioneer — links out to the Auction House, and only stands where it exists. */}
+                    {npcHere("auction") ? (
                     <Link href="/marketplace/auction" className="tw-npc-btn" style={{ left: `${NPC_X.auction}%`, top: `${GROUND + 6}%` }} onClick={(e) => e.stopPropagation()} aria-label="Auction House">
                         <span className="tw-npc-bubble">🔨 Auction House!</span>
                         {art.auctioneer?.url ? (
@@ -2915,6 +2969,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             <img src={art.auctioneer.url} alt="Auctioneer" draggable={false} />
                         ) : <span className="tw-npc-emoji">🔨</span>}
                     </Link>
+                    ) : null}
                       </>
                     ) : null}
                     {/* BOSS RAID: one huge shared boss — tap to join the pack battle (shared HP bar). */}

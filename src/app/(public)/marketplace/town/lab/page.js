@@ -82,8 +82,59 @@ async function snatcherScene() {
     return <TownClient initial={initial} halloween gourd={gourd} frozen />;
 }
 
+// ── ?town=1..7 — ONE OF THE SEVEN BIOME TOWNS, WITH NOBODY GATED ─────────────────────────────────────────────
+// The towns only exist for an account carrying `gated_at`, and nothing stamps that until GATING_LIVE goes on
+// (see the long warning in towns.js). So the only way to look at Fenhollow was to gate a real member — which
+// is how six of the seven shipped as VOIDS and stayed that way until somebody happened to look: the per-layer
+// art fallback was missing and no screen in the project could show it.
+//
+// ⚠️ IT BUILDS THE STATE THE REAL PAGE BUILDS, from the same functions. A lab that assembles a plausible town
+// by hand proves the renderer and nothing else; the fault that got shipped lived in townLayers, so the lab
+// has to call townLayers. Anything hand-written here is a thing this rig cannot catch.
+async function townScene(n) {
+    const { TOWNS } = await import("@/lib/marketplace/towns.js");
+    const { townStreet, getTownArt } = await import("@/lib/marketplace/town.js");
+    const fsSync = await import("node:fs");
+    const path = await import("node:path");
+
+    const town = TOWNS.find((t) => t.n === n) || TOWNS[0];
+    const has = (suffix) => {
+        try {
+            return fsSync.existsSync(path.join(process.cwd(), "public", "images", "town", "ground", `${town.id}${suffix}.webp`));
+        } catch { return false; }
+    };
+    const layers = { id: town.id, sky: has("-sky"), fg: has("-fg"), ground: has("") };
+    const art = await getTownArt().catch(() => ({}));
+    // ⚠️ LAID OUT THE WAY THE SERVER LAYS IT OUT, INCLUDING THE WELL. The first cut spread the buildings by
+    // hand and hardcoded wellX: 50 — which put the centrepiece straight through the Arena and had me reading
+    // a collision the real game never produces. A lab that invents its own layout proves the renderer and
+    // lies about the wiring; see [[declared-but-never-mounted]]. This is the same spaceOut() call, with the
+    // well inserted mid-list exactly as town.js does it.
+    const { spaceOut } = await import("@/lib/marketplace/town.js");
+    const visible = townStreet(town.n);
+    const mid = Math.ceil(visible.length / 2);
+    const laid = spaceOut([...visible.slice(0, mid), { id: "__well" }, ...visible.slice(mid)]);
+    const spread = laid.filter((b) => b.id !== "__well");
+    const wellX = laid.find((b) => b.id === "__well")?.x ?? 50;
+
+    const initial = {
+        me: { id: "lab", name: "You", gold: 12345, sprite: null },
+        art,
+        buildings: spread,
+        wellX,
+        others: {},
+        town: { ...town, layers, reached: TOWNS.filter((t) => t.n <= town.n).map((t) => ({ n: t.n, id: t.id, name: t.name, biome: t.biome })) },
+    };
+    return <TownClient initial={initial} frozen />;
+}
+
 export default async function TownLabPage({ searchParams }) {
     if ((await searchParams)?.scene === "snatcher") return snatcherScene();
+    // ?town=3 opens Fenhollow, and so on. Numbered rather than named because the number is what every other
+    // part of this feature keys on — towns.js, the gate, the act board — and a second vocabulary for the same
+    // seven places is a second thing to keep in step.
+    const townN = Number((await searchParams)?.town) || 0;
+    if (townN >= 1 && townN <= 7) return townScene(townN);
     const rows = await db.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key LIKE 'foe_goblin_%' OR art_key = 'goblin'`)
         .catch(() => []);
     const art = Object.fromEntries((rows || []).map((r) => [r.art_key, { url: r.url }]));
