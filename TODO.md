@@ -15,7 +15,7 @@ has been pressure-tested by anyone but us.
 The half that isn't art. The other half is done: seven towns have their own centrepiece, their own quest-giver
 character and their own buildings (`$1.53` of art, all committed).
 
-### 1.1 The hunts — designed, not built
+### 1.1 The hunts — ~~designed, not built~~ **BUILT 29 Oct**
 
 Each town's quest giver should send you into **that town's map** to kill things. Fenhollow's bog-reader wants
 Fen Lurkers drowned; Ashfall's warden wants Cinderhusks put down.
@@ -36,7 +36,17 @@ are standing.
 ladder about the systems each town unlocks, paying passive perks. Hunts are repeatable and pay loot. Three
 quest families now exist; name them clearly in whatever UI shows them or nobody will know which is which.
 
-Also wanted: a **tracker** — what you are hunting, and how far along, visible without walking back to town.
+**Done:** `town-hunts.js`, `/api/marketplace/hunts`, the board on the town quest giver's own sheet, and
+`settleKills` now reporting `slain` so progress ticks off the same tally the loot came from. Three hunts per
+town, rotating daily, 45g at map 1 to 155g at map 7. Verified end to end: progress caps, a second claim is
+refused, the gold moves.
+
+⚠️ **The tracker is the part still missing**, and the reason is a cost rule rather than an oversight. The
+NPC badge is computed client-side from `state.quests`, which does not carry hunts — and the only free place
+to count them is `getTownTodo`, whose own comment forbids exactly that read ("a badge more expensive than
+the screen it points at"). So today a hunt's progress is only visible by opening the giver. If that proves
+annoying in play, the honest fix is one extra read on `getTownState` behind `gate.town`, traded against
+deleting the fetch-on-open — roughly a wash for anyone who actually uses it.
 
 ### 1.2 A ground line per town
 
