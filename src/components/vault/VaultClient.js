@@ -195,6 +195,18 @@ export default function VaultClient({ initial }) {
                     <span className="vt-head-label">Store credit</span>
                     <strong className="vt-head-value vt-gold">{usd(vault.balanceCents)}</strong>
                 </div>
+                {/* ── ⚠️ THE WAY BACK TO THE PACKS ────────────────────────────────────────────────
+                    A member, 2026-10-28: "it would be great if there was a button in the card vault to
+                    bring you back to the packs quickly."
+
+                    The vault is where you land after every open, and it had no door onward — so the loop
+                    that the whole feature is built around (open, look at it, open another) ended in a
+                    dead end that could only be escaped through the menu. It sits in the header rather
+                    than at the bottom of a list that can be a hundred cards long. */}
+                <a className="vt-head-open" href="/mystery-bags">
+                    <span className="vt-head-open-main">Open another</span>
+                    <span className="vt-head-open-go" aria-hidden="true">&#8250;</span>
+                </a>
             </header>
 
             {notice ? <p className="vt-notice">{notice}</p> : null}

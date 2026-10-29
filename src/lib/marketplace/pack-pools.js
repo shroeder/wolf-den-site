@@ -197,13 +197,42 @@ export async function shelfPoolStats(pool) {
  */
 export async function shelfPoolCards(pool, { limit = 40 } = {}) {
     if (!pool?.category) return [];
+    // ── ⚠️ A CARD SOMEBODY ALREADY PULLED IS NOT STILL ON THE SHELF ─────────────────────────────────────
+    // A member, 2026-10-28: "only the featured $20 pack removes the pulled cards from its list. The others
+    // still show the mythic and legendary cards below but doesn't say which ones were pulled and which ones
+    // are still available. That info would change my mind about which pack I buy and convince me NOT to buy
+    // if I can't tell if something I want is still in there."
+    //
+    // He is right, and the cause is where the two kinds of pool read from. The featured pool is
+    // mystery_bag_cards, whose status flips to 'sold' inside the pull transaction — instantly honest. The
+    // $5/$10/$15 ladder reads inventory_feed, which mirrors SQUARE, and Square still counts a pulled card
+    // because the physical card is still in the box until a staff member works the pull queue
+    // (mkt_pack_pull_task). So between the pull and the shelf-work, the ladder advertises a card that is
+    // already in someone's vault.
+    //
+    // ⚠️ SUBTRACTED, NOT FILTERED. The obvious fix — drop any card that appears in a vault — is wrong, for
+    // two reasons the data shows plainly:
+    //   · a line can hold more than one copy. Cyndaquil is held by a member AND has 2 on the shelf; one is
+    //     spoken for and two are genuinely still pullable.
+    //   · a card SOLD BACK returns to the shop on purpose. Four of the five vault cards currently matching
+    //     the shelf are sold_back, with reshelve tasks open against them. Filtering on "has ever been in a
+    //     vault" would quietly delete cards the shop is deliberately selling again.
+    // Only a HELD copy is unavailable, and only that copy.
     const rows = await db
         .query(
-            `SELECT name, price, image_url
-               FROM inventory_feed
-              WHERE in_stock AND quantity > 0 AND NOT consigned
-                AND category_names = $1
-              ORDER BY price DESC
+            `SELECT f.name, f.price, f.image_url,
+                    f.quantity::int AS quantity,
+                    COALESCE(v.held, 0)::int AS held
+               FROM inventory_feed f
+               LEFT JOIN (
+                    SELECT square_variation_id, COUNT(*)::int AS held
+                      FROM mkt_vault_card
+                     WHERE status = 'held'
+                     GROUP BY square_variation_id
+               ) v ON v.square_variation_id = f.variation_id
+              WHERE f.in_stock AND f.quantity > 0 AND NOT f.consigned
+                AND f.category_names = $1
+              ORDER BY f.price DESC
               LIMIT $2`,
             [pool.category, limit]
         )
@@ -219,12 +248,21 @@ export async function shelfPoolCards(pool, { limit = 40 } = {}) {
     return rows.map((r) => {
         const valueCents = Math.round(Number(r.price || 0) * 100);
         const parsed = parsePackCardName(r.name || "");
+        const left = Math.max(0, (Number(r.quantity) || 0) - (Number(r.held) || 0));
         return {
             id: r.name,
             name: parsed.name || r.name,
             subtitle: packCardSubtitle(r.name || ""),
             valueCents,
             tier: tierForCents(valueCents).key,
+            // ⚠️ SHOWN AS CLAIMED, NOT HIDDEN. The member asked for exactly this — "adding an 'All Claimed'
+            // tag to the rarities when they are claimed would be great" — and it is the better answer than
+            // dropping the row: a pack whose chase card is gone should SAY so, because the whole point of
+            // reading the list is deciding whether the thing you want is still in there. A row that silently
+            // disappears teaches a member nothing; a row that says CLAIMED answers the question they came
+            // with, and answers it against them, which is how a shop earns being believed.
+            claimed: left <= 0,
+            left,
             // ⚠️ SENT, NOT DERIVED — the same rule toPoolCard states at length. The card detail sheet shows
             //    what a member would actually be paid, and the moment a client multiplies a price by a rate
             //    there are two implementations of one number, one of them in a bundle somebody is still
@@ -430,4 +468,21 @@ export async function poolStates() {
             computedAt: s?.computed_at || null,
         };
     });
+}
+
+/**
+ * The lowest price on the shelf right now, in cents — what "from $X" on the entry button must say.
+ *
+ * ⚠️ IT IS NOT pool.priceCents. That is the BAGS pool and it is $20, which is the most expensive thing on
+ * offer — so the entry button was advertising the ladder's ceiling as its floor. A member deciding whether to
+ * tap was being quoted four times the real entry price, which is the kind of wrong that costs a sale in the
+ * direction nobody notices: they do not complain, they just never go in.
+ *
+ * Open pools only, because a closed pool is not a price anyone can pay.
+ */
+export async function cheapestOpenPackCents() {
+    const row = await db
+        .queryOne(`SELECT MIN(price_cents)::int AS cents FROM mkt_pack_pool_state WHERE open`)
+        .catch(() => null);
+    return Number(row?.cents) > 0 ? Number(row.cents) : null;
 }

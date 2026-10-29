@@ -7,6 +7,7 @@ import { getMarketingQrCodes } from "@/lib/marketing-qr";
 import { devFixture } from "@/lib/dev-fixture.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { packPoolSummary, resumePendingOpen } from "@/lib/marketplace/packs.js";
+import { cheapestOpenPackCents } from "@/lib/marketplace/pack-pools.js";
 import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
 import { VAULT_PUBLIC, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 
@@ -88,12 +89,15 @@ export default async function MysteryBagsPage() {
 
     let openingProps = null;
     if (canSeeOpening) {
-        const [pool, balanceCents, pending] = await Promise.all([
+        const [pool, balanceCents, pending, fromCents] = await Promise.all([
             packPoolSummary().catch(() => null),
             getStoreCredit(buyer.id).catch(() => 0),
             resumePendingOpen(buyer.id).catch(() => null),
+            // One MIN() against a nine-row table, on a request already reading three things. See
+            // cheapestOpenPackCents for why the entry button cannot use pool.priceCents.
+            cheapestOpenPackCents().catch(() => null),
         ]);
-        if (pool) openingProps = { pool, balanceCents, pending };
+        if (pool) openingProps = { pool, balanceCents, pending, fromCents };
 
         // ── ⚠️ THE REVEAL CANNOT BE PHOTOGRAPHED WITHOUT SPENDING A PACK, AND THAT IS WHY THIS IS HERE ──
         // Everything this screen draws is a server-rendered prop, so --mock cannot reach it: filming the

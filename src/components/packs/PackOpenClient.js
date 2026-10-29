@@ -638,17 +638,52 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                     />
                     <span className="pk-launch-body">
                         <span className="pk-launch-kick">Mystery packs</span>
-                        <span className="pk-launch-line">Open a pack</span>
+                        {/* ⚠️ IT OPENS A PICKER, SO IT SAYS SO. A member, 2026-10-28: "the 'Open a pack
+                            $20' button at the top of the page would be better phrased as 'Select Your
+                            Pack →'". He is right and the reason is that the old label promised the wrong
+                            thing: next to a price it reads as the buy button, so the tap that follows
+                            feels like a purchase — and it is not, it is a shelf of three. A label that
+                            over-promises on a screen that spends money is worse than a dull one. */}
+                        <span className="pk-launch-line">Select your pack</span>
                         <span className="pk-launch-sub">
                             {pool?.remaining ? `${pool.remaining} left · pays with store credit` : "Back soon"}
                         </span>
                     </span>
                     {priceTrusted && pool?.remaining ? (
-                        <span className="pk-launch-price">{usd(priceCents)}</span>
+                        // ⚠️ THE CHEAPEST PACK, NOT THE BAGS PRICE. `priceCents` here is the $20 bags pool —
+                        // the dearest thing on the shelf — so the entry button used to quote the ceiling as
+                        // though it were the floor. `fromCents` comes off the open pool table; if it is
+                        // missing for any reason the button falls back to the old number rather than
+                        // printing nothing, because a price is more useful than a blank.
+                        <span className="pk-launch-price">
+                            <span className="pk-launch-from">from</span>
+                            {usd(initial?.fromCents ?? priceCents)}
+                        </span>
                     ) : null}
                     <span className="pk-launch-go" aria-hidden="true">&#8250;</span>
                     <span className="pk-glimmer" aria-hidden="true" />
                 </button>
+                {/* ── ⚠️ WHAT YOU HAVE TO SPEND, BEFORE YOU GO IN ─────────────────────────────────────
+                    A member, 2026-10-28: "a counter on the mystery bags page to show current store
+                    credit."
+
+                    Packs are bought with credit and nothing on the way in said how much you had — so the
+                    only way to find out was to open the picker and read it off a price you were already
+                    committing to, or go to another screen and come back. The number was on this page the
+                    whole time (the server sends balanceCents for the opener); it simply was not shown
+                    until you were spending it.
+
+                    ⚠️ ONLY WHEN SIGNED IN AND NON-ZERO IS NOT THE RULE HERE. A zero balance is exactly
+                    when a member most needs to see the number, because the next tap would otherwise fail
+                    for a reason the screen never mentioned. It shows whenever there is a session — which
+                    is what `initial.balanceCents` being present means — and reads $0.00 honestly. */}
+                {initial?.balanceCents != null ? (
+                    <a className="pk-launch-credit" href="/marketplace/credit">
+                        <span className="pk-launch-credit-label">Your store credit</span>
+                        <span className="pk-launch-credit-value">{usd(balanceCents)}</span>
+                        <span className="pk-launch-credit-add">Add</span>
+                    </a>
+                ) : null}
             </section>
         );
     }
@@ -1180,7 +1215,16 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                     {(chosen?.bandOdds || []).length ? (
                         <div className="pk-odds">
                             <h4 className="pk-odds-h">What you&apos;ll probably pull</h4>
-                            {chosen.bandOdds.map((b) => (
+                            {chosen.bandOdds.map((band) => {
+                                // ⚠️ DERIVED HERE, NOT STORED. band_odds is a precomputed snapshot in
+                                // mkt_pack_pool_state, recomputed on its own schedule; what is claimed changes
+                                // the moment somebody opens a pack. Reading it off the card list the sheet is
+                                // already holding keeps the two in step by construction — a stored flag would be
+                                // wrong between recomputes, which is exactly the window the member noticed.
+                                const inBand = (chosen.cards || []).filter(
+                                    (c) => c.valueCents >= band.minCents && c.valueCents <= band.maxCents);
+                                const b = { ...band, allClaimed: inBand.length > 0 && inBand.every((c) => c.claimed) };
+                                return (
                                 <div className="pk-odds-row" key={b.key} style={{ "--band": b.glow }}>
                                     <div className="pk-odds-head">
                                         <span className="pk-odds-range">
@@ -1191,15 +1235,24 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                         <span className="pk-odds-name">{b.label}</span>
                                         {/* ⚠️ Sub-1% bands print one decimal rather than rounding to "0%",
                                             which is the row most worth reading accurately. */}
-                                        <span className="pk-odds-pct">
-                                            {b.bp >= 100 ? `${Math.round(b.bp / 100)}%` : `${(b.bp / 100).toFixed(1)}%`}
-                                        </span>
+                                        {/* ⚠️ A BAND WITH NOTHING LEFT IN IT PRINTS "All claimed" RATHER THAN
+                                            A PERCENTAGE. A 0.4% chance at a tier that currently holds no
+                                            unclaimed cards is not a small chance, it is no chance, and the
+                                            percentage is the most checkable claim on the screen. */}
+                                        {b.allClaimed ? (
+                                            <span className="pk-odds-pct pk-odds-gone">All claimed</span>
+                                        ) : (
+                                            <span className="pk-odds-pct">
+                                                {b.bp >= 100 ? `${Math.round(b.bp / 100)}%` : `${(b.bp / 100).toFixed(1)}%`}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="pk-odds-bar">
                                         <span style={{ width: `${Math.max(1.5, b.bp / 100)}%` }} />
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : null}
 
@@ -1207,7 +1260,9 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                         {((chosen && pools.length > 1 ? chosen.cards : pool.cards) || []).map((card) => {
                             const t = tierByKey(card.tier);
                             return (
-                                <li key={card.id} style={{ "--row-edge": t.edge, "--row-glow": t.glow }}>
+                                <li key={card.id}
+                                    className={card.claimed ? "pk-shelf-gone" : undefined}
+                                    style={{ "--row-edge": t.edge, "--row-glow": t.glow }}>
                                     {/* ⚠️ A BUTTON, NOT AN onClick ON THE <li>. The row is the tap target and
                                         it has to be reachable by keyboard and announce itself; a clickable
                                         list item is neither. The button fills the row and the layout above
@@ -1216,7 +1271,7 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                         type="button"
                                         className="pk-shelf-row"
                                         onClick={() => { Haptic.tap(); setPeek(card); }}
-                                        aria-label={`${card.name}, ${usd(card.valueCents)}, ${t.label}`}
+                                        aria-label={`${card.name}, ${usd(card.valueCents)}, ${card.claimed ? "already claimed" : t.label}`}
                                     >
                                     <span className="pk-shelf-art">
                                         {card.imageUrl ? (
@@ -1232,7 +1287,16 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                                     </span>
                                     <span className="pk-shelf-right">
                                         <span className="pk-shelf-value">{usd(card.valueCents)}</span>
-                                        <span className="pk-shelf-tier">{t.label}</span>
+                                        {/* ⚠️ THE ROW STAYS, AND SAYS IT IS GONE. A member asked for this
+                                            directly: he could not tell which chase cards were still in a
+                                            pool, and said it would "convince me NOT to buy" if he could not
+                                            tell. Hiding a claimed row answers that question by making it
+                                            unaskable; saying CLAIMED answers it honestly, including when the
+                                            honest answer costs the sale. See the note in shelfPoolCards for
+                                            why this is a held-copy count and not "ever been in a vault". */}
+                                        {card.claimed
+                                            ? <span className="pk-shelf-claimed">Claimed</span>
+                                            : <span className="pk-shelf-tier">{t.label}</span>}
                                     </span>
                                     </button>
                                 </li>

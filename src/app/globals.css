@@ -28658,3 +28658,110 @@ body.cas-seated .social-fab { display: none; }
     .tv-toggle { display: none; }
 }
 
+
+
+/* ── CLAIMED CARDS, AND THE DOOR OUT OF THE VAULT ────────────────────────────────────────────────────────────
+   A member, 2026-10-28, on the pack shelf: "only the featured $20 pack removes the pulled cards from its list
+   ... that info would change my mind about which pack I buy and convince me NOT to buy if I can't tell if
+   something I want is still in there."
+
+   So a claimed row is dimmed and struck rather than removed. It still shows its art and its price, because the
+   question being answered is "is the thing I want still in here", and a row that vanishes cannot answer it. */
+.pk-shelf-gone .pk-shelf-row { opacity: 0.42; }
+.pk-shelf-gone .pk-shelf-art img { filter: grayscale(1) brightness(0.8); }
+.pk-shelf-gone .pk-shelf-name { text-decoration: line-through; text-decoration-thickness: 1px; }
+.pk-shelf-gone .pk-shelf-value { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* ⚠️ NOT RED. Claimed is not an error and not a warning — somebody won that card, which is the single most
+   encouraging fact the pool can report. Neutral, quiet, and legible. */
+.pk-shelf-claimed {
+    font-size: 0.64rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9aa3b2;
+    border: 1px solid #39414f;
+    border-radius: 999px;
+    padding: 0.08rem 0.42rem;
+    white-space: nowrap;
+}
+
+.pk-odds-gone {
+    color: #9aa3b2 !important;
+    font-size: 0.7rem !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* "from $5.00" — the launch button opens a shelf of three prices rather than buying one thing. */
+.pk-launch-from {
+    display: block;
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.72;
+    font-weight: 600;
+}
+
+/* The vault's way back to the packs. Sits in the header beside the totals, so it is reachable without
+   scrolling past however many cards the member owns. */
+/* ⚠️ grid-column: 1 / -1 — THE HEADER IS A GRID, NOT A FLEX ROW. The first cut used margin-left:auto, which
+   does nothing useful in `repeat(auto-fit, minmax(96px, 1fr))`: the button was placed into the next STAT CELL,
+   96px wide, where "Open another" wrapped onto two lines and shoved the Store credit figure sideways. Spanning
+   the whole track makes it its own row under the stats, which is what it always needed to be. */
+.vt-head-open {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    margin-top: 0.15rem;
+    padding: 0.62rem 0.9rem;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #ffd977, #f0b429);
+    color: #22160a;
+    font-weight: 800;
+    font-size: 0.82rem;
+    text-decoration: none;
+    box-shadow: 0 2px 10px rgba(240, 180, 41, 0.28);
+}
+.vt-head-open:hover { filter: brightness(1.06); }
+.vt-head-open-go { font-size: 1.05rem; line-height: 1; }
+
+
+
+/* The credit a member has, on the way IN to the packs rather than only once they are spending it. Tapping it
+   goes to the top-up screen, because the two things anyone wants from this number are to read it and to
+   change it. */
+.pk-launch-credit {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0.6rem auto 0;
+    max-width: 30rem;
+    padding: 0.6rem 0.95rem;
+    border-radius: 0.85rem;
+    border: 1px solid #39414f;
+    background: #14181f;
+    text-decoration: none;
+}
+.pk-launch-credit-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #9aa3b2;
+}
+.pk-launch-credit-value {
+    margin-left: auto;
+    font-weight: 800;
+    font-size: 1.02rem;
+    color: #ffd977;
+    font-variant-numeric: tabular-nums;
+}
+.pk-launch-credit-add {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #22160a;
+    background: linear-gradient(180deg, #ffd977, #f0b429);
+    border-radius: 999px;
+    padding: 0.2rem 0.6rem;
+}
