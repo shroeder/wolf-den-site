@@ -637,7 +637,10 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
  * Extracted so the boss and the settle share it rather than carrying two copies — a second copy of a rule
  * with this many edges in it is a second, slightly different game. See reuse-the-rule-never-restate-it.
  */
-async function storeParts(buyerId, parts, packSlots) {
+// Exported so the Coliseum's chests pay through the SAME capacity and overflow rule rather than a second
+// copy of it. A chest that quietly ignored a full pack would be the one place in the Grove where loot
+// vanishes instead of overflowing.
+export async function storeParts(buyerId, parts, packSlots) {
     const held = await db.query(
         `SELECT part_id FROM mkt_grove_item WHERE buyer_id = $1 AND place = 'pack' AND qty > 0`, [buyerId],
     ).catch(() => []);
