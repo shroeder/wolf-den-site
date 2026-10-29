@@ -2929,9 +2929,13 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.quest}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); load(); }} aria-label="Quest Giver">
                         <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
                         {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
-                        {art.questgiver?.url ? (
+                        {/* ⚠️ THE TOWN'S OWN. Luke: "every town has its own kind of thematic quest giver".
+                            One shared figure standing in seven different biomes was the same complaint as the
+                            merchant — themed() asks for this town's character and falls back to the original
+                            for the single ungated street. */}
+                        {themed("questgiver") ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={art.questgiver.url} alt="Quest Giver" draggable={false} />
+                            <img src={themed("questgiver")} alt="Quest Giver" draggable={false} />
                         ) : <span className="tw-npc-emoji">📜</span>}
                     </button>
                     {/* ── THE ACT BOARD ────────────────────────────────────────────────────────────

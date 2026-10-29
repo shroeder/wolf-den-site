@@ -26,6 +26,62 @@ const KEY = props.match(/OPENAI_API_KEY=(.+)/)?.[1]?.trim();
 // Keyed exactly as TownClient asks for them: `<townId>_<artKey>`. A centrepiece stands at the middle of the
 // street where the fountain does; a questgiver stands on the NPC line; a building sits on the ground line.
 const PIECES = {
+    // ── ROOTWOOD WAYSTATION — the autumn forest edge, map 1, where everyone starts ──
+    rootwood_centerpiece: {
+        kind: "prop",
+        prompt: "A village well built into a huge hollow tree stump: pale autumn bark, a mossy fieldstone rim "
+            + "around dark clear water, a rope and oak bucket on a weathered crossbeam, red and gold leaves "
+            + "caught on the stones",
+    },
+    rootwood_questgiver: {
+        kind: "npc",
+        prompt: "A young ranger standing at ease: a russet hooded cloak over worn green leathers, a longbow "
+            + "held upright in one hand, a quiver of goose-fletched arrows at the hip, a short copper horn on "
+            + "a strap, autumn leaves caught in his hair",
+    },
+
+    // ── DEEPDELVE CAMP — a timbered camp underground, map 2, the Undercave ──
+    deepdelve_centerpiece: {
+        kind: "prop",
+        prompt: "A crystal spring in a broken geode: a cracked basin of pale grey rock lined with glowing "
+            + "blue-green crystals, still luminous water pooled inside, a few loose crystal shards and an "
+            + "abandoned iron cup on its rim",
+    },
+    deepdelve_questgiver: {
+        kind: "npc",
+        prompt: "A stout grey-bearded mine captain standing squarely: a battered brass helmet with a lit "
+            + "carbide lamp, soot-marked canvas coat over mail, a heavy pick resting head-down beside him, a "
+            + "coil of rope over one shoulder",
+    },
+
+    // ── FENHOLLOW — a stilted bog village, map 3, the Sunken Fen ──
+    fenhollow_centerpiece: {
+        kind: "prop",
+        prompt: "A bog shrine on a leaning stilted platform of lashed driftwood, a still black pool in its "
+            + "centre ringed with pale river stones, three hanging lanterns of green glass on crooked poles, "
+            + "trailing moss and cattails",
+    },
+    fenhollow_questgiver: {
+        kind: "npc",
+        prompt: "A hooded bog-reader standing still: a heavy oiled grey-green cloak hung with bone charms and "
+            + "dried herbs, a tall crooked pole topped with a smoking lantern, one weathered hand holding a "
+            + "clutch of reeds, face half in shadow",
+    },
+
+    // ── SALTWRACK LANDING — a harbour wall above a grey coast, map 4 ──
+    saltwrack_centerpiece: {
+        kind: "prop",
+        prompt: "A tide-pool capstan: a barnacled stone basin brimming with seawater and kelp, a weathered "
+            + "oak ship's capstan standing in it, thick tarred rope coiled around the base, a brass ship's "
+            + "bell on a bracket",
+    },
+    saltwrack_questgiver: {
+        kind: "npc",
+        prompt: "A weathered harbourmaster standing braced against the wind: a long oilskin coat the colour "
+            + "of wet slate, a knitted cap, a brass spyglass held at her side, a rolled chart under one arm, "
+            + "grey hair whipped across a sunburnt face",
+    },
+
     // ── ASHFALL BASTION — a fortress on a lava flat, map 7, the end of the world ──
     ashfall_centerpiece: {
         kind: "prop",
@@ -44,6 +100,34 @@ const PIECES = {
         prompt: "A squat fortified strongroom cut from black basalt blocks, banded with glowing-hot iron "
             + "straps, a single heavy riveted door with a brass wolf-head boss, narrow slit windows lit from "
             + "within, and molten light seeping from the cracks at its base",
+    },
+
+    // ── DROWNED QUAY — pale sunken ruins standing in water, map 5 ──
+    drownedquay_centerpiece: {
+        kind: "prop",
+        prompt: "A huge green-bronze bell half sunk into a cracked pale stone plinth, verdigris running down "
+            + "its sides, its mouth filled with still dark water, strands of pale weed and small barnacles "
+            + "along the rim",
+    },
+    drownedquay_questgiver: {
+        kind: "npc",
+        prompt: "A ruin-diver standing ready: patched canvas and leather diving gear over a wetsuit of oiled "
+            + "cloth, a heavy brass helmet carried under one arm, a long hooked salvage pole in the other "
+            + "hand, a net bag of dripping finds at the belt",
+    },
+
+    // ── GILDED EXCHANGE — a sandstone market on a desert edge, map 6 ──
+    gilded_centerpiece: {
+        kind: "prop",
+        prompt: "A sandstone fountain carved as a sun-dial: a broad fluted basin of warm pale sandstone with "
+            + "gold inlay around its lip, a tall angled gnomon of polished brass rising from the centre, thin "
+            + "clear water running down the steps",
+    },
+    gilded_questgiver: {
+        kind: "npc",
+        prompt: "A desert caravan-master standing composed: layered sand-coloured robes over a deep indigo "
+            + "sash, a wrapped headcloth, a heavy ledger held against the chest, small brass trade scales "
+            + "hanging from the belt, dark eyes above a weathered smile",
     },
 };
 
