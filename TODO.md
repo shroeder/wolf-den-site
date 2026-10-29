@@ -110,9 +110,29 @@ the test. Two new screens to check, and the shelf queue has 30 real jobs to try 
 
 ⚠️ Eric's employee build was **two releases behind** (711 → 714), so he gets more than just this change.
 
-### 3.3 Ledger duplicate bank imports — 61 pairs, ~$11,827
+### 3.3 Ledger duplicates — ~~61 pairs, waiting on Luke~~ **DONE 29 Oct, except nine**
 
-Unchanged and still waiting on Luke's verification. I will not delete financial rows without it.
+Root cause: the only guard was a set of Plaid ids in SharedPreferences **on the phone**, and the Plaid id
+itself was being stored inside the free-text `notes` string where nothing could index it. Plaid also sends
+`pending_transaction_id` — the id of the pending row a posted charge replaces — and the service read the
+`pending` boolean and discarded the link. That is the entire reason subscriptions paired up.
+
+**Now:** the app sends both ids as fields; the server resolves before writing (posted-replaces-pending, same
+id again, or a bank row adopting a hand entry); history is cleaned — **22 pairs merged, $4,439.41 of phantom
+spend removed**, each logged to `ledger_merge_log` with the deleted row's contents so it is reversible.
+Shipped as app **v1.0.715** on both channels.
+
+⚠️ **Nine pairs still need a human**, and only these — every one has nothing to reason from on either side:
+
+| | |
+|---|---|
+| $1,400.00 | `PAY FIRST CHECK` / `CHECK`, 1 day apart |
+| $321.46, $307.36 | `CHECK CHECK #…` / `AUTOMATIC DEBIT SQUARE INC`, 4 days |
+| $200.00 | two ATM withdrawals, different reference strings, 2 days |
+| $44.16, $20.00, $19.99 ×3 | both descriptions blank |
+
+Run `planBackfill()` in `src/lib/ledger/backfill-dupes.js` to see them again. The 67 same-vendor pairs
+(mostly Southern Hobby, ~$8.3k) are **real repeat orders** and were deliberately left alone.
 
 ---
 
