@@ -395,7 +395,12 @@ export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey =
     // ── 3. SPEND THE CREDIT ─────────────────────────────────────────────────────────────────────────────────
     // Guarded and atomic — two concurrent spends cannot overdraw. Nothing has been destroyed yet, so a
     // failure here unwinds completely.
-    const spent = await spendCredit(buyerId, priceCents, "pack_open", key, { packOpen: true });
+    // ⚠️ THE REF IS THE OPEN ID, NOT THE RESERVATION KEY. It used to be `key`, which lives on
+    // mystery_bag_cards.reservation_key and is WIPED the moment the sale completes — so every
+    // pack_open credit event ever written was unjoinable to the open that caused it (measured: 0 of 49).
+    // Nothing reads `ref` for idempotency and there is no unique index on it; it exists to say which
+    // thing moved the money, and the open id is that thing. The reservation key keeps its trace in meta.
+    const spent = await spendCredit(buyerId, priceCents, "pack_open", row.id, { packOpen: true, reservationKey: key });
     if (!spent.ok) {
         await unbook("credit_spend_failed");
         return { ok: false, error: "insufficient_credit", priceCents, balanceCents };

@@ -449,11 +449,46 @@ export async function recentPackOpens({ limit = 50, before = null } = {}) {
                 c.card_number,
                 c.condition,
                 c.image_url,
-                v.status AS vault_status
+                v.status AS vault_status,
+                buy.delta_cents AS buy_delta,
+                buy.balance_after_cents AS buy_after,
+                buy.exact AS buy_exact,
+                sell.balance_after_cents AS sell_after
            FROM mkt_pack_open o
            JOIN mkt_buyer b ON b.id = o.buyer_id
            LEFT JOIN mystery_bag_cards c ON c.id = o.mystery_card_id
            LEFT JOIN mkt_vault_card v ON v.pack_open_id = o.id
+           -- ── WHAT THE PURCHASE DID TO THEIR BALANCE ────────────────────────────────────────────
+           -- Matching on ref = o.id is the real answer, and is what new opens write. Everything before
+           -- 2026-10-29 wrote the card's reservation_key instead, which is wiped on sale, so those
+           -- rows have no link at all and have to be recognised rather than looked up.
+           --
+           -- ⚠️ THE FALLBACK MATCHES ON AMOUNT AS WELL AS TIME, and that is what makes it safe. Same
+           -- buyer, same cents, inside twenty seconds of the open — a second open by the same person
+           -- for the same price inside that window is the only way to confuse it, and the spend is
+           -- atomic and sequential so two cannot overlap. The exact flag says which way it was found, so
+           -- screen can tell the difference rather than presenting a guess as a fact.
+           LEFT JOIN LATERAL (
+               SELECT e.delta_cents, e.balance_after_cents, (e.ref = o.id::text) AS exact
+                 FROM mkt_store_credit_event e
+                WHERE e.reason = 'pack_open'
+                  AND e.buyer_id = o.buyer_id
+                  AND (e.ref = o.id::text
+                       OR (ABS(e.delta_cents) = ABS(o.price_cents)
+                           AND e.created_at BETWEEN o.created_at - INTERVAL '20 seconds'
+                                               AND o.created_at + INTERVAL '20 seconds'))
+                ORDER BY (e.ref = o.id::text) DESC,
+                         ABS(EXTRACT(EPOCH FROM (e.created_at - o.created_at)))
+                LIMIT 1
+           ) buy ON TRUE
+           -- The sell-back at the reveal already refs the open id, and always did.
+           LEFT JOIN LATERAL (
+               SELECT e.balance_after_cents
+                 FROM mkt_store_credit_event e
+                WHERE e.reason = 'vault_sellback' AND e.ref = o.id::text
+                ORDER BY e.created_at DESC
+                LIMIT 1
+           ) sell ON TRUE
           WHERE ($2::timestamptz IS NULL OR o.created_at < $2)
           ORDER BY o.created_at DESC
           LIMIT $1`,
@@ -494,6 +529,22 @@ export async function recentPackOpens({ limit = 50, before = null } = {}) {
             // Only meaningful for a kept card: held, sold_back (out of the vault later), ordered, shipped.
             vaultStatus: r.vault_status || null,
             soldBackCents: money(r.buy_back_cents),
+            // ── THE BALANCE, EITHER SIDE OF THIS OPEN ───────────────────────────────────────────
+            // Luke: "I want to see each row reflecting their store credit balance before and after".
+            //
+            // Both numbers are READ, never summed: mkt_store_credit_event stores balance_after_cents
+            // at the moment of the movement, so `before` is that minus the delta and no running total
+            // has to be rebuilt. A reconstructed balance drifts the instant one event is missing, and
+            // five vault sell-backs already ref something other than an open.
+            //
+            // `after` is the balance once this open had finished with it — the sell-back when they
+            // took the money, otherwise the purchase. Null when nothing could be tied to the open,
+            // which the screen shows as nothing rather than as zero.
+            creditBeforeCents: r.buy_after == null ? null : Number(r.buy_after) - Number(r.buy_delta || 0),
+            creditAfterCents: r.sell_after != null ? Number(r.sell_after)
+                : r.buy_after == null ? null : Number(r.buy_after),
+            // False means it was matched on buyer+amount+time rather than on the open id.
+            creditExact: r.buy_after == null ? null : Boolean(r.buy_exact),
             // ⚠️ A MULTIPLE, NOT A VERDICT. 3.1x says more at a glance than $62 against $20, and it is the
             // number Luke reads a pull by — but it is reported, never judged: a 0.2x open is not a problem,
             // it is the model working.
