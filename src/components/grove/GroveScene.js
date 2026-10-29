@@ -334,6 +334,10 @@ export default function GroveScene({
     waves = null,
     onWave,
     onRunEnd,
+    // Chests a finished run left on the ground. Rows rather than scene state, so closing the tab
+    // mid-collection is not how you lose what you just earned — see migration 500.
+    groundChests = null,
+    onOpenChest,
     zone, seed, bonuses, stats, heroArt, petArt, belt, labScene, bagRoom = null, gearArt = null,
     // ⚠️ ONE NUMBER, ALREADY MULTIPLIED OUT, AND NOT THE RARITY AND LEVEL IT CAME FROM. The share of a
     // hero swing this member's companion bites for, computed on the server in heroLook (grove.js) off the
@@ -3739,6 +3743,25 @@ export default function GroveScene({
                     The badge is the whole reason this is worth drawing at all — a figure standing in a
                     room says nothing, and a figure with "ready" over their head is a reason to cross
                     the room. */}
+                {/* ── ⚠️ A CHEST IS A THING YOU TAP ONCE, SO IT MUST LOOK SPENT THE INSTANT YOU DO ──
+                    The open is a round trip, and a chest that still looks shut while that is in flight
+                    is a chest somebody taps again — which the server refuses, correctly, and which
+                    reads to the player as the first tap not working. `is-opening` lands on the frame
+                    of the tap; the row disappearing is what confirms it.
+
+                    Spread along the floor rather than stacked: four boxes in one spot is one box as
+                    far as a thumb is concerned. */}
+                {(groundChests || []).map((c, i) => (
+                    <button key={c.id} type="button"
+                        className={`gv-chest${c.opening ? " is-opening" : ""}`}
+                        style={{ "--gv-chest-i": i }}
+                        onPointerDown={(e) => { e.stopPropagation(); if (!c.opening) onOpenChest?.(c.id); }}
+                        aria-label={`Open the ${c.tier} chest`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`/images/grove/chest-${c.tier}.webp`} alt="" draggable={false} />
+                    </button>
+                ))}
+
                 {npcHere ? (
                     <button type="button"
                         className={`gv-npc${npcHere.active?.ready ? " is-ready" : ""}${npcHere.active ? "" : " is-done"}`}

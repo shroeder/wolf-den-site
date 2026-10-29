@@ -62,7 +62,7 @@ function Row({ q, onClaim, busy }) {
     );
 }
 
-export default function GroveQuests({ quests = [], coliseum = null, onChanged }) {
+export default function GroveQuests({ quests = [], coliseum = null, onChanged, onEnter, busy: running = false }) {
     const [busy, setBusy] = useState(false);
     const [note, setNote] = useState(null);
 
@@ -70,6 +70,23 @@ export default function GroveQuests({ quests = [], coliseum = null, onChanged })
     // map one is a wall of things they cannot do yet.
     const seen = quests.filter((q) => q.done > 0 || q.active);
     const byMap = seen.reduce((acc, q) => { (acc[q.map] ||= []).push(q); return acc; }, {});
+
+    async function claimDaily(map) {
+        setBusy(true);
+        try {
+            // ⚠️ THE QUESTS ROUTE, AND ONLY IT. The first cut of this also posted
+            // {action:"start"} to the coliseum route — which SPENDS A KEY AND BEGINS A RUN before
+            // handing the daily over. Taking your free key would have consumed it and dropped you into
+            // an arena you did not ask for. The daily is a quest-giver handing something over; it is
+            // idempotent against the shop's own date and belongs nowhere near the run endpoint.
+            const q = await fetch("/api/marketplace/grove/quests", {
+                method: "POST", headers: { "content-type": "application/json" },
+                body: JSON.stringify({ daily: true, map }),
+            }).then((x) => x.json()).catch(() => null);
+            setNote(q?.ok ? "The marshal hands you a key." : "You already took today's key.");
+            if (q?.ok) onChanged?.();
+        } finally { setBusy(false); }
+    }
 
     async function claim(stepId) {
         setBusy(true);
@@ -103,7 +120,19 @@ export default function GroveQuests({ quests = [], coliseum = null, onChanged })
                             {coliseum.bestWave ? ` · best wave ${coliseum.bestWave}` : ""}
                         </span>
                     </span>
-                    {coliseum.dailyReady ? <span className="gq-pip">Daily ready</span> : null}
+                    {/* ── ⚠️ THE ONLY WAY INTO A RUN, SO IT SAYS WHY IT CANNOT BE TAPPED ────────────
+                        A disabled button with no reason is a broken button. The daily is the answer to
+                        "no keys" and it is one tap away, so the two live together. */}
+                    <span className="gq-colacts">
+                        {coliseum.dailyReady ? (
+                            <button type="button" className="gq-claim" disabled={running}
+                                onClick={() => claimDaily(coliseum.map)}>Take key</button>
+                        ) : null}
+                        <button type="button" className="gq-claim" disabled={running || coliseum.keys < 1}
+                            onClick={() => onEnter?.(coliseum.map)}>
+                            {coliseum.keys < 1 ? "No key" : "Enter"}
+                        </button>
+                    </span>
                 </div>
             ) : null}
 

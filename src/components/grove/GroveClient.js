@@ -20,6 +20,7 @@ import Area from "@/components/grove/GroveArea.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
 import GroveGear from "@/components/grove/GroveGear.js";
 import GroveQuests from "@/components/grove/GroveQuests";
+import { useColiseum } from "@/components/grove/useColiseum";
 import { GROVE_CHESTS, CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
 import {
     GROVE_RECIPES, recipeById, canCraft, newlyReady, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
@@ -644,7 +645,15 @@ export default function GroveClient({ initial }) {
                     server, and st.hero is what the scene fights with. */}
                 {panel === "gear" ? <GroveGear st={st} onChanged={refresh} /> : null}
                 {panel === "quests"
-                    ? <GroveQuests quests={session?.quests || []} coliseum={session?.coliseum || null} onChanged={refresh} />
+                    ? (
+                        <GroveQuests
+                            quests={session?.quests || []}
+                            coliseum={session?.coliseum || null}
+                            onChanged={refresh}
+                            busy={col.busy || Boolean(col.run)}
+                            onEnter={(map) => { col.start(map); setPanel(null); }}
+                        />
+                    )
                     : null}
 
                 {panel === "bag" ? (
@@ -989,8 +998,15 @@ export default function GroveClient({ initial }) {
                     zone={session.zone} seed={session.seed} bonuses={session.bonuses} gearArt={session.gearArt}
                     // Whoever is standing in THIS zone, if anyone. Most zones have nobody — three givers
                     // across twelve rooms — so the scene draws a figure only when this is non-null.
-                    npcHere={session.npcHere || null}
+                    npcHere={col.run ? null : (session.npcHere || null)}
                     onTalk={() => setPanel("quests")}
+                    // ⚠️ THE ARENA REPLACES THE ZONE'S WORLD, it does not sit beside it. Handing both would
+                    // put the zone's doors and its three-hundred-unit floor into a twenty-six unit room.
+                    arena={col.run ? { ...col.run.plan.arena, runMs: col.run.plan.runMs } : null}
+                    waves={col.run ? col.run.plan.waves : null}
+                    onRunEnd={col.finish}
+                    groundChests={col.chests}
+                    onOpenChest={col.open}
                     // ⚠️ THE DOOR'S GATE IS THE SERVER'S, NOT THE CLIENT'S KILL COUNT. groveEnter refuses
                     // any zone past unlocked_n, and the door used to decide for itself from local kills --
                     // so a count the server had not banked yet (the settle still in flight, or trimmed by

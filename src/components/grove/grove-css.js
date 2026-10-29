@@ -3660,4 +3660,41 @@ export const GROVE_CSS = `
     0%, 100% { transform: translateX(-50%) translateY(0); }
     50% { transform: translateX(-50%) translateY(-3px); }
 }
+
+/* ── A CHEST SITTING ON THE ARENA FLOOR ──────────────────────────────────────────────────────────
+   Spread along the bottom rather than stacked, because four boxes in one spot is one box as far as a
+   thumb is concerned. --gv-chest-i is the index, so they lay out without needing world positions. */
+.gv-chest {
+    position: absolute; bottom: 7%;
+    left: calc(26% + (var(--gv-chest-i, 0) * 16%));
+    width: 58px; height: 52px; padding: 0; border: 0; background: none;
+    cursor: pointer; z-index: 250;
+    animation: gvChestLand 420ms cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.gv-chest img {
+    width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
+    animation: gvChestBob 2.4s ease-in-out infinite;
+}
+/* The tap has to read before the round trip answers, or it reads as the tap not working. */
+.gv-chest.is-opening { pointer-events: none; }
+.gv-chest.is-opening img { animation: gvChestPop 320ms ease-out both; }
+
+@keyframes gvChestLand {
+    from { transform: translateY(-34px) scale(0.8); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes gvChestBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+@keyframes gvChestPop {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.25) rotate(-4deg); }
+    100% { transform: scale(0.6) translateY(-10px); opacity: 0; }
+}
+
+/* The marshal's two actions sit together: "no key" is a state the daily button answers. */
+.gq-colacts { display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+.gq-colacts .gq-claim { padding: 6px 10px; font-size: 0.72rem; }
 `;
