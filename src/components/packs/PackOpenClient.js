@@ -1146,10 +1146,19 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
 
                         It disappears the moment it is spent, because a promise still on screen after it
                         has been used is just a lie with good intentions. */}
+                    {/* ⚠️ "SAME ODDS ON EVERYTHING ELSE" WAS NOT TRUE, and the odds board now proves it.
+                        Dropping the filler re-solves alpha on what is left, which moves EVERY band: on
+                        mtg10 uncommon goes 29.3% -> 64.0% and epic FALLS, 12.6% -> 8.9%. What is actually
+                        held constant is the MEAN — first_open_alpha is solved against the same target EV —
+                        so the pack is not more generous, it is less disappointing.
+
+                        The claim had to change because the board beneath it is now the first-open board.
+                        Showing a member different numbers under a line insisting the numbers are the same
+                        is worse than the mismatch it replaced. */}
                     {firstOpen ? (
                         <p className="pk-first-promise">
-                            <strong>Your first pack: no duds.</strong> We take the filler out — same odds
-                            on everything else.
+                            <strong>Your first pack: no duds.</strong> We take the filler out and re-draw the
+                            odds below around what is left — same average value, fewer ways to be let down.
                         </p>
                     ) : null}
                     <p className="pk-fine">Opens are final. The card is yours either way.</p>

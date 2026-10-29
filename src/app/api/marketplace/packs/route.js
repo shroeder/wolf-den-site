@@ -59,8 +59,20 @@ export async function GET(request) {
                     key: p.key, brand: p.brand, priceCents: p.priceCents, units: p.units, art: p.art,
                     open: p.open, closedReason: p.closedReason,
                     maxCents: p.maxCents, medianCents: p.medianCents,
-                    // The odds board — the only thing that honestly separates three tiers off one shelf.
-                    bandOdds: p.bandOdds || [],
+                    // ── THE ODDS BOARD — AND IT MUST BE *THEIR* ODDS BOARD ────────────────────────
+                    // The only thing that honestly separates three tiers off one shelf, which is exactly
+                    // why it has to describe the draw this member will actually get.
+                    //
+                    // ⚠️ A FIRST OPEN DRAWS ON A DIFFERENT POPULATION. It uses first_open_alpha over only
+                    //    the cards at or above the first-open floor, so the ordinary board overstates the
+                    //    cheap bands for somebody who cannot draw them: on mtg10 it advertised "common,
+                    //    35.1%" to a member for whom a common was impossible. The mean is identical by
+                    //    design and the drift is in their favour, but shown odds that are not drawn odds
+                    //    is the one thing this feature cannot be loose about.
+                    bandOdds: (!opened && (p.firstOpenBandOdds || []).length ? p.firstOpenBandOdds : p.bandOdds) || [],
+                    // So the sheet can say WHY their board is different, instead of quietly showing
+                    // another one. "Your first pack can't give you junk" is worth saying out loud.
+                    firstOpenFloorCents: !opened ? (p.firstOpenFloorCents || 0) : 0,
                     // ⚠️ EACH POOL CARRIES ITS OWN CONTENTS. The sheet used to read one global card list
                     //    because there was one pool; with a carousel that would show the BAGS' cards under a
                     //    Pokémon pack — the one screen on this feature whose entire job is being accurate

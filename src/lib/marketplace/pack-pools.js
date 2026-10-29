@@ -387,6 +387,14 @@ export async function recomputePools({ now = null } = {}) {
         // The odds board. Computed here because recomputePools already holds every unit in memory to solve
         // alpha; doing it per request would be a 900-row scan on the busiest screen in the feature.
         const bands = unreachable ? [] : bandOdds(units, alpha);
+        // ⚠️ AND THE BOARD A FIRST-TIMER WILL ACTUALLY PLAY. Same computation, over the population their
+        //    draw really uses: the no-duds set, weighted by the first-open alpha. Without this the shelf
+        //    served one board to everyone while first opens drew on another — on mtg10 that advertised
+        //    "common, 35.1%" to somebody who could not draw a common at all.
+        //
+        //    Empty when the first-open shape is off, which is also how the reader tells the two cases
+        //    apart: no first-open board means there is nothing different to describe.
+        const firstBands = (unreachable || !firstOk) ? [] : bandOdds(noDuds, firstAlpha);
 
         // ⚠️ max/min DESCRIBE THE BAND, NOT THE SHELF. stats comes from shelfPoolStats, which measures the
         //    whole category — so a $5 pack capped at $25 was advertising "MAX PULL $279" on the carousel
@@ -400,9 +408,9 @@ export async function recomputePools({ now = null } = {}) {
                 `INSERT INTO mkt_pack_pool_state
                     (pool, price_cents, ev_cents, uniform_ev_cents, alpha, first_open_floor_cents,
                      first_open_alpha, units, lines, median_cents, min_cents, max_cents,
-                     top_share_bp, open, closed_reason, band_odds, band_lo_cents, band_hi_cents,
+                     top_share_bp, open, closed_reason, band_odds, first_open_band_odds, band_lo_cents, band_hi_cents,
                      computed_at)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18, NOW())
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19, NOW())
                  ON CONFLICT (pool) DO UPDATE SET
                      price_cents = EXCLUDED.price_cents, ev_cents = EXCLUDED.ev_cents,
                      uniform_ev_cents = EXCLUDED.uniform_ev_cents, alpha = EXCLUDED.alpha,
@@ -412,6 +420,7 @@ export async function recomputePools({ now = null } = {}) {
                      min_cents = EXCLUDED.min_cents, max_cents = EXCLUDED.max_cents,
                      top_share_bp = EXCLUDED.top_share_bp, open = EXCLUDED.open,
                      closed_reason = EXCLUDED.closed_reason, band_odds = EXCLUDED.band_odds,
+                     first_open_band_odds = EXCLUDED.first_open_band_odds,
                      band_lo_cents = EXCLUDED.band_lo_cents, band_hi_cents = EXCLUDED.band_hi_cents,
                      computed_at = NOW()`,
                 [
@@ -421,6 +430,11 @@ export async function recomputePools({ now = null } = {}) {
                     unreachable ? stats.minCents : bandMinCents, unreachable ? stats.maxCents : bandMaxCents, stats.topShareBp,
                     !reason && !unreachable, unreachable ? "too_rich_for_price" : reason,
                     JSON.stringify(bands),
+                    // ⚠️ KEEP THIS IN STEP WITH THE COLUMN LIST. Adding first_open_band_odds to the columns
+                    // without a placeholder here made the whole upsert fail with a column/expression count
+                    // mismatch — and the .catch below turned that into one log line while recomputePools
+                    // reported success and wrote NOTHING for any pool. Pool state would have silently frozen.
+                    JSON.stringify(firstBands),
                     bandLo, Number.isFinite(bandHi) ? bandHi : 0,
                 ]
             )
@@ -455,6 +469,8 @@ export async function poolStates() {
             alpha: Number(s?.alpha ?? 0),
             // The odds board the picker shows. Already JSON in the column; never recomputed per request.
             bandOdds: Array.isArray(s?.band_odds) ? s.band_odds : [],
+            firstOpenBandOdds: Array.isArray(s?.first_open_band_odds) ? s.first_open_band_odds : [],
+            firstOpenFloorCents: Number(s?.first_open_floor_cents) || 0,
             bandLoCents: Number(s?.band_lo_cents ?? 0),
             bandHiCents: Number(s?.band_hi_cents ?? 0),
             units: s?.units ?? 0,

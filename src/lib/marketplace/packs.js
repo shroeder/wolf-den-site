@@ -368,12 +368,19 @@ export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey =
         row = await db.queryOne(
             `INSERT INTO mkt_pack_open
                 (buyer_id, mystery_card_id, price_cents, card_value_cents, tier,
-                 revenue_cents, tax_cents, cogs_cents, cogs_basis, idempotency_key, preview, pool)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                 revenue_cents, tax_cents, cogs_cents, cogs_basis, idempotency_key, preview, pool,
+                 draw_alpha, draw_floor_cents, draw_first_open)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
              RETURNING id, created_at`,
             [
                 buyerId, claimed.id, priceCents, valueCents, tier.key,
                 revenueCents, taxCents, cogs.cents, cogs.basis, key, isPreviewOpen(buyerId, pool.key), pool.key,
+                // ⚠️ THE CURVE THIS PULL HAPPENED ON, written beside the pull itself.
+                // alpha is derived and moves whenever the shelf does, and mkt_pack_pool_state keeps only
+                // the current value — so without this column the odds any past pack was drawn on are gone
+                // for good. It cannot be reconstructed later: it depends on the exact shelf composition at
+                // that instant, which nothing snapshots. One write, already in hand, audit forever.
+                drawAlpha, drawFloor, useMagic,
             ]
         );
     } catch (error) {
