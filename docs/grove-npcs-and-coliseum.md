@@ -97,7 +97,15 @@ easy thing to get wrong — see the warning about shared reward tables above.
 
 ---
 
-## Open questions for Luke
+## Decisions (Luke, 2026-10-29)
+
+1. **Coliseum kills count toward the zone gate, in full.** It is deliberately the fast route through the
+   kill requirement — the pressure valve for maps 5–7, which model at 29–80 minutes a node otherwise.
+2. **A failed run spends the key but keeps what you earned.** Chests spawn for the waves you did clear, so a
+   near-miss is still worth something and people keep trying the harder maps.
+3. **Art approved at ~$2.21**, three on a contact sheet first.
+
+## The questions, as asked
 
 1. **Do Coliseum kills count toward the zone-unlock gate?**
    A zone can only produce **40 bodies a minute**. A Coliseum run is twelve rosters plus a boss in two
