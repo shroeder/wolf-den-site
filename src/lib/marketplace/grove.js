@@ -13,6 +13,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { canPreview } from "@/lib/marketplace/owner.js";
+import { questBoard, coliseumState } from "@/lib/marketplace/grove-quests.js";
 import {
     GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_PARTS, GROVE_EMBLEMS, GROVE_POP,
     GROVE_FOODS, GROVE_CHARMS, HEAL_AT, emblemStars, groveZone,
@@ -578,10 +579,19 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
         ).catch(() => [])).map((r) => [r.k, { url: r.url, name: itemById(r.k)?.name || r.k }]))
         : {};
 
+    // ── ⚠️ THE QUEST BOARD RIDES THE SESSION, NOT ITS OWN FETCH ──────────────────────────────────────
+    // The tracker is a dock panel, and a dock panel that fetches on open is a round trip a member pays for
+    // every time they glance at it. This is one read of a small table the session is already awake for —
+    // the same argument that got the nav from 111 round trips to 3.
+    const quests = await questBoard(buyerId).catch(() => []);
+    const coliseum = await coliseumState(buyerId, zone.map || 1).catch(() => null);
+
     return {
         ok: true,
         seed,
         gearArt,
+        quests,
+        coliseum,
         zone: {
             ...zone,
             kills,

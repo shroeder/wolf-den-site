@@ -3579,4 +3579,55 @@ export const GROVE_CSS = `
 .gv-gtot h5 {
     margin: 0 0 6px; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: #a79e88;
 }
+
+/* ── THE QUEST HELPER ────────────────────────────────────────────────────────────────────────────
+   Built around the zone number, because that is the one thing the panel exists to tell you: three
+   givers are hidden across twelve zones on purpose, and without this the instruction "come back to
+   them" means walking the map hoping. */
+.gq { display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 10px; }
+.gq-note { margin: 0; font-size: 0.78rem; color: #cbbf9d; }
+.gq-empty { margin: 10px 2px; font-size: 0.82rem; color: #9b937f; line-height: 1.45; }
+.gq-map h4 {
+    margin: 0 0 6px; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: #a79e88;
+}
+.gq-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.gq-row, .gq-col {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 10px;
+    background: rgba(20, 26, 18, 0.72); border: 1px solid rgba(120, 140, 96, 0.22);
+}
+.gq-col { border-color: rgba(220, 180, 90, 0.3); }
+/* A finished chain stays on the list and says so — see the note in GroveQuests about not hiding it. */
+.gq-row.is-done { opacity: 0.6; }
+.gq-row.is-ready { border-color: rgba(240, 180, 76, 0.55); background: rgba(44, 38, 18, 0.8); }
+
+.gq-face {
+    width: 42px; height: 58px; object-fit: contain; flex: 0 0 auto;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+}
+.gq-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.gq-who { font-size: 0.86rem; color: #f0e7cf; }
+.gq-where { font-size: 0.68rem; color: #a79e88; }
+.gq-task { font-size: 0.8rem; color: #e4d9ba; }
+.gq-ask { font-size: 0.7rem; color: #9b937f; text-transform: capitalize; }
+.gq-fin { font-size: 0.74rem; color: #8d866f; font-style: italic; }
+.gq-num { font-size: 0.66rem; color: #a79e88; font-variant-numeric: tabular-nums; }
+
+.gq-bar {
+    display: block; height: 5px; border-radius: 3px; margin-top: 3px;
+    background: rgba(255, 255, 255, 0.09); overflow: hidden;
+}
+.gq-bar i { display: block; height: 100%; background: linear-gradient(90deg, #7fae55, #cfe08a); }
+
+.gq-claim {
+    flex: 0 0 auto; border: 0; border-radius: 8px; cursor: pointer;
+    padding: 7px 12px; font-size: 0.78rem; font-weight: 700;
+    background: linear-gradient(180deg, #ffe3a8, #f0b44c); color: #3a2906;
+}
+.gq-claim:disabled { opacity: 0.5; cursor: default; }
+.gq-pip {
+    flex: 0 0 auto; font-size: 0.64rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #3a2906; background: #f0b44c; border-radius: 6px; padding: 3px 7px;
+}
 `;

@@ -19,6 +19,7 @@ import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area from "@/components/grove/GroveArea.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
 import GroveGear from "@/components/grove/GroveGear.js";
+import GroveQuests from "@/components/grove/GroveQuests";
 import { GROVE_CHESTS, CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
 import {
     GROVE_RECIPES, recipeById, canCraft, newlyReady, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
@@ -86,6 +87,10 @@ const DOCK = [
     { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
     { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
     { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp" },
+    // ⚠️ THE TRACKER NEEDS A DOOR OR IT IS NOT SHIPPED. ui-board.webp was drawn long ago and never used by
+    // anything — the quest helper is what it was for. Three givers hidden across twelve zones is a good
+    // surprise once and a search forever after, so the panel that names the zone has to be one tap away.
+    { k: "quests", label: "Quests", art: "/images/grove/ui-board.webp" },
     { k: "emblems", label: "Emblems", art: "/images/grove/ui-emblems.webp" },
 ];
 
@@ -638,6 +643,9 @@ export default function GroveClient({ initial }) {
                     started dropping it. `refresh` is passed because equipping recomputes st.hero on the
                     server, and st.hero is what the scene fights with. */}
                 {panel === "gear" ? <GroveGear st={st} onChanged={refresh} /> : null}
+                {panel === "quests"
+                    ? <GroveQuests quests={session?.quests || []} coliseum={session?.coliseum || null} onChanged={refresh} />
+                    : null}
 
                 {panel === "bag" ? (
                     <div className="gv-bag">
