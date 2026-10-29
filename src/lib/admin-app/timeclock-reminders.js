@@ -1,6 +1,6 @@
 import "server-only";
 
-import { CLOCK_IN_LEAD_MIN, ESCALATE_AFTER_MIN, NAG_EVERY_MIN, clockStatus, shiftWindow } from "@/lib/admin-app/timeclock.js";
+import { CLOCK_IN_LEAD_MIN, ESCALATE_AFTER_MIN, NAG_EVERY_MIN, clockStatus, inClockInWindow, shiftWindow } from "@/lib/admin-app/timeclock.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 
@@ -55,7 +55,9 @@ export async function runTimeclockReminders({ dryRun = false } = {}) {
     };
 
     // ── CLOCK IN: fire in the window BEFORE opening, once per day, only if they're not already in.
-    if (!win.open && !status.clockedIn && win.untilOpen != null && win.untilOpen > 0 && win.untilOpen <= CLOCK_IN_LEAD_MIN) {
+    // Same shared window as the queue reminder. Written inline here it was 15 minutes wide, sampled every
+    // 30, against openings that are always on the hour — so it never fired either.
+    if (!win.open && !status.clockedIn && inClockInWindow(win)) {
         if (!day.inNudge) {
             await push("clock_in", "🕒 Shift starting soon", `The Den opens in ${win.untilOpen} min. Tap to clock in when you get there.`);
             day.inNudge = nowMs;

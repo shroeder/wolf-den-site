@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db.js";
-import { CLOCK_IN_LEAD_MIN, shiftWindow } from "@/lib/admin-app/timeclock.js";
+import { inClockInWindow, shiftWindow } from "@/lib/admin-app/timeclock.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 
@@ -71,7 +71,9 @@ export async function runPullQueueReminder({ dryRun = false, force = false } = {
     // "Around clock-in time" is a moving target — the shop's hours differ by day — and a second definition of
     // it would drift from the first the moment the hours changed.
     const win = shiftWindow();
-    if (!force && !(win.untilOpen != null && win.untilOpen > 0 && win.untilOpen <= CLOCK_IN_LEAD_MIN)) {
+    // ⚠️ inClockInWindow, NOT a test written here. The inline version of this was narrower than the cron
+    // interval and so never once matched — see the note on REMINDER_JOB_PERIOD_MIN in timeclock.js.
+    if (!force && !inClockInWindow(win)) {
         out.skipped = "not_clock_in_window";
         return out;
     }

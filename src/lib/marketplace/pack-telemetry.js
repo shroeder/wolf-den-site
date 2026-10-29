@@ -365,7 +365,7 @@ export async function getPackTelemetry({ days = 30 } = {}) {
 export async function getPullQueue({ limit = 60 } = {}) {
     const rows = await db.query(
         `SELECT t.id, t.bag_sku, t.kind, t.promoted, t.created_at, t.note,
-                c.card_name, c.market_value,
+                c.card_name, c.market_value, c.image_url, c.set_name, c.card_number, c.condition,
                 b.display_name AS member
          FROM mkt_pack_pull_task t
          JOIN mystery_bag_cards c ON c.id = t.mystery_card_id
@@ -382,6 +382,13 @@ export async function getPullQueue({ limit = 60 } = {}) {
         kind: r.kind,
         promoted: r.promoted,
         cardName: r.card_name,
+        // The picture is the whole point of the row when you are standing at the tub: matching art is
+        // instant, matching "093/130" against a stack of sleeves is not. It costs nothing — image_url is
+        // already on mystery_bag_cards and the feed has shown it since day one.
+        imageUrl: r.image_url || null,
+        setName: r.set_name || null,
+        cardNumber: r.card_number || null,
+        condition: r.condition || null,
         valueCents: money(Number(r.market_value) * 100),
         member: r.member || "—",
         note: r.note || null,

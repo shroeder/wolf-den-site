@@ -92,6 +92,35 @@ async function hoursToday(teamMemberId) {
 }
 
 // Store hours as a shift window, in minutes relative to now. Negative "untilOpen" means it already started.
+// ── ⚠️ HOW WIDE AN "AROUND CLOCK-IN" WINDOW HAS TO BE ───────────────────────────────────────────────────────
+// A window narrower than the interval you sample it at can be missed forever, and this one was.
+//
+// `timeclock-reminders` runs on `0,30 * * * *`, so it only ever observes the clock at :00 and :30. Every Wolf
+// Den opening time is on the hour (11:00 or 15:00 — see HOURS in store-hours.js), so `untilOpen` at a tick is
+// ALWAYS a multiple of 30. The test was `untilOpen > 0 && untilOpen <= 15`, which a multiple of 30 can never
+// satisfy: the 14:30 tick sees 30 (too early) and the 15:00 tick sees 0 (not > 0).
+//
+// So the clock-in nudge and the pull-queue reminder both never fired, once, since the day they shipped —
+// `pull_queue_reminder_state` was still null with thirty jobs open and the oldest two days old. Nothing
+// errored, nothing logged, and the switch said "on". A dead reminder is worse than no reminder, because
+// everyone stops checking the thing it was supposed to announce.
+//
+// The window must therefore be at least one sampling interval wide. Keep this in step with the cron in
+// vercel.json; if that cadence changes, this changes with it.
+export const REMINDER_JOB_PERIOD_MIN = 30;
+
+/**
+ * Is this tick inside the run-up to opening?
+ *
+ * One definition, used by both the clock-in nudge and the queue reminder, so neither can drift from the other
+ * or re-introduce the off-by-a-cadence bug above. Exactly one tick per day qualifies; callers still guard
+ * once-per-day themselves.
+ */
+export function inClockInWindow(win) {
+    const u = win?.untilOpen;
+    return u != null && u > 0 && u <= CLOCK_IN_LEAD_MIN + REMINDER_JOB_PERIOD_MIN;
+}
+
 export function shiftWindow(now = new Date()) {
     const st = storeStatus(now);
     if (st.open) {
