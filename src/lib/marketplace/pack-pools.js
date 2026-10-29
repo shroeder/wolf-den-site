@@ -333,7 +333,7 @@ export function closedReason(stats) {
  */
 export const PRICE_HOLD_DAYS = 7;
 
-export async function recomputePools({ now = null } = {}) {
+export async function recomputePools({ now = null, source = "cron" } = {}) {
     const out = [];
     for (const pool of shelfPools()) {
         const stats = await shelfPoolStats(pool).catch((error) => {
@@ -440,6 +440,39 @@ export async function recomputePools({ now = null } = {}) {
             )
             .catch((error) => logger.error("pack_pools.write_failed", error, { pool: pool.key }));
 
+        // ── ⚠️ AND THE SAME NUMBERS, APPENDED RATHER THAN OVERWRITTEN ─────────────────────────────
+        // The upsert above is STATE and loses yesterday every night. alpha is derived and moves on its
+        // own — pkmn10 has travelled 0.53 -> 0.15 since its first open — and it cannot be recomputed
+        // after the fact, because it depends on the exact shelf composition at this instant and nothing
+        // snapshots that. A day not written here is a day gone for good.
+        //
+        // Deliberately UNCONDITIONAL. A row identical to yesterday's is a real observation; writing only
+        // on change would make a flat stretch indistinguishable from a recompute that never ran, and the
+        // whole table is about six rows a night.
+        //
+        // margin_bp is stored, not derived on read: TARGET_MARGIN_BP may change, and a margin recomputed
+        // from whatever that constant says later would silently rewrite history to agree with it.
+        const marginBp = priceCents > 0 ? Math.round(((priceCents - evCents) * 10000) / priceCents) : null;
+        await db
+            .query(
+                `INSERT INTO mkt_pack_pool_history
+                    (pool, alpha, first_open_alpha, first_open_floor_cents,
+                     price_cents, ev_cents, uniform_ev_cents, margin_bp,
+                     units, lines, median_cents, band_lo_cents, band_hi_cents,
+                     open, closed_reason, source)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+                [
+                    pool.key, unreachable ? 0 : alpha, firstOk ? firstAlpha : 0, firstOk ? floorCents : 0,
+                    priceCents, evCents, stats.evCents, marginBp,
+                    stats.units, stats.lines, medianCents, bandLo, Number.isFinite(bandHi) ? bandHi : 0,
+                    !reason && !unreachable, unreachable ? "too_rich_for_price" : reason, source,
+                ]
+            )
+            // ⚠️ History failing must never take the recompute down with it. The state write above is what
+            // the shelf serves from; this is the record of it. Logged loudly, because a silent stop here
+            // is exactly the kind of gap that cannot be filled in later.
+            .catch((error) => logger.error("pack_pools.history_write_failed", error, { pool: pool.key }));
+
         out.push({ pool: pool.key, priceCents, open: !reason, reason, ...stats });
     }
     logger.info("pack_pools.recomputed", { pools: out.length });
@@ -501,4 +534,41 @@ export async function cheapestOpenPackCents() {
         .queryOne(`SELECT MIN(price_cents)::int AS cents FROM mkt_pack_pool_state WHERE open`)
         .catch(() => null);
     return Number(row?.cents) > 0 ? Number(row.cents) : null;
+}
+
+/**
+ * How a pool's curve has moved, newest first.
+ *
+ * The point of the table is the SHAPE over time, so this returns the raw series and leaves the
+ * interpretation to the caller — alpha climbing while units fall is a shelf being picked clean; alpha
+ * climbing while units rise is expensive stock arriving. Those are different stories and only the two
+ * columns together tell them apart.
+ */
+export async function poolAlphaHistory({ pool = null, days = 90, limit = 500 } = {}) {
+    const rows = await db.query(
+        `SELECT pool, computed_at, alpha, first_open_alpha, price_cents, ev_cents, margin_bp,
+                units, lines, median_cents, open, closed_reason, source
+           FROM mkt_pack_pool_history
+          WHERE computed_at > NOW() - ($2 || ' days')::interval
+            AND ($1::text IS NULL OR pool = $1)
+          ORDER BY computed_at DESC, pool
+          LIMIT $3`,
+        [pool, String(Math.max(1, Math.min(730, Number(days) || 90))), Math.max(1, Math.min(2000, Number(limit) || 500))],
+    ).catch(() => []);
+    return (rows || []).map((r) => ({
+        pool: r.pool,
+        at: r.computed_at,
+        alpha: r.alpha == null ? null : Number(r.alpha),
+        firstOpenAlpha: r.first_open_alpha == null ? null : Number(r.first_open_alpha),
+        priceCents: Number(r.price_cents) || 0,
+        evCents: Number(r.ev_cents) || 0,
+        // The number the ladder is tuned to, as it stood that day.
+        marginBp: r.margin_bp == null ? null : Number(r.margin_bp),
+        units: Number(r.units) || 0,
+        lines: Number(r.lines) || 0,
+        medianCents: Number(r.median_cents) || 0,
+        open: Boolean(r.open),
+        closedReason: r.closed_reason || null,
+        source: r.source || "cron",
+    }));
 }
