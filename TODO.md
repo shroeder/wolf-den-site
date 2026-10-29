@@ -94,21 +94,30 @@ off).
 
 ## 3. Live and needs a human
 
-### 3.1 The shelf queue — 30 open, 16 are cards owed, oldest 2 days
+### 3.1 The shelf queue — 30 open, 9 are cards owed, oldest 2.3 days
 
 ⚠️ **An unworked `pull` job is a card somebody has already paid for that is still physically on the shelf,
-where it can be sold a second time.** This is the risk Luke pinned himself in `docs/vault-shelf-queue.md`.
+where it can be sold a second time.**
 
-It now has a screen in the admin app and a daily reminder at clock-in to both phones — but **nothing has been
-worked yet**, and the vault change shipped this session (telling members plainly they can collect free in the
-shop) will push more people down that path.
+Workable from either phone now (v1.0.718). Since this was written: a **"Can't find it"** action that refunds
+the member in full — the server supported it from day one and had no caller, so the only outcomes were a
+false Done or an open job forever; **card art** on every row; **grouped by member**, because the unit of work
+is a trip to the tub, not a card; **Done deferred 5s behind an Undo** snackbar, since closing is one-way
+server-side; pull-to-refresh; haptics.
 
-### 3.2 First launch of admin app v1.0.714 — untested on a real device
+⚠️ **Both opening reminders had never fired once.** Window 15 min wide, cron samples every 30, every opening
+on the hour — so `untilOpen` was always a multiple of 30 and `0 < untilOpen <= 15` was unsatisfiable. The
+clock-in nudge used the identical test, so nobody has ever been reminded to clock in either. Fixed, shared,
+and pinned by `node scripts/test-clock-in-window.mjs`. **First real reminder lands 2:30 PM today.**
 
-Published to both channels (`full` and `employee`). I cannot drive a handset from here, so the first launch is
-the test. Two new screens to check, and the shelf queue has 30 real jobs to try the Done button on.
+### 3.2 First launch of admin app v1.0.718 — still untested on a real device
 
-⚠️ Eric's employee build was **two releases behind** (711 → 714), so he gets more than just this change.
+Published to both channels. I cannot drive a handset from here, so the first launch is the test. The queue
+has 30 real jobs to try Done, Undo and "Can't find it" on.
+
+⚠️ `app:publish` **does not build** — it uploads whatever APK is on disk. Always
+`./gradlew clean assembleFullDebug assembleEmployeeDebug` first, and check the versionCode went **up** and
+the class count **moved**; I published a stale 715 twice before noticing.
 
 ### 3.3 Ledger duplicates — ~~61 pairs, waiting on Luke~~ **DONE 29 Oct, nothing outstanding**
 
