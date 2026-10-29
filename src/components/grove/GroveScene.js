@@ -575,6 +575,14 @@ export default function GroveScene({
     // A Coliseum is 26 units and does not scroll; a zone is 300-700 and does. Handing the arena a zone's
     // width would put bodies off the side of a room that has no camera to follow them.
     const W = arena ? arena.width : zoneWidth(zone.n);
+    // ⚠️ THE ARENA BRINGS ITS OWN ROOM. The backdrop is read from zone.bg in two places — the haze behind
+    // everything and the tiled sky — and an arena that only replaced the FLOOR would have put a Coliseum's
+    // platforms in front of a forest. One derived source so the two cannot disagree.
+    const bgArt = arena?.art || zone.bg;
+    // ⚠️ ONE BIOME FOR THE WHOLE SCENE. It is read in three places — the ledge dressing, the slab art and
+    // its measured surface — and an arena that overrode only some of them put mossy forest planks across a
+    // lava pit. slab-char.webp has existed the whole time; nothing was asking for it.
+    const sceneBiome = arena?.biome || zone.biome;
     const maxHp = stats?.maxHp || 100;
 
 
@@ -587,7 +595,7 @@ export default function GroveScene({
         // re-roll it on every re-render, and the scene re-renders whenever a telegraph appears.
         const platforms = decorateLedges(
             arena ? arena.platforms : platformsFor(zone.n, rand),
-            groveBiome(zone.biome), rand,
+            groveBiome(sceneBiome), rand,
         );
         const mk = (x, h, speed, art) => ({
             ...makeBody({ x, y: 0, h, halfW: h * 0.3, speed }),
@@ -791,18 +799,36 @@ export default function GroveScene({
                 if (!body) continue;
                 const i = w.killIndex + w.foes.length;
                 const spot = spawnOnPlatform(w.platforms, w.rand, { minX: 2, maxX: W - 2, inset: 1.5 });
-                const h = groveSize(body);
-                const f = {
-                    ...makeBody({ x: spot.x, y: spot.y, h, halfW: h * 0.3, speed: body.speed || 1 }),
-                    id: body.id, name: body.name, art: body.art,
-                    hp: body.hp, maxHp: body.hp, dmg: body.dmg,
-                    attacks: body.attacks || [],
-                    isBoss: Boolean(wv.bossBody && body === wv.bossBody),
+                // ⚠️ THE SAME SHAPE THE DRIP BUILDS, FIELD FOR FIELD. The first cut invented a smaller
+                // object and six bodies rendered as ONE: the list is keyed on `f.uid`, which this did not
+                // set, so React saw six children with the same undefined key. `foot` is what the body
+                // stands on, `telegraph` and `passive` are how it fights, and without `face` it never
+                // turns. A creature missing any of them is not a creature, it is a hitbox.
+                const size = groveSize(body.id);
+                const isBoss = Boolean(wv.bossBody && body === wv.bossBody);
+                w.foes.push({
+                    ...makeBody({ x: spot.x, y: spot.y, h: size.h, halfW: size.h * 0.32, speed: 0.55 }),
+                    uid: `a${w.waveAt}-${i}-${Math.floor(w.rand() * 1e6)}`,
+                    id: body.id,
                     rare: (wv.rareBodies || []).includes(body),
-                    idx: i, phase: w.rand(), landedAt: 0, flash: 0, node: null,
-                };
-                w.foes.push(f);
+                    isBoss,
+                    art: body.art,
+                    foot: size.foot,
+                    name: body.name,
+                    hp: body.hp, maxHp: body.hp,
+                    dmg: body.dmg, telegraph: body.telegraph, passive: body.passive,
+                    attacks: body.attacks || [],
+                    face: w.rand() < 0.5 ? -1 : 1,
+                    phase: w.rand(),
+                    born: now, landedAt: now, flash: 0, node: null,
+                });
             }
+            // ⚠️ AND TELL REACT. The loop mutates w.foes directly for speed and the drip path ends on
+            // `if (w.foes.length !== before) rerender()` — which this branch returns before ever reaching.
+            // The waves spawned correctly into the world and nothing drew them: the probe showed waveAt 1
+            // and six bodies standing while the screen showed an empty arena. A spawn nobody is told about
+            // is indistinguishable from a spawn that did not happen.
+            rerender();
             return;
         }
 
@@ -1030,7 +1056,12 @@ export default function GroveScene({
             // zone is at y = -344 because it is falling through the floor" photograph identically, and the
             // second one is the answer.
             window.__grove = w;
-            if (labScene !== "wander") {
+            // ⚠️ THE ARENA IS NOT A LAB FIXTURE, IT IS THE REAL MODE. setUpLabScene builds a hand-made
+            // tableau and clears the population to do it, so routing "arena" through it produced a zone
+            // backdrop, the zone's platforms and NOTHING spawning — the wave driver never got a turn. The
+            // arena already has its own floor, its own waves and its own clock; the lab only has to mount
+            // it and get out of the way.
+            if (labScene !== "wander" && labScene !== "arena") {
                 // ⚠️ THE BENCH'S OWN BLOW, HANDED IN. The "multi" scene sizes its creatures against what
                 // this fixture actually swings for, so the four rungs land wherever the kit is tuned
                 // rather than against a number copied out of here and left to drift.
@@ -3616,7 +3647,7 @@ export default function GroveScene({
         // and they are all made of the same thing, so one custom property inherited down is one declaration
         // and one decoded bitmap — and border-image has no src attribute to set anyway.
         <div className="gv-scene is-full" ref={hostRef} onPointerDown={onTapWorld}
-            style={{ "--gv-slab": `url(${slabArt(zone.biome)})`, "--gv-slab-surface": slabSurface(zone.biome) }}>
+            style={{ "--gv-slab": `url(${slabArt(sceneBiome)})`, "--gv-slab-surface": slabSurface(sceneBiome) }}>
             {/* ── ⚠️ EVERYTHING THAT IS IN THE WORLD IS INSIDE THIS ONE LAYER ────────────────────
                 So the screen shake can move the world without moving the interface. The HUD, the boss bar
                 and Leave are deliberately outside it: a shaking interface reads as a broken page rather
@@ -3631,10 +3662,10 @@ export default function GroveScene({
                 {/* ⚠️ BEHIND THE PLATE AND OUTSIDE .gv-sky, so it neither scrolls with the tiles nor gets
                     clipped to their height. It only shows where the world-sized plate stops short of the
                     top of the screen -- nothing at all on anything short and wide. See .gv-haze. */}
-                <div className="gv-haze" style={{ "--gv-haze-img": `url(${zone.bg})` }} aria-hidden="true" />
+                <div className="gv-haze" style={{ "--gv-haze-img": `url(${bgArt})` }} aria-hidden="true" />
                 <div className="gv-sky" ref={(n) => { if (worldRef.current) worldRef.current.skyNode = n; }}>
                     {Array.from({ length: SKY_TILE_COUNT }, (_, i) => i).map((i) => (
-                        <div key={i} className="gv-sky-t" style={{ backgroundImage: `url(${zone.bg})` }} />
+                        <div key={i} className="gv-sky-t" style={{ backgroundImage: `url(${bgArt})` }} />
                     ))}
                 </div>
 

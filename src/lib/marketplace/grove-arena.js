@@ -46,22 +46,28 @@ const g = () => ({ x: 0, w: ARENA_W, y: 0, i: 0, parent: -1 });
 // Seven floors, each laid out for killing rather than for navigating: short hops, nothing to fall off, and
 // no corner the clock can trap you in. The SHAPE is what differs — the fiction is in the backdrop.
 const LAYOUTS = {
-    // 1 Rootwood — two even boughs. The easiest possible read, because this is the first one anyone sees.
-    1: [g(), { x: 3, w: 7, y: 1 }, { x: 16, w: 7, y: 1 }],
-    // 2 Undercave — a stepped shelf across, so bodies string out instead of bunching.
-    2: [g(), { x: 2, w: 6, y: 1 }, { x: 10, w: 6, y: 1 }, { x: 18, w: 6, y: 1 }],
-    // 3 Sunken Fen — two banks and a high reed platform between them.
-    // The high reed platform sits at 6 rather than 8: at 8 it cleared its parent by only four units,
-    // which validateArenas refuses — a hop that lands half off the edge is the fall loop.
-    3: [g(), { x: 4, w: 8, y: 1 }, { x: 15, w: 8, y: 1 }, { x: 6, w: 8, y: 2, parent: 1 }],
-    // 4 Saltwrack — a long pier on the left, broken posts to the right.
-    4: [g(), { x: 1, w: 9, y: 1 }, { x: 13, w: 5, y: 1 }, { x: 20, w: 5, y: 1 }],
-    // 5 Drowned Ruins — a standing column in the middle with low rubble either side.
-    5: [g(), { x: 9, w: 8, y: 1 }, { x: 10, w: 6, y: 2, parent: 1 }, { x: 1, w: 6, y: 1 }, { x: 19, w: 6, y: 1 }],
-    // 6 Gilded Waste — two wide dunes and nothing else. The most open floor of the seven.
-    6: [g(), { x: 2, w: 9, y: 1 }, { x: 15, w: 9, y: 1 }],
-    // 7 Ashen Reach — broken ground, three low slabs and one high.
-    7: [g(), { x: 3, w: 6, y: 1 }, { x: 12, w: 6, y: 1 }, { x: 19, w: 5, y: 1 }, { x: 13, w: 5, y: 2, parent: 2 }],
+    // ⚠️ CONTINUOUS TIERS, NOT SCATTERED LEDGES. Luke: "for the platforms i pictured one or two tiers of
+    // continuous platforms not teeny little ones." The first cut gave each arena two or three short shelves,
+    // which turned a two-minute fight into a navigation puzzle — hopping between islands to reach a body is
+    // exactly the wandering this mode removed from the zones, rearranged vertically.
+    //
+    // A tier now spans almost the whole arena. The gap at each end is deliberate: it is how you get down,
+    // and it keeps the ground reachable without a route.
+    //
+    // 1 Rootwood — one bough across. The first one anyone sees, so it is the simplest thing that can be.
+    1: [g(), { x: 3, w: 20, y: 1 }],
+    // 2 Undercave — a long shelf with a second one over its middle.
+    2: [g(), { x: 2, w: 22, y: 1 }, { x: 7, w: 12, y: 2, parent: 1 }],
+    // 3 Sunken Fen — one near-full bank, because the fen is flat and the water is the character.
+    3: [g(), { x: 1, w: 24, y: 1 }],
+    // 4 Saltwrack — a long deck and a shorter one above, like a ship's tiers.
+    4: [g(), { x: 2, w: 21, y: 1 }, { x: 5, w: 13, y: 2, parent: 1 }],
+    // 5 Drowned Ruins — the widest floor of the seven, with a gallery over it.
+    5: [g(), { x: 1, w: 24, y: 1 }, { x: 8, w: 11, y: 2, parent: 1 }],
+    // 6 Gilded Waste — a single dune ridge. The most open arena.
+    6: [g(), { x: 4, w: 18, y: 1 }],
+    // 7 Ashen Reach — two broad slabs, the upper one wide enough to fight a boss on.
+    7: [g(), { x: 2, w: 22, y: 1 }, { x: 6, w: 15, y: 2, parent: 1 }],
 };
 
 /**
