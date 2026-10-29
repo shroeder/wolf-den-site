@@ -27,7 +27,11 @@ import { mergeEntry } from "@/lib/ledger/dupes.js";
 const UNINFORMATIVE = new RegExp([
     "^$",
     "^(venmo|check|transfer|withdrawal|debit|ach|zelle|cash\\s*app|payment|purchase|pos)$",
-    "^pay\\s*first\\s*check$",
+    // ⚠️ "PAY FIRST" IS A PAYEE AND WAS LISTED HERE AS NOISE. That single line is why the $1,400 pair
+    // read as undecidable: both sides matched this list, so the rule saw two blanks and shrugged. The
+    // books hold a lone "PAY FIRST CHECK" for $1,700 on 2026-09-16 with no twin, which is a payee
+    // behaving like a payee. Plaid then confirmed it outright — one $1,400 check, posted 08-07, with
+    // the bare "CHECK" row named as its pending half.
     "^check\\s*check",            // "CHECK CHECK #0", "CHECK CHECK #9999"
     "^automatic\\s*debit",        // "AUTOMATIC DEBIT SQUARE INC PAY"
     "^atm\\s*/?\\s*trans",        // "ATM /TRANS 401 4TH STREET NW"
@@ -65,8 +69,40 @@ export function classifyPair(a, b) {
                  reason: `One side says nothing (${JSON.stringify(ai ? B : A)}) and the other names the money — the same payment recorded twice.` };
     }
     if (ai && bi) {
+        // ── ⚠️ "BOTH SIDES NAME SOMETHING" IS NOT THE SAME AS "THEY NAME DIFFERENT THINGS" ──────────
+        // This branch read as sound and was quietly the largest leak in the books. Southern Hobby
+        // Distribution appears 33 times across 14 amounts and NOT ONE AMOUNT APPEARS ONLY ONCE —
+        // every single one is doubled at a one-to-four day lag, which is ACH settlement, not
+        // purchasing. Both rows say "Southern Hobby Distribution", so both are informative, so the
+        // rule above called them two coincidental invoices and left $7,200 of phantom spend sitting
+        // in the expense total.
+        //
+        // The June rows show the mechanism outright: the same trio of charges ($530.05, $71.40,
+        // $19.99) lands on 06-03/04, again on 06-06, and again on 06-08, with the payee name sliced
+        // shorter each time — "Southern Hobby Distribution", then "Southern Hobby Distribu", then
+        // "Southern Hobby Distribut". A truncation is not a second purchase.
+        const shorter = A.length <= B.length ? A : B;
+        const longer = A.length <= B.length ? B : A;
+        // ⚠️ EXACT EQUALITY COUNTS AT ANY LENGTH. The prefix test needs 4 characters so a stray initial
+        // cannot swallow an unrelated payee, but "CVS" against "CVS" is the same payee at three.
+        const samePayee = shorter.toLowerCase() === longer.toLowerCase()
+            || (shorter.length >= 4 && longer.toLowerCase().startsWith(shorter.toLowerCase()));
+
+        // ⚠️ AND THE GAP HAS TO LOOK LIKE SETTLEMENT. A zero-day gap is a different animal entirely:
+        // CVS has NINE identical $24.98 rows all dated 2026-06-30, each with its own Plaid id. Nine
+        // copies cannot be a pending/posted pair, and a shared date means the import lost the real
+        // dates rather than that the charge repeated. Merging those would destroy real records, so
+        // same-day same-payee clusters stay out of this and go to a human.
+        if (samePayee && days >= 1 && days <= 4) {
+            return { verdict: "merge", kind: "backfill_same_payee", keep: A.length >= B.length ? "a" : "b",
+                     reason: `The same payee for the same amount ${Math.round(days)} day(s) apart — a pending row and its posted replacement, captured by two separate refreshes. Keeping the fuller spelling of the name.` };
+        }
+        if (samePayee) {
+            return { verdict: "unsure",
+                     reason: `Same payee and same amount but ${Math.round(days)} days apart, which is not a settlement gap. Could be a repeated charge or an import that lost the real dates.` };
+        }
         return { verdict: "distinct",
-                 reason: "Both sides name something, and they are not the same thing. Two purchases that happened to cost the same." };
+                 reason: "Both sides name something, and they name different things. Two purchases that happened to cost the same." };
     }
     return { verdict: "unsure",
              reason: "Neither side says anything useful, so there is nothing to reason from." };
@@ -86,6 +122,16 @@ export async function planBackfill() {
             AND COALESCE(a.payment_method,'') = COALESCE(b.payment_method,'')
             AND ABS(a.date_ms - b.date_ms) <= 4 * 86400000
           WHERE a.type IN ('Expense','Inventory') AND b.type IN ('Expense','Inventory')
+            -- ⚠️ NEVER SECOND-GUESS A ROW THE BANK HAS VOUCHED FOR. A row carrying an external_id was
+            -- anchored by scripts/plaid-reconcile.mjs to a transaction Plaid still reports, so the money
+            -- is confirmed real and no amount of description-shape reasoning may delete it.
+            --
+            -- This is not hypothetical: the bank holds $190.44 to Southern Hobby TWICE, and both rows say
+            -- "Southern Hobby Distribution" two days apart — textbook settlement shape. The shape rule
+            -- called it a duplicate and would have removed a payment that genuinely happened. The ids are
+            -- the stronger evidence wherever they exist, and this clause makes that ordering structural
+            -- rather than something a future caller has to remember.
+            AND a.external_id IS NULL AND b.external_id IS NULL
           ORDER BY ABS(a.amount) DESC`,
     ).catch(() => []);
 
