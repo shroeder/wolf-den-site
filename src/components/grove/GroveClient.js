@@ -662,7 +662,7 @@ export default function GroveClient({ initial }) {
                             coliseum={session?.coliseum || null}
                             onChanged={refresh}
                             busy={col.busy || Boolean(col.run)}
-                            onEnter={(map) => { col.start(map); setPanel(null); }}
+                            onEnter={(map) => { col.start(map); setZonePanel(null); }}
                         />
                     )
                     : null}
@@ -1010,7 +1010,7 @@ export default function GroveClient({ initial }) {
                     // Whoever is standing in THIS zone, if anyone. Most zones have nobody — three givers
                     // across twelve rooms — so the scene draws a figure only when this is non-null.
                     npcHere={col.run ? null : (session.npcHere || null)}
-                    onTalk={() => setPanel("quests")}
+                    onTalk={() => setZonePanel("quests")}
                     // ⚠️ THE ARENA REPLACES THE ZONE'S WORLD, it does not sit beside it. Handing both would
                     // put the zone's doors and its three-hundred-unit floor into a twenty-six unit room.
                     arena={col.run ? { ...col.run.plan.arena, runMs: col.run.plan.runMs } : null}
