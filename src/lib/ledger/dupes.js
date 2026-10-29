@@ -2,168 +2,189 @@ import "server-only";
 
 import { db } from "@/lib/db";
 
-// ── FINDING DUPLICATE LEDGER ENTRIES ─────────────────────────────────────────────────────────────────────────
-// Luke: "we need to properly detect dupes in the most adequate way possible."
+// ── DUPLICATES RESOLVE THEMSELVES ───────────────────────────────────────────────────────────────────────────
+// Luke: "the duplicate prevention should be automated not manual intervention", "the whole reason we use dupes
+// is to elect to hydrate details from whichever is more substantive", and — the one that collapsed the whole
+// design — "if it is truly a dupe than why is it a question."
 //
-// Two mechanisms, because the books contain two different kinds of duplicate and only one of them can be
-// prevented outright:
+// It was a question because the first cut matched on amount and date, which is guesswork, while Plaid had
+// already answered it and the app was discarding the answer. A posted transaction carries
+// `pending_transaction_id`: the id of the pending row it replaces. With that parsed there are exactly three
+// cases and none of them is uncertain:
 //
-//   EXACT    the same source transaction imported twice. Impossible now — ledger_entry.external_id carries
-//            the Plaid id and a partial unique index refuses the second insert, from any device, after any
-//            reinstall. That is a database guarantee, not a check somebody has to remember to call.
+//   pending link present   → the SAME transaction, settling. Merge.
+//   two ids, no link       → two REAL transactions. Leave both. (This is the 63 Southern Hobby "pairs".)
+//   no id at all           → a hand entry. The only genuine collision, and decidable by rule.
 //
-//   NEAR     the same MONEY recorded twice by two different paths, with no shared id to notice it by:
-//            pending→posted (Plaid reissues the id when a charge settles), or a hand entry colliding with
-//            the bank sync. No id can catch these. This file finds them and ASKS.
-//
-// ⚠️ IT FLAGS, IT DOES NOT DELETE, AND THAT IS MEASURED RATHER THAN CAUTIOUS. On the real books there are 105
-// same-amount pairs within four days; 63 of them are the same vendor — almost all Southern Hobby Distribution,
-// the card distributor — 2 to 4 days apart. Those are real repeat orders. An importer confident enough to drop
-// them would have eaten about $9,400 of genuine spend to prevent $3,427 of genuine duplication, and the loss
-// would have been invisible while the duplication at least shows up as a number that looks wrong.
+// ⚠️ A MERGE, NOT A REJECTION. The second arrival is usually the BETTER record — the posted row has the
+// settled amount and the real merchant name where the pending row said "VENMO". Rejecting it on a constraint
+// throws away the improvement. The unique index on external_id stays, because it is what makes two devices
+// syncing at once impossible to get wrong, but the write is ON CONFLICT DO UPDATE: the constraint TRIGGERS
+// the merge rather than failing it.
 
-/** Expenses only. Income duplicating is a different problem with different evidence; this is not it. */
-const SPEND_TYPES = ["Expense", "Inventory"];
+/** How far apart a hand entry and its bank row can sit. Measured: the real collisions are 0-1 days. */
+const ADOPT_WINDOW_MS = 2 * 86400000;
 
-// How far apart two halves of one payment can land. Pending→posted is usually 1-3 days; four is the widest
-// gap observed in the real pairs (Southern Hobby, 09-29 → 10-03). Beyond that the signal is gone and
-// everything matches everything.
-const WINDOW_DAYS = 4;
+// Descriptions a bank hands back when it knows nothing. A typed description always beats one of these.
+const GENERIC = /^(venmo|check|pay\s*first\s*check|transfer|withdrawal|debit|ach|zelle|cash\s*app|payment|purchase|pos|debit card purchase)$/i;
 
-// ── HOW SURE WE ARE, AND WHY ─────────────────────────────────────────────────────────────────────────────────
-// A confidence the UI can sort on and a reason a human can check. The reason matters more than the score: "a
-// Venmo debit for exactly a consignment payout" is an argument, and "0.9" is not.
-const GENERIC = /^(venmo|check|pay\s*first\s*check|transfer|withdrawal|debit|ach|zelle|cash\s*app|payment|purchase)$/i;
-const SUBSCRIPTION = /vercel|google|namecheap|openai|adobe|spotify|microsoft|anthropic|github|dropbox|godaddy|cloudflare/i;
-
-const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+const clean = (s) => (s == null ? "" : String(s).trim());
 
 /**
- * Judge one candidate pair. Pure — no database, no clock — so it can be tested against the real pairs and
- * argued with directly.
+ * Which of two values for one field is more substantive.
+ *
+ * ⚠️ "MORE SUBSTANTIVE" IS NOT "NEWER". The pending row often arrives first with a useless name and the
+ * posted row follows with a good one — but a hand-typed "Consignment payout — Andys Cards" beats both, and it
+ * is the oldest of the three. Recency is a tiebreak, never the rule, or every automatic merge would quietly
+ * overwrite the one description a human bothered to write.
  */
-export function judgePair(a, b) {
-    const A = norm(a.description);
-    const B = norm(b.description);
-    const days = Math.abs(Number(a.date_ms) - Number(b.date_ms)) / 86400000;
-
-    // ⚠️ THE BANK'S GENERIC ROW BESIDE A NAMED ONE IS THE STRONGEST SIGNAL IN THE BOOKS. "Venmo" for exactly
-    // the amount of "Consignment payout — Andys Cards", a day apart, is one payment written down twice: once
-    // by the sync, once by hand. Every one of the five real duplicates found in the audit has this shape.
-    const aGen = GENERIC.test(A);
-    const bGen = GENERIC.test(B);
-    if (aGen !== bGen && A && B) {
-        return { confidence: 0.92, reason: "A generic bank row beside a named entry for the same amount — the same payment recorded twice." };
-    }
-
-    // A subscription does not bill twice in a week. This is pending→posted almost by definition.
-    if (SUBSCRIPTION.test(A) || SUBSCRIPTION.test(B)) {
-        return { confidence: 0.85, reason: "A subscription charged twice days apart — a pending row and its posted twin." };
-    }
-
-    // Same vendor, same amount, days apart. This is the ambiguous mass, and the honest answer is that we do
-    // not know: a distributor order really can repeat. Same DAY is a little more suspicious than three days.
-    const sameVendor = A && B && (A.slice(0, 14) === B.slice(0, 14));
-    if (sameVendor) {
-        return {
-            confidence: days < 1 ? 0.45 : 0.25,
-            reason: days < 1
-                ? "The same vendor twice on one day for the same amount — possible, but worth a look."
-                : "The same vendor a few days apart. Repeat orders look exactly like this; probably real.",
-        };
-    }
-
-    return { confidence: 0.3, reason: "Same amount and payment method within a few days, with nothing else in common." };
+export function pickField(current, incoming, { preferIncoming = false } = {}) {
+    const a = clean(current);
+    const b = clean(incoming);
+    if (!b) return { value: a, changed: false };
+    if (!a) return { value: b, changed: true };
+    const aGen = GENERIC.test(a);
+    const bGen = GENERIC.test(b);
+    if (aGen !== bGen) return aGen ? { value: b, changed: true } : { value: a, changed: false };
+    // Both meaningful or both generic: the longer one carries more, and ties go to whoever is authoritative
+    // for that field (the bank, for money and dates).
+    if (b.length > a.length + 2) return { value: b, changed: true };
+    if (preferIncoming && b !== a) return { value: b, changed: true };
+    return { value: a, changed: false };
 }
 
 /**
- * Every unjudged near-match in the books, strongest first.
+ * Merge an incoming bank row into an existing entry, field by field.
  *
- * ⚠️ PAIRS ALREADY DECIDED ARE EXCLUDED IN SQL, not filtered afterwards. A reviewer who has said "these are
- * two different orders" must never be shown that pair again — being asked the same question repeatedly is how
- * a review queue becomes something people dismiss without reading.
+ * ⚠️ THE BANK WINS ON MONEY AND DATE, THE RICHEST SOURCE WINS ON EVERYTHING ELSE. A posted amount supersedes
+ * a pending estimate — that is the entire point of waiting for it — but the bank's idea of a description is
+ * "VENMO" and must never replace a real one.
  */
-export async function findNearDuplicates({ limit = 200 } = {}) {
-    const rows = await db.query(
-        `SELECT a.entry_id AS a_id, b.entry_id AS b_id,
-                a.amount, a.payment_method,
-                a.description AS a_desc, b.description AS b_desc,
-                a.category AS a_cat, b.category AS b_cat,
-                a.date_ms AS a_date, b.date_ms AS b_date,
-                a.source AS a_src, b.source AS b_src
-           FROM ledger_entry a
-           JOIN ledger_entry b
-             ON a.entry_id < b.entry_id
-            AND ROUND(a.amount::numeric, 2) = ROUND(b.amount::numeric, 2)
-            AND COALESCE(a.payment_method, '') = COALESCE(b.payment_method, '')
-            AND ABS(a.date_ms - b.date_ms) <= $1
-          WHERE a.type = ANY($2) AND b.type = ANY($2)
-            AND NOT EXISTS (
-                SELECT 1 FROM ledger_dupe_verdict v
-                 WHERE v.lo_entry_id = LEAST(a.entry_id, b.entry_id)
-                   AND v.hi_entry_id = GREATEST(a.entry_id, b.entry_id)
-            )
-          LIMIT $3`,
-        [WINDOW_DAYS * 86400000, SPEND_TYPES, Math.max(1, Math.min(1000, limit))],
-    ).catch(() => []);
+export function mergeEntry(existing, incoming) {
+    const fields = {};
+    const out = { ...existing };
 
-    return (rows || [])
-        .map((r) => {
-            const { confidence, reason } = judgePair(
-                { description: r.a_desc, date_ms: r.a_date },
-                { description: r.b_desc, date_ms: r.b_date },
-            );
-            return {
-                aId: r.a_id, bId: r.b_id,
-                amount: Math.abs(Number(r.amount) || 0),
-                paymentMethod: r.payment_method || null,
-                a: { desc: r.a_desc, cat: r.a_cat, at: Number(r.a_date), source: r.a_src },
-                b: { desc: r.b_desc, cat: r.b_cat, at: Number(r.b_date), source: r.b_src },
-                daysApart: Math.round(Math.abs(Number(r.a_date) - Number(r.b_date)) / 86400000),
-                confidence, reason,
-            };
-        })
-        // Strongest first, and within that the most money — a reviewer's attention is finite and should be
-        // spent where both the doubt and the dollars are largest.
-        .sort((x, y) => (y.confidence - x.confidence) || (y.amount - x.amount));
+    const desc = pickField(existing.description, incoming.description);
+    if (desc.changed) { out.description = desc.value; fields.description = { from: existing.description, to: desc.value }; }
+
+    const cat = pickField(existing.category, incoming.category);
+    if (cat.changed) { out.category = cat.value; fields.category = { from: existing.category, to: cat.value }; }
+
+    const pay = pickField(existing.payment_method, incoming.payment_method);
+    if (pay.changed) { out.payment_method = pay.value; fields.payment_method = { from: existing.payment_method, to: pay.value }; }
+
+    // Money and date: the settled figure is the true one.
+    if (incoming.amount != null && Number(incoming.amount) !== Number(existing.amount)) {
+        out.amount = Number(incoming.amount);
+        fields.amount = { from: Number(existing.amount), to: Number(incoming.amount) };
+    }
+    if (incoming.date_ms != null && Number(incoming.date_ms) !== Number(existing.date_ms)) {
+        out.date_ms = Number(incoming.date_ms);
+        fields.date_ms = { from: Number(existing.date_ms), to: Number(incoming.date_ms) };
+    }
+    // The posted id replaces the pending one, and the pending id is kept so the link stays traceable.
+    if (incoming.external_id && incoming.external_id !== existing.external_id) {
+        out.external_id = incoming.external_id;
+        out.external_pending_id = existing.external_id || existing.external_pending_id || null;
+        fields.external_id = { from: existing.external_id, to: incoming.external_id };
+    }
+    return { merged: out, fields };
 }
 
 /**
- * Record a decision about one pair so it is never asked again.
+ * Take one bank transaction and put it in the books, exactly once, as richly as possible.
  *
- * ⚠️ IT DOES NOT DELETE ANYTHING, even for 'duplicate'. Recording the judgement and removing a financial row
- * are two different acts with two different blast radii, and bundling them means a mis-tap on a review screen
- * silently alters the books. The verdict is the durable thing; the deletion is a separate, deliberate step.
+ * Returns { action, entryId } where action is one of:
+ *   'inserted'        genuinely new money
+ *   'pending_posted'  the settled version of a row we already had
+ *   'same_external'   already imported; any better fields folded in
+ *   'adopted_manual'  a hand entry for this money already existed and now carries the bank's id
+ *
+ * ⚠️ NOTHING HERE ASKS ANYTHING, AND NOTHING HERE IS A GUESS. Every branch is decided by an id the source
+ * gave us, except the last — and that one fires only against rows carrying NO external id at all, which is
+ * to say rows a human typed. A bank row can never adopt another bank row, so two real distributor orders two
+ * days apart cannot be collapsed no matter how identical they look.
  */
-export async function recordVerdict(aId, bId, verdict, { by = null, note = null } = {}) {
-    const x = String(aId || "").trim();
-    const y = String(bId || "").trim();
-    if (!x || !y || x === y) return { ok: false, error: "bad_pair" };
-    if (!["duplicate", "distinct"].includes(verdict)) return { ok: false, error: "bad_verdict" };
-    // The table's CHECK enforces lo < hi; ordering here is what makes the lookup in findNearDuplicates hit.
-    const lo = x < y ? x : y;
-    const hi = x < y ? y : x;
+export async function ingestBankTransaction(tx) {
+    const externalId = clean(tx.externalId);
+    if (!externalId) return { action: "skipped", reason: "no_external_id" };
+    const pendingId = clean(tx.externalPendingId) || null;
+
+    // 1 — Plaid says this posted row replaces a pending one we already hold.
+    if (pendingId) {
+        const prior = await db.queryOne(
+            `SELECT * FROM ledger_entry WHERE external_id = $1`, [pendingId],
+        ).catch(() => null);
+        if (prior) return applyMerge(prior, tx, externalId, "pending_posted", pendingId);
+    }
+
+    // 2 — the same transaction id arriving again. Not an error: a re-sync, a second device, a reinstall.
+    const same = await db.queryOne(`SELECT * FROM ledger_entry WHERE external_id = $1`, [externalId]).catch(() => null);
+    if (same) return applyMerge(same, tx, externalId, "same_external", null);
+
+    // 3 — an unlinked hand entry for this money. Same amount, same account, within two days, and crucially
+    //     NO external id of its own, which is what makes it a typed row rather than another bank row.
+    const orphan = await db.queryOne(
+        `SELECT * FROM ledger_entry
+          WHERE external_id IS NULL
+            AND ROUND(amount::numeric, 2) = ROUND($1::numeric, 2)
+            AND COALESCE(payment_method,'') = COALESCE($2,'')
+            AND ABS(date_ms - $3) <= $4
+          ORDER BY ABS(date_ms - $3) ASC
+          LIMIT 1`,
+        [tx.amount, tx.paymentMethod || null, tx.dateMs, ADOPT_WINDOW_MS],
+    ).catch(() => null);
+    if (orphan) return applyMerge(orphan, tx, externalId, "adopted_manual", null);
+
+    return { action: "insert_me", reason: "new" };
+}
+
+async function applyMerge(existing, tx, externalId, kind, pendingId) {
+    const { merged, fields } = mergeEntry(existing, {
+        description: tx.description,
+        category: tx.category,
+        payment_method: tx.paymentMethod,
+        amount: tx.amount,
+        date_ms: tx.dateMs,
+        external_id: externalId,
+    });
+
     await db.query(
-        `INSERT INTO ledger_dupe_verdict (lo_entry_id, hi_entry_id, verdict, decided_by, note)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (lo_entry_id, hi_entry_id)
-         DO UPDATE SET verdict = EXCLUDED.verdict, decided_by = EXCLUDED.decided_by,
-                       note = EXCLUDED.note, decided_at = NOW()`,
-        [lo, hi, verdict, by, note],
+        `UPDATE ledger_entry
+            SET description = $2, category = $3, payment_method = $4, amount = $5, date_ms = $6,
+                external_id = $7, external_pending_id = COALESCE($8, external_pending_id),
+                updated_at_ms = $9
+          WHERE entry_id = $1`,
+        [existing.entry_id, merged.description, merged.category, merged.payment_method,
+         merged.amount, merged.date_ms, externalId, pendingId || merged.external_pending_id || null, Date.now()],
     );
-    return { ok: true, lo, hi, verdict };
+
+    // ⚠️ LOGGED EVEN WHEN NOTHING CHANGED. "This arrived again and improved nothing" is the single most
+    // useful line when somebody is asking why a figure moved — the absence of a log entry would be read as
+    // the sync not running at all.
+    await db.query(
+        `INSERT INTO ledger_merge_log (kept_entry_id, merged_from, kind, fields) VALUES ($1, $2, $3, $4::jsonb)`,
+        [existing.entry_id, pendingId || externalId, kind, JSON.stringify(fields)],
+    ).catch(() => {});
+
+    return { action: kind, entryId: existing.entry_id, changed: Object.keys(fields) };
 }
 
 /**
- * Does this external transaction already exist in the books?
+ * What the resolver has been doing lately — the replacement for the review queue.
  *
- * The import should call this before building a row — but it is belt to the unique index's braces, not a
- * replacement for it. Two devices syncing at the same moment both get "no" from this and only one of them
- * gets past the index, which is the whole reason the guarantee lives in the schema.
+ * ⚠️ READ-ONLY, AND THAT IS THE WHOLE DIFFERENCE. The queue it replaces asked a question and waited; this
+ * reports what already happened. If it is ever wrong the fix is a rule in this file, not a human working
+ * through a list of two hundred pairs that will be two hundred and ten tomorrow.
  */
-export async function alreadyImported(externalId) {
-    const id = String(externalId || "").trim();
-    if (!id) return false;
-    const row = await db.queryOne(`SELECT 1 AS x FROM ledger_entry WHERE external_id = $1`, [id]).catch(() => null);
-    return Boolean(row);
+export async function recentMerges({ limit = 100 } = {}) {
+    return db.query(
+        `SELECT m.id, m.kept_entry_id, m.merged_from, m.kind, m.fields, m.merged_at,
+                e.description, e.amount, e.category
+           FROM ledger_merge_log m
+           LEFT JOIN ledger_entry e ON e.entry_id = m.kept_entry_id
+          ORDER BY m.merged_at DESC
+          LIMIT $1`,
+        [Math.max(1, Math.min(500, limit))],
+    ).catch(() => []);
 }

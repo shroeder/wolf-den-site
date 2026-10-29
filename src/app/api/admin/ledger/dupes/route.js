@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getAdminActor, requireAdminAccess } from "@/lib/admin/admin-auth";
-import { findNearDuplicates, recordVerdict } from "@/lib/ledger/dupes.js";
+import { requireAdminAccess } from "@/lib/admin/admin-auth";
+import { recentMerges } from "@/lib/ledger/dupes.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -10,52 +10,34 @@ export const dynamic = "force-dynamic";
 const noStore = (body, init = {}) =>
     NextResponse.json(body, { ...init, headers: { "Cache-Control": "no-store", ...(init.headers || {}) } });
 
-// ── THE DUPLICATE REVIEW QUEUE ──────────────────────────────────────────────────────────────────────────────
-// GET            every unjudged near-match, strongest first, with the reason it was flagged
-// POST {a,b,verdict}  record 'duplicate' or 'distinct' — and never ask about that pair again
+// ── WHAT THE DEDUPLICATOR HAS BEEN DOING ────────────────────────────────────────────────────────────────────
+// Luke: "I dont want to manually resolve this. The ledger is automated."
 //
-// ⚠️ `ledger.edit`, NOT `ledger.view`. A verdict is a judgement about the books that changes what the reviewer
-// after you is shown; reading the queue and deciding it are different rights.
+// So this is a window, not a queue. It used to be a review list that waited for somebody to judge two hundred
+// pairs; duplicates now resolve themselves from the ids Plaid supplies, and the only thing left worth showing
+// is what got merged and which fields it improved.
 //
-// ⚠️ AND NOTHING HERE DELETES A ROW. Recording that two entries are the same money and removing one of them
-// are separate acts with very different blast radii — bundling them means a mis-tap on a list silently alters
-// a financial record. See the note on recordVerdict.
+// ⚠️ `ledger.view`, NOT `ledger.edit`. Nothing here changes anything any more — the POST that recorded
+// verdicts is gone with the queue that needed it. A read of the books should not require the right to alter
+// them.
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/admin/ledger/dupes", async ({ logger, internalError }) => {
-        const authError = await requireAdminAccess(request, "ledger.edit", logger);
+        const authError = await requireAdminAccess(request, "ledger.view", logger);
         if (authError) return authError;
         try {
-            const limit = Number(new URL(request.url).searchParams.get("limit")) || 200;
-            const pairs = await findNearDuplicates({ limit });
+            const limit = Number(new URL(request.url).searchParams.get("limit")) || 100;
+            const merges = await recentMerges({ limit });
+            const by = {};
+            for (const m of merges) by[m.kind] = (by[m.kind] || 0) + 1;
             return noStore({
-                pairs,
-                // The headline a reviewer needs before deciding whether to start: how much is actually in
-                // doubt, and how much of it is doubt worth having.
-                total: pairs.length,
-                confident: pairs.filter((p) => p.confidence >= 0.8).length,
-                confidentValue: pairs.filter((p) => p.confidence >= 0.8).reduce((s, p) => s + p.amount, 0),
+                merges,
+                // How often each rule fires. `adopted_manual` climbing would mean somebody is hand-entering
+                // things the bank sync already covers, which is a workflow problem rather than a bug.
+                counts: by,
+                total: merges.length,
             });
         } catch (error) {
             return internalError(error, { event: "admin.ledger_dupes.get.failure" });
-        }
-    });
-}
-
-export async function POST(request) {
-    return withRequestLogging(request, "POST /api/admin/ledger/dupes", async ({ logger, internalError }) => {
-        const authError = await requireAdminAccess(request, "ledger.edit", logger);
-        if (authError) return authError;
-        try {
-            const body = await request.json().catch(() => ({}));
-            const actor = await getAdminActor(request).catch(() => null);
-            const res = await recordVerdict(
-                String(body?.a || ""), String(body?.b || ""), String(body?.verdict || ""),
-                { by: actor?.label || null, note: body?.note || null },
-            );
-            if (!res.ok) return noStore(res, { status: 400 });
-            return noStore({ ...res, pairs: await findNearDuplicates({ limit: 200 }) });
-        } catch (error) {
-            return internalError(error, { event: "admin.ledger_dupes.post.failure" });
         }
     });
 }
