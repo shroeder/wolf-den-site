@@ -818,12 +818,22 @@ export const MULTI_KILL_MAX = 8;
  * this — the scene to show it and count it live, the server to bound what the scene claimed — because a
  * second copy of this arithmetic would be a second opinion about how far the player got.
  */
-export function killCredit(dealt, maxHp) {
+export function killCredit(dealt, maxHp, overkillPct = 0) {
     const d = Number(dealt) || 0;
     const hp = Math.max(1, Number(maxHp) || 1);
-    if (d < hp * 2) return 1;
+    // ── ⚠️ THE EMBER MARK LOWERS THE BAR, IT DOES NOT RAISE THE BLOW ────────────────────────────────
+    // The Ashen Reach's card grants `overkill`: a percentage off the damage a rung costs. Applied as a
+    // smaller effective health rather than as bonus damage on purpose — inflating `dealt` would also
+    // inflate the number on screen and the lifesteal that reads it, and the card is about how much a
+    // kill COUNTS FOR, never about hitting harder.
+    //
+    // Capped at a third. Past that the rungs collapse into each other and the whole ladder is x8 — which
+    // is the failure MULTI_KILL_MAX already exists to prevent, arriving by a different road.
+    const edge = Math.min(0.33, Math.max(0, Number(overkillPct) || 0) / 100);
+    const bar = hp * (1 - edge);
+    if (d < bar * 2) return 1;
     // floor to the power of two at or below the ratio: 3.4x is two kills, 7.9x is four.
-    const rung = Math.pow(2, Math.floor(Math.log2(d / hp)));
+    const rung = Math.pow(2, Math.floor(Math.log2(d / bar)));
     return Math.max(1, Math.min(MULTI_KILL_MAX, rung));
 }
 

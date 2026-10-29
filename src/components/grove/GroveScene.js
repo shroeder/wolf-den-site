@@ -1657,7 +1657,11 @@ export default function GroveScene({
             // to stop existing. Captured here, handed to the skills below.
             const wasBurning = Boolean(foe.burn);
             const wasFrozen = now < (foe.stunUntil || 0);
-            const credit = killCredit(dealt, foe.maxHp);
+            // ⚠️ THE SAME BONUS THE SERVER WILL SETTLE AGAINST. The Ember Mark's overkill lowers the bar
+            // for a rung, and the scene must compute the same credit the settle accepts — safeCredit only
+            // checks that a claim is a REAL rung, so a scene that ignored the card would show x1 while the
+            // player had earned x2, and quietly under-pay the door.
+            const credit = killCredit(dealt, foe.maxHp, bonuses?.overkill || 0);
             const i = wd.killIndex;
             wd.killIndex += 1;
             wd.killCredit += credit;

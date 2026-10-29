@@ -105,7 +105,7 @@ export const GROVE_MAPS = [
     {
         n: 2, id: "undercave", short: "Undercave", name: "The Undercave",
         blurb: "Under the roots, where the light is something that grows.",
-        emblem: { id: "em_undercave", name: "The Blind Mark", stat: "armour", per: 2, kind: "flat" },
+        emblem: { id: "em_undercave", name: "The Blind Mark", stat: "hyper_find", per: 1.4, kind: "pct" },
         parts: [
             P("flint_shard", "Flint Shard", "edge", 1, "Came off the wall already sharp."),
             P("mushroom_stalk", "Mushroom Stalk", "haft", 1, "Dense as wood and lighter than it looks."),
@@ -153,7 +153,7 @@ export const GROVE_MAPS = [
     {
         n: 3, id: "fen", short: "Fen", name: "The Sunken Fen",
         blurb: "Wet to the knee and quiet, which is the part that should worry you.",
-        emblem: { id: "em_fen", name: "The Drowned Mark", stat: "vitality", per: 3, kind: "flat" },
+        emblem: { id: "em_fen", name: "The Drowned Mark", stat: "chest_find", per: 1.6, kind: "pct" },
         parts: [
             P("reed_blade", "Reed Blade", "edge", 1, "Sharp enough to open a hand on the way past."),
             P("bog_oak", "Bog Oak", "haft", 1, "Black as iron and about as forgiving."),
@@ -201,7 +201,7 @@ export const GROVE_MAPS = [
     {
         n: 4, id: "saltwrack", short: "Saltwrack", name: "The Saltwrack Coast",
         blurb: "Everything the sea did not want, arranged in a line.",
-        emblem: { id: "em_saltwrack", name: "The Wrack Mark", stat: "move_speed", per: 1.0, kind: "pct" },
+        emblem: { id: "em_saltwrack", name: "The Wrack Mark", stat: "part_yield", per: 2.0, kind: "pct" },
         parts: [
             P("oyster_edge", "Oyster Edge", "edge", 1, "Opens a hand as easily as it opens itself."),
             P("driftwood", "Driftwood", "haft", 1, "Smoothed by a thousand miles of going nowhere."),
@@ -249,7 +249,7 @@ export const GROVE_MAPS = [
     {
         n: 5, id: "drowned", short: "Drowned", name: "The Drowned Ruins",
         blurb: "Somebody built this. The water took it anyway.",
-        emblem: { id: "em_drowned", name: "The Sunken Mark", stat: "might", per: 2, kind: "flat" },
+        emblem: { id: "em_drowned", name: "The Sunken Mark", stat: "gold_find", per: 2.5, kind: "pct" },
         parts: [
             P("shard_tile", "Shard Tile", "edge", 1, "Glazed on one face, murderous on the break."),
             P("temple_rod", "Temple Rod", "haft", 1, "Part of something that held a roof up."),
@@ -297,7 +297,7 @@ export const GROVE_MAPS = [
     {
         n: 6, id: "gilded", short: "Gilded", name: "The Gilded Waste",
         blurb: "Gold-coloured sand, and nothing in it is gold.",
-        emblem: { id: "em_gilded", name: "The Sun Mark", stat: "crit_rate", per: 0.25, kind: "pct", global: true },
+        emblem: { id: "em_gilded", name: "The Sun Mark", stat: "xp_find", per: 2.0, kind: "pct" },
         parts: [
             P("glass_knap", "Glass Knap", "edge", 1, "Sand struck by something hot enough to mean it."),
             P("cactus_rib", "Cactus Rib", "haft", 1, "The skeleton inside, when the rest has gone."),
@@ -345,7 +345,7 @@ export const GROVE_MAPS = [
     {
         n: 7, id: "reach", short: "Ashen", name: "The Ashen Reach",
         blurb: "It burned a long time ago and the ground has not finished.",
-        emblem: { id: "em_reach", name: "The Ember Mark", stat: "crit_damage", per: 0.8, kind: "pct", global: true },
+        emblem: { id: "em_reach", name: "The Ember Mark", stat: "overkill", per: 1.5, kind: "pct" },
         parts: [
             P("obsidian_flake", "Obsidian Flake", "edge", 1, "The sharpest edge there is, for about four swings."),
             P("scorched_bone", "Scorched Bone", "haft", 1, "Fire-hardened by accident, kept on purpose."),
@@ -943,6 +943,27 @@ export const MAP_ZONES = GROVE_MAPS.filter((m) => m.zones).flatMap((m) =>
             node: `/images/grove/node-${biomeNode(z.biome)}.webp`,
         };
     }));
+
+// ── ⚠️ A MAP'S CARD DOES SOMETHING MAP ONE'S CANNOT ─────────────────────────────────────────────────────────
+// Luke, on finding maps 2-7 handed out the same thirteen stats map one already covers: "repeats thats lame."
+// He is right, and it was worse than dull — it made the collection stop being a reason to go deeper. One more
+// source of armour is not a discovery, and a player who has map one's thirteen has, in effect, seen them all.
+//
+// So the deep maps grant things nothing else grants, each tied to what the place IS:
+//
+//   Undercave   hyper_find   things in the dark are worse than they look
+//   Sunken Fen  chest_find   the bog keeps what it takes
+//   Saltwrack   part_yield   the tide brings more than it owes
+//   Drowned     gold_find    somebody was rich here once
+//   Gilded      xp_find      the only thing in the sand actually worth having
+//   Ashen Reach overkill     the forge: less of a blow needed to count for two
+//
+// ⚠️ EVERY ONE OF THESE HAS A CONSUMER, and that was the constraint that shaped the list. A card granting a
+// stat nothing reads is a card that does nothing, which is the worst possible version of a collectible —
+// see bonusesFrom in grove.js and the roll in grove-roll.js for where each lands.
+//
+// `overkill` is the interesting one: it lowers the damage needed to earn a multi-kill rung, which is the one
+// lever that turns a bigger kill requirement into a shorter wait rather than a longer one.
 
 /** One emblem per generated map, in GROVE_EMBLEMS shape. */
 export const MAP_EMBLEMS = Object.fromEntries(

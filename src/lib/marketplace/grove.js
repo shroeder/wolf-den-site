@@ -127,7 +127,13 @@ async function playerRow(buyerId) {
 // and never received. Every call site passes the player row; the charm travels with the session on that
 // row, which is also why a charm cannot expire mid-run. See migration 483.
 function bonusesFrom(emblemRows, player = null) {
-    const out = { rarityFind: 0, emblemFind: 0, rareSpawn: 0 };
+    // ⚠️ EVERY KEY HERE MUST BE READ SOMEWHERE. These are the drop-side card effects; the combat-side ones
+    // go through addGroveStat in grove-kit.js instead. A key added here and nowhere else is a card that
+    // silently does nothing, which is the one failure a collectible cannot survive.
+    const out = {
+        rarityFind: 0, emblemFind: 0, rareSpawn: 0,
+        hyperFind: 0, chestFind: 0, partYield: 0, goldFind: 0, xpFind: 0, overkill: 0,
+    };
     const charmId = player?.charm_id;
     if (charmId && GROVE_CHARMS[charmId]) {
         const stat = GROVE_CHARMS[charmId].stat;
@@ -142,6 +148,12 @@ function bonusesFrom(emblemRows, player = null) {
         if (meta.stat === "rarity_find") out.rarityFind += v;
         else if (meta.stat === "emblem_find") out.emblemFind += v;
         else if (meta.stat === "rare_spawn") out.rareSpawn += v;
+        else if (meta.stat === "hyper_find") out.hyperFind += v;
+        else if (meta.stat === "chest_find") out.chestFind += v;
+        else if (meta.stat === "part_yield") out.partYield += v;
+        else if (meta.stat === "gold_find") out.goldFind += v;
+        else if (meta.stat === "xp_find") out.xpFind += v;
+        else if (meta.stat === "overkill") out.overkill += v;
     }
     return out;
 }

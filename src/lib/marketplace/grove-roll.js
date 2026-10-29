@@ -192,7 +192,10 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
         // is the only reading that works on a table where every row is a part rather than a rarity tier.
         const rarity = Number(bonus.rarityFind) || 0;
         if (rarity > 0 && r() < Math.min(0.75, rarity / 100)) n += 1;
-        out.parts[row.part] = (out.parts[row.part] || 0) + n;
+        // part_yield is a share of the stack, floored at the original — a bonus that could round DOWN
+        // would make a card you equipped for more parts occasionally give fewer.
+        const yielded = Math.max(n, Math.round(n * (1 + (Number(bonus.partYield) || 0) / 100)));
+        out.parts[row.part] = (out.parts[row.part] || 0) + yielded;
         // What the scene dresses the drop as. A haul that looks like one root is a haul nobody noticed.
         out.band = rolled.band;
     }
@@ -230,8 +233,16 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
     // ⚠️ GOLD AND CHESTS ONLY EVER COME FROM HERE. Gold has fourteen faucets already and a kill loop has no
     // natural daily cap; the chest is granted through addChests at the call site rather than by reaching
     // into the chest ROLL, which is a chain where the first match wins and raising one tier steals from gear.
-    if (Array.isArray(foe.gold)) out.gold = span(foe.gold, r());
-    if (foe.chestChance && r() < foe.chestChance) out.chest = foe.chestTier || "wooden";
+    // ── THE DEEP MAPS' CARDS LAND HERE ──────────────────────────────────────────────────────────────
+    // gold_find, chest_find and xp_find are percentages on top of what the creature already pays. They
+    // are deliberately applied to the ROLL rather than to the chest table itself: raising a tier inside
+    // that chain steals from the row below it, which is the warning the chest note two lines up exists
+    // for.
+    if (Array.isArray(foe.gold)) {
+        out.gold = Math.round(span(foe.gold, r()) * (1 + (Number(bonus.goldFind) || 0) / 100));
+    }
+    const chestChance = (Number(foe.chestChance) || 0) * (1 + (Number(bonus.chestFind) || 0) / 100);
+    if (chestChance && r() < chestChance) out.chest = foe.chestTier || "wooden";
 
     // ── 1.3 THE WOW ─────────────────────────────────────────────────────────────────────────────────
     // The hyper table -- enchant scroll, power scroll, ship upgrade, Mythic Morsel, enshrinement stone --
@@ -244,14 +255,20 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
     //
     // ⚠️ GATED TO THE WEAK END BY zoneN, through the same pickHyper the boss uses. A rootrat handing over
     // an enshrinement stone is not a surprise, it is a bug the player assumes they exploited.
-    if (zoneN && hyperTable && r() < wandererHyperChance(zoneN) * (1 + (Number(bonus.rarityFind) || 0) / 100)) {
+    // ⚠️ hyper_find IS ITS OWN LEVER, NOT MORE rarityFind. The Blind Mark exists so the Undercave gives a
+    // reason to equip something map one cannot offer; folding it into rarity would make it a worse copy of
+    // The Mothlight, which is the exact complaint this set of cards was rewritten to answer.
+    const hyperChance = wandererHyperChance(zoneN)
+        * (1 + (Number(bonus.rarityFind) || 0) / 100)
+        * (1 + (Number(bonus.hyperFind) || 0) / 100);
+    if (zoneN && hyperTable && r() < hyperChance) {
         out.hyper = pickHyper(zoneN, r(), hyperTable);
     }
 
     // Small, flat, and deliberately boring. Luke: "small amounts of exp are fine."
     // ⚠️ Whoever grants this MUST pass `gold: 0` to awardXp — it pays gold 1:1 with points otherwise, which
     // on a repeatable kill loop is a money printer. See awardxp-gold-tracks-xp-landmine.
-    out.xp = Math.max(1, Math.round((foe.hp || 10) / XP_PER_FOE_HP));
+    out.xp = Math.max(1, Math.round(((foe.hp || 10) / XP_PER_FOE_HP) * (1 + (Number(bonus.xpFind) || 0) / 100)));
     // ── GEAR ────────────────────────────────────────────────────────────────────────────────────────
     // Luke: "gear drops on enemies throughout the entirety of the grove. That way there's something to
     // farm for... every enemy still has a loot table of items that it can drop, manicured so every enemy
