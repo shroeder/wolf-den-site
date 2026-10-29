@@ -249,10 +249,16 @@ export function playMulti(credit = 2) {
     } catch { /* a missing flourish must never break the kill */ }
     try {
         if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-            // One pulse per credit, so it is countable in the hand too.
-            const p = [];
-            for (let i = 0; i < n; i += 1) p.push(14, 36);
-            navigator.vibrate(p);
+            // ── ⚠️ ONE PULSE, NOT ONE PER KILL ───────────────────────────────────────────────────────
+            // This was `[14, 36]` repeated once per credit, so an eight-kill chain buzzed for 400ms —
+            // and multikills come in runs, so the pulses ran together into a phone that would not stop
+            // shaking. Luke: "the vibrations are too much when im multikilling."
+            //
+            // Countable-in-the-hand was the idea and it was the wrong one: the screen already shows the
+            // count, and a pattern long enough to count is long enough to be annoying. A multikill is ONE
+            // event with weight, so it gets one pulse that grows a little with size and stops well short
+            // of a buzz you notice as a buzz.
+            navigator.vibrate(Math.min(70, 16 + n * 7));
         }
     } catch { /* ignore */ }
 }

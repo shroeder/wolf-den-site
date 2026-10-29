@@ -56,3 +56,24 @@ const ALL = [...GAME_NAV_PATHS, ...GAME_EXTRA_PATHS];
 export function isGamePath(pathname = "") {
     return ALL.some((p) => pathname === p || pathname.startsWith(p.endsWith("/") ? p : `${p}/`));
 }
+
+// ── WHERE THE SHELL MUST GET OUT OF THE WAY ──────────────────────────────────────────────────────────────────
+// Luke, of the Grove: "the global exp snacking should be hidden since it covers everything up."
+//
+// A game path and an IMMERSIVE game path are different questions. Most of the game is a page with a header
+// and some chrome, and the reward strip belongs there — it is the always-on carrot. The Grove is not a page,
+// it is a viewport: a fixed-height scene with the hero, the foes, the dock and the depth counter all placed
+// against the edges. Anything the shell floats on top lands on the art, and on a phone it lands on the part
+// you are actually looking at.
+//
+// ⚠️ A LIST, SHARED, FOR THE SAME REASON isGamePath IS. The reward strip, and anything else that floats, has
+// to make this decision the same way — a second copy would drift the moment another full-screen scene ships
+// and that scene would silently get a banner across its middle.
+export const IMMERSIVE_PATHS = [
+    "/marketplace/grove",
+];
+
+/** True on a screen whose whole viewport is the game, where floating site chrome must not draw. */
+export function isImmersivePath(pathname = "") {
+    return IMMERSIVE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}

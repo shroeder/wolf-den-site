@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { nudgeFeed } from "@/lib/nudge-feed";
 import Coin from "@/components/Coin";
 import Glyph from "@/components/Glyph";
-import { isGamePath } from "@/lib/marketplace/game-paths.js";
+import { isGamePath, isImmersivePath } from "@/lib/marketplace/game-paths.js";
 
 // A slim, site-wide "next unlock" strip for signed-in members — the always-on engagement carrot. Shows
 // the next reward + a progress bar + XP to go, linking to the full rewards track. Renders nothing for
@@ -96,6 +96,13 @@ export default function RewardNudge() {
     // this exact rule, and game-paths.js records four separate occasions where a new room fell out of one
     // list and silently lost its shell. A third copy here would be the fifth.
     if (!isGamePath(pathname)) return null;
+    // ⚠️ AND NOT WHERE THE VIEWPORT IS THE GAME. The Grove places everything against the edges of a fixed
+    // scene, so a floating strip does not sit above the content — it sits ON it. Luke: "the global exp
+    // snacking should be hidden since it covers everything up."
+    //
+    // Hidden rather than restyled: there is nowhere on that screen for it to go. The rewards track is one tap
+    // away from the dock, and the XP it reports is still being earned either way.
+    if (isImmersivePath(pathname)) return null;
     if (!data || !data.authed) return null;
 
     const hasProgress = !data.maxed && data.label;
