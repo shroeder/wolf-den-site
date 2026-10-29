@@ -1,6 +1,7 @@
 import "server-only";
 import { itemById } from "@/lib/marketplace/items.js";
 import { GROVE_GEAR, SET_PIECE } from "@/lib/marketplace/grove-loot.js";
+import { bumpHunts } from "@/lib/marketplace/town-hunts.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 
 import { db } from "@/lib/db";
@@ -730,6 +731,18 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     // player experiences as a drop they watched fall and never received.
     const zoneN = Number(zone?.n) || 0;
     const got = settleKills(list, foeById, Number(p.seed), bonusesFrom(emblemRows, p), zoneN, GROVE_HYPER);
+
+    // ── ⚠️ THE TOWN HUNTS TICK HERE, OFF THE SAME TALLY THE LOOT CAME FROM ──────────────────────────
+    // settleKills now reports `slain` — what died, by name, with the multi-kill credit already folded in.
+    // Hooking the hunt here rather than in the scene means it cannot be inflated by a client: the same list
+    // that decides what loot you get decides what your hunt counts, and the server has already bounded it
+    // (zone membership, the rolling kill ceiling). A second count taken anywhere else would be a second
+    // thing to keep honest.
+    //
+    // Not awaited into the response path beyond this line and failure-tolerant by design: a hunt that misses
+    // a tick is a quest that takes slightly longer, while a settle that throws is loot a member watched drop
+    // and never received.
+    await bumpHunts(buyerId, got.slain, Number(zone?.map) || 0).catch(() => {});
 
     const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p.pack_slots) || 16);
 

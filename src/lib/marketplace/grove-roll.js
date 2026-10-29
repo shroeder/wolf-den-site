@@ -510,6 +510,11 @@ export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTab
     // settle hands over nothing.
     const gears = [];
     let setPieces = 0;
+    // ⚠️ WHAT DIED, BY NAME, AND HOW MANY. The loot rolls answer "what did you get"; nothing answered "what
+    // did you kill" — and a town hunt ("drown twelve Fen Lurkers") is a question about the second. Counted
+    // here rather than re-derived by the caller because the multi-kill credit lives here: a row with c=4 is
+    // four creatures, and a caller counting rows would quietly pay a quarter of what it owed.
+    const slain = {};
 
     for (const k of kills || []) {
         const foe = lookup(k.id);
@@ -525,6 +530,7 @@ export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTab
         for (const h of got.hypers) hypers.push(h);
         for (const g of got.gears) gears.push(g);
         setPieces += got.setPieces || 0;
+        slain[k.id] = (slain[k.id] || 0) + Math.max(1, safeCredit(k?.c) || 1);
     }
-    return { parts, emblems, gold, xp, chests, hypers, gears, setPieces };
+    return { parts, emblems, gold, xp, chests, hypers, gears, setPieces, slain };
 }

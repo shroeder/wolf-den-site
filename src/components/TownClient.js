@@ -725,6 +725,9 @@ const HW_SCENES = [
 // street has no such gap anywhere except the fountain's; a building NAME is ~80px, so 2.31% is where his body
 // stops covering it. 18.6 is the roomiest spot in this stretch at 2.9% from the nearest name and 9.6% from
 // the nearest post.
+// The Quartermaster's own line, and ONLY his: it was appearing under all seven giver names, which made
+// seven characters sound like one person wearing different coats.
+const GENERIC_GREETING = "Do the town a service, wolf, and there’s gold in it for you.";
 const NPC_X = { crier: 9, gourdfather: 18.6, smith: 31, auction: 42, merchant: 53, quest: 64, booth: 76, boothHeld: 89 };
 const NPC_POSTS = Object.values(NPC_X);
 // Measured rather than guessed, against the real street: WORLD_W is about 4,841px, so one percent is ~48px.
@@ -1412,6 +1415,38 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     const [gambleReveal, setGambleReveal] = useState(null); // big gear-gamble reveal: { phase:"rolling"|"reveal", item, dupeAll, refund }
     const [crierMsg, setCrierMsg] = useState(0);      // which rotating announcement the crier is shouting
     const [questOpen, setQuestOpen] = useState(false);
+
+    // ── THE HUNT BOARD ───────────────────────────────────────────────────────────────────────────────
+    // Luke: "every town has its own kind of thematic quest giver who wants you to go out and slay monsters
+    // that are in the different zones."
+    //
+    // It rides the SAME character as the Quartermaster's dailies rather than adding an eighth person to the
+    // street: one figure to walk up to, two kinds of work on their sheet. The data stays strictly separate
+    // (see the header of town-hunts.js) — this is one conversation, not one quest family.
+    //
+    // ⚠️ READ WHEN THE SHEET OPENS, NEVER WITH THE TOWN. getTownState renders the whole plaza on every load
+    // for every member; three more reads on it to serve a board most people never tap is exactly the family-A
+    // waste CLAUDE.md opens with.
+    const [hunts, setHunts] = useState([]);
+    const [huntBusy, setHuntBusy] = useState("");
+    // ⚠️ THE TOWN NUMBER, HOISTED. Depending on `town?.n` while the compiler infers `town` makes it give up
+    // on memoising this whole component — a real cost on the busiest screen in the game for a one-line
+    // closure. Reading the number once and depending on the number is both what it wants and what this means.
+    const townN = town?.n || 0;
+    const loadHunts = useCallback(async () => {
+        const url = townN ? `/api/marketplace/hunts?town=${townN}` : "/api/marketplace/hunts";
+        const r = await fetch(url, { cache: "no-store" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+        if (r?.hunts) setHunts(r.hunts);
+    }, [townN]);
+    const claimHunt = useCallback(async (key) => {
+        setHuntBusy(key);
+        const r = await fetch("/api/marketplace/hunts", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ key, town: townN }),
+        }).then((x) => x.json()).catch(() => null);
+        setHuntBusy("");
+        if (r?.hunts) setHunts(r.hunts);
+    }, [townN]);
     const [questBusy, setQuestBusy] = useState(false);
     const [questFlash, setQuestFlash] = useState(null);
     const [smithOpen, setSmithOpen] = useState(false);
@@ -2941,7 +2976,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         </button>
                     ) : null}
                     {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
-                    <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.quest}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); load(); }} aria-label="Quest Giver">
+                    <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.quest}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); load(); loadHunts(); }} aria-label="Quest Giver">
                         <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
                         {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
                         {/* ⚠️ THE TOWN'S OWN. Luke: "every town has its own kind of thematic quest giver".
@@ -3408,9 +3443,48 @@ export default function TownClient({ initial, frozen = false, halloween = false,
             {questOpen ? (
                 <div className="tw-roster" onClick={() => setQuestOpen(false)} role="presentation">
                     <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
-                        <div className="tw-roster-head"><strong>📜 Town Bounties</strong><button type="button" onClick={() => setQuestOpen(false)} aria-label="Close">✕</button></div>
-                        <p className="muted" style={{ margin: "-2px 2px 8px", fontSize: "0.85rem", fontStyle: "italic" }}>&ldquo;Do the town a service, wolf, and there's gold in it for you.&rdquo;</p>
+                        <div className="tw-roster-head"><strong>📜 {hunts[0]?.giver || "Town Bounties"}</strong><button type="button" onClick={() => setQuestOpen(false)} aria-label="Close">✕</button></div>
+                        <p className="muted" style={{ margin: "-2px 2px 8px", fontSize: "0.85rem", fontStyle: "italic" }}>&ldquo;{hunts[0]?.greeting || GENERIC_GREETING}&rdquo;</p>
                         {questFlash ? <div className="tw-merchant-flash">{questFlash}</div> : null}
+
+                        {/* ── THE HUNT ────────────────────────────────────────────────────────────────
+                            This town's own work: kills in the map it opens onto. Above the dailies because
+                            it is the thing this character is FOR — the plaza bounties are the Quartermaster's
+                            list and they are the same list in every town. */}
+                        {hunts.length ? (
+                            <>
+                                <h4 className="tw-hunt-h">The Hunt &mdash; {hunts[0].mapName}</h4>
+                                <div className="tw-quests">
+                                    {hunts.map((h) => {
+                                        const pct = Math.max(0, Math.min(100, Math.round((h.progress / h.target) * 100)));
+                                        return (
+                                            <div key={h.key} className={`tw-quest${h.claimed ? " is-claimed" : ""}`}>
+                                                {h.art ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img className="tw-hunt-art" src={h.art} alt="" draggable={false} />
+                                                ) : <span className="tw-hunt-pip" aria-hidden="true" />}
+                                                <div className="tw-quest-body">
+                                                    <div className="tw-quest-top">
+                                                        <strong>{h.target}&times; {h.name}</strong>
+                                                        <span className="tw-quest-reward">
+                                                            <img src="/images/ui/coin.png" alt="" className="tw-quest-coin" draggable="false" />{h.gold}
+                                                        </span>
+                                                    </div>
+                                                    <div className="muted" style={{ fontSize: "0.76rem" }}>{h.line}</div>
+                                                    <div className="tw-quest-bar"><span style={{ width: `${pct}%` }} /></div>
+                                                    <div className="tw-quest-prog muted">{h.progress}/{h.target}</div>
+                                                </div>
+                                                {h.claimed ? <span className="tw-quest-tag is-done" aria-label="Claimed"><Gi.GiCheckMark /></span>
+                                                    : h.claimable ? <button type="button" className="tw-quest-claim" disabled={huntBusy === h.key} onClick={() => claimHunt(h.key)}>Claim</button>
+                                                        : null}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <h4 className="tw-hunt-h">Around the plaza</h4>
+                            </>
+                        ) : null}
+
                         <div className="tw-quests">
                             {(state?.quests || []).map((q) => {
                                 const pct = Math.max(0, Math.min(100, Math.round((q.progress / q.target) * 100)));
@@ -3430,7 +3504,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 );
                             })}
                         </div>
-                        <p className="muted" style={{ fontSize: "0.76rem", margin: "10px 2px 0" }}>Bounties refresh daily. Progress ticks as you play in the plaza.</p>
+                        <p className="muted" style={{ fontSize: "0.76rem", margin: "10px 2px 0" }}>Both refresh daily. Hunts tick as you fight in the Grove; bounties as you play in the plaza.</p>
                     </div>
                 </div>
             ) : null}
