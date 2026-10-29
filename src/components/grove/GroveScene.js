@@ -323,6 +323,17 @@ const SWING_V_REACH = 6;
 export default function GroveScene({
     npcHere = null,
     onTalk,
+    // ── ⚠️ THE COLISEUM IS THIS SAME SCENE, DELIBERATELY ────────────────────────────────────────
+    // Luke: "there's no special rules in the Coliseum. It's the same as if you were killing them."
+    // So it reuses the combat rather than reimplementing it — a second copy of swings, multi-kill and
+    // loot would drift from this one the first time either was touched. What `arena` changes is the
+    // FRAME: a contained floor instead of a scrolling zone, waves instead of a drip, a clock.
+    //
+    // Every branch below is guarded on it, so with arena null this file behaves exactly as it did.
+    arena = null,
+    waves = null,
+    onWave,
+    onRunEnd,
     zone, seed, bonuses, stats, heroArt, petArt, belt, labScene, bagRoom = null, gearArt = null,
     // ⚠️ ONE NUMBER, ALREADY MULTIPLIED OUT, AND NOT THE RARITY AND LEVEL IT CAME FROM. The share of a
     // hero swing this member's companion bites for, computed on the server in heroLook (grove.js) off the
@@ -557,7 +568,9 @@ export default function GroveScene({
     useEffect(() => () => { if (heraldTimer.current) clearTimeout(heraldTimer.current); }, []);
 
     // ⚠️ UNITS, NOT SCREENS — zoneWidth answers in world units now. See the note on it.
-    const W = zoneWidth(zone.n);
+    // A Coliseum is 26 units and does not scroll; a zone is 300-700 and does. Handing the arena a zone's
+    // width would put bodies off the side of a room that has no camera to follow them.
+    const W = arena ? arena.width : zoneWidth(zone.n);
     const maxHp = stats?.maxHp || 100;
 
 
@@ -568,7 +581,10 @@ export default function GroveScene({
         // ⚠️ DRESSED AT BUILD, NOT AT RENDER. Which vine hangs where is rolled here, once, off the zone's
         // own seed, and stored on the ledge — see decorateLedges. Rolling it inside the render would
         // re-roll it on every re-render, and the scene re-renders whenever a telegraph appears.
-        const platforms = decorateLedges(platformsFor(zone.n, rand), groveBiome(zone.biome), rand);
+        const platforms = decorateLedges(
+            arena ? arena.platforms : platformsFor(zone.n, rand),
+            groveBiome(zone.biome), rand,
+        );
         const mk = (x, h, speed, art) => ({
             ...makeBody({ x, y: 0, h, halfW: h * 0.3, speed }),
             art, phase: rand(), landedAt: 0, flash: 0, node: null,
@@ -607,7 +623,10 @@ export default function GroveScene({
             // them are on screen, so a door at the far end is something you WALK to — which is the whole
             // reason it reads as a door rather than as a menu item. It also means the way on is in the
             // same place every time: the right-hand wall.
-            doors: [
+            // ⚠️ NO DOORS IN AN ARENA. A Coliseum is one room you are locked into until the clock
+            // decides otherwise — a door would be a way to walk out mid-run holding a spent key, and a
+            // "back a zone" arrow in a fight on a timer is a misclick waiting to happen.
+            doors: arena ? [] : [
                 ...(zone.n > 1 ? [{ side: "back", to: zone.n - 1, x: DOOR_INSET, node: null }] : []),
                 ...(zone.n < ZONE_COUNT
                     ? [{ side: "on", to: zone.n + 1, x: zoneWidth(zone.n) - DOOR_INSET, node: null }]
@@ -635,6 +654,13 @@ export default function GroveScene({
             swingFoe: null,
             swingDone: true,
             nextRespawn: 0,
+            // ── THE COLISEUM'S OWN STATE ────────────────────────────────────────────────────────
+            // waveAt is how many waves have been SENT, not cleared; endsAt is the wall clock. Both are
+            // null outside the arena so nothing here can affect an ordinary zone.
+            waveAt: arena ? 0 : null,
+            waveCleared: arena ? 0 : null,
+            endsAt: null,
+            runOver: false,
             // The running tally down the left. Keyed by label so two drops of one kind share a row.
             haul: new Map(),
             eaten: {},
@@ -677,8 +703,14 @@ export default function GroveScene({
     // without the world being touched. Move speed is baked into the body at build and therefore applies from
     // the next zone; that is a fair price for not resetting the one you are standing in, and the alternative
     // is a rebuild that also respawns everything you just killed.
+    // ⚠️ AND THE ARENA IS A DEPENDENCY, BUT ONLY AS A STABLE KEY. A Coliseum sits INSIDE a zone, so
+    // starting a run does not change zone.n — without this the arena's floor would never be built and the
+    // waves would spawn onto the zone's platforms in a room 26 units wide. But passing the object itself
+    // would rebuild on every render that re-made it, which is the free-full-heal bug described above
+    // arriving through a third door. The art path changes exactly when you enter or leave an arena, which
+    // is precisely when the world SHOULD be rebuilt — a run does start at full health.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [zone.n, seed]);
+    }, [zone.n, seed, arena?.art || null]);
 
     useEffect(() => { worldRef.current = world; }, [world]);
 
@@ -728,6 +760,48 @@ export default function GroveScene({
     // ── SPAWNING ────────────────────────────────────────────────────────────────────────────────────
     // Luke: "15 to 30 enemies, fully replenishing every 45 seconds."
     const spawn = useCallback((w, now) => {
+        // ── ⚠️ THE COLISEUM SENDS WAVES, NOT A DRIP ────────────────────────────────────────────────
+        // A zone trickles one body every 1.5s because it is a place that is lived in. An arena is a
+        // fight on a clock: the next wave arrives the instant the last one is down, because waiting is
+        // the one thing a two-minute run cannot afford.
+        //
+        // ⚠️ IT COUNTS WHAT IS STANDING, NOT w.foes.length. A dying body is still in the array while its
+        // death animation plays, so spawning on length alone would hold the next wave behind corpses —
+        // the same trap the drip's `standing` filter exists for.
+        if (arena && waves) {
+            if (w.runOver) return;
+            const standing = w.foes.filter((f) => !f.dying).length;
+            if (standing > 0) return;
+            if (w.waveAt >= waves.length) { w.runOver = true; return; }
+
+            const wv = waves[w.waveAt];
+            w.waveAt += 1;
+            onWave?.(w.waveAt, waves.length);
+
+            const bodies = [
+                ...(wv.bodies || []),
+                ...(wv.bossBody ? [wv.bossBody] : []),
+                ...(wv.rareBodies || []),
+            ];
+            for (const body of bodies) {
+                if (!body) continue;
+                const i = w.killIndex + w.foes.length;
+                const spot = spawnOnPlatform(w.platforms, w.rand, { minX: 2, maxX: W - 2, inset: 1.5 });
+                const h = groveSize(body);
+                const f = {
+                    ...makeBody({ x: spot.x, y: spot.y, h, halfW: h * 0.3, speed: body.speed || 1 }),
+                    id: body.id, name: body.name, art: body.art,
+                    hp: body.hp, maxHp: body.hp, dmg: body.dmg,
+                    attacks: body.attacks || [],
+                    isBoss: Boolean(wv.bossBody && body === wv.bossBody),
+                    rare: (wv.rareBodies || []).includes(body),
+                    idx: i, phase: w.rand(), landedAt: 0, flash: 0, node: null,
+                };
+                w.foes.push(f);
+            }
+            return;
+        }
+
         // ⚠️ ONE BODY PER CALL ONCE THE ZONE IS STANDING, THE WHOLE ZONE ON THE FIRST CALL. See GROVE_POP:
         // the 45 seconds is a refill RATE, and the burst reading of it left a cleared zone visibly empty for
         // most of every window. `w.want` is rolled once, by the caller, when the zone is built.
@@ -1779,6 +1853,21 @@ export default function GroveScene({
             const dt = w.clock.dt(now, last);
             last = now;
 
+            // ── ⚠️ THE ARENA'S CLOCK, AND THE ONE CALL THAT ENDS A RUN ─────────────────────────
+            // Started on the first frame rather than when the scene mounts: a run whose clock began
+            // while the backdrop was still decoding would hand back seconds the player never saw.
+            if (arena && waves && !w.runOver) {
+                if (!w.endsAt) w.endsAt = now + (arena.runMs || 120000);
+                const done = w.waveAt >= waves.length && w.foes.filter((f) => !f.dying).length === 0;
+                if (done || now >= w.endsAt) {
+                    w.runOver = true;
+                    // waveCleared is waves FINISHED, which is waveAt minus whichever one is still
+                    // standing when the clock runs out. A run that timed out mid-wave did not clear it.
+                    const standing = w.foes.filter((f) => !f.dying).length;
+                    w.waveCleared = Math.max(0, w.waveAt - (standing > 0 ? 1 : 0));
+                    onRunEnd?.({ wavesCleared: w.waveCleared, cleared: done });
+                }
+            }
             if (now >= w.nextRespawn) spawn(w, now);
 
             // ⚠️ PRUNED IN THE LOOP AND RE-RENDERED ONLY WHEN SOMETHING ACTUALLY LEFT. A setTimeout per row
