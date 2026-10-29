@@ -1005,6 +1005,25 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                     {choice === "vault" ? (
                         <div className="pk-done">
                             <p className="pk-done-line">Added to your vault.</p>
+                            {/* ── ⚠️ AND WHAT HAPPENS TO IT NEXT ──────────────────────────────────────
+                                A member, after seven packs in a day: "there's not an obvious thing saying
+                                how to collect them. I assume it's come in in person and talk to you but I
+                                don't recall seeing that posted on there."
+
+                                "Added to your vault" is the moment the question forms, and it was also the
+                                moment the screen stopped talking. He had to assume — and he assumed right,
+                                which is worse, not better: he was right by guessing about a thing he had
+                                just paid for.
+
+                                ⚠️ IT SAYS BOTH OPTIONS AND THAT ONE IS FREE, because "you can collect it"
+                                leaves a member wondering what it costs, and a wondered-about cost on a
+                                thing already bought is exactly the doubt this sentence exists to remove.
+                                One line, under the confirmation, not a panel — the answer is small and the
+                                celebration is what the screen is for. */}
+                            <p className="pk-done-sub">
+                                Collect it free from the shop in Montgomery whenever you like, or have it
+                                shipped &mdash; both live in your <a href="/marketplace/vault">Card Vault</a>.
+                            </p>
                             <PackAgain canOpen={canOpen} shortfallCents={shortfall} priceCents={priceCents} onAgain={openAgain} priceTrusted={priceTrusted} />
                         </div>
                     ) : (

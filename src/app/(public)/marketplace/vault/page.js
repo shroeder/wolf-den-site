@@ -37,8 +37,8 @@ export default async function VaultPage() {
         <div className="stack">
             <h1 style={{ marginBottom: 4 }}>Card Vault</h1>
             <p className="muted" style={{ marginTop: 0 }}>
-                Cards you pulled and kept. Sell them back for store credit whenever you like, or have them
-                shipped or put aside for collection.
+                Cards you pulled and kept. Collect them free from the shop in Montgomery or have them
+                shipped, any time &mdash; or sell them back for store credit instead.
             </p>
             <VaultClient initial={{ ...(vault || { held: [], orders: [], history: [], totals: {} }), balanceCents }} />
         </div>

@@ -236,6 +236,36 @@ export default function VaultClient({ initial }) {
                     </div>
                 ) : (
                     <>
+                        {/* ── ⚠️ HOW TO ACTUALLY GET THE CARDS ────────────────────────────────────────
+                            A member, after buying seven packs in a day: "there's not an obvious thing
+                            saying how to collect them. I assume it's come in in person and talk to you but
+                            I don't recall seeing that posted on there."
+
+                            He was right, and the feature was already built — pickup and shipping both work,
+                            and the sheet says "Collect from the shop — free". The problem is that the only
+                            door to it is the "Get them" bar, and that bar does not exist until you have
+                            SELECTED a card. Nothing anywhere told him cards were tappable, so a flow that
+                            works end to end was invisible to the person who had just spent real money on it.
+                            That is the worst kind of missing feature: one that is present.
+
+                            ⚠️ IT NAMES THE GESTURE, NOT JUST THE OUTCOME. "You can collect or ship your
+                            cards" would have been equally true and equally useless — he already assumed
+                            that much. The sentence has to say TAP A CARD, because that is the step that was
+                            missing, and it has to say it where the cards are.
+
+                            ⚠️ AND IT GOES AWAY ONCE IT HAS BEEN OBEYED. The moment anything is selected the
+                            action bar appears and says the same thing better, so this would be a permanent
+                            instruction for a thing you have just done. */}
+                        {selectedCards.length === 0 ? (
+                            <p className="vt-howto">
+                                {/* ⚠️ {" "} BEFORE THE DASH. JSX drops whitespace that sits against a line
+                                    break, so `</b> &mdash;` rendered as "Get them— collect" with the word
+                                    and the dash welded together. An explicit space is the only reliable
+                                    fix and it is invisible in review until somebody photographs it. */}
+                                Tap a card to choose it, then <b>Get them</b>{" "}
+                                &mdash; collect free from the shop in Montgomery, or have them shipped to you.
+                            </p>
+                        ) : null}
                         <ul className="vt-grid">
                             {held.map((card) => {
                                 const on = selected.has(card.id);

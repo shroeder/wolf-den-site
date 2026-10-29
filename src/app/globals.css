@@ -28765,3 +28765,34 @@ body.cas-seated .social-fab { display: none; }
     border-radius: 999px;
     padding: 0.2rem 0.6rem;
 }
+
+
+/* ── HOW TO GET YOUR CARDS ───────────────────────────────────────────────────────────────────────────────────
+   See the long note in VaultClient: the collection flow was fully built and completely invisible, because its
+   only entrance was a bar that appears after a selection gesture nothing had mentioned. Styled as guidance
+   rather than as a warning — nothing is wrong, the member just has not been told yet. */
+.vt-howto {
+    margin: 0 0 10px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: rgba(255, 215, 94, 0.07);
+    border: 1px solid rgba(255, 215, 94, 0.22);
+    color: #d8d0bd;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+.vt-howto b { color: #ffd75e; font-weight: 700; }
+
+
+/* The line under "Added to your vault" that says how a member actually gets the card. See the note at its
+   call site: the confirmation is the moment the question forms, and it used to be the moment the screen went
+   quiet. */
+.pk-done-sub {
+    margin: 6px auto 0;
+    max-width: 30rem;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: #a9b0bd;
+    text-align: center;
+}
+.pk-done-sub a { color: #ffd75e; font-weight: 700; }
