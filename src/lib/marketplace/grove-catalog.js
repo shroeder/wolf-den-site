@@ -942,7 +942,24 @@ export const GROVE_ZONES = [
 // between Littlewolf and Eric — and Littlewolf, the LOW anchor, measures above the 90th percentile. The
 // curve's idea of a beginner was in the top tenth of the population, which is the whole reason the first
 // zone cost a median member eight seconds a wanderer and the 25th percentile forty. See grove-fit.mjs.
-export const GROVE_SCALE = { hpPerZone: 0.0953, dmgPerZone: 0.0519, zonesPerMap: 12 };
+// ── ⚠️ HP GREW FASTER THAN THE PLAYER, WHICH KILLED THE PROGRESSION LEVER ───────────────────────────────────
+// The note above fits player power at +2.67% a zone. hpPerZone was 0.0953 — so a wanderer outgrew the person
+// fighting it by 6.7% a zone, compounding, and the gap is 200x across the built climb. Measured consequence:
+// multi-kill is x8 at depth 1, x1 for everyone by depth 72, and x1 even for the strongest member in the Den
+// at depth 84. The one lever Luke wants players to pull got WEAKER the further they went.
+//
+// It also could never have worked: the old target was "three swings for whoever belongs at that depth", and
+// multi-kill needs ONE blow worth two full bodies. Three swings and half a swing are a 6x gap in the wrong
+// direction, so frontier multi-kill was impossible by construction rather than by accident.
+//
+// Luke: "difficulty is not the primary pushback on the player." So trash melts now, and the gate is how MANY
+// you melt — zoneUnlock is priced on exactly that. 0.065 keeps wanderers climbing (x13 over a map, still
+// visibly meaner each zone) while staying inside reach of a player who has kept their gear up.
+//
+// ⚠️ TUNED TOGETHER WITH zoneUnlock, ALWAYS. The door asks for minutes x 40 x expectedCredit(depth); if this
+// rate drifts back up, those rungs stop landing and every door silently becomes hours. scripts/grove-gate.mjs
+// prints both sides and is the only honest check.
+export const GROVE_SCALE = { hpPerZone: 0.065, dmgPerZone: 0.0519, zonesPerMap: 12 };
 
 /**
  * How deep in the whole Grove a zone is, counting across maps — the ONE number difficulty scales against.

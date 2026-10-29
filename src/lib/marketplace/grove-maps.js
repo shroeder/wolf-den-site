@@ -728,8 +728,49 @@ export const zoneDepth = (mapN, i) => (Number(mapN) - 1) * 12 + i + 1;
 // ⚠️ CEIL TO FIVE, NOT ROUND. It is a number a player reads on a door, so it wants to be a multiple of five —
 // but rounding produced ties (zone 2 and zone 3 both landing on 25), and a requirement that does not move
 // between two consecutive zones reads as the door being broken. Ceiling is strictly increasing everywhere.
+// ── ⚠️ THE DOOR IS PRICED IN MINUTES, NOT IN KILLS ──────────────────────────────────────────────────────────
+// Luke: "difficulty is not the primary pushback on the player. The primary pushback is the kill count required
+// to unlock the next area. It should take you 10 minutes to clear an area when you get to map 2... and by the
+// time you get to map 4 it should be requiring like 5,000 kills... they need more damage to get more
+// multi-kill, to get more kills to unlock the next level faster."
+//
+// Three separate numbers hide in that, and the old curve (`20 + (d-1)^1.3 * 3`) conflated them into one:
+//
+//   MINUTES   how long a node should take. This is the only number a player actually feels.
+//   RATE      bodies a zone can produce — GROVE_POP's 40 a minute, and no build on earth beats it.
+//   CREDIT    what one body is worth. The ONLY way a bigger kill count is not a longer wait.
+//
+// kills = minutes x 40 x credit. Read in that order the design is obvious: the number on the door grows
+// enormously while the clock barely moves, and the thing that closes the gap is damage. Read as a single
+// polynomial it is just a stopwatch with a steeper face.
+//
+// ⚠️ CREDIT IS A PROMISE THIS CURVE MAKES ON THE PLAYER'S BEHALF. Asking 4,800 kills of someone who only ever
+// lands x1 is a two-hour node, which is the burnout case and not a hard one — it is the DEFAULT unless the
+// rungs below are actually reachable at that depth. That is why GROVE_SCALE.hpPerZone moved in the same
+// commit: the two are one change and must never be tuned apart. Run scripts/grove-gate.mjs after touching
+// either, and read the minutes column, not the kills column.
+
+/** Minutes a node at this depth is meant to cost, at x1 credit. Gentle and roughly linear — the kill count
+ *  does the climbing, not the clock. 1 min at the very start, ~20 by the deepest built zone. */
+const nodeMinutes = (depth) => 1 + Math.max(0, (Number(depth) || 1) - 1) * 0.23;
+
+/**
+ * The multi-kill rung a player who is KEEPING UP should be landing at this depth.
+ *
+ * Doubles once a map to the cap, which is what turns "get more damage" into a visible jump in how fast a
+ * door falls. It is a design target, not a measurement — grove-gate.mjs checks whether real power actually
+ * reaches it, and if it does not, this curve is writing cheques the gear cannot cash.
+ */
+export const expectedCredit = (depth) => {
+    const map = Math.floor(Math.max(0, (Number(depth) || 1) - 1) / 12);  // 0-indexed map
+    return Math.min(8, Math.pow(2, Math.max(0, map - 1)));
+};
+
+// ⚠️ CEIL TO FIVE, NOT ROUND. It is a number a player reads on a door, so it wants to be a multiple of five —
+// but rounding produced ties (zone 2 and zone 3 both landing on 25), and a requirement that does not move
+// between two consecutive zones reads as the door being broken. Ceiling is strictly increasing everywhere.
 export const zoneUnlock = (depth) =>
-    Math.ceil((20 + Math.pow(Math.max(0, (Number(depth) || 1) - 1), 1.3) * 3.0) / 5) * 5;
+    Math.ceil((nodeMinutes(depth) * 40 * expectedCredit(depth)) / 5) * 5;
 
 /** Every part of every generated map, flat, keyed by id — merged into GROVE_PARTS by the catalogue. */
 export const MAP_PARTS = Object.fromEntries(
