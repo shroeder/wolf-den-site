@@ -76,9 +76,17 @@ const foeById = (id) => (id === GROVE_RARE.id ? GROVE_RARE : GROVE_ENEMIES[id] |
 // It is wall-clock now. A zone holds at most GROVE_POP.max and refills every respawnMs, so there is a hard
 // physical roof on kills per minute, and entering more often does not create more enemies.
 //
-// Generous on purpose (3x): a laggy phone settling ninety seconds of play in one burst must never be punished
-// for it. This stops a thousand-kill claim, not a fast player.
-const KILL_CEILING_SLACK = 3;
+// Generous on purpose: a laggy phone settling ninety seconds of play in one burst must never be punished for
+// it. This stops a thousand-kill claim, not a fast player.
+//
+// ⚠️ RAISED FROM 3 TO 6 WHEN CLEARED ZONES STARTED REFILLING AT ONCE. The window below counts respawn
+// windows, which WAS the physical roof: a zone dripped one body every 1.5s, so ~40 kills a minute was all
+// anyone could physically do and 3x slack sat miles above it. Luke: "players shouldn't have to wait for
+// respawns — if they clear the map it should respawn all." That is now true, so kills are bounded by how
+// fast a zone can be CLEARED, not by how fast it refills, and the old 3x no longer represented the same
+// multiple of reality. Left un-raised, the first thing to break would have been a fast player on a long dive
+// having legitimate kills rejected — which reads as the Grove eating your loot.
+const KILL_CEILING_SLACK = 6;
 export const KILL_WINDOW_MS = 10 * 60 * 1000;
 
 export function killCeiling(elapsedMs) {

@@ -34,3 +34,21 @@ weak Lv1 evolves into five weak sprites with no signal. Generate Lv1, eyeball it
   investigated. Probably a double-tap with no guard on the start button.
 - **`mkt_creation_purchase` holds $55.00 but Eric's $25 arrived as a `purchase_credit` ledger row** — creation
   revenue is tracked in two places and they don't agree.
+
+---
+
+## Pack telemetry and member reports — PINNED 2026-10-28
+
+Luke: full visibility into pack openings (newest first: who, which pool, which card, its image and value) and
+per-member dossiers (actions, cards held, orders). **See `docs/pack-telemetry-and-member-reports.md`.**
+
+The headline from the schema audit: **the data is already recorded** — `mkt_pack_open` carries revenue, tax,
+cogs and basis per open; `mkt_vault_card` carries the card with its image; `mkt_activity_event` has 678,345
+rows of member actions. This is screens and joins, not instrumentation.
+
+⚠️ One decision blocks it: whether reports live in the admin app (consistent with
+`admin-screens-belong-in-the-app`) or on owner-gated web, since reading is a different risk class from acting.
+
+⚠️ One thing is genuinely not recorded: **pool alpha over time**. `mkt_pack_pool_state` is state, not history.
+Alpha drift is the entire margin risk on the pack ladder and it is currently unobserved — history not written
+cannot be recovered.

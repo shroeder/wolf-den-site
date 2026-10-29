@@ -706,10 +706,25 @@ export default function GroveScene({
         // the 45 seconds is a refill RATE, and the burst reading of it left a cleared zone visibly empty for
         // most of every window. `w.want` is rolled once, by the caller, when the zone is built.
         if (!w.want) w.want = GROVE_POP.min + Math.floor(w.rand() * (GROVE_POP.max - GROVE_POP.min + 1));
-        // ⚠️ GATED ON "HAS THIS ZONE EVER FILLED", NOT ON "ARE THERE ANY FOES LEFT". Keying off the standing
-        // population reads an emptied zone as a fresh one and dumps the whole roster back in on one frame —
-        // the burst, returned, and at the exact moment the player earned the quiet.
-        const room = w.filled ? Math.min(w.want, w.foes.length + 1) : w.want;
+        // ── ⚠️ A CLEARED ZONE REFILLS AT ONCE. WAITING IS NOT DIFFICULTY ───────────────────────────
+        // Luke: "players in the Grove shouldn't have to wait for respawns. If they clear the map it should
+        // respawn all."
+        //
+        // The drip is one body every 1.5s, so a player who cleared thirty stood in an empty zone for
+        // forty-five seconds picking off arrivals one at a time. That is not pacing, it is the reward for
+        // playing well being dead air — and it got worse with the new difficulty curve, because clearing
+        // got faster while the refill did not.
+        //
+        // So: the drip still governs a zone being WORN DOWN (kill a few, a few wander in), which is the
+        // texture the drip was written for. An EMPTIED zone is a different event and gets the whole roster
+        // back immediately.
+        //
+        // ⚠️ THE BOSS DOES NOT COUNT AS POPULATION. It is pushed into w.foes like anything else, so testing
+        // `w.foes.length` would read a zone containing only the boss as still populated and never refill —
+        // the player would be left alone with a boss they may not be able to take, in a zone that had
+        // decided it was full.
+        const standing = w.foes.filter((f) => !f.isBoss && !f.dying).length;
+        const room = (w.filled && standing > 0) ? Math.min(w.want, w.foes.length + 1) : w.want;
         w.filled = true;
         const before = w.foes.length;
         while (w.foes.length < room) {
