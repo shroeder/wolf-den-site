@@ -3647,6 +3647,9 @@ export default function GroveScene({
         // and they are all made of the same thing, so one custom property inherited down is one declaration
         // and one decoded bitmap — and border-image has no src attribute to set anyway.
         <div className="gv-scene is-full" ref={hostRef} onPointerDown={onTapWorld}
+            // ⚠️ THE BIOME IS ON THE ELEMENT so the stylesheet can answer for a whole room rather than each
+            // ledge carrying its own correction. See the note on the char slab in grove-css.
+            data-biome={groveBiome(sceneBiome)?.slab || null}
             style={{ "--gv-slab": `url(${slabArt(sceneBiome)})`, "--gv-slab-surface": slabSurface(sceneBiome) }}>
             {/* ── ⚠️ EVERYTHING THAT IS IN THE WORLD IS INSIDE THIS ONE LAYER ────────────────────
                 So the screen shake can move the world without moving the interface. The HUD, the boss bar

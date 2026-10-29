@@ -3697,4 +3697,15 @@ export const GROVE_CSS = `
 /* The marshal's two actions sit together: "no key" is a state the daily button answers. */
 .gq-colacts { display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
 .gq-colacts .gq-claim { padding: 6px 10px; font-size: 0.72rem; }
+
+/* ── ⚠️ A NEUTRAL GREY SLAB READS AS GREEN AGAINST LAVA ──────────────────────────────────────────
+   slab-char is correct art — black rock, lava veins, a grey ash top — and it MEASURES neutral: the
+   rendered ledge samples rgb(108,111,109), a green bias of +3 out of 255. It still looked green to
+   two people independently, because simultaneous contrast pushes a neutral toward the complement of
+   whatever surrounds it, and the Ashen Reach surrounds it with saturated red.
+   So this is not a colour bug, it is a colour ILLUSION, and the fix is the same either way: carry a
+   little of the room's own heat in the stone so there is no neutral left to shift. */
+.gv-scene[data-biome="char"] .gv-slab {
+    filter: sepia(0.55) saturate(1.45) hue-rotate(-14deg) brightness(1.02);
+}
 `;
