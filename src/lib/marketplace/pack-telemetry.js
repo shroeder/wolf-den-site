@@ -405,3 +405,94 @@ export async function closePullTask({ taskId, by, notFound = false, note = null 
         [taskId, notFound ? "not_found" : "done", by || "staff", note]
     );
 }
+
+// ── EVERY OPEN, NEWEST FIRST ─────────────────────────────────────────────────────────────────────────────────
+// Luke: "as an admin, I want to know whenever somebody pulls a pack. I kind of just want to know who it was,
+// what they pulled, what pack they decided to open, how much they spent."
+//
+// ⚠️ EVERYTHING ELSE IN THIS FILE IS AN AGGREGATE, AND THAT IS WHY THIS HAD TO BE WRITTEN. getPackTelemetry
+// answers "how are the packs doing" — opens by day, by tier, by pool, by member. There was no way to ask "what
+// just happened", which is the only question a notification can be about. A count of 29 cannot be tapped.
+//
+// ⚠️ THE CARD'S NAME AND IMAGE COME FROM THE BAG ROW, NOT FROM A SECOND LOOKUP. mkt_pack_open stores the
+// mystery_card_id it drew, and mystery_bag_cards still holds that row after the sale (status flips, the row
+// stays) — which is also why a sold-out pool can still be reported on. A join to inventory_feed instead would
+// go blank the moment the single left the shelf, so the feed would lose exactly the cards worth looking at.
+//
+// ⚠️ PREVIEW OPENS ARE KEPT AND FLAGGED, not filtered. The owner plays the floor to test it, and a feed that
+// silently dropped those would be a feed that disagrees with the money — see the note at the top of this file.
+// The caller decides what to do with the flag; the query does not decide for it.
+export async function recentPackOpens({ limit = 50, before = null } = {}) {
+    const rows = await db.query(
+        `SELECT o.id,
+                o.created_at,
+                o.pool,
+                o.price_cents,
+                o.card_value_cents,
+                o.buy_back_cents,
+                o.tier,
+                o.outcome,
+                o.preview,
+                o.revenue_cents,
+                o.cogs_cents,
+                b.display_name,
+                b.alias,
+                c.card_name,
+                c.set_name,
+                c.card_number,
+                c.condition,
+                c.image_url,
+                v.status AS vault_status
+           FROM mkt_pack_open o
+           JOIN mkt_buyer b ON b.id = o.buyer_id
+           LEFT JOIN mystery_bag_cards c ON c.id = o.mystery_card_id
+           LEFT JOIN mkt_vault_card v ON v.pack_open_id = o.id
+          WHERE ($2::timestamptz IS NULL OR o.created_at < $2)
+          ORDER BY o.created_at DESC
+          LIMIT $1`,
+        [Math.max(1, Math.min(200, Number(limit) || 50)), before],
+    ).catch(() => []);
+
+    return (rows || []).map((r) => {
+        const valueCents = money(r.card_value_cents);
+        const priceCents = money(r.price_cents);
+        return {
+            id: r.id,
+            at: r.created_at,
+            member: r.display_name || r.alias || "Someone",
+            alias: r.alias || null,
+            // The pool key IS the pack they chose — pkmn15, mtg5 — so the label a human reads comes from the
+            // pool table rather than being reassembled from the price.
+            pool: r.pool || null,
+            packLabel: poolByKey(r.pool)?.brand || (r.pool ? String(r.pool) : "Mystery pack"),
+            spentCents: priceCents,
+            card: r.card_name || null,
+            setName: r.set_name || null,
+            cardNumber: r.card_number || null,
+            condition: r.condition || null,
+            imageUrl: r.image_url || null,
+            valueCents,
+            tier: r.tier || tierForCents(valueCents).key,
+            // ── ⚠️ WHAT THEY DID WITH IT COMES OFF `outcome`, NOT OFF THE VAULT ROW ─────────────────
+            // The first cut of this read the joined vault status, and it was wrong for most of the feed.
+            // Selling at the reveal never creates a vault card at all — measured: 26 opens are
+            // outcome='sold_back' with no vault row, against 16 outcome='vaulted' which do have one. So a
+            // vault-derived answer reported the majority of every pull as "unknown", on a feed whose whole
+            // job is saying what happened.
+            //
+            // `outcome` is the authoritative field and the vault row is the LATER fate of the kept ones —
+            // four of the sixteen have since been sold back out of the vault, which is a different event
+            // and deserves its own word rather than being flattened into the first decision.
+            kept: r.outcome === "vaulted" ? true : r.outcome === "sold_back" ? false : null,
+            // Only meaningful for a kept card: held, sold_back (out of the vault later), ordered, shipped.
+            vaultStatus: r.vault_status || null,
+            soldBackCents: money(r.buy_back_cents),
+            // ⚠️ A MULTIPLE, NOT A VERDICT. 3.1x says more at a glance than $62 against $20, and it is the
+            // number Luke reads a pull by — but it is reported, never judged: a 0.2x open is not a problem,
+            // it is the model working.
+            multiple: priceCents > 0 ? Number((valueCents / priceCents).toFixed(2)) : null,
+            outcome: r.outcome || null,
+            preview: Boolean(r.preview),
+        };
+    });
+}

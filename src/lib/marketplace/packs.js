@@ -516,6 +516,43 @@ export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey =
     };
 }
 
+// ── ⚠️ TELL THE OWNER A PACK WAS PULLED ──────────────────────────────────────────────────────────────────────
+// Luke: "as an admin, I want to know whenever somebody pulls a pack. I kind of just want to know who it was,
+// what they pulled, what pack they decided to open, how much they spent."
+//
+// All four facts go in the body, because the point of this push is that it answers the question WITHOUT being
+// opened. A notification that only says "a pack was opened" costs a tap to learn anything and gets muted.
+//
+// ⚠️ IT FIRES AT THE OPEN, NOT AT THE SELL-OR-KEEP. The card is decided when the pack is opened — what happens
+// to it afterwards is a second, later decision the member may sit on for days. Waiting for it would mean the
+// alert about a $112 Zekrom arrives whenever somebody gets round to tapping a button.
+//
+// ⚠️ OWNER CHANNEL ONLY. This is "I want to know", not shelf work: the pull queue is what the employee needs
+// and it has its own reminder. See [[push-defaults-to-owner-only]] — the default is right here for once, and
+// is left explicit so nobody has to go and check what the default was.
+//
+// ⚠️ AND THE CALLER DECIDES WHEN. Nothing here is awaited inside the open path — a push must never sit between
+// a member and their reveal, and [[vercel-unawaited-async-dies]] means it cannot be a floating promise either.
+// The route wraps it in `after()`.
+export async function notifyPackOpened(open, buyerName) {
+    if (!open?.id) return;
+    const { sendAdminPush } = await import("@/lib/push/send.js");
+    const name = String(buyerName || "Someone").slice(0, 32);
+    const card = String(open.card?.name || "a card").slice(0, 48);
+    const spent = `$${((Number(open.priceCents) || 0) / 100).toFixed(2)}`;
+    const worth = `$${((Number(open.card?.valueCents) || 0) / 100).toFixed(2)}`;
+    const label = poolByKey(open.pool)?.brand || "Mystery pack";
+    await sendAdminPush({
+        // The hit is in the title so it survives a collapsed notification, where the body is what gets cut.
+        title: open.bigHit ? `🔥 ${name} pulled ${card}` : `${name} opened a pack`,
+        body: `${label} · ${spent} · ${card} · worth ${worth}`,
+        channels: ["full"],
+        route: "packFeed",
+        data: { type: "pack_open", openId: String(open.id), pool: String(open.pool || "") },
+        sound: open.bigHit ? { kind: "alert" } : null,
+    }).catch(() => {});
+}
+
 /**
  * What did the card in this bag actually cost us?
  *

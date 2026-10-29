@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { openPack } from "@/lib/marketplace/packs.js";
+import { notifyPackOpened, openPack } from "@/lib/marketplace/packs.js";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -68,6 +68,18 @@ export async function POST(request) {
                 );
             }
 
+            // ── ⚠️ THE OWNER'S ALERT, AFTER THE RESPONSE ────────────────────────────────────────────
+            // Luke: "I want to know whenever somebody pulls a pack." It must never sit between a member and
+            // their reveal — this is the most latency-sensitive moment in the feature — and it cannot be a
+            // floating promise either, because Vercel kills un-awaited async the instant the response is
+            // returned ([[vercel-unawaited-async-dies]]). `after()` is the one shape that is both.
+            //
+            // ⚠️ NOT ON A RESUME. A resumed open is the same pack being re-delivered after a dropped
+            // connection, not a new pull — alerting on it would double-notify a member with bad signal, and
+            // the one thing worse than no alert is an alert that lies about what happened.
+            if (!result.resumed) {
+                after(() => notifyPackOpened(result.open, buyer.display_name));
+            }
             return noStore({ ok: true, resumed: Boolean(result.resumed), ...result.open });
         } catch (error) {
             return internalError(error, { event: "packs.open.failure" });
