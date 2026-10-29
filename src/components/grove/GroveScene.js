@@ -135,6 +135,11 @@ const SETTLE_EVERY_MS = 45_000;
 const ZONE_DOCK = [
     { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
     { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
+    // ⚠️ GEAR BELONGS IN THE ZONE, NOT ONLY ON THE HUB. It is the one panel whose contents change the fight
+    // you are standing in, and since creatures started dropping gear it is also where the thing you just
+    // picked up goes. Leaving it hub-only would mean walking out of a zone to put on the sword that fell in
+    // it — and leaving is not a free action (see the panel note in GroveClient).
+    { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
     { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp" },
     { k: "emblems", label: "Emblems", art: "/images/grove/ui-emblems.webp" },
 ];
@@ -553,6 +558,8 @@ export default function GroveScene({
     const W = zoneWidth(zone.n);
     const maxHp = stats?.maxHp || 100;
 
+
+
     // ── THE WORLD ───────────────────────────────────────────────────────────────────────────────────
     const world = useMemo(() => {
         const rand = rngFrom(seed);
@@ -641,6 +648,8 @@ export default function GroveScene({
             // ── FEEL STATE ──────────────────────────────────────────────────────────────────────
             clock: makeClock(),
             shake: makeShaker(),
+            // Full health on arrival. This is a SEED, read once when the zone is built — see the dependency
+            // note below for why a later change to max HP must not re-run this.
             hp: stats?.maxHp || 100,
             hpBar: makeChase(1),
             bossBar: null,
@@ -652,10 +661,25 @@ export default function GroveScene({
         };
     // ⚠️ heroArt / petArt are read once on purpose: they are the sprites for this session, and rebuilding
     // the whole world because an image URL arrived late would reset the zone under the player.
+    //
+    // ── ⚠️ AND NEITHER stats.maxHp NOR stats.moveSpeed IS A DEPENDENCY, DELIBERATELY ─────────────────
+    // They used to be, and it was invisible while gear could only be changed outside the Grove. It stops
+    // being invisible the moment there is a gear panel in the zone: this memo seeds the hero at FULL health,
+    // so rebuilding on a max-HP change means swapping any item at 12 hit points hands you a complete heal,
+    // mid-fight, for free — and repopulates the zone on the way past. It is the same exploit the panel note
+    // warns about for the backpack ("opening your bag at 12 hit points would have been a heal"), arriving
+    // through a different door.
+    //
+    // Nothing is lost by dropping them. `maxHp` is read as its own const above and used live everywhere that
+    // matters — the bar, the heal clamps, the ward cap — so a bigger pool applies the instant it is equipped
+    // without the world being touched. Move speed is baked into the body at build and therefore applies from
+    // the next zone; that is a fair price for not resetting the one you are standing in, and the alternative
+    // is a rebuild that also respawns everything you just killed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [zone.n, seed, stats?.moveSpeed, stats?.maxHp]);
+    }, [zone.n, seed]);
 
     useEffect(() => { worldRef.current = world; }, [world]);
+
 
     // ── ⚠️ WHAT THE LAST ZONE LEFT BEHIND ───────────────────────────────────────────────────────────
     // Luke: "the grove had a bunch of stale carry over between maps, like boss state. Damage numbers etc."

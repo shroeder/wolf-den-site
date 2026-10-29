@@ -18,6 +18,7 @@ import GroveBench from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area from "@/components/grove/GroveArea.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
+import GroveGear from "@/components/grove/GroveGear.js";
 import { GROVE_CHESTS, CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
 import {
     GROVE_RECIPES, recipeById, canCraft, newlyReady, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
@@ -83,6 +84,7 @@ const GROVE_STAT_READOUT = {
 const DOCK = [
     { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
     { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
+    { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
     { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp" },
     { k: "emblems", label: "Emblems", art: "/images/grove/ui-emblems.webp" },
 ];
@@ -630,6 +632,13 @@ export default function GroveClient({ initial }) {
                 ) : null}
 
                 {/* ── BAG AND BANK ─────────────────────────────────────────────────────────────────── */}
+                {/* ── YOUR GEAR ────────────────────────────────────────────────────────────────────
+                    Luke: "the grove is not doing a good job showing you your gear." It showed none of it —
+                    see the long note at the top of GroveGear for why that got worse the day creatures
+                    started dropping it. `refresh` is passed because equipping recomputes st.hero on the
+                    server, and st.hero is what the scene fights with. */}
+                {panel === "gear" ? <GroveGear st={st} onChanged={refresh} /> : null}
+
                 {panel === "bag" ? (
                     <div className="gv-bag">
                         <Area id="bag" icon="ui-bag" title="Backpack"

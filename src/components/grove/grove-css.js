@@ -3457,4 +3457,126 @@ export const GROVE_CSS = `
     .ga-card { width: 164px; height: 104px; }
     .ga-card.ga-town { width: 118px; }
 }
+
+/* ── THE GEAR PANEL ──────────────────────────────────────────────────────────────────────────────────────────
+   Luke: "the grove is not doing a good job showing you your gear."
+
+   Built out of the same parts as the backpack — a board, a grid of cells, art in every cell — because they
+   answer the same shape of question and a second visual language for "things you own" would be one language
+   too many. What differs is that a gear cell carries a SLOT, so it is labelled and it is never absent: an
+   empty ring slot is drawn, because a player who cannot see the slot cannot go looking for the ring. */
+.gv-gear { display: grid; gap: 10px; }
+
+.gv-gslots { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 7px; }
+
+.gv-gslot {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 8px 5px 7px; border-radius: 11px; font: inherit; color: #efe7d8; cursor: pointer;
+    background: linear-gradient(180deg, rgba(0,0,0,0.42), rgba(0,0,0,0.3));
+    border: 1px solid rgba(0,0,0,0.55);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6), inset 0 -1px 0 rgba(255,255,255,0.05);
+    transition: transform 120ms ease, border-color 120ms ease;
+}
+.gv-gslot:active { transform: scale(0.95); }
+.gv-gslot:hover { border-color: color-mix(in srgb, var(--area, #e0a83c) 55%, rgba(0,0,0,0.55)); }
+/* A filled slot is edged in its item's rarity — the same colour vocabulary the vault and the reveal use, so
+   the colour a player learns in one place means the same thing here. */
+.gv-gslot.is-on { border-color: color-mix(in srgb, var(--rar, #9aa3b2) 62%, rgba(0,0,0,0.55)); }
+.gv-gslot.is-open { border-color: #ffd75e; }
+
+.gv-gslot-face {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    width: 52px; height: 52px;
+}
+.gv-gslot-face .gv-gart { width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; }
+/* ⚠️ contain, NOT cover. A die-cut sprite is not a photograph and cropping one takes the tip off a sword —
+   see [[sprite-floats-object-fit-contain]]. */
+.gv-gslot-face .gv-gart img { width: 100%; height: 100%; object-fit: contain; }
+.gv-gslot-face .gv-gart svg { width: 34px; height: 34px; opacity: 0.75; }
+
+/* An empty slot is a hole in the board, drawn as one: a recessed dashed well rather than nothing at all. */
+.gv-gslot-none {
+    width: 44px; height: 44px; border-radius: 9px;
+    border: 1px dashed rgba(255,255,255,0.16);
+    background: rgba(0,0,0,0.3);
+}
+.gv-gslot-n {
+    position: absolute; right: 1px; bottom: 1px; min-width: 17px; padding: 0 4px;
+    border-radius: 999px; background: #ffd75e; color: #241c05;
+    font-size: 0.64rem; font-weight: 800; font-style: normal; line-height: 17px; text-align: center;
+}
+.gv-gslot-label {
+    font-size: 0.6rem; letter-spacing: 0.07em; text-transform: uppercase; color: #a79e88;
+}
+.gv-gslot-name {
+    font-size: 0.68rem; line-height: 1.15; text-align: center; color: #efe7d8;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.gv-gslot:not(.is-on) .gv-gslot-name { color: #6f6a5c; }
+
+/* ── THE DRAWER ───────────────────────────────────────────────────────────────────────────────────────────
+   Opens UNDER the grid rather than over it, so the piece being replaced stays on screen while you choose.
+   A sheet that covers the thing you are comparing against is a sheet that makes you remember it. */
+.gv-gpick {
+    display: grid; gap: 5px; margin-top: 9px; padding: 9px;
+    border-radius: 11px; background: rgba(0,0,0,0.34); border: 1px solid rgba(0,0,0,0.5);
+}
+.gv-gpick h5 {
+    margin: 0 0 2px; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: #a79e88;
+}
+.gv-gpick-row {
+    display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px;
+    border-radius: 9px; font: inherit; color: #efe7d8; cursor: pointer; text-align: left;
+    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.2));
+    border: 1px solid rgba(0,0,0,0.5);
+    border-left: 3px solid var(--rar, #9aa3b2);
+}
+.gv-gpick-row:hover { border-color: #ffd75e; border-left-color: var(--rar, #9aa3b2); }
+.gv-gpick-row:active { transform: scale(0.99); }
+.gv-gpick-row.is-worn { border-left-color: #ffd75e; background: rgba(255,215,94,0.08); }
+.gv-gpick-row .gv-gart-sm { width: 34px; height: 34px; flex: 0 0 34px; display: flex; align-items: center; justify-content: center; }
+.gv-gpick-row .gv-gart-sm img { width: 100%; height: 100%; object-fit: contain; }
+.gv-gpick-row .gv-gart-sm svg { width: 26px; height: 26px; opacity: 0.75; }
+.gv-gpick-text { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.gv-gpick-text b { font-size: 0.8rem; font-weight: 700; }
+/* ⚠️ TWO LINES, NOT ONE. A single nowrap line cut every item at "42 Damage · 1.12/s Attack Speed · +3…" —
+   and the clipped tail is where the affixes live, which is the half that decides between two weapons. Two
+   lines fit the whole stat string for almost every item at 390px and still bound the row height. */
+.gv-gpick-text i {
+    font-style: normal; font-size: 0.68rem; color: #a79e88; line-height: 1.25;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.gv-gpick-go, .gv-gpick-off {
+    flex: 0 0 auto; padding: 4px 9px; border-radius: 999px;
+    font-size: 0.68rem; font-weight: 800; white-space: nowrap;
+}
+.gv-gpick-go { background: #ffd75e; color: #241c05; }
+.gv-gpick-off { background: rgba(255,255,255,0.09); color: #cfc7b4; }
+
+.gv-gear-wait { margin: 4px 2px; font-size: 0.76rem; color: #a79e88; line-height: 1.45; }
+.gv-gear-err { margin: 6px 2px 0; font-size: 0.76rem; color: #ff9f8a; }
+
+/* ── WHAT IT ADDS UP TO ───────────────────────────────────────────────────────────────────────────────────
+   The figures the SCENE is handed, so "I put the sword on and my damage went up" is something a player can
+   watch happen rather than infer. Tabular numerals so the column does not jitter when a value changes. */
+.gv-gstats { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 6px; }
+.gv-gstat {
+    display: grid; gap: 1px; padding: 7px 9px; border-radius: 9px;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(0,0,0,0.5);
+}
+.gv-gstat span { font-size: 0.6rem; letter-spacing: 0.07em; text-transform: uppercase; color: #a79e88; }
+.gv-gstat b { font-size: 0.98rem; font-weight: 800; color: #ffd75e; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 560px) {
+    /* 375px with browser chrome is the tightest real screen this has to work on. Three slots across keeps
+       the item name readable on two lines instead of clipping every one of them. */
+    .gv-gslots { grid-template-columns: repeat(3, 1fr); }
+    .gv-gstats { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* The totals, on the gear board rather than a board of their own — see the note in GroveGear. */
+.gv-gtot { margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,0.08); }
+.gv-gtot h5 {
+    margin: 0 0 6px; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: #a79e88;
+}
 `;
