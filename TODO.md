@@ -110,29 +110,62 @@ the test. Two new screens to check, and the shelf queue has 30 real jobs to try 
 
 ⚠️ Eric's employee build was **two releases behind** (711 → 714), so he gets more than just this change.
 
-### 3.3 Ledger duplicates — ~~61 pairs, waiting on Luke~~ **DONE 29 Oct, except nine**
+### 3.3 Ledger duplicates — ~~61 pairs, waiting on Luke~~ **DONE 29 Oct, nothing outstanding**
 
 Root cause: the only guard was a set of Plaid ids in SharedPreferences **on the phone**, and the Plaid id
 itself was being stored inside the free-text `notes` string where nothing could index it. Plaid also sends
 `pending_transaction_id` — the id of the pending row a posted charge replaces — and the service read the
 `pending` boolean and discarded the link. That is the entire reason subscriptions paired up.
 
-**Now:** the app sends both ids as fields; the server resolves before writing (posted-replaces-pending, same
-id again, or a bank row adopting a hand entry); history is cleaned — **22 pairs merged, $4,439.41 of phantom
-spend removed**, each logged to `ledger_merge_log` with the deleted row's contents so it is reversible.
-Shipped as app **v1.0.715** on both channels.
+**Forward fix:** the app sends both ids as fields; the server resolves before writing (posted-replaces-pending,
+same id again, or a bank row adopting a hand entry). Shipped as app **v1.0.715** on both channels.
 
-⚠️ **Nine pairs still need a human**, and only these — every one has nothing to reason from on either side:
+**History:** cleaned twice. First a shape-based pass (22 pairs, $4,439.41), then — after Luke pointed out that
+*"you have access to my bank via plaid"* — properly, by asking Plaid.
 
-| | |
-|---|---|
-| $1,400.00 | `PAY FIRST CHECK` / `CHECK`, 1 day apart |
-| $321.46, $307.36 | `CHECK CHECK #…` / `AUTOMATIC DEBIT SQUARE INC`, 4 days |
-| $200.00 | two ATM withdrawals, different reference strings, 2 days |
-| $44.16, $20.00, $19.99 ×3 | both descriptions blank |
+#### ⚠️ Two conclusions in the previous version of this file were WRONG
 
-Run `planBackfill()` in `src/lib/ledger/backfill-dupes.js` to see them again. The 67 same-vendor pairs
-(mostly Southern Hobby, ~$8.3k) are **real repeat orders** and were deliberately left alone.
+1. **"Nine pairs need a human."** None did. They were undecidable only from the text of two descriptions.
+   `/transactions/get` returns just what exists *now*, so a pending row that has posted is gone and its
+   replacement names it. The bank settled every one:
+
+   | | verdict |
+   |---|---|
+   | $1,400 | **one** check, posted 08-07; the bare `CHECK` row was its pending half |
+   | $200 | **one** ATM withdrawal, 09-21; 09-19 named as its pending half |
+   | $19.99 | **one** UPS membership, 06-08; the 06-04 and 06-06 rows were copies |
+   | $44.16 | **one** charge — `Fixtures Reimbursement` and the bank's blank row, same day |
+   | $321.46, $307.36 | **both real** — payroll debit, check, and the deposit that returned the money |
+
+2. **"The 67 same-vendor pairs (mostly Southern Hobby, ~$8.3k) are real repeat orders."** They were not.
+   Southern Hobby appeared **33 times across 14 amounts with not one amount appearing once** — every one
+   doubled at a 1–4 day lag. The bank holds each exactly **once**. The old rule said "both sides name
+   something, so they are two coincidental purchases", which is the largest leak there was.
+
+   Inverted, the nine identical $24.98 CVS rows on one day — which looked like an import that lost its
+   dates — all carry ids Plaid still reports. Those are **real**.
+
+#### The tool
+
+`node scripts/plaid-reconcile.mjs` — dry run; `--apply` writes; `--shadow` opts into the one non-idempotent
+rule. Applied: **21 phantoms merged ($4,272.28)** plus **223 rows promoted** from a pending id to their
+posted identity, which matters as much as the deletes — an un-promoted row is one the next arrival lands
+beside instead of merging into. Expense+Inventory **-117,322.68**, 742 rows.
+
+Three guards, each from a bug it caught — worth reading before trusting it:
+
+- the **shadow** rule is not idempotent (promotions change which row claims what); after the first apply it
+  offered nine more rows worth $5,814.89, one proposed as a shadow of itself. Opt-in, with an
+  amount-agreement check.
+- ⚠️ **an `external_id` outranks any shape guess**, enforced in the SQL. The bank holds $190.44 to Southern
+  Hobby *twice*, identically named two days apart; the shape rule would have deleted a real payment.
+- don't put a payee ("PAY FIRST") in the bank-noise list.
+
+`scripts/test-ledger-dupe-classify.mjs` pins six cases. Every delete is in `ledger_merge_log` with the
+dropped row's contents and which anchor decided it — reversible by hand.
+
+**Still unexplained, low value:** 32 rows ($9,077.16) whose ids Plaid has no record of, almost all May
+`sheets-import` blanks. Surfaced by the reconciler under UNKNOWN; it never guesses at them.
 
 ---
 
