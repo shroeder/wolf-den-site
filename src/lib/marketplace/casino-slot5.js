@@ -1844,8 +1844,28 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
         // way past. Same family as the gem leak documented above — the display must not know something the
         // player has not been shown yet.
         if (chain && chain.cascades >= m.winAgain.need) {
+            // ── ⚠️ THE ROW HOLDS WHAT YOU WON, NOT A MULTIPLE OF WHAT YOU BET ──────────────────────
+            // This was `sum(multiples) * bet`, with each slot stored as `spinWin / bet`. So a win banked
+            // at a 100 stake and fired at a 2,500 stake paid TWENTY-FIVE TIMES what it was worth when it
+            // was earned — and because the row deliberately survives its own payout (see below), a full
+            // row could be cashed again and again at max bet.
+            //
+            // Luke: "He basically is building his bonus up with low gambles on the vault and then goes
+            // max... its way too rewarding and hes exploiting it." He was exactly right, and the ledger
+            // agrees: at the SAME machine one member returned 72.6% at a 100 stake and 159.6% at 2,500,
+            // which is not a player getting lucky, it is a player banking cheap and cashing dear.
+            //
+            // ⚠️ AND THE SIMULATION THAT CLEARED THIS FEATURE COULD NOT HAVE CAUGHT IT. The note below
+            // records 300k spins across four seeds measuring the cost of a row that is never consumed —
+            // all of them at a CONSTANT bet. An arbitrage that only exists when the stake CHANGES mid-row
+            // is invisible to every one of those runs. If a feature banks something across spins, the
+            // sweep has to vary the bet or it is not testing the thing that matters.
+            //
+            // Storing the absolute win keeps the feature exactly as it reads from the seat — you win back
+            // what is on the row — and removes the arbitrage completely, because the row no longer knows
+            // or cares what you are betting now.
             const paid = nextMeter.reduce((a, n) => a + n, 0);
-            total += paid * bet;
+            total += paid;
             winAgain = { paid, cascades: chain.cascades, need: m.winAgain.need,
                 slots: m.winAgain.slots, label: m.winAgain.label, row: nextMeter };
             // ── HOW THE ROW USED TO BE REBUILT, AND WHY IT NO LONGER IS ─────────────────
@@ -1875,13 +1895,13 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
             // banked win out more than once, and at the old settings that took The Vault from 95.1% to
             // 111.4% — swept, 300k spins, four seeds. `need` went 5 -> 6 and the table took 2% to pay for
             // it; see the note on winAgain.need.
-            nextMeter = [Math.max(0, spinWin) / bet, ...nextMeter].slice(0, m.winAgain.slots);
+            nextMeter = [Math.max(0, spinWin), ...nextMeter].slice(0, m.winAgain.slots);
             return { grid, base, chain, free, locked, hold, built, warren, gems, winAgain,
-                meter: nextMeter, meterBonus: (gems?.total || 0) / bet, total, bet };
+                meter: nextMeter, meterBonus: gems?.total || 0, total, bet };
         }
         // A spin that did not fire pushes its own win on and ages the rest one place along.
-        nextMeter = [Math.max(0, spinWin) / bet, ...nextMeter].slice(0, m.winAgain.slots);
+        nextMeter = [Math.max(0, spinWin), ...nextMeter].slice(0, m.winAgain.slots);
     }
     return { grid, base, chain, free, locked, hold, built, warren, gems, winAgain, meter: nextMeter,
-        meterBonus: (gems?.total || 0) / bet, total, bet };
+        meterBonus: gems?.total || 0, total, bet };
 }

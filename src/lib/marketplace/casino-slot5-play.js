@@ -333,9 +333,12 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // the bonus you just played visibly lands in the meter instead of having been there all along.
             // The row SAVED above is the full one, so a reload mid-bonus settles on the right number.
             next: hideBonus(r.meter || []).map((v) => (v > 0 ? payoutFor(stake, v) : 0)),
-            topUp: r.meterBonus > 0 ? payoutFor(stake, r.meterBonus) : 0,
+            // meterBonus and winAgain.paid are now ABSOLUTE engine units, like `total`, rather
+            // than multiples of the bet — so both divide by the stake here exactly as
+            // `payoutFor(stake, r.total / stake)` does a few lines up.
+            topUp: r.meterBonus > 0 ? payoutFor(stake, r.meterBonus / stake) : 0,
             cleared: Boolean(r.winAgain),
-            fired: r.winAgain ? { total: payoutFor(stake, r.winAgain.paid), cascades: r.winAgain.cascades } : null,
+            fired: r.winAgain ? { total: payoutFor(stake, r.winAgain.paid / stake), cascades: r.winAgain.cascades } : null,
         } : null,
         // ── THE GEM VAULT ────────────────────────────────────────────────────────────────────────────
         // The whole board and the order it comes out in. The screen maps the tile a finger landed on to the
