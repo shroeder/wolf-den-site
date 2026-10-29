@@ -20,5 +20,5 @@ export const metadata = { title: "Grove Lab", robots: { index: false, follow: fa
 export default async function Page({ searchParams }) {
     if (process.env.NODE_ENV !== "development") notFound();
     const sp = await searchParams;
-    return <GroveLab scene={String(sp?.scene || "wander")} zoneN={Number(sp?.zone) || 1} />;
+    return <GroveLab scene={String(sp?.scene || "wander")} zoneN={Number(sp?.zone) || 1} mapN={Number(sp?.map) || 1} />;
 }

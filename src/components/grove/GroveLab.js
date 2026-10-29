@@ -5,6 +5,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { GROVE_ZONES } from "@/lib/marketplace/grove-catalog.js";
+// ⚠️ THE PLAN MODULE, NOT THE SERVER ONE. grove-coliseum.js is server-only.
+import { runPlan } from "@/lib/marketplace/grove-coliseum-plan.js";
 
 // ── THE GROVE, ON A BENCH ────────────────────────────────────────────────────────────────────────────────────
 // Mounts the REAL scene against a fixture session. No database, no auth, no owner gate — and no cost to
@@ -67,7 +69,7 @@ const beltFor = (scene) => (scene === "nobelt" ? null
     : scene === "belt" ? { ...LAB_BELT, count: 0 }
     : LAB_BELT);
 
-export default function GroveLab({ scene = "wander", zoneN = 1 }) {
+export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
     // ── ⚠️ THE LOG IS A REF, AND EVERY HANDLER BELOW IS STABLE. THIS WAS TEARING THE LOOP DOWN ─────
     // The bench used to pass `bonuses={{}}` and a fresh inline arrow for every callback, so each render
     // handed GroveScene new identities — and the scene's loop effect lists onSettle among its
@@ -86,6 +88,9 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
     }, []);
     // Where a gate has taken us, overriding the zone in the URL once one is walked through.
     const [travelled, setTravelled] = useState(null);
+    // The real plan for whichever map the lab was asked for, so the arena scene is not a second fixture
+    // that can drift from what players get.
+    const arenaPlan = useMemo(() => runPlan(Math.max(1, Math.min(7, Number(mapN) || 1))), [mapN]);
     const [panel, setPanel] = useState(null);
     // ── ⚠️ THE BENCH HAD NO WAY TO FILM AN OPEN DOOR, AND NOW THAT MATTERS ─────────────────────────
     // GroveScene locks the way on with `dr.to > unlockedN`, and the lab never passed unlockedN — so it
@@ -256,6 +261,18 @@ export default function GroveLab({ scene = "wander", zoneN = 1 }) {
             ) : null}
             <GroveScene
                 key={scene + zoneN}
+                // ── ⚠️ THE COLISEUM, DRIVABLE ──────────────────────────────────────────────────────
+                // A run normally needs a key, a tap on the marshal and a live account, which makes the one
+                // mode built entirely around TIMING the hardest thing here to look at. ?scene=arena&map=N
+                // mounts the real plan — the authored floor, the real wave list, the real clock — so the
+                // waves can be filmed.
+                //
+                // ⚠️ A LAB PROVES THE COMPONENT, NEVER THE WIRING. This hands the scene a plan directly;
+                // it says nothing about whether the marshal's button reaches it. Both still need checking.
+                arena={scene === "arena" ? { ...arenaPlan.arena, runMs: arenaPlan.runMs } : null}
+                waves={scene === "arena" ? arenaPlan.waves : null}
+                onRunEnd={(r) => say(`run over — ${r.wavesCleared} waves, cleared=${r.cleared}`)}
+                onWave={(n, total) => say(`wave ${n}/${total}`)}
                 zone={zone}
                 seed={seed}
                 bonuses={NO_BONUSES}
