@@ -207,6 +207,17 @@ export default function GroveClient({ initial }) {
         return d?.ok ? d : null;
     }, []);
 
+    // ── THE COLISEUM RUN ────────────────────────────────────────────────────────────────────────────
+    // ⚠️ UP HERE WITH THE OTHER HOOKS, like paperMap above and for the same reason: everything below is
+    // past an early return, and a hook called conditionally changes the hook ORDER between renders.
+    //
+    // ⚠️ AND IT CRASHED THE GROVE BY BEING MISSING. The patch that was meant to add this line silently
+    // matched nothing, and I "verified" it by checking the file contained the string useColiseum — which
+    // it did, because the IMPORT had landed. Every use of `col` below then referenced an undefined
+    // binding: "col is not defined", on the live Grove, for a real member. Checking that a name appears
+    // is not checking that it is DEFINED; the build cannot catch it and neither did I.
+    const col = useColiseum({ onChanged: refresh });
+
     // ── ENTER A ZONE ────────────────────────────────────────────────────────────────────────────────
     const enter = useCallback(async (zone) => {
         // ⚠️ THE CHARM GOES WITH THE ENTER, so choosing one and burning it are a single request. The
