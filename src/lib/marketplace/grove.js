@@ -584,6 +584,11 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
     // every time they glance at it. This is one read of a small table the session is already awake for —
     // the same argument that got the nav from 111 round trips to 3.
     const quests = await questBoard(buyerId).catch(() => []);
+    // ── WHO IS STANDING IN THIS PARTICULAR ZONE ──────────────────────────────────────────────────────
+    // Three givers are hidden across twelve zones per map, so most zones have nobody and the scene must
+    // not draw a figure in them. Matching on the global zone number rather than a per-map index keeps
+    // this honest across map boundaries, where an off-by-twelve would put map 2's cartographer in map 1.
+    const npcHere = quests.find((q) => q.zone === zone.n) || null;
     const coliseum = await coliseumState(buyerId, zone.map || 1).catch(() => null);
 
     return {
@@ -592,6 +597,7 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
         gearArt,
         quests,
         coliseum,
+        npcHere,
         zone: {
             ...zone,
             kills,

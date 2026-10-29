@@ -321,6 +321,8 @@ const SWING_V_REACH = 6;
 // A pet that falls this far behind has lost the plot — see the rescue in the loop.
 
 export default function GroveScene({
+    npcHere = null,
+    onTalk,
     zone, seed, bonuses, stats, heroArt, petArt, belt, labScene, bagRoom = null, gearArt = null,
     // ⚠️ ONE NUMBER, ALREADY MULTIPLIED OUT, AND NOT THE RARITY AND LEVEL IT CAME FROM. The share of a
     // hero swing this member's companion bites for, computed on the server in heroLook (grove.js) off the
@@ -3638,6 +3640,32 @@ export default function GroveScene({
                         </button>
                     );
                 })}
+
+                {/* ── ⚠️ A QUEST-GIVER IS SCENERY YOU CAN TOUCH, NOT A CREATURE ────────────────────
+                    Deliberately NOT a .gv-foe: the scene's tap handler resolves a world coordinate into
+                    "walk there" or "attack that", and an NPC inside that set would be a body the hero
+                    tries to kill. It sits in the same layer as the doors, which is the other thing in a
+                    zone you touch without fighting.
+
+                    The badge is the whole reason this is worth drawing at all — a figure standing in a
+                    room says nothing, and a figure with "ready" over their head is a reason to cross
+                    the room. */}
+                {npcHere ? (
+                    <button type="button"
+                        className={`gv-npc${npcHere.active?.ready ? " is-ready" : ""}${npcHere.active ? "" : " is-done"}`}
+                        onPointerDown={(e) => { e.stopPropagation(); onTalk?.(); }}
+                        aria-label={npcHere.active
+                            ? `${npcHere.name} — ${npcHere.active.ready ? "ready to hand in" : npcHere.active.title}`
+                            : `${npcHere.name} — nothing more to ask`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`/images/grove/npc-${npcHere.npc}.webp`} alt="" draggable={false} />
+                        {npcHere.active ? (
+                            <span className="gv-npc-pip">
+                                {npcHere.active.ready ? "!" : `${npcHere.active.progress}/${npcHere.active.need}`}
+                            </span>
+                        ) : null}
+                    </button>
+                ) : null}
 
                 {world.foes.map((f) => (
                     <button key={f.uid} type="button"

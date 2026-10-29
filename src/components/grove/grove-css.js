@@ -3630,4 +3630,34 @@ export const GROVE_CSS = `
     flex: 0 0 auto; font-size: 0.64rem; letter-spacing: 0.06em; text-transform: uppercase;
     color: #3a2906; background: #f0b44c; border-radius: 6px; padding: 3px 7px;
 }
+
+/* ── A QUEST-GIVER STANDING IN A ZONE ────────────────────────────────────────────────────────────
+   Positioned against the floor the same way the doors are, and deliberately NOT inside the creature
+   layer — see the note in GroveScene about why an NPC must never be a .gv-foe. */
+.gv-npc {
+    position: absolute; left: 62%; bottom: 10%;
+    width: 72px; height: 104px; padding: 0; border: 0; background: none;
+    cursor: pointer; z-index: 240;
+}
+.gv-npc img {
+    width: 100%; height: 100%; object-fit: contain; object-position: bottom;
+    filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5));
+}
+/* Finished chains stay standing — a giver who vanishes reads as a bug — but stop asking for attention. */
+.gv-npc.is-done img { filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5)) saturate(0.65) brightness(0.8); }
+
+.gv-npc-pip {
+    position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
+    min-width: 20px; padding: 2px 6px; border-radius: 9px;
+    font-size: 0.62rem; font-weight: 700; font-variant-numeric: tabular-nums;
+    background: rgba(18, 22, 16, 0.92); color: #cbbf9d; border: 1px solid rgba(140, 160, 110, 0.4);
+}
+.gv-npc.is-ready .gv-npc-pip {
+    background: linear-gradient(180deg, #ffe3a8, #f0b44c); color: #3a2906; border-color: #f0b44c;
+    animation: gvNpcNudge 1.8s ease-in-out infinite;
+}
+@keyframes gvNpcNudge {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-3px); }
+}
 `;

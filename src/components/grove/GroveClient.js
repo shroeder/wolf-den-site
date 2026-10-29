@@ -987,6 +987,10 @@ export default function GroveClient({ initial }) {
             <div className="gv">
                 <GroveScene
                     zone={session.zone} seed={session.seed} bonuses={session.bonuses} gearArt={session.gearArt}
+                    // Whoever is standing in THIS zone, if anyone. Most zones have nobody — three givers
+                    // across twelve rooms — so the scene draws a figure only when this is non-null.
+                    npcHere={session.npcHere || null}
+                    onTalk={() => setPanel("quests")}
                     // ⚠️ THE DOOR'S GATE IS THE SERVER'S, NOT THE CLIENT'S KILL COUNT. groveEnter refuses
                     // any zone past unlocked_n, and the door used to decide for itself from local kills --
                     // so a count the server had not banked yet (the settle still in flight, or trimmed by
