@@ -114,6 +114,19 @@ const FIXTURE = arg("--fixture", null);
 // Semicolon-separated selectors, tapped in order via Input.dispatchTouchEvent at each element's centre, with
 // --touch-wait ms between them. Requires touch emulation, which is turned on whenever this flag is used.
 const TOUCH = arg("--touch", null);
+// ── --touch-xy: TAP A PLACE, NOT A THING ─────────────────────────────────────────────────────────────────────
+// Some screens do not have an element to aim at. The Grove resolves a tap by COORDINATE — its scene listens on
+// one host div and calls worldAt(clientX, clientY) to work out what you touched — so "tap the creature" is a
+// point on the glass, not a selector. Aiming selectors at it is how this rig spent an afternoon filming a hero
+// standing perfectly still while creatures walked into him: every tap either matched nothing or matched an
+// element that was not the scene, and the film looked exactly like a game that does not start.
+//
+//   --touch-xy "195,615;240,620"      semicolon-separated x,y in CSS pixels, tapped in order
+//
+// Coordinates are viewport pixels, so they are only meaningful beside the --w/--h the film was shot at. Taps
+// outside the viewport are refused rather than dispatched, because an off-screen touch silently hits nothing
+// and reads back as "the feature is broken" — which it did here, at x=416 on a 390-wide phone.
+const TOUCH_XY = arg("--touch-xy", null);
 const TOUCH_WAIT = Number(arg("--touch-wait", 900));
 
 if (!url) throw new Error("usage: node scripts/film.mjs <url> <outBase> [--click sel] [--await sel] [--tap sel] [--frames n] [--every ms]");
@@ -175,7 +188,7 @@ if (process.env.SHOT_COOKIE) {
     // This cost a full debugging round on the Forest: the new whole-tree art was live and byte-correct at the
     // edge, and the film kept showing the redwood trunk-crops it replaced. Every conclusion drawn from those
     // frames was about art that had not existed for an hour. shot.mjs learned this and film.mjs was not told.
-    if (TOUCH) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+    if (TOUCH || TOUCH_XY) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
     await send("Network.setCacheDisabled", { cacheDisabled: true });
     if (FIXTURE) await send("Network.setCookie", {
         name: "wolfden-fixture", value: FIXTURE, domain: new URL(url).hostname, path: "/",
@@ -236,6 +249,23 @@ if (CLICK) {
 
 // THE FINGER. Real touch points, one selector at a time, each tap reported with what was under it — because a
 // tap that found nothing is a tap that proves nothing, and this flag exists to prove things.
+if (TOUCH_XY) {
+    for (const pair of TOUCH_XY.split(";").map((x) => x.trim()).filter(Boolean)) {
+        const [sx, sy] = pair.split(",").map((n) => Math.round(Number(n)));
+        if (!Number.isFinite(sx) || !Number.isFinite(sy)) { chrome.kill(); throw new Error(`bad --touch-xy pair "${pair}"`); }
+        if (sx < 0 || sy < 0 || sx > W || sy > H) {
+            chrome.kill();
+            throw new Error(`--touch-xy ${sx},${sy} is outside the ${W}x${H} viewport — it would hit nothing`);
+        }
+        console.log(`  touch at ${sx},${sy}`);
+        const pt = [{ x: sx, y: sy, radiusX: 6, radiusY: 6, force: 1, id: 1 }];
+        await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: pt });
+        await sleep(60);
+        await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await sleep(TOUCH_WAIT);
+    }
+}
+
 if (TOUCH) {
     for (const sel of TOUCH.split(";").map((x) => x.trim()).filter(Boolean)) {
         let at = null;
@@ -249,14 +279,23 @@ if (TOUCH) {
                 if (el) el.scrollIntoView({ block: "center", behavior: "instant" }); })()`);
             await sleep(250);
             at = await evaluate(`(() => {
-                const el = document.querySelector(${JSON.stringify(sel)});
-                if (!el) return null;
-                const r = el.getBoundingClientRect();
-                if (!r.width || !r.height) return null;
-                const y = Math.round(r.top + r.height / 2);
-                if (y < 0 || y > window.innerHeight) return null;
-                return JSON.stringify({ x: Math.round(r.left + r.width / 2), y,
-                    what: String(el.className || el.tagName).slice(0, 40) });
+                // ⚠️ THE FIRST MATCH IS NOT NECESSARILY AN ON-SCREEN MATCH, and x was never checked.
+                // This read querySelector + a y-only bounds test, so a Grove creature standing at x=416 on a
+                // 390-wide phone passed as tappable and the touch was dispatched into nothing. The film then
+                // showed a hero standing still among creatures — which reads exactly like combat being
+                // broken, and cost an afternoon on that assumption. Scan ALL matches and take one that is
+                // actually inside the viewport on BOTH axes.
+                const els = [...document.querySelectorAll(${JSON.stringify(sel)})];
+                for (const el of els) {
+                    const r = el.getBoundingClientRect();
+                    if (!r.width || !r.height) continue;
+                    const x = Math.round(r.left + r.width / 2);
+                    const y = Math.round(r.top + r.height / 2);
+                    if (x < 0 || x > window.innerWidth) continue;
+                    if (y < 0 || y > window.innerHeight) continue;
+                    return JSON.stringify({ x, y, what: String(el.className || el.tagName).slice(0, 40) });
+                }
+                return null;
             })()`);
             if (!at) await sleep(200);
         }
