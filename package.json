@@ -38,6 +38,7 @@
         "check:chrome": "node scripts/check-chrome-fanout.mjs",
         "check:grove": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove.mjs",
         "check:farm": "node scripts/check-farm.mjs",
+        "check:grove-curve": "node scripts/check-grove-curve.mjs",
         "check:grove-roll": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-roll.mjs",
         "check:grove-physics": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-physics.mjs",
         "check:grove-pet": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-pet.mjs",

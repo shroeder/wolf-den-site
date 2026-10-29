@@ -76,14 +76,19 @@ export const tierCount = (slot, i, mapN) => Math.round(BASE_COUNTS[i] * (1 + (Ma
 // maps' creature baselines and map one's are hand-written somewhere else — so when the floor was re-cut for
 // beginners (see BOSS_HP_D1) and only one of the two tables moved, map 1 zone 12 got 2.65x easier and map 2
 // zone 1 did not. A step like that at a map boundary reads as the game breaking, not as it getting harder.
+// ⚠️ THESE ARE DEPTH-ONE BASELINES, AND THEY WERE REBUILT FOR THE NEW CURVE. scaledFoe multiplies them
+// by GROVE_SCALE for the depth a creature actually stands at, so what is written here is what the FIRST
+// zone of the Grove asks of a brand-new account — not what map five asks. The old numbers (286-497 hp,
+// 33-78 damage) were depth-one values fitted to a player who does not exist at depth one: they cost the
+// 25th-percentile member 97 swings per wanderer and killed them in two hits.
 const ARCH = {
     //                       passive  hp    dmg          telegraph
-    swarm: { passive: true, hp: 286, dmg: [33, 52], telegraph: 0 },
-    grazer: { passive: true, hp: 369, dmg: [36, 55], telegraph: 0 },
-    striker: { passive: false, hp: 331, dmg: [43, 64], telegraph: 620 },
-    stalker: { passive: false, hp: 354, dmg: [46, 68], telegraph: 700 },
-    brute: { passive: false, hp: 497, dmg: [53, 78], telegraph: 900 },
-    caster: { passive: false, hp: 309, dmg: [48, 71], telegraph: 820 },
+    swarm: { passive: true, hp: 9, dmg: [5, 7], telegraph: 0 },
+    grazer: { passive: true, hp: 11, dmg: [5, 8], telegraph: 0 },
+    striker: { passive: false, hp: 10, dmg: [6, 9], telegraph: 620 },
+    stalker: { passive: false, hp: 11, dmg: [6, 9], telegraph: 700 },
+    brute: { passive: false, hp: 15, dmg: [7, 11], telegraph: 900 },
+    caster: { passive: false, hp: 10, dmg: [7, 10], telegraph: 820 },
 };
 
 const P = (id, name, role, tier, blurb) => ({ id, name, role, tier, blurb });
@@ -804,19 +809,37 @@ export const MAP_ENEMIES = Object.fromEntries(
 // ⚠️ TRASH IS NOT ON THIS CURVE. See GROVE_SCALE in grove-catalog.js: wanderers climb slower so they stay
 // about three swings at every depth, and the BOSS is the thing that stops you. The first cut of this had them
 // matching, which put Eric at thirteen swings per wanderer on map 7 — that is not difficulty, it is chores.
-const BOSS_HP_D1 = 9000;
-// ⚠️ ANCHORED TO MAP ONE'S HAND-AUTHORED TWELVE IN grove-catalog.js, so the two move together or map two's
-// first boss out-hits map one's last. Briefly 105-143, cut for a difficulty complaint that turned out to be
-// forGrove() dropping lifestealBonus -- see the long note beside MAP_ONE_BOSSES.
-const BOSS_DMG_D1 = [70, 96];
-const MAP_STEP_HP = 2.25;      // was 1.372 — the span from a beginner to Eric, over seven maps
-const MAP_STEP_DMG = 1.47;     // likewise for durability: Adam's 469 effective HP to Eric's 9,580
-const MAP_RAMP_HP = 3.05;      // 9,000 -> 27,450 across map one's twelve. The within-map ramp is unchanged.
-const MAP_RAMP_DMG = 1.16;     // 70 -> 81 across the same twelve
-const bossHp = (mapN, i) =>
-    BOSS_HP_D1 * MAP_STEP_HP ** (mapN - 1) * MAP_RAMP_HP ** (i / 11);
-const bossDmg = (mapN, i, k) =>
-    BOSS_DMG_D1[k] * MAP_STEP_DMG ** (mapN - 1) * MAP_RAMP_DMG ** (i / 11);
+// ── ⚠️ ONE EXPONENTIAL IN GLOBAL DEPTH. THE MAP-STEP CURVE HAD A SEAM IN IT ─────────────────────────────────
+// It used to be `2.25 ** (map - 1) * 3.05 ** (i / 11)` — a step per map, times a ramp within the map. Those
+// two compose into a SAWTOOTH: the ramp climbs to 3.05x across a map's twelve zones, then the next map starts
+// from a step of only 2.25x. Measured, every one of the six map boundaries got EASIER:
+//
+//     map 1 z12  27,458  ->  map 2 z1  20,000     26% easier
+//     map 2 z12  62,000  ->  map 3 z1  46,000     26% easier     ... and so on, all six.
+//
+// So the hardest fight on a map was its eleventh zone, and crossing into new territory was a relief rather
+// than a threshold. Wanderers never had this — they are a single exponential in global depth — which means
+// the two halves of every fight have disagreed about the shape of the Grove since map two shipped.
+//
+// ⚠️ AND THE FLOOR CAME DOWN, which is the change players will actually feel. 9,000 hp at depth one is twenty
+// minutes of swinging for the 25th-percentile member and a one-shot death from its first blow. Anchors are
+// fitted in scripts/grove-fit.mjs against every member on the server, not against two of them:
+//
+//     depth  1         350 hp   a ~47s fight for p25, survivable for seven of its hits
+//     depth 84   3,558,000 hp   unchanged from the old curve's top, so the frontier is untouched
+//
+// The top is deliberately where it already was. The complaint was never that the Grove's end was too hard.
+const BOSS_HP_D1 = 350;
+const BOSS_DMG_D1 = [7, 10];
+const BOSS_HP_PER_ZONE = 0.1176;    // x3.80 a map, smooth across every boundary
+const BOSS_DMG_PER_ZONE = 0.0537;   // x1.87 a map
+
+/** A boss's health at a GLOBAL depth (1..133). The single definition — map one reads it too. */
+export const bossHpAt = (depth) =>
+    BOSS_HP_D1 * (1 + BOSS_HP_PER_ZONE) ** (Math.max(1, Number(depth) || 1) - 1);
+/** A boss's low (k=0) and high (k=1) blow at a global depth. */
+export const bossDmgAt = (depth, k) =>
+    BOSS_DMG_D1[k] * (1 + BOSS_DMG_PER_ZONE) ** (Math.max(1, Number(depth) || 1) - 1);
 
 // ⚠️ A BOSS WITH NO ATTACK LIST NEVER SWINGS. GroveScene guards on `f.attacks?.length`, so an empty list is
 // a health bar standing still while you hit it — a fight that looks finished before it starts. These mirror
@@ -842,8 +865,8 @@ export const MAP_BOSSES = Object.fromEntries(
             const depth = zoneDepth(m.n, i);
             return [z.bossId, {
                 id: z.bossId, name: z.bossName, art: `/images/grove/boss-${z.bossId}.webp`, boss: true,
-                hp: Math.round(bossHp(m.n, i) / 1000) * 1000,
-                dmg: [Math.round(bossDmg(m.n, i, 0)), Math.round(bossDmg(m.n, i, 1))],
+                hp: Math.round(bossHpAt(depth) / 100) * 100,
+                dmg: [Math.round(bossDmgAt(depth, 0)), Math.round(bossDmgAt(depth, 1))],
                 attacks: (BIOME_ATTACKS[z.biome] || ["slam", "sweep"]).map((k) => BOSS_ATTACKS[k]),
                 map: m.n, depth,
                 emblem: m.emblem?.id || null, emblemChance: 0.09,
