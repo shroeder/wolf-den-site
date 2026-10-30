@@ -705,12 +705,23 @@ const VAULT = {
 // left alone: it has no dial, it is a published ruleset rather than a paytable anybody chose, and it
 // simulates at 98.8% on perfect basic strategy while the ledger has it realising 81.8%. It is not the
 // thing that was farmable.
-export const TARGET_RTP = 0.95;
-HUNT.pay = 0.996;
-HARVEST.pay = 0.989;
-DEEP.pay = 0.996;
-MENAGERIE.pay = 0.991;
-VAULT.pay = 0.998;   // THREE passes to converge, exactly as the note above warns
+// ── ⚠️ 0.95 -> 0.90: A REAL CASINO FLOOR ─────────────────────────────────────────────────
+// Luke, 2026-10-30: "Lower all from 95 to something more casino like irl."
+//
+// 0.90 is a real number rather than a chosen one. A Nevada statewide slot hold runs about 6-7% (so ~93-94%
+// back), the Strip averages nearer 92%, and the penny and low-denomination machines most people actually
+// sit at return 88-90%. 0.90 is that last band -- the floor a player really meets -- and it is still 15
+// points above the 75% Nevada legal minimum.
+//
+// ⚠️ EVERY DIAL BELOW IS NOW WRONG UNTIL RE-SOLVED. They are the numbers that put each cabinet on the OLD
+// target. Changing this line alone lowers nothing; the solver has to run and the column has to be written
+// back. See the note above on why they cannot be scaled by the ratio of the targets.
+export const TARGET_RTP = 0.90;
+HUNT.pay = 0.935;
+HARVEST.pay = 0.939;
+DEEP.pay = 0.945;
+MENAGERIE.pay = 0.938;
+VAULT.pay = 0.896;   // THREE passes to converge, exactly as the note above warns
 
 // Multiplies every paying number a cabinet owns. `pays` is symbol -> count -> multiple of the line bet and
 // `scatterPays` is count -> multiple of the total bet; both are payouts and nothing else in the machine is.

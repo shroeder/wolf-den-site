@@ -1031,7 +1031,10 @@ export const KENO_DRAWN = 10;
 // figure is not an estimate — and 1.05/1.2102 is the factor that puts it on the floor's target. Same
 // reason as the slot dials, and exact rather than sampled: five picks from forty is a closed-form sum, which
 // is why keno never needs the second solver pass the slot cabinets do.
-export const KENO_PAY = 1.0024;
+// 0.95 -> 0.90 with the rest of the floor (2026-10-30). Keno is the one game whose return is ARITHMETIC
+// rather than simulated — kenoRtp() sums the hypergeometric exactly — so this dial is solved, not fitted:
+// 1.0024 measured 95.000%, and 1.0024 x 0.90/0.95 lands on 90.000%. No seeds, no sweep, no variance.
+export const KENO_PAY = 0.9496;
 export const KENO_PAYS = Object.fromEntries(
     Object.entries({ 0: 0, 1: 0, 2: 1, 3: 2.7, 4: 22, 5: 540 })
         .map(([k, v]) => [k, Number((v * KENO_PAY).toPrecision(6))]),

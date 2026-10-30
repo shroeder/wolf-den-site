@@ -312,7 +312,32 @@ export const cornersOf = (card, drawn, burnt = []) => {
 // definition and the only thing bounding it is how long somebody will sit there. See TARGET_RTP in
 // casino-slot5.js for the whole argument and the ledger behind it. The dial is linear in the sim's
 // measured return (105.23% at 0.690; one correcting pass after that, the same as the cabinets need), so this is one multiplication rather than the solver's passes.
-export const BINGO_PAY = 0.625;
+// 0.95 -> 0.90 with the rest of the floor (2026-10-30). Solved against the measured outcome mix rather
+// than guessed: at 200,000 cards the lines return 93.08% of the 94.98% total, the day's pattern carries the
+// other 1.90% and does not scale with this dial, so the lines have to land on ~88.4% for the game to land
+// on 90%. With the stake floor below, that is 0.5145 — solved in three passes, because the floor lifts the two
+// commonest outcomes off the dial ENTIRELY -- corners and one line stop responding to it, so 36.6 points of
+// the return are fixed and only the remainder moves. Measured over 1.26M cards in three reps: a single
+// 200k read swings 1.5 points and the pattern component alone came back 1.90 / 1.62 / 1.58 on three of them.
+export const BINGO_PAY = 0.5145;
+
+// ── ⚠️ THE STAKE FLOOR, WHICH USED TO BE A HAND-SET NUMBER AND KEPT DRIFTING ─────────────────────────────
+// "A WIN MUST NOT COST YOU MONEY" is written as a rule in the table below and has now been broken TWICE by
+// moving the dial underneath it. SunflowerJinxx reported it the first time — "A 100 chip bingo bet is paying
+// less than the bet" — and it was fixed by raising `corners` to 1.25, which landed at 1.075 against the 0.86
+// dial of the day. The dial then went to 0.625 for the 95% retune and nobody re-checked: corners fell to
+// 0.781 and ONE LINE to 0.875, so the easiest two wins on the card have been handing back less than the
+// stake ever since, announced with a name and a flourish.
+//
+// A constant cannot hold an invariant that another constant is allowed to move. So the rule is code now: no
+// winning pattern pays less than FLOOR x the stake, whatever the dial does. 1.05 rather than 1.00 because
+// the table's own note asks for "a small win rather than a small loss" — a push is not a win either.
+//
+// ⚠️ IT COMPRESSES THE BOTTOM OF THE LADDER AND THAT IS VISIBLE: corners and one line both pay 1.05 now,
+// and two lines pays 1.08. The base table is only 1.5x from one line to two, so there is no dial that both
+// clears the stake and keeps those three apart — the table wants redesigning rather than re-scaling, and
+// that is a bigger change than a target move.
+export const BINGO_FLOOR = 1.05;
 
 export const BINGO_PAYS = {
     // ⚠️ A WIN MUST NOT COST YOU MONEY. SunflowerJinxx: "A 100 chip bingo bet is paying less than the bet."
@@ -341,6 +366,11 @@ if (BINGO_PAY !== 1) {
     for (const k of Object.keys(BINGO_PAYS)) {
         BINGO_PAYS[k] = Number((BINGO_PAYS[k] * BINGO_PAY).toPrecision(6));
     }
+}
+// The floor applies AFTER the dial, because the dial is the thing that breaks it. Clamping the base table
+// instead would be undone by the next retune, which is exactly how this regressed twice.
+for (const k of Object.keys(BINGO_PAYS)) {
+    if (BINGO_PAYS[k] < BINGO_FLOOR) BINGO_PAYS[k] = BINGO_FLOOR;
 }
 
 /** The single source of truth for what one card won. The screen shows what this returned. */
