@@ -150,7 +150,19 @@ function bonusesFrom(emblemRows, player = null) {
     }
     for (const r of emblemRows || []) {
         const meta = GROVE_EMBLEMS[r.emblem_id];
-        if (!meta || r.slot === null || r.slot === undefined) continue;   // only EQUIPPED emblems apply
+        // ── ⚠️ OWNING IT IS WEARING IT, AS OF 2026-10-30 ────────────────────────────────────────────
+        // Luke: "I think I want to do away with equipping monster cards entirely. And just when you
+        // possess them, you get the bonus for all... and the level it's at, that you get that bonus at
+        // all times."
+        //
+        // This line was `if (r.slot === null) continue` — only the three worn cards counted. A hundred
+        // and three collectibles and a player could feel three of them, so every card after the third
+        // was a number on a shelf. Possession pays now.
+        //
+        // ⚠️ THE `slot` COLUMN STAYS AND NOTHING READS IT. Same rule as the backpack columns: dropping
+        // it loses the record of what people had worn, and it costs nothing to leave. If equipping ever
+        // comes back it comes back as a NEW idea, not by un-commenting this.
+        if (!meta) continue;
         // ⚠️ THE ID DECIDES THE LADDER -- boss cards max at sixteen, not 250. See BOSS_STARS.
         const { stars } = emblemStars(r.count, r.emblem_id);
         if (!stars) continue;

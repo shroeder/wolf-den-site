@@ -184,8 +184,20 @@ export async function groveFighter(buyerId) {
         //
         // The names differ because the two systems were written apart: the Grove calls it `might` and
         // `crit_rate`, the pool calls it `might` and `crit_chance`. Mapped once, here.
+        // ── ⚠️ EVERY CARD OWNED, NOT THE THREE WORN ─────────────────────────────────────────────────
+        // Luke, 2026-10-30: "do away with equipping monster cards entirely... when you possess them you
+        // get the bonus."
+        //
+        // ⚠️ THIS IS THE HALF THAT CARRIES THE COMBAT STATS, and it is a SECOND copy of the rule that
+        // bonusesFrom holds in grove.js. Those two queries decide different things — this one feeds
+        // might/vitality/armour into the fighter, that one feeds rarityFind into the drop roll — so
+        // changing one and not the other would have paid a player's collection on the loot table and
+        // not in the fight, with nothing anywhere saying so. See feature-gates-come-in-pairs.
+        //
+        // `count` still decides the star rung, so the LEVEL a card is at is what it is worth. The slot
+        // column is left on the row and read by nothing.
         const embRows = await db.query(
-            `SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1 AND slot IS NOT NULL`,
+            `SELECT emblem_id, count FROM mkt_grove_emblem WHERE buyer_id = $1 AND count > 0`,
             [buyerId]
         ).catch(() => []);
         let emblemTempo = 0;

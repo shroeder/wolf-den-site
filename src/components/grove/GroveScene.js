@@ -3934,7 +3934,7 @@ export default function GroveScene({
                                     {String(trophy.stat).replace(/_/g, " ")}</u>
                             ) : null}
                         </div>
-                        {/* The one word that stops this being filed under Spire. It is not decoration: a
+                        {/* The one word that stops this being filed under the card game. It is not decoration: a
                             player who never opens a panel still learns from this line that the card is a
                             monster they collected, not a card they play. */}
                         <span className="gv-mc-tag">Monster Card</span>

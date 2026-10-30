@@ -3697,7 +3697,7 @@ export const GROVE_CSS = `
    over green foliage and a thin grey label that looked exactly like picking up a twig.
 
    ⚠️ IT IS NOT A CARD AND MUST NOT BE SHAPED LIKE ONE. The amulets hang on leather cords; the frame
-   here is the cord and the hook it swings from. Luke's worry was players filing these under Spire, and
+   here is the cord and the hook it swings from. Luke's worry was players filing these under the card game, and
    a rounded rectangle with a portrait window in it would have confirmed the misread rather than fixing
    it. See the note at the markup.
 

@@ -139,6 +139,17 @@ const familiesFor = ({ benchFresh = 0, statuesHeld = 0 } = {}) => [
         ],
     },
     {
+        // ⚠️ ITS OWN FAMILY, NOT A ROW UNDER "Carry". Luke: "I hate the fact that the you have class
+        // specific details that are in the monster cards area. The whole class and skills, that shit,
+        // that as a first class citizen, it should have a completely different area where that lives in
+        // its own menu item." It sat as a sub-section of Monster Cards, which said it was a detail OF
+        // the cards -- a different kind of thing filed under the wrong one, exactly like the Armoury
+        // under the shelf. Go / Carry / Make / Train reads as four verbs, which is what they are.
+        title: "Train", rows: [
+            { k: "class", label: "Your Class", art: "/images/grove/ui-class.webp", note: "points, tree, what it does here" },
+        ],
+    },
+    {
         title: "Make", rows: [
             { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp?v=2", note: "spend parts", badge: benchFresh || 0 },
         ],
@@ -890,6 +901,52 @@ export default function GroveClient({ initial }) {
                     </Area>
                 ) : null}
 
+                {panel === "class" ? (
+                    <>
+                        {/* ── ⚠️ YOUR CLASS HAS BEEN COUNTING IN HERE ALL ALONG ────────────────────
+                        grove-kit folds the class tree into the Grove fighter -- a Reaver's Rend and
+                        a Warden's Bulwark genuinely change how a dive goes -- and nothing anywhere
+                        in the feature mentioned a class existed. Points spent, numbers moved, and
+                        the game silent about it, which is the same fault crafting had.
+
+                        ⚠️ AND IT SHOWS WHAT THE GROVE ACTUALLY USES, NOT WHAT THE TREE GRANTS. The
+                        three trees hand out about thirty stats and this engine reads fourteen, so a
+                        list of the nodes you have taken would claim Thornmail is working here. These
+                        numbers are measured by grove-kit against the engine itself -- the same
+                        fighter built with and without the tree -- so the screen cannot promise
+                        something the zone does not do. See classGives. */}
+                    <Area id="training" icon="ui-class" title="Your Class"
+                        count={heroClass ? heroClass.name : "no class"}>
+                        {heroClass ? (
+                            <div className="gv-train">
+                                <img className="gv-train-sigil" src={heroClass.emblem} alt=""
+                                    width={46} height={46} />
+                                <div className="gv-train-body">
+                                    <b style={{ color: heroClass.color }}>{heroClass.name}</b>
+                                    <em>{heroClass.tag}</em>
+                                    {classLines.length ? (
+                                        <ul className="gv-train-list">
+                                            {classLines.map((l) => (
+                                                <li key={l.key}><span>{l.label}</span><b>{l.value}</b></li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        // ⚠️ A CLASS WITH NO POINTS IN IT IS NOT A BROKEN READOUT.
+                                        // Picking a class costs nothing; the tree is where the choice
+                                        // actually happens, and an empty one is genuinely worth zero
+                                        // here. Saying so beats an empty box the player reads as a bug.
+                                        <p className="muted">No points spent yet — your tree is worth
+                                            nothing in the Grove until it has some.</p>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="muted">No class chosen. A class changes how you fight in
+                                here as much as it does in the Arena.</p>
+                        )}
+                    </Area>
+                    </>
+                ) : null}
                 {panel === "emblems" ? (
                     <div className="gv-emblems">
                         {/* ── ⚠️ TWO THINGS LIVED IN ONE SCROLL AND READ AS ONE THING ──────────────
@@ -923,49 +980,6 @@ export default function GroveClient({ initial }) {
                                 Boss Armour<i>{Number(st.merits) || 0}</i>
                             </button>
                         </div>
-                        {/* ── ⚠️ YOUR CLASS HAS BEEN COUNTING IN HERE ALL ALONG ────────────────────
-                            grove-kit folds the class tree into the Grove fighter -- a Reaver's Rend and
-                            a Warden's Bulwark genuinely change how a dive goes -- and nothing anywhere
-                            in the feature mentioned a class existed. Points spent, numbers moved, and
-                            the game silent about it, which is the same fault crafting had.
-
-                            ⚠️ AND IT SHOWS WHAT THE GROVE ACTUALLY USES, NOT WHAT THE TREE GRANTS. The
-                            three trees hand out about thirty stats and this engine reads fourteen, so a
-                            list of the nodes you have taken would claim Thornmail is working here. These
-                            numbers are measured by grove-kit against the engine itself -- the same
-                            fighter built with and without the tree -- so the screen cannot promise
-                            something the zone does not do. See classGives. */}
-                        <Area id="training" icon="ui-emblems" title="Your Training"
-                            count={heroClass ? heroClass.name : "no class"}>
-                            {heroClass ? (
-                                <div className="gv-train">
-                                    <img className="gv-train-sigil" src={heroClass.emblem} alt=""
-                                        width={46} height={46} />
-                                    <div className="gv-train-body">
-                                        <b style={{ color: heroClass.color }}>{heroClass.name}</b>
-                                        <em>{heroClass.tag}</em>
-                                        {classLines.length ? (
-                                            <ul className="gv-train-list">
-                                                {classLines.map((l) => (
-                                                    <li key={l.key}><span>{l.label}</span><b>{l.value}</b></li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            // ⚠️ A CLASS WITH NO POINTS IN IT IS NOT A BROKEN READOUT.
-                                            // Picking a class costs nothing; the tree is where the choice
-                                            // actually happens, and an empty one is genuinely worth zero
-                                            // here. Saying so beats an empty box the player reads as a bug.
-                                            <p className="muted">No points spent yet — your tree is worth
-                                                nothing in the Grove until it has some.</p>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="muted">No class chosen. A class changes how you fight in
-                                    here as much as it does in the Arena.</p>
-                            )}
-                        </Area>
-
                         {embTab === "cards" ? (
                         <Area id="emblems" icon="ui-cards" title="Monster Cards"
                             count={`${(st.emblems || []).filter((e) => e.count > 0).length}/${CARD_TOTAL} found`}>
@@ -975,52 +989,25 @@ export default function GroveClient({ initial }) {
                             them was a picture. Luke: "Dont use words to explain use proffesional
                             design." */
 }
-                        <div className="gv-eslots">
-                            {[0, 1, 2].map((s) => {
-                                const on = (st.emblems || []).find((e) => e.slot === s);
-                                return (
-                                    <div key={s} className="gv-eslot">
-                                        {on ? (
-                                            <button type="button" onClick={async () => { await post({ action: "emblem", emblemId: on.id, slot: null }); refresh(); }}>
-                                                <b style={{ color: on.rung?.color }}>{"★".repeat(on.stars)}</b>
-                                                <span>{GROVE_EMBLEMS[on.id]?.name}</span>
-                                                <em>take off</em>
-                                            </button>
-                                        ) : <span className="gv-eempty">empty</span>}
-                                    </div>
-                                );
-                            })}
-                            {[3, 4, 5].map((s) => <div key={s} className="gv-eslot is-sealed"><span>sealed</span></div>)}
-                        </div>
-                        {/* -- ⚠️ THE CONCEPT, STATED. ------------------------------------------------------
-                            Luke: "Im also worried it will make people think its for the card game.
-                            Thats why I think we need to ensure people understand the concept of
-                            these." He is right and the old copy made it worse: an empty panel that
-                            said only "No emblems yet. They fall rarely" told a player nothing about
-                            what the thing IS, so the only clue left was the word on the tab -- which
-                            at the time was "Monster Cards", pointing straight at Spire.
+                        {/* ── ⚠️ THERE ARE NO SLOTS ANY MORE ──────────────────────────────────────
+                            Three worn and three sealed stood here. Luke: "I think I want to do away with
+                            equipping monster cards entirely. And just when you possess them, you get the
+                            bonus for all... and the level it's at, that you get that bonus at all times."
 
-                            ⚠️ AND THE FIX IS NOT TO RENAME THEM. I read the sprites -- carved amulets
-                            on leather cords -- decided the art was the authority on what the object
-                            was, and renamed the whole feature to Trophies. Luke: "its supposed to be a
-                            card of the enemy you are collecting." The name was never the problem. The
-                            CARD never showed a monster, which is what made it look like a stray Spire
-                            card; it shows one now, and the amulet is its seal.
+                            A hundred and three collectibles of which a player could feel THREE meant
+                            every card after the third was a number on a shelf, and the shelf was the
+                            whole feature. Owning it is wearing it now, so the only thing this panel has
+                            to do is show what you have — which is what the rows below already did. */}
+                        {/* ── ⚠️ NO EXPLANATORY PARAGRAPH, AND NO "SPIRE" ────────────────────────
+                            A paragraph stood here disambiguating these from the card game's cards, twice
+                            over, and naming a game the Den does not have. Luke: "you spend way too much
+                            time trying to say the difference between cards and cards... we should never
+                            refer to the spire, as our Den Quest card game is not called the spire... you
+                            can just delete that whole text blurb."
 
-                            So the disambiguation is done by saying it, here and on the card itself,
-                            rather than by giving the thing a different name than the one it has.
-
-                            ⚠️ THE EXPLANATION SHOWS WHETHER OR NOT YOU HAVE ANY. The empty state is
-                            the obvious place for it, but the player who most needs to be told these
-                            are not Spire cards is the one who just got their first and is looking at
-                            the panel to find out what they caught. */}
-                        <p className="gv-mc-what">
-                            One card for each kind of creature in the Grove, dealt by the creature
-                            itself &mdash; roughly one kill in four hundred leaves one. Carry three at
-                            a time and each one grants what that creature had.{" "}
-                            <b>These are not Spire cards</b> and they are never played; the deck and
-                            the collection have nothing to do with each other.
-                        </p>
+                            He is right on the design as well as the name: the card shows the creature and
+                            the shelf is one row per map. If that does not say what these are, a sentence
+                            under it will not either. See teach-by-showing-not-telling. */}
                         {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">None yet. Roughly one kill in four hundred leaves one behind.</p> : null}
                         {/* ── ⚠️ ONE ROW PER MAP, SCROLLING SIDEWAYS ─────────────────────────────────
                             Was eight stacked sections of a vertical grid. Honest, and a wall: 103 cards

@@ -116,6 +116,10 @@ const ART = {
     // The bag panel already had four headings and all four were the same word in the same green. These are
     // the three with no sprite anywhere in the folder yet; Backpack, Workbench, Map and Emblems reuse the
     // dock's own ui-*.webp, and the chest shelf wears the chest it holds.
+    // The Class room's door. ⚠️ NOT A TABLET AND NOT A CREST: ui-tablet directly below is already a flat
+    // carved stone, and a crest would say "which class" when the row is about SPENDING POINTS. A branching
+    // bough with tokens hung at the forks is a skill TREE, which is the thing behind the door.
+    "ui-class": [`A short forked BOUGH of pale carved wood standing upright like a small tree, three bare branches splitting from one trunk, a round carved bone token hanging on a leather thong from each fork, the lowest token glowing faintly amber. Warm bone-white and pale wood against dark leather. ${STYLE} ${CUTOUT}`, "item"],
     "ui-tablet": [`A weathered grey STONE TABLET standing upright, its face covered in small carved pictograms of leaves, antlers and roots arranged in neat rows, one corner chipped away, faint green moss in the carved grooves. Cool stone greys with green moss. ${STYLE} ${CUTOUT}`, "item"],
     "ui-vault": [`A sturdy fantasy STRONGBOX chest-safe for storing supplies, closed, heavy dark timber banded in cold iron with a large keyhole plate, three-quarter view, standing on short feet. Cool grey-blue iron and dark wood. ${STYLE} ${CUTOUT}`, "item"],
     "ui-belt": [`A worn brown leather ADVENTURER'S BELT with two small pouches and a bundled cloth bandage tucked under it, laid out in a loose curve, three-quarter view. Warm leather browns, brass buckle, a sprig of green herb in one pouch. ${STYLE} ${CUTOUT}`, "item"],
