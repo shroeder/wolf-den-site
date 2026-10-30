@@ -147,6 +147,11 @@ const ICONS = {
     about: "A carved wooden shop sign hanging from a wrought-iron bracket on two short chains, a wolf's head in profile carved into the plank and picked out in gold",
     mystery: "A plump closed cloth drawstring pouch with a corded tie, bulging at the sides, two trading-card corners just visible poking out of the gathered neck",
     events: "A tall triangular pennant flag on a polished wooden pole, the fabric deep red with a gold border, caught mid-flutter",
+    // The Grove. ⚠️ A TREE AND NOT A LEAF: the glyph it replaces was an oak leaf, which at 18px is a green
+    // blob and says "nature" rather than "the place you go down into". The silhouette has to clear `town`
+    // (three cottages) and `farm` (a barn), so this is ONE enormous trunk with a way in at the bottom —
+    // twelve zones of forest you walk into, which is what the room actually is.
+    grove: "A single colossal ancient oak seen head-on, one massive gnarled trunk filling the frame, a broad dark green canopy above and heavy knotted surface roots spreading at its base, with a narrow shadowed hollow opening between two roots like a doorway into the dark",
 };
 
 const want = process.argv.slice(2);

@@ -58,6 +58,10 @@ const NAV_SPRITE = {
     // Until this line existed the tile fell through to a GiCardPickup glyph: a flat monochrome line drawing
     // beside twenty painted sprites, which is the tell that nobody mapped it rather than a design choice.
     "/marketplace/vault": "vault",
+    // ⚠️ AND THE GROVE WAS THE THIRD ONE. Same tell as the Vault note directly above: no mapping, so the
+    // biggest room in the game wore a react-icons oak LEAF — a flat monochrome glyph beside forty painted
+    // sprites. Luke: "It should be a sprite, not an icon or a glyph."
+    "/marketplace/grove": "grove",
 };
 
 // One icon, with the old emoji/react-icon kept as the fallback: a missing or not-yet-generated PNG degrades to
@@ -213,7 +217,13 @@ export default function GameNav() {
 
     // (Fishing was owner-gated at launch prep; it's public now and rides `signedIn` like Town.)
     // Farm + Forge + Auction + Town are all live for every signed-in member now.
-    const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
+    // ⚠️ THE GROVE SITS SECOND, DIRECTLY AFTER HOME, rather than thirty-fourth at the end of the strip.
+    // Luke: "The Grove in the horizontally scrollable menu should be one of the first ones." It is the
+    // biggest thing in the game and it sat behind every utility screen in a strip you have to drag.
+    const links = [...LINKS.slice(0, 1),
+        ...(grove ? [{ href: "/marketplace/grove", Icon: GiOakLeaf, label: "The Grove" }] : []),
+        ...LINKS.slice(1),
+        { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
         { href: "/marketplace/auction", emoji: "🏛️", label: "Auction" },
         ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : []),
         ...(signedIn && fishingOn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : []),
@@ -223,7 +233,6 @@ export default function GameNav() {
         ...(casino ? [{ href: "/marketplace/casino", label: "Casino" }] : []),
         ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "Arena" }] : []),
         ...(cards ? [{ href: "/marketplace/cards", Icon: GiCardPlay, label: "Cards" }] : []),
-        ...(grove ? [{ href: "/marketplace/grove", Icon: GiOakLeaf, label: "The Grove" }] : []),
         ...(signedIn ? [{ href: "/marketplace/market", emoji: "🏪", label: "Market" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || isGamePath(pathname);
 
