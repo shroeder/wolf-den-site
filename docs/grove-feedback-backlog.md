@@ -19,6 +19,8 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 | 3 | Class moves out of the Monster Cards area into its own menu item (Go / Carry / Make / **Train**) | `89873df5` |
 | 4 | The cards-vs-card-game blurb deleted; the word "Spire" gone from the Grove entirely | `89873df5` |
 | 5 | The Grove sits second in the site menu strip, with a real sprite instead of an oak-leaf glyph | `199fc248` |
+| 6 | ⚠️ The bellows timer reset on every tap — armed once now, deaf to taps (item G) | `12f84ec8` |
+| 7 | The craft-ready note moves off the play area to the left edge, beside the menu it is pointing at | `(this)` |
 
 ---
 
@@ -120,6 +122,14 @@ Cooking is the reference implementation — go and read it before inventing anyt
 > have on the existing item."*
 
 A recipe row should answer: do I have this already, at what quality, and is a second one worth the parts.
+
+### M. The craft-ready note sat in the middle of the fight — DONE
+> *"When you can craft a new item, the notification that pops up is directly in the play area. It should
+> instead be… on the left side near the whole crafting panel. That would make a lot more sense."*
+
+Was `left: 50%`, centred over the floor you are fighting on. Now anchored to the left edge above the dock —
+the same edge as the menu handle the workbench lives behind, so the message and its answer are together.
+Bottom-left rather than beside the handle because the haul list already owns that edge from 42% down.
 
 ---
 

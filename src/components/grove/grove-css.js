@@ -262,16 +262,32 @@ export const GROVE_CSS = `
    and the boss bar, and the left edge by the haul list. 78 sits between the scene's full-screen layer
    at 70 and the sheet at 80, so a panel covers it rather than fighting it. Opaque enough to read over
    a lit forest, and it clears itself on a timer -- see the note effect in GroveClient. */
+/* ── ⚠️ LEFT EDGE, NOT THE MIDDLE OF THE FIGHT ────────────────────────────────────────────────
+   Luke: "When you can craft a new item, the notification that pops up is directly in the play area.
+   It should instead be... on the left side near the whole crafting panel. That would make a lot more
+   sense."
+
+   It was centred over the floor you are fighting on, which is both the worst place to read something
+   and the worst place to be interrupted. The menu handle is pinned to the left edge at half height and the workbench
+   lives inside it, so the message and the thing it is telling you to go and do are now on the same
+   edge of the screen -- the note points at its own answer instead of at the middle of nowhere.
+
+   ⚠️ BOTTOM-LEFT RATHER THAN BESIDE THE HANDLE, because the haul list already runs down the left edge from
+   42% and would have been underneath it. Below the haul and above the dock is the one gap on that
+   edge. */
 .gv-note.is-zone { position: fixed; z-index: 78; margin: 0; cursor: pointer;
-    left: 50%; transform: translateX(-50%);
+    left: max(8px, env(safe-area-inset-left));
     bottom: calc(68px + env(safe-area-inset-bottom));
-    max-width: min(86vw, 420px); text-align: center;
+    max-width: min(62vw, 300px); text-align: left;
     font-weight: 700; color: #eafbe0;
     background: rgba(10,16,10,0.88); border-color: rgba(159,224,138,0.55);
     box-shadow: 0 8px 24px rgba(0,0,0,0.6);
     animation: gvNoteIn 220ms cubic-bezier(.2,1.6,.4,1) both; }
-@keyframes gvNoteIn { from { opacity: 0; transform: translate(-50%, 10px); }
-    to { opacity: 1; transform: translate(-50%, 0); } }
+/* ⚠️ NO -50% HERE ANY MORE. The note used to be centred by a transform, so its keyframe had to carry
+   that -50% or the animation threw it across the screen on every appearance. Left-anchored now, so the
+   slide is a plain nudge -- and a stale -50% in here would have been an invisible 150px jump. */
+@keyframes gvNoteIn { from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); } }
 
 /* ── ⚠️ THE FIRST MAP'S RULES LIVED HERE AND OUTLIVED THE FIRST MAP BY TWO REDESIGNS ─────────────
    .gv-map, .gv-node, .gv-node-n, .gv-node-name, .gv-node-bar and .gv-node-lock styled a grid of
