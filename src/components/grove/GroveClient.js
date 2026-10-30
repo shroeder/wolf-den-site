@@ -24,6 +24,7 @@ const CARD_TOTAL = Object.keys(GROVE_EMBLEMS).length;
 
 import { useWishlist } from "@/components/grove/useWishlist.js";
 import GroveCards from "@/components/grove/GroveCards.js";
+import GroveStatues from "@/components/grove/GroveStatues.js";
 import GroveMenu from "@/components/grove/GroveMenu.js";
 import GroveBench from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
@@ -113,6 +114,9 @@ const FAMILIES = [
             { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
             { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp", note: "what you are wearing" },
             { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-cards.webp" },
+            // ⚠️ A SCREEN WITH NO DOOR IS NOT SHIPPED. The statue vendor is reachable from the menu the
+            // moment it exists, not from a panel somebody has to already know about.
+            { k: "statues", label: "Statues", art: "/images/grove/ui-emblems.webp", note: "raise a stat for good" },
         ],
     },
     {
@@ -422,6 +426,11 @@ export default function GroveClient({ initial }) {
     // to be granted. Capacity is gone (see storeParts) and the warning goes with it rather than being
     // left behind reporting Infinity.
     const bagRoom = null;
+
+    // How many statues are sitting unspent, for the panel heading. A number on the door is the whole of
+    // what makes somebody open it -- see the bench badge, which exists for the same reason.
+    const statueCount = useMemo(() => (st?.statues?.lines || [])
+        .reduce((a, l) => a + Object.values(l.held || {}).reduce((x, n) => x + n, 0), 0), [st?.statues]);
 
     // ── WHAT THE CLASS IS, AND WHAT IT IS WORTH IN HERE ────────────────────────────────────────────
     // ⚠️ THE LABELS ARE THE GROVE'S OWN FOURTEEN, NOT THE TREE'S THIRTY. classGives arrives already in
@@ -848,6 +857,20 @@ export default function GroveClient({ initial }) {
                 ) : null}
 
                 {/* ── EMBLEMS ──────────────────────────────────────────────────────────────────────── */}
+                {panel === "statues" ? (
+                    <Area id="statues" icon="ui-emblems" title="Statue Vendor"
+                        count={statueCount ? `${statueCount} held` : undefined}>
+                        <GroveStatues
+                            statues={st.statues}
+                            onTurnIn={async (stat, rarity) => {
+                                const r = await post({ action: "statue", stat, rarity });
+                                refresh();
+                                return r;
+                            }}
+                        />
+                    </Area>
+                ) : null}
+
                 {panel === "emblems" ? (
                     <div className="gv-emblems">
                         {/* ── ⚠️ TWO THINGS LIVED IN ONE SCROLL AND READ AS ONE THING ──────────────

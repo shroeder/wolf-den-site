@@ -172,6 +172,7 @@ const XP_PER_BOSS_HP = 200;  // 59k   -> 295,   180k   -> 900
 
 import { bossChestChance, bossMerits, chestForZone } from "@/lib/marketplace/grove-forge.js";
 import { GROVE_ZONES, wandererHyperChance, safeCredit } from "@/lib/marketplace/grove-catalog.js";
+import { STATUE_CHANCE, STATUE_STAT_IDS, rarityWeights } from "@/lib/marketplace/grove-statues.js";
 import { GROVE_GEAR, GEAR_CHEST, SET_PIECE, SLOT_SPLIT, gearChanceFor } from "@/lib/marketplace/grove-loot.js";
 
 export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = null) {
@@ -179,7 +180,7 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
     // sides of the wire have to pass the same arguments or the replay disagrees; defaulting to "no hyper
     // roll" means a caller that has not been updated is merely missing a feature instead of quietly
     // rolling a different stream and handing the player a drop the server then declines.
-    const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0, band: null, rare: null, hyper: null, gear: null, gearTier: null, setPiece: null };
+    const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0, band: null, rare: null, hyper: null, gear: null, gearTier: null, setPiece: null, statue: null };
     if (!foe) return out;
     const r = killRng(seed, index);
 
@@ -228,6 +229,31 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
     // ── EMBLEM ──────────────────────────────────────────────────────────────────────────────────────
     const emblemChance = (Number(foe.emblemChance) || 0) * (1 + (Number(bonus.emblemFind) || 0) / 100);
     if (foe.emblem && r() < emblemChance) out.emblem = foe.emblem;
+
+    // ── STATUE ──────────────────────────────────────────────────────────────────────────────────────
+    // Luke: "Its about as rare as emblems." Rolled INDEPENDENTLY of the card above rather than sharing its
+    // roll: making them exclusive would have the rarest moment in the game quietly suppressing the other
+    // rarest moment, and a kill that gives you both is the best kill anyone has all week.
+    //
+    // ⚠️ THE VENDOR TIER DECIDES WHICH RARITIES EXIST, not whether a statue drops. Below tier 1 (world 2)
+    // there are no statues at all; at tier 1 every statue is a regular; crystal and prismatic become
+    // possible at the worlds that unlock the vendor that can read them. A tier that gated the DROP instead
+    // would mean a deep player farming a low map found nothing, which punishes exactly the behaviour the
+    // whole system is meant to reward.
+    const weights = rarityWeights(Number(bonus.vendorTier) || 0);
+    if (weights && r() < STATUE_CHANCE) {
+        const stat = STATUE_STAT_IDS[Math.floor(r() * STATUE_STAT_IDS.length)];
+        // Walk the weights with one roll. Ordered rarest-last so a short table (tier 1 is just
+        // { regular: 1 }) cannot fall through to undefined.
+        const roll = r();
+        let acc = 0;
+        let rarity = "regular";
+        for (const [id, w] of Object.entries(weights)) {
+            acc += w;
+            if (roll <= acc) { rarity = id; break; }
+        }
+        out.statue = { stat, rarity };
+    }
 
     // ── THE RARE SPAWN'S OWN PAYLOAD ────────────────────────────────────────────────────────────────
     // ⚠️ GOLD AND CHESTS ONLY EVER COME FROM HERE. Gold has fourteen faucets already and a kill loop has no
@@ -491,7 +517,7 @@ export function rollRareSpawn(baseChance, seed, index, bonus = {}) {
 export function rollKillTimes(foe, seed, index, bonus, zoneN, hyperTable, times = 1) {
     const n = Math.max(1, Math.floor(Number(times) || 1));
     const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0, band: null, rare: null, hyper: null,
-        chests: [], hypers: [], emblems: {}, gear: null, gearTier: null, gears: [], setPieces: 0 };
+        chests: [], hypers: [], emblems: {}, gear: null, gearTier: null, gears: [], setPieces: 0, statues: [] };
     for (let r = 0; r < n; r += 1) {
         const got = rollKill(foe, (Number(seed) || 0) ^ Math.imul(r, 0x85EBCA6B), index, bonus, zoneN, hyperTable);
         for (const [p, c] of Object.entries(got.parts)) out.parts[p] = (out.parts[p] || 0) + c;
@@ -504,6 +530,7 @@ export function rollKillTimes(foe, seed, index, bonus, zoneN, hyperTable, times 
         if (got.gear) out.gears.push({ id: got.gear, tier: got.gearTier });
         if (got.setPiece) out.setPieces += 1;
         if (got.emblem) out.emblems[got.emblem] = (out.emblems[got.emblem] || 0) + 1;
+        if (got.statue) out.statues.push(got.statue);
         // The FIRST roll is the one the scene draws a band and a rare off — those are presentation for the
         // body that just fell, and there is only ever one body.
         if (r === 0) { out.emblem = got.emblem; out.chest = got.chest; out.band = got.band; out.rare = got.rare; out.hyper = got.hyper; out.gear = got.gear; out.gearTier = got.gearTier; }
@@ -514,6 +541,7 @@ export function rollKillTimes(foe, seed, index, bonus, zoneN, hyperTable, times 
 export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTable = null) {
     const parts = {};
     const emblems = {};
+    const statues = [];
     let gold = 0;
     let xp = 0;
     const chests = [];
@@ -546,8 +574,9 @@ export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTab
         for (const c of got.chests) chests.push(c);
         for (const h of got.hypers) hypers.push(h);
         for (const g of got.gears) gears.push(g);
+        for (const st of got.statues) statues.push(st);
         setPieces += got.setPieces || 0;
         slain[k.id] = (slain[k.id] || 0) + Math.max(1, safeCredit(k?.c) || 1);
     }
-    return { parts, emblems, gold, xp, chests, hypers, gears, setPieces, slain };
+    return { parts, emblems, gold, xp, chests, hypers, gears, setPieces, slain, statues };
 }

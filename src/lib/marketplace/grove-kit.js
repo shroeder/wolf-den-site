@@ -6,6 +6,7 @@ import { treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
 import { groveSkills } from "@/lib/marketplace/grove-skills.js";
 import { upgradeEffects } from "@/lib/marketplace/arena-upgrades.js";
 import { GROVE_EMBLEMS, emblemStars } from "@/lib/marketplace/grove-catalog.js";
+import { statueBonus } from "@/lib/marketplace/grove-statues.js";
 import { pieceById, setBonusFor, ARMOUR_SLOTS } from "@/lib/marketplace/grove-forge.js";
 import { procFrom, COUNTER_PER_POINT } from "@/lib/marketplace/arena-kit.js";
 import { createServerLogger } from "@/lib/server-logger";
@@ -197,6 +198,30 @@ export async function groveFighter(buyerId) {
             if (!stars) continue;
             addGroveStat(stats, { [meta.stat]: meta.per * stars },
                 (v) => { emblemTempo += v / 100; }, (v) => { moveSpeed += v; });
+        }
+
+        // ── ⚠️ STATUES JOIN THE SAME POOL, THROUGH THE SAME MAPPING ─────────────────────────────────
+        // A statue point and a gear point mean the same thing, which is the whole reason statueBonus
+        // returns flat points rather than a percentage: it goes through addGroveStat beside the cards and
+        // the gear instead of being a fourth number the fight has to be taught about.
+        //
+        // ⚠️ FROM THE LINE, NEVER FROM THE SHELF. An unspent statue is worth nothing -- see the note on
+        // statueStats. Counting what is held would pay people for hoarding, which is the opposite of a
+        // system built to make turning them in the point.
+        const statueRows = await db.query(
+            `SELECT stat, points, first_crystal_at, first_prismatic_at
+               FROM mkt_grove_statue_line WHERE buyer_id = $1`,
+            [buyerId]
+        ).catch(() => []);
+        for (const row of statueRows || []) {
+            const v = statueBonus({
+                points: Number(row.points) || 0,
+                crystalSeen: Boolean(row.first_crystal_at),
+                prismaticSeen: Boolean(row.first_prismatic_at),
+            });
+            if (!v) continue;
+            addGroveStat(stats, { [row.stat]: v },
+                (t) => { emblemTempo += t / 100; }, (mv) => { moveSpeed += mv; });
         }
 
         // ── ⚠️ THE BOSS SETS JOIN THE SAME POOL, THROUGH THE SAME MAPPING ───────────────────────────

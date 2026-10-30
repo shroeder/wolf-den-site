@@ -5,6 +5,8 @@ import { bumpHunts } from "@/lib/marketplace/town-hunts.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 
 import { db } from "@/lib/db";
+import { vendorTier } from "@/lib/marketplace/grove-statues.js";
+import { grantStatues, statueState } from "@/lib/marketplace/grove-statue-store.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { craftLevel, craftXpFor, rollQuality, qualityBand, qualityOdds, QUALITY_BANDS, toolBonusFor, GROVE_CHESTS,
     ARMOUR_PIECES, pieceById, setBonusFor, GROVE_SETS, craftBonusFor, charmValue, charmValueOf } from "@/lib/marketplace/grove-forge.js";
@@ -133,6 +135,10 @@ function bonusesFrom(emblemRows, player = null) {
     const out = {
         rarityFind: 0, emblemFind: 0, rareSpawn: 0,
         hyperFind: 0, chestFind: 0, partYield: 0, goldFind: 0, xpFind: 0, overkill: 0,
+        // ⚠️ NOT A BONUS, A GATE. It rides in this bag because the bag is already the one thing the roll
+        // receives about the player, and threading a second argument through every caller of rollKill to
+        // carry one integer would be a worse trade. rarityWeights reads it; nothing adds to it.
+        vendorTier: vendorTier(Number(player?.unlocked_n) ? Math.ceil(Number(player.unlocked_n) / 12) : 0),
     };
     const charmId = player?.charm_id;
     if (charmId && GROVE_CHARMS[charmId]) {
@@ -481,6 +487,10 @@ export async function groveState(buyerId) {
             ...emblemStars(Number(e.count), e.emblem_id), meta: GROVE_EMBLEMS[e.emblem_id] || null,
         })),
         bonuses: bonusesFrom(emblems, p),
+        // ⚠️ READ IN THE SAME ROUND TRIP AS EVERYTHING ELSE. A separate /statues fetch would be two more
+        // HTTPS requests per panel open on a driver where every query is its own handshake -- see CLAUDE.md
+        // on Active CPU. It is two small queries and it rides along.
+        statues: await statueState(buyerId, Math.ceil((Number(p?.unlocked_n) || 1) / 12)),
     };
 }
 
@@ -776,6 +786,11 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     await bumpHunts(buyerId, got.slain, Number(zone?.map) || 0).catch(() => {});
 
     const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts);
+
+    // ── STATUES ─────────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ GRANTED, NOT APPLIED. A statue does nothing until it is poured into a line -- see turnInStatue.
+    // This only puts it on the shelf, which is why a settle cannot change anybody's stats.
+    if (got.statues?.length) await grantStatues(buyerId, got.statues).catch(() => {});
 
     // ── EMBLEMS ─────────────────────────────────────────────────────────────────────────────────────
     for (const [em, n] of Object.entries(got.emblems)) {

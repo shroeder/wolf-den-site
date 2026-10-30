@@ -4120,4 +4120,66 @@ export const GROVE_CSS = `
     .gv-mmenu, .gv-mmenu-handle { transition: none; }
 }
 
+
+/* ── THE STATUE VENDOR ────────────────────────────────────────────────────────────────────────────
+   One row per stat, and the row IS the bar. The line wears its own colour (--line), which is stone
+   until the first crystal and then never goes back -- that recolour is the reward, so it is the
+   loudest thing on the row. */
+.gv-stat { display: flex; flex-direction: column; gap: 14px; }
+.gv-stat-lede { margin: 0; font-size: 0.8rem; line-height: 1.5; color: #cfc6b6;
+    padding: 10px 12px; border-radius: 10px;
+    background: rgba(255,196,96,0.07); border: 1px solid rgba(255,196,96,0.22); }
+.gv-stat-lede b { color: #ffd98f; }
+.gv-stat-locked { margin: 0; font-size: 0.84rem; color: #9aa48e; }
+.gv-stat-locked b { color: #ffd98f; }
+.gv-stat-next { margin: 0; font-size: 0.76rem; color: #8f8a80; text-align: center; }
+
+.gv-statline { display: grid; gap: 6px; padding: 12px 13px; border-radius: 11px;
+    background: linear-gradient(168deg, rgba(40,38,30,0.9), rgba(26,25,19,0.95));
+    border: 1px solid color-mix(in srgb, var(--line) 36%, #2b2112);
+    box-shadow: inset 0 0 0 1px rgba(255,222,160,0.07),
+        0 0 16px color-mix(in srgb, var(--line) 22%, transparent); }
+.gv-statline header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.gv-statline header b { font-size: 0.92rem; color: color-mix(in srgb, var(--line) 55%, #fff4dc); }
+.gv-statline header em { font-style: normal; font-size: 0.8rem; font-weight: 700; color: #c8f0ac; }
+
+/* ⚠️ A REAL BOX WITH A REAL HEIGHT. A percentage-width fill inside a zero-height parent paints nothing
+   -- see percentage-needs-a-real-box, which cost four bug reports on the farm. */
+.gv-statbar { height: 8px; border-radius: 999px; overflow: hidden;
+    background: rgba(0,0,0,0.5); box-shadow: inset 0 1px 2px rgba(0,0,0,0.6); }
+.gv-statbar i { display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--line) 70%, #fff), var(--line));
+    box-shadow: 0 0 10px var(--line); transition: width 320ms cubic-bezier(0.16,1,0.3,1); }
+.gv-statline small { font-size: 0.68rem; color: #9aa48e; font-variant-numeric: tabular-nums; }
+
+.gv-statheld { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 2px; }
+.gv-statnone { font-size: 0.72rem; color: #6f6b63; }
+/* A statue is a tap target first. The glyph is a plinth-and-figure silhouette drawn in CSS rather than
+   generated: at 34px a painted statue is a smudge, and five stats would be five more sprites to keep in
+   step with a stat table that changes. */
+.gv-statue { display: grid; grid-template-columns: auto auto auto; align-items: center; gap: 6px;
+    padding: 6px 10px 6px 7px; border-radius: 9px; cursor: pointer; font: inherit;
+    background: linear-gradient(168deg, rgba(60,55,42,0.9), rgba(32,29,22,0.95));
+    border: 1px solid color-mix(in srgb, var(--r) 50%, #2b2112);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--r) 28%, transparent);
+    -webkit-tap-highlight-color: transparent; transition: transform 120ms ease, box-shadow 140ms ease; }
+.gv-statue:active { transform: scale(0.95); }
+.gv-statue:disabled { opacity: 0.55; cursor: default; }
+.gv-statue-glyph { width: 15px; height: 20px; background: var(--r);
+    clip-path: polygon(50% 0%, 66% 16%, 62% 46%, 76% 74%, 84% 100%, 16% 100%, 24% 74%, 38% 46%, 34% 16%);
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--r) 60%, transparent)); }
+.gv-statue-n { font-size: 0.86rem; font-weight: 800; color: #f6edda; }
+.gv-statue-w { font-size: 0.64rem; font-weight: 700; color: color-mix(in srgb, var(--r) 70%, #fff); }
+
+/* The two moments the system exists for. Loud, and gone on the next render. */
+.gv-statflash { margin: 4px 0 0; font-size: 0.78rem; font-weight: 700;
+    animation: gvStatFlash 2600ms ease-out forwards; }
+.gv-statflash.is-level { color: #c8f0ac; }
+.gv-statflash.is-crystal { color: #7fd4e8; text-shadow: 0 0 12px rgba(127,212,232,0.6); }
+.gv-statflash.is-prismatic { color: #d08aff; text-shadow: 0 0 14px rgba(208,138,255,0.7); }
+@keyframes gvStatFlash {
+    0% { opacity: 0; transform: translateY(4px); }
+    8% { opacity: 1; transform: translateY(0); }
+    80% { opacity: 1; }
+    100% { opacity: 0; } }
 `;
