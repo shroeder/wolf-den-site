@@ -40,66 +40,72 @@
  * @property {string} reads    what the picture says without words, in one line
  * @property {number} ms       how long the phase runs; the pool is deliberately not uniform
  * @property {string} tint     the phase's colour, used by the banner and its own art
+ * @property {number} room     which of the act's three painted backdrops it is played in:
+ *                             0 the forge, 1 the anvil, 2 the rack.
+ *
+ * ⚠️ THE ROOM IS NOT DECORATION. The act owns three paintings and a hot spot measured on each (see
+ * STAGE_ANCHOR), so a game has to say where it happens or the work-piece ends up hovering in front of a
+ * fire it is not in. Heat work goes in the forge, metal work on the anvil, finishing at the rack.
  */
 
 /** @type {Minigame[]} */
 export const MINIGAMES = [
     {
-        id: "bellows", name: "The Bellows", verb: "tap-fast", ms: 2600, tint: "#ff8a3c",
+        id: "bellows", room: 0, name: "The Bellows", verb: "tap-fast", ms: 2600, tint: "#ff8a3c",
         reads: "A bar that empties while you watch and a button the size of your thumb.",
         // The one that already existed. Kept because a flat-out sprint is the right way to OPEN a craft —
         // it spends the player's nerves early and makes the quieter games afterwards feel like precision.
     },
     {
-        id: "anvil", name: "The Anvil", verb: "timed-stop", ms: 3450, tint: "#ffd75e",
+        id: "anvil", room: 1, name: "The Anvil", verb: "timed-stop", ms: 3450, tint: "#ffd75e",
         reads: "A marker sweeping a bar with a bright zone in the middle of it.",
         // Also already existed, as three strikes. Three beats of the same verb is one game, so in the pool
         // it keeps its three swings and reports their average.
     },
     {
-        id: "quench", name: "The Quench", verb: "precision-window", ms: 2400, tint: "#5ad7ff",
+        id: "quench", room: 0, name: "The Quench", verb: "precision-window", ms: 2400, tint: "#5ad7ff",
         reads: "Heat falling fast down a gauge, and a narrow band it has to be caught inside.",
         // One shot. The needle drops from white through orange to grey and the band sits where the steel is
         // right; late is brittle, early is soft. The tension is that it only ever gets harder to hit.
     },
     {
-        id: "draw", name: "The Draw", verb: "hold-release", ms: 3200, tint: "#9ad86a",
+        id: "draw", room: 0, name: "The Draw", verb: "hold-release", ms: 3200, tint: "#9ad86a",
         reads: "Metal stretching longer the longer you hold, and a strain line creeping toward red.",
         // Press and the bar grows; let go and you keep what you drew. Hold past the line and it snaps, which
         // is the only game in the pool with a real bust — and the reason it is worth having.
     },
     {
-        id: "fold", name: "The Fold", verb: "rhythm-alternate", ms: 3600, tint: "#c89bff",
+        id: "fold", room: 1, name: "The Fold", verb: "rhythm-alternate", ms: 3600, tint: "#c89bff",
         reads: "Two plates and a beat, lighting left, right, left.",
         // Alternate sides ON the beat. Hitting the same side twice does nothing at all, which teaches the
         // rule in one mistake instead of one sentence.
     },
     {
-        id: "grind", name: "The Grind", verb: "speed-drag", ms: 3400, tint: "#b9c6d4",
+        id: "grind", room: 1, name: "The Grind", verb: "speed-drag", ms: 3400, tint: "#b9c6d4",
         reads: "A stone you drag along an edge, with sparks that get fat when you go too hard.",
         // Steady wins. Too fast throws sparks and burns the temper; too slow leaves the edge dull. The
         // feedback IS the score: the spark size is the error term, drawn.
     },
     {
-        id: "temper", name: "The Temper", verb: "spin-stop", ms: 2800, tint: "#ff6f91",
+        id: "temper", room: 0, name: "The Temper", verb: "spin-stop", ms: 2800, tint: "#ff6f91",
         reads: "A dial spinning past a mark, and one button.",
         // A single stop, no second chance. The dial accelerates slightly as it goes, so waiting for a
         // cleaner pass costs you.
     },
     {
-        id: "rivet", name: "The Rivets", verb: "reaction-sequence", ms: 3300, tint: "#ffc24d",
+        id: "rivet", room: 1, name: "The Rivets", verb: "reaction-sequence", ms: 3300, tint: "#ffc24d",
         reads: "Rivets that appear one at a time and shrink; hit each before it is gone.",
         // Pure reaction, five of them. The only game where the targets move position, so it is the one that
         // makes a player sit up straight.
     },
     {
-        id: "polish", name: "The Polish", verb: "coverage-scrub", ms: 3600, tint: "#ffe9a8",
+        id: "polish", room: 2, name: "The Polish", verb: "coverage-scrub", ms: 3600, tint: "#ffe9a8",
         reads: "A dull surface that brightens exactly where your thumb has been.",
         // Coverage, not speed. Scrubbing one spot forever gets you nothing; the score is how much of the
         // face you actually reached. Deliberately the calmest game in the pool.
     },
     {
-        id: "inlay", name: "The Inlay", verb: "path-trace", ms: 4000, tint: "#7fe3c4",
+        id: "inlay", room: 2, name: "The Inlay", verb: "path-trace", ms: 4000, tint: "#7fe3c4",
         reads: "A gold channel winding across the piece, and a bead that follows your finger.",
         // Trace the channel without leaving it. The hardest of the ten and the longest, which is why it is
         // weighted like any other — a pool where one game is worth more would make the draw unfair.

@@ -32,7 +32,9 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 | 16 | Inventory shelves collapse, and the choice survives leaving the panel (part of D) | `(this)` |
 | 17 | A tool shows the quality band it was forged at — it was in the payload and on no screen | `d7b34e0f` |
 | 18 | A door back into the Grove on the Town page — the dead end is gone (half of item A) | `cf8ff9ec` |
-| 19 | ⚠️ REGRESSION FIX: dropping the Plinko ball on a batch closed the act and cried failure | `(this)` |
+| 19 | ⚠️ REGRESSION FIX: dropping the Plinko ball on a batch closed the act and cried failure | `3ac5a2a6` |
+| 20 | Ten crafting minigames, a pool, and an owner bench to play them on (item C, built) | `ef29f766` |
+| 21 | The act draws three of the ten and plays them — wired into the real craft, not a demo | `(this)` |
 
 ---
 
@@ -72,8 +74,10 @@ gives the Grove fighter and nothing else. Selections and point spending still li
 > they all have to be super clear. So it'll pull from a pool of 10 mini games randomly, and it'll pull three
 > of them, and there's clearly three phases."*
 
-Ten minigames, invented here, each beautiful and self-explanatory. A craft draws **three at random** and the
-three phases must read as three phases.
+**DONE** (`20`, `21`). Ten games with ten distinct verbs, drawn three at a time without replacement, wired
+into the real `GroveCraftAct` — the hardcoded bellows and anvil are two of the ten now. Each game reports one
+number 0..1 and the act weights three; the economy's range is provably unchanged. Bench at
+`/marketplace/grove/minilab`, owner-only.
 
 ### D. A full usability pass on the inventory
 > *"when you're looking at your inventory, you can't collapse things… when you craft something, we need a

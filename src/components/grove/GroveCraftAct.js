@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
     HEAT_MS, HEAT_TARGET, HAND_OFF_MS, heatScore, STRIKES, STRIKE_MS, STRIKE_HIT, STRIKE_PERFECT,
-    strikeGrade, actScore, rackFor, scatterFor, oddsForAim, PEG_ROWS, RACK_MIDDLE,
+    strikeGrade, actScore, rackFor, scatterFor, oddsForAim, PEG_ROWS, RACK_MIDDLE, PHASES,
 } from "@/lib/marketplace/grove-craft-act.js";
 import { QUALITY_BANDS, bandTint, bandInk } from "@/lib/marketplace/grove-forge.js";
 import { recipeArt, toolArt } from "@/lib/marketplace/grove-catalog.js";
@@ -16,6 +16,8 @@ import { playHit, playPickup, playDrop, celebrateUnlock } from "@/components/gro
 // like colorful text and vibrations and stuff." Haptic.fire already swallows the unsupported case — iOS
 // Safari and every desktop are no-ops — so a pattern here is best-effort everywhere and never a thrown error.
 import { Haptic } from "@/components/arena/arena-audio.js";
+import GroveMini from "@/components/grove/GroveMinis.js";
+import { drawPhases } from "@/lib/marketplace/grove-minigames.js";
 
 // ── THE THREE STAGES ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "its 3 separate stages with immersive background and sprite decorations, you seem to have combined it
@@ -43,7 +45,12 @@ import { Haptic } from "@/components/arena/arena-audio.js";
 // back a rattle that provably ends on it. A client bouncing its own piece and reporting where it stopped is a
 // client deciding its own loot, which this game does nowhere.
 
-const STAGE = { fire: 0, shaping: 1, setting: 2 };
+// ⚠️ `playing` IS A THIRD STATE AND IT EXISTS TO STARVE THE OLD ONE. The hardcoded bellows and anvil are
+// gone from the screen, but their clocks were still in this file guarding on `stage !== STAGE.fire` — and a
+// phase that left `stage` at fire would have armed the old 2.6s heat clock, which ends by calling
+// setStage(STAGE.shaping) and would have fought the phase machine for control of the act.
+// Nothing is ever set to fire or shaping now, so every one of those guards returns immediately.
+const STAGE = { fire: 0, shaping: 1, setting: 2, playing: 3 };
 const STAGE_NAME = ["The fire", "The shaping", "The setting"];
 const STAGE_BG = ["bg-forge", "bg-anvil", "bg-rack"];
 // ── ⚠️ WHERE THE WORK HAPPENS IN EACH ROOM ───────────────────────────────────────────────────────────────
@@ -72,7 +79,14 @@ const SET_WORD = {
 };
 
 export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose }) {
-    const [stage, setStage] = useState(STAGE.fire);
+    // ── ⚠️ DRAWN ONCE, ON MOUNT, AND NEVER AGAIN ────────────────────────────────────────────────
+    // useMemo with no dependencies rather than useState(drawPhases()): the latter re-runs the draw on
+    // every render in React's strict double-invoke, which in development silently reshuffles the
+    // line-up between the banner and the game. Three fixed games for the life of this act.
+    const games = useMemo(() => drawPhases(), []);
+    const [scores, setScores] = useState([]);
+    const phase = scores.length;                       // 0,1,2 play a game; 3 is the rack
+    const [stage, setStage] = useState(STAGE.playing);
     const [taps, setTaps] = useState(0);
     // ⚠️ THE CLOCK READS THE TAPS FROM HERE, NOT FROM THE STATE. See the heat clock below: taking `taps`
     // as a dependency is what let a player pump the bellows forever.
@@ -111,8 +125,34 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     const rackRef = useRef(null);
     const rang = useRef(-1);
 
-    const heat = heatScore(taps);
-    const act = useMemo(() => ({ heat, strikes: hits.map((h) => h.score) }), [heat, hits]);
+    // What the act carries to the server. One number per phase; the old {heat, strikes} pair is gone
+    // from this screen entirely, though actScore still reads it for a client that has not reloaded yet.
+    const act = useMemo(() => ({ phases: scores }), [scores]);
+    // Which painting is on. The rack is the finale's room and the fallback, so an unknown game can never
+    // leave the act with no backdrop at all.
+    const room = phase < PHASES && games[phase] ? (games[phase].room ?? 2) : 2;
+    // The running quality of the craft so far, which is what the work-piece glows with. It used to be
+    // the bellows' heat, which no longer exists as a concept here.
+    const heat = scores.length ? scores.reduce((x, y) => x + y, 0) / scores.length : 0;
+
+    // ⚠️ ONE PLACE TAKES A SCORE, AND IT ADVANCES THE ROOM WITH IT. A phase reports exactly once (see
+    // useMini), so appending is safe; the stage follows the count rather than being set separately,
+    // because two sources of truth for "which phase are we on" is how a craft ends up on the rack with
+    // two scores in hand.
+    const takePhase = useCallback((score) => {
+        setScores((prev) => {
+            const next = [...prev, Math.max(0, Math.min(1, Number(score) || 0))];
+            const g = games[prev.length];
+            const graded = score >= 0.92 ? { id: "perfect", word: "CLEAN" }
+                : score >= 0.7 ? { id: "hit", word: "GOOD" }
+                : score >= 0.4 ? { id: "ok", word: "ROUGH" }
+                : { id: "miss", word: "POOR" };
+            setStageSay({ ...graded, sub: g?.name || "", at: "phase" });
+            Haptic.fire(graded.id === "perfect" ? [0, 26, 40, 26, 40, 60] : graded.id === "miss" ? [0, 90] : [0, 30, 50, 20]);
+            setStage(next.length >= PHASES ? STAGE.setting : STAGE.playing);
+            return next;
+        });
+    }, [games]);
     const score = actScore(act);
     const rack = useMemo(() => rackFor(level, { temper }), [level, temper]);
     const scatter = scatterFor(act);
@@ -352,8 +392,12 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 the url makes the next scene pop in unpainted; three stacked layers let the move between
                 places be a dissolve, and all three are decoded from the first frame. */}
             <div className="gv-act-scenes" aria-hidden="true">
+                {/* ⚠️ THE ROOM COMES FROM THE GAME, NOT THE STAGE NUMBER. Three paintings, ten games — so a
+                    drawn phase says which room it happens in: heat work in the forge, metal work at the
+                    anvil, finishing at the rack. Keying to the stage index would have put The Polish in a
+                    coal fire. */}
                 {STAGE_BG.map((bg, i) => (
-                    <i key={bg} className={`gv-act-scene${i === stage ? " is-on" : ""}`}
+                    <i key={bg} className={`gv-act-scene${i === room ? " is-on" : ""}`}
                         style={{ backgroundImage: `url(/images/grove/${bg}.webp)` }} />
                 ))}
             </div>
@@ -362,9 +406,9 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 Positioned over the SCENE at that room's hot spot, not inside the control panel —
                 so the piece is in the coal bed and on the anvil face rather than hovering in front
                 of them. The panel sits below it and no longer covers what you are looking at. */}
-            {STAGE_ANCHOR[stage] ? (
+            {STAGE_ANCHOR[room] ? (
                 <div className="gv-act-work-at"
-                    style={{ left: `${STAGE_ANCHOR[stage].x}%`, top: `${STAGE_ANCHOR[stage].y}%` }}>
+                    style={{ left: `${STAGE_ANCHOR[room].x}%`, top: `${STAGE_ANCHOR[room].y}%` }}>
                     {stage === STAGE.fire ? (
                         <>
                             <span className="gv-act-emberglow" style={{ opacity: 0.18 + heat * 0.82 }} aria-hidden="true" />
@@ -418,82 +462,31 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 <h4 className="gv-act-plank">
                     {art ? <img className="gv-act-ico" src={art} alt="" width={34} height={34} /> : null}
                     {recipe?.name}
-                    <i>{STAGE_NAME[stage]}</i>
+                    {/* The phase's own name — "The fire" is a lie when the phase is The Polish. */}
+                    <i>{phase < PHASES && games[phase] ? games[phase].name : STAGE_NAME[2]}</i>
                 </h4>
 
                 <div className="gv-act-beats" aria-hidden="true">
-                    {STAGE_NAME.map((w, i) => (
-                        <span key={w} className={i === stage ? "is-now" : i < stage ? "is-done" : ""} />
+                    {games.map((g, i) => (
+                        <span key={g.id} className={i === phase ? "is-now" : i < phase ? "is-done" : ""} />
                     ))}
                 </div>
 
-                {/* ── STAGE ONE: THE FIRE ───────────────────────────────────────────────────────── */}
-                {stage === STAGE.fire ? (
-                    <div className="gv-act-stage">
-                        <p className="gv-act-say">Work the bellows</p>
-                        <div className="gv-act-bar">
-                            <i className="gv-act-fill" style={{ width: `${heat * 100}%` }} />
-                            <em>{taps}/{HEAT_TARGET}</em>
-                        </div>
-                        {/* onPointerDown, not onClick: a tap-frequency beat on click fires once per full
-                            press-and-release and feels like treacle. */}
-                        {/* ── ⚠️ THE PUMP HAD NO FEEDBACK AT ALL ─────────────────────────────────────
-                            Luke: "when they're tapping, like there's no feedback. There needs to be
-                            visual feedback, like sparks and flames flying around and stuff."
+                {/* ── THE THREE DRAWN PHASES ────────────────────────────────────────────────────
+                    Luke: "it should pull from, like, let's say 10 different kind of mini games... it'll
+                    pull three of them, and there's clearly three phases." And then: "Wire it all up dont
+                    do fake demo stuff."
 
-                            ⚠️ THE COALS ALREADY GLOW AND THAT IS NOT THE SAME THING. gv-act-embers is
-                            an AMBIENT loop — eight motes rising forever, faster as the bar fills — so
-                            the fire reacts to your SCORE but nothing reacts to the TAP. This is the
-                            per-press half: one burst thrown on each pump, keyed so it restarts every
-                            time. Separate class, because overriding the ambient one would have put out
-                            the coals to add sparks.
+                    The act used to hardcode two beats -- a bellows and three hammer blows -- written
+                    inline here. They are two of ten now and they are drawn, so this renders whichever
+                    three came up and knows nothing else about them. Every game reports one number and the
+                    act keeps three; see actScore.
 
-                            ⚠️ THE EMBERS CARRY THE HEAT, which is the half that is not decoration.
-                            `--hot` rises 0 -> 1 with the bar, and the CSS ramps the embers from a dull
-                            red through orange to white. You can see how hot the fire is without reading
-                            the number, which is the whole of teach-by-showing-not-telling: the colour is
-                            the score. */}
-                        <button type="button" className="gv-act-hit is-bellows" onPointerDown={tapHeat}>PUMP</button>
-                        {pump > 0 ? (
-                            <span key={pump} className="gv-act-pumpfx" aria-hidden="true"
-                                style={{ "--hot": heat.toFixed(3) }}>
-                                {Array.from({ length: 9 }, (_, i) => (
-                                    <i key={i} style={{
-                                        "--a": `${-90 + (i - 4) * 13 + ((pump * 7 + i * 31) % 11) - 5}deg`,
-                                        "--d": `${34 + ((pump * 13 + i * 17) % 26)}px`,
-                                        "--t": `${(i % 3) * 40}ms`,
-                                    }} />
-                                ))}
-                            </span>
-                        ) : null}
-                        <span className="gv-act-clock"><i style={{ width: `${(heatLeft / HEAT_MS) * 100}%` }} /></span>
-                    </div>
-                ) : null}
-
-                {/* ── STAGE TWO: THE SHAPING ────────────────────────────────────────────────────── */}
-                {stage === STAGE.shaping ? (
-                    <div className="gv-act-stage">
-                        <p className="gv-act-say">
-                            {armed ? <>Strike it &mdash; {STRIKES - hits.length} left</> : <>Ready&hellip;</>}
-                        </p>
-                        <div className={`gv-act-anvil${armed ? "" : " is-waiting"}`}>
-                            <span className="gv-act-zone" style={{ width: `${STRIKE_HIT * 100}%` }} />
-                            <span className="gv-act-core" style={{ width: `${STRIKE_PERFECT * 100}%` }} />
-                            <span className="gv-act-marker" style={{ left: `${(marker + 1) * 50}%` }} />
-                        </div>
-                        {/* ⚠️ IT MUST LOOK LIKE IT REFUSES. The hand-off was invisible on film: a
-                            full-bright gold STRIKE sitting over a parked marker, taking taps and
-                            doing nothing. A control that ignores input while looking identical to one
-                            that accepts it reads as a dropped tap -- which is the bug, wearing the
-                            fix's clothes. Dimmed here and lit the moment the window opens. */}
-                        <button type="button" className={`gv-act-hit is-hammer${armed ? "" : " is-waiting"}`}
-                            aria-disabled={!armed} onPointerDown={strike}>STRIKE</button>
-                        <ul className="gv-act-hits">
-                            {Array.from({ length: STRIKES }, (_, i) => (
-                                <li key={i} className={hits[i] ? `is-${hits[i].id}` : ""}>{hits[i]?.label || "—"}</li>
-                            ))}
-                        </ul>
-                    </div>
+                    ⚠️ KEYED ON THE PHASE INDEX so each game mounts fresh. Without the key React would
+                    reuse the previous game's component instance when two phases happen to share a type,
+                    and the second would inherit the first's clock and score. */}
+                {phase < PHASES && games[phase] ? (
+                    <GroveMini key={`p${phase}`} game={games[phase]} onDone={takePhase} />
                 ) : null}
 
                 {/* ── STAGE THREE: THE SETTING ──────────────────────────────────────────────────── */}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Haptic } from "@/components/arena/arena-audio.js";
+import { GROVE_MINI_CSS } from "@/components/grove/grove-mini-css.js";
 
 // ── THE TEN ─────────────────────────────────────────────────────────────────────────────────────────────────
 // The playable half of grove-minigames.js, which holds what each one IS. Every component here obeys the same
@@ -73,6 +74,17 @@ const inBox = (el, e) => {
 function Stage({ game, t, children, hint }) {
     return (
         <div className="gm" style={{ "--tint": game.tint }}>
+            {/* ── ⚠️ THE STYLESHEET TRAVELS WITH THE GAME ─────────────────────────────────────────────
+                First attempt put this in GroveClient beside GROVE_CSS, on the reasoning that the act has
+                always inherited its styles from there. It does — but the copy of that style tag I found
+                lives inside the ZONE branch, which is not rendered while you are standing at the hub
+                bench, so a craft started from the workbench got no mini styles at all. The first photo of
+                the wired act showed The Inlay as an unstyled SVG: a filled black sine wave the height of
+                the forge, no card, no channel.
+
+                A game carrying its own CSS cannot be mounted without it. Duplicate tags are deduplicated
+                by the browser and cost nothing. */}
+            <style>{GROVE_MINI_CSS}</style>
             <div className="gm-head">
                 <b>{game.name}</b>
                 {hint ? <i>{hint}</i> : null}

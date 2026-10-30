@@ -12,8 +12,13 @@
 // at. Everything else is the same near-black board, the same frame and the same clock rail, so the pool reads
 // as one forge with ten tools rather than ten unrelated screens.
 export const GROVE_MINI_CSS = `
+/* ⚠️ min() NOT A FLAT 268px, BECAUSE THE ACT IS NOT THE LAB. The bench gives a game a whole page; the
+   craft act gives it whatever is left under a painted forge scene, in a panel that is bottom-aligned and
+   capped at 86% of the viewport. A fixed 268px fit the lab and pushed the play area clean off the bottom
+   of the real act -- the first screenshot of the wired version showed the title and the pips with the
+   game itself below the fold. Shrinks on a short screen, never grows past what the design wants. */
 .gm { position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: 10px;
-    min-height: 268px; padding: 12px 12px 10px; border-radius: 12px;
+    min-height: min(268px, 32vh); padding: 12px 12px 10px; border-radius: 12px;
     background: radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.05), rgba(0,0,0,0) 62%),
         rgba(8,10,12,0.72);
     border: 1px solid rgba(0,0,0,0.6); box-shadow: inset 0 3px 18px rgba(0,0,0,0.6); }
@@ -82,7 +87,7 @@ export const GROVE_MINI_CSS = `
 .gm-pips li.is-miss { background: #6a6052; }
 
 /* ── 3. QUENCH ──────────────────────────────────────────────────────────────────────────── */
-.gm-quench { width: 100%; height: 100%; min-height: 170px; border: 0; background: none; padding: 0;
+.gm-quench { width: 100%; height: 100%; min-height: min(170px, 22vh); border: 0; background: none; padding: 0;
     display: grid; place-items: center; cursor: pointer; touch-action: manipulation; }
 .gm-col { position: relative; width: 74px; height: 170px; border-radius: 12px;
     background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(0,0,0,0.3));
@@ -110,7 +115,7 @@ export const GROVE_MINI_CSS = `
 
 /* ── 5. FOLD ────────────────────────────────────────────────────────────────────────────── */
 .gm-fold { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; height: 100%;
-    min-height: 160px; }
+    min-height: min(160px, 21vh); }
 .gm-plate { border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer;
     background: rgba(255,255,255,0.04); touch-action: manipulation; }
 /* --beat falls from 1 to 0 across the beat, so the lit plate visibly decays and late reads as late. */
@@ -119,7 +124,7 @@ export const GROVE_MINI_CSS = `
     box-shadow: inset 0 0 calc(10px + 40px * var(--beat)) color-mix(in srgb, var(--tint) 55%, transparent); }
 
 /* ── 6. GRIND ───────────────────────────────────────────────────────────────────────────── */
-.gm-grind { position: relative; width: 100%; height: 100%; min-height: 170px; border-radius: 12px;
+.gm-grind { position: relative; width: 100%; height: 100%; min-height: min(170px, 22vh); border-radius: 12px;
     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
     touch-action: none; cursor: ew-resize; overflow: hidden; }
 .gm-edge { position: absolute; left: 6%; right: 6%; top: 50%; height: 8px; margin-top: -4px;
@@ -150,7 +155,7 @@ export const GROVE_MINI_CSS = `
     filter: drop-shadow(0 0 8px rgba(255,255,255,0.9)); }
 
 /* ── 8. RIVETS ──────────────────────────────────────────────────────────────────────────── */
-.gm-rivets { position: relative; width: 100%; height: 100%; min-height: 180px; }
+.gm-rivets { position: relative; width: 100%; height: 100%; min-height: min(180px, 23vh); }
 .gm-rivet { position: absolute; border: 0; cursor: pointer; padding: 0; border-radius: 50%;
     width: calc(72px - 34px * var(--age)); height: calc(72px - 34px * var(--age));
     margin: calc(-36px + 17px * var(--age));
@@ -160,14 +165,14 @@ export const GROVE_MINI_CSS = `
 
 /* ── 9. POLISH ──────────────────────────────────────────────────────────────────────────── */
 .gm-polish { display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(4, 1fr);
-    gap: 3px; width: 100%; height: 100%; min-height: 170px; touch-action: none; cursor: crosshair; }
+    gap: 3px; width: 100%; height: 100%; min-height: min(170px, 22vh); touch-action: none; cursor: crosshair; }
 .gm-polish i { border-radius: 5px; background: rgba(255,255,255,0.05);
     transition: background 180ms ease, box-shadow 180ms ease; }
 .gm-polish i.is-lit { background: color-mix(in srgb, var(--tint) 46%, transparent);
     box-shadow: inset 0 0 14px color-mix(in srgb, var(--tint) 60%, transparent); }
 
 /* ── 10. INLAY ──────────────────────────────────────────────────────────────────────────── */
-.gm-inlay { position: relative; width: 100%; height: 100%; min-height: 180px; touch-action: none;
+.gm-inlay { position: relative; width: 100%; height: 100%; min-height: min(180px, 23vh); touch-action: none;
     cursor: crosshair; }
 .gm-inlay svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .gm-chan { fill: none; stroke: rgba(255,255,255,0.1); stroke-width: 9; stroke-linecap: round;
