@@ -5,6 +5,7 @@ import { getShopOrderById, setShopOrderFulfillment, setShopOrderArchived } from 
 import { sendOrderCancelledEmail, sendOrderStatusEmail } from "@/lib/shop-order-email.js";
 import { parseTrackingFromScan } from "@/lib/shipping/tracking-scan.js";
 import { withRequestLogging } from "@/lib/server-logger";
+import { collectVaultCards } from "@/lib/marketplace/vault.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,6 +87,26 @@ export async function PATCH(request, { params }) {
 
             const statusChanged =
                 Boolean(fulfillmentStatus) && previous?.fulfillment_status !== fulfillmentStatus;
+
+            // ── ⚠️ A VAULT ORDER THAT LEAVES THE BUILDING RELEASES ITS CARDS ───────────────────────
+            // The vault's own order path went 'held' → 'on_order' → ('held' again, on cancel) and had no
+            // terminal state at all, so an order marked picked up or shipped left its cards sitting in the
+            // member's vault forever -- listed, and sellable the moment anybody cancelled the order.
+            //
+            // The counter hand-over is fixed in the packs queue route; this is the same fault's other
+            // door. Both had to close: one of them alone leaves the exploit intact by the other path.
+            //
+            // Guarded on statusChanged so tapping Picked up twice does not write a second batch of
+            // events, and scoped to vault orders because collectVaultCards matches on order_id and an
+            // ordinary shop order has no vault cards pointing at it.
+            if (statusChanged && ["picked_up", "shipped"].includes(fulfillmentStatus) && order.vault_order) {
+                const handed = await collectVaultCards({ orderId: id, by: "order" });
+                if (handed.length) {
+                    logger.info("admin.shop.order.vault_collected", {
+                        orderId: id, cards: handed.length, fulfillmentStatus,
+                    });
+                }
+            }
 
             // ── A TRACKING NUMBER ARRIVING IS ITSELF NEWS ───────────────────────────────────────────
             // Luke: "when we ship it should ... email the tracking info to the customer."

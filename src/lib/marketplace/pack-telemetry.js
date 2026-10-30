@@ -408,7 +408,9 @@ export async function closePullTask({ taskId, by, notFound = false, note = null 
         `UPDATE mkt_pack_pull_task
          SET status = $2, done_at = NOW(), done_by = $3, note = COALESCE($4, note)
          WHERE id = $1 AND status = 'open'
-         RETURNING id, mystery_card_id, pack_open_id, status`,
+         -- ⚠️ kind IS RETURNED BECAUSE THE CALLER BRANCHES ON IT: a 'reshelve' job is the shop
+         -- putting its own stock back and must NOT release anybody's vault card. See the queue route.
+         RETURNING id, mystery_card_id, pack_open_id, status, kind`,
         [taskId, notFound ? "not_found" : "done", by || "staff", note]
     );
 }

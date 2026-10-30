@@ -53,6 +53,60 @@ function toVaultCard(row) {
     };
 }
 
+/**
+ * ── ⚠️ THE ONLY WAY A CARD LEAVES THE VAULT INTO A MEMBER'S HANDS ────────────────────────────────────────────
+ * Until this existed the vault had exactly two exits: sold back, or a member-placed order — and the order path
+ * only ever went 'held' → 'on_order' → ('held' again, on cancel). NOTHING anywhere moved a card to a terminal
+ * state when the member actually walked out with it.
+ *
+ * What that cost, on 2026-10-29: Anamarisa collected nine cards at the counter, Eric marked the shelf jobs
+ * Done in the employee app, and all nine stayed 'held' in her vault — still listed, still carrying a sell-back
+ * price. $122 of cards she was holding in her hand and could also have sold back to us for credit.
+ *
+ * Luke: "When Eric marks them as picked up or done or whatever, they should definitely get removed from her
+ * card vault. Otherwise, she can just sell them back and exploit the system."
+ *
+ * ⚠️ 'collected' IS DELIBERATELY NOT 'sold_back'. The refund path next door reuses 'sold_back' for a missing
+ * bag, which is honest there — the member got credit. Here the member got the CARD, and a row that claims we
+ * bought it back would put a sale in the books that never happened. The two must stay distinguishable in the
+ * ledger for exactly as long as anybody asks "where did this card go".
+ *
+ * ⚠️ MATCHES 'held' AND 'on_order'. A card can be handed over at the counter whether or not the member ever
+ * raised an order for it, and both were sellable-after-the-fact in their own way: 'held' directly, 'on_order'
+ * by cancelling the order first. Closing one door and not the other would have left the exploit intact.
+ */
+export async function collectVaultCards({ buyerId = null, cardIds = null, packOpenId = null, orderId = null, by = "staff" }) {
+    const where = [];
+    const args = [];
+    if (buyerId) { args.push(buyerId); where.push(`buyer_id = $${args.length}`); }
+    if (cardIds?.length) { args.push(cardIds); where.push(`id = ANY($${args.length}::uuid[])`); }
+    if (packOpenId) { args.push(packOpenId); where.push(`pack_open_id = $${args.length}`); }
+    if (orderId) { args.push(orderId); where.push(`order_id = $${args.length}`); }
+    // ⚠️ A GUARD, NOT A CONVENIENCE. With no selector this would collect every card in the table, and the
+    // callers below build their selectors from request bodies.
+    if (!where.length) return [];
+
+    args.push(String(by || "staff").slice(0, 60));
+    const byArg = `$${args.length}`;
+    const rows = await db.query(
+        `UPDATE mkt_vault_card
+         SET status = 'collected', collected_at = NOW(), collected_by = ${byArg}, updated_at = NOW()
+         WHERE ${where.join(" AND ")} AND status IN ('held', 'on_order')
+         RETURNING id, buyer_id, card_name, current_value_cents`,
+        args
+    );
+    // One event per card so the member's own vault history says where it went, in the same list that
+    // already shows them opening and selling. A silent disappearance is the thing support cannot answer.
+    for (const r of rows) {
+        await db.query(
+            `INSERT INTO mkt_vault_event (buyer_id, action, credit_delta_cents, meta)
+             VALUES ($1, 'collected', 0, $2)`,
+            [r.buyer_id, JSON.stringify({ card: r.card_name, valueCents: r.current_value_cents, by })]
+        ).catch(() => {});
+    }
+    return rows;
+}
+
 /** Everything the vault screen needs, in one read. */
 export async function getVault(buyerId) {
     if (!vaultOpenFor(buyerId)) return null;

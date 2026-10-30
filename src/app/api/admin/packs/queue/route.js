@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { addCredit } from "@/lib/marketplace/store-credit.js";
 import { closePullTask, getPullQueue } from "@/lib/marketplace/pack-telemetry.js";
+import { collectVaultCards } from "@/lib/marketplace/vault.js";
 import { db } from "@/lib/db";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -49,7 +50,32 @@ export async function POST(request) {
             const closed = await closePullTask({ taskId, by, notFound, note: body?.note || null });
             if (!closed) return noStore({ error: "That task is already closed." }, { status: 409 });
 
-            if (!notFound) return noStore({ ok: true, status: closed.status });
+            // ── ⚠️ DONE MEANS THE MEMBER HAS THE CARD, SO IT LEAVES THE VAULT ──────────────────────────────
+            // This line used to be the whole of the happy path: close the task, answer ok, touch nothing
+            // else. The employee app's own note beside closePullTask already said what Done means --
+            // "recording a member as handed something they never got" is how it describes the failure mode
+            // -- so the semantics were agreed on both sides and only the consequence was missing.
+            //
+            // What that cost on 2026-10-29: Anamarisa collected nine cards at the counter, Eric marked the
+            // jobs Done, and all nine stayed 'held' in her vault with a live sell-back price. $122 of cards
+            // she was holding in her hand and could also have sold back to us for credit. Luke: "Otherwise,
+            // she can just sell them back and exploit the system."
+            //
+            // ⚠️ ONLY THE PULL KIND. A 'reshelve' task is the shop putting its own stock back on the shelf --
+            // there is no member and no vault card to release, and collecting on it would be silently
+            // confiscating a card from whoever the open belonged to.
+            if (!notFound) {
+                const handed = closed.kind === "reshelve" ? [] : await collectVaultCards({
+                    packOpenId: closed.pack_open_id,
+                    by,
+                });
+                if (handed.length) {
+                    logger.info("admin.pack_queue.collected", {
+                        taskId, openId: closed.pack_open_id, cards: handed.length, by,
+                    });
+                }
+                return noStore({ ok: true, status: closed.status, collected: handed.length });
+            }
 
             // ── "CAN'T FIND IT" ─────────────────────────────────────────────────────────────────────────────
             // Refund in full, no questions (Luke's call). The member never pays for our inventory drift — and
