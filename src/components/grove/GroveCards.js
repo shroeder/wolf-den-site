@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-    GROVE_EMBLEMS, GROVE_ENEMIES, GROVE_BOSSES, starLadder, emblemFace, emblemArt,
+    GROVE_EMBLEMS, GROVE_ENEMIES, GROVE_ZONES, starLadder, emblemFace, emblemArt,
 } from "@/lib/marketplace/grove-catalog.js";
 
 /**
@@ -29,6 +29,30 @@ import {
  * asked for and is also the better read: the row is "everything that lives on map three", and a boss card
  * is visibly the heavier thing on that row rather than a separate collection to go and find.
  */
+
+/**
+ * ── ⚠️ EACH ROW WEARS ITS MAP'S OWN SKY ──────────────────────────────────────────────────────────────────────
+ * Luke: "I'd like to see kind of like the thematic background of the zones, or the maps, not the zones. So
+ * there's a little bit of vertical delineation between the maps and the themes of them."
+ *
+ * The rows were identical dark strips, so the only thing telling you that you had crossed from map two into
+ * map three was reading the heading — and on a screen whose whole job is sideways scrolling, the vertical
+ * breaks are the one thing that should not need reading.
+ *
+ * The MAP's theme, not the zone's: a map is twelve zones and each has its own backdrop, so painting the real
+ * one per card would change the ground under a single row twelve times. The first zone of each map stands for
+ * the map, which is also the one a player has actually seen.
+ *
+ * ⚠️ ART THAT ALREADY EXISTS. zone-<id>.webp is the backdrop the scene renders; nothing is drawn for this.
+ */
+const MAP_BG = (() => {
+    const out = {};
+    for (const z of GROVE_ZONES) {
+        const m = Number(z.map) || 1;
+        if (!out[m] && z.bg) out[m] = z.bg;
+    }
+    return out;
+})();
 
 /** Which map a card belongs to — the row it lives on. */
 function mapOf(id, meta) {
@@ -109,7 +133,8 @@ export default function GroveCards({ emblems = [], onWear }) {
             {rows.map((r) => {
                 const found = r.cards.filter((c) => owned.get(c.id)?.count > 0).length;
                 return (
-                    <section key={r.map} className="ga-row">
+                    <section key={r.map} className="ga-row is-themed"
+                        style={MAP_BG[r.map] ? { "--row-bg": `url("${MAP_BG[r.map]}")` } : undefined}>
                         <header className="ga-row-head">
                             <b>Map {r.map}</b>
                             <i>{found}/{r.cards.length} found</i>

@@ -3836,7 +3836,36 @@ export const GROVE_CSS = `
    a card-at-a-time crawl. Lifted enough that the centred one is still unmistakably the subject. */
 .gv-cards .ga-cell { transition: transform .2s ease, opacity .2s ease; opacity: 0.8; transform: scale(0.95); }
 .gv-cards .ga-cell.ga-on { opacity: 1; transform: scale(1); }
-.gv-cards .ga-row-head { padding: 0 6px; }
+/* ── ⚠️ EACH ROW WEARS ITS MAP'S OWN SKY ──────────────────────────────────────────────────────
+   Luke: "I'd like to see kind of like the thematic background of the zones, or the maps, not the
+   zones. So there's a little bit of vertical delineation between the maps and the themes of them."
+
+   The rows were identical dark strips, so the only thing saying you had crossed from map two into map
+   three was reading the heading -- and on a screen whose whole job is sideways scrolling, the vertical
+   breaks are the one thing that should not need reading. See GroveCards.js for why it is the map's
+   theme and not the zone's.
+
+   ⚠️ THE SCRIM IS NOT OPTIONAL AND IT IS NOT SUBTLE. These are full-brightness painted backdrops --
+   map one is a sunlit green forest -- and the cards on top of them are small, dark and carry 0.58rem
+   type. Laid on raw, the row becomes a picture with some furniture on it. 0.80 to 0.92 keeps the
+   theme legible as a MOOD (you can tell green forest from black lava at a glance) while leaving the
+   cards the brightest things in their own row, which is the right way round. 0.70 to 0.88 after
+   looking at it: the first pass at 0.80/0.92 left maps one and two reading as the same brown.
+
+   Top-aligned and oversized so each row shows the SKY of its map rather than a cropped middle band --
+   the part of a backdrop that actually carries its colour. */
+.gv-cards .ga-row.is-themed { position: relative; border-radius: 12px; padding: 8px 0 10px;
+    overflow: hidden; isolation: isolate; }
+.gv-cards .ga-row.is-themed::before { content: ""; position: absolute; inset: 0; z-index: -1;
+    background-image:
+        linear-gradient(180deg, rgba(10,12,8,0.70), rgba(10,12,8,0.88)),
+        var(--row-bg, none);
+    background-size: cover, 180% auto;
+    background-position: center, center top;
+    background-repeat: no-repeat; }
+/* A hairline so two dark rows never bleed into one another where their scrims happen to match. */
+.gv-cards .ga-row.is-themed { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); }
+.gv-cards .ga-row-head { padding: 0 12px 2px; }
 .gv-cards .ga-row-head b { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.2em;
     text-transform: uppercase; color: #ffd98f; }
 .gv-cards .ga-row-head i { font-size: 0.66rem; }
