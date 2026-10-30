@@ -4012,18 +4012,43 @@ export const GROVE_CSS = `
    Not a line of text with a picture beside it. The socket is the recessed plate the sprite sits in,
    lit in the family's hue -- the same read as the gear slots and the card windows, so the menu looks
    like it came out of the same game as everything it opens. */
-.gv-mmenu section button { width: 100%; display: grid; grid-template-columns: 44px 1fr auto;
-    align-items: center; gap: 11px; padding: 7px 14px 7px 18px; cursor: pointer;
-    border: 0; border-left: 3px solid transparent; background: transparent; font: inherit;
+/* ── ⚠️ EVERY ROW IS ITS OWN SLAT ─────────────────────────────────────────────────────────────
+   Luke: "the menu items feel like a little too floaty, and they're not kind of like, they don't have
+   their own row, necessarily. It's hard to delineate between the rows."
+
+   He is right, and the cause was that a row had no edges. It was a transparent button on a wooden
+   board, so the only thing separating Backpack from Gear was the gap between two words -- which on a
+   grained background reads as nothing at all, and makes each sprite look like it is floating loose on
+   the plank rather than sitting in a place that belongs to it.
+
+   So a row is now a cut slat: a slightly raised face, a dark groove beneath it and a lit top edge, the
+   way a real stack of boards meets. The groove is what you actually read -- it is the shadow between
+   two planks, so the rows are delineated by the thing that would delineate them if they were wood.
+
+   ⚠️ A GROOVE, NOT A BORDER LINE. A 1px rgba line over grain disappears into the grain; two lines (one
+   dark, one light, one pixel apart) read as a physical seam at any brightness, which is why this is a
+   box-shadow pair rather than border-bottom. */
+.gv-mmenu section button { width: 100%; display: grid; grid-template-columns: 52px 1fr auto;
+    align-items: center; gap: 12px; padding: 9px 14px 9px 17px; cursor: pointer;
+    border: 0; border-left: 3px solid transparent; font: inherit;
     text-align: left; -webkit-tap-highlight-color: transparent;
+    background: linear-gradient(180deg, rgba(255,222,160,0.055), rgba(0,0,0,0.12));
+    box-shadow: inset 0 1px 0 rgba(255,222,160,0.10), 0 1px 0 rgba(0,0,0,0.55);
     transition: background 140ms ease, border-color 140ms ease, transform 120ms ease; }
-.gv-mmenu-sock { position: relative; width: 44px; height: 44px; border-radius: 10px;
+/* The last slat in a family sits against the family seam, so it does not need a groove of its own. */
+.gv-mmenu section button:last-child { box-shadow: inset 0 1px 0 rgba(255,222,160,0.10); }
+/* ── THE SOCKET ───────────────────────────────────────────────────────────────────────────────
+   ⚠️ 52px, NOT 44. These sprites are busy -- the workbench is an anvil AND a bench AND a plane, the
+   gear tile is a cuirass AND a sword AND a shield -- and at 34px they stopped being objects and became
+   texture, which is most of what "the sprites don't really make sense" was pointing at. They are good
+   paintings being shown too small to read. */
+.gv-mmenu-sock { position: relative; width: 52px; height: 52px; border-radius: 11px;
     display: grid; place-items: center;
-    background: radial-gradient(ellipse 80% 70% at 50% 34%,
-        color-mix(in srgb, var(--fam) 22%, #241c10), #17110a 78%);
-    border: 1px solid color-mix(in srgb, var(--fam) 34%, #241c10);
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.75), 0 1px 0 rgba(255,222,160,0.09); }
-.gv-mmenu-sock img { width: 34px; height: 34px; object-fit: contain; display: block;
+    background: radial-gradient(ellipse 80% 70% at 50% 32%,
+        color-mix(in srgb, var(--fam) 24%, #2a2113), #140f08 80%);
+    border: 1px solid color-mix(in srgb, var(--fam) 38%, #241c10);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.8), 0 1px 0 rgba(255,222,160,0.1); }
+.gv-mmenu-sock img { width: 46px; height: 46px; object-fit: contain; display: block;
     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
 .gv-mmenu section button b { display: block; font-size: 0.88rem; font-weight: 800; color: #f6edda;
     text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
@@ -4034,11 +4059,14 @@ export const GROVE_CSS = `
     padding: 2px 8px; border-radius: 999px; color: #1a1408;
     background: linear-gradient(180deg, color-mix(in srgb, var(--fam) 92%, #fff), var(--fam));
     box-shadow: 0 0 11px color-mix(in srgb, var(--fam) 60%, transparent), 0 1px 0 rgba(0,0,0,0.4); }
-.gv-mmenu section button:hover { background: linear-gradient(90deg,
-    color-mix(in srgb, var(--fam) 13%, transparent), transparent 72%); }
+.gv-mmenu section button:hover { background:
+    linear-gradient(90deg, color-mix(in srgb, var(--fam) 15%, transparent), transparent 74%),
+    linear-gradient(180deg, rgba(255,222,160,0.09), rgba(0,0,0,0.1)); }
 .gv-mmenu section button:active { transform: translateX(2px); }
 .gv-mmenu section button.is-on { border-left-color: var(--fam);
-    background: linear-gradient(90deg, color-mix(in srgb, var(--fam) 20%, transparent), transparent 76%); }
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--fam) 22%, transparent), transparent 78%),
+        linear-gradient(180deg, rgba(255,222,160,0.09), rgba(0,0,0,0.1)); }
 .gv-mmenu section button.is-on b { color: var(--fam); }
 
 /* ── THE FOOTER IS FOR SETTINGS ───────────────────────────────────────────────────────────────

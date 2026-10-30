@@ -157,7 +157,7 @@ const ZONE_FAMILIES = [
     },
     {
         title: "Make", rows: [
-            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp" },
+            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp?v=2" },
         ],
     },
 ];

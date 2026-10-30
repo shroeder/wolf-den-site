@@ -138,7 +138,7 @@ const FAMILIES = [
     },
     {
         title: "Make", rows: [
-            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp", note: "spend parts" },
+            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp?v=2", note: "spend parts" },
         ],
     },
 ];
