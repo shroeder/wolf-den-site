@@ -1,0 +1,577 @@
+<title>Cogfall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+/* ── Cogfall. Brass, oil and dial glass. ─────────────────────────────────────────────
+   The accent is brass; the one cold colour (dial) is spent ONLY on the statue thread,
+   because that is the single finding this page exists to deliver. */
+:root {
+    --bg: #f2efe6;
+    --surface: #fbf8f0;
+    --sunk: #e8e3d5;
+    --ink: #211d16;
+    --muted: #6b6454;
+    --faint: #8d8574;
+    --line: #dcd6c5;
+    --rule: #c5bda7;
+    --brass: #8a6412;
+    --brass-soft: #f0e6cc;
+    --dial: #156275;
+    --dial-soft: #dcecef;
+    --oil: #2a2620;
+    --shadow: 0 1px 2px rgba(33,29,22,.06), 0 10px 28px rgba(33,29,22,.06);
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #131209;
+        --surface: #1b1a10;
+        --sunk: #17160d;
+        --ink: #ece5d3;
+        --muted: #9d9583;
+        --faint: #7e7764;
+        --line: #2d2b1d;
+        --rule: #3d3a27;
+        --brass: #e0a83c;
+        --brass-soft: #2b2415;
+        --dial: #7fd4e8;
+        --dial-soft: #16262b;
+        --oil: #0c0b06;
+        --shadow: 0 1px 2px rgba(0,0,0,.5), 0 12px 32px rgba(0,0,0,.4);
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #131209;
+    --surface: #1b1a10;
+    --sunk: #17160d;
+    --ink: #ece5d3;
+    --muted: #9d9583;
+    --faint: #7e7764;
+    --line: #2d2b1d;
+    --rule: #3d3a27;
+    --brass: #e0a83c;
+    --brass-soft: #2b2415;
+    --dial: #7fd4e8;
+    --dial-soft: #16262b;
+    --oil: #0c0b06;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 12px 32px rgba(0,0,0,.4);
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+}
+
+.wrap { max-width: 820px; margin: 0 auto; padding: 36px 20px 90px; }
+
+/* ── Type scale ──────────────────────────────────────────────────────────────────── */
+h1 {
+    font-family: Fraunces, Georgia, serif; font-weight: 700;
+    font-size: clamp(2.6rem, 9vw, 4.4rem); line-height: .96;
+    letter-spacing: -0.025em; margin: 0; text-wrap: balance;
+}
+h2 {
+    font-family: Fraunces, Georgia, serif; font-weight: 700;
+    font-size: clamp(1.4rem, 4.2vw, 1.9rem); line-height: 1.14;
+    margin: 0 0 4px; text-wrap: balance; letter-spacing: -0.012em;
+}
+h3 {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .7rem; font-weight: 500; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--faint); margin: 0 0 10px;
+}
+h4 { font-size: .96rem; font-weight: 600; margin: 0 0 4px; }
+p { margin: 0 0 15px; max-width: 66ch; }
+p:last-child { margin-bottom: 0; }
+b, strong { font-weight: 600; }
+code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .85em; }
+code {
+    background: var(--sunk); border: 1px solid var(--line);
+    border-radius: 3px; padding: .5px 5px; color: var(--ink);
+}
+em, i { font-style: italic; }
+
+.eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .72rem; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--brass); margin: 0 0 14px;
+}
+.said { font-family: Fraunces, Georgia, serif; font-style: italic; color: var(--muted); }
+.note-s { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .78rem; color: var(--faint); }
+
+/* ── The ratchet strip. The town is a stopped gear; the teeth are the stairs. ─────── */
+.ratchet {
+    height: 15px; margin: 22px 0 0;
+    background: repeating-linear-gradient(
+        90deg, var(--brass) 0 3px, transparent 3px 16px);
+    -webkit-mask-image: linear-gradient(90deg, #000 0 72%, transparent 100%);
+            mask-image: linear-gradient(90deg, #000 0 72%, transparent 100%);
+    transform: translateX(-16px);
+    animation: step 1.1s cubic-bezier(.2,.9,.2,1) .25s forwards;
+}
+@keyframes step { to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+    .ratchet { animation: none; transform: translateX(0); }
+}
+
+/* A notched divider: the same teeth, quieter, between sections. */
+.notch {
+    height: 7px; margin: 40px 0 30px; border: 0;
+    background: repeating-linear-gradient(
+        90deg, var(--rule) 0 2px, transparent 2px 11px);
+}
+
+.lede {
+    font-family: Fraunces, Georgia, serif; font-size: 1.22rem; line-height: 1.45;
+    color: var(--muted); max-width: 52ch; margin: 18px 0 0; font-style: italic;
+}
+
+.standfirst { font-size: 1.06rem; max-width: 64ch; }
+
+/* ── Sections sit on a tooth rail ────────────────────────────────────────────────── */
+section { margin: 0; }
+.sec {
+    display: grid; grid-template-columns: 22px 1fr; gap: 0 20px;
+    margin: 34px 0 0;
+}
+.sec > .rail {
+    background: repeating-linear-gradient(
+        180deg, var(--line) 0 2px, transparent 2px 10px);
+    border-radius: 1px;
+}
+.sec > .body { min-width: 0; }
+@media (max-width: 560px) {
+    .sec { grid-template-columns: 1fr; gap: 0; }
+    .sec > .rail { display: none; }
+}
+
+/* ── Panels ──────────────────────────────────────────────────────────────────────── */
+.panel {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 7px; padding: 16px 18px; box-shadow: var(--shadow);
+    margin: 0 0 16px;
+}
+.panel:last-child { margin-bottom: 0; }
+
+.find {
+    background: var(--dial-soft); border: 1px solid var(--line);
+    border-left: 3px solid var(--dial); border-radius: 7px;
+    padding: 16px 18px; margin: 0 0 18px;
+}
+.find h4 { color: var(--dial); }
+
+.warn {
+    background: var(--brass-soft); border: 1px solid var(--line);
+    border-left: 3px solid var(--brass); border-radius: 7px;
+    padding: 16px 18px; margin: 18px 0;
+}
+.warn h4 { color: var(--brass); }
+
+/* The one deliberately dark block: the gate down. */
+.gate {
+    background: var(--oil); border-radius: 7px; padding: 20px 22px;
+    margin: 18px 0; color: #e4dcc6;
+}
+.gate h4 { color: #e8c478; margin-bottom: 8px; }
+.gate p { color: #bdb49c; }
+.gate code { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14); color: #e8c478; }
+
+/* ── Tables ──────────────────────────────────────────────────────────────────────── */
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 0 16px; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th {
+    text-align: left; font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .66rem; font-weight: 500; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--faint); padding: 0 12px 7px 0; border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+}
+td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.k { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .78rem; color: var(--muted); white-space: nowrap; }
+td.say { color: var(--muted); }
+td.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+th.num { text-align: right; }
+td.hit { color: var(--dial); font-weight: 600; }
+tfoot td { font-weight: 600; border-top: 2px solid var(--rule); border-bottom: 0; padding-top: 10px; }
+
+/* ── Lists ───────────────────────────────────────────────────────────────────────── */
+ul.plain { margin: 0 0 15px; padding-left: 18px; max-width: 66ch; }
+ul.plain li { margin-bottom: 7px; }
+ol.asks { margin: 0; padding-left: 20px; max-width: 66ch; }
+ol.asks li { margin-bottom: 13px; }
+ol.chain { margin: 8px 0 0; padding-left: 19px; font-size: .9rem; }
+ol.chain li { margin-bottom: 3px; color: var(--muted); }
+ol.chain .verb {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .72rem;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--brass);
+    margin-right: 5px;
+}
+
+.two { display: grid; gap: 16px; }
+@media (min-width: 660px) { .two { grid-template-columns: 1fr 1fr; } }
+
+a { color: var(--brass); }
+a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--dial); outline-offset: 2px; }
+
+footer { margin-top: 46px; }
+</style>
+
+<div class="wrap">
+
+<p class="eyebrow">The Wolf Den &middot; Grove &middot; Town 8</p>
+<h1>Cogfall</h1>
+<div class="ratchet"></div>
+<p class="lede">Built into a stopped gear the size of a church. The teeth are the stairs.</p>
+
+<div class="sec">
+<div class="rail"></div>
+<div class="body">
+<p class="standfirst" style="margin-top:22px">Towns 1&ndash;7 each exist to open a feature, and the
+towns doc is blunt about what that is worth: the unlock moment <span class="said">&ldquo;should be the
+loudest thing in the game.&rdquo;</span> Town 8 has nothing left to open. A town that arrives with a
+store and a shrug is the anticlimax at the end of twenty hours of climbing.</p>
+<p class="standfirst"><b>Cogfall already has its loudest moment, and it is already in the code.</b>
+That is the finding this page is built around, and nothing below asks for a new feature.</p>
+</div>
+</div>
+
+<hr class="notch">
+
+<!-- ════════════════ THE FINDING ════════════════ -->
+<div class="sec">
+<div class="rail"></div>
+<div class="body">
+<h3>What is already there</h3>
+<h2>World 8 is the statue vendor's second tier</h2>
+
+<div class="find">
+<h4>Shipped last night, in <code>grove-statues.js</code></h4>
+<p style="margin-bottom:10px"><code>VENDOR_TIER_MAP = { 1: 2, 2: 8, 3: 12 }</code></p>
+<p style="margin-bottom:0">Your own words, in the comment above it: <span class="said">&ldquo;the vendor
+base form is part of world 2. And statues dont start dropping until world 2&hellip; maybe at world 8 and
+12 unlocks new tiers of statue vendors allowing you to find different rarity of statues.&rdquo;</span>
+Reaching world 8 <b>is</b> tier 2 &mdash; the tier where crystal statues start to drop.</p>
+</div>
+
+<p>So the statue vendor is not a building Cogfall happens to contain. It is <b>what Cogfall is for</b>,
+and the arrival moment writes itself: the player who has walked seven maps is told that the kill count
+behind them is about to be worth considerably more.</p>
+
+<h3>What the tier is actually worth</h3>
+<div class="scroll"><table>
+<tr><th>Rarity</th><th class="num">Worth</th><th class="num">Drops at tier 1</th><th class="num">Drops at tier 2</th></tr>
+<tr><td>Statue</td><td class="num">1</td><td class="num">100%</td><td class="num">85%</td></tr>
+<tr><td>Crystal Statue</td><td class="num">4</td><td class="num">&mdash;</td><td class="num hit">15%</td></tr>
+<tr><td>Prismatic Statue</td><td class="num">16</td><td class="num">&mdash;</td><td class="num">&mdash; <span class="note-s">(tier 3, town 12)</span></td></tr>
+<tfoot>
+<tr><td>Expected worth per statue found</td><td class="num"></td><td class="num">1.00</td><td class="num hit">1.45</td></tr>
+</tfoot>
+</table></div>
+<p class="note-s" style="max-width:66ch">Every statue that falls after Cogfall is worth <b>45% more</b>
+than every statue that fell before it &mdash; and all three rarities pour into the same bar, so a crystal
+is simply four regulars rather than a thing you have to collect separately.</p>
+
+<div class="find" style="margin-top:18px">
+<h4>And the first crystal of each line doubles it, permanently</h4>
+<p style="margin-bottom:0">Not every crystal &mdash; the first. Five lines, five doublings, each one a
+thing you watched happen, all five of them waiting on the other side of this town. There is deliberately
+no &ldquo;turn in all&rdquo;, so none of it can be spent inside a loop.</p>
+</div>
+
+<h3>Where a player actually stands when they walk in</h3>
+<p>Measured off the shipped curve rather than guessed &mdash; <code>zoneUnlock</code>,
+<code>expectedCredit</code> and <code>STATUE_CHANCE</code> at their current values.</p>
+<div class="scroll"><table>
+<tr><th>At the floor, arriving at Cogfall</th><th class="num">Value</th></tr>
+<tr><td>Bodies killed across maps 1&ndash;7</td><td class="num">35,521</td></tr>
+<tr><td>Statues found <span class="note-s">(at 0.22%)</span></td><td class="num">78</td></tr>
+<tr><td>&hellip;of any one of the five types</td><td class="num">15.6</td></tr>
+<tr><td>Statue level reached <span class="note-s">(cost <code>n(n+2)</code>, so 15 points buys 3)</span></td><td class="num">3 of 10</td></tr>
+<tr><td>Wall clock to get here</td><td class="num">~19 h</td></tr>
+</table></div>
+<p>Level 3 of 10, after nineteen hours. That is the right shape for this to land on: far enough in to
+have felt the grind, nowhere near finished. <b>Crystals arrive exactly where the arithmetic starts to
+look hopeless</b>, which is the best possible place to put them and is where the code already puts them.</p>
+
+<div class="warn">
+<h4>⚠️ Towns 9, 10 and 11 have nothing like this</h4>
+<p style="margin-bottom:0">Tier 3 is town 12, so the two ends are covered and the middle three are not.
+I am not going to invent three moments to fill the gap &mdash; that is how the feature proposals got cut
+in the first place. It is worth knowing that Cogfall is the easy one and Hoarfast is the hard one.</p>
+</div>
+</div>
+</div>
+
+<hr class="notch">
+
+<!-- ════════════════ THE SECOND MOMENT ════════════════ -->
+<div class="sec">
+<div class="rail"></div>
+<div class="body">
+<h3>The second moment, also free</h3>
+<h2>Twelve ladders gain a rung at once</h2>
+<p>A recipe's reachability is already keyed to its map &mdash; <code>reachableRecipes</code> filters on
+<code>mapIsBuilt(recipeMap(r))</code>. So the instant map 8 opens, <b>tier VIII of all twelve tool
+ladders becomes makeable in the same breath</b>, out of materials the player is about to be holding
+too many of.</p>
+<p>That is seventeen objects at once: twelve tools, four foods and the charm. No code, no gate, no new
+screen &mdash; the bench simply has seventeen rows it did not have an hour ago. <b>Cogfall is the first
+town in the game whose reason to exist is the workbench rather than a door</b>, and that is a fair
+description of every town after it too.</p>
+<p class="note-s">The seventeen are specified in full in the maps 8&ndash;12 draft &mdash; The Ratchet
+Rod, The Shearhead, The Drop Forge, the Mainspring Draught, The Stopped Hour and the rest.</p>
+</div>
+</div>
+
+<hr class="notch">
+
+<!-- ════════════════ THE PLACE ════════════════ -->
+<div class="sec">
+<div class="rail"></div>
+<div class="body">
+<h3>The place</h3>
+<h2>A town inside one tooth of something enormous</h2>
+<p>A gear the size of a church stopped turning a long time ago, about a third of the way through a
+rotation, and it stopped at an angle. Cogfall is built in the wedge that left: the rim is the street,
+the teeth are the stairs down to it, and every floor is slightly out of level in the same direction, so
+nothing in town stands quite straight and everybody has stopped noticing.</p>
+<p>It is the <b>first manufactured town in the game</b>. Towns 1&ndash;7 are built out of wood, stone,
+rope and ash &mdash; things found on the ground where the town sits. Cogfall is built out of brass,
+chain, felt and lead, and not one piece of it was made here. That difference is the whole art
+direction and it costs nothing extra to honour: the same buildings, in a vocabulary the game has never
+used for a place people live.</p>
+<p>The machine is <b>not dead</b>, which is the one thing the backdrop has to say. Something in the
+middle distance is still turning. Nobody in Cogfall will tell you what.</p>
+</div>
+</div>
+
+<hr class="notch">
+
+<!-- ════════════════ BUILDINGS ════════════════ -->
+<div class="sec">
+<div class="rail"></div>
+<div class="body">
+<h3>What stands on the rim</h3>
+<h2>Five buildings, none of them shuttered</h2>
+<div class="scroll"><table>
+<tr><th>Building</th><th>What it is</th><th>New?</th></tr>
+<tr><td><b>The Statue Vendor</b></td><td class="say">The reason to arrive. Its <i>second form</i> &mdash; the tier-2 vendor, which is a different carving from the one in town 2, because the tier is the thing being announced.</td><td class="k hit">art only</td></tr>
+<tr><td><b>The Workbench</b></td><td class="say">Seventeen new rows the moment the gate opens. Reached from any town; Cogfall is simply where you are standing when tier VIII lights.</td><td class="k">no</td></tr>
+<tr><td><b>The General Store</b></td><td class="say">The same store as every other town. The till is never gated and does not need a Cogfall stock list.</td><td class="k">no</td></tr>
+<tr><td><b>The Travel Plate</b></td><td class="say">A brass disc set in the rim. Joins the fast-travel ring once map 8 is reached, same as towns 1&ndash;7.</td><td class="k">no</td></tr>
+<tr><td><b>The Gate Down</b></td><td class="say">The way into The Cogfall Gate, zone 1.</td><td class="k">no</td></tr>
+</table></div>
+
+<div class="warn">
+<h4>⚠️ Nothing is shuttered, and that is a visual change nobody has specified</h4>
+<p>Towns 1&ndash;7 are designed around locked buildings: <span class="said">&ldquo;six buildings, four
+of them visibly shuttered with a line saying which map opens them&rdquo;</span>, and the rule is
+<b>locked, not hidden</b> &mdash; a dimmed sprite that says which map opens it. That dimmed row is the
+only advertisement the late game gets.</p>
+<p style="margin-bottom:0">Cogfall has <b>nothing left to shutter</b>. Every door in town 8 is lit, and
+so is every door in 9 through 12. A player who has learned to read a street by its dark windows arrives
+somewhere with none &mdash; which can read as <i>finished</i> or as <i>empty</i>, and the difference is
+worth one deliberate decision rather than falling out of the implementation. My call: the late towns
+should look <b>lit and small</b>, five bright windows rather than six with four out, so the contrast
+says arrival rather than absence.</p>
+</div>
+</div>
+</div>
+
+<hr class="notch">
+
+<!-- ════════════════ RESIDENTS ════════════════ -->
+<div class="sec">
+<div class="rail"></div>
+<div class="body">
+<h3>Who is here</h3>
+<h2>Three residents and a foreman</h2>
+<div class="two">
+
+<div class="panel">
+<h4>Keeper Sprocket</h4>
+<p class="note-s" style="margin-bottom:6px">oiler who never stops walking</p>
+<p class="said" style="margin-bottom:0">&ldquo;Don't stand still. Neither does anything else.&rdquo;</p>
+<ol class="chain">
+<li><span class="verb">survive</span>Outlast the Armour</li>
+<li><span class="verb">cull</span>Clear the Teeth</li>
+<li><span class="verb">forge</span>An Oil That Holds</li>
+<li><span class="verb">delve</span>Two Floors Down</li>
+</ol>
+</div>
+
+<div class="panel">
+<h4>The Tallyman</h4>
+<p class="note-s" style="margin-bottom:6px">counts what the machine has eaten</p>
+<p class="said" style="margin-bottom:0">&ldquo;Four hundred and six. You'd be four hundred and seven.&rdquo;</p>
+<ol class="chain">
+<li><span class="verb">cull</span>Make It Four-Ten</li>
+<li><span class="verb">delve</span>Where the Count Gets Worse</li>
+<li><span class="verb">ticket</span>A Number Worth Having</li>
+</ol>
+</div>
+
+<div class="panel">
+<h4>Widow Flint</h4>
+<p class="note-s" style="margin-bottom:6px">scavenges the stopped machines</p>
+<p class="said" style="margin-bottom:0">&ldquo;The dead ones are the safe ones. There aren't many.&rdquo;</p>
+<ol class="chain">
+<li><span class="verb">harvest</span>Strip the Stopped</li>
+<li><span class="verb">cull</span>The Ones Still Running</li>
+<li><span class="verb">harvest</span>Deeper Scrap</li>
+<li><span class="verb">hunt</span>The Governor</li>
+</ol>
+</div>
+
+<div class="panel">
+<h4>Foreman Gall <span class="note-s">&middot; Coliseum, zone 8</span></h4>
+<p class="said">&ldquo;The floor turns whether you're on it or not. Two minutes.&rdquo;</p>
+<p style="margin-bottom:0"><b>The longest clock of any Coliseum</b>, because nothing on this map dies
+fast. Waves are small and armoured and the wave count is the score &mdash; the ring that rewards raw
+damage.</p>
+</div>
+
+</div>
+<p class="note-s" style="margin-top:14px">Verb mix: <b>cull 3 &middot; delve 2 &middot; harvest 2
+&middot; survive 1 &middot; forge 1 &middot; ticket 1 &middot; hunt 1</b>. Cull-heavy, because on the
+slowest-killing map in the game a kill quota is the honest ask.</p>
+<p class="note-s">The Tallyman is the resident who should be told about statues. He is already a man who
+counts bodies for a living, standing in the town where body count starts paying 45% more &mdash; his
+third quest, <i>A Number Worth Having</i>, is a Coliseum ticket today and could just as easily be the
+line that explains the vendor.</p>
+</div>
+</div>
+
+<hr class="notch">
+
+<!-- ════════════════ THE WAY DOWN ════════════════ -->
+<div class="sec">
+<div class="rail"></div>
+<div class="body">
+<h3>The way down</h3>
+<h2>Through the teeth, into The Cogfall Gate</h2>
+
+<div class="gate">
+<h4>Zone 1 &middot; The Cogfall Gate &middot; <span class="mono">clockwork</span></h4>
+<p style="margin-bottom:10px">Boss: <b>The Doorwarden</b>, at depth 85. It fights the way everything
+in the Grove fights &mdash; draft 3 took the per-map behaviours out and did not put anything back.</p>
+<p style="margin-bottom:0">The Mark on offer is <b>The Geared Mark</b> &mdash;
+<code>salvage</code>, +1.6% a star, the one new stat in maps 8&ndash;12. A kill has a chance to drop a
+part from one map deeper, which is what makes this the map that feeds its own bench.</p>
+</div>
+
+<div class="scroll"><table>
+<tr><th>Map 8, at the floor</th><th class="num">Value</th></tr>
+<tr><td>Door requirement, all twelve zones</td><td class="num">82,915 credit</td></tr>
+<tr><td>Credit per kill at this depth</td><td class="num">8</td></tr>
+<tr><td><b>Bodies, actually</b></td><td class="num">10,364</td></tr>
+<tr><td>Wall clock at the 40-a-minute ceiling</td><td class="num">4.3 h</td></tr>
+<tr><td>Zone 1 boss HP</td><td class="num">3,982,218</td></tr>
+</table></div>
+<p class="note-s" style="max-width:66ch">⚠️ The door is <b>priced in minutes, not bodies</b> &mdash;
+<code>nodeMinutes(depth) &times; 40 &times; expectedCredit(depth)</code> &mdash; so the 82,915 figure is
+credit and reading it as a kill count overstates map 8 by eight times. Worth saying because the towns
+design doc still carries the pre-<code>a832b456</code> numbers, which are now wrong in the other
+direction: it has map 1 at 620 kills where the shipped curve asks 1,115.</p>
+</div>
+</div>
+
+<hr class="notch">
+
+<!-- ════════════════ THE ART GAP ════════════════ -->
+<div class="sec">
+<div class="rail"></div>
+<div class="body">
+<h3>The gap</h3>
+<h2>The statue vendor has no face</h2>
+<p>Cogfall is the statue town, so this is the part that matters most. Right now the statue system
+ships with <b>no art at all</b>:</p>
+<ul class="plain">
+<li>The menu row that opens it <b>borrows the emblems icon</b> &mdash;
+<code>art: "/images/grove/ui-emblems.webp"</code>. A real door, pointed at somebody else's sprite.</li>
+<li>A statue is a <b>coloured chip</b>. <code>style={{ "--r": r.colour }}</code> &mdash; the rarity is a
+hex value on a CSS variable, which is the closest thing to a glyph the Grove has shipped.</li>
+<li>There is <b>no vendor</b>. The thing you turn statues in to is a panel heading.</li>
+</ul>
+<p>Five statues, three rarities each &mdash; a closed fist, open lungs, a faceless figure with a very
+good shield, a half-carved swing, and something kneeling and getting up. Fifteen objects whose whole job
+is to feel worth hoarding, currently rendered as swatches.</p>
+<div class="find">
+<h4>And this is not a map 8 cost</h4>
+<p style="margin-bottom:0">Statues drop from <b>world 2</b>. Every member deep enough to see them is
+looking at the chips today, so the fifteen sprites and the vendor pay off across the whole game and
+merely <i>land</i> in Cogfall. It is the cheapest high-visibility art left in the Grove.</p>
+</div>
+</div>
+</div>
+
+<hr class="notch">
+
+<!-- ════════════════ COST ════════════════ -->
+<div class="sec">
+<div class="rail"></div>
+<div class="body">
+<h3>What it costs to draw</h3>
+<h2>About a dollar</h2>
+<p>Medium quality, never high. The backdrop is 1536&times;1024 (1,568 output tokens); everything else is
+1024&times;1024 (1,056) and downscaled. At $40/1M output tokens.</p>
+<div class="scroll"><table>
+<tr><th>Asset</th><th class="num">Count</th><th class="num">Unit</th><th class="num">Cost</th></tr>
+<tr><td>Town backdrop <span class="note-s">(the stopped gear)</span></td><td class="num">1</td><td class="num">$0.0627</td><td class="num">$0.06</td></tr>
+<tr><td>Buildings</td><td class="num">5</td><td class="num">$0.0422</td><td class="num">$0.21</td></tr>
+<tr><td>The tier-2 statue vendor</td><td class="num">1</td><td class="num">$0.0422</td><td class="num">$0.04</td></tr>
+<tr><td>Statues <span class="note-s">(5 stats &times; 3 rarities &mdash; serves the whole game)</span></td><td class="num">15</td><td class="num">$0.0422</td><td class="num">$0.63</td></tr>
+<tfoot>
+<tr><td>Subtotal</td><td class="num">22</td><td class="num"></td><td class="num">$0.95</td></tr>
+<tr><td>Plus rejects &amp; retries, ~25%</td><td class="num"></td><td class="num"></td><td class="num">$0.24</td></tr>
+<tr><td><b>Expected</b></td><td class="num"></td><td class="num"></td><td class="num"><b>&asymp; $1.19</b></td></tr>
+</tfoot>
+</table></div>
+<p>The three residents and Foreman Gall are already counted in the maps 8&ndash;12 bill, not here. Three
+images a run, in the foreground, on a contact sheet &mdash; about <b>eight runs</b>, and you see every
+one before the next. Nothing at <code>high</code>, ever.</p>
+</div>
+</div>
+
+<hr class="notch">
+
+<!-- ════════════════ ASKS ════════════════ -->
+<div class="sec">
+<div class="rail"></div>
+<div class="body">
+<h3>What needs your call</h3>
+<h2>Four things, in the order they block</h2>
+<ol class="asks">
+<li><b>Is the statue tier the arrival moment?</b> I think it plainly is, and it needs no code &mdash;
+but it does mean the town's whole announcement is a stat system rather than a new room, and you should
+want that before I build the beat around it.</li>
+<li><b>The fifteen statues and the vendor.</b> $0.87 of the bill and the only part that changes
+something members can see today. I would draw these first, before any of map 8.</li>
+<li><b>Lit and small, or six with one out?</b> The late towns have nothing to shutter. My call is five
+lit windows and no dark ones, so the street reads as arrival &mdash; but the locked-building language is
+load-bearing in towns 1&ndash;7 and dropping it at town 8 is a real change of grammar.</li>
+<li><b>Towns 9, 10 and 11 still have no moment.</b> Tier 3 is town 12. I am deliberately not inventing
+three replacements; if the answer is that the middle three are simply quieter towns, that is a fine
+answer and I will write them that way.</li>
+</ol>
+</div>
+</div>
+
+<hr class="notch">
+
+<footer>
+<p class="note-s">Town 8 of 12 &middot; nothing implemented &middot;
+<code>docs/grove-town-8-cogfall.html</code><br>
+Numbers measured against the shipped curve on 2026-10-30, not estimated. Companion to
+<code>docs/grove-maps-8-12-design.html</code> draft 3 and &sect;4 of <code>docs/grove-towns-design.md</code>.</p>
+</footer>
+
+</div>
