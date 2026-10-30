@@ -50,6 +50,10 @@ import { drawPhases } from "@/lib/marketplace/grove-minigames.js";
 // phase that left `stage` at fire would have armed the old 2.6s heat clock, which ends by calling
 // setStage(STAGE.shaping) and would have fought the phase machine for control of the act.
 // Nothing is ever set to fire or shaping now, so every one of those guards returns immediately.
+// ⚠️ `fire` AND `shaping` ARE KEPT AS NUMBERS AND NOTHING SETS THEM. STAGE_BG and STAGE_ANCHOR are
+// indexed arrays whose 0 and 1 entries are the forge and the anvil paintings, and a drawn game's `room`
+// indexes straight into them — so renumbering here would silently repaint every phase. The names stay as
+// the documentation of what 0 and 1 mean.
 const STAGE = { fire: 0, shaping: 1, setting: 2, playing: 3 };
 const STAGE_NAME = ["The fire", "The shaping", "The setting"];
 const STAGE_BG = ["bg-forge", "bg-anvil", "bg-rack"];
@@ -87,21 +91,9 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     const [scores, setScores] = useState([]);
     const phase = scores.length;                       // 0,1,2 play a game; 3 is the rack
     const [stage, setStage] = useState(STAGE.playing);
-    const [taps, setTaps] = useState(0);
-    // ⚠️ THE CLOCK READS THE TAPS FROM HERE, NOT FROM THE STATE. See the heat clock below: taking `taps`
-    // as a dependency is what let a player pump the bellows forever.
-    const tapsRef = useRef(0);
-    // ⚠️ ITS OWN COUNTER, NOT `taps`. The ember burst is keyed on this so React remounts the node and the
-    // CSS animation restarts from frame zero on every single pump — re-rendering the same element just
-    // lets a running animation keep running, and the fifth tap in a second would show nothing at all.
-    const [pump, setPump] = useState(0);
     const [heatLeft, setHeatLeft] = useState(HEAT_MS);
-    const [marker, setMarker] = useState(0);
-    const [hits, setHits] = useState([]);
     const [flash, setFlash] = useState(null);
     // When the anvil starts accepting blows. Set on entering the shaping stage; see HAND_OFF_MS.
-    const [armedAt, setArmedAt] = useState(0);
-    const [armed, setArmed] = useState(false);
     const [aim, setAim] = useState(RACK_MIDDLE);
     const [result, setResult] = useState(null);
     const [fallRow, setFallRow] = useState(-1);
@@ -116,7 +108,6 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     // about the fastest beat in the game was that a second of it had already gone. 3-2-1 is the oldest
     // fix there is and the only honest one: the thing you are about to be judged on is announced before
     // the judging starts. null means the count is over and the coals are live.
-    const [countIn, setCountIn] = useState(3);
     // What the stage you just finished was worth, said out loud. Cleared when the next one begins.
     const [stageSay, setStageSay] = useState(null);
 
@@ -181,92 +172,15 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         return () => clearTimeout(t);
     }, [stageSay]);
 
-    // ⚠️ ITS OWN CLOCK, AND THE HEAT CLOCK WAITS ON IT. One tick a second, a rising blip and a pulse in the
-    // hand on each, then "TAP!" — which is the only word on the screen that is an instruction rather than a
-    // label. Running it inside the heat effect instead would mean the bellows were already burning down
-    // while the three was on screen, which is the exact bug this exists to fix.
-    useEffect(() => {
-        if (stage !== STAGE.fire || countIn == null) return undefined;
-        const t = setTimeout(() => {
-            setCountIn((n) => {
-                if (n == null) return null;
-                if (n <= 1) { Haptic.fire([0, 34]); playHit(7); return null; }
-                Haptic.fire([0, 12]); playHit(2 + (3 - n) * 2);
-                return n - 1;
-            });
-        }, countIn === 3 ? 450 : 620);
-        return () => clearTimeout(t);
-    }, [stage, countIn]);
-
-    // ── ⚠️ `taps` WAS A DEPENDENCY OF THIS EFFECT, AND THAT IS THE WHOLE BUG ────────────────────────
-    // Luke: "the bellows, like you can just tap forever, it resets the timer, so you can literally tap to
-    // infinity. And I think the intention there was for it to be a timed thing... it should never refresh
-    // the timer when they tap, because that's the whole point of the tapping minigame."
+    // ── ⚠️ THE OLD BELLOWS AND ANVIL CLOCKS LIVED HERE, AND THEY ARE GONE ───────────────────────────
+    // Three effects stood here: a 3-2-1 count-in, a 2.6s heat clock that ended by advancing the stage,
+    // and a marker sweep for the hammer. All three were machinery for two hardcoded beats that are now
+    // two of ten drawn games (see GroveMinis), each carrying its own clock in the shared harness.
     //
-    // Every pump changed `taps`, React tore the effect down and re-ran it, and `t0 = performance.now()`
-    // started the countdown again. So the harder you played the longer you got, and the one stage in the
-    // craft with a fail state had none — the bar never emptied while a thumb was moving.
-    //
-    // It was a dependency for an honest reason: the `left <= 0` branch grades the round with
-    // heatScore(taps) and a closure over stale state would have scored zero. The fix is the ref, not the
-    // dependency — the clock must be armed exactly once per round and never hear about a tap again.
-    //
-    // ⚠️ DO NOT ADD `taps` BACK TO SATISFY A LINT RULE. exhaustive-deps is right about almost everything
-    // and wrong about a timer; the dependency it wants is the defect.
-    useEffect(() => {
-        if (stage !== STAGE.fire || countIn != null) return undefined;
-        tapsRef.current = 0;
-        setPump(0);
-        const t0 = performance.now();
-        const tick = () => {
-            const left = Math.max(0, HEAT_MS - Math.max(0, performance.now() - t0));
-            setHeatLeft(left);
-            if (left <= 0) {
-                // ── HOW THE FIRE WENT, SAID OUT LOUD ────────────────────────────────────────────
-                // Luke: "every stage should let you know how you did with like colorful text and
-                // vibrations and stuff." The heat bar emptied and the room simply changed; whether
-                // you had pumped it to temperature or half-filled it was never stated, so there was
-                // nothing to do better next time. The word is graded off the same heatScore the
-                // plinko scatter is, so it cannot flatter you.
-                const h = heatScore(tapsRef.current);
-                const g = h >= 0.99 ? { id: "perfect", word: "WHITE HOT" }
-                    : h >= 0.75 ? { id: "hit", word: "HOT ENOUGH" }
-                    : h >= 0.4 ? { id: "ok", word: "WARM" }
-                    : { id: "miss", word: "COLD" };
-                setStageSay({ ...g, sub: `${tapsRef.current} pumps`, at: "fire" });
-                Haptic.fire(g.id === "perfect" ? [0, 26, 40, 26, 40, 60] : g.id === "miss" ? [0, 90] : [0, 30, 50, 20]);
-                setStage(STAGE.shaping);
-                setArmedAt(performance.now() + HAND_OFF_MS);
-                setArmed(false);
-                return;
-            }
-            raf.current = requestAnimationFrame(tick);
-        };
-        raf.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(raf.current);
-    }, [stage, countIn]);
-
-    // ── ⚠️ THE MARKER WAITS FOR THE HAND-OFF, AND SO DOES THE ANVIL ─────────────────────────────────
-    // Parking the marker rather than only ignoring the tap is the half that makes it fair: a window
-    // already sweeping while the game refuses input reads as a dropped tap, not as a pause. It sits
-    // still at the left, the room says "ready", and then it starts -- so the first strike is aimed.
-    useEffect(() => {
-        if (stage !== STAGE.shaping) return undefined;
-        const tick = () => {
-            const now = performance.now();
-            if (now < armedAt) {
-                setMarker(-1);
-                raf.current = requestAnimationFrame(tick);
-                return;
-            }
-            if (!armed) setArmed(true);
-            const phase = (Math.max(0, now - armedAt) % STRIKE_MS) / STRIKE_MS;
-            setMarker(phase < 0.5 ? -1 + phase * 4 : 3 - phase * 4);
-            raf.current = requestAnimationFrame(tick);
-        };
-        raf.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(raf.current);
-    }, [stage, armedAt, armed]);
+    // ⚠️ THEY WERE STARVED BEFORE THEY WERE CUT, deliberately and in a separate commit: a fourth stage
+    // value meant nothing ever set `fire` or `shaping`, so every guard returned immediately and the
+    // feature could be proven end to end with the dead code inert but present. Deleting live wiring and
+    // changing behaviour in one move is how the batch-craft regression shipped this morning.
 
     // ── THE FALL ────────────────────────────────────────────────────────────────────────────────────
     // Stepped a peg row at a time rather than transitioned to the floor: the rattle is the drama, and a
@@ -309,48 +223,8 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         if (d.batched) { onClose(d); return; }
         setResult(d);
     }, [act, aim, onCommit, onClose]);
-
-    const tapHeat = useCallback(() => {
-        if (stage !== STAGE.fire) return;
-        setTaps((n) => { playHit(Math.min(7, Math.floor((n / HEAT_TARGET) * 8))); tapsRef.current = n + 1; return n + 1; });
-        setPump((n) => n + 1);
-    }, [stage]);
-
-    // ⚠️ THE SIDE EFFECTS SIT OUTSIDE THE UPDATER. Advancing the stage from inside setHits(prev => ...) ran
-    // a POST during render and React said so; the screen worked perfectly and only the browser console ever
-    // mentioned it. A state updater has to be pure.
-    const strike = useCallback(() => {
-        // ⚠️ THE TAP THAT ENDED THE BELLOWS MUST NOT BECOME THE FIRST HAMMER BLOW. Both halves are
-        // needed: the marker is parked above so the window has not started, and this refuses the blow
-        // so a thumb already travelling cannot spend one of three strikes on nothing.
-        if (stage !== STAGE.shaping || hits.length >= STRIKES) return;
-        if (performance.now() < armedAt) return;
-        const grade = strikeGrade(marker);
-        const next = [...hits, grade];
-        playHit(hits.length * 3, grade.id === "perfect");
-        // ⚠️ IN THE HAND, ON THE FRAME. Luke: "it just doesn't have the same pop that our other timing
-        // minigames have to, where you know right away when you hit the button whether you did good or
-        // bad." The flash and the sparks were already here; what was missing is the half of the feedback
-        // that arrives before your eyes have moved — a perfect is a double kick, a miss is one dead thud.
-        Haptic.fire(grade.id === "perfect" ? [0, 18, 30, 44]
-            : grade.id === "hit" ? [0, 26] : [0, 70]);
-        setFlash({ ...grade, at: marker });
-        setHits(next);
-        if (next.length >= STRIKES) {
-            // The shaping, graded as a whole: three blows, and what they came to.
-            const perfect = next.filter((h) => h.id === "perfect").length;
-            const missed = next.filter((h) => h.id === "miss").length;
-            const g = perfect === STRIKES ? { id: "perfect", word: "FLAWLESS" }
-                : missed === STRIKES ? { id: "miss", word: "ALL MISSED" }
-                : missed === 0 ? { id: "hit", word: "CLEAN" }
-                : { id: "ok", word: "ROUGH SHAPING" };
-            setStageSay({ ...g, at: "shaping",
-                sub: next.map((h) => (h.id === "perfect" ? "●" : h.id === "hit" ? "◐" : "○")).join(" ") });
-            Haptic.fire(g.id === "perfect" ? [0, 30, 40, 30, 40, 80] : g.id === "miss" ? [0, 110] : [0, 34, 50, 24]);
-            setStage(STAGE.setting);
-        }
-        setTimeout(() => setFlash(null), 420);
-    }, [stage, hits, marker, armedAt]);
+    // ⚠️ tapHeat AND strike WERE HERE. They were the two hardcoded beats' input handlers; the games own
+    // their own input now. Removed with their clocks above.
 
     // ── AIMING ──────────────────────────────────────────────────────────────────────────────────────
     // ⚠️ NO setPointerCapture. It is the obvious way to track a drag and it breaks MOUSE clicks outright —
@@ -374,13 +248,15 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 if (e.key === " " || e.key === "Enter") { e.preventDefault(); release(); }
                 return;
             }
-            if (e.key !== " " && e.key !== "Enter") return;
-            e.preventDefault();
-            if (stage === STAGE.fire) tapHeat(); else if (stage === STAGE.shaping) strike();
+            // ⚠️ NO KEYBOARD PATH INTO A PHASE ANY MORE, AND THAT IS NOT AN OVERSIGHT I AM HIDING. The old
+            // two beats were both "press a button", so space worked for them. The ten are a dial, a drag, a
+            // scrub and a traced path — there is no one key that means all of those, and wiring space to
+            // whichever game happens to be up would work for three of them and silently do nothing for the
+            // rest. The rack below still takes arrows and space, because aiming genuinely is one axis.
         };
         window.addEventListener("keydown", key);
         return () => window.removeEventListener("keydown", key);
-    }, [stage, canAim, tapHeat, strike, release]);
+    }, [stage, canAim, release]);
 
     const pieceX = fallRow >= 0 && result?.set?.path ? result.set.path[fallRow] : aim;
     const landedBand = settled ? result?.set?.band : null;
@@ -413,23 +289,8 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
             {STAGE_ANCHOR[room] ? (
                 <div className="gv-act-work-at"
                     style={{ left: `${STAGE_ANCHOR[room].x}%`, top: `${STAGE_ANCHOR[room].y}%` }}>
-                    {stage === STAGE.fire ? (
-                        <>
-                            <span className="gv-act-emberglow" style={{ opacity: 0.18 + heat * 0.82 }} aria-hidden="true" />
-                            {/* ⚠️ EMBERS THAT ANSWER THE TAPPING. Eight of them, each on its own delay,
-                                rising faster and brighter as the bar fills — this is what makes the
-                                bellows feel connected to the fire rather than to a progress bar. */}
-                            <span className="gv-act-embers" aria-hidden="true">
-                                {Array.from({ length: 8 }, (_, i) => (
-                                    <i key={i} style={{
-                                        "--i": i,
-                                        opacity: heat > i / 10 ? 1 : 0,
-                                        animationDuration: `${2.4 - heat * 1.1}s`,
-                                    }} />
-                                ))}
-                            </span>
-                        </>
-                    ) : null}
+                    {/* ⚠️ THE AMBIENT COALS, THE 3-2-1 AND THE "TAP!" WERE DRAWN HERE and are gone with
+                        the bellows that owned them. A game that needs a count-in now carries one itself. */}
                     {art ? (
                         <img className={`gv-act-work-piece${flash ? ` is-struck is-${flash.id}` : ""}`}
                             src={art} alt="" width={104} height={104}
@@ -438,13 +299,6 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                             } : undefined} />
                     ) : null}
                     {flash ? <em className={`gv-act-flash is-${flash.id}`}>{flash.label}</em> : null}
-                    {/* The count, over the coals, before anything is being measured. */}
-                    {stage === STAGE.fire && countIn != null ? (
-                        <em key={countIn} className="gv-act-count">{countIn}</em>
-                    ) : null}
-                    {stage === STAGE.fire && countIn == null && taps === 0 ? (
-                        <em className="gv-act-count is-go">TAP!</em>
-                    ) : null}
                     {/* How the stage you just left went. Keyed so a repeat grade still re-animates. */}
                     {stageSay ? (
                         <em key={`${stageSay.at}-${stageSay.word}`} className={`gv-act-stageword is-${stageSay.id}`}>
@@ -607,9 +461,17 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                                     {QUALITY_BANDS.find((b) => b.id === result.set.band)?.name || "Done"}
                                 </span>
                                 <span className="gv-act-reveal-sub">to every stat on it</span>
+                                {/* ── ⚠️ THE RUN, REPORTED IN THE UNITS THE RUN WAS ACTUALLY PLAYED IN ──────
+                                    This read "18 pumps" and a row of hammer dots, which was the whole truth
+                                    when every craft was a bellows and three strikes. With three games drawn
+                                    from ten it was a lie on seven of them — a Polish and an Inlay reported
+                                    as pumps. It names what was drawn and how each one went instead. */}
                                 <span className="gv-act-reveal-run" aria-hidden="true">
-                                    <i>{taps} pumps</i>
-                                    <i>{hits.map((h) => (h.id === "perfect" ? "●" : h.id === "hit" ? "◐" : "○")).join(" ")}</i>
+                                    {games.map((g, i) => (
+                                        <i key={g.id}>{g.name.replace(/^The /, "")}
+                                            <b>{scores[i] == null ? "—" : `${Math.round(scores[i] * 100)}%`}</b>
+                                        </i>
+                                    ))}
                                     <i>{Math.round(score * 100)}% work</i>
                                 </span>
                                 <button type="button"
