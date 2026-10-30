@@ -1,52 +1,80 @@
-// ── EVERY GOOGLE FONT THE SITE LOADS, LOADED ONCE ────────────────────────────────────────────────────────────
+// ── EVERY FONT THE SITE LOADS, FROM DISK ─────────────────────────────────────────────────────────────────────
 //
-// ⚠️ THIS IS THE ONLY FILE ALLOWED TO IMPORT `next/font/google`, AND THAT IS A BUILD RULE RATHER THAN A STYLE
-// PREFERENCE. Each call is a network lookup at BUILD time, inside Turbopack, against Google's servers. When
-// one of them cannot be resolved the whole build dies — not the page that uses the font, the build:
+// ⚠️ NOTHING HERE TOUCHES THE NETWORK AT BUILD TIME, AND THAT IS THE ENTIRE POINT OF THE FILE.
+//
+// `next/font/google` fetches each face from Google's servers while Turbopack is compiling. When one of those
+// lookups fails the BUILD dies — not the page that wanted the font, the build:
 //
 //     Error: Turbopack build failed with 6 errors
 //     Error while looking up import map: next/font/google queries have exactly one entry
 //     [next]/internal/font/google/cinzel_925ed20b.js
 //
-// That has now happened FOUR times — 2026-09-27 (Cinzel), 2026-10-17 (Kreon), and twice on 2026-10-30 — and
-// not once was the failing commit related to fonts. The second one on 2026-10-30 blocked a casino change from
-// shipping for an hour while production sat on the commit before it. Vercel emails Luke "Production
-// deployment failed" every time, so a transient network blip arrives looking exactly like a broken diff.
+// That happened FOUR times — 2026-09-27 (Cinzel), 2026-10-17 (Kreon), and twice on 2026-10-30 — and not one
+// of the four failing commits touched a font. The fourth was the expensive one: it was the newest deploy, so
+// production stayed on the commit before it and a casino change nobody could see had failed sat unshipped.
+// Every time, Vercel emailed Luke "Production deployment failed" for a network blip on a third party.
 //
-// ── WHY GATHERING THEM HELPS ─────────────────────────────────────────────────────────────────────────────────
-// `Cinzel` was called in SEVEN component files with byte-identical options:
+// The first pass at this gathered ten scattered calls into four here, which cut the odds and fixed nothing in
+// principle — one bad lookup still killed the build. Luke: "Ok fix." So the faces are committed now, and the
+// build has no opinion about whether Google is reachable.
 //
-//     Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" })
+// ── THE FILES ────────────────────────────────────────────────────────────────────────────────────────────────
+// `src/lib/font-files/*.woff2`, ~101KB for all four, each the LATIN subset of the family's VARIABLE font —
+// one file covering the whole weight range rather than one per weight. Taken from the same gstatic URLs
+// next/font/google was fetching, so these are byte-for-byte the faces the site has always served.
 //
-// Seven calls, seven lookups, seven chances to fail, for one font. The repo made ten lookups for four faces;
-// this makes four. It does not remove the dependency — one bad lookup still kills the build — but it cuts the
-// surface by well over half, and it puts every face in one place so self-hosting them (`next/font/local` with
-// the woff2 files committed) is a change to this file alone rather than to nine.
+// ⚠️ THE DIRECTORY IS `font-files`, NOT `fonts`, because this module is `@/lib/fonts` and a sibling directory
+// of that name would make `@/lib/fonts` ambiguous between the file and the folder.
 //
-// ⚠️ DO NOT "TIDY" A FONT CALL BACK INTO A COMPONENT. A second call site with the same options is not a
-// duplicate the bundler folds away — it is a second lookup, and the whole point of this file is that there
-// are as few of those as possible.
-import { Cinzel, Kreon, Manrope, Space_Grotesk } from "next/font/google";
+// To update a face: re-download the latin woff2 from the css2 endpoint with a modern browser UA (Google
+// serves a different, worse format to anything it does not recognise) and drop it in. The weight RANGES below
+// must match what the file actually carries, or a weight renders as a synthesised fake.
+import localFont from "next/font/local";
 
 // ── THE SITE'S TWO ───────────────────────────────────────────────────────────────────────────────────────────
 // Exposed as CSS variables and attached to <body> in layout.js, so everything downstream reads
 // var(--font-body) / var(--font-display) rather than importing anything.
-export const BODY_FONT = Manrope({
-    subsets: ["latin"],
+export const BODY_FONT = localFont({
+    src: "./font-files/manrope.woff2",
+    weight: "200 800",
+    style: "normal",
+    display: "swap",
     variable: "--font-body",
+    // The stack that applies while the file is still arriving, and if it never does. `swap` means this IS
+    // what a first-time visitor reads for a moment, so it is picked to be close in metrics rather than left
+    // at the browser default.
+    fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
 });
 
-export const DISPLAY_FONT = Space_Grotesk({
-    subsets: ["latin"],
+export const DISPLAY_FONT = localFont({
+    src: "./font-files/space-grotesk.woff2",
+    weight: "300 700",
+    style: "normal",
+    display: "swap",
     variable: "--font-display",
+    fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
 });
 
 // ── THE CARD GAME'S TWO ──────────────────────────────────────────────────────────────────────────────────────
-// `PANEL_FONT` is the chrome around a card — headers, buttons, the room furniture. Imported as `panelFont` by
-// the seven screens that used to each call Cinzel themselves.
-export const PANEL_FONT = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
+// `PANEL_FONT` is the chrome around a card — headers, buttons, the room furniture. It was called in seven
+// component files with byte-identical options before any of this; it is called once, here.
+export const PANEL_FONT = localFont({
+    src: "./font-files/cinzel.woff2",
+    weight: "400 900",
+    style: "normal",
+    display: "swap",
+    // Cinzel is an old-style serif, so the stand-in is a serif. Falling back to a sans would reflow the card
+    // chrome visibly on a slow connection.
+    fallback: ["Georgia", "Times New Roman", "serif"],
+});
 
 // `CARD_FONT` is the face of a card itself, and it is deliberately a DIFFERENT face from the panel — see the
 // note in CardFace.js. It is still re-exported from there, because a dozen files import it from CardFace and
 // moving the definition should not mean touching every one of them.
-export const CARD_FONT = Kreon({ subsets: ["latin"], weight: ["400", "600", "700"], display: "swap" });
+export const CARD_FONT = localFont({
+    src: "./font-files/kreon.woff2",
+    weight: "300 700",
+    style: "normal",
+    display: "swap",
+    fallback: ["Georgia", "Times New Roman", "serif"],
+});
