@@ -283,6 +283,20 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
         setActing({ recipe: r, temper: tempering === r.id, times });
     };
 
+    // ⚠️ THIS MUST RETURN SOMETHING WITH `ok` ON IT, AND NOT RETURNING ONE WAS A SHIPPED BUG.
+    // Luke: "Plinko mini game is broken, when you choose to drop it, the screen just closes."
+    //
+    // It was. GroveCraftAct's release() does `const d = await onCommit(...)` and then
+    // `if (!d?.ok) { onClose(d); return; }`. This function was lifted out of the old void-returning
+    // craftAll handler and kept returning undefined, so after a perfectly good batch the act read "no ok"
+    // and shut itself — and finishCraft, seeing the same undefined, then wrote "That did not work."
+    // The craft had already succeeded on the server. The player got the parts spent, the items made, the
+    // screen closed and an error, which is about the worst possible combination of true and false.
+    //
+    // ⚠️ IT RETURNS `batched` SO THE ACT KNOWS NOT TO DEAL A CARD. The result card shows a board, a
+    // landing and one band; a batch has ten of each, and printing the last roll's card over ten crafts
+    // would be the same class of lie the original comment on craft-all warned about. The summary note
+    // below is the batch's answer; the act just needs to close cleanly rather than look crashed.
     const postBatch = async (r, times, act, aim) => {
         setBusy(`all-${r.id}`);
         const d = await post({ action: "craftAll", recipe: r.id, temper: tempering === r.id, times, act, aim });
@@ -291,7 +305,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
             setNote(d?.error === "not_enough_parts" ? "Not enough parts for that."
                 : d?.error === "not_repeatable" ? "That one is made once."
                 : "That did not work.");
-            return;
+            return d || { ok: false };
         }
         // ⚠️ WHAT ACTUALLY LANDED, read off the server's totals. `makes` is the summed batch including every
         // band's bonus, so a run of good rolls reads as the bigger number it really was.
@@ -301,6 +315,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
         setNote(`Made ${what}${short}.${d.levelled ? " Crafting levelled up." : ""}`);
         if (d.firstCraft) setNote(`Made ${what}. A Mossbound Cache went to your chests.`);
         await refresh();
+        return { ...d, batched: times };
     };
 
     /** Called when the act closes — with the finished craft, or with an error it could not complete. */

@@ -86,7 +86,41 @@ export const HEAT_WEIGHT = 0.35;
 export const STRIKE_WEIGHT = 0.65;
 
 /** 0..1 across both skill beats. */
-export function actScore({ heat = 0, strikes = [] } = {}) {
+// ── ⚠️ THREE PHASES, DRAWN FROM A POOL — AND THE OLD TWO-FIELD SHAPE STILL WORKS ────────────────────────────
+// Luke: "The crafting minigame sucks... it should pull from, like, let's say 10 different kind of mini games
+// ... it'll pull three of them, and there's clearly three phases."
+//
+// The act used to be exactly two beats with two different shapes: `heat` (one number) and `strikes` (three
+// numbers), weighted 0.35/0.65. Ten interchangeable minigames cannot each pretend to be one of those two, so
+// a phase now reports ONE number in 0..1 and the act carries three of them.
+//
+// ⚠️ THE OLD FIELDS ARE STILL READ, and that is not politeness — it is the only safe way to change a wire
+// format a live client is already posting. A player mid-craft when the deploy lands posts {heat, strikes};
+// if this threw those away their craft would silently score zero on a board they had just played well.
+// `phases` wins when present, the old pair answers when it is not.
+//
+// ⚠️ AND THE RANGE IS UNCHANGED, WHICH IS THE WHOLE POINT. Both paths return 0..1, actBias still multiplies
+// by ACT_MAX_BIAS, so the economy sees exactly the numbers it saw yesterday. Ten new minigames must not be a
+// stealth buff to crafting — see casino-dont-balance-to-a-number for the shape of that mistake.
+export const PHASES = 3;
+
+// Weighted slightly toward the end so a craft BUILDS. Equal thirds made the last phase feel like admin;
+// the final beat being worth most is what makes the third one the one you hold your breath for.
+const PHASE_WEIGHTS = [0.30, 0.33, 0.37];
+
+export function actScore({ heat = 0, strikes = [], phases = null } = {}) {
+    if (Array.isArray(phases) && phases.length) {
+        const out = phases.slice(0, PHASES).reduce(
+            (a, x, i) => a + Math.max(0, Math.min(1, Number(x) || 0)) * PHASE_WEIGHTS[i], 0);
+        // Divided by the weight actually used, so a craft interrupted after two phases is scored out of two
+        // rather than being punished for a phase it never got to play.
+        const used = PHASE_WEIGHTS.slice(0, Math.min(PHASES, phases.length)).reduce((a, w) => a + w, 0);
+        return Math.max(0, Math.min(1, used > 0 ? out / used : 0));
+    }
+    return legacyActScore({ heat, strikes });
+}
+
+function legacyActScore({ heat = 0, strikes = [] } = {}) {
     const h = Math.max(0, Math.min(1, Number(heat) || 0));
     const list = Array.isArray(strikes) ? strikes.slice(0, STRIKES) : [];
     const s = list.reduce((a, x) => a + Math.max(0, Math.min(1, Number(x) || 0)), 0) / STRIKES;
@@ -109,10 +143,18 @@ export function actScore({ heat = 0, strikes = [] } = {}) {
  */
 export function clampAct(act) {
     const strikes = Array.isArray(act?.strikes) ? act.strikes : [];
-    return {
+    const out = {
         heat: Math.max(0, Math.min(1, Number(act?.heat) || 0)),
         strikes: Array.from({ length: STRIKES }, (_, i) => Math.max(0, Math.min(1, Number(strikes[i]) || 0))),
     };
+    // ⚠️ CLAMPED THE SAME WAY AND FOR THE SAME REASON as the two above: the client reports these and the
+    // server cannot replay a thumb, so the posture is "bound it", not "trust it". A phase list is only
+    // carried through when it actually has entries — an empty array would otherwise beat the legacy pair
+    // in actScore and score a real craft as nothing.
+    if (Array.isArray(act?.phases) && act.phases.length) {
+        out.phases = act.phases.slice(0, PHASES).map((x) => Math.max(0, Math.min(1, Number(x) || 0)));
+    }
+    return out;
 }
 
 /** The bias the act adds, in the same units the level and the temper feed. */

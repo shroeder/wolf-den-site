@@ -263,6 +263,10 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         posted.current = true;
         const d = await onCommit(act, aim);
         if (!d?.ok) { onClose(d); return; }
+        // ⚠️ A BATCH CLOSES, IT DOES NOT DEAL A CARD. The result card is built around ONE landing in ONE
+        // band, and a batch has as many of each as it made — the bench writes the summary note instead.
+        // Closing on a successful batch is the finish line here, not a failure path.
+        if (d.batched) { onClose(d); return; }
         setResult(d);
     }, [act, aim, onCommit, onClose]);
 

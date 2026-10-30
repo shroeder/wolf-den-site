@@ -31,7 +31,8 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 | 15 | "Show me where it went" on the craft card — takes you to the shelf and flashes it (part of D) | `a44dbc78` |
 | 16 | Inventory shelves collapse, and the choice survives leaving the panel (part of D) | `(this)` |
 | 17 | A tool shows the quality band it was forged at — it was in the payload and on no screen | `d7b34e0f` |
-| 18 | A door back into the Grove on the Town page — the dead end is gone (half of item A) | `(this)` |
+| 18 | A door back into the Grove on the Town page — the dead end is gone (half of item A) | `cf8ff9ec` |
+| 19 | ⚠️ REGRESSION FIX: dropping the Plinko ball on a batch closed the act and cried failure | `(this)` |
 
 ---
 
