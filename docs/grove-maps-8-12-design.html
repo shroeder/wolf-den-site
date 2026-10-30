@@ -1,0 +1,795 @@
+<title>Grove Maps 8–12</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root {
+    --bg: #f5f3ea; --surface: #fffdf6; --sunk: #efece0;
+    --text: #23221a; --muted: #6a6859; --faint: #8e8c7c;
+    --line: #dedacb; --rule: #c9c4b0;
+    --accent: #8a6412; --accent-soft: #f0e5cb;
+    --m8: #a06a16; --m9: #1d7e96; --m10: #b53a52; --m11: #b05c2a; --m12: #6c48b0;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #14150f; --surface: #1c1d15; --sunk: #191a12;
+        --text: #e8e2d2; --muted: #9a9888; --faint: #7d7b6c;
+        --line: #2e3024; --rule: #3b3d2f;
+        --accent: #e0a83c; --accent-soft: #2a2516;
+        --m8: #d8a05a; --m9: #7fd4e8; --m10: #e8788a; --m11: #f0b48c; --m12: #b58af0;
+        --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #14150f; --surface: #1c1d15; --sunk: #191a12;
+    --text: #e8e2d2; --muted: #9a9888; --faint: #7d7b6c;
+    --line: #2e3024; --rule: #3b3d2f;
+    --accent: #e0a83c; --accent-soft: #2a2516;
+    --m8: #d8a05a; --m9: #7fd4e8; --m10: #e8788a; --m11: #f0b48c; --m12: #b58af0;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+}
+
+* { box-sizing: border-box; }
+body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px; line-height: 1.6; -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 860px; margin: 0 auto; padding: 40px 20px 80px; }
+
+h1 { font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: clamp(2rem, 6vw, 3rem);
+     line-height: 1.08; margin: 0 0 10px; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: clamp(1.45rem, 4vw, 2rem);
+     line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-size: .74rem; font-weight: 600; letter-spacing: .17em; text-transform: uppercase;
+     color: var(--faint); margin: 30px 0 10px; }
+h4 { font-size: .95rem; font-weight: 600; margin: 20px 0 6px; }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+.lede { font-size: 1.1rem; color: var(--muted); max-width: 62ch; }
+.meta { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .78rem;
+        color: var(--faint); letter-spacing: .02em; }
+code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .86em; }
+code { background: var(--sunk); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 36px 0; }
+
+/* ── The index. Also the legend for the five hues used throughout. ───────────────────── */
+.index { display: grid; gap: 8px; margin: 26px 0 10px; padding: 0; list-style: none; }
+.index li { display: grid; grid-template-columns: 2.6rem 1fr auto; gap: 12px; align-items: baseline;
+            padding: 10px 14px; background: var(--surface); border: 1px solid var(--line);
+            border-left: 4px solid var(--c); border-radius: 8px; }
+.index b { font-family: Fraunces, Georgia, serif; font-size: 1.02rem; font-weight: 700; }
+.index .n { font-family: "IBM Plex Mono", monospace; font-weight: 500; color: var(--c); }
+.index .tag { font-size: .76rem; color: var(--faint); font-family: "IBM Plex Mono", monospace; }
+
+/* ── A map chapter ───────────────────────────────────────────────────────────────────── */
+.map { margin: 50px 0 0; padding-top: 26px; border-top: 3px solid var(--c); }
+.map-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.map-head .n { font-family: "IBM Plex Mono", monospace; font-size: 1.1rem; font-weight: 500; color: var(--c); }
+.map-blurb { font-family: Fraunces, Georgia, serif; font-size: 1.12rem; font-style: italic;
+             color: var(--muted); margin: 8px 0 18px; max-width: 58ch; }
+
+/* The one thing that stops a map being the last one, said once, up front. */
+.hook { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--c);
+        border-radius: 8px; padding: 14px 16px; margin: 0 0 22px; box-shadow: var(--shadow); }
+.hook b { display: block; font-size: .72rem; letter-spacing: .17em; text-transform: uppercase;
+          color: var(--c); margin-bottom: 4px; }
+
+table { width: 100%; border-collapse: collapse; font-size: .9rem; margin: 0 0 6px; }
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 0 18px; }
+th { text-align: left; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
+     color: var(--faint); font-weight: 600; padding: 0 10px 7px 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.id { font-family: "IBM Plex Mono", monospace; font-size: .8rem; color: var(--muted); white-space: nowrap; }
+td.arch { font-family: "IBM Plex Mono", monospace; font-size: .76rem; color: var(--c); white-space: nowrap; }
+td.say { color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+
+.two { display: grid; gap: 18px; }
+@media (min-width: 680px) { .two { grid-template-columns: 1fr 1fr; } }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+        padding: 14px 16px; box-shadow: var(--shadow); }
+.card h4 { margin-top: 0; }
+.quote { font-family: Fraunces, Georgia, serif; font-style: italic; color: var(--muted); }
+
+ol.chain { margin: 6px 0 0; padding-left: 20px; font-size: .9rem; }
+ol.chain li { margin-bottom: 3px; }
+ol.chain .k { font-family: "IBM Plex Mono", monospace; font-size: .74rem; color: var(--c);
+              text-transform: uppercase; letter-spacing: .08em; }
+
+.note { background: var(--accent-soft); border: 1px solid var(--line); border-radius: 8px;
+        padding: 14px 16px; margin: 20px 0; }
+.note b { color: var(--accent); }
+
+.cost td.n { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.cost tfoot td { font-weight: 600; border-top: 2px solid var(--rule); border-bottom: 0; padding-top: 10px; }
+</style>
+
+<div class="wrap">
+
+<p class="meta">THE WOLF DEN · GROVE · DESIGN SPEC · DRAFT FOR REVIEW</p>
+<h1>Maps 8 to 12</h1>
+<p class="lede">Five maps, 60 zones, 60 bosses, 60 creatures, 60 parts, 20 NPCs, 15 quest chains and
+5 Coliseums. Nothing here is built yet. This is the thing to argue with before any of it is.</p>
+
+<div class="note">
+<p><b>The brief, and the real risk.</b> Luke: <span class="quote">“every time I have you do the work, it
+tends to all kind of be the same and not very unique… it can't just be, like, vanilla, repeat, repeat.”</span></p>
+<p>That is the correct worry, because the generator makes it easy: a map is twelve parts, twelve creatures,
+twelve zones and an emblem, and five maps of that shape will come out as one map wearing five coats of paint.
+So every map below gets <b>one signature mechanic that no other map has</b>, a <b>different mix of creature
+archetypes</b>, a <b>different mix of quest verbs</b>, and its <b>own rare spawn</b> — today there is exactly
+one rare spawn in the entire game and it is shared by all seven maps.</p>
+<p style="margin-bottom:0">Where a thing genuinely should repeat, it repeats, and I have said so rather than
+inventing difference for its own sake.</p>
+</div>
+
+<h3>The five</h3>
+<ul class="index">
+  <li style="--c:var(--m8)"><span class="n">08</span><span><b>The Clockwork Deep</b> — something built this</span><span class="tag">clockwork</span></li>
+  <li style="--c:var(--m9)"><span class="n">09</span><span><b>The Frostmere</b> — black water under white ice</span><span class="tag">ice</span></li>
+  <li style="--c:var(--m10)"><span class="n">10</span><span><b>The Hollow Colossus</b> — inside a dead titan</span><span class="tag">flesh</span></li>
+  <li style="--c:var(--m11)"><span class="n">11</span><span><b>The Cloudshelf</b> — stone that forgot to fall</span><span class="tag">cloud</span></li>
+  <li style="--c:var(--m12)"><span class="n">12</span><span><b>The Starfall Rim</b> — past the last air</span><span class="tag">star</span></li>
+</ul>
+<p class="meta">Two names survive from the existing table — The Frostmere and The Starfall Rim, which were
+already right. Thunder Steppe and Rotgarden are retired: a steppe is grassland and a rotgarden is a swamp,
+and maps 1, 3 and 4 have covered green and wet thoroughly.</p>
+
+<hr>
+
+<h3>What this had to work around</h3>
+<p><b>The feature ladder is spent.</b> Towns 1–7 introduce every system the game has — pets, mining,
+blacksmith, farm, cooking, sailing, fishing, bounties, dungeons, jeweller, sets, creations, cards, market,
+auction, trade, casino, spin, arena, boss, leaderboard, trophies, track, badges. There is nothing left for
+town 8 to unlock. Towns 8–12 therefore <b>deepen instead of introduce</b>, which is a different job and
+needs your call — proposals are in each chapter and collected at the end.</p>
+<p><b>The map generator is honest about its shape.</b> Each map is exactly 12 parts across 8 roles
+(<code>edge haft bind hide ember glow stone charm</code>), 12 creatures across 6 archetypes
+(<code>swarm striker brute caster stalker grazer</code>), 12 zones each with one boss, and one Mark. Food,
+charm and tool recipes are <i>derived</i> from the parts — so the parts list is the real design surface, and
+a lazy parts list produces lazy crafting automatically.</p>
+<p><b>Every stat needs a consumer.</b> Two of the five Marks below grant something new, and each names the
+code that would have to read it. The other three reuse stats already consumed — deliberately, because five
+new systems in five maps is how a feature becomes a maintenance bill.</p>
+
+<!-- ═══════════════════════════════ MAP 8 ═══════════════════════════════ -->
+<section class="map" style="--c:var(--m8)">
+<div class="map-head"><span class="n">08</span><h2>The Clockwork Deep</h2></div>
+<p class="map-blurb">“Something built this, and it was never told to stop.”</p>
+
+<div class="hook"><b>Signature mechanic — the map keeps time</b>
+Gear platforms rotate on one four-second cycle shared by the whole zone. Every map so far threatens you with
+its <i>creatures</i>; this is the first where the <i>terrain</i> is the threat and the creatures are
+incidental. It is also the first terrain that is fully predictable — so it reads as a skill test rather than
+a damage check, which is the opposite of the Ashen Reach before it.</div>
+
+<div class="two">
+<div class="card"><h4>The Mark</h4>
+<p style="margin:0"><b>The Geared Mark</b> — <code>salvage</code>, +1.6%/star.<br>
+<span class="meta">NEW STAT.</span> A kill has a chance to also drop a part from <i>one map deeper</i>.
+Consumer: the rare row in <code>grove-roll.js</code>, which already does exactly this for
+<code>creatureRareLoot</code> — this raises its rate rather than adding a mechanism.</p></div>
+<div class="card"><h4>Rare spawn</h4>
+<p style="margin:0"><b>The Governor</b> — a regulator sphere that <i>spins faster as it loses health</i>, so
+its telegraphs compress instead of its damage rising. The first rare that gets harder to read rather than
+harder to survive.</p></div>
+</div>
+
+<h3>Zones &amp; bosses</h3>
+<div class="scroll"><table>
+<tr><th>#</th><th>Zone</th><th>Biome</th><th>Boss</th></tr>
+<tr><td class="id">1</td><td>The Cogfall Gate</td><td class="arch">clockwork</td><td>The Doorwarden</td></tr>
+<tr><td class="id">2</td><td>The Toothed Hall</td><td class="arch">clockwork</td><td>The First Tooth</td></tr>
+<tr><td class="id">3</td><td>The Piston Run</td><td class="arch">clockwork</td><td>Longstroke</td></tr>
+<tr><td class="id">4</td><td>The Oil Sump</td><td class="arch">burrow</td><td>The Sump Mother</td></tr>
+<tr><td class="id">5</td><td>The Boiler Floor</td><td class="arch">char</td><td>Pressure</td></tr>
+<tr><td class="id">6</td><td>The Dial Gallery</td><td class="arch">glow</td><td>The Hour Hand</td></tr>
+<tr><td class="id">7</td><td>The Chainworks</td><td class="arch">clockwork</td><td>Slackjaw</td></tr>
+<tr><td class="id">8</td><td>The Governor Ring</td><td class="arch">clockwork</td><td>The Regulator</td></tr>
+<tr><td class="id">9</td><td>The Bellows Deep</td><td class="arch">burrow</td><td>The Long Breath</td></tr>
+<tr><td class="id">10</td><td>The Filament Vault</td><td class="arch">glow</td><td>The Filament</td></tr>
+<tr><td class="id">11</td><td>The Ratchet Stair</td><td class="arch">clockwork</td><td>One Way Up</td></tr>
+<tr><td class="id">12</td><td>The Mainspring</td><td class="arch">clockwork</td><td>The Mainspring Itself</td></tr>
+</table></div>
+<p class="meta">The Ratchet Stair is one-way by design: the first zone in the game you cannot walk back
+through, which is what makes the Mainspring feel like an ending rather than a twelfth room.</p>
+
+<h3>Creatures</h3>
+<p class="meta">Archetype mix: 3 brute · 3 swarm · 2 striker · 2 caster · 2 stalker · <b>0 grazer</b>.
+Nothing grazes in a machine, and the absence is the point — this is the only roster in the game with a gap
+in it.</p>
+<div class="scroll"><table>
+<tr><th>Id</th><th>Name</th><th>Archetype</th><th>What it is</th></tr>
+<tr><td class="id">tick_mite</td><td>Tick Mite</td><td class="arch">swarm</td><td class="say">Lives in the teeth. Comes out when they stop.</td></tr>
+<tr><td class="id">bolt_shedder</td><td>Bolt Shedder</td><td class="arch">swarm</td><td class="say">Sheds what it is made of and keeps walking.</td></tr>
+<tr><td class="id">solder_rat</td><td>Solder Rat</td><td class="arch">swarm</td><td class="say">Chews the joints. The joints are load-bearing.</td></tr>
+<tr><td class="id">piston_hound</td><td>Piston Hound</td><td class="arch">brute</td><td class="say">One stroke forward, and it does not stop early.</td></tr>
+<tr><td class="id">flywheel</td><td>The Flywheel</td><td class="arch">brute</td><td class="say">Already moving when you arrive. Still moving after.</td></tr>
+<tr><td class="id">anvil_drone</td><td>Anvil Drone</td><td class="arch">brute</td><td class="say">Hits once a cycle, on the cycle, forever.</td></tr>
+<tr><td class="id">governor_wasp</td><td>Governor Wasp</td><td class="arch">striker</td><td class="say">Keeps the others to time. Punishes the slow ones.</td></tr>
+<tr><td class="id">ratchet_adder</td><td>Ratchet Adder</td><td class="arch">striker</td><td class="say">Goes one way. Cannot be pushed back.</td></tr>
+<tr><td class="id">arc_coil</td><td>Arc Coil</td><td class="arch">caster</td><td class="say">Charges on the beat and lets go on the next.</td></tr>
+<tr><td class="id">steam_censer</td><td>Steam Censer</td><td class="arch">caster</td><td class="say">Vents where you were going to stand.</td></tr>
+<tr><td class="id">oil_crawler</td><td>Oil Crawler</td><td class="arch">stalker</td><td class="say">Black on black, under the floor you are on.</td></tr>
+<tr><td class="id">gauge_watcher</td><td>Gauge Watcher</td><td class="arch">stalker</td><td class="say">Reads the dial. Moves when the needle does.</td></tr>
+</table></div>
+
+<h3>Parts</h3>
+<div class="scroll"><table>
+<tr><th>Id</th><th>Name</th><th>Role</th><th>Flavour</th></tr>
+<tr><td class="id">brass_burr</td><td>Brass Burr</td><td class="arch">edge</td><td class="say">Came off a tooth that was still turning.</td></tr>
+<tr><td class="id">shear_plate</td><td>Shear Plate</td><td class="arch">edge</td><td class="say">Flat, and sharp along three of its four sides.</td></tr>
+<tr><td class="id">piston_rod</td><td>Piston Rod</td><td class="arch">haft</td><td class="say">Straight in a way nothing grown ever is.</td></tr>
+<tr><td class="id">wire_wrap</td><td>Wire Wrap</td><td class="arch">bind</td><td class="say">Copper, and still warm from carrying something.</td></tr>
+<tr><td class="id">chain_link</td><td>Chain Link</td><td class="arch">bind</td><td class="say">One of forty thousand. They are all still counted.</td></tr>
+<tr><td class="id">gasket_felt</td><td>Gasket Felt</td><td class="arch">hide</td><td class="say">Oil-black, and it never dries.</td></tr>
+<tr><td class="id">bellows_skin</td><td>Bellows Skin</td><td class="arch">hide</td><td class="say">Folded a million times and not split yet.</td></tr>
+<tr><td class="id">furnace_coal</td><td>Furnace Coal</td><td class="arch">ember</td><td class="say">The fire down here was banked, not put out.</td></tr>
+<tr><td class="id">dial_glass</td><td>Dial Glass</td><td class="arch">glow</td><td class="say">The needle under it still moves.</td></tr>
+<tr><td class="id">filament_coil</td><td>Filament Coil</td><td class="arch">glow</td><td class="say">Lights when held. Nobody has found the wire.</td></tr>
+<tr><td class="id">ballast_weight</td><td>Ballast Weight</td><td class="arch">stone</td><td class="say">Lead, and cast with somebody's mark on it.</td></tr>
+<tr><td class="id">the_escapement</td><td>The Escapement</td><td class="arch">charm</td><td class="say">Ticks in your hand at a speed that is not yours.</td></tr>
+</table></div>
+
+<h3>Town 8 · Cogfall</h3>
+<p>Built into a stopped gear the size of a church. <b>Proposed features:</b> <code>foundry</code> — reforge
+a tool you already own into a different tool of the same tier, paying the difference in parts. It is the
+first town that lets you <i>undo</i> a crafting decision, which is the right thing to offer a player eight
+maps deep who picked wrong at map three.</p>
+
+<h3>NPCs &amp; chains</h3>
+<div class="two">
+<div class="card"><h4>Keeper Sprocket <span class="meta">· oiler who never stops walking</span></h4>
+<p class="quote">“Don't stand still. Neither does anything else.”</p>
+<ol class="chain">
+<li><span class="k">survive</span> Stand the Cycle</li>
+<li><span class="k">cull</span> Clear the Teeth</li>
+<li><span class="k">forge</span> An Oil That Holds</li>
+<li><span class="k">delve</span> Two Floors Down</li>
+</ol></div>
+<div class="card"><h4>The Timekeeper <span class="meta">· counts the cycle out loud</span></h4>
+<p class="quote">“Four. Three. You'll learn to like the number.”</p>
+<ol class="chain">
+<li><span class="k">delve</span> Count With Me</li>
+<li><span class="k">survive</span> A Full Rotation</li>
+<li><span class="k">ticket</span> On the Beat</li>
+</ol></div>
+<div class="card"><h4>Widow Flint <span class="meta">· scavenges the stopped machines</span></h4>
+<p class="quote">“The dead ones are the safe ones. There aren't many.”</p>
+<ol class="chain">
+<li><span class="k">harvest</span> Strip the Stopped</li>
+<li><span class="k">cull</span> The Ones Still Running</li>
+<li><span class="k">harvest</span> Deeper Scrap</li>
+<li><span class="k">hunt</span> The Governor</li>
+</ol></div>
+<div class="card"><h4>Coliseum · Foreman Gall <span class="meta">· zone 8</span></h4>
+<p class="quote">“The floor turns whether you're on it or not. Two minutes.”</p>
+<p style="margin:0"><b>What's different:</b> the arena floor itself rotates. Waves arrive at fixed points on
+the cycle, so wave timing is readable and position is the whole problem — the only Coliseum where standing
+in the right place matters more than killing fast.</p></div>
+</div>
+<p class="meta" style="margin-top:14px">Verb mix: <b>survive 2 · delve 2 · harvest 2 · cull 2 · forge 1 · ticket 1 · hunt 1</b>.
+Heavy on <code>survive</code> and <code>delve</code>, because enduring the cycle <i>is</i> the map.</p>
+</section>
+
+<!-- ═══════════════════════════════ MAP 9 ═══════════════════════════════ -->
+<section class="map" style="--c:var(--m9)">
+<div class="map-head"><span class="n">09</span><h2>The Frostmere</h2></div>
+<p class="map-blurb">“Black water under white ice, and the ice is the floor.”</p>
+
+<div class="hook"><b>Signature mechanic — standing still is the danger</b>
+Shelf ice cracks under a stationary player. A cold meter fills while you are still and empties while you
+move, and at full it drops you through. Every other map in the game rewards careful, patient play; this one
+punishes it, which is why it belongs <i>after</i> the Clockwork Deep taught you to wait for a beat.</div>
+
+<div class="two">
+<div class="card"><h4>The Mark</h4>
+<p style="margin:0"><b>The Hoar Mark</b> — <code>armour</code>, +3/star.<br>
+<span class="meta">EXISTING STAT, kept from the current table.</span> A place trying to kill you slowly should
+give armour, and it is the one combat stat no deep-map Mark currently grants.</p></div>
+<div class="card"><h4>Rare spawn</h4>
+<p style="margin:0"><b>The Mere-Lamp</b> — a light under the ice that <i>moves away</i> as you approach and
+has to be cornered against a shelf edge. The first rare you catch by geometry rather than damage.</p></div>
+</div>
+
+<h3>Zones &amp; bosses</h3>
+<div class="scroll"><table>
+<tr><th>#</th><th>Zone</th><th>Biome</th><th>Boss</th></tr>
+<tr><td class="id">1</td><td>Shelf's Edge</td><td class="arch">ice</td><td>The Shelfbreaker</td></tr>
+<tr><td class="id">2</td><td>Thin Ice</td><td class="arch">ice</td><td>Thinwalker</td></tr>
+<tr><td class="id">3</td><td>The Breath</td><td class="arch">ice</td><td>The Long Breath</td></tr>
+<tr><td class="id">4</td><td>The Frozen Stand</td><td class="arch">wood</td><td>Pinebound</td></tr>
+<tr><td class="id">5</td><td>Blackwater</td><td class="arch">ice</td><td>The Blackwater Thing</td></tr>
+<tr><td class="id">6</td><td>The Aurora Field</td><td class="arch">glow</td><td>The Aurora</td></tr>
+<tr><td class="id">7</td><td>The Cracking Mile</td><td class="arch">ice</td><td>The Mile</td></tr>
+<tr><td class="id">8</td><td>The Seal Holes</td><td class="arch">ice</td><td>Holekeeper</td></tr>
+<tr><td class="id">9</td><td>The Hoar Cathedral</td><td class="arch">stone</td><td>The Hoar Priest</td></tr>
+<tr><td class="id">10</td><td>The Drift Maze</td><td class="arch">ice</td><td>Driftmother</td></tr>
+<tr><td class="id">11</td><td>The Deep Mere</td><td class="arch">ice</td><td>The Deep Mere</td></tr>
+<tr><td class="id">12</td><td>The Still</td><td class="arch">ice</td><td>The Still Itself</td></tr>
+</table></div>
+<p class="meta">The Frozen Stand is the only <code>wood</code> zone past map 4 — a drowned pine forest standing
+upright in the ice. It is there to be unsettling by familiarity, not to reuse an asset.</p>
+
+<h3>Creatures</h3>
+<p class="meta">Archetype mix: <b>4 stalker</b> · 3 brute · 2 striker · 2 caster · 1 grazer · 0 swarm.
+Stalker-heavy because the threat is what is <i>under</i> you, and no swarms at all — nothing survives out here
+in numbers.</p>
+<div class="scroll"><table>
+<tr><th>Id</th><th>Name</th><th>Archetype</th><th>What it is</th></tr>
+<tr><td class="id">ice_lurk</td><td>Icelurk</td><td class="arch">stalker</td><td class="say">A shadow keeping pace on the wrong side of the floor.</td></tr>
+<tr><td class="id">drift_stalker</td><td>Driftstalker</td><td class="arch">stalker</td><td class="say">White on white. You find it by the holes it leaves.</td></tr>
+<tr><td class="id">under_ice</td><td>The Under-Ice</td><td class="arch">stalker</td><td class="say">Never surfaces. Does not need to.</td></tr>
+<tr><td class="id">hole_waiter</td><td>The Hole-Waiter</td><td class="arch">stalker</td><td class="say">Sits at a breathing hole that is not its own.</td></tr>
+<tr><td class="id">shelf_cracker</td><td>Shelf Cracker</td><td class="arch">brute</td><td class="say">Heavy on purpose. Breaks the floor to get you.</td></tr>
+<tr><td class="id">snow_mound</td><td>Snowmound</td><td class="arch">brute</td><td class="say">Was a drift until it was not.</td></tr>
+<tr><td class="id">whitecoat</td><td>Whitecoat</td><td class="arch">brute</td><td class="say">The biggest thing on the mere, and it is not hiding.</td></tr>
+<tr><td class="id">needle_gull</td><td>Needle Gull</td><td class="arch">striker</td><td class="say">Comes in off the open water at head height.</td></tr>
+<tr><td class="id">mere_wolf</td><td>Mere Wolf</td><td class="arch">striker</td><td class="say">Alone, which is wrong for a wolf and worse for you.</td></tr>
+<tr><td class="id">hoar_wisp</td><td>Hoar Wisp</td><td class="arch">caster</td><td class="say">Freezes the air where you were headed.</td></tr>
+<tr><td class="id">aurora_moth</td><td>Aurora Moth</td><td class="arch">caster</td><td class="say">Lit from inside by a colour that should not be warm.</td></tr>
+<tr><td class="id">frost_hare</td><td>Frost Hare</td><td class="arch">grazer</td><td class="say">Harmless, and the only thing out here that runs.</td></tr>
+</table></div>
+
+<h3>Parts</h3>
+<div class="scroll"><table>
+<tr><th>Id</th><th>Name</th><th>Role</th><th>Flavour</th></tr>
+<tr><td class="id">ice_splinter</td><td>Ice Splinter</td><td class="arch">edge</td><td class="say">Sharper than steel for about a minute.</td></tr>
+<tr><td class="id">shard_tooth</td><td>Shard Tooth</td><td class="arch">edge</td><td class="say">Came out of something that bit the ice and lost.</td></tr>
+<tr><td class="id">frozen_pine</td><td>Frozen Pine</td><td class="arch">haft</td><td class="say">Dead standing for two hundred years. Still straight.</td></tr>
+<tr><td class="id">frostsinew</td><td>Frostsinew</td><td class="arch">bind</td><td class="say">Thaws in the hand and grips as it does.</td></tr>
+<tr><td class="id">gut_line</td><td>Gut Line</td><td class="arch">bind</td><td class="say">Will hold a man through the ice. Has.</td></tr>
+<tr><td class="id">mere_pelt</td><td>Pelt of the Mere</td><td class="arch">hide</td><td class="say">Warm, and faintly wrong to the touch.</td></tr>
+<tr><td class="id">down_mat</td><td>Down Mat</td><td class="arch">hide</td><td class="say">Stripped from a nest nobody has seen the owner of.</td></tr>
+<tr><td class="id">bankstone</td><td>Bankstone</td><td class="arch">ember</td><td class="say">Holds a fire overnight. The whole camp runs on them.</td></tr>
+<tr><td class="id">aurora_salt</td><td>Aurora Salt</td><td class="arch">glow</td><td class="say">Scraped off the ice where the light touched it.</td></tr>
+<tr><td class="id">coldfire</td><td>Coldfire</td><td class="arch">glow</td><td class="say">Gives light, takes heat. Nobody is sure that is a trade.</td></tr>
+<tr><td class="id">black_ice</td><td>Black Ice</td><td class="arch">stone</td><td class="say">Clear through to the water. Cuts like flint.</td></tr>
+<tr><td class="id">the_still_heart</td><td>The Still Heart</td><td class="arch">charm</td><td class="say">Does not melt. Has been tried.</td></tr>
+</table></div>
+
+<h3>Town 9 · Hoarfast</h3>
+<p>One long hall with a fire that is never allowed out. <b>Proposed features:</b> <code>hearth</code> — a
+pre-run buff you set before entering, chosen from what you cooked. It gives the Farm and Cooking systems
+from town 3 a reason to exist nine maps later, which is the honest answer to “towns have nothing left to
+unlock”: make an old system matter again rather than bolt a new one on.</p>
+
+<h3>NPCs &amp; chains</h3>
+<div class="two">
+<div class="card"><h4>Lantern-Keeper Ost <span class="meta">· keeps the only fire for a mile</span></h4>
+<p class="quote">“Sit if you must. Don't sleep.”</p>
+<ol class="chain">
+<li><span class="k">survive</span> Keep Moving</li>
+<li><span class="k">harvest</span> Fuel for the Night</li>
+<li><span class="k">cull</span> What Comes for the Fire</li>
+<li><span class="k">survive</span> Through the Dark</li>
+</ol></div>
+<div class="card"><h4>The Icewright <span class="meta">· reads the ice like a page</span></h4>
+<p class="quote">“White is the good kind. You'll meet the other.”</p>
+<ol class="chain">
+<li><span class="k">harvest</span> Black Ice, Not White</li>
+<li><span class="k">delve</span> Where It Thins</li>
+<li><span class="k">forge</span> Something With Teeth</li>
+</ol></div>
+<div class="card"><h4>Runner Sable <span class="meta">· carries messages across the mere</span></h4>
+<p class="quote">“I don't stop. That's the whole job.”</p>
+<ol class="chain">
+<li><span class="k">delve</span> Carry This</li>
+<li><span class="k">delve</span> And This</li>
+<li><span class="k">hunt</span> The Light Under</li>
+<li><span class="k">ticket</span> The Ring</li>
+</ol></div>
+<div class="card"><h4>Coliseum · The Hollow Caller <span class="meta">· zone 6</span></h4>
+<p class="quote">“We cut a ring in the shelf. Two minutes before it takes it back.”</p>
+<p style="margin:0"><b>What's different:</b> the arena <i>shrinks</i>. The ring refreezes inward each wave,
+so late waves are fought in a space a third the size. Pressure comes from the floor, not the spawn rate.</p></div>
+</div>
+<p class="meta" style="margin-top:14px">Verb mix: <b>delve 3 · survive 2 · harvest 2 · cull 1 · forge 1 · hunt 1 · ticket 1</b>.
+Delve-heavy: on a map that punishes standing still, the quests should keep asking you to <i>go</i>.</p>
+</section>
+
+<!-- ═══════════════════════════════ MAP 10 ═══════════════════════════════ -->
+<section class="map" style="--c:var(--m10)">
+<div class="map-head"><span class="n">10</span><h2>The Hollow Colossus</h2></div>
+<p class="map-blurb">“It died standing, and the inside never got the message.”</p>
+
+<div class="hook"><b>Signature mechanic — the map has a pulse</b>
+A six-second heartbeat dims and brightens the whole zone. <i>Creatures hit harder on the beat and are
+staggerable off it.</i> Map 8 made the terrain rhythmic; this makes the enemies rhythmic, so the skill you
+learned there transfers and then inverts — there you moved to the beat, here you strike between them.</div>
+
+<div class="two">
+<div class="card"><h4>The Mark</h4>
+<p style="margin:0"><b>The Hollow Mark</b> — <code>life_steal</code>, +2.2%/star.<br>
+<span class="meta">EXISTING STAT, inherited from the retired Rotgarden.</span> Taking life back inside a thing
+that is still trying to live is the single most on-theme stat in the table, and lifesteal is currently only
+granted by one map-one wanderer card.</p></div>
+<div class="card"><h4>Rare spawn</h4>
+<p style="margin:0"><b>The Second Heart</b> — heals every creature near it and never attacks. The first rare
+that is a <i>priority target</i> rather than a fight: ignore it and the room becomes unwinnable.</p></div>
+</div>
+
+<h3>Zones &amp; bosses</h3>
+<div class="scroll"><table>
+<tr><th>#</th><th>Zone</th><th>Biome</th><th>Boss</th></tr>
+<tr><td class="id">1</td><td>Throatfall</td><td class="arch">flesh</td><td>What Went Down First</td></tr>
+<tr><td class="id">2</td><td>The Ribs</td><td class="arch">flesh</td><td>The Climber</td></tr>
+<tr><td class="id">3</td><td>Lungward</td><td class="arch">flesh</td><td>Breathless</td></tr>
+<tr><td class="id">4</td><td>The Long Gut</td><td class="arch">flesh</td><td>The Long Digest</td></tr>
+<tr><td class="id">5</td><td>The Marrowstair</td><td class="arch">stone</td><td>Marrowmother</td></tr>
+<tr><td class="id">6</td><td>The Vein Run</td><td class="arch">flesh</td><td>The Clot</td></tr>
+<tr><td class="id">7</td><td>The Ache</td><td class="arch">flesh</td><td>The Ache Itself</td></tr>
+<tr><td class="id">8</td><td>Bonehall</td><td class="arch">stone</td><td>The Knitter</td></tr>
+<tr><td class="id">9</td><td>The Second Lung</td><td class="arch">glow</td><td>Second Breath</td></tr>
+<tr><td class="id">10</td><td>The Nerve Gallery</td><td class="arch">glow</td><td>The Signal</td></tr>
+<tr><td class="id">11</td><td>The Cage</td><td class="arch">stone</td><td>The Cage</td></tr>
+<tr><td class="id">12</td><td>The Heart</td><td class="arch">flesh</td><td>The Heart Itself</td></tr>
+</table></div>
+
+<h3>Creatures</h3>
+<p class="meta">Archetype mix: <b>4 caster</b> · 3 stalker · 2 swarm · 2 brute · 1 striker · 0 grazer.
+Caster-heavy because a body's defences are chemical — things here spray, bloom and infect rather than charge.</p>
+<div class="scroll"><table>
+<tr><th>Id</th><th>Name</th><th>Archetype</th><th>What it is</th></tr>
+<tr><td class="id">antibody</td><td>The Antibody</td><td class="arch">caster</td><td class="say">You are the wound. It is doing its job.</td></tr>
+<tr><td class="id">bone_knitter</td><td>Bone Knitter</td><td class="arch">caster</td><td class="say">Repairs the others mid-fight, badly, and they keep going.</td></tr>
+<tr><td class="id">the_cough</td><td>The Cough</td><td class="arch">caster</td><td class="say">Clears the passage. You are in the passage.</td></tr>
+<tr><td class="id">bile_bloom</td><td>Bile Bloom</td><td class="arch">caster</td><td class="say">Opens on the beat and closes before you reach it.</td></tr>
+<tr><td class="id">marrow_crawler</td><td>Marrow Crawler</td><td class="arch">stalker</td><td class="say">Comes out of the bone, not along it.</td></tr>
+<tr><td class="id">vein_eel</td><td>Vein Eel</td><td class="arch">stalker</td><td class="say">Travels the walls. Arrives from a direction with no door.</td></tr>
+<tr><td class="id">hollow_child</td><td>Hollow Child</td><td class="arch">stalker</td><td class="say">Something that got in and grew up in here.</td></tr>
+<tr><td class="id">gut_swarm</td><td>Gut Swarm</td><td class="arch">swarm</td><td class="say">Digestion, still running, with nothing left to digest.</td></tr>
+<tr><td class="id">nerve_biter</td><td>Nerve Biter</td><td class="arch">swarm</td><td class="say">Small, and it goes for the parts that report back.</td></tr>
+<tr><td class="id">the_ache</td><td>The Ache</td><td class="arch">brute</td><td class="say">Slow, enormous, and it has been in pain for a century.</td></tr>
+<tr><td class="id">calcifier</td><td>The Calcifier</td><td class="arch">brute</td><td class="say">Turning the soft parts hard, one room at a time.</td></tr>
+<tr><td class="id">rib_climber</td><td>Rib Climber</td><td class="arch">striker</td><td class="say">Drops from the ceiling, which here is a ribcage.</td></tr>
+</table></div>
+
+<h3>Parts</h3>
+<div class="scroll"><table>
+<tr><th>Id</th><th>Name</th><th>Role</th><th>Flavour</th></tr>
+<tr><td class="id">rib_splinter</td><td>Rib Splinter</td><td class="arch">edge</td><td class="say">A yard of it, and the break did the sharpening.</td></tr>
+<tr><td class="id">tooth_chip</td><td>Tooth Chip</td><td class="arch">edge</td><td class="say">Off something that was eaten, not something that ate.</td></tr>
+<tr><td class="id">long_bone</td><td>Long Bone</td><td class="arch">haft</td><td class="say">Lighter than wood and considerably less forgiving.</td></tr>
+<tr><td class="id">tendon_cord</td><td>Tendon Cord</td><td class="arch">bind</td><td class="say">Still tries to pull when it dries.</td></tr>
+<tr><td class="id">nerve_thread</td><td>Nerve Thread</td><td class="arch">bind</td><td class="say">Carries something. Nobody has worked out what.</td></tr>
+<tr><td class="id">stomach_lining</td><td>Stomach Lining</td><td class="arch">hide</td><td class="say">Proof against everything it used to hold.</td></tr>
+<tr><td class="id">hide_of_it</td><td>Hide of It</td><td class="arch">hide</td><td class="say">From the outside, which almost nobody has seen.</td></tr>
+<tr><td class="id">heart_cinder</td><td>Heart Cinder</td><td class="arch">ember</td><td class="say">Warm. That is the whole problem with this place.</td></tr>
+<tr><td class="id">marrow_light</td><td>Marrow Light</td><td class="arch">glow</td><td class="say">The bone glows from inside where it is thickest.</td></tr>
+<tr><td class="id">bile_lamp</td><td>Bile Lamp</td><td class="arch">glow</td><td class="say">Green, and it burns for a week on a thimble.</td></tr>
+<tr><td class="id">calcified_node</td><td>Calcified Node</td><td class="arch">stone</td><td class="say">Was soft once. Got tired of it.</td></tr>
+<tr><td class="id">the_small_heart</td><td>The Small Heart</td><td class="arch">charm</td><td class="say">One of several. It is still going.</td></tr>
+</table></div>
+
+<h3>Town 10 · Ribgate</h3>
+<p>A camp lashed between two ribs at the throat, which everybody agrees is temporary and has been for years.
+<b>Proposed features:</b> <code>infirmary</code> — bank a portion of a run's damage into a permanent, slowly
+healing injury track, in exchange for a meaningful reward. It is the first system that makes <i>losing</i>
+a run produce something, which the game currently has no version of at all.</p>
+
+<h3>NPCs &amp; chains</h3>
+<div class="two">
+<div class="card"><h4>Surgeon Vell <span class="meta">· cutting her way toward the heart</span></h4>
+<p class="quote">“It's not dead. It's just not using it.”</p>
+<ol class="chain">
+<li><span class="k">harvest</span> I Need It Fresh</li>
+<li><span class="k">delve</span> Four Chambers In</li>
+<li><span class="k">cull</span> It Defends Itself</li>
+<li><span class="k">forge</span> Something That Cuts Soft</li>
+<li><span class="k">delve</span> All the Way</li>
+</ol></div>
+<div class="card"><h4>The Listener <span class="meta">· ear to the wall, always</span></h4>
+<p class="quote">“Six seconds. Count it. It matters.”</p>
+<ol class="chain">
+<li><span class="k">survive</span> On the Off-Beat</li>
+<li><span class="k">hunt</span> The Second One</li>
+</ol></div>
+<div class="card"><h4>Gristle <span class="meta">· eats what the body makes</span></h4>
+<p class="quote">“Everything in here is food. Including you, eventually.”</p>
+<ol class="chain">
+<li><span class="k">cull</span> Thin the Gut</li>
+<li><span class="k">harvest</span> The Good Cuts</li>
+<li><span class="k">ticket</span> Somewhere With a Crowd</li>
+</ol></div>
+<div class="card"><h4>Coliseum · The Pulse-Keeper <span class="meta">· zone 7</span></h4>
+<p class="quote">“The ring beats with it. Fight on the beat or don't.”</p>
+<p style="margin:0"><b>What's different:</b> damage dealt <i>on</i> the beat is doubled and damage taken on it
+is too. The only Coliseum where the optimal play is a rhythm, and the only one where a careful player can be
+slower than a reckless one.</p></div>
+</div>
+<p class="meta" style="margin-top:14px">Verb mix: <b>delve 2 · harvest 2 · cull 2 · forge 1 · survive 1 · hunt 1 · ticket 1</b>.
+Vell's five-step chain is the longest on any map — she is the only NPC with a destination, and the chain is
+the walk to it.</p>
+</section>
+
+<!-- ═══════════════════════════════ MAP 11 ═══════════════════════════════ -->
+<section class="map" style="--c:var(--m11)">
+<div class="map-head"><span class="n">11</span><h2>The Cloudshelf</h2></div>
+<p class="map-blurb">“Stone that forgot to fall, and a long way down.”</p>
+
+<div class="hook"><b>Signature mechanic — the gaps are real</b>
+Islands are separated by genuine drops. Falling costs you the zone, not health — the first real
+<i>traversal</i> failure state in the Grove. It is also the only map where the Mark changes how you move
+rather than how you fight, so a player who has collected here plays the terrain differently.</div>
+
+<div class="two">
+<div class="card"><h4>The Mark</h4>
+<p style="margin:0"><b>The Shelf Mark</b> — <code>updraft</code>, +4%/star.<br>
+<span class="meta">NEW STAT.</span> Jump height and glide. Consumer: <code>grove-physics.js</code>, which
+already owns jump velocity and gravity — this scales a number that exists. <b>⚠️ It is also the riskiest
+thing in this document</b>, because it changes traversal and therefore every zone's platform layout
+tolerance. Worth building last, and worth a scripted check that no zone becomes unreachable <i>or</i>
+trivial at six stars.</p></div>
+<div class="card"><h4>Rare spawn</h4>
+<p style="margin:0"><b>The Sky-Herd Bull</b> — a flying grazer that flees <i>outward</i>, over the gap, and
+has to be killed before it leads you off a shelf. The first rare whose danger is the chase.</p></div>
+</div>
+
+<h3>Zones &amp; bosses</h3>
+<div class="scroll"><table>
+<tr><th>#</th><th>Zone</th><th>Biome</th><th>Boss</th></tr>
+<tr><td class="id">1</td><td>Firstledge</td><td class="arch">cloud</td><td>Firstfall</td></tr>
+<tr><td class="id">2</td><td>The Gap</td><td class="arch">cloud</td><td>What Waits at the Gap</td></tr>
+<tr><td class="id">3</td><td>Gullroost</td><td class="arch">stone</td><td>Roostmother</td></tr>
+<tr><td class="id">4</td><td>The Thermal Run</td><td class="arch">cloud</td><td>Thermal</td></tr>
+<tr><td class="id">5</td><td>The Floatstone Field</td><td class="arch">stone</td><td>The Field</td></tr>
+<tr><td class="id">6</td><td>The Spine</td><td class="arch">stone</td><td>Spinewalker</td></tr>
+<tr><td class="id">7</td><td>Stormshelf</td><td class="arch">cloud</td><td>The Storm</td></tr>
+<tr><td class="id">8</td><td>The Narrow Sky</td><td class="arch">cloud</td><td>Narrow</td></tr>
+<tr><td class="id">9</td><td>Sunside</td><td class="arch">glow</td><td>Sunside</td></tr>
+<tr><td class="id">10</td><td>The Long Drop</td><td class="arch">cloud</td><td>What's Below</td></tr>
+<tr><td class="id">11</td><td>Anchorhold</td><td class="arch">stone</td><td>The Anchor</td></tr>
+<tr><td class="id">12</td><td>The Last Shelf</td><td class="arch">cloud</td><td>The Last Shelf</td></tr>
+</table></div>
+
+<h3>Creatures</h3>
+<p class="meta">Archetype mix: <b>4 striker</b> · 3 caster · 2 swarm · 1 stalker · 1 grazer · 1 brute.
+Striker-heavy and almost brute-free: heavy things fell off this map a long time ago. The single brute is an
+anchor beast that cannot leave its island, which is why it is still here.</p>
+<div class="scroll"><table>
+<tr><th>Id</th><th>Name</th><th>Archetype</th><th>What it is</th></tr>
+<tr><td class="id">thermal_rider</td><td>Thermal Rider</td><td class="arch">striker</td><td class="say">Climbs on the warm air and comes down out of the sun.</td></tr>
+<tr><td class="id">feather_adder</td><td>Feather Adder</td><td class="arch">striker</td><td class="say">Glides. Does not flap. You hear it late.</td></tr>
+<tr><td class="id">rim_shrike</td><td>Rim Shrike</td><td class="arch">striker</td><td class="say">Keeps a larder on a spire nobody can reach.</td></tr>
+<tr><td class="id">gust_lance</td><td>Gust Lance</td><td class="arch">striker</td><td class="say">One pass, straight through, and gone over the edge.</td></tr>
+<tr><td class="id">stormcaller</td><td>Stormcaller</td><td class="arch">caster</td><td class="say">Brings the weather with it and leaves it behind.</td></tr>
+<tr><td class="id">mist_weaver</td><td>Mist Weaver</td><td class="arch">caster</td><td class="say">Hides the gap, which is the only thing you needed to see.</td></tr>
+<tr><td class="id">sunmoth</td><td>Sunmoth</td><td class="arch">caster</td><td class="say">Too bright to look at from the side you have to approach.</td></tr>
+<tr><td class="id">cloudgull</td><td>Cloudgull</td><td class="arch">swarm</td><td class="say">Dozens, and they knock rather than bite.</td></tr>
+<tr><td class="id">gale_swarm</td><td>Gale Swarm</td><td class="arch">swarm</td><td class="say">Not individually a problem. Collectively a push.</td></tr>
+<tr><td class="id">the_drop</td><td>The Drop</td><td class="arch">stalker</td><td class="say">Clings under the shelf and takes you from beneath the lip.</td></tr>
+<tr><td class="id">shelf_grazer</td><td>Shelf Grazer</td><td class="arch">grazer</td><td class="say">Eats the moss off floatstone. Has never once looked down.</td></tr>
+<tr><td class="id">anchor_beast</td><td>Anchor Beast</td><td class="arch">brute</td><td class="say">Too heavy to fly and too stubborn to fall.</td></tr>
+</table></div>
+
+<h3>Parts</h3>
+<div class="scroll"><table>
+<tr><th>Id</th><th>Name</th><th>Role</th><th>Flavour</th></tr>
+<tr><td class="id">wind_scour</td><td>Wind Scour</td><td class="arch">edge</td><td class="say">Stone the air sharpened, free of charge, over a century.</td></tr>
+<tr><td class="id">featherblade</td><td>Featherblade</td><td class="arch">edge</td><td class="say">A primary off something large. Stiff as a knife.</td></tr>
+<tr><td class="id">skywood</td><td>Skywood</td><td class="arch">haft</td><td class="say">Grown up here, so it is mostly air and stronger for it.</td></tr>
+<tr><td class="id">kite_cord</td><td>Kite Cord</td><td class="arch">bind</td><td class="say">Rated for a man in a crosswind. Allegedly.</td></tr>
+<tr><td class="id">thermal_silk</td><td>Thermal Silk</td><td class="arch">bind</td><td class="say">Spun in rising air, so it only ever pulls one way.</td></tr>
+<tr><td class="id">gullhide</td><td>Gullhide</td><td class="arch">hide</td><td class="say">Oiled by the bird before you ever got to it.</td></tr>
+<tr><td class="id">downcoat</td><td>Downcoat</td><td class="arch">hide</td><td class="say">Weighs nothing. Worth a zone of walking.</td></tr>
+<tr><td class="id">sunwarm_stone</td><td>Sunwarm Stone</td><td class="arch">ember</td><td class="say">Holds the day's heat right through the night.</td></tr>
+<tr><td class="id">cloudlight</td><td>Cloudlight</td><td class="arch">glow</td><td class="say">The glow off the top of the deck, bottled at dawn.</td></tr>
+<tr><td class="id">stormglass</td><td>Stormglass</td><td class="arch">glow</td><td class="say">Lightning went into sand here and did not come out.</td></tr>
+<tr><td class="id">floatstone</td><td>Floatstone</td><td class="arch">stone</td><td class="say">Heavy in the hand and not, apparently, in the world.</td></tr>
+<tr><td class="id">the_held_breath</td><td>The Held Breath</td><td class="arch">charm</td><td class="say">Warm, and it pulls very slightly upward.</td></tr>
+</table></div>
+
+<h3>Town 11 · Updraught</h3>
+<p>Lashed to the underside of a shelf, because the top is where the wind is. <b>Proposed features:</b>
+<code>aerie</code> — pets gain a glide and can be sent to retrieve from zones you have cleared. It makes the
+pet from town 1 relevant at map 11, which is the same principle as Hoarfast's hearth: reach back for an old
+system rather than invent a new one.</p>
+
+<h3>NPCs &amp; chains</h3>
+<div class="two">
+<div class="card"><h4>Ropewright Jessa <span class="meta">· strings the crossings</span></h4>
+<p class="quote">“If a line's there, somebody made it. If it isn't, don't.”</p>
+<ol class="chain">
+<li><span class="k">harvest</span> Cord, and Plenty</li>
+<li><span class="k">forge</span> A Line That Holds</li>
+<li><span class="k">delve</span> Test It Yourself</li>
+<li><span class="k">cull</span> They Chew the Lines</li>
+</ol></div>
+<div class="card"><h4>The Windreader <span class="meta">· knows which gaps are crossable today</span></h4>
+<p class="quote">“The air changes. The stone doesn't. Trust the stone.”</p>
+<ol class="chain">
+<li><span class="k">delve</span> While It's Calm</li>
+<li><span class="k">survive</span> And When It Isn't</li>
+<li><span class="k">hunt</span> The Bull</li>
+</ol></div>
+<div class="card"><h4>Cass the Dropped <span class="meta">· fell once, came back</span></h4>
+<p class="quote">“It's not the fall. It's that you've got time to think.”</p>
+<ol class="chain">
+<li><span class="k">cull</span> The Ones That Push</li>
+<li><span class="k">ticket</span> Somewhere With a Floor</li>
+<li><span class="k">harvest</span> From the Underside</li>
+</ol></div>
+<div class="card"><h4>Coliseum · Skymarshal Ren <span class="meta">· zone 5</span></h4>
+<p class="quote">“Ring's got no walls. Mind the edges.”</p>
+<p style="margin:0"><b>What's different:</b> no walls — you can be knocked out of it, and being knocked out
+ends the run. The only Coliseum you can lose without dying, and the reason the <code>gale_swarm</code>
+exists.</p></div>
+</div>
+<p class="meta" style="margin-top:14px">Verb mix: <b>delve 2 · harvest 2 · cull 2 · forge 1 · survive 1 · hunt 1 · ticket 1</b>.</p>
+</section>
+
+<!-- ═══════════════════════════════ MAP 12 ═══════════════════════════════ -->
+<section class="map" style="--c:var(--m12)">
+<div class="map-head"><span class="n">12</span><h2>The Starfall Rim</h2></div>
+<p class="map-blurb">“Past the last air. Nothing here is holding anything up.”</p>
+
+<div class="hook"><b>Signature mechanic — there is no ground</b>
+The zone is drifting rock with no continuous floor. Every other map in the game assumes a walkable baseline;
+the last one takes it away. This is the capstone and it should feel like the rules ending, not like map 11
+with different art.</div>
+
+<div class="two">
+<div class="card"><h4>The Mark</h4>
+<p style="margin:0"><b>The Rim Mark</b> — <code>emblem_find</code>, +2.5%/star.<br>
+<span class="meta">EXISTING STAT, kept from the current table.</span> The right capstone: the last map you
+reach is the one that makes every <i>other</i> map's collection faster, so finishing the game turns into a
+reason to go back to the beginning.</p></div>
+<div class="card"><h4>Rare spawn</h4>
+<p style="margin:0"><b>The First Light</b> — the oldest thing in the game, and the only rare that does not
+fight at all. It leaves when hit. Killing it requires everything you have in one go, which is a fitting last
+test and a genuinely different one.</p></div>
+</div>
+
+<h3>Zones &amp; bosses</h3>
+<div class="scroll"><table>
+<tr><th>#</th><th>Zone</th><th>Biome</th><th>Boss</th></tr>
+<tr><td class="id">1</td><td>Lastlight</td><td class="arch">star</td><td>The Lastlight Keeper</td></tr>
+<tr><td class="id">2</td><td>The Thin Air</td><td class="arch">star</td><td>What's Left of the Air</td></tr>
+<tr><td class="id">3</td><td>Driftfield</td><td class="arch">star</td><td>The Drift</td></tr>
+<tr><td class="id">4</td><td>Cometwake</td><td class="arch">star</td><td>Cometwake</td></tr>
+<tr><td class="id">5</td><td>The Dark Between</td><td class="arch">star</td><td>The Dark Between</td></tr>
+<tr><td class="id">6</td><td>The Nebula Shoal</td><td class="arch">glow</td><td>The Shoal</td></tr>
+<tr><td class="id">7</td><td>Gravityfall</td><td class="arch">stone</td><td>The Well</td></tr>
+<tr><td class="id">8</td><td>The Silent Mile</td><td class="arch">star</td><td>Silence</td></tr>
+<tr><td class="id">9</td><td>Starfall</td><td class="arch">char</td><td>The Fall</td></tr>
+<tr><td class="id">10</td><td>The Long Night</td><td class="arch">star</td><td>The Long Night</td></tr>
+<tr><td class="id">11</td><td>The Rim</td><td class="arch">star</td><td>The Rim</td></tr>
+<tr><td class="id">12</td><td>First Light</td><td class="arch">glow</td><td>The First Light</td></tr>
+</table></div>
+<p class="meta">Zone 12 shares its name with the rare spawn on purpose: you have been hunting it for a whole
+map and the last room is where it lives.</p>
+
+<h3>Creatures</h3>
+<p class="meta">Archetype mix: <b>4 caster</b> · 3 stalker · 2 brute · 1 striker · 1 swarm · 1 grazer.
+The strangest roster in the game, and the only one where the <i>grazer</i> is frightening — a thing that
+eats light and has never noticed anything alive.</p>
+<div class="scroll"><table>
+<tr><th>Id</th><th>Name</th><th>Archetype</th><th>What it is</th></tr>
+<tr><td class="id">constellation</td><td>The Constellation</td><td class="arch">caster</td><td class="say">Several bodies, one intent, and the gaps between them hurt.</td></tr>
+<tr><td class="id">the_dark</td><td>The Dark</td><td class="arch">caster</td><td class="say">Puts out your light and waits for the obvious.</td></tr>
+<tr><td class="id">nebula_bloom</td><td>Nebula Bloom</td><td class="arch">caster</td><td class="say">Beautiful, enormous, and corrosive to stand inside.</td></tr>
+<tr><td class="id">cold_signal</td><td>Cold Signal</td><td class="arch">caster</td><td class="say">Repeats something. It has been repeating it for a long time.</td></tr>
+<tr><td class="id">void_lamprey</td><td>Void Lamprey</td><td class="arch">stalker</td><td class="say">Attaches to the rock you are standing on, not to you.</td></tr>
+<tr><td class="id">silent_one</td><td>The Silent One</td><td class="arch">stalker</td><td class="say">No sound at all, in a place with nothing to carry it.</td></tr>
+<tr><td class="id">the_watcher</td><td>The Watcher</td><td class="arch">stalker</td><td class="say">Was watching before you arrived. Does not stop.</td></tr>
+<tr><td class="id">star_eater</td><td>Star Eater</td><td class="arch">brute</td><td class="say">Big enough that the rock moves when it does.</td></tr>
+<tr><td class="id">gravity_well</td><td>Gravity Well</td><td class="arch">brute</td><td class="say">Does not chase. Everything simply arrives.</td></tr>
+<tr><td class="id">comet_rider</td><td>Comet Rider</td><td class="arch">striker</td><td class="say">Crosses the whole zone in one pass and comes back around.</td></tr>
+<tr><td class="id">drift_mote</td><td>Drift Mote</td><td class="arch">swarm</td><td class="say">Dust with opinions.</td></tr>
+<tr><td class="id">lightgrazer</td><td>The Lightgrazer</td><td class="arch">grazer</td><td class="say">Eats light. Has never once noticed anything alive.</td></tr>
+</table></div>
+
+<h3>Parts</h3>
+<div class="scroll"><table>
+<tr><th>Id</th><th>Name</th><th>Role</th><th>Flavour</th></tr>
+<tr><td class="id">starglass</td><td>Starglass</td><td class="arch">edge</td><td class="say">An edge one atom wide and perfectly uninterested in you.</td></tr>
+<tr><td class="id">comet_shard</td><td>Comet Shard</td><td class="arch">edge</td><td class="say">Still travelling, slightly, in the hand.</td></tr>
+<tr><td class="id">voidrod</td><td>Voidrod</td><td class="arch">haft</td><td class="say">Weighs nothing and cannot be bent.</td></tr>
+<tr><td class="id">gravity_thread</td><td>Gravity Thread</td><td class="arch">bind</td><td class="say">Ties things together by making them want to be.</td></tr>
+<tr><td class="id">orbit_cord</td><td>Orbit Cord</td><td class="arch">bind</td><td class="say">Will not hang straight. Nobody expects it to any more.</td></tr>
+<tr><td class="id">voidskin</td><td>Voidskin</td><td class="arch">hide</td><td class="say">Nothing gets through it, including warmth.</td></tr>
+<tr><td class="id">dark_felt</td><td>Dark Felt</td><td class="arch">hide</td><td class="say">Weighs more than it should. Considerably more.</td></tr>
+<tr><td class="id">dying_star</td><td>Dying Star</td><td class="arch">ember</td><td class="say">A grain of it. It will outlast the shop.</td></tr>
+<tr><td class="id">nebula_dust</td><td>Nebula Dust</td><td class="arch">glow</td><td class="say">Lights a room and stains everything in it.</td></tr>
+<tr><td class="id">first_light_shard</td><td>First Light Shard</td><td class="arch">glow</td><td class="say">The oldest light there is, and still arriving.</td></tr>
+<tr><td class="id">meteoric_iron</td><td>Meteoric Iron</td><td class="arch">stone</td><td class="say">Fell a very long way to be picked up by you.</td></tr>
+<tr><td class="id">the_rim_eye</td><td>The Rim Eye</td><td class="arch">charm</td><td class="say">Open. Has been the whole time.</td></tr>
+</table></div>
+
+<h3>Town 12 · Lastlight</h3>
+<p>The last lit thing, and it is one room. <b>Proposed features:</b> <code>observatory</code> — set-completion
+rewards for the Monster Card collection, read across all 12 maps. The capstone town should pay out the thing
+the capstone Mark accelerates, and the collection is currently the only long chase with no terminal reward.</p>
+
+<h3>NPCs &amp; chains</h3>
+<div class="two">
+<div class="card"><h4>The Last Cartographer <span class="meta">· mapping a place with no edges</span></h4>
+<p class="quote">“I've stopped drawing the ground. There isn't any.”</p>
+<ol class="chain">
+<li><span class="k">delve</span> Chart the Drift</li>
+<li><span class="k">delve</span> And Past It</li>
+<li><span class="k">harvest</span> Something to Weight the Page</li>
+<li><span class="k">survive</span> A Night at the Rim</li>
+</ol></div>
+<div class="card"><h4>Oru, Who Waited <span class="meta">· was here before the Grove</span></h4>
+<p class="quote">“You took eleven maps. I took longer.”</p>
+<ol class="chain">
+<li><span class="k">cull</span> They Were Here First</li>
+<li><span class="k">forge</span> Make the Old Thing Again</li>
+<li><span class="k">hunt</span> The First Light</li>
+</ol></div>
+<div class="card"><h4>The Quiet <span class="meta">· does not speak; points</span></h4>
+<p class="quote">“—”</p>
+<p class="meta">The only NPC in the game with no voice line. Its quests arrive with no text beyond the
+objective, which is the last map saying something no amount of dialogue would.</p>
+<ol class="chain">
+<li><span class="k">harvest</span> —</li>
+<li><span class="k">cull</span> —</li>
+<li><span class="k">ticket</span> —</li>
+</ol></div>
+<div class="card"><h4>Coliseum · The Rimward Herald <span class="meta">· zone 10</span></h4>
+<p class="quote">“No floor, no walls, no crowd. Just the two minutes.”</p>
+<p style="margin:0"><b>What's different:</b> fought on drifting fragments that separate as the run goes on, so
+the arena <i>disassembles</i> beneath you. The Frostmere's ring shrank; this one comes apart.</p></div>
+</div>
+<p class="meta" style="margin-top:14px">Verb mix: <b>delve 2 · harvest 2 · cull 2 · forge 1 · survive 1 · hunt 1 · ticket 1</b>.</p>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════════════ THE ASKS ═══════════════════════════════ -->
+<h2 style="font-size:1.5rem">What needs your call</h2>
+<ol>
+<li><b>Towns 8–12.</b> The feature ladder is spent at town 7. My proposals — foundry, hearth, infirmary,
+aerie, observatory — all <i>reach back</i> and make an older system matter again rather than add a new one.
+Four of the five are new code. The cheap alternative is that towns 8–12 are pure waypoints with a store and
+nothing else, which is honest but dull.</li>
+<li><b>Two new stats.</b> <code>salvage</code> (map 8) is low-risk — it scales a rate that already exists.
+<code>updraft</code> (map 11) is <b>the riskiest item in this document</b>: it changes traversal, and a
+six-star player could trivialise or break platform layouts. If you want map 11 cheap, swap it for
+<code>move_speed</code> and keep the falling as flavour.</li>
+<li><b>Per-map rare spawns.</b> There is one rare spawn in the entire game today, shared by all seven maps.
+Five new ones is five creatures of art and a <code>GROVE_RARE</code> that becomes a per-map lookup. I think
+it is the single highest-value item here, because <code>hunt</code> quests currently all point at the same
+stag.</li>
+<li><b>The infirmary</b> (map 10) is the one proposal that changes the shape of a run rather than adding to
+it. It deserves its own conversation.</li>
+</ol>
+
+<!-- ═══════════════════════════════ SPEND ═══════════════════════════════ -->
+<h2 style="font-size:1.5rem">What the art will cost</h2>
+<p>Measured from what maps 1–7 actually shipped, at <b>medium quality</b>, never high. Backdrops are
+1536×1024 (1,568 output tokens); everything else is generated 1024×1024 (1,056) and downscaled. At
+$40/1M output tokens.</p>
+<div class="scroll"><table class="cost">
+<tr><th>Asset</th><th>Per map</th><th>×5 maps</th><th>Unit</th><th>Cost</th></tr>
+<tr><td>Zone backdrops</td><td class="n">12</td><td class="n">60</td><td class="n">$0.0627</td><td class="n">$3.76</td></tr>
+<tr><td>Creatures</td><td class="n">12</td><td class="n">60</td><td class="n">$0.0422</td><td class="n">$2.53</td></tr>
+<tr><td>Bosses</td><td class="n">12</td><td class="n">60</td><td class="n">$0.0422</td><td class="n">$2.53</td></tr>
+<tr><td>Parts</td><td class="n">12</td><td class="n">60</td><td class="n">$0.0422</td><td class="n">$2.53</td></tr>
+<tr><td>NPCs (3 + marshal)</td><td class="n">4</td><td class="n">20</td><td class="n">$0.0422</td><td class="n">$0.84</td></tr>
+<tr><td>Rare spawns</td><td class="n">1</td><td class="n">5</td><td class="n">$0.0422</td><td class="n">$0.21</td></tr>
+<tr><td>Card shelf frames</td><td class="n">1</td><td class="n">5</td><td class="n">$0.0422</td><td class="n">$0.21</td></tr>
+<tr><td>Mark seal · food · charm · node symbol</td><td class="n">4</td><td class="n">20</td><td class="n">$0.0422</td><td class="n">$0.84</td></tr>
+<tfoot>
+<tr><td>Subtotal</td><td class="n">58</td><td class="n">290</td><td></td><td class="n">$13.45</td></tr>
+<tr><td>Plus rejects &amp; retries, ~25%</td><td></td><td></td><td></td><td class="n">$3.36</td></tr>
+<tr><td><b>Expected total</b></td><td></td><td></td><td></td><td class="n"><b>≈ $16.80</b></td></tr>
+</tfoot>
+</table></div>
+<div class="note">
+<p style="margin:0"><b>How it would actually be spent.</b> Three images per run, in the foreground, on a
+contact sheet, every time — so this is roughly <b>97 runs</b> and you see every one before the next. At any
+point the answer can be “stop”, and the maps already generated stay playable because
+<code>MAPS_BUILT</code> gates them one at a time. Nothing is generated at <code>high</code>, ever.</p>
+</div>
+
+<hr>
+<p class="meta">Draft 1 · nothing implemented · <code>docs/grove-maps-8-12-design.html</code></p>
+
+</div>
