@@ -152,8 +152,18 @@ async function warrenArt() {
 
 // ── THE WIN IT AGAIN METER ───────────────────────────────────────────────────────────────────────────────────
 // The Vault remembers its last few wins and pays the lot back when a spin tumbles three times in a row. Held
-// in mkt_casino_meter.recent (mig401) as MULTIPLES OF THE BET, never gold: a meter filled at 25 a spin and
-// emptied at 2,500 would hand somebody a number nobody won.
+// in mkt_casino_meter.recent (mig401).
+//
+// ⚠️ IT HOLDS ABSOLUTE WINS, AND THIS COMMENT SAID THE OPPOSITE FOR A DAY. It read "as MULTIPLES OF THE BET,
+// never gold: a meter filled at 25 a spin and emptied at 2,500 would hand somebody a number nobody won" —
+// which was the rule until 06a1bc6a and is now exactly backwards. Multiples were the arbitrage: a row banked
+// at a 100 stake and fired at 2,500 paid twenty-five times what it was worth when earned. Storing the
+// absolute win is what removed it, and the bar renders these numbers unconverted, so the unit here IS the
+// unit on screen.
+//
+// Left as a warning rather than deleted because the stale version survived the change that falsified it,
+// 1,700 lines from the code it describes, and was the first thing I read when asked whether the feature had
+// started misleading people.
 //
 // Read before the spin and written after, in one place, so there is no path where a spin pays out of the
 // meter and the meter does not move.
