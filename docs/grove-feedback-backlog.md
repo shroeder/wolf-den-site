@@ -163,6 +163,27 @@ Bottom-left rather than beside the handle because the haul list already owns tha
 shop, events — and list the ones with no reachable path. Same shape as the Grove drop-path audit:
 `migrating-a-category-strands-its-drop-paths` is the precedent, where an empty pool read as bad luck.
 
+### O. Hero sprites need iconic personalities
+> *"hero sprites need iconic personalities"*
+
+**Queued as a todo, not started.**
+
+**Where it stands, so the next session does not have to find it:** the hero sprite is generated per player in
+`src/lib/marketplace/avatar-sprite.js`, by redrawing their cartoon avatar as a full-body figure. Read the
+prompt and the gap is obvious — every word of it is about *fidelity and framing*: keep the same face, skin
+tone, hairstyle, eyewear and clothing; fit the whole figure inside with 8% margins; face right.
+
+The only word about attitude is **"a confident heroic standing pose"**, and it is the same word for
+everybody. So the sprites are accurate and interchangeable — which is exactly the complaint.
+
+**The open design question** is where a personality should come from, and it should be answered before any
+art is drawn: the player's **class** (a Reaver and a Warden should not stand the same way), their **gear**,
+or something they **choose**. Pose, silhouette, weapon carry and expression are the levers; the face and
+colours must stay faithful or it stops being their avatar.
+
+⚠️ Anything here is a **regeneration of art every player already has**, so it collides with
+`redrawing-existing-art-needs-high` — draw ONE, show Luke the before/after, and let him decide before a set.
+
 ---
 
 ## Rules these all sit under
