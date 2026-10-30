@@ -29,6 +29,8 @@ import GroveMenu from "@/components/grove/GroveMenu.js";
 import GroveBench from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area, { OPEN_AREA_EVENT } from "@/components/grove/GroveArea.js";
+import SkillTree from "@/components/arena/SkillTree";
+import SkillPanel from "@/components/arena/SkillPanel";
 import { qualityBand } from "@/lib/marketplace/grove-forge.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
 import GroveGear from "@/components/grove/GroveGear.js";
@@ -488,6 +490,53 @@ export default function GroveClient({ initial }) {
 
     // How many statues are sitting unspent, for the panel heading. A number on the door is the whole of
     // what makes somebody open it -- see the bench badge, which exists for the same reason.
+    // ── ⚠️ THE CLASS ROOM TALKS TO THE ARENA, AND DOES NOT GROW ITS OWN COPY OF IT ──────────────────
+    // Luke: "you should be able to make class selections and tree decisions from that same area in the
+    // Grove... people don't understand what their class selection and their point class points are doing
+    // when it comes to the Grove."
+    //
+    // Every one of those actions already exists, validated, on /api/marketplace/arena -- pick_class,
+    // take_node, refund_node, take_skill, take_skill_node, refund_skill, respec. A skill point is worth
+    // gold, so the server re-validates every one against the same pure catalogue the screen renders from.
+    // A second set of those endpoints under the Grove would be a second place for that validation to
+    // drift, for a feature that is the SAME tree seen from another room.
+    //
+    // ⚠️ FETCHED ON OPEN, NOT ON MOUNT. The Grove's own state is already a heavy read and most sessions
+    // never open this room; paying for the arena's state on every entry to the forest would put a second
+    // round trip on the hot path for a panel nobody asked for. Round trips are the meter that bills.
+    const [arena, setArena] = useState(null);
+    const [arenaBusy, setArenaBusy] = useState(false);
+    useEffect(() => {
+        if (view !== "class" || arena) return undefined;
+        let gone = false;
+        fetch("/api/marketplace/arena", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((d) => { if (!gone) setArena(d || null); })
+            .catch(() => {});
+        return () => { gone = true; };
+    }, [view, arena]);
+
+    // The answer IS the new state -- every case on that route returns getArenaState after it validates,
+    // so nothing here has to guess what changed.
+    const arenaAct = useCallback(async (action, extra) => {
+        setArenaBusy(true);
+        try {
+            const r = await fetch("/api/marketplace/arena", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action, ...(extra || {}) }),
+            });
+            const d = await r.json().catch(() => null);
+            if (d && !d.error) setArena(d);
+            // ⚠️ THE GROVE HAS TO REFRESH TOO. grove-kit folds the class tree into the Grove fighter, so a
+            // point spent here changes what the next dive hits for -- and the hero line on this very
+            // screen is built from it. Not refreshing would show the tree update and the numbers it feeds
+            // stay still, which reads as the point having done nothing.
+            await refresh();
+        } finally {
+            setArenaBusy(false);
+        }
+    }, [refresh]);
+
     const statueCount = useMemo(() => (st?.statues?.lines || [])
         .reduce((a, l) => a + Object.values(l.held || {}).reduce((x, n) => x + n, 0), 0), [st?.statues]);
 
@@ -995,6 +1044,45 @@ export default function GroveClient({ initial }) {
                                 here as much as it does in the Arena.</p>
                         )}
                     </Area>
+
+                    {/* ── ⚠️ THE REAL TREE, NOT A PICTURE OF ONE ──────────────────────────────────
+                        Luke: "you should be able to make class selections and tree decisions from that
+                        same area in the Grove... And it shouldn't just explain it in a text blob. It
+                        should be very dopamine inducing."
+
+                        The Area above is the READOUT -- what the tree is worth in this forest,
+                        measured by grove-kit against the engine itself. It answers "is this doing
+                        anything here", and it could not answer "change it".
+
+                        These are the Arena's own SkillTree and SkillPanel, mounted here unchanged.
+                        Not a Grove copy of them: they are already built, already tuned, already the
+                        thing Luke means by dopamine, and a second implementation of a tree that spends
+                        a currency would be a second place for the spending rules to drift. Picking a
+                        class, taking a node, refunding one and respeccing all work from this room now.
+
+                        ⚠️ THE GOLD IS THE GROVE'S OWN. SkillTree prices a respec in gold and takes the
+                        balance as a prop; handing it the arena's stale copy would show one number here
+                        and charge another at the till. */}
+                    {arena?.progress ? (
+                        <Area id="tree" icon="ui-class" title="The Tree"
+                            count={arena.progress.points?.available
+                                ? `${arena.progress.points.available} to spend` : undefined}>
+                            <SkillTree progress={arena.progress} gold={st.gold ?? arena.gold ?? 0}
+                                busy={arenaBusy} onAct={arenaAct} />
+                        </Area>
+                    ) : null}
+
+                    {arena?.progress?.cls ? (
+                        <Area id="skills" icon="ui-merit" title="Skills"
+                            count={arena.progress.skillPoints?.available
+                                ? `${arena.progress.skillPoints.available} to spend` : undefined}>
+                            <SkillPanel progress={arena.progress} busy={arenaBusy} onAct={arenaAct} />
+                        </Area>
+                    ) : null}
+
+                    {/* A room that is still loading has to say so, or it reads as a room with nothing
+                        in it — which is exactly the complaint this whole panel exists to answer. */}
+                    {!arena ? <p className="muted">Reading your tree…</p> : null}
                     </>
                 ) : null}
                 {panel === "emblems" ? (

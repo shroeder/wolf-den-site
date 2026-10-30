@@ -64,8 +64,16 @@ pass. A door stops the bleeding; it is not the ask.
 > explain it in a text blob. It should be very dopamine inducing, and like, you should be able to make class
 > selections and tree decisions from that same area in the Grove."*
 
-**Where it stands:** the room exists (`panel === "class"`) and is **read-only** — it shows what the tree
-gives the Grove fighter and nothing else. Selections and point spending still live elsewhere.
+**DONE** (`23`). The room is fully playable now. Above the fold it still answers "what is my class worth
+*here*" — the readout measured against the Grove's own engine, which is the part the Arena never had. Below
+it sit the Arena's real `SkillTree` and `SkillPanel`, mounted unchanged: pick a class, take a node, refund
+one, respec the whole tree, spend skill points. All of it from the Grove, none of it a copy.
+
+Mounted rather than rebuilt on purpose — a second tree that spends gold and points is a second place for the
+spending rules to drift, and the Arena's is already the tuned, dopamine-inducing one Luke means. Two things
+made that safe: they carry their own `<style jsx global>`, so they arrive dressed wherever they mount, and
+they take `gold` as a prop — fed from the Grove's own balance, so the respec price shown is the price
+charged. Verified by driving the real room, not by a green build.
 
 ### C. Crafting minigames: a pool of ten, three at random
 > *"The crafting minigame sucks. I think that it should, instead of being deterministic, it should be
