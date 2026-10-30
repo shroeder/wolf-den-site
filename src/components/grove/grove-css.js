@@ -76,45 +76,25 @@ export const GROVE_CSS = `
    The zone's dock has been a centred bottom row since Luke asked for one ("Across the bottom, perhaps
    slightly smaller. Floating"), and the fix here is to be the same thing. A bottom row only ever covers
    a strip the scroller can be padded past, which .gv-sheet already is. */
-/* ⚠️ A BAR, NOT FOUR CIRCLES FLOATING ON THE CONTENT. Even as a bottom row the dock passes over the
-   panel while it scrolls, and four round objects sitting on top of a word read as a mistake. Given its
-   own board it reads as the chrome it is -- the same plank the name-boards are cut from, so it belongs
-   to the furniture rather than to the page it is covering. The scroller is already padded past it, so
-   the END of the content clears it; this is about the middle. */
-.gv-dock { position: fixed; z-index: 65;
-    left: 50%; transform: translateX(-50%);
-    bottom: calc(10px + env(safe-area-inset-bottom));
-    display: flex; flex-direction: row; gap: 10px;
-    padding: 8px 12px; border-radius: 999px;
-    background: linear-gradient(180deg, rgba(14,17,12,0.93), rgba(8,10,7,0.97)),
-        url("/images/grove/ui-board.webp") center / cover;
-    border: 1px solid rgba(0,0,0,0.7);
-    box-shadow: 0 10px 26px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07); }
+/* ⚠️ THE DOCK'S RULES ARE GONE, NOT ORPHANED. Both docks -- the hub's bar of six circles and the zone's
+   row across the bottom -- were replaced by the left drawer in GroveMenu.js, and their stylesheets went
+   with them in the same commit. A replaced component whose CSS stays behind is a rule that will one day
+   match something new by accident; see stale-css-rule-on-reshape. */
 /* Inside a bar the buttons no longer need their own plate -- two nested dark discs is one too many. */
-.gv-dock button { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.10); box-shadow: none; }
-.gv-dock button { width: 56px; height: 56px; border-radius: 50%; cursor: pointer; padding: 0;
-    display: grid; place-items: center; font: inherit;
-    background: rgba(8,12,8,0.68); border: 1px solid rgba(255,255,255,0.16);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-    transition: transform 140ms ease, border-color 140ms ease, background 140ms ease; }
-.gv-dock button img { width: 40px; height: 40px; object-fit: contain; display: block;
-    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
 /* ⚠️ THE CURRENT ONE IS LIT, NOT OUTLINED. At this size an outline is a rounding error, and the only
    question the dock has to answer at a glance is "where am I". */
-.gv-dock button.is-on { background: rgba(159,224,138,0.20); border-color: rgba(159,224,138,0.75);
-    transform: scale(1.06); box-shadow: 0 0 18px rgba(159,224,138,0.35), 0 4px 14px rgba(0,0,0,0.5); }
-.gv-dock button:not(.is-on):hover { border-color: rgba(255,255,255,0.34); }
 /* ── ⚠️ ON A LANDSCAPE PHONE HALF THE SCREEN WAS PADDING ──────────────────────────────────────
    52 above and 104 below is 156px of a 320px-tall viewport -- 49% of the screen reserved for a 40px
    button in one corner and a dock in the other, leaving about two rows of the workbench visible. The
    numbers are right for a tall screen and were never checked against a short one.
 
 
-   ⚠️ AND IT LIVES BELOW THE DOCK'S OWN RULES, NOT BESIDE .gv-sheet WHERE IT READS BETTER. A media query
-   adds no specificity, so the first placement -- forty lines above .gv-dock button { width: 56px } --
-   lost to it silently: the padding around the dock shrank while the dock itself stayed 74px tall on
-   every landscape phone. Nothing errored, and the only thing that caught it was the rig measuring the
-   dock's height rather than trusting the rule it had just written.
+   ⚠️ A MEDIA QUERY ADDS NO SPECIFICITY, and this block is where that was learned. The dock it was written
+   against is gone (replaced by the left drawer -- see GroveMenu.js), but the lesson it paid for is not:
+   placed ABOVE the rule it meant to override, this query lost silently, and the padding around the dock
+   shrank while the dock itself stayed 74px tall on every landscape phone. Nothing errored. The only thing
+   that caught it was the rig measuring the element rather than trusting the rule just written. Order still
+   decides every override in here.
 
    Keyed on HEIGHT, not width: this is about how little vertical room there is, and a 915x412 phone has
    the same problem as a 568x320 one. The dock shrinks with it rather than the padding merely getting
@@ -128,9 +108,6 @@ export const GROVE_CSS = `
     .gv-zsheet { padding-top: calc(46px + env(safe-area-inset-top));
         padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
     .gv-zsheet-x { width: 36px; height: 36px; top: calc(6px + env(safe-area-inset-top)); }
-    .gv-dock { bottom: calc(6px + env(safe-area-inset-bottom)); padding: 6px 10px; gap: 8px; }
-    .gv-dock button { width: 46px; height: 46px; }
-    .gv-dock button img { width: 32px; height: 32px; }
     .gv-exit { width: 36px; height: 36px; top: calc(6px + env(safe-area-inset-top)); }
 }
 
@@ -148,34 +125,17 @@ export const GROVE_CSS = `
 
    ⚠️ AND IT CLEARS THE HOME INDICATOR. bottom is safe-area-inset plus a margin: on a gesture-bar phone a
    control flush to the bottom edge is a control that swipes the browser away instead of pressing. */
-/* ⚠️ THE TRANSITION BELONGS HERE AND THE VALUE IS WRITTEN BY THE LOOP. The dock fades back while you
-   are swinging or being hit and returns when you stop -- see DOCK_QUIET_MS. Easing it in CSS keeps the
-   loop writing one number instead of animating one, and the loop only writes it when it changes, or
-   the transition would restart every frame and never arrive. */
-.gv-zdock { transition: opacity 260ms ease; }
-.gv-zdock { position: absolute; z-index: 6;
-    left: 50%; transform: translateX(-50%);
-    bottom: calc(10px + env(safe-area-inset-bottom));
-    display: flex; flex-direction: row; gap: 12px; pointer-events: auto; }
+/* ⚠️ THE TRANSITION BELONGS HERE AND THE VALUE IS WRITTEN BY THE LOOP. The menu handle fades back while
+   you are swinging or being hit and returns when you stop -- see DOCK_QUIET_MS. Easing it in CSS keeps the
+   loop writing one number instead of animating one, and the loop only writes it when it changes, or the
+   transition would restart every frame and never arrive. The loop writes to the HANDLE now (it still holds
+   zdockRef); there is no longer a row of buttons standing in the middle of the fight. */
 /* ── THE SOUND SWITCH, IN THE DOCK ────────────────────────────────────────────────────────────
    It sits with the map and the backpack rather than up beside Leave, where it was colliding with the
    centred kill count. Slightly smaller and quieter than the four panel doors: it is a SETTING, and a
    setting that draws the eye as hard as the workbench is a setting in the wrong place. It is also the
    only button down here with no painted sprite, so the icon carries it. */
-.gv-zdock-sound { color: #cdd2d8; }
-.gv-zdock-sound[aria-pressed="true"] { color: #8d8f93; border-color: rgba(255,255,255,0.10); opacity: 0.78; }
-.gv-zdock-sound svg { width: 20px; height: 20px; }
 
-.gv-zdock button { width: 46px; height: 46px; border-radius: 50%; cursor: pointer; padding: 0;
-    display: grid; place-items: center; font: inherit;
-    background: rgba(8,12,8,0.62); border: 1px solid rgba(255,255,255,0.16);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-    transition: transform 140ms ease, border-color 140ms ease; }
-.gv-zdock button img { width: 34px; height: 34px; object-fit: contain; display: block;
-    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
-.gv-zdock button:active { transform: scale(0.92); }
-.gv-zdock button:hover { border-color: rgba(255,255,255,0.34); }
 
 /* ── A PANEL OVER A PAUSED ZONE ───────────────────────────────────────────────────────────────
    Opaque rather than tinted. A dimmed-but-visible zone behind a backpack reads as the game still running
@@ -688,12 +648,6 @@ export const GROVE_CSS = `
 
    A count on the door, which is how this game teaches everything. Deliberately NOT a prompt, a modal or
    a tutorial: see no-temp-ui-scaffolding and teach-by-showing-not-telling. */
-.gv-zdock button { position: relative; }
-.gv-zdock-n { position: absolute; top: -4px; right: -4px; min-width: 1.15rem; height: 1.15rem;
-    padding: 0 0.22rem; border-radius: 999px; background: linear-gradient(180deg, #ffd978, #e8a02c);
-    color: #2a1a05; font-size: 0.7rem; font-weight: 900; line-height: 1.15rem; text-align: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.6), 0 0 9px rgba(255,190,80,0.55);
-    animation: gv-benchpulse 2.6s ease-in-out infinite; }
 @keyframes gv-benchpulse { 0%, 92%, 100% { transform: scale(1); } 96% { transform: scale(1.18); } }
 
 /* ── THE ZONE WHOSE BOSS IS STILL STANDING ────────────────────────────────────────────────────
@@ -725,9 +679,6 @@ export const GROVE_CSS = `
    counts things you could go and make. This one counts the room you have left, and it only appears at
    three or fewer -- amber while there is still time to do something about it, red at nought, which is
    the state where loot is already being left on the floor. */
-.gv-zdock-n.is-room { background: linear-gradient(180deg, #e0a83c, #b4791f); color: #2a1c06; }
-.gv-zdock-n.is-room.is-full { background: linear-gradient(180deg, #e2594a, #a8301f); color: #fff0ec;
-    box-shadow: 0 0 10px rgba(226,89,74,0.65); }
 .gv-node-pin { position: absolute; top: -17px; left: 50%; width: 15px; height: 15px; margin-left: -7.5px;
     border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: linear-gradient(135deg, #ffd978, #d98b16);
     border: 1.5px solid #8a5607; box-shadow: 0 3px 7px rgba(60, 44, 20, 0.5);
@@ -3944,4 +3895,112 @@ export const GROVE_CSS = `
     animation: gvCardSheen 3600ms linear infinite; pointer-events: none; }
 @keyframes gvCardSheen { 0% { transform: translateX(-62%); } 100% { transform: translateX(62%); } }
 @media (prefers-reduced-motion: reduce) { .gv-card.is-high .gv-card-win::after { animation: none; opacity: 0.25; } }
+
+
+/* ── THE GROVE'S MENU ─────────────────────────────────────────────────────────────────────────────
+   Replaces two docks: six sprite circles across the bottom of the zone and the same six down the
+   right of the hub. The reasoning for the change is at the top of GroveMenu.js; what follows is only
+   how it is drawn.
+
+   ⚠️ THE HANDLE IS SMALL AND THE DRAWER IS WIDE, which is the whole trade. A dock has to be big
+   because each circle is both the label and the target; a drawer only needs one target, so the thing
+   permanently on top of the game can be a 34px tab instead of 320px of furniture.
+
+   ⚠️ FIXED, NOT ABSOLUTE. The zone is a full-screen locked container so either works there, but the HUB's
+   .gv is as tall as the page it scrolls -- an absolute drawer pinned top:0/bottom:0 inside it is as tall as
+   the whole document and its handle sits at the middle of the SCROLL rather than of the screen. One shared
+   component cannot have two positioning schemes, so it takes the one that is correct in both.
+   ⚠️ AND NOTHING ABOVE IT MAY CARRY A CSS filter, which would turn fixed back into absolute against that
+   ancestor -- see filter-creates-containing-block, which cost the site its mobile menu once already. */
+.gv-mmenu-handle { position: fixed; z-index: 8;
+    left: 0; top: 50%; transform: translateY(-50%);
+    width: 34px; height: 74px; padding: 0; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.16); border-left: 0;
+    border-radius: 0 13px 13px 0;
+    background: rgba(8,12,8,0.72); box-shadow: 0 4px 16px rgba(0,0,0,0.55);
+    display: grid; align-content: center; justify-items: center; gap: 4px;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    transition: transform 240ms cubic-bezier(0.16,1,0.3,1), border-color 140ms ease, opacity 260ms ease; }
+.gv-mmenu-handle i { display: block; width: 15px; height: 2px; border-radius: 2px;
+    background: #d8cdb8; transition: transform 240ms ease, opacity 180ms ease; }
+.gv-mmenu-handle:hover { border-color: rgba(255,255,255,0.34); }
+/* Open, it slides out with the drawer and becomes the close control -- the bars fold into a cross, so
+   the one thing on screen that opened the menu is the one thing that shuts it. */
+.gv-mmenu-handle.is-open { transform: translateY(-50%) translateX(var(--gv-mw, 274px)); }
+.gv-mmenu-handle.is-open i:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.gv-mmenu-handle.is-open i:nth-child(2) { opacity: 0; }
+.gv-mmenu-handle.is-open i:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+/* ⚠️ ONE DOT FOR THE WHOLE MENU. The old dock carried its badges on individual circles, which only
+   works while the circles are on screen; a shut drawer has to be able to say "there is something in
+   here" with the one pixel it has. */
+.gv-mmenu-dot { position: absolute; top: 9px; right: 6px; width: 7px; height: 7px; border-radius: 50%;
+    background: #7ed57e; box-shadow: 0 0 8px #7ed57e; }
+
+.gv-mmenu-scrim { position: fixed; inset: 0; z-index: 7; border: 0; padding: 0; cursor: pointer;
+    background: rgba(6,8,5,0.5); -webkit-tap-highlight-color: transparent; }
+
+/* ⚠️ TRANSLATED, NOT WIDTH-ANIMATED. Animating width reflows the rows inside on every frame and the
+   text jitters as it goes; a transform is composited and the contents hold still. */
+.gv-mmenu { --gv-mw: 274px;
+    position: fixed; z-index: 8; left: 0; top: 0; bottom: 0; width: var(--gv-mw);
+    display: flex; flex-direction: column;
+    background: linear-gradient(118deg, rgba(20,24,16,0.97), rgba(12,15,10,0.98));
+    border-right: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 10px 0 34px rgba(0,0,0,0.6);
+    transform: translateX(-100%); visibility: hidden;
+    transition: transform 280ms cubic-bezier(0.16,1,0.3,1), visibility 0s linear 280ms; }
+.gv-mmenu.is-open { transform: translateX(0); visibility: visible; transition-delay: 0s; }
+.gv-mmenu:focus { outline: none; }
+.gv-mmenu > header { padding: 15px 16px 10px; font-size: 0.68rem; font-weight: 800;
+    letter-spacing: 0.3em; text-transform: uppercase; color: #ffd98f;
+    border-bottom: 1px solid rgba(255,255,255,0.08); }
+.gv-mmenu-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 10px;
+    -webkit-overflow-scrolling: touch; }
+.gv-mmenu section { padding: 8px 0 2px; }
+/* The family name. Quiet on purpose -- it is a signpost for the rows under it, and a heading that
+   competes with its own contents is a heading that made the list harder to read. */
+.gv-mmenu h3 { margin: 0; padding: 4px 16px 6px; font-size: 0.58rem; font-weight: 800;
+    letter-spacing: 0.26em; text-transform: uppercase; color: #7d8670; }
+.gv-mmenu section + section { border-top: 1px solid rgba(255,255,255,0.06); }
+.gv-mmenu section button { width: 100%; display: grid; grid-template-columns: 38px 1fr auto;
+    align-items: center; gap: 11px; padding: 9px 16px; cursor: pointer;
+    border: 0; border-left: 3px solid transparent; background: transparent; font: inherit;
+    text-align: left; -webkit-tap-highlight-color: transparent;
+    transition: background 140ms ease, border-color 140ms ease; }
+.gv-mmenu section button img { width: 38px; height: 38px; object-fit: contain; display: block;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+.gv-mmenu section button b { display: block; font-size: 0.86rem; font-weight: 700; color: #f0e7d4; }
+/* The line the circles had nowhere to put. */
+.gv-mmenu section button small { display: block; font-size: 0.66rem; line-height: 1.3; color: #9aa48e; }
+.gv-mmenu section button em { font-style: normal; font-size: 0.62rem; font-weight: 800;
+    padding: 2px 7px; border-radius: 999px; color: #14180f; background: #7ed57e;
+    box-shadow: 0 0 10px rgba(126,213,126,0.5); }
+.gv-mmenu section button:hover { background: rgba(255,255,255,0.05); }
+.gv-mmenu section button:active { background: rgba(255,255,255,0.09); }
+.gv-mmenu section button.is-on { background: rgba(255,214,130,0.09); border-left-color: #ffd98f; }
+.gv-mmenu section button.is-on b { color: #ffd98f; }
+
+/* ── THE FOOTER IS FOR SETTINGS ───────────────────────────────────────────────────────────────
+   The sound switch used to be a seventh circle among six doors, drawing the eye exactly as hard as
+   the workbench. Below the destinations, in smaller type, it finally reads as what it is. */
+/* ⚠️ CLEARS THE SITE'S OWN NAV BUBBLE. That circle is fixed to the bottom-LEFT of every page and the
+   drawer opens from the left, so the footer and the bubble occupy the same 56px. Filmed, the word
+   "Sound on" ran straight under it. The zone's full-screen lock clears the bottom-RIGHT corner for the
+   chat bubbles and was no help here -- this is the other corner. */
+.gv-mmenu > footer { border-top: 1px solid rgba(255,255,255,0.08);
+    padding: 8px 10px calc(62px + env(safe-area-inset-bottom)); }
+.gv-mmenu-sound { width: 100%; display: flex; align-items: center; gap: 10px; cursor: pointer;
+    padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; font: inherit;
+    font-size: 0.74rem; color: #cdd2d8; -webkit-tap-highlight-color: transparent; }
+.gv-mmenu-sound svg { width: 19px; height: 19px; flex: none; }
+.gv-mmenu-sound:hover { background: rgba(255,255,255,0.05); }
+.gv-mmenu-sound[aria-pressed="true"] { color: #8d8f93; }
+
+/* On a wide screen the drawer has no business covering half the forest. */
+@media (min-width: 560px) { .gv-mmenu { --gv-mw: 310px; } }
+@media (prefers-reduced-motion: reduce) {
+    /* ⚠️ IT STILL OPENS AND SHUTS. Reduced motion means no slide, not a menu that cannot be used --
+       see animations-always-play. */
+    .gv-mmenu, .gv-mmenu-handle { transition: none; }
+}
 `;

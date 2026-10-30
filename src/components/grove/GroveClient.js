@@ -20,6 +20,7 @@ import {
 const CARD_ORDER = Object.keys(GROVE_EMBLEMS);
 
 import { useWishlist } from "@/components/grove/useWishlist.js";
+import GroveMenu from "@/components/grove/GroveMenu.js";
 import GroveBench from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area from "@/components/grove/GroveArea.js";
@@ -89,17 +90,34 @@ const GROVE_STAT_READOUT = {
 // because the zone's own full-screen lock already clears that corner of the site's chat bubbles — see
 // gv-full-lock in grove-css.js, which exists because a thumb reaching into that corner was opening a chat
 // panel instead of hitting things.
-const DOCK = [
-    { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
-    { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
-    { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
-    { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp" },
-    // ⚠️ THE TRACKER NEEDS A DOOR OR IT IS NOT SHIPPED. ui-board.webp was drawn long ago and never used by
-    // anything — the quest helper is what it was for. Three givers hidden across twelve zones is a good
-    // surprise once and a search forever after, so the panel that names the zone has to be one tap away.
-    { k: "quests", label: "Quests", art: "/images/grove/ui-board.webp" },
-    { k: "emblems", label: "Cards", art: "/images/grove/ui-emblems.webp" },
+// ⚠️ THE SAME FAMILIES AS THE ZONE'S, so a player learns one menu rather than two arrangements of the
+// same six doors. ZONE_FAMILIES in GroveScene.js carries the identical grouping minus Quests, which has
+// no meaning while you are standing inside a zone.
+const FAMILIES = [
+    {
+        title: "Go", rows: [
+            { k: "map", label: "Map", art: "/images/grove/ui-map.webp", note: "choose a zone" },
+            // ⚠️ THE TRACKER NEEDS A DOOR OR IT IS NOT SHIPPED. ui-board.webp was drawn long ago and never
+            // used by anything — the quest helper is what it was for. Three givers hidden across twelve
+            // zones is a good surprise once and a search forever after, so the panel that names the zone
+            // has to be one tap away.
+            { k: "quests", label: "Quests", art: "/images/grove/ui-board.webp", note: "who wants what" },
+        ],
+    },
+    {
+        title: "Carry", rows: [
+            { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
+            { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp", note: "what you are wearing" },
+            { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-emblems.webp" },
+        ],
+    },
+    {
+        title: "Make", rows: [
+            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp", note: "spend parts" },
+        ],
+    },
 ];
+
 
 // ── ⚠️ THE PARTS HAVE PICTURES AND THESE LISTS WERE NOT USING THEM ───────────────────────────────────────────
 // Thirty-three painted items shipped for the floor of the zone, where a drop is on screen for a couple of
@@ -160,6 +178,7 @@ export default function GroveClient({ initial }) {
     // choice about the run you are about to take, and a choice that survived a reload would be spent on
     // a dive the player had forgotten they armed it for.
     const [charmPick, setCharmPick] = useState(null);
+    const [menuOpen, setMenuOpen] = useState(false);
     // Which half of the emblems panel is showing: the shelf of monster cards, or the merit till.
     // See the note where the tabs are rendered for why these stopped sharing one scroll.
     const [embTab, setEmbTab] = useState("cards");
@@ -1236,20 +1255,23 @@ export default function GroveClient({ initial }) {
 
             {sheetNode}
 
-            {/* ── THE DOCK ──────────────────────────────────────────────────────────────────────
-                Objects rather than words, over the content rather than above it. The current one is lit
-                rather than merely outlined: at 46px an outline is a rounding error, and the question it
-                has to answer at a glance is "where am I". */}
-            <nav className="gv-dock" aria-label="The Grove">
-                {DOCK.map((d) => (
-                    <button key={d.k} type="button" title={d.label} aria-label={d.label}
-                        aria-current={view === d.k ? "page" : undefined}
-                        className={view === d.k ? "is-on" : undefined}
-                        onClick={() => setView(d.k)}>
-                        <img src={d.art} alt="" />
-                    </button>
-                ))}
-            </nav>
+            {/* ── THE MENU ──────────────────────────────────────────────────────────────────────
+                Was a row of six sprite circles floating over the bottom-right of the hub. See the long
+                note in GroveMenu.js for why six peers with no room for a word is not navigation; the
+                short version is that Map and Quests, Backpack and Gear and Cards, and the Workbench are
+                three different kinds of thing and the dock said so nowhere.
+
+                ⚠️ THE HUB KEEPS ITS CURRENT-PAGE MARK. In the zone the drawer opens a panel over a paused
+                fight and there is no "where am I"; here the hub IS one of these views at all times, so
+                `current` is passed and the row you are looking at stays lit. */}
+            <GroveMenu
+                open={menuOpen}
+                onOpen={() => setMenuOpen(true)}
+                onClose={() => setMenuOpen(false)}
+                families={FAMILIES}
+                current={view}
+                onPick={(k) => setView(k)}
+            />
 
             <style>{GROVE_CSS}</style>
         </div>

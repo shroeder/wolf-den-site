@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { GiSoundOff, GiSoundOn } from "react-icons/gi";
 
 import { useWishlist } from "./useWishlist.js";
+import GroveMenu from "./GroveMenu.js";
 
 import {
     GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, dropsAnyOf, HEAL_AT, scaledFoe, scaledRare, killCredit, groveBoss, groveSize, grovePart,
@@ -126,22 +127,39 @@ import {
 // the browser promises to deliver after the page is gone.
 const SETTLE_EVERY_MS = 45_000;
 
-// ── THE IN-ZONE DOCK ─────────────────────────────────────────────────────────────────────────────────────────
-// ⚠️ THE SAME FOUR OBJECTS AS THE HUB'S DOCK, DELIBERATELY. They are the same four places and a player
-// should not have to learn a second set of icons for them; what changes in a zone is the ARRANGEMENT —
-// a row across the bottom rather than a column up the right, because the right-hand column is where Leave
-// and the full-screen toggle already live and because a thumb crossing the middle of a fight to reach a
-// menu is a thumb over the thing it is fighting.
-const ZONE_DOCK = [
-    { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
-    { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
-    // ⚠️ GEAR BELONGS IN THE ZONE, NOT ONLY ON THE HUB. It is the one panel whose contents change the fight
-    // you are standing in, and since creatures started dropping gear it is also where the thing you just
-    // picked up goes. Leaving it hub-only would mean walking out of a zone to put on the sword that fell in
-    // it — and leaving is not a free action (see the panel note in GroveClient).
-    { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
-    { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp" },
-    { k: "emblems", label: "Cards", art: "/images/grove/ui-emblems.webp" },
+// ── THE IN-ZONE MENU ─────────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ FAMILIES, NOT A ROW. This was ZONE_DOCK -- the same six sprite circles as the hub, floating across the
+// bottom of the frame, which is where the creatures are. Luke: "I don't like the floating buttons, lets make
+// a true families menu for the grove, maybe it slides out from the left."
+//
+// The grouping is the point and it is the same on the hub, so a player learns one menu: where you GO, what
+// you CARRY, what you MAKE. Six identical circles said none of that and had nowhere to put a word, which is
+// why the only way to find out what the anvil opened was to press it.
+//
+// ⚠️ SAME KEYS AS BEFORE. openPanel is unchanged and still flushes the kill batch before anything opens --
+// see the note at the markup. The arrangement moved; the wiring did not.
+const ZONE_FAMILIES = [
+    {
+        title: "Go", rows: [
+            { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
+        ],
+    },
+    {
+        title: "Carry", rows: [
+            { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
+            // ⚠️ GEAR BELONGS IN THE ZONE, NOT ONLY ON THE HUB. It is the one panel whose contents change the
+            // fight you are standing in, and since creatures started dropping gear it is also where the thing
+            // you just picked up goes. Leaving it hub-only would mean walking out of a zone to put on the
+            // sword that fell in it -- and leaving is not a free action (see the panel note in GroveClient).
+            { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
+            { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-emblems.webp" },
+        ],
+    },
+    {
+        title: "Make", rows: [
+            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp" },
+        ],
+    },
 ];
 
 // ── REACH, IN WORLD UNITS ───────────────────────────────────────────────────────────────────────────────────
@@ -402,6 +420,7 @@ export default function GroveScene({
     // card stays up while the fight carries on underneath, and the loop must not own something whose
     // lifetime it does not control.
     const [trophy, setTrophy] = useState(null);
+    const [menuOpen, setMenuOpen] = useState(false);
     // ⚠️ KEYED ON THE TROPHY ITSELF so a second emblem during the first one's hold restarts the moment
     // rather than being swallowed — rare twice in a row is the best thing that can happen and must not
     // read as the second one failing to drop.
@@ -4169,73 +4188,57 @@ export default function GroveScene({
                 <button type="button" className="gv-leave" onClick={onLeave}>Leave</button>
             </div>
 
-            {/* ── ⚠️ THE DOCK, AND IT BANKS THE KILLS BEFORE IT OPENS ANYTHING ───────────────────
-                Luke: "The buttons to access crafting and backpack and map should be available when in a
-                node on the Grove. Across the bottom, perhaps slightly smaller. Floating."
-
+            {/* ── ⚠️ THE MENU, AND IT BANKS THE KILLS BEFORE IT OPENS ANYTHING ───────────────────
                 It lives in the SCENE rather than in GroveClient for one reason: kills are settled in
                 batches every 45 seconds, so at any moment there can be most of a minute of drops that the
                 server has never heard about. Opening a backpack that is missing the last forty creatures
                 you killed is worse than not having the button — and crafting off that stale bag would ask
                 the workbench to spend parts the server does not yet know you own. The scene is the only
-                thing holding that list, so it is the thing that flushes it. */}
+                thing holding that list, so it is the thing that flushes it. openPanel does that, and the
+                drawer calls it exactly as the old dock did.
+
+                ⚠️ THE HANDLE KEEPS zdockRef. The loop fades these controls back mid-swing and switches
+                off their pointer events (see DOCK_QUIET_MS), which was written for the old row sitting in
+                the middle of the fight. A handle up the left edge needs it far less — but a thumb that
+                brushes the edge while chasing something should still not open a menu, so the behaviour
+                stays and simply has one element to write to instead of seven. */}
             {onPanel ? (
-                <nav className="gv-zdock" ref={zdockRef} aria-label="The Grove" onPointerDown={(e) => e.stopPropagation()}>
-                    {/* ── ⚠️ THE SOUND SWITCH LIVES DOWN HERE, NOT UP THERE ──────────────────────
-                        Luke: "the mute button is like conflicting with the kill count thing. And I feel
-                        like the mute button can be put somewhere else."
-
-                        It shipped in the top-right cluster next to full-screen and Leave — and that row
-                        also carries the zone's kill count, which is CENTRED on the viewport rather than
-                        laid out with them. On a phone the two met: "71 / FELLED HERE" ran under the
-                        buttons. Nothing was overlapping incorrectly, there was simply no room, and a
-                        centred thing and a right-aligned thing cannot be made to negotiate.
-
-                        The dock is where every other persistent control in the zone already is, it has
-                        room, and a mute belongs with the map and the backpack more than it belongs with
-                        the way out. */}
-                    <button type="button" className="gv-zdock-sound"
-                        title={soundOff ? "Sound off" : "Sound on"}
-                        aria-label={soundOff ? "Turn sound on" : "Turn sound off"}
-                        aria-pressed={soundOff}
-                        onClick={toggleSound}>
-                        {soundOff ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
-                    </button>
-                    {ZONE_DOCK.map((d) => (
-                        <button key={d.k} type="button" title={d.label}
-                            aria-label={d.k === "bench" && benchReady > 0
-                                ? `${d.label}, ${benchReady} waiting`
-                                : d.k === "bag" && bagRoom === 0 ? `${d.label}, full`
-                                : d.k === "bag" && bagRoom != null && bagRoom <= 3 ? `${d.label}, ${bagRoom} slots left`
-                                : d.label}
-                            onClick={() => openPanel(d.k)}>
-                            <img src={d.art} alt="" draggable={false} />
-                            {/* ⚠️ A NUMBER ON A DOOR, NOT A PROMPT. The one thing standing between a
-                                player with 93 parts and the crafting system is that nothing in the zone
-                                -- where the whole session happens -- ever mentions it exists. A badge is
-                                the smallest possible thing that fixes that, and the only kind of
-                                teaching this game does. It counts chests too: "is there anything to go
-                                and do" is one question from the player's side. */}
-                            {d.k === "bench" && benchReady > 0 ? (
-                                <b className="gv-zdock-n" aria-hidden="true">{benchReady > 99 ? "99+" : benchReady}</b>
-                            ) : null}
-                            {/* ── ⚠️ THE CEILING, ON THE DOOR, BEFORE YOU HIT IT ────────────────
-                                The bag holds a fixed number of DISTINCT parts and anything new past
-                                that is not granted at all. Nothing in the zone said so, so the first
-                                a player knew of it was loot they watched land and never received.
-
-                                Same badge idiom as the bench count beside it -- a number on a door,
-                                which is the only kind of teaching this game does -- but only once the
-                                number is worth acting on. A permanent "15 free" is one more digit to
-                                ignore; three or fewer is a warning, and nought is the thing itself.
-                                See [[teach-by-showing-not-telling]]. */}
-                            {d.k === "bag" && bagRoom != null && bagRoom <= 3 ? (
-                                <b className={`gv-zdock-n is-room${bagRoom === 0 ? " is-full" : ""}`}
-                                    aria-hidden="true">{bagRoom}</b>
-                            ) : null}
+                <GroveMenu
+                    open={menuOpen}
+                    onOpen={() => setMenuOpen(true)}
+                    onClose={() => setMenuOpen(false)}
+                    handleRef={zdockRef}
+                    families={ZONE_FAMILIES.map((f) => ({
+                        ...f,
+                        rows: f.rows.map((r) => (
+                            r.k === "bench" && benchReady > 0
+                                ? { ...r, badge: benchReady > 99 ? "99+" : String(benchReady), note: `${benchReady} ready` }
+                                // ⚠️ THE CEILING, ON THE DOOR, BEFORE YOU HIT IT. The bag holds a fixed
+                                // number of DISTINCT parts and anything new past that is not granted at
+                                // all. Nothing in the zone said so, so the first a player knew of it was
+                                // loot they watched land and never received. The old dock could only say
+                                // this with a coloured pip; a row can say it in words.
+                                : r.k === "bag" && bagRoom === 0 ? { ...r, badge: "FULL", note: "no room — nothing new will drop" }
+                                    : r.k === "bag" && bagRoom != null && bagRoom <= 3 ? { ...r, note: `${bagRoom} slots left` }
+                                        : r
+                        )),
+                    }))}
+                    onPick={(k) => openPanel(k)}
+                    footer={(
+                        /* ── ⚠️ THE SOUND SWITCH IS A SETTING AND NOW IT LOOKS LIKE ONE ──────────
+                           Luke: "the mute button is like conflicting with the kill count thing. And I
+                           feel like the mute button can be put somewhere else." It went into the dock,
+                           where it was a seventh circle among six doors — a setting drawing the eye as
+                           hard as the workbench. In a drawer it can sit in a footer, below the
+                           destinations, which is where a setting belongs. */
+                        <button type="button" className="gv-mmenu-sound"
+                            aria-pressed={soundOff}
+                            onClick={toggleSound}>
+                            {soundOff ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
+                            <span>{soundOff ? "Sound off" : "Sound on"}</span>
                         </button>
-                    ))}
-                </nav>
+                    )}
+                />
             ) : null}
 
             <b className="gv-combo" ref={comboRef} aria-hidden="true" />
