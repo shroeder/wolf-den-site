@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
@@ -13,6 +12,7 @@ import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { POTIONS, beltSize, cardById, perkById, removalCost } from "@/lib/marketplace/cards-kit.js";
 import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
 import CardKeyNote from "@/components/cards/CardKeyNote";
+import { PANEL_FONT as panelFont } from "@/lib/fonts";
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke, looking at the first cut: "the merchant looks nothing like it, it doesn't Slay the Spire."
@@ -30,7 +30,6 @@ import CardKeyNote from "@/components/cards/CardKeyNote";
 // ⚠️ THE RULES DID NOT MOVE. Every price, the sale slot, the escalating removal cost and what a refusal means
 // are all still SHOP/removalCost in cards-kit and the run route — this file draws what the server already
 // decided. It has no opinion about what anything costs.
-const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
 const LABEL = { card: "Card", potion: "Potion", perk: "Trinket" };
 

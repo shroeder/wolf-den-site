@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Cinzel } from "next/font/google";
 import {
     GiBiceps, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiHeartPlus, GiShield,
     GiFlame, GiSlowBlob, GiSwordWound, GiGhost, GiPoisonBottle, GiMagicShield, GiThreeLeaves, GiSwapBag, GiBookmarklet,
@@ -31,6 +30,7 @@ import CardPetGains from "@/components/cards/CardPetGains";
 import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
 import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
 import { KEY_OFFER_CSS, KEY_TINT, keyArt } from "@/components/cards/key-offer.js";
+import { PANEL_FONT as panelFont } from "@/lib/fonts";
 
 // 44% of the 460ms lunge below — the frame the animal actually reaches what it was thrown at. The health bar,
 // the floating number and the screen jolt are all timed off this one value, because the whole point of the
@@ -51,7 +51,6 @@ const IMPACT_MS = 200;
 // serif sized for body text at 9px — and using it for a heading just makes a big version of small type.
 // Cinzel is cut from Roman inscriptional capitals, which is the same instinct as the stone-and-metal furniture
 // around it, and it only ever appears at heading size where its width costs nothing.
-const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
 // How long a body takes to go, and how long the line takes to close over it. DIE_MS reaches the stylesheet
 // as --cf-die off the root rather than being written twice: the close-up is timed to start as the last of the

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Kreon } from "next/font/google";
 import {
     GiBiceps, GiCardDraw, GiCrackedShield, GiCrossedSwords, GiHeartPlus, GiShield,
     GiSlowBlob, GiSmallFire, GiThunderStruck,
@@ -39,7 +38,9 @@ import { RARITY_META } from "@/lib/marketplace/rarity.js";
 //
 // Exported rather than re-declared per screen: every screen that draws a card sets --cf-card-font from THIS,
 // so a card in the shop and the same card in the hand are set in the same face.
-export const CARD_FONT = Kreon({ subsets: ["latin"], weight: ["400", "600", "700"], display: "swap" });
+// ⚠️ RE-EXPORTED, NOT DEFINED. The face moved to @/lib/fonts so the build makes one lookup for it
+// instead of one per screen; a dozen files import CARD_FONT from here and none of them had to change.
+export { CARD_FONT } from "@/lib/fonts";
 
 /**
  * ── AN IMAGE THAT ALREADY FAILED BEFORE REACT WAS LISTENING ──────────────────────────────────────────────

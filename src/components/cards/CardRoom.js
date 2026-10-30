@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
@@ -15,6 +14,7 @@ import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
 import CardGot from "@/components/cards/CardGot";
 import { KEY_OFFER_CSS, KEY_TINT, keyArt } from "@/components/cards/key-offer.js";
 import CardKeyNote from "@/components/cards/CardKeyNote";
+import { PANEL_FONT as panelFont } from "@/lib/fonts";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
 // The two rooms on the map that were never rooms.
@@ -33,7 +33,6 @@ import CardKeyNote from "@/components/cards/CardKeyNote";
 // So: one screen, two rooms. The alcove behind them is the merchant's own (shop-room.png) because it was
 // drawn as an empty lantern-lit room with nothing in the foreground, which is precisely what a fire or a
 // chest wants to stand in. The object is the whole screen, the way the brazier is the whole of the purge.
-const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
 // What each room IS. Kept as data rather than as two components: they are the same screen — a backdrop, one
 // object, one thing you may do to it and a way out — and the differences are a picture and three sentences.

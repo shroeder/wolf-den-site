@@ -3,7 +3,6 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { GiBookmarklet, GiSoundOn, GiSoundWaves, GiSpeakerOff } from "react-icons/gi";
 import { useRouter } from "next/navigation";
-import { Cinzel } from "next/font/google";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardGuide from "@/components/cards/CardGuide";
@@ -13,8 +12,8 @@ import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { MAP_LANES, reachable } from "@/lib/marketplace/cards-map.js";
 import { KEYS, KEY_IDS, POTIONS, RUN_LENGTH, actName, cardById, perkById } from "@/lib/marketplace/cards-kit.js";
 import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
+import { PANEL_FONT as panelFont } from "@/lib/fonts";
 
-const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
 // ── THE OVERWORLD ────────────────────────────────────────────────────────────────────────────────────────────
 // Slay the Spire's map. This is the third pass and the first one built off a CLOSE crop of the real screen

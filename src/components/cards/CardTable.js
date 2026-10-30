@@ -5,9 +5,9 @@ import CardFoot from "@/components/cards/CardFoot";
 import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { useRouter } from "next/navigation";
-import { Cinzel } from "next/font/google";
 
 import { ACTS, ASC_MAX, FINAL_ACT, RUN_LENGTH, actName, ascRules, stopLabel } from "@/lib/marketplace/cards-kit.js";
+import { PANEL_FONT as panelFont } from "@/lib/fonts";
 
 // ── THE TABLE YOU SIT DOWN AT ────────────────────────────────────────────────────────────────────────────
 // The card game had no front room. Every other feature in the Den has one — the mine has a shaft head, the
@@ -24,7 +24,6 @@ import { ACTS, ASC_MAX, FINAL_ACT, RUN_LENGTH, actName, ascRules, stopLabel } fr
 // SO RETURN MEANS "GET UP", not "leave". The map's ribbon and the fight's Leave both land here now, and the
 // only thing on this screen that puts you back in the town is the ribbon at the bottom — one more press, and
 // a press you meant.
-const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
 export default function CardTable({ run, history = null }) {
     const router = useRouter();

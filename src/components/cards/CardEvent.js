@@ -13,7 +13,6 @@
 // game, and the whole point of a question mark is that you did not know which room you were walking into.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Cinzel } from "next/font/google";
 import {
     GiAnvil, GiBrokenBone, GiCrackedGlass, GiDeathSkull, GiEgyptianBird, GiEyeOfHorus, GiFangs,
     GiFishCorpse, GiFlame, GiMushroomGills, GiSnakeTongue, GiStoneBlock, GiStoneSphere,
@@ -27,8 +26,8 @@ import { CURSE_CARDS } from "@/lib/marketplace/cards-kit.js";
 import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
 import CardKeyNote from "@/components/cards/CardKeyNote";
+import { PANEL_FONT as panelFont } from "@/lib/fonts";
 
-const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
 // ── THE OBJECT IN THE ROOM ───────────────────────────────────────────────────────────────────────────────
 // One glyph each, not a photograph. Fourteen painted rooms is a week of art and a megabyte of it; a heavy

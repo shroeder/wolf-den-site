@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Cinzel } from "next/font/google";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardKeyNote from "@/components/cards/CardKeyNote";
 import CardFoot from "@/components/cards/CardFoot";
+import { PANEL_FONT as panelFont } from "@/lib/fonts";
 
 // ── EVERY CARD IN THE GAME, AND WHOSE IT IS ──────────────────────────────────────────────────────────────
 // Luke: "overall card collection", alongside "design the way cards reflect their pets level". The two are one
@@ -23,7 +23,6 @@ import CardFoot from "@/components/cards/CardFoot";
 // ⚠️ IT IS A CABINET, NOT A SHOP. Nothing here can be bought, picked or equipped, and no number on this
 // screen is a number the run reads — see the note on petArtMap about why levelling buys the picture and never
 // the damage. A collection screen that starts handing out advantages is a second game with no balance.
-const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
 // ── FIVE DOORS, ONE ROW ──────────────────────────────────────────────────────────────────────────────────
 // Three of these filter the cards and two swap the grid for a catalogue, which is normally an argument for

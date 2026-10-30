@@ -1,21 +1,11 @@
 import "./globals.css";
-import { Manrope, Space_Grotesk } from "next/font/google";
+import { BODY_FONT as manrope, DISPLAY_FONT as spaceGrotesk } from "@/lib/fonts";
 import Script from "next/script";
 import { SITE_URL, STORE_PHONE_TEL } from "@/lib/site";
 import { openingHoursSpecification } from "@/lib/marketplace/store-hours.js";
 import PlayPeekers from "@/components/PlayPeekers";
 import Telemetry from "@/components/Telemetry";
 import ChunkRecovery from "@/components/ChunkRecovery";
-
-const manrope = Manrope({
-    subsets: ["latin"],
-    variable: "--font-body",
-});
-
-const spaceGrotesk = Space_Grotesk({
-    subsets: ["latin"],
-    variable: "--font-display",
-});
 
 export const metadata = {
     metadataBase: new URL(SITE_URL),
