@@ -20,6 +20,7 @@ export default async function Page({ searchParams }) {
             temper={sp?.temper === "1"}
             seed={Number(sp?.seed) || 7}
             games={sp?.games || ""}
+            rack={sp?.rack === "1"}
         />
     );
 }

@@ -118,10 +118,22 @@ Four named pieces:
 > *"the Plinko screen needs to be like way taller. It's like, it feels like it's been shoved in the bottom
 > portion of the screen."*
 
+**DONE** (`19`), and photographed end to end (`25`). The board was a fixed 150px under two stacked headers
+— the stage that decides the item's QUALITY was the smallest thing on the page and the ball crossed it in
+under a second. It is `clamp(230px, 44vh, 380px)` now, so a short phone still gets a real board and a
+desktop does not get an absurd one; the peg rows space themselves and the only thing that changes is how
+far the ball falls, which is the drama.
+
 ### F. Plinko should drop a ball, not the item
 > *"I don't want it to be the item that Plinkos. I want it to just be like a colorful ball or something, but
 > like it has to have way more dopamine as it bounces around, and then a massive dopamine burst when it
 > splashes at the bottom."*
+
+**DONE** (`19`), and photographed end to end (`25`). The thing falling used to be the recipe's own sprite
+— a 32px pickaxe tumbling down a peg board, which reads as the object being dropped and damaged rather
+than as a game being played. It is an orb now, with no such baggage and free to be as loud as it likes:
+`--n` rises 0→1 as it falls and the hue travels with it, the pegs light where it strikes, and the splash
+is 24 shards in the landed band's own colour over three times the old throw.
 
 ### G. ⚠️ The bellows timer resets on every tap, so you can tap forever
 > *"the bellows, like you can just tap forever, it resets the timer, so you can literally tap to infinity.
