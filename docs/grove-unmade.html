@@ -1,0 +1,707 @@
+<title>What the Grove Hasn't Drawn</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+    --bg:#f3f1e8; --surface:#fcfaf3; --sunk:#e9e5d8; --ink:#1f1d17; --muted:#696354;
+    --faint:#8d8676; --line:#dcd7c7; --rule:#c4bda9; --accent:#7a5a2e; --ok:#4a6b3f;
+    --no:#9a3a28; --live:#1b6473; --live-soft:#dcecef;
+    --shadow:0 1px 2px rgba(31,29,23,.05), 0 10px 26px rgba(31,29,23,.05);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#121108; --surface:#1a190f; --sunk:#16150c; --ink:#eae4d2; --muted:#9c9482;
+    --faint:#7c7563; --line:#2c2a1c; --rule:#3c3926; --accent:#d9a861; --ok:#8fc47c;
+    --no:#f09078; --live:#7fd4e8; --live-soft:#15262b;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 32px rgba(0,0,0,.4);
+}}
+:root[data-theme="dark"]{
+    --bg:#121108; --surface:#1a190f; --sunk:#16150c; --ink:#eae4d2; --muted:#9c9482;
+    --faint:#7c7563; --line:#2c2a1c; --rule:#3c3926; --accent:#d9a861; --ok:#8fc47c;
+    --no:#f09078; --live:#7fd4e8; --live-soft:#15262b;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 32px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+     font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:16px;line-height:1.6}
+.wrap{max-width:900px;margin:0 auto;padding:36px 20px 90px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.22em;
+         text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+h1{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:clamp(2.2rem,7vw,3.5rem);
+   line-height:1;letter-spacing:-.024em;margin:0 0 16px;text-wrap:balance}
+h2{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:clamp(1.3rem,4vw,1.7rem);
+   margin:0 0 10px;text-wrap:balance}
+h3{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:1.15rem;margin:0}
+.kicker{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.2em;
+        text-transform:uppercase;color:var(--faint);margin:34px 0 10px}
+p{margin:0 0 14px;max-width:66ch}
+.lede{font-size:1.06rem;color:var(--muted);max-width:62ch}
+.lede b{color:var(--ink);font-weight:600}
+code{font-family:"IBM Plex Mono",monospace;font-size:.84em;background:var(--sunk);
+     border:1px solid var(--line);border-radius:3px;padding:.5px 5px}
+q{font-style:italic;color:var(--muted)}
+.rule{height:6px;margin:34px 0 26px;border:0;
+      background:repeating-linear-gradient(90deg,var(--rule) 0 2px,transparent 2px 10px)}
+.big{display:grid;gap:14px;margin:22px 0 0}
+@media(min-width:620px){.big{grid-template-columns:repeat(3,1fr)}}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;
+      padding:15px 16px;box-shadow:var(--shadow)}
+.stat b{display:block;font-family:Fraunces,Georgia,serif;font-size:2rem;line-height:1;
+        font-variant-numeric:tabular-nums}
+.stat span{display:block;font-family:"IBM Plex Mono",monospace;font-size:.68rem;
+           letter-spacing:.15em;text-transform:uppercase;color:var(--faint);margin-top:6px}
+.live-box{background:var(--live-soft);border:1px solid var(--line);
+          border-left:3px solid var(--live);border-radius:8px;padding:16px 18px;margin:0 0 18px}
+.live-box h2{color:var(--live);font-size:1.25rem}
+.note{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);
+      border-radius:8px;padding:16px 18px;margin:0 0 18px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 0 14px}
+table{width:100%;border-collapse:collapse;font-size:.89rem}
+th{text-align:left;font-family:"IBM Plex Mono",monospace;font-size:.64rem;font-weight:500;
+   letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
+   padding:0 11px 7px 0;border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:7px 11px 7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.k{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--muted);white-space:nowrap}
+td.say{color:var(--muted)}
+td.st,th.st{text-align:right;white-space:nowrap}
+.ok,.no{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase}
+.ok{color:var(--ok)}.no{color:var(--no)}
+.tag-live{font-family:"IBM Plex Mono",monospace;font-size:.6rem;letter-spacing:.14em;
+          text-transform:uppercase;color:var(--live);border:1px solid var(--live);
+          border-radius:3px;padding:0 4px;vertical-align:1px}
+tfoot td{font-weight:600;border-top:2px solid var(--rule);border-bottom:0;padding-top:10px}
+.map{margin:0 0 30px}
+.map-head{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;margin-bottom:3px}
+.mn{font-family:"IBM Plex Mono",monospace;font-size:1rem;color:var(--accent)}
+.rename{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.1em;
+        text-transform:uppercase;color:var(--no);border:1px solid var(--line);
+        border-radius:3px;padding:1px 6px}
+.blurb{font-family:Fraunces,Georgia,serif;font-style:italic;color:var(--muted);
+       margin:0 0 12px;max-width:58ch}
+.meta{font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--faint)}
+footer{margin-top:40px}
+</style>
+<div class="wrap">
+
+<p class="eyebrow">The Wolf Den · Grove · Art inventory</p>
+<h1>What the Grove hasn't drawn</h1>
+<p class="lede">Read off the catalogue, not counted by hand. <b>60 scenes</b> and
+<b>343 sprites</b> are unmade — and three families that look missing on disk are not missing
+at all.</p>
+
+<div class="big">
+  <div class="stat"><b>60</b><span>scenes with no backdrop</span></div>
+  <div class="stat"><b>343</b><span>sprites unmade</span></div>
+  <div class="stat"><b>$19.78</b><span>to draw all of it</span></div>
+</div>
+
+<hr class="rule">
+
+<div class="live-box">
+<h2>Only one gap is live</h2>
+<p><b>The statues.</b> Five stats, three rarities, plus the vendor they are handed to — sixteen
+objects, none drawn. The menu row borrows the emblems icon and a statue renders as a coloured chip
+(<code>--r: r.colour</code>), which is the nearest thing to a glyph the Grove has shipped.</p>
+<p style="margin:0"><b>Statues drop from world 2</b>, so every member deep enough to see them is
+looking at swatches today. Everything else on this page is behind <code>MAPS_BUILT = 7</code>
+and no member can reach it.</p>
+</div>
+
+<div class="note">
+<h2 style="font-size:1.2rem">Three families are borrowed, not missing</h2>
+<p><code>GroveCraftAct</code> already carries this scar: <q>Found by auditing art coverage with
+groveArt and getting 23 false positives: the audit was asking the wrong function.</q> It happens
+again here, and the first pass of this very page reported 44 missing foods before checking.</p>
+<div class="scroll"><table>
+<tr><th>Family</th><th class="n">Count</th><th>Why it needs nothing</th><th class="n">Cost</th></tr>
+<tr><td>Boss emblem seals</td><td class="n">84</td><td class="say"><code>emblemArt()</code> returns null for a <code>boss</code> emblem and falls through to the boss's own sprite — claiming the path <q>would hang a broken image in the corner of every boss card on the shelf.</q></td><td class="n">$0.00</td></tr>
+<tr><td>Generated foods</td><td class="n">24</td><td class="say"><code>MAP_FOODS</code> sets <code>art</code> to map one's picture for the heal tier, so a deep map's draught wears the Heartwood Draught's face. That is the count LIVE on maps 2&ndash;7; the twenty for maps 8&ndash;12 borrow the same four and also cost nothing.</td><td class="n">$0.00</td></tr>
+<tr><td>Charms</td><td class="n">3</td><td class="say">Art is keyed by the <i>stat</i> a charm bends, not by the charm. All three exist, so every charm maps 2&ndash;12 will ever add is already drawn.</td><td class="n">$0.00</td></tr>
+</table></div>
+<p style="margin:0" class="meta">⚠️ <code>check:grove</code> does ask the wrong function, at line 278:
+it checks <code>groveArt(id)</code> for all 103 emblems, so 84 of its 86 complaints are about files
+that are deliberately absent. The gate has been red for that reason alone — which is how the two
+real new problems underneath them went unnoticed.</p>
+</div>
+
+<p class="kicker">What it would cost</p>
+<div class="scroll"><table>
+<tr><th>Family</th><th class="n">Images</th><th>What it is</th><th class="n">Cost</th></tr>
+<tr>
+  <td>Zone backdrops</td>
+  <td class="n">60</td>
+  <td class="say">one scene each, 1536x1024</td>
+  <td class="n">$3.76</td>
+</tr>
+<tr>
+  <td>Creatures</td>
+  <td class="n">60</td>
+  <td class="say">twelve residents a map</td>
+  <td class="n">$2.53</td>
+</tr>
+<tr>
+  <td>Bosses</td>
+  <td class="n">60</td>
+  <td class="say">one a scene</td>
+  <td class="n">$2.53</td>
+</tr>
+<tr>
+  <td>Materials</td>
+  <td class="n">60</td>
+  <td class="say">twelve a map, and every one is in a recipe</td>
+  <td class="n">$2.53</td>
+</tr>
+<tr>
+  <td>Mark seals</td>
+  <td class="n">5</td>
+  <td class="say">one emblem a map</td>
+  <td class="n">$0.21</td>
+</tr>
+<tr>
+  <td>Card shelf frames</td>
+  <td class="n">5</td>
+  <td class="say">the drawn frame each map's row wears</td>
+  <td class="n">$0.21</td>
+</tr>
+<tr>
+  <td>Ledge slabs</td>
+  <td class="n">5</td>
+  <td class="say">one a NEW biome — clockwork, ice, flesh, cloud, star</td>
+  <td class="n">$0.31</td>
+</tr>
+<tr>
+  <td>Chart symbols</td>
+  <td class="n">5</td>
+  <td class="say">the node on the map; an unmapped biome falls back to a forest</td>
+  <td class="n">$0.21</td>
+</tr>
+<tr>
+  <td>Rare spawns</td>
+  <td class="n">5</td>
+  <td class="say">one a map. Today one stag is shared by all seven</td>
+  <td class="n">$0.21</td>
+</tr>
+<tr>
+  <td>NPCs and marshals</td>
+  <td class="n">20</td>
+  <td class="say">three residents and a Coliseum marshal a map</td>
+  <td class="n">$0.84</td>
+</tr>
+<tr>
+  <td>Tool rungs to redraw</td>
+  <td class="n">36</td>
+  <td class="say">tiers VIII, X and XI, drawn from the retired map names</td>
+  <td class="n">$1.52</td>
+</tr>
+<tr>
+  <td>Statues and the vendor <span class="tag-live">live</span></td>
+  <td class="n">16</td>
+  <td class="say">five stats, three rarities — statues drop from WORLD 2</td>
+  <td class="n">$0.68</td>
+</tr>
+<tr>
+  <td>Cogfall</td>
+  <td class="n">6</td>
+  <td class="say">a town backdrop and five buildings. No town is in code yet</td>
+  <td class="n">$0.25</td>
+</tr>
+<tfoot>
+<tr><td>Subtotal</td><td class="n">343</td><td></td><td class="n">$15.83</td></tr>
+<tr><td>Plus rejects &amp; retries, ~25%</td><td class="n"></td><td></td><td class="n">$3.96</td></tr>
+<tr><td><b>All of it</b></td><td class="n"></td><td></td><td class="n"><b>$19.78</b></td></tr>
+</tfoot>
+</table></div>
+<p class="meta">Medium, never high. Backdrops and slabs 1536&times;1024 at $0.06;
+everything else 1024&times;1024 at $0.04. Three images a run on a contact sheet
+makes this about <b>115 runs</b>.</p>
+
+<hr class="rule">
+
+<p class="kicker">The 60 scenes, as the code holds them</p>
+<p>Every one is a backdrop, a roster and a boss. Maps 10 and 11 still answer with the names they
+were declared under in October &mdash; only map 8 has been rewritten so far.</p>
+
+<section class="map">
+<div class="map-head">
+  <span class="mn">08</span>
+  <h3>The Clockwork Deep</h3>
+  
+</div>
+<p class="blurb">Something built this, and it was never told to stop.</p>
+<div class="scroll"><table>
+<tr><th class="n">#</th><th>Scene</th><th>Biome</th><th>Boss</th><th class="st">Backdrop</th></tr>
+<tr>
+  <td class="n">1</td>
+  <td>The Cogfall Gate</td>
+  <td class="k">clockwork</td>
+  <td class="say">The Doorwarden</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">2</td>
+  <td>The Toothed Hall</td>
+  <td class="k">clockwork</td>
+  <td class="say">The First Tooth</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">3</td>
+  <td>The Piston Run</td>
+  <td class="k">clockwork</td>
+  <td class="say">Longstroke</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">4</td>
+  <td>The Oil Sump</td>
+  <td class="k">burrow</td>
+  <td class="say">The Sump Mother</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">5</td>
+  <td>The Boiler Floor</td>
+  <td class="k">char</td>
+  <td class="say">Pressure</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">6</td>
+  <td>The Dial Gallery</td>
+  <td class="k">glow</td>
+  <td class="say">The Hour Hand</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">7</td>
+  <td>The Chainworks</td>
+  <td class="k">clockwork</td>
+  <td class="say">Slackjaw</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">8</td>
+  <td>The Governor Ring</td>
+  <td class="k">clockwork</td>
+  <td class="say">The Regulator</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">9</td>
+  <td>The Bellows Deep</td>
+  <td class="k">burrow</td>
+  <td class="say">The Long Breath</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">10</td>
+  <td>The Filament Vault</td>
+  <td class="k">glow</td>
+  <td class="say">The Filament</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">11</td>
+  <td>The Ratchet Stair</td>
+  <td class="k">clockwork</td>
+  <td class="say">One Way Up</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">12</td>
+  <td>The Mainspring</td>
+  <td class="k">clockwork</td>
+  <td class="say">The Mainspring Itself</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+</table></div>
+</section>
+<section class="map">
+<div class="map-head">
+  <span class="mn">09</span>
+  <h3>The Frostmere</h3>
+  
+</div>
+<p class="blurb">Flat, white, and much further across than it looks.</p>
+<div class="scroll"><table>
+<tr><th class="n">#</th><th>Scene</th><th>Biome</th><th>Boss</th><th class="st">Backdrop</th></tr>
+<tr>
+  <td class="n">1</td>
+  <td>The Thin Crust</td>
+  <td class="k">stone</td>
+  <td class="say">The Crust Breaker</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">2</td>
+  <td>The Frozen Stand</td>
+  <td class="k">char</td>
+  <td class="say">The Standing</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">3</td>
+  <td>The Stalker White</td>
+  <td class="k">field</td>
+  <td class="say">The Patient</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">4</td>
+  <td>The Wolf Run</td>
+  <td class="k">field</td>
+  <td class="say">The White Mother</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">5</td>
+  <td>The Hearth Camp</td>
+  <td class="k">plank</td>
+  <td class="say">The Fire Thief</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">6</td>
+  <td>The Aurora Flats</td>
+  <td class="k">glow</td>
+  <td class="say">The Drifting Light</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">7</td>
+  <td>The Hoar Field</td>
+  <td class="k">stone</td>
+  <td class="say">The Grey</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">8</td>
+  <td>The Rune Stones</td>
+  <td class="k">stone</td>
+  <td class="say">The Keeper of Cuts</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">9</td>
+  <td>The Thaw Line</td>
+  <td class="k">moss</td>
+  <td class="say">The Picker King</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">10</td>
+  <td>Lash Ice</td>
+  <td class="k">stone</td>
+  <td class="say">The White Hauler</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">11</td>
+  <td>The Elk Crossing</td>
+  <td class="k">field</td>
+  <td class="say">The Great Elk</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">12</td>
+  <td>Mereheart</td>
+  <td class="k">glow</td>
+  <td class="say">The Winter Wraith</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+</table></div>
+</section>
+<section class="map">
+<div class="map-head">
+  <span class="mn">10</span>
+  <h3>The Glass Peaks</h3>
+  <span class="rename">draft 3 renames this to The Hollow Colossus</span>
+</div>
+<p class="blurb">Mountains that ring when the wind crosses them.</p>
+<div class="scroll"><table>
+<tr><th class="n">#</th><th>Scene</th><th>Biome</th><th>Boss</th><th class="st">Backdrop</th></tr>
+<tr>
+  <td class="n">1</td>
+  <td>The First Shelf</td>
+  <td class="k">stone</td>
+  <td class="say">The Scatterer</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">2</td>
+  <td>Strider Gap</td>
+  <td class="k">stone</td>
+  <td class="say">Longlegs</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">3</td>
+  <td>The Thread Span</td>
+  <td class="k">stone</td>
+  <td class="say">The Spinner</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">4</td>
+  <td>Ram Ledge</td>
+  <td class="k">stone</td>
+  <td class="say">The White Ram</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">5</td>
+  <td>The Core Vent</td>
+  <td class="k">char</td>
+  <td class="say">The Tender</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">6</td>
+  <td>Moth Hollow</td>
+  <td class="k">glow</td>
+  <td class="say">The Facet Queen</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">7</td>
+  <td>The Sentinel Stair</td>
+  <td class="k">stone</td>
+  <td class="say">The Tall Glass</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">8</td>
+  <td>Warden Summit</td>
+  <td class="k">stone</td>
+  <td class="say">The First Warden</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">9</td>
+  <td>The Hawk Face</td>
+  <td class="k">stone</td>
+  <td class="say">The Shard Hawk</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">10</td>
+  <td>Silk Crevasse</td>
+  <td class="k">stone</td>
+  <td class="say">The Lurker</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">11</td>
+  <td>The Goat Path</td>
+  <td class="k">stone</td>
+  <td class="say">The Elder Goat</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">12</td>
+  <td>Spectrum Summit</td>
+  <td class="k">glow</td>
+  <td class="say">The Spectral</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+</table></div>
+</section>
+<section class="map">
+<div class="map-head">
+  <span class="mn">11</span>
+  <h3>The Rotgarden</h3>
+  <span class="rename">draft 3 renames this to The Cloudshelf</span>
+</div>
+<p class="blurb">Somebody planted all of this. It got out.</p>
+<div class="scroll"><table>
+<tr><th class="n">#</th><th>Scene</th><th>Biome</th><th>Boss</th><th class="st">Backdrop</th></tr>
+<tr>
+  <td class="n">1</td>
+  <td>The Hedge Gate</td>
+  <td class="k">bramble</td>
+  <td class="say">The First Hedge</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">2</td>
+  <td>The Stem Rows</td>
+  <td class="k">bramble</td>
+  <td class="say">The Tall Stem</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">3</td>
+  <td>Creeper Walk</td>
+  <td class="k">moss</td>
+  <td class="say">The Long Creeper</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">4</td>
+  <td>The Husk Beds</td>
+  <td class="k">field</td>
+  <td class="say">The Husk King</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">5</td>
+  <td>The Fever House</td>
+  <td class="k">glow</td>
+  <td class="say">The Bloom Mother</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">6</td>
+  <td>The Lantern Rows</td>
+  <td class="k">glow</td>
+  <td class="say">The Spore Crown</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">7</td>
+  <td>The Canker Orchard</td>
+  <td class="k">char</td>
+  <td class="say">The Cankered</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">8</td>
+  <td>The Seed Vault</td>
+  <td class="k">stone</td>
+  <td class="say">The Seed Warden</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">9</td>
+  <td>The Bramble Maze</td>
+  <td class="k">bramble</td>
+  <td class="say">The Maze Heart</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">10</td>
+  <td>The Thread Floor</td>
+  <td class="k">burrow</td>
+  <td class="say">The Mat</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">11</td>
+  <td>The Moth Arbour</td>
+  <td class="k">heart</td>
+  <td class="say">The Blight Moth</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">12</td>
+  <td>The Gardener Plot</td>
+  <td class="k">heart</td>
+  <td class="say">The Gardener</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+</table></div>
+</section>
+<section class="map">
+<div class="map-head">
+  <span class="mn">12</span>
+  <h3>The Starfall Rim</h3>
+  
+</div>
+<p class="blurb">The edge of the map, where things land that were never up there.</p>
+<div class="scroll"><table>
+<tr><th class="n">#</th><th>Scene</th><th>Biome</th><th>Boss</th><th class="st">Backdrop</th></tr>
+<tr>
+  <td class="n">1</td>
+  <td>First Fall</td>
+  <td class="k">char</td>
+  <td class="say">The First Stone</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">2</td>
+  <td>The Void Steps</td>
+  <td class="k">stone</td>
+  <td class="say">The Walker</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">3</td>
+  <td>Comet Run</td>
+  <td class="k">char</td>
+  <td class="say">The Long Tail</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">4</td>
+  <td>Nightside</td>
+  <td class="k">burrow</td>
+  <td class="say">The Pack of Night</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">5</td>
+  <td>Cinder Fall</td>
+  <td class="k">char</td>
+  <td class="say">The Sun Cinder</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">6</td>
+  <td>Drift Reach</td>
+  <td class="k">glow</td>
+  <td class="say">The Ancient Light</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">7</td>
+  <td>Iron Fall</td>
+  <td class="k">stone</td>
+  <td class="say">The Iron Hulk</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">8</td>
+  <td>The Warden Rim</td>
+  <td class="k">stone</td>
+  <td class="say">The Rim Warden</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">9</td>
+  <td>The Glass Rainfall</td>
+  <td class="k">stone</td>
+  <td class="say">The Shower</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">10</td>
+  <td>The Hanging Cords</td>
+  <td class="k">glow</td>
+  <td class="say">The Hanger</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">11</td>
+  <td>The Umbra Waste</td>
+  <td class="k">burrow</td>
+  <td class="say">The Shadowless</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+<tr>
+  <td class="n">12</td>
+  <td>The Landing</td>
+  <td class="k">glow</td>
+  <td class="say">The Fallen</td>
+  <td class="st"><span class="no">unmade</span></td>
+</tr>
+</table></div>
+</section>
+
+<footer>
+<p class="meta">Generated by <code>scripts/sheet-unmade.mjs</code> ·
+<code>MAPS_BUILT = 7</code> ·
+slab art missing: clockwork ·
+chart symbols missing: node-cogwork.webp</p>
+</footer>
+
+</div>

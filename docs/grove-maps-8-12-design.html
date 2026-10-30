@@ -956,7 +956,8 @@ $40/1M output tokens.</p>
 <tr><td>Bosses</td><td class="n">12</td><td class="n">60</td><td class="n">$0.0422</td><td class="n">$2.53</td></tr>
 <tr><td>Parts</td><td class="n">12</td><td class="n">60</td><td class="n">$0.0422</td><td class="n">$2.53</td></tr>
 <tr><td>NPCs (3 + marshal)</td><td class="n">4</td><td class="n">20</td><td class="n">$0.0422</td><td class="n">$0.84</td></tr>
-<tr><td>Foods <span class="meta">(4 a map, not 1 &mdash; draft 2 undercounted these)</span></td><td class="n">4</td><td class="n">20</td><td class="n">$0.0422</td><td class="n">$0.84</td></tr>
+<tr><td>Ledge slabs <span class="meta">(one per new biome)</span></td><td class="n">1</td><td class="n">5</td><td class="n">$0.0627</td><td class="n">$0.31</td></tr>
+<tr><td>Foods <span class="meta">(borrowed &mdash; see the correction below)</span></td><td class="n">0</td><td class="n">0</td><td class="n">&mdash;</td><td class="n">$0.00</td></tr>
 <tr><td>Tool sprites for the three renamed maps</td><td class="n">12</td><td class="n">36</td><td class="n">$0.0422</td><td class="n">$1.52</td></tr>
 <tr><td>Rare spawns</td><td class="n">1</td><td class="n">5</td><td class="n">$0.0422</td><td class="n">$0.21</td></tr>
 <tr><td>Card shelf frames</td><td class="n">1</td><td class="n">5</td><td class="n">$0.0422</td><td class="n">$0.21</td></tr>
@@ -964,17 +965,30 @@ $40/1M output tokens.</p>
 <tr><td>Node symbols <span class="meta">(5 new biomes)</span></td><td class="n">1</td><td class="n">5</td><td class="n">$0.0422</td><td class="n">$0.21</td></tr>
 <tr><td>Charms <span class="meta">(art is keyed by stat; all 3 exist)</span></td><td class="n">0</td><td class="n">0</td><td class="n">&mdash;</td><td class="n">$0.00</td></tr>
 <tfoot>
-<tr><td>Subtotal</td><td class="n"></td><td class="n">336</td><td></td><td class="n">$15.39</td></tr>
-<tr><td>Plus rejects &amp; retries, ~25%</td><td></td><td></td><td></td><td class="n">$3.85</td></tr>
-<tr><td><b>Expected total</b></td><td></td><td></td><td></td><td class="n"><b>≈ $19.24</b></td></tr>
+<tr><td>Subtotal</td><td class="n"></td><td class="n">321</td><td></td><td class="n">$14.86</td></tr>
+<tr><td>Plus rejects &amp; retries, ~25%</td><td></td><td></td><td></td><td class="n">$3.72</td></tr>
+<tr><td><b>Expected total</b></td><td></td><td></td><td></td><td class="n"><b>≈ $18.58</b></td></tr>
 </tfoot>
 </table></div>
-<p class="meta">Up $2.44 on draft 2, and both increases are corrections rather than new scope: four foods a
-map instead of one, and the 36 tool sprites the renames invalidate. <b>Tier VIII&ndash;XII sprites for the
-two maps that keep their names are already drawn</b> and cost nothing.</p>
+<div class="note">
+<p><b>⚠️ Corrected 2026-10-30, and the correction was to my own correction.</b> Draft 3 added twenty food
+images here, on the reading that food art is keyed per recipe. It is not. <code>MAP_FOODS</code> sets
+<code>art</code> to <i>map one's picture for the heal tier</i>, so a deep map's draught wears the Heartwood
+Draught's face and <b>the foods for maps 8&ndash;12 cost nothing at all</b>. The 24 generated foods already
+live on maps 2&ndash;7 have been borrowing that way the whole time.</p>
+<p style="margin-bottom:0">Two more families are borrowed the same way and are also $0: <b>charms</b> (art is
+keyed by the stat a charm bends &mdash; all three exist) and <b>boss emblem seals</b>
+(<code>emblemArt()</code> returns null for a boss emblem and falls through to the boss's own sprite). What
+the renames genuinely add is the <b>ledge slab per new biome</b>, which nobody had counted:
+<code>grove-maps-remaining.md</code> banked on every zone reusing one of map one's ten biomes. The full
+inventory is at <code>docs/grove-unmade.html</code>.</p>
+</div>
+<p class="meta">Net $0.66 <i>below</i> draft 3's first quote, not above it: twenty food images out, five slabs
+in, and the 36 tool sprites the renames invalidate stay. <b>Tier VIII&ndash;XII sprites for the two maps that
+keep their names are already drawn</b> and cost nothing.</p>
 <div class="note">
 <p style="margin:0"><b>How it would actually be spent.</b> Three images per run, in the foreground, on a
-contact sheet, every time &mdash; so this is roughly <b>112 runs</b> and you see every one before the next.
+contact sheet, every time &mdash; so this is roughly <b>107 runs</b> and you see every one before the next.
 At any point the answer can be “stop”, and the maps already generated stay playable because
 <code>MAPS_BUILT</code> gates them one at a time. Nothing is generated at <code>high</code>, ever.</p>
 </div>
