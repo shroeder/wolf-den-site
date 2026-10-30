@@ -1,0 +1,394 @@
+<title>Grove Art, Drawn and Not</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#f3f1e8;--surface:#fcfaf3;--sunk:#e7e3d5;--ink:#1f1d17;--muted:#696354;
+      --faint:#8d8676;--line:#dcd7c7;--rule:#c4bda9;--accent:#7a5a2e;--no:#9a3a28;
+      --shadow:0 1px 2px rgba(31,29,23,.05),0 8px 22px rgba(31,29,23,.05)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
+      --bg:#121108;--surface:#1a190f;--sunk:#15140b;--ink:#eae4d2;--muted:#9c9482;
+      --faint:#7c7563;--line:#2c2a1c;--rule:#3c3926;--accent:#d9a861;--no:#f09078;
+      --shadow:0 1px 2px rgba(0,0,0,.5),0 10px 28px rgba(0,0,0,.4)}}
+:root[data-theme="dark"]{--bg:#121108;--surface:#1a190f;--sunk:#15140b;--ink:#eae4d2;
+      --muted:#9c9482;--faint:#7c7563;--line:#2c2a1c;--rule:#3c3926;--accent:#d9a861;
+      --no:#f09078;--shadow:0 1px 2px rgba(0,0,0,.5),0 10px 28px rgba(0,0,0,.4)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+     font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;font-size:16px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding:34px 20px 90px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.22em;
+         text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+h1{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:clamp(2.2rem,7vw,3.4rem);
+   line-height:1.02;letter-spacing:-.024em;margin:0 0 14px;text-wrap:balance}
+h2{font-family:Fraunces,Georgia,serif;font-weight:700;font-size:clamp(1.5rem,4.4vw,2rem);
+   margin:0 0 6px;text-wrap:balance}
+h3{font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:500;letter-spacing:.2em;
+   text-transform:uppercase;color:var(--faint);margin:30px 0 4px}
+h4{font-family:Fraunces,Georgia,serif;font-size:1rem;font-weight:700;margin:0 0 4px;line-height:1.2}
+p{margin:0 0 13px;max-width:66ch}
+.lede{font-size:1.05rem;color:var(--muted);max-width:60ch}
+.lede b{color:var(--ink);font-weight:600}
+.bl{color:var(--muted);font-size:.9rem;margin:0 0 14px;max-width:70ch}
+code{font-family:"IBM Plex Mono",monospace;font-size:.84em;background:var(--sunk);
+     border:1px solid var(--line);border-radius:3px;padding:.5px 5px}
+.rule{height:6px;margin:36px 0 28px;border:0;
+      background:repeating-linear-gradient(90deg,var(--rule) 0 2px,transparent 2px 10px)}
+.warn{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--no);
+      border-radius:8px;padding:15px 17px;margin:0 0 22px}
+.warn p:last-child{margin:0}
+.g{display:grid;gap:13px;grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}
+.g.scenes{grid-template-columns:repeat(auto-fill,minmax(268px,1fr))}
+.c{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;
+   overflow:hidden;box-shadow:var(--shadow)}
+.c img{display:block;width:100%;height:auto;background:var(--sunk)}
+.hole{aspect-ratio:1;display:grid;place-items:center;background:var(--sunk);
+      font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--no);
+      text-transform:uppercase;letter-spacing:.1em}
+figcaption{padding:10px 12px 12px}
+.sl{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.15em;
+    text-transform:uppercase;color:var(--faint);margin:0 0 2px}
+.now{font-size:.78rem;color:var(--muted);margin:0;line-height:1.4}
+.meta{font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--faint)}
+footer{margin-top:40px}
+</style>
+<div class="wrap">
+
+<p class="eyebrow">The Wolf Den · Grove · Art</p>
+<h1>Actual sprites</h1>
+<p class="lede">You asked twice and I kept sending tables. Here are the pictures:
+<b>map 8's twelve</b>, and then <b>map 7 drawn in full</b> &mdash; 48 sprites, which is exactly
+what map 8 would be if it were drawn.</p>
+
+<hr class="rule">
+
+<h2>Map 8 has twelve pictures</h2>
+<p>That is all of it. Every one is a tool rung at tier VIII.</p>
+<div class="warn">
+<p>⚠️ <b>All twelve were drawn from The Thunder Steppe</b> &mdash; horn, hide, horsehair and
+lightning-glass. Map 8 is now The Clockwork Deep, made of brass, chain, felt and lead.</p>
+<p>Nothing broke, which is the problem: tool art is keyed
+<code>tool-&lt;slot&gt;-t&lt;tier&gt;.webp</code> with no map in the filename, so all twelve still
+resolve. The line under each picture is what its recipe asks for <i>now</i>. Compare it to the
+picture.</p>
+</div>
+<div class="g">
+<figure class="c">
+  <img src="img/tool-rod-t8.webp" alt="The Ratchet Rod" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">rod</p><h4>The Ratchet Rod</h4>
+  <p class="now">Piston Rod · Chain Link · The Escapement</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-pick-t8.webp" alt="The Shearhead" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">pick</p><h4>The Shearhead</h4>
+  <p class="now">Shear Plate · Piston Rod · Bellows Skin</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-shovel-t8.webp" alt="The Ballast Spade" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">shovel</p><h4>The Ballast Spade</h4>
+  <p class="now">Brass Burr · Ballast Weight · Wire Wrap</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-hammer-t8.webp" alt="The Drop Forge" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">hammer</p><h4>The Drop Forge</h4>
+  <p class="now">Ballast Weight · Furnace Coal · Piston Rod</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-hoe-t8.webp" alt="The Harrow Chain" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">hoe</p><h4>The Harrow Chain</h4>
+  <p class="now">Shear Plate · Chain Link · Gasket Felt</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-sextant-t8.webp" alt="The Dial Sextant" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">sextant</p><h4>The Dial Sextant</h4>
+  <p class="now">Dial Glass · The Escapement · Ballast Weight</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-knife-t8.webp" alt="The Burr Knife" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">knife</p><h4>The Burr Knife</h4>
+  <p class="now">Brass Burr · Piston Rod · Wire Wrap</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-collar-t8.webp" alt="The Timed Collar" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">collar</p><h4>The Timed Collar</h4>
+  <p class="now">Wire Wrap · Bellows Skin · The Escapement</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-lantern-t8.webp" alt="The Filament Lamp" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">lantern</p><h4>The Filament Lamp</h4>
+  <p class="now">Filament Coil · Furnace Coal · Chain Link</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-loupe-t8.webp" alt="The Gauge Loupe" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">loupe</p><h4>The Gauge Loupe</h4>
+  <p class="now">Ballast Weight · Dial Glass · Brass Burr</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-banner-t8.webp" alt="The Oil Standard" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">banner</p><h4>The Oil Standard</h4>
+  <p class="now">Piston Rod · Gasket Felt · Furnace Coal</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/tool-horn-t8.webp" alt="The Bellows Horn" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">horn</p><h4>The Bellows Horn</h4>
+  <p class="now">Furnace Coal · Ballast Weight · Bellows Skin</p></figcaption>
+</figure>
+</div>
+
+<hr class="rule">
+
+<h2>Map 7, drawn</h2>
+<p>The Ashen Reach is the last map that got its art. This is the whole shape of a finished map, and
+map 8 needs all 48 of it: twelve scenes, twelve residents, twelve bosses, twelve materials.</p>
+
+<h3>The twelve scenes</h3>
+<p class="bl">Each one is a backdrop at 1536&times;1024, its own roster and its own boss. Map 8's twelve scenes are named, costed and blank.</p>
+<div class="g scenes">
+<figure class="c wide">
+  <img src="img/zone-glass_barrens.webp" alt="The Glass Barrens" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">1 · char</p><h4>The Glass Barrens</h4>
+  <p class="now">The Shard King</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-bone_kilns.webp" alt="The Bone Kilns" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">2 · char</p><h4>The Bone Kilns</h4>
+  <p class="now">The Great Kiln</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-wirewood_stand.webp" alt="The Wirewood Stand" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">3 · char</p><h4>The Wirewood Stand</h4>
+  <p class="now">The Old Reach</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-boar_run.webp" alt="The Boar Run" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">4 · char</p><h4>The Boar Run</h4>
+  <p class="now">The Tusked</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-ember_drift.webp" alt="The Ember Drift" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">5 · char</p><h4>The Ember Drift</h4>
+  <p class="now">The Drifting Fire</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-opal_hollow.webp" alt="Opal Hollow" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">6 · glow</p><h4>Opal Hollow</h4>
+  <p class="now">The Opal Queen</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-basalt_steps.webp" alt="The Basalt Steps" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">7 · stone</p><h4>The Basalt Steps</h4>
+  <p class="now">The Column</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-vent_fields.webp" alt="The Vent Fields" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">8 · stone</p><h4>The Vent Fields</h4>
+  <p class="now">The Firstborn</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-shrike_cliffs.webp" alt="The Shrike Cliffs" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">9 · stone</p><h4>The Shrike Cliffs</h4>
+  <p class="now">The Glass Shrike</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-slag_run.webp" alt="The Slag Run" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">10 · char</p><h4>The Slag Run</h4>
+  <p class="now">The Slagmother</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-sootfall.webp" alt="Sootfall" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">11 · char</p><h4>Sootfall</h4>
+  <p class="now">The Black</p></figcaption>
+</figure>
+<figure class="c wide">
+  <img src="img/zone-forgeheart.webp" alt="Forgeheart" loading="lazy" width="768" height="512">
+  <figcaption><p class="sl">12 · glow</p><h4>Forgeheart</h4>
+  <p class="now">The Forge Wraith</p></figcaption>
+</figure>
+</div>
+<h3>The twelve residents</h3>
+<p class="bl">One creature per scene. Map 8's twelve are written &mdash; Tick Mite, Piston Hound, Arc Coil, Gauge Watcher &mdash; and none are drawn.</p>
+<div class="g ">
+<figure class="c">
+  <img src="img/foe-glass_crawler.webp" alt="Glass Crawler" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">swarm</p><h4>Glass Crawler</h4>
+  <p class="now">Sheds obsidian as it moves, and the shed bits cut.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-bone_kiln.webp" alt="Bone Kiln" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">brute</p><h4>Bone Kiln</h4>
+  <p class="now">Hollow, hot, and something is burning inside it.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-wirewood.webp" alt="Wirewood" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">stalker</p><h4>Wirewood</h4>
+  <p class="now">A stump until it is a reach.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-cinder_boar.webp" alt="Cinder Boar" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">brute</p><h4>Cinder Boar</h4>
+  <p class="now">Charges through fire because fire is not its problem.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-ember_wisp.webp" alt="Ember Wisp" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">caster</p><h4>Ember Wisp</h4>
+  <p class="now">Drifts, lands, and the landing is the attack.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-opal_moth.webp" alt="Opal Moth" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">caster</p><h4>Opal Moth</h4>
+  <p class="now">Beautiful. Sets things alight by resting on them.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-basalt_golem.webp" alt="Basalt Golem" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">brute</p><h4>Basalt Golem</h4>
+  <p class="now">Cooled on the outside only.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-salamander.webp" alt="Reach Salamander" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">striker</p><h4>Reach Salamander</h4>
+  <p class="now">Lives in the vent and comes out when it cools.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-ashglass_shrike.webp" alt="Ashglass Shrike" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">striker</p><h4>Ashglass Shrike</h4>
+  <p class="now">Dives, and it is made of broken glass.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-slag_crawler.webp" alt="Slag Crawler" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">grazer</p><h4>Slag Crawler</h4>
+  <p class="now">Eats the runoff. Leaves a trail you can follow.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-sootback.webp" alt="Sootback" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">stalker</p><h4>Sootback</h4>
+  <p class="now">Invisible against every surface in this map.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/foe-forge_wraith.webp" alt="Forge Wraith" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">caster</p><h4>Forge Wraith</h4>
+  <p class="now">What is left of somebody who worked the fire too long.</p></figcaption>
+</figure>
+</div>
+<h3>The twelve bosses</h3>
+<p class="bl">One per scene, back up every thirty minutes.</p>
+<div class="g ">
+<figure class="c">
+  <img src="img/boss-the_shard_king.webp" alt="The Shard King" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">The Glass Barrens</p><h4>The Shard King</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_great_kiln.webp" alt="The Great Kiln" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">The Bone Kilns</p><h4>The Great Kiln</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_old_reach.webp" alt="The Old Reach" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">The Wirewood Stand</p><h4>The Old Reach</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_tusked.webp" alt="The Tusked" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">The Boar Run</p><h4>The Tusked</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_drifting_fire.webp" alt="The Drifting Fire" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">The Ember Drift</p><h4>The Drifting Fire</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_opal_queen.webp" alt="The Opal Queen" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">Opal Hollow</p><h4>The Opal Queen</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_column.webp" alt="The Column" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">The Basalt Steps</p><h4>The Column</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_firstborn.webp" alt="The Firstborn" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">The Vent Fields</p><h4>The Firstborn</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_glass_shrike.webp" alt="The Glass Shrike" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">The Shrike Cliffs</p><h4>The Glass Shrike</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_slagmother.webp" alt="The Slagmother" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">The Slag Run</p><h4>The Slagmother</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_black.webp" alt="The Black" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">Sootfall</p><h4>The Black</h4></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/boss-the_forge_wraith.webp" alt="The Forge Wraith" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">Forgeheart</p><h4>The Forge Wraith</h4></figcaption>
+</figure>
+</div>
+<h3>The twelve materials</h3>
+<p class="bl">Every one is in at least one recipe. Map 8's twelve now feed seventeen authored craftables.</p>
+<div class="g ">
+<figure class="c">
+  <img src="img/part-obsidian_flake.webp" alt="Obsidian Flake" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">edge</p><h4>Obsidian Flake</h4>
+  <p class="now">The sharpest edge there is, for about four swings.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-scorched_bone.webp" alt="Scorched Bone" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">haft</p><h4>Scorched Bone</h4>
+  <p class="now">Fire-hardened by accident, kept on purpose.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-wire_root.webp" alt="Wire Root" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">bind</p><h4>Wire Root</h4>
+  <p class="now">What is left of a tree that would not let go.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-cinder_hide.webp" alt="Cinder Hide" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">hide</p><h4>Cinder Hide</h4>
+  <p class="now">Will not take a spark. Nothing here does twice.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-live_ember.webp" alt="Live Ember" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">ember</p><h4>Live Ember</h4>
+  <p class="now">Still going, and has been since before the map.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-fire_opal.webp" alt="Fire Opal" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">glow</p><h4>Fire Opal</h4>
+  <p class="now">Holds a flame it was never shown.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-basalt_core.webp" alt="Basalt Core" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">stone</p><h4>Basalt Core</h4>
+  <p class="now">The shape a bubble leaves when rock sets around it.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-salamander_eye.webp" alt="Salamander Eye" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">charm</p><h4>Salamander Eye</h4>
+  <p class="now">Cold to the touch, in all of this.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-ash_glass.webp" alt="Ash Glass" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">edge</p><h4>Ash Glass</h4>
+  <p class="now">Lightning hit the ash. This is what it left.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-slag_cord.webp" alt="Slag Cord" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">bind</p><h4>Slag Cord</h4>
+  <p class="now">Drawn out of the runoff while it was still soft.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-soot_pelt.webp" alt="Soot Pelt" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">hide</p><h4>Soot Pelt</h4>
+  <p class="now">Black to the root. It was not always.</p></figcaption>
+</figure>
+<figure class="c">
+  <img src="img/part-forge_light.webp" alt="Forge Light" loading="lazy" width="512" height="512">
+  <figcaption><p class="sl">glow</p><h4>Forge Light</h4>
+  <p class="now">The glow a smith works by, prised out of the coal.</p></figcaption>
+</figure>
+</div>
+
+<footer>
+<hr class="rule">
+<p class="meta">Generated by <code>scripts/sheet-grove-art.mjs</code> ·
+60 sprites, served as files rather than inlined ·
+<code>MAPS_BUILT = 7</code></p>
+</footer>
+
+</div>
