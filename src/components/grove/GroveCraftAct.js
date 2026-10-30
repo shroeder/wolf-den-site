@@ -74,6 +74,9 @@ const SET_WORD = {
 export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose }) {
     const [stage, setStage] = useState(STAGE.fire);
     const [taps, setTaps] = useState(0);
+    // ⚠️ THE CLOCK READS THE TAPS FROM HERE, NOT FROM THE STATE. See the heat clock below: taking `taps`
+    // as a dependency is what let a player pump the bellows forever.
+    const tapsRef = useRef(0);
     const [heatLeft, setHeatLeft] = useState(HEAT_MS);
     const [marker, setMarker] = useState(0);
     const [hits, setHits] = useState([]);
@@ -151,8 +154,24 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         return () => clearTimeout(t);
     }, [stage, countIn]);
 
+    // ── ⚠️ `taps` WAS A DEPENDENCY OF THIS EFFECT, AND THAT IS THE WHOLE BUG ────────────────────────
+    // Luke: "the bellows, like you can just tap forever, it resets the timer, so you can literally tap to
+    // infinity. And I think the intention there was for it to be a timed thing... it should never refresh
+    // the timer when they tap, because that's the whole point of the tapping minigame."
+    //
+    // Every pump changed `taps`, React tore the effect down and re-ran it, and `t0 = performance.now()`
+    // started the countdown again. So the harder you played the longer you got, and the one stage in the
+    // craft with a fail state had none — the bar never emptied while a thumb was moving.
+    //
+    // It was a dependency for an honest reason: the `left <= 0` branch grades the round with
+    // heatScore(taps) and a closure over stale state would have scored zero. The fix is the ref, not the
+    // dependency — the clock must be armed exactly once per round and never hear about a tap again.
+    //
+    // ⚠️ DO NOT ADD `taps` BACK TO SATISFY A LINT RULE. exhaustive-deps is right about almost everything
+    // and wrong about a timer; the dependency it wants is the defect.
     useEffect(() => {
         if (stage !== STAGE.fire || countIn != null) return undefined;
+        tapsRef.current = 0;
         const t0 = performance.now();
         const tick = () => {
             const left = Math.max(0, HEAT_MS - Math.max(0, performance.now() - t0));
@@ -164,12 +183,12 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                 // you had pumped it to temperature or half-filled it was never stated, so there was
                 // nothing to do better next time. The word is graded off the same heatScore the
                 // plinko scatter is, so it cannot flatter you.
-                const h = heatScore(taps);
+                const h = heatScore(tapsRef.current);
                 const g = h >= 0.99 ? { id: "perfect", word: "WHITE HOT" }
                     : h >= 0.75 ? { id: "hit", word: "HOT ENOUGH" }
                     : h >= 0.4 ? { id: "ok", word: "WARM" }
                     : { id: "miss", word: "COLD" };
-                setStageSay({ ...g, sub: `${taps} pumps`, at: "fire" });
+                setStageSay({ ...g, sub: `${tapsRef.current} pumps`, at: "fire" });
                 Haptic.fire(g.id === "perfect" ? [0, 26, 40, 26, 40, 60] : g.id === "miss" ? [0, 90] : [0, 30, 50, 20]);
                 setStage(STAGE.shaping);
                 setArmedAt(performance.now() + HAND_OFF_MS);
@@ -180,7 +199,7 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         };
         raf.current = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf.current);
-    }, [stage, countIn, taps]);
+    }, [stage, countIn]);
 
     // ── ⚠️ THE MARKER WAITS FOR THE HAND-OFF, AND SO DOES THE ANVIL ─────────────────────────────────
     // Parking the marker rather than only ignoring the tap is the half that makes it fair: a window
@@ -244,7 +263,7 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
 
     const tapHeat = useCallback(() => {
         if (stage !== STAGE.fire) return;
-        setTaps((n) => { playHit(Math.min(7, Math.floor((n / HEAT_TARGET) * 8))); return n + 1; });
+        setTaps((n) => { playHit(Math.min(7, Math.floor((n / HEAT_TARGET) * 8))); tapsRef.current = n + 1; return n + 1; });
     }, [stage]);
 
     // ⚠️ THE SIDE EFFECTS SIT OUTSIDE THE UPDATER. Advancing the stage from inside setHits(prev => ...) ran

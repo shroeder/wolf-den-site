@@ -98,6 +98,29 @@ A countdown into the round, not a paragraph. See `teach-by-showing-not-telling`.
 > *"when they're tapping, like there's no feedback. There needs to be visual feedback, like sparks and
 > flames flying around and stuff."*
 
+### J. ⚠️ "Craft 10" skips the minigame entirely
+> *"when people do craft 10, it just skips the entire minigame, and also they should be able to craft a
+> selected amount up to the max quantity of ingredients that they have, but it should always do the
+> minigame."*
+
+Two things in one: the batch path (`craftAll` in `GroveBench`) bypasses `GroveCraftAct` altogether, and the
+batch size is a fixed button rather than **a chosen amount up to what the ingredients allow**. The minigame
+must run either way.
+
+### K. Inventory ↔ crafting has to be traversable, the way Cooking is
+> *"there has to be some linkage between your inventory and crafting, kind of like how cooking does it,
+> where you can see all the ingredients and bounce between linked ingredients and stuff. We have to create
+> some kind of connection to easily traverse between inventory and crafting."*
+
+Cooking is the reference implementation — go and read it before inventing anything.
+
+### L. Crafting has to show what you already own
+> *"we also need to be able to have some linkage between crafting and items you've already crafted to see
+> like what you currently possess and whether it's worth crafting that item again, what kind of quality you
+> have on the existing item."*
+
+A recipe row should answer: do I have this already, at what quality, and is a second one worth the parts.
+
 ---
 
 ## Rules these all sit under
