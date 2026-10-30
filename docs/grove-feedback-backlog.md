@@ -26,7 +26,8 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 | 10 | Bellows: a burst of embers on every pump, coloured by how hot the fire is (item I) | `(this)` |
 | 11 | Plinko: the rack is viewport-tall instead of a fixed 150px (item E) | `(this)` |
 | 12 | Plinko: a colourful ball falls, not the item, and the splash is 24 shards (item F) | `1fe97693` |
-| 13 | ⚠️ "Craft N" plays the act once and forges the whole batch against it (half of item J) | `(this)` |
+| 13 | ⚠️ "Craft N" plays the act once and forges the whole batch against it (half of item J) | `f33de06d` |
+| 14 | A batch stepper — pick any amount from 2 up to what the parts allow (the other half of J) | `(this)` |
 
 ---
 
@@ -117,9 +118,11 @@ Two things in one.
 against that performance. Each craft still re-seeds, so ten items roll ten bands — the performance shifts
 where the spread sits rather than stamping one landing ten times.
 
-**⚠️ The quantity half is NOT done.** The button still makes the MAXIMUM the ingredients allow, and Luke
-asked to pick *"a selected amount up to the max quantity of ingredients that they have."* It needs a stepper
-in a row that is already dense, so it wants a proper look at the layout rather than a control squeezed in.
+**The quantity half is DONE** (`14` above): a −/+ stepper around the make button, from 2 up to the live
+maximum, with the ceiling printed under it. The chosen number is deliberately NOT stored per row on mount —
+the max moves whenever a part is spent or picked up, so a stored copy would go stale and start disagreeing
+with the bag. Absent reads as "all of them", and any stored number is clamped against the live max on every
+render.
 
 ### K. Inventory ↔ crafting has to be traversable, the way Cooking is
 > *"there has to be some linkage between your inventory and crafting, kind of like how cooking does it,

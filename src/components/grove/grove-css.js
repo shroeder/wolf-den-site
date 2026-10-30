@@ -2669,6 +2669,29 @@ export const GROVE_CSS = `
     border: 1px solid rgba(207,227,198,0.28); white-space: nowrap; }
 .gv-rec-all:disabled { cursor: default; opacity: 0.6; }
 
+/* ── THE BATCH STEPPER ────────────────────────────────────────────────────────────────────────
+   Minus, the make button, plus, and the ceiling. Luke: "they should be able to craft a selected
+   amount up to the max quantity of ingredients that they have."
+
+   ⚠️ THE MIDDLE COLUMN IS 1fr AND THE STEPPERS ARE auto, so the row cannot grow when the number
+   inside it goes from 2 to 10 -- gv-rec-acts is the narrow third column of a three-column grid and
+   a button that widens with its label would push the artwork and the body around on every tap.
+
+   ⚠️ 30px TARGETS, NOT 20. These sit next to a primary action in a scrolling list on a phone, and a
+   stepper small enough to be elegant is a stepper that fires the craft button instead. */
+.gv-rec-qty { display: grid; grid-template-columns: auto 1fr auto; gap: 4px; align-items: center; }
+.gv-rec-qty > button:not(.gv-rec-all) { pointer-events: auto; cursor: pointer; font: inherit;
+    width: 30px; height: 30px; padding: 0; border-radius: 9px; line-height: 1;
+    font-size: 1rem; font-weight: 800;
+    color: #cfe3c6; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(207,227,198,0.28); }
+.gv-rec-qty > button:not(.gv-rec-all):disabled { cursor: default; opacity: 0.35; }
+.gv-rec-qty .gv-rec-all { padding-left: 6px; padding-right: 6px; }
+/* Spans all three columns so the ceiling sits under the control it belongs to rather than beside it. */
+.gv-rec-qty em { grid-column: 1 / -1; justify-self: center; font-style: normal;
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em;
+    color: rgba(207,227,198,0.55); }
+
 /* ── THE RESULT ───────────────────────────────────────────────────────────────────────────────
    Both halves of the trade on one card: what arrived, and underneath it what left. A toast can
    report a name; it can never report a cost, which is the thing a player needs to see to trust the

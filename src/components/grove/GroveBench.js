@@ -133,6 +133,13 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // The craft being played out, or null. Holds the recipe and whether it was tempered, because
     // both are needed when the act finally posts and the row underneath may have re-sorted by then.
     const [acting, setActing] = useState(null);
+    // ── ⚠️ HOW MANY THIS ROW WILL MAKE, AND ABSENT MEANS "ALL OF THEM" ──────────────────────────────
+    // Luke: "they should be able to craft a selected amount up to the max quantity of ingredients that
+    // they have." Keyed by recipe id and deliberately NOT seeded to the max for every row on mount: the
+    // max moves every time a part is spent or picked up, so a stored copy would go stale and start
+    // disagreeing with the parts actually in the bag. Undefined reads as the live maximum; a number only
+    // exists once the player has touched the stepper, and it is clamped against the live max on render.
+    const [qty, setQty] = useState({});
     // ⚠️ ITS OWN CARD, NOT THE CRAFT RESULT. An open and a craft pay different things and the open can
     // CHAIN -- "open another" has to leave the card standing while the thing underneath it changes.
     const [opened, setOpened] = useState(null);
@@ -669,14 +676,31 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     one" -- which made never playing the minigame the fastest way to
                                     make anything. Luke: "it should always do the minigame." One
                                     performance now forges the whole batch. */}
-                                {ready && batch >= 2 ? (
-                                    <button type="button" className="gv-rec-all"
-                                        disabled={busy === `all-${r.id}`}
-                                        title={`Play the hammer work once and make ${batch} against it`}
-                                        onClick={() => craftAll(r, batch)}>
-                                        {busy === `all-${r.id}` ? "…" : `All · ${batch}`}
-                                    </button>
-                                ) : null}
+                                {ready && batch >= 2 ? (() => {
+                                    // Clamped against the LIVE max on every render, so spending parts
+                                    // elsewhere can never leave this asking for more than the bag holds.
+                                    const n = Math.max(2, Math.min(batch, Number(qty[r.id]) || batch));
+                                    const set = (v) => setQty((q) => ({ ...q, [r.id]: Math.max(2, Math.min(batch, v)) }));
+                                    return (
+                                        <div className="gv-rec-qty">
+                                            <button type="button" aria-label={`Fewer — make ${Math.max(2, n - 1)}`}
+                                                disabled={n <= 2 || busy === `all-${r.id}`}
+                                                onClick={() => set(n - 1)}>&minus;</button>
+                                            <button type="button" className="gv-rec-all"
+                                                disabled={busy === `all-${r.id}`}
+                                                title={`Play the hammer work once and make ${n} against it`}
+                                                onClick={() => craftAll(r, n)}>
+                                                {busy === `all-${r.id}` ? "…" : `Make ${n}`}
+                                            </button>
+                                            <button type="button" aria-label={`More — make ${Math.min(batch, n + 1)}`}
+                                                disabled={n >= batch || busy === `all-${r.id}`}
+                                                onClick={() => set(n + 1)}>+</button>
+                                            {/* The ceiling, said once, where the decision is made. A
+                                                stepper with no top is a stepper you have to probe. */}
+                                            <em>of {batch}</em>
+                                        </div>
+                                    );
+                                })() : null}
                                 </div>
                             )}
                             </div>
