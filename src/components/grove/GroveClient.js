@@ -11,8 +11,14 @@ import {
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import {
-    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, emblemStars, emblemArt, groveArt, toolArt, zoneHasParts,
+    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, EMBLEM_STARS, emblemStars, emblemArt, emblemFace, groveArt, toolArt, zoneHasParts,
 } from "@/lib/marketplace/grove-catalog.js";
+// ── THE ORDER OF THE SHELF ────────────────────────────────────────────────────────────────────────
+// Catalog order, which is the order you meet the creatures: map one's thirteen, then one per map going
+// deeper. ⚠️ NOT sorted by what you own -- a shelf that reshuffles as you collect destroys the one thing
+// a collection screen is for, which is knowing where a given card LIVES and seeing its hole.
+const CARD_ORDER = Object.keys(GROVE_EMBLEMS);
+
 import { useWishlist } from "@/components/grove/useWishlist.js";
 import GroveBench from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
@@ -853,7 +859,7 @@ export default function GroveClient({ initial }) {
                             <button type="button" role="tab" aria-selected={embTab === "cards"}
                                 className={embTab === "cards" ? "is-on" : ""}
                                 onClick={() => setEmbTab("cards")}>
-                                Monster Cards<i>{(st.emblems || []).filter((e) => e.count > 0).length}</i>
+                                Monster Cards<i>{(st.emblems || []).filter((e) => e.count > 0).length}/{CARD_ORDER.length}</i>
                             </button>
                             <button type="button" role="tab" aria-selected={embTab === "armour"}
                                 className={embTab === "armour" ? "is-on" : ""}
@@ -909,7 +915,7 @@ export default function GroveClient({ initial }) {
 
                         {embTab === "cards" ? (
                         <Area id="emblems" icon="ui-emblems" title="Monster Cards"
-                            count={`${(st.emblems || []).filter((e) => e.slot != null).length}/3 worn`}>
+                            count={`${(st.emblems || []).filter((e) => e.count > 0).length}/${CARD_ORDER.length} found`}>
                         {/* ⚠️ NO CAPTION HERE. It read "Three may be worn. Three more are sealed." —
                             above three slots, under a header already counting "1/3 worn", with the
                             sealed ones drawn sealed. Three statements of the same fact and only one of
@@ -933,88 +939,121 @@ export default function GroveClient({ initial }) {
                             })}
                             {[3, 4, 5].map((s) => <div key={s} className="gv-eslot is-sealed"><span>sealed</span></div>)}
                         </div>
-                        <div className="gv-elist">
-                            {(st.emblems || []).filter((e) => e.count > 0).map((e) => {
-                                const meta = GROVE_EMBLEMS[e.id];
-                                const next = e.next;
-                                const face = emblemArt(e.id);
-                                return (
-                                    <div key={e.id} className={`gv-em${e.stars ? "" : " is-dormant"}`}>
-                                        {/* ── ⚠️ THE MONSTER, NOT A DASH ──────────────────────────────
-                                            Luke: "I want emblems to be the unique monster cards ... there
-                                            has to be like sprites associated with this stuff, because
-                                            otherwise I'm getting confused and we built it together."
+                        {/* -- ⚠️ THE CONCEPT, STATED. ------------------------------------------------------
+                            Luke: "Im also worried it will make people think its for the card game.
+                            Thats why I think we need to ensure people understand the concept of
+                            these." He is right and the old copy made it worse: an empty panel that
+                            said only "No emblems yet. They fall rarely" told a player nothing about
+                            what the thing IS, so the only clue left was the word on the tab -- which
+                            at the time was "Monster Cards", pointing straight at Spire.
 
-                                            Every emblem is named after a creature and every one of those
-                                            has been drawn — The Bristleback IS the badger. The panel was
-                                            showing a star count where the face should be, so a shelf of
-                                            collectibles read as a spreadsheet, which is most of why it was
-                                            being confused with the merits panel beneath it. The stars moved
-                                            onto the card as a corner, where a rung belongs. */}
-                                        <span className="gv-em-face"
-                                            style={{ "--rung": e.rung?.color || "#8d8577" }}>
-                                            {face ? <img src={face} alt="" width={46} height={46} loading="lazy" /> : null}
-                                            {e.stars ? (
-                                                <i style={{ color: e.rung?.color || "#8d8577" }}>{"★".repeat(e.stars)}</i>
+                            ⚠️ AND THE FIX IS NOT TO RENAME THEM. I read the sprites -- carved amulets
+                            on leather cords -- decided the art was the authority on what the object
+                            was, and renamed the whole feature to Trophies. Luke: "its supposed to be a
+                            card of the enemy you are collecting." The name was never the problem. The
+                            CARD never showed a monster, which is what made it look like a stray Spire
+                            card; it shows one now, and the amulet is its seal.
+
+                            So the disambiguation is done by saying it, here and on the card itself,
+                            rather than by giving the thing a different name than the one it has.
+
+                            ⚠️ THE EXPLANATION SHOWS WHETHER OR NOT YOU HAVE ANY. The empty state is
+                            the obvious place for it, but the player who most needs to be told these
+                            are not Spire cards is the one who just got their first and is looking at
+                            the panel to find out what they caught. */}
+                        <p className="gv-mc-what">
+                            One card for each kind of creature in the Grove, dealt by the creature
+                            itself &mdash; roughly one kill in four hundred leaves one. Carry three at
+                            a time and each one grants what that creature had.{" "}
+                            <b>These are not Spire cards</b> and they are never played; the deck and
+                            the collection have nothing to do with each other.
+                        </p>
+                        {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">None yet. Roughly one kill in four hundred leaves one behind.</p> : null}
+                        {/* ── ⚠️ THE WHOLE SET IS ON THE SHELF, OWNED OR NOT ──────────────────────────
+                            This used to list only the cards you already had, as rows of text with a 46px
+                            picture. Two things were wrong with that and they compound.
+
+                            A collection you cannot see the SHAPE of is not a collection. With only your
+                            own cards listed, a player with four of them has no idea whether that is four
+                            of six or four of forty, which creature is still missing, or that there is
+                            anything to complete at all. The empty slots are the thing that makes a set a
+                            set -- so every card in the game has a place here from the first time you open
+                            the panel, and the ones you have not found are black silhouettes.
+
+                            ⚠️ A SILHOUETTE STILL TELLS YOU WHICH MONSTER IT IS. That is the point of using
+                            the creature's own sprite at brightness(0) rather than a question mark: the
+                            outline of the stag's antlers or the moth's wings is recognisable, so a missing
+                            card is a specific animal you have not killed yet rather than an anonymous gap.
+                            A "?" box would have been easier and would have taught nothing.
+
+                            Luke: "the card display area needs to be gamified and way more endorphins with
+                            colors ... they should be silhoiete black if not possessed."
+
+                            The colour is not decoration either -- it is the rung. EMBLEM_STARS already
+                            carries one hex per rung (Worn grey, Marked green, Etched blue, Sealed violet,
+                            Crowned gold, Ascendant pink) and the panel was spending it on six characters
+                            of star text in the corner. Now the rung owns the whole card: border, glow,
+                            name, pips. Your shelf visibly changes colour as it levels, which is the only
+                            reward a collection screen can actually pay. */}
+                        <div className="gv-cgrid">
+                            {CARD_ORDER.map((id) => {
+                                const meta = GROVE_EMBLEMS[id];
+                                const e = (st.emblems || []).find((x) => x.id === id) || null;
+                                const count = e?.count || 0;
+                                const stars = e?.stars || 0;
+                                const rung = e?.rung || null;
+                                const next = e?.next || null;
+                                const have = count > 0;
+                                const worn = e && e.slot !== null && e.slot !== undefined;
+                                // ⚠️ THE BAR MEASURES THE RUNG YOU ARE IN, not the whole ladder. Against the
+                                // ladder every bar below Crowned sits near empty and reads as no progress at
+                                // all -- 22 of 250 is 9% when it is actually three-sixths of the way up.
+                                const floor = stars ? EMBLEM_STARS[stars - 1].at : 0;
+                                const pct = next ? Math.max(4, Math.round(((count - floor) / (next.at - floor)) * 100)) : 100;
+                                return (
+                                    <div key={id}
+                                        className={`gv-card${have ? "" : " is-locked"}${worn ? " is-worn" : ""}${stars >= 5 ? " is-high" : ""}`}
+                                        style={{ "--rung": rung?.color || "#6a6355" }}>
+                                        <span className="gv-card-win">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={emblemFace(id)} alt="" loading="lazy" />
+                                            {have && emblemArt(id) ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img className="gv-card-seal" src={emblemArt(id)} alt="" loading="lazy" />
                                             ) : null}
+                                            {worn ? <em className="gv-card-worn">Worn</em> : null}
                                         </span>
-                                        <div>
-                                            <b>{meta?.name || e.id}</b>
-                                            {/* ⚠️ A DORMANT EMBLEM SAYS WHAT IT NEEDS, NOT "+0". Below the
-                                                first rung an emblem pays nothing, and printing "+0 armour"
-                                                on a thing you are WEARING reads as broken rather than as
-                                                not-yet-earned. The number appears when there is one. */}
-                                            {e.stars ? (
-                                                <p>+{(meta?.per || 0) * e.stars}{meta?.kind === "pct" ? "%" : ""} {String(meta?.stat || "").replace(/_/g, " ")}
-                                                    {meta?.global ? <em> · everywhere</em> : null}</p>
-                                            ) : (
-                                                <p className="gv-em-dormant">
-                                                    {next ? `${next.at - e.count} more to wake its ${String(meta?.stat || "bonus").replace(/_/g, " ")}` : "not yet earning"}
-                                                </p>
-                                            )}
-                                            <small>{e.count} collected{next ? ` · ${next.at - e.count} to ${next.label}` : " · maxed"}</small>
-                                        </div>
-                                        <button type="button" disabled={e.slot !== null && e.slot !== undefined}
-                                            onClick={async () => {
-                                                const free = [0, 1, 2].find((s) => !(st.emblems || []).some((x) => x.slot === s));
-                                                await post({ action: "emblem", emblemId: e.id, slot: free ?? 0 });
+                                        {/* Six pips, always six, so the room left to grow is visible on a
+                                            one-star card instead of only on a maxed one. */}
+                                        <span className="gv-card-pips">
+                                            {[1, 2, 3, 4, 5, 6].map((n) => (
+                                                <i key={n} className={n <= stars ? "on" : ""}
+                                                    style={n <= stars ? { color: EMBLEM_STARS[n - 1].color } : undefined}>★</i>
+                                            ))}
+                                        </span>
+                                        <b>{have ? meta?.name || id : "· · ·"}</b>
+                                        {have && stars ? (
+                                            <u>+{(meta?.per || 0) * stars}{meta?.kind === "pct" ? "%" : ""}{" "}
+                                                {String(meta?.stat || "").replace(/_/g, " ")}</u>
+                                        ) : (
+                                            <u className="gv-card-none">
+                                                {have ? `${(next?.at || 3) - count} more to wake it` : "not found"}
+                                            </u>
+                                        )}
+                                        {have ? (
+                                            <span className="gv-card-bar"><i style={{ width: `${pct}%` }} /></span>
+                                        ) : <span className="gv-card-bar" />}
+                                        <small>{have ? `${count}${next ? ` / ${next.at}` : " · maxed"}` : ""}</small>
+                                        {have && !worn ? (
+                                            <button type="button" onClick={async () => {
+                                                const free = [0, 1, 2].find((sl) => !(st.emblems || []).some((x) => x.slot === sl));
+                                                await post({ action: "emblem", emblemId: id, slot: free ?? 0 });
                                                 refresh();
-                                            }}>
-                                            {e.slot !== null && e.slot !== undefined ? "Worn" : "Wear"}
-                                        </button>
+                                            }}>Wear</button>
+                                        ) : null}
                                     </div>
                                 );
                             })}
-                            {/* -- ⚠️ THE CONCEPT, STATED. ------------------------------------------------------
-                                Luke: "Im also worried it will make people think its for the card game.
-                                Thats why I think we need to ensure people understand the concept of
-                                these." He is right and the old copy made it worse: an empty panel that
-                                said only "No emblems yet. They fall rarely" told a player nothing about
-                                what the thing IS, so the only clue left was the word on the tab -- which
-                                at the time was "Monster Cards", pointing straight at Spire.
-
-                                ⚠️ AND THE FIX IS NOT TO RENAME THEM. I read the sprites -- carved amulets
-                                on leather cords -- decided the art was the authority on what the object
-                                was, and renamed the whole feature to Trophies. Luke: "its supposed to be a
-                                card of the enemy you are collecting." The name was never the problem. The
-                                CARD never showed a monster, which is what made it look like a stray Spire
-                                card; it shows one now, and the amulet is its seal.
-
-                                So the disambiguation is done by saying it, here and on the card itself,
-                                rather than by giving the thing a different name than the one it has.
-
-                                ⚠️ THE EXPLANATION SHOWS WHETHER OR NOT YOU HAVE ANY. The empty state is
-                                the obvious place for it, but the player who most needs to be told these
-                                are not Spire cards is the one who just got their first and is looking at
-                                the panel to find out what they caught. */}
-                            <p className="gv-mc-what">
-                                One card for each kind of creature in the Grove, dealt by the creature
-                                itself &mdash; roughly one kill in four hundred leaves one. Carry three at
-                                a time and each one grants what that creature had.{" "}
-                                <b>These are not Spire cards</b> and they are never played; the deck and
-                                the collection have nothing to do with each other.
-                            </p>
-                            {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">None yet. Roughly one kill in four hundred leaves one behind.</p> : null}
                         </div>
                         </Area>
                         ) : null}

@@ -3861,4 +3861,87 @@ export const GROVE_CSS = `
     background: rgba(255,196,96,0.07); border: 1px solid rgba(255,196,96,0.22);
     font-size: 0.82rem; line-height: 1.5; color: #d8cdb8; }
 .gv-mc-what b { color: #ffd98f; }
+
+
+/* ── THE COLLECTION SHELF ─────────────────────────────────────────────────────────────────────────
+   Every card in the game, owned or not. What was here was a list of the ones you already had, as text
+   rows with a 46px picture, and it had the two faults a collection screen cannot have: you could not
+   see the SHAPE of the set, and nothing on it ever changed colour.
+
+   Luke: "the card display area needs to be gamified and way more endorphins with colors ... they
+   should be silhoiete black if not possessed."
+
+   ⚠️ THE COLOUR IS THE RUNG, NOT A PALETTE. EMBLEM_STARS already carries one hex per rung -- Worn grey,
+   Marked green, Etched blue, Sealed violet, Crowned gold, Ascendant pink -- and the old panel spent it
+   on six characters of star text in a corner. Here --rung drives the border, the glow, the name, the
+   pips and the bar, so a shelf that levels up visibly changes colour. That is the reward; a collection
+   screen has no other one to pay.
+
+   Three columns on a phone. Four fits and makes every card too small to read the creature, which is the
+   one thing the card exists to show. */
+.gv-cgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 2px; }
+@media (min-width: 560px) { .gv-cgrid { grid-template-columns: repeat(4, 1fr); } }
+
+.gv-card { position: relative; display: grid; gap: 3px; padding: 6px 6px 7px; border-radius: 10px;
+    background: linear-gradient(168deg, #4a3a22 0%, #382b17 62%, #2b2112 100%);
+    border: 1px solid color-mix(in srgb, var(--rung) 55%, #2b2112);
+    box-shadow: inset 0 0 0 1px rgba(255,222,160,0.12),
+        0 0 14px color-mix(in srgb, var(--rung) 32%, transparent),
+        0 3px 8px rgba(0,0,0,0.6); }
+.gv-card-win { position: relative; aspect-ratio: 1; border-radius: 7px; overflow: hidden;
+    display: grid; place-items: center;
+    background: radial-gradient(ellipse 78% 68% at 50% 62%,
+        color-mix(in srgb, var(--rung) 20%, #22351f), #16241a 74%); }
+.gv-card-win > img { width: 94%; height: 94%; object-fit: contain;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.7)); }
+.gv-card-win > img.gv-card-seal { position: absolute; right: 3%; bottom: 3%; width: 30%; height: 30%;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.9)); }
+/* ── ⚠️ A SILHOUETTE, NOT A QUESTION MARK ──────────────────────────────────────────────────────
+   brightness(0) on the creature's own sprite, so the outline is still the animal: the stag's antlers,
+   the moth's wings, the scarecrow's arms. A missing card is therefore a SPECIFIC thing you have not
+   killed yet rather than an anonymous hole, which is the whole difference between a set that pulls you
+   back into the forest and a grid of boxes. A "?" tile would have been less work and taught nothing. */
+.gv-card.is-locked { border-color: #3a3326; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04); }
+.gv-card.is-locked .gv-card-win { background: radial-gradient(ellipse 78% 68% at 50% 62%, #1d2419, #10160f 74%); }
+.gv-card.is-locked .gv-card-win > img { filter: brightness(0) opacity(0.78); }
+.gv-card.is-locked > b { color: #5d6552; letter-spacing: 0.18em; }
+/* The pips are the ladder, and all six show from the first card so the room left to climb is visible
+   on a one-star card instead of only on a maxed one. */
+.gv-card-pips { display: flex; justify-content: center; gap: 1px; font-size: 0.56rem; line-height: 1;
+    margin-top: 1px; }
+.gv-card-pips i { font-style: normal; color: #2f2a1e; }
+.gv-card-pips i.on { text-shadow: 0 0 6px currentColor; }
+.gv-card > b { font-size: 0.66rem; line-height: 1.2; text-align: center; text-wrap: balance;
+    color: color-mix(in srgb, var(--rung) 62%, #fff4dc);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
+.gv-card > u { text-decoration: none; font-size: 0.58rem; line-height: 1.25; text-align: center;
+    color: #c8f0ac; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
+.gv-card > u.gv-card-none { color: #7d8670; }
+/* ⚠️ THE BAR MEASURES THE RUNG YOU ARE IN, not the whole ladder -- see the note at the markup. Against
+   the full ladder every bar below Crowned sits near empty and reads as no progress at all. */
+.gv-card-bar { height: 3px; border-radius: 999px; background: rgba(0,0,0,0.45); overflow: hidden; }
+.gv-card-bar i { display: block; height: 100%; border-radius: 999px; background: var(--rung);
+    box-shadow: 0 0 7px var(--rung); }
+.gv-card > small { font-size: 0.54rem; text-align: center; color: #9aa48e;
+    font-variant-numeric: tabular-nums; }
+.gv-card > button { margin-top: 2px; padding: 3px 0; border: 0; border-radius: 999px; cursor: pointer;
+    font: inherit; font-size: 0.58rem; font-weight: 800; letter-spacing: 0.08em;
+    color: #2b2112; background: color-mix(in srgb, var(--rung) 80%, #ffe6b0); }
+/* Worn is a state you can see from across the shelf, not a word in a button. */
+.gv-card.is-worn { border-color: var(--rung);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rung) 45%, transparent),
+        0 0 20px color-mix(in srgb, var(--rung) 55%, transparent), 0 3px 8px rgba(0,0,0,0.6); }
+.gv-card-worn { position: absolute; top: 4%; left: 4%; padding: 1px 5px; border-radius: 999px;
+    font-style: normal; font-size: 0.5rem; font-weight: 800; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #2b2112; background: var(--rung); }
+/* ── CROWNED AND ASCENDANT GET A SHEEN ───────────────────────────────────────────────────────────
+   The top two rungs are 110 and 250 of one creature, which is a very long way, and a card that arrives
+   there looking like the 50 did pays nothing for the trip. One slow diagonal pass of light -- the same
+   trick the rare drops on the floor use, so it reads as the same language rather than a new effect.
+   ⚠️ Kept off the lower four deliberately: if everything shines, nothing does. */
+.gv-card.is-high .gv-card-win::after { content: ""; position: absolute; inset: -40%;
+    background: linear-gradient(68deg, transparent 42%, rgba(255,255,255,0.3) 50%, transparent 58%);
+    animation: gvCardSheen 3600ms linear infinite; pointer-events: none; }
+@keyframes gvCardSheen { 0% { transform: translateX(-62%); } 100% { transform: translateX(62%); } }
+@media (prefers-reduced-motion: reduce) { .gv-card.is-high .gv-card-win::after { animation: none; opacity: 0.25; } }
 `;
