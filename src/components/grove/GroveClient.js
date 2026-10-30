@@ -112,7 +112,7 @@ const FAMILIES = [
         title: "Carry", rows: [
             { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
             { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp", note: "what you are wearing" },
-            { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-emblems.webp" },
+            { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-cards.webp" },
         ],
     },
     {
@@ -937,7 +937,7 @@ export default function GroveClient({ initial }) {
                         </Area>
 
                         {embTab === "cards" ? (
-                        <Area id="emblems" icon="ui-emblems" title="Monster Cards"
+                        <Area id="emblems" icon="ui-cards" title="Monster Cards"
                             count={`${(st.emblems || []).filter((e) => e.count > 0).length}/${CARD_TOTAL} found`}>
                         {/* ⚠️ NO CAPTION HERE. It read "Three may be worn. Three more are sealed." —
                             above three slots, under a header already counting "1/3 worn", with the

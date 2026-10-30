@@ -27,6 +27,16 @@ const ICONS = {
     gear: "A suit of adventurer's armour: a steel breastplate with warm brown leather straps and brass "
         + "buckles, standing upright, with the hilt and upper blade of a sword rising behind one shoulder "
         + "and a round shield leaning against its base",
+    // ⚠️ THE MENU ROW FOR MONSTER CARDS WAS A GOLD LOCKET. That said the right thing when these were
+    // amulets and says nothing now they are cards -- Luke flagged it as the one sprite that does not match
+    // the thing it names. A fan of cards has a silhouette nothing else on the menu has (map is a scroll,
+    // backpack a bag, gear a breastplate, workbench a bench), which is the only test that matters here.
+    // The creature on the face is deliberately vague: at 46px it is a shape, and a specific monster would
+    // make the row look like it opens that one card.
+    cards: "A small fan of three thick trading cards held together, splayed like a hand of cards, with "
+        + "carved dark wooden borders and brass corner studs. The front card shows a simple snarling "
+        + "beast's head painted on a deep green field; the two behind it are seen edge-on as thick "
+        + "layered card stock",
 };
 
 // Reverse-engineered from the eight that shipped: painterly cel-shade, heavy dark ink contour, two or three

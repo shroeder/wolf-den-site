@@ -152,7 +152,7 @@ const ZONE_FAMILIES = [
             // you just picked up goes. Leaving it hub-only would mean walking out of a zone to put on the
             // sword that fell in it -- and leaving is not a free action (see the panel note in GroveClient).
             { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
-            { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-emblems.webp" },
+            { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-cards.webp" },
         ],
     },
     {
