@@ -142,7 +142,8 @@ function bonusesFrom(emblemRows, player = null) {
     for (const r of emblemRows || []) {
         const meta = GROVE_EMBLEMS[r.emblem_id];
         if (!meta || r.slot === null || r.slot === undefined) continue;   // only EQUIPPED emblems apply
-        const { stars } = emblemStars(r.count);
+        // ⚠️ THE ID DECIDES THE LADDER -- boss cards max at sixteen, not 250. See BOSS_STARS.
+        const { stars } = emblemStars(r.count, r.emblem_id);
         if (!stars) continue;
         const v = Number(meta.per) * stars;
         if (meta.stat === "rarity_find") out.rarityFind += v;
@@ -478,7 +479,7 @@ export async function groveState(buyerId) {
             : null,
         emblems: (emblems || []).map((e) => ({
             id: e.emblem_id, count: Number(e.count), slot: e.slot,
-            ...emblemStars(Number(e.count)), meta: GROVE_EMBLEMS[e.emblem_id] || null,
+            ...emblemStars(Number(e.count), e.emblem_id), meta: GROVE_EMBLEMS[e.emblem_id] || null,
         })),
         bonuses: bonusesFrom(emblems, p),
     };

@@ -900,6 +900,17 @@ const BIOME_ATTACKS = {
 };
 
 /** Every boss of every generated map, in GROVE_BOSSES shape. */
+/**
+ * A boss's own Monster Card id. Namespaced so it can never collide with a wanderer's.
+ *
+ * ⚠️ IT LIVES HERE, IN THE LOWER MODULE, AND grove-catalog RE-EXPORTS IT. Both files need to name a boss's
+ * card -- this one when it generates maps two to seven, the catalog when it generates map one's twelve and
+ * builds BOSS_EMBLEMS -- and grove-catalog already imports from here, so defining it there would be a cycle.
+ * Writing `em_b_${id}` in both places instead would be the same rule in two homes, which is the thing
+ * balance-constants-never-copied exists to stop.
+ */
+export const bossEmblemId = (bossId) => `em_b_${bossId}`;
+
 export const MAP_BOSSES = Object.fromEntries(
     GROVE_MAPS.filter((m) => m.zones).flatMap((m) =>
         m.zones.map((z, i) => {
@@ -910,7 +921,14 @@ export const MAP_BOSSES = Object.fromEntries(
                 dmg: [Math.round(bossDmgAt(depth, 0)), Math.round(bossDmgAt(depth, 1))],
                 attacks: (BIOME_ATTACKS[z.biome] || ["slam", "sweep"]).map((k) => BOSS_ATTACKS[k]),
                 map: m.n, depth,
-                emblem: m.emblem?.id || null, emblemChance: 0.09,
+                // ⚠️ ITS OWN CARD, AND IT DROPS EVERY TIME. This was `m.emblem?.id` with a 9% chance --
+                // all twelve bosses of a map handing out that map's single Mark, the same card the
+                // wanderers outside the door already drop. A boss is behind a cleared zone and a
+                // thirty-minute cooldown, so a 9% roll on a shared card meant the hardest fight on the
+                // map was the worst place to get anything. One card per boss, guaranteed; the sixteen-rung
+                // BOSS_STARS ladder is what makes repeat kills worth anything. The map's Mark keeps its
+                // source -- every wanderer on the map still drops it, see MAP_ENEMIES below.
+                emblem: bossEmblemId(z.bossId), emblemChance: 1,
                 loot: bossLoot(m, z),
             }];
         })),

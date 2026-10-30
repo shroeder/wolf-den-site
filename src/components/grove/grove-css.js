@@ -4003,4 +4003,17 @@ export const GROVE_CSS = `
        see animations-always-play. */
     .gv-mmenu, .gv-mmenu-handle { transition: none; }
 }
+
+/* ── A SHELF PER SOURCE ───────────────────────────────────────────────────────────────────────────
+   103 cards in one undifferentiated grid is a wall, not a collection: you cannot tell where the card
+   you are hunting lives, and the map-one set you have nearly finished is buried under six maps you
+   have not started. The count on each heading is that shelf's own, because "2 / 12 of map three's
+   bosses" is the question the screen exists to answer. */
+.gv-cshelf + .gv-cshelf { margin-top: 18px; }
+.gv-cshelf h4 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    margin: 0 0 8px; padding-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.64rem; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
+    color: #ffd98f; }
+.gv-cshelf h4 i { font-style: normal; letter-spacing: 0.06em; color: #9aa48e;
+    font-variant-numeric: tabular-nums; }
 `;

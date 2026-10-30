@@ -11,13 +11,38 @@ import {
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import {
-    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, EMBLEM_STARS, emblemStars, emblemArt, emblemFace, groveArt, toolArt, zoneHasParts,
+    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, starLadder, emblemStars, emblemArt, emblemFace, groveArt, toolArt, zoneHasParts,
 } from "@/lib/marketplace/grove-catalog.js";
 // ── THE ORDER OF THE SHELF ────────────────────────────────────────────────────────────────────────
 // Catalog order, which is the order you meet the creatures: map one's thirteen, then one per map going
 // deeper. ⚠️ NOT sorted by what you own -- a shelf that reshuffles as you collect destroys the one thing
 // a collection screen is for, which is knowing where a given card LIVES and seeing its hole.
-const CARD_ORDER = Object.keys(GROVE_EMBLEMS);
+// ── ⚠️ AND IT IS SECTIONED NOW, BECAUSE IT IS 103 CARDS ─────────────────────────────────────────
+// It was nineteen in one grid, which is fine. Giving every boss its own card added eighty-four more, and a
+// hundred-odd silhouettes in one undifferentiated run is not a collection, it is a wall -- you cannot tell
+// where the thing you are hunting lives, and the map-one shelf you have nearly finished is buried under six
+// maps you have not started.
+//
+// Split by where the card comes from and then by map, which is the order you meet them. The wanderers stay
+// first: they are the cards that drop while you play, and the boss shelf is the deliberate chase.
+const CARD_SHELVES = (() => {
+    const all = Object.entries(GROVE_EMBLEMS);
+    const wander = all.filter(([, e]) => !e.boss).map(([id]) => id);
+    const byMap = new Map();
+    for (const [id, e] of all) {
+        if (!e.boss) continue;
+        const m = Number(e.map) || 1;
+        if (!byMap.has(m)) byMap.set(m, []);
+        byMap.get(m).push(id);
+    }
+    return [
+        { title: "Wanderers", ids: wander },
+        ...[...byMap.keys()].sort((a, b) => a - b).map((m) => ({
+            title: `Bosses · Map ${m}`, ids: byMap.get(m),
+        })),
+    ];
+})();
+const CARD_ORDER = CARD_SHELVES.flatMap((sh) => sh.ids);
 
 import { useWishlist } from "@/components/grove/useWishlist.js";
 import GroveMenu from "@/components/grove/GroveMenu.js";
@@ -1014,8 +1039,16 @@ export default function GroveClient({ initial }) {
                             of star text in the corner. Now the rung owns the whole card: border, glow,
                             name, pips. Your shelf visibly changes colour as it levels, which is the only
                             reward a collection screen can actually pay. */}
+                        {CARD_SHELVES.map((shelf) => {
+                            const found = shelf.ids.filter((id) => (st.emblems || []).some((x) => x.id === id && x.count > 0)).length;
+                            return (
+                        <section key={shelf.title} className="gv-cshelf">
+                            {/* The count is per shelf, so "2 / 12" on a map tells you how much of THAT
+                                boss set is left -- which is the question a collection screen is for.
+                                One running total across 103 cards answers nothing. */}
+                            <h4>{shelf.title}<i>{found}/{shelf.ids.length}</i></h4>
                         <div className="gv-cgrid">
-                            {CARD_ORDER.map((id) => {
+                            {shelf.ids.map((id) => {
                                 const meta = GROVE_EMBLEMS[id];
                                 const e = (st.emblems || []).find((x) => x.id === id) || null;
                                 const count = e?.count || 0;
@@ -1027,7 +1060,11 @@ export default function GroveClient({ initial }) {
                                 // ⚠️ THE BAR MEASURES THE RUNG YOU ARE IN, not the whole ladder. Against the
                                 // ladder every bar below Crowned sits near empty and reads as no progress at
                                 // all -- 22 of 250 is 9% when it is actually three-sixths of the way up.
-                                const floor = stars ? EMBLEM_STARS[stars - 1].at : 0;
+                                // ⚠️ THE CARD'S OWN LADDER. EMBLEM_STARS is the wanderer one; a boss card
+                                // maxes at sixteen, so measuring it against 250 would draw every boss bar
+                                // as a sliver and report "3 / 22" on a card that was already two stars.
+                                const ladder = starLadder(id);
+                                const floor = stars ? ladder[stars - 1].at : 0;
                                 const pct = next ? Math.max(4, Math.round(((count - floor) / (next.at - floor)) * 100)) : 100;
                                 return (
                                     <div key={id}
@@ -1047,7 +1084,7 @@ export default function GroveClient({ initial }) {
                                         <span className="gv-card-pips">
                                             {[1, 2, 3, 4, 5, 6].map((n) => (
                                                 <i key={n} className={n <= stars ? "on" : ""}
-                                                    style={n <= stars ? { color: EMBLEM_STARS[n - 1].color } : undefined}>★</i>
+                                                    style={n <= stars ? { color: ladder[n - 1].color } : undefined}>★</i>
                                             ))}
                                         </span>
                                         <b>{have ? meta?.name || id : "· · ·"}</b>
@@ -1074,6 +1111,9 @@ export default function GroveClient({ initial }) {
                                 );
                             })}
                         </div>
+                        </section>
+                            );
+                        })}
                         </Area>
                         ) : null}
                         {/* The till. Behind its own tab now — see the note at the top of this panel. */}

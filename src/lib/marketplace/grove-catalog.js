@@ -26,6 +26,7 @@
 
 import {
     MAP_PARTS, MAP_ENEMIES, MAP_BOSSES, MAP_ZONES, MAP_EMBLEMS, MAP_FOODS, MAP_CHARMS, mapIsBuilt,
+    bossEmblemId,
     RARE_CHANCE, zoneUnlock,
 } from "@/lib/marketplace/grove-maps.js";
 
@@ -166,6 +167,16 @@ export function recipeArt(recipe) {
 // a fifth of that now, and the ladder had to come down with them or six stars would have needed a hundred
 // thousand kills. Changing either of these alone silently breaks the other; check-grove.mjs prints the
 // resulting timeline in sessions so the cost is visible rather than inferred.
+
+// ⚠️ RE-EXPORTED, NOT RE-DECLARED -- it is defined in grove-maps.js, which this file already imports and
+// which also needs it. The note there explains why that is the only direction that is not a cycle.
+export { bossEmblemId };
+
+// ⚠️ IT MUST BE IN SCOPE BEFORE MAP_ONE_BOSSES CALLS IT. That literal is evaluated at module load, four
+// hundred lines above where the boss cards are built, so leaving this beside them put it in the temporal
+// dead zone and the whole catalog threw on import -- which takes the Grove, the shop pages that read it,
+// and every script that loads it, all at once.
+
 export const EMBLEM_STARS = [
     { star: 1, at: 3, color: "#cfd6dd", label: "Worn" },
     { star: 2, at: 9, color: "#7ed57e", label: "Marked" },
@@ -179,14 +190,34 @@ export const EMBLEM_STARS = [
  * How many stars a count is worth. ⚠️ FAILS UPWARD — a count past the last rung keeps the last rung rather
  * than falling off the end to zero. Two of this game's worst bugs were ladders that failed downward.
  */
-export function emblemStars(count) {
+/**
+ * ── ⚠️ A BOSS CARD CLIMBS A DIFFERENT LADDER, AND IT HAS TO ────────────────────────────────────────────────
+ * The wanderer ladder is 3 / 9 / 22 / 50 / 110 / 250, which is right for a thing that falls off one kill in
+ * four hundred from a creature that respawns every 45 seconds. A boss sits behind a cleared zone AND a
+ * thirty-minute cooldown (BOSS_COOLDOWN_MS), so 250 of one boss's card is something like 125 hours of
+ * cooldown on a single door. A collectible nobody can ever wake is the one failure a collectible cannot
+ * survive -- so boss cards drop every time you win and max at sixteen kills.
+ *
+ * Same six rungs, same six colours, same labels: a Crowned card is a Crowned card wherever it came from, and
+ * a player should not have to learn that gold means two different amounts of work.
+ */
+export const BOSS_STARS = EMBLEM_STARS.map((r, i) => ({ ...r, at: [1, 2, 4, 7, 11, 16][i] }));
+
+/** The ladder a given card climbs. Wanderer by default; see BOSS_STARS for why bosses differ. */
+export const starLadder = (id) => (id && GROVE_EMBLEMS[id]?.boss ? BOSS_STARS : EMBLEM_STARS);
+
+export function emblemStars(count, id = null) {
     const n = Number(count) || 0;
-    let out = EMBLEM_STARS[0];
+    // ⚠️ THE LADDER IS CHOSEN BY THE CARD, NOT BY THE CALLER. Every call site used to pass a count alone, so
+    // adding a second ladder without this would have silently measured every boss card against the wanderer
+    // rungs -- a card showing "0 / 3" that actually woke on its first kill.
+    const ladder = starLadder(id);
+    let out = ladder[0];
     let stars = 0;
-    for (const rung of EMBLEM_STARS) {
+    for (const rung of ladder) {
         if (n >= rung.at) { out = rung; stars = rung.star; }
     }
-    return { stars, rung: stars ? out : null, next: EMBLEM_STARS.find((r) => r.at > n) || null };
+    return { stars, rung: stars ? out : null, next: ladder.find((r) => r.at > n) || null };
 }
 
 // What an emblem gives, per star. The value is PER STAR — a 3-star emblem gives three times the row below.
@@ -263,7 +294,13 @@ function emblemFaces() {
  * So the drawn emblem wins, and the creature stays as the FALLBACK: a map that ships an emblem before its
  * sprite is generated still gets a face rather than a hole, and that face is at least the right animal.
  */
-export const emblemArt = (id) => (GROVE_EMBLEMS[id] ? `/images/grove/emblem-${id}.webp` : null) || emblemFaces()[id] || null;
+export const emblemArt = (id) => (
+    // ⚠️ `boss` MEANS "NO CARVED MARK WAS EVER DRAWN FOR THIS ONE". There are nineteen emblem-em_*.webp on
+    // disk, one per wanderer card. The eighty-four boss cards are generated from the bosses themselves and
+    // have no seal sprite, so claiming the path for them would hang a broken image in the corner of every
+    // boss card on the shelf. They fall through to the creature, which for a boss is the boss.
+    GROVE_EMBLEMS[id] && !GROVE_EMBLEMS[id].boss ? `/images/grove/emblem-${id}.webp` : null
+) || emblemFaces()[id] || null;
 
 /**
  * The CREATURE on a Monster Card, as opposed to the carved mark that stands for it.
@@ -616,62 +653,62 @@ const B = (id, name, o) => ({ id, name, art: `/images/grove/boss-${id}.webp`, bo
 // ended up easier than map one's last.
 const MAP_ONE_BOSSES = {
     glutmaw: B("glutmaw", "Glutmaw, the Burrow King", {
-        hp: 350, dmg: [7, 10], emblem: "em_rootrat", emblemChance: 0.09,
+        hp: 350, dmg: [7, 10], emblem: bossEmblemId("glutmaw"), emblemChance: 1,
         attacks: [A.slam, A.sweep],
         loot: [{ part: "gnawed_root", n: [4, 7] }, { part: "damp_moss", n: [3, 5] }],
     }),
     mossmother: B("mossmother", "The Mossmother", {
-        hp: 391, dmg: [7, 11], emblem: "em_grub", emblemChance: 0.09,
+        hp: 391, dmg: [7, 11], emblem: bossEmblemId("mossmother"), emblemChance: 1,
         attacks: [A.slam, A.volley],
         loot: [{ part: "grub_fat", n: [4, 7] }, { part: "damp_moss", n: [3, 6] }],
     }),
     thistlecrown: B("thistlecrown", "Thistlecrown", {
-        hp: 437, dmg: [8, 11], emblem: "em_thornling", emblemChance: 0.10,
+        hp: 437, dmg: [8, 11], emblem: bossEmblemId("thistlecrown"), emblemChance: 1,
         attacks: [A.sweep, A.slam, A.volley],
         loot: [{ part: "thorn_barb", n: [4, 8] }, { part: "gnawed_root", n: [3, 6] }],
     }),
     grandfather_bristle: B("grandfather_bristle", "Grandfather Bristle", {
-        hp: 489, dmg: [8, 12], emblem: "em_badger", emblemChance: 0.10,
+        hp: 489, dmg: [8, 12], emblem: bossEmblemId("grandfather_bristle"), emblemChance: 1,
         attacks: [A.slam, A.sweep],
         loot: [{ part: "bristle_hide", n: [4, 7] }, { part: "split_antler", n: [2, 4] }],
     }),
     rattlerind: B("rattlerind", "Rattlerind", {
-        hp: 546, dmg: [9, 12], emblem: "em_gourdling", emblemChance: 0.10,
+        hp: 546, dmg: [9, 12], emblem: bossEmblemId("rattlerind"), emblemChance: 1,
         attacks: [A.volley, A.slam, A.sweep],
         loot: [{ part: "gourd_rind", n: [4, 8] }, { part: "thorn_barb", n: [3, 6] }],
     }),
     harvestman: B("harvestman", "The Harvestman", {
-        hp: 610, dmg: [9, 13], emblem: "em_husk", emblemChance: 0.11,
+        hp: 610, dmg: [9, 13], emblem: bossEmblemId("harvestman"), emblemChance: 1,
         attacks: [A.sweep, A.slam],
         loot: [{ part: "bound_straw", n: [5, 9] }, { part: "gourd_rind", n: [3, 6] }],
     }),
     barrow_warden: B("barrow_warden", "The Barrow Warden", {
-        hp: 682, dmg: [10, 14], emblem: "em_barrowhound", emblemChance: 0.11,
+        hp: 682, dmg: [10, 14], emblem: bossEmblemId("barrow_warden"), emblemChance: 1,
         attacks: [A.slam, A.volley, A.sweep],
         loot: [{ part: "barrow_tooth", n: [5, 9] }, { part: "bristle_hide", n: [3, 6] }],
     }),
     great_weaver: B("great_weaver", "The Great Weaver", {
-        hp: 762, dmg: [10, 14], emblem: "em_warren", emblemChance: 0.11,
+        hp: 762, dmg: [10, 14], emblem: bossEmblemId("great_weaver"), emblemChance: 1,
         attacks: [A.volley, A.sweep],
         loot: [{ part: "warren_silk", n: [5, 9] }, { part: "barrow_tooth", n: [3, 6] }],
     }),
     lanternwing: B("lanternwing", "The Lanternwing", {
-        hp: 852, dmg: [11, 15], emblem: "em_voidmoth", emblemChance: 0.12,
+        hp: 852, dmg: [11, 15], emblem: bossEmblemId("lanternwing"), emblemChance: 1,
         attacks: [A.volley, A.slam, A.sweep],
         loot: [{ part: "mothlight_dust", n: [5, 9] }, { part: "warren_silk", n: [3, 6] }],
     }),
     everburning: B("everburning", "The Everburning", {
-        hp: 952, dmg: [11, 16], emblem: "em_ashwraith", emblemChance: 0.12,
+        hp: 952, dmg: [11, 16], emblem: bossEmblemId("everburning"), emblemChance: 1,
         attacks: [A.sweep, A.volley, A.slam],
         loot: [{ part: "ash_ember", n: [5, 10] }, { part: "rotwood_knot", n: [3, 6] }],
     }),
     stakelord: B("stakelord", "Gorrak the Stakelord", {
-        hp: 1064, dmg: [12, 17], emblem: "em_goblin", emblemChance: 0.12,
+        hp: 1064, dmg: [12, 17], emblem: bossEmblemId("stakelord"), emblemChance: 1,
         attacks: [A.slam, A.volley, A.sweep],
         loot: [{ part: "goblin_rivet", n: [6, 10] }, { part: "ash_ember", n: [3, 6] }],
     }),
     heartwood_elder: B("heartwood_elder", "The Heartwood Elder", {
-        hp: 1189, dmg: [12, 18], emblem: "em_elder", emblemChance: 0.14,
+        hp: 1189, dmg: [12, 18], emblem: bossEmblemId("heartwood_elder"), emblemChance: 1,
         attacks: [A.sweep, A.slam, A.volley],
         loot: [{ part: "elder_heartwood", n: [4, 8] }, { part: "rotwood_knot", n: [4, 7] }],
     }),
@@ -682,6 +719,78 @@ export const GROVE_BOSSES = {
     ...MAP_ONE_BOSSES,
     ...Object.fromEntries(Object.entries(MAP_BOSSES).filter(([, b]) => mapIsBuilt(b.map))),
 };
+
+// ── ⚠️ ONE CARD PER BOSS, AND NONE OF THEM EXISTED ───────────────────────────────────────────────────────────
+// Luke: "Do we have card emblems for wvery boss. If not please make them and completely finish wire up."
+//
+// Every boss DID have an emblem field, which is why this looked finished, and not one of them was its own.
+// Map one's twelve each pointed at a wanderer's card -- killing The Heartwood Elder gave you The Elder Root,
+// the same card the ordinary elderling drops -- and on maps two to seven all twelve bosses of a map pointed
+// at that map's single Mark. Eighty-four bosses, zero boss cards. The hardest thing in a zone paid out the
+// same collectible as the thing wandering past it.
+//
+// ⚠️ NO ART WAS DRAWN FOR THIS, AND NONE IS NEEDED. A Monster Card's face is the creature's own sprite, and
+// every boss already has one (boss-<id>.webp, or its own path on map one). emblemFaces indexes GROVE_BOSSES
+// alongside GROVE_ENEMIES and always did. What was missing was a catalog entry, not a picture.
+//
+// ⚠️ AND THEY MERGE INTO GROVE_EMBLEMS LATE, ON PURPOSE. GROVE_EMBLEMS is declared four hundred lines above
+// GROVE_BOSSES, so it cannot name them at its own definition; moving either block would mean dragging its
+// dependencies with it. One documented Object.assign at module load is smaller than that, and every consumer
+// of GROVE_EMBLEMS is a function that runs later, so nobody can observe the gap.
+
+// What a boss card is worth, against the map-one wanderer card of the same stat. 2.0 at map one, rising half
+// a counterpart per map. ⚠️ A GUESS WITH A REASON, NOT A MEASUREMENT -- it is deliberately one constant so it
+// can be turned: a boss card costs sixteen kills behind a cleared zone and a thirty-minute cooldown, where a
+// wanderer card costs 250 drops at one in four hundred, so it should be worth clearly more per star and not
+// so much more that the wanderer shelf stops mattering. Only three cards can be worn at once
+// (bonusesFrom and grove-kit both read `slot IS NOT NULL`), which is what bounds this.
+const BOSS_CARD_MULT = (map) => 2 + (Math.max(1, Number(map) || 1) - 1) * 0.5;
+
+// ⚠️ TWELVE STATS, ROTATED, SO A MAP'S TWELVE BOSSES ARE TWELVE DIFFERENT CARDS. Taken from map one's own
+// wanderer cards -- these are the stats the Grove already reads, and inventing boss-only ones would mean
+// eighty-four cards whose effect nothing consumes. See the warning on bonusesFrom: a key added in one place
+// and read nowhere is the worst version of a collectible.
+//
+// The map offsets the rotation, so the Glutmaw's card and map two's first boss are not the same idea twice.
+const BOSS_CARD_STATS = [
+    { stat: "might", per: 2, kind: "flat" },
+    { stat: "vitality", per: 3, kind: "flat" },
+    { stat: "armour", per: 2, kind: "flat" },
+    { stat: "ferocity", per: 2, kind: "flat" },
+    { stat: "tenacity", per: 2, kind: "flat" },
+    { stat: "attack_speed", per: 0.6, kind: "pct" },
+    { stat: "crit_rate", per: 0.25, kind: "pct" },
+    { stat: "crit_damage", per: 0.8, kind: "pct" },
+    { stat: "life_steal", per: 0.4, kind: "pct" },
+    { stat: "move_speed", per: 1.0, kind: "pct" },
+    { stat: "rarity_find", per: 1.2, kind: "pct" },
+    { stat: "emblem_find", per: 1.5, kind: "pct" },
+];
+
+export const BOSS_EMBLEMS = Object.fromEntries(
+    Object.values(GROVE_BOSSES).map((b, i) => {
+        // ⚠️ map ONE's bosses carry no `map` field -- they predate generated maps -- so absence means one.
+        const map = Number(b.map) || 1;
+        const row = BOSS_CARD_STATS[(i + (map - 1) * 5) % BOSS_CARD_STATS.length];
+        const mult = BOSS_CARD_MULT(map);
+        // Rounded to one decimal so a card never shows +3.4000000000000004% life steal.
+        const per = row.kind === "pct"
+            ? Math.round(row.per * mult * 10) / 10
+            : Math.round(row.per * mult);
+        return [bossEmblemId(b.id), {
+            id: bossEmblemId(b.id),
+            // The boss's own name IS the card name. A Monster Card is a card of the thing you killed, so
+            // inventing a second name for the same creature would be one more thing to learn for nothing.
+            name: b.name,
+            stat: row.stat, per, kind: row.kind,
+            boss: true, bossId: b.id, map,
+        }];
+    }),
+);
+
+// See the note above on why this is a merge rather than a declaration.
+Object.assign(GROVE_EMBLEMS, BOSS_EMBLEMS);
+
 
 // How long a boss stays dead. ⚠️ THE ONLY THROTTLE ON THE HYPER-RARE FAUCET, so it is wall-clock and per
 // zone — twelve zones means something is always available to somebody who has cleared the map, which is the

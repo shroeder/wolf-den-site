@@ -193,7 +193,7 @@ export async function groveFighter(buyerId) {
             const meta = GROVE_EMBLEMS[row.emblem_id];
             if (!meta) continue;
             // Stars are earned by HOW MANY you have collected, not by the one you slotted.
-            const { stars } = emblemStars(Number(row.count) || 0);
+            const { stars } = emblemStars(Number(row.count) || 0, row.emblem_id);
             if (!stars) continue;
             addGroveStat(stats, { [meta.stat]: meta.per * stars },
                 (v) => { emblemTempo += v / 100; }, (v) => { moveSpeed += v; });
