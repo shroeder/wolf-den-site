@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
     GROVE_EMBLEMS, GROVE_ENEMIES, starLadder, emblemFace, emblemArt,
 } from "@/lib/marketplace/grove-catalog.js";
+import { GROVE_MAPS } from "@/lib/marketplace/grove-maps.js";
 
 /**
  * ── THE MONSTER CARD SHELF ───────────────────────────────────────────────────────────────────────────────────
@@ -50,6 +51,30 @@ import {
  * fallback if the idea does not earn its keep. Nothing here breaks when the file is missing -- and the file
  * list is the ONLY place that knows which exist, so a frame ships by being drawn and named.
  */
+/**
+ * ── ⚠️ A MAP HAS A NAME AND IT IS NOT "Map 3" ────────────────────────────────────────────────────────────────
+ * Luke: "instead of it saying map 1, we need to have like a name for each act, right? Thematically, can't
+ * just say map 1." And: "I also feel like the colors of each map text should differ."
+ *
+ * The names already exist -- GROVE_MAPS has carried them since the maps were generated, and the headings here
+ * were printing an index instead. The Ashen Reach is a place; "Map 7" is a row number in a spreadsheet.
+ *
+ * ⚠️ READ, NOT RE-TYPED. Copying the twelve names into this file would be twelve strings that can drift from
+ * the ones the atlas and the map screen show. See [[balance-constants-never-copied]] -- the same rule applies
+ * to anything with one true home, not only to numbers.
+ */
+const MAP_NAME = Object.fromEntries(GROVE_MAPS.map((m) => [m.n, m.name]));
+
+// One hue per map, keyed to what the place IS: forest green, cave stone, fen teal, coast blue, drowned
+// indigo, gilded gold, ash ember, storm violet, frost ice, glass pale, rot lime, starfall magenta.
+// ⚠️ IT IS THE HEADING ONLY. The cards below carry the RUNG colours (Worn grey through Ascendant pink) and
+// those mean something precise; a second colour system running through the same cards would make both
+// unreadable. The heading is the one place a map can have its own colour without arguing with anything.
+const MAP_TINT = {
+    1: "#9fe08a", 2: "#c2a06a", 3: "#6fc5b0", 4: "#8ec8e8", 5: "#7a9ce0", 6: "#ffd75e",
+    7: "#f08a5a", 8: "#b58af0", 9: "#a8e4f0", 10: "#d7e8f5", 11: "#b6d44a", 12: "#ff8ec4",
+};
+
 const MAP_FRAME = {
     1: "/images/grove/frame-wood.webp",
 };
@@ -135,10 +160,13 @@ export default function GroveCards({ emblems = [], onWear }) {
                 return (
                     <section key={r.map}
                         className={`ga-row is-themed${MAP_FRAME[r.map] ? " is-framed" : ""}`}
-                        style={MAP_FRAME[r.map] ? { "--row-frame": `url("${MAP_FRAME[r.map]}")` } : undefined}>
+                        style={{
+                            "--map": MAP_TINT[r.map] || "#ffd98f",
+                            ...(MAP_FRAME[r.map] ? { "--row-frame": `url("${MAP_FRAME[r.map]}")` } : null),
+                        }}>
                         {MAP_FRAME[r.map] ? <span className="gv-row-frame" aria-hidden="true" /> : null}
                         <header className="ga-row-head">
-                            <b>Map {r.map}</b>
+                            <b>{MAP_NAME[r.map] || `Map ${r.map}`}</b>
                             <i>{found}/{r.cards.length} found</i>
                         </header>
                         <div className="ga-track" ref={(n) => { trackRefs.current[r.map] = n; }}>

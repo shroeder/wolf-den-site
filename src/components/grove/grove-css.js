@@ -3834,6 +3834,20 @@ export const GROVE_CSS = `
    photographs and the point is which one you are entering. These are a COLLECTION -- the whole reason to
    scroll a row is to see what is on it -- so a neighbour dimmed to near-nothing makes browsing 25 cards
    a card-at-a-time crawl. Lifted enough that the centred one is still unmistakably the subject. */
+/* ── ⚠️ EVERY CARD THE SAME HEIGHT, FOUND OR NOT ──────────────────────────────────────────────
+   Luke: "the height of the cards should match regardless of if you found them or not. It looks a
+   little odd that one's janked down and the next one janks back up again."
+
+   A found card carries a Wear button and a count line that an unfound one does not, so each card was
+   as tall as its own contents and the row's baseline stepped up and down as you scrolled past it. On
+   a shelf where most cards are silhouettes, that is a ragged edge running the whole way along.
+
+   The track is already a flex row, so its items stretch to the tallest by default -- the cells just
+   were not passing that down. A cell becomes a flex box, the card fills it, and the card's own grid
+   packs to the top so the spare space falls at the BOTTOM of a short card rather than being shared
+   out between its rows, which would have pushed the name away from the picture. */
+.gv-cards .ga-cell { display: flex; }
+.gv-cards .ga-cell > .gv-card { height: 100%; align-content: start; }
 .gv-cards .ga-cell { transition: transform .2s ease, opacity .2s ease; opacity: 0.8; transform: scale(0.95); }
 .gv-cards .ga-cell.ga-on { opacity: 1; transform: scale(1); }
 /* ── ⚠️ A FRAMED, NEAR-BLACK ROW ──────────────────────────────────────────────────────────────
@@ -3869,15 +3883,62 @@ export const GROVE_CSS = `
     position: absolute; inset: 0; pointer-events: none; z-index: 2;
     border: 30px solid transparent;
     border-image: var(--row-frame) 128 round; }
-/* ⚠️ THE ROW HAS TO MAKE ROOM FOR ITS OWN FRAME. The overlay sits on top of the content, so without
-   this the heading rendered straight through the top band of brambles and the first card was clipped
-   by the left one. Padding matched to the 30px border, a little less at the sides because the track's
-   own 34% runway already keeps cards away from the edge. */
-.gv-cards .ga-row.is-framed { padding: 26px 0 28px; }
-.gv-cards .ga-row.is-framed > .ga-row-head { padding: 0 34px 4px; }
+/* ── ⚠️ THE ROW HAS TO MAKE REAL ROOM FOR ITS OWN FRAME ──────────────────────────────────────
+   The overlay sits on TOP of the content, so anything that reaches the row's edge goes under the
+   brambles. The first pass padded 26px top and bottom and NOTHING at the sides, on the reasoning that
+   the track's own 34% runway already holds cards away from the edge. That was wrong: the runway is
+   padding INSIDE a scroller, so it scrolls away with everything else -- the cards slide straight under
+   the left and right bands as soon as you move the row.
+
+   Luke: "can you first make some padding inside the border? Right now it's overlapping stuff."
+
+   So the padding is on the ROW, which does not scroll, and it is on all four sides. 34 against a 30px
+   border leaves a few pixels of daylight between the art and the content rather than having them just
+   touch -- a card resting exactly on the inner edge of a frame reads as clipped even when it is not. */
+/* ⚠️ 38 AT THE SIDES AGAINST A 30px BAND, not 30. Matching the padding to the border exactly puts the
+   track's box flush with the inner edge of the art, so a scrolling card grazes the brambles -- which is
+   what "it's overlapping stuff" still looked like after the first fix. The extra 8px is the daylight. */
+.gv-cards .ga-row.is-framed { padding: 34px 38px 34px; }
+/* The header is already inside the row's padding; this is only the small inset that lines it up with
+   the cards below it. */
+.gv-cards .ga-row.is-framed > .ga-row-head { padding: 0 4px 6px; }
+/* ⚠️ AND THE TRACK'S RUNWAY SHRINKS WITH THE BOX. 34% of a 374px row is 127px; 34% of the 298px left
+   inside the frame is 101 -- still more than half a 124px card, which is all that centring the first
+   and last card actually needs. */
+.gv-cards .ga-row.is-framed .ga-track { padding: 2px 32%; }
+/* ── ⚠️ THE TRACK FADES AT ITS EDGES INSTEAD OF SLICING ───────────────────────────────────────
+   Luke: "it looks like it needs like a transporter border, transparent border inset or something, so
+   that it fades from like the padding to the things inside of it. But like, also the card shouldn't be
+   underlapping the overflow. Like it's underflowing. That doesn't look good."
+
+   Those are one fault, not two. A scroller always has a part-card at each end -- that is how you know
+   there is more -- but an overflow box cuts it with a hard vertical line, and a straight edge through
+   the middle of a painted card does not read as "there is more", it reads as broken. Against a drawn
+   frame it reads worse still, because the eye expects the art to be what ended the card and instead
+   finds a clean machine cut a few pixels inside it.
+
+   A mask makes the same part-card fade out into the padding. Nothing about the scrolling changes; only
+   the thing that terminates it does.
+
+   ⚠️ A MASK, NOT AN OVERLAID GRADIENT. The row behind this is #15151a but the FRAME sits on top at the
+   same edges, so a painted fade would have to match the row's colour and would then show as a dark
+   smear over the brambles. A mask removes the card instead of painting over it, so the frame stays
+   untouched whatever is behind it.
+
+   36px is a little more than a quarter of a 124px card: enough that the cut is unmistakably a fade,
+   not so much that a card centred at the edge of the runway goes ghostly. */
+.gv-cards .ga-track {
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 36px,
+        #000 calc(100% - 36px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 36px,
+        #000 calc(100% - 36px), transparent 100%); }
 .gv-cards .ga-row-head { padding: 0 12px 2px; }
-.gv-cards .ga-row-head b { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.2em;
-    text-transform: uppercase; color: #ffd98f; }
+/* ⚠️ THE HEADING WEARS ITS MAP'S OWN COLOUR, and it is the only thing on the row that does -- the cards
+   below carry the RUNG colours (Worn grey through Ascendant pink) and those mean something precise. Two
+   colour systems through the same cards would make both unreadable. */
+.gv-cards .ga-row-head b { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--map, #ffd98f);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
 .gv-cards .ga-row-head i { font-size: 0.66rem; }
 
 .gv-card { position: relative; width: 124px; display: grid; gap: 3px; padding: 6px 6px 7px; border-radius: 10px;
