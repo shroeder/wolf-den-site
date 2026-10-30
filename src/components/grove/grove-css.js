@@ -3171,6 +3171,37 @@ export const GROVE_CSS = `
     100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(0.35); }
 }
 
+/* ── THE PUMP BURST ───────────────────────────────────────────────────────────────────────────
+   One burst per pump, thrown upward out of the button in a ragged fan.
+
+   ⚠️ NOT gv-act-embers, WHICH ALREADY EXISTS TWENTY LINES UP. That one is the ambient coal glow and
+   I first wrote this under the same name, which would have replaced the fire to add sparks to it.
+   The coals answer your SCORE; this answers your TAP. Two different jobs, two class names.
+
+   ⚠️ THE COLOUR IS THE SCORE. --hot comes in from the component as the heat bar's own fraction, and
+   these interpolate dull-red -> orange -> white with it, so a glance at the embers says how close to
+   temperature the fire is without anybody reading the counter. Decoration that is also a readout.
+
+   ⚠️ STAGGERED BY --t AND SCATTERED BY THE ANGLE the component passes, because nine identical
+   particles leaving at the same instant on the same arc reads as one fat triangle rather than a
+   shower of sparks. */
+.gv-act-pumpfx { grid-area: 1 / 1; position: absolute; left: 50%; bottom: 46px;
+    width: 1px; height: 1px; z-index: 3; pointer-events: none; }
+.gv-act-pumpfx i { position: absolute; top: 0; left: 0;
+    width: calc(3px + 2px * var(--hot)); height: calc(3px + 2px * var(--hot));
+    margin: -2px; border-radius: 999px;
+    background: rgb(calc(214 + 41 * var(--hot)) calc(74 + 155 * var(--hot)) calc(22 + 190 * var(--hot)));
+    box-shadow: 0 0 calc(5px + 7px * var(--hot)) rgba(255, calc(120 + 110 * var(--hot)), 60,
+        calc(0.55 + 0.45 * var(--hot)));
+    transform: rotate(var(--a));
+    animation: gv-act-ember-fly calc(420ms + 220ms * var(--hot)) ease-out var(--t) forwards; }
+@keyframes gv-act-ember-fly {
+    0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(0.5); }
+    18% { opacity: 1; }
+    100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) { .gv-act-pumpfx { display: none; } }
+
 /* ── THE COUNT-IN ─────────────────────────────────────────────────────────────────────────────
    Over the coals, before the clock. Big, because its whole job is to be impossible to miss, and
    it scales DOWN as it fades so the eye reads it as a beat landing rather than a thing appearing. */
@@ -3300,8 +3331,15 @@ export const GROVE_CSS = `
 .gv-act-rack { position: relative; padding: 9px 9px 22px; border-radius: 10px; touch-action: none;
     background: rgba(6,8,10,0.55); border: 1px solid rgba(0,0,0,0.6);
     box-shadow: inset 0 3px 14px rgba(0,0,0,0.55); }
-.gv-act-pegs { position: relative; height: 150px; display: flex; flex-direction: column;
-    justify-content: space-between; }
+/* ⚠️ 150px WAS THE WHOLE COMPLAINT. Luke: "the Plinko screen needs to be like way taller. It's like,
+   it feels like it's been shoved in the bottom portion of the screen." It was: a fixed 150px board
+   under two stacked headers, so the ball crossed the entire rack in well under a second and the stage
+   that decides the item's QUALITY was the smallest thing on the page.
+   Viewport-relative with a floor and a ceiling, so a short phone still gets a real board and a desktop
+   does not get an absurd one. The peg rows space themselves out, so the only thing that changes is how
+   far the ball falls -- which is the drama. */
+.gv-act-pegs { position: relative; height: clamp(230px, 44vh, 380px); display: flex;
+    flex-direction: column; justify-content: space-between; }
 .gv-act-pegrow { display: flex; justify-content: space-around; }
 .gv-act-pegrow i { width: 5px; height: 5px; border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #efe0bb, #8a7a52 70%, #2a2318);
@@ -3311,15 +3349,35 @@ export const GROVE_CSS = `
 .gv-act-piece { position: absolute; width: 32px; height: 32px; margin: -16px 0 0 -16px;
     display: grid; place-items: center; z-index: 2;
     transition: left 95ms linear, top 95ms linear; }
-.gv-act-piece img { width: 32px; height: 32px; object-fit: contain;
-    filter: drop-shadow(0 0 12px rgba(255,150,40,0.95)) brightness(1.3) saturate(1.25); }
+/* ── THE BALL ──────────────────────────────────────────────────────────────────────────────────
+   --n is how far down the rack it is, 0 at the top and 1 in the bucket. Everything rides it: the hue
+   travels about 210 degrees on the way down, the glow roughly doubles, and the ball grows a little.
+   So the fall LOOKS like it is building to something rather than being a sprite sliding down a wall. */
+.gv-act-orb { display: block; width: calc(20px + 6px * var(--n, 0)); height: calc(20px + 6px * var(--n, 0));
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 34% 28%, rgba(255,255,255,0.95) 0 14%, rgba(255,255,255,0) 46%),
+        radial-gradient(circle at 50% 55%,
+            hsl(calc(42 + 210 * var(--n, 0)) 100% 64%),
+            hsl(calc(14 + 210 * var(--n, 0)) 96% 46%) 72%);
+    box-shadow:
+        0 0 calc(10px + 14px * var(--n, 0)) hsl(calc(42 + 210 * var(--n, 0)) 100% 60% / 0.95),
+        0 0 calc(22px + 30px * var(--n, 0)) hsl(calc(42 + 210 * var(--n, 0)) 100% 55% / 0.45),
+        inset 0 -3px 6px rgba(0,0,0,0.35);
+    animation: gv-act-orb-spin 620ms linear infinite; }
+@keyframes gv-act-orb-spin { to { filter: hue-rotate(26deg); } }
+@media (prefers-reduced-motion: reduce) { .gv-act-orb { animation: none; } }
 .gv-act-piece.is-set { transition: none; animation: gv-act-land 440ms cubic-bezier(.2,1.6,.4,1); }
 @keyframes gv-act-land { 0% { transform: scale(1.45); } 50% { transform: scale(0.78); } 100% { transform: scale(1); } }
 
 .gv-act-burst { position: absolute; bottom: -6px; width: 0; height: 0; z-index: 3; pointer-events: none; }
-.gv-act-burst i { position: absolute; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%;
-    background: var(--band, #ffd75e); box-shadow: 0 0 8px var(--band, #ffd75e);
-    animation: gv-act-spark 720ms ease-out forwards; transform: rotate(var(--a)) translateY(0); }
+.gv-act-burst i { position: absolute; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%;
+    background: var(--band, #ffd75e); box-shadow: 0 0 14px var(--band, #ffd75e), 0 0 26px var(--band, #ffd75e);
+    animation: gv-act-spark 720ms ease-out forwards; transform: rotate(var(--a)) translateY(0);
+    /* ⚠️ AFTER THE SHORTHAND, NEVER BEFORE IT. The animation shorthand resets every animation-*
+       longhand it does not name, so a delay declared above it is silently wiped — the shards would all
+       have left at the same instant and the stagger would have looked like it was never written. */
+    animation-delay: var(--t, 0ms); }
 @keyframes gv-act-spark {
     0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1.2); }
     100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(0.3); }

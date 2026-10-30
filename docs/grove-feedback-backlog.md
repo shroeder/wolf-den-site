@@ -22,7 +22,10 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 | 6 | ⚠️ The bellows timer reset on every tap — armed once now, deaf to taps (item G) | `12f84ec8` |
 | 7 | The craft-ready note moves off the play area to the left edge, beside the menu it is pointing at | `096ec0a8` |
 | 8 | Grove "Leave" goes to the game home, not the shop's landing page | `8dc5bb1e` |
-| 9 | ⚠️ Signing out signed you straight back in — the bridged /shop session was never cleared | `(this)` |
+| 9 | ⚠️ Signing out signed you straight back in — the bridged /shop session was never cleared | `da4a10b2` |
+| 10 | Bellows: a burst of embers on every pump, coloured by how hot the fire is (item I) | `(this)` |
+| 11 | Plinko: the rack is viewport-tall instead of a fixed 150px (item E) | `(this)` |
+| 12 | Plinko: a colourful ball falls, not the item, and the splash is 24 shards (item F) | `(this)` |
 
 ---
 

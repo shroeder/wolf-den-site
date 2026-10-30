@@ -77,6 +77,10 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     // ⚠️ THE CLOCK READS THE TAPS FROM HERE, NOT FROM THE STATE. See the heat clock below: taking `taps`
     // as a dependency is what let a player pump the bellows forever.
     const tapsRef = useRef(0);
+    // ⚠️ ITS OWN COUNTER, NOT `taps`. The ember burst is keyed on this so React remounts the node and the
+    // CSS animation restarts from frame zero on every single pump — re-rendering the same element just
+    // lets a running animation keep running, and the fifth tap in a second would show nothing at all.
+    const [pump, setPump] = useState(0);
     const [heatLeft, setHeatLeft] = useState(HEAT_MS);
     const [marker, setMarker] = useState(0);
     const [hits, setHits] = useState([]);
@@ -172,6 +176,7 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     useEffect(() => {
         if (stage !== STAGE.fire || countIn != null) return undefined;
         tapsRef.current = 0;
+        setPump(0);
         const t0 = performance.now();
         const tick = () => {
             const left = Math.max(0, HEAT_MS - Math.max(0, performance.now() - t0));
@@ -264,6 +269,7 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     const tapHeat = useCallback(() => {
         if (stage !== STAGE.fire) return;
         setTaps((n) => { playHit(Math.min(7, Math.floor((n / HEAT_TARGET) * 8))); tapsRef.current = n + 1; return n + 1; });
+        setPump((n) => n + 1);
     }, [stage]);
 
     // ⚠️ THE SIDE EFFECTS SIT OUTSIDE THE UPDATER. Advancing the stage from inside setHits(prev => ...) ran
@@ -427,7 +433,35 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                         </div>
                         {/* onPointerDown, not onClick: a tap-frequency beat on click fires once per full
                             press-and-release and feels like treacle. */}
+                        {/* ── ⚠️ THE PUMP HAD NO FEEDBACK AT ALL ─────────────────────────────────────
+                            Luke: "when they're tapping, like there's no feedback. There needs to be
+                            visual feedback, like sparks and flames flying around and stuff."
+
+                            ⚠️ THE COALS ALREADY GLOW AND THAT IS NOT THE SAME THING. gv-act-embers is
+                            an AMBIENT loop — eight motes rising forever, faster as the bar fills — so
+                            the fire reacts to your SCORE but nothing reacts to the TAP. This is the
+                            per-press half: one burst thrown on each pump, keyed so it restarts every
+                            time. Separate class, because overriding the ambient one would have put out
+                            the coals to add sparks.
+
+                            ⚠️ THE EMBERS CARRY THE HEAT, which is the half that is not decoration.
+                            `--hot` rises 0 -> 1 with the bar, and the CSS ramps the embers from a dull
+                            red through orange to white. You can see how hot the fire is without reading
+                            the number, which is the whole of teach-by-showing-not-telling: the colour is
+                            the score. */}
                         <button type="button" className="gv-act-hit is-bellows" onPointerDown={tapHeat}>PUMP</button>
+                        {pump > 0 ? (
+                            <span key={pump} className="gv-act-pumpfx" aria-hidden="true"
+                                style={{ "--hot": heat.toFixed(3) }}>
+                                {Array.from({ length: 9 }, (_, i) => (
+                                    <i key={i} style={{
+                                        "--a": `${-90 + (i - 4) * 13 + ((pump * 7 + i * 31) % 11) - 5}deg`,
+                                        "--d": `${34 + ((pump * 13 + i * 17) % 26)}px`,
+                                        "--t": `${(i % 3) * 40}ms`,
+                                    }} />
+                                ))}
+                            </span>
+                        ) : null}
                         <span className="gv-act-clock"><i style={{ width: `${(heatLeft / HEAT_MS) * 100}%` }} /></span>
                     </div>
                 ) : null}
@@ -469,19 +503,40 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
                                         {Array.from({ length: 8 + (r % 2) }, (_, c) => <i key={c} />)}
                                     </span>
                                 ))}
+                                {/* ── ⚠️ A BALL, NOT THE ITEM ────────────────────────────────────────
+                                    Luke: "I don't want it to be the item that Plinkos. I want it to
+                                    just be like a colorful ball or something, but like it has to have
+                                    way more dopamine as it bounces around, and then a massive dopamine
+                                    burst when it splashes at the bottom."
+
+                                    The thing falling was the recipe's own sprite — a 32px pickaxe
+                                    tumbling down a peg board, which reads as the object being dropped
+                                    and damaged rather than as a game being played. A ball has no such
+                                    baggage and can be as loud as it likes.
+
+                                    --n rises 0 -> 1 as it falls and the CSS rides it: the hue travels
+                                    the spectrum, the glow grows, and the trail lengthens. */}
                                 <span className={`gv-act-piece${settled ? " is-set" : ""}`}
                                     style={{
                                         left: `${Math.max(0, Math.min(100, pieceX * 100))}%`,
                                         top: fallRow >= 0 ? `${((fallRow + 1) / PEG_ROWS) * 100}%` : "0%",
+                                        "--n": fallRow >= 0 ? ((fallRow + 1) / PEG_ROWS).toFixed(3) : "0",
                                     }}>
-                                    {art ? <img src={art} alt="" width={32} height={32} /> : null}
+                                    <b className="gv-act-orb" aria-hidden="true" />
                                 </span>
                                 {burst ? (
                                     <span className={`gv-act-burst is-${result?.set?.band}`}
                                         style={{ left: `${Math.max(0, Math.min(100, pieceX * 100))}%`,
                                             "--band": bandTint(result?.set?.band) }} aria-hidden="true">
-                                        {Array.from({ length: 12 }, (_, i) => (
-                                            <i key={i} style={{ "--a": `${i * 30}deg`, "--d": `${18 + (i % 4) * 9}px` }} />
+                                        {/* Twelve shards over 18-45px was a polite puff. Twenty-four over
+                                            three times the throw, with the band's own colour, is the
+                                            "massive dopamine burst when it splashes" Luke asked for. */}
+                                        {Array.from({ length: 24 }, (_, i) => (
+                                            <i key={i} style={{
+                                                "--a": `${i * 15 + (i % 3) * 5}deg`,
+                                                "--d": `${46 + (i % 5) * 22}px`,
+                                                "--t": `${(i % 4) * 26}ms`,
+                                            }} />
                                         ))}
                                     </span>
                                 ) : null}
