@@ -119,10 +119,18 @@ ol.chain .k { font-family: "IBM Plex Mono", monospace; font-size: .74rem; color:
 <p><b>The brief, and the real risk.</b> Luke: <span class="quote">“every time I have you do the work, it
 tends to all kind of be the same and not very unique… it can't just be, like, vanilla, repeat, repeat.”</span></p>
 <p>That is the correct worry, because the generator makes it easy: a map is twelve parts, twelve creatures,
-twelve zones and an emblem, and five maps of that shape will come out as one map wearing five coats of paint.
-So every map below gets <b>one signature mechanic that no other map has</b>, a <b>different mix of creature
-archetypes</b>, a <b>different mix of quest verbs</b>, and its <b>own rare spawn</b> — today there is exactly
-one rare spawn in the entire game and it is shared by all seven maps.</p>
+twelve zones and an emblem, and five maps of that shape will come out as one map wearing five coats of paint.</p>
+<p><b>Draft 1 solved it the wrong way and this draft throws that out.</b> Every map had a “signature
+mechanic” and all five were level-design gimmicks — gear platforms on a cycle, ice that cracked if you stood
+still, a pulse that doubled damage on the beat, fall-death gaps, a floor that was not continuous. Luke:
+<span class="quote">“I dont want any nifty tropes in the platforming levels. Its not fun for players. They
+just want to kill stuff.”</span> He is right, and it is worse than a matter of taste: progression in the
+Grove <i>is</i> kill count, so anything that taxes the kill rate directly lengthens every node — the thing
+we have spent weeks shortening.</p>
+<p>So a map's identity now comes from <b>the roster's behaviour</b>, <b>its density</b> and <b>what it
+drops</b>. Five ways of killing things, not five floors. Each map also gets a different mix of creature
+archetypes, a different mix of quest verbs, and <b>its own rare spawn</b> — today there is exactly one rare
+spawn in the entire game and it is shared by all seven maps.</p>
 <p style="margin-bottom:0">Where a thing genuinely should repeat, it repeats, and I have said so rather than
 inventing difference for its own sake.</p>
 </div>
@@ -161,11 +169,11 @@ new systems in five maps is how a feature becomes a maintenance bill.</p>
 <div class="map-head"><span class="n">08</span><h2>The Clockwork Deep</h2></div>
 <p class="map-blurb">“Something built this, and it was never told to stop.”</p>
 
-<div class="hook"><b>Signature mechanic — the map keeps time</b>
-Gear platforms rotate on one four-second cycle shared by the whole zone. Every map so far threatens you with
-its <i>creatures</i>; this is the first where the <i>terrain</i> is the threat and the creatures are
-incidental. It is also the first terrain that is fully predictable — so it reads as a skill test rather than
-a damage check, which is the opposite of the Ashen Reach before it.</div>
+<div class="hook"><b>Signature roster — nothing here flinches</b>
+Everything is armoured: high health, low damage, and <i>no stagger</i>. You cannot interrupt anything on this
+map, so a fight is sustained output and target priority rather than reacting. It is the slowest kill rate in
+the game and it is paid for in <code>salvage</code> — this is where the deeper parts come from. No floor
+tricks; the platforms are platforms.</div>
 
 <div class="two">
 <div class="card"><h4>The Mark</h4>
@@ -195,8 +203,8 @@ harder to survive.</p></div>
 <tr><td class="id">11</td><td>The Ratchet Stair</td><td class="arch">clockwork</td><td>One Way Up</td></tr>
 <tr><td class="id">12</td><td>The Mainspring</td><td class="arch">clockwork</td><td>The Mainspring Itself</td></tr>
 </table></div>
-<p class="meta">The Ratchet Stair is one-way by design: the first zone in the game you cannot walk back
-through, which is what makes the Mainspring feel like an ending rather than a twelfth room.</p>
+<p class="meta">The Ratchet Stair and the Mainspring are the two densest zones — the roster thickens toward
+the end of the map rather than the layout changing.</p>
 
 <h3>Creatures</h3>
 <p class="meta">Archetype mix: 3 brute · 3 swarm · 2 striker · 2 caster · 2 stalker · <b>0 grazer</b>.
@@ -209,10 +217,10 @@ in it.</p>
 <tr><td class="id">solder_rat</td><td>Solder Rat</td><td class="arch">swarm</td><td class="say">Chews the joints. The joints are load-bearing.</td></tr>
 <tr><td class="id">piston_hound</td><td>Piston Hound</td><td class="arch">brute</td><td class="say">One stroke forward, and it does not stop early.</td></tr>
 <tr><td class="id">flywheel</td><td>The Flywheel</td><td class="arch">brute</td><td class="say">Already moving when you arrive. Still moving after.</td></tr>
-<tr><td class="id">anvil_drone</td><td>Anvil Drone</td><td class="arch">brute</td><td class="say">Hits once a cycle, on the cycle, forever.</td></tr>
+<tr><td class="id">anvil_drone</td><td>Anvil Drone</td><td class="arch">brute</td><td class="say">Hits like a dropped anvil and takes an age to lift again.</td></tr>
 <tr><td class="id">governor_wasp</td><td>Governor Wasp</td><td class="arch">striker</td><td class="say">Keeps the others to time. Punishes the slow ones.</td></tr>
 <tr><td class="id">ratchet_adder</td><td>Ratchet Adder</td><td class="arch">striker</td><td class="say">Goes one way. Cannot be pushed back.</td></tr>
-<tr><td class="id">arc_coil</td><td>Arc Coil</td><td class="arch">caster</td><td class="say">Charges on the beat and lets go on the next.</td></tr>
+<tr><td class="id">arc_coil</td><td>Arc Coil</td><td class="arch">caster</td><td class="say">Charges visibly, and there is nothing to do about it but out-damage it.</td></tr>
 <tr><td class="id">steam_censer</td><td>Steam Censer</td><td class="arch">caster</td><td class="say">Vents where you were going to stand.</td></tr>
 <tr><td class="id">oil_crawler</td><td>Oil Crawler</td><td class="arch">stalker</td><td class="say">Black on black, under the floor you are on.</td></tr>
 <tr><td class="id">gauge_watcher</td><td>Gauge Watcher</td><td class="arch">stalker</td><td class="say">Reads the dial. Moves when the needle does.</td></tr>
@@ -246,17 +254,17 @@ maps deep who picked wrong at map three.</p>
 <div class="card"><h4>Keeper Sprocket <span class="meta">· oiler who never stops walking</span></h4>
 <p class="quote">“Don't stand still. Neither does anything else.”</p>
 <ol class="chain">
-<li><span class="k">survive</span> Stand the Cycle</li>
+<li><span class="k">survive</span> Outlast the Armour</li>
 <li><span class="k">cull</span> Clear the Teeth</li>
 <li><span class="k">forge</span> An Oil That Holds</li>
 <li><span class="k">delve</span> Two Floors Down</li>
 </ol></div>
-<div class="card"><h4>The Timekeeper <span class="meta">· counts the cycle out loud</span></h4>
-<p class="quote">“Four. Three. You'll learn to like the number.”</p>
+<div class="card"><h4>The Tallyman <span class="meta">· counts what the machine has eaten</span></h4>
+<p class="quote">“Four hundred and six. You'd be four hundred and seven.”</p>
 <ol class="chain">
-<li><span class="k">delve</span> Count With Me</li>
-<li><span class="k">survive</span> A Full Rotation</li>
-<li><span class="k">ticket</span> On the Beat</li>
+<li><span class="k">cull</span> Make It Four-Ten</li>
+<li><span class="k">delve</span> Where the Count Gets Worse</li>
+<li><span class="k">ticket</span> A Number Worth Having</li>
 </ol></div>
 <div class="card"><h4>Widow Flint <span class="meta">· scavenges the stopped machines</span></h4>
 <p class="quote">“The dead ones are the safe ones. There aren't many.”</p>
@@ -268,12 +276,11 @@ maps deep who picked wrong at map three.</p>
 </ol></div>
 <div class="card"><h4>Coliseum · Foreman Gall <span class="meta">· zone 8</span></h4>
 <p class="quote">“The floor turns whether you're on it or not. Two minutes.”</p>
-<p style="margin:0"><b>What's different:</b> the arena floor itself rotates. Waves arrive at fixed points on
-the cycle, so wave timing is readable and position is the whole problem — the only Coliseum where standing
-in the right place matters more than killing fast.</p></div>
+<p style="margin:0"><b>What's different:</b> the longest clock of any Coliseum, because nothing here dies
+fast. Waves are small and armoured, and the wave count is the score. The ring that rewards raw damage.</p></div>
 </div>
-<p class="meta" style="margin-top:14px">Verb mix: <b>survive 2 · delve 2 · harvest 2 · cull 2 · forge 1 · ticket 1 · hunt 1</b>.
-Heavy on <code>survive</code> and <code>delve</code>, because enduring the cycle <i>is</i> the map.</p>
+<p class="meta" style="margin-top:14px">Verb mix: <b>cull 3 · delve 2 · harvest 2 · survive 1 · forge 1 · ticket 1 · hunt 1</b>.
+Cull-heavy, because on the slowest-killing map in the game a kill quota is the honest ask.</p>
 </section>
 
 <!-- ═══════════════════════════════ MAP 9 ═══════════════════════════════ -->
@@ -281,10 +288,11 @@ Heavy on <code>survive</code> and <code>delve</code>, because enduring the cycle
 <div class="map-head"><span class="n">09</span><h2>The Frostmere</h2></div>
 <p class="map-blurb">“Black water under white ice, and the ice is the floor.”</p>
 
-<div class="hook"><b>Signature mechanic — standing still is the danger</b>
-Shelf ice cracks under a stationary player. A cold meter fills while you are still and empties while you
-move, and at full it drops you through. Every other map in the game rewards careful, patient play; this one
-punishes it, which is why it belongs <i>after</i> the Clockwork Deep taught you to wait for a beat.</div>
+<div class="hook"><b>Signature roster — it hits you and leaves</b>
+Ambushers. Things come up through a breathing hole or out of a drift, land one heavy hit, and <i>disengage</i>
+to reposition rather than standing and trading. Low health, high burst, and the most re-engagements per kill
+of any map. Frantic without a single thing on the floor moving — the opposite of the Clockwork Deep's
+immovable wall of armour, and the reason it sits right after it.</div>
 
 <div class="two">
 <div class="card"><h4>The Mark</h4>
@@ -385,8 +393,8 @@ unlock”: make an old system matter again rather than bolt a new one on.</p>
 </ol></div>
 <div class="card"><h4>Coliseum · The Hollow Caller <span class="meta">· zone 6</span></h4>
 <p class="quote">“We cut a ring in the shelf. Two minutes before it takes it back.”</p>
-<p style="margin:0"><b>What's different:</b> the arena <i>shrinks</i>. The ring refreezes inward each wave,
-so late waves are fought in a space a third the size. Pressure comes from the floor, not the spawn rate.</p></div>
+<p style="margin:0"><b>What's different:</b> waves arrive from <i>behind</i> as often as in front. The only
+ring where you are surrounded by default, which is the map's ambush roster turned into a format.</p></div>
 </div>
 <p class="meta" style="margin-top:14px">Verb mix: <b>delve 3 · survive 2 · harvest 2 · cull 1 · forge 1 · hunt 1 · ticket 1</b>.
 Delve-heavy: on a map that punishes standing still, the quests should keep asking you to <i>go</i>.</p>
@@ -397,10 +405,11 @@ Delve-heavy: on a map that punishes standing still, the quests should keep askin
 <div class="map-head"><span class="n">10</span><h2>The Hollow Colossus</h2></div>
 <p class="map-blurb">“It died standing, and the inside never got the message.”</p>
 
-<div class="hook"><b>Signature mechanic — the map has a pulse</b>
-A six-second heartbeat dims and brightens the whole zone. <i>Creatures hit harder on the beat and are
-staggerable off it.</i> Map 8 made the terrain rhythmic; this makes the enemies rhythmic, so the skill you
-learned there transfers and then inverts — there you moved to the beat, here you strike between them.</div>
+<div class="hook"><b>Signature roster — one kill becomes three</b>
+Corpses rupture. Most creatures here split into two or three smaller ones on death, and those have to be
+cleared too. It is by a wide margin the densest map in the game and the best multi-kill map in it — which is
+exactly why its Mark is lifesteal, because you will be standing in the middle of the pile. Kill count per
+minute is the highest of the five until map 11.</div>
 
 <div class="two">
 <div class="card"><h4>The Mark</h4>
@@ -438,7 +447,7 @@ Caster-heavy because a body's defences are chemical — things here spray, bloom
 <tr><td class="id">antibody</td><td>The Antibody</td><td class="arch">caster</td><td class="say">You are the wound. It is doing its job.</td></tr>
 <tr><td class="id">bone_knitter</td><td>Bone Knitter</td><td class="arch">caster</td><td class="say">Repairs the others mid-fight, badly, and they keep going.</td></tr>
 <tr><td class="id">the_cough</td><td>The Cough</td><td class="arch">caster</td><td class="say">Clears the passage. You are in the passage.</td></tr>
-<tr><td class="id">bile_bloom</td><td>Bile Bloom</td><td class="arch">caster</td><td class="say">Opens on the beat and closes before you reach it.</td></tr>
+<tr><td class="id">bile_bloom</td><td>Bile Bloom</td><td class="arch">caster</td><td class="say">Opens, floods the room, and is sealed again before you cross it.</td></tr>
 <tr><td class="id">marrow_crawler</td><td>Marrow Crawler</td><td class="arch">stalker</td><td class="say">Comes out of the bone, not along it.</td></tr>
 <tr><td class="id">vein_eel</td><td>Vein Eel</td><td class="arch">stalker</td><td class="say">Travels the walls. Arrives from a direction with no door.</td></tr>
 <tr><td class="id">hollow_child</td><td>Hollow Child</td><td class="arch">stalker</td><td class="say">Something that got in and grew up in here.</td></tr>
@@ -484,9 +493,9 @@ a run produce something, which the game currently has no version of at all.</p>
 <li><span class="k">delve</span> All the Way</li>
 </ol></div>
 <div class="card"><h4>The Listener <span class="meta">· ear to the wall, always</span></h4>
-<p class="quote">“Six seconds. Count it. It matters.”</p>
+<p class="quote">“It's still got something in it that's moving. Several somethings.”</p>
 <ol class="chain">
-<li><span class="k">survive</span> On the Off-Beat</li>
+<li><span class="k">survive</span> Clear a Whole Chamber</li>
 <li><span class="k">hunt</span> The Second One</li>
 </ol></div>
 <div class="card"><h4>Gristle <span class="meta">· eats what the body makes</span></h4>
@@ -496,11 +505,11 @@ a run produce something, which the game currently has no version of at all.</p>
 <li><span class="k">harvest</span> The Good Cuts</li>
 <li><span class="k">ticket</span> Somewhere With a Crowd</li>
 </ol></div>
-<div class="card"><h4>Coliseum · The Pulse-Keeper <span class="meta">· zone 7</span></h4>
-<p class="quote">“The ring beats with it. Fight on the beat or don't.”</p>
-<p style="margin:0"><b>What's different:</b> damage dealt <i>on</i> the beat is doubled and damage taken on it
-is too. The only Coliseum where the optimal play is a rhythm, and the only one where a careful player can be
-slower than a reckless one.</p></div>
+<div class="card"><h4>Coliseum · The Butcher's Clerk <span class="meta">· zone 7</span></h4>
+<p class="quote">“Kill one, get two. Kill two, get four. Still interested?”</p>
+<p style="margin:0"><b>What's different:</b> every kill splits, so the wave in front of you grows as you
+fight it. The only ring where killing faster makes it <i>harder</i> before it makes it easier — and the only
+one where a wave can genuinely run away from you.</p></div>
 </div>
 <p class="meta" style="margin-top:14px">Verb mix: <b>delve 2 · harvest 2 · cull 2 · forge 1 · survive 1 · hunt 1 · ticket 1</b>.
 Vell's five-step chain is the longest on any map — she is the only NPC with a destination, and the chain is
@@ -512,22 +521,22 @@ the walk to it.</p>
 <div class="map-head"><span class="n">11</span><h2>The Cloudshelf</h2></div>
 <p class="map-blurb">“Stone that forgot to fall, and a long way down.”</p>
 
-<div class="hook"><b>Signature mechanic — the gaps are real</b>
-Islands are separated by genuine drops. Falling costs you the zone, not health — the first real
-<i>traversal</i> failure state in the Grove. It is also the only map where the Mark changes how you move
-rather than how you fight, so a player who has collected here plays the terrain differently.</div>
+<div class="hook"><b>Signature roster — they never stop coming</b>
+Flyers, arriving from off-screen in a continuous stream rather than standing around the zone waiting to be
+found. No walking to the next fight: the next fight arrives. Highest kills-per-minute in the game, which
+makes this the farm map — and the Mark makes the stream occasionally produce something worth stopping for.</div>
 
 <div class="two">
 <div class="card"><h4>The Mark</h4>
-<p style="margin:0"><b>The Shelf Mark</b> — <code>updraft</code>, +4%/star.<br>
-<span class="meta">NEW STAT.</span> Jump height and glide. Consumer: <code>grove-physics.js</code>, which
-already owns jump velocity and gravity — this scales a number that exists. <b>⚠️ It is also the riskiest
-thing in this document</b>, because it changes traversal and therefore every zone's platform layout
-tolerance. Worth building last, and worth a scripted check that no zone becomes unreachable <i>or</i>
-trivial at six stars.</p></div>
+<p style="margin:0"><b>The Shelf Mark</b> — <code>rare_spawn</code>, +1.2%/star.<br>
+<span class="meta">EXISTING STAT.</span> <s>Draft 1 proposed <code>updraft</code> — jump height.</s> Cut: it
+is a traversal stat, and traversal is exactly what should not be carrying a map's identity. <code>rare_spawn</code>
+is currently granted by one card in the whole game, and on the map with the highest throughput it is the
+stat that turns volume into something worth looking at.</p></div>
 <div class="card"><h4>Rare spawn</h4>
-<p style="margin:0"><b>The Sky-Herd Bull</b> — a flying grazer that flees <i>outward</i>, over the gap, and
-has to be killed before it leads you off a shelf. The first rare whose danger is the chase.</p></div>
+<p style="margin:0"><b>The Sky-Herd Bull</b> — arrives <i>with</i> a wave rather than spawning in the zone,
+so it has to be picked out of a crowd and killed before the crowd is. The first rare that is a target
+priority problem.</p></div>
 </div>
 
 <h3>Zones &amp; bosses</h3>
@@ -616,9 +625,9 @@ system rather than invent a new one.</p>
 </ol></div>
 <div class="card"><h4>Coliseum · Skymarshal Ren <span class="meta">· zone 5</span></h4>
 <p class="quote">“Ring's got no walls. Mind the edges.”</p>
-<p style="margin:0"><b>What's different:</b> no walls — you can be knocked out of it, and being knocked out
-ends the run. The only Coliseum you can lose without dying, and the reason the <code>gale_swarm</code>
-exists.</p></div>
+<p style="margin:0"><b>What's different:</b> no gaps between waves. Everywhere else you get a breath; here
+the next wave is already inbound when the last one dies. The ring that tests how long you can keep output up
+rather than how hard you can burst.</p></div>
 </div>
 <p class="meta" style="margin-top:14px">Verb mix: <b>delve 2 · harvest 2 · cull 2 · forge 1 · survive 1 · hunt 1 · ticket 1</b>.</p>
 </section>
@@ -628,10 +637,10 @@ exists.</p></div>
 <div class="map-head"><span class="n">12</span><h2>The Starfall Rim</h2></div>
 <p class="map-blurb">“Past the last air. Nothing here is holding anything up.”</p>
 
-<div class="hook"><b>Signature mechanic — there is no ground</b>
-The zone is drifting rock with no continuous floor. Every other map in the game assumes a walkable baseline;
-the last one takes it away. This is the capstone and it should feel like the rules ending, not like map 11
-with different art.</div>
+<div class="hook"><b>Signature roster — few, enormous, and worth it</b>
+A handful of huge things per zone instead of a crowd. Each takes real commitment and pays many kill credits,
+so the counter moves in jumps rather than a stream. The exact inverse of the Cloudshelf before it, and the
+right last note: after a map where you never stop swinging, a map where every engagement is a decision.</div>
 
 <div class="two">
 <div class="card"><h4>The Mark</h4>
@@ -734,8 +743,9 @@ objective, which is the last map saying something no amount of dialogue would.</
 </ol></div>
 <div class="card"><h4>Coliseum · The Rimward Herald <span class="meta">· zone 10</span></h4>
 <p class="quote">“No floor, no walls, no crowd. Just the two minutes.”</p>
-<p style="margin:0"><b>What's different:</b> fought on drifting fragments that separate as the run goes on, so
-the arena <i>disassembles</i> beneath you. The Frostmere's ring shrank; this one comes apart.</p></div>
+<p style="margin:0"><b>What's different:</b> one enormous foe per wave instead of a crowd. Twelve waves,
+twelve single fights, on the same two-minute clock — the only ring where the timer is beaten by damage per
+fight rather than by clearing speed.</p></div>
 </div>
 <p class="meta" style="margin-top:14px">Verb mix: <b>delve 2 · harvest 2 · cull 2 · forge 1 · survive 1 · hunt 1 · ticket 1</b>.</p>
 </section>
@@ -749,10 +759,13 @@ the arena <i>disassembles</i> beneath you. The Frostmere's ring shrank; this one
 aerie, observatory — all <i>reach back</i> and make an older system matter again rather than add a new one.
 Four of the five are new code. The cheap alternative is that towns 8–12 are pure waypoints with a store and
 nothing else, which is honest but dull.</li>
-<li><b>Two new stats.</b> <code>salvage</code> (map 8) is low-risk — it scales a rate that already exists.
-<code>updraft</code> (map 11) is <b>the riskiest item in this document</b>: it changes traversal, and a
-six-star player could trivialise or break platform layouts. If you want map 11 cheap, swap it for
-<code>move_speed</code> and keep the falling as flavour.</li>
+<li><b>One new stat, down from two.</b> <code>salvage</code> (map 8) is low-risk — it scales a rate that
+already exists in <code>creatureRareLoot</code>. <code>updraft</code> is cut entirely: it was a traversal
+stat, and traversal is the thing that should not be carrying a map.</li>
+<li><b>Rupturing corpses</b> (map 10) is the only roster behaviour here that needs new engine work — a kill
+that spawns smaller foes at the death position. Everything else (no stagger, disengage-after-hit, stream
+spawning, few-and-huge) is tuning numbers the spawner already has. It is also the one with a real failure
+mode: a rupture chain that never terminates. Needs a hard depth cap of one split.</li>
 <li><b>Per-map rare spawns.</b> There is one rare spawn in the entire game today, shared by all seven maps.
 Five new ones is five creatures of art and a <code>GROVE_RARE</code> that becomes a per-map lookup. I think
 it is the single highest-value item here, because <code>hunt</code> quests currently all point at the same
@@ -790,6 +803,7 @@ point the answer can be “stop”, and the maps already generated stay playable
 </div>
 
 <hr>
-<p class="meta">Draft 1 · nothing implemented · <code>docs/grove-maps-8-12-design.html</code></p>
+<p class="meta">Draft 2 · nothing implemented · <code>docs/grove-maps-8-12-design.html</code><br>
+Draft 1 gave every map a level-design gimmick. All five are cut; identity comes from the roster now.</p>
 
 </div>
