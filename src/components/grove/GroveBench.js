@@ -286,7 +286,10 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // sentence means.
     const GOOD = new Set(QUALITY_BANDS.slice(0, 3).map((b) => b.id));
     const goodShare = (list) => (list || []).filter((b) => GOOD.has(b.id)).reduce((a, b) => a + (b.share || 0), 0);
-    const topBandName = `${QUALITY_BANDS[2].name}+`;
+    // ⚠️ "Fine+" WAS SHORTHAND FOR NOTHING THE PLAYER HAD EVER SEEN. The bench printed it beside two
+    // bare percentages and Luke read the result as noise: "Wtf is temper and plus q1 parts". A `+` suffix
+    // is a convention from spreadsheets, not from the game — nowhere else does the Grove say "Fine+".
+    const topBandName = `${QUALITY_BANDS[2].name} or better`;
     const topOdds = goodShare(odds);
     const topOddsT = goodShare(lvl.oddsTempered);
     const recent = lvl.recent || [];
@@ -719,6 +722,52 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     })}
                                 </ul>
                             </div>
+                            </div>
+
+                            {/* ── ⚠️ ONE ACTION BAR, ACROSS THE BOTTOM ───────────────────────────
+                                Luke: "i hate the craft item rows and buttons."
+
+                                These controls used to be a THIRD COLUMN of the card's grid, which cost
+                                twice. It squeezed the body into about 250px, so the recipe's own name,
+                                its tags and its part chips all wrapped against a wall while a tall thin
+                                column of buttons sat beside them half empty; and because the grid was
+                                centred, the Craft button floated at a different height on every row, so
+                                scanning a list of them was scanning a staircase.
+
+                                Everything you can DO to a recipe is on one line now, in the same place
+                                on every card. The card above it is what the thing is; this is what you
+                                can do about it. */}
+                            <div className="gv-rec-bar">
+                            {/* ⚠️ IT HAS TO SAY THE BARGAIN, NOT NAME IT. What stood here was a grey box
+                                labelled TEMPER beside "34% → 44%  Fine+ · +4 parts", and Luke read it
+                                cold and asked "Wtf is temper and plus q1 parts". Every piece of that was
+                                jargon: a forge word for a noun, two percentages with no subject, a
+                                spreadsheet `+` suffix, and a part count that never says which parts.
+
+                                The bargain in English is: pay a share of the recipe again, before you
+                                roll, and the roll bends upward. So the control says that — and the
+                                numbers it is ASKED to justify only appear once it is armed, because
+                                arming it is free and watching the odds move is a better explanation
+                                than a sentence about them (teach-by-showing-not-telling). The part
+                                chips above already restate their own cost with the surcharge in it, so
+                                "which parts" is answered where the parts are. */}
+                            {canTemper ? (
+                                <button type="button"
+                                    className={`gv-temper${temperOn ? " is-on" : ""}`}
+                                    aria-pressed={temperOn}
+                                    onClick={() => setTempering(temperOn ? null : r.id)}>
+                                    <span className="gv-temper-box" aria-hidden="true" />
+                                    <span className="gv-temper-say">
+                                        {temperOn ? (
+                                            <>Spending <b>{temperExtra} more parts</b> — {topBandName}{" "}
+                                                <b>{Math.round(topOddsT * 100)}%</b>,
+                                                was {Math.round(topOdds * 100)}%</>
+                                        ) : (
+                                            <>Spend <b>{temperExtra} more parts</b> for a better roll</>
+                                        )}
+                                    </span>
+                                </button>
+                            ) : null}
 
                             {/* ⚠️ "Built" WAS A DEAD END, AND IT IS THE ONLY STATE A FINISHED PLAYER EVER
                                 SEES. A tool you own showed a disabled button saying so and nothing else --
@@ -734,13 +783,13 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                         : `Rework · ${reworkShort} short`}
                                 </button>
                             ) : (
-                                /* ⚠️ A REAL BOX, NOT A FRAGMENT. gv-rec-main is a three-column grid
-                                   (art · body · action) and a fragment creates no box -- the two
-                                   buttons would be grid items four and five, and the second would
-                                   wrap onto a second row underneath the artwork. One wrapper keeps
-                                   the grid at three children and stacks the pair itself. Same
-                                   family as [[abspos-inside-grid-lands-in-a-cell]]. */
-                                <div className="gv-rec-acts">
+                                /* ⚠️ A FRAGMENT IS CORRECT *NOW*, AND WAS NOT BEFORE. While these
+                                   lived in the third column of gv-rec-main, a fragment made the two
+                                   buttons grid items four and five and the second wrapped under the
+                                   artwork -- so they were given a wrapper box. The bar is a flex row
+                                   that WANTS them as siblings, and keeping the wrapper would nest a
+                                   second layout box inside it for nothing. */
+                                <>
                                 <button type="button" className="gv-rec-go"
                                     disabled={!ready || busy === r.id}
                                     onClick={() => craft(r)}>
@@ -783,7 +832,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                         </div>
                                     );
                                 })() : null}
-                                </div>
+                                </>
                             )}
                             </div>
                             {/* ── ⚠️ THE ONE DECISION A CRAFT HAS EVER OFFERED ───────────────────
@@ -796,26 +845,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 percentages are a decision. Both come from the server's own curve
                                 (st.craft.odds / oddsTempered), so what is printed here is exactly
                                 what the roll will be run against. */}
-                            {canTemper ? (
-                                <div className={`gv-temper${temperOn ? " is-on" : ""}`}>
-                                    <button type="button" className="gv-temper-go"
-                                        aria-pressed={temperOn}
-                                        onClick={() => setTempering(temperOn ? null : r.id)}>
-                                        {temperOn ? "Tempering" : "Temper"}
-                                    </button>
-                                    {/* ⚠️ ONE LINE, NOT THREE FLEX CHILDREN. The card's body column is
-                                        about 250px on a phone — the art sits beside it — and three
-                                        separate items at that width wrapped INSIDE themselves and
-                                        overlapped: "+8 parts" printed on top of "44%". One nowrap
-                                        string cannot collide with itself. */}
-                                    <span className="gv-temper-odds">
-                                        {Math.round(topOdds * 100)}%
-                                        <i aria-hidden="true">&rarr;</i>
-                                        <b>{Math.round(topOddsT * 100)}%</b>
-                                        <em>{topBandName} · +{temperExtra} parts</em>
-                                    </span>
-                                </div>
-                            ) : null}
                         </li>
                     );
                 })}
