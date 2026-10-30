@@ -4,6 +4,10 @@ Started 2026-10-07. **Nothing is in code yet** beyond what the build log at the 
 running design document: decisions get written here as Luke makes them, so a later session starts from the
 decisions instead of re-deriving them.
 
+**Last reconciled with the game 2026-10-30.** Inventory limits, the bank and move speed were removed that
+day; §6 is rewritten and the stale lines are struck rather than erased. Maps 8–12 have their own spec at
+`docs/grove-maps-8-12-design.html`, and §11's open questions still stand.
+
 ---
 
 ## 1. The shape
@@ -119,18 +123,36 @@ craft it**.
 
 - decorations for the farm
 - **up to 2 additional farm plots**
-- **backpack and bank expansions** (see §6)
+- ~~backpack and bank expansions~~ — **deleted 2026-10-30**, see §6
 
 ---
 
-## 6. Inventory and the bank
+## 6. Inventory — no limit, and no bank
 
-- **Backpack: 16 unique slots** to start.
-- **Bank: up to 64 slots**, located in town.
-- An **inventory screen** to see everything collected.
+⚠️ **THIS SECTION DESCRIBED A GAME THAT NO LONGER EXISTS, AND IS KEPT ONLY AS THE RECORD OF WHY.** Until
+2026-10-30 the bag held **16 distinct parts**, the bank held **up to 64** in town, and five backpack and
+three vault expansions were crafted to raise them — unique, one-time, Roman-numbered, each its own recipe.
 
-**Expansions are crafted.** Each expansion is **unique and one-time**, numbered with **Roman numerals** (I,
-II, III …) to say which one it is, and **each has its own recipe**.
+**All of it is gone** (d5581415). Luke: *"I think we get rid of the idea of a bank. And get rid of bag slot
+limits. And get rid of bank and backpack expansions. Its just a lame mechanic that is a meaningless tax on
+the player."*
+
+The sharpest evidence that it was a tax is what the code around it had to be careful about: **loot the
+player watched land and then did not receive**. The overflow map, the FULL badge on the menu, the "n slots
+left" warning, the room counter, and the chest path having to pay through the same rule so it would not
+quietly differ — every one of those existed to make a tax *legible*, not to make the game better.
+
+**What is true now:**
+
+- No bag limit. **Everything found is both seen and stored.**
+- No bank, no second grid, no tap-to-bank and tap-to-take. Bag cells are labels, not buttons.
+- Eight expansion recipes deleted. `ONE_OFF_KINDS` keeps only `plot` and `tool`, which are genuinely
+  one-of-a-kind.
+- ⚠️ **The columns stay.** `pack_slots` / `bank_slots` / `packs_built` / `banks_built` are still on the row
+  and nothing reads them. Dropping columns is how you lose the record of what somebody crafted before the
+  rule changed.
+
+Discovery is still **seeing** rather than keeping, and that now costs nothing to honour.
 
 ---
 
@@ -258,7 +280,7 @@ same tables and the server never trusts what the client says it killed.
 - **12 enemies**, each with its own loot table, parts, emblem and behaviour (zones 1-2 fully passive)
 - **16 parts**, **22 recipes**, **13 emblems** with the 6-star breakpoint ladder
 - **6 new tool slots** — rod, pick, shovel, hammer, hoe, sextant
-- backpack I-V and vault I-VI, Roman-numbered, one-time, each its own recipe
+- ~~backpack I-V and vault I-VI, Roman-numbered, one-time, each its own recipe~~ — **deleted 2026-10-30**
 - 3 farm decorations and the **two** plot recipes
 - **The Crystal Stag** rare spawn at 0.40% per enemy — the ONLY thing here that pays gold or can drop a chest
 - difficulty curve, boss hp by zone: 18 → 29 → 54 → 93 → 151 → 225 → 315 → 443 → 583 → 756 → 956 → 1238
@@ -303,8 +325,11 @@ multipliers and forge scrolls, and the delve potions are run-scoped charges rath
 grows its own: four foods crafted from its own parts (Moss Poultice 25% to Heartwood Draught 100%), each
 craft making a stack. One belt slot; the scene eats automatically below **60%** of max HP.
 
-⚠️ Food takes a BAG SLOT like a part does, which is the whole tension of it - carrying healing costs you
-carrying loot, and slots are the scarcest thing a player has.
+⚠️ ~~Food takes a BAG SLOT like a part does, which is the whole tension of it - carrying healing costs you
+carrying loot, and slots are the scarcest thing a player has.~~ **STALE 2026-10-30.** Slots are no longer
+scarce and there is no tension left to trade: the belt slot is the only limit on food, and carrying healing
+costs nothing but the parts it was made from. The food ladder is unaffected — it was always the heal
+fraction that mattered, not the cost in room.
 
 **Tools are a ladder across the maps, not six items.** The first cut was wrong and worth recording: it made
 one Rootwood Rod, one Antler Pick and so on - six terminal items, craft each once and the entire tool idea

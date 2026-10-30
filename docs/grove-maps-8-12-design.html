@@ -110,27 +110,35 @@ ol.chain .k { font-family: "IBM Plex Mono", monospace; font-size: .74rem; color:
 
 <div class="wrap">
 
-<p class="meta">THE WOLF DEN · GROVE · DESIGN SPEC · DRAFT FOR REVIEW</p>
+<p class="meta">THE WOLF DEN · GROVE · DESIGN SPEC · DRAFT 3 FOR REVIEW</p>
 <h1>Maps 8 to 12</h1>
-<p class="lede">Five maps, 60 zones, 60 bosses, 60 creatures, 60 parts, 20 NPCs, 15 quest chains and
-5 Coliseums. Nothing here is built yet. This is the thing to argue with before any of it is.</p>
+<p class="lede">Five maps, 60 zones, 60 bosses, 60 creatures, 60 parts, <b>85 authored craftables</b>, 20 NPCs, 15 quest chains and 5 Coliseums. No new mechanics, no new systems, and nothing asked of the seven maps that already work.</p>
 
 <div class="note">
-<p><b>The brief, and the real risk.</b> Luke: <span class="quote">“every time I have you do the work, it
-tends to all kind of be the same and not very unique… it can't just be, like, vanilla, repeat, repeat.”</span></p>
-<p>That is the correct worry, because the generator makes it easy: a map is twelve parts, twelve creatures,
-twelve zones and an emblem, and five maps of that shape will come out as one map wearing five coats of paint.</p>
-<p><b>Draft 1 solved it the wrong way and this draft throws that out.</b> Every map had a “signature
-mechanic” and all five were level-design gimmicks — gear platforms on a cycle, ice that cracked if you stood
-still, a pulse that doubled damage on the beat, fall-death gaps, a floor that was not continuous. Luke:
-<span class="quote">“I dont want any nifty tropes in the platforming levels. Its not fun for players. They
-just want to kill stuff.”</span> He is right, and it is worse than a matter of taste: progression in the
-Grove <i>is</i> kill count, so anything that taxes the kill rate directly lengthens every node — the thing
-we have spent weeks shortening.</p>
-<p>So a map's identity now comes from <b>the roster's behaviour</b>, <b>its density</b> and <b>what it
-drops</b>. Five ways of killing things, not five floors. Each map also gets a different mix of creature
-archetypes, a different mix of quest verbs, and <b>its own rare spawn</b> — today there is exactly one rare
-spawn in the entire game and it is shared by all seven maps.</p>
+<p><b>The brief, corrected.</b> Luke: <span class="quote">“the uniqueness I was talking about and the lack
+of variety was more about crafting, not crazy weird tropes and making things all different… I don't want to
+mess with the base game.”</span> And: <span class="quote">“I was hoping that, like, crafting and items would
+be unique.”</span></p>
+<p><b>Two drafts got this wrong in two different directions.</b> Draft 1 gave every map a level-design
+gimmick — gear platforms on a cycle, ice that cracked if you stood still, fall-death gaps. Draft 2 cut those
+and replaced them with engineered roster behaviour: armour that could not be staggered, hit-and-disengage
+ambushers, corpses that ruptured into smaller foes. Both were the same mistake with different paint. The ask
+was never for the maps to <i>play</i> differently.</p>
+<p><b>So this draft asks nothing of the engine at all.</b> No new spawner rules, no new combat behaviour, no
+per-map mechanic. The rosters fight the way everything in the Grove fights. The five maps are a place, a
+roster, a drop table and a bench — and the bench is where the work went.</p>
+<p><b>Which is the right place for it, because the bench is where the repetition actually is.</b> The
+generator in <code>grove-maps.js</code> says so in its own comment: <span class="quote">“NO NEW KIND OF
+OBJECT is ever introduced after map one… from map two onward the bench is twelve tool ladders and a food
+stack, for eleven maps. A player at map nine is crafting the same twelve objects they crafted on day one in
+a new vocabulary.”</span> Maps 8–12's 80 recipes exist today and <b>not one of them was designed</b>:
+<code>toolRecipesForMap</code> takes the first material of each of three roles, and
+<code>foodRecipesForMap</code> presses whatever is left over into the same four heals. That is the vanilla
+repeat, and it is mechanical.</p>
+<p><b>The fix is not a new system. It is care.</b> Luke: <span class="quote">“Just be thoughtful when making
+each maps craftables.”</span> So all 85 are authored below — each tool's three materials chosen rather than
+taken in order, each one named, each one saying what that place makes it into. A pickaxe of rib and long bone
+is not a pickaxe of floatstone and skywood, and the only thing that makes that true is somebody deciding it.</p>
 <p style="margin-bottom:0">Where a thing genuinely should repeat, it repeats, and I have said so rather than
 inventing difference for its own sake.</p>
 </div>
@@ -143,37 +151,43 @@ inventing difference for its own sake.</p>
   <li style="--c:var(--m11)"><span class="n">11</span><span><b>The Cloudshelf</b> — stone that forgot to fall</span><span class="tag">cloud</span></li>
   <li style="--c:var(--m12)"><span class="n">12</span><span><b>The Starfall Rim</b> — past the last air</span><span class="tag">star</span></li>
 </ul>
-<p class="meta">Two names survive from the existing table — The Frostmere and The Starfall Rim, which were
-already right. Thunder Steppe and Rotgarden are retired: a steppe is grassland and a rotgarden is a swamp,
-and maps 1, 3 and 4 have covered green and wet thoroughly.</p>
+<p class="meta">Two names survive from the existing table — The Frostmere and The Starfall Rim, which were already right. Thunder Steppe, Glass Peaks and Rotgarden are retired: a steppe is grassland and a rotgarden is a swamp, and maps 1, 3 and 4 have covered green and wet thoroughly. See the note on what that costs in redrawn tool sprites.</p>
 
 <hr>
 
 <h3>What this had to work around</h3>
-<p><b>The feature ladder is spent.</b> Towns 1–7 introduce every system the game has — pets, mining,
-blacksmith, farm, cooking, sailing, fishing, bounties, dungeons, jeweller, sets, creations, cards, market,
-auction, trade, casino, spin, arena, boss, leaderboard, trophies, track, badges. There is nothing left for
-town 8 to unlock. Towns 8–12 therefore <b>deepen instead of introduce</b>, which is a different job and
-needs your call — proposals are in each chapter and collected at the end.</p>
+<p><b>The unlock ladder is finished and stays finished.</b> Towns 1–7 introduce every system the game has and
+that flow is not touched here. Draft 2 proposed five new town features — a foundry, a hearth, an infirmary,
+an aerie, an observatory — and all five are cut. Luke: <span class="quote">“I want to leave the unlock flow
+as it is between worlds 1 and 7, and then don't worry about worlds 8 through 12's unlocks for features. We
+can deal with that over time.”</span> Towns 8–12 are a store, a bench and the way down. Features arrive when
+there is a feature, not because a town needs one.</p>
 <p><b>The map generator is honest about its shape.</b> Each map is exactly 12 parts across 8 roles
 (<code>edge haft bind hide ember glow stone charm</code>), 12 creatures across 6 archetypes
-(<code>swarm striker brute caster stalker grazer</code>), 12 zones each with one boss, and one Mark. Food,
-charm and tool recipes are <i>derived</i> from the parts — so the parts list is the real design surface, and
-a lazy parts list produces lazy crafting automatically.</p>
-<p><b>Every stat needs a consumer.</b> Two of the five Marks below grant something new, and each names the
-code that would have to read it. The other three reuse stats already consumed — deliberately, because five
-new systems in five maps is how a feature becomes a maintenance bill.</p>
+(<code>swarm striker brute caster stalker grazer</code>), 12 zones each with one boss, and one Mark. Nothing
+below changes that shape. What changes is that the recipes stop being derived from it.</p>
+<p><b>One new stat, and it is a crafting stat.</b> Four of the five Marks grant stats the game already
+consumes. The fifth, <code>salvage</code> on map 8, raises a rate that already exists in
+<code>creatureRareLoot</code> — a kill dropping a part from one map deeper. It survives the cut because it
+lands on the materials side, which is the side this draft is about.</p>
+<p><b>⚠️ These maps are further along than “nothing is built” suggests.</b> All five are already declared in
+<code>grove-maps.js</code> with parts, creatures, zones and bosses, 80 recipes are generated off them, and
+<b>60 tool sprites for tiers VIII–XII already exist on disk</b>. What does not exist is any of it on screen:
+<code>MAPS_BUILT = 7</code>, and no zone, creature, boss or part art has been drawn past map 7.</p>
+<p><b>⚠️ And renaming three of them has a bill.</b> Maps 8, 10 and 11 are currently The Thunder Steppe, The
+Glass Peaks and The Rotgarden. Draft 2 retired the first and third as duplicates of ground maps 1, 3 and 4
+already cover, and this draft keeps that call — but the 36 tool sprites for those three tiers were drawn
+<i>from those maps' materials</i> (<code>tool-pick-t8</code> is a pickaxe of horn edge, lance shaft and bison
+hide) and would have to be redrawn. They have never been seen by a player, so this is not repainting shipped
+art; it is $1.52 and it belongs in the bill below.</p>
 
 <!-- ═══════════════════════════════ MAP 8 ═══════════════════════════════ -->
 <section class="map" style="--c:var(--m8)">
 <div class="map-head"><span class="n">08</span><h2>The Clockwork Deep</h2></div>
 <p class="map-blurb">“Something built this, and it was never told to stop.”</p>
 
-<div class="hook"><b>Signature roster — nothing here flinches</b>
-Everything is armoured: high health, low damage, and <i>no stagger</i>. You cannot interrupt anything on this
-map, so a fight is sustained output and target priority rather than reacting. It is the slowest kill rate in
-the game and it is paid for in <code>salvage</code> — this is where the deeper parts come from. No floor
-tricks; the platforms are platforms.</div>
+<div class="hook"><b>What map 8 is</b>
+A stopped machine the size of a county, still running in places. Brutes and swarms with two stalkers under the floor and no grazers at all &mdash; nothing grazes in a machine &mdash; fought exactly the way everything in the Grove is fought. The difference is in the parts bin: <b>every material here is manufactured rather than grown</b>, which has not been true of any map before it, and the twelve tools made out of it are the first that look made rather than found.</div>
 
 <div class="two">
 <div class="card"><h4>The Mark</h4>
@@ -182,9 +196,7 @@ tricks; the platforms are platforms.</div>
 Consumer: the rare row in <code>grove-roll.js</code>, which already does exactly this for
 <code>creatureRareLoot</code> — this raises its rate rather than adding a mechanism.</p></div>
 <div class="card"><h4>Rare spawn</h4>
-<p style="margin:0"><b>The Governor</b> — a regulator sphere that <i>spins faster as it loses health</i>, so
-its telegraphs compress instead of its damage rising. The first rare that gets harder to read rather than
-harder to survive.</p></div>
+<p style="margin:0"><b>The First Light</b> &mdash; The oldest thing in the game. <span class="meta">Same mechanism as the stag.</span> A rare roll, its own art, its own drop. Draft 2 gave each of the five a behaviour &mdash; compressing telegraphs, fleeing, healing the room. All cut: that is engine work, and five rares that are simply <i>five different rares</i> is the whole win here.</p></div>
 </div>
 
 <h3>Zones &amp; bosses</h3>
@@ -243,11 +255,37 @@ in it.</p>
 <tr><td class="id">the_escapement</td><td>The Escapement</td><td class="arch">charm</td><td class="say">Ticks in your hand at a speed that is not yours.</td></tr>
 </table></div>
 
-<h3>Town 8 · Cogfall</h3>
-<p>Built into a stopped gear the size of a church. <b>Proposed features:</b> <code>foundry</code> — reforge
-a tool you already own into a different tool of the same tier, paying the difference in parts. It is the
-first town that lets you <i>undo</i> a crafting decision, which is the right thing to offer a player eight
-maps deep who picked wrong at map three.</p>
+<h3>Craftables</h3>
+<p class="meta">Twelve tools out of twelve manufactured parts. The map has two edges, two binds, two hides and two glows, so eight of the twelve tools involve a choice the generator cannot make: the shear plate goes in the pick and the hoe because it is flat, the brass burr goes in the knife and the loupe because it is small.</p>
+<div class="scroll"><table>
+<tr><th>Slot</th><th>Tier VIII</th><th>Made from</th><th>What it is</th></tr>
+<tr><td class="arch">rod</td><td><b>The Ratchet Rod</b></td><td class="say">Piston Rod &middot; Chain Link &middot; The Escapement</td><td class="say">The escapement is the drag. Line goes out one tooth at a time and never comes back on its own.</td></tr>
+<tr><td class="arch">pick</td><td><b>The Shearhead</b></td><td class="say">Shear Plate &middot; Piston Rod &middot; Bellows Skin</td><td class="say">It does not swing so much as stroke. Two hands, and the rod does the second one.</td></tr>
+<tr><td class="arch">shovel</td><td><b>The Ballast Spade</b></td><td class="say">Brass Burr &middot; Ballast Weight &middot; Wire Wrap</td><td class="say">Lead cast into the heel. The dig is the weight's idea; you only aim it.</td></tr>
+<tr><td class="arch">hammer</td><td><b>The Drop Forge</b></td><td class="say">Ballast Weight &middot; Furnace Coal &middot; Piston Rod</td><td class="say">A banked coal sits in the head, so it strikes warm and the work gives first.</td></tr>
+<tr><td class="arch">hoe</td><td><b>The Harrow Chain</b></td><td class="say">Shear Plate &middot; Chain Link &middot; Gasket Felt</td><td class="say">Three plates on a chain. It does not cut a row, it drags one, and the felt keeps the oil off the roots.</td></tr>
+<tr><td class="arch">sextant</td><td><b>The Dial Sextant</b></td><td class="say">Dial Glass &middot; The Escapement &middot; Ballast Weight</td><td class="say">The needle under the glass still moves. It has never agreed with the sky and has never been wrong.</td></tr>
+<tr><td class="arch">knife</td><td><b>The Burr Knife</b></td><td class="say">Brass Burr &middot; Piston Rod &middot; Wire Wrap</td><td class="say">Came off a tooth that was still turning, and kept the turn in it.</td></tr>
+<tr><td class="arch">collar</td><td><b>The Timed Collar</b></td><td class="say">Wire Wrap &middot; Bellows Skin &middot; The Escapement</td><td class="say">Whatever wears it keeps your time. Nobody has settled which of you is being kept to it.</td></tr>
+<tr><td class="arch">lantern</td><td><b>The Filament Lamp</b></td><td class="say">Filament Coil &middot; Furnace Coal &middot; Chain Link</td><td class="say">Lights when held, hung on a chain so that nothing has to hold it.</td></tr>
+<tr><td class="arch">loupe</td><td><b>The Gauge Loupe</b></td><td class="say">Ballast Weight &middot; Dial Glass &middot; Brass Burr</td><td class="say">Ground out of a dial face. Everything seen through it looks like a reading somebody took.</td></tr>
+<tr><td class="arch">banner</td><td><b>The Oil Standard</b></td><td class="say">Piston Rod &middot; Gasket Felt &middot; Furnace Coal</td><td class="say">Oil-black, and it never dries. It hangs the same whether there is wind in the ring or not.</td></tr>
+<tr><td class="arch">horn</td><td><b>The Bellows Horn</b></td><td class="say">Furnace Coal &middot; Ballast Weight &middot; Bellows Skin</td><td class="say">Folded a million times and not split yet. It does not want breath, only squeezing.</td></tr>
+</table></div>
+<h4>Food &mdash; four, and 12 a craft</h4>
+<p class="meta">The heal ladder stops at 100% and cannot climb, so a deeper map does not heal harder; it makes more per craft. What is authored here is which two materials each one is pressed out of, and that is the difference between a mouthful and a thing worth carrying home.</p>
+<div class="scroll"><table>
+<tr><th>Heals</th><th>Name</th><th>Made from</th><th>What it is</th></tr>
+<tr><td class="id">25%</td><td><b>Sump Poultice</b></td><td class="say">Gasket Felt &middot; Bellows Skin</td><td class="say">Oil-black felt packed on and bound. It seals before it soothes.</td></tr>
+<tr><td class="id">40%</td><td><b>Boiler Flask</b></td><td class="say">Furnace Coal &middot; Wire Wrap</td><td class="say">Condensate off the boiler floor, still warm. Tastes of copper and keeps you upright.</td></tr>
+<tr><td class="id">60%</td><td><b>Filament Tonic</b></td><td class="say">Filament Coil &middot; Dial Glass</td><td class="say">Scraped glow in a measured glass. The dose is marked on the side; the mark is optimistic.</td></tr>
+<tr><td class="id">100%</td><td><b>Mainspring Draught</b></td><td class="say">The Escapement &middot; Furnace Coal</td><td class="say">For an hour your heart keeps the machine's time. The hour is the part to plan around.</td></tr>
+</table></div>
+<h4>Charm &mdash; The Stopped Hour</h4>
+<p><code>emblemFind</code>, +29.1%. Made from Chain Link &middot; The Escapement, and taught by <b>The Mainspring Itself</b> &mdash; the last boss of the map, so the recipe arrives when you are already holding too much of what it needs. One of forty thousand, and they are all still counted. Something down here keeps a tally; this is how you ask to see it.</p>
+
+<h3>Town 8 &middot; Cogfall</h3>
+<p>Built into a stopped gear the size of a church. A store, a bench and the way down. <b>No new feature</b> &mdash; the unlock ladder ends at town 7 and stays there.</p>
 
 <h3>NPCs &amp; chains</h3>
 <div class="two">
@@ -288,11 +326,8 @@ Cull-heavy, because on the slowest-killing map in the game a kill quota is the h
 <div class="map-head"><span class="n">09</span><h2>The Frostmere</h2></div>
 <p class="map-blurb">“Black water under white ice, and the ice is the floor.”</p>
 
-<div class="hook"><b>Signature roster — it hits you and leaves</b>
-Ambushers. Things come up through a breathing hole or out of a drift, land one heavy hit, and <i>disengage</i>
-to reposition rather than standing and trading. Low health, high burst, and the most re-engagements per kill
-of any map. Frantic without a single thing on the floor moving — the opposite of the Clockwork Deep's
-immovable wall of armour, and the reason it sits right after it.</div>
+<div class="hook"><b>What map 9 is</b>
+Black water under white ice, and the ice is the floor. Stalker-heavy, because the threat is what is under you, and no swarms at all &mdash; nothing survives out here in numbers. <b>Its materials are the only ones in the Grove that change in the hand</b>: sinew that grips as it thaws, splinters that stay sharp for about a minute, a stone that holds a fire overnight. Four of its twelve tools get better the longer you work.</div>
 
 <div class="two">
 <div class="card"><h4>The Mark</h4>
@@ -360,11 +395,37 @@ in numbers.</p>
 <tr><td class="id">the_still_heart</td><td>The Still Heart</td><td class="arch">charm</td><td class="say">Does not melt. Has been tried.</td></tr>
 </table></div>
 
-<h3>Town 9 · Hoarfast</h3>
-<p>One long hall with a fire that is never allowed out. <b>Proposed features:</b> <code>hearth</code> — a
-pre-run buff you set before entering, chosen from what you cooked. It gives the Farm and Cooking systems
-from town 3 a reason to exist nine maps later, which is the honest answer to “towns have nothing left to
-unlock”: make an old system matter again rather than bolt a new one on.</p>
+<h3>Craftables</h3>
+<p class="meta">The Frostmere's trick is that four of its materials behave: frostsinew tightens as it thaws, ice splinters stay sharp for a minute, bankstone holds a fire, black ice knaps like flint. Each one is put where that behaviour is the point of the tool rather than a line of flavour under it.</p>
+<div class="scroll"><table>
+<tr><th>Slot</th><th>Tier IX</th><th>Made from</th><th>What it is</th></tr>
+<tr><td class="arch">rod</td><td><b>The Holewatcher</b></td><td class="say">Frozen Pine &middot; Gut Line &middot; The Still Heart</td><td class="say">Gut line that will hold a man through the ice, and a heart on the butt that does not mind how long you sit.</td></tr>
+<tr><td class="arch">pick</td><td><b>The Shardtooth</b></td><td class="say">Shard Tooth &middot; Frozen Pine &middot; Pelt of the Mere</td><td class="say">A tooth that bit the ice and lost, set in pine dead and straight for two hundred years.</td></tr>
+<tr><td class="arch">shovel</td><td><b>The Blackwater Spade</b></td><td class="say">Ice Splinter &middot; Black Ice &middot; Frostsinew</td><td class="say">Black ice knaps like flint, and the sinew tightens as it thaws &mdash; the blade gets tighter the longer you work.</td></tr>
+<tr><td class="arch">hammer</td><td><b>The Bankstone Maul</b></td><td class="say">Black Ice &middot; Bankstone &middot; Frozen Pine</td><td class="say">The stone holds a fire overnight. The only hammer in the Grove that is warm when you pick it up.</td></tr>
+<tr><td class="arch">hoe</td><td><b>The Thawblade</b></td><td class="say">Ice Splinter &middot; Gut Line &middot; Down Mat</td><td class="say">Sharper than steel for about a minute, which is exactly how long a row takes.</td></tr>
+<tr><td class="arch">sextant</td><td><b>The Aurora Sextant</b></td><td class="say">Aurora Salt &middot; The Still Heart &middot; Black Ice</td><td class="say">Salt scraped off the ice where the light touched it. It reads the sky it was made under, not the one above you.</td></tr>
+<tr><td class="arch">knife</td><td><b>The Mere Knife</b></td><td class="say">Shard Tooth &middot; Frozen Pine &middot; Frostsinew</td><td class="say">Thaws in the hand and grips as it does. Hold it wrong once and you learn the grip.</td></tr>
+<tr><td class="arch">collar</td><td><b>The Warm Collar</b></td><td class="say">Frostsinew &middot; Pelt of the Mere &middot; The Still Heart</td><td class="say">Warm, and faintly wrong to the touch. Whatever wears it stops minding the cold.</td></tr>
+<tr><td class="arch">lantern</td><td><b>The Coldfire Lamp</b></td><td class="say">Coldfire &middot; Bankstone &middot; Gut Line</td><td class="say">Gives light and takes heat, with a bankstone in the base to pay some of it back.</td></tr>
+<tr><td class="arch">loupe</td><td><b>The Clearwater Loupe</b></td><td class="say">Black Ice &middot; Aurora Salt &middot; Ice Splinter</td><td class="say">Clear through to the water. You can see what is under the ice, and you will wish you could not.</td></tr>
+<tr><td class="arch">banner</td><td><b>The Hoarfast Standard</b></td><td class="say">Frozen Pine &middot; Down Mat &middot; Bankstone</td><td class="say">Down off a nest nobody has seen the owner of. It does not freeze stiff, which is the whole trick.</td></tr>
+<tr><td class="arch">horn</td><td><b>The Longbreath Horn</b></td><td class="say">Bankstone &middot; Black Ice &middot; Pelt of the Mere</td><td class="say">Sounded over open ice. It carries for a mile and something always answers from under it.</td></tr>
+</table></div>
+<h4>Food &mdash; four, and 13 a craft</h4>
+<p class="meta">The heal ladder stops at 100% and cannot climb, so a deeper map does not heal harder; it makes more per craft. What is authored here is which two materials each one is pressed out of, and that is the difference between a mouthful and a thing worth carrying home.</p>
+<div class="scroll"><table>
+<tr><th>Heals</th><th>Name</th><th>Made from</th><th>What it is</th></tr>
+<tr><td class="id">25%</td><td><b>Mere Poultice</b></td><td class="say">Pelt of the Mere &middot; Frostsinew</td><td class="say">Pelt and thawing sinew, bound tight. It stops the bleeding by stopping everything.</td></tr>
+<tr><td class="id">40%</td><td><b>Gutline Flask</b></td><td class="say">Gut Line &middot; Bankstone</td><td class="say">Rendered on a bankstone overnight. Thick, and it tastes of the whole winter.</td></tr>
+<tr><td class="id">60%</td><td><b>Aurora Tonic</b></td><td class="say">Aurora Salt &middot; Coldfire</td><td class="say">Salt and cold light. Goes down freezing and comes up warm, in that order.</td></tr>
+<tr><td class="id">100%</td><td><b>Stillheart Draught</b></td><td class="say">The Still Heart &middot; Down Mat</td><td class="say">Does not melt. Has been tried, and the trying is what makes it work.</td></tr>
+</table></div>
+<h4>Charm &mdash; The Long Call</h4>
+<p><code>rareSpawn</code>, +23.0%. Made from Frozen Pine &middot; The Still Heart, and taught by <b>The Still Itself</b> &mdash; the last boss of the map, so the recipe arrives when you are already holding too much of what it needs. Sounded at the mouth of a zone and left burning. Out here, something bigger coming to look is a decision rather than a gift.</p>
+
+<h3>Town 9 &middot; Hoarfast</h3>
+<p>One long hall with a fire that is never allowed out. A store, a bench and the way down. <b>No new feature</b> &mdash; the unlock ladder ends at town 7 and stays there.</p>
 
 <h3>NPCs &amp; chains</h3>
 <div class="two">
@@ -405,11 +466,8 @@ Delve-heavy: on a map that punishes standing still, the quests should keep askin
 <div class="map-head"><span class="n">10</span><h2>The Hollow Colossus</h2></div>
 <p class="map-blurb">“It died standing, and the inside never got the message.”</p>
 
-<div class="hook"><b>Signature roster — one kill becomes three</b>
-Corpses rupture. Most creatures here split into two or three smaller ones on death, and those have to be
-cleared too. It is by a wide margin the densest map in the game and the best multi-kill map in it — which is
-exactly why its Mark is lifesteal, because you will be standing in the middle of the pile. Kill count per
-minute is the highest of the five until map 11.</div>
+<div class="hook"><b>What map 10 is</b>
+Inside a dead titan that never got the message. Caster-heavy, because a body's defences are chemical &mdash; things here spray, bloom and infect rather than charge. <b>Every material is anatomy</b>, and that makes this the strangest bench in the game: a spade that pulls itself back out of the ground as the tendon dries, a lamp that burns a week on a thimble of bile, and the only draught in the Grove made out of something still beating.</div>
 
 <div class="two">
 <div class="card"><h4>The Mark</h4>
@@ -475,11 +533,37 @@ Caster-heavy because a body's defences are chemical — things here spray, bloom
 <tr><td class="id">the_small_heart</td><td>The Small Heart</td><td class="arch">charm</td><td class="say">One of several. It is still going.</td></tr>
 </table></div>
 
-<h3>Town 10 · Ribgate</h3>
-<p>A camp lashed between two ribs at the throat, which everybody agrees is temporary and has been for years.
-<b>Proposed features:</b> <code>infirmary</code> — bank a portion of a run's damage into a permanent, slowly
-healing injury track, in exchange for a meaningful reward. It is the first system that makes <i>losing</i>
-a run produce something, which the game currently has no version of at all.</p>
+<h3>Craftables</h3>
+<p class="meta">Anatomy is the hardest vocabulary to make twelve believable tools out of, and that is the reason to do it properly. The rule here was that every tool must be a thing a field surgeon would actually improvise &mdash; nothing is bone-because-bone-is-spooky.</p>
+<div class="scroll"><table>
+<tr><th>Slot</th><th>Tier X</th><th>Made from</th><th>What it is</th></tr>
+<tr><td class="arch">rod</td><td><b>The Nerve Rod</b></td><td class="say">Long Bone &middot; Nerve Thread &middot; The Small Heart</td><td class="say">The thread carries something back up the line. You feel the bite before the bite.</td></tr>
+<tr><td class="arch">pick</td><td><b>The Ribsplitter</b></td><td class="say">Rib Splinter &middot; Long Bone &middot; Hide of It</td><td class="say">A yard of rib, and the break did the sharpening. Lighter than wood and considerably less forgiving.</td></tr>
+<tr><td class="arch">shovel</td><td><b>The Marrow Spade</b></td><td class="say">Tooth Chip &middot; Calcified Node &middot; Tendon Cord</td><td class="say">The cord still tries to pull when it dries, so the spade comes back out of the ground on its own.</td></tr>
+<tr><td class="arch">hammer</td><td><b>The Calcifier</b></td><td class="say">Calcified Node &middot; Heart Cinder &middot; Long Bone</td><td class="say">Was soft once and got tired of it. What it strikes goes the same way.</td></tr>
+<tr><td class="arch">hoe</td><td><b>The Gut Harrow</b></td><td class="say">Rib Splinter &middot; Tendon Cord &middot; Stomach Lining</td><td class="say">Lined with a stomach proof against everything it used to hold. Nothing in the soil gets through it either.</td></tr>
+<tr><td class="arch">sextant</td><td><b>The Marrowglass</b></td><td class="say">Marrow Light &middot; The Small Heart &middot; Calcified Node</td><td class="say">Bone glows from inside where it is thickest. Read it in the dark and it gives you a direction, though not always yours.</td></tr>
+<tr><td class="arch">knife</td><td><b>The Fresh Cut</b></td><td class="say">Tooth Chip &middot; Long Bone &middot; Tendon Cord</td><td class="say">Off something that was eaten, not something that ate. Surgeon Vell's pattern, and she will tell you so.</td></tr>
+<tr><td class="arch">collar</td><td><b>The Second Heart</b></td><td class="say">Nerve Thread &middot; Hide of It &middot; The Small Heart</td><td class="say">One of several. It is still going, and so is whatever wears this.</td></tr>
+<tr><td class="arch">lantern</td><td><b>The Bile Lamp</b></td><td class="say">Bile Lamp &middot; Heart Cinder &middot; Nerve Thread</td><td class="say">Green, and it burns a week on a thimble. The only light in here that nothing comes toward.</td></tr>
+<tr><td class="arch">loupe</td><td><b>The Surgeon's Loupe</b></td><td class="say">Calcified Node &middot; Marrow Light &middot; Tooth Chip</td><td class="say">Ground from a node that hardened around a flaw. The flaw is what does the magnifying.</td></tr>
+<tr><td class="arch">banner</td><td><b>The Ribgate Standard</b></td><td class="say">Long Bone &middot; Hide of It &middot; Heart Cinder</td><td class="say">From the outside, which almost nobody has seen. In a ring it is the only proof the thing had an outside.</td></tr>
+<tr><td class="arch">horn</td><td><b>The Ache</b></td><td class="say">Heart Cinder &middot; Calcified Node &middot; Stomach Lining</td><td class="say">Warm. That is the whole problem with this place, and the whole reason the note carries.</td></tr>
+</table></div>
+<h4>Food &mdash; four, and 14 a craft</h4>
+<p class="meta">The heal ladder stops at 100% and cannot climb, so a deeper map does not heal harder; it makes more per craft. What is authored here is which two materials each one is pressed out of, and that is the difference between a mouthful and a thing worth carrying home.</p>
+<div class="scroll"><table>
+<tr><th>Heals</th><th>Name</th><th>Made from</th><th>What it is</th></tr>
+<tr><td class="id">25%</td><td><b>Lining Poultice</b></td><td class="say">Stomach Lining &middot; Tendon Cord</td><td class="say">Proof against everything it used to hold. It will hold you too, for a while.</td></tr>
+<tr><td class="id">40%</td><td><b>Marrow Flask</b></td><td class="say">Long Bone &middot; Heart Cinder</td><td class="say">Marrow off the stair, warmed on a cinder. Rich to the point of being a problem.</td></tr>
+<tr><td class="id">60%</td><td><b>Bile Tonic</b></td><td class="say">Bile Lamp &middot; Nerve Thread</td><td class="say">Green, bitter, and it reports back. You know it is working before it works.</td></tr>
+<tr><td class="id">100%</td><td><b>Heart Draught</b></td><td class="say">The Small Heart &middot; Marrow Light</td><td class="say">One of several, and it is still going. For ten minutes, so are you.</td></tr>
+</table></div>
+<h4>Charm &mdash; The Fresh Chamber</h4>
+<p><code>rarityFind</code>, +45.5%. Made from Tendon Cord &middot; The Small Heart, and taught by <b>The Heart Itself</b> &mdash; the last boss of the map, so the recipe arrives when you are already holding too much of what it needs. Surgeon Vell's instruction, verbatim: cut it while it is still interested in being alive.</p>
+
+<h3>Town 10 &middot; Ribgate</h3>
+<p>A camp lashed between two ribs at the throat, which everybody agrees is temporary and has been for years. A store, a bench and the way down. <b>No new feature</b> &mdash; the unlock ladder ends at town 7 and stays there.</p>
 
 <h3>NPCs &amp; chains</h3>
 <div class="two">
@@ -521,10 +605,8 @@ the walk to it.</p>
 <div class="map-head"><span class="n">11</span><h2>The Cloudshelf</h2></div>
 <p class="map-blurb">“Stone that forgot to fall, and a long way down.”</p>
 
-<div class="hook"><b>Signature roster — they never stop coming</b>
-Flyers, arriving from off-screen in a continuous stream rather than standing around the zone waiting to be
-found. No walking to the next fight: the next fight arrives. Highest kills-per-minute in the game, which
-makes this the farm map — and the Mark makes the stream occasionally produce something worth stopping for.</div>
+<div class="hook"><b>What map 11 is</b>
+Stone that forgot to fall, and a long way down. Striker-heavy and almost brute-free &mdash; heavy things fell off this map a long time ago. <b>Its materials are the lightest in the game and several of them pull upward</b>, so this is the only bench where weight is a choice rather than a consequence: floatstone, skywood and thermal silk make the twelve tools you forget you are carrying.</div>
 
 <div class="two">
 <div class="card"><h4>The Mark</h4>
@@ -593,11 +675,37 @@ anchor beast that cannot leave its island, which is why it is still here.</p>
 <tr><td class="id">the_held_breath</td><td>The Held Breath</td><td class="arch">charm</td><td class="say">Warm, and it pulls very slightly upward.</td></tr>
 </table></div>
 
-<h3>Town 11 · Updraught</h3>
-<p>Lashed to the underside of a shelf, because the top is where the wind is. <b>Proposed features:</b>
-<code>aerie</code> — pets gain a glide and can be sent to retrieve from zones you have cleared. It makes the
-pet from town 1 relevant at map 11, which is the same principle as Hoarfast's hearth: reach back for an old
-system rather than invent a new one.</p>
+<h3>Craftables</h3>
+<p class="meta">The lightest set in the game, and the only one where two materials fight each other: floatstone is heavy in the hand and weightless in the world, downcoat weighs nothing at all. Which tools want which is the whole design of this bench.</p>
+<div class="scroll"><table>
+<tr><th>Slot</th><th>Tier XI</th><th>Made from</th><th>What it is</th></tr>
+<tr><td class="arch">rod</td><td><b>The Kite Rod</b></td><td class="say">Skywood &middot; Kite Cord &middot; The Held Breath</td><td class="say">Rated for a man in a crosswind, allegedly. It fishes downward off a ledge, which is a thing you have to see.</td></tr>
+<tr><td class="arch">pick</td><td><b>The Scourhead</b></td><td class="say">Wind Scour &middot; Skywood &middot; Gullhide</td><td class="say">Stone the air sharpened over a century, free of charge, on a haft that is mostly air and stronger for it.</td></tr>
+<tr><td class="arch">shovel</td><td><b>The Floatstone Spade</b></td><td class="say">Featherblade &middot; Floatstone &middot; Thermal Silk</td><td class="say">Heavy in the hand and not, apparently, in the world. You stop noticing you are carrying it.</td></tr>
+<tr><td class="arch">hammer</td><td><b>The Sunwarm Maul</b></td><td class="say">Floatstone &middot; Sunwarm Stone &middot; Skywood</td><td class="say">Holds the day's heat right through the night, so the first swing of the morning lands like the last of the evening.</td></tr>
+<tr><td class="arch">hoe</td><td><b>The Shelfbreaker</b></td><td class="say">Featherblade &middot; Kite Cord &middot; Downcoat</td><td class="say">A primary off something large, stiff as a knife. It turns thin soil without taking it off the edge.</td></tr>
+<tr><td class="arch">sextant</td><td><b>The Dawnglass</b></td><td class="say">Cloudlight &middot; The Held Breath &middot; Floatstone</td><td class="say">The glow off the top of the deck, bottled at dawn. It reads a horizon rather than a shore, which is the first honest sextant the Grove has made.</td></tr>
+<tr><td class="arch">knife</td><td><b>The Crosswind Knife</b></td><td class="say">Wind Scour &middot; Skywood &middot; Thermal Silk</td><td class="say">Silk spun in rising air only ever pulls one way, so the grip tightens as you cut upward.</td></tr>
+<tr><td class="arch">collar</td><td><b>The Glide Collar</b></td><td class="say">Thermal Silk &middot; Downcoat &middot; The Held Breath</td><td class="say">Weighs nothing and pulls very slightly upward. Whatever wears it lands later than it should.</td></tr>
+<tr><td class="arch">lantern</td><td><b>The Stormglass Lamp</b></td><td class="say">Stormglass &middot; Sunwarm Stone &middot; Kite Cord</td><td class="say">Lightning went into sand here and did not come out. On a cord it shows the gap before the mist does.</td></tr>
+<tr><td class="arch">loupe</td><td><b>The Windreader's Loupe</b></td><td class="say">Floatstone &middot; Cloudlight &middot; Featherblade</td><td class="say">Shows the air moving &mdash; the only thing up here worth knowing and the only thing you cannot see.</td></tr>
+<tr><td class="arch">banner</td><td><b>The Updraught Standard</b></td><td class="say">Skywood &middot; Gullhide &middot; Sunwarm Stone</td><td class="say">Oiled by the bird before you ever got to it. The one banner that is quieter in a gale than out of one.</td></tr>
+<tr><td class="arch">horn</td><td><b>The Long Drop Horn</b></td><td class="say">Sunwarm Stone &middot; Floatstone &middot; Downcoat</td><td class="say">Sounded over the edge. The echo comes back late enough that people stop talking to wait for it.</td></tr>
+</table></div>
+<h4>Food &mdash; four, and 15 a craft</h4>
+<p class="meta">The heal ladder stops at 100% and cannot climb, so a deeper map does not heal harder; it makes more per craft. What is authored here is which two materials each one is pressed out of, and that is the difference between a mouthful and a thing worth carrying home.</p>
+<div class="scroll"><table>
+<tr><th>Heals</th><th>Name</th><th>Made from</th><th>What it is</th></tr>
+<tr><td class="id">25%</td><td><b>Gullhide Poultice</b></td><td class="say">Gullhide &middot; Thermal Silk</td><td class="say">Oiled by the bird before you ever got to it. Goes on cold and stays put in wind.</td></tr>
+<tr><td class="id">40%</td><td><b>Thermal Flask</b></td><td class="say">Sunwarm Stone &middot; Kite Cord</td><td class="say">Brewed on a stone that holds the day. Drunk at altitude it is the best thing on the map.</td></tr>
+<tr><td class="id">60%</td><td><b>Cloudlight Tonic</b></td><td class="say">Cloudlight &middot; Downcoat</td><td class="say">Dawn off the top of the deck. Tastes of nothing and fixes a great deal.</td></tr>
+<tr><td class="id">100%</td><td><b>Heldbreath Draught</b></td><td class="say">The Held Breath &middot; Stormglass</td><td class="say">Warm, and it pulls very slightly upward. For a moment you are not quite standing on anything, and neither is the wound.</td></tr>
+</table></div>
+<h4>Charm &mdash; The Thermal Totem</h4>
+<p><code>emblemFind</code>, +38.5%. Made from Thermal Silk &middot; The Held Breath, and taught by <b>The Last Shelf</b> &mdash; the last boss of the map, so the recipe arrives when you are already holding too much of what it needs. The dead leave more of themselves. Up here they leave it on the way down, and the silk only ever pulls one way.</p>
+
+<h3>Town 11 &middot; Updraught</h3>
+<p>Lashed to the underside of a shelf, because the top is where the wind is. A store, a bench and the way down. <b>No new feature</b> &mdash; the unlock ladder ends at town 7 and stays there.</p>
 
 <h3>NPCs &amp; chains</h3>
 <div class="two">
@@ -637,10 +745,8 @@ rather than how hard you can burst.</p></div>
 <div class="map-head"><span class="n">12</span><h2>The Starfall Rim</h2></div>
 <p class="map-blurb">“Past the last air. Nothing here is holding anything up.”</p>
 
-<div class="hook"><b>Signature roster — few, enormous, and worth it</b>
-A handful of huge things per zone instead of a crowd. Each takes real commitment and pays many kill credits,
-so the counter moves in jumps rather than a stream. The exact inverse of the Cloudshelf before it, and the
-right last note: after a map where you never stop swinging, a map where every engagement is a decision.</div>
+<div class="hook"><b>What map 12 is</b>
+Past the last air. The strangest roster in the game and the only one where the grazer is frightening. <b>Its materials are the oldest and the most final</b> &mdash; an edge one atom wide, a grain of dying star, light that left before the Grove existed. Tier XII is the last rung of all twelve ladders, and the objects made here are meant to read as the last version of each one anybody will ever need.</div>
 
 <div class="two">
 <div class="card"><h4>The Mark</h4>
@@ -710,10 +816,37 @@ eats light and has never noticed anything alive.</p>
 <tr><td class="id">the_rim_eye</td><td>The Rim Eye</td><td class="arch">charm</td><td class="say">Open. Has been the whole time.</td></tr>
 </table></div>
 
-<h3>Town 12 · Lastlight</h3>
-<p>The last lit thing, and it is one room. <b>Proposed features:</b> <code>observatory</code> — set-completion
-rewards for the Monster Card collection, read across all 12 maps. The capstone town should pay out the thing
-the capstone Mark accelerates, and the collection is currently the only long chase with no terminal reward.</p>
+<h3>Craftables</h3>
+<p class="meta">Tier XII, the last rung of all twelve ladders. Every one of these is the final version of its object, so the brief was simple and strict: it should be impossible to imagine a better one, and it should be obvious that nothing here was grown.</p>
+<div class="scroll"><table>
+<tr><th>Slot</th><th>Tier XII</th><th>Made from</th><th>What it is</th></tr>
+<tr><td class="arch">rod</td><td><b>The Orbit Rod</b></td><td class="say">Voidrod &middot; Orbit Cord &middot; The Rim Eye</td><td class="say">The cord will not hang straight and nobody expects it to any more. What it catches arrives from the side.</td></tr>
+<tr><td class="arch">pick</td><td><b>The Starglass Pick</b></td><td class="say">Starglass &middot; Voidrod &middot; Voidskin</td><td class="say">An edge one atom wide and perfectly uninterested in you. The skin is there to keep it that way.</td></tr>
+<tr><td class="arch">shovel</td><td><b>The Cometwake Spade</b></td><td class="say">Comet Shard &middot; Meteoric Iron &middot; Gravity Thread</td><td class="say">Fell a very long way to be picked up by you. It digs by making the ground want to be elsewhere.</td></tr>
+<tr><td class="arch">hammer</td><td><b>The Last Forge</b></td><td class="say">Meteoric Iron &middot; Dying Star &middot; Voidrod</td><td class="say">A grain of dying star in the head. It will outlast the shop, the forest and the hand that swings it.</td></tr>
+<tr><td class="arch">hoe</td><td><b>The Driftfield Hoe</b></td><td class="say">Starglass &middot; Gravity Thread &middot; Dark Felt</td><td class="say">The thread ties things together by making them want to be. The soil comes up in one piece and stays in one piece.</td></tr>
+<tr><td class="arch">sextant</td><td><b>The First Light Sextant</b></td><td class="say">First Light Shard &middot; The Rim Eye &middot; Meteoric Iron</td><td class="say">The oldest light there is, and still arriving. The last rung of the ladder, and the only instrument in the game older than what it measures.</td></tr>
+<tr><td class="arch">knife</td><td><b>The Travelling Edge</b></td><td class="say">Comet Shard &middot; Voidrod &middot; Orbit Cord</td><td class="say">Still travelling, slightly, in the hand. You do not push this one; you let it get there.</td></tr>
+<tr><td class="arch">collar</td><td><b>The Rim Collar</b></td><td class="say">Gravity Thread &middot; Voidskin &middot; The Rim Eye</td><td class="say">Open. Has been the whole time. Whatever wears it comes back from further out than it should be able to.</td></tr>
+<tr><td class="arch">lantern</td><td><b>The Nebula Lamp</b></td><td class="say">Nebula Dust &middot; Dying Star &middot; Gravity Thread</td><td class="say">Lights a room and stains everything in it, permanently, including the hand that carried it.</td></tr>
+<tr><td class="arch">loupe</td><td><b>The Oldest Light</b></td><td class="say">Meteoric Iron &middot; First Light Shard &middot; Starglass</td><td class="say">Everything under it is lit by light that left before the Grove. Gems look like they have been waiting.</td></tr>
+<tr><td class="arch">banner</td><td><b>The Lastlight Standard</b></td><td class="say">Voidrod &middot; Dark Felt &middot; Dying Star</td><td class="say">Dark felt weighs more than it should, considerably more. The only banner in the ring that hangs dead still.</td></tr>
+<tr><td class="arch">horn</td><td><b>The Long Night Horn</b></td><td class="say">Dying Star &middot; Meteoric Iron &middot; Voidskin</td><td class="say">There is nothing out here to carry sound. It is sounded anyway, and that is the point of it.</td></tr>
+</table></div>
+<h4>Food &mdash; four, and 16 a craft</h4>
+<p class="meta">The heal ladder stops at 100% and cannot climb, so a deeper map does not heal harder; it makes more per craft. What is authored here is which two materials each one is pressed out of, and that is the difference between a mouthful and a thing worth carrying home.</p>
+<div class="scroll"><table>
+<tr><th>Heals</th><th>Name</th><th>Made from</th><th>What it is</th></tr>
+<tr><td class="id">25%</td><td><b>Voidskin Poultice</b></td><td class="say">Voidskin &middot; Gravity Thread</td><td class="say">Nothing gets through it, including warmth. The wound keeps whatever it has left.</td></tr>
+<tr><td class="id">40%</td><td><b>Driftfield Flask</b></td><td class="say">Nebula Dust &middot; Orbit Cord</td><td class="say">Lights a room and stains everything in it. Your mouth included, for about a week.</td></tr>
+<tr><td class="id">60%</td><td><b>Cinder Tonic</b></td><td class="say">Dying Star &middot; Dark Felt</td><td class="say">A grain of it, strained through felt. It will outlast the shop and it very nearly outlasts you.</td></tr>
+<tr><td class="id">100%</td><td><b>First Light Draught</b></td><td class="say">First Light Shard &middot; The Rim Eye</td><td class="say">The oldest light there is, swallowed. Whatever it mends, it mends the way it was at the start.</td></tr>
+</table></div>
+<h4>Charm &mdash; The Open Eye</h4>
+<p><code>rareSpawn</code>, +29.8%. Made from Orbit Cord &middot; The Rim Eye, and taught by <b>The First Light</b> &mdash; the last boss of the map, so the recipe arrives when you are already holding too much of what it needs. Open, and it has been the whole time. On the last map, calling something bigger is the only way to meet the thing you came for.</p>
+
+<h3>Town 12 &middot; Lastlight</h3>
+<p>The last lit thing, and it is one room. A store, a bench and the way down. <b>No new feature</b> &mdash; the unlock ladder ends at town 7 and stays there.</p>
 
 <h3>NPCs &amp; chains</h3>
 <div class="two">
@@ -752,26 +885,63 @@ fight rather than by clearing speed.</p></div>
 
 <hr>
 
-<!-- ═══════════════════════════════ THE ASKS ═══════════════════════════════ -->
+<!-- ═══════════════════════════════ ALREADY DONE ═══════════════════════════════ -->
+<h2 style="font-size:1.5rem">Decided and shipped after draft 2</h2>
+<p>Three calls landed in the hours after draft 2 was written, so none of them are in it. They are not
+proposals; they are in the game.</p>
+<ol>
+<li><b>Bag slot limits and the bank are gone</b> <span class="meta">(d5581415)</span>. Luke:
+<span class="quote">“I think we get rid of the idea of a bank. And get rid of bag slot limits. And get rid
+of bank and backpack expansions. Its just a lame mechanic that is a meaningless tax on the player.”</span>
+Sixteen distinct slots, the overflow map, the FULL badge, the “n slots left” warning, the second grid and
+eight expansion recipes: all deleted. Everything found is now both seen and stored. <b>This matters to maps
+8&ndash;12 directly</b> &mdash; every argument the old recipes made about a sixteen-slot bag (<span
+class="quote">“a part that drops and does nothing is litter in a sixteen-slot bag”</span>) is now an
+argument about a bench instead, which is a better reason to author the recipes rather than generate them.</li>
+<li><b>Move speed is retired</b> <span class="meta">(d5581415)</span>. Off The Straw Man, the boss card
+rotation and the feet gear roll. Luke: <span class="quote">“I also dont like move speed, seems like another
+meaningless factor we should not use.”</span> It is the right call in a kill-rate game, and it is why no
+tool, charm or Mark below touches traversal.</li>
+<li><b>Statues shipped</b> <span class="meta">(64bfe4ee)</span> &mdash; the answer to volume. Emblem-rare
+drops into five flat stat bars, the first crystal and the first prismatic each permanently doubling the
+line, no “turn in all”. It is the only thing in the Grove where the hundredth is worth as much as the
+first, and it is the reason maps 8&ndash;12 do not need a collection system of their own.</li>
+</ol>
+<div class="note">
+<p style="margin:0"><b>⚠️ And one doc is now wrong, not merely stale.</b>
+<code>docs/node-map-design.md</code> §6 is still titled “Inventory and the bank” and still says
+<i>“Backpack: 16 unique slots”</i>, <i>“Bank: up to 64 slots, located in town”</i>, lists backpack I&ndash;V
+and vault I&ndash;VI, and at line 306 says <i>“Food takes a BAG SLOT like a part does, which is the whole
+tension of it.”</i> That describes a game that no longer exists. Corrected in the same pass as this draft.</p>
+</div>
+
+<hr>
+
+<!-- THE ASKS -->
 <h2 style="font-size:1.5rem">What needs your call</h2>
 <ol>
-<li><b>Towns 8–12.</b> The feature ladder is spent at town 7. My proposals — foundry, hearth, infirmary,
-aerie, observatory — all <i>reach back</i> and make an older system matter again rather than add a new one.
-Four of the five are new code. The cheap alternative is that towns 8–12 are pure waypoints with a store and
-nothing else, which is honest but dull.</li>
-<li><b>One new stat, down from two.</b> <code>salvage</code> (map 8) is low-risk — it scales a rate that
-already exists in <code>creatureRareLoot</code>. <code>updraft</code> is cut entirely: it was a traversal
-stat, and traversal is the thing that should not be carrying a map.</li>
-<li><b>Rupturing corpses</b> (map 10) is the only roster behaviour here that needs new engine work — a kill
-that spawns smaller foes at the death position. Everything else (no stagger, disengage-after-hit, stream
-spawning, few-and-huge) is tuning numbers the spawner already has. It is also the one with a real failure
-mode: a rupture chain that never terminates. Needs a hard depth cap of one split.</li>
-<li><b>Per-map rare spawns.</b> There is one rare spawn in the entire game today, shared by all seven maps.
-Five new ones is five creatures of art and a <code>GROVE_RARE</code> that becomes a per-map lookup. I think
-it is the single highest-value item here, because <code>hunt</code> quests currently all point at the same
-stag.</li>
-<li><b>The infirmary</b> (map 10) is the one proposal that changes the shape of a run rather than adding to
-it. It deserves its own conversation.</li>
+<li><b>Read the craftables, not the maps.</b> That is the whole draft. 60 tools, 20 foods and 5 charms are
+authored above and the test is simple: does map 10's bench read like a different place from map 11's, or does
+it read like the same twelve objects in new words? If any map fails that, it fails on the page and costs
+nothing to fix. <b>Nothing else here is a question about variety any more.</b></li>
+<li><b>Hand-authored recipes mean the generators stop being the source.</b>
+<code>toolRecipesForMap</code> and <code>foodRecipesForMap</code> currently build 80 recipes for these five
+maps from role order. Authoring them means those functions keep serving maps 2&ndash;7 and maps 8&ndash;12
+carry explicit rows instead. That is more lines and <i>less</i> machinery, but it does mean
+<code>check-grove.mjs</code> has to check two shapes rather than one.</li>
+<li><b>One new stat.</b> <code>salvage</code> (map 8) raises a rate that already exists in
+<code>creatureRareLoot</code> &mdash; a kill dropping a part from one map deeper. It is the only new code in
+the draft and it feeds crafting, which is why it survived. Say the word and it reuses an existing stat
+instead.</li>
+<li><b>Per-map rare spawns.</b> One rare exists in the whole game today and all seven maps share it, so
+every <code>hunt</code> quest points at the same stag. Five named rares is five creatures of art and a
+<code>GROVE_RARE</code> that becomes a per-map lookup &mdash; no behaviour, no engine work. Cheapest real
+win on the list.</li>
+<li><b>Renaming maps 8, 10 and 11 costs 36 redrawn tool sprites</b> ($1.52). They have never been seen by a
+player, so this is not repainting shipped art. The alternative is keeping Thunder Steppe, Glass Peaks and
+Rotgarden, which means maps 1, 3 and 4 have company they do not need.</li>
+<li><b>The statue numbers.</b> Unrelated to these maps and still the open one: a statue of a given type
+every ~2,270 kills, level 10 at ~273,000. That wants your eye against the kill curve, not mine.</li>
 </ol>
 
 <!-- ═══════════════════════════════ SPEND ═══════════════════════════════ -->
@@ -786,24 +956,32 @@ $40/1M output tokens.</p>
 <tr><td>Bosses</td><td class="n">12</td><td class="n">60</td><td class="n">$0.0422</td><td class="n">$2.53</td></tr>
 <tr><td>Parts</td><td class="n">12</td><td class="n">60</td><td class="n">$0.0422</td><td class="n">$2.53</td></tr>
 <tr><td>NPCs (3 + marshal)</td><td class="n">4</td><td class="n">20</td><td class="n">$0.0422</td><td class="n">$0.84</td></tr>
+<tr><td>Foods <span class="meta">(4 a map, not 1 &mdash; draft 2 undercounted these)</span></td><td class="n">4</td><td class="n">20</td><td class="n">$0.0422</td><td class="n">$0.84</td></tr>
+<tr><td>Tool sprites for the three renamed maps</td><td class="n">12</td><td class="n">36</td><td class="n">$0.0422</td><td class="n">$1.52</td></tr>
 <tr><td>Rare spawns</td><td class="n">1</td><td class="n">5</td><td class="n">$0.0422</td><td class="n">$0.21</td></tr>
 <tr><td>Card shelf frames</td><td class="n">1</td><td class="n">5</td><td class="n">$0.0422</td><td class="n">$0.21</td></tr>
-<tr><td>Mark seal · food · charm · node symbol</td><td class="n">4</td><td class="n">20</td><td class="n">$0.0422</td><td class="n">$0.84</td></tr>
+<tr><td>Mark seals</td><td class="n">1</td><td class="n">5</td><td class="n">$0.0422</td><td class="n">$0.21</td></tr>
+<tr><td>Node symbols <span class="meta">(5 new biomes)</span></td><td class="n">1</td><td class="n">5</td><td class="n">$0.0422</td><td class="n">$0.21</td></tr>
+<tr><td>Charms <span class="meta">(art is keyed by stat; all 3 exist)</span></td><td class="n">0</td><td class="n">0</td><td class="n">&mdash;</td><td class="n">$0.00</td></tr>
 <tfoot>
-<tr><td>Subtotal</td><td class="n">58</td><td class="n">290</td><td></td><td class="n">$13.45</td></tr>
-<tr><td>Plus rejects &amp; retries, ~25%</td><td></td><td></td><td></td><td class="n">$3.36</td></tr>
-<tr><td><b>Expected total</b></td><td></td><td></td><td></td><td class="n"><b>≈ $16.80</b></td></tr>
+<tr><td>Subtotal</td><td class="n"></td><td class="n">336</td><td></td><td class="n">$15.39</td></tr>
+<tr><td>Plus rejects &amp; retries, ~25%</td><td></td><td></td><td></td><td class="n">$3.85</td></tr>
+<tr><td><b>Expected total</b></td><td></td><td></td><td></td><td class="n"><b>≈ $19.24</b></td></tr>
 </tfoot>
 </table></div>
+<p class="meta">Up $2.44 on draft 2, and both increases are corrections rather than new scope: four foods a
+map instead of one, and the 36 tool sprites the renames invalidate. <b>Tier VIII&ndash;XII sprites for the
+two maps that keep their names are already drawn</b> and cost nothing.</p>
 <div class="note">
 <p style="margin:0"><b>How it would actually be spent.</b> Three images per run, in the foreground, on a
-contact sheet, every time — so this is roughly <b>97 runs</b> and you see every one before the next. At any
-point the answer can be “stop”, and the maps already generated stay playable because
+contact sheet, every time &mdash; so this is roughly <b>112 runs</b> and you see every one before the next.
+At any point the answer can be “stop”, and the maps already generated stay playable because
 <code>MAPS_BUILT</code> gates them one at a time. Nothing is generated at <code>high</code>, ever.</p>
 </div>
 
 <hr>
-<p class="meta">Draft 2 · nothing implemented · <code>docs/grove-maps-8-12-design.html</code><br>
-Draft 1 gave every map a level-design gimmick. All five are cut; identity comes from the roster now.</p>
+<p class="meta">Draft 3 · nothing implemented · <code>docs/grove-maps-8-12-design.html</code><br>
+Draft 1 gave every map a level-design gimmick. Draft 2 replaced those with engineered roster behaviour. Both
+are cut: the maps play the way the Grove plays, and the 85 craftables are where the variety lives.</p>
 
 </div>

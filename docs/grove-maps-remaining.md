@@ -1,7 +1,15 @@
 # The Grove, maps 8–12 — what is left, and how to do it
 
-Written 2026-10-19, at the point where the spend was stopped. Everything in this file is a to-do list, not a
-design question: **the design for all twelve maps is finished and committed.** What maps 8–12 lack is art.
+Written 2026-10-19, at the point where the spend was stopped. Everything in this file was a to-do list
+rather than a design question: the design for all twelve maps was finished and committed, and what maps 8–12
+lacked was art.
+
+> ⚠️ **SUPERSEDED IN PART, 2026-10-30.** Maps 8–12 now have their own spec —
+> `docs/grove-maps-8-12-design.html`, draft 3 — and it changes two things this file treats as settled.
+> **Three of the five maps are renamed** (8, 10 and 11), and **their recipes are authored rather than
+> derived from roles.** The build procedure, the traps and the open questions below are all still correct;
+> the map names and the "a new map is twelve materials, not twelve recipes" line are not. Read the spec
+> first, then this file for how to actually ship one.
 
 ---
 
@@ -11,7 +19,8 @@ design question: **the design for all twelve maps is finished and committed.** W
 |---|---|
 | **Design, all 12 maps** | done — 132 zones, 132 creatures, 132 bosses, 132 materials, 11 emblems, 144 tool recipes |
 | **Art, maps 1–7** | done — 48 images each (12 backdrops, 12 creatures, 12 bosses, 12 materials) |
-| **Art, maps 8–12** | **none** — 240 images, about **$9.30** at medium |
+| **Art, maps 8–12** | **none** — 240 images for the four core families, about **$9.30** at medium |
+| **Art, everything else 8–12** | NPCs, foods, rares, frames, seals, node symbols and 36 redrawn tool rungs — see the spec; **≈$19.24** all in |
 | **Tool rungs** | 12 tools × 12 tiers drawn |
 | `MAPS_BUILT` | raise it as a map's art lands; everything player-facing reads it |
 
@@ -24,15 +33,21 @@ remaining $9.30 and nothing else — no new mechanics, no new decisions, no code
 
 | # | Map | What the place is |
 |---|---|---|
-| 8 | **The Thunder Steppe** | open grass with the sky hunting across it |
-| 9 | **The Frostmere** | cold that is itself the enemy |
-| 10 | **The Glass Peaks** | thin air, hard light, a long way down |
-| 11 | **The Rotgarden** | something cultivated that got out |
-| 12 | **The Starfall Rim** | the edge, where things land that were never up there |
+| # | in `grove-maps.js` today | in draft 3 | what the place is |
+|---|---|---|---|
+| 8 | The Thunder Steppe | **The Clockwork Deep** | something built this, and it was never told to stop |
+| 9 | The Frostmere | **The Frostmere** *(kept)* | black water under white ice |
+| 10 | The Glass Peaks | **The Hollow Colossus** | inside a dead titan |
+| 11 | The Rotgarden | **The Cloudshelf** | stone that forgot to fall |
+| 12 | The Starfall Rim | **The Starfall Rim** *(kept)* | past the last air |
 
 Each is twelve zones, twelve residents, twelve bosses and twelve materials, already written in
-`src/lib/marketplace/grove-maps.js`. The names, the blurbs, the loot tables, the emblem and the tool rung all
-exist. Nothing needs inventing.
+`src/lib/marketplace/grove-maps.js` — names, blurbs, loot tables, emblem and tool rung.
+
+⚠️ **The three renames are not free.** Steppe, Glass Peaks and Rotgarden are retired because maps 1, 3 and 4
+already cover green, wet and high ground, but the **36 tool sprites for tiers VIII, X and XI were drawn from
+those maps' materials** (`tool-pick-t8` is a pickaxe of horn edge, lance shaft and bison hide) and have to be
+redrawn. They have never been seen by a player, so this is not repainting shipped art.
 
 ---
 
@@ -62,8 +77,14 @@ look finished and the rest look broken.
 - **A tier is a map.** Tool tier N comes from map N's materials. `TOOL_TIER_CAP = 12` is the only place the
   map count lives.
 - **Each tier is remade from the one below it** — tier V needs the tier IV tool in hand.
-- **Roles, not recipes.** A pickaxe is an edge, a haft and a hide; each map names its own material for each of
-  the eight roles and the recipes fall out. A new map is twelve materials, not twelve recipes.
+- **Roles, not recipes — for maps 2–7 only.** A pickaxe is an edge, a haft and a hide; each map names its own
+  material for each of the eight roles and the recipes fall out. ⚠️ **Reversed for maps 8–12 by draft 3.**
+  Luke: *"the uniqueness I was talking about and the lack of variety was more about crafting… Just be
+  thoughtful when making each maps craftables."* Role order picks the FIRST material of each role, so a map
+  with two edges and two binds never uses half its own parts list in a tool, and five maps of that produce
+  the same twelve objects in new words. Maps 8–12 carry **85 authored craftables** instead — 60 tools, 20
+  foods, 5 charms — each with its three materials chosen. `toolRecipesForMap` and `foodRecipesForMap` keep
+  serving maps 2–7.
 - **Creature i is the resident of zone i, and part i is what that zone is made of.** That is what makes "where
   do I get Dripstone" answerable by looking at the map. Every material is somebody's primary drop.
 - **One emblem per map, not per creature.** 132 new passive stat stacks is a second stat system arriving by
