@@ -86,35 +86,40 @@ export default function GroveMenu({
                 onPointerDown={(e) => e.stopPropagation()}>
                 <header>The Grove</header>
                 <div className="gv-mmenu-scroll">
-                    {families.map((fam) => (
-                        <section key={fam.title}>
-                            {/* ⚠️ THE FAMILY NAME IS A VERB, not a category noun. "Go", "Carry", "Make" say
-                                what you came to the menu to DO; "Navigation", "Inventory", "Crafting" are
-                                names for the code rather than for the player. */}
-                            <h3>{fam.title}</h3>
-                            {fam.rows.map((r) => (
-                                <button key={r.k} type="button"
-                                    className={current === r.k ? "is-on" : undefined}
-                                    aria-current={current === r.k ? "page" : undefined}
-                                    onClick={() => { onPick?.(r.k); onClose?.(); }}>
-                                    {/* ⚠️ A SOCKET, NOT A BARE IMAGE. The sprite sits in a recessed
-                                        plate lit in the family's hue -- the same read as a gear slot
-                                        or a card window, which is what makes the menu look like it
-                                        came out of the same game as the things it opens. */}
-                                    <span className="gv-mmenu-sock">
-                                        <img src={r.art} alt="" draggable={false} />
-                                    </span>
-                                    <span>
-                                        <b>{r.label}</b>
-                                        {/* The line the old circles had nowhere to put. It is the
-                                            destination's own state -- what is ready, how full it is --
-                                            so the menu answers "is it worth opening" before you open it. */}
-                                        {r.note ? <small>{r.note}</small> : null}
-                                    </span>
-                                    {r.badge ? <em>{r.badge}</em> : null}
-                                </button>
-                            ))}
-                        </section>
+                    {/* ── ⚠️ ONE FLAT LIST. NO SECTION HEADINGS. ──────────────────────────────────
+                        Luke: "Get rid of the little section titles in the buttons too, or the left
+                        menu. I don't like the little sections."
+
+                        This started as a FAMILIES menu -- Go / Carry / Make -- and the grouping was
+                        the whole original argument for replacing the dock. It was wrong at this size:
+                        six destinations do not need to be taught in three groups of one, two and one,
+                        and three headings over six rows is more chrome than content. The site's own
+                        drawer lists twelve links flat for the same reason.
+
+                        The grouping survives as ORDER ONLY. families is still the shape the callers
+                        pass and the rows still come out go-then-carry-then-make, so the list reads in
+                        the same sensible sequence -- it just no longer announces it. */}
+                    {families.flatMap((fam) => fam.rows).map((r) => (
+                        <button key={r.k} type="button"
+                            className={current === r.k ? "is-on" : undefined}
+                            aria-current={current === r.k ? "page" : undefined}
+                            onClick={() => { onPick?.(r.k); onClose?.(); }}>
+                            {/* A fixed box around the sprite so every label starts at the same x,
+                                drawn or not -- the site drawer reserves the same 35px for exactly this
+                                reason: a ragged left edge reads as broken long before anyone notices an
+                                icon is missing. */}
+                            <span className="gv-mmenu-sock">
+                                <img src={r.art} alt="" draggable={false} />
+                            </span>
+                            <span>
+                                <b>{r.label}</b>
+                                {/* The line a row of circles had nowhere to put. It is the
+                                    destination's own state -- what is ready, how full it is -- so the
+                                    menu answers "is it worth opening" before you open it. */}
+                                {r.note ? <small>{r.note}</small> : null}
+                            </span>
+                            {r.badge ? <em>{r.badge}</em> : null}
+                        </button>
                     ))}
                 </div>
                 {footer ? <footer>{footer}</footer> : null}

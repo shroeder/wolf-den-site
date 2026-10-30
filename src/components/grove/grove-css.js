@@ -3913,197 +3913,110 @@ export const GROVE_CSS = `
 
 
 /* ── THE GROVE'S MENU ─────────────────────────────────────────────────────────────────────────────
-   Replaces two docks: six sprite circles across the bottom of the zone and the same six down the right
-   of the hub. The reasoning for the change is at the top of GroveMenu.js; what follows is how it is
-   drawn, and the first attempt got that badly wrong.
+   ⚠️ THIS IS .nav-drawer, NOT A NEW DESIGN. Luke: "I want the menu black, okay? Like other slide-out
+   menus we have. You can get rid of the weird stuff you got going on with that thing. Just ever be on
+   the left like the other slide-out menus."
 
-   ⚠️ IT HAS TO LOOK ATTACHED TO THE LEFT EDGE AND IT HAS TO LOOK LIKE THE GAME.
-   Luke, on the first cut: "that menu is absolutely god-awful. Didn't we say we were going to have it be
-   like a gamified menu that slides up from the left? That don't look attached to the left to me."
+   I had built it twice and both were inventions. First a flat dark full-height slab, then -- reacting
+   to "that don't look attached to the left" -- a carved wooden board with a brass hinge, recessed
+   sockets, a hue per family and a slat per row. The second one was prettier and still wrong, because
+   the site already HAS a slide-out menu and a player opening this one should not be meeting a new
+   object. Every decision below is copied from .nav-drawer in globals.css rather than chosen:
 
-   Both halves of that were fair and they had one cause: the panel was a FULL-HEIGHT FLAT DARK SLAB.
+     · #15151a, lifted off the page colour deliberately -- a drawer the same shade as what it covers
+       reads as the page reflowing rather than as a panel sliding over it. (its words, its reason)
+     · full height, min(82vw, 320px), one hairline border on the right, a long shadow
+     · parked at translateX(-100%) with visibility hidden, so it SLIDES rather than popping, and does
+       not swallow taps along the left edge while closed
+     · 240ms cubic-bezier(0.2, 0.9, 0.3, 1)
+     · rows are inset rounded pills, 12px 13px, separated by SPACING AND NOT BY RULES
 
-    · Full height meant the Workbench row sat a third of the way down a column of nothing. A panel
-      stretched top-to-bottom reads as an overlay that happens to be on the left, not as a thing hinged
-      TO the left -- there is no edge it visibly belongs to, because it meets three of them at once.
-      It is now sized to its contents and centred on its own hinge, so the left edge is the only edge it
-      touches and the hinge is where it grows from.
-    · Flat dark meant it belonged to no world. Everything else in the Grove is painted: carved wood,
-      warm light, sockets with objects sitting in them. A #14180f rectangle with 0.86rem system text is
-      a settings sheet from another application.
+   That last one is load-bearing and it is Luke's, two days ago, on the site menu: "the menu items have
+   a bad border." A drawer separates rows by space. My slats were that same mistake rebuilt in wood.
 
-   So: a carved board, square on the left and rounded on the right like a plank let into the wall, a
-   hinge strip welded down its left edge, and rows that are objects in sockets rather than lines in a
-   list. Each family takes a hue, which is the same device the panels already use (--area). */
+   ⚠️ WHAT IS NOT COPIED: .nav-drawer is opened by the wolf in the site header, and the Grove has no
+   header -- in a zone the screen is the game. So the handle below stays. It is the one piece of this
+   that has to exist here and nowhere else, and it is drawn as quietly as it can be. */
 
-/* ── THE HANDLE ───────────────────────────────────────────────────────────────────────────────
-   A small target, because a dock has to be big (each circle is both label and target) and a drawer
-   only needs one. Square on the left, rounded on the right: the same silhouette as the board it
-   opens, so it reads as the end of the same object rather than as a separate button. */
-.gv-mmenu-handle { position: fixed; z-index: 8;
+/* The handle. Plain, dark, flush to the edge, no bigger than it needs to be. */
+.gv-mmenu-handle { position: fixed; z-index: 1002;
     left: 0; top: 50%; transform: translateY(-50%);
-    width: 32px; height: 86px; padding: 0 0 0 3px; cursor: pointer;
-    border: 1px solid #221a0e; border-left: 0; border-radius: 0 14px 14px 0;
-    background:
-        linear-gradient(96deg, rgba(70,55,32,0.5), rgba(32,24,13,0.7)),
-        url("/images/grove/ui-board.webp") left center / cover,
-        linear-gradient(96deg, #5c4728, #332715 100%);
-    box-shadow: inset 1px 0 0 rgba(255,222,160,0.18), inset 0 1px 0 rgba(255,222,160,0.12),
-        3px 4px 16px rgba(0,0,0,0.62);
+    width: 30px; height: 76px; padding: 0; cursor: pointer;
+    border: 1px solid var(--line, rgba(255,255,255,0.12)); border-left: 0;
+    border-radius: 0 12px 12px 0;
+    background: #15151a; box-shadow: 6px 0 20px rgba(0,0,0,0.6);
     display: grid; align-content: center; justify-items: center; gap: 5px;
     -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-    transition: transform 300ms cubic-bezier(0.2,1.1,0.4,1), filter 140ms ease, opacity 260ms ease; }
+    transition: transform 240ms cubic-bezier(0.2,0.9,0.3,1), background 140ms ease, opacity 260ms ease; }
 .gv-mmenu-handle i { display: block; width: 14px; height: 2px; border-radius: 2px;
-    background: #ffd98f; box-shadow: 0 1px 0 rgba(0,0,0,0.55);
-    transition: transform 240ms ease, opacity 180ms ease; }
-.gv-mmenu-handle:hover { filter: brightness(1.12); }
-/* Open, it rides out on the board's right edge and folds into a cross -- the thing that opened the
-   menu is the thing that shuts it. */
-.gv-mmenu-handle.is-open { transform: translateY(-50%) translateX(var(--gv-mw, 268px)); }
+    background: #d8d4cc; transition: transform 240ms ease, opacity 180ms ease; }
+.gv-mmenu-handle:hover { background: #1d1d23; }
+/* Rides out on the drawer's edge and folds into a cross: the thing that opened it shuts it. */
+.gv-mmenu-handle.is-open { transform: translateY(-50%) translateX(min(82vw, 320px)); }
 .gv-mmenu-handle.is-open i:nth-child(1) { transform: translateY(7px) rotate(45deg); }
 .gv-mmenu-handle.is-open i:nth-child(2) { opacity: 0; }
 .gv-mmenu-handle.is-open i:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-/* ⚠️ ONE DOT FOR THE WHOLE MENU. The old dock carried badges on individual circles, which only works
-   while the circles are on screen; a shut drawer has to say "there is something in here" with the one
-   pixel it has. */
-.gv-mmenu-dot { position: absolute; top: 10px; right: 5px; width: 8px; height: 8px; border-radius: 50%;
-    background: #9fe08a; box-shadow: 0 0 9px #9fe08a, 0 0 0 1px rgba(0,0,0,0.5); }
+/* One dot for the whole menu: a shut drawer has to be able to say "there is something in here". */
+.gv-mmenu-dot { position: absolute; top: 9px; right: 5px; width: 7px; height: 7px; border-radius: 50%;
+    background: #9fe08a; box-shadow: 0 0 8px #9fe08a; }
 
-.gv-mmenu-scrim { position: fixed; inset: 0; z-index: 7; border: 0; padding: 0; cursor: pointer;
-    background: radial-gradient(ellipse 60% 70% at 0% 50%, rgba(6,8,5,0.3), rgba(6,8,5,0.66) 70%);
-    -webkit-tap-highlight-color: transparent; }
+.gv-mmenu-scrim { position: fixed; inset: 0; z-index: 1000; border: 0; padding: 0; cursor: pointer;
+    background: rgba(0,0,0,0.55); -webkit-tap-highlight-color: transparent; }
 
-/* ── THE BOARD ────────────────────────────────────────────────────────────────────────────────
-   ⚠️ CENTRED AND CONTENT-HEIGHT, NOT INSET 0. This is the fix for "that don't look attached to the
-   left": a plank let into the left wall touches ONE edge, and its height is however long the plank is.
-   max-height keeps a future seventh destination from running off a short landscape phone -- the list
-   scrolls inside the board rather than the board growing past the screen.
-
-   ⚠️ TRANSLATED, NOT WIDTH-ANIMATED. Animating width reflows the rows on every frame and the text
-   jitters as it goes; a transform is composited and the contents hold still. */
-.gv-mmenu { --gv-mw: 268px;
-    position: fixed; z-index: 8; left: 0; top: 50%; width: var(--gv-mw);
-    max-height: min(86vh, 560px);
+.gv-mmenu {
+    position: fixed; inset: 0 auto 0 0; height: 100dvh;
+    width: min(82vw, 320px); z-index: 1001;
     display: flex; flex-direction: column;
-    border: 1px solid #221a0e; border-left: 0; border-radius: 0 16px 16px 0;
-    /* ⚠️ OPAQUE. The first pass used 0.97/0.98 alpha and a sunlit forest came straight through it --
-       the board read as a brown film laid over the trees rather than as a plank, and every piece of
-       cream text on it lost contrast to whatever happened to be behind that row. A thing that is made
-       of wood is not see-through. The texture does the work the transparency was trying to do. */
-    background:
-        linear-gradient(104deg, rgba(60,46,26,0.55), rgba(26,19,10,0.75) 70%),
-        url("/images/grove/ui-board.webp") left center / cover,
-        linear-gradient(104deg, #4a3a22, #2a2012 64%, #1d1609);
-    box-shadow: inset 0 1px 0 rgba(255,222,160,0.14), 8px 10px 38px rgba(0,0,0,0.66);
-    transform: translate(-102%, -50%); visibility: hidden;
-    transition: transform 320ms cubic-bezier(0.2,1.06,0.4,1), visibility 0s linear 320ms; }
-.gv-mmenu.is-open { transform: translate(0, -50%); visibility: visible; transition-delay: 0s; }
+    border-right: 1px solid var(--line, rgba(255,255,255,0.12));
+    background: #15151a;
+    box-shadow: 14px 0 50px rgba(0,0,0,0.75);
+    overscroll-behavior: contain; touch-action: pan-y;
+    transform: translateX(-100%); visibility: hidden;
+    transition: transform 240ms cubic-bezier(0.2,0.9,0.3,1); }
+.gv-mmenu.is-open { transform: translateX(0); visibility: visible; }
 .gv-mmenu:focus { outline: none; }
-/* The hinge. A brass strip welded down the left edge -- the one piece of the board that says which
-   wall it is fixed to, which is exactly what the flat slab had nothing of. */
-.gv-mmenu::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
-    background: linear-gradient(180deg, #a98542, #6d5225 18%, #c9a35c 50%, #6d5225 82%, #a98542);
-    box-shadow: 1px 0 0 rgba(0,0,0,0.5); }
-.gv-mmenu > header { padding: 13px 16px 11px 20px; font-size: 0.66rem; font-weight: 800;
-    letter-spacing: 0.3em; text-transform: uppercase; color: #ffd98f;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.85);
-    border-bottom: 1px solid rgba(0,0,0,0.5); box-shadow: 0 1px 0 rgba(255,222,160,0.09); }
-.gv-mmenu-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 5px 0 6px;
-    -webkit-overflow-scrolling: touch; }
-.gv-mmenu section { padding: 5px 0 2px; }
-/* ── A HUE PER FAMILY ─────────────────────────────────────────────────────────────────────────
-   The same device the panels use (--area). It is not decoration: the colour is what lets you go
-   straight to the half of the menu you wanted without reading the headings, which is the whole point
-   of grouping them in the first place. */
-.gv-mmenu section:nth-child(1) { --fam: #9fe08a; }
-.gv-mmenu section:nth-child(2) { --fam: #e0a83c; }
-.gv-mmenu section:nth-child(3) { --fam: #a7cbe0; }
-.gv-mmenu h3 { margin: 0; padding: 3px 16px 5px 20px; font-size: 0.55rem; font-weight: 800;
-    letter-spacing: 0.26em; text-transform: uppercase; color: var(--fam);
-    opacity: 0.85; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
-.gv-mmenu section + section { border-top: 1px solid rgba(0,0,0,0.42);
-    box-shadow: 0 -1px 0 rgba(255,222,160,0.07) inset; }
-/* ── A ROW IS AN OBJECT IN A SOCKET ───────────────────────────────────────────────────────────
-   Not a line of text with a picture beside it. The socket is the recessed plate the sprite sits in,
-   lit in the family's hue -- the same read as the gear slots and the card windows, so the menu looks
-   like it came out of the same game as everything it opens. */
-/* ── ⚠️ EVERY ROW IS ITS OWN SLAT ─────────────────────────────────────────────────────────────
-   Luke: "the menu items feel like a little too floaty, and they're not kind of like, they don't have
-   their own row, necessarily. It's hard to delineate between the rows."
+.gv-mmenu > header { padding: max(18px, env(safe-area-inset-top)) 16px 12px;
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.26em; text-transform: uppercase;
+    color: #8f8a80; }
+.gv-mmenu-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 18px; }
+/* ⚠️ THE SECTION AND HEADING RULES ARE GONE, not left orbiting. The menu renders one flat list now --
+   see the note at the markup for why three headings over six rows was more chrome than content. The
+   scroller below is the list; there are no section elements in this component any more. */
+.gv-mmenu-scroll { display: flex; flex-direction: column; gap: 2px; }
+/* An inset rounded pill, exactly like the site drawer's rows. ⚠️ NO BORDERS AND NO DIVIDERS --
+   separated by the 2px gap above. See the note at the top. */
+.gv-mmenu-scroll > button { width: 100%; display: flex; align-items: center; gap: 11px;
+    padding: 10px 13px; border: 0; border-radius: 12px; background: transparent; font: inherit;
+    text-align: left; cursor: pointer; color: #efe7d8;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 140ms ease; }
+.gv-mmenu-scroll > button:hover,
+.gv-mmenu-scroll > button:active { background: rgba(255,255,255,0.06); }
+.gv-mmenu-scroll > button.is-on { background: rgba(255,255,255,0.09); }
+.gv-mmenu-sock { flex: none; width: 34px; height: 34px; display: grid; place-items: center; }
+.gv-mmenu-sock img { width: 34px; height: 34px; object-fit: contain; display: block; }
+.gv-mmenu-scroll > button > span:not(.gv-mmenu-sock) { flex: 1; min-width: 0; }
+.gv-mmenu-scroll > button b { display: block; font-size: 1rem; font-weight: 600; color: #efe7d8; }
+/* The line a row of circles had nowhere to put. */
+.gv-mmenu-scroll > button small { display: block; font-size: 0.72rem; line-height: 1.3; color: #8f8a80; }
+.gv-mmenu-scroll > button em { flex: none; font-style: normal; font-size: 0.68rem; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px; color: #10120d; background: #9fe08a; }
 
-   He is right, and the cause was that a row had no edges. It was a transparent button on a wooden
-   board, so the only thing separating Backpack from Gear was the gap between two words -- which on a
-   grained background reads as nothing at all, and makes each sprite look like it is floating loose on
-   the plank rather than sitting in a place that belongs to it.
+/* ⚠️ CLEARS THE SITE'S OWN NAV BUBBLE. That circle is fixed to the bottom-LEFT of every page and this
+   drawer is full height on the left, so the two share a corner -- filmed, the nav wolf sat straight on
+   top of the word "Sound". .nav-drawer never hits this because the bubble IS its opener and lives in
+   the header; here it is a separate control that happens to land in the same place. */
+.gv-mmenu > footer { border-top: 1px solid var(--line, rgba(255,255,255,0.1));
+    padding: 8px 10px calc(62px + env(safe-area-inset-bottom)); }
+.gv-mmenu-sound { width: 100%; display: flex; align-items: center; gap: 11px; cursor: pointer;
+    padding: 10px 13px; border: 0; border-radius: 12px; background: transparent; font: inherit;
+    font-size: 0.86rem; color: #a8a49c; -webkit-tap-highlight-color: transparent; }
+.gv-mmenu-sound svg { width: 20px; height: 20px; flex: none; }
+.gv-mmenu-sound:hover { background: rgba(255,255,255,0.06); }
+.gv-mmenu-sound[aria-pressed="true"] { color: #6f6b63; }
 
-   So a row is now a cut slat: a slightly raised face, a dark groove beneath it and a lit top edge, the
-   way a real stack of boards meets. The groove is what you actually read -- it is the shadow between
-   two planks, so the rows are delineated by the thing that would delineate them if they were wood.
-
-   ⚠️ A GROOVE, NOT A BORDER LINE. A 1px rgba line over grain disappears into the grain; two lines (one
-   dark, one light, one pixel apart) read as a physical seam at any brightness, which is why this is a
-   box-shadow pair rather than border-bottom. */
-.gv-mmenu section button { width: 100%; display: grid; grid-template-columns: 52px 1fr auto;
-    align-items: center; gap: 12px; padding: 9px 14px 9px 17px; cursor: pointer;
-    border: 0; border-left: 3px solid transparent; font: inherit;
-    text-align: left; -webkit-tap-highlight-color: transparent;
-    background: linear-gradient(180deg, rgba(255,222,160,0.055), rgba(0,0,0,0.12));
-    box-shadow: inset 0 1px 0 rgba(255,222,160,0.10), 0 1px 0 rgba(0,0,0,0.55);
-    transition: background 140ms ease, border-color 140ms ease, transform 120ms ease; }
-/* The last slat in a family sits against the family seam, so it does not need a groove of its own. */
-.gv-mmenu section button:last-child { box-shadow: inset 0 1px 0 rgba(255,222,160,0.10); }
-/* ── THE SOCKET ───────────────────────────────────────────────────────────────────────────────
-   ⚠️ 52px, NOT 44. These sprites are busy -- the workbench is an anvil AND a bench AND a plane, the
-   gear tile is a cuirass AND a sword AND a shield -- and at 34px they stopped being objects and became
-   texture, which is most of what "the sprites don't really make sense" was pointing at. They are good
-   paintings being shown too small to read. */
-.gv-mmenu-sock { position: relative; width: 52px; height: 52px; border-radius: 11px;
-    display: grid; place-items: center;
-    background: radial-gradient(ellipse 80% 70% at 50% 32%,
-        color-mix(in srgb, var(--fam) 24%, #2a2113), #140f08 80%);
-    border: 1px solid color-mix(in srgb, var(--fam) 38%, #241c10);
-    box-shadow: inset 0 2px 6px rgba(0,0,0,0.8), 0 1px 0 rgba(255,222,160,0.1); }
-.gv-mmenu-sock img { width: 46px; height: 46px; object-fit: contain; display: block;
-    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
-.gv-mmenu section button b { display: block; font-size: 0.88rem; font-weight: 800; color: #f6edda;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
-/* The line the circles had nowhere to put. */
-.gv-mmenu section button small { display: block; font-size: 0.64rem; line-height: 1.3; color: #b6bda4;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.75); }
-.gv-mmenu section button em { font-style: normal; font-size: 0.62rem; font-weight: 800;
-    padding: 2px 8px; border-radius: 999px; color: #1a1408;
-    background: linear-gradient(180deg, color-mix(in srgb, var(--fam) 92%, #fff), var(--fam));
-    box-shadow: 0 0 11px color-mix(in srgb, var(--fam) 60%, transparent), 0 1px 0 rgba(0,0,0,0.4); }
-.gv-mmenu section button:hover { background:
-    linear-gradient(90deg, color-mix(in srgb, var(--fam) 15%, transparent), transparent 74%),
-    linear-gradient(180deg, rgba(255,222,160,0.09), rgba(0,0,0,0.1)); }
-.gv-mmenu section button:active { transform: translateX(2px); }
-.gv-mmenu section button.is-on { border-left-color: var(--fam);
-    background:
-        linear-gradient(90deg, color-mix(in srgb, var(--fam) 22%, transparent), transparent 78%),
-        linear-gradient(180deg, rgba(255,222,160,0.09), rgba(0,0,0,0.1)); }
-.gv-mmenu section button.is-on b { color: var(--fam); }
-
-/* ── THE FOOTER IS FOR SETTINGS ───────────────────────────────────────────────────────────────
-   The sound switch used to be a seventh circle among six doors, drawing the eye exactly as hard as
-   the workbench. Below the destinations, in smaller type, it finally reads as what it is.
-   ⚠️ NO LONGER NEEDS TO CLEAR THE SITE'S NAV BUBBLE. That circle is fixed to the bottom-left of every
-   page and the old full-height panel ran straight under it; a board centred on its hinge ends well
-   above it, so the 62px of dead padding that used to be here is gone. */
-.gv-mmenu > footer { border-top: 1px solid rgba(0,0,0,0.42);
-    box-shadow: 0 -1px 0 rgba(255,222,160,0.07) inset;
-    padding: 6px 8px 8px 14px; }
-.gv-mmenu-sound { width: 100%; display: flex; align-items: center; gap: 9px; cursor: pointer;
-    padding: 7px 10px; border: 0; border-radius: 9px; background: transparent; font: inherit;
-    font-size: 0.72rem; color: #c3c9b6; -webkit-tap-highlight-color: transparent; }
-.gv-mmenu-sound svg { width: 18px; height: 18px; flex: none; }
-.gv-mmenu-sound:hover { background: rgba(255,222,160,0.07); }
-.gv-mmenu-sound[aria-pressed="true"] { color: #8d8f93; }
-
-@media (min-width: 560px) { .gv-mmenu { --gv-mw: 300px; } }
 @media (prefers-reduced-motion: reduce) {
-    /* ⚠️ IT STILL OPENS AND SHUTS. Reduced motion means no slide, not a menu that cannot be used --
-       see animations-always-play. */
+    /* ⚠️ IT STILL OPENS AND SHUTS. Reduced motion means no slide, not a menu that cannot be used. */
     .gv-mmenu, .gv-mmenu-handle { transition: none; }
 }
 
