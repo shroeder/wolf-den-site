@@ -11,40 +11,19 @@ import {
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import {
-    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, starLadder, emblemStars, emblemArt, emblemFace, groveArt, toolArt, zoneHasParts,
+    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, groveArt, toolArt, zoneHasParts,
 } from "@/lib/marketplace/grove-catalog.js";
 // ── THE ORDER OF THE SHELF ────────────────────────────────────────────────────────────────────────
 // Catalog order, which is the order you meet the creatures: map one's thirteen, then one per map going
 // deeper. ⚠️ NOT sorted by what you own -- a shelf that reshuffles as you collect destroys the one thing
 // a collection screen is for, which is knowing where a given card LIVES and seeing its hole.
-// ── ⚠️ AND IT IS SECTIONED NOW, BECAUSE IT IS 103 CARDS ─────────────────────────────────────────
-// It was nineteen in one grid, which is fine. Giving every boss its own card added eighty-four more, and a
-// hundred-odd silhouettes in one undifferentiated run is not a collection, it is a wall -- you cannot tell
-// where the thing you are hunting lives, and the map-one shelf you have nearly finished is buried under six
-// maps you have not started.
-//
-// Split by where the card comes from and then by map, which is the order you meet them. The wanderers stay
-// first: they are the cards that drop while you play, and the boss shelf is the deliberate chase.
-const CARD_SHELVES = (() => {
-    const all = Object.entries(GROVE_EMBLEMS);
-    const wander = all.filter(([, e]) => !e.boss).map(([id]) => id);
-    const byMap = new Map();
-    for (const [id, e] of all) {
-        if (!e.boss) continue;
-        const m = Number(e.map) || 1;
-        if (!byMap.has(m)) byMap.set(m, []);
-        byMap.get(m).push(id);
-    }
-    return [
-        { title: "Wanderers", ids: wander },
-        ...[...byMap.keys()].sort((a, b) => a - b).map((m) => ({
-            title: `Bosses · Map ${m}`, ids: byMap.get(m),
-        })),
-    ];
-})();
-const CARD_ORDER = CARD_SHELVES.flatMap((sh) => sh.ids);
+// How many Monster Cards exist, for the panel's own heading. The SHELVING -- a row per map, bosses in
+// with that map's wanderers -- lives in GroveCards.js now, because that is the thing that draws it; a
+// second copy of the grouping here would be the same rule in two homes.
+const CARD_TOTAL = Object.keys(GROVE_EMBLEMS).length;
 
 import { useWishlist } from "@/components/grove/useWishlist.js";
+import GroveCards from "@/components/grove/GroveCards.js";
 import GroveMenu from "@/components/grove/GroveMenu.js";
 import GroveBench from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
@@ -903,7 +882,7 @@ export default function GroveClient({ initial }) {
                             <button type="button" role="tab" aria-selected={embTab === "cards"}
                                 className={embTab === "cards" ? "is-on" : ""}
                                 onClick={() => setEmbTab("cards")}>
-                                Monster Cards<i>{(st.emblems || []).filter((e) => e.count > 0).length}/{CARD_ORDER.length}</i>
+                                Monster Cards<i>{(st.emblems || []).filter((e) => e.count > 0).length}/{CARD_TOTAL}</i>
                             </button>
                             <button type="button" role="tab" aria-selected={embTab === "armour"}
                                 className={embTab === "armour" ? "is-on" : ""}
@@ -959,7 +938,7 @@ export default function GroveClient({ initial }) {
 
                         {embTab === "cards" ? (
                         <Area id="emblems" icon="ui-emblems" title="Monster Cards"
-                            count={`${(st.emblems || []).filter((e) => e.count > 0).length}/${CARD_ORDER.length} found`}>
+                            count={`${(st.emblems || []).filter((e) => e.count > 0).length}/${CARD_TOTAL} found`}>
                         {/* ⚠️ NO CAPTION HERE. It read "Three may be worn. Three more are sealed." —
                             above three slots, under a header already counting "1/3 worn", with the
                             sealed ones drawn sealed. Three statements of the same fact and only one of
@@ -1013,107 +992,28 @@ export default function GroveClient({ initial }) {
                             the collection have nothing to do with each other.
                         </p>
                         {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">None yet. Roughly one kill in four hundred leaves one behind.</p> : null}
-                        {/* ── ⚠️ THE WHOLE SET IS ON THE SHELF, OWNED OR NOT ──────────────────────────
-                            This used to list only the cards you already had, as rows of text with a 46px
-                            picture. Two things were wrong with that and they compound.
+                        {/* ── ⚠️ ONE ROW PER MAP, SCROLLING SIDEWAYS ─────────────────────────────────
+                            Was eight stacked sections of a vertical grid. Honest, and a wall: 103 cards
+                            meant scrolling past roughly forty silhouettes to reach map three, with no way
+                            to jump and no sense of which shelf you were working on.
 
-                            A collection you cannot see the SHAPE of is not a collection. With only your
-                            own cards listed, a player with four of them has no idea whether that is four
-                            of six or four of forty, which creature is still missing, or that there is
-                            anything to complete at all. The empty slots are the thing that makes a set a
-                            set -- so every card in the game has a place here from the first time you open
-                            the panel, and the ones you have not found are black silhouettes.
+                            Luke: "I kind of want it to be like the virtual horizontal scroll that we made
+                            for a few other things recently, where the vertical skew would be different
+                            maps, and the horizontal skew would be different enemies. And the bosses would
+                            just be lumped in with enemies for that map."
 
-                            ⚠️ A SILHOUETTE STILL TELLS YOU WHICH MONSTER IT IS. That is the point of using
-                            the creature's own sprite at brightness(0) rather than a question mark: the
-                            outline of the stag's antlers or the moth's wings is recognisable, so a missing
-                            card is a specific animal you have not killed yet rather than an anonymous gap.
-                            A "?" box would have been easier and would have taught nothing.
-
-                            Luke: "the card display area needs to be gamified and way more endorphins with
-                            colors ... they should be silhoiete black if not possessed."
-
-                            The colour is not decoration either -- it is the rung. EMBLEM_STARS already
-                            carries one hex per rung (Worn grey, Marked green, Etched blue, Sealed violet,
-                            Crowned gold, Ascendant pink) and the panel was spending it on six characters
-                            of star text in the corner. Now the rung owns the whole card: border, glow,
-                            name, pips. Your shelf visibly changes colour as it levels, which is the only
-                            reward a collection screen can actually pay. */}
-                        {CARD_SHELVES.map((shelf) => {
-                            const found = shelf.ids.filter((id) => (st.emblems || []).some((x) => x.id === id && x.count > 0)).length;
-                            return (
-                        <section key={shelf.title} className="gv-cshelf">
-                            {/* The count is per shelf, so "2 / 12" on a map tells you how much of THAT
-                                boss set is left -- which is the question a collection screen is for.
-                                One running total across 103 cards answers nothing. */}
-                            <h4>{shelf.title}<i>{found}/{shelf.ids.length}</i></h4>
-                        <div className="gv-cgrid">
-                            {shelf.ids.map((id) => {
-                                const meta = GROVE_EMBLEMS[id];
-                                const e = (st.emblems || []).find((x) => x.id === id) || null;
-                                const count = e?.count || 0;
-                                const stars = e?.stars || 0;
-                                const rung = e?.rung || null;
-                                const next = e?.next || null;
-                                const have = count > 0;
-                                const worn = e && e.slot !== null && e.slot !== undefined;
-                                // ⚠️ THE BAR MEASURES THE RUNG YOU ARE IN, not the whole ladder. Against the
-                                // ladder every bar below Crowned sits near empty and reads as no progress at
-                                // all -- 22 of 250 is 9% when it is actually three-sixths of the way up.
-                                // ⚠️ THE CARD'S OWN LADDER. EMBLEM_STARS is the wanderer one; a boss card
-                                // maxes at sixteen, so measuring it against 250 would draw every boss bar
-                                // as a sliver and report "3 / 22" on a card that was already two stars.
-                                const ladder = starLadder(id);
-                                const floor = stars ? ladder[stars - 1].at : 0;
-                                const pct = next ? Math.max(4, Math.round(((count - floor) / (next.at - floor)) * 100)) : 100;
-                                return (
-                                    <div key={id}
-                                        className={`gv-card${have ? "" : " is-locked"}${worn ? " is-worn" : ""}${stars >= 5 ? " is-high" : ""}`}
-                                        style={{ "--rung": rung?.color || "#6a6355" }}>
-                                        <span className="gv-card-win">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={emblemFace(id)} alt="" loading="lazy" />
-                                            {have && emblemArt(id) ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img className="gv-card-seal" src={emblemArt(id)} alt="" loading="lazy" />
-                                            ) : null}
-                                            {worn ? <em className="gv-card-worn">Worn</em> : null}
-                                        </span>
-                                        {/* Six pips, always six, so the room left to grow is visible on a
-                                            one-star card instead of only on a maxed one. */}
-                                        <span className="gv-card-pips">
-                                            {[1, 2, 3, 4, 5, 6].map((n) => (
-                                                <i key={n} className={n <= stars ? "on" : ""}
-                                                    style={n <= stars ? { color: ladder[n - 1].color } : undefined}>★</i>
-                                            ))}
-                                        </span>
-                                        <b>{have ? meta?.name || id : "· · ·"}</b>
-                                        {have && stars ? (
-                                            <u>+{(meta?.per || 0) * stars}{meta?.kind === "pct" ? "%" : ""}{" "}
-                                                {String(meta?.stat || "").replace(/_/g, " ")}</u>
-                                        ) : (
-                                            <u className="gv-card-none">
-                                                {have ? `${(next?.at || 3) - count} more to wake it` : "not found"}
-                                            </u>
-                                        )}
-                                        {have ? (
-                                            <span className="gv-card-bar"><i style={{ width: `${pct}%` }} /></span>
-                                        ) : <span className="gv-card-bar" />}
-                                        <small>{have ? `${count}${next ? ` / ${next.at}` : " · maxed"}` : ""}</small>
-                                        {have && !worn ? (
-                                            <button type="button" onClick={async () => {
-                                                const free = [0, 1, 2].find((sl) => !(st.emblems || []).some((x) => x.slot === sl));
-                                                await post({ action: "emblem", emblemId: id, slot: free ?? 0 });
-                                                refresh();
-                                            }}>Wear</button>
-                                        ) : null}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        </section>
-                            );
-                        })}
+                            It is the GroveAtlas rig, reused rather than rebuilt — same classes, same
+                            snapping track, same computed centre. See the note at the top of GroveCards.js.
+                            The whole set is still shown, found or not; the silhouettes did not go
+                            anywhere, they just stopped being a single column of them. */}
+                        <GroveCards
+                            emblems={st.emblems || []}
+                            onWear={async (id) => {
+                                const free = [0, 1, 2].find((sl) => !(st.emblems || []).some((x) => x.slot === sl));
+                                await post({ action: "emblem", emblemId: id, slot: free ?? 0 });
+                                refresh();
+                            }}
+                        />
                         </Area>
                         ) : null}
                         {/* The till. Behind its own tab now — see the note at the top of this panel. */}

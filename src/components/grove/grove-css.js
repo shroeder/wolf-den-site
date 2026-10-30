@@ -3815,25 +3815,33 @@ export const GROVE_CSS = `
 
 
 /* ── THE COLLECTION SHELF ─────────────────────────────────────────────────────────────────────────
-   Every card in the game, owned or not. What was here was a list of the ones you already had, as text
-   rows with a 46px picture, and it had the two faults a collection screen cannot have: you could not
-   see the SHAPE of the set, and nothing on it ever changed colour.
+   A row per map, scrolling sideways, bosses in with that map's wanderers. The rig is GroveAtlas's --
+   .ga-row / .ga-track / .ga-cell, reused rather than rebuilt, so the two screens scroll identically and
+   a fix to the track's padding lands on both.
 
-   Luke: "the card display area needs to be gamified and way more endorphins with colors ... they
-   should be silhoiete black if not possessed."
+   ⚠️ THE GRID THAT WAS HERE IS GONE, not left orbiting. It was .gv-cgrid plus .gv-cshelf headings for
+   eight stacked sections; nothing renders either any more. See stale-css-rule-on-reshape -- a replaced
+   component whose CSS stays behind is a rule that will one day match something new by accident.
 
-   ⚠️ THE COLOUR IS THE RUNG, NOT A PALETTE. EMBLEM_STARS already carries one hex per rung -- Worn grey,
-   Marked green, Etched blue, Sealed violet, Crowned gold, Ascendant pink -- and the old panel spent it
-   on six characters of star text in a corner. Here --rung drives the border, the glow, the name, the
-   pips and the bar, so a shelf that levels up visibly changes colour. That is the reward; a collection
-   screen has no other one to pay.
+   Luke: "the vertical skew would be different maps, and the horizontal skew would be different enemies.
+   And the bosses would just be lumped in with enemies for that map." */
+.gv-cards { display: flex; flex-direction: column; gap: 16px; padding: 2px 0 8px; }
+/* ⚠️ THE TRACK IS THE ATLAS'S, but its cards are 188px wide and these are 124 -- so the 32% side padding
+   that lets the atlas centre its first and last card leaves far too much dead rail here. Narrower cards
+   need less runway, and 38% of a phone is most of the screen. */
+.gv-cards .ga-track { padding: 2px 34%; gap: 9px; }
+/* ⚠️ THE NEIGHBOURS STAY LEGIBLE. The atlas dims its off-centre cards to 0.52 because they are zone
+   photographs and the point is which one you are entering. These are a COLLECTION -- the whole reason to
+   scroll a row is to see what is on it -- so a neighbour dimmed to near-nothing makes browsing 25 cards
+   a card-at-a-time crawl. Lifted enough that the centred one is still unmistakably the subject. */
+.gv-cards .ga-cell { transition: transform .2s ease, opacity .2s ease; opacity: 0.8; transform: scale(0.95); }
+.gv-cards .ga-cell.ga-on { opacity: 1; transform: scale(1); }
+.gv-cards .ga-row-head { padding: 0 6px; }
+.gv-cards .ga-row-head b { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #ffd98f; }
+.gv-cards .ga-row-head i { font-size: 0.66rem; }
 
-   Three columns on a phone. Four fits and makes every card too small to read the creature, which is the
-   one thing the card exists to show. */
-.gv-cgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 2px; }
-@media (min-width: 560px) { .gv-cgrid { grid-template-columns: repeat(4, 1fr); } }
-
-.gv-card { position: relative; display: grid; gap: 3px; padding: 6px 6px 7px; border-radius: 10px;
+.gv-card { position: relative; width: 124px; display: grid; gap: 3px; padding: 6px 6px 7px; border-radius: 10px;
     background: linear-gradient(168deg, #4a3a22 0%, #382b17 62%, #2b2112 100%);
     border: 1px solid color-mix(in srgb, var(--rung) 55%, #2b2112);
     box-shadow: inset 0 0 0 1px rgba(255,222,160,0.12),
@@ -3882,6 +3890,13 @@ export const GROVE_CSS = `
 .gv-card.is-worn { border-color: var(--rung);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rung) 45%, transparent),
         0 0 20px color-mix(in srgb, var(--rung) 55%, transparent), 0 3px 8px rgba(0,0,0,0.6); }
+/* A boss card says so on its face: it is the heavier thing on an otherwise undifferentiated row. Top
+   RIGHT, because Worn already owns the top left and the two can be true at once. */
+.gv-card-boss { position: absolute; top: 4%; right: 4%; padding: 1px 5px; border-radius: 999px;
+    font-style: normal; font-size: 0.5rem; font-weight: 800; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #ffe9c4; background: rgba(20,14,6,0.82);
+    border: 1px solid rgba(255,214,130,0.5); }
+.gv-card.is-locked .gv-card-boss { color: #7d8670; border-color: rgba(255,255,255,0.14); }
 .gv-card-worn { position: absolute; top: 4%; left: 4%; padding: 1px 5px; border-radius: 999px;
     font-style: normal; font-size: 0.5rem; font-weight: 800; letter-spacing: 0.1em;
     text-transform: uppercase; color: #2b2112; background: var(--rung); }
@@ -4092,16 +4107,4 @@ export const GROVE_CSS = `
     .gv-mmenu, .gv-mmenu-handle { transition: none; }
 }
 
-/* ── A SHELF PER SOURCE ───────────────────────────────────────────────────────────────────────────
-   103 cards in one undifferentiated grid is a wall, not a collection: you cannot tell where the card
-   you are hunting lives, and the map-one set you have nearly finished is buried under six maps you
-   have not started. The count on each heading is that shelf's own, because "2 / 12 of map three's
-   bosses" is the question the screen exists to answer. */
-.gv-cshelf + .gv-cshelf { margin-top: 18px; }
-.gv-cshelf h4 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-    margin: 0 0 8px; padding-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.08);
-    font-size: 0.64rem; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase;
-    color: #ffd98f; }
-.gv-cshelf h4 i { font-style: normal; letter-spacing: 0.06em; color: #9aa48e;
-    font-variant-numeric: tabular-nums; }
 `;
