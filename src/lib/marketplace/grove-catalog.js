@@ -265,6 +265,24 @@ function emblemFaces() {
  */
 export const emblemArt = (id) => (GROVE_EMBLEMS[id] ? `/images/grove/emblem-${id}.webp` : null) || emblemFaces()[id] || null;
 
+/**
+ * The CREATURE on a Monster Card, as opposed to the carved mark that stands for it.
+ *
+ * ── ⚠️ A MONSTER CARD HAS TO SHOW THE MONSTER ──────────────────────────────────────────────────────────────
+ * Luke: "its supposed to be a card of the enemy you are collecting. So i want it to be a card of the enemy as
+ * a sprite for each one." emblemArt answers with `emblem-em_*.webp`, which is a carved amulet on a cord -- a
+ * good object, and the wrong one to put on the face of a card. A card of the enemy shows the enemy.
+ *
+ * Nothing has to be drawn for that. Every creature in the Grove already has its own sprite, and emblemFaces
+ * already indexes them by the emblem they drop; it was just not reachable from outside this file. So the
+ * card's face is the creature's own art and the amulet becomes the card's SEAL -- a small mark in the corner,
+ * which is what an emblem always was.
+ *
+ * Falls back to the amulet rather than to nothing: a map that ships an emblem before its creature art exists
+ * should still deal a card with a picture on it.
+ */
+export const emblemFace = (id) => emblemFaces()[id] || (GROVE_EMBLEMS[id] ? `/images/grove/emblem-${id}.webp` : null) || null;
+
 // ── ⚠️ THE CURVE IS ANCHORED TO TWO REAL MEMBERS, AND THE HIGH ANCHOR IS MAP 12 ──────────────────────────
 // Luke: "Lets make it so eric would have a tough time with map 12 first zone. I say that to give you the
 // linear growth line. And consider that this is the grove, multiple enemies, different levels of aggression.

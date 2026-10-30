@@ -8,7 +8,7 @@ import { useWishlist } from "./useWishlist.js";
 
 import {
     GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, dropsAnyOf, HEAL_AT, scaledFoe, scaledRare, killCredit, groveBoss, groveSize, grovePart,
-    groveArt, groveEmblem, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
+    groveArt, groveEmblem, emblemArt, emblemFace, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKillTimes, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
 import {
@@ -141,7 +141,7 @@ const ZONE_DOCK = [
     // it — and leaving is not a free action (see the panel note in GroveClient).
     { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
     { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp" },
-    { k: "emblems", label: "Emblems", art: "/images/grove/ui-emblems.webp" },
+    { k: "emblems", label: "Cards", art: "/images/grove/ui-emblems.webp" },
 ];
 
 // ── REACH, IN WORLD UNITS ───────────────────────────────────────────────────────────────────────────────────
@@ -303,6 +303,11 @@ const HERALD_MS = 2200;
 
 // ── DYING ────────────────────────────────────────────────────────────────────────────────────────────────────
 // The longest hold in the feature, because it is the only one with nothing after it. A boss kill stops for
+// How long the dealt card stays up. Long enough to read the creature, the name and what it gives — three
+// things — and short enough that it is gone before the next wanderer closes. Measured against the fight
+// rather than chosen: at 1.2s the card was still on screen when a replacement spawned and walked under it.
+const TROPHY_HOLD_MS = 2100;
+
 // 130ms and an emblem for 190; this is allowed to sit, because the next thing the player sees is a panel
 // telling them the run is over and the screen should already feel like it has stopped before it arrives.
 const DEATH_STOP_MS = 420;
@@ -388,6 +393,23 @@ export default function GroveScene({
     const [warp, setWarp] = useState(null);
     // Which gate is being walked through, so it can flare under the screen flood.
     const [entering, setEntering] = useState(null);
+    // ── ⚠️ THE TROPHY, SHOWN. A trophy is about one kill in four hundred, it is carved with the creature's
+    // own mark, and at the moment it dropped the player saw a twenty-pixel dark blob arc across a
+    // green forest and a thin grey label. Filmed frame by frame it was indistinguishable from picking up
+    // a twig. The collectible had a face the whole time and the drop never showed it.
+    //
+    // Held in React rather than on the world object because it OUTLIVES the frame that caused it: the
+    // card stays up while the fight carries on underneath, and the loop must not own something whose
+    // lifetime it does not control.
+    const [trophy, setTrophy] = useState(null);
+    // ⚠️ KEYED ON THE TROPHY ITSELF so a second emblem during the first one's hold restarts the moment
+    // rather than being swallowed — rare twice in a row is the best thing that can happen and must not
+    // read as the second one failing to drop.
+    useEffect(() => {
+        if (!trophy) return undefined;
+        const t = setTimeout(() => setTrophy(null), TROPHY_HOLD_MS);
+        return () => clearTimeout(t);
+    }, [trophy]);
     // ⚠️ THE RUNNING TOTAL, NOT THIS VISIT'S. zone.kills is what the server has banked across every session
     // in this zone; `kills` is only what has died since this one started. Luke: "Ensure the kill count
     // persists, we don't want it to get reset if you leave." The door reads the sum, so walking out at 19
@@ -486,6 +508,35 @@ export default function GroveScene({
     // depending on ancestors it does not own. See filter-creates-containing-block.
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); }, []);
+
+    // ── ⚠️ THE TROPHY ART IS FETCHED BEFORE IT IS EVER NEEDED ────────────────────────────────────
+    // The reveal mounts an <img> at the instant of the kill, and a 256px webp that has never been asked
+    // for before takes most of a second to arrive and decode. Filmed, that is nine frames of a gold ray
+    // fan spinning around an EMPTY HOLE before the amulet turns up -- which reads as a loading spinner,
+    // the single worst thing the rarest moment in the feature could be mistaken for.
+    //
+    // There is no clever fix at reveal time, because the reveal is the first moment anything knows which
+    // trophy dropped. So nothing waits: every trophy this zone's creatures can leave is pulled into the
+    // browser cache on mount. It is two to four images on a screen that has already loaded a backdrop,
+    // a hero, a pet and thirty creatures, and it buys the one frame that matters.
+    //
+    // ⚠️ THE GROUND DROP READS THE SAME URL, so this covers that too -- the amulet lying in the grass was
+    // arriving just as late and for exactly the same reason.
+    useEffect(() => {
+        if (!mounted) return;
+        const ids = new Set();
+        for (const e of zone.enemies || []) {
+            const em = GROVE_ENEMIES[e]?.emblem;
+            if (em) ids.add(em);
+        }
+        for (const id of ids) {
+            const url = emblemArt(id);
+            if (!url) continue;
+            const img = new window.Image();
+            img.decoding = "async";
+            img.src = url;
+        }
+    }, [mounted, zone.id, zone.enemies]);
 
     // ── THE MUSIC ────────────────────────────────────────────────────────────────────────────────
     // ⚠️ KEYED ON THE ZONE AND NOTHING ELSE. The loop effect below depends on the world, the stats, the
@@ -1853,9 +1904,30 @@ export default function GroveScene({
                 shockwave(foe.x, foe.y + foe.h * 0.4, "crit");
                 burst(foe.x, foe.y + foe.h * 0.4, { crit: true });
                 playEmblemDrop();
-                addPop("loot", em?.name || "Emblem", foe.x, foe.y + foe.h + 4);
                 spill(`e${i}`, got.emblem, em?.name || "Emblem", // name/qty default below
-                    { emblem: true, tier: 6, rare: true, vy: EMBLEM_THROW, vx: 0 });
+                    {
+                        emblem: true, tier: 6, rare: true, vy: EMBLEM_THROW, vx: 0,
+                        // ⚠️ THE THING ON THE GROUND IS THE CARD. Luke: "What does it look like on the
+                        // ground. It should show the sprite of the card properly." It was showing
+                        // `emblem-em_*.webp` -- the carved mark -- at the same 3.2 units as a gnawed
+                        // root, so the rarest drop in the feature was a small brown smudge on a brown
+                        // forest floor AND it was the wrong object. A card lies on the floor as a card.
+                        face: emblemFace(got.emblem), seal: emblemArt(got.emblem),
+                    });
+                // ⚠️ NO addPop HERE ANY MORE. The little floating name was doing the job the reveal now
+                // does, and two labels for one event read as a bug rather than as emphasis.
+                setTrophy({
+                    id: got.emblem,
+                    name: em?.name || "Emblem",
+                    // ⚠️ TWO PICTURES, AND THE CREATURE IS THE FACE. See emblemFace -- the carved amulet
+                    // is the SEAL on the card, not the card.
+                    face: emblemFace(got.emblem),
+                    seal: emblemArt(got.emblem),
+                    stat: em?.stat || null,
+                    per: em?.per || 0,
+                    kind: em?.kind || "flat",
+                    at: Date.now(),
+                });
             }
             rerender();
         };
@@ -3715,7 +3787,21 @@ export default function GroveScene({
                     <span key={d.uid} className={`gv-drop t${d.tier || 1}${d.emblem ? " is-emblem" : ""}${d.rare ? " is-rare" : ""}${d.band ? ` is-${d.band}` : ""}${d.rareRow ? " is-rarerow" : ""}`}
                         ref={(n) => { const dd = d; dd.node = n; dd.labelNode = n?.querySelector("b") || null; }}
                         aria-hidden="true">
-                        {d.art ? <img src={d.art} alt="" /> : <i />}
+                        {/* ⚠️ AN EMBLEM DROP IS A CARD, NOT A SPRITE. Everything else in the pile is one
+                            picture of one object, so it renders as an <img> and the drawn tier-stone is
+                            the fallback for anything with no art yet. A Monster Card is a composed thing
+                            -- creature, frame, seal -- and the floor shows the same object the reveal
+                            did, at the size you can recognise from across the zone. */}
+                        {d.emblem && d.face ? (
+                            <span className="gv-drop-card">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={d.face} alt="" />
+                                {d.seal ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img className="gv-drop-seal" src={d.seal} alt="" />
+                                ) : null}
+                            </span>
+                        ) : d.art ? <img src={d.art} alt="" /> : <i />}
                         <b>{d.label}</b>
                     </span>
                 ))}
@@ -3789,6 +3875,53 @@ export default function GroveScene({
 
                     Spread along the floor rather than stacked: four boxes in one spot is one box as
                     far as a thumb is concerned. */}
+                {/* ── THE CARD, DEALT ──────────────────────────────────────────────────────────
+                    Rises, holds, and goes. Deliberately NOT a modal: the fight continues underneath and
+                    nothing waits for a tap, because a rare drop that interrupts you is a rare drop you
+                    start to resent on the four-hundredth kill. Pointer-transparent for the same reason —
+                    an overlay over the creature you were about to hit must never eat the tap.
+
+                    ⚠️ THE CREATURE IS THE FACE OF THE CARD. Luke: "its supposed to be a card of the enemy
+                    you are collecting. So i want it to be a card of the enemy as a sprite for each one."
+                    An earlier cut of this showed `emblem-em_*.webp` — the carved amulet — at full size and
+                    called the thing a trophy, on the reasoning that the art should name the object. That
+                    had it backwards: the object was always a card of a monster, and the amulet is the mark
+                    that stands for that monster. So the amulet is the seal in the corner and the creature's
+                    own sprite is the picture.
+
+                    No art was drawn for this. Every creature in the Grove already has a sprite and
+                    emblemFace indexes them by the card they drop. */}
+                {trophy ? (
+                    <div className="gv-mc" key={trophy.at} aria-hidden="true">
+                        <i className="gv-mc-rays" />
+                        <div className="gv-mc-card">
+                            <div className="gv-mc-art">
+                                {trophy.face ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={trophy.face} alt="" draggable={false} />
+                                ) : null}
+                                {trophy.seal ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img className="gv-mc-seal" src={trophy.seal} alt="" draggable={false} />
+                                ) : null}
+                            </div>
+                            <b>{trophy.name}</b>
+                            {/* ⚠️ THE EFFECT IS PART OF THE MOMENT, not something to go and look up. A card
+                                whose whole point is a permanent passive, revealed without saying what it
+                                does, teaches nothing — and teaching is the job here, because the player
+                                holding their first one has no idea what they caught. */}
+                            {trophy.stat ? (
+                                <u>{trophy.kind === "pct" ? `+${trophy.per}%` : `+${trophy.per}`}{" "}
+                                    {String(trophy.stat).replace(/_/g, " ")}</u>
+                            ) : null}
+                        </div>
+                        {/* The one word that stops this being filed under Spire. It is not decoration: a
+                            player who never opens a panel still learns from this line that the card is a
+                            monster they collected, not a card they play. */}
+                        <span className="gv-mc-tag">Monster Card</span>
+                    </div>
+                ) : null}
+
                 {(groundChests || []).map((c, i) => (
                     <button key={c.id} type="button"
                         className={`gv-chest${c.opening ? " is-opening" : ""}`}
@@ -4495,13 +4628,26 @@ function setUpLabScene(w, scene, blow = 400) {
             f.hit = true; f.passive = false;
         });
     } else if (scene === "emblem") {
-        // One creature at the hero's elbow with enough health to still be dying when the camera starts.
+        // One creature at the hero's elbow, dying.
+        //
+        // ⚠️ 420 HEALTH WAS TWELVE SWINGS AND THE FILM IS TWO SECONDS. Every other scene here is staged to
+        // SURVIVE the camera, and this one was written to the same instinct -- "enough health to still be
+        // dying when the camera starts" -- but the moment this scene exists to photograph begins at the
+        // KILL, so health is the one thing it must not have. Two full sheets came back as twenty-four
+        // frames of an ordinary fight, counter stuck on 0/40, no trophy in any of them, and the scene
+        // looked broken when it was only mis-staged.
+        //
+        // 160 is a handful of swings -- about a second and a half. Deliberately not fewer: at 40 the kill
+        // landed ~300ms after mount, which is faster than a cold image fetch, so every film showed the ray
+        // fan spinning around an empty hole and made the art preload look like it had not worked. In real
+        // play a trophy arrives minutes into a zone and the preload finished long before. A lab scene that
+        // is harsher than anything the game can produce tests the rig, not the feature.
         const victim = w.foes.filter((f) => !f.isBoss)[0];
         if (victim) {
             victim.x = w.hero.x + 2.5;
             victim.y = 0;
             victim.vx = 0; victim.vy = 0; victim.grounded = true; victim.face = -1;
-            victim.hp = 420; victim.maxHp = 420;
+            victim.hp = 160; victim.maxHp = 160;
             victim.hit = true; victim.passive = false;
             w.target = victim;
         }

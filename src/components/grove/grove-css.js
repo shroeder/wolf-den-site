@@ -1066,9 +1066,40 @@ export const GROVE_CSS = `
     filter: drop-shadow(0 0 14px rgba(255,200,110,0.95)) drop-shadow(0 2px 3px rgba(0,0,0,0.7)); }
 .gv-drop.is-rare i { animation: gvBob 1500ms ease-in-out infinite, gvSheen 2200ms linear infinite; }
 /* The painted emblem keeps the loud halo the gold star had. The silhouette is the sprite's job now, so
-   this is only the glow that picks it out of a pile of six ordinary parts. */
+   this is only the glow that picks it out of a pile of six ordinary parts.
+
+   ⚠️ AND IT IS BIGGER THAN EVERYTHING ELSE IN THE PILE. Luke, watching one land: "What does it look like
+   on the ground. It should show the sprite of the card properly." It did show the sprite — at 3.2 units,
+   which is the size of a gnawed root, and the sprites are DARK: a brown amulet on a brown forest floor at
+   thirty-odd pixels is a smudge. The rarest drop in the feature was the hardest one to see.
+
+   5.4 units rather than 3.2, and a light underneath it rather than only a glow around it. The halo alone
+   lost against the foliage; a beam has nothing behind it to lose against. */
+.gv-drop.is-emblem { width: calc(5.4 * var(--gv-unit, 1%)); height: calc(5.4 * var(--gv-unit, 1%));
+    margin-left: calc(-2.7 * var(--gv-unit, 1%)); z-index: 3; }
 .gv-drop.is-emblem img {
-    filter: drop-shadow(0 0 14px rgba(255,200,110,0.95)) drop-shadow(0 2px 3px rgba(0,0,0,0.7)); }
+    filter: drop-shadow(0 0 10px rgba(255,214,130,0.95)) drop-shadow(0 0 22px rgba(255,170,60,0.55))
+        drop-shadow(0 2px 4px rgba(0,0,0,0.85)); }
+/* The card, lying in the grass. The same object the reveal showed, shrunk -- a drop that looks like one
+   thing in the air and a different thing on the floor is a drop the player has to learn twice.
+   ⚠️ NO TEXT ON IT AT THIS SIZE. At roughly 60 pixels tall a name renders as a grey smear and makes the
+   card look like a bug; the label beside the drop already says what it is. */
+.gv-drop-card { position: absolute; inset: 0; display: grid; place-items: center;
+    border-radius: 15%; padding: 7%;
+    background: linear-gradient(168deg, #6b5330 0%, #48381f 54%, #382b17 100%);
+    border: 1px solid #8a6f42;
+    box-shadow: inset 0 0 0 1px rgba(255,222,160,0.2), 0 1px 4px rgba(0,0,0,0.8);
+    animation: gvBob 1500ms ease-in-out infinite; }
+.gv-drop-card > img { width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+.gv-drop-card .gv-drop-seal { position: absolute; right: 4%; bottom: 4%; width: 30%; height: 30%; }
+/* The beam. Sits behind the amulet, anchored to the floor the amulet is lying on, and does not spin —
+   a rotating shaft reads as a portal; a still one reads as "this is worth walking over to". */
+.gv-drop.is-emblem::before { content: ""; position: absolute; left: 50%; bottom: -8%;
+    width: 220%; height: 300%; transform: translateX(-50%);
+    background: radial-gradient(ellipse 34% 50% at 50% 100%, rgba(255,196,96,0.5), rgba(255,170,60,0.18) 45%, transparent 72%);
+    animation: gvTrophBeam 2400ms ease-in-out infinite; pointer-events: none; }
+@keyframes gvTrophBeam { 0%, 100% { opacity: 0.62; } 50% { opacity: 1; } }
 .gv-drop.is-rare img { animation: gvBob 1500ms ease-in-out infinite, gvSheen 2200ms linear infinite; }
 /* An emblem's name is longer than a part's and it lands in the same place, so it gets the room to say it. */
 .gv-drop.is-emblem b { color: #ffe9b0; border-color: rgba(255,208,120,0.45); }
@@ -3708,4 +3739,126 @@ export const GROVE_CSS = `
 .gv-scene[data-biome="char"] .gv-slab {
     filter: sepia(0.55) saturate(1.45) hue-rotate(-14deg) brightness(1.02);
 }
+
+
+/* -- THE TROPHY REVEAL ----------------------------------------------------------------------------
+   One kill in four hundred earns this, and before it existed the whole event was a dark blob arcing
+   over green foliage and a thin grey label that looked exactly like picking up a twig.
+
+   ⚠️ IT IS NOT A CARD AND MUST NOT BE SHAPED LIKE ONE. The amulets hang on leather cords; the frame
+   here is the cord and the hook it swings from. Luke's worry was players filing these under Spire, and
+   a rounded rectangle with a portrait window in it would have confirmed the misread rather than fixing
+   it. See the note at the markup.
+
+   Pointer-transparent throughout: the fight is still running underneath, and this must never eat a tap
+   meant for the creature behind it. */
+.gv-mc { position: absolute; inset: 0; display: grid; place-items: center; align-content: center;
+    gap: 14px; pointer-events: none; z-index: 46;
+    animation: gvMcIn 2100ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+/* ── ⚠️ THE WORLD HAS TO DROP BACK, OR NONE OF THIS IS VISIBLE ──────────────────────────────────────
+   Filmed without this, the moment was gold light and a two-line strapline over a SUNLIT GREEN FOREST:
+   the ray fan disappeared completely, both small lines of type were gone, and the only thing that
+   survived the background was the name in bold white. The reveal was running perfectly and reading as
+   nothing.
+
+   A radial scrim rather than a flat one -- darkest at the edges, thinner at the centre -- so the card
+   sits in the one bright part of the frame and the fight stays legible underneath it. This is a REVEAL
+   scrim, not scene lighting: no-overlay-for-lighting is about painting depth into a world, which is
+   still a thing to fix in the art rather than with a sheet. */
+.gv-mc::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 72% 48% at 50% 44%, rgba(12,10,6,0.44), rgba(8,7,4,0.84) 78%);
+    animation: gvMcScrim 2100ms ease-out forwards; }
+@keyframes gvMcScrim { 0% { opacity: 0; } 8% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+/* The light behind the card. Scaled from nothing in ~250ms so the frame the card lands on is the
+   brightest -- the flash IS the event and everything after it is the player reading what they got. */
+.gv-mc-rays { position: absolute; width: 104%; aspect-ratio: 1; border-radius: 50%;
+    background:
+        conic-gradient(from 0deg, rgba(255,226,150,0.85) 0deg 7deg, transparent 7deg 26deg,
+            rgba(255,210,120,0.55) 26deg 31deg, transparent 31deg 54deg,
+            rgba(255,232,165,0.92) 54deg 62deg, transparent 62deg 88deg,
+            rgba(255,204,110,0.5) 88deg 93deg, transparent 93deg 120deg,
+            rgba(255,226,150,0.85) 120deg 128deg, transparent 128deg 150deg,
+            rgba(255,210,120,0.55) 150deg 155deg, transparent 155deg 180deg,
+            rgba(255,232,165,0.92) 180deg 188deg, transparent 188deg 212deg,
+            rgba(255,204,110,0.5) 212deg 217deg, transparent 217deg 244deg,
+            rgba(255,226,150,0.85) 244deg 252deg, transparent 252deg 274deg,
+            rgba(255,210,120,0.55) 274deg 279deg, transparent 279deg 306deg,
+            rgba(255,232,165,0.92) 306deg 314deg, transparent 314deg 338deg,
+            rgba(255,204,110,0.5) 338deg 343deg, transparent 343deg 360deg);
+    /* ⚠️ MASKED TO A RING, or the shafts converge to a solid disc at the centre and the card -- the one
+       thing the moment exists to show -- sits on a bright plate and loses all its contrast. */
+    -webkit-mask: radial-gradient(circle, transparent 34%, #000 50%, rgba(0,0,0,0.5) 72%, transparent 86%);
+    mask: radial-gradient(circle, transparent 34%, #000 50%, rgba(0,0,0,0.5) 72%, transparent 86%);
+    /* The blur is what turns them into LIGHT. Unblurred, a conic gradient's segments are hard-edged cream
+       rectangles -- filmed, the fan read as confetti laid over the forest rather than as a glow. */
+    filter: blur(9px);
+    animation: gvMcRays 2100ms ease-out forwards; }
+
+/* ── THE CARD ────────────────────────────────────────────────────────────────────────────────────
+   A real card: portrait aspect, a carved wooden border, the creature in a window, its name and what
+   it grants. The border is drawn here rather than generated, so all 21 cards cost nothing in art and a
+   22nd creature is a card the day its sprite lands. */
+.gv-mc-card { position: relative; width: min(54vw, 208px); aspect-ratio: 5 / 7;
+    display: grid; grid-template-rows: 1fr auto auto; gap: 4px;
+    padding: 9px 9px 10px; border-radius: 13px;
+    /* Carved wood, lit from the top-left like every other object in the house style. The double border
+       is the card's edge and its bevel -- one ring of pale grain inside one ring of shadow, which is what
+       makes a flat rectangle read as a cut object rather than as a div. */
+    background: linear-gradient(168deg, #6b5330 0%, #48381f 54%, #382b17 100%);
+    border: 2px solid #8a6f42;
+    box-shadow: inset 0 0 0 1px rgba(255,222,160,0.22),
+        0 0 26px rgba(255,186,80,0.5), 0 10px 22px rgba(0,0,0,0.75);
+    transform-origin: 50% 50%;
+    animation: gvMcDeal 2100ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.gv-mc-art { position: relative; border-radius: 8px; overflow: hidden;
+    background: radial-gradient(ellipse 78% 68% at 50% 62%, #2c4a2a, #16241a 72%);
+    display: grid; place-items: center; }
+.gv-mc-art > img { width: 92%; height: 92%; object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.7)); }
+/* The carved mark, demoted to what an emblem always was: the seal that stands for the creature. Sat in
+   the corner of the window rather than thrown away -- nineteen of these are drawn and on disk. */
+/* ⚠️ SELECT IT AS .gv-mc-art > img.gv-mc-seal, NOT AS A BARE .gv-mc-seal. The window's own rule
+   is one class and one element, which outranks a bare class, so the seal was being sized by the rule
+   meant for the creature and rendered at 92% of the card. Filmed, the amulet covered the rat completely
+   and the Monster Card showed everything except the monster. Name the parent to win the cascade. */
+.gv-mc-art > img.gv-mc-seal { position: absolute; right: 3%; bottom: 3%; width: 26%; height: 26%;
+    object-fit: contain; opacity: 0.95;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.9)); }
+.gv-mc-card > b { font-size: 0.92rem; line-height: 1.15; text-align: center; color: #fff4dc;
+    text-wrap: balance; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+.gv-mc-card > u { text-decoration: none; font-size: 0.72rem; font-weight: 700; text-align: center;
+    color: #c8f0ac; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+/* ⚠️ THE ONE WORD THAT STOPS THIS BEING FILED UNDER SPIRE. Luke's worry, said out loud at the one
+   moment the player is definitely looking. */
+.gv-mc-tag { font-size: 0.64rem; letter-spacing: 0.3em; text-transform: uppercase; color: #ffd98f;
+    text-shadow: 0 1px 4px rgba(0,0,0,1), 0 0 12px rgba(0,0,0,0.9);
+    animation: gvMcSay 2100ms ease-out forwards; }
+@keyframes gvMcIn { 0% { opacity: 0; } 6% { opacity: 1; } 86% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes gvMcRays {
+    0% { opacity: 0; transform: scale(0.2) rotate(-26deg); }
+    12% { opacity: 1; transform: scale(1.1) rotate(0deg); }
+    26% { opacity: 0.85; transform: scale(1) rotate(6deg); }
+    100% { opacity: 0.5; transform: scale(1.04) rotate(30deg); } }
+/* Dealt: spun in edge-on and overshot. The overshoot is the whole reason it reads as thrown to you
+   rather than faded in -- the drop's own arc does the same thing in the world layer. */
+@keyframes gvMcDeal {
+    0% { opacity: 0; transform: translateY(22%) scale(0.3) rotate(-18deg); }
+    14% { opacity: 1; transform: translateY(0) scale(1.14) rotate(5deg); }
+    28% { transform: scale(1) rotate(-2.5deg); }
+    48% { transform: scale(1) rotate(1.2deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); } }
+@keyframes gvMcSay {
+    0%, 14% { opacity: 0; transform: translateY(6px); }
+    30% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+    /* ⚠️ THE MOMENT STILL HAPPENS. Reduced motion means no spin and no turning light, not a rare drop
+       the player is never told about -- see animations-always-play for the same rule. */
+    .gv-mc-card, .gv-mc-rays, .gv-mc-tag { animation-duration: 1ms; animation-fill-mode: forwards; }
+    .gv-mc-rays { transform: scale(1); opacity: 0.7; }
+    .gv-drop.is-emblem::before { animation: none; opacity: 0.85; } }
+.gv-mc-what { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px;
+    background: rgba(255,196,96,0.07); border: 1px solid rgba(255,196,96,0.22);
+    font-size: 0.82rem; line-height: 1.5; color: #d8cdb8; }
+.gv-mc-what b { color: #ffd98f; }
 `;

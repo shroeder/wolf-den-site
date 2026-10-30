@@ -92,7 +92,7 @@ const DOCK = [
     // anything — the quest helper is what it was for. Three givers hidden across twelve zones is a good
     // surprise once and a search forever after, so the panel that names the zone has to be one tap away.
     { k: "quests", label: "Quests", art: "/images/grove/ui-board.webp" },
-    { k: "emblems", label: "Emblems", art: "/images/grove/ui-emblems.webp" },
+    { k: "emblems", label: "Cards", art: "/images/grove/ui-emblems.webp" },
 ];
 
 // ── ⚠️ THE PARTS HAVE PICTURES AND THESE LISTS WERE NOT USING THEM ───────────────────────────────────────────
@@ -985,7 +985,36 @@ export default function GroveClient({ initial }) {
                                     </div>
                                 );
                             })}
-                            {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">No emblems yet. They fall rarely.</p> : null}
+                            {/* -- ⚠️ THE CONCEPT, STATED. ------------------------------------------------------
+                                Luke: "Im also worried it will make people think its for the card game.
+                                Thats why I think we need to ensure people understand the concept of
+                                these." He is right and the old copy made it worse: an empty panel that
+                                said only "No emblems yet. They fall rarely" told a player nothing about
+                                what the thing IS, so the only clue left was the word on the tab -- which
+                                at the time was "Monster Cards", pointing straight at Spire.
+
+                                ⚠️ AND THE FIX IS NOT TO RENAME THEM. I read the sprites -- carved amulets
+                                on leather cords -- decided the art was the authority on what the object
+                                was, and renamed the whole feature to Trophies. Luke: "its supposed to be a
+                                card of the enemy you are collecting." The name was never the problem. The
+                                CARD never showed a monster, which is what made it look like a stray Spire
+                                card; it shows one now, and the amulet is its seal.
+
+                                So the disambiguation is done by saying it, here and on the card itself,
+                                rather than by giving the thing a different name than the one it has.
+
+                                ⚠️ THE EXPLANATION SHOWS WHETHER OR NOT YOU HAVE ANY. The empty state is
+                                the obvious place for it, but the player who most needs to be told these
+                                are not Spire cards is the one who just got their first and is looking at
+                                the panel to find out what they caught. */}
+                            <p className="gv-mc-what">
+                                One card for each kind of creature in the Grove, dealt by the creature
+                                itself &mdash; roughly one kill in four hundred leaves one. Carry three at
+                                a time and each one grants what that creature had.{" "}
+                                <b>These are not Spire cards</b> and they are never played; the deck and
+                                the collection have nothing to do with each other.
+                            </p>
+                            {!(st.emblems || []).some((e) => e.count > 0) ? <p className="muted">None yet. Roughly one kill in four hundred leaves one behind.</p> : null}
                         </div>
                         </Area>
                         ) : null}
