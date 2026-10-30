@@ -3836,35 +3836,45 @@ export const GROVE_CSS = `
    a card-at-a-time crawl. Lifted enough that the centred one is still unmistakably the subject. */
 .gv-cards .ga-cell { transition: transform .2s ease, opacity .2s ease; opacity: 0.8; transform: scale(0.95); }
 .gv-cards .ga-cell.ga-on { opacity: 1; transform: scale(1); }
-/* ── ⚠️ EACH ROW WEARS ITS MAP'S OWN SKY ──────────────────────────────────────────────────────
-   Luke: "I'd like to see kind of like the thematic background of the zones, or the maps, not the
-   zones. So there's a little bit of vertical delineation between the maps and the themes of them."
+/* ── ⚠️ A FRAMED, NEAR-BLACK ROW ──────────────────────────────────────────────────────────────
+   Luke: "I don't like the transparency. I think what I want is like high detail, thorny, like
+   bordered area for like the forest area... But then like a just a black or whatever near black
+   color we typically use for the contrast on the cards, like on the background, so that the cards
+   contrast with it."
 
-   The rows were identical dark strips, so the only thing saying you had crossed from map two into map
-   three was reading the heading -- and on a screen whose whole job is sideways scrolling, the vertical
-   breaks are the one thing that should not need reading. See GroveCards.js for why it is the map's
-   theme and not the zone's.
+   The backdrop-behind-the-cards idea is dead and this is why it deserved to be: a painted scrim is
+   a compromise in both directions at once. Light enough to read as a theme, it steals contrast from
+   the cards; dark enough to leave the cards alone, it is a brown smear. There is no setting where it
+   is doing both jobs, which is what the two passes at 0.80/0.92 and 0.70/0.88 were really measuring.
 
-   ⚠️ THE SCRIM IS NOT OPTIONAL AND IT IS NOT SUBTLE. These are full-brightness painted backdrops --
-   map one is a sunlit green forest -- and the cards on top of them are small, dark and carry 0.58rem
-   type. Laid on raw, the row becomes a picture with some furniture on it. 0.80 to 0.92 keeps the
-   theme legible as a MOOD (you can tell green forest from black lava at a glance) while leaving the
-   cards the brightest things in their own row, which is the right way round. 0.70 to 0.88 after
-   looking at it: the first pass at 0.80/0.92 left maps one and two reading as the same brown.
+   So the theme moves to the EDGE and the middle goes near-black -- #15151a, the same colour the site
+   drawer uses, for the same reason: cards on it are the brightest thing in their row.
 
-   Top-aligned and oversized so each row shows the SKY of its map rather than a cropped middle band --
-   the part of a backdrop that actually carries its colour. */
-.gv-cards .ga-row.is-themed { position: relative; border-radius: 12px; padding: 8px 0 10px;
-    overflow: hidden; isolation: isolate; }
-.gv-cards .ga-row.is-themed::before { content: ""; position: absolute; inset: 0; z-index: -1;
-    background-image:
-        linear-gradient(180deg, rgba(10,12,8,0.70), rgba(10,12,8,0.88)),
-        var(--row-bg, none);
-    background-size: cover, 180% auto;
-    background-position: center, center top;
-    background-repeat: no-repeat; }
-/* A hairline so two dark rows never bleed into one another where their scrims happen to match. */
-.gv-cards .ga-row.is-themed { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); }
+   ⚠️ border-image, NOT A BACKGROUND PICTURE, AND THAT IS THE WHOLE TRICK. Luke: "The border idea
+   probably won't work out unless you get the aspect ratio right." He is right that a single painted
+   frame cannot work -- a row is about 374x215 on a phone and changes height with its content, so any
+   fixed-aspect frame art is stretched the moment it is used. border-image slices one square drawing
+   into nine, pins the four corners, and REPEATS the four edges to whatever length they need. The
+   aspect ratio stops being a thing that can be got wrong.
+
+   A map with no frame drawn yet simply has no border-image and falls back to the plain near-black
+   row, which is also exactly the state to revert to if this idea does not earn its keep. */
+.gv-cards .ga-row.is-themed { position: relative; border-radius: 12px; padding: 10px 0 12px;
+    background: #15151a; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); }
+/* ⚠️ THE FRAME IS A SEPARATE LAYER, NOT A BORDER ON THE ROW. border-image replaces the border box,
+   so putting it on .ga-row would fight the border-radius and the inset hairline, and the frame's own
+   transparent middle would let the row's corners show through square. An overlay owns the frame and
+   nothing else; it is pointer-transparent so it can never eat a swipe on the track beneath it. */
+.gv-cards .ga-row.is-framed > .gv-row-frame {
+    position: absolute; inset: 0; pointer-events: none; z-index: 2;
+    border: 30px solid transparent;
+    border-image: var(--row-frame) 128 round; }
+/* ⚠️ THE ROW HAS TO MAKE ROOM FOR ITS OWN FRAME. The overlay sits on top of the content, so without
+   this the heading rendered straight through the top band of brambles and the first card was clipped
+   by the left one. Padding matched to the 30px border, a little less at the sides because the track's
+   own 34% runway already keeps cards away from the edge. */
+.gv-cards .ga-row.is-framed { padding: 26px 0 28px; }
+.gv-cards .ga-row.is-framed > .ga-row-head { padding: 0 34px 4px; }
 .gv-cards .ga-row-head { padding: 0 12px 2px; }
 .gv-cards .ga-row-head b { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.2em;
     text-transform: uppercase; color: #ffd98f; }

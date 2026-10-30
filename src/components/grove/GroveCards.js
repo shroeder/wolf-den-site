@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-    GROVE_EMBLEMS, GROVE_ENEMIES, GROVE_ZONES, starLadder, emblemFace, emblemArt,
+    GROVE_EMBLEMS, GROVE_ENEMIES, starLadder, emblemFace, emblemArt,
 } from "@/lib/marketplace/grove-catalog.js";
 
 /**
@@ -31,28 +31,28 @@ import {
  */
 
 /**
- * ── ⚠️ EACH ROW WEARS ITS MAP'S OWN SKY ──────────────────────────────────────────────────────────────────────
- * Luke: "I'd like to see kind of like the thematic background of the zones, or the maps, not the zones. So
- * there's a little bit of vertical delineation between the maps and the themes of them."
+ * ── ⚠️ THE THEME IS A FRAME, NOT A BACKGROUND ────────────────────────────────────────────────────────────────
+ * Luke: "I don't like the transparency... what I want is like high detail, thorny, like bordered area for like
+ * the forest area... But then like a just a black or whatever near black color we typically use for the
+ * contrast on the cards."
  *
- * The rows were identical dark strips, so the only thing telling you that you had crossed from map two into
- * map three was reading the heading — and on a screen whose whole job is sideways scrolling, the vertical
- * breaks are the one thing that should not need reading.
+ * A painted scrim behind the cards was a compromise in both directions: light enough to read as a theme and it
+ * steals contrast from the cards, dark enough to leave them alone and it is a brown smear. The theme belongs
+ * at the EDGE, where it is not competing with anything.
  *
- * The MAP's theme, not the zone's: a map is twelve zones and each has its own backdrop, so painting the real
- * one per card would change the ground under a single row twelve times. The first zone of each map stands for
- * the map, which is also the one a player has actually seen.
+ * ⚠️ ONE SQUARE DRAWING PER BIOME, SLICED BY CSS. Luke: "The border idea probably won't work out unless you
+ * get the aspect ratio right." Exactly so -- a row is roughly 374x215 and changes height with its content, so
+ * painted frame art at any fixed aspect is stretched the moment it is used. border-image pins the corners and
+ * repeats the edges, so one square drawing fits every row at every size and the aspect ratio stops being a
+ * thing that can be got wrong.
  *
- * ⚠️ ART THAT ALREADY EXISTS. zone-<id>.webp is the backdrop the scene renders; nothing is drawn for this.
+ * ⚠️ ABSENT IS A VALID STATE. A map with no frame yet renders the plain near-black row, which is also the
+ * fallback if the idea does not earn its keep. Nothing here breaks when the file is missing -- and the file
+ * list is the ONLY place that knows which exist, so a frame ships by being drawn and named.
  */
-const MAP_BG = (() => {
-    const out = {};
-    for (const z of GROVE_ZONES) {
-        const m = Number(z.map) || 1;
-        if (!out[m] && z.bg) out[m] = z.bg;
-    }
-    return out;
-})();
+const MAP_FRAME = {
+    1: "/images/grove/frame-wood.webp",
+};
 
 /** Which map a card belongs to — the row it lives on. */
 function mapOf(id, meta) {
@@ -133,8 +133,10 @@ export default function GroveCards({ emblems = [], onWear }) {
             {rows.map((r) => {
                 const found = r.cards.filter((c) => owned.get(c.id)?.count > 0).length;
                 return (
-                    <section key={r.map} className="ga-row is-themed"
-                        style={MAP_BG[r.map] ? { "--row-bg": `url("${MAP_BG[r.map]}")` } : undefined}>
+                    <section key={r.map}
+                        className={`ga-row is-themed${MAP_FRAME[r.map] ? " is-framed" : ""}`}
+                        style={MAP_FRAME[r.map] ? { "--row-frame": `url("${MAP_FRAME[r.map]}")` } : undefined}>
+                        {MAP_FRAME[r.map] ? <span className="gv-row-frame" aria-hidden="true" /> : null}
                         <header className="ga-row-head">
                             <b>Map {r.map}</b>
                             <i>{found}/{r.cards.length} found</i>

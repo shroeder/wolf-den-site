@@ -39,6 +39,21 @@ const ICONS = {
         + "layered card stock",
 };
 
+// ── ⚠️ A FRAME IS NOT AN ICON AND NEEDS ITS OWN BRIEF ────────────────────────────────────────────────────────
+// These are sliced by CSS border-image: the four corners are pinned and the four EDGES ARE REPEATED to
+// whatever length the row needs. That imposes two things no icon prompt cares about:
+//   · the middle must be genuinely empty, or the repeat tiles a smear across the card area
+//   · each edge must read as a continuous run of the same material, so that repeating it does not produce a
+//     visible seam every 128px
+// Hence "continuous", "even thickness", "hollow centre" said three ways. The model will not infer any of it
+// from the word "frame", which on its own reliably produces a picture frame with a scene inside.
+const FRAMES = {
+    wood: "An ornate rectangular border of dark thorny brambles, gnarled branches, twisting briar vines and "
+        + "sharp curved thorns, with small oak leaves and moss. The border is a CONTINUOUS even-thickness "
+        + "band of tangled growth running around all four edges and meeting at four thick knotted corners. "
+        + "The centre is COMPLETELY EMPTY — a large hollow rectangular opening with nothing inside it",
+};
+
 // Reverse-engineered from the eight that shipped: painterly cel-shade, heavy dark ink contour, two or three
 // flat tone steps, warm brown and gold with cool steel-blue metal, chunky and slightly oversized proportions.
 const STYLE = "Painterly cel-shaded 2D video-game icon with a heavy dark ink contour around the whole "
@@ -46,8 +61,20 @@ const STYLE = "Painterly cel-shaded 2D video-game icon with a heavy dark ink con
     + "and golds with cool steel-blue metal, chunky slightly exaggerated proportions, lit from the upper "
     + "left. A SINGLE isolated object, centred, filling the frame, seen from slightly above at three-quarter "
     + "view.";
+// Same house hand as STYLE, minus everything that says "one object in the middle of the frame".
+const FRAME_STYLE = "Painterly cel-shaded 2D video-game border art with a heavy dark ink contour, two or "
+    + "three flat tone steps per surface, deep saturated greens and warm browns, lit from the upper left. "
+    + "Drawn flat-on, square to the canvas, filling the whole canvas edge to edge with the band of growth "
+    + "touching all four outer edges.";
+
 const BAN = "FULLY TRANSPARENT background — no ground, no cast shadow on any surface, no scene, no sky, no "
     + "characters, no text, no letters, no numbers, no logo, no border, no frame. Nothing but the object.";
+
+// ⚠️ A FRAME MUST NOT BE TRIMMED OR RE-CENTRED. The icon path below trims to the subject and pads it back
+// to a square, which for a frame would crop the outer edge of the border and then inset it — border-image
+// slices at fixed percentages, so anything that moves the art relative to the canvas moves the slice lines
+// off the drawing. Frames are written through at full size, untouched.
+const FRAME = process.argv.includes("--frame");
 
 const want = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 if (!want.length) { console.log(`icons: ${Object.keys(ICONS).join(" ")}`); process.exit(0); }
@@ -55,12 +82,13 @@ if (!want.length) { console.log(`icons: ${Object.keys(ICONS).join(" ")}`); proce
 if (want.length > 3) { console.error("at most three at a time."); process.exit(1); }
 
 for (const key of want) {
-    if (!ICONS[key]) { console.error(`no such icon: ${key}`); continue; }
+    const table = FRAME ? FRAMES : ICONS;
+    if (!table[key]) { console.error(`no such ${FRAME ? "frame" : "icon"}: ${key}`); continue; }
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
         body: JSON.stringify({
-            model: IMAGE_MODEL, prompt: `${ICONS[key]}. ${STYLE} ${BAN}`,
+            model: IMAGE_MODEL, prompt: `${table[key]}. ${FRAME ? FRAME_STYLE : STYLE} ${BAN}`,
             // ⚠️ MEDIUM. Never high, in this script or any other — see the rule at the top of CLAUDE.md.
             size: "1024x1024", quality: "medium", background: "transparent", n: 1,
         }),
@@ -75,12 +103,15 @@ for (const key of want) {
     const { data, info } = await sharp(Buffer.from(b64, "base64")).ensureAlpha().raw()
         .toBuffer({ resolveWithObject: true });
     for (let i = 3; i < data.length; i += 4) if (data[i] <= 40) data[i] = 0;
-    const out = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
-        .trim({ threshold: 1 })
-        .resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
-        .webp({ quality: 92 }).toBuffer();
-    const file = path.join(OUT, `ui-${key}.webp`);
+    const pipe = sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } });
+    const out = await (FRAME
+        // Full canvas, untouched geometry — see the note on FRAME above.
+        ? pipe.resize(512, 512, { fit: "fill" })
+        : pipe.trim({ threshold: 1 })
+            .resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    ).webp({ quality: 92 }).toBuffer();
+    const file = path.join(OUT, FRAME ? `frame-${key}.webp` : `ui-${key}.webp`);
     fs.writeFileSync(file, out);
     const m = await sharp(out).metadata();
-    console.log(`✓ ui-${key}.webp  ${m.width}x${m.height}  ${Math.round(out.length / 1024)}kb`);
+    console.log(`✓ ${path.basename(file)}  ${m.width}x${m.height}  ${Math.round(out.length / 1024)}kb`);
 }
