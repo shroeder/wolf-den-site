@@ -13,7 +13,10 @@
 // hang. Everything else about the look lives in grove-css.js under .gv-sect.
 export default function GroveArea({ id, icon, title, count, children }) {
     return (
-        <section className={`gv-sect is-${id}`}>
+        // ⚠️ A REAL DOM id, NOT ONLY THE CLASS. `id` arrived here as decoration — it became `is-tools` on
+        // the className and nothing else — so anything trying to scroll a player to an Area found nothing
+        // and failed silently. The craft card's "Show me" is the first caller; see goToArea.
+        <section id={`area-${id}`} className={`gv-sect is-${id}`}>
             <h4>
                 <img className="gv-sect-ico" src={`/images/grove/${icon}.webp`} alt="" width={38} height={38} />
                 {title}

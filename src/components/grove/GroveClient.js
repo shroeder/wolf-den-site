@@ -396,6 +396,31 @@ export default function GroveClient({ initial }) {
 
     const leave = useCallback(() => { setSession(null); setView("map"); setBossWon(null); refresh(); }, [refresh]);
 
+    // ── ⚠️ "WHERE DID IT GO" IS A NAVIGATION PROBLEM, NOT A COPY PROBLEM ────────────────────────────
+    // Luke: "we also need the ability to go see where to go look at the item, because people have no
+    // idea where to go after they craft it. Like, it's just completely like disappeared."
+    //
+    // A tool, a food and a charm all land in three different Areas of the SAME panel, so telling someone
+    // where their thing went is one view switch and a scroll. Saying it in words on the card would be the
+    // lazy version -- the card can just take them there.
+    //
+    // ⚠️ THE SCROLL WAITS A FRAME. setView re-renders the panel, and the target Area does not exist in
+    // the DOM until that paint lands -- scrolling in the same tick finds nothing and silently does
+    // nothing, which looks exactly like a dead button.
+    const goToArea = useCallback((view, areaId) => {
+        setView(view);
+        if (!areaId) return;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            const el = document.getElementById(`area-${areaId}`);
+            if (!el) return;
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+            // A flash on arrival, because a smooth scroll that lands on a wall of panels leaves the
+            // player hunting for which one moved.
+            el.classList.add("is-found");
+            setTimeout(() => el.classList.remove("is-found"), 1800);
+        }));
+    }, []);
+
     // ── WHAT YOU BUILT, AND IT IS BUILT ON THE SERVER ───────────────────────────────────────────────
     // Luke: "Every stat should be important that you have on your gear, as well as all the passives that
     // you get, just like the arena... I do care about honoring all the players' commitments to their gear
@@ -883,6 +908,7 @@ export default function GroveClient({ initial }) {
                     <GroveBench
                         st={st} known={known} partName={partName} PartIcon={PartIcon}
                         post={post} refresh={refresh} setNote={setNote}
+                        onGoTo={goToArea}
                     />
                 ) : null}
 

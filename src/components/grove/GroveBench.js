@@ -119,7 +119,12 @@ const FILTERS = [
     { id: "farm", label: "Farm" },
 ];
 
-export default function GroveBench({ st, known, partName, PartIcon, post, refresh, setNote }) {
+// Which shelf of the bag panel a finished thing lands on. ⚠️ KINDS THAT LEAVE THE GROVE ARE ABSENT on
+// purpose: a plot and a decoration go to the Farm, and sending somebody out of the feature from a craft
+// card is a worse answer than letting the card stay quiet.
+const MADE_HOME = { tool: "tools", food: "belt", charm: "charms" };
+
+export default function GroveBench({ st, known, partName, PartIcon, post, refresh, setNote, onGoTo }) {
     // The shopping list. Client-only on purpose — see useWishlist.
     const { wish, toggle, want } = useWishlist();
     const [result, setResult] = useState(null);
@@ -860,6 +865,24 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                             printed "ore yield 3% -> 3%" on the very card celebrating the upgrade. What
                             the player wants from a result is what they NOW have. */}
                         <p className="gv-made-pay">{payoff(result.recipe, st, true, result)}</p>
+
+                        {/* ── ⚠️ WHERE IT WENT, AS A DOOR RATHER THAN A SENTENCE ─────────────────────
+                            Luke: "we also need the ability to go see where to go look at the item,
+                            because people have no idea where to go after they craft it. Like, it's just
+                            completely like disappeared."
+
+                            A tool, a food and a charm land in three different Areas of the bag panel,
+                            and nothing on this card ever said which. Printing "it is in your Tools"
+                            would be the lazy half; this takes them there and flashes the shelf on
+                            arrival. Decorations and plots are deliberately absent -- those leave the
+                            Grove for the Farm, and a button that navigated out of the feature mid-craft
+                            would be a worse answer than none. */}
+                        {MADE_HOME[result.kind] && onGoTo ? (
+                            <button type="button" className="gv-made-goto"
+                                onClick={() => { setResult(null); onGoTo("bag", MADE_HOME[result.kind]); }}>
+                                Show me where it went
+                            </button>
+                        ) : null}
 
                         {result.spent?.length ? (
                             <>

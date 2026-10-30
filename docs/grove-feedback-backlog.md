@@ -27,7 +27,8 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 | 11 | Plinko: the rack is viewport-tall instead of a fixed 150px (item E) | `(this)` |
 | 12 | Plinko: a colourful ball falls, not the item, and the splash is 24 shards (item F) | `1fe97693` |
 | 13 | ⚠️ "Craft N" plays the act once and forges the whole batch against it (half of item J) | `f33de06d` |
-| 14 | A batch stepper — pick any amount from 2 up to what the parts allow (the other half of J) | `(this)` |
+| 14 | A batch stepper — pick any amount from 2 up to what the parts allow (the other half of J) | `1ac05a5a` |
+| 15 | "Show me where it went" on the craft card — takes you to the shelf and flashes it (part of D) | `(this)` |
 
 ---
 
@@ -73,8 +74,15 @@ three phases must read as three phases.
 > tools in your tools area. I feel like when you're in the inventory, like we just need to do a lot better
 > job letting people inspect things… You need to do a full pass on that."*
 
-Four named pieces: **collapsible sections**, a **craft-result modal** (what it is, why it matters, its
-stats), a **take me to it** route from that modal, and **inspectable tools**.
+Four named pieces:
+
+- ~~a **craft-result modal**~~ — one already existed and shows the name, the quality roll, the art, what it
+  does, what it cost and the crafting level. Left as it was.
+- ~~a **take me to it** route~~ — DONE (`15` above). The card now carries "Show me where it went", which
+  switches to the bag panel, scrolls to the right shelf and flashes it. `GroveArea` had been taking an `id`
+  and rendering it only as a className, so nothing could ever have scrolled to one.
+- **collapsible sections** — still open.
+- **inspectable tools** — still open.
 
 ---
 

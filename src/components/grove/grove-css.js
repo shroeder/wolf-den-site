@@ -2692,6 +2692,27 @@ export const GROVE_CSS = `
     font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em;
     color: rgba(207,227,198,0.55); }
 
+/* ── "SHOW ME WHERE IT WENT" ──────────────────────────────────────────────────────────────────
+   The craft card's answer to the one question it never used to answer. Quieter than the close
+   button on purpose: it is an offer, not the thing most people want after a craft. */
+.gv-made-goto { display: block; width: 100%; margin: 10px 0 0; padding: 9px 12px;
+    border-radius: 999px; font: inherit; font-size: 0.78rem; font-weight: 800; cursor: pointer;
+    color: #cfe3c6; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(207,227,198,0.28); }
+.gv-made-goto:hover { background: rgba(255,255,255,0.09); }
+
+/* ── THE SHELF THAT WAS JUST SCROLLED TO ──────────────────────────────────────────────────────
+   ⚠️ A SMOOTH SCROLL THAT LANDS ON A WALL OF IDENTICAL PANELS leaves the player hunting for which
+   one moved. The flash says "this one" and then gets out of the way. Removed on a timer in
+   goToArea rather than on animationend -- an animationend never fires if the element is not
+   painted, and a permanently lit panel would be worse than no flash at all. */
+.gv-sect.is-found { animation: gv-found 1.6s ease-out; }
+@keyframes gv-found {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(159,224,138,0); }
+    18% { box-shadow: 0 0 0 3px rgba(159,224,138,0.55), 0 0 26px rgba(159,224,138,0.35); }
+}
+@media (prefers-reduced-motion: reduce) { .gv-sect.is-found { animation: none; } }
+
 /* ── THE RESULT ───────────────────────────────────────────────────────────────────────────────
    Both halves of the trade on one card: what arrived, and underneath it what left. A toast can
    report a name; it can never report a cost, which is the thing a player needs to see to trust the
