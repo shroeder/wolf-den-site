@@ -20,7 +20,9 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 | 4 | The cards-vs-card-game blurb deleted; the word "Spire" gone from the Grove entirely | `89873df5` |
 | 5 | The Grove sits second in the site menu strip, with a real sprite instead of an oak-leaf glyph | `199fc248` |
 | 6 | ⚠️ The bellows timer reset on every tap — armed once now, deaf to taps (item G) | `12f84ec8` |
-| 7 | The craft-ready note moves off the play area to the left edge, beside the menu it is pointing at | `(this)` |
+| 7 | The craft-ready note moves off the play area to the left edge, beside the menu it is pointing at | `096ec0a8` |
+| 8 | Grove "Leave" goes to the game home, not the shop's landing page | `8dc5bb1e` |
+| 9 | ⚠️ Signing out signed you straight back in — the bridged /shop session was never cleared | `(this)` |
 
 ---
 
@@ -130,6 +132,15 @@ A recipe row should answer: do I have this already, at what quality, and is a se
 Was `left: 50%`, centred over the floor you are fighting on. Now anchored to the left edge above the dock —
 the same edge as the menu handle the workbench lives behind, so the message and its answer are together.
 Bottom-left rather than beside the handle because the haul list already owns that edge from 42% down.
+
+### N. Audit the pets for ones that can no longer be obtained
+> *"there's certain pets that are casino exclusive, or maybe were, that are maybe no longer attainable. Can
+> you do an audit later on all the pets we have, and if there are some of them are just not achievable
+> anymore?"*
+
+**Explicitly "for later."** Walk every pet against every live source — casino prize tables, chests, drops,
+shop, events — and list the ones with no reachable path. Same shape as the Grove drop-path audit:
+`migrating-a-category-strands-its-drop-paths` is the precedent, where an empty pool read as bad luck.
 
 ---
 
