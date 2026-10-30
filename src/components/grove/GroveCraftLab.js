@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 
 import GroveCraftAct from "@/components/grove/GroveCraftAct.js";
+import { MINIGAME_BY_ID } from "@/lib/marketplace/grove-minigames.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { GROVE_RECIPES } from "@/lib/marketplace/grove-recipes.js";
 import {
@@ -22,7 +23,10 @@ import {
 // shape changes, which is how a bench starts lying to the person reading it.
 const FALLBACK = { id: "lab_piece", name: "Thornfield Hoe", kind: "tool", slot: "hoe", tier: 1, parts: {} };
 
-export default function GroveCraftLab({ level = 12, temper = false, seed = 7 }) {
+export default function GroveCraftLab({ level = 12, temper = false, seed = 7, games = "" }) {
+    // ?games=rivet,inlay,polish — name one and it is dealt first, name three and the whole act is yours.
+    // Unknown ids are dropped rather than throwing, so a typo shows you a random act, not a crash.
+    const forceGames = (games || "").split(",").map((x) => MINIGAME_BY_ID[x.trim()]).filter(Boolean);
     const [open, setOpen] = useState(true);
     const [last, setLast] = useState(null);
 
@@ -53,7 +57,7 @@ export default function GroveCraftLab({ level = 12, temper = false, seed = 7 }) 
         <div style={{ minHeight: "100vh", background: "#0d1410" }}>
             <style>{GROVE_CSS}</style>
             {open ? (
-                <GroveCraftAct recipe={recipe} level={level} temper={temper}
+                <GroveCraftAct recipe={recipe} level={level} temper={temper} forceGames={forceGames}
                     onCommit={commitCraft} onClose={() => setOpen(false)} />
             ) : (
                 <div style={{ color: "#efe7d8", padding: 24, font: "500 15px/1.6 system-ui, sans-serif" }}>

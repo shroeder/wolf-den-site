@@ -53,6 +53,25 @@ export const GROVE_MINI_CSS = `
 
 /* The phase clock. The only thing common to all ten, and it drains rather than fills so the pressure is
    a thing disappearing. */
+/* ── THE COUNT-IN ─────────────────────────────────────────────────────────────
+   Three beats over a game that is already drawn. The veil is deliberately THIN — the whole purpose of the
+   pause is that you read the picture underneath it, so anything opaque enough to hide the anvil would have
+   defeated the feature while looking tidier.
+
+   Each number is its own element (key={count}), so each one replays the animation from the start instead of
+   one node quietly swapping its text. The number arrives large and loose and settles — the settling is what
+   makes it read as a beat rather than a label. */
+.gm-countin { position: absolute; inset: 0; display: grid; place-items: center; z-index: 5;
+    background: radial-gradient(60% 60% at 50% 50%, rgba(6,8,12,0.52), rgba(6,8,12,0.78)); }
+.gm-countin b { font-size: clamp(76px, 22vw, 150px); font-weight: 900; line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--tint, #ffd75e);
+    text-shadow: 0 0 34px color-mix(in srgb, var(--tint, #ffd75e) 60%, transparent), 0 6px 0 rgba(0,0,0,0.5);
+    animation: gm-count 420ms cubic-bezier(.16,.9,.3,1) both; }
+@keyframes gm-count {
+    from { transform: scale(1.7); opacity: 0; letter-spacing: 0.3em; }
+    55%  { transform: scale(1); opacity: 1; letter-spacing: 0; }
+    to   { transform: scale(0.94); opacity: 0.72; letter-spacing: 0; }
+}
 .gm-clock { display: block; height: 6px; border-radius: 999px; overflow: hidden;
     background: rgba(255,255,255,0.07); box-shadow: inset 0 1px 3px rgba(0,0,0,0.7); }
 .gm-clock i { display: block; height: 100%; border-radius: 999px;
@@ -168,20 +187,40 @@ export const GROVE_MINI_CSS = `
 .gm-draw { width: 100%; height: 100%; border: 0; background: none; padding: 0; display: grid;
     align-content: center; gap: 20px; justify-items: center; cursor: pointer; touch-action: none;
     user-select: none; }
-.gm-bar { position: relative; width: min(100%, 340px); height: 54px; border-radius: 12px;
-    background: linear-gradient(180deg, #23272c, #121519);
-    box-shadow: inset 0 2px 0 rgba(255,255,255,0.07), inset 0 -12px 22px rgba(0,0,0,0.7); overflow: hidden; }
-.gm-bar i { display: block; height: 100%;
-    background: linear-gradient(90deg, #8c4a16, #ffb648 58%, #fff4d6 86%, #ff6a4a);
-    box-shadow: 0 0 34px rgba(255,170,70,0.75); }
-.gm-bar em { position: absolute; top: -3px; bottom: -3px; width: 4px; margin-left: -2px;
-    background: repeating-linear-gradient(180deg, #fff 0 5px, rgba(255,255,255,0.25) 5px 10px);
-    box-shadow: 0 0 14px rgba(255,255,255,0.9); }
-.gm-draw.is-hot .gm-bar { animation: gm-shiver 120ms linear infinite; }
-@keyframes gm-shiver { 0%,100% { transform: translateX(0) } 50% { transform: translateX(1.5px) } }
+/* The stock track is the full width of the card; the billet occupies 18% of it at rest and 90% at the
+   moment it tears, so --h drives one number into both of its dimensions. */
+.gm-stock { position: relative; width: 100%; height: 190px; display: flex; align-items: center; }
+/* The jaw. Fixed, heavy, and slightly inset so the billet reads as coming OUT of it. */
+.gm-jaw { position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 54px; height: 104px; border-radius: 10px 4px 4px 10px;
+    background: linear-gradient(180deg, #3a4048, #171a1f 60%, #0e1013);
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.12), 0 10px 22px rgba(0,0,0,0.6); z-index: 2; }
+/* Longer and thinner on the same metal, and hotter as it thins — the colour is interpolated on --h so
+   there is no step where it suddenly "turns" dangerous; it just keeps going. */
+.gm-billet { position: absolute; left: 30px; top: 50%; transform: translateY(-50%);
+    width: calc((18 + var(--h) * 72) * 1%);
+    height: calc(84px - var(--h) * 58px);
+    border-radius: 6px;
+    background: linear-gradient(90deg,
+        color-mix(in srgb, #ff7a2a calc(var(--h) * 100%), #6d3a12) 0%,
+        color-mix(in srgb, #fff2cf calc(var(--h) * 100%), #ffae4a) 62%,
+        color-mix(in srgb, #ff4d3a calc(var(--h) * 100%), #ff8a3c) 100%);
+    box-shadow: 0 0 calc(18px + var(--h) * 54px) rgba(255,150,60, calc(0.45 + var(--h) * 0.5));
+    transition: none; }
+/* Scored into the steel rather than floating over it: the mark is where the smith knows to stop. */
+.gm-strain { position: absolute; top: 18%; bottom: 18%; width: 5px; margin-left: -2px; z-index: 3;
+    background: repeating-linear-gradient(180deg, rgba(255,255,255,0.95) 0 6px, rgba(255,255,255,0.18) 6px 12px);
+    box-shadow: 0 0 16px rgba(255,255,255,0.8); }
+.gm-draw.is-hot .gm-billet { animation: gm-shiver 90ms linear infinite; }
+.gm-draw.is-torn .gm-billet { opacity: 0.35; filter: grayscale(0.7); }
+@keyframes gm-shiver { 0%,100% { transform: translateY(-50%) translateX(0) } 50% { transform: translateY(-50%) translateX(2px) } }
 .gm-draw b { font-size: 0.95rem; font-weight: 900; letter-spacing: 0.2em;
     color: rgba(255,255,255,0.6); }
 .gm-draw.is-hot b { color: #ffd75e; text-shadow: 0 0 18px rgba(255,215,94,0.9); }
+.gm-draw.is-torn b { color: #ff6a4a; text-shadow: 0 0 18px rgba(255,106,74,0.9); }
+/* The number is for the player who wants one, set large and dim so it never competes with the metal. */
+.gm-draw-read { font-size: 2.6rem; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1;
+    color: rgba(255,255,255,0.14); }
 
 /* ── 5. FOLD ────────────────────────────────────────────────────────────────────────────────
    Two halves of the billet. The lit one is raised and hot; the dark one has gone cold. Alternating
@@ -306,6 +345,6 @@ export const GROVE_MINI_CSS = `
 
 @media (prefers-reduced-motion: reduce) {
     .gm-sparks, .gm-grit, .gm-ring { display: none; }
-    .gm-fire, .gm-band, .gm-wheel, .gm-draw.is-hot .gm-bar { animation: none; }
+    .gm-fire, .gm-band, .gm-wheel, .gm-draw.is-hot .gm-billet { animation: none; }
 }
 `;

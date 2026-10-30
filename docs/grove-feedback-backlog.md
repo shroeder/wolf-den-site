@@ -137,6 +137,12 @@ Four named pieces:
 
 A countdown into the round, not a paragraph. See `teach-by-showing-not-telling`.
 
+**DONE** (`24`), and for all ten rather than the bellows alone — landing cold in The Inlay with the clock
+already draining is the same complaint, worse, because a craft now deals three unknown games out of ten.
+Three beats over the game, already drawn and frozen behind them: that is the whole explanation, and it is
+the only kind this pool is allowed. `t` stays at 0 through the lead so nothing is moving yet, and the
+overlay itself eats the taps — ten games each remembering to check a flag is nine chances to forget.
+
 ### I. No feedback while tapping the bellows
 > *"when they're tapping, like there's no feedback. There needs to be visual feedback, like sparks and
 > flames flying around and stuff."*
@@ -157,6 +163,20 @@ maximum, with the ceiling printed under it. The chosen number is deliberately NO
 the max moves whenever a part is spent or picked up, so a stored copy would go stale and start disagreeing
 with the bag. Absent reads as "all of them", and any stored number is clamped against the live max on every
 render.
+
+### ⚠️ Two real bugs the new console capture found, and the rig change that found them — DONE
+`shot.mjs` now reports a page's console errors, uncaught throws and failed loads beside the filename it
+writes. It was added because the craft lab photographed perfectly while Next's dev overlay sat in the
+corner of the picture reading "2 Issues" — a rig reporting a pass over a page that is saying it is broken.
+Both of those turned out to be real, and neither was visible in any screenshot:
+
+- **The Inlay's channel was a hydration mismatch.** `Math.sin` is implementation-defined in its last bits
+  and Node's does not agree with Chrome's, so the polyline the server rendered and the polyline the browser
+  rendered differed around the 15th decimal — enough for React to refuse to patch the subtree. Rounded to
+  two decimals on a 0..100 viewBox, which is finer than a pixel at any size it is ever drawn.
+- **The Draw set state on the act while the act was rendering.** It grew the billet inside `setHeld`'s
+  updater and called `finish()` from in there when the metal burst — and an updater runs during render.
+  The truth lives in a ref now and the state is only the picture of it.
 
 ### K. Inventory ↔ crafting has to be traversable, the way Cooking is
 > *"there has to be some linkage between your inventory and crafting, kind of like how cooking does it,

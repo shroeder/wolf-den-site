@@ -75,13 +75,38 @@ const sock = new WebSocket(ws);
 await new Promise((r) => { sock.onopen = r; });
 let id = 0;
 const pending = new Map();
+// ── ⚠️ A SCREENSHOT DOES NOT PHOTOGRAPH AN EXCEPTION ───────────────────────────────────
+// The craft lab photographed perfectly while Next's dev overlay sat in the corner of the picture reading
+// "2 Issues" — which is the rig reporting a pass over a page that is telling you it is broken. A hydration
+// mismatch, a failed image, a thrown effect: all of them leave the pixels looking right.
+//
+// So every shot now carries its console back with it. Errors print after the filename and are the rig's
+// opinion, not its verdict — the picture is still written, because an error you can see beside the
+// screenshot that caused it is worth more than a refusal to shoot.
+const noise = [];
 sock.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.id && pending.has(m.id)) { pending.get(m.id)(m.result); pending.delete(m.id); }
+    if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") {
+        noise.push("console.error  " + m.params.args.map((a) => a.value ?? a.description ?? a.type).join(" "));
+    }
+    if (m.method === "Runtime.exceptionThrown") {
+        const d = m.params.exceptionDetails;
+        noise.push("uncaught       " + (d.exception?.description || d.text || "").split(String.fromCharCode(10))[0]);
+    }
+    // A 404 on a sprite is the single most common way a Grove shot lies: the layout is perfect and the
+    // picture is of an empty box. Network.loadingFailed never reaches the console on its own.
+    if (m.method === "Network.loadingFailed" && !m.params.canceled) {
+        noise.push("load failed    " + (m.params.errorText || "") + " " + (m.params.type || ""));
+    }
 };
 const send = (method, params = {}) => new Promise((res) => { const i = ++id; pending.set(i, res); sock.send(JSON.stringify({ id: i, method, params })); });
 
 await send("Page.enable");
+await send("Runtime.enable");
+// Unconditionally, not only inside the cookie branch below — a shot with no session still loads
+// sprites, and a 404 on one is exactly what the loadingFailed listener above exists to catch.
+await send("Network.enable");
 // THE ONE THAT MATTERS: a real 375-wide viewport, at 2x so the sprites are judged at phone pixel density.
 await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 2, mobile: true });
 
@@ -272,6 +297,14 @@ if (MOCK) await reportMock(evaluate);
 const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
 writeFileSync(out, Buffer.from(data, "base64"));
 console.log(`${out}  ${W}x${H}`);
+if (noise.length) {
+    // Deduplicated: one broken sprite in a list of forty reports forty times and buries everything else.
+    const seen = [...new Set(noise)];
+    console.log(`
+⚠️  ${seen.length} console problem${seen.length === 1 ? "" : "s"} on that page:`);
+    for (const line of seen.slice(0, 12)) console.log(`   ${line.slice(0, Number(process.env.SHOT_NOISE_CHARS) || 220)}`);
+    if (seen.length > 12) console.log(`   …and ${seen.length - 12} more`);
+}
 sock.close();
 chrome.kill();
 process.exit(0);

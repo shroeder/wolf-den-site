@@ -82,12 +82,16 @@ const SET_WORD = {
     rough: "Rough, but it holds",
 };
 
-export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose }) {
+export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose, forceGames = null }) {
     // ── ⚠️ DRAWN ONCE, ON MOUNT, AND NEVER AGAIN ────────────────────────────────────────────────
     // useMemo with no dependencies rather than useState(drawPhases()): the latter re-runs the draw on
     // every render in React's strict double-invoke, which in development silently reshuffles the
     // line-up between the banner and the game. Three fixed games for the life of this act.
-    const games = useMemo(() => drawPhases(), []);
+    // ⚠️ forceGames IS THE LAB'S DOOR AND NOTHING ELSE PASSES IT. Ten games dealt at random cannot be
+    // reviewed by reloading until the one you need comes up, and "it looked fine in the three I saw" is how
+    // seven of them ship unwatched. Nothing in the app supplies this prop; GroveCraftLab is the only caller,
+    // and that page 404s outside development.
+    const games = useMemo(() => (forceGames?.length ? forceGames : drawPhases()), [forceGames]);
     const [scores, setScores] = useState([]);
     const phase = scores.length;                       // 0,1,2 play a game; 3 is the rack
     const [stage, setStage] = useState(STAGE.playing);

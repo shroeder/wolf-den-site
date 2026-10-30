@@ -31,8 +31,29 @@ import { GROVE_MINI_CSS } from "@/components/grove/grove-mini-css.js";
  * ⚠️ AND `done` IS LATCHED IN A REF, NOT IN STATE. Two taps in the same frame both see the old state and both
  * report, and the act would take the second as the NEXT phase's score.
  */
-function useMini(ms, onDone) {
+// ── ⚠️ THE COUNT-IN BELONGS TO THE HARNESS, NOT TO THE BELLOWS ──────────────────────────
+// Luke, about the bellows: "it just pops up with no explanation to the player that they're about to start a
+// tapping minigame and then go. So it should be like a countdown."
+//
+// He said it about one game, but it is true of all ten and MORE true of the other nine: the bellows at least
+// used to be the only thing that ever appeared there, and now a craft deals three unknown games out of ten.
+// Landing cold in The Inlay with the clock already draining is the same complaint, worse.
+//
+// Three beats, and the game is already on screen behind them — that is the entire explanation, and it is the
+// only kind this pool is allowed (teach-by-showing-not-telling, and Luke on the pick-3 screen: "none of that
+// should exist"). You get ~1.2s to look at a picture that says what to do, then it goes.
+//
+// ⚠️ t STAYS AT 0 THROUGH THE LEAD, which freezes every game driven off it — the anvil's marker, the quench
+// needle, the grindstone. A count-in over a game already in motion would be a count-in you have to play
+// through, which is worse than none.
+const BEAT = 420;
+const LEAD = BEAT * 3;
+
+function useMini(ms, onDone, lead = LEAD) {
     const [t, setT] = useState(0);              // 0..1 through the phase
+    // 3..1 while counting in, 0 once the phase is live. Input is blocked by the overlay, not by a flag each
+    // game has to remember to check — ten games each testing `if (count) return` is nine chances to forget.
+    const [count, setCount] = useState(Math.ceil(lead / BEAT));
     const done = useRef(false);
     const raf = useRef(0);
     const started = useRef(0);
@@ -46,18 +67,27 @@ function useMini(ms, onDone) {
 
     useEffect(() => {
         started.current = performance.now();
+        let beat = -1;
         const tick = () => {
-            const p = Math.min(1, Math.max(0, performance.now() - started.current) / ms);
+            const el = Math.max(0, performance.now() - started.current);
+            if (el < lead) {
+                const n = Math.max(1, Math.ceil((lead - el) / BEAT));
+                if (n !== beat) { beat = n; setCount(n); Haptic.fire([0, 10]); }
+                raf.current = requestAnimationFrame(tick);
+                return;
+            }
+            if (beat !== 0) { beat = 0; setCount(0); }
+            const p = Math.min(1, (el - lead) / ms);
             setT(p);
             if (p >= 1) { finish(0); return; }        // ran out: see the note above
             raf.current = requestAnimationFrame(tick);
         };
         raf.current = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf.current);
-        // finish is stable; ms never changes for a mounted phase.
-    }, [ms, finish]);
+        // finish is stable; ms and lead never change for a mounted phase.
+    }, [ms, lead, finish]);
 
-    return { t, finish, over: done };
+    return { t, count, finish, over: done };
 }
 
 /** Pointer position inside an element, 0..1 on both axes. Clamped, so a drag off the edge pins rather than flies. */
@@ -71,7 +101,7 @@ const inBox = (el, e) => {
 };
 
 /** Shell every game sits in, so the frame, the clock rail and the title are written once. */
-function Stage({ game, t, children, hint }) {
+function Stage({ game, t, count = 0, children, hint }) {
     return (
         <div className="gm" style={{ "--tint": game.tint }}>
             {/* ── ⚠️ THE STYLESHEET TRAVELS WITH THE GAME ─────────────────────────────────────────────
@@ -89,7 +119,17 @@ function Stage({ game, t, children, hint }) {
                 <b>{game.name}</b>
                 {hint ? <i>{hint}</i> : null}
             </div>
-            <div className="gm-body">{children}</div>
+            <div className="gm-body">
+                {children}
+                {/* ⚠️ THE OVERLAY IS THE INPUT GUARD. It sits over the whole body and eats pointer events,
+                    so a player drumming on the screen through the count-in cannot bank taps against a
+                    phase that has not started. Unmounting at 0 is what hands control over. */}
+                {count > 0 ? (
+                    <div className="gm-countin" aria-hidden="true">
+                        <b key={count}>{count}</b>
+                    </div>
+                ) : null}
+            </div>
             {/* The phase clock. Drains left to right; the only thing on screen common to all ten. */}
             <span className="gm-clock"><i style={{ width: `${(1 - t) * 100}%` }} /></span>
         </div>
@@ -99,7 +139,7 @@ function Stage({ game, t, children, hint }) {
 // ── 1. THE BELLOWS — tap-fast ───────────────────────────────────────────────────────────────────────────────
 const TAP_TARGET = 18;
 function Bellows({ game, onDone }) {
-    const { t, finish } = useMini(game.ms, onDone);
+    const { t, count, finish } = useMini(game.ms, onDone);
     const [taps, setTaps] = useState(0);
     const [pump, setPump] = useState(0);
     const n = useRef(0);
@@ -110,7 +150,7 @@ function Bellows({ game, onDone }) {
     const hit = () => { n.current += 1; setTaps(n.current); setPump((p) => p + 1); Haptic.fire([0, 8]); };
     const heat = Math.min(1, taps / TAP_TARGET);
     return (
-        <Stage game={game} t={t} hint={`${taps}/${TAP_TARGET}`}>
+        <Stage game={game} t={t} count={count} hint={`${taps}/${TAP_TARGET}`}>
             <div className="gm-bellows" style={{ "--hot": heat.toFixed(3) }}>
                 {/* The fire IS the gauge. The thin bar across the top is a second opinion for anyone who
                     wants a number, but the thing you actually read is how far up the throat the flame has
@@ -136,7 +176,7 @@ function Bellows({ game, onDone }) {
 // ── 2. THE ANVIL — timed-stop ───────────────────────────────────────────────────────────────────────────────
 const SWINGS = 3;
 function Anvil({ game, onDone }) {
-    const { t, finish } = useMini(game.ms, onDone);
+    const { t, count, finish } = useMini(game.ms, onDone);
     const [hits, setHits] = useState([]);
     const [flash, setFlash] = useState(0);
     const hitsRef = useRef([]);
@@ -155,7 +195,7 @@ function Anvil({ game, onDone }) {
         if (hitsRef.current.length >= SWINGS) finish(avg(hitsRef.current));
     };
     return (
-        <Stage game={game} t={t} hint={`${SWINGS - hits.length} left`}>
+        <Stage game={game} t={t} count={count} hint={`${SWINGS - hits.length} left`}>
             <div className="gm-anvil">
                 <div className="gm-track">
                     <span className="gm-zone" /><span className="gm-core" />
@@ -174,7 +214,7 @@ const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
 
 // ── 3. THE QUENCH — precision-window ────────────────────────────────────────────────────────────────────────
 function Quench({ game, onDone }) {
-    const { t, finish } = useMini(game.ms, onDone);
+    const { t, count, finish } = useMini(game.ms, onDone);
     // The needle falls the whole height over the phase; the band sits two thirds down, so waiting is
     // required and overshooting is the common mistake rather than the rare one.
     const BAND = 0.66, HALF = 0.075;
@@ -186,7 +226,7 @@ function Quench({ game, onDone }) {
         finish(off < HALF ? 1 - (off / HALF) * 0.25 : Math.max(0, 0.55 - off * 2.2));
     };
     return (
-        <Stage game={game} t={t}>
+        <Stage game={game} t={t} count={count}>
             <button type="button" className="gm-quench" onPointerDown={tap}>
                 <span className="gm-col">
                     <i className="gm-band" style={{ top: `${(BAND - HALF) * 100}%`, height: `${HALF * 200}%` }} />
@@ -200,22 +240,28 @@ function Quench({ game, onDone }) {
 
 // ── 4. THE DRAW — hold-release ──────────────────────────────────────────────────────────────────────────────
 function Draw({ game, onDone }) {
-    const { t, finish } = useMini(game.ms, onDone);
+    const { t, count, finish } = useMini(game.ms, onDone);
     const [held, setHeld] = useState(0);
+    // ⚠️ THE TRUTH IS THE REF; THE STATE IS ONLY THE PICTURE OF IT. The first version grew the bar inside
+    // setHeld's updater and called finish() from in there when it burst — and a state updater runs DURING
+    // render, so bursting the billet set state on the act while the act was rendering. React said so
+    // ("Cannot update a component while rendering a different component") and it was invisible in every
+    // screenshot: the picture was perfect. Found by the console capture in shot.mjs, which exists now
+    // because of exactly this.
+    const heldRef = useRef(0);
     const holding = useRef(false);
     const raf = useRef(0);
     const SNAP = 0.88;                                   // past here it tears
-    useEffect(() => { if (t >= 1) finish(holding.current ? 0 : held); }, [t, finish, held]);
+    useEffect(() => { if (t >= 1) finish(holding.current ? 0 : heldRef.current); }, [t, finish]);
     const grow = useCallback(() => {
         if (!holding.current) return;
-        setHeld((h) => {
-            const next = h + 0.012;
-            // ⚠️ THE BUST IS CHECKED HERE, NOT ON RELEASE. Holding through the line has to end the phase by
-            // itself — if it only failed on release, the safest play would be to hold forever and let the
-            // clock run out, which is the opposite of the decision this game is about.
-            if (next >= 1) { Haptic.fire([0, 120]); finish(0.05); return 1; }
-            return next;
-        });
+        const next = Math.min(1, heldRef.current + 0.012);
+        heldRef.current = next;
+        setHeld(next);
+        // ⚠️ THE BUST IS CHECKED HERE, NOT ON RELEASE. Holding through the line has to end the phase by
+        // itself — if it only failed on release, the safest play would be to hold forever and let the
+        // clock run out, which is the opposite of the decision this game is about.
+        if (next >= 1) { holding.current = false; Haptic.fire([0, 120]); finish(0.05); return; }
         raf.current = requestAnimationFrame(grow);
     }, [finish]);
     const down = () => { holding.current = true; raf.current = requestAnimationFrame(grow); };
@@ -225,17 +271,29 @@ function Draw({ game, onDone }) {
         cancelAnimationFrame(raf.current);
         Haptic.fire([0, 24]);
         // Closer to the line is better, and the line itself is the best place to stop.
-        finish(held >= SNAP ? 1 : held / SNAP * 0.92);
+        const h = heldRef.current;
+        finish(h >= SNAP ? 1 : h / SNAP * 0.92);
     };
+    // ⚠️ THE BILLET IS THE GAUGE, AND IT CONSERVES ITS METAL. First pass drew this as a progress bar
+    // with a mark on it, which told you the number and nothing about the material -- in a card this tall it
+    // was a thin line in a lot of empty dark. Now the stock stretches the way stock does: longer AND thinner,
+    // same metal, and the thinner it gets the hotter and less steady it looks. You do not need to be told
+    // that a bar about to go transparent is about to tear.
+    const pct = (held * 100).toFixed(2);
     return (
-        <Stage game={game} t={t}>
-            <button type="button" className={`gm-draw${held >= SNAP ? " is-hot" : ""}`}
+        <Stage game={game} t={t} count={count} hint={`${Math.round(held * 100)}%`}>
+            <button type="button" className={`gm-draw${held >= SNAP ? " is-hot" : ""}${held >= 1 ? " is-torn" : ""}`}
+                style={{ "--h": held.toFixed(3) }}
                 onPointerDown={down} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}>
-                <span className="gm-bar">
-                    <i style={{ width: `${held * 100}%` }} />
-                    <em style={{ left: `${SNAP * 100}%` }} />
+                <span className="gm-stock" aria-hidden="true">
+                    {/* The jaw the metal is drawn OUT of -- without something holding the left end, a bar
+                        that grows rightwards reads as a bar filling up, which is the wrong verb entirely. */}
+                    <i className="gm-jaw" />
+                    <i className="gm-billet" />
+                    <em className="gm-strain" style={{ left: `${(18 + SNAP * 72).toFixed(2)}%` }} />
                 </span>
                 <b>{held >= 1 ? "SNAPPED" : "HOLD"}</b>
+                <span className="gm-draw-read" aria-hidden="true">{pct}</span>
             </button>
         </Stage>
     );
@@ -243,7 +301,7 @@ function Draw({ game, onDone }) {
 
 // ── 5. THE FOLD — rhythm-alternate ──────────────────────────────────────────────────────────────────────────
 function Fold({ game, onDone }) {
-    const { t, finish } = useMini(game.ms, onDone);
+    const { t, count, finish } = useMini(game.ms, onDone);
     const BEAT = 460;
     const beats = Math.max(1, Math.floor(game.ms / BEAT));
     const [got, setGot] = useState([]);
@@ -264,7 +322,7 @@ function Fold({ game, onDone }) {
         Haptic.fire([0, 16]);
     };
     return (
-        <Stage game={game} t={t} hint={`${got.length}/${beats}`}>
+        <Stage game={game} t={t} count={count} hint={`${got.length}/${beats}`}>
             <div className="gm-fold">
                 {["l", "r"].map((side) => (
                     <button key={side} type="button"
@@ -279,7 +337,7 @@ function Fold({ game, onDone }) {
 
 // ── 6. THE GRIND — speed-drag ───────────────────────────────────────────────────────────────────────────────
 function Grind({ game, onDone }) {
-    const { t, finish } = useMini(game.ms, onDone);
+    const { t, count, finish } = useMini(game.ms, onDone);
     const box = useRef(null);
     const last = useRef(null);
     const good = useRef(0);
@@ -303,7 +361,7 @@ function Grind({ game, onDone }) {
     };
     const err = Math.min(1, Math.abs(spd - TARGET) / TARGET);
     return (
-        <Stage game={game} t={t}>
+        <Stage game={game} t={t} count={count}>
             <div ref={box} className="gm-grind" onPointerMove={(e) => e.buttons || e.pointerType !== "mouse" ? move(e) : null}
                 onPointerDown={move} style={{ "--err": err.toFixed(3) }}>
                 {/* The wheel is the thing you are moving; the edge is what you are moving it along. */}
@@ -320,7 +378,7 @@ function Grind({ game, onDone }) {
 
 // ── 7. THE TEMPER — spin-stop ───────────────────────────────────────────────────────────────────────────────
 function Temper({ game, onDone }) {
-    const { t, finish } = useMini(game.ms, onDone);
+    const { t, count, finish } = useMini(game.ms, onDone);
     // Accelerates, so hanging on for a cleaner pass costs something.
     const turns = 2.2 + t * 2.6;
     const deg = (t * turns * 360) % 360;
@@ -331,7 +389,7 @@ function Temper({ game, onDone }) {
         finish(off < 0.06 ? 1 : Math.max(0, 1 - off * 2.3));
     };
     return (
-        <Stage game={game} t={t}>
+        <Stage game={game} t={t} count={count}>
             <button type="button" className="gm-temper" onPointerDown={stop}>
                 <span className="gm-dial" style={{ "--deg": `${deg}deg` }}>
                     <i className="gm-notch" />
@@ -345,7 +403,7 @@ function Temper({ game, onDone }) {
 // ── 8. THE RIVETS — reaction-sequence ───────────────────────────────────────────────────────────────────────
 const RIVETS = 5;
 function Rivet({ game, onDone }) {
-    const { t, finish } = useMini(game.ms, onDone);
+    const { t, count, finish } = useMini(game.ms, onDone);
     const [i, setI] = useState(0);
     const [born, setBorn] = useState(() => performance.now());
     const scores = useRef([]);
@@ -372,7 +430,7 @@ function Rivet({ game, onDone }) {
         else { setI((n) => n + 1); setBorn(performance.now()); }
     };
     return (
-        <Stage game={game} t={t} hint={`${scores.current.length}/${RIVETS}`}>
+        <Stage game={game} t={t} count={count} hint={`${scores.current.length}/${RIVETS}`}>
             <div className="gm-rivets">
                 <button type="button" className="gm-rivet" onPointerDown={tap}
                     style={{ left: `${spot.x}%`, top: `${spot.y}%`, "--age": age.toFixed(3) }}
@@ -385,7 +443,7 @@ function Rivet({ game, onDone }) {
 // ── 9. THE POLISH — coverage-scrub ──────────────────────────────────────────────────────────────────────────
 const CELLS = 24;                                        // 6 x 4
 function Polish({ game, onDone }) {
-    const { t, finish } = useMini(game.ms, onDone);
+    const { t, count, finish } = useMini(game.ms, onDone);
     const box = useRef(null);
     const [lit, setLit] = useState(() => new Set());
     const litRef = useRef(new Set());
@@ -400,7 +458,7 @@ function Polish({ game, onDone }) {
         if (litRef.current.size >= CELLS) finish(1);
     };
     return (
-        <Stage game={game} t={t} hint={`${lit.size}/${CELLS}`}>
+        <Stage game={game} t={t} count={count} hint={`${lit.size}/${CELLS}`}>
             <div ref={box} className="gm-polish"
                 onPointerDown={rub}
                 onPointerMove={(e) => (e.buttons || e.pointerType !== "mouse") && rub(e)}>
@@ -414,7 +472,7 @@ function Polish({ game, onDone }) {
 
 // ── 10. THE INLAY — path-trace ──────────────────────────────────────────────────────────────────────────────
 function Inlay({ game, onDone }) {
-    const { t, finish } = useMini(game.ms, onDone);
+    const { t, count, finish } = useMini(game.ms, onDone);
     const box = useRef(null);
     const [at, setAt] = useState(0);                      // how far along the channel, 0..1
     const atRef = useRef(0);
@@ -433,12 +491,17 @@ function Inlay({ game, onDone }) {
             if (p.x > 0.985) { Haptic.fire([0, 18, 30, 44]); finish(Math.max(0, 1 - strayRef.current * 0.04)); }
         }
     };
+    // ⚠️ ROUNDED, AND THE ROUNDING IS LOAD-BEARING. Math.sin is implementation-defined in the last bits
+    // and Node's does not agree with Chrome's, so the channel this renders on the server and the channel
+    // it renders in the browser differed around the 15th decimal — enough for React to call the whole
+    // subtree a hydration mismatch and refuse to patch it. Two decimals on a 0..100 viewBox is finer than
+    // a pixel at any size this is ever drawn, and the attribute gets ~8x shorter as a bonus.
     const pts = useMemo(() => Array.from({ length: 41 }, (_, i) => {
         const x = i / 40;
-        return `${x * 100},${yAt(x) * 100}`;
+        return `${(x * 100).toFixed(2)},${(yAt(x) * 100).toFixed(2)}`;
     }).join(" "), []);
     return (
-        <Stage game={game} t={t} hint={`${Math.round(at * 100)}%`}>
+        <Stage game={game} t={t} count={count} hint={`${Math.round(at * 100)}%`}>
             <div ref={box} className="gm-inlay"
                 onPointerDown={move}
                 onPointerMove={(e) => (e.buttons || e.pointerType !== "mouse") && move(e)}>
