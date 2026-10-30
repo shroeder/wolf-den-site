@@ -3,6 +3,7 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { db } from "@/lib/db";
 import { halloweenOn } from "@/lib/marketplace/owner.js";
 import { getTownState } from "@/lib/marketplace/town.js";
+import { groveOpen } from "@/lib/marketplace/grove.js";
 import { HALLOWEEN_PUBLIC } from "@/lib/marketplace/halloween.js";
 import { IDLE_LINES, GREET_LINES, BUY_LINES, BROKE_LINES, OWNED_LINES } from "@/lib/marketplace/gourdfather.js";
 import { DOORS, knockedToday, snatcherDoors } from "@/lib/marketplace/trick-or-treat.js";
@@ -60,6 +61,34 @@ export default async function TownPage({ searchParams }) {
         : null;
     return (
         <div className="stack" style={{ maxWidth: 820, margin: "0 auto", padding: "0 12px" }}>
+            {/* ── ⚠️ THE WAY BACK INTO THE GROVE, BECAUSE THERE WAS NONE ─────────────────────────────
+                Luke: "if you go to town, you completely get booted out of the Grove. Like, the whole
+                experience is lost. You have to go all the way back into the menu to find the Grove
+                again. And I don't like that."
+
+                He is describing a real dead end. The Grove sends people here from two places -- the
+                town button in a zone and dying -- and both are hard navigations into a page that had
+                no route back. The only way home was the site's own menu, several taps away, on a
+                strip the Grove deliberately hides while you are in it.
+
+                ⚠️ THIS IS THE PRAGMATIC HALF AND NOT THE WHOLE ASK. What he actually wants is Town
+                rendered as another Grove zone with the Grove's own menu down the left -- "still in
+                that experience". TownClient is a full-screen social overworld with its own camera,
+                polling and state, so mounting it inside the Grove shell is a real piece of work and
+                wants its own pass. A door is not that. A door is the bleeding stopped.
+
+                ⚠️ ON THE PAGE, NOT IN TownClient. The page is a server component that already holds
+                the buyer, so the access check is free here and the 4,000-line client is untouched.
+
+                ⚠️ AND ONLY FOR PEOPLE WHO CAN ACTUALLY GO. groveOpen is the same gate the Grove
+                itself uses -- a door to a room you are not allowed into is worse than no door. */}
+            {groveOpen(buyer.id) ? (
+                <a href="/marketplace/grove" className="tw-grove-door" aria-label="Back to the Grove">
+                    {/* The real nav sprite, not a glyph: this is a destination. */}
+                    <img src="/images/nav/grove.png" alt="" width={30} height={30} aria-hidden="true" />
+                    <span>The Grove</span>
+                </a>
+            ) : null}
             <TownClient initial={initial} halloween={hw} gourd={gourd} />
         </div>
     );

@@ -30,7 +30,8 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 | 14 | A batch stepper — pick any amount from 2 up to what the parts allow (the other half of J) | `1ac05a5a` |
 | 15 | "Show me where it went" on the craft card — takes you to the shelf and flashes it (part of D) | `a44dbc78` |
 | 16 | Inventory shelves collapse, and the choice survives leaving the panel (part of D) | `(this)` |
-| 17 | A tool shows the quality band it was forged at — it was in the payload and on no screen | `(this)` |
+| 17 | A tool shows the quality band it was forged at — it was in the payload and on no screen | `d7b34e0f` |
+| 18 | A door back into the Grove on the Town page — the dead end is gone (half of item A) | `(this)` |
 
 ---
 
@@ -43,10 +44,15 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 > any other zone of the Grove with the menu on the left and still in that experience, at least when it goes
 > ungated."*
 
-**Where it stands:** `GroveClient` does `window.location.href = "/marketplace/town"` — a hard navigation
-into a separate client with no Grove shell. Death does the same (`router.push("/marketplace/town")`). The
-session is genuinely destroyed, not hidden. **Structural: decide whether Town mounts inside the Grove shell
-or the shell wraps Town.**
+**Half done** (`18` above). The Grove sends people to Town from two places — the town button in a zone and
+dying — and both were hard navigations into a page with **no route back**; the only way home was the site
+menu, on a strip the Grove hides while you are in it. The Town page now carries a fixed door on the left
+edge, at the same height as the Grove's own menu handle, shown only to players `groveOpen` lets in.
+
+**⚠️ The rest is still open and it is the bigger half.** He wants Town rendered *as another Grove zone, with
+the Grove's menu down the left* — "still in that experience". `TownClient` is a full-screen social overworld
+with its own camera, polling and state, so mounting it inside the Grove shell is real work and wants its own
+pass. A door stops the bleeding; it is not the ask.
 
 ### B. The class tree must be playable from inside the Grove
 > *"we need to make it super clear, like the whole class tree and everything, that all that needs to also

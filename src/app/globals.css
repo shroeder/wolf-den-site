@@ -28859,3 +28859,24 @@ body.cas-seated .social-fab { display: none; }
     object-fit: contain;
     filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55));
 }
+
+/* ── THE DOOR BACK INTO THE GROVE, ON THE TOWN PAGE ───────────────────────────────────────────
+   Luke: "if you go to town, you completely get booted out of the Grove... You have to go all the
+   way back into the menu to find the Grove again."
+
+   ⚠️ LEFT EDGE, MID HEIGHT — the same place the Grove's own menu handle lives, so the way back is
+   where the hand already expects a Grove control to be. Fixed, because the town street scrolls
+   sideways forever and a door that scrolls away is a door you cannot find.
+
+   ⚠️ z-index 60: above the street and its props, below the Grove's own layers (70+) and any modal,
+   so it can never cover a fight or a shop sheet. */
+.tw-grove-door { position: fixed; z-index: 60; left: 0; top: 50%; transform: translateY(-50%);
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px 10px 10px;
+    border: 1px solid rgba(159,224,138,0.35); border-left: 0; border-radius: 0 12px 12px 0;
+    background: rgba(10,16,10,0.9); box-shadow: 6px 0 20px rgba(0,0,0,0.55);
+    color: #d8f5cc; font-weight: 800; font-size: 0.8rem; text-decoration: none; }
+.tw-grove-door img { display: block; width: 30px; height: 30px; object-fit: contain; }
+.tw-grove-door:hover { background: rgba(14,24,14,0.96); border-color: rgba(159,224,138,0.6); }
+.tw-grove-door:focus-visible { outline: 2px solid rgba(159,224,138,0.9); outline-offset: 3px; }
+/* On a phone the label is what costs the width, and the sprite alone is unambiguous beside it. */
+@media (max-width: 480px) { .tw-grove-door span { display: none; } .tw-grove-door { padding: 10px; } }
