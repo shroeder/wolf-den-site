@@ -97,7 +97,13 @@ export default function GroveMenu({
                                     className={current === r.k ? "is-on" : undefined}
                                     aria-current={current === r.k ? "page" : undefined}
                                     onClick={() => { onPick?.(r.k); onClose?.(); }}>
-                                    <img src={r.art} alt="" draggable={false} />
+                                    {/* ⚠️ A SOCKET, NOT A BARE IMAGE. The sprite sits in a recessed
+                                        plate lit in the family's hue -- the same read as a gear slot
+                                        or a card window, which is what makes the menu look like it
+                                        came out of the same game as the things it opens. */}
+                                    <span className="gv-mmenu-sock">
+                                        <img src={r.art} alt="" draggable={false} />
+                                    </span>
                                     <span>
                                         <b>{r.label}</b>
                                         {/* The line the old circles had nowhere to put. It is the
