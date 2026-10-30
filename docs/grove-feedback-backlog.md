@@ -197,12 +197,38 @@ Both of those turned out to be real, and neither was visible in any screenshot:
 
 Cooking is the reference implementation — go and read it before inventing anything.
 
+**DONE** (`26`). Cooking's move is a recipe row whose missing ingredient jumps to the recipe that MAKES it,
+with a breadcrumb back. The Grove cannot copy that move, because a Grove part is not made by anything — it
+is cut off a creature. So the jump has two destinations instead of one, and a part now has a sheet that is
+both: **backwards** to which creatures carry it and which zones they live in, and **forwards** to every
+recipe that wants it, each one a door that lands you on that row at the bench.
+
+It opens from the BAG, which is the half of the loop that had no answer: the bench is a list of recipes, so
+"what does this recipe need" was always free, and standing over twenty kinds of bone with nothing saying
+which were worth keeping is the direction a player is actually facing. The bag cells were inert spans —
+correctly, since tap-to-bank died with the bank — and are buttons again because there is finally something
+behind them.
+
+Two things it needed on the way: recipe rows had no DOM `id` (a React key is not in the document, so
+nothing could scroll to one — the same defect `GroveArea` had), and the bench now drops its chip filter
+when a jump names a row, because Cooking learned that one too: "a jump that lands on nothing is worse".
+
 ### L. Crafting has to show what you already own
 > *"we also need to be able to have some linkage between crafting and items you've already crafted to see
 > like what you currently possess and whether it's worth crafting that item again, what kind of quality you
 > have on the existing item."*
 
 A recipe row should answer: do I have this already, at what quality, and is a second one worth the parts.
+
+**DONE** (`26`). A TOOL row already answered it — it carries the band of the tool in that slot and prices a
+Rework against it. Foods and charms answered nothing, and a charm is where the question bites hardest:
+charms are banded, you can hold several, and the only reason to craft a second is to beat the band you have.
+The row now carries what you hold and, where the kind is banded, the best band of it — "Moss Poultice ×35",
+"Rootwood Seeking ×3 Fine".
+
+⚠️ COUNT AND BEST BAND, NOT A LIST. The Charms shelf is one row per potency on purpose, because a Rough
+and a Masterwork are different objects and picking between them is the decision. That is right for a shelf
+you pick FROM and wrong for a recipe, where the only question is whether another would beat what you have.
 
 ### M. The craft-ready note sat in the middle of the fight — DONE
 > *"When you can craft a new item, the notification that pops up is directly in the play area. It should

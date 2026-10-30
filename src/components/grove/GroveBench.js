@@ -5,7 +5,7 @@ import { ROMAN, craftableTimes
 import { toolArt, recipeArt } from "@/lib/marketplace/grove-catalog.js";
 
 import { useWishlist } from "./useWishlist.js";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
     GiAnvil, GiBackpack, GiCompass, GiFarmTractor, GiFishingPole,
@@ -101,6 +101,38 @@ const bandName = (id) => QUALITY_BANDS.find((b) => b.id === id)?.name || id;
 // The band a raw 0-100 score falls in, named — what the Rework button shows you are trying to beat.
 const bandNameOf = (score) => bandName(qualityBand(Number(score) || 0)?.id);
 
+// ── ⚠️ WHAT YOU ALREADY HOLD OF THE THING THIS ROW MAKES ─────────────────────────────────
+// Luke: "we also need to be able to have some linkage between crafting and items you've already crafted to
+// see like what you currently possess and whether it's worth crafting that item again, what kind of quality
+// you have on the existing item."
+//
+// A TOOL row has answered this for a while: it carries the band of the tool in that slot and offers a Rework
+// priced against it. Foods and charms answered nothing at all, and a charm is the kind where the question
+// bites hardest — charms are banded, you can hold several, and the ONLY reason to craft a second one is to
+// beat the band you already have. Without this the row looked identical whether you held none or nine.
+//
+// ⚠️ COUNT AND BEST BAND, NOT A LIST. The Charms shelf is deliberately one row per potency, because a
+// Rough and a Masterwork are different objects and choosing between them is the decision. That is the right
+// shape for a shelf you are picking FROM; it is the wrong shape for a recipe, where the only question is
+// "would another one beat what I have" — which is answered by the best one, not by all of them.
+function holdingOf(r, st) {
+    if (r.kind === "food") {
+        const n = Number(st.food?.[r.id]) || 0;
+        return n ? { n, band: null } : null;
+    }
+    if (r.kind === "charm") {
+        const mine = (st.charms || []).filter((c) => c.id === r.id && Number(c.qty) > 0);
+        if (!mine.length) return null;
+        const n = mine.reduce((a, c) => a + (Number(c.qty) || 0), 0);
+        // QUALITY_BANDS is best-first — the tool tag tests QUALITY_BANDS[0] for "already at the top", and
+        // the Rework button hides itself there. Same order, so index 0 wins.
+        const order = QUALITY_BANDS.map((b) => b.id);
+        const best = [...mine].sort((a, b) => order.indexOf(a.band) - order.indexOf(b.band))[0];
+        return { n, band: best?.band || null };
+    }
+    return null;
+}
+
 // ⚠️ "Storage" AND "Farm" GROUP TWO RECIPE KINDS EACH, on purpose. A player thinks "where do I put things"
 // and "what about the farm" — they do not think "pack" and "bank" as separate questions, and six chips that
 // each hide three rows is a worse list than four that hide nine.
@@ -123,6 +155,9 @@ const FILTERS = [
 // purpose: a plot and a decoration go to the Farm, and sending somebody out of the feature from a craft
 // card is a worse answer than letting the card stay quiet.
 const MADE_HOME = { tool: "tools", food: "belt", charm: "charms" };
+
+/** Asks the bench to clear its filter so a named row is definitely rendered. See goToArea's third argument. */
+export const SHOW_RECIPE_EVENT = "grove:show-recipe";
 
 export default function GroveBench({ st, known, partName, PartIcon, post, refresh, setNote, onGoTo }) {
     // The shopping list. Client-only on purpose — see useWishlist.
@@ -203,6 +238,17 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // at the top and what you have already built at the bottom. The chips are for the other question, the
     // one a sort cannot answer: "show me only the tools", when you came here to finish the tool ladder.
     const [kind, setKind] = useState("all");
+    // ⚠️ A JUMP INTO A FILTERED LIST LANDS ON NOTHING. The part sheet sends players at one specific
+    // recipe, and a player who had narrowed the chips to Tools would be scrolled to a food row that is not
+    // in the DOM — a button that silently does nothing, which is the failure mode this whole pass exists
+    // to remove. Cooking solved it the same way ("the target may not be in the current filter, and a jump
+    // that lands on nothing is worse"). An event rather than a prop because the sender is the BAG panel,
+    // which is not an ancestor of this one.
+    useEffect(() => {
+        const show = () => setKind("all");
+        window.addEventListener(SHOW_RECIPE_EVENT, show);
+        return () => window.removeEventListener(SHOW_RECIPE_EVENT, show);
+    }, []);
     // Two memos, deliberately: the chip COUNTS must describe the whole list, so they cannot be computed
     // from the filtered one. Picking "Tools" should not make every other chip read 0.
     // ⚠️ THE SHARED RULE, NOT A LOCAL COPY. This used to be twenty lines inline here, and the zone dock now
@@ -541,11 +587,16 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                     // no reason to walk to, which is the wishlist telling you something false.
                     const shortParts = costs.filter((c) => c.short > 0).map((c) => c.part);
                     const allWished = shortParts.length > 0 && shortParts.every((pt) => wish.includes(pt));
+                    const hold = holdingOf(r, st);
                     const temperOn = tempering === r.id;
                     const tmpCost = canTemper ? temperCost(r) : null;
                     const temperExtra = tmpCost ? Object.values(tmpCost).reduce((a, b) => a + b, 0) : 0;
                     return (
-                        <li key={r.id} className={`gv-rec${ready ? " is-ready" : ""}${built ? " is-built" : ""}${made && !built ? " is-made" : ""}`}>
+                        // ⚠️ A REAL id, NOT ONLY A key. React keys are not in the DOM, so a row
+                        // nothing can address is a row nothing can scroll to — the same defect
+                        // GroveArea had, where `id` became a className and the craft card's "Show
+                        // me where it went" silently found nothing. The part sheet lands here.
+                        <li key={r.id} id={`gv-rec-${r.id}`} className={`gv-rec${ready ? " is-ready" : ""}${built ? " is-built" : ""}${made && !built ? " is-made" : ""}`}>
                             {/* ⚠️ THE THREE COLUMNS LIVE IN THEIR OWN ROW. The temper strip used to be a
                                 fourth child of this grid spanning 1 / -1, and a spanning item's
                                 min-content is distributed into the tracks it crosses: measured live, the
@@ -576,6 +627,17 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                         only difference between a recipe you have never seen and one you
                                         have made nine times was nothing at all. */}
                                     {made && !built ? <em className="gv-tag is-made">made</em> : null}
+                                    {/* Sits BEFORE the status tag, so the row reads "Moss Poultice ×35,
+                                        Ready" — what you have, then what you could do about it. */}
+                                    {hold ? (
+                                        <em className={`gv-tag is-hold${hold.band ? ` is-${hold.band}` : ""}`}
+                                            style={hold.band ? { "--band": bandTint(hold.band) } : undefined}
+                                            title={hold.band
+                                                ? `You already hold ${hold.n}; the best of them is ${bandName(hold.band)}`
+                                                : `You already hold ${hold.n}`}>
+                                            ×{hold.n}{hold.band ? ` ${bandName(hold.band)}` : ""}
+                                        </em>
+                                    ) : null}
                                     {built && r.kind === "tool" && st.toolQuality?.[r.slot] != null ? (
                                         // The thing the level BUYS, on the thing it was spent on.
                                         <em className={`gv-tag is-q is-${qualityBand(st.toolQuality[r.slot]).id}`}

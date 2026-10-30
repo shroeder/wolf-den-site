@@ -26,9 +26,10 @@ import { useWishlist } from "@/components/grove/useWishlist.js";
 import GroveCards from "@/components/grove/GroveCards.js";
 import GroveStatues from "@/components/grove/GroveStatues.js";
 import GroveMenu from "@/components/grove/GroveMenu.js";
-import GroveBench from "@/components/grove/GroveBench";
+import GroveBench, { SHOW_RECIPE_EVENT } from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area, { OPEN_AREA_EVENT } from "@/components/grove/GroveArea.js";
+import GrovePartSheet from "@/components/grove/GrovePartSheet.js";
 import SkillTree from "@/components/arena/SkillTree";
 import SkillPanel from "@/components/arena/SkillPanel";
 import { qualityBand } from "@/lib/marketplace/grove-forge.js";
@@ -201,6 +202,8 @@ export default function GroveClient({ initial }) {
     const [paperMap, setPaperMap] = useState(null);
     // The shopping list, shared with the bench and the zone. Client-only — see useWishlist.
     const { wish, toggle: toggleWish, clear: clearWish } = useWishlist();
+    // Which part's sheet is open, or null. See GrovePartSheet.
+    const [partView, setPartView] = useState(null);
     const [st, setSt] = useState(initial);
     const [view, setView] = useState("map");     // map | zone | bag | bench | emblems
     // ⚠️ THE SAME BODY CLASS THE ZONE ALREADY USES, not a second mechanism. It stops the page behind
@@ -410,7 +413,10 @@ export default function GroveClient({ initial }) {
     // ⚠️ THE SCROLL WAITS A FRAME. setView re-renders the panel, and the target Area does not exist in
     // the DOM until that paint lands -- scrolling in the same tick finds nothing and silently does
     // nothing, which looks exactly like a dead button.
-    const goToArea = useCallback((view, areaId) => {
+    // elId: an optional element INSIDE the area to finish on — a single recipe row rather than the whole
+    // workbench. The area still has to be opened and scrolled first, because the row does not exist in the
+    // DOM at all while its shelf is collapsed.
+    const goToArea = useCallback((view, areaId, elId = null) => {
         setView(view);
         if (!areaId) return;
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -424,6 +430,16 @@ export default function GroveClient({ initial }) {
             // player hunting for which one moved.
             el.classList.add("is-found");
             setTimeout(() => el.classList.remove("is-found"), 1800);
+            if (!elId) return;
+            // One more frame: the shelf was collapsed a moment ago and its children have only just
+            // mounted, so the row is not addressable until after this paint.
+            requestAnimationFrame(() => {
+                const row = document.getElementById(elId);
+                if (!row) return;
+                row.scrollIntoView({ behavior: "smooth", block: "center" });
+                row.classList.add("is-found");
+                setTimeout(() => row.classList.remove("is-found"), 1800);
+            });
         }));
     }, []);
 
@@ -823,11 +839,17 @@ export default function GroveClient({ initial }) {
                                 {/* ⚠️ NOT BUTTONS ANY MORE. Their only job was tap-to-bank, and there is no
                                     bank to tap into. A control that looks pressable and does nothing is
                                     worse than a label. */}
+                                {/* ⚠️ BUTTONS AGAIN, BECAUSE THERE IS FINALLY SOMETHING BEHIND THEM. They
+                                    were demoted to inert spans when the bank went away and tap-to-bank
+                                    went with it — correctly, at the time. A tap now opens the part's
+                                    sheet: what drops it, where those live, and every recipe that wants
+                                    it, each one a door back to its row at the bench. */}
                                 {bagRows.map(([p, n]) => (
-                                    <span key={p} className="gv-cell is-inert" title={partName(p)}>
+                                    <button key={p} type="button" className="gv-cell" title={`${partName(p)} — tap to see what it is for`}
+                                        onClick={() => setPartView(p)}>
                                         <span className="gv-cell-face"><PartIcon id={p} size={46} /><i>{n}</i></span>
                                         <span className="gv-cell-name">{partName(p)}</span>
-                                    </span>
+                                    </button>
                                 ))}
                             </div>
                         </Area>
@@ -1184,6 +1206,33 @@ export default function GroveClient({ initial }) {
 
 
     // ── THE ZONE ────────────────────────────────────────────────────────────────────────────────────
+    // ── ⚠️ ONE SHEET, RENDERED IN BOTH RETURNS ─────────────────────────────────────────
+    // This component has TWO returns — `if (view === "zone" && session)` below returns the whole forest and
+    // never reaches the hub's JSX. The bag is openable from both (at the hub it is a view; in a zone it is
+    // a zonePanel), so a sheet written into either return alone is a tap that does nothing in the other
+    // half of the game. It was written into the zone's first, and the rig caught it refusing to shoot:
+    // "`.gv-inv .gv-cell` never produced `.gv-pv-card`". Same defect as the minigame stylesheet, which
+    // also went into this file beside things that live in the zone branch only.
+    //
+    // ⚠️ PORTALLED, because GroveScene portals its full-screen layer to the body — anything left in the
+    // page tree paints UNDERNEATH the zone however high its z-index is set.
+    const partSheet = partView && mounted ? createPortal((
+        <GrovePartSheet
+            part={partView} have={Number(st.pack?.[partView] || 0)}
+            wished={wish.includes(partView)}
+            partName={partName} PartIcon={PartIcon}
+            onToggleWish={toggleWish}
+            onClose={() => setPartView(null)}
+            onGoRecipe={(recipeId) => {
+                setPartView(null);
+                // Clear the bench's chips first: a player narrowed to Tools would otherwise be scrolled
+                // at a food row that is not in the DOM. See SHOW_RECIPE_EVENT.
+                window.dispatchEvent(new CustomEvent(SHOW_RECIPE_EVENT, { detail: recipeId }));
+                goToArea("bench", "bench", `gv-rec-${recipeId}`);
+            }}
+        />
+    ), fsHost || document.body) : null;
+
     if (view === "zone" && session) {
         return (
             <div className="gv">
@@ -1312,6 +1361,8 @@ export default function GroveClient({ initial }) {
                     <p className="gv-note is-zone" onClick={() => setNote(null)}>{note}</p>,
                     fsHost || document.body,
                 ) : null}
+
+                {partSheet}
                 {zonePanel && mounted ? createPortal((
                     <div className="gv-zsheet">
                         <button type="button" className="gv-zsheet-x" aria-label="Back to the zone"
@@ -1375,6 +1426,10 @@ export default function GroveClient({ initial }) {
                 current={view}
                 onPick={(k) => setView(k)}
             />
+
+            {/* The other half of the sheet's two homes — see the note where partSheet is built. The bag
+                is a view at the hub and a zonePanel inside a zone, so both returns have to render it. */}
+            {partSheet}
 
             <style>{GROVE_CSS}</style>
         </div>

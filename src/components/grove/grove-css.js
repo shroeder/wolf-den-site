@@ -2753,6 +2753,57 @@ export const GROVE_CSS = `
 /* ⚠️ ABOVE THE DOCK. The dock sits over the panel by design and kept floating on top of the
    result card, so the moment that is supposed to own the screen had four buttons punched
    through it. 1200 clears every chrome layer this feature has. */
+/* ── THE PART SHEET ─────────────────────────────────────────────────────────
+   Same backdrop and the same z-index band as .gv-made, because it is the same KIND of thing: a thing you
+   tapped, answered, over the screen you tapped it from. It reads left-aligned rather than centred like
+   the craft card -- that one is a trophy and this one is a reference, and a list of creatures centred on
+   the page reads as a poster instead of as something to scan. */
+.gv-pv { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center;
+    background: rgba(4,6,4,0.78); padding: 18px; animation: gvMadeIn 200ms ease-out both; }
+.gv-pv-card { width: min(380px, 100%); max-height: 86vh; overflow-y: auto;
+    padding: 16px 16px 14px; border-radius: 18px; border: 1px solid rgba(224,168,60,0.42);
+    background: radial-gradient(120% 90% at 50% 0%, rgba(224,168,60,0.18), transparent 62%), #14170f;
+    box-shadow: 0 24px 70px rgba(0,0,0,0.7); }
+.gv-pv-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+.gv-pv-face { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 12px;
+    background: rgba(0,0,0,0.42); border: 1px solid rgba(0,0,0,0.55);
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.6); }
+.gv-pv-head b { display: block; font-size: 1.05rem; font-weight: 800; color: #f3ead8; }
+.gv-pv-head i { display: block; font-style: normal; font-size: 0.78rem; color: #b9b1a2; }
+.gv-pv-x { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(0,0,0,0.42); color: #d8cfbd; font-size: 1.2rem; line-height: 1; cursor: pointer; }
+
+.gv-pv-sec { margin-top: 15px; }
+.gv-pv-sec h5 { margin: 0 0 7px; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.17em;
+    text-transform: uppercase; color: #8e8676; }
+
+/* The creatures, as the carved amulets the game already draws for them — a player recognises the
+   Rootrat's token long before they recognise the words "Rootrat". */
+.gv-pv-foes { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 7px; }
+.gv-pv-foe { display: flex; align-items: center; gap: 7px; padding: 5px 10px 5px 6px;
+    border-radius: 999px; background: rgba(0,0,0,0.38); border: 1px solid rgba(255,255,255,0.07); }
+.gv-pv-foe img { width: 26px; height: 26px; object-fit: contain; }
+.gv-pv-foe b { font-size: 0.74rem; font-weight: 700; color: #ded5c3; }
+.gv-pv-where { margin: 8px 0 0; font-size: 0.72rem; color: #9a927f; }
+
+/* Every row is a door. Full-width hit areas, because this is the control the whole sheet exists for. */
+.gv-pv-uses { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.gv-pv-uses button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); cursor: pointer; font: inherit;
+    text-align: left; color: #e7dece; background: rgba(0,0,0,0.38);
+    transition: border-color 120ms ease, background 120ms ease; }
+.gv-pv-uses button:hover { border-color: rgba(224,168,60,0.5); background: rgba(224,168,60,0.1); }
+.gv-pv-uses b { flex: 1; font-size: 0.82rem; font-weight: 700; }
+.gv-pv-uses em { font-style: normal; font-size: 0.78rem; font-weight: 800;
+    font-variant-numeric: tabular-nums; }
+.gv-pv-uses em.is-have { color: #8fd36a; }
+.gv-pv-uses em.is-short { color: #c9a05a; }
+
+.gv-pv-wish { width: 100%; margin-top: 15px; padding: 11px; border-radius: 11px; cursor: pointer;
+    font: inherit; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.04em;
+    border: 1px solid rgba(224,168,60,0.42); background: rgba(224,168,60,0.12); color: #f0c877; }
+.gv-pv-wish.is-on { background: rgba(224,168,60,0.85); border-color: rgba(224,168,60,0.9); color: #1a1407; }
+
 .gv-made { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center;
     background: rgba(4,6,4,0.76); padding: 18px;
     animation: gvMadeIn 220ms ease-out both; }
@@ -2995,6 +3046,13 @@ export const GROVE_CSS = `
 .gv-act-odds li[style*="--band"] b { color: var(--band) !important; }
 .gv-tag.is-q[style*="--band"] { color: var(--band);
     background: color-mix(in srgb, var(--band) 18%, transparent); }
+/* "You already hold six of these." Quieter than the status tag beside it on purpose: it is context for
+   the decision, not the decision. Banded kinds borrow the same colour treatment as the tool's band so
+   one word means one thing everywhere on this screen. */
+.gv-tag.is-hold { color: #a9a192; background: rgba(255,255,255,0.06);
+    font-variant-numeric: tabular-nums; }
+.gv-tag.is-hold[style*="--band"] { color: var(--band);
+    background: color-mix(in srgb, var(--band) 14%, transparent); }
 .gv-slot[style*="--band"] svg { color: var(--band); }
 .gv-slot.is-masterwork svg { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--band) 60%, transparent)); }
 .gv-made-q.is-masterwork, .gv-made-bonus.is-masterwork {

@@ -455,3 +455,33 @@ export function tabletBonuses(distinctSeen) {
     const n = Number(distinctSeen) || 0;
     return TABLET_BREAKS.filter((b) => n >= b.at);
 }
+
+// ── ⚠️ WHAT IS THIS PART FOR? ───────────────────────────────────────────────────────────────────────────────
+// Luke: "there has to be some linkage between your inventory and crafting, kind of like how cooking does it,
+// where you can see all the ingredients and bounce between linked ingredients and stuff. We have to create
+// some kind of connection to easily traverse between inventory and crafting."
+//
+// The bench has always been able to answer "what does this recipe need" — it is a list of recipes, so that
+// direction is free. The other direction had no answer anywhere: a bag of twenty kinds of bone and moss, and
+// nothing on any screen said which of them were worth keeping or what they were being kept FOR. That is the
+// half of the loop that was missing, and it is the half a player is looking at when they are standing in a
+// forest deciding whether to pick something up.
+//
+// Built once, from GROVE_RECIPES itself, so it cannot drift from what the bench charges. Sorted cheapest-use
+// first: the recipe that wants two of something is the realistic answer to "what can I do with these two".
+const USED_BY = (() => {
+    const by = new Map();
+    for (const r of GROVE_RECIPES) {
+        for (const [part, need] of Object.entries(r.parts || {})) {
+            if (!by.has(part)) by.set(part, []);
+            by.get(part).push({ id: r.id, name: r.name, kind: r.kind, slot: r.slot, tier: r.tier, need: Number(need) });
+        }
+    }
+    for (const list of by.values()) list.sort((a, b) => a.need - b.need || a.name.localeCompare(b.name));
+    return by;
+})();
+
+/** Every recipe that wants this part, cheapest use first. Never null. */
+export function recipesUsing(partId) {
+    return USED_BY.get(partId) || [];
+}
