@@ -37,6 +37,11 @@ const PREVIEW_GUESTS = {
     grove: new Set([
         "27da67c2-8548-453f-bda4-4349c0e4ef06", // Littlewolf
         "9db11753-f826-4a4f-8ad9-41e19bc45fe4", // Adam Malz (smalz123@) — registered 2026-10-22
+        // Luke, 2026-10-30: "Give eric the grove." He is the Den's high anchor — grove-reach.mjs has him
+        // clearing all seven maps where everybody else walls, and the towns design is measured against him
+        // by name. The one person whose feedback on maps 5-7 is worth anything is the only person who can
+        // actually reach them.
+        "d68dacf6-10e1-40fe-93c8-9ca6ebdbb87e", // Eric D (ericd2317@) — registered 2026-07-15
     ]),
     // Opening a mystery pack online + the Card Vault. Luke, 2026-10-26: "for now I would prefer it only show
     // up for me." Owners pass without being listed, so this stays empty until somebody is invited.
