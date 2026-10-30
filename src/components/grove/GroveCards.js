@@ -76,7 +76,14 @@ const MAP_TINT = {
 };
 
 const MAP_FRAME = {
-    1: "/images/grove/frame-wood.webp",
+    1: "/images/grove/frame-wood.webp",        // The Grove — bramble and oak
+    2: "/images/grove/frame-undercave.webp",   // The Undercave — dripstone and glowing fungus
+    3: "/images/grove/frame-fen.webp",         // The Sunken Fen — reeds and lily
+    4: "/images/grove/frame-saltwrack.webp",   // The Saltwrack Coast — kelp, driftwood, shells
+    5: "/images/grove/frame-drowned.webp",     // The Drowned Ruins — broken columns and coral
+    6: "/images/grove/frame-gilded.webp",      // The Gilded Waste — bone and tarnished gold
+    7: "/images/grove/frame-reach.webp",       // The Ashen Reach — basalt and ember
+    // Maps 8-12 have no frame because they have no map. ⚠️ ABSENT IS A VALID STATE -- see above.
 };
 
 /** Which map a card belongs to — the row it lives on. */

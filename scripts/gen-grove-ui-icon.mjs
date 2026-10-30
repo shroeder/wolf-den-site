@@ -52,6 +52,33 @@ const FRAMES = {
         + "sharp curved thorns, with small oak leaves and moss. The border is a CONTINUOUS even-thickness "
         + "band of tangled growth running around all four edges and meeting at four thick knotted corners. "
         + "The centre is COMPLETELY EMPTY — a large hollow rectangular opening with nothing inside it",
+    // One per map, each made of what that place is actually built from. ⚠️ EVERY ONE REPEATS THE SAME THREE
+    // CONSTRAINTS -- continuous band, even thickness, empty centre -- because they are what border-image needs
+    // and the model drops any of them the moment the subject gets interesting.
+    undercave: "An ornate rectangular border of pale hanging cave roots, wet limestone, dripstone columns and "
+        + "small clusters of glowing blue mushrooms. The border is a CONTINUOUS even-thickness band of stone "
+        + "and root running around all four edges and meeting at four heavy rock corners. The centre is "
+        + "COMPLETELY EMPTY — a large hollow rectangular opening with nothing inside it",
+    fen: "An ornate rectangular border of tall bog reeds, drooping marsh grass, twisted swamp roots, lily "
+        + "pads and hanging strands of pond weed. The border is a CONTINUOUS even-thickness band of wet "
+        + "growth running around all four edges and meeting at four thick knotted corners. The centre is "
+        + "COMPLETELY EMPTY — a large hollow rectangular opening with nothing inside it",
+    saltwrack: "An ornate rectangular border of bull kelp, grey driftwood, knotted ship rope, barnacles and "
+        + "scattered seashells. The border is a CONTINUOUS even-thickness band of wrack and timber running "
+        + "around all four edges and meeting at four heavy driftwood corners. The centre is COMPLETELY EMPTY "
+        + "— a large hollow rectangular opening with nothing inside it",
+    drowned: "An ornate rectangular border of broken stone columns, rusted chain, brain coral and swaying "
+        + "sea fans in deep blue-green. The border is a CONTINUOUS even-thickness band of ruin and coral "
+        + "running around all four edges and meeting at four cracked masonry corners. The centre is "
+        + "COMPLETELY EMPTY — a large hollow rectangular opening with nothing inside it",
+    gilded: "An ornate rectangular border of sun-bleached bone, drifted sand, dry thorn scrub and tarnished "
+        + "gold ornament. The border is a CONTINUOUS even-thickness band of bone and gold running around all "
+        + "four edges and meeting at four heavy gilded corners. The centre is COMPLETELY EMPTY — a large "
+        + "hollow rectangular opening with nothing inside it",
+    reach: "An ornate rectangular border of cracked black basalt, glowing orange embers, drifting ash and "
+        + "jagged obsidian shards. The border is a CONTINUOUS even-thickness band of burnt rock running "
+        + "around all four edges and meeting at four heavy molten corners. The centre is COMPLETELY EMPTY — "
+        + "a large hollow rectangular opening with nothing inside it",
 };
 
 // Reverse-engineered from the eight that shipped: painterly cel-shade, heavy dark ink contour, two or three
