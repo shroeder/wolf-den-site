@@ -227,7 +227,11 @@ const MAP_ONE_EMBLEMS = {
     em_thornling: { name: "The Thornling", stat: "attack_speed", per: 0.6, kind: "pct" },
     em_badger: { name: "The Bristleback", stat: "armour", per: 2, kind: "flat" },
     em_gourdling: { name: "The Gourdling", stat: "life_steal", per: 0.4, kind: "pct" },
-    em_husk: { name: "The Straw Man", stat: "move_speed", per: 1.0, kind: "pct" },
+    // ⚠️ WAS move_speed. Luke: "I also dont like move speed, seems like another meaningless factor we
+    // should not use." He is right for this game specifically -- the Grove is a kill-rate game, and walking
+    // faster between fights does not change the number the whole progression is measured in. Swapped for
+    // ferocity, which is the one combat stat only a single map-one card granted.
+    em_husk: { name: "The Straw Man", stat: "ferocity", per: 2, kind: "flat" },
     em_ashwraith: { name: "The Ash Wraith", stat: "crit_damage", per: 0.8, kind: "pct", global: true },
     em_barrowhound: { name: "The Barrow Hound", stat: "crit_rate", per: 0.25, kind: "pct", global: true },
     em_warren: { name: "The Warren Mother", stat: "emblem_find", per: 1.5, kind: "pct" },
@@ -762,7 +766,8 @@ const BOSS_CARD_STATS = [
     { stat: "crit_rate", per: 0.25, kind: "pct" },
     { stat: "crit_damage", per: 0.8, kind: "pct" },
     { stat: "life_steal", per: 0.4, kind: "pct" },
-    { stat: "move_speed", per: 1.0, kind: "pct" },
+    // move_speed removed from the boss rotation for the same reason -- see The Straw Man above.
+    { stat: "tenacity", per: 2, kind: "flat" },
     { stat: "rarity_find", per: 1.2, kind: "pct" },
     { stat: "emblem_find", per: 1.5, kind: "pct" },
 ];

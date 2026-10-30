@@ -4213,14 +4213,11 @@ export default function GroveScene({
                         rows: f.rows.map((r) => (
                             r.k === "bench" && benchReady > 0
                                 ? { ...r, badge: benchReady > 99 ? "99+" : String(benchReady), note: `${benchReady} ready` }
-                                // ⚠️ THE CEILING, ON THE DOOR, BEFORE YOU HIT IT. The bag holds a fixed
-                                // number of DISTINCT parts and anything new past that is not granted at
-                                // all. Nothing in the zone said so, so the first a player knew of it was
-                                // loot they watched land and never received. The old dock could only say
-                                // this with a coloured pip; a row can say it in words.
-                                : r.k === "bag" && bagRoom === 0 ? { ...r, badge: "FULL", note: "no room — nothing new will drop" }
-                                    : r.k === "bag" && bagRoom != null && bagRoom <= 3 ? { ...r, note: `${bagRoom} slots left` }
-                                        : r
+                                // ⚠️ NOTHING TO WARN ABOUT. This said FULL, and then "n slots left",
+                                // because the bag had a ceiling and loot past it was never granted. The
+                                // ceiling is gone (see storeParts) so the warning is too -- a badge that
+                                // can never fire is a badge somebody maintains forever for nothing.
+                                : r
                         )),
                     }))}
                     onPick={(k) => openPanel(k)}

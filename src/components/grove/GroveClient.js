@@ -417,20 +417,11 @@ export default function GroveClient({ initial }) {
 
     // What the scene actually eats: the equipped food, its heal fraction, and how many are in the bag.
     // Resolved here rather than in the scene so the scene never has to know what a recipe is.
-    // ── ⚠️ HOW MUCH ROOM IS LEFT, BECAUSE THE ZONE DID NOT KNOW THERE WAS A CEILING ────────────────
-    // The bag holds a fixed number of DISTINCT parts (see storeParts). Past that, a part you do not
-    // already carry is simply not granted -- the server works this out, returns it as `overflow`, and
-    // until now the only screen that ever showed one was the chest opener. So in a zone: the drop pops,
-    // the haul list names it, the pickup sound plays, and the part is then quietly never given to you.
-    //
-    // packSlots existed in exactly one place in this whole feature and it was inside the bag panel, so
-    // the room the player was standing in had no idea the limit existed. This is the number that fixes
-    // that, and it goes to the dock, where the badge idiom already means "there is something to know".
-    const bagRoom = useMemo(() => {
-        const slots = Number(st?.packSlots) || 0;
-        if (!slots) return null;
-        return Math.max(0, slots - Object.keys(st?.pack || {}).length);
-    }, [st?.packSlots, st?.pack]);
+    // ⚠️ THERE IS NO BAG ROOM ANY MORE, so there is nothing to warn about. This was a memo computed
+    // solely to drive a "FULL" badge on the menu, which existed because loot you watched land could fail
+    // to be granted. Capacity is gone (see storeParts) and the warning goes with it rather than being
+    // left behind reporting Infinity.
+    const bagRoom = null;
 
     // ── WHAT THE CLASS IS, AND WHAT IT IS WORTH IN HERE ────────────────────────────────────────────
     // ⚠️ THE LABELS ARE THE GROVE'S OWN FOURTEEN, NOT THE TREE'S THIRTY. classGives arrives already in
@@ -525,7 +516,6 @@ export default function GroveClient({ initial }) {
     // PAUSED zone. `panel` is what decides which one shows: the dock view on the hub, and the zone's own
     // separate selection while in a node, because `view` is "zone" the whole time you are in one.
     const bagRows = Object.entries(st.pack || {});
-    const bankRows = Object.entries(st.bank || {});
     const known = new Set(st.recipes || []);
     // ⚠️ THE TRAIL STOPS WHERE YOU DID. Drawing the whole route in confident ink would tell a new player
     // the shape of a map they have not earned; drawing none of it loses the one thing the chart is for.
@@ -698,8 +688,11 @@ export default function GroveClient({ initial }) {
 
                 {panel === "bag" ? (
                     <div className="gv-bag">
+                        {/* ⚠️ A COUNT, NOT A CAPACITY. It said "6/20" when twenty was a ceiling you had
+                            to craft your way past; now it says how many KINDS of thing you are carrying,
+                            which is the only part of that number that was ever interesting. */}
                         <Area id="bag" icon="ui-bag" title="Backpack"
-                            count={`${bagRows.length}/${st.packSlots}`}>
+                            count={`${bagRows.length} kind${bagRows.length === 1 ? "" : "s"}`}>
                             {/* -- THE EMPTY SLOTS ARE DRAWN -------------------------------------
                                 Luke: "a lot of void in the area where we show the items."
 
@@ -710,31 +703,26 @@ export default function GroveClient({ initial }) {
                                 once as a number and once as a shape, and the shape is the half a counter
                                 on its own can never tell you. */}
                             <div className="gv-inv">
+                                {/* ⚠️ NOT BUTTONS ANY MORE. Their only job was tap-to-bank, and there is no
+                                    bank to tap into. A control that looks pressable and does nothing is
+                                    worse than a label. */}
                                 {bagRows.map(([p, n]) => (
-                                    <button key={p} type="button" className="gv-cell"
-                                        title={partName(p) + " - tap to bank"}
-                                        onClick={async () => { await post({ action: "move", partId: p, from: "pack", to: "bank", qty: n }); refresh(); }}>
+                                    <span key={p} className="gv-cell is-inert" title={partName(p)}>
                                         <span className="gv-cell-face"><PartIcon id={p} size={46} /><i>{n}</i></span>
                                         <span className="gv-cell-name">{partName(p)}</span>
-                                    </button>
+                                    </span>
                                 ))}
-                                {emptyCells(st.packSlots, bagRows.length)}
                             </div>
                         </Area>
-                        <Area id="bank" icon="ui-vault" title="Bank"
-                            count={`${bankRows.length}/${st.bankSlots}`}>
-                            <div className="gv-inv">
-                                {bankRows.map(([p, n]) => (
-                                    <button key={p} type="button" className="gv-cell"
-                                        title={partName(p) + " - tap to take"}
-                                        onClick={async () => { await post({ action: "move", partId: p, from: "bank", to: "pack", qty: n }); refresh(); }}>
-                                        <span className="gv-cell-face"><PartIcon id={p} size={46} /><i>{n}</i></span>
-                                        <span className="gv-cell-name">{partName(p)}</span>
-                                    </button>
-                                ))}
-                                {emptyCells(st.bankSlots, bankRows.length)}
-                            </div>
-                        </Area>
+                        {/* ── ⚠️ THE BANK IS GONE ───────────────────────────────────────────────
+                            Luke: "I think we get rid of the idea of a bank. And get rid of bag slot
+                            limits. And get rid of bank and backpack expansions. Its just a lame mechanic
+                            that is a meaningless tax on the player."
+
+                            A bank only means something when a bag is full, and the bag no longer fills.
+                            What stood here was a second grid, a second counter, a tap-to-bank on every
+                            item and a tap-to-take on every item back — an entire screen of shuffling
+                            that existed to service a limit nobody wanted. */}
                         {/* ── THE BELT ────────────────────────────────────────────────────────────────
                             Luke: "a way to equip food or potions that auto heal you if you get below 60
                             percent hp." One slot: choosing which is the decision. */}

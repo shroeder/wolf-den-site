@@ -67,8 +67,7 @@ function payoff(r, st, built = false, got = null) {
     if (r.kind === "charm") {
         return `${CHARM_STAT_LABEL[r.stat] || "Bonus"} +${charmValue(r.id, 0)}% to +${charmValue(r.id, 100)}% · one run`;
     }
-    if (r.kind === "pack") return `+${got?.adds || r.adds} backpack slots (now ${st.packSlots || 16})`;
-    if (r.kind === "bank") return `+${got?.adds || r.adds} vault slots (now ${st.bankSlots || 16})`;
+    // pack / bank lines removed with the expansions themselves -- a bag has no ceiling to raise.
     if (r.kind === "plot") return "+1 farm plot";
     if (r.kind === "tool") {
         const t = TOOL_SLOTS.find((x) => x.slot === r.slot);

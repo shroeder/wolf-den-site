@@ -476,7 +476,9 @@ export const ARMOUR_SLOTS = [
 const SLOT_PROFILE = {
     head: { crit_rate: 1.05, rarity_find: 2.4 },
     body: { armour: 6, vitality: 7.2 },
-    feet: { attack_speed: 1.2, move_speed: 2.4 },
+    // ⚠️ feet NO LONGER ROLL move_speed. It was the only stat on the slot that did not touch a fight, and
+    // a boot whose good roll is "you walk between kills faster" is a boot nobody is pleased to find.
+    feet: { attack_speed: 1.2, tenacity: 2.4 },
 };
 
 // ⚠️ ONE CURVE, NOT A HAND-WRITTEN NUMBER PER PIECE. Fifteen pieces authored by hand is fifteen chances to

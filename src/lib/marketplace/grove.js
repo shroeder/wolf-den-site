@@ -327,10 +327,9 @@ export async function groveState(buyerId) {
         ...look,
         hero,
         unlockedN: Number(p?.unlocked_n) || 1,
-        packSlots: Number(p?.pack_slots) || 16,
-        bankSlots: Number(p?.bank_slots) || 16,
-        packsBuilt: p?.packs_built || [],
-        banksBuilt: p?.banks_built || [],
+        // ⚠️ THE COLUMNS STAY, THE CONCEPT GOES. pack_slots / bank_slots / packs_built / banks_built are
+        // still on the row because dropping columns is how you lose the record of what somebody crafted
+        // before the rule changed; nothing reads them any more. See storeParts.
         plotsBuilt: p?.plots_built || [],
         zones: GROVE_ZONES.map((z) => {
             const row = killsBy[z.id];
@@ -639,31 +638,31 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
 /**
  * Parts into the backpack, and into the permanent seen-set.
  *
- * ⚠️ THE BAG HAS A CEILING AND IT IS COUNTED IN ROWS. Sixteen "unique slots" means sixteen distinct parts,
- * not sixteen items — a part you already hold stacks for free, a new one needs a slot. Anything that does not
- * fit is simply not granted and the client is told, rather than silently vanishing.
+ * ── ⚠️ THE BAG HAS NO CEILING ANY MORE ──────────────────────────────────────────────────────────────────────
+ * It used to hold sixteen DISTINCT parts, expandable in fours by crafting a backpack, and anything that did
+ * not fit was simply not granted. Luke: "get rid of bag slot limits. And get rid of bank and backpack
+ * expansions. Its just a lame mechanic that is a meaningless tax on the player."
  *
- * ⚠️ AND DISCOVERY IS SEEING, NOT KEEPING. A part that fell out while the bag was full was still FOUND, and
- * the recipe it unlocks must unlock. Luke was explicit: "If you get the first item and discard it or bank it,
- * then find the second part. The recipe unlocks, so its just based on discovery."
+ * He is right, and the sharpest evidence is what this function used to have to be careful about: loot the
+ * player WATCHED LAND and then did not receive. Every guard around that — the overflow map, the "FULL" badge
+ * on the menu, the room counter, the chest path having to pay through the same rule so it would not quietly
+ * differ — existed to make a tax legible rather than to make the game better. The whole apparatus is gone and
+ * the failure mode went with it.
  *
- * Extracted so the boss and the settle share it rather than carrying two copies — a second copy of a rule
- * with this many edges in it is a second, slightly different game. See reuse-the-rule-never-restate-it.
+ * ⚠️ DISCOVERY IS STILL SEEING, NOT KEEPING, and that rule now costs nothing to honour: everything found is
+ * both seen and stored, so a recipe unlocks because you picked the part up.
+ *
+ * Still shared by the settle and the Coliseum's chests rather than copied — same reason as before.
  */
-// Exported so the Coliseum's chests pay through the SAME capacity and overflow rule rather than a second
-// copy of it. A chest that quietly ignored a full pack would be the one place in the Grove where loot
-// vanishes instead of overflowing.
-export async function storeParts(buyerId, parts, packSlots) {
-    const held = await db.query(
-        `SELECT part_id FROM mkt_grove_item WHERE buyer_id = $1 AND place = 'pack' AND qty > 0`, [buyerId],
-    ).catch(() => []);
-    const heldSet = new Set((held || []).map((r) => r.part_id));
-
+// Exported so the Coliseum's chests pay through the same path as the settle.
+export async function storeParts(buyerId, parts) {
     const stored = {};
+    // ⚠️ KEPT AS AN ALWAYS-EMPTY OBJECT rather than deleted from the return. Four call sites read
+    // `overflow` and the client renders a line when it has keys; returning the shape and never filling it
+    // means the removal is one edit here instead of five, and a caller that still checks it is simply
+    // always told there was none.
     const overflow = {};
     for (const [part, n] of Object.entries(parts || {})) {
-        if (!heldSet.has(part) && heldSet.size >= packSlots) { overflow[part] = n; continue; }
-        heldSet.add(part);
         stored[part] = n;
         await db.query(
             `INSERT INTO mkt_grove_item (buyer_id, place, part_id, qty) VALUES ($1, 'pack', $2, $3)
@@ -776,7 +775,7 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     // and never received.
     await bumpHunts(buyerId, got.slain, Number(zone?.map) || 0).catch(() => {});
 
-    const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p.pack_slots) || 16);
+    const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts);
 
     // ── EMBLEMS ─────────────────────────────────────────────────────────────────────────────────────
     for (const [em, n] of Object.entries(got.emblems)) {
@@ -982,7 +981,7 @@ export async function groveBoss(buyerId, zoneId) {
     const emblemRows = await db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const got = rollBoss(boss, zone.n, Number(p.seed), index, bonusesFrom(emblemRows, p), bossHyperChance(zone.n), GROVE_HYPER);
 
-    const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p.pack_slots) || 16);
+    const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts);
 
     if (got.emblem) {
         await db.query(

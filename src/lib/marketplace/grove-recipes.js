@@ -134,19 +134,8 @@ export const GROVE_RECIPES = [
         { makes: 3, blurb: "There is not much of it in the world." }),
 
     // ── BACKPACK — unique, one-time, Roman-numbered, each its own recipe ─────────────────────────────
-    R("pack_i", "Backpack I", "pack", { damp_moss: 6, gnawed_root: 6 }, { adds: 4, numeral: "I" }),
-    R("pack_ii", "Backpack II", "pack", { bristle_hide: 8, thorn_barb: 8 }, { adds: 4, numeral: "II" }),
-    R("pack_iii", "Backpack III", "pack", { gourd_rind: 10, bound_straw: 10 }, { adds: 4, numeral: "III" }),
-    R("pack_iv", "Backpack IV", "pack", { warren_silk: 10, barrow_tooth: 10 }, { adds: 4, numeral: "IV" }),
-    R("pack_v", "Backpack V", "pack", { mothlight_dust: 12, ash_ember: 12 }, { adds: 4, numeral: "V" }),
 
     // ── BANK — the same shape, bigger numbers, up to the 64 ceiling ──────────────────────────────────
-    R("bank_i", "Vault I", "bank", { grub_fat: 10, damp_moss: 10 }, { adds: 8, numeral: "I" }),
-    R("bank_ii", "Vault II", "bank", { split_antler: 12, bristle_hide: 12 }, { adds: 8, numeral: "II" }),
-    R("bank_iii", "Vault III", "bank", { bound_straw: 14, gourd_rind: 14 }, { adds: 8, numeral: "III" }),
-    R("bank_iv", "Vault IV", "bank", { barrow_tooth: 16, warren_silk: 16 }, { adds: 8, numeral: "IV" }),
-    R("bank_v", "Vault V", "bank", { goblin_rivet: 18, rotwood_knot: 18 }, { adds: 8, numeral: "V" }),
-    R("bank_vi", "Vault VI", "bank", { elder_heartwood: 14, crystal_shard: 3 }, { adds: 8, numeral: "VI" }),
 
     // ── THE FARM ────────────────────────────────────────────────────────────────────────────────────
     // "Could maybe make some craftable decorations for the farm" and "Maybe you could build up to 2
@@ -301,7 +290,11 @@ export const reachableRecipes = (taught) => {
 //   tool          remade in place -- one row per slot holding the tier reached, so there is no second one
 //
 // Everything else is a thing you hold: food stacks, charms are consumed on a dive, decorations are objects.
-export const ONE_OFF_KINDS = new Set(["pack", "bank", "plot", "tool"]);
+// ⚠️ pack AND bank ARE GONE FROM THIS SET BECAUSE THEY ARE GONE FROM THE GAME. Backpack and vault
+// expansions were the two things in here that bought CAPACITY, and capacity is no longer a thing a player
+// has to buy — see storeParts. What is left are the two kinds that are genuinely one-of-a-kind: a farm plot
+// (capped anyway) and a tool (one row per slot, remade in place).
+export const ONE_OFF_KINDS = new Set(["plot", "tool"]);
 
 /** Can this recipe be made more than once? The question craft-all asks. */
 export const repeatable = (recipe) => !!recipe && !ONE_OFF_KINDS.has(recipe.kind);
