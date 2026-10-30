@@ -192,7 +192,7 @@ for (let n = 2; n <= TOOL_TIER_CAP; n += 1) {
 for (let n = 2; n <= TOOL_TIER_CAP; n += 1) {
     for (const r of toolRecipesForMap(n)) {
         const base = TOOL_SLOTS.find((t) => t.slot === r.slot);
-        GROVE_RECIPES.push(R(`${r.slot}_t${n}`, `${r.short} ${base?.name || r.slot}`, "tool", r.parts, {
+        GROVE_RECIPES.push(R(`${r.slot}_t${n}`, r.name || `${r.short} ${base?.name || r.slot}`, "tool", r.parts, {
             slot: r.slot, tier: n, map: n, mapName: r.mapName,
             blurb: `${base?.name || "A tool"}, remade out of what ${r.mapName.replace(/^The /, "the ")} is made of.`,
         }));

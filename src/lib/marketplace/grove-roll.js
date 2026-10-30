@@ -220,7 +220,17 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
     //      One of them is a tease and not a shortcut, because the recipe still wants eight.
     //
     // rareLoot is authored per creature in grove-catalog.js, so each creature's rare drop is ITS rare drop.
-    if (foe.rareLoot && r() < (Number(foe.rareChance) || 0) * (1 + (Number(bonus.rarityFind) || 0) / 100)) {
+    // ── ⚠️ `salvage` IS A RATE, NOT A MECHANISM ──────────────────────────────────────────────────────────
+    // The Geared Mark (map 8) grants it, and this is its only consumer. The row it scales ALREADY pays a
+    // part from one map deeper -- MAP_ENEMIES has handed `deeperMap` to creatureRareLoot since maps 2-12
+    // were declared -- so salvage buys more of a thing that happens, rather than a new thing. The maps
+    // 8-12 draft described it as "a kill has a chance to also drop a part from one map deeper", which
+    // overstated it: every map past the first already does that.
+    //
+    // It multiplies ALONGSIDE rarityFind rather than being folded into it, because they are granted by
+    // different things and a player who stacks both should get both.
+    const salvage = 1 + (Number(bonus.salvage) || 0) / 100;
+    if (foe.rareLoot && r() < (Number(foe.rareChance) || 0) * (1 + (Number(bonus.rarityFind) || 0) / 100) * salvage) {
         const rare = foe.rareLoot;
         out.parts[rare.part] = (out.parts[rare.part] || 0) + span(rare.n || [1, 1], r());
         out.rare = rare.part;

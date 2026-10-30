@@ -135,6 +135,9 @@ function bonusesFrom(emblemRows, player = null) {
     const out = {
         rarityFind: 0, emblemFind: 0, rareSpawn: 0,
         hyperFind: 0, chestFind: 0, partYield: 0, goldFind: 0, xpFind: 0, overkill: 0,
+        // Map 8's Geared Mark. Read by the rare row in grove-roll.js and nowhere else -- the row that
+        // already pays a part from one map deeper, so this buys more of it rather than adding a mechanism.
+        salvage: 0,
         // ⚠️ NOT A BONUS, A GATE. It rides in this bag because the bag is already the one thing the roll
         // receives about the player, and threading a second argument through every caller of rollKill to
         // carry one integer would be a worse trade. rarityWeights reads it; nothing adds to it.
@@ -161,6 +164,7 @@ function bonusesFrom(emblemRows, player = null) {
         else if (meta.stat === "gold_find") out.goldFind += v;
         else if (meta.stat === "xp_find") out.xpFind += v;
         else if (meta.stat === "overkill") out.overkill += v;
+        else if (meta.stat === "salvage") out.salvage += v;
     }
     return out;
 }

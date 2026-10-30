@@ -887,6 +887,18 @@ export const GROVE_BIOMES = {
     // The oldest thing in the forest, and the most overgrown.
     heart: { slab: "wood", density: 2.2, sitDensity: 1.4,
         hang: ["vine_flower", "vine_leafy", "moss_beard"], sit: ["fern_tuft", "mushroom_cluster", "grass_tuft"] },
+    // ── MAP 8. THE FIRST BIOME SINCE MAP ONE, AND IT COSTS ONE IMAGE ─────────────────────────────────────
+    // grove-maps-remaining.md banked on every generated zone naming one of map one's ten biomes, so that
+    // "no slab or decoration art is needed for any of the eleven maps". Naming `clockwork` broke that, and
+    // it is worth saying how cheaply: the hangs BORROW (a stopped machine has slack cable and webs, and
+    // rope_coil and cobweb both already exist), and the sits are EMPTY on the `char` precedent, because
+    // nothing grows in a dry machine. Only the floor can borrow nothing -- a machine deck is not planks and
+    // not limestone, and the note on `stone` above is the scar from pretending two materials were one.
+    //
+    // sitDensity is 0 rather than low: an empty `sit` list with a density would roll for decorations and
+    // find none, which reads as a bug the one time somebody profiles it.
+    clockwork: { slab: "cogwork", density: 1.4, sitDensity: 0,
+        hang: ["rope_coil", "cobweb"], sit: [] },
 };
 
 // ── ⚠️ WHERE EACH SLAB'S STANDING SURFACE IS, AS A SHARE OF ITS HEIGHT ───────────────────────────────────────

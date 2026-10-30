@@ -391,50 +391,55 @@ export const GROVE_MAPS = [
     },
 
     {
-        n: 8, id: "steppe", short: "Thunder", name: "The Thunder Steppe",
-        blurb: "Grass to the edge of the world, and the sky doing the talking.",
-        emblem: { id: "em_steppe", name: "The Storm Mark", stat: "attack_speed", per: 0.6, kind: "pct" },
+        n: 8, id: "cogwork", short: "Clockwork", name: "The Clockwork Deep",
+        blurb: "Something built this, and it was never told to stop.",
+        // ⚠️ THE ONE NEW STAT IN MAPS 8-12, AND IT IS A CRAFTING STAT. `salvage` scales the rare row in
+        // grove-roll.js -- the row that ALREADY pays a part from one map deeper, because MAP_ENEMIES has
+        // passed `deeperMap` to creatureRareLoot since maps 2-12 were declared. So this adds no mechanism;
+        // it raises the rate of one that shipped. The draft said "a kill has a chance to also drop a part
+        // from one map deeper", which overstated it -- every map already does that.
+        emblem: { id: "em_cogwork", name: "The Geared Mark", stat: "salvage", per: 1.6, kind: "pct" },
         parts: [
-            P("horn_edge", "Horn Edge", "edge", 1, "Split lengthways and ground down on a stone."),
-            P("lance_shaft", "Lance Shaft", "haft", 1, "Straight, light, and longer than you need."),
-            P("horsehair", "Horsehair", "bind", 2, "Plaited by somebody who had all day on a horse."),
-            P("bison_hide", "Bison Hide", "hide", 2, "One hide, one tent, one winter."),
-            P("fulgurite", "Fulgurite", "ember", 3, "Lightning went into the ground and this came out."),
-            P("storm_light", "Storm Light", "glow", 4, "The flash, held between the flash and the thunder."),
-            P("thunderstone", "Thunderstone", "stone", 3, "Found where the strike was. Warm for days."),
-            P("sky_token", "The Sky Token", "charm", 6, "The steppe people hang these facing up."),
-            P("flint_tooth", "Flint Tooth", "edge", 1, "Set in a jaw of wood, the old way."),
-            P("gut_cord", "Gut Cord", "bind", 2, "Sings when the wind gets into it."),
-            P("hawk_down", "Hawk Down", "hide", 2, "From under the wing, where the bird keeps the warm."),
-            P("cloud_glow", "Cloud Glow", "glow", 4, "The underside of a storm, lit from inside."),
+            P("brass_burr", "Brass Burr", "edge", 1, "Came off a tooth that was still turning."),
+            P("piston_rod", "Piston Rod", "haft", 1, "Straight in a way nothing grown ever is."),
+            P("wire_wrap", "Wire Wrap", "bind", 2, "Copper, and still warm from carrying something."),
+            P("gasket_felt", "Gasket Felt", "hide", 2, "Oil-black, and it never dries."),
+            P("furnace_coal", "Furnace Coal", "ember", 3, "The fire down here was banked, not put out."),
+            P("dial_glass", "Dial Glass", "glow", 4, "The needle under it still moves."),
+            P("ballast_weight", "Ballast Weight", "stone", 3, "Lead, and cast with somebody's mark on it."),
+            P("the_escapement", "The Escapement", "charm", 6, "Ticks in your hand at a speed that is not yours."),
+            P("shear_plate", "Shear Plate", "edge", 1, "Flat, and sharp along three of its four sides."),
+            P("chain_link", "Chain Link", "bind", 2, "One of forty thousand. They are all still counted."),
+            P("bellows_skin", "Bellows Skin", "hide", 2, "Folded a million times and not split yet."),
+            P("filament_coil", "Filament Coil", "glow", 4, "Lights when held. Nobody has found the wire."),
         ],
         creatures: [
-            C("horned_runner", "Horned Runner", "grazer", "Grazes in hundreds and turns as one."),
-            C("lancer", "Steppe Lancer", "striker", "Rides something. Nobody has got close enough to say what."),
-            C("hair_weaver", "Hair Weaver", "caster", "Strings the grass and waits for the herd."),
-            C("great_bison", "Great Bison", "brute", "Does not charge so much as arrive."),
-            C("fulgur_hound", "Fulgur Hound", "striker", "Runs ahead of the storm and brings some with it."),
-            C("storm_caller", "Storm Caller", "caster", "Stands in the open and points."),
-            C("thunder_ox", "Thunder Ox", "brute", "You feel this one through the ground first."),
-            C("skywatcher", "Skywatcher", "stalker", "Stands still on the flat and is never where you looked."),
-            C("flint_jaw", "Flint Jaw", "swarm", "Low, fast, and they hunt the edges of the herd."),
-            C("cord_singer", "Cord Singer", "caster", "The humming is it. The humming is not weather."),
-            C("steppe_hawk", "Steppe Hawk", "striker", "Comes out of the sun, which here is everywhere."),
-            C("cloudborn", "Cloudborn", "caster", "Drops out of the storm and goes back up into it."),
+            C("tick_mite", "Tick Mite", "swarm", "Lives in the teeth. Comes out when they stop."),
+            C("bolt_shedder", "Bolt Shedder", "swarm", "Sheds what it is made of and keeps walking."),
+            C("solder_rat", "Solder Rat", "swarm", "Chews the joints. The joints are load-bearing."),
+            C("piston_hound", "Piston Hound", "brute", "One stroke forward, and it does not stop early."),
+            C("flywheel_brute", "The Flywheel", "brute", "Already moving when you arrive. Still moving after."),
+            C("anvil_drone", "Anvil Drone", "brute", "Hits like a dropped anvil and takes an age to lift again."),
+            C("governor_wasp", "Governor Wasp", "striker", "Keeps the others to time. Punishes the slow ones."),
+            C("ratchet_adder", "Ratchet Adder", "striker", "Goes one way. Cannot be pushed back."),
+            C("arc_coil", "Arc Coil", "caster", "Charges visibly, and there is nothing to do but out-damage it."),
+            C("steam_censer", "Steam Censer", "caster", "Vents where you were going to stand."),
+            C("oil_crawler", "Oil Crawler", "stalker", "Black on black, under the floor you are on."),
+            C("gauge_watcher", "Gauge Watcher", "stalker", "Reads the dial. Moves when the needle does."),
         ],
         zones: [
-            Z("longgrass", "The Long Grass", "field", [0], "the_great_runner", "The Great Runner", "Head high, moving, and you cannot see your feet."),
-            Z("lancer_road", "The Lancer Road", "field", [1, 0], "the_first_lance", "The First Lance", "A track worn by riders, and they still use it."),
-            Z("weaver_flats", "The Weaver Flats", "field", [2], "the_grass_weaver", "The Grass Weaver", "The grass is tied. Not blown, tied."),
-            Z("bison_ground", "Bison Ground", "field", [3, 0], "the_herd_father", "The Herd Father", "Flattened for a mile, and still warm."),
-            Z("strike_plain", "The Strike Plain", "field", [4], "the_first_hound", "The First Hound", "Glass trees where the lightning went in."),
-            Z("caller_rise", "Caller Rise", "stone", [5, 4], "the_caller", "The Caller", "The only high ground, and somebody is standing on it."),
-            Z("ox_wallow", "The Ox Wallow", "field", [6], "the_thunder_ox", "The Thunder Ox", "Mud, enormous prints, and no sound at all."),
-            Z("the_watch", "The Watch", "field", [7, 5], "the_watcher", "The Watcher", "Figures on the horizon that never get closer or further."),
-            Z("jawline", "The Jawline", "field", [8], "the_pack_jaw", "The Pack Jaw", "Bones in a line, picked clean, pointing somewhere."),
-            Z("singing_draw", "The Singing Draw", "stone", [9, 8], "the_singer", "The Singer", "A cut in the land that hums when the wind is right."),
-            Z("hawk_reach", "Hawk Reach", "stone", [10, 1], "the_stooping", "The Stooping", "Nothing above you for a thousand feet, and then something."),
-            Z("stormhead_steppe", "The Storm Head", "glow", [11, 6], "the_cloudborn", "The Cloudborn", "The storm parks here. It has parked here for years."),
+            Z("cogfall_gate", "The Cogfall Gate", "clockwork", [0], "the_doorwarden", "The Doorwarden", "A gear the size of a church, stopped a third of the way round."),
+            Z("toothed_hall", "The Toothed Hall", "clockwork", [1, 0], "the_first_tooth", "The First Tooth", "Teeth the height of a man, and the gaps between them are the road."),
+            Z("piston_run", "The Piston Run", "clockwork", [2], "longstroke", "Longstroke", "Shafts going in and out of the wall, slowly, for ever."),
+            Z("oil_sump", "The Oil Sump", "burrow", [3, 2], "the_sump_mother", "The Sump Mother", "Black to the knee, and something lives in it."),
+            Z("boiler_floor", "The Boiler Floor", "char", [4], "pressure", "Pressure", "Still hot. The fire was banked a century ago and nobody came back."),
+            Z("dial_gallery", "The Dial Gallery", "glow", [5, 4], "the_hour_hand", "The Hour Hand", "A wall of faces, all lit, none of them agreeing."),
+            Z("chainworks", "The Chainworks", "clockwork", [6], "slackjaw", "Slackjaw", "Forty thousand links overhead, and they are all still counted."),
+            Z("governor_ring", "The Governor Ring", "clockwork", [7, 6], "the_regulator", "The Regulator", "A ring of spheres that spin to keep something else honest."),
+            Z("bellows_deep", "The Bellows Deep", "burrow", [8], "bellows_breath", "The Long Breath", "It inhales for four minutes and exhales for four. You learn to time it."),
+            Z("filament_vault", "The Filament Vault", "glow", [9, 8], "the_filament", "The Filament", "Light with no lamp, no wire and no explanation."),
+            Z("ratchet_stair", "The Ratchet Stair", "clockwork", [10, 1], "one_way_up", "One Way Up", "It only turns the one way, and it has been turning the whole time."),
+            Z("the_mainspring", "The Mainspring", "clockwork", [11, 3], "the_mainspring_itself", "The Mainspring Itself", "Wound, and still wound. Whatever wound it is not here."),
         ],
     },
 
@@ -945,6 +950,9 @@ export const MAP_BOSSES = Object.fromEntries(
 const BIOME_NODE = {
     burrow: "warren", stone: "barrows", moss: "hollow", field: "stubble", bramble: "bramble",
     char: "rotwood", plank: "palisade", glow: "mothlight", wood: "thicket", heart: "heartwood",
+    // Map 8. ⚠️ A biome with no entry here falls back to "thicket" -- a forest symbol on a map with no
+    // trees, and a fallback is not an error, so nothing would have told us.
+    clockwork: "cogwork",
 };
 export const biomeNode = (biome) => BIOME_NODE[biome] || "thicket";
 
@@ -1000,12 +1008,74 @@ export const MAP_EMBLEMS = Object.fromEntries(
 // same mouthful; you simply come home with eleven of them instead of five.
 const FOOD_HEALS = [0.25, 0.40, 0.60, 1.00];
 const FOOD_NAMES = ["Poultice", "Flask", "Tonic", "Draught"];
+// ── ⚠️ AUTHORED CRAFTABLES: MAPS THAT DO NOT USE THE GENERATOR ──────────────────────────────────────────────
+// Luke, 2026-10-30, on what the maps 8-12 draft was actually for: "the uniqueness I was talking about and the
+// lack of variety was more about crafting... Just be thoughtful when making each maps craftables."
+//
+// The generators below pick the FIRST material of each role. Map 8 has two edges, two binds, two hides and
+// two glows, so role order never puts half its own parts list into a tool, and five maps of that come out as
+// the same twelve objects in a new vocabulary. These rows are the same twelve objects with the materials
+// CHOSEN: the shear plate goes in the pick and the hoe because it is flat, the brass burr in the knife and
+// the loupe because it is small.
+//
+// ⚠️ THE COUNTS ARE THE GENERATOR'S OWN. tierCount would have said 10/9/7 at map 8 and these say 10/9/7, so
+// authoring changes which materials a rung wants and never what it costs. The day one of these is tuned by
+// hand instead, the tool ladder quietly stops being one curve.
+const AUTHORED_TOOLS = {
+    8: [
+        ["rod", "The Ratchet Rod", ["piston_rod", "chain_link", "the_escapement"]],
+        ["pick", "The Shearhead", ["shear_plate", "piston_rod", "bellows_skin"]],
+        ["shovel", "The Ballast Spade", ["brass_burr", "ballast_weight", "wire_wrap"]],
+        ["hammer", "The Drop Forge", ["ballast_weight", "furnace_coal", "piston_rod"]],
+        ["hoe", "The Harrow Chain", ["shear_plate", "chain_link", "gasket_felt"]],
+        ["sextant", "The Dial Sextant", ["dial_glass", "the_escapement", "ballast_weight"]],
+        ["knife", "The Burr Knife", ["brass_burr", "piston_rod", "wire_wrap"]],
+        ["collar", "The Timed Collar", ["wire_wrap", "bellows_skin", "the_escapement"]],
+        ["lantern", "The Filament Lamp", ["filament_coil", "furnace_coal", "chain_link"]],
+        ["loupe", "The Gauge Loupe", ["ballast_weight", "dial_glass", "brass_burr"]],
+        ["banner", "The Oil Standard", ["piston_rod", "gasket_felt", "furnace_coal"]],
+        ["horn", "The Bellows Horn", ["furnace_coal", "ballast_weight", "bellows_skin"]],
+    ],
+};
+
+// Four foods a map, and the heal ladder cannot climb past 100% -- so a deeper map does not heal harder, it
+// makes more per craft. What is authored is which two materials each is pressed out of.
+const AUTHORED_FOODS = {
+    8: [
+        ["Sump Poultice", ["gasket_felt", "bellows_skin"], "Oil-black felt packed on and bound. It seals before it soothes."],
+        ["Boiler Flask", ["furnace_coal", "wire_wrap"], "Condensate off the boiler floor, still warm. Tastes of copper and keeps you upright."],
+        ["Filament Tonic", ["filament_coil", "dial_glass"], "Scraped glow in a measured glass. The dose is marked on the side; the mark is optimistic."],
+        ["Mainspring Draught", ["the_escapement", "furnace_coal"], "For an hour your heart keeps the machine's time. The hour is the part to plan around."],
+    ],
+};
+
+// The charm keeps its generated stat and potency -- the flavour cycle and the depth curve are the two things
+// that must stay on rails, or map 8 gets a charm map 9 cannot beat. Only the name, the two materials and the
+// line are authored.
+const AUTHORED_CHARMS = {
+    8: ["The Stopped Hour", ["chain_link", "the_escapement"],
+        "One of forty thousand, and they are all still counted. Something down here keeps a tally; this is how you ask to see it."],
+};
+
 const USED_ROLES = new Set(Object.values(TOOL_ROLES).flat());
 
 /** The four food recipes for one generated map, built from the materials its tools do not want. */
 export function foodRecipesForMap(n) {
     const map = groveMap(n);
     if (!map?.parts) return [];
+    // ⚠️ SAME IDS, SAME MAKES, SAME HEALS as the generated shape would have produced -- only the name, the
+    // two materials and the line are authored. Keeping the id scheme keeps the art filename predictable
+    // (food-food_cogwork_1.webp) and keeps GROVE_FOODS, the belt and the bench naming one object once.
+    if (AUTHORED_FOODS[n]) {
+        return AUTHORED_FOODS[n].map(([name, parts, blurb], i) => ({
+            id: `food_${map.id}_${i + 1}`,
+            name, heals: FOOD_HEALS[i], makes: 5 + (n - 1),
+            tier: map.parts.find((p) => p.id === parts[0])?.tier ?? 1,
+            map: n,
+            parts: { [parts[0]]: 4 + Math.round((n - 1) * 0.5), [parts[1]]: 3 },
+            blurb,
+        }));
+    }
     const spares = map.parts.filter((p, i) => map.parts.findIndex((q) => q.role === p.role) !== i || !USED_ROLES.has(p.role));
     return spares.slice(0, 4).map((part, i) => ({
         id: `food_${map.id}_${i + 1}`,
@@ -1062,6 +1132,18 @@ export function charmForMap(n) {
     // a reason to keep a surplus rather than a competitor for the tool ladder.
     const a = map.parts[Math.min(2, map.parts.length - 1)];
     const b = map.parts[Math.min(map.parts.length - 1, 7)];
+    const authored = AUTHORED_CHARMS[n];
+    if (authored) {
+        const [name, mats, blurb] = authored;
+        return {
+            id: `charm_${map.id}`, name, stat: flavour.stat,
+            per: Math.round(base * (1 + (n - 1) * CHARM_GROWTH) * 10) / 10,
+            map: n,
+            parts: { [mats[0]]: 6 + Math.round((n - 1) * 0.8), [mats[1]]: 4 + Math.round((n - 1) * 0.6) },
+            blurb,
+            taughtBy: map.zones?.[map.zones.length - 1]?.bossId || null,
+        };
+    }
     return {
         id: `charm_${map.id}`,
         name: `${map.short} ${flavour.word}`,
@@ -1102,6 +1184,24 @@ export const MAP_FOODS = Object.fromEntries(
 export function toolRecipesForMap(n) {
     const map = groveMap(n);
     if (!map?.parts) return [];
+    if (AUTHORED_TOOLS[n]) {
+        const known = new Set(map.parts.map((p) => p.id));
+        return AUTHORED_TOOLS[n].map(([slot, short, mats]) => {
+            const parts = {};
+            mats.forEach((id, i) => {
+                // ⚠️ A TYPO HERE WOULD BE A RECIPE NOBODY CAN EVER COMPLETE, and check-grove would catch it
+                // only because it also asserts every part a recipe names exists. Throwing here names the
+                // map and the tool instead of the part, which is the faster half of the answer.
+                if (!known.has(id)) throw new Error(`map ${n} (${map.id}) ${slot}: no material "${id}"`);
+                parts[id] = tierCount(slot, i, n);
+            });
+            // ⚠️ `name`, NOT `short`. The generated shape hands back a map prefix and grove-recipes
+            // composes "Clockwork" + "Fishing Rod". An authored rung is already a whole name, so passing
+            // it as `short` produced "The Ratchet Rod Fishing Rod". It carries both: `name` wins where it
+            // exists, and `short` stays so the blurb still reads "remade out of what the Deep is made of".
+            return { slot, tier: n, parts, mapId: map.id, mapName: map.name, short: map.short, name: short };
+        });
+    }
     const byRole = {};
     for (const p of map.parts) if (!byRole[p.role]) byRole[p.role] = p;
     return Object.entries(TOOL_ROLES).map(([slot, roles]) => {

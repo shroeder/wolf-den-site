@@ -388,6 +388,9 @@ ART["map-plate"] = [MAP_PLATE, "plate"];
 const MAPNODE = `A single MAP SYMBOL for an illustrated fantasy map, drawn from a high oblique angle in fine brown ink with soft watercolour wash, the way a skilled scribe draws a place on a chart. Confident linework, light stippled shading, a small amount of real colour. Compact and self-contained, filling the frame, reading clearly as its own kind of place at thumbnail size. ISOLATED on a FULLY TRANSPARENT background - no parchment, no paper, no ground patch, no circle, no frame, no border, no shadow. No text, no letters, no numbers, no labels of any kind.`;
 
 const MAP_NODES = {
+    // Map 8. ⚠️ biomeNode() falls back to "thicket" for an unmapped biome, which would have put a stand of
+    // birch trees on the chart for a map with no trees in it -- and a fallback is not an error.
+    cogwork: "A STOPPED GEAR the size of a building: one enormous upright brass cog-wheel sunk into the ground at a slight angle, about a third of its teeth showing above the surface, each tooth taller than a man, with a smaller iron gear meshed into it and a length of heavy chain draped across the rim. Warm brass and dark oiled iron. Motionless.",
     thicket: "The edge of a wood: a loose GROUP OF SLIM BIRCH AND HAZEL TREES, seven or eight of them, pale trunks and light green canopies, with a few tufts of long grass between them. Open and airy - the friendly edge of a forest.",
     hollow: "A damp mossy HOLLOW: a shallow green dell ringed with mossed-over fallen logs, a small still pool of blue-green water at the bottom, clusters of little mushrooms on the rim.",
     fernway: "A stand of ENORMOUS FERNS: six or seven big arching fern fronds crowded together, deep lush green, with a narrow gap of bare ground showing between them.",
@@ -461,6 +464,15 @@ const SLABS = {
     // ledge went back to reading as a bar laid over the painting rather than a thing cut out of it. A
     // biome may share a slab only where the two places are genuinely the same material.
     earth: "A burrow ledge of packed dark earth: a bar of dense root-threaded brown soil, its top edge trodden smooth and dusted paler, pale severed rootlets and small stones embedded through the face, a crumbling darker underside. The ends break off into torn soil with roots trailing out of them.",
+    // ── MAP 8. THE FIRST NEW SLAB SINCE MAP ONE ──────────────────────────────────────────────────────
+    // The hangs and sits for `clockwork` borrow (rope_coil, cobweb, and an empty sit list on the `char`
+    // precedent, because nothing grows in a dry machine). Only the FLOOR can borrow nothing: a machine
+    // deck is not planks and not limestone, and the note on `stone` below is the scar from pretending two
+    // materials were one.
+    //
+    // ⚠️ NO RUST AND NO RUIN. The Clockwork Deep is STOPPED, not abandoned -- something in the middle
+    // distance is still turning. A corroded deck would say the opposite of the map's one idea.
+    cogwork: "A machined deck plate of brass and iron: a flat milled brass tread-plate along the top, its surface scored with fine parallel machining lines and a row of flush countersunk rivets, a band of dark oiled iron beneath it, and a lower seam of blackened grease-darkened metal. Warm brass yellows over cold grey iron, oil-black in the recesses. The two ends are cleanly sheared flat with the plate's layers visible in section. Not rusted, not ruined -- maintained, and recently.",
     stone: "A barrow ledge of old grey stone: a single weathered limestone slab, its top edge worn smooth and dusted with thin dry turf, hairline cracks and lichen blotches of pale green and rust across the face, a chipped lower edge. The ends are rough broken stone.",
     char: "A burnt ledge of charred timber: a blackened beam, its top crusted in grey ash, deep carbon fissures across the face glowing the faintest dull ember orange from inside, the grain burnt to charcoal. The ends are broken and jagged where the wood snapped in the fire.",
     plank: "A crude goblin platform of lashed planks: three rough sawn boards nailed side by side with bent iron nails, grey weathered timber, a wrap of tarred rope binding at each end and one short length of rope tail. The ends are sawn square and splintered.",
