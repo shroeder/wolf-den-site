@@ -26630,6 +26630,41 @@ body.cas-seated .social-fab { display: none; }
     color: var(--muted);
 }
 
+/* ── THE COUNTER CODE ────────────────────────────────────────────────────────────────────────────
+   Shown to another person at arm's length in a shop, so it is big, plain and has exactly one control.
+   Fixed rather than inline because a member holding their phone up should not have to find it on a
+   scrolled page while staff wait. */
+.vt-qr {
+    position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
+    padding: 24px; background: rgba(6, 7, 5, 0.86);
+}
+.vt-qr-card {
+    width: min(340px, 100%); display: grid; justify-items: center; gap: 14px; text-align: center;
+    padding: 24px 20px 20px; border-radius: 18px;
+    background: #14120e; border: 1px solid #3a3222;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.vt-qr-eyebrow {
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #9b937f;
+}
+/* ⚠️ WHITE PLATE UNDER THE CODE. The QR is black-on-transparent, and on this panel's near-black
+   background a scanner sees almost nothing. The quiet zone has to be light. */
+.vt-qr-card img {
+    display: block; background: #fff; padding: 10px; border-radius: 12px;
+}
+.vt-qr-card p { margin: 0; font-size: 14px; line-height: 1.45; color: #cfc6b6; }
+.vt-qr-card button {
+    width: 100%; padding: 11px; border: 0; border-radius: 999px; cursor: pointer;
+    font: inherit; font-weight: 700; color: #1b1710; background: #e0a83c;
+}
+.vt-qr-btn {
+    align-self: center; padding: 9px 16px; border-radius: 999px; cursor: pointer;
+    font: inherit; font-size: 13px; font-weight: 700;
+    color: #1b1710; background: #e0a83c; border: 0;
+}
+.vt-qr-btn:disabled { opacity: 0.6; cursor: default; }
+.vt-qr-err { margin: 6px 0 0; font-size: 13px; color: #f0a08a; }
+
 .vt-head-value {
     font-size: 1.22rem;
     font-variant-numeric: tabular-nums;

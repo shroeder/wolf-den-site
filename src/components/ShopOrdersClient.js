@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { redeemUrl } from "@/lib/marketplace/redeem-link";
+
 const money = (cents) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(cents || 0) / 100);
 
@@ -28,6 +30,40 @@ function OrderCard({ order }) {
     const isCancelled = order.fulfillmentStatus === "cancelled";
     const isFulfilled = ["shipped", "picked_up"].includes(order.fulfillmentStatus);
     const canRequest = !isCancelled && !isFulfilled && !requested;
+
+    // ── ⚠️ THE CODE STAFF SCAN TO FIND THIS ORDER ────────────────────────────────────────────────
+    // Luke: "People should be able to show their QR code for their order and it should pull them up
+    // right away into the right section of the apps."
+    //
+    // What it replaces: a member reading a confirmation number off their phone while staff type it
+    // into a search. Same mechanism as the vault code -- it identifies, it does not act, and every
+    // verb behind the screen it opens is separately admin-authenticated.
+    //
+    // ⚠️ PICKUP ONLY, AND ONLY WHILE THERE IS SOMETHING TO COLLECT. A shipping order is not collected
+    // at a counter, and an order already picked up or cancelled has nothing for staff to do -- a code
+    // offered there is a member queueing to be told no.
+    const canShowQr = order.fulfillmentMode === "pickup" && !isCancelled && !isFulfilled;
+    const [qr, setQr] = useState(null);
+    const [qrBusy, setQrBusy] = useState(false);
+
+    async function showPickupQr() {
+        setQrBusy(true);
+        try {
+            const res = await fetch("/api/marketplace/handoff", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ kind: "order", orderId: order.id }),
+            });
+            const d = await res.json().catch(() => null);
+            if (!res.ok || !d?.ok) throw new Error("no code");
+            const QRCode = (await import("qrcode")).default;
+            const img = await QRCode.toDataURL(redeemUrl("order", d.token), { width: 320, margin: 1 }).catch(() => null);
+            setQr({ img });
+        } catch {
+            setMsg("Couldn't make a pickup code just now.");
+        } finally {
+            setQrBusy(false);
+        }
+    }
 
     async function requestCancel() {
         setBusy(true);
@@ -59,6 +95,26 @@ function OrderCard({ order }) {
                 <h2 style={{ margin: 0 }}>Order #{shortId(order.id)}</h2>
                 <span className="pill">{statusLabel(order)}</span>
             </div>
+
+            {canShowQr ? (
+                <button type="button" className="vt-qr-btn" style={{ marginTop: 8 }}
+                    onClick={showPickupQr} disabled={qrBusy}>
+                    {qrBusy ? "One moment…" : "Show pickup code"}
+                </button>
+            ) : null}
+            {qr ? (
+                /* The same overlay the vault uses, for the same reason: it is held up to another person
+                   at arm's length in a shop. Reusing the class keeps one look for one gesture. */
+                <div className="vt-qr" role="dialog" aria-label="Show this to staff">
+                    <div className="vt-qr-card">
+                        <span className="vt-qr-eyebrow">Show this to staff</span>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {qr.img ? <img src={qr.img} alt="" width={260} height={260} /> : null}
+                        <p>They&rsquo;ll scan it to pull up this order.</p>
+                        <button type="button" onClick={() => setQr(null)}>Done</button>
+                    </div>
+                </div>
+            ) : null}
             <p className="secondary" style={{ marginTop: 4 }}>
                 {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : ""} ·{" "}
                 {order.fulfillmentMode === "pickup" ? "Local pickup" : "Shipping"} · {money(order.totalCents)}

@@ -23,6 +23,16 @@ const KINDS = {
         lede: "Show this screen at the counter — staff will scan it to spend your store credit.",
         staff: "Staff: open the Wolf Den app, go to Store Credit, and scan the member's QR.",
     },
+    [REDEEM_KIND.vault]: {
+        title: "Card Vault code",
+        lede: "Show this screen at the counter — staff will scan it to hand over the cards in your vault.",
+        staff: "Staff: scan this to open the member's Card Vault and hand their cards over.",
+    },
+    [REDEEM_KIND.order]: {
+        title: "Order code",
+        lede: "Show this screen at the counter — staff will scan it to find your order.",
+        staff: "Staff: scan this to open the order and mark it picked up.",
+    },
 };
 
 export function generateMetadata() {

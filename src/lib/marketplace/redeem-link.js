@@ -15,6 +15,11 @@ export const REDEEM_ORIGIN = "https://www.wolfdengamingmn.com";
 export const REDEEM_KIND = {
     charge: "chg", // an item's in-store perk charge
     credit: "crd", // store credit spent at the register
+    // ⚠️ THESE TWO SPEND NOTHING. chg and crd both consume something when staff scan them; vlt and ord only
+    // open a screen. Same URL shape on purpose -- /r/ is already a verified App Link, so a new kind routes
+    // to the app for free, where a new path prefix would need the assetlinks verification doing again.
+    vault: "vlt",  // "open this member's card vault" -- staff hand cards over at the counter
+    order: "ord",  // "open this order" -- staff mark it picked up
 };
 
 /**

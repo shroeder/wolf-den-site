@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { BUYBACK_PERCENT } from "@/lib/marketplace/buyback.js";
+import { redeemUrl } from "@/lib/marketplace/redeem-link";
 
 const usd = (cents) => `$${((Number(cents) || 0) / 100).toFixed(2)}`;
 
@@ -29,6 +30,41 @@ function shortDate(value) {
 }
 
 export default function VaultClient({ initial }) {
+    // ── ⚠️ THE CODE STAFF SCAN TO HAND THESE OVER ────────────────────────────────────────────────
+    // Luke: "there should be a QR code the customer can pull up from their card vault. And then the
+    // admin or employee app, you can scan it with the camera and it'll open it up to that person's
+    // card vault so you can clear it out for them."
+    //
+    // What it replaces: staff typing a name that might be a display name, an alias or neither, into a
+    // member search, to find a vault that had no staff-facing screen at all. The slow part of a
+    // hand-over was never the tapping -- it was finding the right person.
+    //
+    // ⚠️ IT SPENDS NOTHING. Unlike the store-credit code beside it, this only says WHO. Every action
+    // behind the screen it opens is separately admin-authenticated, so the worst a stolen screenshot
+    // does is open a vault to somebody who already had the keys to every vault.
+    const [qr, setQr] = useState(null);
+    const [qrBusy, setQrBusy] = useState(false);
+    const [qrErr, setQrErr] = useState("");
+
+    async function showCounterQr() {
+        setQrErr(""); setQrBusy(true);
+        try {
+            const res = await fetch("/api/marketplace/handoff", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ kind: "vault" }),
+            });
+            const d = await res.json().catch(() => null);
+            if (!res.ok || !d?.ok) throw new Error("Couldn't make a code just now.");
+            const QRCode = (await import("qrcode")).default;
+            const img = await QRCode.toDataURL(redeemUrl("vault", d.token), { width: 320, margin: 1 }).catch(() => null);
+            setQr({ img, expiresAt: d.expiresAt });
+        } catch (e) {
+            setQrErr(e instanceof Error ? e.message : "Couldn't make a code just now.");
+        } finally {
+            setQrBusy(false);
+        }
+    }
+
     const [vault, setVault] = useState(initial);
     const [tab, setTab] = useState("cards");
     const [selected, setSelected] = useState(() => new Set());
@@ -171,8 +207,24 @@ export default function VaultClient({ initial }) {
 
     if (!vault) return null;
 
+    const counterQr = qr ? (
+        /* Deliberately a plain overlay and not the app's usual sheet: this is held up to another person,
+           at arm's length, in a shop. Nothing on it is interactive except the way out. */
+        <div className="vt-qr" role="dialog" aria-label="Show this to staff">
+            <div className="vt-qr-card">
+                <span className="vt-qr-eyebrow">Show this to staff</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {qr.img ? <img src={qr.img} alt="" width={260} height={260} /> : null}
+                <p>They&rsquo;ll scan it to hand over the {held.length} card{held.length === 1 ? "" : "s"} in your vault.</p>
+                <button type="button" onClick={() => setQr(null)}>Done</button>
+            </div>
+        </div>
+    ) : null;
+
     return (
         <section className="vt-wrap">
+            {counterQr}
+            {qrErr ? <p className="vt-qr-err">{qrErr}</p> : null}
             <header className="vt-head">
                 <div>
                     <span className="vt-head-label">Vault value</span>
@@ -195,6 +247,13 @@ export default function VaultClient({ initial }) {
                     <span className="vt-head-label">Store credit</span>
                     <strong className="vt-head-value vt-gold">{usd(vault.balanceCents)}</strong>
                 </div>
+                {/* ⚠️ ONLY WHEN THERE IS SOMETHING TO HAND OVER. A "show this at the counter" button on an
+                    empty vault invites a member to queue up for nothing. */}
+                {held.length ? (
+                    <button type="button" className="vt-qr-btn" onClick={showCounterQr} disabled={qrBusy}>
+                        {qrBusy ? "One moment…" : "Collect in store"}
+                    </button>
+                ) : null}
                 {/* ── ⚠️ THE WAY BACK TO THE PACKS ────────────────────────────────────────────────
                     A member, 2026-10-28: "it would be great if there was a button in the card vault to
                     bring you back to the packs quickly."
