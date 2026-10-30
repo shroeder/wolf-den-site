@@ -1199,8 +1199,16 @@ export default function GroveClient({ initial }) {
             {/* ⚠️ THE WAY OUT, BECAUSE THE SITE'S OWN NAV IS UNDERNEATH THIS. Covering the whole viewport
                 without putting a door in it is how a player ends up using the browser's back button to
                 escape a game screen. Top-left, which is where a back control is looked for. */}
+            {/* ⚠️ THE GAME'S HOME, NOT THE SITE'S. Luke: "when you click the leave button on the Grove,
+                it should take you to the game homepage, not the whole website homepage, but the game
+                homepage."
+
+                This pushed /marketplace, which is the shop's landing page -- so leaving a dive dropped
+                you out of the game entirely and into the storefront, several taps from anything you
+                were doing. /marketplace/play is the room the game nav calls Home and the one every
+                other game screen treats as the way back. */}
             <button type="button" className="gv-exit" aria-label="Leave the Grove"
-                onClick={() => router.push("/marketplace")}>
+                onClick={() => router.push("/marketplace/play")}>
                 <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                     <path d="M12.5 4 6.5 10l6 6" fill="none" stroke="currentColor" strokeWidth="2.2"
                         strokeLinecap="round" strokeLinejoin="round" />
