@@ -434,6 +434,18 @@ export async function createVaultOrder({
         //    revenue, and billing it again would charge a member twice for one card.
         unitPriceCents: 0,
         vaultCardId: c.id,
+        // ── ⚠️ WHAT ACTUALLY IDENTIFIES A CARD ───────────────────────────────────────────────────
+        // The name alone does not. "Pikachu" is several hundred different objects at several hundred
+        // different prices; set, number and condition are the three that pin it to one. The order row is
+        // the only record of what was in a shipment once the cards have left the vault, and the
+        // confirmation email renders straight off it -- so a list that says only "Pikachu x 1" is a
+        // receipt nobody can check a parcel against.
+        setName: c.set_name || null,
+        cardNumber: c.card_number || null,
+        condition: c.condition || null,
+        // What it was worth on the day it left. Not a charge -- see the zero above -- but the member is
+        // being handed something with a value and a receipt that hides it is a worse receipt.
+        valueCents: money(c.current_value_cents),
     }));
 
     const order = await db.queryOne(

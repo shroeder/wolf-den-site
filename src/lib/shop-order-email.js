@@ -211,6 +211,55 @@ function itemsHtml(itemsJson) {
         .join("");
 }
 
+/**
+ * ── A VAULT HAND-OVER IS A DIFFERENT RECEIPT ────────────────────────────────────────────────────────────────
+ * Luke: "when we mark their cards as shipped or picked up, it should send them an email with an itemized list
+ * of cards that are either being shipped to them or ... hey, you picked these up in the store."
+ *
+ * itemsHtml above is right for a shop order: a name, a quantity and a line total. A vault card has none of
+ * those problems and all of a different one -- every line is quantity one, every line is £0 because it was
+ * paid for when the pack was opened, and the NAME DOES NOT IDENTIFY IT. "Pikachu" is several hundred objects
+ * at several hundred prices. Set, number and condition are what let somebody check this list against the
+ * cards in their hand, which is the only thing a hand-over receipt is for.
+ *
+ * ⚠️ FALLS BACK TO itemsHtml. An order written before vault items carried set/number/condition still renders
+ * -- as the plain list it always did, rather than as a column of "undefined".
+ */
+/** "3 cards" / "1 card", for a subject line that says how much is in the parcel before it is opened. */
+function count(order) {
+    let n = 0;
+    try {
+        const items = Array.isArray(order.items_json) ? order.items_json : JSON.parse(order.items_json || "[]");
+        n = items.length;
+    } catch { n = 0; }
+    return `${n || "your"} card${n === 1 ? "" : "s"}`;
+}
+const plural = (order, one, many) => (count(order).startsWith("1 ") ? one : many);
+
+function vaultItemsHtml(itemsJson) {
+    let items = [];
+    try {
+        items = Array.isArray(itemsJson) ? itemsJson : JSON.parse(itemsJson || "[]");
+    } catch {
+        items = [];
+    }
+    if (!items.length) return "<li>(cards unavailable)</li>";
+    if (!items.some((i) => i.setName || i.cardNumber || i.condition)) return itemsHtml(itemsJson);
+
+    return items
+        .map((i) => {
+            const name = escapeHtml(i.name || "Card");
+            const detail = [i.setName, i.cardNumber, i.condition].filter(Boolean).map(escapeHtml).join(" &middot; ");
+            const value = Number(i.valueCents || 0);
+            return `<li style="margin-bottom:6px">`
+                + `<strong>${name}</strong>`
+                + (detail ? `<br/><span style="color:#666;font-size:13px">${detail}</span>` : "")
+                + (value ? `<br/><span style="color:#666;font-size:13px">Valued at ${money(value)}</span>` : "")
+                + `</li>`;
+        })
+        .join("");
+}
+
 function totalsHtml(order) {
     const lines = [`Subtotal: ${money(order.subtotal_cents)}`];
     if (order.tax_cents) lines.push(`Tax: ${money(order.tax_cents)}`);
@@ -283,6 +332,9 @@ export async function sendOrderStatusEmail(order, status) {
     }
 
     const number = confirmationNumber(order);
+    // Vault orders say "your cards", never "order #1234" -- the member's mental model is a collection they
+    // are taking delivery of, not a purchase. See the two branches below.
+    const isVault = Boolean(order.vault_order);
     let subject = null;
     let body = null;
 
@@ -295,8 +347,18 @@ export async function sendOrderStatusEmail(order, status) {
             <ul>${itemsHtml(order.items_json)}</ul>
         `;
     } else if (status === "shipped") {
-        subject = `Order #${number} has shipped`;
-        body = `
+        // ⚠️ A VAULT SHIPMENT IS CARDS LEAVING A COLLECTION, not merchandise being sold. It says so, and
+        //    it names them properly -- see vaultItemsHtml.
+        subject = isVault
+            ? `Your ${count(order)} from the vault ${plural(order, "is", "are")} on the way`
+            : `Order #${number} has shipped`;
+        body = isVault ? `
+            <h1>Your cards are on their way</h1>
+            <p>These came out of your Card Vault and shipped today. They are no longer in your vault.</p>
+            ${trackingHtml(order)}
+            ${order.shipping_name ? `<p><strong>Shipping to:</strong><br/>${shipToHtml(order)}</p>` : ""}
+            <ul>${vaultItemsHtml(order.items_json)}</ul>
+        ` : `
             <h1>Your order is on its way</h1>
             <p>Order <strong>#${number}</strong> shipped today.</p>
             ${trackingHtml(order)}
@@ -304,8 +366,16 @@ export async function sendOrderStatusEmail(order, status) {
             <ul>${itemsHtml(order.items_json)}</ul>
         `;
     } else if (status === "picked_up") {
-        subject = `Order #${number} was picked up`;
-        body = `
+        subject = isVault
+            ? `You picked up ${count(order)} from the vault`
+            : `Order #${number} was picked up`;
+        body = isVault ? `
+            <h1>Thanks for coming in!</h1>
+            <p>You collected these from your Card Vault at ${escapeHtml(PICKUP_LOCATION)}. They have been
+               taken out of your vault, so they will not show there any more.</p>
+            <ul>${vaultItemsHtml(order.items_json)}</ul>
+            <p>If you did NOT pick these up, reply to this email and we&rsquo;ll sort it out straight away.</p>
+        ` : `
             <h1>Thanks for coming in!</h1>
             <p>Order <strong>#${number}</strong> is marked picked up. Enjoy it.</p>
             <ul>${itemsHtml(order.items_json)}</ul>
