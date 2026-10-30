@@ -110,9 +110,16 @@ function Bellows({ game, onDone }) {
     const hit = () => { n.current += 1; setTaps(n.current); setPump((p) => p + 1); Haptic.fire([0, 8]); };
     const heat = Math.min(1, taps / TAP_TARGET);
     return (
-        <Stage game={game} t={t}>
-            <div className="gm-bellows">
-                <div className="gm-gauge"><i style={{ width: `${heat * 100}%` }} /><em>{taps}/{TAP_TARGET}</em></div>
+        <Stage game={game} t={t} hint={`${taps}/${TAP_TARGET}`}>
+            <div className="gm-bellows" style={{ "--hot": heat.toFixed(3) }}>
+                {/* The fire IS the gauge. The thin bar across the top is a second opinion for anyone who
+                    wants a number, but the thing you actually read is how far up the throat the flame has
+                    climbed — which is why the bar is small and the fire is the whole panel. */}
+                <div className="gm-throat">
+                    <span className="gm-fire" aria-hidden="true" />
+                    <span className="gm-coals" aria-hidden="true" />
+                    <span className="gm-gauge"><i style={{ width: `${heat * 100}%` }} /></span>
+                </div>
                 <button type="button" className="gm-big" onPointerDown={hit}>PUMP</button>
                 {pump > 0 ? (
                     <span key={pump} className="gm-sparks" style={{ "--hot": heat.toFixed(3) }}>
@@ -299,6 +306,8 @@ function Grind({ game, onDone }) {
         <Stage game={game} t={t}>
             <div ref={box} className="gm-grind" onPointerMove={(e) => e.buttons || e.pointerType !== "mouse" ? move(e) : null}
                 onPointerDown={move} style={{ "--err": err.toFixed(3) }}>
+                {/* The wheel is the thing you are moving; the edge is what you are moving it along. */}
+                <span className="gm-wheel" aria-hidden="true" />
                 <span className="gm-edge" />
                 {/* Sparks fatten with the error, so the picture is the score. */}
                 <span className="gm-grit" aria-hidden="true">
@@ -434,8 +443,9 @@ function Inlay({ game, onDone }) {
                 onPointerDown={move}
                 onPointerMove={(e) => (e.buttons || e.pointerType !== "mouse") && move(e)}>
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline className="gm-chan2" points={pts} />
                     <polyline className="gm-chan" points={pts} />
-                    <polyline className="gm-gold" points={pts} style={{ strokeDasharray: 400, strokeDashoffset: 400 - at * 400 }} />
+                    <polyline className="gm-gold" points={pts} style={{ strokeDasharray: 420, strokeDashoffset: 420 - at * 420 }} />
                 </svg>
                 <span className="gm-bead" style={{ left: `${at * 100}%`, top: `${yAt(at) * 100}%` }} />
             </div>

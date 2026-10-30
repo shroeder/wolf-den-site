@@ -3130,6 +3130,17 @@ export const GROVE_CSS = `
 .gv-act { position: fixed; inset: 0; z-index: 1300; display: grid; align-items: end; justify-items: center;
     padding: 12px; background: #090806; overflow: hidden; }
 .gv-act.is-shook { animation: gv-act-shake 480ms cubic-bezier(.36,.07,.19,.97); }
+/* ── ⚠️ A PHASE OWNS THE SCREEN ───────────────────────────────────────────────────────────────
+   Luke: "all the new minigames need to be like, they need to take up a majority of the screen."
+
+   The act is built around a painted room with a control strip under it, which is right for the rack
+   -- you are watching a ball fall through a board. It is wrong for a phase, where the painting is
+   scenery and the game is the whole point. While one is playing the panel is allowed the full height
+   and the scene dims back to being a wall. */
+.gv-act.is-playing .gv-act-in { max-height: 100%; justify-content: flex-end; }
+.gv-act.is-playing .gv-act-scene { filter: brightness(0.55) saturate(0.85); }
+/* The work-piece is a passenger during a phase and must not sit on top of the thing being played. */
+.gv-act.is-playing .gv-act-work-at { opacity: 0.5; }
 @keyframes gv-act-shake {
     0%, 100% { transform: translate3d(0,0,0); }
     12% { transform: translate3d(-6px,2px,0) rotate(-0.5deg); }

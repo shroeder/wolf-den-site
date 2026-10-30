@@ -386,7 +386,11 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
     const landedBand = settled ? result?.set?.band : null;
 
     return (
-        <div className={`gv-act${shake ? " is-shook" : ""}`}
+        // ⚠️ `is-playing` HANDS THE SCREEN TO THE GAME. Luke: "all the new minigames need to be like, they
+        // need to take up a majority of the screen." They were a 32vh card pinned under a full-bleed
+        // painting — the scene was the feature and the thing you actually DO was a strip at the bottom.
+        // While a phase is running the panel takes the room and the forge becomes the wall behind it.
+        <div className={`gv-act${shake ? " is-shook" : ""}${phase < PHASES ? " is-playing" : ""}`}
             role="dialog" aria-label={`Crafting ${recipe?.name || ""}`}>
             {/* ⚠️ ONE LAYER PER STAGE, CROSS-FADED, rather than swapping a background-image url. Swapping
                 the url makes the next scene pop in unpainted; three stacked layers let the move between
