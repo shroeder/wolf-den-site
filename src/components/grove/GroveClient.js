@@ -98,7 +98,26 @@ const GROVE_STAT_READOUT = {
 // ⚠️ THE SAME FAMILIES AS THE ZONE'S, so a player learns one menu rather than two arrangements of the
 // same six doors. ZONE_FAMILIES in GroveScene.js carries the identical grouping minus Quests, which has
 // no meaning while you are standing inside a zone.
-const FAMILIES = [
+// ── ⚠️ THE ROWS CARRY LIVE COUNTS, AND UNTIL NOW NONE OF THEM DID ───────────────────────────────────────────
+// Luke, 2026-10-30: "when you get a bunch of items from enemies, it is not clear at all what you're supposed
+// to do with them... it's also not clear that there's a menu on the left. So we need a ramp to teach people
+// what the game loop is."
+//
+// GroveMenu has supported `r.badge` since it was written, and shows the SUM on the closed button so a shut
+// menu can still say there is something inside — and nothing ever set one. The zone dock got its number
+// (benchReady, below) and the hub got nothing, so standing in the hub holding ninety parts there was no
+// signal anywhere that the Workbench was the answer.
+//
+// ⚠️ IT IS NOT A TUTORIAL AND MUST NOT BECOME ONE. [[teach-by-showing-not-telling]]: the ramp is the number
+// MOVING. Kill something, a part drops, the closed menu grows a count, the Workbench row is the one lit —
+// that teaches parts-make-things with no words at all, at the moment the question occurs.
+//
+// ⚠️ EVERY BADGE HERE MUST BE CLEARABLE. readyCount's own note is the scar: most of the book is repeatable,
+// so "could make this now" is permanently true and a badge that cannot be completed teaches you to ignore
+// every other badge. Luke: "you can like never get rid of the bubbles." So the Workbench counts only recipes
+// never finished, Statues counts only ones still unspent, and the Backpack — which is never empty once you
+// are playing — deliberately carries nothing.
+const familiesFor = ({ benchFresh = 0, statuesHeld = 0 } = {}) => [
     {
         title: "Go", rows: [
             { k: "map", label: "Map", art: "/images/grove/ui-map.webp", note: "choose a zone" },
@@ -116,12 +135,12 @@ const FAMILIES = [
             { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-cards.webp" },
             // ⚠️ A SCREEN WITH NO DOOR IS NOT SHIPPED. The statue vendor is reachable from the menu the
             // moment it exists, not from a panel somebody has to already know about.
-            { k: "statues", label: "Statues", art: "/images/grove/ui-emblems.webp", note: "raise a stat for good" },
+            { k: "statues", label: "Statues", art: "/images/grove/ui-emblems.webp", note: "raise a stat for good", badge: statuesHeld || 0 },
         ],
     },
     {
         title: "Make", rows: [
-            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp?v=2", note: "spend parts" },
+            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp?v=2", note: "spend parts", badge: benchFresh || 0 },
         ],
     },
 ];
@@ -1219,7 +1238,7 @@ export default function GroveClient({ initial }) {
                 open={menuOpen}
                 onOpen={() => setMenuOpen(true)}
                 onClose={() => setMenuOpen(false)}
-                families={FAMILIES}
+                families={familiesFor({ benchFresh: st ? readyCount(st) : 0, statuesHeld: statueCount })}
                 current={view}
                 onPick={(k) => setView(k)}
             />
