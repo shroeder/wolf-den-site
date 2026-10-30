@@ -2692,6 +2692,39 @@ export const GROVE_CSS = `
     font-size: 0.62rem; font-weight: 700; letter-spacing: 0.04em;
     color: rgba(207,227,198,0.55); }
 
+/* ── A TOOL'S QUALITY, ON THE TOOL ────────────────────────────────────────────────────────────
+   The band the craft rolled, in the band's own colour, sitting under the tier. Small and tinted
+   rather than loud: it is an attribute of the tool, not an event. The colours are the gear rarity
+   ramp, so Masterwork reads as mythic here exactly as it does everywhere else in the game. */
+.gv-slot-band { display: inline-block; align-self: start; margin: 1px 0 0;
+    padding: 1px 7px; border-radius: 999px; font-style: normal;
+    font-size: 0.6rem; font-weight: 900; letter-spacing: 0.06em; text-decoration: none;
+    color: var(--band, #cfe3c6);
+    background: color-mix(in srgb, var(--band, #cfe3c6) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--band, #cfe3c6) 45%, transparent); }
+.gv-slot.is-dim .gv-slot-band { display: none; }
+
+/* ── THE COLLAPSE CONTROL ─────────────────────────────────────────────────────────────────────
+   Luke: "when you're looking at your inventory, you can't collapse things."
+
+   ⚠️ THE WHOLE HEADING IS THE TARGET, not a chevron in the corner. These are read one-handed on a
+   phone in a long scrolling panel, and a 20px arrow at the end of a title is a thing you miss twice
+   before you hit it. The button is laid out exactly as the old h4 contents were, so nothing moves. */
+.gv-sect-head { display: flex; align-items: center; gap: inherit; width: 100%;
+    font: inherit; color: inherit; text-align: inherit; letter-spacing: inherit;
+    background: none; border: 0; padding: 0; margin: 0; cursor: pointer; }
+.gv-sect-head:focus-visible { outline: 2px solid rgba(159,224,138,0.8); outline-offset: 3px; border-radius: 6px; }
+/* The chevron is pushed to the far end and rotates rather than swapping glyph — drawn in CSS, because
+   a destination gets a sprite and a disclosure arrow is furniture. */
+.gv-sect-chev { margin-left: auto; flex: none; width: 10px; height: 10px;
+    border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+    opacity: 0.55; transform: rotate(45deg) translate(-2px, -2px);
+    transition: transform 160ms ease; }
+.gv-sect.is-shut .gv-sect-chev { transform: rotate(-45deg) translate(-1px, 1px); }
+/* ⚠️ THE TRIM HANGS OFF THE BOTTOM OF THE BODY, so a shut section needs its own floor or the four
+   corners collapse onto the heading and the panel looks broken rather than closed. */
+.gv-sect.is-shut { padding-bottom: 10px; }
+
 /* ── "SHOW ME WHERE IT WENT" ──────────────────────────────────────────────────────────────────
    The craft card's answer to the one question it never used to answer. Quieter than the close
    button on purpose: it is an offer, not the thing most people want after a craft. */

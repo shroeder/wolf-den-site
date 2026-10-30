@@ -28,7 +28,9 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 | 12 | Plinko: a colourful ball falls, not the item, and the splash is 24 shards (item F) | `1fe97693` |
 | 13 | ⚠️ "Craft N" plays the act once and forges the whole batch against it (half of item J) | `f33de06d` |
 | 14 | A batch stepper — pick any amount from 2 up to what the parts allow (the other half of J) | `1ac05a5a` |
-| 15 | "Show me where it went" on the craft card — takes you to the shelf and flashes it (part of D) | `(this)` |
+| 15 | "Show me where it went" on the craft card — takes you to the shelf and flashes it (part of D) | `a44dbc78` |
+| 16 | Inventory shelves collapse, and the choice survives leaving the panel (part of D) | `(this)` |
+| 17 | A tool shows the quality band it was forged at — it was in the payload and on no screen | `(this)` |
 
 ---
 
@@ -81,8 +83,13 @@ Four named pieces:
 - ~~a **take me to it** route~~ — DONE (`15` above). The card now carries "Show me where it went", which
   switches to the bag panel, scrolls to the right shelf and flashes it. `GroveArea` had been taking an `id`
   and rendering it only as a className, so nothing could ever have scrolled to one.
-- **collapsible sections** — still open.
-- **inspectable tools** — still open.
+- ~~**collapsible sections**~~ — DONE (`16`). Every shelf collapses from its heading, and the open/shut
+  choice is stored, because the bag panel unmounts whenever you open the map or the bench — component state
+  alone would have reopened everything and read as broken.
+- **inspectable tools** — PART DONE (`17`). The quality band is now printed on the tool, which was the
+  biggest miss: `toolMeta` has carried `quality` since it was written and no screen showed it, so the one
+  thing the crafting minigame exists to decide was invisible on the thing it decided. A fuller inspect —
+  which map forged it, reworks used, what the next rung costs — is still open.
 
 ---
 

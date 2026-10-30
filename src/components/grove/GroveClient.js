@@ -28,7 +28,8 @@ import GroveStatues from "@/components/grove/GroveStatues.js";
 import GroveMenu from "@/components/grove/GroveMenu.js";
 import GroveBench from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
-import Area from "@/components/grove/GroveArea.js";
+import Area, { OPEN_AREA_EVENT } from "@/components/grove/GroveArea.js";
+import { qualityBand } from "@/lib/marketplace/grove-forge.js";
 import GroveArmoury from "@/components/grove/GroveArmoury.js";
 import GroveGear from "@/components/grove/GroveGear.js";
 import GroveQuests from "@/components/grove/GroveQuests";
@@ -411,6 +412,9 @@ export default function GroveClient({ initial }) {
         setView(view);
         if (!areaId) return;
         requestAnimationFrame(() => requestAnimationFrame(() => {
+            // ⚠️ OPEN IT BEFORE SCROLLING TO IT. A shelf the player collapsed earlier would otherwise
+            // answer "where did it go" with a closed lid, which is worse than not offering the button.
+            window.dispatchEvent(new CustomEvent(OPEN_AREA_EVENT, { detail: areaId }));
             const el = document.getElementById(`area-${areaId}`);
             if (!el) return;
             el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -887,6 +891,26 @@ export default function GroveClient({ initial }) {
                                         {/* Roman numerals, and the ceiling beside them: a tier means
                                             nothing without knowing how many there are. One per map. */}
                                         <span>{t.tier ? `Tier ${toolNumeral(t.tier)} of ${toolNumeral(TOOL_TIER_CAP)}` : "—"}</span>
+                                        {/* ── ⚠️ THE QUALITY WAS IN THE PAYLOAD AND ON NO SCREEN ──────
+                                            Luke: "you can't even like inspect the tools in your tools
+                                            area... we need to do a lot better job letting people inspect
+                                            things." And separately: "what kind of quality you have on the
+                                            existing item."
+
+                                            toolMeta has carried `quality` since it was written and this
+                                            shelf never printed it. So the one thing the whole crafting
+                                            minigame exists to decide — whether yours came out Rough or
+                                            Masterwork — was invisible on the tool it decided, and the
+                                            only way to find out was to open the bench and read the
+                                            rework button. It is on the tool now, in its own band colour.
+
+                                            ⚠️ THE BONUS ALREADY INCLUDES IT (see toolBonusFor), so this
+                                            is the NAME of a multiplier the player was already being
+                                            paid — not a second, separate number to reconcile. */}
+                                        {t.tier && t.quality != null ? (() => {
+                                            const band = qualityBand(t.quality);
+                                            return <u className="gv-slot-band" style={{ "--band": band.tint }}>{band.name}</u>;
+                                        })() : null}
                                         <em>{t.tier ? `+${t.pct}% ${t.bonus}` : t.bonus}</em>
                                     </span>
                                     );
