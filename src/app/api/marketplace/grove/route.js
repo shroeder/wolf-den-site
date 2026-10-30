@@ -64,12 +64,24 @@ export async function POST(request) {
                     act: b.act && typeof b.act === "object" ? b.act : null,
                     aim: b.aim,
                 }));
-                // ⚠️ NO `act` AND NO `aim`. Craft-all skips the skill beats, so it must not accept a
-                // score for beats nobody played -- a client that could post a flawless act with a batch of
-                // ten would be buying the top of the rack ten times for one request. See groveCraftMany.
+                // ── ⚠️ THIS USED TO REFUSE act AND aim, AND THE REASON IT DID IS NOW FALSE ─────────────
+                // The note here read: "Craft-all skips the skill beats, so it must not accept a score for
+                // beats nobody played." That was correct while the batch skipped them. Luke, 2026-10-30:
+                // "when people do craft 10, it just skips the entire minigame... it should always do the
+                // minigame." The beats ARE played now, once, before this fires -- so refusing the score
+                // would mean throwing away a performance the player actually gave.
+                //
+                // ⚠️ THE RESIDUAL RISK IS REAL AND IT IS NOT NEW. A scripted client can post a flawless
+                // act, and could already do so on the single-craft case above; a batch makes that cheat
+                // CHEAPER IN REQUESTS, not newly possible. What holds the line is unchanged: clampAct
+                // bounds every reported number server-side, and each craft in the batch re-seeds off the
+                // player's current xp, so one performance shifts where ten landings sit without stamping
+                // the same landing ten times.
                 case "craftAll": return noStore(await groveCraftMany(buyer.id, String(b.recipe || ""), {
                     temper: Boolean(b.temper),
                     times: b.times,
+                    act: b.act && typeof b.act === "object" ? b.act : null,
+                    aim: b.aim,
                 }));
                 case "rework": return noStore(await groveRework(buyer.id, String(b.slot || "")));
                 // The Grove's own chest line, never chests.js. See the note on the boss grant.

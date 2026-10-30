@@ -238,12 +238,18 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // Luke: "Let's make it fun." The button no longer spends anything — it starts three beats, and the
     // third of them posts. Nothing has left the bag until the hammer work is done, so backing out of the
     // overlay costs nothing and a player who opens it by accident is not charged for curiosity.
-    const craft = (r) => { setActing({ recipe: r, temper: tempering === r.id }); };
+    const craft = (r) => { setActing({ recipe: r, temper: tempering === r.id, times: 1 }); };
 
     /** Called by the act once the skill beats are played. This is the only place a craft is posted. */
     const commitCraft = async (act, aim) => {
         const r = acting?.recipe;
         if (!r) return { ok: false };
+        // ⚠️ ONE ACT, EITHER ONE ITEM OR THE WHOLE BATCH. The act does not know or care which; it plays
+        // the beats and hands back a performance, and this decides what that performance buys. Keeping
+        // the branch here rather than inside the act means there is still exactly ONE place a craft is
+        // posted from, which is what the note on this function has always promised.
+        const times = Math.max(1, Number(acting.times) || 1);
+        if (times > 1) return await postBatch(r, times, act, aim);
         setBusy(r.id);
         const d = await post({ action: "craft", recipe: r.id, temper: Boolean(acting.temper), act, aim });
         setBusy(null);
@@ -257,10 +263,17 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // one note saying what came out. It deliberately does NOT reuse the result card -- that card shows a
     // board, a landing and one band, and a batch has ten of each. Printing the last roll's card over ten
     // crafts would be the same class of lie as a card announcing `recipe.makes` after a Masterwork.
-    const craftAll = async (r, times) => {
+    // ⚠️ IT OPENS THE ACT NOW INSTEAD OF POSTING. Luke: "when people do craft 10, it just skips the entire
+    // minigame... it should always do the minigame." One performance, then the whole batch is forged
+    // against it -- see commitCraft, which is still the only place a craft is posted from.
+    const craftAll = (r, times) => {
         if (!times) return;
+        setActing({ recipe: r, temper: tempering === r.id, times });
+    };
+
+    const postBatch = async (r, times, act, aim) => {
         setBusy(`all-${r.id}`);
-        const d = await post({ action: "craftAll", recipe: r.id, temper: tempering === r.id, times });
+        const d = await post({ action: "craftAll", recipe: r.id, temper: tempering === r.id, times, act, aim });
         setBusy(null);
         if (!d?.ok) {
             setNote(d?.error === "not_enough_parts" ? "Not enough parts for that."
@@ -651,14 +664,15 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     that cannot happen. `repeatable` is the shared rule, not a list
                                     of kinds restated here; see ONE_OFF_KINDS.
 
-                                    ⚠️ AND IT SAYS WHAT IT COSTS YOU. Skipping the act means the
-                                    neutral rack, which is a real trade and must not be discovered
-                                    after the parts are gone. */}
+                                    ⚠️ IT NO LONGER SKIPS THE ACT. It used to say so in its own
+                                    tooltip -- "without playing the hammer work, base odds on every
+                                    one" -- which made never playing the minigame the fastest way to
+                                    make anything. Luke: "it should always do the minigame." One
+                                    performance now forges the whole batch. */}
                                 {ready && batch >= 2 ? (
                                     <button type="button" className="gv-rec-all"
                                         disabled={busy === `all-${r.id}`}
-                                        title={`Make ${batch} without playing the hammer work`
-                                            + " — base odds on every one"}
+                                        title={`Play the hammer work once and make ${batch} against it`}
                                         onClick={() => craftAll(r, batch)}>
                                         {busy === `all-${r.id}` ? "…" : `All · ${batch}`}
                                     </button>

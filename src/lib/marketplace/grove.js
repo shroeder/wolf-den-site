@@ -1691,7 +1691,20 @@ export { GROVE_RECIPES };
 // ⚠️ IT STOPS, IT DOES NOT FAIL. A batch that runs out of parts on the seventh has made six real things and
 // must report six -- returning an error would be a lie about a bag that has already changed. Only a refusal
 // on the FIRST pass is an error, because then nothing happened.
-export async function groveCraftMany(buyerId, recipeId, { temper = false, times = 1 } = {}) {
+// ── ⚠️ THE BATCH PLAYS THE ACT TOO, AS OF 2026-10-30 ────────────────────────────────────────────────────────
+// Luke: "when people do craft 10, it just skips the entire minigame... it should always do the minigame."
+//
+// This used to call groveCraft with NO act and NO aim, so every item in a batch was forged by a null
+// performance on a neutral rack. The old comment on the button called that "a real trade" and it was an
+// honest design -- the ceremony for one, the relief from it for ten -- but it meant the fastest way to make
+// anything was to never play the game, which is the wrong incentive to put on a skill minigame.
+//
+// ⚠️ ONE PERFORMANCE, TEN LANDINGS -- NOT ONE LANDING COPIED TEN TIMES. The act is played once and handed
+// to every craft in the batch, but each groveCraft re-seeds off the player's CURRENT xp (which moves with
+// every craft), so the ten items still roll ten bands. The performance shifts where that spread sits; it
+// does not flatten it. That keeps the comment below honest -- a batch really does roll ten bands -- while
+// making the minigame matter to all ten instead of none.
+export async function groveCraftMany(buyerId, recipeId, { temper = false, times = 1, act = null, aim = 0.5 } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const recipe = recipeById(recipeId);
     if (!recipe) return { ok: false, error: "no_recipe" };
@@ -1702,7 +1715,7 @@ export async function groveCraftMany(buyerId, recipeId, { temper = false, times 
     const made = [];
     let stopped = null;
     for (let i = 0; i < want; i += 1) {
-        const one = await groveCraft(buyerId, recipeId, { temper });
+        const one = await groveCraft(buyerId, recipeId, { temper, act, aim });
         if (!one?.ok) {
             // The first refusal is the whole answer; a later one just ends the batch.
             if (!made.length) return one;

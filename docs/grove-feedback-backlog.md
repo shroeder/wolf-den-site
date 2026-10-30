@@ -25,7 +25,8 @@ did it. Do not delete an item when it ships — a struck item is the proof it wa
 | 9 | ⚠️ Signing out signed you straight back in — the bridged /shop session was never cleared | `da4a10b2` |
 | 10 | Bellows: a burst of embers on every pump, coloured by how hot the fire is (item I) | `(this)` |
 | 11 | Plinko: the rack is viewport-tall instead of a fixed 150px (item E) | `(this)` |
-| 12 | Plinko: a colourful ball falls, not the item, and the splash is 24 shards (item F) | `(this)` |
+| 12 | Plinko: a colourful ball falls, not the item, and the splash is 24 shards (item F) | `1fe97693` |
+| 13 | ⚠️ "Craft N" plays the act once and forges the whole batch against it (half of item J) | `(this)` |
 
 ---
 
@@ -110,9 +111,15 @@ A countdown into the round, not a paragraph. See `teach-by-showing-not-telling`.
 > selected amount up to the max quantity of ingredients that they have, but it should always do the
 > minigame."*
 
-Two things in one: the batch path (`craftAll` in `GroveBench`) bypasses `GroveCraftAct` altogether, and the
-batch size is a fixed button rather than **a chosen amount up to what the ingredients allow**. The minigame
-must run either way.
+Two things in one.
+
+**The minigame half is DONE** (`13` above): the batch opens the act, plays it once, and every item is forged
+against that performance. Each craft still re-seeds, so ten items roll ten bands — the performance shifts
+where the spread sits rather than stamping one landing ten times.
+
+**⚠️ The quantity half is NOT done.** The button still makes the MAXIMUM the ingredients allow, and Luke
+asked to pick *"a selected amount up to the max quantity of ingredients that they have."* It needs a stepper
+in a row that is already dense, so it wants a proper look at the layout rather than a control squeezed in.
 
 ### K. Inventory ↔ crafting has to be traversable, the way Cooking is
 > *"there has to be some linkage between your inventory and crafting, kind of like how cooking does it,
