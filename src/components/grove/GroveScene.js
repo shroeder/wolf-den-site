@@ -3943,8 +3943,14 @@ export default function GroveScene({
 
                 {(groundChests || []).map((c, i) => (
                     <button key={c.id} type="button"
-                        className={`gv-chest${c.opening ? " is-opening" : ""}`}
-                        style={{ "--gv-chest-i": i }}
+                        // ⚠️ gv-zchest, NOT gv-chest. The bench's chest SHELF already owned .gv-chest — a
+                        // list of rows with art, a name and an Open button — and this rule set, being
+                        // later in the same stylesheet, was absolutely positioning every one of those
+                        // rows at 26% / 7% in a 58x52 box at z-index 250. Luke saw the result as "this
+                        // random open button just hanging out over text". Same stylesheet, same name,
+                        // two completely different objects: [[grep-the-class-name-before-taking-it]].
+                        className={`gv-zchest${c.opening ? " is-opening" : ""}`}
+                        style={{ "--gv-zchest-i": i }}
                         onPointerDown={(e) => { e.stopPropagation(); if (!c.opening) onOpenChest?.(c.id); }}
                         aria-label={`Open the ${c.tier} chest`}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}

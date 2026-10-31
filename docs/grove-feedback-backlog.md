@@ -138,10 +138,23 @@ earns it by playing the three minigames and it costs no parts — it is the whol
 > *"when we had chests, there's this weird overlap issue where like there's this random open button just
 > hanging out over text."*
 
-⚠️ **THIS WAS REPORTED IN THE SAME BREATH AS ITEM D AND NEVER WRITTEN DOWN** — it was claimed as logged
-in a session summary and was not actually in this file, which is exactly the failure this document exists
-to prevent. It has never been reproduced or investigated. Start by reproducing it rather than reading the
-chest markup: a-report-is-not-a-bug.
+⚠️ **REPORTED IN THE SAME BREATH AS ITEM D AND NEVER WRITTEN DOWN** — claimed as logged in a session
+summary and not actually in this file, which is the failure this document exists to prevent.
+
+**DONE** (`28`). A class-name collision, and a textbook one. The bench's chest SHELF owned `.gv-chest` —
+a list of rows, each with art, a name and an Open button. The chest that stands on the zone floor was
+given the same name in the same stylesheet, later in the file, and won:
+
+```
+.gv-chest { position: absolute; bottom: 7%; left: calc(26% + ...); width: 58px; height: 52px; z-index: 250 }
+```
+
+So every row of the shelf was ripped out of flow into a 58x52 box at 26%/7%, stacked on top of each other
+at z-index 250 — "this random open button just hanging out over text", exactly. Measured on the live page
+before the fix: `position: absolute, left: 101.391px, width: 58px, zIndex: 250`. After: `static, auto,
+390px, auto`. The floor chest is `.gv-zchest` now; the shelf keeps the name it had first.
+
+⚠️ The report was two weeks old and still live. [[grep-the-class-name-before-taking-it]].
 
 
 ### E. Plinko is squashed into the bottom of the screen
