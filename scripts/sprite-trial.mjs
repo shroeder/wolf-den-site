@@ -124,30 +124,39 @@ const DESCRIBE = {
 const SAME_FACE = /keeping the same face, skin tone, hairstyle and hair color, facial hair, /;
 const LIKENESS = "matching the skin tone, hairstyle and hair color, facial hair, ";
 
+// ── ROUND THREE: THE EXPRESSION, IN WORDS ───────────────────────────────────────────
+// Round two proved the reference image was doing the copying: drop it and the face comes alive, keep it
+// and loosening the words barely moves. But dropping it also drifts the likeness, because the only thing
+// left describing the member was describeAvatar — skin, hair, beard, glasses, clothes. No face at all.
+//
+// The member picks eyes, eyebrows and mouth. Those three fields are nothing but personality and the
+// prompt has never mentioned them. describeExpression says them in English now; this tests whether that
+// is enough to get the face back without the flat one to copy.
 const VARIANTS = [
     {
-        id: "d-described-not-shown",
-        why: "No reference image at all. Drawn from describeAvatar's words alone, so there is no flat face to copy.",
+        id: "g-expression-no-image",
+        why: "No reference image, plus the chosen eyes/brows/mouth in words. The likeness now has a face in it.",
         mode: "generate",
-        prompt: (base, rules) => base.replace(DESCRIBE.from, DESCRIBE.to).replace(SAME_FACE, LIKENESS) + rules,
+        prompt: (base, rules, expr) => base.replace(DESCRIBE.from, DESCRIBE.to).replace(SAME_FACE, LIKENESS)
+            + expr + rules,
     },
     {
-        id: "e-shown-face-freed",
-        why: "Reference kept, but the copy-the-face instruction loosened to colouring and features only.",
+        id: "h-expression-with-image",
+        why: "Reference kept and the expression described. Tests whether words can beat the flat face rather than replace it.",
         mode: "edits",
-        prompt: (base, rules) => base.replace(SAME_FACE, LIKENESS) + rules,
+        prompt: (base, rules, expr) => base.replace(SAME_FACE, LIKENESS) + expr + rules,
     },
     {
-        id: "f-described-and-unflattened",
-        why: "No reference image AND the two-or-three-tones clause removed — the one thing round one showed does help the face.",
+        id: "i-expression-no-image-unflattened",
+        why: "No image, expression described, and the two-or-three-tones clause removed. Everything that helped, together.",
         mode: "generate",
-        prompt: (base, rules) => base.replace(DESCRIBE.from, DESCRIBE.to).replace(SAME_FACE, LIKENESS)
-            + rules.replace(FLAT_FACE, ""),
+        prompt: (base, rules, expr) => base.replace(DESCRIBE.from, DESCRIBE.to).replace(SAME_FACE, LIKENESS)
+            + expr + rules.replace(FLAT_FACE, ""),
     },
 ];
 
 async function main() {
-    const { db, editImage, renderAvatarPng, buildSpritePrompt, SPRITE_RULES,
+    const { db, editImage, renderAvatarPng, buildSpritePrompt, SPRITE_RULES, describeExpression,
         IMAGE_MODEL, houseStyleRefs, getEquippedGearPhrase } = await app();
     if (!BUYER) {
         console.log("usage: --buyer <uuid> [--apply]  — draws 3 trial sprites for one member, writes nothing live");
@@ -162,6 +171,8 @@ async function main() {
     // two different pictures, which is the trap the admin route's own note warns about.
     const gear = await getEquippedGearPhrase(BUYER).catch(() => "");
     const base = buildSpritePrompt(row.avatar_config, gear);
+    const expr = describeExpression(row.avatar_config);
+    console.log(`   expression: ${expr.trim() || "(none)"}`);
 
     // ⚠️ EVERY TRANSFORM BELOW IS A STRING SURGERY ON A PROMPT THIS SCRIPT DOES NOT OWN. If any of
     // them stops matching, the run would quietly draw the control three times and look like a result.
@@ -211,7 +222,7 @@ async function main() {
             } else {
                 refs.forEach((b, i) => form.append("image[]", new Blob([b], { type: "image/png" }), `style-${i}.png`));
             }
-            form.append("prompt", v.prompt(base, SPRITE_RULES));
+            form.append("prompt", v.prompt(base, SPRITE_RULES, expr));
             form.append("size", "1024x1024");
             form.append("quality", "medium");
             form.append("background", "transparent");

@@ -68,6 +68,60 @@ const CLOTH_NAMES = { "262e33": "black", "3c4f5c": "slate", "25557c": "navy", "5
 
 const colorName = (map, hex) => map[String(hex || "").toLowerCase()] || "colored";
 
+// ── ⚠️ THE EXPRESSION WAS IN THE DATA ALL ALONG AND NEVER IN THE WORDS ─────────────────────
+// Luke: "they used to have a lot of personality... maybe we need to just describe what they look like
+// instead of in terms of the face."
+//
+// Every member picks three fields that are nothing BUT personality — eyes, eyebrows and mouth, twelve
+// options each — and describeAvatar below has never mentioned any of them. So the only place a chosen
+// expression reached the model was as flat vector shapes in the reference image, which the newer model
+// copies literally. The member asked for angry brows and a serious mouth and got a Gravatar.
+//
+// ⚠️ PHRASED AS A PERSON, NOT AS A TOKEN. "eyes: squint, eyebrows: angryNatural, mouth: serious" is a
+// database row; "narrowed eyes under heavy angry brows, mouth set in a hard line" is a face a model can
+// draw. The DiceBear names are an interface, not English, and handing them over raw would be the same
+// mistake as showing the flat face — asking the model to reproduce a widget instead of a person.
+//
+// ⚠️ ONE SENTENCE, AT MOST THREE CLAUSES. This rides on an already long prompt and the end of a prompt
+// is the part a model weights most; a paragraph about eyebrows would push the gear and the framing rules
+// out of the part that gets read.
+const EYE_WORDS = {
+    default: "steady level eyes", happy: "bright smiling eyes", wink: "one eye closed in a wink",
+    winkWacky: "a wild lopsided wink", surprised: "wide startled eyes", squint: "narrowed appraising eyes",
+    side: "eyes cut sideways", hearts: "eyes lit up", closed: "eyes shut, chin up",
+    eyeRoll: "eyes rolled skyward", cry: "glassy eyes", xDizzy: "dazed unfocused eyes",
+};
+const BROW_WORDS = {
+    angry: "heavy angry brows", angryNatural: "heavy angry brows",
+    raisedExcited: "brows raised high", raisedExcitedNatural: "brows raised high",
+    sadConcerned: "brows drawn together", sadConcernedNatural: "brows drawn together",
+    flatNatural: "flat level brows", unibrowNatural: "a single thick brow",
+    upDown: "one brow cocked", upDownNatural: "one brow cocked",
+};
+const MOUTH_WORDS = {
+    smile: "an open grin", default: "an easy half-smile", twinkle: "a crooked smirk",
+    serious: "a mouth set in a hard line", tongue: "tongue out", eating: "cheeks full",
+    grimace: "a clenched grimace", disbelief: "an unimpressed flat mouth",
+    concerned: "a worried mouth", sad: "a downturned mouth", screamOpen: "mouth open in a shout",
+};
+
+/**
+ * The member's chosen expression, in English.
+ *
+ * ⚠️ THE DEFAULTS ARE DESCRIBED TOO, DELIBERATELY. A face is better specified as "steady level eyes, an
+ * open grin" than left to the model, which is what produced the blank one. Only EYEBROWS has no entry for
+ * its default, because "default brows" is genuinely nothing to say. Empty only if nothing maps at all.
+ */
+export function describeExpression(rawConfig) {
+    const c = sanitizeAvatarConfig(rawConfig);
+    const bits = [
+        EYE_WORDS[c.eyes],
+        BROW_WORDS[c.eyebrows],
+        MOUTH_WORDS[c.mouth],
+    ].filter(Boolean);
+    if (!bits.length) return "";
+    return ` His expression is his own and must read clearly on the face: ${bits.join(", ")}.`;
+}
 // Build a plain-English description of the avatar for the art prompt.
 export function describeAvatar(rawConfig) {
     const c = sanitizeAvatarConfig(rawConfig);
