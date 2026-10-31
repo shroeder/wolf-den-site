@@ -4,6 +4,7 @@ import { ROMAN, craftableTimes
 } from "@/lib/marketplace/grove-recipes.js";
 import { toolArt, recipeArt } from "@/lib/marketplace/grove-catalog.js";
 
+import GroveRecipeSheet from "@/components/grove/GroveRecipeSheet.js";
 import { useWishlist } from "./useWishlist.js";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -232,6 +233,8 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // at the top and what you have already built at the bottom. The chips are for the other question, the
     // one a sort cannot answer: "show me only the tools", when you came here to finish the tool ladder.
     const [kind, setKind] = useState("all");
+    // Which recipe is being inspected, or null. See GroveRecipeSheet.
+    const [peek, setPeek] = useState(null);
     // ⚠️ A JUMP INTO A FILTERED LIST LANDS ON NOTHING. The part sheet sends players at one specific
     // recipe, and a player who had narrowed the chips to Tools would be scrolled to a food row that is not
     // in the DOM — a button that silently does nothing, which is the failure mode this whole pass exists
@@ -589,13 +592,23 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                             {/* ⚠️ A SPRITE OR NOTHING. The glyph fallback is gone — a line pictogram beside
                                 a painted poultice does not read as the same game, and every kind has art
                                 now. An empty frame is a smaller fault than the wrong kind of picture. */}
-                            <div className="gv-rec-face">
+                            {/* ⚠️ THE PICTURE IS THE INSPECT CONTROL, AND CRAFT STAYS WHERE IT WAS.
+                                Luke: "I need to be able to click things before I make them to inspect
+                                what they actually do in game and see the possible stat rolls."
+
+                                Tapping the thing to look at it is the convention every inventory in
+                                every game already taught; a second button marked "Info" on 117 rows
+                                would be a third control per card on a screen that was just cut down to
+                                two. The Craft button is untouched, so nobody who knows what they want
+                                has to detour through a sheet to get it. */}
+                            <button type="button" className="gv-rec-face" onClick={() => setPeek(r)}
+                                title={`What ${r.name} does, and how it could roll`}>
                                 {art ? <img src={art} alt="" width={44} height={44} loading="lazy" /> : null}
-                            </div>
+                            </button>
 
                             <div className="gv-rec-body">
                                 <div className="gv-rec-top">
-                                    <b>{r.name}</b>
+                                    <b><button type="button" className="gv-rec-name" onClick={() => setPeek(r)}>{r.name}</button></b>
                                     {/* ── ⚠️ "YOU HAVE ONE OF THESE" IS NOT "YOU CANNOT MAKE ANOTHER" ──
                                         Luke: "if you already have a harvesting hoe, then you ... can make
                                         another one because it's random rolls, but we should definitely
@@ -886,6 +899,14 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                     onCommit={commitCraft}
                     onClose={finishCraft}
                 />
+            ), host) : null}
+
+            {/* ⚠️ MOUNTED IN THE SAME COMMIT AS THE TAP THAT OPENS IT. A handler with no screen is the
+                defect this codebase has shipped three times now. */}
+            {peek && host ? createPortal((
+                <GroveRecipeSheet recipe={peek} st={st} odds={odds}
+                    partName={partName} PartIcon={PartIcon}
+                    onClose={() => setPeek(null)} />
             ), host) : null}
 
             {result && host ? createPortal((

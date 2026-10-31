@@ -2865,6 +2865,31 @@ export const GROVE_CSS = `
 .gv-ts-cost li.is-have { border-color: rgba(143,211,106,0.4); color: #cfe3c6; }
 .gv-ts-cost li.is-short { border-color: rgba(214,106,90,0.45); color: #e8b3a6; }
 
+/* ── THE ROLL TABLE ─────────────────────────────────────────────────────────
+   Band, what it pays, your chance of it. Best first, because that is the one you are hoping for and the
+   one the rest are measured against.
+
+   ⚠️ THE BAND'S COLOUR IS ON A RAIL, NOT ON THE TEXT. Five rows of five different coloured words is a
+   fruit salad; a 3px edge says the same thing and leaves the numbers legible. */
+.gv-rs-rolls { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.gv-rs-rolls li { display: flex; align-items: center; gap: 10px; padding: 8px 11px;
+    border-radius: 9px; background: rgba(0,0,0,0.34);
+    border: 1px solid rgba(255,255,255,0.07); border-left: 3px solid var(--band, #888); }
+.gv-rs-rolls b { flex: none; width: 86px; font-size: 0.78rem; font-weight: 800; color: var(--band, #e7dece); }
+.gv-rs-rolls span { flex: 1; min-width: 0; font-size: 0.76rem; color: #c2baa9;
+    font-variant-numeric: tabular-nums; }
+.gv-rs-rolls em { flex: none; font-style: normal; font-size: 0.82rem; font-weight: 800; color: #e7dece;
+    font-variant-numeric: tabular-nums; }
+.gv-rs-flavour { margin: 6px 0 0; font-size: 0.74rem; font-style: italic; color: #8e8676; }
+
+/* ⚠️ THE ART AND THE NAME ARE BUTTONS NOW, so they need the reset the rest of this card's controls
+   already have. .gv-rec-face keeps its own box; the name has to inherit the heading it sits in or it
+   would drop to a browser default mid-sentence. */
+.gv-rec-face { padding: 0; cursor: pointer; }
+.gv-rec-name { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer;
+    text-align: left; }
+.gv-rec-name:hover { color: #ffd166; }
+
 .gv-pv-wish { width: 100%; margin-top: 15px; padding: 11px; border-radius: 11px; cursor: pointer;
     font: inherit; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.04em;
     border: 1px solid rgba(224,168,60,0.42); background: rgba(224,168,60,0.12); color: #f0c877; }
