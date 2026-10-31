@@ -10437,14 +10437,19 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    shared and cannot drift. Only the row differs, because a pose row answers "owned, locked, or for sale"
    where a gear row answers "what does this swap change". */
 .posepick-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+/* ⚠️ 64px IN THE ROW, 46 IN THE SLOT, AND THE DIFFERENCE IS DELIBERATE. The doll slot has to be 46 or it
+   stops matching the nine gear slots around it. A picker row has no such constraint, and the round-one
+   contact sheet showed why it should not inherit the number: at 46 all three poses read as "a grey knight"
+   and the stance — which is the entire product — was gone. The row is where you decide what to wear, so it
+   gets the size the decision needs. */
 .posepick-row {
-    display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+    display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 10px;
     padding: 8px 10px; border-radius: 10px;
     background: rgba(0, 0, 0, 0.3); border: 1px solid color-mix(in srgb, var(--rar, #9aa7b5) 45%, transparent);
 }
 .posepick-row.is-locked { opacity: 0.72; }
 .posepick-art {
-    width: 46px; height: 46px; object-fit: contain; display: block;
+    width: 64px; height: 64px; object-fit: contain; display: block;
     /* The rarity reads off the art's own glow as well as the border, the way a chest reward does — a
        coloured hairline alone is invisible at 46px on a phone. */
     filter: drop-shadow(0 0 6px color-mix(in srgb, var(--rar, #9aa7b5) 60%, transparent));
@@ -10465,7 +10470,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .posepick-foot b { color: #e7dece; }
 .posepick-foot em { font-style: normal; color: #ffd166; }
 .gearpick-glyph.pose-glyph {
-    width: 46px; height: 46px; object-fit: contain;
+    width: 64px; height: 64px; object-fit: contain;
     filter: drop-shadow(0 0 6px color-mix(in srgb, var(--rar, #9aa7b5) 60%, transparent));
 }
 
