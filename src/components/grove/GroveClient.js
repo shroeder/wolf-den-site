@@ -140,11 +140,21 @@ const familiesFor = ({ benchFresh = 0, statuesHeld = 0 } = {}) => [
     {
         title: "Go", rows: [
             { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
-            // ⚠️ THE TRACKER NEEDS A DOOR OR IT IS NOT SHIPPED. ui-board.webp was drawn long ago and never
-            // used by anything — the quest helper is what it was for. Three givers hidden across twelve
-            // zones is a good surprise once and a search forever after, so the panel that names the zone
-            // has to be one tap away.
-            { k: "quests", label: "Quests", art: "/images/grove/ui-board.webp" },
+            // ⚠️ THE TRACKER NEEDS A DOOR OR IT IS NOT SHIPPED. Three givers hidden across twelve zones
+            // is a good surprise once and a search forever after, so the panel that names the zone has to
+            // be one tap away.
+            //
+            // ⚠️ IT POINTED AT A WALL FOR WEEKS. The art here was ui-board.webp, and the comment that
+            // stood here claimed that file "was drawn long ago and never used by anything". Both halves
+            // were wrong: it is a seamless plank TEXTURE whose own prompt says "Completely EMPTY: no
+            // objects, no props... a plain background material", and it IS used — as a panel background
+            // in grove-css. Pointed at a 46px icon slot it rendered as a flat brown rectangle, which is
+            // what Luke saw: "Quests need a better sprite."
+            //
+            // I grabbed an asset because it was lying around and its name sounded right, which is
+            // [[grep-the-class-name-before-taking-it]] wearing a different hat. ui-quests.webp is a
+            // notice board drawn for this row.
+            { k: "quests", label: "Quests", art: "/images/grove/ui-quests.webp" },
             // ⚠️ TOWN IS A PLACE IN THE GROVE, NOT A WAY OUT OF IT. Luke: "if you go to town, you
             // completely get booted out of the Grove. Like, the whole experience is lost... when you're
             // in the town, it should be like you're in any other zone of the Grove with the menu on the

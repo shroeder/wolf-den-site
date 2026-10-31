@@ -303,6 +303,16 @@ const DOCK = {
     "ui-map": "A rolled paper MAP tied with a leather cord, partly unrolled so one curled edge shows a hand-inked coastline and a few tiny hills, warm aged parchment catching the light. Nothing written on it: no words, no letters, no labels, no compass rose, no X - only terrain lines. Warm cream parchment, umber ink, tan cord.",
     "ui-bag": "A sturdy forager's BACKPACK of worn brown leather seen from the front, the flap buckled down with two brass buckles, a bedroll strapped across the top and a small pouch on one side, straps hanging loose. Scuffed and well-used. Warm saddle brown, brass, cream canvas.",
     "ui-bench": "A heavy wooden WORKBENCH seen from the front at a slight angle, one thick plank top on stout legs, with a small anvil, a hammer lying on its side and a hand-plane resting on it, wood shavings at the base. Dark oak, blackened iron, pale shavings.",
+    // ⚠️ QUESTS HAD NO ICON AND WAS WEARING A WALL. The menu row pointed at ui-board.webp, which is
+    // the seamless plank TEXTURE above — a background material, "Completely EMPTY: no objects, no props".
+    // Pointed at a 46px icon slot it renders as a flat brown rectangle, which is what Luke saw. The
+    // texture is doing its real job as a panel background in grove-css; this is the icon that should
+    // always have existed.
+    //
+    // ⚠️ NOT A SCROLL. ui-map is already a rolled parchment tied with a cord, and two rolled
+    // parchments at 46px are one icon drawn twice. A notice board on a post is what every game has
+    // taught people quests look like, and it shares nothing with the map but its paper.
+    "ui-quests": "A small weathered wooden NOTICE BOARD on a short post, two curling parchment notices pinned to it with dark iron nails, one hanging slightly crooked as if read and left. Nothing written on them: no words, no letters, no symbols, no drawings - only blank cream parchment. Weathered grey-brown planks, cream parchment, dark iron nails.",
     "ui-emblems": "A single ornate MEDALLION hanging from a short leather thong, a thick gold disc with a raised scalloped rim and a smooth polished centre catching a bright highlight, one small green gem set at the top of the rim. Rich warm gold, deep shadow in the relief, green gem. No markings or letters on the face.",
 };
 for (const [id, subject] of Object.entries(DOCK)) ART[id] = [`${ITEM} ${subject}`, "item"];
