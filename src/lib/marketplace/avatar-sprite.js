@@ -200,12 +200,52 @@ export const DEFAULT_SPRITE_PROMPT = buildSpritePrompt(DEFAULT_AVATAR);
 // in this prompt for four tuning rounds and moved measured detail density by 0.2 points, while "at most
 // three gems" and a named ban-list moved it by ~3,500 distinct colours in one step. Do not soften those
 // counts back into adjectives.
-export const SPRITE_RULES = HOUSE_CHARACTER_TAIL
+// ── ⚠️ TWO HOUSE CLAUSES ARE STRIPPED FOR THE HERO, AND ONLY FOR THE HERO ─────────────────
+// Luke: "their faces look straight up like they're coming from Gravatar, whereas in the past they used
+// to have like personalities." Measured over four trial rounds (scripts/sprite-trial.mjs):
+//
+//   "flat cel shading with only two or three tone steps per colour... no fine filigree and no hundreds
+//    of tiny marks" is a direct instruction not to draw the small marks a face is made of.
+//   "standing squarely on both feet with a wide planted stance" overrides the per-member pose above it,
+//    so every hero stood identically.
+//
+// ⚠️ STRIPPED HERE, NOT IN image-model.js. HOUSE_CHARACTER_TAIL is shared — gen-grove-npcs.mjs draws
+// from it too — and those clauses are RIGHT for an NPC, a creature or a prop, which are meant to read
+// as a silhouette at 40px and have no expression to lose. A hero is a portrait of a member.
+//
+// ⚠️ IF EITHER STRING STOPS MATCHING, THE STRIP SILENTLY DOES NOTHING and the faces go flat again
+// without a single test failing. That is exactly how the chibi clause came back after 73870534 reverted
+// it. sprite-trial.mjs checks both against the shared tail and refuses to run if they have drifted.
+//
+// ⚠️ "two or three tone steps" APPEARS TWICE IN THE TAIL AND ONLY THE FIRST IS REMOVED. The second
+// is in STYLE_SHEET_RULE, describing what to copy FROM the house reference sheet — line weight,
+// flatness, simplicity — and that one is what keeps a hero looking like Den art at all. String.replace
+// takes the first occurrence, which is the one that wanted removing; that is luck, so it is written
+// down. Verifying this with includes("two or three tone steps") reports a FALSE FAILURE for exactly
+// this reason — test for "no hundreds of tiny marks", which is unique to the clause being stripped.
+const FLAT_SHADING = "flat cel shading with "
+    + "only two or three tone steps per colour, large simple areas of solid colour, and a bold dark outline "
+    + "around the whole figure and around every major shape inside it. No airbrushed or soft gradients, no "
+    + "painterly rendering, no photographic or cinematic lighting, no rim light tracing every edge, no fine "
+    + "filigree and no hundreds of tiny marks — a few large shapes must read better than many small ones. ";
+const PLANTED_STANCE = "standing squarely on both feet with a wide "
+    + "planted stance.";
+export const SPRITE_RULES = HOUSE_CHARACTER_TAIL.replace(FLAT_SHADING, "").replace(PLANTED_STANCE, "")
     + " ONE WEAPON PER HAND AND NO DUPLICATES: draw each piece of equipment exactly once "
     + "and only where it belongs — a one-handed weapon is held in ONE hand and does not also appear sheathed, "
     + "floating, or duplicated in the other hand; a shield goes on the arm that is not holding the weapon; "
     + "never draw two of the same sword, axe or shield on one figure.";
 
+/**
+ * The string that decides whether a sprite is STALE, and the one stored in avatar_sprite_prompt.
+ *
+ * ⚠️ THE EXPRESSION HAS TO BE IN HERE OR CHANGING YOUR FACE REDRAWS NOTHING. The art prompt sends the
+ * expression last (see generateBuyerSprite), after the house rules, because that is the part a model
+ * weights most — but the comparison key is built from the member's own details only. Leave the
+ * expression out of this and somebody could switch from a grin to a scowl and keep the old picture
+ * forever, because nothing would have noticed.
+ */
+export const spriteIdentity = (config, gear = "") => buildSpritePrompt(config, gear) + describeExpression(config);
 // Buyers whose sprite should be (re)drawn now. Redraw when the avatar's APPEARANCE or equipped GEAR changed
 // since the last draw (the art prompt includes equipped gear) — BUT never more than once per
 // REGEN_COOLDOWN_HOURS per member, so a serial gear-swapper can't run up the image bill. Members with no
@@ -283,7 +323,7 @@ export async function listSpritesAdmin() {
         // one we would send now. That is exact where the old timestamp test was not: equipment_updated_at
         // bumps when a member takes a ring off and puts the same ring back on, which changes nothing about
         // the picture, and this screen used to report 43 of 84 members pending on that basis.
-        pending: !r.avatar_sprite_url || r.avatar_sprite_prompt !== buildSpritePrompt(r.avatar_config, gearMap.get(r.id) || ""),
+        pending: !r.avatar_sprite_url || r.avatar_sprite_prompt !== spriteIdentity(r.avatar_config, gearMap.get(r.id) || ""),
     }));
 }
 
@@ -387,7 +427,14 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, mo
     const row = await db.queryOne(`SELECT avatar_config, avatar_sprite_prompt, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]);
     if (!row || !row.avatar_config) throw new Error("No avatar to draw");
     const gear = await getEquippedGearPhrase(buyerId).catch(() => "");
-    const prompt = buildSpritePrompt(row.avatar_config, gear);
+    // ⚠️ THE EXPRESSION GOES LAST IN WHAT IS SENT, AND INSIDE WHAT IS COMPARED. Four trial rounds and
+    // the deciding one was POSITION: this file's own note on promptExtra says the end of a long prompt is
+    // the part a model weights most, and the expression had been landing mid-prompt ahead of ~900 words of
+    // house rules, where it was simply not read. Moved to the end, a member who chose narrowed eyes and a
+    // hard mouth gets them — with the reference image still carrying the likeness.
+    const base = buildSpritePrompt(row.avatar_config, gear);
+    const expression = describeExpression(row.avatar_config);
+    const prompt = base + expression;
 
     // equipment_updated_at bumps on EVERY equip, unequip and sell — including taking a ring off and putting
     // the same ring back on, or swapping to a different item that reads identically in the prompt. The
@@ -414,7 +461,7 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, mo
     //    It goes LAST because the end of a long prompt is the part a model weights most, and everything it
     //    corrects — proportions, flatness, no cast shadow — is a correction TO the standing recipe rather
     //    than a replacement for it.
-    const url = await editImage(png, prompt + SPRITE_RULES + (promptExtra || ""), {
+    const url = await editImage(png, base + SPRITE_RULES + expression + (promptExtra || ""), {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
         model: model || SPRITE_MODEL, quality: quality || SPRITE_QUALITY,
         // ⚠️ THE SHEET IS A DEFAULT, NOT A CONSTANT. An explicit styleRefs from the admin route wins, so a
