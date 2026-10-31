@@ -134,6 +134,16 @@ earns it by playing the three minigames and it costs no parts — it is the whol
 
 ## Open — the specific bugs
 
+### P. A stray "Open" button overlapping text on the chests — UNVERIFIED
+> *"when we had chests, there's this weird overlap issue where like there's this random open button just
+> hanging out over text."*
+
+⚠️ **THIS WAS REPORTED IN THE SAME BREATH AS ITEM D AND NEVER WRITTEN DOWN** — it was claimed as logged
+in a session summary and was not actually in this file, which is exactly the failure this document exists
+to prevent. It has never been reproduced or investigated. Start by reproducing it rather than reading the
+chest markup: a-report-is-not-a-bug.
+
+
 ### E. Plinko is squashed into the bottom of the screen
 > *"the Plinko screen needs to be like way taller. It's like, it feels like it's been shoved in the bottom
 > portion of the screen."*
