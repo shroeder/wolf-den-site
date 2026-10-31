@@ -35,6 +35,9 @@ const SAYS_SHIELD = /\bshield\b/i;
  * @property {string} name    what the shop and the equipment screen call it
  * @property {string} say     the sentence that replaces the default pose clause
  * @property {"unlock"|"shop"} source
+ * @property {string} rarity  common|rare|epic|legendary|mythic - the SHARED scale, so the slot and the
+ *                            picker colour themselves off `rar-${rarity}` like every other equippable
+ * @property {string} art     the pose's own sprite, shown in the slot and on the picker row
  * @property {string} [how]   unlock poses: what you did to get it, in the player's words
  * @property {string} [event] unlock poses: the mkt_activity_event counted toward it
  * @property {number} [need]  unlock poses: how many of that event
@@ -59,42 +62,52 @@ export const POSES = [
     // the one they are wearing.
     {
         id: "ready", name: "At the Ready", source: "unlock", how: "Yours from the start",
+        rarity: "common", art: "/images/poses/ready.webp",
         say: "a confident heroic standing pose, weapon held ready in one hand and the shield on the other arm",
     },
     {
         id: "guard", name: "On Guard", source: "unlock", how: "Win an arena bout", event: "arena_win", need: 1,
+        rarity: "common", art: "/images/poses/guard.webp",
         say: "a braced defensive stance, shield raised across the body and the weapon drawn back low beside it, weight on the back foot",
     },
     {
         id: "shoulder", name: "Shouldered", source: "unlock", how: "Open 25 chests", event: "open_chest", need: 25,
+        rarity: "rare", art: "/images/poses/shoulder.webp",
         say: "a casual stance with the weapon resting back over one shoulder and the shield hanging loose from the other hand",
     },
     {
         id: "planted", name: "Planted", source: "unlock", how: "Land 50 hits on a weekly boss", event: "boss_attack", need: 50,
+        rarity: "epic", art: "/images/poses/planted.webp",
         say: "standing squarely on both feet with a wide planted stance, the weapon point-down on the ground under both hands and the shield slung on the back",
     },
     {
         id: "salute", name: "The Salute", source: "unlock", how: "Take 10 daily spins", event: "daily_spin", need: 10,
+        rarity: "rare", art: "/images/poses/salute.webp",
         say: "an upright salute with the weapon held vertical in front of the face in one hand, the shield lowered at the other side",
     },
     {
         id: "lunge", name: "Mid-Lunge", source: "unlock", how: "Put down 100 wanderers", event: "swarm_kill", need: 100,
+        rarity: "legendary", art: "/images/poses/lunge.webp",
         say: "a forward lunge, front knee bent deep and the weapon thrust ahead in one hand, the shield tucked tight to the other shoulder",
     },
     {
         id: "scan", name: "The Scan", source: "unlock", how: "Catch 50 fish", event: "fish_caught", need: 50,
+        rarity: "epic", art: "/images/poses/scan.webp",
         say: "a watchful stance with one hand shading the eyes and the weapon sheathed at the hip, the shield carried low in the other hand",
     },
     {
         id: "rest", name: "Hilt Rest", source: "unlock", how: "Salvage 100 pieces", event: "craft_salvage", need: 100,
+        rarity: "legendary", art: "/images/poses/rest.webp",
         say: "a relaxed pose with both hands resting on the pommel of the weapon planted point-down in front, the shield slung across the back",
     },
     {
         id: "folded", name: "Arms Folded", source: "unlock", how: "Cook 50 dishes", event: "cooked", need: 50,
+        rarity: "epic", art: "/images/poses/folded.webp",
         say: "a relaxed confident pose with both arms FOLDED ACROSS THE CHEST and both hands empty and visible, the weapon strapped across the back and the shield slung on the back, neither held in a hand",
     },
     {
         id: "beckon", name: "Come On", source: "unlock", how: "Win 25 arena bouts", event: "arena_win", need: 25,
+        rarity: "epic", art: "/images/poses/beckon.webp",
         say: "a taunting stance, shield forward and one hand beckoning with the fingers, the weapon held back and low in the other hand",
     },
 
@@ -105,42 +118,52 @@ export const POSES = [
     // caught mid-turn, the moment rather than the stance.
     {
         id: "triumph", name: "Triumph", source: "shop", cents: 300,
+        rarity: "rare", art: "/images/poses/triumph.webp",
         say: "a triumphant pose with the weapon raised high overhead in one hand and the head tilted back mid shout, the shield held out wide in the other hand",
     },
     {
         id: "skyward", name: "Skyward Point", source: "shop", cents: 300,
+        rarity: "rare", art: "/images/poses/skyward.webp",
         say: "a commanding pose with the weapon pointed straight up at arm's length in one hand, the shield braced across the chest in the other",
     },
     {
         id: "charge", name: "The Charge", source: "shop", cents: 400,
+        rarity: "epic", art: "/images/poses/charge.webp",
         say: "a full charging stride, body leaning hard forward, the weapon swept back behind in one hand and the shield thrust ahead in the other",
     },
     {
         id: "coiled", name: "Coiled", source: "shop", cents: 400,
+        rarity: "epic", art: "/images/poses/coiled.webp",
         say: "a low crouched ready stance, knees bent deep and one fist planted on the ground, the weapon held back ready to spring and the shield slung on the back",
     },
     {
         id: "cleave", name: "Downward Cleave", source: "shop", cents: 500,
+        rarity: "epic", art: "/images/poses/cleave.webp",
         say: "mid-swing in a downward cleave, the weapon brought down hard in both hands and the shield slung on the back, body twisted into the blow",
     },
     {
         id: "bulwark", name: "Bulwark", source: "shop", cents: 500,
+        rarity: "epic", art: "/images/poses/bulwark.webp",
         say: "braced behind the shield held edge-on toward the viewer with both the shoulder and the weapon tucked behind it, the weapon low and ready",
     },
     {
         id: "turn", name: "The Turn", source: "shop", cents: 600,
+        rarity: "legendary", art: "/images/poses/turn.webp",
         say: "caught mid-turn with the cape swept wide, the weapon trailing in one hand and the shield swinging out from the other, hair and cloth in motion",
     },
     {
         id: "kneel", name: "The Oath", source: "shop", cents: 600,
+        rarity: "legendary", art: "/images/poses/kneel.webp",
         say: "kneeling on one knee with the head bowed, the weapon planted point-down in front under both hands and the shield laid flat on the ground beside",
     },
     {
         id: "aloft", name: "Standard Bearer", source: "shop", cents: 800,
+        rarity: "mythic", art: "/images/poses/aloft.webp",
         say: "standing tall with the weapon held aloft horizontally overhead in both hands like a trophy, the shield slung on the back",
     },
     {
         id: "landing", name: "Hard Landing", source: "shop", cents: 800,
+        rarity: "mythic", art: "/images/poses/landing.webp",
         say: "landing from a leap in a deep three-point crouch, one fist driven into the ground and the weapon flared out wide in the other hand, the shield on the back arm",
     },
 ];
@@ -165,11 +188,21 @@ export const isFreePose = (id) => id === DEFAULT_POSE;
  * Catalogue self-check. Every pose has to place BOTH pieces of gear, or it loses to SPRITE_RULES silently.
  * Exported so a script can assert it; called at import so a bad pose cannot ship quietly.
  */
+// The shared rarity scale, and deliberately only the first five rungs of it. Ascendant and above are the
+// elite tiers the gear screen animates with haloes and a sunburst; a cosmetic stance is not that, and
+// spending a rung there would cheapen the ones that are. See [[rarity-tables-stop-at-eternal]].
+const POSE_RARITIES = new Set(["common", "rare", "epic", "legendary", "mythic"]);
+
 export function checkPoses() {
     const bad = POSES.filter((p) => !SAYS_WEAPON.test(p.say) || !SAYS_SHIELD.test(p.say));
+    // ⚠️ A POSE WITHOUT A RARITY OR A SPRITE IS NOT FINISHED. The slot colours itself off the rarity and
+    // draws the sprite; a pose missing either renders as an empty grey box in the middle of the paper doll,
+    // which reads as a broken slot rather than as a missing cosmetic.
+    const unranked = POSES.filter((p) => !POSE_RARITIES.has(p.rarity));
+    const unpainted = POSES.filter((p) => !p.art);
     const priced = POSES.filter((p) => p.source === "shop" && !(p.cents > 0));
     const dupes = POSES.length !== new Set(POSES.map((p) => p.id)).size;
     // An unlock pose with no condition is unobtainable, which is the shape the pet audit exists to catch.
     const unearnable = POSES.filter((p) => p.source === "unlock" && !isFreePose(p.id) && !(p.event && p.need > 0));
-    return { bad, priced, dupes, unearnable };
+    return { bad, priced, dupes, unearnable, unranked, unpainted };
 }

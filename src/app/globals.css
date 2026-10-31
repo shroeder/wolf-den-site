@@ -10408,7 +10408,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
         "main  hero  off"
         "chest hero  back"
         "ring1 belt  ring2"
-        ".     boots .";
+        "pose  boots .";
     gap: 8px;
     padding: 14px;
     max-width: 460px;
@@ -10425,6 +10425,49 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .slot-back { grid-area: back; }
 .slot-ring1 { grid-area: ring1; } .slot-ring2 { grid-area: ring2; }
 .slot-boots { grid-area: boots; }
+/* ── THE POSE SLOT ────────────────────────────────────────────────────────────────────────────────────────
+   The bottom-left cell the doll has always left empty. Luke: "its supposed to look like an equipment slot."
+   It needs no rules of its own beyond the grid area — .equip-slot and .equip-slot.filled.rar-* already give
+   it the frame, the rarity colour and the elite animations, which is the whole reason a pose was given a
+   rarity on the shared scale rather than a tag of its own. */
+.slot-pose { grid-area: pose; }
+
+/* ── THE POSE PICKER ROWS ─────────────────────────────────────────────────────────────────────────────────
+   Inside the gear picker's own sheet (.gearpick), so the chrome, the scrim and the "Wearing now" block are
+   shared and cannot drift. Only the row differs, because a pose row answers "owned, locked, or for sale"
+   where a gear row answers "what does this swap change". */
+.posepick-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+.posepick-row {
+    display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 10px;
+    background: rgba(0, 0, 0, 0.3); border: 1px solid color-mix(in srgb, var(--rar, #9aa7b5) 45%, transparent);
+}
+.posepick-row.is-locked { opacity: 0.72; }
+.posepick-art {
+    width: 46px; height: 46px; object-fit: contain; display: block;
+    /* The rarity reads off the art's own glow as well as the border, the way a chest reward does — a
+       coloured hairline alone is invisible at 46px on a phone. */
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--rar, #9aa7b5) 60%, transparent));
+}
+.posepick-body { min-width: 0; display: grid; gap: 2px; }
+.posepick-body b { font-size: 0.9rem; font-weight: 700; }
+.posepick-body span { font-size: 0.74rem; color: #9aa08f; }
+.posepick-btn {
+    min-width: 86px; padding: 9px 14px; border-radius: 999px; border: 0;
+    font: inherit; font-size: 0.82rem; font-weight: 800; cursor: pointer;
+    color: #1a1a12; background: linear-gradient(180deg, #ffd166, #e0a83c);
+}
+.posepick-btn.is-buy { color: #2a1f05; background: linear-gradient(180deg, #ffc861, #c89a3a); }
+.posepick-btn.is-flat { color: #9aa08f; background: rgba(255, 255, 255, 0.06); cursor: default;
+    display: grid; place-items: center; }
+.posepick-btn:disabled { opacity: 0.5; cursor: default; }
+.posepick-foot { margin: 12px 0 0; font-size: 0.82rem; color: #9aa08f; display: grid; gap: 4px; }
+.posepick-foot b { color: #e7dece; }
+.posepick-foot em { font-style: normal; color: #ffd166; }
+.gearpick-glyph.pose-glyph {
+    width: 46px; height: 46px; object-fit: contain;
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--rar, #9aa7b5) 60%, transparent));
+}
 
 .equip-slot {
     aspect-ratio: 1; width: 100%; max-width: 72px; justify-self: center; align-self: center;

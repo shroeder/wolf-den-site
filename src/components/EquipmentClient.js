@@ -18,6 +18,9 @@ import { RARITIES } from "@/lib/marketplace/rarity.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { scoreStats, statDelta, PRIORITY_STATS } from "@/lib/marketplace/item-value.js";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
+
+// Store credit, in dollars. Poses are the only thing on this screen bought with money rather than gold.
+const usd = (cents) => `$${((Number(cents) || 0) / 100).toFixed(2)}`;
 import Coin from "@/components/Coin";
 
 // An item's elemental affinity chip(s) — matters against a boss weak to that element (bonus damage). Prefers the
@@ -264,6 +267,56 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     // removes itself. The other half of this is the confirmation on the bulk opens in ChestOpener — this
     // stops the tap, that stops the loss if one ever gets through.
     const [shield, setShield] = useState(false);
+
+    // ── ⚠️ THE POSE IS A SLOT, NOT A LIST UNDER THE DOLL ─────────────────────────────────────────────────
+    // Luke, looking at the first cut: "its supposed to look like an equipment slot." It shipped as a
+    // collapsible card of twenty text rows sitting below the paper doll, which is a menu about the hero
+    // rather than a thing worn on him — and it had no unequip at all, because the worn row was a flat
+    // label. A pose IS equipment: it is the only one that changes the whole figure rather than one corner
+    // of it, so it belongs in the doll with the other ten.
+    //
+    // ⚠️ FETCHED WHEN THE SLOT IS TAPPED. Three queries for a panel nobody opened is the family-A waste
+    // CLAUDE.md opens with, and most visits to this screen are about gear.
+    const [poseOpen, setPoseOpen] = useState(false);
+    const [poseShelf, setPoseShelf] = useState(null);
+    const [poseBusy, setPoseBusy] = useState("");
+    const [poseNote, setPoseNote] = useState(null);
+    const loadPoses = useCallback(async () => {
+        const d = await fetch("/api/marketplace/poses", { cache: "no-store" })
+            .then((r) => r.json()).catch(() => null);
+        if (d && !d.error) setPoseShelf(d);
+    }, []);
+    const openPoses = useCallback(() => { setPoseOpen(true); if (!poseShelf) loadPoses(); }, [poseShelf, loadPoses]);
+    const closePoses = useCallback(() => {
+        setPoseOpen(false); setPoseNote(null);
+        // Same stray-tap shield the gear picker uses, for the same reason: this sheet unmounts under a finger.
+        setShield(true);
+        setTimeout(() => setShield(false), 350);
+    }, []);
+    const actPose = useCallback(async (action, pose) => {
+        setPoseBusy(pose); setPoseNote(null);
+        const d = await fetch("/api/marketplace/poses", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action, pose }),
+        }).then((r) => r.json()).catch(() => null);
+        setPoseBusy("");
+        if (!d) { setPoseNote("That did not go through."); return; }
+        // The reply carries the whole shelf, so the balance, the owned set and what is worn move together.
+        if (d.poses) setPoseShelf(d);
+        if (d.ok === false) {
+            setPoseNote(d.error === "not_enough_credit" ? "Not enough store credit for that one."
+                : d.error === "already_owned" ? "You already have that one."
+                    : d.error === "not_owned" ? "That one is not yours yet."
+                        : "That did not go through.");
+            return;
+        }
+        // ⚠️ SAYS WHAT HAPPENS NEXT, BECAUSE NOTHING VISIBLE DOES. The hero above does not change on this
+        // screen — the redraw is a cron pass away — so a silent success reads as a button that did nothing.
+        setPoseNote(action === "buy"
+            ? "Bought and worn. Your hero is redrawn in the next pass."
+            : "Worn. Your hero is redrawn in the next pass.");
+    }, []);
+    const wornPose = poseShelf?.poses?.find((p) => p.worn) || null;
     const closePicker = useCallback(() => {
         setSlot(null); setPickerOpen(false);
         setShield(true);
@@ -514,6 +567,30 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         </button>
                     );
                 })}
+                {/* ── THE POSE SLOT ───────────────────────────────────────────────────────────────────
+                    Bottom-left, in the cell the doll always had empty beside the boots. It behaves like
+                    every other slot — tap it, a picker opens, the worn one sits at the top with a Take off
+                    — and it carries `rar-${rarity}` so it colours and animates off the shared scale that
+                    already styles .equip-slot.filled.
+
+                    ⚠️ IT DRAWS THE POSE'S OWN SPRITE, NOT THE HERO'S. The hero above is the same figure in
+                    that pose, so reusing it here would put the same picture on the screen twice at two
+                    sizes and tell you nothing about the nineteen you are not wearing. Luke: "A sprite
+                    representing the pose, along with the poses rarity color."
+
+                    ⚠️ AND THE SLOT IS FILLED BEFORE THE SHELF LOADS. The shelf is fetched on tap, so until
+                    then there is no worn pose to name — but every member has one (null is the starter),
+                    so the slot shows the starter rather than reading as an empty socket. */}
+                <button
+                    type="button"
+                    className={`equip-slot slot-pose filled rar-${wornPose?.rarity || "common"}`}
+                    onClick={openPoses}
+                    title={wornPose ? `Pose: ${wornPose.name}` : "Pose"}
+                >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="equip-slot-glyph" src={wornPose?.art || "/images/poses/ready.webp"} alt="" aria-hidden="true" />
+                </button>
+
                 <div className="equip-hero">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     {/* Mirror only the sprite (not the head-on avatar fallback) when flagged backwards. */}
@@ -603,6 +680,82 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             {shield && typeof document !== "undefined" ? createPortal((
                 <div aria-hidden="true" style={{ position: "fixed", inset: 0, zIndex: 1400, background: "transparent" }}
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} />
+            ), document.body) : null}
+
+            {/* ── THE POSE PICKER ─────────────────────────────────────────────────────────────────────────
+                The gear picker's own markup and classes, deliberately: a pose is picked the same way a
+                helmet is, and a second sheet with its own look would teach that it is a different kind of
+                thing. What differs is only what a row can be — owned, locked with progress, or for sale. */}
+            {poseOpen && typeof document !== "undefined" ? createPortal((
+                <div className="gearpick-scrim" role="dialog" aria-modal="true" onClick={closePoses}>
+                    <div className="gearpick" onClick={(e) => e.stopPropagation()}>
+                        <div className="gearpick-head">
+                            <b>Pose</b>
+                            <button type="button" className="gearpick-x" onClick={closePoses}>Close</button>
+                        </div>
+
+                        {!poseShelf ? <p className="gearpick-empty">Reading your shelf…</p> : (
+                            <>
+                                <div className="gearpick-worn">
+                                    <span className="gearpick-worn-kick">Wearing now</span>
+                                    <div className="gearpick-worn-row">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img className={`gearpick-glyph pose-glyph rar-${wornPose?.rarity || "common"}`}
+                                            src={wornPose?.art || "/images/poses/ready.webp"} alt="" aria-hidden="true" />
+                                        <div className="gearpick-worn-body">
+                                            <b>{wornPose?.name || "At the Ready"}</b>
+                                            <span>{wornPose?.rarity || "common"}</span>
+                                        </div>
+                                        {/* ⚠️ TAKE OFF IS WEARING THE STARTER, AND THERE HAS TO BE ONE. The first
+                                            cut had no unequip at all — the worn row was a flat label — so a
+                                            member who bought The Oath was kneeling for ever. There is no such
+                                            thing as no pose (the sprite has to stand somehow), so off means
+                                            back to the one everybody begins with. */}
+                                        <button type="button" className="gearpick-off"
+                                            onClick={() => actPose("equip", "ready")}
+                                            disabled={poseBusy !== "" || wornPose?.id === "ready"}>
+                                            Take off
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <ul className="posepick-list">
+                                    {poseShelf.poses.filter((p) => !p.worn).map((p) => (
+                                        <li key={p.id} className={`posepick-row rar-${p.rarity}${p.owned ? "" : " is-locked"}`}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img className={`posepick-art rar-${p.rarity}`} src={p.art} alt="" aria-hidden="true" />
+                                            <div className="posepick-body">
+                                                <b>{p.name}</b>
+                                                {/* ⚠️ THE NUMBER, NOT JUST THE LOCK. "Win 25 arena bouts" with 18
+                                                    under it is a thing to go and do; without the count it is a
+                                                    wall, and a wall on a cosmetic screen reads as a tease. */}
+                                                <span>{!p.owned && p.need ? `${p.how} · ${p.have}/${p.need}` : (p.how || p.rarity)}</span>
+                                            </div>
+                                            {p.owned ? (
+                                                <button type="button" className="posepick-btn" disabled={poseBusy === p.id}
+                                                    onClick={() => actPose("equip", p.id)}>
+                                                    {poseBusy === p.id ? "…" : "Wear it"}
+                                                </button>
+                                            ) : p.source === "shop" ? (
+                                                <button type="button" className="posepick-btn is-buy"
+                                                    disabled={poseBusy === p.id || !p.affordable}
+                                                    title={p.affordable ? `Buy ${p.name}` : "Not enough store credit"}
+                                                    onClick={() => actPose("buy", p.id)}>
+                                                    {poseBusy === p.id ? "…" : usd(p.cents)}
+                                                </button>
+                                            ) : <span className="posepick-btn is-flat">Locked</span>}
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                <p className="posepick-foot">
+                                    Store credit <b>{usd(poseShelf.balanceCents)}</b>
+                                    {poseNote ? <em>{poseNote}</em> : null}
+                                </p>
+                            </>
+                        )}
+                    </div>
+                </div>
             ), document.body) : null}
 
             {slot && typeof document !== "undefined" ? createPortal((

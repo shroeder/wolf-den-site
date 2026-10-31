@@ -71,6 +71,8 @@ export async function poseShelf(buyerId) {
             || (p.source === "shop" ? bought.has(p.id) : Boolean(p.event) && have >= p.need);
         return {
             id: p.id, name: p.name, source: p.source,
+            // The slot and the picker row colour themselves off this, same as any other equippable.
+            rarity: p.rarity, art: p.art,
             owned, worn: p.id === worn,
             how: p.how || null,
             cents: p.source === "shop" ? p.cents : null,
@@ -95,14 +97,11 @@ async function ownsPose(buyerId, id) {
 }
 
 /**
- * Wear a pose.
+ * Wear `id`, and tell the sprite job the hero changed.
  *
  * ⚠️ OWNERSHIP IS CHECKED ON THE SERVER, NOT TRUSTED FROM THE SCREEN. The shelf already hides what you do
  * not own, which is a nicety; this is the rule. A POST naming a $8 pose must fail for somebody who has not
  * bought it, or the price is advisory.
- */
-/**
- * Wear `id`, and tell the sprite job the hero changed.
  *
  * ⚠️ WRITING `equipped_pose` ALONE DRAWS NOTHING, AND THAT IS WHY THIS IS ONE FUNCTION. The cron picks a
  * member up on `avatar_updated_at > avatar_sprite_at OR equipment_updated_at > avatar_sprite_at`, so a
