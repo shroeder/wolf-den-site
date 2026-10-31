@@ -146,30 +146,68 @@ const LIKENESS = "matching the skin tone, hairstyle and hair color, facial hair,
 //   ⚠️ THE FLAT-SHADING CLAUSE. "two or three tone steps per colour... no hundreds of tiny marks" is
 //   a direct instruction not to draw the small marks a face is made of. Round one showed removing it
 //   helps; it was never tested together with an expression that the model could actually see.
+// ── ROUND FIVE: CAN A POSE BE SOLD? ──────────────────────────────────────────────
+// Luke: "maybe we add options that are purchasable with store credit... We could start with poses.
+// Maybe make a couple as a test and see if we can get the prompting to always honor them?"
+//
+// ⚠️ HONOURING IS THE WHOLE QUESTION, AND IT HAS TO BE ANSWERED BEFORE ANY SHOP EXISTS. A cosmetic
+// somebody PAID store credit for and did not get is a refund and a complaint, not a bad draw. If the
+// model only takes a pose four times in five, poses are not sellable at any price — and the honest
+// version of that finding is worth more than a store screen.
+//
+// ⚠️ A POSE REPLACES AN EXISTING PHRASE RATHER THAN BEING APPENDED. The prompt already says "in a
+// confident heroic standing pose"; adding a second pose instruction lower down would leave two
+// contradicting each other, and the model would pick one. There is exactly one pose clause.
+//
+// ⚠️ THE FRAMING RULE IS THE ONE AT RISK. It forbids anything touching an edge, naming "a raised
+// weapon" specifically, and tells the model to draw SMALLER rather than crop. A pose that lifts a
+// sword overhead is the direct test of whether those two can hold at once — so one is in the set.
+const POSE = /a confident heroic standing pose/;
+
+// ── ROUND SIX: WHY ONE POSE LOST, AND WHETHER A WIN REPEATS ───────────────────────────
+// Round five: sword-raised landed clean, crouch landed as a lunge, arms-crossed was ignored outright.
+//
+// ⚠️ ARMS-CROSSED DID NOT LOSE TO THE MODEL, IT LOST TO ANOTHER INSTRUCTION. SPRITE_RULES says "ONE
+// WEAPON PER HAND AND NO DUPLICATES... a shield goes on the arm that is not holding the weapon". A
+// member with a sword and a shield cannot fold his arms, and the gear clause is the more specific of
+// the two. So the pose was never going to win unless it says where the gear goes.
+//
+// That matters more than the picture: a POSE SOLD FOR STORE CREDIT CANNOT CONTRADICT THE EQUIPPED
+// GEAR. Either the pose moves the gear explicitly, or poses that need empty hands are simply not in
+// the catalogue. This round tests the first.
+//
+// ⚠️ AND IT TESTS THE SAME POSE TWICE. One good draw is not "always honours". The two sword-raised
+// entries are byte-identical prompts — the only difference is the roll — which is the only way to see
+// whether a member who paid for a pose reliably gets it.
 const VARIANTS = [
     {
-        id: "j-expr-last",
-        why: "Image kept. Expression moved to the very end, nothing else changed. Isolates position alone.",
+        id: "q1-arms-crossed-gear-stowed",
+        why: "Arms folded, but the pose now says where the sword and shield go. Tests whether a pose can beat the gear clause by resolving it.",
         mode: "edits",
-        prompt: (base, rules, expr) => base.replace(SAME_FACE, LIKENESS) + rules + expr,
+        prompt: (base, rules, expr) => base
+            .replace(POSE, "a relaxed confident pose with both arms FOLDED ACROSS THE CHEST and both hands empty and visible on the opposite upper arms — the weapon is SHEATHED at the hip or strapped across the back and the shield is SLUNG ON THE BACK, neither held in a hand")
+            .replace(SAME_FACE, LIKENESS) + rules + expr,
     },
     {
-        id: "k-expr-last-unflattened",
-        why: "Image kept, expression last, flat-shading clause removed. The combination I expect to win.",
+        id: "q2-sword-raised-take1",
+        why: "The pose that worked, drawn again. Identical prompt to take 2.",
         mode: "edits",
-        prompt: (base, rules, expr) => base.replace(SAME_FACE, LIKENESS) + rules.replace(FLAT_FACE, "") + expr,
+        prompt: (base, rules, expr) => base
+            .replace(POSE, "a triumphant pose with the weapon raised high overhead in one hand and the head tilted back mid shout")
+            .replace(SAME_FACE, LIKENESS) + rules + expr,
     },
     {
-        id: "l-expr-last-unflattened-unplanted",
-        why: "The same, plus the wide-planted-stance clause removed, so the body is free as well as the face.",
+        id: "q3-sword-raised-take2",
+        why: "Same prompt as take 1. Any difference here is the roll, which is what a paying member is exposed to.",
         mode: "edits",
-        prompt: (base, rules, expr) => base.replace(SAME_FACE, LIKENESS)
-            + rules.replace(FLAT_FACE, "").replace(PLANTED, "") + expr,
+        prompt: (base, rules, expr) => base
+            .replace(POSE, "a triumphant pose with the weapon raised high overhead in one hand and the head tilted back mid shout")
+            .replace(SAME_FACE, LIKENESS) + rules + expr,
     },
 ];
 
 async function main() {
-    const { db, editImage, renderAvatarPng, buildSpritePrompt, SPRITE_RULES, describeExpression,
+    const { db, editImage, renderAvatarPng, buildSpritePrompt, SPRITE_RULES, describeExpression, HOUSE_CHARACTER_TAIL,
         IMAGE_MODEL, houseStyleRefs, getEquippedGearPhrase } = await app();
     if (!BUYER) {
         console.log("usage: --buyer <uuid> [--apply]  — draws 3 trial sprites for one member, writes nothing live");
@@ -192,8 +230,10 @@ async function main() {
     const checks = [
         [DESCRIBE.from.test(base), "the opening sentence of buildSpritePrompt"],
         [SAME_FACE.test(base), "the keeping-the-same-face clause"],
-        [SPRITE_RULES.includes(FLAT_FACE), "the flat cel shading clause in SPRITE_RULES"],
-        [SPRITE_RULES.includes(PLANTED), "the wide-planted-stance clause in SPRITE_RULES"],
+        // ⚠️ NOT SPRITE_RULES ANY MORE. The hero path now strips that clause on purpose, so checking
+        // for it there fails by design. Rounds that want it back take it from the SHARED tail.
+        [HOUSE_CHARACTER_TAIL.includes(FLAT_FACE), "the flat cel shading clause in the shared house tail"],
+        [POSE.test(base), "the pose clause in buildSpritePrompt"],
     ].filter(([ok]) => !ok);
     if (checks.length) {
         console.log(`\n\u26a0\ufe0f  the prompt changed — these no longer match:`);
