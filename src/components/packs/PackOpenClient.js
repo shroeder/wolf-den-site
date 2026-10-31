@@ -223,8 +223,10 @@ function PackBank({ fromCents, toCents, payoutCents, cardName }) {
  *   `openSignal`  — a counter the room bumps to open the modal. A number rather than a boolean because the
  *                   modal closes itself, and a boolean the parent has to remember to lower is a door that
  *                   will not open twice.
+ *   `startOpen`   — the room IS the opener, so skip the launch strip entirely and start on the picker.
+ *                   See the note on the state itself for why this cannot be openSignal.
  */
-export default function PackOpenClient({ initial, hideLaunch = false, openSignal = 0 }) {
+export default function PackOpenClient({ initial, hideLaunch = false, openSignal = 0, startOpen = false }) {
     const [pool, setPool] = useState(initial?.pool || null);
     // ── THE PICKER (docs/category-packs.md §9) ───────────────────────────────────────────────────────────
     // `pool` above is the BAGS pool summary and always has been. `pools` is the shelf of packs a member may
@@ -263,7 +265,17 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
     //
     // ⚠️ A member resumed into a pending choice opens STRAIGHT into the modal. The card is already theirs
     //    and already paid for; the one thing they cannot be shown is a page that looks like nothing happened.
-    const [modalOpen, setModalOpen] = useState(Boolean(initial?.pending));
+    // ⚠️ startOpen IS FOR A ROOM THAT IS NOTHING BUT THIS. Luke, watching people use the mystery bag
+    // screen: "it's not apparent that you can rip packs. Everybody just skips the top thing that lets...
+    // that's the entry point for opening them." On /mystery-bags the launch strip sits above a page about
+    // something else — the Live Chase Board — and a control people scroll past is a feature that does
+    // not exist for most of them. The Virtual Rips page has no other content, so the strip is pointless
+    // there: the picker IS the page.
+    //
+    // ⚠️ INITIAL STATE, NOT AN EFFECT. openSignal cannot do this — it compares against its own first
+    // value and so does nothing on mount by design — and opening in an effect renders the launch strip
+    // for one frame first, which is a flash of the exact control this page exists to remove.
+    const [modalOpen, setModalOpen] = useState(Boolean(initial?.pending) || startOpen);
     // Null until a pack is opened. A member resumed into the readout never had a burst on this page load, so
     // there is nothing to throw — see the guard on the render.
     const [debris, setDebris] = useState(null);

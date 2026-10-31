@@ -323,8 +323,17 @@ export default function SiteHeader() {
     // Placed straight after Mystery Bags because that is where a card in it came from.
     const links = mktVault
         ? navItems.flatMap((item) => (item.href === "/mystery-bags"
+            // ⚠️ THREE ROWS IN THE ORDER THE MEMBER MOVES THROUGH THEM: the board that says what is in a
+            // pack, the room where you rip one, the shelf the card lands on. Virtual Rips is its own door
+            // because Luke watched people skip the opener bolted to the top of Mystery Bags: "it's not
+            // apparent that you can rip packs... that's the entry point for opening them." A control people
+            // scroll past is a feature that does not exist for most of them.
+            //
+            // ⚠️ SHIPPED WITH ITS PAGE, IN ONE COMMIT. [[a-screen-with-no-door-is-not-shipped]].
             // "vault", not "cards" — the card game owns `cards`, and these two menus must not disagree.
-            ? [item, { href: "/marketplace/vault", label: "Card Vault", sprite: "vault" }]
+            ? [item,
+                { href: "/marketplace/rips", label: "Virtual Rips", sprite: "rips" },
+                { href: "/marketplace/vault", label: "Card Vault", sprite: "vault" }]
             : [item]))
         : navItems;
 

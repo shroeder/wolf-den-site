@@ -146,6 +146,10 @@ const ICONS = {
     // is a pennant rather than a fourth prize.
     about: "A carved wooden shop sign hanging from a wrought-iron bracket on two short chains, a wolf's head in profile carved into the plank and picked out in gold",
     mystery: "A plump closed cloth drawstring pouch with a corded tie, bulging at the sides, two trading-card corners just visible poking out of the gathered neck",
+    // ⚠️ NOT ANOTHER POUCH. `mystery` directly above is a closed drawstring bag and `vault` is a box of
+    // filed cards — this row sits between them in the nav, so a third container would be the same picture
+    // three times. Virtual Rips is the MOMENT, not the container: a pack already torn, mid-spill.
+    rips: "A foil trading-card pack torn wide open across the top, its ragged metallic edges peeled back, three cards spilling out and fanning forward through the opening, the topmost catching a bright highlight along its edge",
     events: "A tall triangular pennant flag on a polished wooden pole, the fabric deep red with a gold border, caught mid-flutter",
     // The Grove. ⚠️ A TREE AND NOT A LEAF: the glyph it replaces was an oak leaf, which at 18px is a green
     // blob and says "nature" rather than "the place you go down into". The silhouette has to clear `town`
