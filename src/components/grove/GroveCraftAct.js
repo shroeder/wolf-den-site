@@ -82,7 +82,7 @@ const SET_WORD = {
     rough: "Rough, but it holds",
 };
 
-export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose, forceGames = null, startAtRack = false }) {
+export default function GroveCraftAct({ recipe, level, onCommit, onClose, forceGames = null, startAtRack = false }) {
     // ── ⚠️ DRAWN ONCE, ON MOUNT, AND NEVER AGAIN ────────────────────────────────────────────────
     // useMemo with no dependencies rather than useState(drawPhases()): the latter re-runs the draw on
     // every render in React's strict double-invoke, which in development silently reshuffles the
@@ -154,7 +154,7 @@ export default function GroveCraftAct({ recipe, level, temper, onCommit, onClose
         });
     }, [games]);
     const score = actScore(act);
-    const rack = useMemo(() => rackFor(level, { temper }), [level, temper]);
+    const rack = useMemo(() => rackFor(level), [level]);
     const scatter = scatterFor(act);
     const odds = useMemo(() => oddsForAim(rack, aim, scatter), [rack, aim, scatter]);
     // ── ⚠️ recipeArt, NOT groveArt. THE ACT WAS ASKING THE WRONG FUNCTION ───────────────────────────

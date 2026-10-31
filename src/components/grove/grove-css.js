@@ -2572,7 +2572,7 @@ export const GROVE_CSS = `
 .gv-recs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
 
 /* The rail on the left is the whole ranking signal: gold means go. */
-/* ⚠️ THE CARD IS A COLUMN; THE THREE COLUMNS ARE A ROW INSIDE IT. The temper strip was first added as a
+/* ⚠️ THE CARD IS A COLUMN; THE THREE COLUMNS ARE A ROW INSIDE IT. A full-width strip was first added as a
    fourth grid child spanning 1 / -1, which is exactly the trap grid sets for you: a spanning item's
    min-content is distributed into the tracks it crosses. Measured on a 375px phone, the auto column took
    214px of that and the 1fr body column resolved to 0px, so the recipe text wrapped one word per line and
@@ -2673,7 +2673,7 @@ export const GROVE_CSS = `
 /* ⚠️ CRAFT IS NOT FULL WIDTH, AND THAT WAS A REAL STEP BACKWARDS WHEN IT WAS. Letting it take the
    leftover room turned it into a yellow slab the width of the card on every single row — three of them
    on screen at once, each shouting louder than the recipe it belonged to. It is sized to its label and
-   anchored right; the temper line takes the slack, which is what a quiet secondary control is for.
+   anchored right, so the bar is the same shape on every card.
 
    ⚠️ WRAPS RATHER THAN CRUSHES. Craft + a stepper + a sentence will not fit on a 390px phone, so the
    stepper drops to its own line instead of squeezing the other two into coins. */
@@ -2682,9 +2682,8 @@ export const GROVE_CSS = `
    letting flex choose which one falls off the line picked CRAFT — the primary action — and stranded it
    alone on a row of its own under the stepper. The batch stepper is the optional one, so it is the one
    given 100% and pushed to its own line; Craft stays top-right on every card, stepper or no stepper. */
-.gv-rec-bar > .gv-temper { order: 1; flex: 1 1 150px; margin-top: 0; }
 .gv-rec-bar > .gv-rec-go { order: 2; flex: 0 0 auto; min-width: 96px; margin-left: auto; }
-.gv-rec-bar > .gv-rec-qty { order: 3; flex: 1 1 100%; justify-content: flex-end; }
+.gv-rec-bar > .gv-rec-qty { order: 1; flex: 0 1 auto; min-width: 0; }
 .gv-rec-all { pointer-events: auto; cursor: pointer; font: inherit;
     padding: 7px 12px; border-radius: 999px; font-weight: 800; font-size: 0.74rem;
     color: #cfe3c6; background: rgba(255,255,255,0.05);
@@ -2823,6 +2822,34 @@ export const GROVE_CSS = `
     font-variant-numeric: tabular-nums; }
 .gv-pv-uses em.is-have { color: #8fd36a; }
 .gv-pv-uses em.is-short { color: #c9a05a; }
+
+/* ── THE TOOL SHEET ─────────────────────────────────────────────────────────
+   Shares .gv-pv's card and backdrop — it is the same kind of thing opened from the same kind of shelf,
+   and two near-identical sheets styled separately drift within a week. */
+/* What the tool pays, big, because it is the one number the shelf was printing and the one the player
+   came to check. The band colours it, which is the half the number alone never said. */
+.gv-ts-big { margin: 0; font-size: 1.6rem; font-weight: 900; line-height: 1.1;
+    color: var(--band, #ffd166); font-variant-numeric: tabular-nums; }
+.gv-ts-big span { font-size: 0.86rem; font-weight: 700; color: #b9b1a2; }
+.gv-pv-where b { color: #e7dece; }
+/* The rung above, as a door. Same affordance as a recipe row in the part sheet so one shape means one
+   thing across both. */
+.gv-ts-next { width: 100%; display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+    padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer; font: inherit; text-align: left; color: #e7dece; background: rgba(0,0,0,0.38);
+    transition: border-color 120ms ease, background 120ms ease; }
+.gv-ts-next:hover { border-color: rgba(224,168,60,0.5); background: rgba(224,168,60,0.1); }
+.gv-ts-next b { flex: 1; font-size: 0.86rem; font-weight: 700; }
+.gv-ts-next em { font-style: normal; font-size: 0.8rem; font-weight: 800; color: #ffd166;
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gv-ts-next em i { margin: 0 3px; font-style: normal; color: #8e8676; }
+/* Its parts, as the same have/need chips the bench uses — read once, recognised everywhere. */
+.gv-ts-cost { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.gv-ts-cost li { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
+    font-size: 0.76rem; font-weight: 700; font-variant-numeric: tabular-nums;
+    background: rgba(0,0,0,0.38); border: 1px solid rgba(255,255,255,0.08); }
+.gv-ts-cost li.is-have { border-color: rgba(143,211,106,0.4); color: #cfe3c6; }
+.gv-ts-cost li.is-short { border-color: rgba(214,106,90,0.45); color: #e8b3a6; }
 
 .gv-pv-wish { width: 100%; margin-top: 15px; padding: 11px; border-radius: 11px; cursor: pointer;
     font: inherit; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.04em;
@@ -2977,32 +3004,6 @@ export const GROVE_CSS = `
     font-size: 0.76rem; font-weight: 700; background: rgba(159,224,138,0.18); color: #cdf5bd; }
 .gv-em button:disabled { opacity: 0.5; cursor: default; }
 
-/* ── TEMPERING ───────────────────────────────────────────────────────────────────────────────────────────
-   The one control on a recipe card that is a choice rather than a confirmation, so it reads as a switch
-   with a price on it: the button, what it buys, and what it costs, on one line. Dim until armed — an
-   always-lit second button beside Craft would compete with the thing the card is for. */
-/* ⚠️ THE WHOLE CONTROL IS THE BUTTON NOW. It used to be a bordered strip CONTAINING a button, which
-   made it as visually heavy as the recipe it hung under and still left the words beside it unclickable —
-   you had to hit a small grey box labelled with a noun. One wide, quiet row that lights when armed. */
-.gv-temper { width: 100%; display: flex; align-items: center; gap: 9px; margin-top: 8px;
-    padding: 7px 9px; border-radius: 9px; cursor: pointer; text-align: left; font: inherit;
-    background: rgba(0,0,0,0.24); border: 1px solid rgba(255,255,255,0.06); }
-.gv-temper.is-on { border-color: rgba(255,200,97,0.42); background: rgba(255,200,97,0.09); }
-/* A tickbox, because this is a thing you turn on, and every player alive already knows what one of
-   these means. The old affordance was a button whose label changed from Temper to Tempering — two
-   words a player has to compare to work out which state they are in. */
-.gv-temper-box { flex: none; width: 17px; height: 17px; border-radius: 5px;
-    border: 1.5px solid rgba(255,255,255,0.28); background: rgba(0,0,0,0.3);
-    position: relative; transition: background 120ms ease, border-color 120ms ease; }
-.gv-temper.is-on .gv-temper-box { background: #ffc861; border-color: #c89a3a; }
-.gv-temper.is-on .gv-temper-box::after { content: ""; position: absolute; left: 5px; top: 1px;
-    width: 4px; height: 9px; border: solid #2a1f05; border-width: 0 2px 2px 0; transform: rotate(42deg); }
-/* ⚠️ WRAPS, AND THAT IS THE CHANGE. The old line was nowrap with an ellipsis because three flex
-   children at ~250px collided — so on a phone it TRUNCATED the part of the sentence that explained
-   it. A sentence is allowed two lines; a sentence cut off mid-word is worse than one that reflows. */
-.gv-temper-say { flex: 1; min-width: 0; font-size: 0.7rem; line-height: 1.35; color: #9aa08f;
-    font-variant-numeric: tabular-nums; }
-.gv-temper-say b { color: #ffc861; font-weight: 800; }
 
 /* What the band bought, on the card for the thing it bought it for. Sits under the roll, because it is
    the roll's consequence and reads as its second half. */
@@ -3010,7 +3011,6 @@ export const GROVE_CSS = `
    specificity, so every result read the same shade whatever it rolled — the colour is the
    fastest thing on the card to read and it was saying nothing. */
 .gv-made-bonus { display: block; margin-top: 4px; font-size: 0.9rem; font-weight: 800; }
-.gv-made-tmp { margin-left: 7px; font-style: normal; font-size: 0.62rem; letter-spacing: 0.08em;
     text-transform: uppercase; color: #ffc861; opacity: 0.85; }
 
 /* ── CHARMS ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -3055,7 +3055,6 @@ export const GROVE_CSS = `
 .gv-rec-pay { margin: 2px 0 0; font-size: 0.78rem; line-height: 1.3; color: #e0a83c;
     overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .gv-rec-top b { font-size: 0.9rem; }
-.gv-temper { margin-top: 0; padding: 5px 8px; }
 .gv-rec-go { padding: 9px 13px; font-size: 0.82rem; }
 
 /* ── ⚠️ ONE RULE FOR EVERY BAND COLOUR ───────────────────────────────────────────────────────────────────
@@ -3145,7 +3144,7 @@ export const GROVE_CSS = `
    still be hit on purpose; 44 is the size a thumb actually covers, and it is the figure the rest of this
    repo already works to. Re-audited with elementFromPoint rather than getBoundingClientRect -- "can a
    thumb land on this" instead of "how big is the box" -- and the zone HUD, both close buttons, Craft,
-   Temper, Forge, the filter chips and both emblem buttons all came in under it on every phone size.
+   Forge, the filter chips and both emblem buttons all came in under it on every phone size.
 
    ⚠️ AND TWO MECHANISMS, BECAUSE ONE DOES NOT COVER IT:
 
@@ -3171,7 +3170,6 @@ export const GROVE_CSS = `
    done by the Find control in the same card's header, so 44px each would cost three rows of height on
    every card to duplicate a button already sitting above them. */
 .gv-paper-arrow { min-width: 44px; min-height: 44px; }
-.gv-temper { min-height: 44px; }
 .gv-arm-go { min-height: 44px; }
 .gv-recchip { min-height: 44px; }
 .gv-em button, .gv-eslot button { min-height: 44px; }

@@ -5,7 +5,7 @@ import { QUALITY_BANDS, qualityOdds } from "@/lib/marketplace/grove-forge.js";
 // based, one is tap frequency based. And one is just rng, la plinko ball hitting pegs on itd way down. With
 // varying buckets."
 //
-// The bench had a decision (tempering) and no ACT. Pressing Craft was still a press — you chose a row, the game
+// The bench had no ACT. Pressing Craft was still a press — you chose a row, the game
 // rolled a number, a card told you what happened. These are the three beats that happen instead:
 //
 //   1  THE HEAT     tap frequency.  Work the bellows. The coals come up to temperature.
@@ -29,12 +29,14 @@ import { QUALITY_BANDS, qualityOdds } from "@/lib/marketplace/grove-forge.js";
 // They do not widen the buckets and they do not aim the piece. They decide how closely it lands to where
 // the PLAYER aimed it, which is what makes the narrow middle of the rack worth going for at all.
 //
-// ⚠️ AND THE BIAS IS CAPPED AT ROUGHLY WHAT TEMPERING BUYS. Two reasons, and the second is the real one.
+// ⚠️ AND THE BIAS IS CAPPED. Two reasons, and the second is the real one. (The cap was originally set
+// at what tempering bought; tempering was removed on 2026-10-30 and the cap stayed, because it was never
+// really about parity — see below.)
 // First, a thumb should not out-earn the crafting LADDER — twenty-five levels would mean nothing against a
 // player with fast hands. Second, this is the one number in the Grove the server cannot verify: it can
 // replay a kill from a seed, but it cannot replay whether somebody actually hit the window. A claim taken on
 // trust must be worth little enough that lying about it is not worth the trouble. See clampAct.
-export const ACT_MAX_BIAS = 0.52;     // same units as TEMPER_BONUS, which is 0.5
+export const ACT_MAX_BIAS = 0.52;     // same units the level feeds into qualityOdds' exponent
 
 // ── THE HEAT: TAP FREQUENCY ──────────────────────────────────────────────────────────────────────────────────
 // The opener, because it is the one beat nobody can fail. No window to miss, nothing to learn: tap and the
@@ -135,7 +137,6 @@ function legacyActScore({ heat = 0, strikes = [] } = {}) {
  * client word. The posture is therefore not "detect the lie", it is "make the lie not worth telling":
  *
  *   · every input is clamped into range, so a claim of heat 900 is a claim of heat 1
- *   · the whole act is worth about what tempering is worth, and tempering costs real parts
  *   · nothing here reaches a band that was unreachable; it widens the odds and stops
  *
  * A perfect act is therefore worth having and not worth cheating for, which is the only stable place to put
@@ -157,7 +158,7 @@ export function clampAct(act) {
     return out;
 }
 
-/** The bias the act adds, in the same units the level and the temper feed. */
+/** The bias the act adds, in the same units the level feeds. */
 export const actBias = (act) => actScore(clampAct(act)) * ACT_MAX_BIAS;
 
 // ── THE SET: THE RACK ────────────────────────────────────────────────────────────────────────────────────────
@@ -210,8 +211,8 @@ const PEG_KICK = 0.055;
  * it is a single undivided slot at dead centre, so the narrowest thing on the rack is also the only one
  * you can aim straight at.
  */
-export function rackFor(level, { temper = false } = {}) {
-    const share = Object.fromEntries(qualityOdds(level, temper).map((o) => [o.id, o.share]));
+export function rackFor(level) {
+    const share = Object.fromEntries(qualityOdds(level).map((o) => [o.id, o.share]));
     const outward = QUALITY_BANDS.filter((b) => b.id !== "masterwork");   // pristine, fine, sound, rough
     const spans = [];
     let x = 0;

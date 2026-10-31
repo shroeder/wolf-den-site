@@ -105,12 +105,32 @@ Four named pieces:
 - ~~**collapsible sections**~~ — DONE (`16`). Every shelf collapses from its heading, and the open/shut
   choice is stored, because the bag panel unmounts whenever you open the map or the bench — component state
   alone would have reopened everything and read as broken.
-- **inspectable tools** — PART DONE (`17`). The quality band is now printed on the tool, which was the
-  biggest miss: `toolMeta` has carried `quality` since it was written and no screen showed it, so the one
-  thing the crafting minigame exists to decide was invisible on the thing it decided. A fuller inspect —
-  which map forged it, reworks used, what the next rung costs — is still open.
+- ~~**inspectable tools**~~ — DONE (`17`, then `27`). The quality band went onto the tool first, which was
+  the biggest miss: `toolMeta` had carried `quality` since it was written and no screen showed it, so the
+  one thing the crafting act exists to decide was invisible on the thing it decided. Tapping a tool now
+  opens its own sheet.
+
+  ⚠️ **A TIER AND A BAND ARE TWO LADDERS AND THE SHELF WAS MULTIPLYING THEM INTO ONE NUMBER.** The tier
+  is what the tool IS and only goes up; the band is how well that one came out and a rework re-rolls it.
+  A Masterwork tier 4 and a Rough tier 6 pay nearly the same and want completely different things from
+  you — which is why "+4.1%" on its own could not be acted on. The sheet separates them ("the tier is
+  worth 3%; it came out Fine, which a rework can still re-roll"), prices the next rung against the bag,
+  and offers a door for each. It never crafts: every route ends on a row at the bench, because a second
+  Craft button priced separately is two implementations of "can I make this".
 
 ---
+
+### ✂️ Tempering — REMOVED
+> *"Spending more parts to roll better, remove that."* (2026-10-30, after reading the row cold)
+
+Gone at every layer, not hidden: the control, the surcharge in `temperCost`/`TEMPER_SHARE`, the extra term
+in the quality exponent (`TEMPER_BONUS`), the `temper` flag through `groveCraft`/`groveCraftMany`, the
+`oddsTempered` column in the payload, and the API's acceptance of it. A flag the UI no longer sends but
+the server still honours is an exploit waiting to be found.
+
+⚠️ **THE ACT'S BIAS IS NOT THE SAME THING AND IT STAYS.** `extra` bends the same exponent, but the player
+earns it by playing the three minigames and it costs no parts — it is the whole reason the act exists.
+⚠️ And "The Temper" is still one of the ten minigames (the spin-stop dial); that name is unrelated.
 
 ## Open — the specific bugs
 

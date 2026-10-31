@@ -60,7 +60,6 @@ export async function POST(request) {
                 // craft — a begin/commit pair would double the round trips on the one screen a player
                 // visits in bursts, and round trips are the meter that bills (see CLAUDE.md).
                 case "craft": return noStore(await groveCraft(buyer.id, String(b.recipe || ""), {
-                    temper: Boolean(b.temper),
                     act: b.act && typeof b.act === "object" ? b.act : null,
                     aim: b.aim,
                 }));
@@ -78,7 +77,6 @@ export async function POST(request) {
                 // player's current xp, so one performance shifts where ten landings sit without stamping
                 // the same landing ten times.
                 case "craftAll": return noStore(await groveCraftMany(buyer.id, String(b.recipe || ""), {
-                    temper: Boolean(b.temper),
                     times: b.times,
                     act: b.act && typeof b.act === "object" ? b.act : null,
                     aim: b.aim,

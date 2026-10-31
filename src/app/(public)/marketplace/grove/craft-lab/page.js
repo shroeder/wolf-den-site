@@ -17,7 +17,6 @@ export default async function Page({ searchParams }) {
     return (
         <GroveCraftLab
             level={Number(sp?.level) || 12}
-            temper={sp?.temper === "1"}
             seed={Number(sp?.seed) || 7}
             games={sp?.games || ""}
             rack={sp?.rack === "1"}

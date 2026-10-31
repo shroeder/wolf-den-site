@@ -15,7 +15,7 @@ import {
 
 import Area from "@/components/grove/GroveArea.js";
 import GroveCraftAct from "@/components/grove/GroveCraftAct.js";
-import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes, reworkCost, temperCost } from "@/lib/marketplace/grove-recipes.js";
+import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes, reworkCost } from "@/lib/marketplace/grove-recipes.js";
 import { QUALITY_BANDS, qualityBand, toolBonusFor, GROVE_CHESTS, GROVE_CHEST_ORDER, craftBonusLabel, charmValue, CHARM_STAT_LABEL, bandTint } from "@/lib/marketplace/grove-forge.js";
 
 // ── THE WORKBENCH ───────────────────────────────────────────────────────────────────────────────────────────
@@ -164,13 +164,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     const { wish, toggle, want } = useWishlist();
     const [result, setResult] = useState(null);
     const [busy, setBusy] = useState(null);
-    // ── ⚠️ TEMPERING IS PER ROW, NOT A MODE THE SCREEN IS IN ────────────────────────────────────────
-    // A single "temper" switch at the top would be armed from one recipe and fire on the next one the
-    // player pressed, spending a surplus of commons on a vault they only wanted one of. Holding the
-    // recipe id means the choice belongs to the thing it was made about, and pressing Craft on any other
-    // row is an ordinary craft.
-    const [tempering, setTempering] = useState(null);
-    // The craft being played out, or null. Holds the recipe and whether it was tempered, because
+    // The craft being played out, or null. Holds the recipe, because
     // both are needed when the act finally posts and the row underneath may have re-sorted by then.
     const [acting, setActing] = useState(null);
     // ── ⚠️ HOW MANY THIS ROW WILL MAKE, AND ABSENT MEANS "ALL OF THEM" ──────────────────────────────
@@ -279,19 +273,17 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     const lvl = st.craft || { level: 1, progress: 0, intoLevel: 0, needForNext: null, capped: false };
     const odds = lvl.odds || [];
     // ── ⚠️ "FINE OR BETTER", NOT "MASTERWORK" ───────────────────────────────────────────────────────
-    // Quoting the top band alone would advertise tempering with a number that moves from 2% to 4% and
-    // read as buying nothing, when what it actually shifts is the whole distribution. The three best
+    // Quoting the top band alone reads as buying nothing — it is a number that moves from 2% to 4% —
+    // when what actually shifts is the whole distribution. The three best
     // bands together are the threshold a player feels, and the set is taken from QUALITY_BANDS by
     // position rather than by name, so adding a sixth band tomorrow does not quietly change what this
     // sentence means.
     const GOOD = new Set(QUALITY_BANDS.slice(0, 3).map((b) => b.id));
     const goodShare = (list) => (list || []).filter((b) => GOOD.has(b.id)).reduce((a, b) => a + (b.share || 0), 0);
-    // ⚠️ "Fine+" WAS SHORTHAND FOR NOTHING THE PLAYER HAD EVER SEEN. The bench printed it beside two
-    // bare percentages and Luke read the result as noise: "Wtf is temper and plus q1 parts". A `+` suffix
-    // is a convention from spreadsheets, not from the game — nowhere else does the Grove say "Fine+".
+    // ⚠️ AND NEVER "Fine+". A `+` suffix is a convention from spreadsheets, not from the game; nowhere
+    // else does the Grove say it, and Luke read it cold as noise.
     const topBandName = `${QUALITY_BANDS[2].name} or better`;
     const topOdds = goodShare(odds);
-    const topOddsT = goodShare(lvl.oddsTempered);
     const recent = lvl.recent || [];
     const merits = Number(st.merits) || 0;
 
@@ -299,7 +291,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // Luke: "Let's make it fun." The button no longer spends anything — it starts three beats, and the
     // third of them posts. Nothing has left the bag until the hammer work is done, so backing out of the
     // overlay costs nothing and a player who opens it by accident is not charged for curiosity.
-    const craft = (r) => { setActing({ recipe: r, temper: tempering === r.id, times: 1 }); };
+    const craft = (r) => { setActing({ recipe: r, times: 1 }); };
 
     /** Called by the act once the skill beats are played. This is the only place a craft is posted. */
     const commitCraft = async (act, aim) => {
@@ -312,7 +304,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
         const times = Math.max(1, Number(acting.times) || 1);
         if (times > 1) return await postBatch(r, times, act, aim);
         setBusy(r.id);
-        const d = await post({ action: "craft", recipe: r.id, temper: Boolean(acting.temper), act, aim });
+        const d = await post({ action: "craft", recipe: r.id, act, aim });
         setBusy(null);
         return d;
     };
@@ -329,7 +321,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // against it -- see commitCraft, which is still the only place a craft is posted from.
     const craftAll = (r, times) => {
         if (!times) return;
-        setActing({ recipe: r, temper: tempering === r.id, times });
+        setActing({ recipe: r, times });
     };
 
     // ⚠️ THIS MUST RETURN SOMETHING WITH `ok` ON IT, AND NOT RETURNING ONE WAS A SHIPPED BUG.
@@ -348,7 +340,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // below is the batch's answer; the act just needs to close cleanly rather than look crashed.
     const postBatch = async (r, times, act, aim) => {
         setBusy(`all-${r.id}`);
-        const d = await post({ action: "craftAll", recipe: r.id, temper: tempering === r.id, times, act, aim });
+        const d = await post({ action: "craftAll", recipe: r.id, times, act, aim });
         setBusy(null);
         if (!d?.ok) {
             setNote(d?.error === "not_enough_parts" ? "Not enough parts for that."
@@ -381,9 +373,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                 : "Couldn't make that.");
             return;
         }
-        // ⚠️ CLEARED ON SUCCESS, so a tempered craft does not quietly temper the next one. The cost is
-        // real and silently repeating it is the kind of charge a player only notices in the bag.
-        setTempering(null);
         // The moment. Built from the SERVER's spent list, so what is shown is what actually left the bag.
         setResult({ ...d, recipe: r });
         await refresh();
@@ -576,31 +565,20 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                         : [];
                     const reworkShort = rwShortList.reduce((a, b) => a + b, 0);
                     const reworkReady = canRework && reworkShort === 0;
-                    // ── WHAT TEMPERING THIS ROW WOULD COST AND BUY ───────────────────────────────
-                    // ⚠️ OFFERED ONLY WHERE THERE IS A ROLL TO IMPROVE — so not on a row already built,
-                    // and not on a rework (which is its own re-roll and is priced separately). Showing
-                    // it on a finished vault would be a button that spends parts on nothing.
-                    const canTemper = !built && !canRework;
-                    // ⚠️ RECOMPUTED AGAINST THIS ROW'S TOGGLE rather than taken from the row's own `times`,
-                    // which is the untempered count. Tempering adds parts, so turning it on must shrink the
-                    // batch the button offers -- otherwise it offers ten and the seventh runs out.
-                    const batch = craftableTimes(r, st.pack || {}, { temper: tempering === r.id });
+                    const batch = craftableTimes(r, st.pack || {});
                     // What this row would put on the wishlist, and whether it is all there already.
                     // ⚠️ SHORT PARTS ONLY. Wishing the ones you already hold would light creatures you have
                     // no reason to walk to, which is the wishlist telling you something false.
                     const shortParts = costs.filter((c) => c.short > 0).map((c) => c.part);
                     const allWished = shortParts.length > 0 && shortParts.every((pt) => wish.includes(pt));
                     const hold = holdingOf(r, st);
-                    const temperOn = tempering === r.id;
-                    const tmpCost = canTemper ? temperCost(r) : null;
-                    const temperExtra = tmpCost ? Object.values(tmpCost).reduce((a, b) => a + b, 0) : 0;
                     return (
                         // ⚠️ A REAL id, NOT ONLY A key. React keys are not in the DOM, so a row
                         // nothing can address is a row nothing can scroll to — the same defect
                         // GroveArea had, where `id` became a className and the craft card's "Show
                         // me where it went" silently found nothing. The part sheet lands here.
                         <li key={r.id} id={`gv-rec-${r.id}`} className={`gv-rec${ready ? " is-ready" : ""}${built ? " is-built" : ""}${made && !built ? " is-made" : ""}`}>
-                            {/* ⚠️ THE THREE COLUMNS LIVE IN THEIR OWN ROW. The temper strip used to be a
+                            {/* ⚠️ THE THREE COLUMNS LIVE IN THEIR OWN ROW. A strip under the card used to be a
                                 fourth child of this grid spanning 1 / -1, and a spanning item's
                                 min-content is distributed into the tracks it crosses: measured live, the
                                 auto column took 214px of it and the body column collapsed to EXACTLY 0px,
@@ -689,11 +667,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
 
                                 <ul className="gv-cost">
                                     {costs.map((c) => {
-                                        // ⚠️ THE COST SHOWN IS THE COST CHARGED. With tempering armed the
-                                        // row has to count the surcharge too, or the card says twelve and
-                                        // the bag loses seventeen — the exact unaccountability this screen
-                                        // was rebuilt to remove.
-                                        const need = c.need + (temperOn ? (tmpCost?.[c.part] || 0) : 0);
+                                        const need = c.need;
                                         const short = Math.max(0, need - c.have);
                                         return (
                                             // ⚠️ THE NAME IS A TITLE, NOT A LINE. One chip per row meant a
@@ -738,36 +712,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 on every card. The card above it is what the thing is; this is what you
                                 can do about it. */}
                             <div className="gv-rec-bar">
-                            {/* ⚠️ IT HAS TO SAY THE BARGAIN, NOT NAME IT. What stood here was a grey box
-                                labelled TEMPER beside "34% → 44%  Fine+ · +4 parts", and Luke read it
-                                cold and asked "Wtf is temper and plus q1 parts". Every piece of that was
-                                jargon: a forge word for a noun, two percentages with no subject, a
-                                spreadsheet `+` suffix, and a part count that never says which parts.
-
-                                The bargain in English is: pay a share of the recipe again, before you
-                                roll, and the roll bends upward. So the control says that — and the
-                                numbers it is ASKED to justify only appear once it is armed, because
-                                arming it is free and watching the odds move is a better explanation
-                                than a sentence about them (teach-by-showing-not-telling). The part
-                                chips above already restate their own cost with the surcharge in it, so
-                                "which parts" is answered where the parts are. */}
-                            {canTemper ? (
-                                <button type="button"
-                                    className={`gv-temper${temperOn ? " is-on" : ""}`}
-                                    aria-pressed={temperOn}
-                                    onClick={() => setTempering(temperOn ? null : r.id)}>
-                                    <span className="gv-temper-box" aria-hidden="true" />
-                                    <span className="gv-temper-say">
-                                        {temperOn ? (
-                                            <>Spending <b>{temperExtra} more parts</b> — {topBandName}{" "}
-                                                <b>{Math.round(topOddsT * 100)}%</b>,
-                                                was {Math.round(topOdds * 100)}%</>
-                                        ) : (
-                                            <>Spend <b>{temperExtra} more parts</b> for a better roll</>
-                                        )}
-                                    </span>
-                                </button>
-                            ) : null}
 
                             {/* ⚠️ "Built" WAS A DEAD END, AND IT IS THE ONLY STATE A FINISHED PLAYER EVER
                                 SEES. A tool you own showed a disabled button saying so and nothing else --
@@ -835,16 +779,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 </>
                             )}
                             </div>
-                            {/* ── ⚠️ THE ONE DECISION A CRAFT HAS EVER OFFERED ───────────────────
-                                Luke: crafting lacked "engagement" — and pressing Craft took no input
-                                at all. The parts were fixed and the roll was the game's, so the
-                                player's whole contribution was picking a row.
-
-                                ⚠️ IT SHOWS THE ODDS IT BUYS, BOTH WAYS, BEFORE THE SPEND. "Better
-                                chance" with no number is a thing you are asked to believe; two
-                                percentages are a decision. Both come from the server's own curve
-                                (st.craft.odds / oddsTempered), so what is printed here is exactly
-                                what the roll will be run against. */}
                         </li>
                     );
                 })}
@@ -929,7 +863,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                 <GroveCraftAct
                     recipe={acting.recipe}
                     level={lvl.level}
-                    temper={acting.temper}
                     onCommit={commitCraft}
                     onClose={finishCraft}
                 />
@@ -1039,7 +972,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 {result.quality != null ? (
                                     <span className={`gv-made-q is-${result.qualityBand}`} style={{ "--band": bandTint(result.qualityBand) }}>
                                         Rolled {bandName(result.qualityBand)} · {result.quality}/100
-                                        {result.tempered ? <i className="gv-made-tmp">tempered</i> : null}
                                     </span>
                                 ) : null}
                                 {/* ── ⚠️ WHAT THE BAND ACTUALLY BOUGHT, IN THE THING THE PLAYER MADE ──

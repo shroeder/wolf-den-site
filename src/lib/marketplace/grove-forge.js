@@ -171,27 +171,22 @@ export const QUALITY_BIAS = 0.062;   // how hard a level bends the curve
 
 // ── ⚠️ TEMPERING: THE ONLY DECISION THE CRAFT ITSELF HAS EVER OFFERED ───────────────────────────────────────
 // Pressing Craft took no input. The parts were fixed, the roll was the game's, and the player's entire
-// contribution was choosing a row -- which is why a crafting screen built around a random outcome still felt
-// like a vending machine. Tempering is the choice: pay a share of the recipe again and the roll bends.
+// contribution was choosing a row -- which is why a crafting screen built around a random outcome still felt// ⚠️ TEMPERING IS GONE, AND THE CURVE KEEPS ITS SHAPE. Luke, 2026-10-30: "Spending more parts to roll
+// better, remove that." It was one extra term in this exponent — pay 40% of the recipe again before the
+// roll and the roll bends — so removing it is removing the term, not unpicking a second mechanism.
 //
-// ⚠️ IT BENDS THE SAME CURVE THE LEVEL DOES, rather than being a second mechanism bolted beside it. A flat
-// "+10 quality" would collide with the band edges in ways no screen could explain, and a separate roll would
-// need its own odds table living next to a live formula -- two numbers that disagree the first time either is
-// tuned. This is one extra term in one exponent, so qualityOdds shows the tempered chances by passing the
-// same flag, and the player is rolled against exactly the odds they were shown.
-//
-// Worth about eight crafting levels at the bottom of the ladder and rather less at the top, which is the
-// right shape: it is most useful to the player who has least, and it never becomes a formality.
-export const TEMPER_BONUS = 0.5;
+// ⚠️ `extra` IS NOT THE SAME THING AND IT STAYS. That is the crafting act's bias: the player earns it
+// by playing the three minigames, it costs no parts, and it is the whole reason the act exists. The
+// resemblance is only that both bend this one exponent.
 
 // ⚠️ `extra` IS A THIRD TERM, NOT A FOURTH CURVE. The craft act (grove-craft-act.js) needs to bend the same
 // exponent that the level and the temper bend, and the first attempt expressed it as extra LEVELS -- which
 // silently did nothing at level 25, because the level is clamped to the cap. A capped crafter would have
 // played the beats perfectly and watched the board not move, which is the dead-ladder bug this curve was
 // rewritten once already to remove. A term outside the clamp cannot have that problem.
-export function rollQuality(level, rand, temper = false, extra = 0) {
+export function rollQuality(level, rand, extra = 0) {
     const lv = Math.max(1, Math.min(CRAFT_LEVEL_CAP, Number(level) || 1));
-    const p = 1 / (1 + lv * QUALITY_BIAS + (temper ? TEMPER_BONUS : 0) + Math.max(0, Number(extra) || 0));
+    const p = 1 / (1 + lv * QUALITY_BIAS + Math.max(0, Number(extra) || 0));
     const u = Math.min(0.999999, Math.max(1e-9, rand()));
     return Math.max(0, Math.min(100, Math.round(100 * u ** p)));
 }
@@ -204,9 +199,9 @@ export function rollQuality(level, rand, temper = false, extra = 0) {
  * the player would be shown one set of chances and rolled against another, which is the worst possible
  * version of "transparency". Closed form: P(q >= at) = 1 - (at/100)^(1/p).
  */
-export function qualityOdds(level, temper = false, extra = 0) {
+export function qualityOdds(level, extra = 0) {
     const lv = Math.max(1, Math.min(CRAFT_LEVEL_CAP, Number(level) || 1));
-    const p = 1 / (1 + lv * QUALITY_BIAS + (temper ? TEMPER_BONUS : 0) + Math.max(0, Number(extra) || 0));
+    const p = 1 / (1 + lv * QUALITY_BIAS + Math.max(0, Number(extra) || 0));
     // ── ⚠️ THE BAND EDGE IS HALF A POINT LOWER THAN IT LOOKS, BECAUSE THE ROLL ROUNDS ───────────────
     // rollQuality returns Math.round(100 * u ** p), so a score of 98 is produced by anything from 97.5
     // up. Integrating to a flat 98 therefore computes the odds of a roll the game does not make.

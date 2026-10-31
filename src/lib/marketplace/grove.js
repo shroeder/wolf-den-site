@@ -25,7 +25,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { petBiteShare } from "@/lib/marketplace/grove-world.js";
 import { pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
-import { reworkCost, temperCost, toolRecipeFor, repeatable, CRAFT_ALL_CAP
+import { reworkCost, toolRecipeFor, repeatable, CRAFT_ALL_CAP
 } from "@/lib/marketplace/grove-recipes.js";
 import { rackFor, scatterFor, landingFor, bandAt, oddsForAim, rattle, qualityInBand,
     clampAct, actScore } from "@/lib/marketplace/grove-craft-act.js";
@@ -415,11 +415,6 @@ export async function groveState(buyerId) {
             // actual band shares at THIS level are a fact the player can check against what they get.
             // Computed from the same curve the server rolls against, so the screen cannot drift from it.
             odds: qualityOdds(craftLevel(Number(p?.craft_xp) || 0).level),
-            // ⚠️ AND THE TEMPERED ODDS BESIDE THEM, FROM THE SAME CURVE. The bench shows both columns so
-            // the player can see what the extra parts actually buy before spending them — a "better
-            // chance" with no number is a thing you are asked to believe rather than a decision you can
-            // make. Same function, one flag, so the two can never drift apart.
-            oddsTempered: qualityOdds(craftLevel(Number(p?.craft_xp) || 0).level, true),
             recent: (craftLog || []).map((r) => ({
                 recipe: r.recipe_id,
                 kind: r.kind,
@@ -1258,7 +1253,7 @@ export async function groveMove(buyerId, { partId, from, to, qty = 1 } = {}) {
 }
 
 /** Craft a discovered recipe. Parts come out of the BAG. */
-export async function groveCraft(buyerId, recipeId, { temper = false, act = null, aim = 0.5 } = {}) {
+export async function groveCraft(buyerId, recipeId, { act = null, aim = 0.5 } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const recipe = recipeById(recipeId);
     if (!recipe) return { ok: false, error: "no_recipe" };
@@ -1300,14 +1295,11 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
     // ⚠️ EVERY PART DEBITED CONDITIONALLY, AND ROLLED BACK IF ANY FAILS. neon() over HTTP has no
     // transactions (see CLAUDE.md), so the rollback is by hand — without it a half-paid craft eats parts and
     // gives nothing.
-    // ── ⚠️ TEMPERING IS PAID IN THE SAME DEBIT, NOT IN A SECOND ONE ─────────────────────────────────
-    // Two debits means two failure points and a window where the recipe is paid for and the temper is not —
-    // on a driver with no transactions, that window is a player who loses sixteen parts and gets nothing.
-    // Folding the extra into one cost map means the existing conditional-debit-and-roll-back covers both,
-    // and a shortfall anywhere refunds everything exactly as it already did.
-    const extra = temper ? (temperCost(recipe) || {}) : {};
+    // ⚠️ ONE COST MAP, ONE DEBIT. This used to fold tempering's surcharge in here before debiting,
+    // deliberately, so that one conditional-debit-and-roll-back covered both. Tempering is gone (Luke,
+    // 2026-10-30: "Spending more parts to roll better, remove that") and the single map stays — a craft
+    // that pays for a recipe in two places is a craft that can half-pay for it.
     const cost = { ...recipe.parts };
-    for (const [part, n] of Object.entries(extra)) cost[part] = (cost[part] || 0) + n;
 
     const spent = [];
     for (const [part, need] of Object.entries(cost)) {
@@ -1338,13 +1330,12 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
     const gained = craftXpFor(recipe);
     // Seeded off the player's own running total rather than the session seed: a craft is not a kill and has
     // no kill index, and a client that could re-roll a bad quality by retrying is a client that never gets
-    // a bad quality. The temper flag joins the seed so the two paths cannot collide on one total.
     // ── ⚠️ THE BOARD IS THE ROLL ────────────────────────────────────────────────────────────────────
     // Luke: "Let's make it fun ... 3 interactive steps ... one is just rng, la plinko ball hitting pegs on
     // itd way down. With varying buckets."
     //
     // The quality no longer comes from rollQuality here. It comes from where the ball lands on a board whose
-    // five buckets are the five bands, each exactly as wide as its chance at this level, with this temper,
+    // five buckets are the five bands, each exactly as wide as its chance at this level,
     // after this act. That is not decoration over a number decided elsewhere: the landing IS the number, so
     // the thing the player watched is the thing they were given. See grove-craft-act.js for the two versions
     // of this that were not honest and why.
@@ -1361,9 +1352,9 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
     // rack the piece is thrown, and the rack decides the rest. The middle is worth the most and is the
     // hardest to hold, which is the whole of the decision.
     const where = Math.max(0, Math.min(1, Number(aim)));
-    const seed = ((beforeXp + 1) * 2654435761) ^ (temper ? 0x9e3779b9 : 0) ^ Math.round(actScore(tidy) * 1e6)
+    const seed = ((beforeXp + 1) * 2654435761) ^ Math.round(actScore(tidy) * 1e6)
         ^ Math.round(where * 1e5);
-    const spans = rackFor(beforeLevel, { temper });
+    const spans = rackFor(beforeLevel);
     const scatter = scatterFor(tidy);
     const landing = landingFor(where, scatter, seed);
     const band = bandAt(spans, landing);
@@ -1469,7 +1460,7 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
     }
 
     await trackActivity(buyerId, "grove_craft", {
-        recipe: recipe.id, kind: recipe.kind, first: firstCraft, quality, temper, band: bonus.band,
+        recipe: recipe.id, kind: recipe.kind, first: firstCraft, quality, band: bonus.band,
     }).catch(() => {});
 
     // ── ⚠️ THE BAND PAYS MERITS ON THE TWO KINDS THAT HAVE NO "MORE" TO GIVE ────────────────────────
@@ -1484,8 +1475,7 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
     // The xp is priced off the recipe's own PART COST, never flat per craft -- a flat award makes the
     // cheapest recipe the fastest ladder, which turns crafting into poultice spam. Food is additionally
     // the worst-paying kind, because it is the one recipe that makes a stack and is meant to be made
-    // constantly. ⚠️ TEMPERING PAYS NO EXTRA XP: it is parts spent on odds, not on a bigger craft, and
-    // paying the ladder for it would make tempering the fastest way to level rather than a decision.
+    // constantly.
     const afterRow = await db.queryOne(
         `UPDATE mkt_grove_player SET craft_xp = craft_xp + $2, updated_at = NOW()
           WHERE buyer_id = $1 RETURNING craft_xp`,
@@ -1528,7 +1518,6 @@ export async function groveCraft(buyerId, recipeId, { temper = false, act = null
         slot: recipe.slot || null,
         // What the band bought on top of the recipe, so the card can show the roll paying for itself.
         bonus,
-        tempered: Boolean(temper),
         // ── ⚠️ THE FALL, SENT BACK SO THE SCREEN CAN PLAY IT ────────────────────────────────────────
         // The client is handed the board it was already looking at, the landing the server chose, and a
         // rattle that provably ends on it. It animates the drop it is given rather than running its own
@@ -1704,7 +1693,7 @@ export { GROVE_RECIPES };
 // every craft), so the ten items still roll ten bands. The performance shifts where that spread sits; it
 // does not flatten it. That keeps the comment below honest -- a batch really does roll ten bands -- while
 // making the minigame matter to all ten instead of none.
-export async function groveCraftMany(buyerId, recipeId, { temper = false, times = 1, act = null, aim = 0.5 } = {}) {
+export async function groveCraftMany(buyerId, recipeId, { times = 1, act = null, aim = 0.5 } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const recipe = recipeById(recipeId);
     if (!recipe) return { ok: false, error: "no_recipe" };
@@ -1715,7 +1704,7 @@ export async function groveCraftMany(buyerId, recipeId, { temper = false, times 
     const made = [];
     let stopped = null;
     for (let i = 0; i < want; i += 1) {
-        const one = await groveCraft(buyerId, recipeId, { temper, act, aim });
+        const one = await groveCraft(buyerId, recipeId, { act, aim });
         if (!one?.ok) {
             // The first refusal is the whole answer; a later one just ends the batch.
             if (!made.length) return one;
@@ -1749,7 +1738,6 @@ export async function groveCraftMany(buyerId, recipeId, { temper = false, times 
         xpGained: made.reduce((a, x) => a + (Number(x.craft?.xpGained) || 0), 0),
         craft: last?.craft || null,
         levelled: made.some((x) => x.craft?.levelled),
-        tempered: Boolean(temper),
     };
 }
 

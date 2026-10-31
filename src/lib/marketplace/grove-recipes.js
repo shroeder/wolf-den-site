@@ -315,12 +315,9 @@ export const CRAFT_ALL_CAP = 10;
  *
  * Returns 0 for a one-off kind: "how many" is not a question a backpack has an answer to.
  */
-export function craftableTimes(recipe, pack = {}, { temper = false } = {}) {
+export function craftableTimes(recipe, pack = {}) {
     if (!repeatable(recipe)) return 0;
     const cost = { ...recipe.parts };
-    if (temper) {
-        for (const [part, n] of Object.entries(temperCost(recipe) || {})) cost[part] = (cost[part] || 0) + n;
-    }
     let times = CRAFT_ALL_CAP;
     for (const [part, need] of Object.entries(cost)) {
         if (need <= 0) continue;
@@ -407,23 +404,6 @@ export function reworkCost(recipe) {
     );
 }
 
-// ── ⚠️ TEMPERING IS PRICED THE SAME WAY, AND DELIBERATELY SO ────────────────────────────────────────────────
-// A share of the recipe, floor of one each, exactly like a rework — because they are the same bargain seen
-// from two sides: pay parts to improve a roll. Two different pricing schemes for one idea would be two
-// tables to extend every time the ladder grows, and the player would have to learn both.
-//
-// Cheaper than a rework (40% against 60%) because tempering is paid BEFORE the roll and buys only better
-// odds, while a rework is paid against a known outcome and can never lose ground. Paying more for the
-// gamble than for the guarantee would make the gamble the wrong button every time.
-export const TEMPER_SHARE = 0.4;
-
-/** What tempering this craft costs, as { part: n } — on TOP of the recipe's own cost. */
-export function temperCost(recipe) {
-    if (!recipe) return null;
-    return Object.fromEntries(
-        Object.entries(recipe.parts).map(([part, n]) => [part, Math.max(1, Math.ceil(n * TEMPER_SHARE))]),
-    );
-}
 
 /** The recipe that made the tool now sitting in a slot, which is the one a rework is priced against. */
 export const toolRecipeFor = (slot, tier) => GROVE_RECIPES.find(

@@ -30,6 +30,7 @@ import GroveBench, { SHOW_RECIPE_EVENT } from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area, { OPEN_AREA_EVENT } from "@/components/grove/GroveArea.js";
 import GrovePartSheet from "@/components/grove/GrovePartSheet.js";
+import GroveToolSheet from "@/components/grove/GroveToolSheet.js";
 import SkillTree from "@/components/arena/SkillTree";
 import SkillPanel from "@/components/arena/SkillPanel";
 import { qualityBand } from "@/lib/marketplace/grove-forge.js";
@@ -204,6 +205,8 @@ export default function GroveClient({ initial }) {
     const { wish, toggle: toggleWish, clear: clearWish } = useWishlist();
     // Which part's sheet is open, or null. See GrovePartSheet.
     const [partView, setPartView] = useState(null);
+    // Which tool's sheet is open, or null. See GroveToolSheet.
+    const [toolView, setToolView] = useState(null);
     const [st, setSt] = useState(initial);
     const [view, setView] = useState("map");     // map | zone | bag | bench | emblems
     // ⚠️ THE SAME BODY CLASS THE ZONE ALREADY USES, not a second mechanism. It stops the page behind
@@ -940,7 +943,16 @@ export default function GroveClient({ initial }) {
                                 {(st.toolMeta || []).map((t) => {
                                     const Glyph = TOOL_GLYPH[t.slot] || GiStoneCrafting;
                                     return (
-                                    <span key={t.slot} className={`gv-slot${t.tier ? "" : " is-dim"}`}>
+                                    // ⚠️ A BUTTON, BECAUSE THE SHELF COULD NEVER ANSWER THE QUESTION
+                                    // PEOPLE OPEN IT WITH. Luke: "you can't even like inspect the tools
+                                    // in your tools area." It says what the tool IS; what it could not
+                                    // say is whether it is finished and what the next rung would cost,
+                                    // which lived four taps away in a list of 129 rows. Dim slots are
+                                    // tappable too -- "I don't have one" is exactly when you want to
+                                    // know what making one takes.
+                                    <button key={t.slot} type="button"
+                                        className={`gv-slot${t.tier ? "" : " is-dim"}`}
+                                        onClick={() => setToolView(t)}>
                                         {/* ── THE TOOL, DRAWN ─────────────────────────────────────────
                                             Every one of these was a react-icons glyph until the sprites
                                             existed: a generic pickaxe standing in for a pick knapped out
@@ -983,7 +995,7 @@ export default function GroveClient({ initial }) {
                                             return <u className="gv-slot-band" style={{ "--band": band.tint }}>{band.name}</u>;
                                         })() : null}
                                         <em>{t.tier ? `+${t.pct}% ${t.bonus}` : t.bonus}</em>
-                                    </span>
+                                    </button>
                                     );
                                 })}
                             </div>
@@ -1233,6 +1245,20 @@ export default function GroveClient({ initial }) {
         />
     ), fsHost || document.body) : null;
 
+    // Same two-returns rule as partSheet above, and the same portal target for the same reason.
+    const toolSheet = toolView && mounted ? createPortal((
+        <GroveToolSheet
+            tool={toolView} pack={st.pack || {}}
+            partName={partName} PartIcon={PartIcon}
+            onClose={() => setToolView(null)}
+            onGoRecipe={(recipeId) => {
+                setToolView(null);
+                window.dispatchEvent(new CustomEvent(SHOW_RECIPE_EVENT, { detail: recipeId }));
+                goToArea("bench", "bench", `gv-rec-${recipeId}`);
+            }}
+        />
+    ), fsHost || document.body) : null;
+
     if (view === "zone" && session) {
         return (
             <div className="gv">
@@ -1363,6 +1389,7 @@ export default function GroveClient({ initial }) {
                 ) : null}
 
                 {partSheet}
+                {toolSheet}
                 {zonePanel && mounted ? createPortal((
                     <div className="gv-zsheet">
                         <button type="button" className="gv-zsheet-x" aria-label="Back to the zone"
@@ -1430,6 +1457,7 @@ export default function GroveClient({ initial }) {
             {/* The other half of the sheet's two homes — see the note where partSheet is built. The bag
                 is a view at the hub and a zonePanel inside a zone, so both returns have to render it. */}
             {partSheet}
+            {toolSheet}
 
             <style>{GROVE_CSS}</style>
         </div>

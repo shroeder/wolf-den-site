@@ -24,7 +24,7 @@ import {
 // shape changes, which is how a bench starts lying to the person reading it.
 const FALLBACK = { id: "lab_piece", name: "Thornfield Hoe", kind: "tool", slot: "hoe", tier: 1, parts: {} };
 
-export default function GroveCraftLab({ level = 12, temper = false, seed = 7, games = "", rack = false }) {
+export default function GroveCraftLab({ level = 12, seed = 7, games = "", rack = false }) {
     // ?games=rivet,inlay,polish — name one and it is dealt first, name three and the whole act is yours.
     // Unknown ids are dropped rather than throwing, so a typo shows you a random act, not a crash.
     //
@@ -46,7 +46,7 @@ export default function GroveCraftLab({ level = 12, temper = false, seed = 7, ga
 
     const commitCraft = useCallback(async (act, aim) => {
         const tidy = clampAct(act);
-        const spans = rackFor(level, { temper });
+        const spans = rackFor(level);
         const scatter = scatterFor(tidy);
         const landing = landingFor(aim, scatter, () => {
             // Deterministic, so a filmed run is reproducible frame for frame.
@@ -62,13 +62,13 @@ export default function GroveCraftLab({ level = 12, temper = false, seed = 7, ga
         };
         setLast(out.set);
         return out;
-    }, [level, temper, seed]);
+    }, [level, seed]);
 
     return (
         <div style={{ minHeight: "100vh", background: "#0d1410" }}>
             <style>{GROVE_CSS}</style>
             {open ? (
-                <GroveCraftAct recipe={recipe} level={level} temper={temper} forceGames={forceGames} startAtRack={rack}
+                <GroveCraftAct recipe={recipe} level={level} forceGames={forceGames} startAtRack={rack}
                     onCommit={commitCraft} onClose={() => setOpen(false)} />
             ) : (
                 <div style={{ color: "#efe7d8", padding: 24, font: "500 15px/1.6 system-ui, sans-serif" }}>
