@@ -10485,6 +10485,16 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     font-variant-numeric: tabular-nums;
 }
 .posepick-row.is-locked .posepick-state { color: #8b93a0; }
+/* Out of reach, and saying so before it is tapped: the price goes quiet instead of sitting there in full
+   gold next to nine you CAN buy. The row still answers -- it is not disabled -- it just answers with the
+   shortfall rather than with a purchase. */
+.posepick-row.is-dear .posepick-state { color: #8b93a0; font-weight: 700; }
+.posepick-row.is-dear .posepick-art { opacity: 0.75; }
+.posepick-credit {
+    justify-self: start; margin-top: 4px; padding: 7px 12px; border-radius: 999px;
+    font-size: 0.78rem; font-weight: 800; text-decoration: none;
+    color: #1a1a12; background: linear-gradient(180deg, #ffd166, #e0a83c);
+}
 .posepick-row.is-armed .posepick-state { color: #ffb347; }
 .posepick-foot { margin: 12px 0 0; font-size: 0.82rem; color: #9aa08f; display: grid; gap: 4px; }
 .posepick-foot b { color: #e7dece; }

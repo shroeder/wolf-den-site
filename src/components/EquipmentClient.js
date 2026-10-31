@@ -744,10 +744,25 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                             <li key={p.id}>
                                                 <button
                                                     type="button"
-                                                    className={`posepick-row rar-${p.rarity}${locked ? " is-locked" : ""}${armed ? " is-armed" : ""}`}
-                                                    disabled={locked || poseBusy === p.id || (buying && !p.affordable)}
+                                                    className={`posepick-row rar-${p.rarity}${locked ? " is-locked" : ""}${armed ? " is-armed" : ""}${buying && !p.affordable ? " is-dear" : ""}`}
+                                                    disabled={locked || poseBusy === p.id}
                                                     onClick={() => {
                                                         if (p.owned) { actPose("equip", p.id); return; }
+                                                        // ⚠️ A ROW YOU CANNOT AFFORD EXPLAINS ITSELF, IT DOES
+                                                        // NOT GO DEAD. It used to be `disabled` and look
+                                                        // identical to every other row: full price, normal
+                                                        // border, and a tap that did nothing at all. The pack
+                                                        // opener has said the right thing for months -- "You're
+                                                        // $8.75 short of a $20.00 pack" over an Add store
+                                                        // credit button -- and its own note says why the end
+                                                        // screens were wrong to omit it: the screen knew
+                                                        // exactly why you could not continue and said nothing,
+                                                        // which neither lets you go on nor tells you what would.
+                                                        if (!p.affordable) {
+                                                            setPoseConfirm(null);
+                                                            setPoseNote(`You are ${usd(p.cents - poseShelf.balanceCents)} short of ${p.name}.`);
+                                                            return;
+                                                        }
                                                         // ⚠️ A PURCHASE ASKS TWICE AND AN EQUIP DOES NOT, BECAUSE
                                                         // ONLY ONE OF THEM IS REVERSIBLE. Wearing a pose you own
                                                         // costs nothing and is undone by wearing another. Buying
@@ -784,9 +799,18 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     })}
                                 </ul>
 
+                                {/* ⚠️ THE DOOR SHOWS BEFORE THE TAP, NOT ONLY AFTER IT. A member who cannot
+                                    afford the cheapest pose on the shelf should not have to tap a row to find
+                                    out there is somewhere to go -- the balance at the foot is the moment they
+                                    are already looking at the money. Hidden once anything is affordable, so it
+                                    is not a permanent advert sitting under a cosmetic list. */}
                                 <p className="posepick-foot">
                                     Store credit <b>{usd(poseShelf.balanceCents)}</b>
                                     {poseNote ? <em>{poseNote}</em> : null}
+                                    {poseShelf.poses.some((x) => x.source === "shop" && !x.owned && !x.affordable)
+                                        && !poseShelf.poses.some((x) => x.affordable) ? (
+                                            <a className="posepick-credit" href="/marketplace/credit">Add store credit</a>
+                                        ) : null}
                                 </p>
                             </>
                         )}
