@@ -799,18 +799,26 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     })}
                                 </ul>
 
-                                {/* ⚠️ THE DOOR SHOWS BEFORE THE TAP, NOT ONLY AFTER IT. A member who cannot
-                                    afford the cheapest pose on the shelf should not have to tap a row to find
-                                    out there is somewhere to go -- the balance at the foot is the moment they
-                                    are already looking at the money. Hidden once anything is affordable, so it
-                                    is not a permanent advert sitting under a cosmetic list. */}
+                                {/* ── THE DOOR SHOWS WHENEVER ANYTHING IS OUT OF REACH ────────────────────
+                                    It first shipped gated on "and nothing at all is affordable", on the
+                                    argument that somebody mid-way through buying a $4 pose should not be
+                                    upsold. Luke: "Disagree, should show."
+
+                                    He is right and the reasoning was backwards: a member looking at a $8
+                                    mythic they cannot have is in exactly the state the door is for, and
+                                    whether they can also afford a cheaper one has nothing to do with it.
+                                    Hiding it there meant the people most likely to top up were the only ones
+                                    never offered the chance.
+
+                                    Still conditional, not permanent: once every pose on the shelf is owned or
+                                    affordable there is nothing to top up FOR, and a buy-credit button under a
+                                    finished cosmetic list is an advert. */}
                                 <p className="posepick-foot">
                                     Store credit <b>{usd(poseShelf.balanceCents)}</b>
                                     {poseNote ? <em>{poseNote}</em> : null}
-                                    {poseShelf.poses.some((x) => x.source === "shop" && !x.owned && !x.affordable)
-                                        && !poseShelf.poses.some((x) => x.affordable) ? (
-                                            <a className="posepick-credit" href="/marketplace/credit">Add store credit</a>
-                                        ) : null}
+                                    {poseShelf.poses.some((x) => x.source === "shop" && !x.owned && !x.affordable) ? (
+                                        <a className="posepick-credit" href="/marketplace/credit">Add store credit</a>
+                                    ) : null}
                                 </p>
                             </>
                         )}
