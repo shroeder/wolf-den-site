@@ -132,26 +132,39 @@ const LIKENESS = "matching the skin tone, hairstyle and hair color, facial hair,
 // The member picks eyes, eyebrows and mouth. Those three fields are nothing but personality and the
 // prompt has never mentioned them. describeExpression says them in English now; this tests whether that
 // is enough to get the face back without the flat one to copy.
+// ── ROUND FOUR: KEEP THE LIKENESS, MOVE THE EXPRESSION TO WHERE IT IS READ ─────────────────
+// Round three corrected round two. Dropping the reference image DOES free the face — and it costs the
+// member's green beard and his glasses, which survive only when the image is sent. A hero who is not
+// recognisably you is not a fix.
+//
+// So the image stays, and the two things fighting the face get dealt with instead:
+//
+//   ⚠️ POSITION. avatar-sprite.js's own note on promptExtra says it goes last because "the end of a
+//   long prompt is the part a model weights most". The expression sentence was landing mid-prompt,
+//   ahead of ~900 words of house rules. Moved to the very end it is the last thing read.
+//
+//   ⚠️ THE FLAT-SHADING CLAUSE. "two or three tone steps per colour... no hundreds of tiny marks" is
+//   a direct instruction not to draw the small marks a face is made of. Round one showed removing it
+//   helps; it was never tested together with an expression that the model could actually see.
 const VARIANTS = [
     {
-        id: "g-expression-no-image",
-        why: "No reference image, plus the chosen eyes/brows/mouth in words. The likeness now has a face in it.",
-        mode: "generate",
-        prompt: (base, rules, expr) => base.replace(DESCRIBE.from, DESCRIBE.to).replace(SAME_FACE, LIKENESS)
-            + expr + rules,
-    },
-    {
-        id: "h-expression-with-image",
-        why: "Reference kept and the expression described. Tests whether words can beat the flat face rather than replace it.",
+        id: "j-expr-last",
+        why: "Image kept. Expression moved to the very end, nothing else changed. Isolates position alone.",
         mode: "edits",
-        prompt: (base, rules, expr) => base.replace(SAME_FACE, LIKENESS) + expr + rules,
+        prompt: (base, rules, expr) => base.replace(SAME_FACE, LIKENESS) + rules + expr,
     },
     {
-        id: "i-expression-no-image-unflattened",
-        why: "No image, expression described, and the two-or-three-tones clause removed. Everything that helped, together.",
-        mode: "generate",
-        prompt: (base, rules, expr) => base.replace(DESCRIBE.from, DESCRIBE.to).replace(SAME_FACE, LIKENESS)
-            + expr + rules.replace(FLAT_FACE, ""),
+        id: "k-expr-last-unflattened",
+        why: "Image kept, expression last, flat-shading clause removed. The combination I expect to win.",
+        mode: "edits",
+        prompt: (base, rules, expr) => base.replace(SAME_FACE, LIKENESS) + rules.replace(FLAT_FACE, "") + expr,
+    },
+    {
+        id: "l-expr-last-unflattened-unplanted",
+        why: "The same, plus the wide-planted-stance clause removed, so the body is free as well as the face.",
+        mode: "edits",
+        prompt: (base, rules, expr) => base.replace(SAME_FACE, LIKENESS)
+            + rules.replace(FLAT_FACE, "").replace(PLANTED, "") + expr,
     },
 ];
 
@@ -180,6 +193,7 @@ async function main() {
         [DESCRIBE.from.test(base), "the opening sentence of buildSpritePrompt"],
         [SAME_FACE.test(base), "the keeping-the-same-face clause"],
         [SPRITE_RULES.includes(FLAT_FACE), "the flat cel shading clause in SPRITE_RULES"],
+        [SPRITE_RULES.includes(PLANTED), "the wide-planted-stance clause in SPRITE_RULES"],
     ].filter(([ok]) => !ok);
     if (checks.length) {
         console.log(`\n\u26a0\ufe0f  the prompt changed — these no longer match:`);
