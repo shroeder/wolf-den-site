@@ -664,6 +664,8 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     stopped to look at one thing; in a list it is what stops them finding
                                     anything. It still shows on the craft act and the result card. */}
                                 <p className="gv-rec-pay">{payoff(r, st, built)}</p>
+                            </div>
+                            </div>
 
                                 {/* ── ⚠️ THE CHIPS AND THE BUTTON SHARE A LINE ───────────────────────
                                     Luke: "Layout needs improving, all the empty space."
@@ -677,7 +679,19 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     it costs and the button spends it, and the chips wrap inside their
                                     own box so a four-part recipe grows downward without ever pushing
                                     Craft off the row. */}
-                                <div className="gv-rec-foot">
+                            {/* ── ⚠️ FULL CARD WIDTH, NOT THE BODY COLUMN ───────────────────────
+                                Luke: "I dont like the material overflow" — three parts wrapping to
+                                two rows, on card after card.
+
+                                Measured, the body column is 234px: the 44px thumbnail and its gap eat
+                                a fifth of the row, and three chips plus a button do not fit in what is
+                                left at any size still legible. Four passes went into shaving the chips
+                                and the button to fit a box that was simply too small.
+
+                                Out here, UNDER the art rather than beside it, the line is ~290px and
+                                three chips and a real button fit with room over — which is also what
+                                let Craft go back to being a button rather than a coin. */}
+                            <div className="gv-rec-foot">
                                 <ul className="gv-cost">
                                     {costs.map((c) => {
                                         const need = c.need;
@@ -785,8 +799,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 );
                             })() : null}
 
-                            </div>
-                            </div>
                         </li>
                     );
                 })}

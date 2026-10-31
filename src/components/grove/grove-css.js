@@ -40,7 +40,11 @@ export const GROVE_CSS = `
    to its content instead of overflowing it, and the panel simply runs off the bottom of the screen. */
 .gv-sheet { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
     display: flex; flex-direction: column;
-    padding: calc(52px + env(safe-area-inset-top)) 14px calc(104px + env(safe-area-inset-bottom)); }
+    /* ⚠️ 52px HERE WAS THE EXIT BUTTON'S CLEARANCE COUNTED TWICE. Luke: "Get rid of dead space at the
+       top." Measured on a 390px phone: the sheet's own top is already 69px, and the fixed exit button
+       runs 27–67 — so it was clear before the padding was added, and the padding pushed the first panel
+       to 121px with a third of the screen empty above it. 12px is the panel's own breathing room. */
+    padding: calc(12px + env(safe-area-inset-top)) 14px calc(104px + env(safe-area-inset-bottom)); }
 /* ⚠️ THE MAP SITS IN THE MIDDLE OF THE SCREEN IT WAS JUST GIVEN. Going full screen made the strip a band
    across the top of nine hundred pixels with five hundred of black under it — more room is not the same
    thing as using it. Auto margins centre it when there is space and collapse when there is not, which a
@@ -2674,7 +2678,8 @@ export const GROVE_CSS = `
    ⚠️ align-items: flex-end SO THE BUTTON SITS ON THE LAST ROW OF CHIPS. A recipe with four parts wraps
    its chips to two lines, and a centred button would float between them. Bottom-aligned, the button is
    always level with the last chip however many there are. */
-.gv-rec-foot { display: flex; align-items: flex-end; gap: 8px; }
+/* A full-width row of the card, not a line inside the body column — see its note in GroveBench. */
+.gv-rec-foot { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
 /* ⚠️ 0 1 auto, NOT 1 1 auto. Letting the chips GROW pushed the button to the far edge and reopened
    the gap this whole change exists to close; they take what they need and the button follows them. */
 .gv-rec-foot > .gv-cost { flex: 0 1 auto; min-width: 0; }
@@ -2685,11 +2690,14 @@ export const GROVE_CSS = `
    when there is one — both hugging the right edge beside the chips. A row here would have fought the
    chips for width and pushed them into a third line. */
 .gv-rec-bar { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-/* ⚠️ NO min-width HERE. A 96px floor was what stopped the chips and the button sharing a line at all:
-   three chips measure ~235px and a phone's body column is ~296px, so a 96px button plus its gap did not
-   fit and flex squeezed the chips down to one per row. Sized to its own label, "Craft" is ~64px and the
-   line works. The 44px tap-target floor still applies on height, which is the one that matters. */
-.gv-rec-bar > .gv-rec-go { min-width: 0; }
+/* ⚠️ THE FLOOR IS BACK, AND REMOVING IT WAS THE WHOLE BUG. Luke: "The craft button is lame." It was
+   a yellow COIN — and this file already carried the warning, in the note I deleted to make room:
+   '"Craft" measures 29px of text; with the phone media query's 13px side padding that is a 55px box, and
+   the 44px tap-target floor added for touch turns 55x44 at a 999px radius into a circle rather than a
+   pill.' I took the floor out to fit the chips beside it, reproduced the exact failure the note predicted,
+   and the real answer was never to shrink the button — it was to stop squeezing both into a 234px column.
+   The foot is full width now, so a proper button fits. */
+.gv-rec-bar > .gv-rec-go { min-width: 92px; }
 .gv-rec-all { pointer-events: auto; cursor: pointer; font: inherit;
     padding: 7px 12px; border-radius: 999px; font-weight: 800; font-size: 0.74rem;
     color: #cfe3c6; background: rgba(255,255,255,0.05);
@@ -3051,10 +3059,10 @@ export const GROVE_CSS = `
    nothing a player was actually reading removed. */
 .gv-rec { padding: 9px 10px; }
 .gv-cost { display: flex; flex-wrap: wrap; gap: 5px; list-style: none; margin: 5px 0 0; padding: 0; }
-/* ⚠️ SIZED SO THREE OF THEM AND THE BUTTON SHARE ONE LINE. A chip says an 18px picture and "4/4";
-   at the old padding that measured ~90px, three came to 280 of a ~296px body column, and Craft could
-   not fit beside them at any size. Tightened to ~62px the whole foot fits on one row on a 390px phone
-   with room to spare on a 412 — which is what removed the empty half-row under every card. */
+/* ⚠️ COMPACT, BUT NOT BECAUSE OF THE BUTTON ANY MORE. These were shaved to ~51px to fit beside Craft
+   in the 234px body column; the foot is full width now, so the room came from the layout instead. The
+   smaller chip is kept because it is genuinely better — a 15px picture and "4/4" never needed 90px — and
+   the padding still lives on the button, which is what makes the tap target the whole chip. */
 /* ⚠️ THE PADDING IS ON THE BUTTON, NOT THE li. Both had their own and the chip paid for both — 65px
    measured for a 15px picture and the word "6/6". Moved onto the button it is ~52px, three fit beside
    Craft in a 234px body, and the tap target is now the whole chip rather than a box inset inside it. */

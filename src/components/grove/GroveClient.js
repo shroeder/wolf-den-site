@@ -130,15 +130,21 @@ const GROVE_STAT_READOUT = {
 // every other badge. Luke: "you can like never get rid of the bubbles." So the Workbench counts only recipes
 // never finished, Statues counts only ones still unspent, and the Backpack — which is never empty once you
 // are playing — deliberately carries nothing.
+// ⚠️ NO SUBTITLES. Luke, looking at the open drawer: "we dont need descriptions for the menu items."
+// Every row carried a line under it — "choose a zone", "what you are wearing", "who wants what" — which
+// doubled the height of the list and explained words that were already the explanation. A menu that
+// annotates itself is a menu that does not trust its own labels, and nine of them on one screen is the
+// list telling you to read rather than to pick. GroveMenu still renders `note` when a row carries one;
+// nothing does any more.
 const familiesFor = ({ benchFresh = 0, statuesHeld = 0 } = {}) => [
     {
         title: "Go", rows: [
-            { k: "map", label: "Map", art: "/images/grove/ui-map.webp", note: "choose a zone" },
+            { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
             // ⚠️ THE TRACKER NEEDS A DOOR OR IT IS NOT SHIPPED. ui-board.webp was drawn long ago and never
             // used by anything — the quest helper is what it was for. Three givers hidden across twelve
             // zones is a good surprise once and a search forever after, so the panel that names the zone
             // has to be one tap away.
-            { k: "quests", label: "Quests", art: "/images/grove/ui-board.webp", note: "who wants what" },
+            { k: "quests", label: "Quests", art: "/images/grove/ui-board.webp" },
             // ⚠️ TOWN IS A PLACE IN THE GROVE, NOT A WAY OUT OF IT. Luke: "if you go to town, you
             // completely get booted out of the Grove. Like, the whole experience is lost... when you're
             // in the town, it should be like you're in any other zone of the Grove with the menu on the
@@ -147,17 +153,17 @@ const familiesFor = ({ benchFresh = 0, statuesHeld = 0 } = {}) => [
             // ⚠️ THE SPRITE IS THE NAV'S OWN TOWN ART, NOT A NEW ONE. It already exists, it is already
             // in the house style, and drawing a second town would cost money for a picture of a thing
             // that has a picture. [[no-icons-or-glyphs-in-the-game]] asks for a sprite, not for a NEW one.
-            { k: "town", label: "Town", art: "/images/nav/town.png", note: "the street outside" },
+            { k: "town", label: "Town", art: "/images/nav/town.png" },
         ],
     },
     {
         title: "Carry", rows: [
             { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
-            { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp", note: "what you are wearing" },
+            { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
             { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-cards.webp" },
             // ⚠️ A SCREEN WITH NO DOOR IS NOT SHIPPED. The statue vendor is reachable from the menu the
             // moment it exists, not from a panel somebody has to already know about.
-            { k: "statues", label: "Statues", art: "/images/grove/ui-emblems.webp", note: "raise a stat for good", badge: statuesHeld || 0 },
+            { k: "statues", label: "Statues", art: "/images/grove/ui-emblems.webp", badge: statuesHeld || 0 },
         ],
     },
     {
@@ -168,12 +174,12 @@ const familiesFor = ({ benchFresh = 0, statuesHeld = 0 } = {}) => [
         // the cards -- a different kind of thing filed under the wrong one, exactly like the Armoury
         // under the shelf. Go / Carry / Make / Train reads as four verbs, which is what they are.
         title: "Train", rows: [
-            { k: "class", label: "Your Class", art: "/images/grove/ui-class.webp", note: "points, tree, what it does here" },
+            { k: "class", label: "Your Class", art: "/images/grove/ui-class.webp" },
         ],
     },
     {
         title: "Make", rows: [
-            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp?v=2", note: "spend parts", badge: benchFresh || 0 },
+            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp?v=2", badge: benchFresh || 0 },
         ],
     },
 ];
