@@ -11,6 +11,7 @@ import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
 import { avatarConfigToQuery, DEFAULT_AVATAR, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { inspectSprite, spriteVerdict } from "@/lib/marketplace/sprite-cleanup.js";
 import { IMAGE_MODEL, HOUSE_CHARACTER_TAIL, houseStyleRefs } from "@/lib/marketplace/image-model.js";
+import { poseSay } from "@/lib/marketplace/poses.js";
 
 // The ONE shared default sprite used for members who haven't built their own avatar — so we don't spend
 // AI generating a unique sprite for everyone. Generated once from the default avatar, stored in settings.
@@ -164,7 +165,17 @@ export function describeAvatar(rawConfig) {
 //
 // So wording that is about HOW to draw rather than WHAT to draw lives in SPRITE_RULES below and is appended
 // at the moment the request is sent. Same instruction to the model, and no member is re-billed for it.
-export function buildSpritePrompt(config, gear = "") {
+/**
+ * ⚠️ THE POSE IS A SENTENCE SWAP, NOT AN EXTRA INSTRUCTION. There is exactly one pose clause in this
+ * prompt; appending a second one lower down would leave two contradicting each other and the model
+ * would pick. poseSay resolves null and retired ids to the starter pose, so this can never produce the
+ * fragment "in a , keeping the same face".
+ *
+ * ⚠️ IT SWAPS ONLY THE STANCE AND LEAVES THE FACING ALONE. Every consumer of a hero sprite assumes it
+ * faces RIGHT — there is a stored flip flag and an AI read-pass built on that — so the three-quarter
+ * right-facing half of the clause is not a pose's to change.
+ */
+export function buildSpritePrompt(config, gear = "", pose = null) {
     // ── DO NOT ASK FOR GLASSES ON A FACE THAT HAS NONE ───────────────────────────────────────────────────
     // The feature list below used to read "...facial hair, glasses, and clothing..." for EVERY member, so the
     // prompt named glasses as a thing to preserve even when the reference had none — and a model told to keep
@@ -176,7 +187,7 @@ export function buildSpritePrompt(config, gear = "") {
     // "filling the frame below" cost us the top of a lot of heads: measured across 25 stored hero sprites, 11
     // ran clean off an edge and only one had healthy margins. Nothing downstream crops — the model was doing
     // what the prompt asked. It now has to fit the whole figure INSIDE the frame instead.
-    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet), in a confident heroic standing pose shown from a three-quarter view facing to the RIGHT (the character's body turned toward the right side of the frame), keeping the same face, skin tone, hairstyle and hair color, facial hair, ${eyewear}and clothing colors/style as the reference (${describeAvatar(config)}).${noEyewear} ${gear ? gear + " " : ""}FRAMING: the ENTIRE figure must fit INSIDE the image with clear empty space on all four sides — roughly 8% of the image empty above the head and below the feet. Nothing may touch or run off any edge: not the top of the head, hair, hat, helmet or crown, not the feet, not a cape, wing, tail or raised weapon. Draw the figure SMALLER rather than cropping any part of it. 2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border. CRITICAL: the character must be oriented facing and looking toward the RIGHT side of the image (a right-facing three-quarter view) — NOT facing forward and NOT facing left.`;
+    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet), in ${poseSay(pose)} shown from a three-quarter view facing to the RIGHT (the character's body turned toward the right side of the frame), keeping the same face, skin tone, hairstyle and hair color, facial hair, ${eyewear}and clothing colors/style as the reference (${describeAvatar(config)}).${noEyewear} ${gear ? gear + " " : ""}FRAMING: the ENTIRE figure must fit INSIDE the image with clear empty space on all four sides — roughly 8% of the image empty above the head and below the feet. Nothing may touch or run off any edge: not the top of the head, hair, hat, helmet or crown, not the feet, not a cape, wing, tail or raised weapon. Draw the figure SMALLER rather than cropping any part of it. 2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border. CRITICAL: the character must be oriented facing and looking toward the RIGHT side of the image (a right-facing three-quarter view) — NOT facing forward and NOT facing left.`;
 }
 
 // The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
@@ -245,7 +256,8 @@ export const SPRITE_RULES = HOUSE_CHARACTER_TAIL.replace(FLAT_SHADING, "").repla
  * expression out of this and somebody could switch from a grin to a scowl and keep the old picture
  * forever, because nothing would have noticed.
  */
-export const spriteIdentity = (config, gear = "") => buildSpritePrompt(config, gear) + describeExpression(config);
+export const spriteIdentity = (config, gear = "", pose = null) =>
+    buildSpritePrompt(config, gear, pose) + describeExpression(config);
 // Buyers whose sprite should be (re)drawn now. Redraw when the avatar's APPEARANCE or equipped GEAR changed
 // since the last draw (the art prompt includes equipped gear) — BUT never more than once per
 // REGEN_COOLDOWN_HOURS per member, so a serial gear-swapper can't run up the image bill. Members with no
@@ -323,7 +335,7 @@ export async function listSpritesAdmin() {
         // one we would send now. That is exact where the old timestamp test was not: equipment_updated_at
         // bumps when a member takes a ring off and puts the same ring back on, which changes nothing about
         // the picture, and this screen used to report 43 of 84 members pending on that basis.
-        pending: !r.avatar_sprite_url || r.avatar_sprite_prompt !== spriteIdentity(r.avatar_config, gearMap.get(r.id) || ""),
+        pending: !r.avatar_sprite_url || r.avatar_sprite_prompt !== spriteIdentity(r.avatar_config, gearMap.get(r.id) || "", r.equipped_pose),
     }));
 }
 
@@ -424,7 +436,7 @@ export async function setBuyerSprite(buyerId, base64) {
  * comparing two different inputs. Anything worth measuring is worth measuring on the real rails.
  */
 export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, model = null, quality = null, promptExtra = null, styleRefs = [] } = {}) {
-    const row = await db.queryOne(`SELECT avatar_config, avatar_sprite_prompt, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]);
+    const row = await db.queryOne(`SELECT avatar_config, equipped_pose, avatar_sprite_prompt, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]);
     if (!row || !row.avatar_config) throw new Error("No avatar to draw");
     const gear = await getEquippedGearPhrase(buyerId).catch(() => "");
     // ⚠️ THE EXPRESSION GOES LAST IN WHAT IS SENT, AND INSIDE WHAT IS COMPARED. Four trial rounds and
@@ -432,7 +444,7 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, mo
     // the part a model weights most, and the expression had been landing mid-prompt ahead of ~900 words of
     // house rules, where it was simply not read. Moved to the end, a member who chose narrowed eyes and a
     // hard mouth gets them — with the reference image still carrying the likeness.
-    const base = buildSpritePrompt(row.avatar_config, gear);
+    const base = buildSpritePrompt(row.avatar_config, gear, row.equipped_pose);
     const expression = describeExpression(row.avatar_config);
     const prompt = base + expression;
 

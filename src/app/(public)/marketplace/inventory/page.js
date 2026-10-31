@@ -1,5 +1,6 @@
 import ConsumablesClient from "@/components/ConsumablesClient";
 import { gatePage } from "@/lib/marketplace/gate-page.js";
+import PosePicker from "@/components/PosePicker";
 import EquipmentClient from "@/components/EquipmentClient";
 import ViewPing from "@/components/ViewPing";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
@@ -51,6 +52,13 @@ export default async function InventoryPage() {
                 level={profile?.level?.level || 1}
                 backdropUrl={backdropUrl || null}
             />
+
+            {/* ⚠️ HERE, BECAUSE THIS IS WHERE THE HERO IS. Luke: "Poses would be manageable from the
+                equipment screen and equipable... Purchasable from where we manage equipment." The sprite
+                above it is the thing a pose changes, so the control belongs under the picture of it rather
+                than on the cosmetics page with the borders and frames — those are drawn AROUND a member,
+                a pose is drawn INTO them. */}
+            <PosePicker />
         </div>
     );
 }
