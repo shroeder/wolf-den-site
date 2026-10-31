@@ -10490,6 +10490,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    shortfall rather than with a purchase. */
 .posepick-row.is-dear .posepick-state { color: #8b93a0; font-weight: 700; }
 .posepick-row.is-dear .posepick-art { opacity: 0.75; }
+/* "Owned" is a fact, not an offer -- it sits in the same column as the prices and must not read like one. */
+.posepick-row.is-mine .posepick-state { color: #8b93a0; font-weight: 700; }
 .posepick-credit {
     justify-self: start; margin-top: 4px; padding: 7px 12px; border-radius: 999px;
     font-size: 0.78rem; font-weight: 800; text-decoration: none;

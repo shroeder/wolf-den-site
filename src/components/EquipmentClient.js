@@ -744,7 +744,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                             <li key={p.id}>
                                                 <button
                                                     type="button"
-                                                    className={`posepick-row rar-${p.rarity}${locked ? " is-locked" : ""}${armed ? " is-armed" : ""}${buying && !p.affordable ? " is-dear" : ""}`}
+                                                    className={`posepick-row rar-${p.rarity}${locked ? " is-locked" : ""}${armed ? " is-armed" : ""}${buying && !p.affordable ? " is-dear" : ""}${p.owned && p.source === "shop" ? " is-mine" : ""}`}
                                                     disabled={locked || poseBusy === p.id}
                                                     onClick={() => {
                                                         if (p.owned) { actPose("equip", p.id); return; }
@@ -788,10 +788,16 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                                         <span>{p.how || p.rarity}</span>
                                                     </div>
                                                     <span className="posepick-state">
+                                                        {/* ⚠️ AN OWNED SHOP POSE SAID NOTHING AT ALL, so an $8
+                                                            mythic you paid for looked exactly like a pose you
+                                                            earned by catching fish. The state column is the
+                                                            only place that distinction can live, now that
+                                                            there is no price left on the row to imply it. */}
                                                         {poseBusy === p.id ? "…"
                                                             : locked ? `${p.have}/${p.need}`
                                                                 : buying ? (armed ? "Tap to confirm" : usd(p.cents))
-                                                                    : null}
+                                                                    : p.source === "shop" ? "Owned"
+                                                                        : null}
                                                     </span>
                                                 </button>
                                             </li>
@@ -799,26 +805,23 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     })}
                                 </ul>
 
-                                {/* ── THE DOOR SHOWS WHENEVER ANYTHING IS OUT OF REACH ────────────────────
-                                    It first shipped gated on "and nothing at all is affordable", on the
-                                    argument that somebody mid-way through buying a $4 pose should not be
-                                    upsold. Luke: "Disagree, should show."
+                                {/* ── THE DOOR IS ALWAYS THERE ────────────────────────────────────────────
+                                    Twice now I shipped this behind a condition and twice it was the wrong
+                                    call. First it was gated on "nothing at all is affordable" -- Luke:
+                                    "Disagree, should show" -- so I narrowed it to "anything out of reach",
+                                    which still hid it from the member who owns the lot. Luke: "Also there
+                                    with already bought state."
 
-                                    He is right and the reasoning was backwards: a member looking at a $8
-                                    mythic they cannot have is in exactly the state the door is for, and
-                                    whether they can also afford a cheaper one has nothing to do with it.
-                                    Hiding it there meant the people most likely to top up were the only ones
-                                    never offered the chance.
-
-                                    Still conditional, not permanent: once every pose on the shelf is owned or
-                                    affordable there is nothing to top up FOR, and a buy-credit button under a
-                                    finished cosmetic list is an advert. */}
+                                    The condition was always me deciding, on their behalf, when somebody is
+                                    allowed to want more credit. A balance is a thing you top up; the place
+                                    it is written is where you would look to do it, and that is true whether
+                                    you are $6 short or hold all twenty poses. It sits under the balance, at
+                                    the foot of a sheet you opened on purpose -- which is not where an advert
+                                    lives. */}
                                 <p className="posepick-foot">
                                     Store credit <b>{usd(poseShelf.balanceCents)}</b>
                                     {poseNote ? <em>{poseNote}</em> : null}
-                                    {poseShelf.poses.some((x) => x.source === "shop" && !x.owned && !x.affordable) ? (
-                                        <a className="posepick-credit" href="/marketplace/credit">Add store credit</a>
-                                    ) : null}
+                                    <a className="posepick-credit" href="/marketplace/credit">Add store credit</a>
                                 </p>
                             </>
                         )}
