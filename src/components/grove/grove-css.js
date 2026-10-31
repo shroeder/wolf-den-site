@@ -4310,6 +4310,26 @@ export const GROVE_CSS = `
    that has to exist here and nowhere else, and it is drawn as quietly as it can be. */
 
 /* The handle. Plain, dark, flush to the edge, no bigger than it needs to be. */
+/* ── THE TOWN, AS A ROOM OF THE GROVE ─────────────────────────────────────────────
+   ⚠️ THE WHOLE AREA, NOT A PANEL. Every other Grove view is a column of parchment panels inside
+   .gv-sheet; the town is a camera on a street and has to own the viewport the way a zone does, or it is
+   a page in a window rather than a place you walked to.
+
+   ⚠️ BELOW THE MENU HANDLE, WHICH IS THE ENTIRE POINT. The handle is fixed at z-index 1002, so the
+   Grove's menu stays down the left edge over the street -- "the menu on the left and still in that
+   experience". The exit button sits above it too, for the same reason. */
+/* ⚠️ top: 58px CLEARS THE GROVE'S OWN BACK ARROW. Flush to the top, the arrow sat directly on the
+   words "Wolf Den Town" — the Grove's chrome and the room's chrome occupying the same 44px. The Grove's
+   furniture stays on top and the room starts under it, which is also the right reading order.
+
+   ⚠️ AND IT SCROLLS. First cut was overflow:hidden, which clipped everything under the street: the
+   chat, the buildings, the whole lower half of the town. A room you can only see the top of is worse
+   than a link to a page. */
+.gv-town { position: absolute; inset: 58px 0 0; z-index: 4;
+    overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.gv-town-wait { position: absolute; inset: 0; display: grid; place-items: center; margin: 0;
+    color: #b9b1a2; font-size: 0.9rem; }
+
 .gv-mmenu-handle { position: fixed; z-index: 1002;
     left: 0; top: 50%; transform: translateY(-50%);
     width: 30px; height: 76px; padding: 0; cursor: pointer;

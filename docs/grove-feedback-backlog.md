@@ -52,10 +52,28 @@ dying — and both were hard navigations into a page with **no route back**; the
 menu, on a strip the Grove hides while you are in it. The Town page now carries a fixed door on the left
 edge, at the same height as the Grove's own menu handle, shown only to players `groveOpen` lets in.
 
-**⚠️ The rest is still open and it is the bigger half.** He wants Town rendered *as another Grove zone, with
-the Grove's menu down the left* — "still in that experience". `TownClient` is a full-screen social overworld
-with its own camera, polling and state, so mounting it inside the Grove shell is real work and wants its own
-pass. A door stops the bleeding; it is not the ask.
+**DONE** (`29`) — the bigger half as well. Town is a VIEW of the Grove now, in the Go family beside Map and
+Quests, with the Grove's menu handle down the left edge over the street. The two hard navigations that used
+to tear the Grove down — the town button in a zone and dying — are `setView("town")`.
+
+`TownClient` mounts unchanged. It takes plain props and paints itself, so a Grove copy of the street would
+have been a second street to keep in step with the first — the same call as the Arena's skill tree in the
+class room.
+
+Three things it needed:
+- ⚠️ **Fetched when opened, never with the Grove.** `getTownState` is the highest-volume request in the
+  app by TownClient's own account; computing it on the Grove's server render would bill it for everyone who
+  opens the forest and never walks to the street. That is the family-A mistake CLAUDE.md opens with.
+- ⚠️ **Dynamically imported, `ssr: false`.** 5,500 lines with their own camera, polling and stylesheet,
+  which would otherwise ride in the Grove's bundle for every player who never leaves the forest.
+- ⚠️ **`top: 58px`.** Flush to the top, the Grove's own back arrow sat directly on the words "Wolf Den
+  Town" — the Grove's chrome and the room's chrome in the same 44px.
+
+The menu sprite is the nav's existing town art. `no-icons-or-glyphs-in-the-game` asks for a sprite, not for
+a new one, and drawing a second town would be money for a picture of a thing that has a picture.
+
+`/marketplace/town` still stands on its own for anyone arriving from the site nav, with the Grove door that
+shipped as `18`.
 
 ### B. The class tree must be playable from inside the Grove
 > *"we need to make it super clear, like the whole class tree and everything, that all that needs to also

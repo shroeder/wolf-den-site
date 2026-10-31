@@ -29,8 +29,16 @@ import GroveMenu from "@/components/grove/GroveMenu.js";
 import GroveBench, { SHOW_RECIPE_EVENT } from "@/components/grove/GroveBench";
 import { readyCount } from "@/lib/marketplace/grove-recipes.js";
 import Area, { OPEN_AREA_EVENT } from "@/components/grove/GroveArea.js";
+import dynamic from "next/dynamic";
+
 import GrovePartSheet from "@/components/grove/GrovePartSheet.js";
 import GroveToolSheet from "@/components/grove/GroveToolSheet.js";
+
+// ⚠️ LOADED ONLY WHEN SOMEBODY WALKS TO IT. TownClient is 5,500 lines with its own camera, polling
+// and stylesheet; statically imported it would ride in the Grove's bundle for every player who never
+// leaves the forest. ssr:false because it is only ever reached by a tap, so there is no first paint to
+// server-render, and its state arrives over fetch anyway.
+const TownClient = dynamic(() => import("@/components/TownClient"), { ssr: false });
 import SkillTree from "@/components/arena/SkillTree";
 import SkillPanel from "@/components/arena/SkillPanel";
 import { qualityBand } from "@/lib/marketplace/grove-forge.js";
@@ -131,6 +139,15 @@ const familiesFor = ({ benchFresh = 0, statuesHeld = 0 } = {}) => [
             // zones is a good surprise once and a search forever after, so the panel that names the zone
             // has to be one tap away.
             { k: "quests", label: "Quests", art: "/images/grove/ui-board.webp", note: "who wants what" },
+            // ⚠️ TOWN IS A PLACE IN THE GROVE, NOT A WAY OUT OF IT. Luke: "if you go to town, you
+            // completely get booted out of the Grove. Like, the whole experience is lost... when you're
+            // in the town, it should be like you're in any other zone of the Grove with the menu on the
+            // left and still in that experience."
+            //
+            // ⚠️ THE SPRITE IS THE NAV'S OWN TOWN ART, NOT A NEW ONE. It already exists, it is already
+            // in the house style, and drawing a second town would cost money for a picture of a thing
+            // that has a picture. [[no-icons-or-glyphs-in-the-game]] asks for a sprite, not for a NEW one.
+            { k: "town", label: "Town", art: "/images/nav/town.png", note: "the street outside" },
         ],
     },
     {
@@ -208,7 +225,23 @@ export default function GroveClient({ initial }) {
     // Which tool's sheet is open, or null. See GroveToolSheet.
     const [toolView, setToolView] = useState(null);
     const [st, setSt] = useState(initial);
-    const [view, setView] = useState("map");     // map | zone | bag | bench | emblems
+    const [view, setView] = useState("map");     // map | zone | town | bag | bench | emblems
+
+    // ── ⚠️ THE TOWN IS FETCHED WHEN IT IS OPENED, NEVER WITH THE GROVE ────────────────────
+    // getTownState is described in TownClient's own notes as the highest-volume request in the app.
+    // Computing it on the Grove's server render would bill it for every member who opens the forest and
+    // never walks to the street — the exact family-A mistake CLAUDE.md opens with: reaching for the
+    // convenient existing call instead of the narrow one. Null until asked for, once per visit.
+    const [townState, setTownState] = useState(null);
+    useEffect(() => {
+        if (view !== "town" || townState) return undefined;
+        let gone = false;
+        fetch("/api/marketplace/town", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((d) => { if (!gone && d && !d.error) setTownState(d); })
+            .catch(() => {});
+        return () => { gone = true; };
+    }, [view, townState]);
     // ⚠️ THE SAME BODY CLASS THE ZONE ALREADY USES, not a second mechanism. It stops the page behind
     // scrolling and hides the site's own fixed chat bubbles, which sit in exactly the corner the dock now
     // occupies. Added for the WHOLE feature rather than only the zone, because the whole feature is full
@@ -697,6 +730,25 @@ export default function GroveClient({ initial }) {
 
 
     const panel = view === "zone" ? zonePanel : view;
+    // ── ⚠️ THE STREET, INSIDE THE FOREST ──────────────────────────────────────────
+    // Luke: "when you're in the town, it should be like you're in any other zone of the Grove with the
+    // menu on the left and still in that experience."
+    //
+    // TownClient takes plain props and paints itself, so it mounts here unchanged — the same decision as
+    // the Arena's skill tree in the class room, and for the same reason: a Grove copy of the street would
+    // be a second street to keep in step with the first.
+    //
+    // ⚠️ IT IS NOT IN gv-sheet. The sheet is a scrolling column of parchment panels; the town is a
+    // camera on a street and has to be the whole area. It sits outside that column, under the menu handle
+    // (fixed, z-index 1002), which is what makes it read as another room of the Grove rather than a page.
+    const townNode = view === "town" ? (
+        <div className="gv-town">
+            {townState
+                ? <TownClient initial={townState} />
+                : <p className="gv-town-wait">Walking to town…</p>}
+        </div>
+    ) : null;
+
     const sheetNode = (
                 <div className="gv-sheet">
 
@@ -742,7 +794,9 @@ export default function GroveClient({ initial }) {
                         zoneState={zoneState}
                         frontier={frontier}
                         onEnter={enter}
-                        onTown={() => { window.location.href = "/marketplace/town"; }}
+                        // ⚠️ A VIEW, NOT A NAVIGATION. This was window.location.href, which tore the
+                        // whole Grove down and rebuilt the site around a town page with no way back.
+                        onTown={() => setView("town")}
                     />
                     {/* ── ⚠️ ONE PLATE, NOT TWO ──────────────────────────────────────────────────
                         Luke: "Two things on top compete and seem redundant." They did, and they were:
@@ -1307,7 +1361,9 @@ export default function GroveClient({ initial }) {
                     // Luke: "when you die it should send you back to town." ⚠️ router.push, NOT the
                     // leave handler — leaving drops you on the Grove map, which is the screen inviting you
                     // straight back into the zone that just killed you. Town is somewhere else.
-                    onDeath={() => router.push("/marketplace/town")}
+                    // Dying sends you to the street, as it always did — but the street is in here now,
+                    // so losing a run no longer also loses the session.
+                    onDeath={() => setView("town")}
                 />
                 {bossWon ? (
                     <div className="gv-unlock gv-won" onClick={() => setBossWon(null)}>
@@ -1434,6 +1490,7 @@ export default function GroveClient({ initial }) {
             {popNode}
             {note ? <p className="gv-note">{note}</p> : null}
 
+            {townNode}
             {sheetNode}
 
             {/* ── THE MENU ──────────────────────────────────────────────────────────────────────
