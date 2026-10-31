@@ -281,6 +281,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const [poseShelf, setPoseShelf] = useState(null);
     const [poseBusy, setPoseBusy] = useState("");
     const [poseNote, setPoseNote] = useState(null);
+    // Which shop pose is one tap from being bought. Cleared on close and after every action, so an
+    // armed row cannot survive the sheet and charge on a tap meant for something else.
+    const [poseConfirm, setPoseConfirm] = useState(null);
     const loadPoses = useCallback(async () => {
         const d = await fetch("/api/marketplace/poses", { cache: "no-store" })
             .then((r) => r.json()).catch(() => null);
@@ -288,13 +291,13 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     }, []);
     const openPoses = useCallback(() => { setPoseOpen(true); if (!poseShelf) loadPoses(); }, [poseShelf, loadPoses]);
     const closePoses = useCallback(() => {
-        setPoseOpen(false); setPoseNote(null);
+        setPoseOpen(false); setPoseNote(null); setPoseConfirm(null);
         // Same stray-tap shield the gear picker uses, for the same reason: this sheet unmounts under a finger.
         setShield(true);
         setTimeout(() => setShield(false), 350);
     }, []);
     const actPose = useCallback(async (action, pose) => {
-        setPoseBusy(pose); setPoseNote(null);
+        setPoseBusy(pose); setPoseNote(null); setPoseConfirm(null);
         const d = await fetch("/api/marketplace/poses", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action, pose }),
@@ -722,33 +725,63 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     </div>
                                 </div>
 
+                                {/* ── ⚠️ THE ROW IS THE CONTROL. THERE IS NO BUTTON. ──────────────
+                                    Luke: "I hate the yellow button we need to find a new way." Twenty gold
+                                    pills down one edge is what a list of twenty actions looks like when every
+                                    row carries its own, and they shouted over the art beside them.
+
+                                    The answer was already in this sheet. The GEAR picker below has no buttons
+                                    either: `.gearpick-row` IS a <button>, and its right-hand column carries
+                                    STATE rather than a verb. Same shape here, so choosing a pose and choosing
+                                    a helmet are one gesture instead of two conventions in one modal. */}
+                                <p className="posepick-hint">Tap a pose to wear it.</p>
                                 <ul className="posepick-list">
-                                    {poseShelf.poses.filter((p) => !p.worn).map((p) => (
-                                        <li key={p.id} className={`posepick-row rar-${p.rarity}${p.owned ? "" : " is-locked"}`}>
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img className={`posepick-art rar-${p.rarity}`} src={p.art} alt="" aria-hidden="true" />
-                                            <div className="posepick-body">
-                                                <b>{p.name}</b>
-                                                {/* ⚠️ THE NUMBER, NOT JUST THE LOCK. "Win 25 arena bouts" with 18
-                                                    under it is a thing to go and do; without the count it is a
-                                                    wall, and a wall on a cosmetic screen reads as a tease. */}
-                                                <span>{!p.owned && p.need ? `${p.how} · ${p.have}/${p.need}` : (p.how || p.rarity)}</span>
-                                            </div>
-                                            {p.owned ? (
-                                                <button type="button" className="posepick-btn" disabled={poseBusy === p.id}
-                                                    onClick={() => actPose("equip", p.id)}>
-                                                    {poseBusy === p.id ? "…" : "Wear it"}
+                                    {poseShelf.poses.filter((p) => !p.worn).map((p) => {
+                                        const locked = !p.owned && p.source !== "shop";
+                                        const buying = !p.owned && p.source === "shop";
+                                        const armed = poseConfirm === p.id;
+                                        return (
+                                            <li key={p.id}>
+                                                <button
+                                                    type="button"
+                                                    className={`posepick-row rar-${p.rarity}${locked ? " is-locked" : ""}${armed ? " is-armed" : ""}`}
+                                                    disabled={locked || poseBusy === p.id || (buying && !p.affordable)}
+                                                    onClick={() => {
+                                                        if (p.owned) { actPose("equip", p.id); return; }
+                                                        // ⚠️ A PURCHASE ASKS TWICE AND AN EQUIP DOES NOT, BECAUSE
+                                                        // ONLY ONE OF THEM IS REVERSIBLE. Wearing a pose you own
+                                                        // costs nothing and is undone by wearing another. Buying
+                                                        // one spends store credit and cannot be undone -- and
+                                                        // this sheet is a full-screen portal that unmounts under
+                                                        // a finger, which is how Kaishiern opened every chest he
+                                                        // had been saving. The gold pill charged on tap one.
+                                                        if (armed) { setPoseConfirm(null); actPose("buy", p.id); }
+                                                        else setPoseConfirm(p.id);
+                                                    }}
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img className={`posepick-art rar-${p.rarity}`} src={p.art} alt="" aria-hidden="true" />
+                                                    <div className="posepick-body">
+                                                        <b>{p.name}</b>
+                                                        {/* ⚠️ THE NUMBER STILL SHOWS, IT JUST MOVED RIGHT.
+                                                            "Win 25 arena bouts" with 18 under it is a thing to
+                                                            go and do; without the count it is a wall, and a wall
+                                                            on a cosmetic screen reads as a tease. It lives in
+                                                            the state column now with the prices, so the subtitle
+                                                            is the TASK and the right-hand edge is always the
+                                                            number -- printing it in both read as a stutter. */}
+                                                        <span>{p.how || p.rarity}</span>
+                                                    </div>
+                                                    <span className="posepick-state">
+                                                        {poseBusy === p.id ? "…"
+                                                            : locked ? `${p.have}/${p.need}`
+                                                                : buying ? (armed ? "Tap to confirm" : usd(p.cents))
+                                                                    : null}
+                                                    </span>
                                                 </button>
-                                            ) : p.source === "shop" ? (
-                                                <button type="button" className="posepick-btn is-buy"
-                                                    disabled={poseBusy === p.id || !p.affordable}
-                                                    title={p.affordable ? `Buy ${p.name}` : "Not enough store credit"}
-                                                    onClick={() => actPose("buy", p.id)}>
-                                                    {poseBusy === p.id ? "…" : usd(p.cents)}
-                                                </button>
-                                            ) : <span className="posepick-btn is-flat">Locked</span>}
-                                        </li>
-                                    ))}
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
 
                                 <p className="posepick-foot">

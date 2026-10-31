@@ -10436,36 +10436,56 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    Inside the gear picker's own sheet (.gearpick), so the chrome, the scrim and the "Wearing now" block are
    shared and cannot drift. Only the row differs, because a pose row answers "owned, locked, or for sale"
    where a gear row answers "what does this swap change". */
-.posepick-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
-/* ⚠️ 64px IN THE ROW, 46 IN THE SLOT, AND THE DIFFERENCE IS DELIBERATE. The doll slot has to be 46 or it
-   stops matching the nine gear slots around it. A picker row has no such constraint, and the round-one
-   contact sheet showed why it should not inherit the number: at 46 all three poses read as "a grey knight"
-   and the stance — which is the entire product — was gone. The row is where you decide what to wear, so it
-   gets the size the decision needs. */
+.posepick-hint { margin: 10px 0 8px; font-size: 0.76rem; color: #8b93a0; }
+.posepick-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+
+/* ── ⚠️ THE ROW IS A BUTTON AND IT IS QUIET ───────────────────────────────────────────────────────────────
+   Luke: "I hate the yellow button we need to find a new way." Every row used to carry a gold pill, so the
+   list read as twenty calls to action stacked on top of each other, each one louder than the silhouette it
+   was sitting next to.
+
+   This is `.gearpick-row` wearing the pose's clothes: the same neutral translucent fill, the same hover, the
+   same three-column grid, the same "the row is the control" rule. The rarity is on the BORDER and the art's
+   own glow, not on a filled shape — a 64px sprite lit in its rarity colour is a stronger signal than a pill
+   and it does not compete with the one gold control on the screen, which is the stage's Open button. */
 .posepick-row {
     display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 10px;
-    padding: 8px 10px; border-radius: 10px;
-    background: rgba(0, 0, 0, 0.3); border: 1px solid color-mix(in srgb, var(--rar, #9aa7b5) 45%, transparent);
+    width: 100%; padding: 8px 10px; border-radius: 12px; cursor: pointer; text-align: left;
+    font: inherit; color: inherit;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid color-mix(in srgb, var(--rar, #9aa7b5) 42%, transparent);
+    transition: background 0.12s ease, border-color 0.12s ease;
 }
-.posepick-row.is-locked { opacity: 0.72; }
+.posepick-row:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--rar, #9aa7b5) 12%, rgba(255, 255, 255, 0.06));
+    border-color: color-mix(in srgb, var(--rar, #9aa7b5) 75%, transparent);
+}
+.posepick-row:disabled { cursor: default; }
+/* Locked reads as not-yet rather than as broken: the art dims, the frame stays its rarity, and the count on
+   the right is the thing to go and do. */
+.posepick-row.is-locked { opacity: 0.6; }
+.posepick-row.is-locked .posepick-art { filter: grayscale(0.9) brightness(0.6); }
+/* ⚠️ ARMED IS THE ONLY WARM STATE LEFT IN THE LIST, WHICH IS THE POINT. One row at a time ever wears it, and
+   it means "the next tap spends money" -- the single moment on this screen that deserves to shout. */
+.posepick-row.is-armed {
+    border-color: #ffb347;
+    background: rgba(255, 179, 71, 0.12);
+}
 .posepick-art {
     width: 64px; height: 64px; object-fit: contain; display: block;
-    /* The rarity reads off the art's own glow as well as the border, the way a chest reward does — a
-       coloured hairline alone is invisible at 46px on a phone. */
     filter: drop-shadow(0 0 6px color-mix(in srgb, var(--rar, #9aa7b5) 60%, transparent));
 }
 .posepick-body { min-width: 0; display: grid; gap: 2px; }
-.posepick-body b { font-size: 0.9rem; font-weight: 700; }
-.posepick-body span { font-size: 0.74rem; color: #9aa08f; }
-.posepick-btn {
-    min-width: 86px; padding: 9px 14px; border-radius: 999px; border: 0;
-    font: inherit; font-size: 0.82rem; font-weight: 800; cursor: pointer;
-    color: #1a1a12; background: linear-gradient(180deg, #ffd166, #e0a83c);
+.posepick-body b { display: block; font-size: 0.9rem; font-weight: 700; color: #f0e6d2; }
+.posepick-body span { display: block; font-size: 0.74rem; color: #9aa08f; }
+/* The right-hand column is STATE, not a verb -- a price, a progress count, or nothing at all when the pose
+   is already yours and tapping simply wears it. Same job .gearpick-score does with its arrows. */
+.posepick-state {
+    font-size: 0.8rem; font-weight: 800; color: #c9a86a; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
-.posepick-btn.is-buy { color: #2a1f05; background: linear-gradient(180deg, #ffc861, #c89a3a); }
-.posepick-btn.is-flat { color: #9aa08f; background: rgba(255, 255, 255, 0.06); cursor: default;
-    display: grid; place-items: center; }
-.posepick-btn:disabled { opacity: 0.5; cursor: default; }
+.posepick-row.is-locked .posepick-state { color: #8b93a0; }
+.posepick-row.is-armed .posepick-state { color: #ffb347; }
 .posepick-foot { margin: 12px 0 0; font-size: 0.82rem; color: #9aa08f; display: grid; gap: 4px; }
 .posepick-foot b { color: #e7dece; }
 .posepick-foot em { font-style: normal; color: #ffd166; }
