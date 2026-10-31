@@ -142,8 +142,8 @@ export const trackCost = (lvl) => 400 * (Number(lvl) + 1) * (Number(lvl) + 1);
 // that pays for: a Star Fruit is a mythic crop with a 43-hour grow, and tier 4 handed one over for cooking
 // badly. Four ladders' worth of failure was quietly the best seed source in the game.
 //
-// Now the only seed the kitchen pays is a Star Fruit, on the Master's ladder, at the very top — which needs
-// the Master's Book to reach at all, a flawless cook to climb, and the jackpot roll on top of that.
+// Now the only seed the kitchen pays is a Star Fruit, and it stays on the Master's ladder — which needs the
+// Master's Book to reach at all. It is no longer the TOP rung of it: see the ladder note below.
 // Every page in the base book, by id. The kitchen board starts from RECIPES and then adds back the GATED
 // pages this member has actually learned — see getKitchenState — so it needs to know which ids are base ones
 // without naming the gated books one at a time. Built once at import, not per request.
@@ -223,22 +223,40 @@ export const TIERS = [
     {
         // ── THE MASTER'S LADDER ──────────────────────────────────────────────────────
         // Only reachable by somebody holding the Master's Book, because nothing outside it cooks at tier 6.
-        // Its consolation rung is deliberately better than the Legendary ladder's PRIZE rung — the whole
-        // point of a bought tier is that its worst outcome beats the best one you had.
+        // The whole point of a bought tier is that it climbs past the one you had: its prize rung is an
+        // ascendant chest, the best thing any ladder pays, and everything under it is at Legendary's level
+        // or above. The one rung that ISN'T is the consolation seed — read the note on it.
         tier: 6, name: "Master", color: "#ff7a3d",
         rewards: [
+            // ── THE ONLY SEED THE KITCHEN PAYS, AND IT IS THE CONSOLATION ────────────────────────────────
+            // This was rung 7 — the top of the last ladder — and that made the ladder climb DOWNWARDS at
+            // the finish: Master's Book, a flawless cook and the jackpot roll, all of it to be handed one
+            // seed standing on top of an ascendant chest. GrayKitsune reported it twice, 2026-09-14 and
+            // 2026-10-31: "a legendary recipe can take 30+ and this is 1". He is exactly right — Starfruit
+            // Ambrosia, Sunlit Whale Course and Fallen Star Plate each cost 30 starfruit once `p_essence`
+            // is followed down the chain, so the best outcome of the best ladder was 1/30th of one dish's
+            // inputs, as a seed, 43 hours from being a fruit.
+            //
+            // Luke's call, 2026-10-31: reorder only. The seed still drops at the same rate from the same
+            // ladder — no new starfruit enters the game and none leaves — it is simply the rung a fumbled
+            // Master cook lands on instead of the rung a perfect one does. That is about what one seed is
+            // worth, and the ladder now climbs the whole way.
+            //
+            // Scarcity is still the argument FOR it being here at all, and it survives the move: tier 6
+            // needs the Master's Book before a pot is lit, so this remains the one place outside the farm
+            // a Star Fruit comes from. Two knock-ons, both wanted:
+            //   · Head Chef floors the rung at 1 (see payout below), so that power now trades the seed away
+            //     for never landing on a consolation — a real choice rather than a strict gain.
+            //   · It is the one rung on this ladder that does NOT beat the Legendary ladder's prize, which
+            //     is the price of keeping supply flat. Raising the count instead would have been new
+            //     starfruit, and that needs the 3-day daily total measured first.
+            { kind: "seed", pool: ["starfruit"], min: 1, max: 1 },
             { kind: "parts", partTier: 5, min: 4, max: 6 },
             { kind: "consumable", id: "treat_golden" },
             { kind: "consumable", id: "farm_fertilizer_haul" },
             { kind: "spin", n: 3 },
             { kind: "chest", chestTier: "mythic" },
             { kind: "chest", chestTier: "ascendant" },
-            // ── THE ONLY SEED THE KITCHEN PAYS ───────────────────────────────────────────────────────────
-            // Last rung of the last ladder, which is the hardest thing to reach in cooking: tier 6 needs the
-            // Master's Book before a pot is even lit, the top of a ladder needs a flawless run, and the top
-            // band needs the jackpot roll after that. A Star Fruit is the farm's mythic crop and this is the
-            // one place outside the farm it comes from — which is what makes it worth the chain.
-            { kind: "seed", pool: ["starfruit"], min: 1, max: 1 },
         ],
     },
 ];
@@ -295,7 +313,10 @@ export function rewardLabel(r, art = {}) {
         }
         case "seed": {
             const first = r.pool[0];
-            return { name: `Seeds ×${r.min}–${r.max}`, desc: `Farm seeds: ${r.pool.map((x) => SEEDS[x]?.name || x).join(", ")}.`, rarity: SEEDS[first]?.rarity || "common", sprite: crops[`crop:${first}`] || null, fallback: KIND_FALLBACK.seed };
+            // "Seeds ×1–1" is how a fixed quantity rendered, which reads as a broken range rather than a
+            // count. A range only gets printed when there is one.
+            const qty = r.min === r.max ? `×${r.min}` : `×${r.min}–${r.max}`;
+            return { name: `Seeds ${qty}`, desc: `Farm seeds: ${r.pool.map((x) => SEEDS[x]?.name || x).join(", ")}.`, rarity: SEEDS[first]?.rarity || "common", sprite: crops[`crop:${first}`] || null, fallback: KIND_FALLBACK.seed };
         }
         case "spin":
             // Threshold moved with the counts. The top spin rung is 3 now, not 8, so `>= 5` would have made
