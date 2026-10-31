@@ -101,10 +101,35 @@ async function ownsPose(buyerId, id) {
  * not own, which is a nicety; this is the rule. A POST naming a $8 pose must fail for somebody who has not
  * bought it, or the price is advisory.
  */
+/**
+ * Wear `id`, and tell the sprite job the hero changed.
+ *
+ * ⚠️ WRITING `equipped_pose` ALONE DRAWS NOTHING, AND THAT IS WHY THIS IS ONE FUNCTION. The cron picks a
+ * member up on `avatar_updated_at > avatar_sprite_at OR equipment_updated_at > avatar_sprite_at`, so a
+ * column nothing compares against is invisible to it — the pose would sit in the database, show as
+ * `pending` on the owner's sprite screen (which tests the PROMPT, not the timestamps), and never be drawn
+ * until the member happened to swap a ring days later. A paid cosmetic that does not apply.
+ *
+ * Bumping `equipment_updated_at` is the honest signal rather than a third timestamp: a pose is part of how
+ * the figure is drawn, it is managed from the gear screen, and the 24h per-member cooldown on that column
+ * is exactly the throttle a pose wants too — try on all twenty, pay for one image.
+ *
+ * Attempts are cleared the way `inventory.js` clears them on an equip: a member whose avatar poisoned out
+ * and backed off deserves a fresh run at a prompt that is now different.
+ */
+const wearPose = (buyerId, id) =>
+    db.query(
+        `UPDATE mkt_buyer
+            SET equipped_pose = $2, equipment_updated_at = NOW(),
+                avatar_sprite_attempts = 0, avatar_sprite_error = NULL
+          WHERE id = $1`,
+        [buyerId, id],
+    );
+
 export async function equipPose(buyerId, id) {
     if (!buyerId || !POSE_BY_ID[id]) return { ok: false, error: "unknown_pose" };
     if (!(await ownsPose(buyerId, id))) return { ok: false, error: "not_owned" };
-    await db.query(`UPDATE mkt_buyer SET equipped_pose = $2 WHERE id = $1`, [buyerId, id]);
+    await wearPose(buyerId, id);
     return { ok: true, worn: id };
 }
 
@@ -140,6 +165,6 @@ export async function buyPose(buyerId, id) {
         return { ok: false, error: spent?.error || "not_enough_credit" };
     }
 
-    await db.query(`UPDATE mkt_buyer SET equipped_pose = $2 WHERE id = $1`, [buyerId, id]);
+    await wearPose(buyerId, id);
     return { ok: true, worn: id, spentCents: p.cents };
 }
