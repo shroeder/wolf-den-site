@@ -3504,7 +3504,14 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 );
                             })}
                         </div>
-                        <p className="muted" style={{ fontSize: "0.76rem", margin: "10px 2px 0" }}>Both refresh daily. Hunts tick as you fight in the Grove; bounties as you play in the plaza.</p>
+                        {/* ⚠️ THE FOOTNOTE WAS A LEAK OF ITS OWN. It named the Grove to every member in town, including
+                            the ones the Hunt block above is now correctly hidden from — so the one line left on screen
+                            was the one explaining a feature they cannot see. It says what is actually there. */}
+                        <p className="muted" style={{ fontSize: "0.76rem", margin: "10px 2px 0" }}>
+                            {hunts.length
+                                ? "Both refresh daily. Hunts tick as you fight in the Grove; bounties as you play in the plaza."
+                                : "Bounties refresh daily, and tick as you play in the plaza."}
+                        </p>
                     </div>
                 </div>
             ) : null}

@@ -2670,20 +2670,26 @@ export const GROVE_CSS = `
    Everything you can do to a recipe, on one line, in the same place on every card. Craft takes the
    room left over so it is the same size and the same height on every row — the old column centred it
    against a body of varying height, so a list of them read as a staircase. */
-/* ⚠️ CRAFT IS NOT FULL WIDTH, AND THAT WAS A REAL STEP BACKWARDS WHEN IT WAS. Letting it take the
-   leftover room turned it into a yellow slab the width of the card on every single row — three of them
-   on screen at once, each shouting louder than the recipe it belonged to. It is sized to its label and
-   anchored right, so the bar is the same shape on every card.
-
-   ⚠️ WRAPS RATHER THAN CRUSHES. Craft + a stepper + a sentence will not fit on a 390px phone, so the
-   stepper drops to its own line instead of squeezing the other two into coins. */
-.gv-rec-bar { display: flex; align-items: center; gap: 8px; margin-top: 2px; flex-wrap: wrap; }
-/* ⚠️ THE WRAP IS DECIDED HERE, NOT LEFT TO WIDTHS. Three controls will not fit on a phone, and
-   letting flex choose which one falls off the line picked CRAFT — the primary action — and stranded it
-   alone on a row of its own under the stepper. The batch stepper is the optional one, so it is the one
-   given 100% and pushed to its own line; Craft stays top-right on every card, stepper or no stepper. */
-.gv-rec-bar > .gv-rec-go { order: 2; flex: 0 0 auto; min-width: 96px; margin-left: auto; }
-.gv-rec-bar > .gv-rec-qty { order: 1; flex: 0 1 auto; min-width: 0; }
+/* ── THE FOOT: WHAT IT COSTS, AND THE BUTTON THAT SPENDS IT ──────────────────────────────
+   ⚠️ align-items: flex-end SO THE BUTTON SITS ON THE LAST ROW OF CHIPS. A recipe with four parts wraps
+   its chips to two lines, and a centred button would float between them. Bottom-aligned, the button is
+   always level with the last chip however many there are. */
+.gv-rec-foot { display: flex; align-items: flex-end; gap: 8px; }
+/* ⚠️ 0 1 auto, NOT 1 1 auto. Letting the chips GROW pushed the button to the far edge and reopened
+   the gap this whole change exists to close; they take what they need and the button follows them. */
+.gv-rec-foot > .gv-cost { flex: 0 1 auto; min-width: 0; }
+.gv-rec-foot > .gv-rec-bar { margin-left: auto; }
+/* Its own line, right-aligned, only on rows that can batch. See the note at its markup. */
+.gv-rec-qty { justify-content: flex-end; margin-top: 7px; }
+/* ⚠️ THE BAR IS A COLUMN NOW, NOT A ROW, and it does not grow. Craft above, the batch stepper under it
+   when there is one — both hugging the right edge beside the chips. A row here would have fought the
+   chips for width and pushed them into a third line. */
+.gv-rec-bar { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+/* ⚠️ NO min-width HERE. A 96px floor was what stopped the chips and the button sharing a line at all:
+   three chips measure ~235px and a phone's body column is ~296px, so a 96px button plus its gap did not
+   fit and flex squeezed the chips down to one per row. Sized to its own label, "Craft" is ~64px and the
+   line works. The 44px tap-target floor still applies on height, which is the one that matters. */
+.gv-rec-bar > .gv-rec-go { min-width: 0; }
 .gv-rec-all { pointer-events: auto; cursor: pointer; font: inherit;
     padding: 7px 12px; border-radius: 999px; font-weight: 800; font-size: 0.74rem;
     color: #cfe3c6; background: rgba(255,255,255,0.05);
@@ -3045,9 +3051,18 @@ export const GROVE_CSS = `
    nothing a player was actually reading removed. */
 .gv-rec { padding: 9px 10px; }
 .gv-cost { display: flex; flex-wrap: wrap; gap: 5px; list-style: none; margin: 5px 0 0; padding: 0; }
-.gv-cost li { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 4px;
-    border-radius: 999px; font-size: 0.72rem; background: rgba(0,0,0,0.3);
+/* ⚠️ SIZED SO THREE OF THEM AND THE BUTTON SHARE ONE LINE. A chip says an 18px picture and "4/4";
+   at the old padding that measured ~90px, three came to 280 of a ~296px body column, and Craft could
+   not fit beside them at any size. Tightened to ~62px the whole foot fits on one row on a 390px phone
+   with room to spare on a 412 — which is what removed the empty half-row under every card. */
+/* ⚠️ THE PADDING IS ON THE BUTTON, NOT THE li. Both had their own and the chip paid for both — 65px
+   measured for a 15px picture and the word "6/6". Moved onto the button it is ~52px, three fit beside
+   Craft in a 234px body, and the tap target is now the whole chip rather than a box inset inside it. */
+.gv-cost li { display: inline-flex; align-items: center; gap: 4px; padding: 0;
+    border-radius: 999px; font-size: 0.68rem; background: rgba(0,0,0,0.3);
     border: 1px solid rgba(255,255,255,0.08); }
+.gv-cost li > button { padding: 2px 7px 2px 3px; min-height: 30px; gap: 4px; }
+.gv-cost :global(img) { width: 15px; height: 15px; }
 .gv-cost li.is-have { border-color: rgba(124,185,90,0.42); }
 .gv-cost li.is-short { border-color: rgba(255,122,106,0.42); }
 .gv-cost li.is-short .gv-cost-n { color: #ff9f90; }
@@ -3055,7 +3070,7 @@ export const GROVE_CSS = `
 .gv-rec-pay { margin: 2px 0 0; font-size: 0.78rem; line-height: 1.3; color: #e0a83c;
     overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .gv-rec-top b { font-size: 0.9rem; }
-.gv-rec-go { padding: 9px 13px; font-size: 0.82rem; }
+.gv-rec-go { padding: 9px 12px; font-size: 0.8rem; }
 
 /* ── ⚠️ ONE RULE FOR EVERY BAND COLOUR ───────────────────────────────────────────────────────────────────
    There were eleven places in this file naming a hex for Pristine and all eleven had to agree. They are

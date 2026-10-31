@@ -1,3 +1,4 @@
+import { groveOpen } from "@/lib/marketplace/owner.js";
 import "server-only";
 import { itemById } from "@/lib/marketplace/items.js";
 import { GROVE_GEAR, SET_PIECE } from "@/lib/marketplace/grove-loot.js";
@@ -14,7 +15,6 @@ import { addChests } from "@/lib/marketplace/chests.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { canPreview } from "@/lib/marketplace/owner.js";
 import { questBoard, coliseumState } from "@/lib/marketplace/grove-quests.js";
 import {
     GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_PARTS, GROVE_EMBLEMS, GROVE_POP,
@@ -54,7 +54,12 @@ import { mapIsBuilt } from "@/lib/marketplace/grove-maps.js";
 // Guests are named per feature in owner.js and deliberately NOT added to OWNER_BUYER_IDS: that list is
 // checked in 44 files and decides casino controls, credit checkout, the role system and pet drops, none of
 // which an invitation to test a forest minigame should carry. See [[preview-guests-not-owner-list]].
-export const groveOpen = (buyerId) => canPreview("grove", buyerId);
+// Defined in owner.js so the town can ask it too without an import cycle; re-exported here
+// because eight callers already import it from this file.
+// ⚠️ IMPORTED AND THEN EXPORTED, NOT `export ... from`. A bare re-export forwards the name without
+// creating a local binding, and this file calls groveOpen itself in three places — which compiled
+// clean and failed only under lint:undef.
+export { groveOpen };
 
 const ZONE_BY_ID = Object.fromEntries(GROVE_ZONES.map((z) => [z.id, z]));
 const foeById = (id) => (id === GROVE_RARE.id ? GROVE_RARE : GROVE_ENEMIES[id] || null);

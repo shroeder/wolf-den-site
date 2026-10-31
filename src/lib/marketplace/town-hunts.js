@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { GROVE_ENEMIES, GROVE_ZONES } from "@/lib/marketplace/grove-catalog.js";
+import { groveOpen } from "@/lib/marketplace/owner.js";
 import { TOWNS } from "@/lib/marketplace/towns.js";
 
 // ── THE HUNTS ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -191,6 +192,20 @@ export async function bumpHunts(buyerId, slain, mapN) {
 
 /** Today's board for a town, with this member's progress on it. */
 export async function getHunts(buyerId, townN) {
+    // ── ⚠️ A HUNT IS A GROVE QUEST WEARING A TOWN'S CLOTHES ─────────────────────────────
+    // Luke: "the grove quests are leaking into the base town."
+    //
+    // Every hunt names a creature out of GROVE_ENEMIES and sends you into the map that town opens onto, and
+    // the ONLY thing that moves one is bumpHunts, called from the Grove's own settle. So to a member the
+    // Grove is not open for, this board was a quest giver handing out work that is impossible to start and
+    // impossible to progress, in a place they have never been told exists.
+    //
+    // The town page already gated the Grove's DOOR on exactly this. The quest giver standing next to it was
+    // not gated at all — [[feature-gates-come-in-pairs]], almost word for word.
+    //
+    // ⚠️ GATED IN THE LIB, NOT IN THE ROUTE. getHunts has two callers in the route (the GET and the
+    // POST's reply) and claimHunt is a third door; a check in one of them is a check in one of them.
+    if (!groveOpen(buyerId)) return [];
     const today = huntsForTown(townN);
     if (!today.length) return [];
     if (!buyerId) return today.map((h) => ({ ...h, progress: 0, claimed: false, claimable: false }));
@@ -218,6 +233,9 @@ export async function getHunts(buyerId, townN) {
  */
 export async function claimHunt(buyerId, key, townN) {
     if (!buyerId || !key) return { ok: false, error: "unknown_hunt" };
+    // The second door. A board that renders nothing still has a POST behind it, and a row could have been
+    // banked before the gate existed — see the note in getHunts.
+    if (!groveOpen(buyerId)) return { ok: false, error: "unknown_hunt" };
     const hunt = huntsForTown(townN).find((h) => h.key === key);
     if (!hunt) return { ok: false, error: "not_today" };
 

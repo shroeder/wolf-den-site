@@ -63,6 +63,18 @@ export function canPreview(feature, buyerId) {
     return Boolean(PREVIEW_GUESTS[feature]?.has(String(buyerId)));
 }
 
+/**
+ * Can this member go into the Grove?
+ *
+ * ⚠️ IT LIVES HERE, NOT IN grove.js, BECAUSE grove.js CANNOT BE IMPORTED BY EVERYTHING THAT NEEDS IT.
+ * The town's hunt board has to ask this question — its quests send you into Grove maps — and grove.js
+ * already imports `bumpHunts` from town-hunts.js, so asking the other way round is an import cycle. Next to
+ * canPreview it is one definition with no dependencies, which is what a gate should be.
+ *
+ * grove.js still re-exports it, so the eight existing callers did not have to move.
+ */
+export const groveOpen = (buyerId) => canPreview("grove", buyerId);
+
 // ── THE COSTUME'S DOOR, AND THE ONLY ONE ─────────────────────────────────────────────────────────────────────
 // ⚠️ A GATE THAT DOES NOT HEAR THE LAUNCH SWITCH IS A GATE THAT NEVER OPENS. The Halloween event turns on with
 // one line — HALLOWEEN_PUBLIC in halloween.js — and that line was wired to the chests, the items, the pets and

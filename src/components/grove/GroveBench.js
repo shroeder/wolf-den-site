@@ -665,6 +665,19 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     anything. It still shows on the craft act and the result card. */}
                                 <p className="gv-rec-pay">{payoff(r, st, built)}</p>
 
+                                {/* ── ⚠️ THE CHIPS AND THE BUTTON SHARE A LINE ───────────────────────
+                                    Luke: "Layout needs improving, all the empty space."
+
+                                    Giving the controls a bar of their own fixed the staircase but
+                                    bought it with a whole row per card, and once tempering was removed
+                                    that row held ONE button with a card's width of nothing beside it.
+                                    Three recipes on screen meant three dead bands.
+
+                                    The parts and the button belong on the same line: the chips say what
+                                    it costs and the button spends it, and the chips wrap inside their
+                                    own box so a four-part recipe grows downward without ever pushing
+                                    Craft off the row. */}
+                                <div className="gv-rec-foot">
                                 <ul className="gv-cost">
                                     {costs.map((c) => {
                                         const need = c.need;
@@ -695,22 +708,7 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                         );
                                     })}
                                 </ul>
-                            </div>
-                            </div>
 
-                            {/* ── ⚠️ ONE ACTION BAR, ACROSS THE BOTTOM ───────────────────────────
-                                Luke: "i hate the craft item rows and buttons."
-
-                                These controls used to be a THIRD COLUMN of the card's grid, which cost
-                                twice. It squeezed the body into about 250px, so the recipe's own name,
-                                its tags and its part chips all wrapped against a wall while a tall thin
-                                column of buttons sat beside them half empty; and because the grid was
-                                centred, the Craft button floated at a different height on every row, so
-                                scanning a list of them was scanning a staircase.
-
-                                Everything you can DO to a recipe is on one line now, in the same place
-                                on every card. The card above it is what the thing is; this is what you
-                                can do about it. */}
                             <div className="gv-rec-bar">
 
                             {/* ⚠️ "Built" WAS A DEAD END, AND IT IS THE ONLY STATE A FINISHED PLAYER EVER
@@ -751,33 +749,43 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                     one" -- which made never playing the minigame the fastest way to
                                     make anything. Luke: "it should always do the minigame." One
                                     performance now forges the whole batch. */}
-                                {ready && batch >= 2 ? (() => {
-                                    // Clamped against the LIVE max on every render, so spending parts
-                                    // elsewhere can never leave this asking for more than the bag holds.
-                                    const n = Math.max(2, Math.min(batch, Number(qty[r.id]) || batch));
-                                    const set = (v) => setQty((q) => ({ ...q, [r.id]: Math.max(2, Math.min(batch, v)) }));
-                                    return (
-                                        <div className="gv-rec-qty">
-                                            <button type="button" aria-label={`Fewer — make ${Math.max(2, n - 1)}`}
-                                                disabled={n <= 2 || busy === `all-${r.id}`}
-                                                onClick={() => set(n - 1)}>&minus;</button>
-                                            <button type="button" className="gv-rec-all"
-                                                disabled={busy === `all-${r.id}`}
-                                                title={`Play the hammer work once and make ${n} against it`}
-                                                onClick={() => craftAll(r, n)}>
-                                                {busy === `all-${r.id}` ? "…" : `Make ${n}`}
-                                            </button>
-                                            <button type="button" aria-label={`More — make ${Math.min(batch, n + 1)}`}
-                                                disabled={n >= batch || busy === `all-${r.id}`}
-                                                onClick={() => set(n + 1)}>+</button>
-                                            {/* The ceiling, said once, where the decision is made. A
-                                                stepper with no top is a stepper you have to probe. */}
-                                            <em>of {batch}</em>
-                                        </div>
-                                    );
-                                })() : null}
                                 </>
                             )}
+                            </div>
+                            </div>
+                            {/* ⚠️ THE STEPPER IS NOT IN THE BUTTON COLUMN, AND THAT WAS COSTING A WHOLE ROW
+                                OF CHIPS. Stacked under Craft it made that column as wide as ITSELF — 138px
+                                measured, against Craft's 53 — and a column reserves its width on every line
+                                it is on. So the chips got 88px of a 234px body and wrapped to one per row,
+                                on every card, whether or not the row even had a stepper. Out here it costs
+                                its own line only on the rows that have one. */}
+                            {ready && batch >= 2 ? (() => {
+                                // Clamped against the LIVE max on every render, so spending parts
+                                // elsewhere can never leave this asking for more than the bag holds.
+                                const n = Math.max(2, Math.min(batch, Number(qty[r.id]) || batch));
+                                const set = (v) => setQty((q) => ({ ...q, [r.id]: Math.max(2, Math.min(batch, v)) }));
+                                return (
+                                    <div className="gv-rec-qty">
+                                        <button type="button" aria-label={`Fewer — make ${Math.max(2, n - 1)}`}
+                                            disabled={n <= 2 || busy === `all-${r.id}`}
+                                            onClick={() => set(n - 1)}>&minus;</button>
+                                        <button type="button" className="gv-rec-all"
+                                            disabled={busy === `all-${r.id}`}
+                                            title={`Play the hammer work once and make ${n} against it`}
+                                            onClick={() => craftAll(r, n)}>
+                                            {busy === `all-${r.id}` ? "…" : `Make ${n}`}
+                                        </button>
+                                        <button type="button" aria-label={`More — make ${Math.min(batch, n + 1)}`}
+                                            disabled={n >= batch || busy === `all-${r.id}`}
+                                            onClick={() => set(n + 1)}>+</button>
+                                        {/* The ceiling, said once, where the decision is made. A
+                                            stepper with no top is a stepper you have to probe. */}
+                                        <em>of {batch}</em>
+                                    </div>
+                                );
+                            })() : null}
+
+                            </div>
                             </div>
                         </li>
                     );
