@@ -94,24 +94,55 @@ const FLAT_FACE = "flat cel shading with "
 const PLANTED = "standing squarely on both feet with a wide "
     + "planted stance.";
 
+// ⚠️ ROUND ONE AIMED AT THE WRONG THING. It subtracted the house tail's stance and flat-shading
+// clauses, which moved the POSE and the RENDERING and left the face identical in all four. Luke:
+// "All the ones you showed me, they're all basically still exactly the same problem."
+//
+// He named the real one: "it's taking their like Gravatar face too seriously... or maybe we need to
+// just describe what they look like instead of in terms of the face."
+//
+// ⚠️ THE REFERENCE IMAGE IS LITERALLY A GRAVATAR. renderAvatarPng draws the member's DiceBear
+// `avataaars` — the flat vector cartoon face — into the top 42% of the canvas and hands it to the
+// edits endpoint as the SUBJECT, under a prompt that says "keeping the same face". The model is doing
+// exactly what it was told. The faces look like Gravatar because they ARE Gravatar, faithfully copied.
+//
+// That also explains why they used to have personality: gpt-image-1 treated a reference loosely and
+// painted a character over it. gpt-image-2.5-sunburst is more obedient, so the same instruction that
+// used to read as a hint now reads as a spec.
+//
+// ⚠️ THERE IS NO TEMPERATURE TO TUNE. The images endpoints take model, size, quality, background,
+// output_format and n — no sampling knob of any kind. That avenue is closed, not untried.
+//
+// So round two tests the REFERENCE, not the rules: describe them instead of showing them.
+const DESCRIBE = {
+    from: /^Redraw this cartoon avatar as a full-body 2D video-game hero character\. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe \(torso, arms, hands, legs and feet\), in a/,
+    to: "Draw a full-body 2D video-game hero character from the description below — a real face with real expression, not a flat avatar portrait. Draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet), in a",
+};
+
+// "keeping the same face... as the reference" is the clause doing the copying. Loosened, not deleted:
+// the member still has to be recognisably themselves or it stops being their hero.
+const SAME_FACE = /keeping the same face, skin tone, hairstyle and hair color, facial hair, /;
+const LIKENESS = "matching the skin tone, hairstyle and hair color, facial hair, ";
+
 const VARIANTS = [
     {
-        id: "a-no-planted-stance",
-        why: "Pose only. Removes the mandated identical stance and lets the per-player 'confident heroic standing pose' win again.",
-        make: (rules) => rules.replace(PLANTED, ""),
-        needs: PLANTED,
+        id: "d-described-not-shown",
+        why: "No reference image at all. Drawn from describeAvatar's words alone, so there is no flat face to copy.",
+        mode: "generate",
+        prompt: (base, rules) => base.replace(DESCRIBE.from, DESCRIBE.to).replace(SAME_FACE, LIKENESS) + rules,
     },
     {
-        id: "b-no-flat-face",
-        why: "Rendering only. Removes the two-or-three-tones and no-small-marks clause, which is what leaves a face with nothing in it.",
-        make: (rules) => rules.replace(FLAT_FACE, ""),
-        needs: FLAT_FACE,
+        id: "e-shown-face-freed",
+        why: "Reference kept, but the copy-the-face instruction loosened to colouring and features only.",
+        mode: "edits",
+        prompt: (base, rules) => base.replace(SAME_FACE, LIKENESS) + rules,
     },
     {
-        id: "c-neither",
-        why: "Both removed. If this one has personality and A and B do not, the two clauses are doing it together.",
-        make: (rules) => rules.replace(PLANTED, "").replace(FLAT_FACE, ""),
-        needs: PLANTED,
+        id: "f-described-and-unflattened",
+        why: "No reference image AND the two-or-three-tones clause removed — the one thing round one showed does help the face.",
+        mode: "generate",
+        prompt: (base, rules) => base.replace(DESCRIBE.from, DESCRIBE.to).replace(SAME_FACE, LIKENESS)
+            + rules.replace(FLAT_FACE, ""),
     },
 ];
 
@@ -132,11 +163,17 @@ async function main() {
     const gear = await getEquippedGearPhrase(BUYER).catch(() => "");
     const base = buildSpritePrompt(row.avatar_config, gear);
 
-    const missing = VARIANTS.filter((v) => !SPRITE_RULES.includes(v.needs));
-    if (missing.length) {
-        console.log(`\n⚠️  ${missing.length} clause(s) no longer appear in SPRITE_RULES verbatim:`);
-        for (const v of missing) console.log(`   ${v.id}`);
-        console.log("   The house tail changed. Re-copy the clauses before trusting this run.\n");
+    // ⚠️ EVERY TRANSFORM BELOW IS A STRING SURGERY ON A PROMPT THIS SCRIPT DOES NOT OWN. If any of
+    // them stops matching, the run would quietly draw the control three times and look like a result.
+    const checks = [
+        [DESCRIBE.from.test(base), "the opening sentence of buildSpritePrompt"],
+        [SAME_FACE.test(base), "the keeping-the-same-face clause"],
+        [SPRITE_RULES.includes(FLAT_FACE), "the flat cel shading clause in SPRITE_RULES"],
+    ].filter(([ok]) => !ok);
+    if (checks.length) {
+        console.log(`\n\u26a0\ufe0f  the prompt changed — these no longer match:`);
+        for (const [, what] of checks) console.log(`   ${what}`);
+        console.log("   Re-copy them before trusting this run.");
         process.exit(1);
     }
 
@@ -161,14 +198,20 @@ async function main() {
             // The request below is editOnce's, field for field, so the draw is still the real one.
             const form = new FormData();
             form.append("model", IMAGE_MODEL);
+            // ⚠️ A "generate" VARIANT SENDS NO AVATAR AT ALL — that is the whole experiment. The house
+            // style sheet still rides along as a reference, because the question is whether the FACE
+            // improves without the flat one to copy, not whether the art style survives losing its refs.
             const refs = houseStyleRefs();
-            if (refs.length) {
-                form.append("image[]", new Blob([png], { type: "image/png" }), "subject.png");
+            const subject = v.mode === "generate" ? null : png;
+            if (subject && refs.length) {
+                form.append("image[]", new Blob([subject], { type: "image/png" }), "subject.png");
                 refs.forEach((b, i) => form.append("image[]", new Blob([b], { type: "image/png" }), `style-${i}.png`));
+            } else if (subject) {
+                form.append("image", new Blob([subject], { type: "image/png" }), "avatar.png");
             } else {
-                form.append("image", new Blob([png], { type: "image/png" }), "avatar.png");
+                refs.forEach((b, i) => form.append("image[]", new Blob([b], { type: "image/png" }), `style-${i}.png`));
             }
-            form.append("prompt", base + v.make(SPRITE_RULES));
+            form.append("prompt", v.prompt(base, SPRITE_RULES));
             form.append("size", "1024x1024");
             form.append("quality", "medium");
             form.append("background", "transparent");
