@@ -355,6 +355,31 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
     }, [openSignal, refreshPool]);
 
     /**
+     * ⚠️ A MODAL THAT IS ALREADY OPEN ON MOUNT STILL HAS TO FETCH, AND NOTHING WAS DOING IT.
+     *
+     * `pools` — the shelf of packs a member may open — is NOT a server prop on either page. It arrives from
+     * /api/marketplace/packs, and every existing call site is something the member TAPPED: the launch
+     * strip's button, openSignal changing, finishing an open, closing the modal. `startOpen` removes the
+     * strip by design and openSignal ignores its first value by design, so on /marketplace/rips there was
+     * no tap and no fetch, and `pools` stayed `[]` for the life of the page.
+     *
+     * Empty pools is not an error, which is exactly why it survived a build, a deploy and a look: the
+     * picker's condition is `pools.length > 1`, so the room quietly fell back to the single-bag arena and
+     * showed the house bag on its own. Luke, photographing the shop PC: "its not clear on pc there are
+     * other packs to open." There were seven, and the page built to show them was the only one that could
+     * not. Same family as the carousel width fixed beside it, and the worse half.
+     *
+     * ⚠️ READ FROM A REF SEEDED AT MOUNT, NOT FROM `modalOpen`. Keyed on the live value this would also
+     * fire when the launch strip opens the modal, and that button already calls refreshPool — two fetches
+     * for one tap. Only a modal that was open before anyone touched anything is missing its read.
+     */
+    const openedOnMount = useRef(modalOpen);
+    useEffect(() => {
+        if (!openedOnMount.current) return;
+        refreshPool().catch(() => {});
+    }, [refreshPool]);
+
+    /**
      * Everything from the detonation onward, which is the only part that needs the server's answer.
      *
      * ⚠️ SPLIT HERE ON PURPOSE, AND IT FALLS STRAIGHT OUT OF THE IDENTICAL-SHAKE RULE: if nothing before the

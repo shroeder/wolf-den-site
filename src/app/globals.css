@@ -26590,6 +26590,26 @@ body.cas-seated .social-fab { display: none; }
     /* The modal is the whole window on a desktop, and a .pk-foot column stretches its children edge to
        edge — a 1250px-wide "Open a pack" button reads as a page banner rather than as a control. */
     .pk-bagwrap { width: min(40vw, 320px); }
+
+    /* ── ⚠️ A PERCENTAGE CARD DELETES THE CAROUSEL'S ONLY AFFORDANCE ON A DESKTOP ────────────────────────
+       Luke, photographing the shop PC: "its not clear on pc there are other packs to open." He was right,
+       and the rule on `.pk-pick` says why in its own words: there is no dot row and no arrows here, so the
+       ONLY thing announcing a shelf is the edge of the next bag. That is what the 78% buys on a phone.
+
+       `.pk-stage` is `position: fixed; inset: 0`, so the track is the whole window and 78% of it is most of
+       a laptop — one bag, centred, with nothing either side. And a mouse has no swipe, the scrollbar is
+       hidden and the neighbours are off-screen, so the other packs were not merely unannounced, they were
+       close to unreachable.
+
+       Capping the card in pixels — the same idiom as .pk-bagwrap above — turns the identical rule back into
+       a shelf: four or five bags with more running off both edges, every one of them already clickable
+       (tapping a neighbour centres it and opens its sheet).
+
+       ⚠️ THE TRACK'S PADDING HAS TO BE DERIVED FROM THE CARD, NOT LEFT AT 11%. The padding exists so the
+       first and last bags can reach the middle; 11% of a wide window is nowhere near half the gap beside a
+       320px card, so the end packs would snap short of centre and sit selected-but-off-centre. */
+    .pk-pick-track { --pk-card: 320px; padding: 0 calc(50% - var(--pk-card) / 2); }
+    .pk-pick { flex-basis: var(--pk-card); }
 }
 
 /* ── THE CARD VAULT ──────────────────────────────────────────────────────────────────────────────────────────
