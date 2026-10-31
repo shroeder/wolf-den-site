@@ -588,7 +588,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     title={wornPose ? `Pose: ${wornPose.name}` : "Pose"}
                 >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="equip-slot-glyph" src={wornPose?.art || "/images/poses/ready.webp"} alt="" aria-hidden="true" />
+                    <img className="equip-slot-pose" src={wornPose?.art || "/images/poses/ready.webp"} alt="" aria-hidden="true" />
                 </button>
 
                 <div className="equip-hero">
@@ -698,7 +698,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             <>
                                 <div className="gearpick-worn">
                                     <span className="gearpick-worn-kick">Wearing now</span>
-                                    <div className="gearpick-worn-row">
+                                    {/* is-pose widens the row's FIRST COLUMN. It is hard-coded to 36px for a
+                                        gear glyph, so a 64px pose sprite overflowed it and sat on top of its
+                                        own name — the image was the right size and the column was not. */}
+                                    <div className="gearpick-worn-row is-pose">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img className={`gearpick-glyph pose-glyph rar-${wornPose?.rarity || "common"}`}
                                             src={wornPose?.art || "/images/poses/ready.webp"} alt="" aria-hidden="true" />

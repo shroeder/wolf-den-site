@@ -10487,6 +10487,16 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .equip-slot-glyph { font-size: clamp(1.4rem, 6vw, 2rem); color: var(--rar); display: flex; }
 .equip-slot-glyph svg { width: 1em; height: 1em; }
 .equip-slot-empty { font-size: 1.2rem; opacity: 0.3; }
+/* ── ⚠️ .equip-slot-glyph SIZES AN SVG, NOT AN IMAGE, AND IT BLEW THE DOLL APART ──────────────────────────
+   The pose slot reused that class on a plain <img> because every other slot's glyph carries it. But the rule
+   is `font-size` plus `svg { width: 1em }` — there is nothing in it that constrains a raster, so an 835px
+   sprite rendered at 835px, stretched its grid row and spilled a giant knight across the whole paper doll.
+   A class that happens to be on the right element is not a class that does the right thing; the slot needs
+   its own rule. See grep-the-class-name-before-taking-it. */
+.equip-slot-pose {
+    width: 78%; height: 78%; object-fit: contain; display: block;
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--rar, #9aa7b5) 60%, transparent));
+}
 
 .equip-hero { grid-area: hero; position: relative; display: grid; place-items: center; padding: 4px; }
 .equip-hero img {
@@ -18626,6 +18636,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .gearpick-worn-kick { display: block; font-size: 9.5px; font-weight: 900; letter-spacing: .14em;
     text-transform: uppercase; color: #d8b25e; margin-bottom: 5px; }
 .gearpick-worn-row { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 10px; }
+/* ⚠️ THE COLUMN IS SIZED FOR A 36px GEAR GLYPH AND A POSE IS 64. Sized in px rather than min-content on
+   purpose — the rest of the picker lines its art up down one edge, and a column that measured its own child
+   would put the pose row's text at a different x from every row beneath it. */
+.gearpick-worn-row.is-pose { grid-template-columns: 64px 1fr auto; }
 .gearpick-worn-body { min-width: 0; }
 .gearpick-worn-body b { display: block; font-size: 0.9rem; color: #f0e6d2; }
 .gearpick-worn-body span { display: block; font-size: 0.72rem; line-height: 1.4; color: #9aa2ab; }
