@@ -588,8 +588,20 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
         reset();
         setError(null);
         setShelfOpen(false);
-        setModalOpen(false);
         refreshPool();
+        // ── ⚠️ A ROOM THAT IS THE OPENER HAS NO CLOSED STATE ─────────────────────────────────────────
+        // Luke: "virtual rips shouldn't have another mode other than the drilled in mode where you see
+        // the packs."
+        //
+        // setModalOpen(false) renders the LAUNCH STRIP — the "open a pack" card that sits on top of
+        // /mystery-bags. That is the exact control this page was built to delete, and it was reappearing
+        // here the moment anyone dismissed the sheet or finished a pull: the one screen with no second
+        // job had a second mode, and it was the mode people scroll past.
+        //
+        // So on /rips, closing is RETURNING TO THE PICKER. The reset above already put the stage back to
+        // idle; not unmounting is the whole change.
+        if (startOpen) return;
+        setModalOpen(false);
     }
 
     const shortfall = Math.max(0, priceCents - balanceCents);
@@ -630,6 +642,14 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
         : null;
     // The × exists only where a dismiss cannot strand a paid-for card. See closeModal().
     const closable = phase === PHASE.idle || Boolean(choice);
+    // ── ⚠️ AND IN THE RIPS ROOM AT REST IT IS A DOOR, NOT A DISMISS ──────────────────────────────────
+    // With nothing to dismiss back to, an × at idle would be a control that visibly does nothing. It is
+    // also the only way out: .pk-stage is `position: fixed; inset: 0`, so the site nav is UNDER this and
+    // a room with no × is a room you cannot leave. See a-screen-with-no-door-is-not-shipped.
+    //
+    // /marketplace/play, not /marketplace — the first is the room the game nav calls Home, the second is
+    // the shop's landing page. The Grove's Leave was fixed for exactly this in 8dc5bb1e.
+    const leaveRoom = startOpen && phase === PHASE.idle && !choice;
 
     // ── THE ONE CALL TO ACTION ───────────────────────────────────────────────────────────────────────────
     // Luke: "there should be one call to action that glimmers."
@@ -735,15 +755,19 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
             }}
             onClick={phase === PHASE.shake ? skip : undefined}
         >
-            <button
-                type="button"
-                className="pk-close"
-                onClick={closeModal}
-                hidden={!closable}
-                aria-label="Close"
-            >
-                &#215;
-            </button>
+            {leaveRoom ? (
+                <a className="pk-close" href="/marketplace/play" aria-label="Leave">&#215;</a>
+            ) : (
+                <button
+                    type="button"
+                    className="pk-close"
+                    onClick={closeModal}
+                    hidden={!closable}
+                    aria-label="Close"
+                >
+                    &#215;
+                </button>
+            )}
 
             {/* ⚠️ IT COLLAPSES ONCE THE BAG GOES, IT DOES NOT DISAPPEAR. The first cut hid this outright to
                 buy the card its height, and Luke found the hole standing at the choice on a real pull: "I
