@@ -14,21 +14,23 @@ const ARBITER = "369fb5f7-3217-485f-bd72-e0c17ef5e383";
 //
 // ⚠️ NO BOUNTY AND NO NUMBERS THAT ONLY MAKE SENSE IN CODE. See announcements-paraphrase-only.
 
-const ANNOUNCE = `⚖️ **Twenty ways to stand.**
+const ANNOUNCE = `⚖️ **Twenty ways to stand, and your old heroes back.**
 
 /images/poses/aloft.webp
 
 Your hero has stood the same way since the day you made them — feet planted, weapon out, exactly like everybody else's. There is a new slot on the equipment screen for that, bottom-left of the paper doll beside the boots, and it decides how they stand.
 
-**Ten of them are earned, and some of yours are already waiting.** Win a bout in the arena. Open twenty-five chests. Land fifty hits on a weekly boss. Take ten daily spins, catch fifty fish, cook fifty dishes, salvage a hundred pieces, put down a hundred wanderers in the Grove. The ones you have not reached show you how far along you are rather than just saying no.
+**Ten of them are earned, and some of yours are already waiting.** Win a bout in the arena. Open twenty-five chests. Land fifty hits on a weekly boss. Take ten daily spins, catch fifty fish, cook fifty dishes, salvage a hundred pieces, put down a hundred wanderers in the Grove. The ones you have not reached show how far along you are rather than just saying no.
 
 **Ten more are bought with store credit**, three dollars up to eight, and those are the loud ones — a standard raised overhead, an oath sworn on one knee, a landing out of the sky. A pose you buy is worn the moment you buy it.
 
-**Wearing one does not repaint you on the spot.** Your hero is redrawn on the next pass and at most once a day, so try all of them on, settle on one, and let it catch up in its own time. Taking a pose off puts you back to the one everybody starts with.`;
+**And your heroes are kept now.** Until today a new drawing replaced the one you had and the old one was gone, which is why some of you locked yours — that was the only way to say "I like this one". Locks are gone and nothing is lost: every hero you are drawn goes on a shelf under the paper doll, you can switch between them whenever you like for nothing, and the ones you star stay forever.
+
+**Nothing redraws you behind your back any more.** Changing your gear or your pose no longer repaints your hero on its own — the shelf tells you when your hero is out of date, and there is an empty place on it that says "Draw a new hero". One a day. The one you were wearing is still there afterwards.`;
 
 const GLOBAL = `⚖️ Your hero can stand differently now — a new Pose slot on the equipment screen, bottom-left of the paper doll. Ten earned, ten bought, and a few of yours are probably already unlocked.
 
-Full notice in the announcements room.`;
+Your old heroes are kept too. Locks are gone, nothing gets overwritten, and new drawings only happen when you ask. Full notice in the announcements room.`;
 
 console.log(ANNOUNCE);
 console.log("\n─────────────────────────────────────\n");
