@@ -2,7 +2,8 @@ import { after, NextResponse } from "next/server";
 
 import { AVATAR_FIELDS, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { generateAvatarSvg, renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
-import { generateBuyerSprite, heroRedrawQuote, setSpriteLock } from "@/lib/marketplace/avatar-sprite.js";
+import { favouriteSprite, generateBuyerSprite, heroRedrawQuote, requestSpriteDraw, setSpriteLock,
+    spriteShelf, wearSprite } from "@/lib/marketplace/avatar-sprite.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { setAvatarConfig } from "@/lib/marketplace/profile.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -56,13 +57,40 @@ export async function POST(request) {
             // would leave a gold-spending action reachable by anyone willing to post JSON at it.
             if (body?.action === "redrawQuote") return noStore(await heroRedrawQuote(buyer.id));
             // Freeze the hero you have, or let gear change it again. Asked for by @Jinxx.
+            //
+            // ⚠️ THE LOCK IS A NO-OP NOW AND THE ENDPOINT STAYS ANYWAY. Nothing redraws a hero behind the
+            // member's back any more, so there is nothing to freeze -- but an app or a cached page that
+            // still posts {action:"lock"} must not 400 at somebody for using the screen they had open.
+            // It writes the flag, nothing reads it, and it comes out when the column does.
             if (body?.action === "lock") return noStore(await setSpriteLock(buyer.id, Boolean(body?.locked)));
+
+            // ── THE SHELF ────────────────────────────────────────────────────────────────────────────
+            // Read it, wear one, star one, ask for a new one. Four verbs against one lib, because every
+            // rule about what a member owns and when a draw is allowed lives in avatar-sprite.js -- a
+            // route that re-decided any of it would be a second answer. Same shape as the pose shelf.
+            if (body?.action === "shelf") return noStore(await spriteShelf(buyer.id));
+            if (body?.action === "wear") {
+                const r = await wearSprite(buyer.id, body?.sprite);
+                return noStore({ ...r, ...(await spriteShelf(buyer.id)) }, { status: r.ok ? 200 : 400 });
+            }
+            if (body?.action === "favourite") {
+                const r = await favouriteSprite(buyer.id, body?.sprite, Boolean(body?.on));
+                return noStore({ ...r, ...(await spriteShelf(buyer.id)) }, { status: r.ok ? 200 : 400 });
+            }
+            // ⚠️ THE ONLY THING ON THIS ROUTE THAT SPENDS MONEY, AND IT IS AWAITED. A draw is ~4c of
+            // OpenAI and takes most of a minute; backgrounding it would hand the member a reply before
+            // there is anything to show, and Vercel kills un-awaited async anyway.
+            if (body?.action === "draw") {
+                const r = await requestSpriteDraw(buyer.id);
+                return noStore({ ...r, ...(await spriteShelf(buyer.id)) }, { status: r.ok ? 200 : 400 });
+            }
 
             const config = body?.config ? sanitizeAvatarConfig(body.config) : null;
             const profile = await setAvatarConfig(buyer.id, config);
-            // NOTE: we intentionally do NOT generate the sprite here. setAvatarConfig bumps avatar_updated_at,
-            // so the NIGHTLY sprite cron redraws it — keeping OpenAI image generation to once/night, not on
-            // every avatar save. (New/changed looks reflect in the boss fight after the next nightly run.)
+            // ⚠️ NOTHING IS DRAWN HERE, AND NOTHING IS DRAWN LATER EITHER. This note used to say the
+            // nightly cron would pick the change up. It will not any more: the job draws a FIRST hero and
+            // stops. Changing your avatar marks the hero you are wearing as out of date, the gear screen
+            // says so, and the member decides whether that is worth a new draw.
             return noStore({ profile });
         } catch (error) {
             return internalError(error, { event: "marketplace.avatar.save.failure" });

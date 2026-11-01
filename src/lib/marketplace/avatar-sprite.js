@@ -279,20 +279,17 @@ export function pendingSpriteIds(limit = null) {
                 -- shared default sprite exists for: they render it until they change something, which stamps
                 -- avatar_updated_at and makes them eligible here for the first time.
                 AND avatar_updated_at IS NOT NULL
-                AND (
-                    -- No sprite at all: draw it now, no cooldown.
-                    avatar_sprite_url IS NULL
-                    -- Or the look changed since the last draw. Bounded to one redraw per member per
-                    -- REGEN_COOLDOWN_HOURS, so a member trying on gear all afternoon costs one image, not
-                    -- twenty; the changes in between coalesce into the next draw.
-                    -- A sprite with no draw-time is a row we cannot reason about; treat it as due rather than
-                    -- letting the NULL comparison quietly exclude it forever.
-                    OR avatar_sprite_at IS NULL
-                    OR (
-                        (avatar_updated_at > avatar_sprite_at OR equipment_updated_at > avatar_sprite_at)
-                        AND avatar_sprite_at < NOW() - INTERVAL '${REGEN_COOLDOWN_HOURS} hours'
-                    )
-                )
+                -- ── ⚠️ THE JOB DRAWS A FIRST HERO AND NOTHING ELSE ──────────────────────────────────────
+                -- It used to redraw whenever the look or the gear moved past the last draw. That is what
+                -- made the sprite overwrite itself, which is what made avatar_sprite_locked necessary, and
+                -- it spent money on members who were perfectly happy with the hero they had. Luke: "I love
+                -- the idea of saving money if they've already found a sprite that they like."
+                --
+                -- Every later draw is asked for, by a member, through requestSpriteDraw. A first one is not
+                -- askable -- somebody with no hero does not know there is a button -- so it stays automatic
+                -- and stays free. That is also where almost none of the spend was: 43 members were redrawn
+                -- in the 30 days before this changed, and nearly all of them already had a sprite.
+                AND avatar_sprite_url IS NULL
               ORDER BY avatar_sprite_at NULLS FIRST, avatar_sprite_attempts ASC, avatar_updated_at DESC NULLS LAST
               ${capped ? "LIMIT $1" : ""}`,
             capped ? [Math.floor(Number(limit))] : []
@@ -495,7 +492,125 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, mo
         //    make the next ordinary redraw look unnecessary and leave trial art in place for ever.
         [buyerId, url, prompt + (promptExtra || ""), verdict.ok ? null : `art quality: ${verdict.problems.join("; ")}`.slice(0, 500)]
     );
+    // ⚠️ AND IT GOES ON THE SHELF, BECAUSE THE LINE ABOVE IS AN OVERWRITE. Every sprite ever drawn before
+    // migration 505 is still sitting in blob storage and is unreachable, because the only pointer to it was
+    // replaced by the next draw. One insert stops that happening again, and it is what makes a member able
+    // to go back to a hero they liked instead of locking the one they have. ON CONFLICT because a redraw
+    // that returns a byte-identical image would otherwise shelve the same picture twice.
+    await db.query(
+        `INSERT INTO mkt_buyer_sprite (buyer_id, url, prompt) VALUES ($1, $2, $3)
+         ON CONFLICT (buyer_id, url) DO NOTHING`,
+        [buyerId, url, prompt + (promptExtra || "")],
+    ).catch(() => {});
     return url;
+}
+
+// ── THE SHELF ────────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "a way for people to store previous sprites that they liked that they can switch their appearance
+// to at any time."
+//
+// ⚠️ WEARING IS FREE AND DRAWING IS NOT, AND THE TWO ARE DELIBERATELY DIFFERENT VERBS. The old lock
+// conflated them: the only way to keep a hero was to forbid new ones, and the only way to get a new one was
+// to risk the one you had. Split, both halves get simple -- switch between what you own as often as you
+// like, and ask for a new one when you actually want one.
+
+/** Everything this member has been drawn, newest first, with what they are wearing and whether it is stale. */
+export async function spriteShelf(buyerId) {
+    if (!buyerId) return { sprites: [], wornUrl: null, stale: false, canDraw: false, nextDrawAt: null };
+    const [row, rows] = await Promise.all([
+        db.queryOne(
+            `SELECT avatar_config, equipped_pose, avatar_sprite_url, avatar_sprite_at FROM mkt_buyer WHERE id = $1`,
+            [buyerId],
+        ).catch(() => null),
+        db.query(
+            `SELECT id, url, favourite, created_at FROM mkt_buyer_sprite
+              WHERE buyer_id = $1 ORDER BY favourite DESC, created_at DESC`,
+            [buyerId],
+        ).catch(() => []),
+    ]);
+    if (!row) return { sprites: [], wornUrl: null, stale: false, canDraw: false, nextDrawAt: null };
+
+    // ⚠️ STALE IS MEASURED AGAINST THE PROMPT, NOT A TIMESTAMP. equipment_updated_at bumps when a ring comes
+    // off and goes back on, which changes nothing about the picture -- the same trap the old cron fell into
+    // and the reason skipIfUnchanged compares strings. The question here is "would a draw look different",
+    // and only the prompt can answer it.
+    const gear = await getEquippedGearPhrase(buyerId).catch(() => "");
+    const wouldDraw = spriteIdentity(row.avatar_config, gear, row.equipped_pose);
+    const wornRow = (rows || []).find((r) => r.url === row.avatar_sprite_url) || null;
+    const wornPrompt = await db.queryOne(
+        `SELECT prompt FROM mkt_buyer_sprite WHERE buyer_id = $1 AND url = $2`,
+        [buyerId, row.avatar_sprite_url],
+    ).catch(() => null);
+
+    const since = row.avatar_sprite_at ? Date.now() - new Date(row.avatar_sprite_at).getTime() : Infinity;
+    const waitMs = REGEN_COOLDOWN_HOURS * 3600 * 1000;
+    return {
+        sprites: (rows || []).map((r) => ({
+            id: Number(r.id), url: r.url,
+            favourite: r.favourite === true,
+            worn: r.url === row.avatar_sprite_url,
+        })),
+        wornUrl: row.avatar_sprite_url || null,
+        // Nothing to compare against means nothing to offer: a member with no hero gets one from the job.
+        stale: Boolean(row.avatar_sprite_url && wornPrompt && wornPrompt.prompt !== wouldDraw),
+        hasWorn: Boolean(wornRow),
+        // ⚠️ THE SAME 24h THE CRON USED, KEPT AS THE RATE LIMIT ON THE BUTTON. A free control that spends
+        // four cents an image needs a ceiling, and reusing this one means there is one number to reason
+        // about rather than two that can disagree. It is NOT a price: the paid re-roll was removed on
+        // 2026-08-11 and is not coming back without Luke saying so.
+        canDraw: since >= waitMs,
+        nextDrawAt: Number.isFinite(since) && since < waitMs
+            ? new Date(new Date(row.avatar_sprite_at).getTime() + waitMs).toISOString()
+            : null,
+    };
+}
+
+/** Wear one you already have. Costs nothing, draws nothing, and is undone by wearing another. */
+export async function wearSprite(buyerId, spriteId) {
+    if (!buyerId) return { ok: false, error: "unauthorized" };
+    const row = await db.queryOne(
+        `SELECT url, prompt FROM mkt_buyer_sprite WHERE id = $1 AND buyer_id = $2`,
+        [Number(spriteId) || 0, buyerId],
+    ).catch(() => null);
+    if (!row) return { ok: false, error: "not_yours" };
+    // ⚠️ THE PROMPT MOVES WITH THE PICTURE. avatar_sprite_prompt is what every staleness test compares
+    // against; leaving the previous hero's prompt behind would make the shelf report the wrong sprite as
+    // out of date the moment you switched.
+    //
+    // ⚠️ AND avatar_sprite_at IS NOT TOUCHED. It is the clock on the draw BUTTON, not on the wardrobe --
+    // bumping it here would mean putting on an old hero silently cost you your next free draw.
+    await db.query(
+        `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_prompt = $3 WHERE id = $1`,
+        [buyerId, row.url, row.prompt],
+    );
+    return { ok: true, url: row.url };
+}
+
+/** Star one, or unstar it. A star is a promise we keep it; nothing else about it changes. */
+export async function favouriteSprite(buyerId, spriteId, on) {
+    if (!buyerId) return { ok: false, error: "unauthorized" };
+    const row = await db.queryOne(
+        `UPDATE mkt_buyer_sprite SET favourite = $3 WHERE id = $1 AND buyer_id = $2 RETURNING favourite`,
+        [Number(spriteId) || 0, buyerId, Boolean(on)],
+    ).catch(() => null);
+    if (!row) return { ok: false, error: "not_yours" };
+    return { ok: true, favourite: row.favourite === true };
+}
+
+/**
+ * Draw a new one, because the member asked.
+ *
+ * ⚠️ IT DOES NOT REPLACE WHAT THEY ARE WEARING -- IT ADDS. generateBuyerSprite still points mkt_buyer at
+ * the new image, which is right (you asked for it, you get to see it), but the previous one is on the shelf
+ * and one tap away. That is the whole difference between this and the overwrite the lock existed to prevent.
+ */
+export async function requestSpriteDraw(buyerId) {
+    if (!buyerId) return { ok: false, error: "unauthorized" };
+    const shelf = await spriteShelf(buyerId);
+    if (!shelf.canDraw) return { ok: false, error: "too_soon", nextDrawAt: shelf.nextDrawAt };
+    const url = await generateBuyerSprite(buyerId).catch((e) => ({ err: e?.message || "draw failed" }));
+    if (!url || typeof url !== "string") return { ok: false, error: "draw_failed" };
+    return { ok: true, url };
 }
 
 // Store a finished PNG (base64, generated on the phone from the DEFAULT avatar) as the shared default

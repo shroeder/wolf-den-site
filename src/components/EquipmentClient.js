@@ -242,7 +242,7 @@ const chargeErr = (code) => ({
     unauthorized: "Please sign in again.",
 }[code] || "Couldn't start that redemption. Try again.");
 
-export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, spriteFlip = false, displayLabel = "Hero", level = 1, backdropUrl = null, view = "gear" }) {
+export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, spriteFlip = false, displayLabel = "Hero", level = 1, backdropUrl = null, view = "gear", heroShelf = null }) {
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
     const [slot, setSlot] = useState(null); // open picker for this slot
@@ -320,6 +320,40 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             : "Worn. Your hero is redrawn in the next pass.");
     }, []);
     const wornPose = poseShelf?.poses?.find((p) => p.worn) || null;
+
+    // ── ⚠️ THE HERO SHELF REPLACES THE LOCK ──────────────────────────────────────────────────────────────
+    // Luke: "the lock is basically a favorite, but it's limited in that it can only favorite one, and it's
+    // lost upon unlocking... a way for people to store previous sprites that they liked that they can
+    // switch their appearance to at any time."
+    //
+    // The lock existed because a draw OVERWROTE the hero you had. Nothing overwrites anything now: every
+    // sprite is a row, wearing one is free, and a new one is asked for. So there is nothing to lock, and
+    // the fear nine members were defending against -- "if I unlock it I lose this one" -- has no mechanism
+    // behind it any more.
+    //
+    // Seeded from the server render so the out-of-date line is on the page at load. Re-read from the
+    // replies, which carry the whole shelf for the same reason the pose route does: wearing, starring and
+    // drawing all move several things at once and a screen patching them from memory drifts.
+    const [shelf, setShelf] = useState(heroShelf);
+    const [shelfBusy, setShelfBusy] = useState(false);
+    const [shelfNote, setShelfNote] = useState(null);
+    const heroAct = useCallback(async (body, note) => {
+        setShelfBusy(true); setShelfNote(null);
+        const d = await fetch("/api/marketplace/avatar", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        }).then((r) => r.json()).catch(() => null);
+        setShelfBusy(false);
+        if (!d) { setShelfNote("That did not go through."); return; }
+        if (d.sprites) setShelf(d);
+        if (d.ok === false) {
+            setShelfNote(d.error === "too_soon" ? "You have already had a new hero today. Try again tomorrow."
+                : d.error === "draw_failed" ? "The drawing did not come back. Nothing was changed."
+                    : "That did not go through.");
+            return;
+        }
+        if (note) setShelfNote(note);
+    }, []);
     const closePicker = useCallback(() => {
         setSlot(null); setPickerOpen(false);
         setShield(true);
@@ -611,6 +645,60 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 <b>Tap any slot</b>{" "}
                 to compare it against everything else you own &mdash; ranked, with what each swap changes.
             </p>
+
+            {/* ── YOUR HEROES ─────────────────────────────────────────────────────────────────────────
+                Only once there is more than one to choose between, or something to say about the one you
+                have. A strip of exactly one picture under a picture of the same thing is furniture. */}
+            {shelf && (shelf.sprites.length > 1 || shelf.stale) ? (
+                <section className="herobar">
+                    <div className="herobar-head">
+                        <b>Your heroes</b>
+                        {/* ⚠️ THE OUT-OF-DATE LINE IS THE WHOLE DISCOVERY MECHANISM. Nothing redraws a hero
+                            on its own now, so without this a member changes their gear, sees no difference
+                            ever, and concludes the sprite is broken. It states the fact and offers the
+                            button; it does not nag and it does not spend. */}
+                        {shelf.stale ? <i>Your gear has changed since this was drawn.</i> : null}
+                    </div>
+
+                    <div className="herobar-strip">
+                        {shelf.sprites.map((sp) => (
+                            <div key={sp.id} className={`herobar-cell${sp.worn ? " is-worn" : ""}`}>
+                                <button
+                                    type="button" className="herobar-pick" disabled={shelfBusy || sp.worn}
+                                    title={sp.worn ? "You are wearing this one" : "Wear this one"}
+                                    onClick={() => heroAct({ action: "wear", sprite: sp.id }, "Hero changed.")}
+                                >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={sp.url} alt="" aria-hidden="true" />
+                                </button>
+                                {/* A star is a promise we keep it. Nothing is deleted today, but a shelf
+                                    that grows for ever needs to know what may never be tidied away. */}
+                                <button
+                                    type="button"
+                                    className={`herobar-star${sp.favourite ? " is-on" : ""}`}
+                                    disabled={shelfBusy}
+                                    aria-label={sp.favourite ? "Remove from favourites" : "Save as a favourite"}
+                                    onClick={() => heroAct({ action: "favourite", sprite: sp.id, on: !sp.favourite })}
+                                >
+                                    {sp.favourite ? "★" : "☆"}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="herobar-foot">
+                        <button
+                            type="button" className="herobar-draw"
+                            disabled={shelfBusy || !shelf.canDraw}
+                            onClick={() => heroAct({ action: "draw" }, "Drawn. It is on your shelf and you are wearing it.")}
+                        >
+                            {shelfBusy ? "Drawing…" : shelf.canDraw ? "Draw a new hero" : "New hero tomorrow"}
+                        </button>
+                        <span>Switching between the ones you have is free and never loses one.</span>
+                    </div>
+                    {shelfNote ? <p className="herobar-note">{shelfNote}</p> : null}
+                </section>
+            ) : null}
 
             {/* Live stat total */}
             <div className="equip-stats card">
