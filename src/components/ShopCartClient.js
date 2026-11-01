@@ -1191,6 +1191,24 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                 <input type="checkbox" checked={applyCredit} onChange={(e) => setApplyCredit(e.target.checked)} />
                                 <span>Apply store credit <strong>({formatMoney(creditBalanceCents)} available)</strong></span>
                             </label>
+                        ) : !authCustomer ? (
+                            /* ── ⚠️ A GUEST SAW NOTHING ABOUT STORE CREDIT AT ALL ────────────────────────
+                               Luke, at his own checkout: "I dont see option to use store credit?" The
+                               toggle above renders on `creditBalanceCents > 0`, and that balance is only
+                               ever fetched for a signed-in SHOP customer — a different session from the
+                               game login the site header shows. So a member with money on their account
+                               who was not signed in on the shop side got a bare card field and no hint
+                               that any of this existed.
+
+                               ⚠️ IT IS NOT A NAG, AND THAT IS WHY IT IS GATED ON !authCustomer RATHER
+                               THAN ON A ZERO BALANCE. Somebody signed in with no credit has already been
+                               told everything true about their account; telling them again at the moment
+                               they are typing a card number would be an advert. This only speaks to the
+                               one person who cannot see their own money. */
+                            <p className="shop-credit-hint">
+                                Have Wolf Den store credit?{" "}
+                                <Link href="/shop/account">Sign in</Link> to spend it on this order.
+                            </p>
                         ) : null}
 
                         {!missingSquareConfig && checkoutCardState !== "error" && (
