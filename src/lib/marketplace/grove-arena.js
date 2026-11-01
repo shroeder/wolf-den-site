@@ -60,10 +60,10 @@ export const arenaArt = (mapN) => ARENA_ART[Number(mapN)] || ARENA_ART[1];
  */
 export const COLISEUM_ART = {
     1: { src: "/images/grove/coliseum-rootwood.webp", ar: 1.288 },
-    2: { src: "/images/grove/coliseum-undercave.webp", ar: 1.1 },
-    3: { src: "/images/grove/coliseum-fen.webp", ar: 1.1 },
-    4: { src: "/images/grove/coliseum-saltwrack.webp", ar: 1.1 },
-    5: { src: "/images/grove/coliseum-drowned.webp", ar: 1.1 },
+    2: { src: "/images/grove/coliseum-undercave.webp", ar: 1.235 },
+    3: { src: "/images/grove/coliseum-fen.webp", ar: 1.063 },
+    4: { src: "/images/grove/coliseum-saltwrack.webp", ar: 1.152 },
+    5: { src: "/images/grove/coliseum-drowned.webp", ar: 1.154 },
     6: { src: "/images/grove/coliseum-gilded.webp", ar: 1.098 },
     7: { src: "/images/grove/coliseum-ashen.webp", ar: 1.127 },
 };
