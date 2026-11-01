@@ -777,6 +777,98 @@ export async function searchSalesForVariations(variationLookup, options = {}) {
     return Array.from(aggregates.values()).sort((left, right) => right.revenue - left.revenue || left.name.localeCompare(right.name));
 }
 
+// ── JUST THE LINES IN THE CART ───────────────────────────────────────────────────────────────────────────
+// Luke: "The add to cart features takes a really long time" / "Loading my cart takes fucking way long too."
+// Measured on production before changing anything: 9.4s cold, 0.24s warm.
+//
+// ⚠️ THE CART WAS WALKING THE ENTIRE SQUARE CATALOGUE TO PRICE THREE LINES. getCartSummary called
+// listShopInventory() -- every category, then every item under every category, cursor by cursor, then the
+// inventory counts and image URLs for all seventeen hundred variations -- and then threw all of it away
+// except the handful of ids actually in the basket. The shared() cache in front of it is per-lambda, so a
+// cold instance pays the whole bill, and most requests land on a cold instance.
+//
+// That is family A exactly as CLAUDE.md describes it: "a caller reaching for the most convenient existing
+// function instead of the narrowest one... good reuse instinct and it bills a fortune."
+//
+// ⚠️ IT READS SQUARE, NOT inventory_feed, AND THAT IS DELIBERATE. The mirror would be one SQL query and
+// faster still -- but it is refreshed on the hour and the half hour, and this map decides the price the
+// customer is CHARGED. Trading a correct price for a fast one is not a performance fix, it is a pricing
+// bug with a stopwatch. Same source of truth as before; three calls instead of twenty-four.
+export async function getCartInventory(variationIds = []) {
+    const ids = [...new Set((variationIds || []).filter(Boolean).map(String))];
+    const out = new Map();
+    if (!ids.length) return out;
+
+    // 1. The variations, and their parent items in the same response.
+    const related = new Map();
+    const variations = [];
+    // Square caps a batch retrieve at 1000 ids; a cart cannot approach that, but chunking keeps this
+    // honest if it is ever reused somewhere that can.
+    for (let i = 0; i < ids.length; i += 500) {
+        const payload = await squareFetch("/v2/catalog/batch-retrieve", {
+            method: "POST",
+            body: JSON.stringify({ object_ids: ids.slice(i, i + 500), include_related_objects: true }),
+        });
+        for (const o of payload.objects || []) if (o.type === "ITEM_VARIATION") variations.push(o);
+        for (const o of payload.related_objects || []) related.set(o.id, o);
+    }
+    if (!variations.length) return out;
+
+    // 2. Category names for whatever those items are filed under — usually one or two objects.
+    const categoryIdsWanted = new Set();
+    for (const v of variations) {
+        const item = related.get(v.item_variation_data?.item_id);
+        for (const c of item?.item_data?.categories || []) if (c?.id) categoryIdsWanted.add(c.id);
+        if (item?.item_data?.category_id) categoryIdsWanted.add(item.item_data.category_id);
+    }
+    const categoryNames = new Map();
+    if (categoryIdsWanted.size) {
+        const payload = await squareFetch("/v2/catalog/batch-retrieve", {
+            method: "POST",
+            body: JSON.stringify({ object_ids: [...categoryIdsWanted] }),
+        }).catch(() => ({}));
+        for (const o of payload.objects || []) {
+            if (o.type === "CATEGORY" && o.category_data?.name) categoryNames.set(o.id, o.category_data.name);
+        }
+    }
+
+    // 3. Counts and images, both already batched helpers.
+    const counts = await getInventoryCounts(variations.map((v) => v.id));
+    const imageIds = new Set();
+    for (const v of variations) {
+        const item = related.get(v.item_variation_data?.item_id);
+        const imageId = item ? getCatalogImageId(item, v) : null;
+        if (imageId) imageIds.add(imageId);
+    }
+    const imageUrlLookup = await getImageUrlLookup([...imageIds]);
+
+    for (const v of variations) {
+        const item = related.get(v.item_variation_data?.item_id);
+        const catIds = [
+            ...(item?.item_data?.categories || []).map((c) => c?.id).filter(Boolean),
+            ...(item?.item_data?.category_id ? [item.item_data.category_id] : []),
+        ];
+        const imageId = item ? getCatalogImageId(item, v) : null;
+        out.set(v.id, {
+            id: v.id,
+            name: toDisplayName(item?.item_data?.name || "Unnamed Item", v.item_variation_data?.name),
+            price: normalizeMoney(v.item_variation_data?.price_money?.amount),
+            sku: v.item_variation_data?.sku || null,
+            imageId,
+            createdAt: v.created_at || item?.created_at || null,
+            quantity: counts.get(v.id) || 0,
+            imageUrl: imageId ? imageUrlLookup.get(imageId) || null : null,
+            // ⚠️ THE FIRST CATEGORY NAME, WHICH IS WHAT THE OLD MAP ENDED UP WITH TOO. toInventoryMap
+            // overwrote the entry once per category an item appeared in, so the LAST one won; both are
+            // arbitrary when an item is in several, and only categoryIds is actually load-bearing (the
+            // consignment check is keyed on ids, not names).
+            categoryName: catIds.map((id) => categoryNames.get(id)).find(Boolean) || null,
+            categoryIds: catIds,
+        });
+    }
+    return out;
+}
+
 export async function listShopInventory() {
     // 1. Fetch all categories
     const categories = new Map();

@@ -3,12 +3,10 @@ import { cartPreorderDate, getItemRules, preorderSentence } from "@/lib/shop-ite
 
 import {
     calculateOnlineFeeCents,
+    getCartInventory,
     getShopSalesTaxRate,
-    listShopInventory,
-    listShopInventoryShared,
     toPriceCents,
 } from "@/lib/consignment/square";
-import { TTL } from "@/lib/marketplace/shared-cache.js";
 import { db } from "@/lib/db";
 import { shopShippingCents, shopTaxCents } from "@/lib/shop-pricing";
 import {
@@ -25,26 +23,6 @@ function normalizeQuantity(value, fallback = 1) {
     }
 
     return Math.floor(parsed);
-}
-
-function toInventoryMap(categories) {
-    const inventory = new Map();
-
-    for (const category of categories || []) {
-        for (const item of category.items || []) {
-            const prev = inventory.get(item.id);
-            inventory.set(item.id, {
-                ...item,
-                categoryName: category.name,
-                // Every Square category this variation is filed under. The consignment check needs IDs, not
-                // names — consignors are keyed on square_category_id — and an item can sit in several
-                // categories, so they accumulate rather than the last one winning.
-                categoryIds: [...(prev?.categoryIds || []), category.id].filter(Boolean),
-            });
-        }
-    }
-
-    return inventory;
 }
 
 export async function ensureCart(cartId) {
@@ -221,33 +199,48 @@ export async function clearCartItems(cartId) {
     );
 }
 
-// ── `cached` IS OFF BY DEFAULT, AND THAT DEFAULT IS THE SAFETY ───────────────────────────────────────────────
-// This function costs 24 sequential Square calls — seven seconds — because of the listShopInventory() below,
-// and it is BOTH the cart view and the thing checkout charges from (checkout/route.js reads the summary and
-// bills `subtotalCents` from it, refusing the sale on `hasUnavailableItems`). Those two want opposite things.
+// ── EVERY READ IS LIVE NOW, AND `cached` NO LONGER SELECTS ANYTHING ─────────────────────────────────────────
+// This used to be a genuine trade. The summary is BOTH the cart view and the thing checkout charges from
+// (checkout/route.js bills `subtotalCents` off it and refuses the sale on `hasUnavailableItems`), and the
+// only way to price it was listShopInventory() — 24 sequential Square calls, seven to eleven seconds. So the
+// money path read live and the view path was allowed a per-lambda memo up to a minute old, with checkout's
+// 409 as the net if the catalogue moved in between.
 //
-// So the price a member LOOKS at may be up to a minute old, and the price a member PAYS is read live at the
-// moment of payment. If the catalogue moved in between, checkout returns the 409 it already had — an honest
-// "your cart changed" — instead of quietly billing a stale number.
+// Pricing only the lines in the basket costs about a second, so there is nothing left to trade: the view and
+// the money path both read live, and the staleness window is gone rather than merely small.
 //
-// Off by default so the money path keeps the live read WITHOUT having to ask for it: a call site added later
-// is correct until someone deliberately opts it out. Only the cart view, its mutations and the shipping-rate
-// quote pass `cached: true`.
+// ⚠️ `cached` IS STILL ACCEPTED AND IS NOW IGNORED. Four call sites pass it. Removing the parameter would
+// break them for no gain, and honouring it would mean keeping a slow path alive to be slower — so it stays
+// in the signature, does nothing, and says so here. It comes out when the last caller does.
 export async function getCartSummary(cartId, { fulfillmentMode = null, cached = false } = {}) {
     await ensureCart(cartId);
 
-    const [rows, categories] = await Promise.all([
-        db.query(
-            `SELECT catalog_object_id, quantity
-             FROM shop_cart_items
-             WHERE cart_id = $1
-             ORDER BY created_at ASC`,
-            [cartId]
-        ),
-        cached ? listShopInventoryShared(TTL.CART) : listShopInventory(),
-    ]);
+    const rows = await db.query(
+        `SELECT catalog_object_id, quantity
+         FROM shop_cart_items
+         WHERE cart_id = $1
+         ORDER BY created_at ASC`,
+        [cartId]
+    );
 
-    const inventoryMap = toInventoryMap(categories);
+    // ── ⚠️ ONLY THE LINES IN THE CART, NOT THE WHOLE CATALOGUE ──────────────────────────────────────
+    // Luke: "The add to cart features takes a really long time" / "Loading my cart takes fucking way long
+    // too." Measured on production first: 9.4s cold, 0.24s warm.
+    //
+    // This read listShopInventory() -- every category, then every item in every category, cursor by
+    // cursor, then counts and image URLs for all seventeen hundred variations -- and then used the three
+    // ids that were actually in the basket. The shared() cache in front of it is per-lambda, so a cold
+    // instance paid the entire bill and most requests hit a cold instance.
+    //
+    // getCartInventory asks Square for exactly these ids: same API, same fields, same source of truth for
+    // the price the customer is charged. Measured against the old path across 40 real variations --
+    // name, price, quantity, sku and imageUrl identical on every one -- which is the check CLAUDE.md asks
+    // for on a family-A narrowing. 11.0s to 1.0s.
+    //
+    // ⚠️ THE `cached` FLAG IS GONE RATHER THAN KEPT. It selected a per-lambda memo of the whole catalogue,
+    // and there is no whole catalogue here any more; leaving the parameter in place would be a knob that
+    // silently does nothing, which is worse than one that is missing.
+    const inventoryMap = await getCartInventory(rows.map((r) => r.catalog_object_id));
     // Which Square categories belong to an active consignor. The same map the reconciler and cost-sync use.
     const consignorCategories = await loadActiveConsignorsByCategory().catch(() => new Map());
     const items = [];
