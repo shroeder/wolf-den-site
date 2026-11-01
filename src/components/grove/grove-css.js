@@ -1097,6 +1097,17 @@ export const GROVE_CSS = `
 .gv-door.is-locked { cursor: default; }
 .gv-door.is-locked img { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.75)); }
 
+/* -- THE QUEST LAB WRAPPER (dev only) --------------------------------------------------------
+   Chrome for the beat-by-beat rig at /marketplace/grove/quest-lab. Deliberately plain: the thing
+   being looked at is GroveQuests underneath, and a styled frame around it would be one more
+   variable between the photograph and the game. */
+.ql-wrap { min-height: 100vh; background: #0c120d; padding: 18px 16px 48px; color: #e9e3cd; }
+.ql-head { max-width: 620px; margin: 0 auto 16px; }
+.ql-head b { display: block; font-family: var(--font-display); font-size: 1.1rem; color: #e3c766; }
+.ql-head p { margin: 5px 0 0; font-size: 0.88rem; line-height: 1.45; color: #93a089; }
+.ql-fake { max-width: 620px; margin: 14px auto 0; font-size: 0.86rem; color: #93a089; }
+.ql-fake b { color: #e3c766; display: block; margin-top: 3px; }
+
 /* -- THE MARSHAL'S OFFER ---------------------------------------------------------------------
    Luke: "it doesnt feel like an mmo quest. Its too web forms." The previous pass was a rounded
    card with a label/value table in it, which is a settings screen. This is built like a quest
