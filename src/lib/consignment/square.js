@@ -1465,17 +1465,24 @@ export async function findShopItemByVariationId(variationId, { cached = false } 
         return null;
     }
 
-    const categories = cached ? await listShopInventoryShared(TTL.CART) : await listShopInventory();
-
-    for (const category of categories) {
-        const item = category.items.find((entry) => entry.id === normalizedVariationId);
-
-        if (item) {
-            return {
-                ...item,
-                categoryName: category.name,
-            };
-        }
+    // ── ⚠️ ONE VARIATION, ASKED FOR BY ID ───────────────────────────────────────────────────────────
+    // This walked the WHOLE catalogue — every category, every item, counts and images for seventeen
+    // hundred variations — and then ran .find() for a single id. It is called on every add-to-cart and
+    // every quantity change, which is the other half of Luke's "the add to cart features takes a really
+    // long time": narrowing getCartSummary alone left the endpoint bimodal at 0.7s or 9.6s, because this
+    // was still here behind the same per-lambda cache.
+    //
+    // getCartInventory answers the same question off the same API in about a second, so the `cached`
+    // branch has nothing left to buy and both paths are live.
+    const inventory = await getCartInventory([normalizedVariationId]);
+    const found = inventory.get(normalizedVariationId);
+    // ⚠️ OUT-OF-STOCK MUST STILL READ AS NOT FOUND. The old walk only ever contained items with
+    // quantity > 0 (listShopInventory filters them out), so every caller treats "absent" as "cannot be
+    // bought" — the cart route checks `!item || item.quantity < 1` and 409s. A batch retrieve has no such
+    // filter and happily returns a sold-out variation, so the filter has to be restated here or a sold-out
+    // item becomes addable.
+    if (found && Number(found.quantity) > 0) {
+        return found;
     }
 
     return null;
