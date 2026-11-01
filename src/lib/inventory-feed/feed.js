@@ -88,6 +88,43 @@ export async function listShopFeedItems() {
     }));
 }
 
+/**
+ * Everything currently on pre-order, for the shop's pre-orders section.
+ *
+ * ⚠️ THE JOIN IS INNER AND THAT IS THE POINT. A pre-order lives in shop_item_rules (ours) and the thing a
+ * shopper can actually see lives in inventory_feed (Square's mirror). An item with a date but no feed row
+ * is one that has not synced yet, or has sold out, or was created without a Square category -- in every
+ * one of those cases there is nothing to put on a shelf, and listing a name with no price and no picture
+ * would be worse than listing nothing.
+ *
+ * ⚠️ SOONEST FIRST, AND LATE ONES STILL COUNT. A pre-order is live until somebody marks it arrived, not
+ * until its date passes, so a late shipment stays on the shelf saying the date it was due. Hiding it the
+ * moment it slipped would delete the page exactly when customers are checking it most.
+ */
+export async function listPreorderShopItems() {
+    const rows = await db.query(
+        `SELECT f.variation_id, f.name, f.image_url, f.price, f.quantity, f.category_names,
+                r.preorder_arrives_on
+           FROM shop_item_rules r
+           JOIN inventory_feed f ON f.variation_id = r.variation_id
+          WHERE r.preorder_arrives_on IS NOT NULL
+            AND r.preorder_arrived_at IS NULL
+            AND f.in_stock = TRUE
+          ORDER BY r.preorder_arrives_on ASC, f.name ASC`,
+        [],
+    ).catch(() => []);
+
+    return (rows || []).map((row) => ({
+        variationId: row.variation_id,
+        name: row.name,
+        imageUrl: row.image_url,
+        price: row.price == null ? null : Number(row.price),
+        quantity: row.quantity == null ? null : Number(row.quantity),
+        categoryNames: row.category_names ? row.category_names.split(CATEGORY_SEPARATOR) : [],
+        arrivesOn: row.preorder_arrives_on,
+    }));
+}
+
 /** Every in-stock item (variation id + name + updated_at) for the sitemap's product URLs. */
 export async function listInStockForSitemap() {
     const rows = await db.query(

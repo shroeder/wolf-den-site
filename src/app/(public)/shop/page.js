@@ -6,7 +6,7 @@ import StoreCreditCallout from "@/components/StoreCreditCallout";
 import ViewPing from "@/components/ViewPing";
 import { listShopInventoryShared } from "@/lib/consignment/square";
 import { TTL } from "@/lib/marketplace/shared-cache.js";
-import { listRecentChanges } from "@/lib/inventory-feed/feed";
+import { listPreorderShopItems, listRecentChanges } from "@/lib/inventory-feed/feed";
 import { attachSetNames } from "@/lib/shop-set-tags";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { discoverOpenFor } from "@/lib/marketplace/discover-gate.js";
@@ -40,9 +40,10 @@ const SHOP_CATALOGUE_TTL = TTL.ART;
 const JUST_IN_WINDOW_HOURS = 24 * 7;
 
 export default async function ShopPage() {
-    let [categories, justInItems] = await Promise.all([
+    let [categories, justInItems, preorders] = await Promise.all([
         listShopInventoryShared(SHOP_CATALOGUE_TTL).catch(() => null),
         listRecentChanges({ windowHours: JUST_IN_WINDOW_HOURS }).catch(() => []),
+        listPreorderShopItems().catch(() => []),
     ]);
     if (categories) {
         categories = await attachSetNames(categories).catch(() => categories);
@@ -74,6 +75,23 @@ export default async function ShopPage() {
                 </Link>
             ) : null}
             {paymentsEnabled ? <><RewardsCallout /><StoreCreditCallout /></> : null}
+            {/* ── THE DOOR TO THE PRE-ORDER SHELF ─────────────────────────────────────────────────────
+                ⚠️ ONLY WHILE THERE IS SOMETHING ON IT. A permanent link to an empty room is a link people
+                learn to stop tapping, and this shop will spend most of its year with nothing on pre-order.
+                The page itself still answers for anybody arriving from a bookmark or a shared link.
+
+                Above the browser rather than inside it: a pre-order is the one thing here you buy on a
+                promise instead of on availability, which is a different decision from the one the category
+                list is for. The Discover note above is the lesson -- a finished screen reachable only by
+                typing its URL does not exist. */}
+            {preorders.length > 0 ? (
+                <Link href="/shop/preorders" className="shop-preorder-door">
+                    <strong>
+                        {preorders.length === 1 ? "1 pre-order open" : `${preorders.length} pre-orders open`}
+                    </strong>
+                    <span>Reserve an upcoming release &mdash; pay now, we tell you the day it lands</span>
+                </Link>
+            ) : null}
             {hasContent ? (
                 <section className="card">
                     <ShopBrowser
