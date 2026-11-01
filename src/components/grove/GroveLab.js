@@ -276,7 +276,11 @@ export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
                 // ⚠️ THE GATE, ON THE ZONE THAT ACTUALLY HOLDS IT. Mirrors the real rule rather than
                 // forcing it on every zone -- a lab that shows a thing everywhere proves nothing about
                 // whether it appears in the right room. ?scene=wander&zone=7&map=1 is where it lives.
-                coliseumHere={scene !== "arena" && COLISEUM_ZONE[mapN] === zoneN
+                // ⚠️ GLOBAL ZONE NUMBER, NOT THE PER-MAP INDEX. COLISEUM_ZONE is "the 7th room of this
+                // map"; zone.n counts straight through all of them, so a bare equality matched only map 1
+                // and silently showed nothing on 2-7 -- the same off-by-twelve grove.js warns about where
+                // it places quest givers.
+                coliseumHere={scene !== "arena" && COLISEUM_ZONE[mapN] && (mapN - 1) * 12 + COLISEUM_ZONE[mapN] === zoneN
                     ? { map: mapN, zone: zoneN, keys: 1, dailyReady: true,
                         marshal: COLISEUM_NPCS.find((n) => n.map === mapN) || null }
                     : null}

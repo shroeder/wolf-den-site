@@ -1108,20 +1108,18 @@ export const GROVE_CSS = `
    still while the world scrolled past -- which is what .gv-npc does and the reason the quest giver
    reads as part of the HUD instead of part of the room. */
 .gv-colgate { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    width: calc(13 * var(--gv-unit, 1%)); height: calc(13 * var(--gv-unit, 1%));
-    margin-left: calc(-6.5 * var(--gv-unit, 1%));
+    width: calc(20 * var(--gv-unit, 1%)); height: calc(20 * var(--gv-unit, 1%));
+    margin-left: calc(-10 * var(--gv-unit, 1%));
     padding: 0; border: 0; background: none; cursor: pointer; z-index: 235;
     will-change: transform; -webkit-tap-highlight-color: transparent;
     touch-action: manipulation; }
 .gv-colgate img { width: 100%; height: 100%; object-fit: contain; object-position: bottom;
-    /* WARNING: sepia-then-rotate, NOT a bare hue-rotate. hue-rotate(-150deg) on the teal portal lands on
-       magenta, because the source art is more blue than green and the rotation is relative, not absolute.
-       Flattening to sepia first throws the source hue away, so the result is the same gold whatever the
-       plate underneath happens to be. */
-    filter: sepia(1) saturate(3.2) hue-rotate(-12deg) brightness(1.05)
-        drop-shadow(0 0 18px rgba(240, 180, 76, 0.5)) drop-shadow(0 4px 6px rgba(0,0,0,0.7)); }
+    /* ⚠️ NO HUE FILTER ANY MORE, AND THAT IS THE POINT. This used to recolour the teal zone portal to tell
+       the two apart, which was a workaround for the building not existing. Each map now has its OWN front,
+       painted in its own materials, so tinting it would be repainting art that was drawn correctly. */
+    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.45)) drop-shadow(0 5px 7px rgba(0, 0, 0, 0.7)); }
 /* No key and none waiting: still standing, still readable, just not calling you over. */
-.gv-colgate.is-shut img { filter: saturate(0.5) brightness(0.72) drop-shadow(0 3px 6px rgba(0,0,0,0.75)); }
+.gv-colgate.is-shut img { filter: saturate(0.55) brightness(0.68) drop-shadow(0 4px 7px rgba(0,0,0,0.75)); }
 
 .gv-colgate-tag, .gv-colgate-keys {
     position: absolute; left: 50%; transform: translateX(-50%);

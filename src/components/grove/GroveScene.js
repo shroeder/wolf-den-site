@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { coliseumArt } from "@/lib/marketplace/grove-arena.js";
 import { createPortal } from "react-dom";
 import { GiSoundOff, GiSoundOn } from "react-icons/gi";
 
@@ -334,9 +335,6 @@ const DEATH_STOP_MS = 420;
 const WARP_OUT_MS = 260;
 const WARP_IN_MS = 420;
 const ZONE_COUNT = GROVE_ZONES.length;
-// The Coliseum's own gate, so it is not mistaken for the way on to the next zone.
-const COLISEUM_ART = "/images/grove/portal-open.webp";
-
 const DOOR_ART = {
     open: "/images/grove/portal-open.webp",
     locked: "/images/grove/portal-locked.webp",
@@ -4014,8 +4012,11 @@ export default function GroveScene({
                                 : coliseumHere.dailyReady
                                     ? "Coliseum — take today's key"
                                     : "Coliseum — no key"}>
+                            {/* ⚠️ THE MAP'S OWN BUILDING, NOT ONE SPRITE RECOLOURED SEVEN TIMES. Each
+                                front is built from what its map HAS — roots, bone, basalt — so walking in
+                                is not a change of world. See COLISEUM_ART in grove-arena.js. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={COLISEUM_ART} alt="" draggable={false} />
+                            <img src={coliseumArt(coliseumHere.map)} alt="" draggable={false} />
                             <span className="gv-colgate-tag">Coliseum</span>
                             <span className="gv-colgate-keys">
                                 {coliseumHere.dailyReady && coliseumHere.keys < 1

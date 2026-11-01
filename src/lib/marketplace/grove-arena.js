@@ -35,6 +35,29 @@ export const ARENA_ART = {
 
 export const arenaArt = (mapN) => ARENA_ART[Number(mapN)] || ARENA_ART[1];
 
+/**
+ * The OUTSIDE of each Coliseum — the building you walk up to in the zone that holds it.
+ *
+ * ⚠️ NOT ARENA_ART ABOVE, AND NOT THE ZONE PORTAL. Three different things that kept getting confused:
+ * ARENA_ART is the backdrop once you are INSIDE; portal-open.webp is the way on to the next zone; this is
+ * the facade standing on the level floor. The first cut of the feature recoloured the portal gold and
+ * called it a Coliseum, which is how you end up with a door where a building should be.
+ *
+ * Drawn by scripts/gen-grove-coliseums.mjs, die-cut on transparency so each one composites onto whatever
+ * level art it stands on — the backdrops are the levels and are not touched.
+ */
+export const COLISEUM_ART = {
+    1: "/images/grove/coliseum-rootwood.webp",
+    2: "/images/grove/coliseum-undercave.webp",
+    3: "/images/grove/coliseum-fen.webp",
+    4: "/images/grove/coliseum-saltwrack.webp",
+    5: "/images/grove/coliseum-drowned.webp",
+    6: "/images/grove/coliseum-gilded.webp",
+    7: "/images/grove/coliseum-ashen.webp",
+};
+
+export const coliseumArt = (mapN) => COLISEUM_ART[Number(mapN)] || COLISEUM_ART[1];
+
 /** One screen, at the narrowest real viewport. */
 export const ARENA_W = 26;
 

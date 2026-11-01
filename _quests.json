@@ -1,0 +1,594 @@
+{
+ "npcs": [
+  {
+   "id": "alder",
+   "map": 1,
+   "name": "Warden Alder",
+   "role": "Keeper of the treeline",
+   "line": "You're the first thing to come through here on purpose in a while."
+  },
+  {
+   "id": "pell",
+   "map": 1,
+   "name": "Mossgatherer Pell",
+   "role": "Collects what grows on the dead",
+   "line": "Careful where you tread. Half of what's underfoot is still deciding."
+  },
+  {
+   "id": "snare",
+   "map": 1,
+   "name": "The Snarefitter",
+   "role": "Sets traps she never checks",
+   "line": "I set forty lines out there. I'd like to know what's been walking into them."
+  },
+  {
+   "id": "mub",
+   "map": 2,
+   "name": "Lampwright Mub",
+   "role": "Farms the glow",
+   "line": "Down here light is a crop. Mine's been failing and I'd like to know what's eating it."
+  },
+  {
+   "id": "cart",
+   "map": 2,
+   "name": "The Blind Cartographer",
+   "role": "Maps by sound",
+   "line": "I don't need to see it. I need you to go there and make noise."
+  },
+  {
+   "id": "odd",
+   "map": 2,
+   "name": "Spelunker Odd",
+   "role": "Goes further than is sensible",
+   "line": "Everything worth having is one chamber past where people stop."
+  },
+  {
+   "id": "sil",
+   "map": 3,
+   "name": "Reedcutter Sil",
+   "role": "Harvests the blades",
+   "line": "The reeds cut back now. That's new, and I don't like new."
+  },
+  {
+   "id": "priest",
+   "map": 3,
+   "name": "The Bog-Priest",
+   "role": "Tends something under the water",
+   "line": "It's not drowning if it meant to go under. Remember that."
+  },
+  {
+   "id": "nim",
+   "map": 3,
+   "name": "Stiltwalker Nim",
+   "role": "Never touches the ground",
+   "line": "I've walked this marsh for eleven years and I've not had wet feet once."
+  },
+  {
+   "id": "coble",
+   "map": 4,
+   "name": "Wrackpicker Coble",
+   "role": "Works the tideline",
+   "line": "Tide brings it, I sort it. Lately it's bringing things that sort themselves."
+  },
+  {
+   "id": "keeper",
+   "map": 4,
+   "name": "The Line-Keeper",
+   "role": "Decides where the coast ends",
+   "line": "There's a line. Things on the far side of it are not my problem yet."
+  },
+  {
+   "id": "oss",
+   "map": 4,
+   "name": "Netmender Oss",
+   "role": "Mends what comes back torn",
+   "line": "Nets come home with holes the shape of nothing I can name."
+  },
+  {
+   "id": "mason",
+   "map": 5,
+   "name": "The Last Mason",
+   "role": "Still repairing it",
+   "line": "Somebody has to hold it up. It may as well be the one who remembers how."
+  },
+  {
+   "id": "quell",
+   "map": 5,
+   "name": "Diver Quell",
+   "role": "Goes down and comes back less",
+   "line": "Everything valuable is at the bottom. So is everything that wants you there."
+  },
+  {
+   "id": "vane",
+   "map": 5,
+   "name": "Archivist Vane",
+   "role": "Reads what the water left",
+   "line": "The writing survived. The people did not. I'd like to know why that order."
+  },
+  {
+   "id": "dune",
+   "map": 6,
+   "name": "Assayer Dune",
+   "role": "Tells fools from fortunes",
+   "line": "Everyone brings me gold. Nobody brings me gold."
+  },
+  {
+   "id": "gilt",
+   "map": 6,
+   "name": "The Gilt-Hunter",
+   "role": "Still convinced",
+   "line": "Dune's wrong. It's out here. I just haven't dug the right hole."
+  },
+  {
+   "id": "kel",
+   "map": 6,
+   "name": "Sandwright Kel",
+   "role": "Builds things the wind unbuilds",
+   "line": "I've raised this marker nine times. Something keeps taking it down."
+  },
+  {
+   "id": "rook",
+   "map": 7,
+   "name": "Cinderwarden Rook",
+   "role": "Keeps the fire where it is",
+   "line": "It's not out. It's waiting, and it's patient, and so am I."
+  },
+  {
+   "id": "counter",
+   "map": 7,
+   "name": "The Ash-Counter",
+   "role": "Measures how far it spread",
+   "line": "I count what burned. The number is going up again."
+  },
+  {
+   "id": "sol",
+   "map": 7,
+   "name": "Emberwright Sol",
+   "role": "Works metal in live coals",
+   "line": "Everything here is ruined except what the heat made better. Bring me the second kind."
+  }
+ ],
+ "cols": [
+  {
+   "id": "thorn",
+   "map": 1,
+   "name": "Ringmaster Thorn",
+   "line": "Twelve rooms of it, all at once, on the clock. Interested?"
+  },
+  {
+   "id": "caller",
+   "map": 2,
+   "name": "The Pit-Caller",
+   "line": "Shout down the hole. Whatever answers, you fight."
+  },
+  {
+   "id": "dredge",
+   "map": 3,
+   "name": "Marshal Dredge",
+   "line": "We drained a pit for this. Don't waste it."
+  },
+  {
+   "id": "brin",
+   "map": 4,
+   "name": "Tidecaller Brin",
+   "line": "Tide's out for two minutes. That's your two minutes."
+  },
+  {
+   "id": "herald",
+   "map": 5,
+   "name": "The Drowned Herald",
+   "line": "They still fill the stands. You just can't see them."
+  },
+  {
+   "id": "vex",
+   "map": 6,
+   "name": "Goldmaster Vex",
+   "line": "The purse is real, which makes this the only honest thing out here."
+  },
+  {
+   "id": "kade",
+   "map": 7,
+   "name": "Ashmarshal Kade",
+   "line": "The sand's warm. It's always warm. Go on."
+  }
+ ],
+ "chains": {
+  "alder": [
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "Thin the Treeline"
+   },
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "What Grows on the Dead"
+   },
+   {
+    "kind": "delve",
+    "n": 1,
+    "title": "Walk It Yourself"
+   }
+  ],
+  "pell": [
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "A Basket's Worth"
+   },
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "The Ones That Bite Back"
+   }
+  ],
+  "snare": [
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "Check My Lines"
+   },
+   {
+    "kind": "hunt",
+    "n": 1,
+    "title": "Something Bigger"
+   },
+   {
+    "kind": "forge",
+    "n": 1,
+    "title": "Make Me a Better Snare"
+   },
+   {
+    "kind": "survive",
+    "n": 1,
+    "title": "Sit the Night Out"
+   }
+  ],
+  "mub": [
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "The Glow Is Failing"
+   },
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "Whatever's Eating It"
+   },
+   {
+    "kind": "forge",
+    "n": 1,
+    "title": "A Lamp That Holds"
+   }
+  ],
+  "cart": [
+   {
+    "kind": "delve",
+    "n": 1,
+    "title": "Make Noise at the Fourth"
+   },
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "Count Them for Me"
+   },
+   {
+    "kind": "delve",
+    "n": 2,
+    "title": "And the Ninth"
+   },
+   {
+    "kind": "ticket",
+    "n": 1,
+    "title": "The Loud Room"
+   }
+  ],
+  "odd": [
+   {
+    "kind": "delve",
+    "n": 2,
+    "title": "One Chamber Further"
+   },
+   {
+    "kind": "hunt",
+    "n": 1,
+    "title": "The Thing I Saw"
+   }
+  ],
+  "sil": [
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "Blades for Cutting"
+   },
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "The Reeds Cut Back"
+   },
+   {
+    "kind": "forge",
+    "n": 1,
+    "title": "A Handle That Holds"
+   },
+   {
+    "kind": "survive",
+    "n": 1,
+    "title": "Stand in the Wet"
+   }
+  ],
+  "priest": [
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "It Meant to Go Under"
+   },
+   {
+    "kind": "hunt",
+    "n": 1,
+    "title": "What Answers"
+   },
+   {
+    "kind": "ticket",
+    "n": 1,
+    "title": "A Congregation"
+   }
+  ],
+  "nim": [
+   {
+    "kind": "delve",
+    "n": 1,
+    "title": "Dry Feet"
+   },
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "From Up Here"
+   }
+  ],
+  "coble": [
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "Sort the Tideline"
+   },
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "The Ones That Sort Themselves"
+   },
+   {
+    "kind": "harvest",
+    "n": 2,
+    "title": "A Second Tide"
+   },
+   {
+    "kind": "forge",
+    "n": 1,
+    "title": "Something Watertight"
+   },
+   {
+    "kind": "hunt",
+    "n": 1,
+    "title": "What the Sea Kept"
+   }
+  ],
+  "keeper": [
+   {
+    "kind": "delve",
+    "n": 2,
+    "title": "Walk to the Line"
+   },
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "Hold It"
+   }
+  ],
+  "oss": [
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "Cord for Mending"
+   },
+   {
+    "kind": "forge",
+    "n": 1,
+    "title": "A Net That Holds"
+   },
+   {
+    "kind": "survive",
+    "n": 1,
+    "title": "Haul It In"
+   }
+  ],
+  "mason": [
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "Stone That Still Rings"
+   },
+   {
+    "kind": "forge",
+    "n": 1,
+    "title": "Set a Keystone"
+   },
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "Clear the Scaffold"
+   },
+   {
+    "kind": "ticket",
+    "n": 1,
+    "title": "Prove It Holds"
+   }
+  ],
+  "quell": [
+   {
+    "kind": "delve",
+    "n": 2,
+    "title": "Down and Back"
+   },
+   {
+    "kind": "hunt",
+    "n": 1,
+    "title": "What's at the Bottom"
+   },
+   {
+    "kind": "harvest",
+    "n": 2,
+    "title": "Go Again"
+   }
+  ],
+  "vane": [
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "The Writing Survived"
+   },
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "Why That Order"
+   },
+   {
+    "kind": "delve",
+    "n": 2,
+    "title": "The Eleventh Room"
+   },
+   {
+    "kind": "forge",
+    "n": 1,
+    "title": "Copy It Properly"
+   },
+   {
+    "kind": "survive",
+    "n": 1,
+    "title": "Read It Through"
+   }
+  ],
+  "dune": [
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "Bring Me Gold"
+   },
+   {
+    "kind": "harvest",
+    "n": 2,
+    "title": "Bring Me Actual Gold"
+   },
+   {
+    "kind": "forge",
+    "n": 1,
+    "title": "Assay It"
+   }
+  ],
+  "gilt": [
+   {
+    "kind": "delve",
+    "n": 1,
+    "title": "The Right Hole"
+   },
+   {
+    "kind": "delve",
+    "n": 2,
+    "title": "The Next Right Hole"
+   },
+   {
+    "kind": "hunt",
+    "n": 1,
+    "title": "I Told You"
+   }
+  ],
+  "kel": [
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "Something Keeps Taking It"
+   },
+   {
+    "kind": "forge",
+    "n": 1,
+    "title": "Raise It a Tenth Time"
+   },
+   {
+    "kind": "survive",
+    "n": 1,
+    "title": "Watch It Stand"
+   },
+   {
+    "kind": "ticket",
+    "n": 1,
+    "title": "Build It in the Ring"
+   }
+  ],
+  "rook": [
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "Keep It Where It Is"
+   },
+   {
+    "kind": "delve",
+    "n": 2,
+    "title": "The Far Edge"
+   },
+   {
+    "kind": "survive",
+    "n": 1,
+    "title": "It's Patient. Be Patient."
+   },
+   {
+    "kind": "hunt",
+    "n": 1,
+    "title": "What's Feeding It"
+   },
+   {
+    "kind": "ticket",
+    "n": 1,
+    "title": "The Hot Gate"
+   }
+  ],
+  "counter": [
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "Count What Burned"
+   },
+   {
+    "kind": "cull",
+    "n": 1,
+    "title": "The Number Is Going Up"
+   },
+   {
+    "kind": "harvest",
+    "n": 2,
+    "title": "Count It Again"
+   }
+  ],
+  "sol": [
+   {
+    "kind": "harvest",
+    "n": 1,
+    "title": "The Second Kind"
+   },
+   {
+    "kind": "forge",
+    "n": 1,
+    "title": "Work It Hot"
+   },
+   {
+    "kind": "hunt",
+    "n": 1,
+    "title": "A Better Coal"
+   },
+   {
+    "kind": "forge",
+    "n": 2,
+    "title": "Now Make Something"
+   }
+  ]
+ }
+}
