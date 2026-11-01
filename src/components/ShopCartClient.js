@@ -279,6 +279,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     // /cart. The local build said "Compiled successfully" and failed at the export step after it.
     const isPickup = fulfillmentMode === "pickup" || cartPickupOnly;
     const pickupOnlyNames = cartData?.pickupOnlyItems || [];
+    // Built on the server in shop-carts.js so the cart, the checkout and the confirmation email cannot
+    // end up quoting three different dates. See reuse-the-rule-never-restate-it.
+    const preorderNote = cartData?.preorderNote || null;
     const limitedItems = cartData?.limitedItems || [];
 
     const hasFulfillmentChoice = fulfillmentMode === "shipping" || fulfillmentMode === "pickup";
@@ -891,6 +894,14 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
                             <section className="cart-fulfillment-section" aria-label="Fulfillment">
                                 <p className="cart-fulfillment-label">Fulfillment</p>
+                                {/* ── WHEN THIS ORDER MOVES ───────────────────────────────────────────
+                                    Above the shipping/pickup toggle on purpose: this is the sentence that
+                                    changes what either of those choices MEANS. Picking pickup does not get
+                                    a pre-order into your hands any sooner, and a customer choosing between
+                                    the two deserves to know that before they choose rather than after. */}
+                                {preorderNote ? (
+                                    <p className="cart-preorder-note">{preorderNote}</p>
+                                ) : null}
                                 {cartPickupOnly ? (
                                     <p className="cart-pickup-only-note">
                                         {pickupOnlyNames.length === 1

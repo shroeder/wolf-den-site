@@ -6,7 +6,7 @@ import { productHandle, variationIdFromHandle } from "@/lib/inventory-feed/produ
 import { SITE_URL } from "@/lib/site";
 import ShopProductBuy from "@/components/ShopProductBuy";
 import { isSingleName } from "@/lib/single-discount";
-import { getItemRule } from "@/lib/shop-item-rules.js";
+import { getItemRule, preorderDateLabel } from "@/lib/shop-item-rules.js";
 
 // Regenerate each product's static HTML at most every 30 min (inventory reconcile runs ~every 15).
 export const revalidate = 1800;
@@ -139,6 +139,20 @@ export default async function ShopProductPage({ params }) {
                         {rule?.limitPerCustomer ? (
                             <p className="shop-rule-note shop-rule-limit">
                                 Limit {rule.limitPerCustomer} per customer, and you{"\u2019"}ll need to be signed in to buy it.
+                            </p>
+                        ) : null}
+                        {/* ── A PRE-ORDER SAYS SO BEFORE THE BUTTON, NOT AFTER THE MONEY ──────────
+                            ⚠️ AND IT IS THE LOUDEST OF THE THREE, because it is the only one that is
+                            true of the ORDER rather than of the shop. Pickup-only and a per-customer
+                            limit can be discovered at the cart and nobody is out of pocket. A customer
+                            who finds out after paying that the thing is not in the building, and will not
+                            move for three weeks, has been sold something they did not agree to buy. */}
+                        {rule?.preorderArrivesOn ? (
+                            <p className="shop-rule-note shop-rule-preorder">
+                                <strong>Pre-order {"\u2014"} arrives {preorderDateLabel(rule.preorderArrivesOn)}.</strong>{" "}
+                                You can order it now and pay now. It won{"\u2019"}t ship or be ready to collect until it
+                                reaches the shop, and we{"\u2019"}ll email you the moment it does. Anything else you order
+                                with it travels at the same time.
                             </p>
                         ) : null}
                         <ShopProductBuy

@@ -159,7 +159,7 @@ export async function getItemRules(variationIds = []) {
             // ⚠️ LIVE UNTIL MARKED ARRIVED, NOT UNTIL THE DATE PASSES. A shipment three days late is still
             // a pre-order and the customer is still waiting; a storefront that quietly stopped saying so
             // on the stroke of the expected date would be lying on exactly the day it matters most.
-            preorderArrivesOn: r.preorder_arrived_at ? null : (r.preorder_arrives_on || null),
+            preorderArrivesOn: r.preorder_arrived_at ? null : ymd(r.preorder_arrives_on),
         };
     }
     return map;
@@ -173,10 +173,31 @@ export async function getItemRules(variationIds = []) {
 // and the confirmation email all have to say the same thing, and four copies of a promise about WHEN
 // somebody's money turns into a parcel is four chances to disagree. See reuse-the-rule-never-restate-it.
 
+/**
+ * A DATE column, as YYYY-MM-DD, whatever shape the driver handed us.
+ *
+ * ⚠️ THE DRIVER RETURNS A DATE COLUMN AS A JS Date, NOT A STRING, and the first version of this file
+ * assumed a string throughout. `String(date).slice(0, 10)` is "Sat Feb 14" — which compares wrong against
+ * other dates, prints wrong on the board, and fed back into a Date constructor produces Invalid Date, so
+ * the whole customer-facing sentence came back null. Nothing threw. The storefront would simply have said
+ * nothing about a pre-order, which is the one outcome this feature exists to prevent.
+ *
+ * Normalised once, at the two places rows leave the database, so everything downstream handles one shape.
+ */
+export function ymd(value) {
+    if (!value) return null;
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+    }
+    const str = String(value);
+    return /^\d{4}-\d{2}-\d{2}/.test(str) ? str.slice(0, 10) : null;
+}
+
 /** 14 February — the way a person writes a date, not 2026-02-14. */
 export function preorderDateLabel(value) {
-    if (!value) return null;
-    const d = value instanceof Date ? value : new Date(`${String(value).slice(0, 10)}T12:00:00Z`);
+    const iso = ymd(value);
+    if (!iso) return null;
+    const d = new Date(`${iso}T12:00:00Z`);
     if (Number.isNaN(d.getTime())) return null;
     return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
@@ -192,9 +213,8 @@ export function cartPreorderDate(cartItems, rules) {
     let latest = null;
     for (const line of cartItems || []) {
         const r = rules?.[String(line?.catalogObjectId || "")];
-        const on = r?.preorderArrivesOn;
-        if (!on) continue;
-        const d = String(on).slice(0, 10);
+        const d = ymd(r?.preorderArrivesOn);
+        if (!d) continue;
         if (!latest || d > latest) latest = d;
     }
     return latest;
@@ -695,11 +715,11 @@ export async function listPreorders() {
     return (rows || []).map((r) => ({
         variationId: r.variation_id,
         name: r.item_name || r.preorder_base_name || "Item",
-        arrivesOn: r.preorder_arrives_on ? String(r.preorder_arrives_on).slice(0, 10) : null,
+        arrivesOn: ymd(r.preorder_arrives_on),
         arrivesLabel: preorderDateLabel(r.preorder_arrives_on),
         // ⚠️ LATE IS A FACT THE SCREEN MUST STATE. A pre-order past its date with people waiting on it is
         // the one row on this screen that needs somebody to do something today.
-        late: Boolean(r.preorder_arrives_on && String(r.preorder_arrives_on).slice(0, 10) < today),
+        late: Boolean(ymd(r.preorder_arrives_on) && ymd(r.preorder_arrives_on) < today),
         orders: Number(r.orders) || 0,
         units: Number(r.units) || 0,
     }));

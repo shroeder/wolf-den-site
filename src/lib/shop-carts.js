@@ -1,5 +1,5 @@
 import "server-only";
-import { getItemRules } from "@/lib/shop-item-rules.js";
+import { cartPreorderDate, getItemRules, preorderSentence } from "@/lib/shop-item-rules.js";
 
 import {
     calculateOnlineFeeCents,
@@ -325,6 +325,9 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
         if (!rule) continue;
         item.pickupOnly = rule.pickupOnly;
         item.limitPerCustomer = rule.limitPerCustomer;
+        // Per line, so the cart can badge the one that is holding the order up rather than only saying
+        // the order is held. With two pre-orders in a basket the customer should be able to see which.
+        item.preorderArrivesOn = rule.preorderArrivesOn || null;
         if (rule.pickupOnly) pickupOnly = true;
         // A limit also caps the line: offering a quantity stepper that goes to 5 on a one-per-customer item
         // is an invitation to a refusal at the till.
@@ -343,10 +346,22 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
     // shows a shipping charge and a tax figure computed on top of it for an order that can only ever be
     // collected, and the totals move the moment they reach checkout.
     const effectiveMode = pickupOnly ? "pickup" : fulfillmentMode;
+    // ── THE WHOLE ORDER WAITS ────────────────────────────────────────────────────────────────────────
+    // Luke's call on a mixed basket: one order, one shipment, held until the pre-order lands. So the cart
+    // carries ONE date — the latest in it — and says so once, rather than making the customer work out
+    // which of three lines decides when their parcel moves.
+    //
+    // ⚠️ IT DOES NOT MAKE ANYTHING UNAVAILABLE. A pre-order is a perfectly good sale; it is the one rule
+    // here that changes WHEN rather than WHETHER, which is why it touches neither maxQuantity nor
+    // hasUnavailableItems the way the limit above does.
+    const preorderArrivesOn = cartPreorderDate(items, itemRules);
+    const preorderNote = preorderSentence(preorderArrivesOn, effectiveMode);
     const shippingCents = shopShippingCents(subtotalCents, effectiveMode);
     const taxCents = shopTaxCents(subtotalCents, taxRate, shippingCents);
 
     return {
+        preorderArrivesOn,
+        preorderNote,
         cartId,
         items,
         itemCount,

@@ -1675,6 +1675,17 @@ textarea {
     border: 1px solid rgba(215, 180, 90, 0.32);
 }
 
+/* ── A PRE-ORDER NOTICE IS A PROMISE ABOUT TIME, SO IT IS NOT STYLED AS A WARNING ────────────────────────
+   Amber rather than the red the unavailable lines use: nothing is wrong, nothing needs fixing, and a
+   customer should not read "this order ships on the 14th" as an error they have to clear before paying. */
+.cart-preorder-note, .shop-rule-note.shop-rule-preorder {
+    margin: 0 0 10px; padding: 10px 12px; border-radius: 10px;
+    font-size: 0.85rem; line-height: 1.45;
+    color: #ffd9a3; background: rgba(255, 179, 71, 0.1);
+    border: 1px solid rgba(255, 179, 71, 0.4);
+}
+.shop-rule-note.shop-rule-preorder strong { color: #ffc861; }
+
 .cart-pickup-only-note {
     margin: 0 0 10px;
     padding: 9px 12px;

@@ -1,4 +1,5 @@
 import "server-only";
+import { cartPreorderDate, getItemRules, preorderSentence } from "@/lib/shop-item-rules.js";
 
 import { Resend } from "resend";
 
@@ -283,6 +284,58 @@ function shipToHtml(order) {
  * so a pickup buyer has something to say at the counter. Skips silently only when we genuinely have no
  * address to write to (a guest who gave none).
  */
+/**
+ * The latest pre-order arrival date in an order, or null.
+ *
+ * ⚠️ READ OFF THE ORDER'S OWN LINES, NOT THE HOLDS LEDGER. The ledger is written a moment later in the
+ * checkout and this email is sent in the same breath; depending on it would make the sentence appear or
+ * not depending on which of two awaits finished first.
+ */
+async function orderPreorderDate(order) {
+    let items = order?.items_json;
+    if (typeof items === "string") { try { items = JSON.parse(items); } catch { items = []; } }
+    if (!Array.isArray(items) || !items.length) return null;
+    const rules = await getItemRules(items.map((i) => i?.catalogObjectId)).catch(() => ({}));
+    return cartPreorderDate(items, rules);
+}
+
+/**
+ * It landed. Sent once per order per item, from the arrival screen.
+ *
+ * ⚠️ THIS IS NOT sendOrderStatusEmail. That one reports a fulfilment status the owner set and says the
+ * thing is bagged and waiting. This one says the stock is in the building — which is news the customer has
+ * been waiting weeks for, and is NOT a promise that anybody has picked their copy yet. Luke's call: email
+ * only, the orders are then worked from the Orders screen like any other, so this must not imply a status
+ * it has not got.
+ */
+export async function sendPreorderArrivedEmail(order, itemName) {
+    const resend = getResendClient();
+    const to = recipientEmail(order);
+    if (!resend || !to) return false;
+    const isPickup = order.fulfillment_mode === "pickup";
+    const number = confirmationNumber(order);
+    const what = escapeHtml(itemName || "Your pre-order");
+    const html = shellHtml(`
+        <h1>${what} has arrived</h1>
+        <p>The pre-order on your order <strong>#${number}</strong> is in the shop.</p>
+        <p>${
+            isPickup
+                ? `We&rsquo;re getting it onto the shelf for you now, and you&rsquo;ll get a second email the moment it&rsquo;s ready to collect at ${escapeHtml(PICKUP_LOCATION)}. ` +
+                  `No need to come down until then.`
+                : `Your order is being packed and will ship shortly. We&rsquo;ll email you a tracking number as soon as it leaves us.`
+        }</p>
+        <ul>${itemsHtml(order.items_json)}</ul>
+        ${footerHtml()}
+    `);
+    const result = await resend.emails.send({
+        from: FROM,
+        to,
+        subject: `${itemName ? `${itemName} has arrived` : "Your pre-order has arrived"} — order #${number}`,
+        html,
+    });
+    return !result?.error;
+}
+
 export async function sendOrderConfirmationEmail(order) {
     const resend = getResendClient();
     const to = recipientEmail(order);
@@ -291,12 +344,23 @@ export async function sendOrderConfirmationEmail(order) {
     }
     const isPickup = order.fulfillment_mode === "pickup";
     const number = confirmationNumber(order);
+    // ── ⚠️ A PRE-ORDER HAS TO CONTRADICT THE LINE BELOW IT, SO IT GOES ABOVE IT ──────────────────
+    // Luke: text "both when they're ordering and when they get the confirmation email that the item is
+    // not going to be shipped until the expected arrival date".
+    //
+    // The two sentences underneath promise "we're packing it now" and "a tracking number as soon as it
+    // ships", and on a pre-order both are false by three weeks. Rather than fork them into four variants,
+    // the arrival sentence is stated FIRST and in bold -- a customer reads it before the paragraph it
+    // qualifies, which is the order the two facts actually happen in.
+    const preorderOn = await orderPreorderDate(order);
+    const preorderLine = preorderSentence(preorderOn, isPickup ? "pickup" : "ship");
     const html = shellHtml(`
         <h1>Thanks for your order!</h1>
         <p>Your order is confirmed. Your confirmation number is:</p>
         <p style="font-size:24px;font-weight:bold;letter-spacing:2px;margin:12px 0;">#${number}</p>
         <ul>${itemsHtml(order.items_json)}</ul>
         <p>${totalsHtml(order)}</p>
+        ${preorderLine ? `<p style="padding:12px 14px;border-radius:8px;background:#fff6e6;border:1px solid #f0c67a;color:#6b4a10;"><strong>${escapeHtml(preorderLine)}</strong></p>` : ""}
         <p>${
             isPickup
                 ? `<strong>Pickup in store.</strong> We&rsquo;re packing it now and will email you the moment it&rsquo;s ready. ` +
