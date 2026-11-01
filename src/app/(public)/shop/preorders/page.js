@@ -76,9 +76,19 @@ export default async function PreordersPage() {
                                     : <span className="po-chip">{shortDate(item.arrivesOn) || "SOON"}</span>}
                             </div>
                             <p className="po-name">{plain(item.name)}</p>
-                            {item.price != null ? (
-                                <p className="po-price">${Number(item.price).toFixed(2)}</p>
-                            ) : null}
+                            {/* ── ⚠️ THE TILE HAD NO CALL TO ACTION ───────────────────────────────
+                                Luke: "The call to action isnt clear." Art, a name and a price is a
+                                catalogue entry — it tells you what the thing is and never once says what
+                                to do about it, and "pre-order" is the one word a shopper needs permission
+                                to believe. The price now sits INSIDE the verb, so the action and its cost
+                                are one thing to read rather than two. */}
+                            {item.soldOut ? (
+                                <span className="po-cta po-cta-gone">All reserved</span>
+                            ) : (
+                                <span className="po-cta">
+                                    Reserve{item.price != null ? <b>${Number(item.price).toFixed(2)}</b> : null}
+                                </span>
+                            )}
                         </Link>
                     ))}
                 </div>

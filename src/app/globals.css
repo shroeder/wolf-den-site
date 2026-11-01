@@ -28700,19 +28700,20 @@ body.cas-seated .social-fab { display: none; }
     /* Two lines and then an ellipsis: a long sealed-product name must not set the height of the whole row. */
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.po-price { margin: 4px 10px 0; font-size: 0.95rem; font-weight: 800; color: #ffd166; }
-
-.shop-try-new directly below: both are a sentence inviting you somewhere
-   else rather than a nav item, and a shop with two differently-dressed invitations stacked on it reads as
-   two unrelated experiments. Amber instead of that one's accent, because amber is already what a pre-order
-   means everywhere else on the site -- the product page, the cart and the email all use it. */
-.shop-preorder-door {
-    display: block; margin: 0 0 14px; padding: 13px 15px; border-radius: 12px; text-decoration: none;
-    background: rgba(255, 179, 71, 0.09); border: 1px solid rgba(255, 179, 71, 0.4);
+/* ── THE ACTION, WITH THE PRICE INSIDE IT ────────────────────────────────────────────────────────────────
+   A tile that ends in a price is a catalogue entry: it says what the thing is and never what to do about
+   it. This is a button to look at — the whole tile is the link, so it is deliberately a span and not a
+   nested <a>, which would be a control inside a control. */
+.po-cta {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin: 8px 10px 0; padding: 8px 10px; border-radius: 999px;
+    font-size: 0.82rem; font-weight: 800; color: #1a1a12;
+    background: linear-gradient(180deg, #ffd166, #e0a83c);
 }
-.shop-preorder-door:hover { background: rgba(255, 179, 71, 0.15); }
-.shop-preorder-door strong { display: block; color: #ffc861; font-size: 0.98rem; }
-.shop-preorder-door span { display: block; margin-top: 2px; font-size: 0.82rem; color: #c9c3b6; }
+.po-cta b { font-weight: 900; }
+.po-cta-gone { color: #e7dece; background: rgba(255, 255, 255, 0.08); }
+
+
 
 .preorder-card { display: block; text-decoration: none; }
 .preorder-card-art { width: 100%; max-width: 190px; height: auto; display: block; margin: 0 auto 10px;
