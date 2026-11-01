@@ -75,8 +75,16 @@ export default async function PreordersPage() {
                                     ? <span className="po-chip po-chip-gone">SOLD OUT</span>
                                     : <span className="po-chip">{shortDate(item.arrivesOn) || "SOON"}</span>}
                                 {!item.soldOut && item.listPrice != null && item.price != null ? (
+                                    /* ⚠️ DOLLARS OR PERCENT, WHICHEVER IS THE BIGGER-SOUNDING TRUTH, and
+                                       they are both true. Luke took $10 off a $550 box, which is a real
+                                       tenner and a feeble-looking 2% — while $8.50 off a $170 box is a
+                                       respectable 5% and a forgettable number of dollars. Percent
+                                       flatters small prices, dollars flatter large ones, so the chip
+                                       picks per item instead of forcing one framing on both. */
                                     <span className="po-chip po-chip-save">
-                                        {Math.round((1 - item.price / item.listPrice) * 100)}% OFF
+                                        {(item.listPrice - item.price) >= 10
+                                            ? `$${Math.round(item.listPrice - item.price)} OFF`
+                                            : `${Math.round((1 - item.price / item.listPrice) * 100)}% OFF`}
                                     </span>
                                 ) : null}
                             </div>
