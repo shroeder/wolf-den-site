@@ -60,3 +60,7 @@ scripts/fixtures/.live/
 scripts/out/
 scripts/_map-owed.json
 scripts/.trial/
+
+# Scratch extracts from the quest-chain ledger build.
+_quests*.json
+_quests*.html
