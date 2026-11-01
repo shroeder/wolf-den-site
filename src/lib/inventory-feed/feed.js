@@ -104,7 +104,7 @@ export async function listShopFeedItems() {
 export async function listPreorderShopItems() {
     const rows = await db.query(
         `SELECT f.variation_id, f.name, f.image_url, f.price, f.quantity, f.category_names,
-                r.preorder_arrives_on
+                r.preorder_arrives_on, r.list_price_cents
            FROM shop_item_rules r
            JOIN inventory_feed f ON f.variation_id = r.variation_id
           WHERE r.preorder_arrives_on IS NOT NULL
@@ -127,6 +127,13 @@ export async function listPreorderShopItems() {
         // forgotten the release existed. Proven by the first real order — one unit, bought, and the item
         // would have silently vanished from /shop/preorders on the next feed sync.
         soldOut: !(row.quantity > 0),
+        // Only a HIGHER recorded price is a discount. Equal or lower means somebody changed the Square
+        // price and never updated this, and showing "was $120, now $170" would be worse than showing
+        // nothing at all.
+        listPrice: row.list_price_cents != null && row.price != null
+            && Number(row.list_price_cents) > Math.round(Number(row.price) * 100)
+            ? Number(row.list_price_cents) / 100
+            : null,
     }));
 }
 

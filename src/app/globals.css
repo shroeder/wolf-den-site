@@ -28711,6 +28711,11 @@ body.cas-seated .social-fab { display: none; }
     background: linear-gradient(180deg, #ffd166, #e0a83c);
 }
 .po-cta b { font-weight: 900; }
+/* The old price, struck. Dimmed and smaller so the number you PAY is the one the eye lands on. */
+.po-cta s { opacity: 0.6; font-weight: 700; font-size: 0.76rem; text-decoration-thickness: 2px; }
+/* Opposite corner from the date chip, so a tile can carry both without them colliding. */
+.po-chip-save { left: auto; right: 6px; color: #fff; background: #2f8f4e; }
+
 .po-cta-gone { color: #e7dece; background: rgba(255, 255, 255, 0.08); }
 
 

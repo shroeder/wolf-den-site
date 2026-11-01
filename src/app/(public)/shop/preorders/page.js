@@ -74,6 +74,11 @@ export default async function PreordersPage() {
                                 {item.soldOut
                                     ? <span className="po-chip po-chip-gone">SOLD OUT</span>
                                     : <span className="po-chip">{shortDate(item.arrivesOn) || "SOON"}</span>}
+                                {!item.soldOut && item.listPrice != null && item.price != null ? (
+                                    <span className="po-chip po-chip-save">
+                                        {Math.round((1 - item.price / item.listPrice) * 100)}% OFF
+                                    </span>
+                                ) : null}
                             </div>
                             <p className="po-name">{plain(item.name)}</p>
                             {/* ── ⚠️ THE TILE HAD NO CALL TO ACTION ───────────────────────────────
@@ -86,7 +91,13 @@ export default async function PreordersPage() {
                                 <span className="po-cta po-cta-gone">All reserved</span>
                             ) : (
                                 <span className="po-cta">
-                                    Reserve{item.price != null ? <b>${Number(item.price).toFixed(2)}</b> : null}
+                                    Reserve
+                                    {/* The struck price is the regular price we recorded, never a computed
+                                        one — see migration 508. No record, no strike. */}
+                                    {item.listPrice != null ? (
+                                        <s>${Number(item.listPrice).toFixed(2)}</s>
+                                    ) : null}
+                                    {item.price != null ? <b>${Number(item.price).toFixed(2)}</b> : null}
                                 </span>
                             )}
                         </Link>

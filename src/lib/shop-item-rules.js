@@ -136,7 +136,7 @@ export async function getItemRules(variationIds = []) {
     if (!ids.length) return {};
     const rows = await db.query(
         `SELECT variation_id, pickup_only, limit_per_customer, run_started_at,
-                preorder_arrives_on, preorder_arrived_at
+                preorder_arrives_on, preorder_arrived_at, list_price_cents
            FROM shop_item_rules
           WHERE variation_id = ANY($1)
             -- ⚠️ THE PRE-ORDER CLAUSE IS NOT OPTIONAL HERE. This filter existed so a row that had been
@@ -160,6 +160,7 @@ export async function getItemRules(variationIds = []) {
             // a pre-order and the customer is still waiting; a storefront that quietly stopped saying so
             // on the stroke of the expected date would be lying on exactly the day it matters most.
             preorderArrivesOn: r.preorder_arrived_at ? null : ymd(r.preorder_arrives_on),
+            listPriceCents: r.list_price_cents == null ? null : Number(r.list_price_cents),
         };
     }
     return map;

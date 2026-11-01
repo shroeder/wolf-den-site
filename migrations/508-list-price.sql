@@ -1,0 +1,17 @@
+-- ── "WAS $550, NOW $522.50" ────────────────────────────────────────────────────────────────────────────────
+-- Luke: "Can we offer 5 percent off with a strike through, is it possible to discount items?"
+--
+-- Yes, and shop-carts.js already settled HOW, in the note left when the last discount was torn out: "If a
+-- discount is ever wanted again it belongs in Square, where the POS and the online shop read the same
+-- number, not in a helper the shop applies on its way to checkout." That helper had quietly taken 10% off
+-- consigned singles whose consignors were on 87-95% payouts — more than the entire margin — because it
+-- keyed on price rather than on anybody deciding.
+--
+-- So the DISCOUNTED price goes in Square and is the only number anything charges. This column holds the
+-- price it was struck down FROM, purely so the strike-through can be shown.
+--
+-- ⚠️ IT IS A RECORD, NOT A RULE. Nothing computes a discount from it and nothing charges it. If it is
+-- higher than the Square price the shop shows "was"; if it is absent or lower, the shop shows one price and
+-- says nothing. A strike-through against a number we never actually charged is a lie printed next to a
+-- payment button, and that is the one thing this must never become.
+ALTER TABLE shop_item_rules ADD COLUMN IF NOT EXISTS list_price_cents INTEGER;
