@@ -1148,6 +1148,19 @@ export const GROVE_CSS = `
 
 .gm-note { margin: 12px 0 0; font-size: 0.86rem; color: #ffd75e; }
 
+/* What the run pays, read off chestsFor so the card and the settle cannot disagree. Sits between the
+   stats and the buttons because it is the thing the decision is actually made on. */
+.gm-pays { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(190, 210, 160, 0.16); }
+.gm-pays-head { display: block; font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #93a089; margin-bottom: 7px; }
+.gm-rung { display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+    padding: 3px 0; font-size: 0.84rem; }
+.gm-rung span { color: #93a089; white-space: nowrap; }
+.gm-rung b { color: #cfd6c3; font-weight: 600; text-align: right; }
+/* The full clear is the only rung that reaches the top box on the map, so it is the one worth chasing. */
+.gm-rung.is-best span { color: #cfd6c3; }
+.gm-rung.is-best b { color: #ffd75e; }
+
 .gm-acts { display: flex; flex-direction: column; gap: 9px; margin-top: 16px; }
 /* min-height 46px: these are the only two things on the card and both are a thumb target. */
 .gm-btn { min-height: 46px; border-radius: 11px; border: 1px solid transparent; cursor: pointer;
@@ -1189,17 +1202,6 @@ export const GROVE_CSS = `
     filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.45)) drop-shadow(0 5px 7px rgba(0, 0, 0, 0.7)); }
 /* No key and none waiting: still standing, still readable, just not calling you over. */
 .gv-colgate.is-shut img { filter: saturate(0.55) brightness(0.68) drop-shadow(0 4px 7px rgba(0,0,0,0.75)); }
-
-.gv-colgate-tag, .gv-colgate-keys {
-    position: absolute; left: 50%; transform: translateX(-50%);
-    white-space: nowrap; pointer-events: none;
-    font-family: var(--font-display); font-weight: 700;
-}
-.gv-colgate-tag { top: -16px; font-size: 0.66rem; letter-spacing: 0.1em; color: #ffe3a8;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
-.gv-colgate-keys { bottom: -15px; font-size: 0.6rem; color: #cbbf9d;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
-.gv-colgate.is-open .gv-colgate-keys { color: #f0b44c; }
 
 /* The marshal stands on the APPROACH side of his gate, not past it. You enter a zone from the left and
    walk right, so a marshal placed to the gate's right is someone you meet after you have already

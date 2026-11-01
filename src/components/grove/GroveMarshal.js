@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+
+import { chestsFor } from "@/lib/marketplace/grove-coliseum-plan.js";
+import { GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
 
 // ── TALKING TO THE MARSHAL ──────────────────────────────────────────────────────────────────────────────────
 // Luke, asked what interacting with the NPC looked like: it looked like nothing. Tapping him either claimed
@@ -16,9 +19,34 @@ import { useState } from "react";
 // is the correct ORDER and the wrong shape: a tap that silently spends currency is a tap people stop making.
 export default function GroveMarshal({ coliseum, busy = false, onTakeKey, onEnter, onClose }) {
     const [note, setNote] = useState(null);
-    if (!coliseum?.marshal) return null;
 
-    const { marshal, keys = 0, dailyReady, bestWave = 0, zone } = coliseum;
+    // ⚠️ DESTRUCTURE AND MEMOISE BEFORE ANY EARLY RETURN. The guard used to sit on the line above and the
+    // useMemo below it, which is a conditionally-called hook — React throws the moment the component renders
+    // once with a marshal and once without. Hooks first, bail after.
+    const { marshal, keys = 0, dailyReady, bestWave = 0, zone, map } = coliseum || {};
+
+    // ── ⚠️ WHAT YOU WIN, BEFORE YOU SPEND THE KEY ───────────────────────────────────────────────────
+    // The card used to say "Two minutes. Waves until the clock runs out" and nothing else, so a player was
+    // asked to spend a scarce daily key on an unstated reward. Nobody does that twice.
+    //
+    // Read from chestsFor, the same function the settle actually pays out of — a hand-written list here
+    // would be a second description of the rules, and the one that goes stale. [[reuse-the-rule-never-restate-it]]
+    const rungs = useMemo(() => {
+        const name = (id) => GROVE_CHESTS[id]?.name || id;
+        const at = (n, cleared) => chestsFor({ map, wavesCleared: n, totalWaves: 4, cleared });
+        const tally = (list) => {
+            const by = new Map();
+            for (const id of list) by.set(id, (by.get(id) || 0) + 1);
+            return [...by].map(([id, n]) => (n > 1 ? `${n} × ${name(id)}` : name(id))).join(" + ");
+        };
+        return [
+            { when: "A quarter in", pays: tally(at(1, false)) },
+            { when: "Three quarters", pays: tally(at(3, false)) },
+            { when: "Cleared, inside the clock", pays: tally(at(4, true)), best: true },
+        ].filter((r) => r.pays);
+    }, [map]);
+
+    if (!marshal) return null;
 
     async function takeKey() {
         setNote(null);
@@ -51,6 +79,15 @@ export default function GroveMarshal({ coliseum, busy = false, onTakeKey, onEnte
                 </div>
 
                 {note ? <p className="gm-note">{note}</p> : null}
+
+                <div className="gm-pays">
+                    <span className="gm-pays-head">What it pays</span>
+                    {rungs.map((r) => (
+                        <div key={r.when} className={`gm-rung${r.best ? " is-best" : ""}`}>
+                            <span>{r.when}</span><b>{r.pays}</b>
+                        </div>
+                    ))}
+                </div>
 
                 <div className="gm-acts">
                     {dailyReady ? (

@@ -4028,12 +4028,12 @@ export default function GroveScene({
                                 is not a change of world. See COLISEUM_ART in grove-arena.js. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={coliseumArt(coliseumHere.map).src} alt="" draggable={false} />
-                            <span className="gv-colgate-tag">Coliseum</span>
-                            <span className="gv-colgate-keys">
-                                {coliseumHere.dailyReady && coliseumHere.keys < 1
-                                    ? "Free key"
-                                    : `${coliseumHere.keys} key${coliseumHere.keys === 1 ? "" : "s"}`}
-                            </span>
+                            {/* ⚠️ NO FLOATING LABEL. "Coliseum" and the key count used to hang over and
+                                under the building in HUD type. Everything else in the frame is painted into
+                                the world, so two pieces of interface stapled on top turned a landmark back
+                                into a map marker — the exact thing building it was meant to stop. The
+                                building says what it is by being one; the key count lives on the marshal's
+                                card, which is where you go to decide anything. */}
                         </button>
                         {coliseumHere.marshal ? (
                             <button type="button" ref={colNpcRef}
