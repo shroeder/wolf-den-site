@@ -114,7 +114,15 @@ export default async function ShopProductPage({ params }) {
                             </p>
                         )}
                         <p className="muted">
-                            {item.inStock
+                            {/* ⚠️ A PRE-ORDER IS NOT "IN STOCK AT OUR MONTGOMERY STORE", AND SAYING BOTH IS
+                                WORSE THAN SAYING NEITHER. Square carries the units as on-hand so the thing
+                                is buyable at all, which means item.inStock is true for a box that is not in
+                                the building — and this line sat directly above the pre-order notice flatly
+                                contradicting it. The customer has to decide which of two sentences from the
+                                same shop to believe, one line apart. */}
+                            {rule?.preorderArrivesOn
+                                ? `On pre-order${item.quantity > 1 ? ` · ${item.quantity} available` : ""} — not in the shop yet`
+                                : item.inStock
                                 ? `In stock${item.quantity > 1 ? ` · ${item.quantity} available` : ""} at our Montgomery, MN store`
                                 : "Currently out of stock"}
                         </p>
