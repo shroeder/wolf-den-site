@@ -109,7 +109,6 @@ export async function listPreorderShopItems() {
            JOIN inventory_feed f ON f.variation_id = r.variation_id
           WHERE r.preorder_arrives_on IS NOT NULL
             AND r.preorder_arrived_at IS NULL
-            AND f.in_stock = TRUE
           ORDER BY r.preorder_arrives_on ASC, f.name ASC`,
         [],
     ).catch(() => []);
@@ -122,6 +121,12 @@ export async function listPreorderShopItems() {
         quantity: row.quantity == null ? null : Number(row.quantity),
         categoryNames: row.category_names ? row.category_names.split(CATEGORY_SEPARATOR) : [],
         arrivesOn: row.preorder_arrives_on,
+        // ⚠️ A SOLD-OUT PRE-ORDER STAYS ON THE SHELF, MARKED. The first cut required in_stock = TRUE,
+        // which is right for ordinary stock and wrong here: an allocation selling out is NEWS, and the
+        // people deciding whether to chase one need to see that it went rather than find a page that has
+        // forgotten the release existed. Proven by the first real order — one unit, bought, and the item
+        // would have silently vanished from /shop/preorders on the next feed sync.
+        soldOut: !(row.quantity > 0),
     }));
 }
 

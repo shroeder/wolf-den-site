@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { getShopOrderById, setShopOrderFulfillment, setShopOrderArchived } from "@/lib/shop-orders";
-import { sendOrderCancelledEmail, sendOrderStatusEmail } from "@/lib/shop-order-email.js";
+import { sendOrderCancelledEmail, sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/shop-order-email.js";
 import { parseTrackingFromScan } from "@/lib/shipping/tracking-scan.js";
 import { withRequestLogging } from "@/lib/server-logger";
 import { collectVaultCards } from "@/lib/marketplace/vault.js";
@@ -32,6 +32,29 @@ export async function PATCH(request, { params }) {
             // structured 2D block. That logic lives in ONE place with its own checks beside it, rather than
             // being ported into Kotlin where it would drift from this copy the first time a carrier changed
             // a format. See tracking-scan.js.
+            // ── RESEND THE CONFIRMATION ─────────────────────────────────────────────────────────
+            // The first thing anybody reaches for when a customer says "I never got anything". Before
+            // this the only options were to tell them to check spam or to do nothing.
+            //
+            // ⚠️ IT SENDS THE CONFIRMATION, NOT A FULFILMENT NOTICE, and it changes no state. A resend
+            // must not be able to tell somebody their order is ready when it is not, and it must not be
+            // able to move an order along by accident — which is why it is handled here, before any of
+            // the fulfilment branches below, and returns immediately.
+            //
+            // Every attempt lands in shop_email_log like any other, so a resend is as auditable as the
+            // original and you can see whether THAT one left the building either.
+            if (body.resendConfirmation === true) {
+                const order = await getShopOrderById(id);
+                if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+                const sent = await sendOrderConfirmationEmail(order);
+                logger.info("admin.shop.orders.resend_confirmation", { orderId: id, sent });
+                return NextResponse.json({
+                    ok: sent,
+                    sentTo: order.customer_email || order.shipping_email || null,
+                    error: sent ? null : "Resend would not accept it — check the email log.",
+                });
+            }
+
             // ── ARCHIVE / UNARCHIVE ─────────────────────────────────────────────────────────────
             // Handled before everything below because it is the one change that touches no fulfilment
             // state and must never email anybody. Filing a row is not news to the customer.

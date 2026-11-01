@@ -12,11 +12,27 @@ const shortId = (id) => String(id || "").slice(0, 8).toUpperCase();
 
 // Buyer-facing status label. Payment is already captured (these are completed orders); this reflects
 // where the ORDER is in fulfillment.
+// 22 November, the way a person writes it.
+function whenLabel(iso) {
+    if (!iso) return null;
+    const d = new Date(`${String(iso).slice(0, 10)}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+}
+
 function statusLabel(o) {
     if (o.fulfillmentStatus === "cancelled") return "Cancelled";
     if (o.fulfillmentStatus === "shipped") return "Shipped";
     if (o.fulfillmentStatus === "picked_up") return "Picked up";
     if (o.fulfillmentStatus === "ready") return o.fulfillmentMode === "pickup" ? "Ready for pickup" : "Ready";
+    // ⚠️ A PRE-ORDER IS NOT "RECEIVED AND NOTHING HAPPENING". It sits unfulfilled for however many weeks
+    // the release is away, and this is the one order a customer checks over and over — because waiting is
+    // the deal they agreed to. "Order received" for three weeks reads as neglect; the date reads as a
+    // promise being kept.
+    if (o.waitingOnPreorder) {
+        const when = whenLabel(o.preorderArrivesOn);
+        return when ? `Arriving ${when}` : "Pre-order — awaiting stock";
+    }
     return "Order received";
 }
 

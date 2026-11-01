@@ -28665,6 +28665,7 @@ body.cas-seated .social-fab { display: none; }
 .preorder-card-name { margin: 0; font-size: 1rem; line-height: 1.3; }
 /* The one fact that decides whether somebody taps the card, so it outranks the price. */
 .preorder-card-when { margin: 6px 0 0; font-size: 0.84rem; font-weight: 700; color: #ffc861; }
+.preorder-card-gone { margin: 2px 0 0; font-size: 0.8rem; font-weight: 700; color: #ff9a8a; }
 .preorder-card-price { margin: 2px 0 0; font-size: 0.92rem; color: #c9c3b6; }
 
 .shop-try-new {

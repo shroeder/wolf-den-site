@@ -67,6 +67,9 @@ export default async function PreordersPage() {
                             <p className="preorder-card-when">
                                 Arrives {preorderDateLabel(item.arrivesOn) || "soon"}
                             </p>
+                            {item.soldOut ? (
+                                <p className="preorder-card-gone">Sold out — all reserved</p>
+                            ) : null}
                             {item.price != null ? (
                                 <p className="preorder-card-price">${Number(item.price).toFixed(2)}</p>
                             ) : null}

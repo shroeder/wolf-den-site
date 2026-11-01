@@ -1,4 +1,5 @@
 import "server-only";
+import { db } from "@/lib/db";
 import { cartPreorderDate, getItemRules, preorderSentence } from "@/lib/shop-item-rules.js";
 
 import { Resend } from "resend";
@@ -327,13 +328,44 @@ export async function sendPreorderArrivedEmail(order, itemName) {
         <ul>${itemsHtml(order.items_json)}</ul>
         ${footerHtml()}
     `);
-    const result = await resend.emails.send({
-        from: FROM,
+    return deliver({
+        kind: "preorder_arrived",
+        orderId: order?.id || null,
         to,
         subject: `${itemName ? `${itemName} has arrived` : "Your pre-order has arrived"} — order #${number}`,
         html,
     });
-    return !result?.error;
+}
+
+
+// ── EVERY SHOP EMAIL GOES THROUGH HERE, AND EVERY ATTEMPT IS WRITTEN DOWN ───────────────────────────────────
+// Six senders in this file each called resend.emails.send directly and returned a boolean nobody kept. So
+// "did the customer get their confirmation" had no answer — not whether it was sent, not where to, not
+// whether Resend took it. For a pre-order that is worse than untidy: the customer agreed to wait weeks on
+// the promise we would email them when it landed, and `notified_at` only ever proved we TRIED.
+//
+// ⚠️ THE LOG WRITE CAN NEVER FAIL A SEND. It is a record of what happened, not part of making it happen —
+// a logging table that could throw would turn a delivered email into a 500 on the checkout path.
+async function deliver({ kind, orderId = null, to, subject, html }) {
+    const resend = getResendClient();
+    if (!resend || !to) return false;
+    let result = null;
+    let thrown = null;
+    try {
+        result = await resend.emails.send({ from: FROM, to, subject, html });
+    } catch (error) {
+        thrown = error instanceof Error ? error.message : String(error);
+    }
+    const ok = Boolean(!thrown && result && !result.error);
+    const errorText = thrown
+        || (result?.error ? (result.error.message || JSON.stringify(result.error)).slice(0, 400) : null);
+    await db.query(
+        `INSERT INTO shop_email_log (order_id, kind, to_email, subject, provider_id, ok, error)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [orderId, kind, String(to).slice(0, 320), String(subject || "").slice(0, 300),
+            result?.data?.id || null, ok, errorText],
+    ).catch(() => { /* a log that breaks the thing it logs is worse than no log */ });
+    return ok;
 }
 
 export async function sendOrderConfirmationEmail(order) {
@@ -370,13 +402,13 @@ export async function sendOrderConfirmationEmail(order) {
         ${order.receipt_url ? `<p><a href="${escapeHtml(order.receipt_url)}">View your payment receipt &rarr;</a></p>` : ""}
         ${footerHtml()}
     `);
-    const result = await resend.emails.send({
-        from: FROM,
+    return deliver({
+        kind: "confirmation",
+        orderId: order?.id || null,
         to,
         subject: `Your Wolf Den order #${number} is confirmed`,
         html,
     });
-    return !result?.error;
 }
 
 /**
@@ -449,13 +481,13 @@ export async function sendOrderStatusEmail(order, status) {
         return false;
     }
 
-    const result = await resend.emails.send({
-        from: FROM,
+    return deliver({
+        kind: `status_${status}`,
+        orderId: order?.id || null,
         to,
         subject,
         html: shellHtml(`${body}${footerHtml()}`),
     });
-    return !result?.error;
 }
 
 /**
@@ -481,13 +513,13 @@ export async function sendOrderCancelledEmail(order, { reason, refundAmountCents
         }
         <p style="color:#777;font-size:13px;">Sorry for the inconvenience — questions? Just reply to this email.</p>
     `);
-    const result = await resend.emails.send({
-        from: FROM,
+    return deliver({
+        kind: "cancelled",
+        orderId: order?.id || null,
         to,
         subject: `Your Wolf Den order #${shortId(order.id)} was cancelled`,
         html,
     });
-    return !result?.error;
 }
 
 /** Owner alert: a customer requested to cancel an order (owner decides whether to honor it). */
@@ -507,13 +539,13 @@ export async function sendOrderCancelRequestAlertEmail(order, { reason } = {}) {
         <ul>${itemsHtml(order.items_json)}</ul>
         <p>Review it in the admin app — you decide whether to <strong>Cancel &amp; refund</strong> or keep the order.</p>
     `;
-    const result = await resend.emails.send({
-        from: FROM,
+    return deliver({
+        kind: "cancel_request",
+        orderId: order?.id || null,
         to: ownerEmail(),
         subject: `Cancellation request — order #${shortId(order.id)}`,
         html,
     });
-    return !result?.error;
 }
 
 /** New-order alert to the store owner so an order is never missed. */
@@ -533,11 +565,11 @@ export async function sendNewOrderAlertEmail(order) {
         ${isPickup ? "" : `<p><strong>Ship to:</strong><br/>${shipToHtml(order)}</p>`}
         ${order.receipt_url ? `<p><a href="${escapeHtml(order.receipt_url)}">Square receipt →</a></p>` : ""}
     `;
-    const result = await resend.emails.send({
-        from: FROM,
+    return deliver({
+        kind: "new_order_alert",
+        orderId: order?.id || null,
         to: ownerEmail(),
         subject: `New order #${shortId(order.id)} — ${money(order.total_cents)}`,
         html,
     });
-    return !result?.error;
 }
