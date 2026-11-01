@@ -169,9 +169,27 @@ function dedupeSearchItems(items) {
     return deduped;
 }
 
+// ── ⚠️ THE PRE-ORDER RIBBON ─────────────────────────────────────────────────────────────────────────────
+// A pre-order sits in Pokemon Sealed and Magic Sealed alongside stock that is physically on the shelf, and
+// that is the correct place for it — Luke: "I want them to be in the right square category." Which means
+// the ONLY thing separating "we have this" from "we will have this on the 13th" inside that grid is what
+// the tile says, so the tile has to say it. The Square name carries "[Pre-Order] " for the counter; the
+// ribbon is the same fact drawn where a shopper is already looking, over the picture rather than in a
+// line of grey text under the price.
+//
+// `preorderDates` is a plain object keyed by variation id, built once on the server from the same
+// shop_item_rules column everything else reads. Absent key = ordinary stock.
+const preorderLabel = (iso) => {
+    if (!iso) return "Pre-order";
+    const d = new Date(`${String(iso).slice(0, 10)}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) return "Pre-order";
+    return `Pre-order \u00B7 ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`;
+};
+
 export default function ShopInventoryClient({
     categories,
     paymentsEnabled,
+    preorderDates = {},
 }) {
     const orderedCategories = useMemo(() => sortShopCategories(categories), [categories]);
     // Default the shop to the Pokémon Sealed category (falls back to the first tab if it's absent).
@@ -800,6 +818,11 @@ export default function ShopInventoryClient({
                                     }}
                                 >
                                     <div className="shop-tile-image-wrap">
+                                        {preorderDates[item.id] !== undefined ? (
+                                            <span className="shop-tile-preorder">
+                                                {preorderLabel(preorderDates[item.id])}
+                                            </span>
+                                        ) : null}
                                         {item.imageUrl ? (
                                             <img
                                                 src={item.imageUrl}

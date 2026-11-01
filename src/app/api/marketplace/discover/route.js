@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { discoverOpenFor } from "@/lib/marketplace/discover-gate.js";
-import { DISCOVER_ERAS, DISCOVER_PRICES, discoverPage, discoverRows } from "@/lib/marketplace/discover.js";
+import {
+    DISCOVER_ERAS, DISCOVER_PREORDERS, DISCOVER_PRICES, discoverPage, discoverRows,
+} from "@/lib/marketplace/discover.js";
 import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -27,6 +29,7 @@ export async function GET(request) {
             const filters = {
                 era: sp.get("era") || "any",
                 price: sp.get("price") || "any",
+                preorder: sp.get("preorder") || "any",
                 q: sp.get("q") || "",
             };
 
@@ -49,6 +52,7 @@ export async function GET(request) {
                 creditCents: await getStoreCredit(buyer.id).catch(() => 0),
                 eras: DISCOVER_ERAS,
                 prices: DISCOVER_PRICES,
+                preorders: DISCOVER_PREORDERS,
             });
         } catch (error) {
             return internalError(error, { event: "discover.list.failure" });

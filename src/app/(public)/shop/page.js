@@ -50,6 +50,22 @@ export default async function ShopPage() {
     }
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
 
+    // -- PRE-ORDERS ARE NOT A CATEGORY AND MUST NOT BECOME ONE ------------------------------------------
+    // Luke: "I want them to be in the right square category under Pokemon Sealed and Magic Sealed. But I
+    // wonder if there's a way to also flag them with a custom attribute as pre-order."
+    //
+    // The flag already exists: shop_item_rules.preorder_arrives_on, written by the Restocking screen. That
+    // one column drives every place a pre-order shows its face -- the "[Pre-Order] " prefix on the Square
+    // name, the wording at checkout, the confirmation email, the arrival email, and these two props.
+    // Mirroring it into a Square custom attribute would be two sources for one fact, and there would be a
+    // day somebody set one and not the other.
+    //
+    // So the item keeps its real Square category and the shelf is assembled HERE, off the list that was
+    // already fetched for the door above. No extra round trip.
+    const preorderDates = Object.fromEntries(
+        preorders.map((item) => [item.variationId, item.arrivesOn || null]),
+    );
+
     // ── ⚠️ THE DOOR TO DISCOVER ─────────────────────────────────────────────────────────────────────────
     // Built the deck, shipped it, and linked it from nowhere — Luke: "Where is the experimental at I don't
     // see the try the new view." That is the SECOND time in one day a finished screen had no way in (the
@@ -98,6 +114,11 @@ export default async function ShopPage() {
                         justInItems={justInItems || []}
                         categories={categories || []}
                         paymentsEnabled={paymentsEnabled}
+                        preorders={preorders}
+                        /* A plain object, not a Set. This crosses the server/client boundary, and a Set
+                           arrives at the client as {} -- which would fail SILENTLY: every ribbon would
+                           simply not render and the grid would still look fine. */
+                        preorderDates={preorderDates}
                     />
                 </section>
             ) : (

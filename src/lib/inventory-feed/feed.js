@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { ymd } from "@/lib/shop-item-rules.js";
 
 const DEFAULT_WINDOW_HOURS = 24 * 7;
 const CATEGORY_SEPARATOR = " · ";
@@ -120,7 +121,10 @@ export async function listPreorderShopItems() {
         price: row.price == null ? null : Number(row.price),
         quantity: row.quantity == null ? null : Number(row.quantity),
         categoryNames: row.category_names ? row.category_names.split(CATEGORY_SEPARATOR) : [],
-        arrivesOn: row.preorder_arrives_on,
+        // NORMALISED HERE, ONCE. A Postgres DATE arrives as a JS Date, and String(date).slice(0, 10)
+        // yields "Sat Feb 14" — which is how preorderSentence silently returned null the first time.
+        // Every consumer gets a plain YYYY-MM-DD string and nobody has to remember.
+        arrivesOn: ymd(row.preorder_arrives_on),
         // ⚠️ A SOLD-OUT PRE-ORDER STAYS ON THE SHELF, MARKED. The first cut required in_stock = TRUE,
         // which is right for ordinary stock and wrong here: an allocation selling out is NEWS, and the
         // people deciding whether to chase one need to see that it went rather than find a page that has

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import JustInClient from "@/components/JustInClient";
+import PreorderDeck from "@/components/shop/PreorderDeck";
 import ShopInventoryClient from "@/components/ShopInventoryClient";
 
 // Unified shop browse: the FULL INVENTORY is the default view, with a toggle to "Just In" (recent
@@ -14,9 +15,28 @@ import ShopInventoryClient from "@/components/ShopInventoryClient";
 // what is for sale. Opening on a 24-hour slice showed a visitor a handful of items and read as a nearly
 // empty shop. The two have to agree -- the tab that is selected must also be the one on the left, or the
 // highlight reads as a stray second button rather than as the current view.
-export default function ShopBrowser({ justInItems = [], categories = [], paymentsEnabled = false }) {
+// ── ⚠️ AND A THIRD TAB FOR PRE-ORDERS ───────────────────────────────────────────────────────────────────
+// Luke: "the shop should have a skew of looking at pre-orders as well from there. And it should have its
+// own filter too. Like the pre-orders maybe are just a category."
+//
+// They are NOT a category, and deliberately so — he wants them filed under Pokemon Sealed and Magic Sealed
+// in Square, which is where a cashier and the sales reports expect them. The pre-order flag already lives
+// in shop_item_rules.preorder_arrives_on, set from the Restocking screen, and that one column is what
+// drives the Square name prefix, the confirmation wording, the arrival emails and this tab. A second copy
+// of it as a Square category or custom attribute would be a second thing to keep in step, and the two
+// would drift the first time somebody set one and not the other.
+//
+// The tab only exists while something is on the shelf: a permanent tab onto an empty room is a tab people
+// learn not to press, and this shop will spend most of the year with nothing on pre-order.
+export default function ShopBrowser({
+    justInItems = [],
+    categories = [],
+    paymentsEnabled = false,
+    preorders = [],
+}) {
     const hasJustIn = Array.isArray(justInItems) && justInItems.length > 0;
     const hasInventory = Array.isArray(categories) && categories.length > 0;
+    const hasPreorders = Array.isArray(preorders) && preorders.length > 0;
     const [view, setView] = useState("all");
 
     return (
@@ -41,9 +61,27 @@ export default function ShopBrowser({ justInItems = [], categories = [], payment
                 >
                     🔥 Just In
                 </button>
+                {hasPreorders ? (
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={view === "preorders"}
+                        className={`shop-view-tab${view === "preorders" ? " shop-view-tab-active" : ""}`}
+                        onClick={() => setView("preorders")}
+                    >
+                        Pre-orders
+                        <span className="shop-view-n">{preorders.length}</span>
+                    </button>
+                ) : null}
             </div>
 
-            {view === "justin" ? (
+            {/* NO INTRO PARAGRAPH. The first draft opened with four lines explaining what a pre-order is,
+                which on a 390px phone pushed the product itself below the fold -- the exact complaint that
+                killed the first version of the dedicated page ("verbose and ghetto"). The banner above
+                already says it once and every card repeats the deal under its own button. */}
+            {view === "preorders" && hasPreorders ? (
+                <PreorderDeck items={preorders} />
+            ) : view === "justin" ? (
                 hasJustIn ? (
                     <>
                         <div className="just-in-intro">

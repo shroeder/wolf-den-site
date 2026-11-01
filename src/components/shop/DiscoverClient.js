@@ -25,6 +25,14 @@ import { Haptic } from "@/components/arena/arena-audio.js";
 
 const usd = (cents) => `$${((Number(cents) || 0) / 100).toFixed(2)}`;
 
+// "Pre-order · Nov 13". An item not in the building yet sits in the deck alongside stock that is, under
+// the same Square category, so the CARD is the only thing that can tell them apart.
+const preorderLabel = (iso) => {
+    const d = new Date(`${String(iso).slice(0, 10)}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) return "Pre-order";
+    return `Pre-order \u00B7 ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`;
+};
+
 // Start fetching the next page when this many cards remain to the right. Luke: "it should load ahead so
 // the user never notices it loading." Six cards is several seconds of swiping at any realistic pace.
 const LOOKAHEAD = 6;
@@ -55,6 +63,7 @@ export default function DiscoverClient() {
     const [rows, setRows] = useState([]);
     const [eras, setEras] = useState([]);
     const [prices, setPrices] = useState([]);
+    const [preorderOpts, setPreorderOpts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [detail, setDetail] = useState(null);
@@ -71,8 +80,8 @@ export default function DiscoverClient() {
     // Filters. `draft` is what the sheet is editing; `applied` is what the deck is showing — so closing the
     // sheet without pressing anything cannot silently change the deck underneath.
     const [sheetOpen, setSheetOpen] = useState(false);
-    const [applied, setApplied] = useState({ era: "any", price: "any", q: "" });
-    const [draft, setDraft] = useState({ era: "any", price: "any", q: "" });
+    const [applied, setApplied] = useState({ era: "any", price: "any", preorder: "any", q: "" });
+    const [draft, setDraft] = useState({ era: "any", price: "any", preorder: "any", q: "" });
 
     // ⚠️ REFS, NOT STATE. In-flight page requests and the measured deck height: nothing renders from the
     //    first, and the second would re-render the whole deck mid-scroll.
@@ -84,7 +93,7 @@ export default function DiscoverClient() {
         setLoading(true);
         setError(null);
         try {
-            const qs = new URLSearchParams({ era: f.era, price: f.price });
+            const qs = new URLSearchParams({ era: f.era, price: f.price, preorder: f.preorder || "any" });
             if (f.q) qs.set("q", f.q);
             const res = await fetch(`/api/marketplace/discover?${qs}`, { cache: "no-store" });
             const data = await res.json();
@@ -93,6 +102,7 @@ export default function DiscoverClient() {
             setCredit(typeof data.creditCents === "number" ? data.creditCents : null);
             setEras(data.eras || []);
             setPrices(data.prices || []);
+            setPreorderOpts(data.preorders || []);
             setItemIndex({});
             fetching.current.clear();
         } catch {
@@ -102,7 +112,7 @@ export default function DiscoverClient() {
         }
     }, []);
 
-    useEffect(() => { load({ era: "any", price: "any", q: "" }); }, [load]);
+    useEffect(() => { load({ era: "any", price: "any", preorder: "any", q: "" }); }, [load]);
 
     useEffect(() => {
         if (loading) return undefined;
@@ -134,7 +144,7 @@ export default function DiscoverClient() {
         try {
             const qs = new URLSearchParams({
                 row: row.key, offset: String(row.items.length),
-                era: applied.era, price: applied.price,
+                era: applied.era, price: applied.price, preorder: applied.preorder || "any",
             });
             if (applied.q) qs.set("q", applied.q);
             const res = await fetch(`/api/marketplace/discover?${qs}`, { cache: "no-store" });
@@ -215,7 +225,10 @@ export default function DiscoverClient() {
         }
     }
 
-    const filtersOn = applied.era !== "any" || applied.price !== "any" || Boolean(applied.q);
+    const filtersOn = applied.era !== "any"
+        || applied.price !== "any"
+        || applied.preorder !== "any"
+        || Boolean(applied.q);
 
     function openSheet() { setDraft(applied); setSheetOpen(true); }
     function applyDraft(next) {
@@ -240,7 +253,7 @@ export default function DiscoverClient() {
             {!rows.length ? (
                 <div className="dv-none">
                     <p>Nothing matches that.</p>
-                    <button type="button" className="dv-btn dv-add" onClick={() => applyDraft({ era: "any", price: "any", q: "" })}>
+                    <button type="button" className="dv-btn dv-add" onClick={() => applyDraft({ era: "any", price: "any", preorder: "any", q: "" })}>
                         Clear filters
                     </button>
                 </div>
@@ -306,6 +319,9 @@ export default function DiscoverClient() {
                                             />
                                         </button>
                                         <div className="dv-meta">
+                                            {item.preorder ? (
+                                                <p className="dv-preorder">{preorderLabel(item.preorder)}</p>
+                                            ) : null}
                                             <h3 className="dv-name">{item.name}</h3>
                                             <p className="dv-sub">
                                                 <span className="dv-price">{usd(item.priceCents)}</span>
@@ -410,6 +426,21 @@ export default function DiscoverClient() {
                             onKeyDown={(e) => { if (e.key === "Enter") applyDraft(); }}
                         />
 
+                        {preorderOpts.length ? (
+                            <div className="dv-sheet-group">
+                                {preorderOpts.map((o) => (
+                                    <button
+                                        key={o.key}
+                                        type="button"
+                                        className={`dv-chip${draft.preorder === o.key ? " dv-chip-on" : ""}`}
+                                        onClick={() => setDraft((d) => ({ ...d, preorder: o.key }))}
+                                    >
+                                        {o.label}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+
                         <div className="dv-sheet-group">
                             {eras.map((o) => (
                                 <button
@@ -441,7 +472,7 @@ export default function DiscoverClient() {
                             <button
                                 type="button"
                                 className="dv-sheet-clear"
-                                onClick={() => applyDraft({ era: "any", price: "any", q: "" })}
+                                onClick={() => applyDraft({ era: "any", price: "any", preorder: "any", q: "" })}
                             >
                                 Clear everything
                             </button>
@@ -458,6 +489,9 @@ export default function DiscoverClient() {
                         <img src={detail.imageUrl} alt={detail.name} />
                         <h3>{detail.name}</h3>
                         <p className="dv-detail-cat">{detail.category}</p>
+                        {detail.preorder ? (
+                            <p className="dv-preorder">{preorderLabel(detail.preorder)}</p>
+                        ) : null}
                         <p className="dv-detail-price">{usd(detail.priceCents)}</p>
                         <button
                             type="button"
