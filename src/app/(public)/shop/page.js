@@ -1,4 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+
+import DiscoverClient from "@/components/shop/DiscoverClient";
+import ShopViewToggle from "@/components/shop/ShopViewToggle";
+import { SHOP_VIEW, SHOP_VIEW_COOKIE, parseShopView } from "@/lib/shop-view.js";
 
 import RewardsCallout from "@/components/RewardsCallout";
 import ShopBrowser from "@/components/ShopBrowser";
@@ -8,8 +13,6 @@ import { listShopInventoryShared } from "@/lib/consignment/square";
 import { TTL } from "@/lib/marketplace/shared-cache.js";
 import { listPreorderShopItems, listRecentChanges } from "@/lib/inventory-feed/feed";
 import { attachSetNames } from "@/lib/shop-set-tags";
-import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { discoverOpenFor } from "@/lib/marketplace/discover-gate.js";
 
 export const metadata = {
     title: "Pokemon, MTG & Accessories",
@@ -40,6 +43,27 @@ const SHOP_CATALOGUE_TTL = TTL.ART;
 const JUST_IN_WINDOW_HOURS = 24 * 7;
 
 export default async function ShopPage() {
+    // -- THE VIEW IS DECIDED BEFORE ANYTHING IS FETCHED, AND THAT IS THE POINT ---------------------------
+    // Measured on production 2026-11-01: /shop ships 863 KB of HTML holding all 1,798 in-stock items --
+    // every name, price and image URL -- because ShopBrowser is a client component that switches category
+    // without a round trip. Only 66 <img> actually render. TTFB is fine (0.21 s; the shared catalogue cache
+    // did its job and the 7-second Square problem described below is gone). The stall is the browser
+    // parsing that payload and then HYDRATING a React tree of 1,798 items, and it lands hardest on a phone.
+    //
+    // The deck needs none of it -- DiscoverClient pages its own rows off /api/marketplace/discover, 24 at a
+    // time. So the default path must not even CALL listShopInventoryShared. Returning before the fetch is
+    // worth more than any amount of tuning inside the grid.
+    const view = parseShopView((await cookies()).get(SHOP_VIEW_COOKIE)?.value);
+    if (view === SHOP_VIEW.swipe) {
+        return (
+            <div className="stack reveal">
+                <ViewPing event="view_shop" />
+                <ShopViewToggle view={view} />
+                <DiscoverClient />
+            </div>
+        );
+    }
+
     let [categories, justInItems, preorders] = await Promise.all([
         listShopInventoryShared(SHOP_CATALOGUE_TTL).catch(() => null),
         listRecentChanges({ windowHours: JUST_IN_WINDOW_HOURS }).catch(() => []),
@@ -66,7 +90,7 @@ export default async function ShopPage() {
         preorders.map((item) => [item.variationId, item.arrivesOn || null]),
     );
 
-    // ── ⚠️ THE DOOR TO DISCOVER ─────────────────────────────────────────────────────────────────────────
+    // ── ⚠️ THE DOOR TO DISCOVER, AND WHY THERE IS NO LONGER A LINK HERE ─────────────────────────────────
     // Built the deck, shipped it, and linked it from nowhere — Luke: "Where is the experimental at I don't
     // see the try the new view." That is the SECOND time in one day a finished screen had no way in (the
     // pack telemetry was the first). A feature reachable only by typing its URL does not exist.
@@ -74,22 +98,18 @@ export default async function ShopPage() {
     // ⚠️ IT IS A try/catch AROUND AN AUTH READ ON A PUBLIC, CACHED PAGE. /shop renders for signed-out
     // visitors and for crawlers; a session lookup that throws must degrade to "no toggle", never to a 500
     // on the storefront. Worth more than the toggle it controls.
-    const viewer = await getAuthenticatedBuyer().catch(() => null);
-    const canDiscover = Boolean(viewer && discoverOpenFor(viewer.id));
+    // The invitation that used to sit here is gone: the deck is the DEFAULT now, so what this page needs
+    // is a way BACK to the grid, and that is ShopViewToggle below — the same control in both views. The
+    // auth read went with it; nothing on this path is per-member any more.
     const hasContent = (categories && categories.length > 0) || (justInItems && justInItems.length > 0);
 
     return (
         <div className="stack reveal">
             <ViewPing event="view_shop" />
-            {canDiscover ? (
-                /* Stage one of the rollout, so only the owner sees this at all (discover-gate.js). Phrased
-                   as an invitation rather than a nav item, because it IS experimental and the honest frame
-                   is "try it", not "here is a section of the site". */
-                <Link href="/shop/discover" className="shop-try-new">
-                    <strong>Try the new view</strong>
-                    <span>Swipe through the shop one card at a time</span>
-                </Link>
-            ) : null}
+            {/* The same control, in the same place, in both views. The prose link above is dead -- the
+                thing it advertised is what you get by default now, and Luke could not find it on his own
+                phone anyway, which is the lesson recorded directly above it. */}
+            <ShopViewToggle view={view} />
             {paymentsEnabled ? <><RewardsCallout /><StoreCreditCallout /></> : null}
             {/* ── THE DOOR TO THE PRE-ORDER SHELF ─────────────────────────────────────────────────────
                 ⚠️ ONLY WHILE THERE IS SOMETHING ON IT. A permanent link to an empty room is a link people

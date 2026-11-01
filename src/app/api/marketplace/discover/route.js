@@ -23,7 +23,11 @@ export async function GET(request) {
     return withRequestLogging(request, "GET /api/marketplace/discover", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
-            if (!buyer || !discoverOpenFor(buyer.id)) return noStore({ open: false }, { status: 403 });
+            // ⚠️ A SIGNED-OUT VISITOR IS A CUSTOMER, NOT AN INTRUDER. `!buyer` meant closed, which was right while
+            // the deck was an owner preview and is wrong now it is the storefront — it would hand every
+            // first-time visitor a 403 and an empty shop. The buyer is still read; the balance below needs
+            // one. It is simply no longer required in order to LOOK.
+            if (!discoverOpenFor(buyer?.id)) return noStore({ open: false }, { status: 403 });
 
             const sp = new URL(request.url).searchParams;
             const filters = {
@@ -49,7 +53,13 @@ export async function GET(request) {
                 // ⚠️ SENT, NOT DERIVED. The Buy-with-credit button disables itself when the balance cannot
                 //    cover the card; a client guessing at the balance would offer a purchase the server is
                 //    about to refuse.
-                creditCents: await getStoreCredit(buyer.id).catch(() => 0),
+                // 0 for a signed-out visitor, which disables the buy-with-credit button exactly as an empty
+                // balance does. They can still add to the cart and check out the ordinary way.
+                // ⚠️ SIGNED-OUT AND BROKE ARE DIFFERENT ANSWERS, and the client cannot tell them apart from
+                // a bare 0: a visitor with no account was being offered a disabled "Not enough credit"
+                // button, which reads as a refusal rather than as a thing that needs an account.
+                signedIn: Boolean(buyer),
+                creditCents: buyer ? await getStoreCredit(buyer.id).catch(() => 0) : 0,
                 eras: DISCOVER_ERAS,
                 prices: DISCOVER_PRICES,
                 preorders: DISCOVER_PREORDERS,

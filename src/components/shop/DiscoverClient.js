@@ -74,6 +74,8 @@ export default function DiscoverClient() {
     const [bought, setBought] = useState({});
     const [buying, setBuying] = useState("");
     const [credit, setCredit] = useState(null);
+    // Whether there is an account behind this visitor at all — see the note on the credit button.
+    const [signedIn, setSignedIn] = useState(false);
     const [rowIndex, setRowIndex] = useState(0);
     const [itemIndex, setItemIndex] = useState({});
 
@@ -100,6 +102,7 @@ export default function DiscoverClient() {
             if (!res.ok || !data.open) throw new Error("closed");
             setRows(data.rows || []);
             setCredit(typeof data.creditCents === "number" ? data.creditCents : null);
+            setSignedIn(Boolean(data.signedIn));
             setEras(data.eras || []);
             setPrices(data.prices || []);
             setPreorderOpts(data.preorders || []);
@@ -341,7 +344,12 @@ export default function DiscoverClient() {
                                             >
                                                 {added[item.id] ? "In your cart" : adding === item.id ? "Adding…" : "Add to cart"}
                                             </button>
-                                            {bought[item.id] ? (
+                                            {/* ⚠️ NOTHING AT ALL WHEN SIGNED OUT. Store credit needs an
+                                                account, and a disabled "Not enough credit" sitting under
+                                                every card tells a first-time visitor they have been
+                                                refused. Add to cart above works signed-out and is the
+                                                whole path they need. */}
+                                            {!signedIn ? null : bought[item.id] ? (
                                                 <a className="dv-btn dv-buy dv-buy-done" href="/marketplace/vault">
                                                     In your vault &rarr;
                                                 </a>

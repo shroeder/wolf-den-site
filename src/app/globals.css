@@ -28953,6 +28953,51 @@ body.cas-seated .social-fab { display: none; }
     .pd-pips { display: none; }
 }
 
+/* -- THE SHOP MODE SWITCH (swipe vs browse) ------------------------------------------------------------------------------------
+   Two halves, the current one filled. Luke: "have a way to change the view mode to the old one that is
+   intuitive" -- and the control it replaces was a prose link he could not find on his own phone, so this
+   one is a shape people already read as a two-position switch rather than a sentence to notice.
+
+   WARNING: min-height 44px on the options, not padding alone. These are the only way back to the grid; a
+   36px tap target on a phone is the kind of miss somebody makes twice and then gives up on. */
+.shop-mode-switch {
+    display: inline-flex;
+    /* WARNING: .stack is a GRID, so align-self only pins the block axis -- without justify-self the pill
+       stretched the full width of a desktop page and stopped reading as a two-position switch. width
+       fit-content is the belt to that braces, for any other container this ever lands in. */
+    width: fit-content;
+    align-self: flex-start;
+    justify-self: start;
+    padding: 3px;
+    gap: 3px;
+    border-radius: 999px;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.sms-opt {
+    min-height: 44px;
+    padding: 0 22px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink-secondary);
+    font-family: var(--font-display);
+    font-size: 0.92rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.sms-opt:hover { color: var(--ink); }
+
+/* The filled half. Dark text on gold, which is the site's one "this is the active thing" treatment. */
+.sms-on, .sms-on:hover {
+    background: linear-gradient(180deg, #E6C76B, #C79F2A);
+    color: #1A1403;
+}
+
 .shop-try-new {
     display: flex;
     flex-direction: column;

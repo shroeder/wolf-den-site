@@ -40,6 +40,11 @@ const nextConfig = {
             { source: '/just-in', destination: '/shop', permanent: true },
             { source: '/get-offers', destination: '/sell-cards', permanent: true },
             { source: '/alerts', destination: '/shop', permanent: true },
+            // The swipe deck is what /shop renders by default now, so its old standalone URL is just
+            // another way in. Here rather than as a redirect() inside the page: a redirect from a
+            // force-dynamic server component is served as a 200 with a one-second <meta refresh>, which
+            // is a visible stall on a link people already have in their history. This is a real 308.
+            { source: '/shop/discover', destination: '/shop', permanent: true },
             {
                 source: '/:path*',
                 has: [
