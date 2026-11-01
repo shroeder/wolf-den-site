@@ -71,43 +71,51 @@ export default async function PreordersPage() {
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={item.imageUrl} alt="" aria-hidden="true" />
                                 ) : <span className="po-art-none">No image</span>}
-                                {item.soldOut
-                                    ? <span className="po-chip po-chip-gone">SOLD OUT</span>
-                                    : <span className="po-chip">{shortDate(item.arrivesOn) || "SOON"}</span>}
-                                {!item.soldOut && item.listPrice != null && item.price != null ? (
-                                    /* ⚠️ DOLLARS OR PERCENT, WHICHEVER IS THE BIGGER-SOUNDING TRUTH, and
-                                       they are both true. Luke took $10 off a $550 box, which is a real
-                                       tenner and a feeble-looking 2% — while $8.50 off a $170 box is a
-                                       respectable 5% and a forgettable number of dollars. Percent
-                                       flatters small prices, dollars flatter large ones, so the chip
-                                       picks per item instead of forcing one framing on both. */
-                                    <span className="po-chip po-chip-save">
-                                        {(item.listPrice - item.price) >= 10
-                                            ? `$${Math.round(item.listPrice - item.price)} OFF`
-                                            : `${Math.round((1 - item.price / item.listPrice) * 100)}% OFF`}
+
+                                <span className="po-chips">
+                                    {item.soldOut
+                                        ? <span className="po-chip po-chip-gone">Sold out</span>
+                                        : <span className="po-chip">{shortDate(item.arrivesOn) || "Soon"}</span>}
+                                    {!item.soldOut && item.listPrice != null && item.price != null ? (
+                                        /* ⚠️ DOLLARS OR PERCENT, WHICHEVER IS THE BIGGER-SOUNDING TRUTH,
+                                           and both are true. $10 off $550 is a real tenner and a feeble
+                                           2%; $8.50 off $170 is a respectable 5% and a forgettable number
+                                           of dollars. Percent flatters cheap things, dollars flatter dear
+                                           ones, so the chip picks per item. */
+                                        <span className="po-chip po-chip-save">
+                                            {(item.listPrice - item.price) >= 10
+                                                ? `Save $${Math.round(item.listPrice - item.price)}`
+                                                : `Save ${Math.round((1 - item.price / item.listPrice) * 100)}%`}
+                                        </span>
+                                    ) : null}
+                                </span>
+
+                                {/* The price sits ON the art, over a scrim, the way a storefront puts a
+                                    ticket on the box rather than on a label underneath it. */}
+                                {item.price != null ? (
+                                    <span className="po-money">
+                                        {item.listPrice != null ? (
+                                            <s>${Number(item.listPrice).toFixed(2)}</s>
+                                        ) : null}
+                                        <b>${Number(item.price).toFixed(2)}</b>
                                     </span>
                                 ) : null}
                             </div>
-                            <p className="po-name">{plain(item.name)}</p>
-                            {/* ── ⚠️ THE TILE HAD NO CALL TO ACTION ───────────────────────────────
-                                Luke: "The call to action isnt clear." Art, a name and a price is a
-                                catalogue entry — it tells you what the thing is and never once says what
-                                to do about it, and "pre-order" is the one word a shopper needs permission
-                                to believe. The price now sits INSIDE the verb, so the action and its cost
-                                are one thing to read rather than two. */}
-                            {item.soldOut ? (
-                                <span className="po-cta po-cta-gone">All reserved</span>
-                            ) : (
-                                <span className="po-cta">
-                                    Reserve
-                                    {/* The struck price is the regular price we recorded, never a computed
-                                        one — see migration 508. No record, no strike. */}
-                                    {item.listPrice != null ? (
-                                        <s>${Number(item.listPrice).toFixed(2)}</s>
-                                    ) : null}
-                                    {item.price != null ? <b>${Number(item.price).toFixed(2)}</b> : null}
+
+                            <div className="po-foot">
+                                <p className="po-name">{plain(item.name)}</p>
+                                {/* ── ⚠️ NOT A BUTTON ─────────────────────────────────────────────────
+                                    Luke, twice in one day on two different screens: "I hate the yellow
+                                    button", "dont like the buttons at all". A filled gold lozenge inside
+                                    every tile fights the box art it is sitting under, and the whole tile
+                                    is already the link — the pill was a control drawn inside a control.
+                                    A single amber line with an arrow says the same thing and lets the
+                                    product be the loudest object on the page. */}
+                                <span className="po-go">
+                                    {item.soldOut ? "All reserved" : "Reserve"}
+                                    {item.soldOut ? null : <i aria-hidden="true">&rarr;</i>}
                                 </span>
-                            )}
+                            </div>
                         </Link>
                     ))}
                 </div>
