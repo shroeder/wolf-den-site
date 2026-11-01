@@ -87,26 +87,6 @@ export default function AvatarBuilder({ current = null }) {
         return () => { alive = false; };
     }, []);
 
-    // ── LOCK THE HERO ────────────────────────────────────────────────────────────────────────────────────
-    // Asked for by @Jinxx: she likes the sprite she has and does not want gear changing it. Equipping anything
-    // otherwise queues a fresh draw within the day, and a generative model never returns the same picture
-    // twice — so "I like this one" had no way to be said.
-    const toggleLock = async () => {
-        if (busy || !quote) return;
-        setBusy(true); setErr(null); setMsg(null);
-        try {
-            const r = await fetch("/api/marketplace/avatar", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "lock", locked: !quote.locked }),
-            });
-            const d = await r.json().catch(() => ({}));
-            if (d?.ok) {
-                setQuote((q) => (q ? { ...q, locked: d.locked } : q));
-                setMsg(d.locked ? "Hero locked — gear won't change it." : "Hero unlocked — gear can change it again.");
-            } else setErr("Couldn't change the lock right now.");
-        } catch { setErr("Couldn't change the lock right now."); } finally { setBusy(false); }
-    };
-
     const [msg, setMsg] = useState("");
     const [err, setErr] = useState("");
     // The site header is sticky+opaque, so a preview stuck at top:0 slides behind it and the avatar's head
@@ -209,21 +189,16 @@ export default function AvatarBuilder({ current = null }) {
                     on its own after any gear change, once a day, with nobody deciding it was worth doing. */}
                 {/* Offered only once there is a drawn hero to keep. Before that the lock would freeze a member
                     on the shared stock sprite, which is not a thing anybody means to choose. */}
-                {quote && !quote.firstIsFree ? (
-                    <button
-                        type="button"
-                        className={`btn-ghost${quote.locked ? " is-active" : ""}`}
-                        onClick={toggleLock}
-                        disabled={busy}
-                        title={quote.locked ? "Your gear can change your hero again" : "Keep this hero exactly as it is, whatever you equip"}
-                    >
-                        {quote.locked ? "🔒 Hero locked" : "🔓 Lock this hero"}
-                    </button>
-                ) : null}
+                {/* ⚠️ THE LOCK BUTTON WAS HERE AND IT HAD STARTED LYING. It said "gear won't change it" /
+                    "gear can change it again", and neither is true since the shelf shipped: nothing
+                    redraws a hero on its own, locked or not. A toggle promising a behaviour the system no
+                    longer has is worse than no toggle, because the nine members who relied on it would
+                    keep pressing it to stay safe. Their locks are stars on the shelf now. */}
             </div>
-            {quote?.locked ? (
+            {quote && !quote.firstIsFree ? (
                 <p className="muted" style={{ marginTop: 6, fontSize: "0.8rem" }}>
-                    Your hero stays exactly as it is. Change gear all you like — it won&apos;t be redrawn until you unlock it.
+                    Your hero is only redrawn when you ask for it, and the ones you have had are kept.
+                    They live on the gear screen, under the paper doll.
                 </p>
             ) : null}
             {quote?.firstIsFree ? (
