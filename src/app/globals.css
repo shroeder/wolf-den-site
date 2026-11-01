@@ -11787,6 +11787,16 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     background: rgba(255,215,94,0.25); color: #ffe9a8; font-weight: 900; font-size: 0.85em; line-height: 1; }
 .shop-credit-line strong { color: #7cffb2; }
 /* The guest's version of the credit toggle: same slot, same weight, a sentence instead of a control. */
+/* The guest's wall at the payment step. Stated plainly and with the way out in it — a gate with no door
+   is just a dead end, and this one appears at the moment somebody has decided to spend money. */
+.shop-signin-gate {
+    display: grid; gap: 8px; justify-items: start; margin: 12px 0; padding: 14px;
+    border-radius: 12px; background: rgba(255, 209, 102, 0.08);
+    border: 1px solid rgba(255, 209, 102, 0.45);
+}
+.shop-signin-gate strong { font-size: 1rem; color: #ffd166; }
+.shop-signin-gate span { font-size: 0.84rem; line-height: 1.45; color: #cfd8c6; }
+
 .shop-credit-hint {
     margin: 10px 0; padding: 10px 12px; border-radius: 10px; font-size: 0.85rem;
     color: #cfd8c6; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);

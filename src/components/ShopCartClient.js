@@ -220,7 +220,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const [pickupName, setPickupName] = useState("");
     // Pickup has no shipping block, so this is the only address we get for a guest — and it is what the
     // confirmation / "ready for pickup" / "picked up" emails are sent to.
-    const [pickupEmail, setPickupEmail] = useState("");
     const [saveCustomerProfile, setSaveCustomerProfile] = useState(false);
     const [profileLookupBusy, setProfileLookupBusy] = useState(false);
     const [profileLookupMessage, setProfileLookupMessage] = useState("");
@@ -306,9 +305,10 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     // so we can send the confirmation number and the "it's ready" notice. The field is SEEDED from a
     // signed-in buyer's account email (see the effect below) rather than falling back to it here, so
     // that backspacing the last character doesn't snap the address back and make the box uneditable.
-    const pickupEmailValue = pickupEmail.trim();
-    const isPickupEmailValid = /^\S+@\S+\.\S+$/.test(pickupEmailValue);
-    const isPickupReady = isPickup && pickupName.trim().length >= 2 && isPickupEmailValid;
+    // ⚠️ NO TYPED EMAIL ON A PICKUP ANY MORE. Ordering requires an account, so the confirmation address
+    // is the account's — asking a signed-in member to retype the email we already have was the guest
+    // flow's leftover, and it was a second place for the address to be wrong.
+    const isPickupReady = isPickup && pickupName.trim().length >= 2;
     const isFulfillmentReady = isPickupReady || isShippingReady;
 
     // When EasyPost returns live rates, the buyer must pick one and the totals use that rate.
@@ -365,6 +365,10 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
     const canSubmitCheckout = Boolean(
         (checkoutCardState === "ready" || creditCoversAll)
+        // ⚠️ AN ACCOUNT IS PART OF BEING ABLE TO SUBMIT, not a thing checked afterwards. The route
+        // refuses a guest with sign_in_required; if Pay now stayed live the member would type a card,
+        // press it, and be told to sign in -- having already handed their details to Square's iframe.
+        && Boolean(authCustomer)
         && !checkoutBusy
         && cartData.items.length
         && !cartData.hasUnavailableItems
@@ -560,11 +564,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
     // A signed-in buyer shouldn't have to type an address we already hold, so prefill the pickup email
     // when the session resolves — but only into an empty box, never over something they typed.
-    useEffect(() => {
-        if (authCustomer?.email) {
-            setPickupEmail((current) => (current.trim() ? current : authCustomer.email));
-        }
-    }, [authCustomer]);
 
     useEffect(() => {
         if (canShowCart && cartData.items.length) {
@@ -688,7 +687,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
         if (isPickup) {
             checkoutPayload.pickupName = pickupName.trim();
-            checkoutPayload.pickupEmail = pickupEmailValue;
         }
 
         if (fulfillmentMode === "shipping" && !cartPickupOnly) {
@@ -881,12 +879,17 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                             <div className="cart-account-panel">
                                 <p className="cart-fulfillment-label">Account</p>
                                 <div className="cart-account-row">
+                                    {/* ⚠️ IT STATES A REQUIREMENT NOW, NOT A CONVENIENCE. Luke: "now
+                                        everyone is required to be logged in to order." The old line
+                                        offered signing in as a way to save shipping info, which reads as
+                                        optional — and a shopper who declines it now hits a wall at the
+                                        payment step with no idea why. */}
                                     <p className="secondary">
                                         {authLoading
                                             ? "Checking account status..."
                                             : authCustomer
                                                 ? <>Signed in as <strong>{authCustomer.email}</strong></>
-                                                : "Not signed in. Sign in to load and save shipping info."}
+                                                : "You need an account to order. Signing in also loads your shipping info and store credit."}
                                     </p>
                                     <Link href="/shop/account" className="button" prefetch={false}>Manage account</Link>
                                 </div>
@@ -1080,24 +1083,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                                 autoComplete="name"
                                             />
                                         </label>
-                                        <label className="cart-field cart-field-full">
-                                            <span>Email for your confirmation</span>
-                                            <input
-                                                type="email"
-                                                value={pickupEmail}
-                                                onChange={(event) => setPickupEmail(event.target.value)}
-                                                placeholder="you@example.com"
-                                                autoComplete="email"
-                                                aria-invalid={pickupEmail && !isPickupEmailValid ? "true" : "false"}
-                                            />
-                                            <small className="secondary">
-                                                We&rsquo;ll send your confirmation number here, and email you again the
-                                                moment your order is ready to collect.
-                                            </small>
-                                            {fieldErrors.pickupEmail ? (
-                                                <small className="shop-payment-error">{fieldErrors.pickupEmail}</small>
-                                            ) : null}
-                                        </label>
+{/* The "Email for your confirmation" field lived here. It existed because a guest had
+                                            no account to read an address off; everybody has one now, and the
+                                            confirmation goes to it. */}
                                     </div>
                                 ) : null}
 
@@ -1106,7 +1094,6 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                         Still needed:{" "}
                                         {[
                                             pickupName.trim().length >= 2 ? null : "name for pickup",
-                                            isPickupEmailValid ? null : "a valid email",
                                         ]
                                             .filter(Boolean)
                                             .join(" and ")}
@@ -1185,6 +1172,27 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                 </strong>
                             </p>
                         </div>
+
+                        {/* ── ⚠️ NO ACCOUNT, NO PAYMENT FORM ──────────────────────────────────────────
+                            The checkout route refuses a guest outright (sign_in_required) — that is the
+                            rule. This is so nobody meets the rule by typing a card number first and being
+                            rejected afterwards, which is the worst possible moment to learn it.
+
+                            ⚠️ AND authLoading IS NOT A GUEST. The auth read takes a moment; showing a
+                            sign-in wall to a signed-in member for half a second on every cart load would
+                            be its own bug. Only a settled "no" gates. */}
+                        {!authLoading && !authCustomer ? (
+                            <div className="shop-signin-gate">
+                                <strong>Sign in to finish your order</strong>
+                                <span>
+                                    Orders are tied to an account so you can track them, use store credit
+                                    and ask for a cancellation. It takes a moment.
+                                </span>
+                                <Link href="/shop/account" className="button" prefetch={false}>
+                                    Sign in or create an account
+                                </Link>
+                            </div>
+                        ) : null}
 
                         {creditBalanceCents > 0 ? (
                             <label className="shop-credit-toggle">

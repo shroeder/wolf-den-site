@@ -18,6 +18,8 @@ import { updateShopCustomerSquareId } from "@/lib/shop-customers";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { clearCartItems, getCartSummary } from "@/lib/shop-carts";
 import { markOrderInventoryAdjusted, recordInventoryRepair } from "@/lib/inventory-feed/repair.js";
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { bridgeMarketplaceToShop } from "@/lib/marketplace/shop-bridge.js";
 import { sendNewOrderAlertEmail, sendOrderConfirmationEmail } from "@/lib/shop-order-email.js";
 import {
     checkCartRules, claimCartRules, releaseClaims, identitySignals, clientIpFrom, recordCardSignal,
@@ -245,11 +247,32 @@ export async function POST(request) {
 
             const fulfillment = validateFulfillment(body);
             const saveCustomerProfile = body?.saveCustomerProfile === true;
-            const authenticatedCustomer = await getAuthenticatedShopCustomerFromCookies();
+            let authenticatedCustomer = await getAuthenticatedShopCustomerFromCookies();
 
-            if (saveCustomerProfile && !authenticatedCustomer) {
+            // ── ⚠️ ORDERING REQUIRES AN ACCOUNT, AND THIS IS WHERE THAT IS TRUE ──────────────────────
+            // Luke: "now everyone is required to be logged in to order. That is now a requirement."
+            //
+            // The cart hides the payment form from a guest, and a hidden form is a nicety — this is the
+            // rule. Anything that can POST JSON reaches this route, and a guest order is one with no
+            // account to attach store credit, order history, pickup identity or a cancellation request
+            // to. Refusing here is what makes the requirement real.
+            //
+            // ⚠️ THE MARKETPLACE SESSION IS TRIED FIRST, BECAUSE THE TWO ACCOUNTS ARE ONE PERSON. Someone
+            // signed into the game with an expired shop cookie IS logged in as far as they are concerned
+            // -- the header shows their face -- and bouncing them to a second login they did not know
+            // existed would be the bug in a different costume. /api/shop/auth heals this on read; doing
+            // it here too means a checkout POST that arrives before that read still works.
+            if (!authenticatedCustomer) {
+                const buyer = await getAuthenticatedBuyer().catch(() => null);
+                if (buyer?.email) {
+                    await bridgeMarketplaceToShop(buyer.email).catch(() => {});
+                    authenticatedCustomer = await getAuthenticatedShopCustomerFromCookies();
+                }
+            }
+
+            if (!authenticatedCustomer) {
                 return jsonNoStore(
-                    { error: "Sign in to save checkout info for next time." },
+                    { error: "Sign in to place an order.", code: "sign_in_required" },
                     { status: 401 }
                 );
             }
