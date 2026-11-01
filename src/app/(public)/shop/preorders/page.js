@@ -3,7 +3,6 @@ import Link from "next/link";
 import ViewPing from "@/components/ViewPing";
 import { listPreorderShopItems } from "@/lib/inventory-feed/feed.js";
 import { productHandle } from "@/lib/inventory-feed/product-url.js";
-import { preorderDateLabel } from "@/lib/shop-item-rules.js";
 
 export const dynamic = "force-dynamic";
 
@@ -14,15 +13,29 @@ export const metadata = {
 };
 
 // ── THE PRE-ORDER SHELF ──────────────────────────────────────────────────────────────────────────────────
-// Luke: "Can we make a preorders section of the shop".
+// Luke: "I hate the pre-orders page its verbose and ghetto."
 //
-// ⚠️ IT IS A SHELF, NOT A FILTER ON THE MAIN ONE. A pre-order is the one thing in the shop you buy on a
-// promise rather than on availability, and the whole page can therefore say once, at the top, what every
-// card on it means — instead of each card having to re-explain itself the way it does when it is sitting
-// between things that are actually in the building.
+// He was right. The first cut opened with a five-line grey paragraph explaining the concept, then stacked
+// full-width cards whose two-line yellow headings shouted over the box art. A shop page is a grid of
+// things you can buy; this was an essay with products underneath it.
 //
-// ⚠️ AND THE DATE IS ON EVERY CARD. The product page carries the full sentence; a card has room for the
-// one fact that decides whether somebody taps it, which is when they would get the thing.
+// ⚠️ THE PICTURE IS THE PRODUCT. Two up, art filling the tile, and everything else kept to one line each:
+// a date chip, the name, the price. Nobody reads a paragraph on a shop page and nobody needed to — a chip
+// saying NOV 13 explains a pre-order faster than fifty words.
+//
+// ⚠️ AND THE "[Pre-Order] " PREFIX IS STRIPPED FOR DISPLAY HERE. It is load-bearing in Square, where a
+// cashier needs it on the POS, and pure noise on a page that is nothing but pre-orders — it pushed every
+// name onto a second line and buried the thing the customer is actually looking for.
+const plain = (name) => String(name || "").replace(/^\[Pre-Order\]\s*/i, "");
+
+const shortDate = (value) => {
+    if (!value) return null;
+    const iso = value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+    const d = new Date(`${iso}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).toUpperCase();
+};
+
 export default async function PreordersPage() {
     const items = await listPreorderShopItems().catch(() => []);
 
@@ -30,19 +43,13 @@ export default async function PreordersPage() {
         <div className="stack reveal">
             <ViewPing event="view_preorders" />
 
-            <section className="card">
-                <h1 style={{ marginTop: 0 }}>Pre-orders</h1>
-                <p className="muted" style={{ marginBottom: 0 }}>
-                    Upcoming releases you can reserve now. You pay today and the price is locked in; nothing
-                    ships or goes on the pickup shelf until it reaches the shop, and we email you the moment it
-                    does. Anything else you order alongside a pre-order travels with it.
-                </p>
-            </section>
+            <div className="po-head">
+                <h1>Pre-orders</h1>
+                {/* One line. Pay now, we tell you when it lands — that is the whole deal. */}
+                <p>Reserve it now, pay now. We email you the day it reaches the shop.</p>
+            </div>
 
             {items.length === 0 ? (
-                /* ⚠️ AN EMPTY SHELF SAYS SO AND POINTS SOMEWHERE. This page is linked from the shop only
-                   while something is on it, so a visitor seeing this arrived from a bookmark, a search
-                   result or a link somebody shared after the release landed. */
                 <section className="card">
                     <h2 style={{ marginTop: 0 }}>Nothing on pre-order right now</h2>
                     <p className="muted">
@@ -52,30 +59,29 @@ export default async function PreordersPage() {
                     <Link href="/shop" className="button">Browse the shop</Link>
                 </section>
             ) : (
-                <section className="grid two-col">
+                <div className="po-grid">
                     {items.map((item) => (
                         <Link
                             key={item.variationId}
                             href={`/shop/${productHandle(item.name, item.variationId)}`}
-                            className="card lift preorder-card"
+                            className="po-tile"
                         >
-                            {item.imageUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img className="preorder-card-art" src={item.imageUrl} alt="" aria-hidden="true" />
-                            ) : null}
-                            <h2 className="preorder-card-name">{item.name}</h2>
-                            <p className="preorder-card-when">
-                                Arrives {preorderDateLabel(item.arrivesOn) || "soon"}
-                            </p>
-                            {item.soldOut ? (
-                                <p className="preorder-card-gone">Sold out — all reserved</p>
-                            ) : null}
+                            <div className="po-art">
+                                {item.imageUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={item.imageUrl} alt="" aria-hidden="true" />
+                                ) : <span className="po-art-none">No image</span>}
+                                {item.soldOut
+                                    ? <span className="po-chip po-chip-gone">SOLD OUT</span>
+                                    : <span className="po-chip">{shortDate(item.arrivesOn) || "SOON"}</span>}
+                            </div>
+                            <p className="po-name">{plain(item.name)}</p>
                             {item.price != null ? (
-                                <p className="preorder-card-price">${Number(item.price).toFixed(2)}</p>
+                                <p className="po-price">${Number(item.price).toFixed(2)}</p>
                             ) : null}
                         </Link>
                     ))}
-                </section>
+                </div>
             )}
         </div>
     );

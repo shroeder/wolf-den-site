@@ -28647,7 +28647,62 @@ body.cas-seated .social-fab { display: none; }
    an experiment somebody is being invited into, and it has to read that way or it reads as a broken
    section of the site. */
 /* ── THE PRE-ORDER DOOR AND SHELF ────────────────────────────────────────────────────────────────────────
-   Deliberately the same shape as .shop-try-new directly below: both are a sentence inviting you somewhere
+   The door is shaped like .shop-try-new below it — both are a sentence inviting you elsewhere, and two
+   differently-dressed invitations stacked on one page read as two unrelated experiments. Amber, because
+   amber already means pre-order on the product page, in the cart and in the email. */
+.shop-preorder-door {
+    display: block; margin: 0 0 14px; padding: 13px 15px; border-radius: 12px; text-decoration: none;
+    background: rgba(255, 179, 71, 0.09); border: 1px solid rgba(255, 179, 71, 0.4);
+}
+.shop-preorder-door:hover { background: rgba(255, 179, 71, 0.15); }
+.shop-preorder-door strong { display: block; color: #ffc861; font-size: 0.98rem; }
+.shop-preorder-door span { display: block; margin-top: 2px; font-size: 0.82rem; color: #c9c3b6; }
+
+/* ── THE SHELF ITSELF ────────────────────────────────────────────────────────────────────────────────────
+   Luke: "I hate the pre-orders page its verbose and ghetto." It was a five-line grey paragraph over
+   full-width cards with two-line yellow headings. A shop page is a grid of things you can buy.
+
+   Two up on a phone, art doing the work, one line each for date, name and price. The date is a chip ON the
+   image because that is the one fact that makes a pre-order different from everything else in the shop,
+   and a chip says it in four characters where the old paragraph took fifty words. */
+.po-head { margin: 0 0 14px; }
+.po-head h1 { margin: 0; font-size: 1.5rem; }
+.po-head p { margin: 4px 0 0; font-size: 0.86rem; color: #9aa08f; }
+
+.po-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 760px) { .po-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.po-tile {
+    display: block; text-decoration: none; border-radius: 12px; overflow: hidden;
+    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 10px; transition: border-color .12s ease, background .12s ease;
+}
+.po-tile:hover { border-color: rgba(255, 209, 102, 0.5); background: rgba(255, 255, 255, 0.07); }
+
+/* A fixed square so a tall box and a wide one line up; the art is contained, never cropped — a cut-off
+   booster box is the one thing a collector notices instantly. */
+.po-art {
+    position: relative; aspect-ratio: 1; display: grid; place-items: center;
+    background: #0e0c12; padding: 8px;
+}
+.po-art img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.po-art-none { font-size: 0.72rem; color: #6f7681; }
+
+.po-chip {
+    position: absolute; top: 6px; left: 6px; padding: 3px 7px; border-radius: 999px;
+    font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em;
+    color: #2a1f05; background: #ffc861;
+}
+.po-chip-gone { color: #fff; background: #b4453a; }
+
+.po-name {
+    margin: 8px 10px 0; font-size: 0.84rem; line-height: 1.3; color: #e7dece;
+    /* Two lines and then an ellipsis: a long sealed-product name must not set the height of the whole row. */
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.po-price { margin: 4px 10px 0; font-size: 0.95rem; font-weight: 800; color: #ffd166; }
+
+.shop-try-new directly below: both are a sentence inviting you somewhere
    else rather than a nav item, and a shop with two differently-dressed invitations stacked on it reads as
    two unrelated experiments. Amber instead of that one's accent, because amber is already what a pre-order
    means everywhere else on the site -- the product page, the cart and the email all use it. */
