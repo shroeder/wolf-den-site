@@ -637,40 +637,68 @@ main.content {
 }
 
 /* Shop: Just In vs All inventory view toggle. */
+/* -- THE SHOP VIEW TABS -------------------------------------------------------------------------------
+   Luke: "Pill tab thingies need work. Icky poi poo."
+
+   They were a pill rail: a bordered tray holding three lozenges, the active one a solid gold blob. Two
+   things broke at three tabs. The tray does not fit 390px, so Pre-orders dropped to a second line and sat
+   there as a lone gold slug under the other two; and a filled gold control is the exact shape he has now
+   rejected on three separate screens in two days ("I hate the yellow button", "dont like the buttons at
+   all"). A tab is not a button -- it says where you are, it does not do anything -- and dressing it as the
+   loudest control on the page says otherwise.
+
+   So: text on a rule, the active one underlined in gold. No tray, no fill, nothing to wrap, and the same
+   quiet chrome the Discover deck uses so the shop reads as one place. */
 .shop-view-toggle {
-    display: inline-flex;
-    /* Three tabs overflow a 375px phone on one line, and an inline-flex row does not wrap by default --
-       it just runs off the right edge taking Pre-orders with it. */
-    flex-wrap: wrap;
-    gap: 4px;
-    padding: 4px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--line, rgba(255, 255, 255, 0.08));
-    margin-bottom: 16px;
+    display: flex;
+    gap: 22px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--line, rgba(255, 255, 255, 0.08));
+    /* Scrolls rather than wraps if a fourth view ever lands: a wrapped tab row loses its baseline and
+       the underline stops meaning "this one". */
+    overflow-x: auto;
+    scrollbar-width: none;
 }
+.shop-view-toggle::-webkit-scrollbar { display: none; }
+
 .shop-view-tab {
+    position: relative;
+    flex: 0 0 auto;
     border: none;
     background: transparent;
     color: var(--muted, #b9b4c7);
     font-weight: 700;
     font-size: 0.95rem;
-    padding: 0.5rem 1rem;
-    border-radius: 9px;
+    letter-spacing: -0.01em;
+    padding: 0 0 11px;
     cursor: pointer;
-    transition: background 150ms ease, color 150ms ease;
+    white-space: nowrap;
+    transition: color 150ms ease;
 }
+.shop-view-tab:hover:not(:disabled) { color: #e8e4da; }
+
 .shop-view-tab:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: default;
 }
+
+/* The underline overhangs the container's own 1px rule so it reads as sitting ON it, not above it. */
 .shop-view-tab-active {
-    background: linear-gradient(135deg, #e6c76b, #d4af37 55%, #b8912e);
-    color: #171008;
+    color: #F0D27A;
+}
+.shop-view-tab-active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #e6c76b, #d4af37);
 }
 
-/* The count beside the Pre-orders tab. A tab that says how many is a tab worth pressing; "Pre-orders" on
-   its own could be an empty room and people learn to stop checking. */
+/* The count beside Pre-orders. A tab that says how many is a tab worth pressing; "Pre-orders" alone could
+   be an empty room, and people learn to stop checking those. */
 .shop-view-n {
     display: inline-block;
     margin-left: 6px;
@@ -682,7 +710,10 @@ main.content {
     background: rgba(255, 255, 255, 0.08);
     color: inherit;
 }
-.shop-view-tab-active .shop-view-n { background: rgba(0, 0, 0, 0.18); }
+.shop-view-tab-active .shop-view-n {
+    background: rgba(212, 175, 55, 0.18);
+    color: #F0D27A;
+}
 
 /* -- THE PRE-ORDER RIBBON ----------------------------------------------------------------------------
    A pre-order sits in Pokemon Sealed next to stock that is physically on the shelf, because that is where

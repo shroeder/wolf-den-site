@@ -59,7 +59,10 @@ export default function ShopBrowser({
                     onClick={() => setView("justin")}
                     disabled={!hasJustIn}
                 >
-                    🔥 Just In
+                    {/* The fire emoji is gone. Standing rule: no emoji in the UI -- every destination
+                        gets real art or plain type, and a glyph standing in for a treatment is how the
+                        gap stays invisible. It also fought the gold underline next to it. */}
+                    Just In
                 </button>
                 {hasPreorders ? (
                     <button
