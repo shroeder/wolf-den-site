@@ -1108,12 +1108,18 @@ export const GROVE_CSS = `
    still while the world scrolled past -- which is what .gv-npc does and the reason the quest giver
    reads as part of the HUD instead of part of the room. */
 .gv-colgate { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    width: calc(20 * var(--gv-unit, 1%)); height: calc(20 * var(--gv-unit, 1%));
-    margin-left: calc(-10 * var(--gv-unit, 1%));
+    /* HEIGHT is the constant and width follows the building's own aspect (--col-ar, measured by
+       scripts/trim-grove-coliseums.mjs). A square box with object-fit: contain rendered the wide fronts
+       smaller than the tall ones, which is six scales for one row of buildings. */
+    height: calc(var(--col-h, 30) * var(--gv-unit, 1%));
+    width: calc(var(--col-h, 30) * var(--col-ar, 1.1) * var(--gv-unit, 1%));
+    margin-left: calc(var(--col-h, 30) * var(--col-ar, 1.1) * var(--gv-unit, 1%) / -2);
     padding: 0; border: 0; background: none; cursor: pointer; z-index: 235;
     will-change: transform; -webkit-tap-highlight-color: transparent;
     touch-action: manipulation; }
-.gv-colgate img { width: 100%; height: 100%; object-fit: contain; object-position: bottom;
+/* ⚠️ fill, NOT contain. The sprite is cropped to the building now, so the box IS the building and
+   contain would only reintroduce slack. The trim is what makes this safe. */
+.gv-colgate img { width: 100%; height: 100%; object-fit: fill; display: block;
     /* ⚠️ NO HUE FILTER ANY MORE, AND THAT IS THE POINT. This used to recolour the teal zone portal to tell
        the two apart, which was a workaround for the building not existing. Each map now has its OWN front,
        painted in its own materials, so tinting it would be repainting art that was drawn correctly. */
@@ -1143,7 +1149,7 @@ export const GROVE_CSS = `
        first pass guessed 13 and drew a quest-giver nearly twice the height of the hero standing next to
        him -- the sprite is the same art the HUD shows at 72px, where nothing tells you its world scale. */
     width: calc(8 * var(--gv-unit, 1%)); height: calc(8 * var(--gv-unit, 1%));
-    margin-left: calc(-15 * var(--gv-unit, 1%));
+    margin-left: calc(-11 * var(--gv-unit, 1%));
     padding: 0; border: 0; background: none; cursor: pointer; z-index: 236;
     will-change: transform; -webkit-tap-highlight-color: transparent;
     touch-action: manipulation; }

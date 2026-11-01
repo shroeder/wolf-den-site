@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { coliseumArt } from "@/lib/marketplace/grove-arena.js";
+import { COLISEUM_H, coliseumArt } from "@/lib/marketplace/grove-arena.js";
 import { createPortal } from "react-dom";
 import { GiSoundOff, GiSoundOn } from "react-icons/gi";
 
@@ -669,7 +669,11 @@ export default function GroveScene({
     //
     // One screen in from the back wall: you arrive from the previous zone walking right, and it comes into
     // view almost immediately, without ever sitting on top of the door you just came through.
-    const colX = DOOR_INSET + 16;
+    // ⚠️ TUNED AGAINST THE PHONE, NOT THE DESKTOP. Three positions were tried: +16 put the marshal on top
+    // of the back door the hero spawns beside; +24 cleared it but pushed the building off the right edge of
+    // a 390px screen, so the doorway was not visible from the spawn at all. +20, with the marshal pulled in
+    // to 11 units, clears the door AND leaves the building in frame as you arrive.
+    const colX = DOOR_INSET + 20;
     // ⚠️ THE ARENA BRINGS ITS OWN ROOM. The backdrop is read from zone.bg in two places — the haze behind
     // everything and the tiled sky — and an arena that only replaced the FLOOR would have put a Coliseum's
     // platforms in front of a forest. One derived source so the two cannot disagree.
@@ -4005,6 +4009,9 @@ export default function GroveScene({
                 {coliseumHere ? (
                     <>
                         <button type="button" ref={colGateRef}
+                            /* Height is the constant; width follows the building's own measured aspect, so
+                               all seven stand the same height instead of six different ones. */
+                            style={{ "--col-h": COLISEUM_H, "--col-ar": coliseumArt(coliseumHere.map).ar }}
                             className={`gv-colgate${coliseumHere.keys > 0 || coliseumHere.dailyReady ? " is-open" : " is-shut"}`}
                             onPointerDown={(e) => { e.stopPropagation(); onColiseum?.(); }}
                             aria-label={coliseumHere.keys > 0
@@ -4016,7 +4023,7 @@ export default function GroveScene({
                                 front is built from what its map HAS — roots, bone, basalt — so walking in
                                 is not a change of world. See COLISEUM_ART in grove-arena.js. */}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={coliseumArt(coliseumHere.map)} alt="" draggable={false} />
+                            <img src={coliseumArt(coliseumHere.map).src} alt="" draggable={false} />
                             <span className="gv-colgate-tag">Coliseum</span>
                             <span className="gv-colgate-keys">
                                 {coliseumHere.dailyReady && coliseumHere.keys < 1

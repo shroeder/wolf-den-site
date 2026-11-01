@@ -46,17 +46,42 @@ export const arenaArt = (mapN) => ARENA_ART[Number(mapN)] || ARENA_ART[1];
  * Drawn by scripts/gen-grove-coliseums.mjs, die-cut on transparency so each one composites onto whatever
  * level art it stands on — the backdrops are the levels and are not touched.
  */
+/**
+ * ⚠️ EACH ONE CARRIES ITS MEASURED ASPECT, AND THAT IS NOT BOOKKEEPING.
+ *
+ * The fronts are drawn on a square canvas but the BUILDINGS are not square, and not square in the same way:
+ * rootwood's content is 1.288 wide-to-tall, gilded's is 1.098. Sized as a square box with object-fit:
+ * contain, the wide one shrinks to fit its height and renders visibly smaller than the others — seven
+ * buildings at six different scales. Sizing by HEIGHT and deriving width from this ratio makes them all
+ * stand the same height, which is what "a row of Coliseums" has to mean.
+ *
+ * Written by scripts/trim-grove-coliseums.mjs, which prints exactly this object after cropping. Re-run it
+ * after drawing a new front and paste the number in; a stale ratio stretches the building.
+ */
 export const COLISEUM_ART = {
-    1: "/images/grove/coliseum-rootwood.webp",
-    2: "/images/grove/coliseum-undercave.webp",
-    3: "/images/grove/coliseum-fen.webp",
-    4: "/images/grove/coliseum-saltwrack.webp",
-    5: "/images/grove/coliseum-drowned.webp",
-    6: "/images/grove/coliseum-gilded.webp",
-    7: "/images/grove/coliseum-ashen.webp",
+    1: { src: "/images/grove/coliseum-rootwood.webp", ar: 1.288 },
+    2: { src: "/images/grove/coliseum-undercave.webp", ar: 1.1 },
+    3: { src: "/images/grove/coliseum-fen.webp", ar: 1.1 },
+    4: { src: "/images/grove/coliseum-saltwrack.webp", ar: 1.1 },
+    5: { src: "/images/grove/coliseum-drowned.webp", ar: 1.1 },
+    6: { src: "/images/grove/coliseum-gilded.webp", ar: 1.098 },
+    7: { src: "/images/grove/coliseum-ashen.webp", ar: 1.127 },
 };
 
 export const coliseumArt = (mapN) => COLISEUM_ART[Number(mapN)] || COLISEUM_ART[1];
+
+/**
+ * How tall a Coliseum stands, in world units.
+ *
+ * ⚠️ A PHONE SEES ABOUT 27 UNITS, AND THE BUILDING HAS TO FIT IN THEM. 30 was tried and is wrong: at
+ * rootwood's 1.288 aspect that is 38.6 units wide, so on a 390px phone the doorway itself was off the
+ * right-hand edge — a landmark you cannot take in is not a landmark. [[world-constants-sized-against-a-view]].
+ *
+ * 20 x 1.288 = 25.8 units, which clears the phone with the marshal still beside it. And it is NOT the same
+ * 20 as before: the sprites were carrying 8-14% transparent padding until they were trimmed, so the
+ * building inside the box is materially bigger at the identical number.
+ */
+export const COLISEUM_H = 20;
 
 /** One screen, at the narrowest real viewport. */
 export const ARENA_W = 26;
