@@ -11,6 +11,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { GROVE_NPCS, COLISEUM_NPCS, COLISEUM_ZONE, questsFor, npcsOnMap } from "@/lib/marketplace/grove-npcs.js";
+import { awardXp } from "@/lib/marketplace/xp.js";
 
 /** The shop's own day, for the Coliseum daily. See the note in migration 500 about why this is a date. */
 export const centralDay = (d = new Date()) =>
@@ -154,8 +155,68 @@ export async function claimStep(buyerId, stepId) {
     ).catch(() => null);
     if (!won) return { ok: false, error: "already_claimed" };
 
-    return { ok: true, step: { id: step.id, title: step.title }, reward: step.reward, npc: npc.name };
+    // ── ⚠️ AND NOW ACTUALLY PAY IT ──────────────────────────────────────────────────────────────────
+    // Until today this function stamped claimed_at, returned `reward`, and that was the end of it. Nothing
+    // anywhere consumed the object: no gold, no xp, no chest. Twenty-one chains, seventy-two steps, and
+    // every single hand-in paid NOTHING while the UI said "paid." It was found while wiring the Coliseum
+    // token onto the last step — the token would have been a fourth field nobody read.
+    //
+    // ⚠️ gold IS PASSED EXPLICITLY. awardXp pays gold 1:1 with points unless told otherwise, so taking the
+    // default here would have paid the xp figure as gold on top of the gold figure.
+    // See [[awardxp-gold-tracks-xp-landmine]].
+    const paid = step.reward || {};
+    if (paid.xp > 0 || paid.gold > 0) {
+        await awardXp(buyerId, "grove_quest", {
+            points: Math.max(1, Number(paid.xp) || 1),
+            gold: Math.max(0, Number(paid.gold) || 0),
+            // The claim stamp above is the lock, but a dedupe key costs nothing and makes a retry safe.
+            dedupeKey: `grove_quest_${stepId}`,
+            meta: { stepId, npc: npcId, map: npc.map },
+        }).catch(() => {});
+    }
+
+    // ⚠️ THE GROVE'S OWN CHEST TABLE, NEVER addChests. mkt_chest rolls a CHAIN across eight tiers and the
+    // first match wins, so a Grove tier dropped in there silently steals from every tier beneath it. Same
+    // reason the boss grant keeps out of it. See [[chest-rolls-are-a-chain]].
+    if (paid.chest) {
+        await db.query(
+            `INSERT INTO mkt_grove_chest (buyer_id, tier, qty) VALUES ($1, $2, 1)
+             ON CONFLICT (buyer_id, tier) DO UPDATE
+                SET qty = mkt_grove_chest.qty + 1, updated_at = NOW()`,
+            [buyerId, paid.chest],
+        ).catch(() => {});
+    }
+
+    // The Coliseum token. Clamped at the cap rather than refused, so finishing a chain while full still
+    // completes the chain — you simply do not get a fourth token you could not have held anyway.
+    let token = 0;
+    if (paid.token > 0) {
+        const r = await db.queryOne(
+            `INSERT INTO mkt_grove_coliseum (buyer_id, map_n, keys) VALUES ($1, $2, 1)
+             ON CONFLICT (buyer_id, map_n) DO UPDATE
+                SET keys = LEAST($3, mkt_grove_coliseum.keys + 1), updated_at = NOW()
+             RETURNING keys`,
+            [buyerId, npc.map, COLISEUM_KEY_CAP],
+        ).catch(() => null);
+        if (r) token = 1;
+    }
+
+    return {
+        ok: true,
+        step: { id: step.id, title: step.title },
+        reward: step.reward,
+        token,
+        npc: npc.name,
+    };
 }
+
+// ── ⚠️ HOW MANY TOKENS A PLAYER MAY HOLD ───────────────────────────────────────────────────────────────────
+// Luke's call, asked directly: 3 per map. Enough that missing a day is not punishing and a good session can
+// be spent in one sitting; not enough to bank a fortnight and marathon the chest ladder in an afternoon.
+//
+// ⚠️ ENFORCED AT EVERY FAUCET, NOT ON THE WAY OUT. Both sources — the daily and a finished chain — clamp
+// against it, because a cap checked only when spending is not a cap, it is a display.
+export const COLISEUM_KEY_CAP = 3;
 
 // ── THE COLISEUM ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -185,10 +246,10 @@ export async function claimDailyKey(buyerId, mapN) {
         `INSERT INTO mkt_grove_coliseum (buyer_id, map_n, keys, daily_on)
          VALUES ($1,$2,1,$3)
          ON CONFLICT (buyer_id, map_n) DO UPDATE
-           SET keys = mkt_grove_coliseum.keys + 1, daily_on = $3, updated_at = NOW()
+           SET keys = LEAST($4, mkt_grove_coliseum.keys + 1), daily_on = $3, updated_at = NOW()
          WHERE mkt_grove_coliseum.daily_on IS DISTINCT FROM $3
          RETURNING keys`,
-        [buyerId, mapN, today],
+        [buyerId, mapN, today, COLISEUM_KEY_CAP],
     ).catch(() => null);
     if (!row) return { ok: false, error: "already_today" };
     return { ok: true, keys: Number(row.keys) || 0 };

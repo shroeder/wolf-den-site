@@ -97,7 +97,12 @@ export default function GroveQuests({ quests = [], coliseum = null, onChanged, o
                 body: JSON.stringify({ stepId }),
             });
             const j = await r.json();
-            setNote(j?.ok ? `${j.npc}: ${j.step?.title} — paid.` : (j?.error || "Could not claim that."));
+            // ⚠️ SAY WHAT WAS PAID, now that something actually is. Until today claimStep stamped the row
+            // and granted nothing, and this line said "paid" over the top of it. A token is the part worth
+            // naming — it is the only reward that unlocks a thing to go and do.
+            setNote(j?.ok
+                ? `${j.npc}: ${j.step?.title} — paid.${j.token ? " A Coliseum token with it." : ""}`
+                : (j?.error || "Could not claim that."));
             if (j?.ok) onChanged?.();
         } catch {
             setNote("Could not claim that.");
