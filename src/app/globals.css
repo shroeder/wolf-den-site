@@ -10531,35 +10531,67 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 }
 
 /* ── YOUR HEROES: THE SHELF THE LOCK USED TO STAND IN FOR ────────────────────────────────────────────────
-   A strip under the doll. Thumbnails are generous rather than icon-sized because the thing being chosen
-   between IS a picture of a person and the differences are in the face. */
-.herobar { max-width: 460px; margin: 10px auto 0; padding: 12px; border-radius: 14px;
+   A strip under the doll, and the strip IS the controls. The thing being chosen between is a picture of a
+   person and the differences are in the face, so the tiles are portrait-sized rather than icon-sized — at
+   86px square the two heroes read as two blobs. 104x124 is a face you can actually compare.
+
+   ⚠️ NO GOLD PILL. The draw action was one, and it was the same shape pulled out of the pose rows for
+   shouting over its own content. The last tile in the shelf is the empty one; that is the whole control. */
+.herobar { max-width: 460px; margin: 10px auto 0; padding: 13px 13px 11px; border-radius: 14px;
     background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); }
-.herobar-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 9px; }
+.herobar-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-bottom: 10px; }
 .herobar-head b { font-size: .92rem; font-weight: 800; }
 .herobar-head i { font-style: normal; font-size: .76rem; color: #ffd166; }
-/* Scrolls rather than wraps: a member with a dozen heroes should not push the stats panel down a screen. */
-.herobar-strip { display: flex; gap: 9px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+
+/* Scrolls rather than wraps: a member with a dozen heroes must not push the stats panel down a screen. */
+.herobar-strip { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; }
 .herobar-strip::-webkit-scrollbar { display: none; }
-.herobar-cell { position: relative; flex: 0 0 auto; }
-.herobar-pick { display: block; padding: 0; border-radius: 12px; cursor: pointer;
-    width: 86px; height: 86px; overflow: hidden;
-    background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.08), rgba(0,0,0,.45));
-    border: 1.5px solid rgba(255,255,255,.14); }
+.herobar-cell { position: relative; flex: 0 0 auto; display: grid; gap: 5px; justify-items: center; }
+
+.herobar-pick, .herobar-new {
+    width: 104px; height: 124px; padding: 0; border-radius: 13px; cursor: pointer; overflow: hidden;
+    display: grid; place-items: center; font: inherit;
+    transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
+}
+.herobar-pick {
+    background: radial-gradient(circle at 50% 32%, rgba(255,255,255,.09), rgba(0,0,0,.5));
+    border: 1.5px solid rgba(255,255,255,.14);
+}
 .herobar-pick img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.herobar-pick:hover:not(:disabled) { border-color: rgba(255,215,94,.55); }
 .herobar-pick:disabled { cursor: default; }
-.herobar-cell.is-worn .herobar-pick { border-color: #ffd166; box-shadow: 0 0 12px -3px #ffd166; }
-.herobar-star { position: absolute; top: -5px; right: -5px; width: 24px; height: 24px; border-radius: 999px;
-    display: grid; place-items: center; cursor: pointer; font-size: 13px; line-height: 1;
-    color: #8b93a0; background: #15121b; border: 1px solid rgba(255,255,255,.18); }
+/* The one you are wearing, marked the way the doll marks a filled slot — the member already knows that look. */
+.herobar-cell.is-worn .herobar-pick {
+    border-color: #ffd166;
+    box-shadow: inset 0 0 0 1px rgba(255,209,102,.5), 0 0 14px -4px #ffd166;
+}
+
+/* ⚠️ THE EMPTY PLACE ON THE SHELF. Dashed, quiet, and WORDS not a plus sign — see
+   no-icons-or-glyphs-in-the-game. It is the only control that spends, and it looks like the least
+   important thing here on purpose: the heroes are the subject, this is the gap at the end of them. */
+.herobar-new {
+    background: rgba(255,255,255,.02);
+    border: 1.5px dashed rgba(255,255,255,.22);
+    color: #c9c3b6; font-size: .76rem; font-weight: 800; line-height: 1.3;
+    padding: 0 12px; text-align: center;
+}
+.herobar-new:hover:not(:disabled) { border-color: rgba(255,215,94,.6); color: #ffd166;
+    background: rgba(255,209,102,.07); }
+.herobar-new:disabled { cursor: default; color: #6f7681; border-color: rgba(255,255,255,.12); }
+
+/* A word under each tile, because a gold ring is a colour you have to learn and "Wearing" is not. The row
+   keeps its height whether or not a tile has one, so nothing shifts when you switch. */
+.herobar-tag { min-height: 13px; font-size: .66rem; font-weight: 800; letter-spacing: .08em;
+    text-transform: uppercase; color: #8b93a0; }
+.herobar-cell.is-worn .herobar-tag { color: #ffd166; }
+
+.herobar-star { position: absolute; top: 5px; right: 5px; width: 26px; height: 26px; border-radius: 999px;
+    display: grid; place-items: center; cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+    color: #9aa2ab; background: rgba(10,8,14,.78); border: 1px solid rgba(255,255,255,.16); }
+.herobar-star:hover:not(:disabled) { color: #ffd166; }
 .herobar-star.is-on { color: #ffd166; border-color: rgba(255,209,102,.6); }
-.herobar-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
-.herobar-foot span { flex: 1; min-width: 140px; font-size: .72rem; color: #8b93a0; }
-.herobar-draw { padding: 9px 14px; border-radius: 999px; border: 0; cursor: pointer;
-    font: inherit; font-size: .82rem; font-weight: 800; color: #1a1a12;
-    background: linear-gradient(180deg, #ffd166, #e0a83c); }
-.herobar-draw:disabled { opacity: .5; cursor: default; }
-.herobar-note { margin: 9px 0 0; font-size: .78rem; color: #ffd166; }
+
+.herobar-foot { margin: 8px 0 0; font-size: .73rem; color: #8b93a0; }
 
 .equip-hero { grid-area: hero; position: relative; display: grid; place-items: center; padding: 4px; }
 .equip-hero img {

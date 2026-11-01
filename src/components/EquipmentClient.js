@@ -647,16 +647,25 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             </p>
 
             {/* ── YOUR HEROES ─────────────────────────────────────────────────────────────────────────
-                Only once there is more than one to choose between, or something to say about the one you
-                have. A strip of exactly one picture under a picture of the same thing is furniture. */}
-            {shelf && (shelf.sprites.length > 1 || shelf.stale) ? (
+                ⚠️ IT SHOWS WHENEVER THERE IS A HERO AT ALL, not only when there are two. The first cut
+                hid it below two sprites on the grounds that a strip of one picture is furniture -- which
+                was true right up until the draw tile moved INTO the strip, because then hiding the strip
+                hides the only way to ever ask for a second one. A member with one hero and nothing stale
+                could not have got another.
+
+                ⚠️ AND THE DRAW IS A TILE, NOT A BUTTON. Luke: "I think we can do a little bit better,
+                including the button." It was a gold pill -- the same shape taken out of the pose rows an
+                hour earlier for shouting over its own content, put straight back on the screen below.
+                The row is a shelf of heroes; the last place on the shelf is the empty one. No glyph in it,
+                because the rule here is sprites or words and never a plus sign. */}
+            {shelf && shelf.sprites.length ? (
                 <section className="herobar">
                     <div className="herobar-head">
                         <b>Your heroes</b>
                         {/* ⚠️ THE OUT-OF-DATE LINE IS THE WHOLE DISCOVERY MECHANISM. Nothing redraws a hero
                             on its own now, so without this a member changes their gear, sees no difference
-                            ever, and concludes the sprite is broken. It states the fact and offers the
-                            button; it does not nag and it does not spend. */}
+                            ever, and concludes the sprite is broken. It states the fact; the empty tile
+                            beside it is the offer. */}
                         {shelf.stale ? <i>Your gear has changed since this was drawn.</i> : null}
                     </div>
 
@@ -666,13 +675,14 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 <button
                                     type="button" className="herobar-pick" disabled={shelfBusy || sp.worn}
                                     title={sp.worn ? "You are wearing this one" : "Wear this one"}
-                                    onClick={() => heroAct({ action: "wear", sprite: sp.id }, "Hero changed.")}
+                                    onClick={() => heroAct({ action: "wear", sprite: sp.id }, null)}
                                 >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={sp.url} alt="" aria-hidden="true" />
                                 </button>
-                                {/* A star is a promise we keep it. Nothing is deleted today, but a shelf
-                                    that grows for ever needs to know what may never be tidied away. */}
+                                {/* The worn one says so in words. A gold ring alone is a colour a member has
+                                    to learn; the label is the same information nobody has to decode. */}
+                                <span className="herobar-tag">{sp.worn ? "Wearing" : sp.favourite ? "Saved" : ""}</span>
                                 <button
                                     type="button"
                                     className={`herobar-star${sp.favourite ? " is-on" : ""}`}
@@ -684,19 +694,23 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 </button>
                             </div>
                         ))}
+
+                        <div className="herobar-cell">
+                            <button
+                                type="button"
+                                className="herobar-new"
+                                disabled={shelfBusy || !shelf.canDraw}
+                                onClick={() => heroAct({ action: "draw" }, "Drawn, and you are wearing it. The old one is still here.")}
+                            >
+                                {shelfBusy ? "Drawing…" : shelf.canDraw ? "Draw a new hero" : "One a day"}
+                            </button>
+                            <span className="herobar-tag">{shelf.canDraw ? "" : "Tomorrow"}</span>
+                        </div>
                     </div>
 
-                    <div className="herobar-foot">
-                        <button
-                            type="button" className="herobar-draw"
-                            disabled={shelfBusy || !shelf.canDraw}
-                            onClick={() => heroAct({ action: "draw" }, "Drawn. It is on your shelf and you are wearing it.")}
-                        >
-                            {shelfBusy ? "Drawing…" : shelf.canDraw ? "Draw a new hero" : "New hero tomorrow"}
-                        </button>
-                        <span>Switching between the ones you have is free and never loses one.</span>
-                    </div>
-                    {shelfNote ? <p className="herobar-note">{shelfNote}</p> : null}
+                    <p className="herobar-foot">
+                        {shelfNote || "Switching between the ones you have is free, and never loses one."}
+                    </p>
                 </section>
             ) : null}
 
