@@ -3,6 +3,7 @@ import { listInStockForSitemap } from "@/lib/inventory-feed/feed";
 import { productHandle } from "@/lib/inventory-feed/product-url";
 import { listIndexableMarketplaceProductIds, listVendorsForBrowse } from "@/lib/marketplace/search.js";
 import { SITE_URL } from "@/lib/site";
+import { BAGS_PUBLIC } from "@/lib/marketplace/bags-gate.js";
 
 const BASE_URL = SITE_URL;
 
@@ -84,13 +85,15 @@ export default async function sitemap() {
             changeFrequency: "monthly",
             priority: 0.6,
         },
-        {
+        // Omitted while the bags are withdrawn — the page 404s, and a sitemap that keeps pointing at a 404
+        // is how Search Console starts reporting errors for a thing we switched off on purpose.
+        ...(BAGS_PUBLIC ? [{
             url: `${BASE_URL}/mystery-bags`,
             lastModified: new Date(),
             changeFrequency: "daily",
             priority: 0.85,
             images: [`${BASE_URL}/images/mystery_bag.jpg`],
-        },
+        }] : []),
         {
             url: `${BASE_URL}/sell-cards`,
             lastModified: new Date(),

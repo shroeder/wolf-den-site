@@ -10,6 +10,8 @@ import { packPoolSummary, resumePendingOpen } from "@/lib/marketplace/packs.js";
 import { cheapestOpenPackCents } from "@/lib/marketplace/pack-pools.js";
 import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
 import { VAULT_PUBLIC, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
+import { BAGS_PUBLIC } from "@/lib/marketplace/bags-gate.js";
+import { notFound } from "next/navigation";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -64,6 +66,11 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function MysteryBagsPage() {
+    // ⚠️ notFound(), NOT a redirect and NOT an empty board. The page is withdrawn, not moved, and an empty
+    // Live Chase Board reads as "we have no stock" rather than "this is switched off". One line back on in
+    // bags-gate.js restores it exactly as it was.
+    if (!BAGS_PUBLIC) notFound();
+
     const [data, qrCodes] = await Promise.all([
         getMysteryBagDashboardData().catch(() => null),
         getMarketingQrCodes().catch(() => []),

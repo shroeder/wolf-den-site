@@ -1,4 +1,5 @@
 import { canPreview } from "@/lib/marketplace/owner.js";
+import { BAGS_PUBLIC } from "@/lib/marketplace/bags-gate.js";
 
 // ── THE ONE DOOR FOR VIRTUAL PACKS AND THE CARD VAULT ───────────────────────────────────────────────────────
 // Luke, 2026-10-26: "this needs to be a feature flagged thing for now. For now I would prefer it only show up
@@ -66,6 +67,19 @@ export function vaultOpenFor(buyerId) {
 // It is the only way back if the shelf runs thin or Square plays up, and re-deriving the gate under pressure
 // is how a feature gets half-closed.
 export const SHELF_PACKS_PUBLIC = true;
+
+/**
+ * May this member see and open the $20 house bag?
+ *
+ * ⚠️ AND-ED WITH THE VAULT GATE for the same reason shelfPacksOpenFor is: the reveal, the sell-back and the
+ * vault a bag's card lands in are all the vault feature. BAGS_PUBLIC is the switch; see bags-gate.js for the
+ * list of doors it closes.
+ */
+export function bagsOpenFor(buyerId) {
+    if (!buyerId) return false;
+    if (!vaultOpenFor(buyerId)) return false;
+    return BAGS_PUBLIC || canPreview("vault", buyerId);
+}
 
 export function shelfPacksOpenFor(buyerId) {
     if (!buyerId) return false;

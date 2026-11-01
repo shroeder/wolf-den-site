@@ -11,7 +11,7 @@ import { packCardSubtitle, parsePackCardName } from "@/lib/marketplace/pack-card
 import { BIG_HIT_CENTS, tierForCents } from "@/lib/marketplace/pack-rarity.js";
 import { addCredit, getStoreCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
 import { completeBuyBack } from "@/lib/marketplace/vault-restock.js";
-import { isPreviewOpen, shelfPacksOpenFor, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
+import { bagsOpenFor, isPreviewOpen, shelfPacksOpenFor, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { poolByKey, poolStates } from "@/lib/marketplace/pack-pools.js";
 import { claimShelfCard } from "@/lib/marketplace/pack-shelf-claim.js";
 import { hasOpenedBefore, markFirstOpen } from "@/lib/marketplace/pack-weights.js";
@@ -199,6 +199,12 @@ async function deleteWithRetry(variationId, attempts = 3) {
  * ⚠️ READ THE ORDER OF THE STEPS BEFORE CHANGING ANY OF THEM.
  */
 export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey = "bags" } = {}) {
+    // ⚠️ THE ACT PATH, NOT JUST THE TILE. vault-gate.js §16.2: "the door is not the machine" — the casino
+    // shipped with three doors removed and a fourth gate inside the play path, and worked for one person for
+    // twenty minutes. A withdrawn bag must refuse the open, not merely stop advertising it.
+    if (poolKey === "bags" && !bagsOpenFor(buyerId)) {
+        return { ok: false, error: "pool_closed" };
+    }
     // ── ⚠️ ONE FUNCTION, TWO POOLS, AND THE BRANCHES ARE DELIBERATELY TINY ──────────────────────────────────
     // docs/category-packs.md. A category pack differs from a bag in exactly three places — where the card is
     // claimed, what the price comes from, and whether the register copy is DELETED or DECREMENTED — and

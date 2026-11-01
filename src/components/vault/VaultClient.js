@@ -1,11 +1,16 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { BAGS_PUBLIC } from "@/lib/marketplace/bags-gate.js";
 
 import { BUYBACK_PERCENT } from "@/lib/marketplace/buyback.js";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
 
 const usd = (cents) => `$${((Number(cents) || 0) / 100).toFixed(2)}`;
+
+// ⚠️ WHERE "OPEN ANOTHER" GOES. The vault's whole job is closing the open-look-open loop, so this link must
+// never point at a 404. /mystery-bags is withdrawn (bags-gate.js); the rips room is the opener regardless.
+const OPEN_HREF = BAGS_PUBLIC ? "/mystery-bags" : "/marketplace/rips";
 
 const TABS = [
     { key: "cards", label: "Cards" },
@@ -262,7 +267,7 @@ export default function VaultClient({ initial }) {
                     that the whole feature is built around (open, look at it, open another) ended in a
                     dead end that could only be escaped through the menu. It sits in the header rather
                     than at the bottom of a list that can be a hundred cards long. */}
-                <a className="vt-head-open" href="/mystery-bags">
+                <a className="vt-head-open" href={OPEN_HREF}>
                     <span className="vt-head-open-main">Open another</span>
                     <span className="vt-head-open-go" aria-hidden="true">&#8250;</span>
                 </a>
@@ -291,7 +296,7 @@ export default function VaultClient({ initial }) {
                 held.length === 0 ? (
                     <div className="vt-empty">
                         <p>Nothing in the vault yet.</p>
-                        <a className="pk-btn pk-btn-primary" href="/mystery-bags">Open a pack</a>
+                        <a className="pk-btn pk-btn-primary" href={OPEN_HREF}>Open a pack</a>
                     </div>
                 ) : (
                     <>

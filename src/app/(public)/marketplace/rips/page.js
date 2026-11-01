@@ -6,6 +6,7 @@ import { packPoolSummary, resumePendingOpen } from "@/lib/marketplace/packs.js";
 import { cheapestOpenPackCents } from "@/lib/marketplace/pack-pools.js";
 import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
 import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
+import { BAGS_PUBLIC } from "@/lib/marketplace/bags-gate.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,10 @@ export default async function VirtualRipsPage() {
     // ⚠️ THE SAME GATE THE OPENER ALREADY HAD, not a new one. A page whose whole body is a gated feature has
     // nothing to render for somebody outside the gate, so it sends them to the board instead of drawing an
     // empty room — see [[feature-gates-come-in-pairs]] for why the door and the thing behind it must agree.
-    if (!buyer || !vaultOpenFor(buyer.id)) redirect("/mystery-bags");
+    // ⚠️ NOT /mystery-bags WHILE THE BAGS ARE WITHDRAWN — that page 404s now, so the old fallback would send
+    // somebody outside the gate to a dead end instead of back to the game. See bags-gate.js.
+    const RIPS_FALLBACK = BAGS_PUBLIC ? "/mystery-bags" : "/marketplace/play";
+    if (!buyer || !vaultOpenFor(buyer.id)) redirect(RIPS_FALLBACK);
 
     const [pool, balanceCents, pending, fromCents] = await Promise.all([
         packPoolSummary().catch(() => null),
@@ -39,7 +43,7 @@ export default async function VirtualRipsPage() {
         resumePendingOpen(buyer.id).catch(() => null),
         cheapestOpenPackCents().catch(() => null),
     ]);
-    if (!pool) redirect("/mystery-bags");
+    if (!pool) redirect(RIPS_FALLBACK);
 
     return (
         <div className="rip-room">

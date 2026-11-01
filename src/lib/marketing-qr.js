@@ -3,6 +3,7 @@ import "server-only";
 import QRCode from "qrcode";
 
 import { SITE_URL } from "@/lib/site";
+import { BAGS_PUBLIC } from "@/lib/marketplace/bags-gate.js";
 
 // Discord invite is the same one linked across the public site (about, community, etc.).
 const DISCORD_INVITE_URL = "https://discord.gg/Pad8U2KVsD";
@@ -31,7 +32,11 @@ export const MARKETING_LINKS = [
         key: "mystery",
         title: "Mystery packs",
         caption: "Grab your own bag to rip",
-        url: siteUrl("/mystery-bags"),
+        // ⚠️ POINTS AT THE RIPS ROOM WHILE THE BAGS ARE WITHDRAWN (bags-gate.js). These get PRINTED and
+        // taped up in the shop, so the one thing this URL must never be is a 404 — a member is standing at
+        // the counter with their phone out. Any card already printed carries the old URL; see the note Luke
+        // was given when the bags were switched off.
+        url: siteUrl(BAGS_PUBLIC ? "/mystery-bags" : "/marketplace/rips"),
     },
     {
         key: "google",

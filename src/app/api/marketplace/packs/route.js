@@ -5,7 +5,7 @@ import { packPoolSummary, resumePendingOpen } from "@/lib/marketplace/packs.js";
 import { getStoreCredit } from "@/lib/marketplace/store-credit.js";
 import { vaultSummary } from "@/lib/marketplace/vault.js";
 import { hasOpenedBefore } from "@/lib/marketplace/pack-weights.js";
-import { shelfPacksOpenFor, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
+import { bagsOpenFor, shelfPacksOpenFor, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { beatsPriceBp, poolByKey, poolStates, shelfPoolCards } from "@/lib/marketplace/pack-pools.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -45,8 +45,11 @@ export async function GET(request) {
             // The carousel (§9): the bags first because they are the house product, then every shelf pool
             // the member may open. A CLOSED pool is still listed — it says "back soon" rather than
             // vanishing, so a member who saw it yesterday is not left wondering what they imagined.
+            // ⚠️ DROPPED, NOT LISTED-AND-CLOSED. A "back soon" tile is right for a pool that emptied; it is
+            // wrong for one deliberately withdrawn, where it would advertise a product nobody can buy. See
+            // bags-gate.js — the whole $20 bag is off until Luke turns it back on.
             const pools = [
-                {
+                ...(bagsOpenFor(buyer.id) ? [{
                     key: "bags", brand: "Wolf Den Mystery Bag", priceCents: pool.priceCents,
                     art: poolByKey("bags")?.art || null,
                     units: pool.remaining, open: pool.remaining > 0 && pool.priceTrusted !== false,
@@ -54,7 +57,7 @@ export async function GET(request) {
                     maxCents: pool.cards?.[0]?.valueCents ?? 0,
                     medianCents: null,
                     cards: pool.cards || [],
-                },
+                }] : []),
                 ...(await Promise.all(shelf.map(async (p) => ({
                     key: p.key, brand: p.brand, priceCents: p.priceCents, units: p.units, art: p.art,
                     open: p.open, closedReason: p.closedReason,

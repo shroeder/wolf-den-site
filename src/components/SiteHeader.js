@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { BAGS_PUBLIC } from "@/lib/marketplace/bags-gate.js";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -37,7 +38,10 @@ const navItems = [
     { href: "/looking-for", label: "Looking For", sprite: "bounties" },
     { href: "/marketplace", label: "Marketplace", sprite: "market" },
     // "mystery", not "mystery-bags" — the key is the filename in /public/images/nav, not the route.
-    { href: "/mystery-bags", label: "Mystery Bags", sprite: "mystery" },
+    // ⚠️ DROPPED WHILE THE BAGS ARE WITHDRAWN (bags-gate.js). [[a-screen-with-no-door-is-not-shipped]] run
+    // backwards: a door onto a 404 is worse than no door. Virtual Rips and Card Vault keep their rows — see
+    // the flatMap below, which anchors on Marketplace instead when this entry is absent.
+    ...(BAGS_PUBLIC ? [{ href: "/mystery-bags", label: "Mystery Bags", sprite: "mystery" }] : []),
     { href: "/events", label: "Events", sprite: "events" },
     { href: "/sell-cards", label: "Sell Your Cards", sprite: "trades" },
 ];
@@ -322,7 +326,10 @@ export default function SiteHeader() {
     //
     // Placed straight after Mystery Bags because that is where a card in it came from.
     const links = mktVault
-        ? navItems.flatMap((item) => (item.href === "/mystery-bags"
+        // ⚠️ THE ANCHOR MOVES WITH THE FLAG. These two rows used to hang off the Mystery Bags entry; with the
+        // bags withdrawn that entry is gone and the rips/vault doors would have gone with it — a feature
+        // switched off by accident because the row it was stapled to was switched off on purpose.
+        ? navItems.flatMap((item) => (item.href === (BAGS_PUBLIC ? "/mystery-bags" : "/marketplace")
             // ⚠️ THREE ROWS IN THE ORDER THE MEMBER MOVES THROUGH THEM: the board that says what is in a
             // pack, the room where you rip one, the shelf the card lands on. Virtual Rips is its own door
             // because Luke watched people skip the opener bolted to the top of Mystery Bags: "it's not
