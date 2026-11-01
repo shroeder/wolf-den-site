@@ -21,6 +21,7 @@ import { markOrderInventoryAdjusted, recordInventoryRepair } from "@/lib/invento
 import { sendNewOrderAlertEmail, sendOrderConfirmationEmail } from "@/lib/shop-order-email.js";
 import {
     checkCartRules, claimCartRules, releaseClaims, identitySignals, clientIpFrom, recordCardSignal,
+    getItemRules, recordPreorderHolds,
 } from "@/lib/shop-item-rules.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 import {
@@ -619,6 +620,26 @@ export async function POST(request) {
                     after(() => Promise.allSettled((cart.items || []).map((it) =>
                         recordInventoryRepair({ variationId: it.variationId || it.catalogObjectId || it.catalog_object_id, itemName: it.name || it.itemName, quantity: it.quantity || 1, source: "shop_order", reference: updatedOrder.id, error: msg })
                     )));
+                }
+
+                // ── WHO IS WAITING FOR A PRE-ORDER ──────────────────────────────────────────────
+                // Written HERE, after the card has actually been charged, and not up beside the claim.
+                // A claim is taken before the charge on purpose (nobody should be billed for something
+                // they are then refused) — but a hold recorded there would survive a declined card as a
+                // customer who is owed an arrival email and never paid for anything.
+                //
+                // ⚠️ IT MUST NOT BE ABLE TO FAIL THE ORDER. The money has moved; a bookkeeping row that
+                // throws here would hand back an error for a purchase that completed. If this is ever
+                // lost the customer still has their order and their confirmation — they just do not get
+                // the arrival email, which is a thing a human can fix from the Orders screen.
+                try {
+                    const preorderRules = await getItemRules((cart.items || []).map((i) => i.catalogObjectId));
+                    await recordPreorderHolds(updatedOrder.id, cart.items, preorderRules);
+                } catch (preorderError) {
+                    logger.warn("shop.checkout.preorder_hold_failed", {
+                        orderId: updatedOrder.id,
+                        errorMessage: preorderError instanceof Error ? preorderError.message : "unknown_error",
+                    });
                 }
 
                 // Order emails + owner push. Awaited (so the serverless function doesn't terminate first)

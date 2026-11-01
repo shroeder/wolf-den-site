@@ -135,10 +135,18 @@ export async function getItemRules(variationIds = []) {
     const ids = [...new Set((variationIds || []).filter(Boolean).map(String))];
     if (!ids.length) return {};
     const rows = await db.query(
-        `SELECT variation_id, pickup_only, limit_per_customer, run_started_at
+        `SELECT variation_id, pickup_only, limit_per_customer, run_started_at,
+                preorder_arrives_on, preorder_arrived_at
            FROM shop_item_rules
           WHERE variation_id = ANY($1)
-            AND (pickup_only = TRUE OR limit_per_customer IS NOT NULL)`,
+            -- ⚠️ THE PRE-ORDER CLAUSE IS NOT OPTIONAL HERE. This filter existed so a row that had been
+            -- cleared of both flags stopped being read. Adding a third kind of rule without adding it to
+            -- the filter would have made every PURE pre-order invisible to every caller -- the cart, the
+            -- product page and the email all read this one function -- while the row sat in the table
+            -- looking correct. Nothing would have errored.
+            AND (pickup_only = TRUE
+                 OR limit_per_customer IS NOT NULL
+                 OR (preorder_arrives_on IS NOT NULL AND preorder_arrived_at IS NULL))`,
         [ids],
     ).catch(() => []);
     const map = {};
@@ -148,9 +156,57 @@ export async function getItemRules(variationIds = []) {
             pickupOnly: Boolean(r.pickup_only),
             limitPerCustomer: r.limit_per_customer == null ? null : Number(r.limit_per_customer),
             runStartedAt: r.run_started_at,
+            // ⚠️ LIVE UNTIL MARKED ARRIVED, NOT UNTIL THE DATE PASSES. A shipment three days late is still
+            // a pre-order and the customer is still waiting; a storefront that quietly stopped saying so
+            // on the stroke of the expected date would be lying on exactly the day it matters most.
+            preorderArrivesOn: r.preorder_arrived_at ? null : (r.preorder_arrives_on || null),
         };
     }
     return map;
+}
+
+// ── WHAT A PRE-ORDER MAKES US SAY ────────────────────────────────────────────────────────────────────────
+// Luke: "there's going to be text making it clear both when they're ordering and when they get the
+// confirmation email that the item is not going to be shipped until the expected arrival date."
+//
+// ⚠️ ONE SENTENCE, BUILT IN ONE PLACE, USED BY ALL FOUR SCREENS. The product page, the cart, the checkout
+// and the confirmation email all have to say the same thing, and four copies of a promise about WHEN
+// somebody's money turns into a parcel is four chances to disagree. See reuse-the-rule-never-restate-it.
+
+/** 14 February — the way a person writes a date, not 2026-02-14. */
+export function preorderDateLabel(value) {
+    if (!value) return null;
+    const d = value instanceof Date ? value : new Date(`${String(value).slice(0, 10)}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+/**
+ * The latest arrival date across a basket, or null if nothing in it is a pre-order.
+ *
+ * ⚠️ THE LATEST, BECAUSE THE WHOLE ORDER WAITS. Luke's call: one order, one shipment, held until the
+ * pre-order lands. Two pre-orders in a cart means the order moves when the LAST one does, and quoting the
+ * earlier date would be a promise we miss by a fortnight.
+ */
+export function cartPreorderDate(cartItems, rules) {
+    let latest = null;
+    for (const line of cartItems || []) {
+        const r = rules?.[String(line?.catalogObjectId || "")];
+        const on = r?.preorderArrivesOn;
+        if (!on) continue;
+        const d = String(on).slice(0, 10);
+        if (!latest || d > latest) latest = d;
+    }
+    return latest;
+}
+
+/** The sentence itself. `mode` is "ship" or "pickup"; a pickup cannot be collected early either. */
+export function preorderSentence(dateValue, mode = "ship") {
+    const when = preorderDateLabel(dateValue);
+    if (!when) return null;
+    return mode === "pickup"
+        ? `This order contains a pre-order and will not be ready to collect until ${when}. We will email you the moment it arrives in the shop.`
+        : `This order contains a pre-order and will not ship until ${when}. Everything in it travels together, and we will email you the moment it arrives.`;
 }
 
 /** One variation's rule, or null. */
@@ -589,4 +645,128 @@ export async function listRunClaims(variationId, { limit = 100 } = {}) {
         orderId: r.order_id, email: r.email || null, ip: r.ip || null,
         name: r.name || null, status: r.status || null, flag: r.flag || null, at: r.at,
     }));
+}
+
+// ── WHO IS WAITING ───────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Record that this order is holding pre-orders. Called once, where the claim ledger is written, because
+ * that is the moment the money is real.
+ *
+ * ⚠️ IT TAKES THE RULES IT WAS CHECKED AGAINST rather than re-reading them. A customer who paid while an
+ * item was a pre-order is waiting for it even if somebody marks it arrived a second later, and re-reading
+ * here would quietly drop them off the list in exactly that race.
+ */
+export async function recordPreorderHolds(orderId, cartItems, rules) {
+    if (!orderId) return 0;
+    let n = 0;
+    for (const line of cartItems || []) {
+        const id = String(line?.catalogObjectId || "");
+        if (!rules?.[id]?.preorderArrivesOn) continue;
+        await db.query(
+            `INSERT INTO shop_preorder_holds (order_id, variation_id, item_name, quantity)
+             VALUES ($1, $2, $3, $4) ON CONFLICT (order_id, variation_id) DO NOTHING`,
+            [String(orderId), id, line?.name || null, Number(line?.quantity) || 1],
+        ).catch(() => {});
+        n += 1;
+    }
+    return n;
+}
+
+/**
+ * Everything still on pre-order, for the app screen: what it is, when it is due, and how many people are
+ * waiting. Late ones first — they are the ones somebody has to answer for.
+ */
+export async function listPreorders() {
+    const rows = await db.query(
+        `SELECT r.variation_id, r.item_name, r.preorder_arrives_on, r.preorder_base_name, r.updated_at,
+                COALESCE(h.orders, 0)  AS orders,
+                COALESCE(h.units, 0)   AS units
+           FROM shop_item_rules r
+           LEFT JOIN (
+                SELECT variation_id, COUNT(*) AS orders, SUM(quantity) AS units
+                  FROM shop_preorder_holds WHERE notified_at IS NULL GROUP BY variation_id
+           ) h ON h.variation_id = r.variation_id
+          WHERE r.preorder_arrives_on IS NOT NULL AND r.preorder_arrived_at IS NULL
+          ORDER BY r.preorder_arrives_on ASC`,
+        [],
+    ).catch(() => []);
+    const today = new Date().toISOString().slice(0, 10);
+    return (rows || []).map((r) => ({
+        variationId: r.variation_id,
+        name: r.item_name || r.preorder_base_name || "Item",
+        arrivesOn: r.preorder_arrives_on ? String(r.preorder_arrives_on).slice(0, 10) : null,
+        arrivesLabel: preorderDateLabel(r.preorder_arrives_on),
+        // ⚠️ LATE IS A FACT THE SCREEN MUST STATE. A pre-order past its date with people waiting on it is
+        // the one row on this screen that needs somebody to do something today.
+        late: Boolean(r.preorder_arrives_on && String(r.preorder_arrives_on).slice(0, 10) < today),
+        orders: Number(r.orders) || 0,
+        units: Number(r.units) || 0,
+    }));
+}
+
+/**
+ * Mark one arrived: end the pre-order and hand back everybody who must be told.
+ *
+ * ⚠️ IT DOES NOT SEND THE EMAILS AND IT DOES NOT TOUCH SQUARE. Both belong to the caller -- the route has
+ * the Square client and the mailer, and this file has never reached outside the database. What it does own
+ * is the thing that must not be done twice: `notified_at IS NULL` is set in the same UPDATE that returns
+ * the rows, so a double tap, two staff or a retry gets an empty list rather than a second email.
+ *
+ * Luke's call on what happens next: email only. The orders stay exactly where they are and get worked from
+ * the Orders screen like any other, so the shelf and the screen cannot disagree about what is bagged.
+ */
+export async function markPreorderArrived(variationId) {
+    const id = String(variationId || "");
+    if (!id) return { ok: false, error: "no_variation" };
+    const rule = await db.queryOne(
+        `SELECT item_name, preorder_base_name, preorder_arrives_on, preorder_arrived_at
+           FROM shop_item_rules WHERE variation_id = $1`,
+        [id],
+    ).catch(() => null);
+    if (!rule) return { ok: false, error: "not_found" };
+    if (rule.preorder_arrived_at) return { ok: false, error: "already_arrived" };
+
+    // Claim the holders FIRST. If the update below fails we would rather have told people the truth early
+    // than have ended the pre-order and told nobody.
+    const holders = await db.query(
+        `UPDATE shop_preorder_holds SET notified_at = NOW()
+          WHERE variation_id = $1 AND notified_at IS NULL
+          RETURNING order_id, item_name, quantity`,
+        [id],
+    ).catch(() => []);
+
+    await db.query(
+        `UPDATE shop_item_rules SET preorder_arrived_at = NOW(), updated_at = NOW() WHERE variation_id = $1`,
+        [id],
+    );
+    return {
+        ok: true,
+        baseName: rule.preorder_base_name || null,
+        itemName: rule.item_name || rule.preorder_base_name || "Item",
+        holders: (holders || []).map((h) => ({
+            orderId: h.order_id, itemName: h.item_name, quantity: Number(h.quantity) || 1,
+        })),
+    };
+}
+
+/** Set or clear the pre-order on one variation. `arrivesOn` null ends it without marking it arrived. */
+export async function setPreorder(variationId, { arrivesOn, itemName, baseName, updatedBy } = {}) {
+    const id = String(variationId || "");
+    if (!id) return { ok: false, error: "no_variation" };
+    await db.query(
+        `INSERT INTO shop_item_rules (variation_id, preorder_arrives_on, preorder_base_name, item_name, updated_by, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (variation_id) DO UPDATE
+            SET preorder_arrives_on = EXCLUDED.preorder_arrives_on,
+                -- Keep the first base name we ever recorded: re-saving a pre-order whose Square name
+                -- already carries "Pre-Order" must not bake the prefix into the name we restore.
+                preorder_base_name = COALESCE(shop_item_rules.preorder_base_name, EXCLUDED.preorder_base_name),
+                preorder_arrived_at = NULL,
+                item_name = COALESCE(EXCLUDED.item_name, shop_item_rules.item_name),
+                updated_by = EXCLUDED.updated_by,
+                updated_at = NOW()`,
+        [id, arrivesOn || null, baseName || null, itemName || null, updatedBy || null],
+    );
+    return { ok: true };
 }
