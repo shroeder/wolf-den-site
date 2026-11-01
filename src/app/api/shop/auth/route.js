@@ -28,6 +28,8 @@ import {
     isShopAuthTemporarilyBlocked,
     recordFailedShopAuthAttempt,
 } from "@/lib/shop-auth-throttle";
+import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { bridgeMarketplaceToShop } from "@/lib/marketplace/shop-bridge.js";
 import { resolveActiveCartId } from "@/lib/shop-carts";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -111,7 +113,34 @@ export async function GET(request) {
 
         try {
             const cookieStore = await cookies();
-            const session = await getAuthenticatedShopCustomerSessionFromCookies();
+            let session = await getAuthenticatedShopCustomerSessionFromCookies();
+
+            // ── ⚠️ A GAME LOGIN IS A SHOP LOGIN, AND IT HEALS ITSELF HERE ────────────────────────────
+            // Luke: "How are we not signed in but have a profile picture and cart" — the header avatar
+            // comes from memberSession() (the marketplace account) and this endpoint answers for the SHOP
+            // account. Two cookies, one person, and the header can show your face while the checkout
+            // treats you as a stranger who cannot see their own store credit.
+            //
+            // shop-bridge.js already says what the intent is: "ONE account... the customer never sees the
+            // separate shop login." It was only ever called from afterEmailVerified, so it ran once, at
+            // verification. A marketplace session lasts 90 days and outlives its shop cookie easily —
+            // after which nothing re-ran the bridge and the member silently became a guest.
+            //
+            // Doing it HERE is the fix rather than at every login, because this is the one request that
+            // asks "who is this", so every screen that cares is self-healing by construction.
+            //
+            // ⚠️ IT MINTS A SHOP SESSION FROM A MARKETPLACE ONE, WHICH IS A REAL TRUST DECISION AND AN
+            // OLD ONE. Same human, same verified email, and the bridge has granted exactly this since it
+            // was written; this only runs it more often. It is strictly a no-op for anyone without a
+            // valid marketplace session cookie.
+            if (!session?.customer) {
+                const buyer = await getAuthenticatedBuyer().catch(() => null);
+                if (buyer?.email) {
+                    await bridgeMarketplaceToShop(buyer.email).catch(() => {});
+                    session = await getAuthenticatedShopCustomerSessionFromCookies();
+                }
+            }
+
             const pendingTwoFactor = session?.customer
                 ? null
                 : await getPendingShopCustomerTwoFactorPayloadFromCookies();
