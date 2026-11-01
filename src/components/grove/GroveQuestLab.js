@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 import GroveQuests from "@/components/grove/GroveQuests";
+import GroveGiver from "@/components/grove/GroveGiver";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { questsFor, GROVE_NPCS, COLISEUM_NPCS, COLISEUM_ZONE } from "@/lib/marketplace/grove-npcs.js";
 
@@ -34,6 +35,11 @@ const BEATS = {
          blurb: "The next step took over on its own. Three of four done; the last one pays the token." },
     6: { done: 4, progress: 0, label: "Beat 6 — nothing more to ask",
          blurb: "A finished chain STAYS on the board. Dropping it would make the panel feel forgetful." },
+    // The two that matter most now: the hand-in happens in front of the person, not on the panel.
+    7: { done: 0, progress: 0.4, label: "Beat 7 — you walk up to her, not done yet", giver: true,
+         blurb: "Tapping the giver in her zone. She tells you what she asked for and how far you are." },
+    8: { done: 0, progress: 1, label: "Beat 8 — handing it in, standing there", giver: true,
+         blurb: "Bar full in front of her face. This is the turn-in, and it is the only one there is." },
 };
 
 export default function GroveQuestLab({ beat = 1 }) {
@@ -85,6 +91,14 @@ export default function GroveQuestLab({ beat = 1 }) {
             </header>
             {/* The real panel, mounted exactly as GroveClient mounts it. */}
             <GroveQuests quests={quests} coliseum={coliseum} />
+            {/* The world dialogue, over the tracker — which is exactly how it sits in the game. */}
+            {b.giver ? (
+                <GroveGiver
+                    npcHere={quests.find((q) => q.npc === WHO)}
+                    onClaim={async () => ({ ok: true, token: true })}
+                    onClose={() => {}}
+                />
+            ) : null}
             {beat === 4 ? (
                 <p className="ql-fake">
                     Ringmaster Thorn aside &mdash; the hand-in says:

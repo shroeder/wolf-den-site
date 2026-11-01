@@ -1097,6 +1097,22 @@ export const GROVE_CSS = `
 .gv-door.is-locked { cursor: default; }
 .gv-door.is-locked img { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.75)); }
 
+/* The giver's own dialogue reuses the marshal's .qd-* frame; these are the few parts only a quest
+   step needs. Shared on purpose: two people you walk up to should not be two kinds of object. */
+.qd-task { margin: 0 0 3px; font-family: var(--font-display); font-size: 1.02rem; color: #f3eedd; }
+.qd-ask { margin: 0 0 10px; font-size: 0.86rem; color: #93a089; text-transform: capitalize; }
+.qd-bar { display: block; height: 9px; background: rgba(10, 14, 9, 0.8);
+    border: 1px solid rgba(190, 176, 108, 0.3); overflow: hidden; }
+.qd-bar i { display: block; height: 100%; background: linear-gradient(180deg, #a8c56a, #6d8f3c); }
+.qd-count { display: block; margin-top: 5px; font-size: 0.8rem; color: #a8a271;
+    font-variant-numeric: tabular-nums; }
+.qd-chain { margin: 14px 0 0; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase;
+    color: #7f8b6b; }
+
+/* On the tracker panel, where a Claim button used to be. It is a direction, not a control. */
+.gq-goto { align-self: center; font-size: 0.74rem; letter-spacing: 0.04em; color: #e3c766;
+    text-align: right; max-width: 92px; line-height: 1.3; }
+
 /* -- THE QUEST LAB WRAPPER (dev only) --------------------------------------------------------
    Chrome for the beat-by-beat rig at /marketplace/grove/quest-lab. Deliberately plain: the thing
    being looked at is GroveQuests underneath, and a styled frame around it would be one more

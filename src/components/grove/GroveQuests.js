@@ -27,7 +27,7 @@ function Bar({ have, need }) {
     );
 }
 
-function Row({ q, onClaim, busy }) {
+function Row({ q }) {
     const a = q.active;
     const finished = !a;
     return (
@@ -53,11 +53,12 @@ function Row({ q, onClaim, busy }) {
                     </>
                 )}
             </span>
-            {a?.ready ? (
-                <button type="button" className="gq-claim" disabled={busy} onClick={() => onClaim(a.id)}>
-                    Claim
-                </button>
-            ) : null}
+            {/* ⚠️ NO CLAIM BUTTON. Luke: "Needs to feel like an mmo where you turn in next to them, not a
+                panel ui form game." Handing in from a menu made the person standing in the zone
+                decoration — you could finish a chain without ever walking back to them. The hand-in is
+                in the world now (GroveGiver); this says WHERE to take it, which the header comment above
+                has always claimed was this panel's real job. */}
+            {a?.ready ? <span className="gq-goto">Take it to zone {q.zone}</span> : null}
         </li>
     );
 }
@@ -88,28 +89,6 @@ export default function GroveQuests({ quests = [], coliseum = null, onChanged, o
         } finally { setBusy(false); }
     }
 
-    async function claim(stepId) {
-        setBusy(true);
-        try {
-            const r = await fetch("/api/marketplace/grove/quests", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ stepId }),
-            });
-            const j = await r.json();
-            // ⚠️ SAY WHAT WAS PAID, now that something actually is. Until today claimStep stamped the row
-            // and granted nothing, and this line said "paid" over the top of it. A token is the part worth
-            // naming — it is the only reward that unlocks a thing to go and do.
-            setNote(j?.ok
-                ? `${j.npc}: ${j.step?.title} — paid.${j.token ? " A Coliseum token with it." : ""}`
-                : (j?.error || "Could not claim that."));
-            if (j?.ok) onChanged?.();
-        } catch {
-            setNote("Could not claim that.");
-        } finally {
-            setBusy(false);
-        }
-    }
 
     return (
         <div className="gq">
@@ -150,7 +129,7 @@ export default function GroveQuests({ quests = [], coliseum = null, onChanged, o
                     <section key={map} className="gq-map">
                         <h4>Map {map}</h4>
                         <ul className="gq-list">
-                            {list.map((q) => <Row key={q.npc} q={q} onClaim={claim} busy={busy} />)}
+                            {list.map((q) => <Row key={q.npc} q={q} />)}
                         </ul>
                     </section>
                 ))

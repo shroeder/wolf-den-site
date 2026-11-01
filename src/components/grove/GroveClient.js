@@ -47,6 +47,7 @@ import GroveGear from "@/components/grove/GroveGear.js";
 import GroveQuests from "@/components/grove/GroveQuests";
 import { useColiseum } from "@/components/grove/useColiseum";
 import GroveMarshal from "@/components/grove/GroveMarshal";
+import GroveGiver from "@/components/grove/GroveGiver";
 import { GROVE_CHESTS, CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
 import {
     GROVE_RECIPES, recipeById, canCraft, newlyReady, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
@@ -343,6 +344,20 @@ export default function GroveClient({ initial }) {
 
     // The marshal handing over the day's key, from the world rather than from the quest panel. Idempotent
     // against the shop's own date on the server, so a double tap cannot mint two.
+    // Whether the giver standing in this zone is being talked to.
+    const [giverOpen, setGiverOpen] = useState(false);
+
+    // ⚠️ RETURNS THE SERVER'S ANSWER so the dialogue can say what changed hands — including the token,
+    // which is the only part of a payout that unlocks something to go and do.
+    const claimStep = useCallback(async (stepId) => {
+        const j = await fetch("/api/marketplace/grove/quests", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ stepId }),
+        }).then((r) => r.json()).catch(() => null);
+        refresh();
+        return j || { ok: false };
+    }, [refresh]);
+
     // Whether the marshal's card is open. Not a zonePanel: those replace the scene, and this is a thing
     // standing IN the scene that you are talking to without leaving it.
     const [marshalOpen, setMarshalOpen] = useState(false);
@@ -1375,7 +1390,10 @@ export default function GroveClient({ initial }) {
                         setZonePanel(null);
                     }}
                     onMarshal={() => setMarshalOpen(true)}
-                    onTalk={() => setZonePanel("quests")}
+                    // ⚠️ THE GIVER, NOT THE PANEL. This used to open the quest list, which made walking up
+                    // to somebody a long way of pressing a menu button. Luke: "Needs to feel like an mmo
+                    // where you turn in next to them, not a panel ui form game."
+                    onTalk={() => setGiverOpen(true)}
                     // ⚠️ THE ARENA REPLACES THE ZONE'S WORLD, it does not sit beside it. Handing both would
                     // put the zone's doors and its three-hundred-unit floor into a twenty-six unit room.
                     arena={col.run ? { ...col.run.plan.arena, runMs: col.run.plan.runMs } : null}
@@ -1423,6 +1441,17 @@ export default function GroveClient({ initial }) {
                     the bottom of this file never renders here. [[groveclient-has-two-returns]]. It is also
                     not a zonePanel: a panel REPLACES the scene, and this is a person you are talking to
                     while standing in front of them. */}
+                {/* The person who asked for it, where they are standing. Same branch as the marshal and
+                    for the same reason — [[groveclient-has-two-returns]]. */}
+                {giverOpen && session.npcHere ? (
+                    <GroveGiver
+                        npcHere={session.npcHere}
+                        busy={col.busy || Boolean(col.run)}
+                        onClaim={claimStep}
+                        onClose={() => setGiverOpen(false)}
+                    />
+                ) : null}
+
                 {marshalOpen && session.coliseum ? (
                     <GroveMarshal
                         coliseum={session.coliseum}
