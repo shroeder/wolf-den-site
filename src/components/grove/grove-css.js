@@ -1097,81 +1097,119 @@ export const GROVE_CSS = `
 .gv-door.is-locked { cursor: default; }
 .gv-door.is-locked img { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.75)); }
 
-/* -- THE MARSHAL'S CARD -----------------------------------------------------------------------
-   The thing that used to not exist. Tapping the marshal claimed a key with no acknowledgement or
-   spent one and started a timed fight, so the interaction was invisible either way.
+/* -- THE MARSHAL'S OFFER ---------------------------------------------------------------------
+   Luke: "it doesnt feel like an mmo quest. Its too web forms." The previous pass was a rounded
+   card with a label/value table in it, which is a settings screen. This is built like a quest
+   dialogue: a framed portrait, his words as the body, the job, the loot as OBJECTS in slots, and
+   accept / walk away at the bottom.
 
-   WARNING: position: fixed and a very high z-index, because GroveScene portals its world layer to
-   document.body. A card rendered in the page tree under any ancestor with a transform, a filter or an
-   opacity gets a LOCAL stacking context, and then it paints under the zone however high you set the
-   number -- the same trap the crafting sheet already fell into, noted a few hundred lines down. */
-.gm-scrim {
+   WARNING: position fixed, z-index 4200. GroveScene portals its world layer to document.body, so a
+   panel rendered in the page tree under any ancestor with a transform, filter or opacity gets a
+   LOCAL stacking context and paints under the zone however high the number goes. */
+.qd-scrim {
     position: fixed; inset: 0; z-index: 4200;
-    display: flex; align-items: flex-end; justify-content: center;
-    padding: 18px;
-    background: rgba(6, 10, 6, 0.6);
-    animation: gmIn 140ms ease-out;
+    display: flex; align-items: flex-end; justify-content: center; padding: 14px;
+    background: radial-gradient(ellipse at 50% 60%, rgba(8, 12, 8, 0.55), rgba(4, 7, 4, 0.82));
+    animation: qdIn 150ms ease-out;
 }
-@media (min-width: 640px) { .gm-scrim { align-items: center; } }
-@media (prefers-reduced-motion: reduce) { .gm-scrim { animation: none; } }
-@keyframes gmIn { from { opacity: 0; } to { opacity: 1; } }
+@media (min-width: 640px) { .qd-scrim { align-items: center; } }
+@media (prefers-reduced-motion: reduce) { .qd-scrim { animation: none; } }
+@keyframes qdIn { from { opacity: 0; } to { opacity: 1; } }
+.qd-dismiss { position: absolute; inset: 0; border: 0; padding: 0; background: none; cursor: pointer; }
 
-/* The scrim itself is the dismiss target, stretched behind the card. A world card whose only exit is a
-   small X is a trap on a phone. */
-.gm-dismiss { position: absolute; inset: 0; border: 0; padding: 0; background: none; cursor: pointer; }
-
-.gm-card {
-    position: relative; width: min(420px, 100%);
-    padding: 18px 18px 16px; border-radius: 16px;
-    background: linear-gradient(180deg, #1d241c, #141a13);
-    border: 1px solid rgba(190, 210, 160, 0.26);
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
-    color: #e8e4d4;
+/* Squared corners and a double rule, not a rounded card. A 16px radius is the single strongest
+   "this is a web component" signal on the whole thing. */
+.qd-panel {
+    position: relative; width: min(430px, 100%);
+    padding: 20px 20px 18px;
+    background:
+        linear-gradient(180deg, rgba(42, 48, 36, 0.97), rgba(20, 25, 18, 0.99));
+    border: 1px solid #6d6a3f;
+    box-shadow: 0 0 0 3px rgba(12, 16, 10, 0.95), 0 0 0 4px rgba(142, 132, 78, 0.55),
+        0 24px 60px rgba(0, 0, 0, 0.72);
+    color: #e9e3cd;
+}
+/* A hairline inset, the way a panel in a game has a bevel rather than a border-radius. */
+.qd-panel::before {
+    content: ""; position: absolute; inset: 5px; border: 1px solid rgba(190, 176, 108, 0.22);
+    pointer-events: none;
 }
 
-.gm-head { display: flex; align-items: center; gap: 12px; }
-.gm-face { width: 62px; height: 62px; object-fit: contain; flex: none;
-    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55)); }
-.gm-who b { display: block; font-family: var(--font-display); font-size: 1.08rem; color: #f3eedd; }
-.gm-who span { display: block; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
-    color: #93a089; margin-top: 2px; }
+.qd-top { display: flex; align-items: center; gap: 14px; }
+/* The person is the biggest thing on the panel. 96px, framed, on its own plate. */
+.qd-portrait {
+    width: 96px; height: 96px; flex: none; position: relative;
+    background: radial-gradient(ellipse at 50% 35%, rgba(120, 132, 80, 0.3), rgba(10, 14, 9, 0.9));
+    border: 1px solid rgba(190, 176, 108, 0.5);
+    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.7);
+}
+.qd-portrait img { width: 100%; height: 100%; object-fit: contain; object-position: bottom;
+    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.6)); }
 
-/* His line leads. It is the reason he is a person standing outside a building and not a menu item. */
-.gm-line { margin: 14px 0 0; font-size: 0.95rem; line-height: 1.5; font-style: italic; color: #cfd6c3;
-    padding-left: 11px; border-left: 2px solid rgba(190, 210, 160, 0.25); }
+.qd-id b { display: block; font-family: var(--font-display); font-size: 1.3rem; line-height: 1.1;
+    color: #f6edcf; letter-spacing: 0.01em; }
+.qd-id span { display: block; margin-top: 4px; font-size: 0.68rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #a8a271; }
 
-.gm-stats { display: flex; gap: 22px; margin-top: 14px; }
-.gm-stats div { display: flex; align-items: baseline; gap: 6px; }
-.gm-stats b { font-family: var(--font-display); font-size: 1.3rem; color: #ffd75e;
-    font-variant-numeric: tabular-nums; }
-.gm-stats span { font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: #93a089; }
+/* What he says. Larger than the body copy and set in italic, because it is the one thing on the
+   panel that is a voice rather than information. */
+.qd-say {
+    margin: 16px 0 0; font-size: 1.04rem; line-height: 1.5; font-style: italic; color: #ded7bb;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
 
-.gm-note { margin: 12px 0 0; font-size: 0.86rem; color: #ffd75e; }
+.qd-block { margin-top: 16px; padding-top: 13px; border-top: 1px solid rgba(190, 176, 108, 0.2); }
+.qd-block > p { margin: 0; font-size: 0.9rem; line-height: 1.45; color: #c3bd9d; }
+.qd-label { display: block; font-size: 0.64rem; letter-spacing: 0.22em; text-transform: uppercase;
+    color: #a8a271; margin-bottom: 7px; }
 
-/* What the run pays, read off chestsFor so the card and the settle cannot disagree. Sits between the
-   stats and the buttons because it is the thing the decision is actually made on. */
-.gm-pays { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(190, 210, 160, 0.16); }
-.gm-pays-head { display: block; font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
-    color: #93a089; margin-bottom: 7px; }
-.gm-rung { display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
-    padding: 3px 0; font-size: 0.84rem; }
-.gm-rung span { color: #93a089; white-space: nowrap; }
-.gm-rung b { color: #cfd6c3; font-weight: 600; text-align: right; }
-/* The full clear is the only rung that reaches the top box on the map, so it is the one worth chasing. */
-.gm-rung.is-best span { color: #cfd6c3; }
-.gm-rung.is-best b { color: #ffd75e; }
+/* The loot, as things. A row of slots is the oldest reward idiom there is and it does in one glance
+   what three rows of right-aligned text could not. */
+.qd-loot { display: flex; gap: 9px; margin-bottom: 9px; }
+.qd-slot {
+    position: relative; width: 62px; height: 62px;
+    background: radial-gradient(ellipse at 50% 30%, rgba(120, 132, 80, 0.26), rgba(10, 14, 9, 0.92));
+    border: 1px solid rgba(190, 176, 108, 0.45);
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.65);
+}
+.qd-slot img { width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); }
+/* Stack count, bottom-right, the way every inventory slot has done it for thirty years. */
+.qd-n {
+    position: absolute; right: 2px; bottom: 1px;
+    font-family: var(--font-display); font-size: 0.76rem; font-weight: 700; color: #f6edcf;
+    text-shadow: 0 1px 2px #000, 0 0 3px #000; font-variant-numeric: tabular-nums;
+}
+.qd-fine { margin: 0; font-size: 0.78rem; color: #8f8a6b; }
 
-.gm-acts { display: flex; flex-direction: column; gap: 9px; margin-top: 16px; }
-/* min-height 46px: these are the only two things on the card and both are a thumb target. */
-.gm-btn { min-height: 46px; border-radius: 11px; border: 1px solid transparent; cursor: pointer;
-    font-family: var(--font-display); font-weight: 700; font-size: 0.98rem; }
-.gm-btn:disabled { cursor: default; opacity: 0.5; }
-.gm-take { background: rgba(255, 215, 94, 0.12); border-color: rgba(255, 215, 94, 0.45); color: #ffd75e; }
-.gm-take:hover:not(:disabled) { background: rgba(255, 215, 94, 0.2); }
-.gm-enter { background: linear-gradient(180deg, #e6c76b, #c79f2a); color: #1a1403; }
-.gm-enter:disabled { background: rgba(255, 255, 255, 0.07); color: #93a089; }
+.qd-record { margin: 14px 0 0; font-size: 0.82rem; color: #a8a271; }
+.qd-record b { color: #e3c766; }
+.qd-note { margin: 12px 0 0; font-size: 0.88rem; color: #e3c766; font-style: italic; }
 
-.gm-fine { margin: 12px 0 0; font-size: 0.76rem; color: #7f8b78; text-align: center; }
+.qd-acts { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+/* Squared, bevelled, 46px of thumb. Not a pill. */
+.qd-btn {
+    min-height: 46px; padding: 0 16px; cursor: pointer;
+    font-family: var(--font-display); font-weight: 700; font-size: 1rem; letter-spacing: 0.02em;
+    border: 1px solid rgba(190, 176, 108, 0.5);
+    background: linear-gradient(180deg, rgba(86, 92, 56, 0.6), rgba(38, 44, 28, 0.75));
+    color: #e9e3cd;
+}
+.qd-btn:hover:not(:disabled) { border-color: rgba(227, 199, 102, 0.8); }
+.qd-btn:disabled { cursor: default; opacity: 0.45; }
+.qd-accept {
+    background: linear-gradient(180deg, #e8cf7e, #b4902c);
+    border-color: #f0dc9a; color: #231a04;
+    box-shadow: 0 0 18px rgba(227, 199, 102, 0.22);
+}
+.qd-accept:disabled { background: linear-gradient(180deg, rgba(86, 92, 56, 0.5), rgba(38, 44, 28, 0.7));
+    border-color: rgba(190, 176, 108, 0.3); color: #a8a271; box-shadow: none; }
+/* Declining is a sentence, not a button. It should never compete with the offer. */
+.qd-walk {
+    border: 0; background: none; cursor: pointer; padding: 6px 0 0;
+    font-size: 0.84rem; color: #8f8a6b; text-decoration: underline; text-underline-offset: 3px;
+}
+.qd-walk:hover { color: #c3bd9d; }
 
 /* ── THE COLISEUM GATE, AND WHY IT IS NOT A .gv-door ─────────────────────────────────────────
    Same world placement and the same unit maths, deliberately a different class. A .gv-door means
