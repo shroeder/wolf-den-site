@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 
+import { COLISEUM_ZONE, COLISEUM_NPCS } from "@/lib/marketplace/grove-npcs.js";
+
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { GROVE_ZONES } from "@/lib/marketplace/grove-catalog.js";
@@ -271,6 +273,14 @@ export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
                 // it says nothing about whether the marshal's button reaches it. Both still need checking.
                 arena={scene === "arena" ? { ...arenaPlan.arena, runMs: arenaPlan.runMs } : null}
                 waves={scene === "arena" ? arenaPlan.waves : null}
+                // ⚠️ THE GATE, ON THE ZONE THAT ACTUALLY HOLDS IT. Mirrors the real rule rather than
+                // forcing it on every zone -- a lab that shows a thing everywhere proves nothing about
+                // whether it appears in the right room. ?scene=wander&zone=7&map=1 is where it lives.
+                coliseumHere={scene !== "arena" && COLISEUM_ZONE[mapN] === zoneN
+                    ? { map: mapN, zone: zoneN, keys: 1, dailyReady: true,
+                        marshal: COLISEUM_NPCS.find((n) => n.map === mapN) || null }
+                    : null}
+                onColiseum={() => say("coliseum tapped")}
                 onRunEnd={(r) => say(`run over — ${r.wavesCleared} waves, cleared=${r.cleared}`)}
                 onWave={(n, total) => say(`wave ${n}/${total}`)}
                 zone={zone}

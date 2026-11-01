@@ -1097,6 +1097,62 @@ export const GROVE_CSS = `
 .gv-door.is-locked { cursor: default; }
 .gv-door.is-locked img { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.75)); }
 
+/* ── THE COLISEUM GATE, AND WHY IT IS NOT A .gv-door ─────────────────────────────────────────
+   Same world placement and the same unit maths, deliberately a different class. A .gv-door means
+   "the way on" and "the way back" -- two things at the two walls whose whole value is being in the
+   same place every time. A third one of those in the middle of the room, going somewhere else
+   entirely, would make all three ambiguous. Gold rather than the doors' teal, and it carries its own
+   name so nobody has to tap it to find out.
+
+   WARNING: the x comes from the frame loop, like a door. Positioned in percentages it would sit
+   still while the world scrolled past -- which is what .gv-npc does and the reason the quest giver
+   reads as part of the HUD instead of part of the room. */
+.gv-colgate { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    width: calc(13 * var(--gv-unit, 1%)); height: calc(13 * var(--gv-unit, 1%));
+    margin-left: calc(-6.5 * var(--gv-unit, 1%));
+    padding: 0; border: 0; background: none; cursor: pointer; z-index: 235;
+    will-change: transform; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; }
+.gv-colgate img { width: 100%; height: 100%; object-fit: contain; object-position: bottom;
+    /* WARNING: sepia-then-rotate, NOT a bare hue-rotate. hue-rotate(-150deg) on the teal portal lands on
+       magenta, because the source art is more blue than green and the rotation is relative, not absolute.
+       Flattening to sepia first throws the source hue away, so the result is the same gold whatever the
+       plate underneath happens to be. */
+    filter: sepia(1) saturate(3.2) hue-rotate(-12deg) brightness(1.05)
+        drop-shadow(0 0 18px rgba(240, 180, 76, 0.5)) drop-shadow(0 4px 6px rgba(0,0,0,0.7)); }
+/* No key and none waiting: still standing, still readable, just not calling you over. */
+.gv-colgate.is-shut img { filter: saturate(0.5) brightness(0.72) drop-shadow(0 3px 6px rgba(0,0,0,0.75)); }
+
+.gv-colgate-tag, .gv-colgate-keys {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; pointer-events: none;
+    font-family: var(--font-display); font-weight: 700;
+}
+.gv-colgate-tag { top: -16px; font-size: 0.66rem; letter-spacing: 0.1em; color: #ffe3a8;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
+.gv-colgate-keys { bottom: -15px; font-size: 0.6rem; color: #cbbf9d;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
+.gv-colgate.is-open .gv-colgate-keys { color: #f0b44c; }
+
+/* The marshal stands on the APPROACH side of his gate, not past it. You enter a zone from the left and
+   walk right, so a marshal placed to the gate's right is someone you meet after you have already
+   decided -- and on a 390px phone he is off the edge of the screen at the moment the gate first appears.
+   Left of the arch he is the first thing you reach, which is what a doorman is for.
+
+   WORLD placed like the gate: the pair have to travel together or he looks like he is sliding. */
+.gv-colnpc { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    /* WARNING: 8 units, because a BODY IN THIS WORLD IS 7 (--gv-h default in the .gv-body rule). The
+       first pass guessed 13 and drew a quest-giver nearly twice the height of the hero standing next to
+       him -- the sprite is the same art the HUD shows at 72px, where nothing tells you its world scale. */
+    width: calc(8 * var(--gv-unit, 1%)); height: calc(8 * var(--gv-unit, 1%));
+    margin-left: calc(-15 * var(--gv-unit, 1%));
+    padding: 0; border: 0; background: none; cursor: pointer; z-index: 236;
+    will-change: transform; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; }
+.gv-colnpc img { width: 100%; height: 100%; object-fit: contain; object-position: bottom;
+    filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5)); }
+.gv-colnpc .gv-npc-pip { position: absolute; top: -4px; left: 50%; transform: translateX(-50%); }
+
 /* ── A WORKING DOOR IS NEVER QUITE STILL ──────────────────────────────────────────────────────
    The light in the arch drifts whether or not anyone is looking at it, which is the difference between
    a gate and a photograph of a gate. Slow and small — a portal that throbs is a hazard, not a door. */

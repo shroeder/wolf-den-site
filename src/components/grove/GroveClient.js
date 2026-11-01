@@ -281,6 +281,16 @@ export default function GroveClient({ initial }) {
     // Which panel is open OVER the zone, or null for none. Separate from `view`, which stays "zone" the
     // whole time you are in one — see the hoist note above the panels.
     const [zonePanel, setZonePanel] = useState(null);
+
+    // The marshal handing over the day's key, from the world rather than from the quest panel. Idempotent
+    // against the shop's own date on the server, so a double tap cannot mint two.
+    const takeColiseumKey = useCallback(async (map) => {
+        await fetch("/api/marketplace/grove/quests", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ daily: true, map }),
+        }).catch(() => null);
+        refresh();
+    }, [refresh]);
     // ⚠️ THE SHEET IS PORTALLED, AND A z-index WAS NOT ENOUGH. GroveScene portals its full-screen layer to
     // document.body; the sheet was rendered inside the page tree, where ANY ancestor with a transform,
     // a filter or an opacity makes a stacking context and turns its z-index into a local number. It then
@@ -1337,6 +1347,26 @@ export default function GroveClient({ initial }) {
                     // Whoever is standing in THIS zone, if anyone. Most zones have nobody — three givers
                     // across twelve rooms — so the scene draws a figure only when this is non-null.
                     npcHere={col.run ? null : (session.npcHere || null)}
+                    // ── ⚠️ THE COLISEUM IS IN A ZONE, SO IT IS DRAWN IN THAT ZONE ───────────────
+                    // coliseumState is keyed on MAP, which is why its card showed up identically in
+                    // all twelve rooms and "Coliseum · zone 7" was a sentence about a place that did
+                    // not exist. The gate and the marshal are drawn only where the data already said
+                    // they were. Not during a run: the arena reuses this same scene.
+                    coliseumHere={col.run || session.coliseum?.zone !== session.zone?.n
+                        ? null
+                        : session.coliseum}
+                    onColiseum={() => {
+                        const c = session.coliseum;
+                        if (!c) return;
+                        // ⚠️ THE FREE KEY FIRST, ALWAYS. Entering spends a key, so a tap that started a
+                        // run while today's key sat unclaimed would charge somebody for something they
+                        // were owed. Same ordering the quest panel already uses, same endpoint — the
+                        // daily belongs to the quests route, never to the run route.
+                        if (c.keys < 1 && c.dailyReady) { takeColiseumKey(c.map); return; }
+                        if (c.keys < 1) return;
+                        col.start(c.map);
+                        setZonePanel(null);
+                    }}
                     onTalk={() => setZonePanel("quests")}
                     // ⚠️ THE ARENA REPLACES THE ZONE'S WORLD, it does not sit beside it. Handing both would
                     // put the zone's doors and its three-hundred-unit floor into a twenty-six unit room.

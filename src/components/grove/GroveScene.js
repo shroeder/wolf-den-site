@@ -334,6 +334,9 @@ const DEATH_STOP_MS = 420;
 const WARP_OUT_MS = 260;
 const WARP_IN_MS = 420;
 const ZONE_COUNT = GROVE_ZONES.length;
+// The Coliseum's own gate, so it is not mistaken for the way on to the next zone.
+const COLISEUM_ART = "/images/grove/portal-open.webp";
+
 const DOOR_ART = {
     open: "/images/grove/portal-open.webp",
     locked: "/images/grove/portal-locked.webp",
@@ -346,6 +349,17 @@ const SWING_V_REACH = 6;
 export default function GroveScene({
     npcHere = null,
     onTalk,
+    // ── ⚠️ THE COLISEUM IS A PLACE YOU WALK TO NOW ──────────────────────────────────────────────
+    // Luke asked where the Coliseum and its NPC were, and the honest answer was NOWHERE: the arena
+    // existed, the marshal was drawn, and the only way in was a card in the quest panel that showed
+    // up identically in all twelve zones. "Coliseum · zone 7" was a line of text about a place that
+    // was not rendered. So the gate and the marshal stand in that zone, and you reach them the same
+    // way you reach anything else here — by walking.
+    //
+    // Null in every other zone, and null during a run: an arena has no doors (see the note on them)
+    // and a way back out mid-clock is the exact misclick that note exists to prevent.
+    coliseumHere = null,
+    onColiseum,
     // ── ⚠️ THE COLISEUM IS THIS SAME SCENE, DELIBERATELY ────────────────────────────────────────
     // Luke: "there's no special rules in the Coliseum. It's the same as if you were killing them."
     // So it reuses the combat rather than reimplementing it — a second copy of swings, multi-kill and
@@ -377,6 +391,10 @@ export default function GroveScene({
     const hostRef = useRef(null);
     const worldLayerRef = useRef(null);
     const fxRef = useRef(null);
+    // The Coliseum gate and its marshal. Refs rather than world bodies: they never move, never take a
+    // hit and never die, so the only thing the loop owes them is the camera transform.
+    const colGateRef = useRef(null);
+    const colNpcRef = useRef(null);
     // ⚠️ hpRef / hpGhostRef ARE GONE WITH THE ELEMENT THEY POINTED AT. The player's own bar was removed
     // on Luke's call ("I hate the kill display and red bar. Remove it.") and these two refs stayed behind,
     // written to by the loop every frame against null for ever after. Declared but never mounted: see the
@@ -645,6 +663,15 @@ export default function GroveScene({
     // A Coliseum is 26 units and does not scroll; a zone is 300-700 and does. Handing the arena a zone's
     // width would put bodies off the side of a room that has no camera to follow them.
     const W = arena ? arena.width : zoneWidth(zone.n);
+    // ⚠️ NEAR THE ENTRANCE, NOT MID-ZONE, AND THAT IS NOT LAZINESS. The first cut put it at W*0.5, which
+    // is correct-sounding and useless: a zone is 300-700 units wide and about 20 are on screen, so a gate
+    // in the middle is a hundred units of walking past nothing to reach a thing you had no reason to
+    // believe was there. The whole complaint this fixes is that the Coliseum was invisible. Putting it
+    // somewhere you cannot see it from either door would have fixed the data and not the complaint.
+    //
+    // One screen in from the back wall: you arrive from the previous zone walking right, and it comes into
+    // view almost immediately, without ever sitting on top of the door you just came through.
+    const colX = DOOR_INSET + 16;
     // ⚠️ THE ARENA BRINGS ITS OWN ROOM. The backdrop is read from zone.bg in two places — the haze behind
     // everything and the tiled sky — and an arena that only replaced the FLOOR would have put a Coliseum's
     // platforms in front of a forest. One derived source so the two cannot disagree.
@@ -3380,6 +3407,19 @@ export default function GroveScene({
                 dr.node.classList.toggle("is-near", near);
             }
 
+            // ── THE COLISEUM GATE AND ITS MARSHAL ────────────────────────────────────────────────
+            // Placed with the doors and by the same maths, because they are the same kind of thing: a
+            // fixed point in the zone that the camera slides past. Anything positioned in PERCENTAGES
+            // instead would sit still while the world moved underneath it — which is what the quest
+            // giver does today, and the reason he reads as part of the HUD rather than part of the room.
+            for (const node of [colGateRef.current, colNpcRef.current]) {
+                if (!node) continue;
+                node.style.transform = `translate3d(${(colX - cam) * unit}px, ${camY * unit}px, 0)`;
+            }
+            if (colGateRef.current) {
+                colGateRef.current.classList.toggle("is-near", Math.abs(w.hero.x - colX) < DOOR_NEAR);
+            }
+
             for (const d of w.drops) {
                 if (!d.node) continue;
                 d.node.style.transform = `translate3d(${(d.x - cam) * unit}px, ${-(d.y - camY) * unit}px, 0)`;
@@ -3957,6 +3997,44 @@ export default function GroveScene({
                         <img src={`/images/grove/chest-${c.tier}.webp`} alt="" draggable={false} />
                     </button>
                 ))}
+
+                {/* ── ⚠️ THE COLISEUM, STANDING IN THE ZONE THAT CLAIMS TO HOLD IT ─────────────────
+                    Two touchable things, not one: the gate is the destination and the marshal is the
+                    person who explains it and hands over the daily key. Tapping either does the right
+                    thing for the state you are in — take the free key when one is waiting, otherwise
+                    go in — because a gate that refuses you with "no key" while a free key sits
+                    unclaimed on the other sprite is a puzzle nobody asked for. */}
+                {coliseumHere ? (
+                    <>
+                        <button type="button" ref={colGateRef}
+                            className={`gv-colgate${coliseumHere.keys > 0 || coliseumHere.dailyReady ? " is-open" : " is-shut"}`}
+                            onPointerDown={(e) => { e.stopPropagation(); onColiseum?.(); }}
+                            aria-label={coliseumHere.keys > 0
+                                ? "Enter the Coliseum"
+                                : coliseumHere.dailyReady
+                                    ? "Coliseum — take today's key"
+                                    : "Coliseum — no key"}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={COLISEUM_ART} alt="" draggable={false} />
+                            <span className="gv-colgate-tag">Coliseum</span>
+                            <span className="gv-colgate-keys">
+                                {coliseumHere.dailyReady && coliseumHere.keys < 1
+                                    ? "Free key"
+                                    : `${coliseumHere.keys} key${coliseumHere.keys === 1 ? "" : "s"}`}
+                            </span>
+                        </button>
+                        {coliseumHere.marshal ? (
+                            <button type="button" ref={colNpcRef}
+                                className={`gv-colnpc${coliseumHere.dailyReady ? " is-ready" : ""}`}
+                                onPointerDown={(e) => { e.stopPropagation(); onColiseum?.(); }}
+                                aria-label={`${coliseumHere.marshal.name} — ${coliseumHere.marshal.line}`}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={`/images/grove/npc-${coliseumHere.marshal.id}.webp`} alt="" draggable={false} />
+                                {coliseumHere.dailyReady ? <span className="gv-npc-pip">!</span> : null}
+                            </button>
+                        ) : null}
+                    </>
+                ) : null}
 
                 {npcHere ? (
                     <button type="button"
