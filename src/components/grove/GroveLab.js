@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { COLISEUM_ZONE, COLISEUM_NPCS } from "@/lib/marketplace/grove-npcs.js";
+import GroveMarshal from "@/components/grove/GroveMarshal";
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
@@ -106,6 +107,8 @@ export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
     // onBoss is the real scene's own callback, which is exactly what GroveClient now reads `unlocked`
     // from — so the bench walks the real sequence rather than a staged copy of it.
     const [bossDown, setBossDown] = useState(scene === "travel");
+    // So the marshal's card can be photographed. ?scene=wander&zone=7&map=1 then tap him.
+    const [marshalOpen, setMarshalOpen] = useState(false);
     // ⚠️ bossReady, OR THE BOSS SCENE IS EMPTY. The real client sets that flag from the server (the zone
     // must be cleared and the cooldown elapsed); without it the spawn pass skips the boss entirely and the
     // boss scene films a rootrat.
@@ -285,6 +288,7 @@ export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
                         marshal: COLISEUM_NPCS.find((n) => n.map === mapN) || null }
                     : null}
                 onColiseum={() => say("coliseum tapped")}
+                onMarshal={() => setMarshalOpen(true)}
                 onRunEnd={(r) => say(`run over — ${r.wavesCleared} waves, cleared=${r.cleared}`)}
                 onWave={(n, total) => say(`wave ${n}/${total}`)}
                 zone={zone}
@@ -321,6 +325,15 @@ export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
                 onLeave={onLeaveLab}
                 onDeath={onDeathLab}
             />
+            {marshalOpen && COLISEUM_ZONE[mapN] && (mapN - 1) * 12 + COLISEUM_ZONE[mapN] === zoneN ? (
+                <GroveMarshal
+                    coliseum={{ map: mapN, zone: zoneN, keys: 1, dailyReady: true, bestWave: 6,
+                        marshal: COLISEUM_NPCS.find((n) => n.map === mapN) || null }}
+                    onTakeKey={() => { say("took the key"); return true; }}
+                    onEnter={() => { say("entered"); setMarshalOpen(false); }}
+                    onClose={() => setMarshalOpen(false)}
+                />
+            ) : null}
             {/* Off-screen, so it never lands in a frame of film but is still readable with --eval. */}
             <b data-lab-log ref={logNode} style={{ position: "fixed", left: -9999, top: -9999 }} />
         </>

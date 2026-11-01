@@ -46,6 +46,7 @@ import GroveArmoury from "@/components/grove/GroveArmoury.js";
 import GroveGear from "@/components/grove/GroveGear.js";
 import GroveQuests from "@/components/grove/GroveQuests";
 import { useColiseum } from "@/components/grove/useColiseum";
+import GroveMarshal from "@/components/grove/GroveMarshal";
 import { GROVE_CHESTS, CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
 import {
     GROVE_RECIPES, recipeById, canCraft, newlyReady, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
@@ -282,15 +283,6 @@ export default function GroveClient({ initial }) {
     // whole time you are in one — see the hoist note above the panels.
     const [zonePanel, setZonePanel] = useState(null);
 
-    // The marshal handing over the day's key, from the world rather than from the quest panel. Idempotent
-    // against the shop's own date on the server, so a double tap cannot mint two.
-    const takeColiseumKey = useCallback(async (map) => {
-        await fetch("/api/marketplace/grove/quests", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ daily: true, map }),
-        }).catch(() => null);
-        refresh();
-    }, [refresh]);
     // ⚠️ THE SHEET IS PORTALLED, AND A z-index WAS NOT ENOUGH. GroveScene portals its full-screen layer to
     // document.body; the sheet was rendered inside the page tree, where ANY ancestor with a transform,
     // a filter or an opacity makes a stacking context and turns its z-index into a local number. It then
@@ -348,6 +340,23 @@ export default function GroveClient({ initial }) {
     // binding: "col is not defined", on the live Grove, for a real member. Checking that a name appears
     // is not checking that it is DEFINED; the build cannot catch it and neither did I.
     const col = useColiseum({ onChanged: refresh });
+
+    // The marshal handing over the day's key, from the world rather than from the quest panel. Idempotent
+    // against the shop's own date on the server, so a double tap cannot mint two.
+    // Whether the marshal's card is open. Not a zonePanel: those replace the scene, and this is a thing
+    // standing IN the scene that you are talking to without leaving it.
+    const [marshalOpen, setMarshalOpen] = useState(false);
+
+    // ⚠️ RETURNS WHETHER IT WORKED, so the card can say so. The silent version of this call is the bug the
+    // card exists to fix; a claim that fails and also says nothing is the same bug wearing a hat.
+    const takeColiseumKey = useCallback(async (map) => {
+        const j = await fetch("/api/marketplace/grove/quests", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ daily: true, map }),
+        }).then((r) => r.json()).catch(() => null);
+        refresh();
+        return Boolean(j?.ok);
+    }, [refresh]);
 
     // ── ENTER A ZONE ────────────────────────────────────────────────────────────────────────────────
     const enter = useCallback(async (zone) => {
@@ -1355,18 +1364,17 @@ export default function GroveClient({ initial }) {
                     coliseumHere={col.run || session.coliseum?.zone !== session.zone?.n
                         ? null
                         : session.coliseum}
+                    // The BUILDING: straight in when you are holding a key, because walking up to the door
+                    // with one is the decision. With no key it opens the marshal rather than doing nothing —
+                    // a tap that silently fails is indistinguishable from a broken button.
                     onColiseum={() => {
                         const c = session.coliseum;
                         if (!c) return;
-                        // ⚠️ THE FREE KEY FIRST, ALWAYS. Entering spends a key, so a tap that started a
-                        // run while today's key sat unclaimed would charge somebody for something they
-                        // were owed. Same ordering the quest panel already uses, same endpoint — the
-                        // daily belongs to the quests route, never to the run route.
-                        if (c.keys < 1 && c.dailyReady) { takeColiseumKey(c.map); return; }
-                        if (c.keys < 1) return;
+                        if (c.keys < 1) { setMarshalOpen(true); return; }
                         col.start(c.map);
                         setZonePanel(null);
                     }}
+                    onMarshal={() => setMarshalOpen(true)}
                     onTalk={() => setZonePanel("quests")}
                     // ⚠️ THE ARENA REPLACES THE ZONE'S WORLD, it does not sit beside it. Handing both would
                     // put the zone's doors and its three-hundred-unit floor into a twenty-six unit room.
@@ -1411,6 +1419,19 @@ export default function GroveClient({ initial }) {
                     // so losing a run no longer also loses the session.
                     onDeath={() => setView("town")}
                 />
+                {/* ⚠️ MOUNTED IN THE ZONE BRANCH, which is the one that early-returns — anything added at
+                    the bottom of this file never renders here. [[groveclient-has-two-returns]]. It is also
+                    not a zonePanel: a panel REPLACES the scene, and this is a person you are talking to
+                    while standing in front of them. */}
+                {marshalOpen && session.coliseum ? (
+                    <GroveMarshal
+                        coliseum={session.coliseum}
+                        busy={col.busy || Boolean(col.run)}
+                        onTakeKey={() => takeColiseumKey(session.coliseum.map)}
+                        onEnter={() => { setMarshalOpen(false); col.start(session.coliseum.map); }}
+                        onClose={() => setMarshalOpen(false)}
+                    />
+                ) : null}
                 {bossWon ? (
                     <div className="gv-unlock gv-won" onClick={() => setBossWon(null)}>
                         <div>

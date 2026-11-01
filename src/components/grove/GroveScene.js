@@ -357,7 +357,11 @@ export default function GroveScene({
     // Null in every other zone, and null during a run: an arena has no doors (see the note on them)
     // and a way back out mid-clock is the exact misclick that note exists to prevent.
     coliseumHere = null,
+    // ⚠️ TWO HANDLERS, BECAUSE THEY ARE TWO DIFFERENT ACTS. Tapping the BUILDING means "in, now" — you have
+    // already decided. Tapping the MARSHAL means "tell me about this". One handler for both is what made a
+    // tap on a man standing in a field silently spend a key and start a timed fight.
     onColiseum,
+    onMarshal,
     // ── ⚠️ THE COLISEUM IS THIS SAME SCENE, DELIBERATELY ────────────────────────────────────────
     // Luke: "there's no special rules in the Coliseum. It's the same as if you were killing them."
     // So it reuses the combat rather than reimplementing it — a second copy of swings, multi-kill and
@@ -4034,7 +4038,7 @@ export default function GroveScene({
                         {coliseumHere.marshal ? (
                             <button type="button" ref={colNpcRef}
                                 className={`gv-colnpc${coliseumHere.dailyReady ? " is-ready" : ""}`}
-                                onPointerDown={(e) => { e.stopPropagation(); onColiseum?.(); }}
+                                onPointerDown={(e) => { e.stopPropagation(); onMarshal?.(); }}
                                 aria-label={`${coliseumHere.marshal.name} — ${coliseumHere.marshal.line}`}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={`/images/grove/npc-${coliseumHere.marshal.id}.webp`} alt="" draggable={false} />

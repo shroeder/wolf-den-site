@@ -1097,6 +1097,69 @@ export const GROVE_CSS = `
 .gv-door.is-locked { cursor: default; }
 .gv-door.is-locked img { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.75)); }
 
+/* -- THE MARSHAL'S CARD -----------------------------------------------------------------------
+   The thing that used to not exist. Tapping the marshal claimed a key with no acknowledgement or
+   spent one and started a timed fight, so the interaction was invisible either way.
+
+   WARNING: position: fixed and a very high z-index, because GroveScene portals its world layer to
+   document.body. A card rendered in the page tree under any ancestor with a transform, a filter or an
+   opacity gets a LOCAL stacking context, and then it paints under the zone however high you set the
+   number -- the same trap the crafting sheet already fell into, noted a few hundred lines down. */
+.gm-scrim {
+    position: fixed; inset: 0; z-index: 4200;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding: 18px;
+    background: rgba(6, 10, 6, 0.6);
+    animation: gmIn 140ms ease-out;
+}
+@media (min-width: 640px) { .gm-scrim { align-items: center; } }
+@media (prefers-reduced-motion: reduce) { .gm-scrim { animation: none; } }
+@keyframes gmIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* The scrim itself is the dismiss target, stretched behind the card. A world card whose only exit is a
+   small X is a trap on a phone. */
+.gm-dismiss { position: absolute; inset: 0; border: 0; padding: 0; background: none; cursor: pointer; }
+
+.gm-card {
+    position: relative; width: min(420px, 100%);
+    padding: 18px 18px 16px; border-radius: 16px;
+    background: linear-gradient(180deg, #1d241c, #141a13);
+    border: 1px solid rgba(190, 210, 160, 0.26);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+    color: #e8e4d4;
+}
+
+.gm-head { display: flex; align-items: center; gap: 12px; }
+.gm-face { width: 62px; height: 62px; object-fit: contain; flex: none;
+    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55)); }
+.gm-who b { display: block; font-family: var(--font-display); font-size: 1.08rem; color: #f3eedd; }
+.gm-who span { display: block; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #93a089; margin-top: 2px; }
+
+/* His line leads. It is the reason he is a person standing outside a building and not a menu item. */
+.gm-line { margin: 14px 0 0; font-size: 0.95rem; line-height: 1.5; font-style: italic; color: #cfd6c3;
+    padding-left: 11px; border-left: 2px solid rgba(190, 210, 160, 0.25); }
+
+.gm-stats { display: flex; gap: 22px; margin-top: 14px; }
+.gm-stats div { display: flex; align-items: baseline; gap: 6px; }
+.gm-stats b { font-family: var(--font-display); font-size: 1.3rem; color: #ffd75e;
+    font-variant-numeric: tabular-nums; }
+.gm-stats span { font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: #93a089; }
+
+.gm-note { margin: 12px 0 0; font-size: 0.86rem; color: #ffd75e; }
+
+.gm-acts { display: flex; flex-direction: column; gap: 9px; margin-top: 16px; }
+/* min-height 46px: these are the only two things on the card and both are a thumb target. */
+.gm-btn { min-height: 46px; border-radius: 11px; border: 1px solid transparent; cursor: pointer;
+    font-family: var(--font-display); font-weight: 700; font-size: 0.98rem; }
+.gm-btn:disabled { cursor: default; opacity: 0.5; }
+.gm-take { background: rgba(255, 215, 94, 0.12); border-color: rgba(255, 215, 94, 0.45); color: #ffd75e; }
+.gm-take:hover:not(:disabled) { background: rgba(255, 215, 94, 0.2); }
+.gm-enter { background: linear-gradient(180deg, #e6c76b, #c79f2a); color: #1a1403; }
+.gm-enter:disabled { background: rgba(255, 255, 255, 0.07); color: #93a089; }
+
+.gm-fine { margin: 12px 0 0; font-size: 0.76rem; color: #7f8b78; text-align: center; }
+
 /* ── THE COLISEUM GATE, AND WHY IT IS NOT A .gv-door ─────────────────────────────────────────
    Same world placement and the same unit maths, deliberately a different class. A .gv-door means
    "the way on" and "the way back" -- two things at the two walls whose whole value is being in the
