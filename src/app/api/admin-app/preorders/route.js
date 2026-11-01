@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
-import { arrivePreorder, preorderBoard } from "@/lib/admin-app/preorders.js";
+import { applySquarePrefix, arrivePreorder, preorderBoard } from "@/lib/admin-app/preorders.js";
 import { setPreorder } from "@/lib/shop-item-rules.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -62,7 +62,12 @@ export async function POST(request) {
                     baseName: body?.baseName || null,
                     updatedBy: body?.by || null,
                 });
-                return noStore({ ...r, ...(await preorderBoard()) }, { status: r.ok ? 200 : 400 });
+                // ⚠️ THE NAME IS PART OF SETTING A PRE-ORDER, NOT A SEPARATE CHORE. The app prefixes items
+                // it CREATES in Square and cannot prefix one that already existed — see applySquarePrefix.
+                // Applying it here covers both branches with one implementation, and it is idempotent, so
+                // the created-item case simply finds nothing to change.
+                const square = r.ok && body?.arrivesOn ? await applySquarePrefix(variationId) : null;
+                return noStore({ ...r, square, ...(await preorderBoard()) }, { status: r.ok ? 200 : 400 });
             }
 
             return noStore({ ok: false, error: "unknown_action" }, { status: 400 });

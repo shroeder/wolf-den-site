@@ -46,7 +46,7 @@ export const plainName = (name) => String(name || "").replace(PREORDER_PREFIX, "
  * you get a 409 under any concurrent edit; sending a stale one is how you silently clobber somebody's price
  * change. Read, edit the one field, write it straight back.
  */
-async function clearSquarePrefix(variationId, fallbackBaseName) {
+async function renameSquareItem(variationId, nextNameFor) {
     const token = process.env.SQUARE_ACCESS_TOKEN;
     if (!token) return { ok: false, error: "no_square_token" };
     const headers = {
@@ -68,14 +68,17 @@ async function clearSquarePrefix(variationId, fallbackBaseName) {
     if (!object?.item_data) return { ok: false, error: "no_item_data" };
 
     const current = object.item_data.name || "";
-    const next = fallbackBaseName || plainName(current);
-    if (next === current) return { ok: true, renamed: false, name: current };
+    const next = nextNameFor(current);
+    // ⚠️ NO WRITE WHEN THERE IS NOTHING TO CHANGE, which is what makes both callers idempotent. Setting a
+    // pre-order twice must not bake the prefix in twice, and arriving twice must not rewrite a name
+    // somebody has since edited by hand in Square.
+    if (!next || next === current) return { ok: true, renamed: false, name: current };
 
     const put = await fetch(`${squareBase()}/v2/catalog/object`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-            idempotency_key: `preorder-arrived-${variationId}-${object.version}`,
+            idempotency_key: `preorder-name-${variationId}-${object.version}`,
             object: { ...object, item_data: { ...object.item_data, name: next } },
         }),
     });
@@ -98,9 +101,8 @@ export async function arrivePreorder(variationId, { by } = {}) {
     const claimed = await markPreorderArrived(variationId);
     if (!claimed.ok) return claimed;
 
-    const square = await clearSquarePrefix(variationId, claimed.baseName).catch((e) => ({
-        ok: false, error: e?.message || "square_failed",
-    }));
+    const square = await renameSquareItem(variationId, (current) => claimed.baseName || plainName(current))
+        .catch((e) => ({ ok: false, error: e?.message || "square_failed" }));
 
     // ⚠️ ONE READ FOR ALL THE ORDERS, NOT ONE PER HOLDER. A pre-order with forty buyers would otherwise be
     // forty round trips on the neon() HTTP driver before a single email is sent — the exact family-A waste
@@ -136,4 +138,24 @@ export async function arrivePreorder(variationId, { by } = {}) {
         failed: failures,
         square,
     };
+}
+
+/**
+ * Put "[Pre-Order] " ON the Square item, for a variation that already existed.
+ *
+ * ⚠️ THE APP ONLY PREFIXES ITEMS IT CREATES, AND THAT IS HALF THE CASES. pushRestockItemsToSquare has two
+ * branches: a brand-new item gets its name built with the prefix, and an item already in the catalogue --
+ * matched by SKU, or adopted by name -- takes the existing-variation branch, has its stock and price
+ * updated, and is never renamed at all. So pre-ordering something the shop has carried before, or topping
+ * up a pre-order with a second restock, produced the flag and the date correctly and left the one guard
+ * Luke actually asked for off the item: "it would add pre-order to the item name in Square. So it's baked
+ * into the unit, so it's very, very clear."
+ *
+ * Doing it here rather than in Kotlin means ONE implementation of the prefix for both branches and for
+ * arrival, so the string that gets added can never disagree with the string that gets removed.
+ */
+export async function applySquarePrefix(variationId) {
+    return renameSquareItem(variationId, (current) => preorderName(current)).catch((e) => ({
+        ok: false, error: e?.message || "square_failed",
+    }));
 }
