@@ -12,19 +12,18 @@
 //   · the right buttons exist for the state, and no bar appears on an untaken job
 //   · reopening the same conversation five times does not leak or drift
 //   · the panel settles — no network request storm while it sits open
-import { spawn, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
-const PORT = process.env.PORT || "3998";
+import { attach, launchChrome, requireDevServer } from "./lib/qa-chrome.mjs";
+
+const PORT = process.env.PORT || "3000";
 const COOKIE = process.env.SHOT_COOKIE;
 const setState = (...args) => execFileSync("node", ["scripts/qa-quest-state.mjs", ...args], { encoding: "utf8" }).trim();
 
-const chrome = spawn("C:/Program Files/Google/Chrome/Application/chrome.exe", [
-    "--remote-debugging-port=9350", "--headless=new", "--no-first-run", "--no-default-browser-check",
-    `--user-data-dir=${process.env.TEMP}/qa-dialogue-profile`, "about:blank"], { stdio: "ignore" });
+await requireDevServer(PORT);
+const chrome = launchChrome(9350, "qa-dialogue-profile");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-await sleep(1800);
-const list = await (await fetch("http://127.0.0.1:9350/json/list")).json();
-const ws = new WebSocket(list.find((t) => t.type === "page").webSocketDebuggerUrl);
+const ws = new WebSocket(await attach(9350));
 await new Promise((r) => { ws.addEventListener("open", r, { once: true }); });
 
 let id = 0; const pending = new Map();
@@ -49,8 +48,8 @@ const ev = async (x) => (await send("Runtime.evaluate", { expression: x, returnB
 const waitFor = async (x, n = 200) => { for (let k = 0; k < n; k++) { if (await ev(x)) return true; await sleep(500); } return false; };
 
 let fails = 0; const results = [];
-const check = (ok, msg) => { results.push(`  ${ok ? "✓" : "✗"} ${msg}`); if (!ok) fails += 1; };
-const section = (t) => results.push(`\n── ${t} ${"─".repeat(Math.max(0, 62 - t.length))}`);
+const check = (ok, msg) => { const l = `  ${ok ? "✓" : "✗"} ${msg}`; results.push(l); console.log(l); if (!ok) fails += 1; };
+const section = (t) => { const l = `\n── ${t} ${"─".repeat(Math.max(0, 62 - t.length))}`; results.push(l); console.log(l); };
 
 await send("Page.enable"); await send("Runtime.enable"); await send("Network.enable");
 await send("Network.setCookie", { name: "wolfden-mkt-buyer-session", value: COOKIE, domain: "localhost", path: "/" });

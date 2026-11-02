@@ -1551,7 +1551,12 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     // 60% — so an unpaused sheet would quietly spend your food while you were not looking
                     // at the screen. It also makes the scene's own clock honest: nothing ages, nothing
                     // respawns, and the fight you come back to is the fight you left.
-                    paused={zonePanel !== null}
+                    // ⚠️ A CONVERSATION PAUSES THE ZONE TOO. The note on the giver explains it is not a
+                    // zonePanel because it does not REPLACE the scene — but "does not replace" is not the
+                    // same as "does not pause", and the zone has a clock: the note on this prop says an
+                    // unpaused sheet "would quietly spend your food while you were not looking". Reading
+                    // four lines of dialogue is exactly not looking.
+                    paused={zonePanel !== null || giverOpen || marshalOpen}
                     onPanel={setZonePanel}
                     // Luke: "when you die it should send you back to town." ⚠️ router.push, NOT the
                     // leave handler — leaving drops you on the Grove map, which is the screen inviting you

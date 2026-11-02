@@ -225,12 +225,16 @@ export function layOutStreet(visible, { townN = null, features = null, stocks = 
     }
     const mid = Math.ceil(withNpcs.length / 2);
     const townFolk = npcs.filter((n) => !n.anchor).map((n) => ({ id: n.id, kind: "npc" }));
+    // ⚠️ THE STOCKADE STANDS WITH THE TOWN FOLK, not trailing the row. It was last for no reason other than
+    // the order I happened to write the array in, which put the one piece of civic furniture at the far end
+    // of the street with nothing beyond it — the thing Luke photographed. It belongs to the town rather than
+    // to a building, exactly like the Crier beside it.
     const row = [
         ...townFolk,
+        ...(stocks && townN === 1 ? [{ id: "stockade", kind: "npc" }] : []),
         ...withNpcs.slice(0, mid),
         { id: "__well", kind: "well" },
         ...withNpcs.slice(mid),
-        ...(stocks && townN === 1 ? [{ id: "stockade", kind: "npc" }] : []),
     ];
     const objects = spaceOut(row);
     return {
@@ -268,15 +272,41 @@ export function layOutStreet(visible, { townN = null, features = null, stocks = 
 // of its street at the same comfortable spacing as everywhere else.
 export const WORLD_MIN = 2900;   // px — never narrower than this, or the parallax rows run out of scenery
 export const PER_SLOT = 284;     // px between neighbours. The whole design decision; see the note above.
-const SPREAD = 88;               // the span a long street settles at, which is what makes the two rules agree
+
+// ── ⚠️ THE MARGIN IS A NUMBER WE CHOSE, NOT WHATEVER IS LEFT OVER ───────────────────────────────────────────
+// Luke, looking at the voting booth pressed into the right-hand edge: "The Stockade voting is too close to
+// the border. I thought we talked about this?"
+//
+// We had. The previous pass made the spacing constant and centred the row — which fixed the SHORT streets,
+// and left the crowded ones exactly as bad, because the margin was still a leftover. The world was clamped
+// at WORLD_MIN and the row either fitted inside it (huge margins) or filled it (almost none). Measured:
+//
+//     Rootwood   10 objects   174px      <- the booth in the photograph
+//     Gilded      9 objects   313px
+//     Saltwrack   5 objects   882px
+//
+// A building sprite is up to 244px wide and is centred on its x, so it reaches ~122px either side. At 174px
+// of margin that leaves about fifty pixels of street beyond it — which is "against the frame" to any eye,
+// and my own check passed it because I had written the threshold as a PERCENTAGE of a world whose width
+// changes with the object count. The check agreed with the bug.
+//
+// So the world is sized as "the row, plus a real margin at each end", and the margin is one and a half
+// slots: enough that the widest sprite clears the frame by more than its own half-width. Short streets still
+// centre inside WORLD_MIN and keep their generous outskirts; crowded ones now grow the street instead of
+// squeezing the ends.
+export const EDGE_MARGIN = Math.round(PER_SLOT * 1.5);   // 426px of street beyond the first and last object
 
 /** How wide the street is, for `slots` objects standing on it. Read by the client for its camera. */
-export const worldWidthFor = (slots) => Math.max(WORLD_MIN, Math.round((PER_SLOT * 100 * Math.max(1, slots - 1)) / SPREAD));
+export const worldWidthFor = (slots) =>
+    Math.max(WORLD_MIN, PER_SLOT * Math.max(0, slots - 1) + EDGE_MARGIN * 2);
 
 export function spaceOut(list) {
     if (!list.length) return list;
     if (list.length === 1) return list.map((b) => ({ ...b, x: 50 }));
-    const stepPct = (PER_SLOT / worldWidthFor(list.length)) * 100;
+    const world = worldWidthFor(list.length);
+    const stepPct = (PER_SLOT / world) * 100;
+    // Centred, so both margins are equal — and because the world is sized FOR the margin, centring can no
+    // longer squeeze it to nothing.
     const first = (100 - stepPct * (list.length - 1)) / 2;
     return list.map((b, i) => ({ ...b, x: Math.round((first + stepPct * i) * 10) / 10 }));
 }

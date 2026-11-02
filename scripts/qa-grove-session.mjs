@@ -5,19 +5,18 @@
 // was looking at" is how the other three stay broken.
 //
 // Run from the repo root:  SHOT_COOKIE=<token> node scripts/qa-grove-session.mjs
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
-const PORT = process.env.PORT || "3998";
+import { attach, launchChrome, requireDevServer } from "./lib/qa-chrome.mjs";
+
+const PORT = process.env.PORT || "3000";
 const COOKIE = process.env.SHOT_COOKIE;
 const ZONE_INDEX = Number(process.argv[2] || 1);   // 0-based among the row's zone cards; 1 = zone 2 (Alder)
 
-const chrome = spawn("C:/Program Files/Google/Chrome/Application/chrome.exe", [
-    "--remote-debugging-port=9355", "--headless=new", "--no-first-run", "--no-default-browser-check",
-    `--user-data-dir=${process.env.TEMP}/qa-session-profile`, "about:blank"], { stdio: "ignore" });
+await requireDevServer(PORT);
+const chrome = launchChrome(9355, "qa-session-profile");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-await sleep(1800);
-const list = await (await fetch("http://127.0.0.1:9355/json/list")).json();
-const ws = new WebSocket(list.find((t) => t.type === "page").webSocketDebuggerUrl);
+const ws = new WebSocket(await attach(9355));
 await new Promise((r) => { ws.addEventListener("open", r, { once: true }); });
 let id = 0; const pending = new Map(); const bad = [];
 ws.addEventListener("message", (e) => {

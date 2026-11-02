@@ -96,7 +96,17 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
     const pct = a && a.need > 0 ? Math.min(100, (100 * a.progress) / a.need) : 0;
 
     return (
-        <div className="qd-scrim" role="dialog" aria-modal="true" aria-label={npcHere.name}>
+        /* ── ⚠️ THE SCENE UNDERNEATH IS LIVE, SO THE SCRIM HAS TO SWALLOW THE POINTER ──────────
+            GroveScene's root carries onPointerDown={onTapWorld}, which sets the hero's moveTo. This
+            card renders inside that subtree, so without this every tap to advance dialogue ALSO walked
+            the hero — measured at 167.7px -> 168.6px across four taps. Luke hit the identical bug in
+            the town: "When I tap to continue dialogue, my character moves in the background."
+
+            ⚠️ ON THE SCRIM, NOT ON THE PANEL. The panel is only part of what is covered; a tap on the
+           dimmed area either side of it reached the world just the same. */
+        <div className="qd-scrim" role="dialog" aria-modal="true" aria-label={npcHere.name}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}>
             <button type="button" className="qd-dismiss" aria-label="Close" onClick={onClose} />
             <div className="qd-panel" onClick={() => { if (!plate && !sendoff) advance(); }}>
                 <div className="qd-top">

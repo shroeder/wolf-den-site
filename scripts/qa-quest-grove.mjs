@@ -2,19 +2,18 @@
 // The system Luke specified, and the one I had never driven in a browser. Walks into zone 2 (Warden Alder)
 // and runs the same assertions the town pass runs: monotonic text, no console errors, the right buttons per
 // state, the plate, and that the server actually recorded the acceptance.
-import { spawn, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
-const PORT = process.env.PORT || "3998";
+import { attach, launchChrome, requireDevServer } from "./lib/qa-chrome.mjs";
+
+const PORT = process.env.PORT || "3000";
 const COOKIE = process.env.SHOT_COOKIE;
 const setState = (...a) => execFileSync("node", ["scripts/qa-quest-state.mjs", ...a], { encoding: "utf8" }).trim();
 
-const chrome = spawn("C:/Program Files/Google/Chrome/Application/chrome.exe", [
-    "--remote-debugging-port=9351", "--headless=new", "--no-first-run", "--no-default-browser-check",
-    `--user-data-dir=${process.env.TEMP}/qa-grove-profile`, "about:blank"], { stdio: "ignore" });
+await requireDevServer(PORT);
+const chrome = launchChrome(9351, "qa-grove-profile");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-await sleep(1800);
-const list = await (await fetch("http://127.0.0.1:9351/json/list")).json();
-const ws = new WebSocket(list.find((t) => t.type === "page").webSocketDebuggerUrl);
+const ws = new WebSocket(await attach(9351));
 await new Promise((r) => { ws.addEventListener("open", r, { once: true }); });
 
 let id = 0; const pending = new Map(); let bad = [];

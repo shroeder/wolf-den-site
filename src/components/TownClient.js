@@ -1881,7 +1881,24 @@ export default function TownClient({ initial, frozen = false, halloween = false,
         return () => clearTimeout(t);
     }, [bark]);
 
-    const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || gourdOpen || questOpen || smithOpen || stockOpen || Boolean(gambleReveal) || Boolean(fight);
+    // ── ⚠️ EVERY OVERLAY IN THIS FILE, AND THE LIST IS CHECKED ─────────────────────────────────────
+    // Luke: "When I tap to continue dialogue, my character moves in the background. This is the kind of
+    // thing that you should be catching... I'm talking about a flaw in the process you use to create
+    // features."
+    //
+    // This was ten names long and the file has thirteen overlays. actOpen, bossOpen and voteOpen were
+    // missing, so tapping any of those three walked the hero and dragged the street behind the panel —
+    // which is the exact bug the note below describes being fixed ONCE already, for whichever overlays
+    // existed that day. A hand-written list cannot tell you it has stopped covering things.
+    //
+    // ⚠️ SO IT IS A RECORD, NOT AN EXPRESSION, and `npm run check:overlays` fails if any `*Open` /
+    // `*Reveal` state in this file is absent from it. The list still has to be joined; what changed is
+    // that forgetting is now a red gate instead of a bug Luke finds on his phone.
+    const TOWN_OVERLAYS = {
+        roster, menuFor, boardOpen, merchantOpen, gourdOpen, questOpen, smithOpen,
+        stockOpen, gambleReveal, fight, actOpen, bossOpen, voteOpen,
+    };
+    const anyTownModal = Object.values(TOWN_OVERLAYS).some(Boolean);
     // …and stop the scene's own pointer handlers from firing while an overlay is up (else tapping a modal
     // button was walking the hero + scrolling the street behind the panel). Read via a ref so the [] -deps
     // pointer callbacks always see the live value.

@@ -54,7 +54,9 @@
         "prove:vault": "node --import ./scripts/lib/register-loader.mjs scripts/prove-vault.mjs",
         "check:craft-act": "node --import ./scripts/lib/register-loader.mjs scripts/check-craft-act.mjs",
         "check:gates": "node --import ./scripts/lib/register-loader.mjs scripts/check-gates.mjs",
-        "check:acts": "node --import ./scripts/lib/register-loader.mjs scripts/check-acts.mjs"
+        "check:acts": "node --import ./scripts/lib/register-loader.mjs scripts/check-acts.mjs",
+        "check:overlays": "node scripts/check-overlays.mjs",
+        "check:street": "node --import ./scripts/lib/register-loader.mjs scripts/check-street.mjs"
     },
     "keywords": [],
     "author": "",
