@@ -44,8 +44,8 @@ function Row({ q }) {
                         <span className="gq-task">{a.title}</span>
                         <span className="gq-ask">
                             {KIND_WORD[a.kind] || "Do"} {a.need > 1 ? a.need : ""}
-                            {a.foe ? ` · ${a.foe.replace(/_/g, " ")}` : ""}
-                            {a.part ? ` · ${a.part.replace(/_/g, " ")}` : ""}
+                            {a.foe ? ` · ${a.foeLabel || a.foe.replace(/_/g, " ")}` : ""}
+                            {a.part ? ` · ${a.partLabel || a.part.replace(/_/g, " ")}` : ""}
                             {a.zone ? ` · zone ${a.zone}` : ""}
                         </span>
                         <Bar have={a.progress} need={a.need} />

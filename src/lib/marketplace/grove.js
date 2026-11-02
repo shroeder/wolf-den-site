@@ -353,6 +353,18 @@ export async function groveState(buyerId) {
         ok: true,
         ...look,
         hero,
+        // ── ⚠️ THE TRACKER NEEDS THIS AT THE HUB, AND HAD NOTHING ───────────────────────────────────
+        // GroveQuests was fed `session?.quests` — and `session` only exists once you have ENTERED a
+        // zone. So at the hub, which is the only place the Quests row appears in the menu, the panel
+        // was handed [] every single time and said "Nobody has asked you for anything yet" no matter
+        // how many chains were underway. The one panel whose whole job is telling you WHERE the next
+        // giver stands could not do it.
+        //
+        // ⚠️ ONE QUERY. questBoard is rowsFor() plus arithmetic over static catalogues, so this adds a
+        // single indexed read to a page that already does many — the same trade the session makes, and
+        // the alternative is a fetch every time somebody glances at the panel, which the note on the
+        // session's own copy argues against.
+        quests: await questBoard(buyerId).catch(() => []),
         unlockedN: Number(p?.unlocked_n) || 1,
         // ⚠️ THE COLUMNS STAY, THE CONCEPT GOES. pack_slots / bank_slots / packs_built / banks_built are
         // still on the row because dropping columns is how you lose the record of what somebody crafted

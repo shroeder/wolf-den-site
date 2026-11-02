@@ -472,7 +472,24 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         // fact already carrying. Merged rather than refetched: one request already answered this.
         if (d.belt) setSt((prev) => (prev && prev.belt !== d.belt ? { ...prev, belt: d.belt } : prev));
         if (d.charm) setNote(`${d.charm.name} burning — ${CHARM_STAT_LABEL[d.charm.stat] || "bonus"} +${d.charm.value}%`);
-        setSession({ zone: d.zone, seed: d.seed, bonuses: d.bonuses, charm: d.charm || null });
+        // ── ⚠️ THE SESSION IS THE ENTER RESPONSE, NOT FOUR FIELDS COPIED OUT OF IT ──────────────
+        // This used to be { zone, seed, bonuses, charm } — hand-listed — while the scene below reads
+        // session.npcHere, session.coliseum and session.gearArt. All three were dropped on the floor
+        // here, so:
+        //
+        //   · THE THREE QUEST GIVERS PER MAP NEVER APPEARED IN A ZONE. 21 people, 71 chain steps,
+        //     21 drawn portraits, authored zones, a whole dialogue system — and .gv-npc rendered
+        //     zero times, because `session.npcHere` was always undefined. The server has been
+        //     sending it correctly the entire time.
+        //   · THE COLISEUM MARSHAL likewise, and with him the only non-daily source of a token.
+        //   · gearArt, so the scene drew whatever its fallback is instead of the player's own gear.
+        //
+        // Nothing errored. The zone rendered perfectly, just empty of people, which is exactly what
+        // an unvisited forest is supposed to look like — the failure had no symptom to notice.
+        //
+        // Spread, so a field the server starts sending arrives here without anybody remembering to
+        // add its name to a list. The list was the bug.
+        setSession({ ...d, charm: d.charm || null });
         // ⚠️ AND THE LAST ZONE'S CARDS GO WITH IT. Both of these are click-to-dismiss overlays owned by
         // this component, which does not unmount between zones — so a boss kill card or an unlock pop left
         // standing was still standing in the next place. Cleared HERE rather than in the door handler
@@ -1019,8 +1036,11 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                 {panel === "gear" ? <GroveGear st={st} onChanged={refresh} /> : null}
                 {panel === "quests"
                     ? (
+                        /* ⚠️ BOTH SOURCES. In a zone the board rides the session; at the hub there is
+                           no session, and the hub is the only place this panel can be opened from.
+                           Reading one of the two is how it was always empty. */
                         <GroveQuests
-                            quests={session?.quests || []}
+                            quests={session?.quests || st?.quests || []}
                             coliseum={session?.coliseum || null}
                             onChanged={refresh}
                             busy={col.busy || Boolean(col.run)}

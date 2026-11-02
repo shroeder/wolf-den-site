@@ -92,6 +92,13 @@ export async function questBoard(buyerId) {
                         // offering it, which is a different conversation from nudging you about it.
                         started: cur.started,
                         foe: cur.step.foe || null, part: cur.step.part || null,
+                        // ⚠️ THE NAME, NOT THE ID. The tracker rendered `a.foe.replace(/_/g," ")`, so a
+                        // row for voidmoth read "Voidmoth" while the creature is called Mothlight and the
+                        // giver standing in the zone says Mothlight. One monster, two names, in two
+                        // panels a tap apart. Resolved here because this is where the catalogue already
+                        // is — the client would otherwise have to import it to spell a noun.
+                        foeLabel: cur.step.foe ? foeName(cur.step.foe) : null,
+                        partLabel: cur.step.part ? partName(cur.step.part) : null,
                         zone: cur.step.zone || null, wave: cur.step.wave || null,
                         reward: cur.step.reward,
                         say: sayFor(cur, npc),
