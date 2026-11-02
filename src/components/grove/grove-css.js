@@ -1194,6 +1194,35 @@ export const GROVE_CSS = `
 
 .qd-record { margin: 14px 0 0; font-size: 0.82rem; color: #B493E8; }
 .qd-record b { color: #FFD75E; }
+/* ── THE CONVERSATION ─────────────────────────────────────────────────────────────────────────
+   Added when the givers stopped being a form with a face. The panel is tappable now (one line of
+   speech at a time), so it wants a caret to show it is mid-sentence and a hint that tapping is the
+   interaction. See GroveGiver. */
+.qd-panel { cursor: pointer; }
+.qd-caret { display: inline-block; width: 7px; height: 1em; margin-left: 2px; vertical-align: -2px;
+    background: rgba(255,215,110,0.7); animation: qdBlink 1s steps(1) infinite; }
+@keyframes qdBlink { 50% { opacity: 0; } }
+.qd-more { position: absolute; right: 16px; bottom: 12px; font-size: 0.68rem; color: #7d7465;
+    animation: qdNudge 1.4s ease-in-out infinite; }
+@keyframes qdNudge { 50% { transform: translateX(3px); opacity: 0.5; } }
+.qd-steps { margin-left: auto; font-size: 0.72rem; font-weight: 800; color: #9A8FB8; }
+
+/* ── THE MOMENT ───────────────────────────────────────────────────────────────────────────────
+   Centre screen, over everything, and it is the thing Luke asked for by name. pointer-events none
+   so it cannot eat the tap that is already on its way to the panel underneath. */
+.qd-plate { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; pointer-events: none; }
+.qd-plate-in { text-align: center; padding: 18px 30px; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(32,24,12,0.97), rgba(18,13,8,0.97));
+    border: 1px solid rgba(255,215,110,0.55);
+    box-shadow: 0 0 60px rgba(255,200,80,0.35), 0 20px 60px rgba(0,0,0,0.7);
+    animation: qdPlate .5s cubic-bezier(.2,1.4,.4,1) both; }
+.qd-plate-in b { display: block; font-size: 1.25rem; letter-spacing: 3px; color: #ffd75e; }
+.qd-plate-in span { display: block; margin-top: 4px; font-size: 0.92rem; color: #f2ead9; }
+.qd-plate-in em { display: block; margin-top: 8px; font-size: 0.86rem; font-style: normal;
+    font-weight: 800; color: #8fe39a; }
+@keyframes qdPlate { from { opacity: 0; transform: scale(.82); } }
+@media (prefers-reduced-motion: reduce) { .qd-plate-in { animation: none; } }
+
 .qd-note { margin: 12px 0 0; font-size: 0.9rem; color: #FFD75E; font-style: italic; }
 
 .qd-task { margin: 0 0 3px; font-family: var(--font-display); font-size: 1.04rem; color: #FFF3D4; }

@@ -10,7 +10,8 @@ import "server-only";
 // opposite of "you have to come back to them".
 
 import { db } from "@/lib/db";
-import { GROVE_NPCS, COLISEUM_NPCS, COLISEUM_ZONE, questsFor, npcsOnMap } from "@/lib/marketplace/grove-npcs.js";
+import { GROVE_NPCS, COLISEUM_NPCS, COLISEUM_ZONE, questsFor, npcsOnMap, foeName, partName } from "@/lib/marketplace/grove-npcs.js";
+import { GREET, SENDOFF, SPENT, fill, stepLines } from "@/lib/marketplace/grove-npc-dialogue.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
 /** The shop's own day, for the Coliseum daily. See the note in migration 500 about why this is a date. */
@@ -43,6 +44,21 @@ export function activeStep(chain, rows) {
     return null;
 }
 
+/**
+ * The beats this step's state calls for, with the real creature and part names put in.
+ *
+ * ⚠️ ONLY THE BEATS FOR THE STATE. Sending all four would put the payoff line in the browser before the
+ * work was done, which is a spoiler sitting in devtools.
+ */
+function sayFor(cur, npc) {
+    const l = stepLines(cur.step.id, npc.id, npc.line);
+    const names = { foe: foeName(cur.step.foe), part: partName(cur.step.part) };
+    const f = (x) => fill(x, cur.step, names);
+    if (!cur.started) return { problem: (l.problem || []).map(f), ask: f(l.ask) };
+    if (cur.progress >= cur.step.need) return { done: (l.done || []).map(f), ask: f(l.ask) };
+    return { nudge: f(l.nudge), ask: f(l.ask) };
+}
+
 /** Everything the tracker needs: who, where, what, how far, what it pays. */
 export async function questBoard(buyerId) {
     const rows = await rowsFor(buyerId);
@@ -61,14 +77,24 @@ export async function questBoard(buyerId) {
                 done,
                 // `null` here means finished, and the screen says so rather than hiding the row — a chain you
                 // completed is a thing you want to see you completed.
+                // What they actually say, for the state this step is in. ⚠️ FILLED HERE, where the
+                // resolved step is in hand — the client has the step id and nothing to turn
+                // "{n} {foe}" into "37 Urchin Roller" with, and shipping raw placeholders to a
+                // browser is how a player ends up reading the template.
+                greet: cur ? (GREET[npc.id] || npc.line) : (SPENT[npc.id] || npc.line),
+                sendoff: SENDOFF[npc.id] || "",
                 active: cur
                     ? {
                         id: cur.step.id, title: cur.step.title, kind: cur.step.kind,
                         need: cur.step.need, progress: Math.min(cur.progress, cur.step.need),
                         ready: cur.progress >= cur.step.need,
+                        // `started` is the acceptance — see acceptStep. Untaken means the giver is
+                        // offering it, which is a different conversation from nudging you about it.
+                        started: cur.started,
                         foe: cur.step.foe || null, part: cur.step.part || null,
                         zone: cur.step.zone || null, wave: cur.step.wave || null,
                         reward: cur.step.reward,
+                        say: sayFor(cur, npc),
                     }
                     : null,
             });
@@ -108,14 +134,18 @@ export async function bumpQuests(buyerId, events = {}) {
             if (s.kind === "ticket" && s.wave) add = Number(events.wave) >= s.wave ? s.need : 0;
             if (add <= 0) continue;
 
+            // ⚠️ A STEP NOBODY TOOK DOES NOT TICK. This used to INSERT the row itself, which meant a
+            // chain advanced on its own: you could walk up to Warden Alder having already finished the
+            // thing he was about to ask for, and his "I can't get to it" line would arrive over a
+            // completed bar. The row IS the acceptance now — see acceptStep — so this only ever
+            // UPDATES, and a step you have not been asked for counts nothing.
+            if (!cur.started) continue;
             const next = Math.min(s.need, (cur.progress || 0) + add);
             if (next === cur.progress) continue;
             await db.query(
-                `INSERT INTO mkt_grove_quest (buyer_id, step_id, npc_id, map_n, progress)
-                 VALUES ($1,$2,$3,$4,$5)
-                 ON CONFLICT (buyer_id, step_id) DO UPDATE
-                   SET progress = LEAST($5, GREATEST(mkt_grove_quest.progress, $5)), updated_at = NOW()
-                 WHERE mkt_grove_quest.claimed_at IS NULL`,
+                `UPDATE mkt_grove_quest
+                    SET progress = LEAST($5, GREATEST(progress, $5)), updated_at = NOW()
+                  WHERE buyer_id = $1 AND step_id = $2 AND claimed_at IS NULL`,
                 [buyerId, s.id, npc.id, map, next],
             ).catch(() => {});
             touched.push({ step: s.id, progress: next, need: s.need, done: next >= s.need, title: s.title });
@@ -131,6 +161,43 @@ export async function bumpQuests(buyerId, events = {}) {
  * what it pays comes from the catalogue, never from the request. Trusting a posted reward is how a quest
  * board becomes a gold faucet with a text box on it.
  */
+/**
+ * Take the step a giver is offering.
+ *
+ * ⚠️ NO MIGRATION FOR THIS, AND THAT IS THE POINT. mkt_grove_quest already had `started_at` and
+ * activeStep already reported `started: Boolean(row)` — the row's EXISTENCE was always the record of
+ * having begun, it was simply being created as a side effect of killing the right thing rather than by
+ * anybody agreeing to anything. Creating it here, and nowhere else, turns the same row into an
+ * acceptance without a second table to keep in step.
+ *
+ * ⚠️ RE-CHECKED FROM THE DATABASE, because the sheet that drew the button is a client. Only the chain's
+ * current step may be taken, so a client cannot skip to the last one and have it tick.
+ */
+export async function acceptStep(buyerId, stepId) {
+    if (!buyerId || !stepId) return { ok: false, error: "bad_request" };
+    const npcId = String(stepId).split("_")[0];
+    const npc = GROVE_NPCS.find((n) => n.id === npcId);
+    if (!npc) return { ok: false, error: "unknown_step" };
+
+    const chain = questsFor(npcId);
+    const step = chain.find((s) => s.id === stepId);
+    if (!step) return { ok: false, error: "unknown_step" };
+
+    const rows = await rowsFor(buyerId, npc.map);
+    const cur = activeStep(chain, rows);
+    if (!cur || cur.step.id !== stepId) return { ok: false, error: "not_current" };
+    if (cur.started) return { ok: true, already: true };
+
+    // ⚠️ DO NOTHING ON CONFLICT. The row carries started_at, which is the moment the ask was made; a
+    // second accept that moved it would be rewriting when the player was asked.
+    await db.query(
+        `INSERT INTO mkt_grove_quest (buyer_id, step_id, npc_id, map_n, progress)
+         VALUES ($1,$2,$3,$4,0) ON CONFLICT (buyer_id, step_id) DO NOTHING`,
+        [buyerId, stepId, npcId, npc.map],
+    ).catch(() => {});
+    return { ok: true, accepted: stepId };
+}
+
 export async function claimStep(buyerId, stepId) {
     if (!buyerId || !stepId) return { ok: false, error: "bad_request" };
     const npcId = String(stepId).split("_")[0];

@@ -431,6 +431,17 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         return j || { ok: false };
     }, [refresh]);
 
+    // ⚠️ RETURNS A BOOLEAN, so the dialogue only raises QUEST RECEIVED when the server actually took
+    // it. A plate over a failed write is a lie the player then goes and acts on for an hour.
+    const acceptStep = useCallback(async (stepId) => {
+        const j = await fetch("/api/marketplace/grove/quests", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "accept", stepId }),
+        }).then((r) => r.json()).catch(() => null);
+        refresh();
+        return Boolean(j?.ok);
+    }, [refresh]);
+
     // Whether the marshal's card is open. Not a zonePanel: those replace the scene, and this is a thing
     // standing IN the scene that you are talking to without leaving it.
     const [marshalOpen, setMarshalOpen] = useState(false);
@@ -1563,6 +1574,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         npcHere={session.npcHere}
                         busy={col.busy || Boolean(col.run)}
                         onClaim={claimStep}
+                        onAccept={acceptStep}
                         onClose={() => setGiverOpen(false)}
                     />
                 ) : null}
