@@ -187,6 +187,20 @@ export async function claimStep(buyerId, stepId) {
         ).catch(() => {});
     }
 
+    // ── THE PARTS ───────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ THROUGH storeParts, NOT A RAW INSERT. That function owns the bag cap and the overflow report;
+    // writing straight into mkt_grove_item here would hand parts to a player whose pack is full and then
+    // tell them nothing, which is the single most confusing thing this feature can do.
+    //
+    // ⚠️ DYNAMIC IMPORT because grove.js imports THIS file — a static import back is a cycle. Same shape
+    // chests.js and arena-progress.js already use for addParts.
+    let partsPaid = null;
+    if (paid.parts > 0 && paid.partId) {
+        const { storeParts } = await import("@/lib/marketplace/grove.js");
+        const r = await storeParts(buyerId, { [paid.partId]: Number(paid.parts) }).catch(() => null);
+        if (r) partsPaid = { part: paid.partId, n: Number(paid.parts), overflow: r.overflow || {} };
+    }
+
     // The Coliseum token. Clamped at the cap rather than refused, so finishing a chain while full still
     // completes the chain — you simply do not get a fourth token you could not have held anyway.
     let token = 0;
@@ -205,6 +219,7 @@ export async function claimStep(buyerId, stepId) {
         ok: true,
         step: { id: step.id, title: step.title },
         reward: step.reward,
+        partsPaid,
         token,
         npc: npc.name,
     };

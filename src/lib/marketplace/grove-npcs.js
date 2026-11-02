@@ -266,12 +266,25 @@ export function questsFor(npcId) {
             npc: npcId, map: npc.map, idx: i, title, kind, need: n,
             reward: stepReward(kind, npc.map, i, i === shape.length - 1),
         };
+        // ── ⚠️ THE REWARD'S `parts` IS A COUNT WITH NO PART, AND SO WAS UNPAYABLE ──────────────────
+        // stepReward has always returned `parts: 2` and nothing else: no id, so nothing downstream could
+        // hand anything over, and that half of every reward in the feature quietly did not exist. The id
+        // is resolved HERE, where this map's parts are already in hand.
+        //
+        // A step that already names a part pays a DIFFERENT one — being handed more of the thing you were
+        // just asked to go and collect is not a reward, it is a refund.
+        step.reward = { ...step.reward, partId: null };
         if (kind === "cull") step.foe = pick(t.foes, seed);
         if (kind === "hunt") step.foe = pick(t.bosses, seed);
         if (kind === "harvest" || kind === "forge") step.part = pick(t.parts, seed);
         if (kind === "delve") step.zone = zoneBase + Math.min(12, n);
         if (kind === "survive") step.zone = zoneBase + Math.min(12, 4 + i * 2);
         if (kind === "ticket") step.wave = n;
+        if (step.reward.parts > 0 && t.parts.length) {
+            const own = step.part;
+            const pool = t.parts.length > 1 ? t.parts.filter((x) => x !== own) : t.parts;
+            step.reward.partId = pick(pool, seed + 13);
+        }
         return step;
     });
 }

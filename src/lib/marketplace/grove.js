@@ -816,11 +816,12 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     //
     // `parts: stored` rather than got.parts: a harvest step should count what actually reached the pack,
     // not what the floor offered before the bag cap took its share.
-    const questTicks = await bumpQuests(buyerId, {
-        slain: got.slain,
-        parts: stored,
-        zone: zoneN,
-    }).catch(() => []);
+    //
+    // ⚠️ AND IT FIRES LATE, AFTER `cleared` IS KNOWN. The first version of this call ran here with only
+    // slain/parts/zone, which fed four of the SIX event types bumpQuests reads — so forge, survive and
+    // ticket steps could never advance: 22 of 71 steps, blocking 13 of 21 chains partway, several of them
+    // before the last step where the Coliseum token lives. A fix that moves the dead end is not a fix.
+    // `cleared` is computed below from the banked kill count, so the call waits for it.
 
     // ── STATUES ─────────────────────────────────────────────────────────────────────────────────────
     // ⚠️ GRANTED, NOT APPLIED. A statue does nothing until it is poured into a line -- see turnInStatue.
@@ -906,6 +907,14 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     // and now they actually are. Clearing a zone earns the RIGHT TO FIGHT its boss; killing the boss is what
     // ENDS the zone and opens the next one. See openTheWay, which is the only thing that moves unlocked_n.
     const cleared = Number(z?.kills) >= zone.toUnlock;
+
+    // Now that `cleared` exists, the quest board can be told everything this settle did.
+    const questTicks = await bumpQuests(buyerId, {
+        slain: got.slain,
+        parts: stored,
+        zone: zoneN,
+        cleared,
+    }).catch(() => []);
 
     // One UPDATE, folded into what settle already writes — the window costs no extra round trip. A stale
     // window is reset here rather than by a cron: the only thing that needs to know is the next settle.
@@ -1531,8 +1540,23 @@ export async function groveCraft(buyerId, recipeId, { act = null, aim = 0.5 } = 
     // else, so the screen could say "Made Moss Poultice" and not what had just left the bag -- a
     // system that silently eats sixteen parts and reports four words. The spent array is the exact list
     // the transaction decremented, so the panel can show the trade rather than assert it.
+    // ── ⚠️ A FORGE STEP TICKS HERE, NOWHERE ELSE ───────────────────────────────────────────────────
+    // bumpQuests reads `forged` keyed on the part a forge step names, and nothing ever supplied it, so
+    // all eleven forge steps sat at 0/1 forever. One craft that CONSUMES the named part is the whole
+    // requirement (stepSize returns 1 for forge), so each spent part counts once.
+    //
+    // ⚠️ DYNAMIC IMPORT, because grove-quests.js is imported by this file at the top and a static import
+    // the other way is a cycle. Same shape arena-progress.js and chests.js already use for addParts.
+    const forgeTicks = await (async () => {
+        const forged = {};
+        for (const [part] of spent) forged[part] = 1;
+        if (!Object.keys(forged).length) return [];
+        return bumpQuests(buyerId, { forged }).catch(() => []);
+    })();
+
     return {
         ok: true, made: recipe.id, kind: recipe.kind, name: recipe.name,
+        questTicks: forgeTicks,
         // The screen announces this; a chest granted silently is a chest nobody knows they have.
         firstCraft,
         spent: spent.map(([part, n]) => ({ part, n })),

@@ -6,6 +6,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { wavesFor, chestsFor, runPlan } from "@/lib/marketplace/grove-coliseum-plan.js";
+import { bumpQuests } from "@/lib/marketplace/grove-quests.js";
 
 export * from "@/lib/marketplace/grove-coliseum-plan.js";
 
@@ -52,7 +53,14 @@ export async function settleRun(buyerId, { map, wavesCleared, cleared }) {
             [buyerId, m, tier],
         ).catch(() => {});
     }
-    return { ok: true, wavesCleared: got, totalWaves: total, cleared: won, chests: tiers };
+    // ── ⚠️ AND THE TICKET STEPS, WHICH HAD NO SOURCE AT ALL ────────────────────────────────────────
+    // A `ticket` step asks you to reach wave N of this map's Coliseum. bumpQuests reads `events.wave`
+    // and nothing in the codebase ever passed it, so all five ticket steps were permanently 0 — and
+    // three of them sit mid-chain, which hard-stopped the chains behind them. This is the only place
+    // that knows how far a run got.
+    const questTicks = await bumpQuests(buyerId, { wave: got }).catch(() => []);
+
+    return { ok: true, wavesCleared: got, totalWaves: total, cleared: won, chests: tiers, questTicks };
 }
 
 /** Chests still sitting on the ground, waiting to be tapped. */
