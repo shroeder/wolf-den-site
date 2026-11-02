@@ -710,7 +710,6 @@ export const GROVE_CSS = `
 }
 
 
-
 /* ── THE CHART'S CHROME ──────────────────────────────────────────────────────────────────────────────
    ⚠️ .gv-paper-head HAD NO RULES AT ALL. It has been in the markup for two passes carrying the map name,
    the map-to-map arrows and now the cleared count, and every one of them rendered as bare unstyled text
@@ -787,15 +786,6 @@ export const GROVE_CSS = `
    means the animation starts fully hidden, which is what it wants anyway. */
 .gv-paper-trail .is-walked { animation: gv-ink 900ms ease-out both; }
 @keyframes gv-ink { from { stroke-dasharray: 0 400; } to { stroke-dasharray: 7 6; } }
-@media (prefers-reduced-motion: reduce) {
-    /* The zone note is the one animation here that is NOT the readout -- the words are. It still has to
-       appear, so the slide goes and the line stays. See animations-always-play for the house rule and
-       why the bump on a kill count does not get this treatment. */
-    .gv-paper-trail .is-walked, .gv-node-pin, .gv-node.is-next img, .gv-note.is-zone,
-    .gv-belt.is-eat, .gv-belt.is-eat i,
-    /* The tint IS the readout; only the flicker on it is decoration. */
-    .gv-status.is-burning, .gv-status.is-stunned, .gv-status.is-low { animation: none; }
-}
 @keyframes gv-bossbeat { 0%, 100% { scale: 1; } 50% { scale: 1.07; } }
 
 /* A hyper-rare off an ordinary kill is about one in two thousand -- the rarest thing in the feature.
@@ -3088,7 +3078,6 @@ export const GROVE_CSS = `
     0%, 100% { box-shadow: 0 0 0 0 rgba(159,224,138,0); }
     18% { box-shadow: 0 0 0 3px rgba(159,224,138,0.55), 0 0 26px rgba(159,224,138,0.35); }
 }
-@media (prefers-reduced-motion: reduce) { .gv-sect.is-found { animation: none; } }
 
 /* ── THE RESULT ───────────────────────────────────────────────────────────────────────────────
    Both halves of the trade on one card: what arrived, and underneath it what left. A toast can
@@ -3377,11 +3366,6 @@ export const GROVE_CSS = `
     letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.72; }
 
 
-
-
-
-
-
 /* ── ⚠️ THE RECIPE ROW IS A LIST ITEM, NOT A POSTER ──────────────────────────────────────────────────────
    Luke: "cards are too big and verbose". There are 129 of these and each one carried a name, a tag, a
    payoff line, two lines of italic flavour, one full-width row PER INGREDIENT, and a temper strip — about
@@ -3645,9 +3629,6 @@ export const GROVE_CSS = `
 @keyframes gv-act-enter {
     from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; }
 }
-@media (prefers-reduced-motion: reduce) {
-    .gv-act-stage, .gv-act-scene { animation: none; transition: opacity 200ms ease; }
-}
 
 /* ── THE WORK, STANDING IN THE ROOM ──────────────────────────────────────────────────────────────────
    Absolutely placed over the SCENE at that room's hot spot — in the coal bed, on the anvil face — rather
@@ -3730,7 +3711,6 @@ export const GROVE_CSS = `
     18% { opacity: 1; }
     100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(1.15); }
 }
-@media (prefers-reduced-motion: reduce) { .gv-act-pumpfx { display: none; } }
 
 /* ── THE COUNT-IN ─────────────────────────────────────────────────────────────────────────────
    Over the coals, before the clock. Big, because its whole job is to be impossible to miss, and
@@ -3896,7 +3876,6 @@ export const GROVE_CSS = `
         inset 0 -3px 6px rgba(0,0,0,0.35);
     animation: gv-act-orb-spin 620ms linear infinite; }
 @keyframes gv-act-orb-spin { to { filter: hue-rotate(26deg); } }
-@media (prefers-reduced-motion: reduce) { .gv-act-orb { animation: none; } }
 .gv-act-piece.is-set { transition: none; animation: gv-act-land 440ms cubic-bezier(.2,1.6,.4,1); }
 @keyframes gv-act-land { 0% { transform: scale(1.45); } 50% { transform: scale(0.78); } 100% { transform: scale(1); } }
 
@@ -4440,12 +4419,6 @@ export const GROVE_CSS = `
     0%, 14% { opacity: 0; transform: translateY(6px); }
     30% { opacity: 1; transform: translateY(0); }
     100% { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) {
-    /* ⚠️ THE MOMENT STILL HAPPENS. Reduced motion means no spin and no turning light, not a rare drop
-       the player is never told about -- see animations-always-play for the same rule. */
-    .gv-mc-card, .gv-mc-rays, .gv-mc-tag { animation-duration: 1ms; animation-fill-mode: forwards; }
-    .gv-mc-rays { transform: scale(1); opacity: 0.7; }
-    .gv-drop.is-emblem::before { animation: none; opacity: 0.85; } }
 .gv-mc-what { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px;
     background: rgba(255,196,96,0.07); border: 1px solid rgba(255,196,96,0.22);
     font-size: 0.82rem; line-height: 1.5; color: #d8cdb8; }
@@ -4647,7 +4620,6 @@ export const GROVE_CSS = `
     background: linear-gradient(68deg, transparent 42%, rgba(255,255,255,0.3) 50%, transparent 58%);
     animation: gvCardSheen 3600ms linear infinite; pointer-events: none; }
 @keyframes gvCardSheen { 0% { transform: translateX(-62%); } 100% { transform: translateX(62%); } }
-@media (prefers-reduced-motion: reduce) { .gv-card.is-high .gv-card-win::after { animation: none; opacity: 0.25; } }
 
 
 /* ── THE GROVE'S MENU ─────────────────────────────────────────────────────────────────────────────
@@ -4772,11 +4744,6 @@ export const GROVE_CSS = `
 .gv-mmenu-sound svg { width: 20px; height: 20px; flex: none; }
 .gv-mmenu-sound:hover { background: rgba(255,255,255,0.06); }
 .gv-mmenu-sound[aria-pressed="true"] { color: #6f6b63; }
-
-@media (prefers-reduced-motion: reduce) {
-    /* ⚠️ IT STILL OPENS AND SHUTS. Reduced motion means no slide, not a menu that cannot be used. */
-    .gv-mmenu, .gv-mmenu-handle { transition: none; }
-}
 
 
 /* ── THE STATUE VENDOR ────────────────────────────────────────────────────────────────────────────
