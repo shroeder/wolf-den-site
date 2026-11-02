@@ -209,7 +209,21 @@ export const GUIDE_CHAPTERS = [
         steps: [
             { key: "casino_play", label: "Pull a machine", why: "Five cabinets and every one is a different game underneath — a warren, a threshing floor, a kraken hold, a giant animal, a vault that falls in on itself. Whatever you stake comes back as chips regardless of how the spins fell, so a bad run still buys something.", href: "/marketplace/casino", cta: "Walk in", gold: 125, events: ["casino_play"] },
             { key: "casino_table", label: "Sit at a table", why: "Blackjack, keno and bingo are away from the reels and they pay exactly the multiple printed on the felt — three-to-two is three-to-two, and five of five on a ticket is five of five. Nothing here is quietly worth less than it says.", href: "/marketplace/casino", cta: "Take a seat", gold: 175, verify: "casinotable" },
-            { key: "casino_counter", label: "Spend at the Counter", why: "The only place a chip is worth anything. Chests up to Primordial, five pets that exist nowhere else in the Den, and a few things that change how the floor treats you. Chips buy nothing outside this room, so there is no reason to sit on them.", href: "/marketplace/casino", cta: "See the shelf", gold: 200, events: ["casino_buy"] },
+            // ── ⚠️ BOTH EVENTS, BECAUSE THE SHELF STOPPED BEING A SHOP ──────────────────────────────────
+            // Anamarisa, 2026-11-01: "The 'spend at the counter' intro quest for the casino is frozen at
+            // almost complete. I have earned the first 4 pets, im quite sure I spent plenty." Sphinx:
+            // "Same for me still says its incomplete."
+            //
+            // They are both right and neither could ever have finished it. The Counter was converted from a
+            // SHOP into a milestone LADDER — casino-milestones.js opens with it: "nothing on this floor is
+            // bought. Everything is CLAIMED." Claiming fires casino_claim; this chapter watched casino_buy
+            // and only casino_buy. Measured in production: casino_claim 711 events across 21 members, last
+            // seen today; casino_buy last fired on 2026-10-03. Anamarisa has 13 claims and zero buys.
+            //
+            // ⚠️ AND THE WORDING FOLLOWED THE RULE. A step called "Spend at the Counter" on a floor where
+            // nothing is spent sends people looking for a shop that is not there — which is most of why
+            // she was sure she had already done it.
+            { key: "casino_counter", label: "Take something from the Counter", why: "Where a run on the floor turns into something you keep. Chests up to Primordial, five pets that exist nowhere else in the Den, and a few things that change how the floor treats you. Most of the shelf is CLAIMED off the milestone ladder as your lifetime winnings climb, so the only way to move it is to play.", href: "/marketplace/casino", cta: "See the shelf", gold: 200, events: ["casino_claim", "casino_buy"] },
         ],
         reward: { gold: 350, chest: "gold" },
     },
