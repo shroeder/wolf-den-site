@@ -255,11 +255,29 @@ export async function logForgeOpen(buyerId) {
 // ── Daily forge quests (owner-only, lives in the forge) ──
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 const DAILY_FIELDS = new Set(["salvages", "enhances", "combines", "best_grade"]);
+// ── ⚠️ A GOLD LABEL IS DERIVED, NEVER TYPED ─────────────────────────────────────────────────────────────────
+// Anamarisa, 2026-11-01: "The forge's daily task to hit 4 perfect strikes did not pay out 250 gold. There is
+// only 139 gold in my bank after claiming it."
+//
+// She was right and the receipt proves it: 14 + 125 = 139. On 2026-08-25 the gold faucet was halved across
+// the board (f4312422) — the `reward` values were halved and the `rewardLabel` STRINGS WERE NOT. For ten
+// weeks the Forge advertised +150 and +250 while paying 75 and 125, which is the shop promising a number and
+// handing over half of it.
+//
+// ⚠️ SO THE LABEL IS NOT A STRING ANY MORE. Two descriptions of one fact drift the first time either is
+// touched, and this pair drifted inside a single commit. A gold reward now renders from the gold, and the
+// next person to re-tune the faucet cannot leave the sign behind. [[reuse-the-rule-never-restate-it]]
+//
+// ⚠️ AND THE PAYOUT IS LEFT ALONE. Raising 125 back to 250 would quietly undo a deliberate 50% nerf to the
+// mint rate — that is Luke's lever, not a bug fix. See [[gold-mint-rate-lever]].
 const DAILIES = [
-    { key: "salvage3", label: "Salvage 3 pieces of gear", field: "salvages", need: 3, reward: { gold: 75 }, rewardLabel: "+150 gold" },
+    { key: "salvage3", label: "Salvage 3 pieces of gear", field: "salvages", need: 3, reward: { gold: 75 } },
     { key: "enhance1", label: "Enhance a piece of gear", field: "enhances", need: 1, reward: { partTier: 2, partN: 2 }, rewardLabel: "+2 Iron Filings" },
-    { key: "perfect", label: "Land a Perfect+ strike", field: "best_grade", need: 3, reward: { gold: 125 }, rewardLabel: "+250 gold" },
+    { key: "perfect", label: "Land a Perfect+ strike", field: "best_grade", need: 3, reward: { gold: 125 } },
 ];
+
+/** What a daily pays, said once, from the reward itself. */
+const dailyRewardLabel = (d) => d.rewardLabel || (d.reward?.gold ? `+${d.reward.gold} gold` : "");
 async function bumpDaily(buyerId, field, amount = 1) {
     if (!DAILY_FIELDS.has(field)) return;
     await db.query(`INSERT INTO mkt_forge_daily (buyer_id, day) VALUES ($1, ${DAY}) ON CONFLICT (buyer_id, day) DO NOTHING`, [buyerId]).catch(() => {});
@@ -807,7 +825,7 @@ export async function getForgeState(buyerId) {
     ]);
     const dRow = await db.queryOne(`SELECT salvages, enhances, combines, best_grade, claimed FROM mkt_forge_daily WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => null);
     const claimedSet = new Set(parseClaimed(dRow?.claimed));
-    const dailies = DAILIES.map((q) => { const prog = Number(dRow?.[q.field] || 0); return { key: q.key, label: q.label, need: q.need, progress: Math.min(prog, q.need), done: prog >= q.need, claimed: claimedSet.has(q.key), rewardLabel: q.rewardLabel }; });
+    const dailies = DAILIES.map((q) => { const prog = Number(dRow?.[q.field] || 0); return { key: q.key, label: q.label, need: q.need, progress: Math.min(prog, q.need), done: prog >= q.need, claimed: claimedSet.has(q.key), rewardLabel: dailyRewardLabel(q) }; });
     const equippedIds = new Set(Object.values(bySlot));
     // Everything in the bag, for counting how much of a set a piece belongs to you already hold.
     const ownedIds = new Set((ownedRows || []).map((r) => r.item_id));
