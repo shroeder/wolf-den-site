@@ -419,6 +419,11 @@ export default function GroveScene({
     // hit and never die, so the only thing the loop owes them is the camera transform.
     const colGateRef = useRef(null);
     const colNpcRef = useRef(null);
+    // ⚠️ THE QUEST GIVER IS A PLACE IN THE ZONE, NOT A SPOT ON THE SCREEN. See the note in the camera loop
+    // beside colX, which named this exact defect before Luke hit it: "Anything positioned in PERCENTAGES
+    // would sit still while the world moved underneath it — which is what the quest giver does today, and
+    // the reason he reads as part of the HUD rather than part of the room."
+    const npcRef = useRef(null);
     // ⚠️ hpRef / hpGhostRef ARE GONE WITH THE ELEMENT THEY POINTED AT. The player's own bar was removed
     // on Luke's call ("I hate the kill display and red bar. Remove it.") and these two refs stayed behind,
     // written to by the loop every frame against null for ever after. Declared but never mounted: see the
@@ -700,6 +705,9 @@ export default function GroveScene({
     // a 390px screen, so the doorway was not visible from the spawn at all. +20, with the marshal pulled in
     // to 11 units, clears the door AND leaves the building in frame as you arrive.
     const colX = DOOR_INSET + 20;
+    // Far enough from the Coliseum gate that the two never share a patch of ground, and in from the door so
+    // you walk past him rather than onto him.
+    const npcX = DOOR_INSET + 34;
     // ⚠️ THE ARENA BRINGS ITS OWN ROOM. The backdrop is read from zone.bg in two places — the haze behind
     // everything and the tiled sky — and an arena that only replaced the FLOOR would have put a Coliseum's
     // platforms in front of a forest. One derived source so the two cannot disagree.
@@ -3442,6 +3450,10 @@ export default function GroveScene({
                 if (!node) continue;
                 node.style.transform = `translate3d(${(colX - cam) * unit}px, ${camY * unit}px, 0)`;
             }
+            // The quest giver, by the same maths and for the reason the note above gives.
+            if (npcRef.current) {
+                npcRef.current.style.transform = `translate3d(${(npcX - cam) * unit}px, ${camY * unit}px, 0)`;
+            }
             if (colGateRef.current) {
                 colGateRef.current.classList.toggle("is-near", Math.abs(w.hero.x - colX) < DOOR_NEAR);
             }
@@ -4069,7 +4081,7 @@ export default function GroveScene({
                 ) : null}
 
                 {npcHere ? (
-                    <button type="button"
+                    <button type="button" ref={npcRef}
                         className={`gv-npc${npcHere.active?.ready ? " is-ready" : ""}${npcHere.active ? "" : " is-done"}`}
                         onPointerDown={(e) => { e.stopPropagation(); onTalk?.(); }}
                         aria-label={npcHere.active

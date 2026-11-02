@@ -4256,9 +4256,24 @@ export const GROVE_CSS = `
 /* ── A QUEST-GIVER STANDING IN A ZONE ────────────────────────────────────────────────────────────
    Positioned against the floor the same way the doors are, and deliberately NOT inside the creature
    layer — see the note in GroveScene about why an NPC must never be a .gv-foe. */
+/* ── ⚠️ A PLACE IN THE ROOM, NOT A SPOT ON THE SCREEN ─────────────────────────────────────────
+   Luke: "There's just this random guy fixed on my screen with 05. Nothing. It does not make sense
+   at all."
+
+   This was left:62% / bottom:10% with a 72x104 PIXEL box. Two separate wrongs in three values:
+   the percentage pinned him to the viewport so he never moved while the world slid past, and the
+   pixel size meant he did not scale with the world either -- he was HUD furniture standing in
+   front of the scenery.
+
+   Both fixed the way .gv-colnpc directly above already does it: anchored to the ground, sized in
+   world units, and positioned every frame by the camera loop. ⚠️ 8 UNITS, because a body in this
+   world is 7 -- the same warning the marshal carries, written after a first pass guessed 13 and
+   drew a quest giver twice the height of the hero beside him. */
 .gv-npc {
-    position: absolute; left: 62%; bottom: 10%;
-    width: 72px; height: 104px; padding: 0; border: 0; background: none;
+    position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    width: calc(8 * var(--gv-unit, 1%)); height: calc(8 * var(--gv-unit, 1%));
+    margin-left: calc(-4 * var(--gv-unit, 1%));
+    padding: 0; border: 0; background: none;
     cursor: pointer; z-index: 240;
 }
 .gv-npc img {
