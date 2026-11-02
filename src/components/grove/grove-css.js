@@ -1113,105 +1113,226 @@ export const GROVE_CSS = `
 .gq-goto { align-self: center; font-size: 0.74rem; letter-spacing: 0.04em; color: #e3c766;
     text-align: right; max-width: 92px; line-height: 1.3; }
 
-/* -- THE PROGRESS BAR, WITH SOMETHING IN IT ---------------------------------------------------
-   Luke: "it should tickle my brain when I see that progress bar." The old one was 9px of flat
-   green on a flat track, and 12/12 looked exactly like 7/12 only longer. Three things fix that and
-   none of them is more colour:
+/* -- THE MARSHAL'S OFFER, AND THE GIVER'S --------------------------------------------------------
+   Luke, twice: "it doesnt feel like an mmo quest. Its too web forms", then "I dont like the squarey
+   boxes and the not exciting colors."
 
-     1. the fill is lit -- a gradient with a bright top edge, so it reads as charged rather than
-        painted. A flat rectangle is a measurement; a lit one is a gauge.
-     2. SEGMENT TICKS. Visible chunks turn one long smear into countable progress, which is the
-        whole reason an xp bar has notches.
-     3. FULL IS A DIFFERENT STATE, not a longer one. It goes gold, gains a glow and a shine that
-        crosses it, because arriving has to look different from approaching.
+   The first note sent me to hard square corners and a double rule, which fixed the form problem by
+   overcorrecting into a stone slab. Square is not the opposite of a web form -- a form's tell is the
+   UNIFORM radius on a flat card, not curvature itself. What a game panel has is a SHAPED frame:
+   generous curves, a bevel that catches light, ornament inside the edge, and a ground with depth.
 
-   No prefers-reduced-motion branch anywhere in here, deliberately: this game always animates.
-   [[animations-always-play]] */
+   And the palette was olive on olive. The Grove is green, so a green panel over a green zone is
+   camouflage. The rarity ramp this game already uses runs green -> blue -> PURPLE for epic, and
+   purple against gold is the oldest "this is worth your time" pairing there is. Deep violet ground
+   now, and the gold reads off it instead of sinking into it. */
+.qd-scrim {
+    position: fixed; inset: 0; z-index: 4200;
+    display: flex; align-items: flex-end; justify-content: center; padding: 14px;
+    background: radial-gradient(ellipse at 50% 55%, rgba(74, 44, 120, 0.42), rgba(6, 4, 12, 0.86));
+    animation: qdIn 160ms ease-out;
+}
+@media (min-width: 640px) { .qd-scrim { align-items: center; } }
+@keyframes qdIn { from { opacity: 0; } to { opacity: 1; } }
+.qd-dismiss { position: absolute; inset: 0; border: 0; padding: 0; background: none; cursor: pointer; }
+
+.qd-panel {
+    position: relative; width: min(430px, 100%);
+    padding: 22px 20px 18px;
+    border-radius: 22px;
+    background:
+        radial-gradient(ellipse 120% 70% at 50% 0%, rgba(140, 96, 220, 0.3), transparent 70%),
+        linear-gradient(180deg, #2b1f45 0%, #1a1230 46%, #0f0a1c 100%);
+    border: 1px solid rgba(255, 215, 94, 0.5);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 236, 190, 0.22),
+        inset 0 -18px 40px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(10, 6, 18, 0.9),
+        0 0 36px rgba(150, 96, 230, 0.26),
+        0 26px 60px rgba(0, 0, 0, 0.7);
+    color: #F2EBDA;
+    animation: qdRise 220ms cubic-bezier(.2,.9,.3,1);
+}
+@keyframes qdRise { from { opacity: 0; transform: translateY(16px) scale(0.985); } to { opacity: 1; transform: none; } }
+.qd-panel::before {
+    content: ""; position: absolute; inset: 7px; border-radius: 17px;
+    border: 1px solid rgba(255, 215, 94, 0.2); pointer-events: none;
+}
+
+.qd-top { display: flex; align-items: center; gap: 15px; }
+/* A lit disc, not a square plate. The ring is what makes it a portrait and not a thumbnail. */
+.qd-portrait {
+    width: 98px; height: 98px; flex: none; position: relative; border-radius: 50%;
+    background: radial-gradient(circle at 50% 36%, rgba(176, 130, 255, 0.5), rgba(14, 9, 26, 0.95) 72%);
+    border: 2px solid rgba(255, 215, 94, 0.55);
+    box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.7), 0 0 20px rgba(150, 96, 230, 0.35);
+}
+.qd-portrait img { width: 100%; height: 100%; object-fit: contain; object-position: bottom;
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.65)); }
+
+.qd-id b { display: block; font-family: var(--font-display); font-size: 1.34rem; line-height: 1.1;
+    color: #FFF3D4; letter-spacing: 0.01em; text-shadow: 0 0 16px rgba(255, 215, 94, 0.3); }
+.qd-id span { display: block; margin-top: 5px; font-size: 0.68rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #C9A9F0; }
+
+.qd-say {
+    margin: 17px 0 0; font-size: 1.05rem; line-height: 1.5; font-style: italic; color: #E8DFF6;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.qd-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 215, 94, 0.16); }
+.qd-block > p { margin: 0; font-size: 0.9rem; line-height: 1.45; color: #CFC4E4; }
+.qd-label { display: block; font-size: 0.64rem; letter-spacing: 0.22em; text-transform: uppercase;
+    color: #B493E8; margin-bottom: 8px; }
+
+/* Loot slots: rounded and lit from inside, so a chest sits IN something rather than on a grey square. */
+.qd-loot { display: flex; gap: 10px; margin-bottom: 10px; }
+.qd-slot {
+    position: relative; width: 66px; height: 66px; border-radius: 14px;
+    background: radial-gradient(circle at 50% 28%, rgba(176, 130, 255, 0.34), rgba(12, 8, 22, 0.95) 74%);
+    border: 1px solid rgba(255, 215, 94, 0.4);
+    box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.6), 0 0 12px rgba(150, 96, 230, 0.18);
+}
+.qd-slot img { width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.65)); }
+.qd-n {
+    position: absolute; right: 4px; bottom: 2px;
+    font-family: var(--font-display); font-size: 0.78rem; font-weight: 700; color: #FFE9A4;
+    text-shadow: 0 1px 2px #000, 0 0 4px #000; font-variant-numeric: tabular-nums;
+}
+.qd-fine { margin: 0; font-size: 0.78rem; color: #9B8CB8; }
+
+.qd-record { margin: 14px 0 0; font-size: 0.82rem; color: #B493E8; }
+.qd-record b { color: #FFD75E; }
+.qd-note { margin: 12px 0 0; font-size: 0.9rem; color: #FFD75E; font-style: italic; }
+
+.qd-task { margin: 0 0 3px; font-family: var(--font-display); font-size: 1.04rem; color: #FFF3D4; }
+.qd-ask { margin: 0 0 11px; font-size: 0.86rem; color: #B493E8; text-transform: capitalize; }
+.qd-chain { margin: 14px 0 0; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase;
+    color: #8B7BA8; }
+
+.qd-acts { display: flex; flex-direction: column; gap: 9px; margin-top: 18px; }
+.qd-btn {
+    min-height: 48px; padding: 0 16px; cursor: pointer; border-radius: 14px;
+    font-family: var(--font-display); font-weight: 700; font-size: 1rem; letter-spacing: 0.02em;
+    border: 1px solid rgba(255, 215, 94, 0.4);
+    background: linear-gradient(180deg, rgba(96, 66, 150, 0.75), rgba(42, 28, 68, 0.85));
+    color: #F2EBDA;
+    box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.18);
+    transition: filter 140ms ease, transform 100ms ease;
+}
+.qd-btn:hover:not(:disabled) { filter: brightness(1.12); }
+.qd-btn:active:not(:disabled) { transform: translateY(1px); }
+.qd-btn:disabled { cursor: default; opacity: 0.42; }
+/* The accept: hot gold with a live sheen, because it is what the whole panel is for. */
+.qd-accept {
+    position: relative; overflow: hidden;
+    background: linear-gradient(180deg, #FFE9A4 0%, #F0C452 44%, #C98E1C 100%);
+    border-color: #FFF0BE; color: #2A1C02;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 26px rgba(255, 196, 82, 0.4);
+}
+.qd-accept::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(100deg, transparent 25%, rgba(255, 255, 255, 0.55) 50%, transparent 75%);
+    transform: translateX(-100%); animation: qdShine 2.8s ease-in-out 0.4s infinite;
+}
+.qd-accept:disabled { background: linear-gradient(180deg, rgba(96, 66, 150, 0.5), rgba(42, 28, 68, 0.7));
+    border-color: rgba(255, 215, 94, 0.22); color: #9B8CB8; box-shadow: none; }
+.qd-accept:disabled::after { display: none; }
+.qd-walk {
+    border: 0; background: none; cursor: pointer; padding: 7px 0 0;
+    font-size: 0.86rem; color: #9B8CB8; text-decoration: underline; text-underline-offset: 3px;
+}
+.qd-walk:hover { color: #D6CBE8; }
+
+/* -- THE PROGRESS BAR ----------------------------------------------------------------------------
+   Rounded, deep and lit. Flat green on flat grey said nothing; a capsule with a bright crown over a
+   purple-black well, notched across the top, reads as a gauge filling. Full is a SEPARATE state --
+   gold, brighter glow, a shine crossing it -- because arriving must not look like approaching with a
+   longer rectangle. No reduce-motion branch anywhere here. [[animations-always-play]] */
 .qd-bar {
-    display: block; position: relative; height: 14px; overflow: hidden;
-    background: linear-gradient(180deg, #0a0e09, #141a12);
-    border: 1px solid rgba(190, 176, 108, 0.32);
-    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.8);
+    display: block; position: relative; height: 16px; border-radius: 10px; overflow: hidden;
+    background: linear-gradient(180deg, #120c22, #1d1536);
+    border: 1px solid rgba(255, 215, 94, 0.26);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.85);
 }
 .qd-bar i {
-    display: block; height: 100%; position: relative;
-    background: linear-gradient(180deg, #bcd97a 0%, #86b347 45%, #5d8a33 100%);
-    box-shadow: 0 0 10px rgba(150, 200, 90, 0.4);
-    transition: width 420ms cubic-bezier(.2,.9,.3,1);
+    display: block; height: 100%; position: relative; border-radius: 9px;
+    background: linear-gradient(180deg, #9CF7C0 0%, #4FD98A 42%, #249A5E 100%);
+    box-shadow: 0 0 14px rgba(79, 217, 138, 0.55);
+    transition: width 460ms cubic-bezier(.2,.9,.3,1);
 }
-/* The lit top edge. One pixel, and it is most of the difference between flat and charged. */
 .qd-bar i::before {
-    content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+    content: ""; position: absolute; inset: 2px 3px auto 3px; height: 3px; border-radius: 3px;
     background: rgba(255, 255, 255, 0.5);
 }
-/* Countable chunks. Painted over the whole track so empty segments read as "still to go". */
 .qd-bar::after {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
+    content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 10px;
     background: repeating-linear-gradient(90deg,
-        transparent 0 calc(8.333% - 1px), rgba(6, 10, 6, 0.75) calc(8.333% - 1px) 8.333%);
+        transparent 0 calc(8.333% - 2px), rgba(10, 6, 20, 0.6) calc(8.333% - 2px) 8.333%);
 }
-
-/* ARRIVING LOOKS DIFFERENT FROM APPROACHING. */
-.qd-block .qd-bar i[style*="width: 100%"],
-.qd-bar.is-full i {
-    background: linear-gradient(180deg, #ffe9a4 0%, #f0c452 45%, #c79324 100%);
-    box-shadow: 0 0 16px rgba(240, 196, 82, 0.7);
+.qd-block.is-ready .qd-bar i {
+    background: linear-gradient(180deg, #FFF3C4 0%, #FFD75E 42%, #D79A1E 100%);
+    box-shadow: 0 0 22px rgba(255, 215, 94, 0.8);
 }
-.qd-block .qd-bar i[style*="width: 100%"]::after,
-.qd-bar.is-full i::after {
+.qd-block.is-ready .qd-bar i::after {
     content: ""; position: absolute; inset: 0;
-    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.65) 50%, transparent 80%);
-    transform: translateX(-100%);
-    animation: qdShine 2.1s ease-in-out 0.25s infinite;
+    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.7) 50%, transparent 80%);
+    transform: translateX(-100%); animation: qdShine 2.1s ease-in-out 0.25s infinite;
 }
-@keyframes qdShine { to { transform: translateX(240%); } }
+@keyframes qdShine { to { transform: translateX(260%); } }
 
-/* The count. Tabular, and gold the moment it matches. */
-.qd-count { font-size: 0.92rem; font-weight: 700; color: #cfd6c3; }
-.qd-block:has(i[style*="width: 100%"]) .qd-count { color: #ffd75e; font-size: 1.02rem; }
-/* "Ready to hand in" is the loudest thing on the card after the button. */
-.qd-block:has(i[style*="width: 100%"]) .qd-label { color: #ffd75e; animation: qdNudge 1.9s ease-in-out infinite; }
-@keyframes qdNudge { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.qd-count { display: block; margin-top: 7px; font-size: 0.94rem; font-weight: 700; color: #CFC4E4;
+    font-variant-numeric: tabular-nums; }
+.qd-block.is-ready .qd-count { color: #FFD75E; font-size: 1.08rem;
+    text-shadow: 0 0 14px rgba(255, 215, 94, 0.5); }
+.qd-block.is-ready .qd-label { color: #FFD75E;
+    animation: qdNudge 1.9s ease-in-out infinite; }
+@keyframes qdNudge { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-/* -- QUEST PROGRESS, IN PLAY -------------------------------------------------------------------
-   The toast that fires on a settle that moved a step. Below the HUD and above the floor, so it
-   lands in the dead middle-left where nothing else is drawn and a thumb never rests. */
+/* -- QUEST PROGRESS, IN PLAY ---------------------------------------------------------------------
+   The toast that fires on a settle that moved a step. Rounded and glowing so it reads as a reward
+   popping rather than a notification bar docking. */
 .gv-qtick {
-    position: absolute; left: 10px; top: 86px; z-index: 300; width: 186px;
-    padding: 9px 11px 10px;
-    background: linear-gradient(180deg, rgba(30, 38, 26, 0.96), rgba(16, 22, 14, 0.97));
-    border: 1px solid rgba(190, 176, 108, 0.45);
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+    position: absolute; left: 10px; top: 86px; z-index: 300; width: 196px;
+    padding: 10px 12px 11px; border-radius: 16px;
+    background:
+        radial-gradient(ellipse 120% 80% at 50% 0%, rgba(140, 96, 220, 0.4), transparent 72%),
+        linear-gradient(180deg, #2a1f45, #130d24);
+    border: 1px solid rgba(255, 215, 94, 0.4);
+    box-shadow: inset 0 1px 0 rgba(255, 236, 190, 0.18), 0 0 24px rgba(150, 96, 230, 0.28),
+        0 10px 24px rgba(0, 0, 0, 0.6);
     pointer-events: none;
-    animation: qtIn 240ms cubic-bezier(.2,.9,.3,1), qtOut 420ms ease-in 2.1s forwards;
+    animation: qtIn 260ms cubic-bezier(.2,.9,.3,1), qtOut 420ms ease-in 2.1s forwards;
 }
 .gv-qtick.is-done {
-    border-color: #f0c452;
-    box-shadow: 0 0 22px rgba(240, 196, 82, 0.35), 0 8px 22px rgba(0, 0, 0, 0.6);
-    animation: qtIn 240ms cubic-bezier(.2,.9,.3,1), qtPop 520ms ease-out 240ms, qtOut 420ms ease-in 3.7s forwards;
+    border-color: #FFD75E;
+    box-shadow: 0 0 30px rgba(255, 215, 94, 0.45), 0 10px 24px rgba(0, 0, 0, 0.6);
+    animation: qtIn 260ms cubic-bezier(.2,.9,.3,1), qtPop 560ms ease-out 240ms, qtOut 420ms ease-in 3.7s forwards;
 }
-@keyframes qtIn { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+@keyframes qtIn { from { opacity: 0; transform: translateX(-16px) scale(0.94); } to { opacity: 1; transform: none; } }
 @keyframes qtOut { to { opacity: 0; transform: translateX(-10px); } }
-@keyframes qtPop { 0% { transform: scale(1); } 35% { transform: scale(1.06); } 100% { transform: scale(1); } }
+@keyframes qtPop { 0% { transform: scale(1); } 32% { transform: scale(1.08); } 100% { transform: scale(1); } }
 
 .gv-qtick-top { display: block; font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase;
-    color: #a8a271; }
-.gv-qtick.is-done .gv-qtick-top { color: #ffd75e; }
-.gv-qtick b { display: block; margin: 3px 0 7px; font-family: var(--font-display); font-size: 0.86rem;
-    line-height: 1.2; color: #f3eedd; }
-.gv-qtick-bar { display: block; position: relative; height: 10px; overflow: hidden;
-    background: linear-gradient(180deg, #0a0e09, #141a12);
-    border: 1px solid rgba(190, 176, 108, 0.3); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8); }
-.gv-qtick-bar i { display: block; height: 100%; position: relative;
-    background: linear-gradient(180deg, #bcd97a, #6d8f3c);
-    transition: width 380ms cubic-bezier(.2,.9,.3,1); }
-.gv-qtick-bar i::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
-    background: rgba(255, 255, 255, 0.45); }
-.gv-qtick.is-done .gv-qtick-bar i { background: linear-gradient(180deg, #ffe9a4, #c79324);
-    box-shadow: 0 0 12px rgba(240, 196, 82, 0.65); }
-.gv-qtick-num { display: block; margin-top: 4px; font-size: 0.68rem; color: #a8a271;
+    color: #B493E8; }
+.gv-qtick.is-done .gv-qtick-top { color: #FFD75E; }
+.gv-qtick b { display: block; margin: 4px 0 8px; font-family: var(--font-display); font-size: 0.88rem;
+    line-height: 1.2; color: #FFF3D4; }
+.gv-qtick-bar { display: block; position: relative; height: 12px; border-radius: 7px; overflow: hidden;
+    background: linear-gradient(180deg, #120c22, #1d1536);
+    border: 1px solid rgba(255, 215, 94, 0.24); box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.85); }
+.gv-qtick-bar i { display: block; height: 100%; position: relative; border-radius: 6px;
+    background: linear-gradient(180deg, #9CF7C0, #249A5E);
+    box-shadow: 0 0 12px rgba(79, 217, 138, 0.5);
+    transition: width 400ms cubic-bezier(.2,.9,.3,1); }
+.gv-qtick-bar i::before { content: ""; position: absolute; inset: 2px 3px auto 3px; height: 2px;
+    border-radius: 2px; background: rgba(255, 255, 255, 0.45); }
+.gv-qtick.is-done .gv-qtick-bar i { background: linear-gradient(180deg, #FFF3C4, #D79A1E);
+    box-shadow: 0 0 18px rgba(255, 215, 94, 0.8); }
+.gv-qtick-num { display: block; margin-top: 5px; font-size: 0.7rem; color: #B493E8;
     font-variant-numeric: tabular-nums; }
-.gv-qtick.is-done .gv-qtick-num { color: #ffd75e; }
+.gv-qtick.is-done .gv-qtick-num { color: #FFD75E; font-weight: 700; }
 
 /* -- THE QUEST LAB WRAPPER (dev only) --------------------------------------------------------
    Chrome for the beat-by-beat rig at /marketplace/grove/quest-lab. Deliberately plain: the thing
@@ -1232,119 +1353,6 @@ export const GROVE_CSS = `
 
 .ql-fake { max-width: 620px; margin: 14px auto 0; font-size: 0.86rem; color: #93a089; }
 .ql-fake b { color: #e3c766; display: block; margin-top: 3px; }
-
-/* -- THE MARSHAL'S OFFER ---------------------------------------------------------------------
-   Luke: "it doesnt feel like an mmo quest. Its too web forms." The previous pass was a rounded
-   card with a label/value table in it, which is a settings screen. This is built like a quest
-   dialogue: a framed portrait, his words as the body, the job, the loot as OBJECTS in slots, and
-   accept / walk away at the bottom.
-
-   WARNING: position fixed, z-index 4200. GroveScene portals its world layer to document.body, so a
-   panel rendered in the page tree under any ancestor with a transform, filter or opacity gets a
-   LOCAL stacking context and paints under the zone however high the number goes. */
-.qd-scrim {
-    position: fixed; inset: 0; z-index: 4200;
-    display: flex; align-items: flex-end; justify-content: center; padding: 14px;
-    background: radial-gradient(ellipse at 50% 60%, rgba(8, 12, 8, 0.55), rgba(4, 7, 4, 0.82));
-    animation: qdIn 150ms ease-out;
-}
-@media (min-width: 640px) { .qd-scrim { align-items: center; } }
-@keyframes qdIn { from { opacity: 0; } to { opacity: 1; } }
-.qd-dismiss { position: absolute; inset: 0; border: 0; padding: 0; background: none; cursor: pointer; }
-
-/* Squared corners and a double rule, not a rounded card. A 16px radius is the single strongest
-   "this is a web component" signal on the whole thing. */
-.qd-panel {
-    position: relative; width: min(430px, 100%);
-    padding: 20px 20px 18px;
-    background:
-        linear-gradient(180deg, rgba(42, 48, 36, 0.97), rgba(20, 25, 18, 0.99));
-    border: 1px solid #6d6a3f;
-    box-shadow: 0 0 0 3px rgba(12, 16, 10, 0.95), 0 0 0 4px rgba(142, 132, 78, 0.55),
-        0 24px 60px rgba(0, 0, 0, 0.72);
-    color: #e9e3cd;
-}
-/* A hairline inset, the way a panel in a game has a bevel rather than a border-radius. */
-.qd-panel::before {
-    content: ""; position: absolute; inset: 5px; border: 1px solid rgba(190, 176, 108, 0.22);
-    pointer-events: none;
-}
-
-.qd-top { display: flex; align-items: center; gap: 14px; }
-/* The person is the biggest thing on the panel. 96px, framed, on its own plate. */
-.qd-portrait {
-    width: 96px; height: 96px; flex: none; position: relative;
-    background: radial-gradient(ellipse at 50% 35%, rgba(120, 132, 80, 0.3), rgba(10, 14, 9, 0.9));
-    border: 1px solid rgba(190, 176, 108, 0.5);
-    box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.7);
-}
-.qd-portrait img { width: 100%; height: 100%; object-fit: contain; object-position: bottom;
-    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.6)); }
-
-.qd-id b { display: block; font-family: var(--font-display); font-size: 1.3rem; line-height: 1.1;
-    color: #f6edcf; letter-spacing: 0.01em; }
-.qd-id span { display: block; margin-top: 4px; font-size: 0.68rem; letter-spacing: 0.2em;
-    text-transform: uppercase; color: #a8a271; }
-
-/* What he says. Larger than the body copy and set in italic, because it is the one thing on the
-   panel that is a voice rather than information. */
-.qd-say {
-    margin: 16px 0 0; font-size: 1.04rem; line-height: 1.5; font-style: italic; color: #ded7bb;
-    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
-}
-
-.qd-block { margin-top: 16px; padding-top: 13px; border-top: 1px solid rgba(190, 176, 108, 0.2); }
-.qd-block > p { margin: 0; font-size: 0.9rem; line-height: 1.45; color: #c3bd9d; }
-.qd-label { display: block; font-size: 0.64rem; letter-spacing: 0.22em; text-transform: uppercase;
-    color: #a8a271; margin-bottom: 7px; }
-
-/* The loot, as things. A row of slots is the oldest reward idiom there is and it does in one glance
-   what three rows of right-aligned text could not. */
-.qd-loot { display: flex; gap: 9px; margin-bottom: 9px; }
-.qd-slot {
-    position: relative; width: 62px; height: 62px;
-    background: radial-gradient(ellipse at 50% 30%, rgba(120, 132, 80, 0.26), rgba(10, 14, 9, 0.92));
-    border: 1px solid rgba(190, 176, 108, 0.45);
-    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.65);
-}
-.qd-slot img { width: 100%; height: 100%; object-fit: contain;
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); }
-/* Stack count, bottom-right, the way every inventory slot has done it for thirty years. */
-.qd-n {
-    position: absolute; right: 2px; bottom: 1px;
-    font-family: var(--font-display); font-size: 0.76rem; font-weight: 700; color: #f6edcf;
-    text-shadow: 0 1px 2px #000, 0 0 3px #000; font-variant-numeric: tabular-nums;
-}
-.qd-fine { margin: 0; font-size: 0.78rem; color: #8f8a6b; }
-
-.qd-record { margin: 14px 0 0; font-size: 0.82rem; color: #a8a271; }
-.qd-record b { color: #e3c766; }
-.qd-note { margin: 12px 0 0; font-size: 0.88rem; color: #e3c766; font-style: italic; }
-
-.qd-acts { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
-/* Squared, bevelled, 46px of thumb. Not a pill. */
-.qd-btn {
-    min-height: 46px; padding: 0 16px; cursor: pointer;
-    font-family: var(--font-display); font-weight: 700; font-size: 1rem; letter-spacing: 0.02em;
-    border: 1px solid rgba(190, 176, 108, 0.5);
-    background: linear-gradient(180deg, rgba(86, 92, 56, 0.6), rgba(38, 44, 28, 0.75));
-    color: #e9e3cd;
-}
-.qd-btn:hover:not(:disabled) { border-color: rgba(227, 199, 102, 0.8); }
-.qd-btn:disabled { cursor: default; opacity: 0.45; }
-.qd-accept {
-    background: linear-gradient(180deg, #e8cf7e, #b4902c);
-    border-color: #f0dc9a; color: #231a04;
-    box-shadow: 0 0 18px rgba(227, 199, 102, 0.22);
-}
-.qd-accept:disabled { background: linear-gradient(180deg, rgba(86, 92, 56, 0.5), rgba(38, 44, 28, 0.7));
-    border-color: rgba(190, 176, 108, 0.3); color: #a8a271; box-shadow: none; }
-/* Declining is a sentence, not a button. It should never compete with the offer. */
-.qd-walk {
-    border: 0; background: none; cursor: pointer; padding: 6px 0 0;
-    font-size: 0.84rem; color: #8f8a6b; text-decoration: underline; text-underline-offset: 3px;
-}
-.qd-walk:hover { color: #c3bd9d; }
 
 /* ── THE COLISEUM GATE, AND WHY IT IS NOT A .gv-door ─────────────────────────────────────────
    Same world placement and the same unit maths, deliberately a different class. A .gv-door means

@@ -27,6 +27,10 @@ export default function GroveGiver({ npcHere, busy = false, onClaim, onClose }) 
     const a = npcHere.active;
     const done = !a;
 
+    // ⚠️ is-ready IS A CLASS BELOW, NOT AN INLINE-STYLE SNIFF. The gold "full" state was first written as
+    // .qd-bar i[style*="width: 100%"] and silently never matched: React emits width:100% with NO space
+    // after the colon, so a finished step kept a green bar and a grey label. Never ask CSS to parse a style
+    // attribute it did not write — say the state out loud and key off that.
     async function handIn() {
         if (!a?.ready || sent) return;
         setSent(true);
@@ -62,7 +66,7 @@ export default function GroveGiver({ npcHere, busy = false, onClaim, onClose }) 
                         <p>You have done everything they had. {npcHere.steps} of {npcHere.steps}.</p>
                     </div>
                 ) : (
-                    <div className="qd-block">
+                    <div className={`qd-block${a.ready ? " is-ready" : ""}`}>
                         <span className="qd-label">{a.ready ? "Ready to hand in" : "What they asked for"}</span>
                         <p className="qd-task">{a.title}</p>
                         <p className="qd-ask">
