@@ -27,6 +27,12 @@ const CHORD = {
     D: { arp: [62, 66, 69, 74], bass: 50 },
 };
 const ARP_PATTERN = [0, 1, 2, 3, 2, 3, 1, 2]; // which chord tone plays on each of the 8 eighth-notes in a bar
+// ── ⚠️ AND A VIBE MAY BRING ITS OWN ─────────────────────────────────────────────────────────────────────
+// Every loop in this file used the one pattern above, which is why the cabinet tunes had to be told apart by
+// tempo and register alone. For the seven towns that is not enough: they are the SAME ROOM in seven biomes,
+// heard one after another by somebody comparing them, and four of them want a rhythmic figure rather than a
+// different speed — a pick swing, a boat's roll, a march. `arp` on a vibe replaces this; leaving it off keeps
+// the original figure, so nothing already shipped changes by a note.
 // Town lead melody over the 4-bar loop (step 0..31 = eighth-notes). Sparse + singable; null = rest.
 const TOWN_LEAD = { 0: 64, 3: 67, 8: 71, 11: 67, 16: 69, 19: 72, 24: 72, 27: 69 };
 // The casino's lead. Late, lazy entries that come in behind the beat and hold — a lounge line, not a chase.
@@ -82,8 +88,77 @@ const BINGO_LEAD = { 0: 72, 2: 72, 4: 76, 6: 79, 8: 77, 12: 76, 16: 74, 18: 74, 
 // the loop has to survive somebody sitting at it for twenty hands.
 const BLACKJACK_LEAD = { 3: 69, 9: 72, 15: 70, 21: 69, 27: 65 };
 
+// ── ONE TUNE PER TOWN ───────────────────────────────────────────────────────────────────────────────────
+// Luke: "I think the music is the same for every town. Can you make it different so that it fits the theme
+// for each town?"
+//
+// It was: every street asked for `town`, so the cave camp, the swamp and the fortress all played the bright
+// C-G-Am-F folk loop written for the first forest waystation.
+//
+// ⚠️ THE TOWNS ARE A HARDER PROBLEM THAN THE CABINETS, and the note above ARP_PATTERN is why. The eight
+// casino machines sit on a floor you walk across, so tempo and register alone tell them apart. The seven
+// towns are the SAME STREET — same buildings, same camera, same layout — in seven biomes, and they get
+// compared back to back by somebody flipping through the atlas. So each one moves three things at once:
+// the PROGRESSION (what key it lives in), the TEXTURE (filter ceiling + oscillator + release), and the
+// FIGURE (its own arp pattern), on top of tempo.
+//
+// ⚠️ ROOTWOOD IS NOT IN THIS LIST, DELIBERATELY. Town 1 is the forest waystation the `town` loop was
+// written for — it is already its own theme, and it is the tune the plaza has always had. Mapping it to a
+// copy of itself would be a second place to change it. See TOWN_VIBE in TownClient.
+
+// Deepdelve — a work song. Low, few notes, long gaps: a pick swinging in a space too big for the lantern.
+const DEEPDELVE_LEAD = { 0: 50, 6: 53, 12: 57, 16: 53, 24: 50, 28: 48 };
+// Fenhollow — four notes in thirty-two steps, high and wet, falling. Water off a leaf, not a melody.
+const FENHOLLOW_LEAD = { 0: 74, 10: 72, 16: 77, 26: 74 };
+// Saltwrack — the only singable line of the seven. A harbour has people in it who know the words.
+const SALTWRACK_LEAD = { 0: 67, 3: 71, 8: 74, 12: 72, 16: 71, 20: 67, 26: 69, 30: 71 };
+// Drowned Quay — a lament: four held notes walking down and never coming back up.
+const DROWNEDQUAY_LEAD = { 0: 57, 8: 55, 16: 53, 24: 52 };
+// Gilded — quick, bright and never still, the way a room full of people counting sounds.
+const GILDED_LEAD = { 0: 72, 2: 76, 5: 74, 8: 79, 10: 77, 13: 76, 16: 74, 18: 77, 21: 79, 24: 81, 27: 79, 30: 76 };
+// Ashfall — a horn call on open fifths and octaves. The oldest "form up" shape there is.
+const ASHFALL_LEAD = { 0: 69, 4: 76, 8: 74, 16: 72, 20: 69, 24: 76, 28: 81 };
+
 const VIBES = {
     town: { bpm: 104, lpf: 1600, prog: ["C", "G", "Am", "F"], lead: TOWN_LEAD, arpType: "triangle", arpGain: 0.06, bassType: "triangle", bassGain: 0.15, arpRelease: 0.55, master: 0.42 },
+    // ── TOWN 2 · DEEPDELVE CAMP (cave) ── Slow and laborious, and the darkest ceiling of the seven: stone
+    // eats the top end, so 760Hz is the room as much as the mood. The arp is the figure that matters —
+    // [0,0,2,0,3,0,2,0] strikes the root over and over with an answer between strikes, which is a pick
+    // swinging, and a long release lets each one ring off the walls. Sawtooth bass for the weight of rock.
+    town_deepdelve: { bpm: 78, lpf: 760, prog: ["Dm", "Bb", "F", "Am"], lead: DEEPDELVE_LEAD,
+        arp: [0, 0, 2, 0, 3, 0, 2, 0], arpType: "triangle", arpGain: 0.05, bassType: "sawtooth",
+        bassGain: 0.22, arpRelease: 0.85, master: 0.38 },
+    // ── TOWN 3 · FENHOLLOW (swamp) ── The slowest and the murkiest. Sine everywhere, a 640Hz ceiling and a
+    // 1.3s release mean the notes smear into one another instead of landing — nothing here has an edge. The
+    // progression wanders and the Gm leans flat, so it never quite arrives anywhere, which is the swamp.
+    town_fenhollow: { bpm: 68, lpf: 640, prog: ["Dm", "Am", "Gm", "Dm"], lead: FENHOLLOW_LEAD,
+        arp: [0, 2, 3, 2, 1, 2, 3, 2], arpType: "sine", arpGain: 0.055, bassType: "sine",
+        bassGain: 0.18, arpRelease: 1.3, master: 0.34 },
+    // ── TOWN 4 · SALTWRACK LANDING (coast) ── The one that opens back up after two dark towns, and the
+    // relief is the point: major, bright ceiling, air in it. [0,1,2,3,3,2,1,0] climbs and comes straight
+    // back down — a symmetrical figure is a SWAY, which no amount of tempo would have produced.
+    town_saltwrack: { bpm: 96, lpf: 2000, prog: ["G", "Em", "C", "D"], lead: SALTWRACK_LEAD,
+        arp: [0, 1, 2, 3, 3, 2, 1, 0], arpType: "triangle", arpGain: 0.055, bassType: "triangle",
+        bassGain: 0.18, arpRelease: 0.5, master: 0.40 },
+    // ── TOWN 5 · DROWNED QUAY (ruins) ── Everything falls. The progression descends, the arp descends
+    // ([3,2,1,0,…]) and the lead walks down four held notes and stops. Sawtooth bass under a sine arp is
+    // the weight of the water over the top of somewhere that used to be a town.
+    town_drownedquay: { bpm: 72, lpf: 820, prog: ["Am", "Em", "F", "Dm"], lead: DROWNEDQUAY_LEAD,
+        arp: [3, 2, 1, 0, 2, 1, 0, 1], arpType: "sine", arpGain: 0.05, bassType: "sawtooth",
+        bassGain: 0.21, arpRelease: 1.0, master: 0.36 },
+    // ── TOWN 6 · GILDED EXCHANGE (gold) ── C-Am-Dm-G is the oldest turnaround in popular music and it
+    // circles without ever settling, which is what a market is. The shortest release of the seven (0.3)
+    // clips every note off, so it reads as busy rather than merely fast.
+    town_gilded: { bpm: 112, lpf: 2300, prog: ["C", "Am", "Dm", "G"], lead: GILDED_LEAD,
+        arp: [0, 2, 1, 3, 2, 0, 3, 1], arpType: "triangle", arpGain: 0.05, bassType: "triangle",
+        bassGain: 0.19, arpRelease: 0.3, master: 0.36 },
+    // ── TOWN 7 · ASHFALL BASTION (war) ── ⚠️ NOT THE RAID LOOP SLOWED DOWN. The raid is a chase at 144 and
+    // this is a garrison: 100bpm, the heaviest bass in the game outside the Vault, and a short release that
+    // makes it march. [0,3,0,3,…] alternates root and octave — a drum tattoo, the figure armies actually
+    // use. Am-F-E-Am RESOLVES, hard, where the Hallowe'en loop's Am-F-Dm-E deliberately refuses to.
+    town_ashfall: { bpm: 100, lpf: 1700, prog: ["Am", "F", "E", "Am"], lead: ASHFALL_LEAD,
+        arp: [0, 3, 0, 3, 2, 3, 1, 3], arpType: "triangle", arpGain: 0.05, bassType: "sawtooth",
+        bassGain: 0.25, arpRelease: 0.35, master: 0.42 },
     // ── THE CASINO FLOOR ── Am -> Dm -> G -> C is a TURNAROUND: it never resolves, it just keeps handing
     // you back to the top, which is exactly the feeling a room full of machines is trying to produce. Slow
     // enough to stand around in, a soft sine arp for the glassy lounge shimmer over the top, and a fat
@@ -238,8 +313,9 @@ export default function SceneMusic({ vibe = "town", place = "top-right", muted: 
             const bar = Math.floor(s / 8) % 4;
             const inBar = s % 8;
             const chord = CHORD[cfg.prog[bar]];
-            // Arpeggio (every eighth-note)
-            pluck(chord.arp[ARP_PATTERN[inBar] % chord.arp.length], t, cfg.arpRelease, cfg.arpGain, cfg.arpType);
+            // Arpeggio (every eighth-note), on this vibe's own figure if it brought one.
+            const pat = cfg.arp || ARP_PATTERN;
+            pluck(chord.arp[pat[inBar] % chord.arp.length], t, cfg.arpRelease, cfg.arpGain, cfg.arpType);
             // Bass on beats 1 and 3
             if (inBar === 0 || inBar === 4) pluck(chord.bass, t, step8 * 3.6, cfg.bassGain, cfg.bassType);
             // Lead melody (town), longer + slightly detuned for a singing tone

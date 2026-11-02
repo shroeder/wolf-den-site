@@ -205,9 +205,7 @@ function Avatar({ a, isYou, onTap, raiding }) {
                 {a.sprite ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={a.sprite} alt={a.name} draggable={false} style={{ transform: spriteTransform(a.flip, a.facing) }} />
-                ) : (
-                    <span className="tw-sprite-fallback" style={{ transform: spriteTransform(a.flip, a.facing) }}>🐺</span>
-                )}
+                ) : null}
                 {a.wave ? <span className="tw-wave">👋</span> : null}
             </div>
             <div className="tw-name">{isYou ? "You" : a.name}</div>
@@ -591,11 +589,54 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
     );
 }
 
-// A bounty's glyph. Game-Icons, not emoji: emoji are drawn by the operating system, so the same bounty is a
-// different picture on an iPhone, an Android and a laptop, and none of the three match this game's art.
-const QuestIcon = ({ name }) => {
-    const C = Gi[name] || Gi.GiScrollUnfurled;
-    return <span className="tw-quest-emoji" aria-hidden="true"><C /></span>;
+// ── ⚠️ A BOUNTY WEARS THE SPRITE OF THE PLACE IT SENDS YOU ───────────────────────────────────────────────
+// Luke, looking at the board: "Use sprites. We have a rule against this. Fix all of them having these."
+//
+// They were react-icons glyphs — a flat monochrome ladder, anvil, sailboat and wheat sheaf, in a list whose
+// OTHER half (the hunts, directly above) already drew the real painted creature. Two kinds of picture in one
+// list is the tell. The rule is [[no-icons-or-glyphs-in-the-game]], and the defence in the old comment here
+// ("Game-Icons, not emoji") answered the emoji half of it and not the glyph half.
+//
+// ⚠️ NO NEW ART WAS DRAWN FOR THIS, AND THAT IS THE POINT RATHER THAN A SAVING. Every bounty is an errand to
+// a room that already has a sprite — "Harvest 5 crops on your farm" is the Farm, "Pour 2 smelts" is the Mine
+// — so pointing at that room's own drawing is the sanctioned reuse in the rule, and it is more honest than a
+// seventeenth bespoke icon would have been. Three of them (the mine's tunnel, seams and furnace) share the
+// Mine's sprite because they genuinely share the Mine; these are errands, not destinations, so the
+// one-sprite-per-destination rule is not in play.
+//
+// The two that are not nav destinations take the street's OWN art, which is per-town and already loaded: the
+// Tavern the bounty means is the tavern standing in THIS town, and the Well is the centrepiece on this
+// street. A seventeen-entry map with a hole in it is the failure mode here, so check-quest-sprites asserts
+// every activity in QUEST_POOL resolves.
+const QUEST_SPRITE = {
+    harvest: "/images/nav/farm.png",
+    angler: "/images/nav/fishing.png",
+    voyage: "/images/nav/sailing.png",
+    slayer: "/images/nav/boss.png",
+    smith: "/images/nav/forge.png",
+    beastfriend: "/images/nav/pets.png",
+    // The mine's three verbs — steps, seams and smelts — are all the Mine.
+    delver: "/images/nav/mining.png",
+    collier: "/images/nav/mining.png",
+    founder: "/images/nav/mining.png",
+    delver_deep: "/images/nav/delves.png",
+    merchant: "/images/nav/store.png",
+    cook: "/images/cooking/dish.png",
+    hoarder: "/images/ui/chest.png",
+    // Both of these happen in the plaza itself rather than in a room you travel to.
+    rally: "/images/nav/boss.png",
+    civic: "/images/nav/town.png",
+};
+// Activity → the key its sprite lives under in the town's own art, for the two that are street furniture
+// rather than doors. `centerpiece` is the fountain/well; see the themed() call that draws it.
+const QUEST_TOWN_ART = { patron: "tavern", well: "centerpiece" };
+
+// ⚠️ .tw-hunt-art, NOT a class of its own. It is already "the size the bounty icons sit at so the two lists
+// stay aligned" — its own comment — and a second 34px rule beside it is the pair that drifts.
+const QuestIcon = ({ activity, art }) => {
+    const src = QUEST_SPRITE[activity] || art?.[QUEST_TOWN_ART[activity]]?.url || "/images/nav/bounties.png";
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="tw-hunt-art" src={src} alt="" aria-hidden="true" draggable={false} />;
 };
 
 // `frozen` is the lab's doing: the plaza polls itself every couple of seconds, so a fixture handed in as
@@ -1201,6 +1242,19 @@ function buildHalloweenDressing(buildings, occupied = []) {
     }
     return out;
 }
+
+// ── THE TOWN'S OWN TUNE ──────────────────────────────────────────────────────────────────────────────────
+// town id → the vibe in SceneMusic that belongs to it. ⚠️ ROOTWOOD IS MISSING ON PURPOSE: town 1 is the
+// forest waystation the default `town` loop was written for, so it falls through to it rather than carrying
+// a second name for the same tune. The ungated street (no `town` at all) lands in the same place.
+const TOWN_VIBE = {
+    deepdelve: "town_deepdelve",
+    fenhollow: "town_fenhollow",
+    saltwrack: "town_saltwrack",
+    drownedquay: "town_drownedquay",
+    gilded: "town_gilded",
+    ashfall: "town_ashfall",
+};
 
 // ── ⚠️ WHICH TOWN, WHEN THERE IS NO URL TO READ IT FROM ──────────────────────────────────────────────────
 // `previewTown` is the town number this street was mounted for. The page at /marketplace/town puts it in the
@@ -2429,7 +2483,12 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     Gourdfather, the candy and the chests go the other way (they are CONTENT and follow
                     HALLOWEEN_PUBLIC); this is the same line the fish module draws, from the other side.
                     A raid still wins: the plaza is on fire and that outranks the season. */}
-                <SceneMusic vibe={raidActive ? "raid" : spooky ? "town_hw" : "town"} />
+                {/* ⚠️ AND THE BIOME PICKS THE TUNE. Every street asked for `town`, so the cave camp, the
+                    swamp and the fortress all played the bright folk loop written for the first forest
+                    waystation. TOWN_VIBE answers with the town's own; an unlisted town (Rootwood, and the
+                    default ungated street, which has no `town` at all) falls through to that same loop,
+                    which is the one it was written for. See the note over the vibes in SceneMusic. */}
+                <SceneMusic vibe={raidActive ? "raid" : spooky ? "town_hw" : (TOWN_VIBE[town?.id] || "town")} />
                 {/* ONE status bubble, top-left: who's here AND whether the shop is open. These were two separate
                     absolutely-positioned pills and they overlapped each other the moment the Den was open —
                     the "1 in town" count sat underneath "Open until 9 PM". They're the same kind of
@@ -2924,7 +2983,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         {art.smith?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={art.smith.url} alt="Blacksmith" draggable={false} />
-                        ) : <span className="tw-npc-emoji">⚒️</span>}
+                        ) : null}
                     </button>
                     ) : null}
                     {/* Town Crier — shouts rotating live news; tap to open the Town Hall */}
@@ -2947,7 +3006,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         <button type="button" className="tw-npc-btn tw-votebooth"
                             style={{ left: stockade?.occupant ? `${NPC_X.boothHeld}%` : `${NPC_X.booth}%`, top: `${GROUND + 6}%` }}
                             onClick={(e) => { e.stopPropagation(); setVoteOpen(true); }} aria-label="The voting booth">
-                            <span className="tw-npc-bubble">🗳️ Who goes in the stockade?</span>
+                            <span className="tw-npc-bubble">Who goes in the stockade?</span>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img className="tw-booth-art" src="/images/town/vote-booth.png" alt="" draggable="false" />
                         </button>
@@ -2958,7 +3017,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 half of the feature — what they are accused of — hidden behind a tap. The crime is
                                 the whole joke, so it goes on the sign. */}
                             <span className="tw-npc-bubble tw-stock-plate">
-                                <b>⛓️ {stockade.occupant.name}</b>
+                                <b>{stockade.occupant.name}</b>
                                 {stockade.occupant.reason ? <em>&ldquo;{stockade.occupant.reason}&rdquo;</em> : null}
                             </span>
                             {stockade.occupant.artUrl || stockade.occupant.spriteUrl ? (
@@ -2978,7 +3037,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 // Only when we have neither: the empty prop rather than nothing at all.
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={art.stockade.url} alt="The Stockade" draggable={false} />
-                            ) : <span className="tw-npc-emoji">⛓️</span>}
+                            ) : null}
                         </button>
                     ) : null}
                     {/* ⚠️ THE CRIER IS THE CAPITAL'S, NOT EVERY TOWN'S. He shouts the Den's live news and
@@ -2987,11 +3046,11 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         stockade and the voting booth: those belong to the first town only. */}
                     {townHasStocks ? (
                     <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.crier}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
-                        {crierLines.length ? <span className="tw-npc-bubble">📣 {crierLines[crierMsg % crierLines.length]}</span> : null}
+                        {crierLines.length ? <span className="tw-npc-bubble">{crierLines[crierMsg % crierLines.length]}</span> : null}
                         {art.crier?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={art.crier.url} alt="Town Crier" draggable={false} />
-                        ) : <span className="tw-npc-emoji">📣</span>}
+                        ) : null}
                     </button>
                     ) : null}
                     {/* ── THE GOURDFATHER ──────────────────────────────────────────────────────────────
@@ -3018,7 +3077,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             {art.gourdfather?.url ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={art.gourdfather.url} alt="The Gourdfather" draggable={false} />
-                            ) : <span className="tw-npc-emoji">🎃</span>}
+                            ) : null}
                         </button>
                     ) : null}
                     {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
@@ -3032,7 +3091,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         {themed("questgiver") ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={themed("questgiver")} alt="Quest Giver" draggable={false} />
-                        ) : <span className="tw-npc-emoji">📜</span>}
+                        ) : null}
                     </button>
                     {/* ── THE ACT BOARD ────────────────────────────────────────────────────────────
                         A notice board, tapped to read what this act is asking of you. It stands in the
@@ -3057,7 +3116,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         {art.merchant?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={art.merchant.url} alt="Traveling Merchant" draggable={false} />
-                        ) : <span className="tw-npc-emoji">🧳</span>}
+                        ) : null}
                     </button>
                     ) : null}
                     {/* Auctioneer — links out to the Auction House, and only stands where it exists. */}
@@ -3067,7 +3126,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         {art.auctioneer?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={art.auctioneer.url} alt="Auctioneer" draggable={false} />
-                        ) : <span className="tw-npc-emoji">🔨</span>}
+                        ) : null}
                     </Link>
                     ) : null}
                       </>
@@ -3536,7 +3595,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 const pct = Math.max(0, Math.min(100, Math.round((q.progress / q.target) * 100)));
                                 return (
                                     <div key={q.key} className={`tw-quest${q.claimed ? " is-claimed" : ""}`}>
-                                        <QuestIcon name={q.icon} />
+                                        <QuestIcon activity={q.key} art={art} />
                                         <div className="tw-quest-body">
                                             <div className="tw-quest-top"><strong>{q.label}</strong><span className="tw-quest-reward"><img src="/images/ui/coin.png" alt="" className="tw-quest-coin" draggable="false" />{q.gold}</span></div>
                                             <div className="muted" style={{ fontSize: "0.76rem" }}>{q.desc}</div>
@@ -4708,7 +4767,6 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 @keyframes twBreathe { 0%,100% { transform: scaleY(1) scaleX(1); } 48% { transform: scaleY(0.955) scaleX(1.035); } }
 .tw-sprite img { width: 60px; height: 60px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.55)); }
 .tw-npc-btn img { animation: twBreathe 3.1s ease-in-out infinite; transform-origin: 50% 100%; }
-.tw-sprite-fallback { font-size: 42px; }
 .tw-pet-wrap { position: absolute; bottom: -2px; z-index: -1; transition: transform 1.6s ease-in-out; }
 .tw-pet-bob { display: block; }
 .tw-pet-bob.is-walking { animation: twPetTrot .42s ease-in-out infinite; }
@@ -4857,7 +4915,6 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-stockade img:first-of-type { height: 92px; }
 .tw-stockade .tw-npc-bubble { background: rgba(120,32,32,0.92); border-color: rgba(255,140,140,0.5); }
 .tw-npc-btn img { height: 86px; width: auto; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
-.tw-npc-emoji { font-size: 50px; line-height: 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
 
 /* ── THE GOURDFATHER ────────────────────────────────────────────────────────────────────────────────────
    Twice the width of an ordinary NPC. He is a pumpkin the size of a cart and the whole joke is the scale —
@@ -4867,12 +4924,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    this element, so the Gourdfather rendered as a 170 by 86 oval, squashed to half his height. Overriding the
    height and letting the width follow is the only way round that keeps him round. */
 .gf-npc img { height: 150px !important; width: auto !important; max-width: none !important; }
-.gf-npc .tw-npc-emoji { font-size: 92px; }
 /* His bubble is wider and sits higher, because his lines are longer than anyone else's and his head is in
    the way of where a normal bubble would go. */
 .gf-bubble { max-width: 230px; margin-bottom: 9px;
     background: linear-gradient(180deg, #fff6e2, #ffd9a0); color: #2a1403; font-weight: 800; }
-.tw-npc-btn:hover img, .tw-npc-btn:hover .tw-npc-emoji { filter: drop-shadow(0 0 8px rgba(255,215,110,0.8)); }
+.tw-npc-btn:hover img { filter: drop-shadow(0 0 8px rgba(255,215,110,0.8)); }
 .tw-npc-bubble { max-width: 155px; font-size: 10px; font-weight: 800; line-height: 1.2; text-align: center; color: #241206; background: linear-gradient(180deg,#fff,#ffe9b0); border-radius: 9px; padding: 4px 9px; margin-bottom: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.45); }
 .tw-merchant-flash { text-align: center; font-weight: 800; color: #ffe0b0; background: rgba(255,215,110,0.12); border: 1px solid rgba(255,215,110,0.35); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; }
 .tw-wares { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
@@ -4918,9 +4974,6 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-quests { display: flex; flex-direction: column; gap: 10px; }
 .tw-quest { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
 .tw-quest.is-claimed { opacity: 0.6; }
-/* A drawn glyph, not an emoji — sized and coloured to the card instead of to whatever the OS ships. */
-.tw-quest-emoji { display: grid; place-items: center; flex: 0 0 auto; width: 34px; height: 34px;
-    font-size: 26px; color: #ffd28a; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
 .tw-quest-coin { width: 15px; height: 15px; object-fit: contain; vertical-align: -2px; margin-right: 4px; }
 .tw-quest-tag.is-done { display: grid; place-items: center; font-size: 22px; color: #8fe39a; }
 .tw-quest-body { flex: 1 1 auto; min-width: 0; }
