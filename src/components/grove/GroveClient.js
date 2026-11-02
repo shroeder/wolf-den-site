@@ -1422,14 +1422,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                             snapping track, same computed centre. See the note at the top of GroveCards.js.
                             The whole set is still shown, found or not; the silhouettes did not go
                             anywhere, they just stopped being a single column of them. */}
-                        <GroveCards
-                            emblems={st.emblems || []}
-                            onWear={async (id) => {
-                                const free = [0, 1, 2].find((sl) => !(st.emblems || []).some((x) => x.slot === sl));
-                                await post({ action: "emblem", emblemId: id, slot: free ?? 0 });
-                                refresh();
-                            }}
-                        />
+                        <GroveCards emblems={st.emblems || []} />
                         </Area>
                         ) : null}
                         {/* The till. Behind its own tab now — see the note at the top of this panel. */}

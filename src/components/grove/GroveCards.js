@@ -94,7 +94,16 @@ function mapOf(id, meta) {
     return Number(e?.map) || 1;
 }
 
-export default function GroveCards({ emblems = [], onWear }) {
+// ⚠️ NO WEARING. Luke, 2026-10-30: "I think I want to do away with equipping monster cards entirely."
+// That was done in bonusesFrom the same day — every card you own pays its bonus at its own star rung — but
+// the WEAR BUTTON stayed on the card, and the "Worn" flag with it. So for four days the panel asked you to
+// equip something for a mechanic that no longer existed, and the button wrote a `slot` column that nothing
+// reads. Luke again, 2026-11-02: "you don't have to equip cards. They should always be worn. The whole idea
+// of wearing them and unwearing them is stupid."
+//
+// A control that does nothing is worse than a missing one: it teaches people their choices matter when they
+// do not. Both are gone, and groveEquipEmblem with them.
+export default function GroveCards({ emblems = [] }) {
     const rows = useMemo(() => {
         const by = new Map();
         for (const [id, meta] of Object.entries(GROVE_EMBLEMS)) {
@@ -187,12 +196,11 @@ export default function GroveCards({ emblems = [], onWear }) {
                                 const next = L.find((x) => x.at > count) || null;
                                 const floor = stars ? L[stars - 1].at : 0;
                                 const pct = next ? Math.max(4, Math.round(((count - floor) / (next.at - floor)) * 100)) : 100;
-                                const worn = row && row.slot !== null && row.slot !== undefined;
                                 const seal = emblemArt(c.id);
                                 const face = emblemFace(c.id);
                                 return (
                                     <div key={c.id} className={`ga-cell${centred[r.map] === i ? " ga-on" : ""}`}>
-                                        <div className={`gv-card${have ? "" : " is-locked"}${worn ? " is-worn" : ""}${stars >= 5 ? " is-high" : ""}${c.meta.boss ? " is-boss" : ""}`}
+                                        <div className={`gv-card${have ? "" : " is-locked"}${stars >= 5 ? " is-high" : ""}${c.meta.boss ? " is-boss" : ""}`}
                                             style={{ "--rung": (stars ? L[stars - 1].color : "#6a6355") }}>
                                             <span className="gv-card-win">
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -204,7 +212,6 @@ export default function GroveCards({ emblems = [], onWear }) {
                                                 {/* A boss card says so on its face. It is the heavier thing on
                                                     the row and the row is otherwise undifferentiated. */}
                                                 {c.meta.boss ? <em className="gv-card-boss">Boss</em> : null}
-                                                {worn ? <em className="gv-card-worn">Worn</em> : null}
                                             </span>
                                             <span className="gv-card-pips">
                                                 {[1, 2, 3, 4, 5, 6].map((n) => (
@@ -224,9 +231,6 @@ export default function GroveCards({ emblems = [], onWear }) {
                                             )}
                                             <span className="gv-card-bar">{have ? <i style={{ width: `${pct}%` }} /> : null}</span>
                                             <small>{have ? `${count}${next ? ` / ${next.at}` : " · maxed"}` : ""}</small>
-                                            {have && !worn ? (
-                                                <button type="button" onClick={() => onWear?.(c.id)}>Wear</button>
-                                            ) : null}
                                         </div>
                                     </div>
                                 );

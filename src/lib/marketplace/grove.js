@@ -1665,21 +1665,14 @@ export async function groveBelt(buyerId, foodId) {
     return { ok: true, belt: foodId || null };
 }
 
-/** Equip or unequip an emblem. Three slots now; three more exist and stay locked. */
-export async function groveEquipEmblem(buyerId, { emblemId, slot } = {}) {
-    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
-    if (!GROVE_EMBLEMS[emblemId]) return { ok: false, error: "no_emblem" };
-    if (slot === null) {
-        await db.query(`UPDATE mkt_grove_emblem SET slot = NULL WHERE buyer_id = $1 AND emblem_id = $2`, [buyerId, emblemId]).catch(() => {});
-        return { ok: true };
-    }
-    const n = Number(slot);
-    if (!Number.isInteger(n) || n < 0 || n > 2) return { ok: false, error: "slot_locked" };
-    // Whatever was in that slot steps out first — the unique index would refuse two in one slot.
-    await db.query(`UPDATE mkt_grove_emblem SET slot = NULL WHERE buyer_id = $1 AND slot = $2`, [buyerId, n]).catch(() => {});
-    await db.query(`UPDATE mkt_grove_emblem SET slot = $3 WHERE buyer_id = $1 AND emblem_id = $2 AND count > 0`, [buyerId, emblemId, n]).catch(() => {});
-    return { ok: true };
-}
+// ── ⚠️ groveEquipEmblem IS GONE ─────────────────────────────────────────────────────────────────────────────
+// It set a `slot` column that bonusesFrom stopped reading on 2026-10-30, when owning a card became wearing
+// it. The verb survived the mechanic by four days, and with it a Wear button that wrote to the database and
+// changed nothing a player could feel. Luke: "The whole idea of wearing them and unwearing them is stupid."
+//
+// ⚠️ THE COLUMN STAYS. Same rule as the backpack columns and as the note in bonusesFrom: dropping it loses
+// the record of what people had worn, and it costs nothing to leave. If equipping ever returns it returns as
+// a NEW idea, not by restoring this.
 
 export { GROVE_RECIPES };
 
