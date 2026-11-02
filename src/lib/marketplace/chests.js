@@ -478,10 +478,16 @@ export async function getChests(buyerId) {
         getChestArt().catch(() => ({})),
     ]);
     const counts = Object.fromEntries(rows.map((r) => [r.tier, r.count]));
-    // A seasonal chest is listed only while the event is on. Anything a member is still holding when it ends
-    // stays in the table untouched — it reappears next Halloween rather than being deleted out from under them.
+    // ⚠️ A SEASONAL CHEST YOU ALREADY HOLD STAYS LISTED AFTER THE EVENT ENDS. It used to vanish from the
+    // list the moment HALLOWEEN_PUBLIC went false — 31 of them across 26 members, earned during the event
+    // and then simply gone from the screen until next October. Nothing was deleted, which is what the old
+    // note here said; but a reward you cannot see and cannot open is indistinguishable from one that was
+    // taken away, and that is the version the member experiences.
+    //
+    // `counts[t]` is the whole gate now: you see it because you have it. Granting is still gated — see
+    // SEASONAL_ORDER below — so no new ones appear.
     return ALL_CHEST_ORDER
-        .filter((t) => counts[t] && (!isHalloweenChest(t) || HALLOWEEN_PUBLIC))
+        .filter((t) => counts[t])
         .map((t) => ({ tier: t, count: counts[t], ...CHEST_TIERS[t], image: art[t] || null }));
 }
 
@@ -705,9 +711,13 @@ async function openHalloweenChest(buyerId, tier, remaining) {
 export async function openChest(buyerId, tier) {
     const def = CHEST_TIERS[tier];
     if (!def) return { ok: false, error: "unknown_tier" };
-    // A seasonal chest cannot be opened while the event is down. Not consumed, not lost — the row sits there
-    // until next Halloween. Checked BEFORE the decrement, obviously.
-    if (isHalloweenChest(tier) && !HALLOWEEN_PUBLIC) return { ok: false, error: "event_closed" };
+    // ⚠️ AND IT CAN STILL BE OPENED AFTER THE EVENT ENDS. This used to refuse with event_closed whenever
+    // HALLOWEEN_PUBLIC was false, which meant ending the event confiscated 31 earned chests from 26 people
+    // for a year. The chest only exists because it was granted while the event was running; refusing to
+    // open it does not un-grant it, it just makes it furniture.
+    //
+    // What "off" has to stop is EARNING: no drops, no substitutions, no fish, no Gourdfather, no dressing.
+    // All of that is gated elsewhere on the same flag. Opening what you already hold is not earning.
     const dec = await db.queryOne(`UPDATE mkt_user_chest SET count = count - 1 WHERE buyer_id = $1 AND tier = $2 AND count > 0 RETURNING count`, [buyerId, tier]).catch(() => null);
     if (!dec) return { ok: false, error: "no_chest" };
     // ── AND A HALLOWEEN CHEST GOES NOWHERE NEAR THE CHAIN BELOW ──────────────────────────────────────────

@@ -8,7 +8,23 @@
 // ⚠️ ONE LINE TURNS THE EVENT ON. While it is false the four chests cannot be granted, cannot be opened and
 // do not appear in any list — but the art, the items and the pets all exist, which is what makes the whole
 // thing testable on the live site before anybody else can see it.
-export const HALLOWEEN_PUBLIC = true;   // LIVE 2026-10-05, Luke: "Lets make the halloween event live"
+// LIVE 2026-10-05, Luke: "Lets make the halloween event live". OFF 2026-11-02, Luke: "I thought we said
+// Halloween event was over. We need to make sure that that's off."
+//
+// ⚠️ TURNING IT OFF STOPS IT BEING EARNED, NOT BEING OPENED. See the note on openChest — 31 chests were
+// sitting unopened across 26 members when this flipped, and the first version of "off" made every one of
+// them answer event_closed for a year.
+export const HALLOWEEN_PUBLIC = false;
+
+// ── ⚠️ AND THE OWNER PREVIEW IS ITS OWN SWITCH ──────────────────────────────────────────────────────────────
+// halloweenOn() used to be `HALLOWEEN_PUBLIC || canPreview("halloween", id)`, and canPreview returns true for
+// owners unconditionally. That is right in the weeks BEFORE a launch — it is how the whole event got built
+// and photographed on the live site — and it is wrong the day after, because it means the one person who
+// needs to confirm the event is off is the only person who cannot see that it is. Luke flipped the flag and
+// was still looking at pumpkins.
+//
+// Two flags, used in order: PREVIEW true while building, PUBLIC true to launch, both false when it is done.
+export const HALLOWEEN_PREVIEW = false;
 
 /** `unreleased` for a Halloween-exclusive catalogue row. Kept here so the catalogues cannot drift apart. */
 export const HALLOWEEN_HIDDEN = !HALLOWEEN_PUBLIC;

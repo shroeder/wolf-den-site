@@ -1,4 +1,4 @@
-import { HALLOWEEN_PUBLIC } from "./halloween.js";
+import { HALLOWEEN_PREVIEW, HALLOWEEN_PUBLIC } from "./halloween.js";
 
 // Owner-only gate for in-development features. Rather than a feature flag, unreleased systems (e.g. the
 // Sailing minigame) check the authenticated buyer against this allow-list so ONLY the shop owner account can
@@ -107,7 +107,10 @@ export const groveOpen = (buyerId) => canPreview("grove", buyerId);
  */
 export function halloweenOn(buyerId) {
     if (!buyerId) return false;
-    return HALLOWEEN_PUBLIC || canPreview("halloween", buyerId);
+    // ⚠️ THE PREVIEW IS GATED TOO. canPreview returns true for owners unconditionally, so without
+    // HALLOWEEN_PREVIEW the owner keeps seeing the event after it ends — and is therefore the one person
+    // who cannot confirm it is off. See the note beside the flag.
+    return HALLOWEEN_PUBLIC || (HALLOWEEN_PREVIEW && canPreview("halloween", buyerId));
 }
 
 export function isOwner(buyerId) {
