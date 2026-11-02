@@ -162,6 +162,83 @@ export function townStreet(townN) {
     return [...here, ...soon];
 }
 
+// ── ⚠️ EVERYONE WHO STANDS ON THE STREET IS LAID OUT IN THE SAME PASS ────────────────────────────────────────
+// Luke: "I'm also wondering why you put the like bounty board in front of the mine. When we have so much room
+// to place things, why overlap them like that?"
+//
+// Because there were two layout systems on one street and they could not see each other. The buildings and
+// the well went through spaceOut, which re-spaces for however many there are; the NPCs and the act board sat
+// at hand-picked percentages (crier 9, smith 31, merchant 53, quest 64, the board a literal `left: "22%"`)
+// chosen against the old fifteen-building street. Change the street and the two sets slide straight through
+// each other. Measured across the seven towns it was not one collision, it was SIX — the act board alone
+// landed 0.4% from the Mine in Deepdelve, 0.4% from the General Store in Rootwood and 0.4% from the Vault in
+// the Drowned Quay.
+//
+// ⚠️ THIS FILE ALREADY KNEW. The note over DOOR_OFFSETS in TownClient says it outright — "the NPCs stand at
+// hand-picked spots and the buildings space themselves out for however many you can see, so the two sets
+// slide past each other every time the street changes and no single number survives it." That was written
+// about Hallowe'en PAILS, and the pails were given a scoring pass to dodge the NPCs. Nobody went back and
+// applied the same finding to the NPCs themselves.
+//
+// So there is one list now. An NPC is a street object exactly like a building, it takes a slot, and nothing
+// can collide with anything because a single spaceOut owns every x on the street. No scoring, no offsets, no
+// second table to keep in step — the collision is designed out rather than detected.
+//
+// WHO STANDS WHERE: an NPC whose trade has a door stands next to that door (the Blacksmith beside the Forge),
+// which is the rule the per-town NPC filtering already follows. The two who belong to the town rather than to
+// a building — the Crier and the Quest Giver — stand at the near end, because they are who you want to find
+// when you arrive and the far end of a street you have to walk is where things go to be missed.
+const STREET_NPCS = [
+    // anchor: the building id this one stands beside. null = belongs to the town itself.
+    { id: "questgiver", anchor: null, feature: null },
+    // ⚠️ TOWN 1 ONLY, because the CLIENT only draws him there — Luke's call on the vendor who stood in all
+    // seven: "seven copies of one man rather than seven places". A slot reserved here for somebody who is
+    // not rendered is a 284px hole in the street, which is the same class of bug as the overlap above,
+    // arriving from the opposite direction. The roster and the layout have to agree.
+    { id: "crier", anchor: null, feature: null, town1: true },
+    { id: "smith", anchor: "forge", feature: "blacksmith" },
+    { id: "merchant", anchor: "shop", feature: "store" },
+    { id: "auctioneer", anchor: "auction", feature: "auction" },
+];
+
+/**
+ * The whole street, in the order things stand along it: the two town NPCs, then the buildings with their
+ * own NPCs beside them, with the well in the middle.
+ *
+ * @returns {{ objects: object[], npcX: Record<string, number> }}
+ */
+export function layOutStreet(visible, { townN = null, features = null, stocks = false } = {}) {
+    const has = (f) => !f || !features || features.includes(f);
+    // `features === null` is the ungated street, which shows everyone it always did.
+    const npcs = STREET_NPCS.filter((n) => has(n.feature) && (!n.town1 || features === null || townN === 1));
+    const anchored = new Map();
+    for (const n of npcs) if (n.anchor) anchored.set(n.anchor, n);
+
+    // Buildings, each trailed by the NPC who works there.
+    const withNpcs = [];
+    for (const b of visible) {
+        withNpcs.push({ ...b, kind: "building" });
+        const n = anchored.get(b.id);
+        // ⚠️ ONLY BESIDE A DOOR THAT IS OPEN. The next town's buildings stand here shuttered, and parking
+        // the Blacksmith outside a forge nobody can enter yet is an invitation to a locked room.
+        if (n && !b.locked) withNpcs.push({ id: n.id, kind: "npc" });
+    }
+    const mid = Math.ceil(withNpcs.length / 2);
+    const townFolk = npcs.filter((n) => !n.anchor).map((n) => ({ id: n.id, kind: "npc" }));
+    const row = [
+        ...townFolk,
+        ...withNpcs.slice(0, mid),
+        { id: "__well", kind: "well" },
+        ...withNpcs.slice(mid),
+        ...(stocks && townN === 1 ? [{ id: "stockade", kind: "npc" }] : []),
+    ];
+    const objects = spaceOut(row);
+    return {
+        objects,
+        npcX: Object.fromEntries(objects.filter((o) => o.kind === "npc").map((o) => [o.id, o.x])),
+    };
+}
+
 // Lay the street out evenly for however many buildings the viewer can actually see.
 //
 // The x values on TOWN_BUILDINGS were hand-picked 11% apart, which is ~319px of the 2900px street — comfortably
@@ -172,11 +249,36 @@ export function townStreet(townN) {
 // Exported for the lab, which has to lay its street out the way the real one does or every position measured
 // off a photograph of it is a position that does not exist. Not a balance number, but the same argument: one
 // expression, read twice.
+// ⚠️ CONSTANT SPACING, CENTRED — NOT "SPREAD ACROSS THE WHOLE STREET" ────────────────────────────────────────
+// Luke: "The placement of the forge is like really far on the left. It seems odd... we have enough space to
+// evenly place things out and not put them right up against the boundaries."
+//
+// The old rule stretched however many objects there were across a fixed 4%..92%. Two things fall out of that,
+// and both are visible in every town:
+//
+//   · THE FIRST AND LAST ARE ALWAYS JAMMED INTO THE EDGES. 4% and 92% are not margins, they are the frame —
+//     so every one of the seven streets opened with a building half in the wall and closed with another one.
+//   · A SHORT STREET IS MOSTLY EMPTY. The world clamps at WORLD_MIN (2900px), so six objects spread across
+//     88% of it land ~510px apart against a design spacing of 284 — Saltwrack and Ashfall both had a 29%
+//     stretch of nothing in the middle. More room did not read as generous, it read as unfinished.
+//
+// So the spacing is the constant and the span is what varies: neighbours are always PER_SLOT apart, and the
+// whole row is CENTRED, which gives equal margins at both ends for free. On a long street this is identical
+// to the old behaviour (the world grows until the row spans ~88%); on a short one the row sits in the middle
+// of its street at the same comfortable spacing as everywhere else.
+export const WORLD_MIN = 2900;   // px — never narrower than this, or the parallax rows run out of scenery
+export const PER_SLOT = 284;     // px between neighbours. The whole design decision; see the note above.
+const SPREAD = 88;               // the span a long street settles at, which is what makes the two rules agree
+
+/** How wide the street is, for `slots` objects standing on it. Read by the client for its camera. */
+export const worldWidthFor = (slots) => Math.max(WORLD_MIN, Math.round((PER_SLOT * 100 * Math.max(1, slots - 1)) / SPREAD));
+
 export function spaceOut(list) {
     if (!list.length) return list;
-    const FIRST = 4, LAST = 92;
-    const step = list.length > 1 ? (LAST - FIRST) / (list.length - 1) : 0;
-    return list.map((b, i) => ({ ...b, x: Math.round((FIRST + step * i) * 10) / 10 }));
+    if (list.length === 1) return list.map((b) => ({ ...b, x: 50 }));
+    const stepPct = (PER_SLOT / worldWidthFor(list.length)) * 100;
+    const first = (100 - stepPct * (list.length - 1)) / 2;
+    return list.map((b, i) => ({ ...b, x: Math.round((first + stepPct * i) * 10) / 10 }));
 }
 
 // Shared generated art (background + building sprites), keyed. Empty until generated via the admin tool.
@@ -612,11 +714,20 @@ export async function getTownState(buyerId, { previewTown = null } = {}) {
             const visible = town
                 ? townStreet(town).filter((b) => b.gate !== "owner" || isOwner(buyerId))
                 : [...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))];
-            const mid = Math.ceil(visible.length / 2);
-            const laid = spaceOut([...visible.slice(0, mid), { id: "__well" }, ...visible.slice(mid)]);
+            // ⚠️ ONE PASS FOR EVERYTHING THAT STANDS OUT THERE — see layOutStreet. The NPCs used to carry
+            // their own hand-picked percentages in the client, which is how the act board ended up 0.4%
+            // from the Mine. They take a slot in this row now, so a collision cannot be expressed.
+            const { objects, npcX } = layOutStreet(visible, {
+                townN: town,
+                // No town means the ungated street, which shows every NPC it ever did.
+                features: town ? (TOWNS.find((t) => t.n === town)?.features || []) : null,
+                stocks: !town || town === 1,
+            });
             return {
-                buildings: laid.filter((b) => b.id !== "__well"),
-                wellX: laid.find((b) => b.id === "__well")?.x ?? 20,
+                buildings: objects.filter((o) => o.kind === "building"),
+                wellX: objects.find((o) => o.kind === "well")?.x ?? 50,
+                // Where each NPC stands on THIS street. The client reads this instead of a fixed table.
+                npcX,
                 // Which town this is, and which ones the member can travel to. Null for an ungated account,
                 // and TownClient draws its usual single street when it is null.
                 town: town ? {

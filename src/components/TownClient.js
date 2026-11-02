@@ -769,8 +769,16 @@ const HW_SCENES = [
 // The Quartermaster's own line, and ONLY his: it was appearing under all seven giver names, which made
 // seven characters sound like one person wearing different coats.
 const GENERIC_GREETING = "Do the town a service, wolf, and there’s gold in it for you.";
-const NPC_X = { crier: 9, gourdfather: 18.6, smith: 31, auction: 42, merchant: 53, quest: 64, booth: 76, boothHeld: 89 };
-const NPC_POSTS = Object.values(NPC_X);
+// ── ⚠️ NOBODY STANDS AT A HAND-PICKED PERCENTAGE ANY MORE ────────────────────────────────────────────────
+// This WAS the table: { crier: 9, gourdfather: 18.6, smith: 31, auction: 42, merchant: 53, quest: 64,
+// booth: 76, boothHeld: 89 } — eight numbers chosen against the old fifteen-building street, while the
+// buildings beside them re-spaced themselves for whatever the town actually had. Six collisions across the
+// seven towns, including the act board sitting 0.4% from the Mine, which is the one Luke photographed.
+//
+// The street is laid out in ONE pass on the server now (layOutStreet in town.js) and an NPC takes a slot in
+// it exactly like a building does, so there is no number here to get wrong. These are fallbacks only, for a
+// payload that predates the change — a stale poll mid-deploy, not a code path anybody lives in.
+const NPC_FALLBACK = { crier: 9, gourdfather: 18.6, smith: 31, auctioneer: 42, merchant: 53, questgiver: 64, stockade: 76 };
 // Measured rather than guessed, against the real street: WORLD_W is about 4,841px, so one percent is ~48px.
 // A canopy at 30-36% of the scene is ~160px across, call it 3.3%; an NPC sprite is 86px, ~1.8%; the fountain
 // is the widest thing out there at roughly 4%. Half of each pair summed is 2.6% for an NPC and 3.7% for the
@@ -1276,6 +1284,8 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // Null for every account that predates gating, and TownClient then behaves exactly as it always has:
     // the cobbles, the whole street, no travel bar. See the branch in town.js.
     const town = state?.town || null;
+    // Where each NPC stands on THIS street, from the single layout pass in town.js. See NPC_FALLBACK.
+    const npcAt = useCallback((id) => state?.npcX?.[id] ?? NPC_FALLBACK[id] ?? 50, [state?.npcX]);
     // The stockade belongs to the Den, not to each street: the default town (no gating) or town 1.
     // ── ⚠️ AN NPC STANDS WHERE HIS TRADE DOES ─────────────────────────────────────────────────────
     // Luke, looking at all seven streets side by side: "I don't like the fact that that same vendor is in
@@ -1343,7 +1353,9 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // The seasonal layout is built FROM the buildings, so porches land on real doors even as the street grows.
     // The fountain moves with the town's own state; the NPC posts come from NPC_X, which the markup below now
     // reads too, so the two cannot drift apart again.
-    const hwOccupied = useMemo(() => [...NPC_POSTS, Number(state?.wellX) || 20], [state?.wellX]);
+    // Everyone standing out there, so a pail is never placed on top of one. Reads the live layout rather
+    // than the old fixed table — the whole point of the change above.
+    const hwOccupied = useMemo(() => [...Object.values(state?.npcX || NPC_FALLBACK), Number(state?.wellX) || 50], [state?.npcX, state?.wellX]);
     const hwProps = useMemo(() => buildHalloweenDressing(buildings, hwOccupied), [buildings, hwOccupied]);
     const [me, setMe] = useState(() => ({ x: initial?.you?.x ?? 50, y: initial?.you?.y ?? 80, facing: initial?.you?.facing ?? 1, moving: false, moveDist: 0, wave: false }));
     const [others, setOthers] = useState({});
@@ -1439,17 +1451,18 @@ export default function TownClient({ initial, frozen = false, halloween = false,
         // Everything already standing in the street that a pail must not land on top of: every NPC post, and
         // every pail placed before this one. The stockade and the vote booth share the booth's x, so one entry
         // covers both.
-        const taken = Object.entries(NPC_X)
+        const live = state?.npcX || NPC_FALLBACK;
+        const taken = Object.entries(live)
             .filter(([, x]) => Number.isFinite(x))
             .map(([id, x]) => ({ x, clear: id === "gourdfather" ? DOOR_CLEAR_GOURD : DOOR_CLEAR }));
         const posts = [
             ...buildings.map((b) => ({ id: b.id, x: b.x, top: GROUND + 2.2, z: 220 })),
-            ...NPC_DOORS.map((id) => ({ id, x: NPC_X[id], top: GROUND + 7.4, z: 260 })),
+            ...NPC_DOORS.map((id) => ({ id, x: live[id], top: GROUND + 7.4, z: 260 })),
         ].filter((d) => Number.isFinite(d.x) && doorBook.has(d.id));
         return posts.map((d) => {
             // The NPC doors are the exception: the pail belongs to the person standing there, so their own
             // post is not an obstacle to clear — only everybody else's.
-            const mine = NPC_DOORS.includes(d.id) ? NPC_X[d.id] : null;
+            const mine = NPC_DOORS.includes(d.id) ? live[d.id] : null;
             const blockers = taken.filter((t) => t.x !== mine);
             // ⚠️ SCORED, NOT FIRST-THAT-FITS. The first version took the first offset that cleared EVERY
             // blocker and fell back to the nearest one when none did — and on a street this crowded "none
@@ -1471,7 +1484,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
             taken.push({ x: d.x + at, clear: DOOR_CLEAR });
             return { ...d, x: d.x + at, label: doorBook.get(d.id) };
         });
-    }, [gourd, buildings, doorBook]);
+    }, [gourd, buildings, doorBook, state?.npcX]);
     const doorsLeft = doorPosts.filter((d) => !knocked.has(d.id)).length;
     const barkAt = bark ? (doorPosts.find((d) => d.id === bark.door)?.x ?? null) : null;
     // The spray starts at the pail's mouth, which is its top -- hence the small lift off the post's own top.
@@ -2979,7 +2992,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                       <>
                     {/* Blacksmith NPC by the Forge — tap for a tip + a shortcut in */}
                     {npcHere("blacksmith") ? (
-                    <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.smith}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
+                    <button type="button" className="tw-npc-btn" style={{ left: `${npcAt("smith")}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setSmithOpen(true); }} aria-label="Blacksmith">
                         {art.smith?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={art.smith.url} alt="Blacksmith" draggable={false} />
@@ -3004,7 +3017,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         never see towns at all. */}
                     {townHasStocks && stockade?.election?.phase === "voting" ? (
                         <button type="button" className="tw-npc-btn tw-votebooth"
-                            style={{ left: stockade?.occupant ? `${NPC_X.boothHeld}%` : `${NPC_X.booth}%`, top: `${GROUND + 6}%` }}
+                            style={{ left: stockade?.occupant ? `${npcAt("stockade") + 2}%` : `${npcAt("stockade")}%`, top: `${GROUND + 6}%` }}
                             onClick={(e) => { e.stopPropagation(); setVoteOpen(true); }} aria-label="The voting booth">
                             <span className="tw-npc-bubble">Who goes in the stockade?</span>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -3045,7 +3058,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         seven copies of one man rather than seven places. Same call Luke already made for the
                         stockade and the voting booth: those belong to the first town only. */}
                     {townHasStocks ? (
-                    <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.crier}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
+                    <button type="button" className="tw-npc-btn" style={{ left: `${npcAt("crier")}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
                         {crierLines.length ? <span className="tw-npc-bubble">{crierLines[crierMsg % crierLines.length]}</span> : null}
                         {art.crier?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -3062,8 +3075,14 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         LOOKS; he is content, and a member who prefers the undecorated street must not lose
                         the event's shop and its currency over a cosmetic choice. Same distinction the
                         chests and the Hallowe'en fish already make. */}
-                    {gourd ? (
-                        <button type="button" className="tw-npc-btn gf-npc" style={{ left: `${NPC_X.gourdfather}%`, top: `${GROUND + 6}%` }}
+                    {/* ⚠️ AND NOT IN THE SEVEN TOWNS. `spooky` is `halloween && !town` because, as the note
+                        further up puts it, "the seven towns do not dress for Hallowe'en" — but he was gated
+                        on `gourd` alone, so a pumpkin the size of a cart stood in the cave camp, the swamp
+                        and the volcanic bastion, in all seven, with a sweets bubble over his head. Caught on
+                        a contact sheet of the seven streets; one town at a time it reads as the event being
+                        on, and only side by side does it read as the same man seven times. */}
+                    {gourd && !town ? (
+                        <button type="button" className="tw-npc-btn gf-npc" style={{ left: `${npcAt("gourdfather")}%`, top: `${GROUND + 6}%` }}
                             onClick={(e) => { e.stopPropagation(); setGourdOpen(true); }} aria-label="The Gourdfather">
                             {/* He is the host of the night, so the count lives in his mouth rather than in a
                                 pill bolted to the corner of the scene. One less thing floating over the town,
@@ -3081,7 +3100,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                         </button>
                     ) : null}
                     {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
-                    <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.quest}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); load(); loadHunts(); }} aria-label="Quest Giver">
+                    <button type="button" className="tw-npc-btn" style={{ left: `${npcAt("questgiver")}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); load(); loadHunts(); if (town) openActBoard(); }} aria-label="Quest Giver">
                         <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
                         {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
                         {/* ⚠️ THE TOWN'S OWN. Luke: "every town has its own kind of thematic quest giver".
@@ -3093,25 +3112,21 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             <img src={themed("questgiver")} alt="Quest Giver" draggable={false} />
                         ) : null}
                     </button>
-                    {/* ── THE ACT BOARD ────────────────────────────────────────────────────────────
-                        A notice board, tapped to read what this act is asking of you. It stands in the
-                        town rather than living on a menu because the act's quests are about the systems
-                        that act just unlocked, and the town is where you are standing when they unlock.
+                    {/* ── ⚠️ THE ACT BOARD IS GONE, AND A PERSON HAS ITS JOB ──────────────────────
+                        Luke: "why did you elect to use a bounty board? I thought we were going to use
+                        NPCs for all of this."
 
-                        Biome towns only: the default street is every feature at once and has no act. */}
-                    {town ? (
-                        <button type="button" className="tw-npc-btn tw-actboard"
-                            style={{ left: "22%", top: `${GROUND + 6}%` }}
-                            onClick={(e) => { e.stopPropagation(); openActBoard(); }} aria-label="The act board">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src="/images/town/actboard.png" alt="" draggable={false} />
-                        </button>
-                    ) : null}
+                        A notice board was the lazy answer to "where do quests live". It is furniture: it
+                        cannot greet you, cannot react to what you just finished, and cannot be the one
+                        who asks. It was also a hardcoded `left: "22%"` that landed 0.4% from the Mine.
+
+                        The act's quests are the Quest Giver's now — he is a few lines up, he is laid out
+                        with everybody else, and he opens with dialogue rather than a list. */}
                     {/* Traveling Merchant — he SELLS, so he stands where the store does. He was in all
                         seven towns with the same bubble, which is the single thing Luke picked out of the
                         contact sheet: "that same vendor is in every town". */}
                     {npcHere("store") ? (
-                    <button type="button" className="tw-npc-btn" style={{ left: `${NPC_X.merchant}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
+                    <button type="button" className="tw-npc-btn" style={{ left: `${npcAt("merchant")}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setMerchantFlash(null); setMerchantOpen(true); }} aria-label="Traveling Merchant">
                         <span className="tw-npc-bubble">🧳 Wares for sale!</span>
                         {art.merchant?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -3121,7 +3136,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     ) : null}
                     {/* Auctioneer — links out to the Auction House, and only stands where it exists. */}
                     {npcHere("auction") ? (
-                    <Link href="/marketplace/auction" className="tw-npc-btn" style={{ left: `${NPC_X.auction}%`, top: `${GROUND + 6}%` }} onClick={(e) => e.stopPropagation()} aria-label="Auction House">
+                    <Link href="/marketplace/auction" className="tw-npc-btn" style={{ left: `${npcAt("auctioneer")}%`, top: `${GROUND + 6}%` }} onClick={(e) => e.stopPropagation()} aria-label="Auction House">
                         <span className="tw-npc-bubble">🔨 Auction House!</span>
                         {art.auctioneer?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -4475,7 +4490,6 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    A notice board on the street, and the sheet behind it. One rung is open at a time; the rest stay
    VISIBLE and shut, because a posted board you can read ahead on is the whole difference between a
    ramp and a daily quest. */
-.tw-npc-btn.tw-actboard img { height: 92px; width: auto; }
 .tw-actsheet { max-width: 520px; }
 .tw-act-title { margin: 0 0 2px; font-size: 1.02rem; color: #f3ecda; }
 .tw-act-blurb { margin: 0 0 12px; font-size: 0.84rem; color: #a99f88; font-style: italic; }
