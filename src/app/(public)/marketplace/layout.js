@@ -5,6 +5,7 @@
 import DailyCheckin from "@/components/DailyCheckin";
 import LaunchCatchUp from "@/components/LaunchCatchUp";
 import GameNav from "@/components/GameNav";
+import GroveReturnDoor from "@/components/grove/GroveReturnDoor";
 
 export default function MarketplaceLayout({ children }) {
     return (
@@ -16,6 +17,15 @@ export default function MarketplaceLayout({ children }) {
             {/* In-game menu bar — self-hides on non-game pages. (Presence heartbeat lives in the site-wide
                 public layout so a member active ANYWHERE — shop, home, etc. — shows as online.) */}
             <GameNav />
+            {/* ── THE WAY BACK INTO THE GROVE, ON EVERY FEATURE ────────────────────────────────────
+                Luke: "Going into a feature completely departs from the grove, we need a way to get
+                back right where we left off... And this applies to every feature."
+
+                ⚠️ HERE RATHER THAN IN EACH FEATURE, because "every feature" is twenty-odd pages and
+                a per-page door is twenty chances to forget. Renders nothing at all unless the Grove
+                left a note in this tab, and reads NO endpoint — see check:chrome and the note in the
+                component. */}
+            <GroveReturnDoor />
             {children}
         </div>
     );

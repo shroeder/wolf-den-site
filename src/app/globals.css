@@ -29442,3 +29442,16 @@ body.cas-seated .social-fab { display: none; }
 .tw-grove-door:focus-visible { outline: 2px solid rgba(159,224,138,0.9); outline-offset: 3px; }
 /* On a phone the label is what costs the width, and the sprite alone is unambiguous beside it. */
 @media (max-width: 480px) { .tw-grove-door span { display: none; } .tw-grove-door { padding: 10px; } }
+
+/* ── ⚠️ AND ONLY ONE OF THEM AT A TIME ────────────────────────────────────────────────────────
+   There are two doors now and they stand in the same fixed slot. The one above is the town PAGE's,
+   rendered on the server for any member who can open the Grove — it goes to the Grove's front step
+   and knows nothing about where they were. GroveReturnDoor is the layout's, and it only exists when
+   the Grove left a note in this tab, which makes it strictly better: it names the room and returns
+   to it. So where both would appear, the one that knows where you were wins, and the generic one
+   stands down rather than stacking on top of it.
+
+   :has() rather than a prop, because the two are rendered by different components in different
+   trees — the page and the layout — and the alternative is threading "is the other one here" from
+   one to the other through a server boundary to decide a z-index. */
+body:has(.gv-return-door) .tw-grove-door:not(.gv-return-door) { display: none; }

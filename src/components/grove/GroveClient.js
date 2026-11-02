@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GroveAtlas from "@/components/grove/GroveAtlas";
 import { TOWNS } from "@/lib/marketplace/towns.js";
+import { groveSpot, stampGroveReturn } from "@/lib/marketplace/grove-return.js";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -231,7 +232,23 @@ const PartIcon = ({ id, size = 34 }) => {
     return <img className="gv-ico" src={art} alt="" width={size} height={size} />;
 };
 
-export default function GroveClient({ initial }) {
+// ── WHICH MAP THE PLAYER IS LOOKING AT ───────────────────────────────────────────────────────────────────
+// Module level, and that is the point: it is needed ONCE near the top (the return note, which is a hook and
+// so must sit above the closed-Grove early return) and again in the render far below. A second copy of this
+// three-line rule in the effect is the pair that drifts — the deepest OPEN map, unless the atlas has been
+// scrolled to another one.
+function pickShownMap(zones, paperMap) {
+    const zoneMaps = [...new Set((zones || []).map((z) => z.map || 1))].sort((a, b) => a - b);
+    const openMaps = zoneMaps.filter((m) => (zones || []).some((z) => (z.map || 1) === m && z.unlocked));
+    const deepestMap = openMaps.length ? openMaps[openMaps.length - 1] : 1;
+    const shownMap = paperMap && zoneMaps.includes(paperMap) ? paperMap : deepestMap;
+    return { zoneMaps, openMaps, shownMap };
+}
+
+// `initialView` / `initialTown` come off the URL the return door built — see grove-return.js. They are the
+// other half of that door: without them it would land on the Grove's front step rather than in the room the
+// note names, which is the behaviour being fixed.
+export default function GroveClient({ initial, initialView = null, initialTown = null }) {
     // Which map the paper is showing. ⚠️ UP HERE WITH THE OTHER HOOKS, not beside the code that uses
     // it: that sits after the "not signed in" early return, and a hook called conditionally changes
     // the hook ORDER between renders, which React treats as a different component.
@@ -243,7 +260,11 @@ export default function GroveClient({ initial }) {
     // Which tool's sheet is open, or null. See GroveToolSheet.
     const [toolView, setToolView] = useState(null);
     const [st, setSt] = useState(initial);
-    const [view, setView] = useState("map");     // map | zone | town | bag | bench | emblems
+    // map | zone | town | bag | bench | emblems
+    // ⚠️ zone IS NOT RESTORABLE and is not accepted here — a run holds a live server session that a URL
+    // cannot rebuild, so `view=zone` would open a Grove with no session and render nothing. grove-return.js
+    // stamps a zone's MAP for the same reason; this is the second half of that rule, kept beside the first.
+    const [view, setView] = useState(initialView === "town" ? "town" : "map");
 
     // ── ⚠️ THE TOWN IS FETCHED WHEN IT IS OPENED, NEVER WITH THE GROVE ────────────────────
     // getTownState is described in TownClient's own notes as the highest-volume request in the app.
@@ -267,7 +288,7 @@ export default function GroveClient({ initial }) {
     // what came back, because the server answers `null` for anyone the preview does not apply to and
     // comparing against that would refetch on a loop.
     const [townState, setTownState] = useState(null); // { n, data }
-    const [townN, setTownN] = useState(null);
+    const [townN, setTownN] = useState(Number(initialTown) || null);
     useEffect(() => {
         if (view !== "town" || townState?.n === townN) return undefined;
         let gone = false;
@@ -278,6 +299,31 @@ export default function GroveClient({ initial }) {
             .catch(() => {});
         return () => { gone = true; };
     }, [view, townState, townN]);
+    // ── ⚠️ THE GROVE WRITES DOWN WHERE IT IS, AND NOTHING ELSE HAS TO ───────────────────────
+    // Luke: "if I go to the forge in act 2 town I want to easily go right back to where I was in
+    // town. And this applies to every feature."
+    //
+    // This is the whole mechanism, and grove-return.js has the reasoning for why it is one effect
+    // here instead of a parameter on every link out: the ways out are not a list anybody can hold —
+    // fifteen buildings on the street, the nav bar, the menu handle, a sheet's deep link, the
+    // Tavern, a push notification. Decorating them means finding them all, and the one that is
+    // missed silently reverts to the old behaviour and looks identical to one nobody did yet.
+    //
+    // So the note is kept current as you move around in here, and whatever takes you out leaves it
+    // behind. GroveReturnDoor, mounted once in the marketplace layout, is what reads it.
+    //
+    // ⚠️ UP HERE WITH THE OTHER HOOKS, for the reason the note on paperMap gives: everything below
+    // the closed-Grove branch is after an early return, and a hook there is called conditionally.
+    useEffect(() => {
+        const { shownMap } = pickShownMap(st?.zones, paperMap);
+        stampGroveReturn(groveSpot({
+            view,
+            townN,
+            townName: TOWNS.find((t) => t.n === townN)?.name,
+            mapName: (st?.zones || []).find((z) => (z.map || 1) === shownMap)?.mapName,
+        }));
+    }, [view, townN, st, paperMap]);
+
     // ⚠️ THE SAME BODY CLASS THE ZONE ALREADY USES, not a second mechanism. It stops the page behind
     // scrolling and hides the site's own fixed chat bubbles, which sit in exactly the corner the dock now
     // occupies. Added for the WHOLE feature rather than only the zone, because the whole feature is full
@@ -783,14 +829,12 @@ export default function GroveClient({ initial }) {
     // Twelve zones to a map and twelve maps, so the chart shows ONE of them. It opens on the furthest map
     // you have reached rather than on map one, because the place you are working is the place you want to
     // look at; the arrows walk back through the ones you have opened.
-    const zoneMaps = [...new Set((st.zones || []).map((z) => z.map || 1))].sort((a, b) => a - b);
-    const openMaps = zoneMaps.filter((m) => (st.zones || []).some((z) => (z.map || 1) === m && z.unlocked));
-    const deepestMap = openMaps.length ? openMaps[openMaps.length - 1] : 1;
-    const shownMap = paperMap && zoneMaps.includes(paperMap) ? paperMap : deepestMap;
+    const { zoneMaps, openMaps, shownMap } = pickShownMap(st.zones, paperMap);
     const shownZones = (st.zones || []).filter((z) => (z.map || 1) === shownMap);
     const shownName = shownZones[0]?.mapName || "The Grove";
     const mapIdx = openMaps.indexOf(shownMap);
     const walkedZones = shownZones.filter((z) => z.unlocked);
+
 
     // ── ⚠️ ONE PLACE TO GO NEXT, AND IT IS NOT THE SAME AS "A BOSS IS HERE" ─────────────────────────
     // Luke, looking at the chart: "Why are two selected". Nothing was — two zones had bosses standing
