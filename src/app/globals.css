@@ -21578,6 +21578,11 @@ body.cas-seated .social-fab { display: none; }
    The machine has advertised "twenty lines" since it shipped and never once showed them, so the only way
    to know whether three-in-a-row sat on one was to have the table memorised. Twenty little 5x3 grids with
    the shape lit on each — the cheapest possible answer to a question that came up three times in a row. */
+/* The multiplier reel's explanation. Prose, not a table: it is a rule, and the rows above are amounts. */
+.pt-mult { margin: 14px 0 4px; }
+.pt-mult h5 { margin: 0 0 6px; font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; color: #ffd75e; }
+.pt-mult p { margin: 0; font-size: 0.84rem; line-height: 1.5; color: #cbd3dc; }
+.pt-mult b { color: #ffd75e; }
 .pt-lines { margin: 14px 0 4px; }
 .pt-lines h5 { margin: 0 0 8px; font-family: var(--font-display); font-size: 13px;
     color: var(--acc, #ffd75e); }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { SLOTS5, lookFor, symbolName, LINES } from "@/lib/marketplace/casino-slot5.js";
+import { SLOTS5, lookFor, symbolName, slot5, LINES } from "@/lib/marketplace/casino-slot5.js";
 import { payoutFor } from "@/lib/marketplace/casino-payout.js";
 
 // ── WHAT IT PAYS ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -96,6 +96,8 @@ export default function Paytable({ machineId, kind, table, art, bet, onClose }) 
         [kind, machineId, bet, table],
     );
     if (!built) return null;
+    // Only the colossal cabinets carry a multiplier reel; the ordinary five- and three-reel ones do not.
+    const hasMultReel = Boolean(slot5(machineId)?.colossal?.multStrip);
     const { rows, heads, m } = built;
     // Which symbols have no three-of-a-kind pay. Derived from the same `rows` the grid renders, so the
     // sentence underneath can never disagree with the dashes above it.
@@ -144,6 +146,30 @@ export default function Paytable({ machineId, kind, table, art, bet, onClose }) 
                         </div>
                     ))}
                 </div>
+
+                {/* ── THE MULTIPLIER REEL, WHICH THE TABLE NEVER MENTIONED ─────────────────────────────
+                    ValkyrieSylve: "What are the x2, x3, x5 etc tiles supposed to do on the last row of the
+                    menagerie? I have never seen them proc, and they arent listed in the payout screen."
+
+                    The second half of that is the part this screen owns. A cabinet that puts numbered tiles
+                    on a reel and then does not say what they do has invented a rule the player has to
+                    reverse-engineer from their own balance — which is what she tried to do, and why she
+                    concluded they were broken.
+
+                    ⚠️ THE WORDING IS THE ACTUAL RULE, INCLUDING THE AWKWARD BIT. Biggest showing, not the
+                    sum (a twelve-row sum returned 31,000% when it was tried), and the tall set only. Saying
+                    "multiplies your win" would be a nicer sentence and a second thing to be wrong about. */}
+                {hasMultReel ? (
+                    <div className="pt-mult">
+                        <h5>The multiplier reel</h5>
+                        <p>
+                            The right-hand tall reel lands numbers instead of symbols, on every spin — not
+                            just in the free round. The <b>biggest</b> one showing multiplies whatever the
+                            tall set pays that spin. They do not add together, and they do not touch the
+                            small set.
+                        </p>
+                    </div>
+                ) : null}
 
                 {/* ── AND THE TWENTY LINES, DRAWN ──────────────────────────────────────────────────────
                     Luke, three boards running: "what are the paylines? The blue three across the bottom

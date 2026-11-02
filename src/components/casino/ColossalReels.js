@@ -98,7 +98,16 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
     const readout = useMemo(() => {
         if (paid && !isBigWin(paid.multiple)) return { kind: "paid", ...paid };
         if (free) return { kind: "free", at: free.at, of: free.of, mult: spin?.applied || 1 };
-        if (won > 0) return { kind: "won", gold: won };
+        // ── ⚠️ AND THE MULTIPLIER IS NAMED OUTSIDE THE ROUND TOO ────────────────────────────────────
+        // ValkyrieSylve, 2026-10-20: "What are the x2, x3, x5 etc tiles supposed to do on the last row of
+        // the menagerie? I have never seen them proc, and they arent listed in the payout screen."
+        //
+        // They DO proc — runColossal multiplies the tall set by the biggest number showing, on every spin
+        // since Luke asked for them outside the bonus. The readout simply never said so: `free` carried
+        // `mult` and `won` did not, so in the base game the number lands on the reel, multiplies your
+        // money, and nothing on screen connects the two. A multiplier you cannot see apply is, to the
+        // player, a multiplier that does not work.
+        if (won > 0) return { kind: "won", gold: won, mult: spin?.applied || 1 };
         return null;
     }, [paid, free, won, spin]);
     useEffect(() => { onReadout?.(readout); }, [readout, onReadout]);

@@ -1164,7 +1164,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, go
                                 <span className="s5-meter is-win" aria-live="polite">
                                     <i>{colReadout.kind === "free"
                                         ? `Free ${colReadout.at + 1}/${colReadout.of}${colReadout.mult > 1 ? ` ×${colReadout.mult}` : ""}`
-                                        : "Won"}</i>
+                                        : `Won${colReadout.mult > 1 ? ` ×${colReadout.mult}` : ""}`}</i>
                                     {/* WinTally renders its own <b>, so it is dropped in rather than wrapped. */}
                                     {colReadout.kind === "paid"
                                         ? <WinTally key={colReadout.k} gold={colReadout.gold}
