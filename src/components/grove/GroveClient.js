@@ -250,16 +250,34 @@ export default function GroveClient({ initial }) {
     // Computing it on the Grove's server render would bill it for every member who opens the forest and
     // never walks to the street — the exact family-A mistake CLAUDE.md opens with: reaching for the
     // convenient existing call instead of the narrow one. Null until asked for, once per visit.
-    const [townState, setTownState] = useState(null);
+    //
+    // ── ⚠️ AND IT IS FETCHED FOR A PARTICULAR TOWN ───────────────────────────────────────
+    // Luke: "when I go to the deep delve camp, it apparently takes me back to the first town and not the
+    // new town."
+    //
+    // It did. GroveAtlas hands `onTown` the town it drew the card for, and this component used to drop
+    // that argument on the floor — so all seven cards opened one street, asked this route with no `?town=`,
+    // and got `town: null` back. TownClient reads null as "an account from before gating" and paints its
+    // original default cobbles, which ARE the first town as far as anybody looking at it is concerned. The
+    // camp was never sending anyone anywhere; nothing had ever told the street which town to be.
+    //
+    // ⚠️ THE FETCHED TOWN IS PART OF THE STATE, not a second flag. The old guard was `|| townState` — once
+    // ANY town had been loaded it never fetched again, so walking map 2 → map 3 would have shown Deepdelve
+    // a second time even after the number was threaded through. `n` is what it was ASKED for rather than
+    // what came back, because the server answers `null` for anyone the preview does not apply to and
+    // comparing against that would refetch on a loop.
+    const [townState, setTownState] = useState(null); // { n, data }
+    const [townN, setTownN] = useState(null);
     useEffect(() => {
-        if (view !== "town" || townState) return undefined;
+        if (view !== "town" || townState?.n === townN) return undefined;
         let gone = false;
-        fetch("/api/marketplace/town", { cache: "no-store" })
+        const want = townN;
+        fetch(`/api/marketplace/town${want ? `?town=${encodeURIComponent(want)}` : ""}`, { cache: "no-store" })
             .then((r) => r.json())
-            .then((d) => { if (!gone && d && !d.error) setTownState(d); })
+            .then((d) => { if (!gone && d && !d.error) setTownState({ n: want, data: d }); })
             .catch(() => {});
         return () => { gone = true; };
-    }, [view, townState]);
+    }, [view, townState, townN]);
     // ⚠️ THE SAME BODY CLASS THE ZONE ALREADY USES, not a second mechanism. It stops the page behind
     // scrolling and hides the site's own fixed chat bubbles, which sit in exactly the corner the dock now
     // occupies. Added for the WHOLE feature rather than only the zone, because the whole feature is full
@@ -815,8 +833,13 @@ export default function GroveClient({ initial }) {
     // (fixed, z-index 1002), which is what makes it read as another room of the Grove rather than a page.
     const townNode = view === "town" ? (
         <div className="gv-town">
-            {townState
-                ? <TownClient initial={townState} />
+            {/* ⚠️ previewTown IS NOT BELT AND BRACES. TownClient re-polls the route on a timer and reads
+                `?town=` off window.location to carry the preview through — which works on the town PAGE and
+                cannot work here, because the URL is /marketplace/grove with no query. Without the prop the
+                first paint would be Deepdelve and the next tick, six seconds later, would quietly put
+                Rootwood back. */}
+            {townState?.data
+                ? <TownClient initial={townState.data} previewTown={townState.n} />
                 : <p className="gv-town-wait">Walking to town…</p>}
         </div>
     ) : null;
@@ -868,7 +891,10 @@ export default function GroveClient({ initial }) {
                         onEnter={enter}
                         // ⚠️ A VIEW, NOT A NAVIGATION. This was window.location.href, which tore the
                         // whole Grove down and rebuilt the site around a town page with no way back.
-                        onTown={() => setView("town")}
+                        //
+                        // ⚠️ AND IT TAKES THE TOWN. The atlas has always passed it; ignoring it is what made
+                        // every card in the column open the same street. See the fetch above.
+                        onTown={(t) => { setTownN(Number(t?.n) || null); setView("town"); }}
                     />
                     {/* ── ⚠️ ONE PLATE, NOT TWO ──────────────────────────────────────────────────
                         Luke: "Two things on top compete and seem redundant." They did, and they were:
@@ -1457,7 +1483,14 @@ export default function GroveClient({ initial }) {
                     // straight back into the zone that just killed you. Town is somewhere else.
                     // Dying sends you to the street, as it always did — but the street is in here now,
                     // so losing a run no longer also loses the session.
-                    onDeath={() => setView("town")}
+                    //
+                    // ⚠️ AND IT NAMES ITS TOWN. `townN` persists across views, so a death that only set
+                    // the view would drop you in whichever town you had last looked at from the atlas —
+                    // die in the first forest after a glance at Deepdelve and you wake up in the cave.
+                    // The town you come back to is the town for the map you died on, every time.
+                    // A town sits BEFORE the map it is named for, so the town for map N simply IS town N —
+                    // the same identity GroveAtlas pairs them on (`towns.find((t) => t.n === m)`).
+                    onDeath={() => { setTownN(Number(session.zone.map) || 1); setView("town"); }}
                 />
                 {/* ⚠️ MOUNTED IN THE ZONE BRANCH, which is the one that early-returns — anything added at
                     the bottom of this file never renders here. [[groveclient-has-two-returns]]. It is also

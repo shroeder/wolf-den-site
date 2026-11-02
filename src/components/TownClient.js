@@ -1202,8 +1202,19 @@ function buildHalloweenDressing(buildings, occupied = []) {
     return out;
 }
 
-export default function TownClient({ initial, frozen = false, halloween = false, gourd = null }) {
+// ── ⚠️ WHICH TOWN, WHEN THERE IS NO URL TO READ IT FROM ──────────────────────────────────────────────────
+// `previewTown` is the town number this street was mounted for. The page at /marketplace/town puts it in the
+// query string and `load` below has always read it back off window.location — but the Grove mounts this
+// component inside its own view, at /marketplace/grove, where there is no query string to read. The poll
+// therefore refetched with no town and overwrote the right street with the default one a few seconds after
+// arriving, which is the long way round to landing in town 1. The prop wins; the URL is the fallback.
+export default function TownClient({ initial, frozen = false, halloween = false, gourd = null, previewTown = null }) {
     const [state, setState] = useState(initial || null);
+    // ⚠️ THROUGH A REF, so `load` keeps its empty dep list. Fifteen effects name `load` in their deps and
+    // several of them fetch on mount; giving it a changing identity would fire all of them again on the
+    // busiest screen in the game to carry a number that does not change while the street is up.
+    const previewRef = useRef(previewTown);
+    previewRef.current = previewTown;
     // The street's width, and everything that measures against it. Declared HERE because the camera below
     // reads it — a hook that depends on a value declared under it is the temporal-dead-zone trap check:hook-deps
     // exists to catch. The well rides in the same layout as the buildings, hence the +1.
@@ -1769,8 +1780,10 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     }, [anyTownModal]);
 
     const load = useCallback(async () => {
-        // Carry ?town=N through the refresh — see the note in the route. Owner-only, checked server-side.
-        const pv = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("town") : null;
+        // Carry the town through the refresh — see the note in the route. Owner-only, checked server-side.
+        // The prop first (the Grove mounts this with no query string of its own), then the URL for the page.
+        const pv = previewRef.current
+            || (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("town") : null);
         const r = await fetch(`/api/marketplace/town${pv ? `?town=${encodeURIComponent(pv)}` : ""}`, { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
         if (!d) return;
