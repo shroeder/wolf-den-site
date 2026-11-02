@@ -344,6 +344,15 @@ export default function GroveClient({ initial }) {
 
     // The marshal handing over the day's key, from the world rather than from the quest panel. Idempotent
     // against the shop's own date on the server, so a double tap cannot mint two.
+    // The last quest step this settle moved, shown as a toast over the zone. Keyed so an identical
+    // follow-up tick re-triggers the animation rather than sitting there looking stale.
+    const [questTick, setQuestTick] = useState(null);
+    useEffect(() => {
+        if (!questTick) return undefined;
+        const t = setTimeout(() => setQuestTick(null), questTick.done ? 4200 : 2600);
+        return () => clearTimeout(t);
+    }, [questTick]);
+
     // Whether the giver standing in this zone is being talked to.
     const [giverOpen, setGiverOpen] = useState(false);
 
@@ -444,6 +453,19 @@ export default function GroveClient({ initial }) {
         // is the screen nobody opens.
         const lost = Object.keys(d.overflow || {});
         const made = before && after ? newlyReady(before, after) : [];
+
+        // ── ⚠️ QUEST PROGRESS, SAID OUT LOUD, IN PLAY ───────────────────────────────────────────────
+        // Luke: "What does it look like when im pkaying and I het quest progress" — and until now the
+        // answer was NOTHING, twice over. bumpQuests was never called, so no bar moved; and even once it
+        // does, a bar that only exists behind a menu is progress almost nobody watches happen.
+        //
+        // The toast is the moment. A step that FINISHED outranks one that merely moved, because finishing
+        // is the thing that sends you walking back across the map to hand it in.
+        const ticks = Array.isArray(d.questTicks) ? d.questTicks : [];
+        const finished = ticks.find((t) => t.done);
+        if (finished) setQuestTick({ ...finished, key: `${finished.step}-done` });
+        else if (ticks.length) setQuestTick({ ...ticks[0], key: `${ticks[0].step}-${ticks[0].progress}` });
+
         if (lost.length) {
             setNote(`Bag full — left ${lost.map(partName).join(", ")} behind. Bank something.`);
         } else if (made.length) {
@@ -1441,6 +1463,22 @@ export default function GroveClient({ initial }) {
                     the bottom of this file never renders here. [[groveclient-has-two-returns]]. It is also
                     not a zonePanel: a panel REPLACES the scene, and this is a person you are talking to
                     while standing in front of them. */}
+                {questTick ? (
+                    <div key={questTick.key}
+                        className={`gv-qtick${questTick.done ? " is-done" : ""}`}
+                        role="status">
+                        <span className="gv-qtick-top">
+                            {questTick.done ? "Ready to hand in" : "Quest"}
+                        </span>
+                        <b>{questTick.title}</b>
+                        <span className="gv-qtick-bar" aria-hidden="true">
+                            <i style={{ width: `${questTick.need > 0
+                                ? Math.min(100, (100 * questTick.progress) / questTick.need) : 0}%` }} />
+                        </span>
+                        <span className="gv-qtick-num">{questTick.progress}/{questTick.need}</span>
+                    </div>
+                ) : null}
+
                 {/* The person who asked for it, where they are standing. Same branch as the marshal and
                     for the same reason — [[groveclient-has-two-returns]]. */}
                 {giverOpen && session.npcHere ? (

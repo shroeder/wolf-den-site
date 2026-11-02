@@ -15,7 +15,7 @@ import { addChests } from "@/lib/marketplace/chests.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { questBoard, coliseumState } from "@/lib/marketplace/grove-quests.js";
+import { questBoard, coliseumState, bumpQuests } from "@/lib/marketplace/grove-quests.js";
 import {
     GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_PARTS, GROVE_EMBLEMS, GROVE_POP,
     GROVE_FOODS, GROVE_CHARMS, HEAL_AT, emblemStars, groveZone,
@@ -803,6 +803,25 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
 
     const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts);
 
+    // ── ⚠️ AND THE QUEST CHAINS, WHICH WERE NEVER TICKING AT ALL ────────────────────────────────────
+    // bumpQuests has existed since the chains shipped, is exported, and was imported by NOTHING. Grepped
+    // across src and scripts: zero call sites. Every bar on the quest board sat at 0 for the life of the
+    // feature, every step was permanently unclaimable, and nothing errored — the panel rendered a row with
+    // an honest 0/12 on it forever.
+    //
+    // It belongs HERE, beside the town hunts, for the reason written over them: the same server-side tally
+    // that decides what loot you got decides what your quest counts, so a client cannot inflate it. Same
+    // failure tolerance too — a missed tick is a quest that takes slightly longer; a throw is loot somebody
+    // watched drop and never received.
+    //
+    // `parts: stored` rather than got.parts: a harvest step should count what actually reached the pack,
+    // not what the floor offered before the bag cap took its share.
+    const questTicks = await bumpQuests(buyerId, {
+        slain: got.slain,
+        parts: stored,
+        zone: zoneN,
+    }).catch(() => []);
+
     // ── STATUES ─────────────────────────────────────────────────────────────────────────────────────
     // ⚠️ GRANTED, NOT APPLIED. A statue does nothing until it is poured into a line -- see turnInStatue.
     // This only puts it on the shelf, which is why a settle cannot change anybody's stats.
@@ -922,6 +941,9 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         hypers,
         xp: got.xp,
         newlySeen,
+        // What moved on the quest board because of this settle, so the scene can SAY SO. Progress that
+        // only appears if you go and open a panel is progress most people never see happen.
+        questTicks,
         ate,
         rejected,
         zoneKills: Number(z?.kills) || 0,

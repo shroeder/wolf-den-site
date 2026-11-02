@@ -1113,6 +1113,106 @@ export const GROVE_CSS = `
 .gq-goto { align-self: center; font-size: 0.74rem; letter-spacing: 0.04em; color: #e3c766;
     text-align: right; max-width: 92px; line-height: 1.3; }
 
+/* -- THE PROGRESS BAR, WITH SOMETHING IN IT ---------------------------------------------------
+   Luke: "it should tickle my brain when I see that progress bar." The old one was 9px of flat
+   green on a flat track, and 12/12 looked exactly like 7/12 only longer. Three things fix that and
+   none of them is more colour:
+
+     1. the fill is lit -- a gradient with a bright top edge, so it reads as charged rather than
+        painted. A flat rectangle is a measurement; a lit one is a gauge.
+     2. SEGMENT TICKS. Visible chunks turn one long smear into countable progress, which is the
+        whole reason an xp bar has notches.
+     3. FULL IS A DIFFERENT STATE, not a longer one. It goes gold, gains a glow and a shine that
+        crosses it, because arriving has to look different from approaching.
+
+   No prefers-reduced-motion branch anywhere in here, deliberately: this game always animates.
+   [[animations-always-play]] */
+.qd-bar {
+    display: block; position: relative; height: 14px; overflow: hidden;
+    background: linear-gradient(180deg, #0a0e09, #141a12);
+    border: 1px solid rgba(190, 176, 108, 0.32);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.8);
+}
+.qd-bar i {
+    display: block; height: 100%; position: relative;
+    background: linear-gradient(180deg, #bcd97a 0%, #86b347 45%, #5d8a33 100%);
+    box-shadow: 0 0 10px rgba(150, 200, 90, 0.4);
+    transition: width 420ms cubic-bezier(.2,.9,.3,1);
+}
+/* The lit top edge. One pixel, and it is most of the difference between flat and charged. */
+.qd-bar i::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+    background: rgba(255, 255, 255, 0.5);
+}
+/* Countable chunks. Painted over the whole track so empty segments read as "still to go". */
+.qd-bar::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(90deg,
+        transparent 0 calc(8.333% - 1px), rgba(6, 10, 6, 0.75) calc(8.333% - 1px) 8.333%);
+}
+
+/* ARRIVING LOOKS DIFFERENT FROM APPROACHING. */
+.qd-block .qd-bar i[style*="width: 100%"],
+.qd-bar.is-full i {
+    background: linear-gradient(180deg, #ffe9a4 0%, #f0c452 45%, #c79324 100%);
+    box-shadow: 0 0 16px rgba(240, 196, 82, 0.7);
+}
+.qd-block .qd-bar i[style*="width: 100%"]::after,
+.qd-bar.is-full i::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.65) 50%, transparent 80%);
+    transform: translateX(-100%);
+    animation: qdShine 2.1s ease-in-out 0.25s infinite;
+}
+@keyframes qdShine { to { transform: translateX(240%); } }
+
+/* The count. Tabular, and gold the moment it matches. */
+.qd-count { font-size: 0.92rem; font-weight: 700; color: #cfd6c3; }
+.qd-block:has(i[style*="width: 100%"]) .qd-count { color: #ffd75e; font-size: 1.02rem; }
+/* "Ready to hand in" is the loudest thing on the card after the button. */
+.qd-block:has(i[style*="width: 100%"]) .qd-label { color: #ffd75e; animation: qdNudge 1.9s ease-in-out infinite; }
+@keyframes qdNudge { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+/* -- QUEST PROGRESS, IN PLAY -------------------------------------------------------------------
+   The toast that fires on a settle that moved a step. Below the HUD and above the floor, so it
+   lands in the dead middle-left where nothing else is drawn and a thumb never rests. */
+.gv-qtick {
+    position: absolute; left: 10px; top: 86px; z-index: 300; width: 186px;
+    padding: 9px 11px 10px;
+    background: linear-gradient(180deg, rgba(30, 38, 26, 0.96), rgba(16, 22, 14, 0.97));
+    border: 1px solid rgba(190, 176, 108, 0.45);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    animation: qtIn 240ms cubic-bezier(.2,.9,.3,1), qtOut 420ms ease-in 2.1s forwards;
+}
+.gv-qtick.is-done {
+    border-color: #f0c452;
+    box-shadow: 0 0 22px rgba(240, 196, 82, 0.35), 0 8px 22px rgba(0, 0, 0, 0.6);
+    animation: qtIn 240ms cubic-bezier(.2,.9,.3,1), qtPop 520ms ease-out 240ms, qtOut 420ms ease-in 3.7s forwards;
+}
+@keyframes qtIn { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+@keyframes qtOut { to { opacity: 0; transform: translateX(-10px); } }
+@keyframes qtPop { 0% { transform: scale(1); } 35% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+.gv-qtick-top { display: block; font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: #a8a271; }
+.gv-qtick.is-done .gv-qtick-top { color: #ffd75e; }
+.gv-qtick b { display: block; margin: 3px 0 7px; font-family: var(--font-display); font-size: 0.86rem;
+    line-height: 1.2; color: #f3eedd; }
+.gv-qtick-bar { display: block; position: relative; height: 10px; overflow: hidden;
+    background: linear-gradient(180deg, #0a0e09, #141a12);
+    border: 1px solid rgba(190, 176, 108, 0.3); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8); }
+.gv-qtick-bar i { display: block; height: 100%; position: relative;
+    background: linear-gradient(180deg, #bcd97a, #6d8f3c);
+    transition: width 380ms cubic-bezier(.2,.9,.3,1); }
+.gv-qtick-bar i::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+    background: rgba(255, 255, 255, 0.45); }
+.gv-qtick.is-done .gv-qtick-bar i { background: linear-gradient(180deg, #ffe9a4, #c79324);
+    box-shadow: 0 0 12px rgba(240, 196, 82, 0.65); }
+.gv-qtick-num { display: block; margin-top: 4px; font-size: 0.68rem; color: #a8a271;
+    font-variant-numeric: tabular-nums; }
+.gv-qtick.is-done .gv-qtick-num { color: #ffd75e; }
+
 /* -- THE QUEST LAB WRAPPER (dev only) --------------------------------------------------------
    Chrome for the beat-by-beat rig at /marketplace/grove/quest-lab. Deliberately plain: the thing
    being looked at is GroveQuests underneath, and a styled frame around it would be one more
@@ -1121,6 +1221,15 @@ export const GROVE_CSS = `
 .ql-head { max-width: 620px; margin: 0 auto 16px; }
 .ql-head b { display: block; font-family: var(--font-display); font-size: 1.1rem; color: #e3c766; }
 .ql-head p { margin: 5px 0 0; font-size: 0.88rem; line-height: 1.45; color: #93a089; }
+/* A stand-in for the zone, so the absolutely-positioned toast has something to sit on in the rig. */
+.ql-stage { position: relative; max-width: 620px; margin: 0 auto; height: 230px;
+    background: linear-gradient(180deg, #16231a, #0d140e); border: 1px dashed rgba(190, 176, 108, 0.2); }
+.ql-stage .gv-qtick { top: 18px;
+    /* ⚠️ IN ONLY, NO AUTO-OUT. The live toast fades itself after a couple of seconds, which is right in
+       the game and useless in a rig — the shot settles for longer than that and photographs a ghost. */
+    animation: qtIn 240ms cubic-bezier(.2,.9,.3,1) both; }
+.ql-stage .gv-qtick.is-done { animation: qtIn 240ms cubic-bezier(.2,.9,.3,1) both; }
+
 .ql-fake { max-width: 620px; margin: 14px auto 0; font-size: 0.86rem; color: #93a089; }
 .ql-fake b { color: #e3c766; display: block; margin-top: 3px; }
 
@@ -1140,7 +1249,6 @@ export const GROVE_CSS = `
     animation: qdIn 150ms ease-out;
 }
 @media (min-width: 640px) { .qd-scrim { align-items: center; } }
-@media (prefers-reduced-motion: reduce) { .qd-scrim { animation: none; } }
 @keyframes qdIn { from { opacity: 0; } to { opacity: 1; } }
 .qd-dismiss { position: absolute; inset: 0; border: 0; padding: 0; background: none; cursor: pointer; }
 
@@ -4084,11 +4192,39 @@ export const GROVE_CSS = `
 .gq-fin { font-size: 0.74rem; color: #8d866f; font-style: italic; }
 .gq-num { font-size: 0.66rem; color: #a79e88; font-variant-numeric: tabular-nums; }
 
+/* ⚠️ THE TRACKER'S BAR GETS THE SAME TREATMENT AS THE DIALOGUE'S, and it has to: these are the same
+   fact in two places, and a 5px flat sliver here next to a lit gauge there would make the panel look
+   like the stale copy. Taller, lit top edge, notched, and GOLD at full — arriving must not look like
+   approaching with a longer rectangle. */
 .gq-bar {
-    display: block; height: 5px; border-radius: 3px; margin-top: 3px;
-    background: rgba(255, 255, 255, 0.09); overflow: hidden;
+    display: block; position: relative; height: 11px; margin-top: 5px; overflow: hidden;
+    background: linear-gradient(180deg, #0a0e09, #141a12);
+    border: 1px solid rgba(190, 176, 108, 0.26);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75);
 }
-.gq-bar i { display: block; height: 100%; background: linear-gradient(90deg, #7fae55, #cfe08a); }
+.gq-bar i {
+    display: block; height: 100%; position: relative;
+    background: linear-gradient(180deg, #bcd97a, #6d8f3c);
+    transition: width 420ms cubic-bezier(.2,.9,.3,1);
+}
+.gq-bar i::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+    background: rgba(255, 255, 255, 0.45); }
+.gq-bar::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(90deg,
+        transparent 0 calc(8.333% - 1px), rgba(6, 10, 6, 0.7) calc(8.333% - 1px) 8.333%);
+}
+/* A row the panel already marks ready — its own class, so no :has() and no width sniffing. */
+.gq-row.is-ready .gq-bar i {
+    background: linear-gradient(180deg, #ffe9a4, #c79324);
+    box-shadow: 0 0 14px rgba(240, 196, 82, 0.6);
+}
+.gq-row.is-ready .gq-bar i::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.6) 50%, transparent 80%);
+    transform: translateX(-100%); animation: qdShine 2.1s ease-in-out 0.25s infinite;
+}
+.gq-row.is-ready .gq-num { color: #ffd75e; font-weight: 700; }
 
 .gq-claim {
     flex: 0 0 auto; border: 0; border-radius: 8px; cursor: pointer;
