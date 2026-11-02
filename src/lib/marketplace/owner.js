@@ -42,6 +42,9 @@ const PREVIEW_GUESTS = {
         // by name. The one person whose feedback on maps 5-7 is worth anything is the only person who can
         // actually reach them.
         "d68dacf6-10e1-40fe-93c8-9ca6ebdbb87e", // Eric D (ericd2317@) — registered 2026-07-15
+        // Luke, 2026-11-02: "Can u give aanw the grove". One n short of her alias, and the only member
+        // on the roster it can mean.
+        "cd8f4cd8-330a-4ead-ab34-b664fdd6dacf", // aannw (alyssa.craven@) — registered 2026-07-16
     ]),
     // Opening a mystery pack online + the Card Vault. Luke, 2026-10-26: "for now I would prefer it only show
     // up for me." Owners pass without being listed, so this stays empty until somebody is invited.
