@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import QuestSpeech from "@/components/QuestSpeech";
 
 import { GROVE_NPCS } from "@/lib/marketplace/grove-npcs.js";
 
@@ -34,27 +36,6 @@ import { GROVE_NPCS } from "@/lib/marketplace/grove-npcs.js";
 //
 // ⚠️ SAME .qd-* STYLES AS THE MARSHAL'S CARD, still. Two people you walk up to and talk to should not be two
 // different kinds of object; the difference is what they offer, not how they look.
-
-const LETTER_MS = 16;
-
-/** One line of speech that types itself in, and completes instantly when tapped through. */
-function Speech({ text, onDone }) {
-    const [shown, setShown] = useState("");
-    const full = text || "";
-    const done = useRef(false);
-    useEffect(() => {
-        done.current = false;
-        setShown("");
-        let i = 0;
-        const t = setInterval(() => {
-            i += 1;
-            setShown(full.slice(0, i));
-            if (i >= full.length) { clearInterval(t); if (!done.current) { done.current = true; onDone?.(); } }
-        }, LETTER_MS);
-        return () => clearInterval(t);
-    }, [full, onDone]);
-    return <p className="qd-say">{shown}<span className="qd-caret" aria-hidden="true" /></p>;
-}
 
 export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, onClose }) {
     const [i, setI] = useState(0);
@@ -130,9 +111,19 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
                     <span className="qd-steps">{npcHere.done}/{npcHere.steps}</span>
                 </div>
 
+                {/* ⚠️ THE KEY IS THE LINE, AND `complete` IS THE PARENT'S OWN FLAG. Both matter — see
+                    the note in QuestSpeech. The old version keyed partly on `typed`, so finishing a
+                    line remounted the typewriter and it started again. */}
                 {sendoff
-                    ? <Speech key="sendoff" text={npcHere.sendoff} onDone={() => {}} />
-                    : <Speech key={`${state}-${i}`} text={lines[i]} onDone={() => setTyped(true)} />}
+                    ? <QuestSpeech key="sendoff" text={npcHere.sendoff} />
+                    : (
+                        <QuestSpeech
+                            key={`${state}-${i}`}
+                            text={lines[i]}
+                            complete={typed}
+                            onComplete={() => setTyped(true)}
+                        />
+                    )}
 
                 {/* ── THE ASK ──────────────────────────────────────────────────────────────────────────
                     Only once the talking is done, so the job is the last thing on screen when the

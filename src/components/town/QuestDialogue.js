@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import QuestSpeech from "@/components/QuestSpeech";
 
 import { PERK_SYSTEM } from "@/lib/marketplace/acts.js";
 
@@ -28,30 +30,6 @@ import { PERK_SYSTEM } from "@/lib/marketplace/acts.js";
 // on screen together, which is a paragraph — and a paragraph is a thing you skim and dismiss. Metering it
 // makes the player set the pace, and it is the only reason the ask lands as a sentence somebody said rather
 // than as a row in a table.
-
-const LETTER_MS = 16;   // typing speed. Fast enough not to be a wait, slow enough to read as speech.
-
-/** One line of speech that types itself in, and finishes instantly if the reader taps through. */
-function Speech({ text, onDone }) {
-    const [shown, setShown] = useState("");
-    const full = text || "";
-    const doneRef = useRef(false);
-    useEffect(() => {
-        doneRef.current = false;
-        setShown("");
-        let i = 0;
-        const t = setInterval(() => {
-            i += 1;
-            setShown(full.slice(0, i));
-            if (i >= full.length) {
-                clearInterval(t);
-                if (!doneRef.current) { doneRef.current = true; onDone?.(); }
-            }
-        }, LETTER_MS);
-        return () => clearInterval(t);
-    }, [full, onDone]);
-    return <p className="qd-line">{shown}<span className="qd-caret" aria-hidden="true" /></p>;
-}
 
 export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim, onOddJobs, onClose }) {
     // Which beat we are on. `i` walks the current state's line list; `card` is the ask; `plate` is the moment.
@@ -136,10 +114,20 @@ export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim
                     <span className="qd-prog" aria-label={`${claimedN} of ${ladder.length} done`}>{claimedN}/{ladder.length}</span>
                 </div>
 
+                {/* ⚠️ KEYED ON THE LINE ONLY. This keyed on `typed` as well, so the moment a line
+                    finished the whole typewriter remounted and retyped it — on top of the callback-in-
+                    deps loop described in QuestSpeech. (The text prop was also `typed ? lines[i] :
+                    lines[i]`, which is the same thing twice and did nothing.) */}
                 {sendoff ? (
-                    <Speech key="sendoff" text={board.accepted} onDone={() => {}} />
+                    <QuestSpeech key="sendoff" text={board.accepted} className="qd-line" />
                 ) : (
-                    <Speech key={`${state}-${i}-${typed}`} text={typed ? lines[i] : lines[i]} onDone={() => setTyped(true)} />
+                    <QuestSpeech
+                        key={`${state}-${i}`}
+                        text={lines[i]}
+                        complete={typed}
+                        onComplete={() => setTyped(true)}
+                        className="qd-line"
+                    />
                 )}
 
                 {/* ── THE ASK, AS A CARD ───────────────────────────────────────────────────────────────
