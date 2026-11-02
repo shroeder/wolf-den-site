@@ -181,6 +181,28 @@ const ATTACK_RANGE = 4.5;
 // tall; they were getting the rootrat's number. Adding the target's own half-width covers all of them and
 // deletes the special case, which is the version that cannot drift.
 const reachTo = (foe) => ATTACK_RANGE + (Number(foe?.halfW) || 0);
+
+// ── ⚠️ A HIT FLASH IS TWO FIELDS, AND THEY MUST BE SET TOGETHER ─────────────────────────────────────────────
+// Luke: "In the grove, sometimes the enemies flash white and stay white despite being alive and not being
+// hit."
+//
+// The decay only runs on creatures that have a deadline:
+//
+//     if (f.flashUntil && now >= f.flashUntil) { f.flash = 0; f.flashUntil = 0; }
+//     else if (f.flashUntil) f.flash = Math.max(0, (f.flashUntil - now) / FLASH_MS);
+//
+// Five places set `.flash = 1`. Two of them also set `flashUntil`. The other three — area damage, the nova
+// skill and the death kit — set the brightness and no deadline, so the decay branch never looked at them and
+// the creature stayed lit at full white for the rest of its life. Anything killed by a single hit looked
+// fine; anything that survived an AoE tick stood there glowing.
+//
+// So lighting one up is a function now, and it is the only way to do it. Two fields that must agree, written
+// by hand in five places, is the same shape as every other defect this week: the pairing cannot be enforced
+// by remembering. `npm run check:flash` fails if `.flash = 1` appears anywhere outside this helper.
+const lightUp = (foe, now, mult = 1) => {
+    foe.flash = 1;
+    foe.flashUntil = now + FLASH_MS * mult;
+};
 // Luke: "The player must walk near the loot for it to get picked up." Rest is where it lands; this is how
 // close you have to come before it commits to you.
 const LOOT_DRAW_RANGE = 6;
@@ -1556,7 +1578,7 @@ export default function GroveScene({
                 const tick = Math.max(1, Math.round(dmg * vuln));
                 f.hp -= tick;
                 f.hurtAt = now;
-                f.flash = 1;
+                lightUp(f, now);
                 if (f.big || f.rare) { w.bossBar = { hp: Math.max(0, f.hp), maxHp: f.maxHp }; w.bossHurtAt = now; }
                 // ⚠️ A NUMBER ON THE FIRST FEW ONLY. A nova catching nine bodies printed nine numbers into
                 // one ellipse and they overlapped into a smear — the ring already says how many were
@@ -1627,7 +1649,7 @@ export default function GroveScene({
                     const from = nearestFoes(ctx.x ?? w.hero.x, ctx.y ?? w.hero.y, Math.min(6, sk.n + n - 1), foe);
                     for (const t of from) {
                         const tick = Math.max(1, Math.round(base * sk.share * n));
-                        t.hp -= tick; t.hurtAt = now; t.flash = 1;
+                        t.hp -= tick; t.hurtAt = now; lightUp(t, now);
                         addPop("nova", `${tick}`, t.x, t.y + t.h * 0.62, popWeight(tick, t.maxHp));
                         burst(t.x, t.y + t.h * 0.5, { kind: "spark", crit: true });
                         if (t.hp <= 0) {
@@ -1685,7 +1707,7 @@ export default function GroveScene({
             foe.deathDir = foe.face || 1;
             impulse(foe, foe.deathDir * -dk.launch, dk.up);
             foe.dying = now;
-            foe.flash = 1;
+            lightUp(foe, now);
             burst(foe.x, foe.y + foe.h * 0.45, { crit: true, dir: -(foe.face || 1), kind: "spark" });
             burst(foe.x, foe.y, { kind: "dust" });
 
@@ -2441,8 +2463,7 @@ export default function GroveScene({
                     // When its bar was last struck. Drives whether the bar is up at all, and the flash,
                     // jolt and swell on it while it is. See drawFoeBar.
                     foe.hurtAt = now;
-                    foe.flash = 1;
-                    foe.flashUntil = now + (hit.crit ? FLASH_MS * 1.6 : FLASH_MS);
+                    lightUp(foe, now, hit.crit ? 1.6 : 1);
                     const dir = Math.sign(foe.x - w.hero.x) || 1;
                     // ⚠️ KNOCKBACK IS AN IMPULSE INTO THE SOLVER, which is what makes it carry the
                     // target's weight: a boss barely moves and a rootrat is thrown, with nobody writing
@@ -2652,8 +2673,7 @@ export default function GroveScene({
                     // the pet's reason — the body is thrown and the screen shaken on the strength of
                     // something the player did not do.
                     foe.hurtAt = now;
-                    foe.flash = 1;
-                    foe.flashUntil = now + FLASH_MS;
+                    lightUp(foe, now);
                     const dir = Math.sign(foe.x - w.pet.x) || 1;
                     const mass = Math.max(0.35, Math.min(1.6, HERO_UNITS / foe.h));
                     // A twitch, not a throw: the pet's knockback is a fraction of the hero's so the
