@@ -1313,6 +1313,15 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     const [dragging, setDragging] = useState(false); // true mid-drag → camera follows the finger instantly (no ease)
     const [chatText, setChatText] = useState("");    // town chat composer
     const [myChat, setMyChat] = useState(null);      // my own speech bubble (optimistic, clears after a few s)
+    // ── ⚠️ AND THE LOG HAS TO SHOW IT TOO ───────────────────────────────────────────────────────────────
+    // GrayKitsune, 2026-11-01: "If you send a message in chat from the town screen instead of opening the
+    // chat button, you cannot see that your own message sent."
+    //
+    // sendChat posted fire-and-forget and set myChat — which is a speech bubble over your AVATAR, up in the
+    // plaza scene and very often scrolled out of view on a phone. The chat log sitting directly above the
+    // box you just typed into was not touched at all, so the message vanished until the next poll came
+    // round. You cannot tell that from "it failed", which is why people send it twice.
+    const [pendingChat, setPendingChat] = useState([]);
     const [menuFor, setMenuFor] = useState(null);    // tapped another player → action sheet
     const [boardOpen, setBoardOpen] = useState(false); // Town Hall (events + plaza fund) panel
     const [contribBusy, setContribBusy] = useState(false);
@@ -1949,6 +1958,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
         if (!body) return;
         setChatText("");
         showMyChat(body.slice(0, 200));
+        setPendingChat((p) => [...p, { id: `pending-${Date.now()}`, body, at: Date.now(), mine: true, pending: true }]);
         postAction({ action: "chat", body });
     }, [chatText, showMyChat, postAction]);
     const quickEmote = useCallback((emoji) => { showMyChat(emoji); postAction({ action: "chat", body: emoji }); }, [showMyChat, postAction]);
@@ -2202,6 +2212,29 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     }, [state?.hangout?.justGranted, state?.hangout?.active, state?.hangout?.pct]);
 
     const you = state?.you;
+
+    // ── THE LOG THE COMPOSER IS SITTING UNDER ───────────────────────────────────────────────────────────
+    // Server rows, plus anything of mine still in flight. A pending row retires the moment the real one
+    // comes back with the same text, and expires on its own after fifteen seconds so a dropped post cannot
+    // leave a message on screen that the plaza never received — saying it sent when it did not is the same
+    // lie as saying nothing, pointed the other way.
+    const chatRows = useMemo(() => {
+        const rows = state?.chatLog || [];
+        if (!pendingChat.length) return rows;
+        const seen = new Set(rows.filter((m) => m.mine).map((m) => String(m.body)));
+        const live = pendingChat.filter((p) => !seen.has(p.body) && Date.now() - p.at < 15000);
+        return live.length ? [...rows, ...live.map((p) => ({ ...p, name: "You", sprite: you?.sprite || null, flip: you?.flip }))] : rows;
+    }, [state?.chatLog, pendingChat, you?.sprite, you?.flip]);
+
+    // Sweep retired pendings out of state so the list does not grow for a long session.
+    useEffect(() => {
+        if (!pendingChat.length) return undefined;
+        const seen = new Set((state?.chatLog || []).filter((m) => m.mine).map((m) => String(m.body)));
+        const keep = pendingChat.filter((p) => !seen.has(p.body) && Date.now() - p.at < 15000);
+        if (keep.length !== pendingChat.length) setPendingChat(keep);
+        const t = setTimeout(() => setPendingChat((cur) => cur.filter((p) => Date.now() - p.at < 15000)), 4000);
+        return () => clearTimeout(t);
+    }, [state?.chatLog, pendingChat]);
     const art = state?.art || {};
 
     // ── ⚠️ ART CAN BE THEMED PER TOWN, AND FALLS BACK WHEN IT IS NOT ──────────────────────────────
@@ -3233,10 +3266,10 @@ export default function TownClient({ initial, frozen = false, halloween = false,
             </div>
 
             <section className="card tw-chatbar">
-                {(state?.chatLog || []).length ? (
+                {chatRows.length ? (
                     <div className="tw-chatlog" aria-label="Plaza chat log">
-                        {(state.chatLog).slice().reverse().map((m) => (
-                            <div key={m.id} className={`tw-clog-row${m.mine ? " mine" : ""}`}>
+                        {chatRows.slice().reverse().map((m) => (
+                            <div key={m.id} className={`tw-clog-row${m.mine ? " mine" : ""}${m.pending ? " is-pending" : ""}`}>
                                 <span className="tw-clog-hero" aria-hidden="true">
                                     {m.sprite ? (
                                         // eslint-disable-next-line @next/next/no-img-element
@@ -4688,6 +4721,10 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-chatbar { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
 /* Persistent plaza chat LOG under the scene — column-reverse so the newest sits at the bottom and it stays
    pinned there as messages arrive (fed newest-first). Each row shows the sender's HERO sprite + name + time. */
+/* A message that has left the browser but has not come back from the server yet. Dimmed, not hidden:
+   the whole complaint was that it looked like nothing happened. It either firms up when the real row
+   arrives or disappears after fifteen seconds, and both of those are honest. */
+.tw-clog-row.is-pending { opacity: 0.55; }
 .tw-chatlog { display: flex; flex-direction: column-reverse; gap: 9px; max-height: 190px; overflow-y: auto; padding: 4px 2px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 2px; }
 .tw-clog-row { display: flex; gap: 8px; align-items: flex-start; }
 .tw-clog-row.mine { flex-direction: row-reverse; }
