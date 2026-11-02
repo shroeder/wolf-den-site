@@ -1010,6 +1010,35 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, go
         const t = setTimeout(() => setPhase("done"), 120000);
         return () => clearTimeout(t);
     }, [phase]);
+
+    // ── ⚠️ AND THE SAME GUARD FOR *EVERY* PHASE, WHICH IS THE LESSON THE TWO ABOVE ALREADY TEACH ─────────
+    // ValkyrieSylve, 2026-11-01: "After playing my first slot machine, I dont have the option to spin
+    // again. This has happened almost everyday I go into the casino lately."
+    //
+    // SPIN is disabled while `phase` is anything but idle or done. Nine phases exist and seven of them —
+    // trigger, free, freeIntro, freeDone, pick, build, warren, gems, tumble — leave ONLY by a callback or a
+    // setTimeout held in timers.current. A phone that locks, backgrounds the tab or suspends the page
+    // mid-animation can lose that timer, and then nothing ever moves the phase on.
+    //
+    // ⚠️ AND IT IS A DEADLOCK, NOT A STALL. The one thing that clears the timer list and resets the round is
+    // `pull`, and `pull` is behind the SPIN button the stuck phase just disabled. The cabinet cannot be
+    // recovered by the player at all — which is exactly "I dont have the option to spin again", and why it
+    // reads as daily rather than rare.
+    //
+    // Two special cases for this already exist directly above, each written after the same discovery. This
+    // is the general form: whatever the phase, the machine comes back. The ceiling sits above the longest
+    // legitimate round (the colossal one, 120s) so it never fires in normal play, and the worst it can do is
+    // release a cabinet slightly late instead of never.
+    useEffect(() => {
+        if (phase === "idle" || phase === "done" || phase === "colossal") return undefined;
+        const t = setTimeout(() => {
+            clearTimers();
+            setFlashSym(null);
+            setShowLine(-1);
+            setPhase("done");
+        }, 150000);
+        return () => clearTimeout(t);
+    }, [phase, clearTimers]);
     useEffect(() => {
         if (isColossal) return undefined;
         if (phase !== "done" || !(Number(result?.wonGold || 0) > 0)) return undefined;
