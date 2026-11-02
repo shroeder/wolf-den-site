@@ -73,7 +73,23 @@ export const POSES = [
     {
         id: "shoulder", name: "Shouldered", source: "unlock", how: "Open 25 chests", event: "open_chest", need: 25,
         rarity: "rare", art: "/images/poses/shoulder.webp",
-        say: "a casual stance with the weapon resting back over one shoulder and the shield hanging loose from the other hand",
+        // ── ⚠️ THE HAFT HAS TO SURVIVE THE SHOULDER ─────────────────────────────────────────────────
+        // Mama G, 2026-11-01: "There is a graphic glitch with my avatar, in the 'shouldered' pose my
+        // hammer looks broken lol."
+        //
+        // It is the hardest pose in the set for a hafted weapon. "Resting back over one shoulder" asks the
+        // model to foreshorten a long handle across the body and put the heavy end BEHIND the figure, and
+        // what it does instead is lose the handle where it crosses the shoulder — leaving a hammer head
+        // floating with a stump in the hand, which reads exactly as broken.
+        //
+        // Said explicitly, because an image model follows a stated constraint far better than it infers
+        // one: the handle is a single unbroken line, gripped low, passing IN FRONT of the shoulder. Every
+        // other pose carries the weapon clear of the body and does not need this.
+        //
+        // ⚠️ GENERATOR ONLY — no existing sprite is redrawn. New draws come out right; a member who wants
+        // theirs again can ask for it, which is already how the sprite job works.
+        // [[redrawing-existing-art-needs-high]]
+        say: "a casual stance with the weapon resting back over one shoulder and the shield hanging loose from the other hand, the weapon's handle drawn as ONE unbroken line from the gripping hand up across the front of the shoulder, with the head of the weapon resting behind the shoulder and still clearly attached to that handle",
     },
     {
         id: "planted", name: "Planted", source: "unlock", how: "Land 50 hits on a weekly boss", event: "boss_attack", need: 50,
