@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { actBoard, claimActQuest } from "@/lib/marketplace/act-board.js";
+import { acceptActQuest, actBoard, claimActQuest } from "@/lib/marketplace/act-board.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 // ── THE ACT BOARD'S DOOR ─────────────────────────────────────────────────────────────────────────────────────
@@ -33,9 +33,16 @@ export async function POST(request) {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer?.id) return NextResponse.json({ ok: false, error: "signed_out" }, { status: 401 });
             const body = await request.json().catch(() => ({}));
-            const res = await claimActQuest(buyer.id, String(body?.quest || ""));
+            // ⚠️ TWO VERBS NOW, AND THE ACCEPT IS NOT COSMETIC. Taking a rung starts the window its
+            // progress is counted over (migration 509), so it is a write with consequences and gets the
+            // same re-checking from the database that the claim does. See act-board.js.
+            const res = body?.action === "accept"
+                ? await acceptActQuest(buyer.id, String(body?.quest || ""))
+                : await claimActQuest(buyer.id, String(body?.quest || ""));
             // The board is re-read from the server rather than patched on the client, so what the player sees
             // after a claim is what the database says — including the next rung opening.
+            // Re-read from the server rather than patching on the client, so what the player sees after
+            // either verb is what the database says — including the next rung opening behind it.
             const board = res.ok ? await actBoard(buyer.id, String(body?.town || "")) : null;
             return NextResponse.json({ ...res, board }, { headers: { "Cache-Control": "no-store" } });
         } catch (e) {

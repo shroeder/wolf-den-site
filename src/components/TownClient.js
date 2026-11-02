@@ -10,6 +10,7 @@ import GourdfatherStall from "@/components/GourdfatherStall";
 import { knockHaptic, knockSound, snatcherDropSound, snatcherHaptic, snatcherSound, stopTownAudio } from "@/components/town/town-audio.js";
 import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
+import QuestDialogue from "@/components/town/QuestDialogue";
 import CoinCta from "@/components/CoinCta";
 import { bandLeftPct, bandPct, gradeKeyForDist } from "@/lib/marketplace/timing.js";
 import { STAT_META, statParts, describeSea, describeFarm } from "@/lib/marketplace/items.js";
@@ -1309,6 +1310,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
 
     const townHasStocks = !town || town.n === 1;
 
+
     // ── THE ACT BOARD ───────────────────────────────────────────────────────────────────────────────
     // Luke: "in each town, there'd be a building you can click to see what your quests are for that act
     // ... how you open the quests is going to be something thematically that fits in the town."
@@ -1319,11 +1321,55 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     const [actOpen, setActOpen] = useState(false);
     const [actBoard, setActBoard] = useState(null);
     const [actBusy, setActBusy] = useState("");
+    // ── ⚠️ WHAT THE QUEST GIVER IS WORTH WALKING OVER FOR ───────────────────────────────────────
+    // Three states worth signalling, and they are not the same signal:
+    //   offered  he has a NEW job. The strongest draw — this is the one a player should cross a
+    //            street for, and the thing that used to be invisible until you tapped him.
+    //   ready    you have finished one and he does not know yet. Turning it in is the dopamine beat
+    //            Luke named, and it is worth nothing if you have to remember to go back unprompted.
+    //   active   nothing to say; he is just a man standing there.
+    // ⚠️ NO GLYPH FOR IT. The classic answer is an exclamation mark over his head, which is exactly
+    // the borrowed clipart the house rule forbids — so it is a lit ring on the NPC plus the line he
+    // would say, which is better anyway: it tells you WHAT rather than THAT.
+    const actFocus = (actBoard?.rungs || []).find((r) => r.key === actBoard?.focusKey) || null;
+    const questMark = actFocus?.state === "ready" ? "ready" : actFocus?.state === "offered" ? "offered" : null;
+    // ── ⚠️ READ ONCE WHEN THE STREET OPENS, NEVER ON THE POLL ───────────────────────────────────
+    // Luke wants quest AWARENESS: you should know the Quest Giver has something without walking over
+    // and tapping him, and you should be able to see what you are on while you are doing it. Both need
+    // the ladder's state out here in the scene rather than inside the sheet.
+    //
+    // ⚠️ BUT NOT IN getTownState. That is the highest-volume request in the app — every viewer runs it
+    // on a timer — and act-board.js costs three reads. Folding it in would bill the ladder on every
+    // four-second tick for every member in every town, which is the family-A mistake CLAUDE.md opens
+    // with, to light up a marker that changes a few times a week. Once per visit is the right rate for
+    // a thing that only moves when the player does something.
+    useEffect(() => {
+        if (!town?.id) return undefined;
+        let gone = false;
+        fetch(`/api/marketplace/acts?town=${encodeURIComponent(town.id)}`, { cache: "no-store" })
+            .then((r) => r.json())
+            .then((d) => { if (!gone && d?.board) setActBoard(d.board); })
+            .catch(() => {});
+        return () => { gone = true; };
+    }, [town?.id]);
+
     const openActBoard = async () => {
         setActOpen(true);
         const r = await fetch(`/api/marketplace/acts?town=${encodeURIComponent(town?.id || "")}`, { cache: "no-store" })
             .then((x) => x.json()).catch(() => null);
         setActBoard(r?.board || null);
+    };
+    // Taking a rung. ⚠️ IT RETURNS A BOOLEAN, because QuestDialogue only raises the QUEST RECEIVED
+    // plate when the server actually took it — a plate over a failed write is a lie the player acts on.
+    const acceptAct = async (key) => {
+        setActBusy(key);
+        const r = await fetch("/api/marketplace/acts", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "accept", quest: key, town: town?.id || "" }),
+        }).then((x) => x.json()).catch(() => null);
+        setActBusy("");
+        if (r?.board) setActBoard(r.board);
+        return Boolean(r?.ok);
     };
     const claimAct = async (key) => {
         setActBusy(key);
@@ -1333,6 +1379,8 @@ export default function TownClient({ initial, frozen = false, halloween = false,
         }).then((x) => x.json()).catch(() => null);
         setActBusy("");
         if (r?.board) setActBoard(r.board);
+        // Same contract as acceptAct: the QUEST COMPLETE plate only goes up if the server paid it.
+        return Boolean(r?.ok);
     };
     // ⚠️ BUMP THIS WHEN A TOWN LAYER IS REDRAWN. Static assets under /public are served with a day of
     // max-age, so a redrawn sky keeps rendering as the old one — which cost a full round of "the art did not
@@ -2501,6 +2549,29 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     waystation. TOWN_VIBE answers with the town's own; an unlisted town (Rootwood, and the
                     default ungated street, which has no `town` at all) falls through to that same loop,
                     which is the one it was written for. See the note over the vibes in SceneMusic. */}
+                {/* ── ⚠️ WHAT YOU ARE ON, WITHOUT ASKING ANYBODY ──────────────────────────────────
+                    Luke: "first class citizen like level features around quest management and
+                    awareness and dopamine from getting progress on them".
+
+                    The ladder used to be invisible the moment the sheet closed — you had to walk back
+                    to the NPC to find out whether the thing you just did counted. A quest you cannot
+                    see is a quest you forget you are on, and forgetting is the opposite of the loop.
+
+                    It is a BAR as well as a number on purpose: 3/5 is information and a bar that moves
+                    is a feeling, and the feeling is the part that was missing. */}
+                {actFocus && (actFocus.state === "active" || actFocus.state === "ready") ? (
+                    <button type="button" className={`tw-track${actFocus.state === "ready" ? " is-ready" : ""}`}
+                        onClick={(e) => { e.stopPropagation(); openActBoard(); setActOpen(true); }}>
+                        <span className="tw-track-top">
+                            <b>{actFocus.title}</b>
+                            <i>{actFocus.have}/{actFocus.need}</i>
+                        </span>
+                        <span className="tw-track-bar"><span style={{ width: `${Math.round((actFocus.have / actFocus.need) * 100)}%` }} /></span>
+                        <span className="tw-track-foot">
+                            {actFocus.state === "ready" ? `Done — take it back to ${actBoard?.giver || "the giver"}` : actFocus.desc}
+                        </span>
+                    </button>
+                ) : null}
                 <SceneMusic vibe={raidActive ? "raid" : spooky ? "town_hw" : (TOWN_VIBE[town?.id] || "town")} />
                 {/* ONE status bubble, top-left: who's here AND whether the shop is open. These were two separate
                     absolutely-positioned pills and they overlapped each other the moment the Den was open —
@@ -3099,10 +3170,27 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             ) : null}
                         </button>
                     ) : null}
-                    {/* Quest-Giver NPC — tap for town bounties; alert badge when a reward is claimable */}
-                    <button type="button" className="tw-npc-btn" style={{ left: `${npcAt("questgiver")}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setQuestFlash(null); setQuestOpen(true); load(); loadHunts(); if (town) openActBoard(); }} aria-label="Quest Giver">
-                        <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
-                        {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
+                    {/* ── THE QUEST GIVER ─────────────────────────────────────────────────────────────
+                        In a town he opens the CONVERSATION — the act chain, one rung at a time, with
+                        dialogue. On the single ungated street (no acts exist for it) he still opens the
+                        old daily list, because that is the only thing he has there and an NPC who does
+                        nothing when tapped is worse than a list. */}
+                    <button type="button" className={`tw-npc-btn${questMark ? ` tw-has-quest is-${questMark}` : ""}`} style={{ left: `${npcAt("questgiver")}%`, top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); if (town) { openActBoard(); } else { setQuestFlash(null); setQuestOpen(true); load(); loadHunts(); } }} aria-label={actBoard?.giver || "Quest Giver"}>
+                        {/* What he would say, over his head, so the draw is a sentence rather than a mark. */}
+                        {questMark ? <span className="tw-npc-bubble">{questMark === "ready" ? "Back already? Let's see it." : actBoard?.hail}</span> : null}
+                        {/* ⚠️ ONE MARKER, AND THE CHAIN OWNS IT IN A TOWN. This was driven by
+                            `questsClaimable` — the daily gold bounties — so in a town it lit up for the
+                            list the player was told to stop caring about and stayed dark for the quest
+                            somebody was actually waiting on. The marker has to point at the thing the
+                            NPC will talk about when you tap him, or it is training people to ignore it. */}
+                        {town
+                            ? (questMark ? <span className={`tw-quest-marker${questMark === "ready" ? " is-ready" : ""}`} aria-hidden="true">{questMark === "ready" ? "?" : "!"}</span> : null)
+                            : (
+                                <>
+                                    <span className={`tw-quest-marker${questsClaimable > 0 ? " is-ready" : ""}`} aria-hidden="true">{questsClaimable > 0 ? "?" : "!"}</span>
+                                    {questsClaimable > 0 ? <span className="tw-npc-alert">{questsClaimable}</span> : null}
+                                </>
+                            )}
                         {/* ⚠️ THE TOWN'S OWN. Luke: "every town has its own kind of thematic quest giver".
                             One shared figure standing in seven different biomes was the same complaint as the
                             merchant — themed() asks for this town's character and falls back to the original
@@ -3313,41 +3401,24 @@ export default function TownClient({ initial, frozen = false, halloween = false,
             {/* ── THE ACT LADDER ───────────────────────────────────────────────────────────────────────
                 One rung open at a time, the rest visible but shut — the order IS the teaching, so a player
                 can read where this act is going without being able to skip to the end of it. */}
+            {/* ── ⚠️ A CONVERSATION, NOT A LIST ───────────────────────────────────────────────────
+                This was an ordered list with Claim buttons down the right. Every structural thing
+                about the ladder was already right — one rung open at a time, one-time, paying passive
+                perks rather than gold — and none of it READ as a quest, because a list cannot want
+                anything. The Mine Captain has a problem with his props; the list had a row.
+
+                See QuestDialogue for the beats. The ladder is still in there, underneath the
+                conversation, because acts.js is explicit that later rungs stay visible. */}
             {actOpen ? (
-                <div className="tw-roster" role="dialog" aria-label="Act quests" onClick={() => setActOpen(false)}>
-                    <div className="tw-roster-panel tw-actsheet" onClick={(e) => e.stopPropagation()}>
-                        {/* The same head every other town sheet uses — a panel that closes differently
-                            from its neighbours is a panel people get stuck in. */}
-                        <div className="tw-roster-head">
-                            <strong>{actBoard?.name || "The board"}</strong>
-                            <button type="button" onClick={() => setActOpen(false)} aria-label="Close">✕</button>
-                        </div>
-                        {!actBoard ? <p className="tw-act-empty">Reading the board&hellip;</p> : (
-                            <>
-                                <p className="tw-act-blurb">{actBoard.blurb}</p>
-                                <ol className="tw-act-list">
-                                    {actBoard.rungs.map((r) => (
-                                        <li key={r.key} className={`tw-act-rung${r.claimed ? " is-done" : ""}${!r.open ? " is-shut" : ""}${r.claimable ? " is-ready" : ""}`}>
-                                            <div className="tw-act-main">
-                                                <b>{r.title}</b>
-                                                <span>{r.desc}</span>
-                                                {r.perk ? <i>+{r.perk.pct}% to {PERK_SYSTEM[r.perk.slot] || r.perk.slot}</i> : null}
-                                            </div>
-                                            <div className="tw-act-side">
-                                                {r.claimed ? <span className="tw-act-tick">Done</span>
-                                                    : !r.open ? <span className="tw-act-lock">Locked</span>
-                                                    : r.claimable ? (
-                                                        <button type="button" className="tw-act-claim" disabled={actBusy === r.key}
-                                                            onClick={() => claimAct(r.key)}>{actBusy === r.key ? "..." : "Claim"}</button>
-                                                    ) : <span className="tw-act-count">{r.have}/{r.need}</span>}
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ol>
-                            </>
-                        )}
-                    </div>
-                </div>
+                <QuestDialogue
+                    board={actBoard}
+                    portrait={themed("questgiver")}
+                    busy={Boolean(actBusy)}
+                    onAccept={acceptAct}
+                    onClaim={claimAct}
+                    onOddJobs={() => { setActOpen(false); setQuestFlash(null); setQuestOpen(true); load(); loadHunts(); }}
+                    onClose={() => setActOpen(false)}
+                />
             ) : null}
 
             </div>
@@ -4988,6 +5059,31 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-quests { display: flex; flex-direction: column; gap: 10px; }
 .tw-quest { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
 .tw-quest.is-claimed { opacity: 0.6; }
+/* ── THE QUEST GIVER HAS SOMETHING ────────────────────────────────────────────────────────────
+   A lit ring on the NPC rather than an exclamation mark over him: the classic mark is a glyph, and
+   the house rule has no exception for "but everyone does it". The ready state is the louder of the two,
+   because turning in is the beat worth crossing a street for. */
+.tw-npc-btn.tw-has-quest img { filter: drop-shadow(0 0 10px rgba(255,215,94,0.9)) drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+.tw-npc-btn.tw-has-quest.is-ready img { filter: drop-shadow(0 0 12px rgba(143,227,154,0.95)) drop-shadow(0 4px 6px rgba(0,0,0,0.5)); animation: twQuestPulse 1.8s ease-in-out infinite; }
+@keyframes twQuestPulse { 50% { transform: translateY(-3px); } }
+
+/* ── THE TRACKER ──────────────────────────────────────────────────────────────────────────────
+   Top-left under the status pill, fixed to the SCENE rather than the world, so it does not scroll
+   away down a street that is 2,900px wide. Tapping it reopens the conversation. */
+.tw-track { position: absolute; left: 10px; top: 52px; z-index: 300; width: min(260px, 62%);
+    display: flex; flex-direction: column; gap: 4px; text-align: left; cursor: pointer;
+    padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(255,215,110,0.3);
+    background: rgba(10,8,14,0.82); backdrop-filter: blur(2px); box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+.tw-track.is-ready { border-color: rgba(143,227,154,0.6); }
+.tw-track-top { display: flex; align-items: baseline; gap: 8px; }
+.tw-track-top b { font-size: 0.8rem; color: #f3ecda; }
+.tw-track-top i { margin-left: auto; font-style: normal; font-size: 0.72rem; font-weight: 800; color: #ffd75e; }
+.tw-track.is-ready .tw-track-top i { color: #8fe39a; }
+.tw-track-bar { display: block; height: 6px; border-radius: 999px; background: rgba(255,255,255,0.12); overflow: hidden; }
+.tw-track-bar span { display: block; height: 100%; border-radius: 999px; transition: width .6s cubic-bezier(.2,.9,.3,1);
+    background: linear-gradient(90deg,#ffd75e,#f3b23a); }
+.tw-track.is-ready .tw-track-bar span { background: linear-gradient(90deg,#8fe39a,#5fbf74); }
+.tw-track-foot { font-size: 0.7rem; color: #a99f88; line-height: 1.3; }
 .tw-quest-coin { width: 15px; height: 15px; object-fit: contain; vertical-align: -2px; margin-right: 4px; }
 .tw-quest-tag.is-done { display: grid; place-items: center; font-size: 22px; color: #8fe39a; }
 .tw-quest-body { flex: 1 1 auto; min-width: 0; }
