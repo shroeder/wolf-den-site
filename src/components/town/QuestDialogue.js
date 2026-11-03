@@ -31,7 +31,7 @@ import { PERK_SYSTEM } from "@/lib/marketplace/acts.js";
 // makes the player set the pace, and it is the only reason the ask lands as a sentence somebody said rather
 // than as a row in a table.
 
-export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim, onOddJobs, onClose }) {
+export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim, onClose }) {
     // Which beat we are on. `i` walks the current state's line list; `card` is the ask; `plate` is the moment.
     const [i, setI] = useState(0);
     const [typed, setTyped] = useState(false);
@@ -208,18 +208,24 @@ export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim
                     A chain does not need to show its links. How far along you are is already on the
                     header as {claimed}/{total}, and the next rung arrives the way the first one did:
                     somebody asks you for it. */}
-                {/* ── ⚠️ THE DAILIES ARE STILL HERE, AND THEY ARE NOT THE POINT ANY MORE ──────────
-                    Luke on the old sheet: "this one big modal with a bunch of irrelevant rewards,
-                    it's all gold." It is demoted rather than deleted, for two reasons. The Grove
-                    HUNTS live in the same sheet and are genuinely tied to the forest; and a feature
-                    with no door left in the building is the mistake this repo has made twice in one
-                    day. One line, under the conversation, in his voice rather than as a tab. */}
-                {!sendoff && last && typed && onOddJobs ? (
-                    <button type="button" className="qd-odd" onClick={(e) => { e.stopPropagation(); onOddJobs(); }}>
-                        &ldquo;Anything else going?&rdquo;
-                    </button>
-                ) : null}
+                {/* ── ⚠️ NO SECOND QUEST BOARD BEHIND THIS PERSON ─────────────────────────────
+                    Luke: "its odd that they have another quest board under 'anything else going on'. I
+                    dont think they should have another flat quest board. Just a chain of quests."
 
+                    What stood here was "Anything else going?" — one line in the giver's voice that
+                    opened the OLD sheet: the daily bounties and the Grove hunts, as a list with Claim
+                    buttons. It was demoted rather than deleted when the conversation replaced the board,
+                    on the grounds that a feature with no door left in the building is a mistake this
+                    repo has made before. But it is still a flat quest board, and hanging it off the back
+                    of the one person who was supposed to replace it is the worst place for it to be: ask
+                    a man for work and get a spreadsheet.
+
+                    ⚠️ AND IT STRANDS NOTHING, which is the only reason this can go. The dailies keep
+                    their own door and a better one — GameNav carries a "Quests" entry with a badge for
+                    how many are ready to claim, and PlayHub and the pets screen both link it too. The
+                    door this removes was the fourth, not the only.
+
+                    A quest giver offers a chain. That is all he offers. */}
                 {!sendoff && !(last && typed) ? <span className="qd-more" aria-hidden="true">tap</span> : null}
             </div>
 
@@ -284,10 +290,7 @@ const QD_CSS = `
 .qd-later { flex: 0 0 auto; padding: 10px 14px; border-radius: 10px; cursor: pointer;
     border: 1px solid rgba(255,255,255,0.16); background: transparent; color: #cfc3ad; font-weight: 700; }
 
-.qd-odd { display: block; width: 100%; margin-top: 10px; padding: 8px; border-radius: 10px; cursor: pointer;
-    border: 1px dashed rgba(255,255,255,0.18); background: transparent; color: #a99f88;
-    font-size: 0.8rem; font-style: italic; }
-.qd-odd:hover { color: #cfc3ad; border-color: rgba(255,255,255,0.3); }
+/* .qd-odd's rules went with its markup. [[stale-css-rule-on-reshape]] */
 /* The ladder's rules went with its markup — a rule left behind for a deleted element is what
    restyles the next thing to take the class name. [[stale-css-rule-on-reshape]] */
 

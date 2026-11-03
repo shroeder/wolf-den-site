@@ -3528,7 +3528,6 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     busy={Boolean(actBusy)}
                     onAccept={acceptAct}
                     onClaim={claimAct}
-                    onOddJobs={() => { setActOpen(false); setQuestFlash(null); setQuestOpen(true); load(); loadHunts(); }}
                     onClose={() => setActOpen(false)}
                 />
             ) : null}
