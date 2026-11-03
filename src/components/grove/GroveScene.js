@@ -1413,12 +1413,34 @@ export default function GroveScene({
             return false;
         };
 
+        // ── ⚠️ THE SPARKS HAVE A BUDGET NOW ─────────────────────────────────────────────────────
+        // Luke: "when I kill like more than one thing, the game freaking like lags out and freaking
+        // like stutters big time."
+        //
+        // There was no ceiling on live particles at all. A crit burst is 14 nodes; a nova that catches
+        // nine bodies calls burst once per body AND twice more in each death kit, so a single frame
+        // created three to four HUNDRED elements — and then wrote a transform and an opacity to every
+        // one of them, every frame, for the next 400ms. One kill is free; nine is a DOM thrash.
+        //
+        // ⚠️ IT SCALES DOWN, IT DOES NOT CUT OFF. A hard "stop at N" would give the first two bodies a
+        // full spray and the other seven nothing, which reads as the effect being broken rather than
+        // busy. Past half the budget each burst gets proportionally fewer particles, so a nine-body
+        // nova still throws sparks off all nine — just thinner ones, at the moment when there is far
+        // too much on screen to count them anyway.
+        const SPARK_BUDGET = 150;
         const burst = (x, y, { crit = false, dir = 0, kind = "spark", scale = 1 } = {}) => {
             const layer = fxRef.current;
             if (!layer) return;
             const dust = kind === "dust";
             const base = dust ? DUST.n : crit ? SPARK.nCrit : SPARK.n;
-            const n = Math.max(1, Math.round(base * scale));
+            let n = Math.max(1, Math.round(base * scale));
+            const live = w.sparks.length;
+            if (live >= SPARK_BUDGET) return;
+            if (live > SPARK_BUDGET * 0.5) {
+                const room = (SPARK_BUDGET - live) / (SPARK_BUDGET * 0.5);
+                n = Math.max(1, Math.round(n * room));
+            }
+            n = Math.min(n, SPARK_BUDGET - live);
             for (let i = 0; i < n; i += 1) {
                 const s = makeSpark(i, n, x, y, {
                     speed: (dust ? DUST.speed : crit ? SPARK.speedCrit : SPARK.speed) * scale,
