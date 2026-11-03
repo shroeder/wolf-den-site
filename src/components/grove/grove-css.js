@@ -1099,10 +1099,6 @@ export const GROVE_CSS = `
 .qd-chain { margin: 14px 0 0; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase;
     color: #7f8b6b; }
 
-/* On the tracker panel, where a Claim button used to be. It is a direction, not a control. */
-.gq-goto { align-self: center; font-size: 0.74rem; letter-spacing: 0.04em; color: #e3c766;
-    text-align: right; max-width: 92px; line-height: 1.3; }
-
 /* -- THE MARSHAL'S OFFER, AND THE GIVER'S --------------------------------------------------------
    Luke, twice: "it doesnt feel like an mmo quest. Its too web forms", then "I dont like the squarey
    boxes and the not exciting colors."
@@ -4446,84 +4442,144 @@ export const GROVE_CSS = `
     margin: 0 0 6px; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: #a79e88;
 }
 
-/* ── THE QUEST HELPER ────────────────────────────────────────────────────────────────────────────
-   Built around the zone number, because that is the one thing the panel exists to tell you: three
-   givers are hidden across twelve zones on purpose, and without this the instruction "come back to
-   them" means walking the map hoping. */
-.gq { display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 10px; }
-.gq-note { margin: 0; font-size: 0.78rem; color: #cbbf9d; }
-.gq-empty { margin: 10px 2px; font-size: 0.82rem; color: #9b937f; line-height: 1.45; }
-.gq-map h4 {
-    margin: 0 0 6px; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: #a79e88;
-}
-.gq-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+/* ── THE QUEST LOG ──────────────────────────────────────────────
+   Luke: "lets build a quest log that is a first class feature, and it is separated by region and
+   zone, shows the quest npc, and lets you turn it in remotely."
 
-.gq-row, .gq-col {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 10px; border-radius: 10px;
-    background: rgba(20, 26, 18, 0.72); border: 1px solid rgba(120, 140, 96, 0.22);
-}
-.gq-col { border-color: rgba(220, 180, 90, 0.3); }
-/* A finished chain stays on the list and says so — see the note in GroveQuests about not hiding it. */
-.gq-row.is-done { opacity: 0.6; }
-.gq-row.is-ready { border-color: rgba(240, 180, 76, 0.55); background: rgba(44, 38, 18, 0.8); }
+   ⚠️ .gql-, NOT .gq-. The old tracker's rules are DELETED rather than inherited: it was a flat list
+   of 56px rows and this is a card with four bands in it, so every one of those rules would have been
+   a shape that no longer exists, sitting in the file waiting for a reused class name to pick it up.
+   [[stale-css-rule-on-reshape]].
 
-.gq-face {
-    width: 42px; height: 58px; object-fit: contain; flex: 0 0 auto;
-    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
-}
-.gq-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
-.gq-who { font-size: 0.86rem; color: #f0e7cf; }
-.gq-where { font-size: 0.68rem; color: #a79e88; }
-.gq-task { font-size: 0.8rem; color: #e4d9ba; }
-.gq-ask { font-size: 0.7rem; color: #9b937f; text-transform: capitalize; }
-.gq-fin { font-size: 0.74rem; color: #8d866f; font-style: italic; }
-.gq-num { font-size: 0.66rem; color: #a79e88; font-variant-numeric: tabular-nums; }
+   The card is built around a READING ORDER, not a grid: who is asking, what they want, where it is,
+   how far along. Each band may be absent -- a finished chain is one line -- so a row collapses to
+   what it has to say rather than holding space for what it does not. */
+.gql { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 10px; }
+.gql-top { margin: 0; font-size: 0.8rem; color: #cbbf9d; }
+.gql-top b { color: #ffd75e; }
+.gql-note { margin: 0; padding: 8px 10px; font-size: 0.78rem; color: #1d1a0c; cursor: pointer;
+    background: linear-gradient(180deg, #ffe3a8, #f0b44c); border-radius: 8px; }
+.gql-empty { margin: 10px 2px; font-size: 0.82rem; color: #9b937f; line-height: 1.5; }
 
-/* ⚠️ THE TRACKER'S BAR GETS THE SAME TREATMENT AS THE DIALOGUE'S, and it has to: these are the same
-   fact in two places, and a 5px flat sliver here next to a lit gauge there would make the panel look
-   like the stale copy. Taller, lit top edge, notched, and GOLD at full — arriving must not look like
-   approaching with a longer rectangle. */
-.gq-bar {
-    display: block; position: relative; height: 11px; margin-top: 5px; overflow: hidden;
+/* ── A REGION ──────────────────────────────────────────────
+   Named, because "Map 3" is not a place anybody has been to. The count on the right is what is OPEN
+   there, which is the thing that decides whether you scroll past the whole region. */
+.gql-region-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    margin: 0 0 7px; padding-bottom: 5px; border-bottom: 1px solid rgba(190, 176, 108, 0.18);
+}
+.gql-region-head b { font-family: var(--font-display); font-size: 0.95rem; color: #f0e7cf;
+    letter-spacing: 0.02em; }
+.gql-region-head i { font-style: normal; font-size: 0.66rem; letter-spacing: 0.06em;
+    text-transform: uppercase; color: #a79e88; }
+.gql-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+
+.gql-row, .gql-col {
+    display: flex; flex-direction: column; gap: 9px;
+    padding: 11px 12px; border-radius: 12px;
+    background: rgba(22, 27, 20, 0.78); border: 1px solid rgba(190, 176, 108, 0.16);
+}
+.gql-col { flex-direction: row; align-items: center; gap: 10px;
+    border-color: rgba(220, 180, 90, 0.3); }
+.gql-row.is-done { opacity: 0.58; }
+/* The two that want something from you are lit; the ones in progress are not, because everything
+   being urgent is the same as nothing being urgent. */
+.gql-row.is-ready { border-color: rgba(127, 209, 79, 0.5); background: rgba(24, 38, 20, 0.82); }
+.gql-row.is-offered { border-color: rgba(255, 215, 94, 0.42); background: rgba(38, 34, 16, 0.78); }
+
+/* ── WHO IS ASKING ────────────────────────────────────────────── */
+.gql-who { display: flex; align-items: center; gap: 10px; }
+.gql-face {
+    flex: 0 0 auto; width: 46px; height: 46px; border-radius: 10px; object-fit: cover;
+    object-position: top; background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(190, 176, 108, 0.22);
+}
+.gql-id { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
+.gql-id b { font-size: 0.88rem; color: #f0e7cf; }
+.gql-role { font-size: 0.66rem; color: #8d866f; font-style: italic;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gql-stands { font-size: 0.68rem; color: #a79e88; }
+.gql-chip {
+    flex: 0 0 auto; align-self: flex-start; font-size: 0.6rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 3px 8px;
+    color: #cbbf9d; background: rgba(10, 14, 9, 0.7); border: 1px solid rgba(190, 176, 108, 0.3);
+}
+.gql-chip.is-ready { color: #10300a; background: linear-gradient(180deg, #d8f6c8, #7fd14f);
+    border-color: #7fd14f; }
+.gql-chip.is-offered { color: #3a2906; background: linear-gradient(180deg, #fff6d8, #ffd75e);
+    border-color: #ffd75e; }
+
+/* ── WHAT, WHERE, HOW FAR ────────────────────────────────────────────── */
+.gql-job { display: flex; flex-direction: column; gap: 6px; }
+.gql-task { font-size: 0.84rem; color: #e4d9ba; }
+.gql-ask { font-size: 0.74rem; color: #bcd97a; }
+.gql-fin { margin: 0; font-size: 0.76rem; color: #8d866f; font-style: italic; }
+.gql-untaken { font-size: 0.72rem; color: #a79e88; font-style: italic; }
+
+/* ⚠️ THE DESTINATIONS ARE BUTTONS. Naming a room the player then has to go and find on the map has
+   only moved the search -- these walk you there. Wrapped, because a creature can live in four rooms. */
+.gql-where { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.gql-where-lab { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8d866f; }
+.gql-go {
+    border: 1px solid rgba(190, 176, 108, 0.34); border-radius: 999px; cursor: pointer;
+    padding: 4px 10px; font: inherit; font-size: 0.7rem; color: #e4d9ba;
+    background: rgba(10, 14, 9, 0.6);
+}
+.gql-go i { font-style: normal; color: #8d866f; font-size: 0.64rem; }
+.gql-go:hover { border-color: rgba(255, 215, 94, 0.6); color: #ffd75e; }
+.gql-go:disabled { opacity: 0.45; cursor: default; }
+.gql-anywhere { font-size: 0.7rem; color: #a79e88; }
+
+.gql-prog { display: flex; align-items: center; gap: 8px; }
+.gql-num { flex: 0 0 auto; font-size: 0.7rem; color: #a79e88; font-variant-numeric: tabular-nums; }
+.gql-pay { font-size: 0.68rem; color: #8d866f; }
+
+/* ⚠️ THE SAME GAUGE AS THE DIALOGUE'S, and it has to be: these are the same fact in two places, and
+   a flat sliver here next to a lit gauge there makes the panel look like the stale copy. */
+.gql-bar {
+    flex: 1 1 auto; display: block; position: relative; height: 11px; overflow: hidden;
     background: linear-gradient(180deg, #0a0e09, #141a12);
     border: 1px solid rgba(190, 176, 108, 0.26);
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75);
 }
-.gq-bar i {
+.gql-bar i {
     display: block; height: 100%; position: relative;
     background: linear-gradient(180deg, #bcd97a, #6d8f3c);
     transition: width 420ms cubic-bezier(.2,.9,.3,1);
 }
-.gq-bar i::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+.gql-bar i::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
     background: rgba(255, 255, 255, 0.45); }
-.gq-bar::after {
+.gql-bar::after {
     content: ""; position: absolute; inset: 0; pointer-events: none;
     background: repeating-linear-gradient(90deg,
         transparent 0 calc(8.333% - 1px), rgba(6, 10, 6, 0.7) calc(8.333% - 1px) 8.333%);
 }
-/* A row the panel already marks ready — its own class, so no :has() and no width sniffing. */
-.gq-row.is-ready .gq-bar i {
-    background: linear-gradient(180deg, #ffe9a4, #c79324);
-    box-shadow: 0 0 14px rgba(240, 196, 82, 0.6);
+/* Full, and waiting on you -- its own class, so no :has() and no width sniffing. */
+.gql-bar.is-done i {
+    background: linear-gradient(180deg, #e7ffd4, #7fd14f);
+    box-shadow: 0 0 14px rgba(127, 209, 79, 0.55);
 }
-.gq-row.is-ready .gq-bar i::after {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.6) 50%, transparent 80%);
-    transform: translateX(-100%); animation: qdShine 2.1s ease-in-out 0.25s infinite;
-}
-.gq-row.is-ready .gq-num { color: #ffd75e; font-weight: 700; }
+.gql-row.is-ready .gql-num { color: #9fe36a; font-weight: 700; }
 
-.gq-claim {
-    flex: 0 0 auto; border: 0; border-radius: 8px; cursor: pointer;
-    padding: 7px 12px; font-size: 0.78rem; font-weight: 700;
-    background: linear-gradient(180deg, #ffe3a8, #f0b44c); color: #3a2906;
+/* ── THE ACTIONS ──────────────────────────────────────────────
+   ⚠️ THE SHORTCUT IS THE QUIETER OF THE TWO. Handing in next to them is where the writing is -- the
+   payoff lines, the plate, the send-off -- so "go and see them" is a real option sitting beside the
+   convenience rather than buried under it. The convenience is still the solid button, because Luke
+   asked for it by name; it simply does not pretend the person is not there. */
+.gql-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }
+.gql-handin {
+    border: 0; border-radius: 9px; cursor: pointer; padding: 8px 14px;
+    font: inherit; font-size: 0.78rem; font-weight: 700;
+    background: linear-gradient(180deg, #d8f6c8, #7fd14f); color: #10300a;
 }
-.gq-claim:disabled { opacity: 0.5; cursor: default; }
-.gq-pip {
-    flex: 0 0 auto; font-size: 0.64rem; letter-spacing: 0.06em; text-transform: uppercase;
-    color: #3a2906; background: #f0b44c; border-radius: 6px; padding: 3px 7px;
+.gql-handin:disabled { opacity: 0.5; cursor: default; }
+.gql-goto {
+    border: 1px solid rgba(190, 176, 108, 0.34); border-radius: 9px; cursor: pointer;
+    padding: 7px 12px; font: inherit; font-size: 0.74rem; color: #cbbf9d;
+    background: transparent;
 }
+.gql-goto:hover { border-color: rgba(255, 215, 94, 0.5); color: #ffd75e; }
+.gql-goto:disabled { opacity: 0.45; cursor: default; }
 
 /* ── A QUEST-GIVER STANDING IN A ZONE ────────────────────────────────────────────────────────────
    Positioned against the floor the same way the doors are, and deliberately NOT inside the creature
@@ -4551,9 +4607,34 @@ export const GROVE_CSS = `
 .gv-npc img {
     width: 100%; height: 100%; object-fit: contain; object-position: bottom;
     filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5));
+    /* ── ⚠️ HE HAS TO BREATHE ────────────────────────────────────────────────────────────────
+       Luke: "Npc is glowing and had no animations." Every other living thing in the frame moves —
+       the hero and the creatures are driven by the loop, the loot bobs — and the giver was the one
+       figure painted dead still, which is what makes him read as a lit cut-out pasted onto the
+       scene rather than somebody standing in it.
+
+       CSS, not the loop: he never moves in world space, so putting him in the frame budget would be
+       paying per frame for a thing that only ever needs two keyframes. Countable, deliberately
+       small: 1.5% of his own height, 3.4s, which is slower than the loot bob (1.5s) so he reads as a
+       person waiting rather than an item asking to be picked up.
+
+       transform-origin at the feet so the scale does not lift him off the floor he is standing on —
+       [[a-sprite-stands-on-its-measured-surface]]. */
+    transform-origin: 50% 100%;
+    animation: gvNpcBreathe 3400ms ease-in-out infinite;
 }
-/* Finished chains stay standing — a giver who vanishes reads as a bug — but stop asking for attention. */
-.gv-npc.is-done img { filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5)) saturate(0.65) brightness(0.8); }
+@keyframes gvNpcBreathe {
+    0%, 100% { transform: translateY(0) scaleY(1); }
+    50% { transform: translateY(-0.6%) scaleY(1.015); }
+}
+/* Finished chains stay standing — a giver who vanishes reads as a bug — but stop asking for attention.
+   ⚠️ AND STOP BREATHING, which is the cheapest way to say "there is nothing here for you now" without
+   removing a person from the world. */
+.gv-npc.is-done img {
+    filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5)) saturate(0.65) brightness(0.8);
+    animation: none;
+}
+@media (prefers-reduced-motion: reduce) { .gv-npc img { animation: none; } }
 
 .gv-npc-pip {
     position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
@@ -4561,8 +4642,16 @@ export const GROVE_CSS = `
     font-size: 0.62rem; font-weight: 700; font-variant-numeric: tabular-nums;
     background: rgba(18, 22, 16, 0.92); color: #cbbf9d; border: 1px solid rgba(140, 160, 110, 0.4);
 }
+/* ── THE THREE MARKS ─────────────────────────────────────────────────────────────────────────
+   A bang when he is offering something, the count while you are carrying it, a tick when it is
+   done and he is waiting. The two that want you to walk over nudge; the count does not, because a
+   number that bounces every time you glance at it is a notification, and this is just information. */
+.gv-npc.is-new .gv-npc-pip {
+    background: linear-gradient(180deg, #fff6d8, #ffd75e); color: #3a2906; border-color: #ffd75e;
+    animation: gvNpcNudge 1.8s ease-in-out infinite;
+}
 .gv-npc.is-ready .gv-npc-pip {
-    background: linear-gradient(180deg, #ffe3a8, #f0b44c); color: #3a2906; border-color: #f0b44c;
+    background: linear-gradient(180deg, #d8f6c8, #7fd14f); color: #10300a; border-color: #7fd14f;
     animation: gvNpcNudge 1.8s ease-in-out infinite;
 }
 @keyframes gvNpcNudge {
@@ -4608,10 +4697,6 @@ export const GROVE_CSS = `
     45% { transform: scale(1.25) rotate(-4deg); }
     100% { transform: scale(0.6) translateY(-10px); opacity: 0; }
 }
-
-/* The marshal's two actions sit together: "no key" is a state the daily button answers. */
-.gq-colacts { display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
-.gq-colacts .gq-claim { padding: 6px 10px; font-size: 0.72rem; }
 
 /* ── ⚠️ A NEUTRAL GREY SLAB READS AS GREEN AGAINST LAVA ──────────────────────────────────────────
    slab-char is correct art — black rock, lava veins, a grey ash top — and it MEASURES neutral: the

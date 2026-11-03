@@ -86,7 +86,7 @@ export default function GroveQuestLab({ beat = 1 }) {
     return (
         <div className="ql-wrap">
             {/* ⚠️ THE STYLES SHIP WITH GroveClient, NOT GLOBALLY. GroveQuests mounted without them renders
-                raw: the giver's portrait fills the screen because .gq-face is the only thing sizing it.
+                raw: the giver's portrait fills the screen because .gql-face is the only thing sizing it.
                 Any rig that mounts a Grove component has to bring GROVE_CSS with it, exactly as the real
                 screen does. */}
             <style>{GROVE_CSS}</style>

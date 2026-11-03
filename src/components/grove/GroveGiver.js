@@ -48,14 +48,28 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
     const who = GROVE_NPCS.find((n) => n.id === npcHere?.npc);
     const state = !a ? "spent" : !a.started ? "offered" : a.ready ? "ready" : "active";
 
-    // The lines for this visit: the greeting, then whatever this state has to say.
+    // ── ⚠️ A CONVERSATION YOU HAVE ALREADY HAD IS NOT A CONVERSATION ────────────────────────────────
+    // Luke: "Interacting with an npc you have a quest for should simply show the quest progress with
+    // them. I dont want to see their dialogue if I already saw it."
+    //
+    // Two of the four states are NEW writing and worth metering out a line at a time — the problem he is
+    // asking you to solve, and the payoff when you bring it back. The middle state is not: you took the
+    // job, you are doing the job, and walking past him should answer "how far along am I" in one look.
+    // It was costing two taps through a greeting and a nudge you had both read before.
+    //
+    // So an ACTIVE step opens straight on the card. His nudge still appears, as a line UNDER the
+    // progress rather than a gate in front of it, because the one-liner is the bit with the character
+    // in it and it costs nothing to read.
     const say = a?.say || {};
-    const lines = [npcHere?.greet || who?.line].filter(Boolean);
+    const open = state === "active";
+    const lines = open ? [] : [npcHere?.greet || who?.line].filter(Boolean);
     if (state === "offered") lines.push(...(say.problem || []));
-    if (state === "active" && say.nudge) lines.push(say.nudge);
     if (state === "ready") lines.push(...(say.done || []));
 
     const last = i >= lines.length - 1;
+    // Whether the job itself is on screen yet: immediately when there is nothing to read, otherwise once
+    // the last line has finished typing.
+    const shown = open || (last && typed);
     const advance = useCallback(() => {
         if (!typed) { setTyped(true); return; }
         if (!last) { setI((n) => n + 1); setTyped(false); }
@@ -126,7 +140,7 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
                     line remounted the typewriter and it started again. */}
                 {sendoff
                     ? <QuestSpeech key="sendoff" text={npcHere.sendoff} />
-                    : (
+                    : open ? null : (
                         <QuestSpeech
                             key={`${state}-${i}`}
                             text={lines[i]}
@@ -138,7 +152,7 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
                 {/* ── THE ASK ──────────────────────────────────────────────────────────────────────────
                     Only once the talking is done, so the job is the last thing on screen when the
                     player decides. The ask is their SENTENCE now, not "Defeat 37 · urchin_roller". */}
-                {!sendoff && last && typed && a ? (
+                {!sendoff && shown && a ? (
                     <div className={`qd-block${a.ready ? " is-ready" : ""}`}>
                         <span className="qd-label">
                             {state === "offered" ? "What they want" : a.ready ? "Ready to hand in" : "What they asked for"}
@@ -152,12 +166,17 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
                             <>
                                 <span className="qd-bar" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
                                 <span className="qd-count">{a.progress}/{a.need}</span>
+                                {/* Which link of the chain this is, so a five-step chain reads as one. */}
+                                <span className="qd-step">Step {npcHere.step || npcHere.done + 1} of {npcHere.steps}</span>
                             </>
                         ) : null}
+                        {/* His one line, UNDER the bar on a step already in hand — see the note above the
+                            `open` flag. It is the bit with the character in it; it is just no longer a gate. */}
+                        {open && say.nudge ? <p className="qd-nudge">&ldquo;{say.nudge}&rdquo;</p> : null}
                     </div>
                 ) : null}
 
-                {!a && last && typed ? (
+                {!a && shown ? (
                     <div className="qd-block">
                         <span className="qd-label">Nothing more to ask</span>
                         <p>You have done everything they had. {npcHere.steps} of {npcHere.steps}.</p>
@@ -167,12 +186,18 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
                 {note ? <p className="qd-note">{note}</p> : null}
 
                 <div className="qd-acts">
-                    {!sendoff && last && typed && state === "offered" ? (
+                    {/* ⚠️ `state === "offered"` IS `!a.started`, AND THAT NOW MEANS SOMETHING. Luke: "When
+                        I tall to the npc after already having their quest I can re accept it which is
+                        wrong." The gate was always right — what was wrong is that the payload behind it
+                        was written once on entering the zone and never updated, so `started` stayed false
+                        for the whole visit and this button came back every time. Fixed where it broke, in
+                        GroveClient's refreshBoard. */}
+                    {!sendoff && shown && state === "offered" ? (
                         <button type="button" className="qd-btn qd-accept" disabled={busy} onClick={(e) => { e.stopPropagation(); take(); }}>
                             I&rsquo;ll do it
                         </button>
                     ) : null}
-                    {!sendoff && last && typed && state === "ready" ? (
+                    {!sendoff && shown && state === "ready" ? (
                         <button type="button" className="qd-btn qd-accept" disabled={busy} onClick={(e) => { e.stopPropagation(); handIn(); }}>
                             Hand it in
                         </button>
@@ -184,7 +209,7 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
                     ) : null}
                 </div>
 
-                {!sendoff && !(last && typed) ? <span className="qd-more" aria-hidden="true">tap</span> : null}
+                {!sendoff && !shown ? <span className="qd-more" aria-hidden="true">tap</span> : null}
             </div>
 
             {plate ? (

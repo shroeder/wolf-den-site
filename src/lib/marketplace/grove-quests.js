@@ -10,7 +10,7 @@ import "server-only";
 // opposite of "you have to come back to them".
 
 import { db } from "@/lib/db";
-import { GROVE_NPCS, COLISEUM_NPCS, COLISEUM_ZONE, questsFor, npcsOnMap, foeName, partName } from "@/lib/marketplace/grove-npcs.js";
+import { GROVE_NPCS, COLISEUM_NPCS, COLISEUM_ZONE, questsFor, npcsOnMap, foeName, partName, mapName, zoneByN, whereFor } from "@/lib/marketplace/grove-npcs.js";
 import { GREET, SENDOFF, SPENT, fill, stepLines } from "@/lib/marketplace/grove-npc-dialogue.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
@@ -72,9 +72,16 @@ export async function questBoard(buyerId) {
                 name: npc.name,
                 role: npc.role,
                 map,
+                // ⚠️ THE REGION'S NAME, NOT ITS NUMBER. The log groups by region and "Map 3" is not a
+                // place anybody has been to — the zone strip, the atlas and the giver all say Bogwater.
+                mapName: mapName(map),
                 zone: npc.zone,
+                zoneName: zoneByN(npc.zone)?.name || null,
                 steps: npc.chain.length,
                 done,
+                // Which link of the chain is in hand, so the log can say "step 2 of 5" rather than
+                // leaving the player to subtract.
+                step: done + 1,
                 // `null` here means finished, and the screen says so rather than hiding the row — a chain you
                 // completed is a thing you want to see you completed.
                 // What they actually say, for the state this step is in. ⚠️ FILLED HERE, where the
@@ -100,6 +107,10 @@ export async function questBoard(buyerId) {
                         foeLabel: cur.step.foe ? foeName(cur.step.foe) : null,
                         partLabel: cur.step.part ? partName(cur.step.part) : null,
                         zone: cur.step.zone || null, wave: cur.step.wave || null,
+                        // ⚠️ WHERE TO GO, RESOLVED SERVER-SIDE. Only delve and survive steps name a zone;
+                        // a cull step names a creature and the player was left to remember which of twelve
+                        // rooms has them in it. This is the map's own zone list searched for the target.
+                        where: whereFor(cur.step, map),
                         reward: cur.step.reward,
                         say: sayFor(cur, npc),
                     }

@@ -4333,16 +4333,32 @@ export default function GroveScene({
 
                 {npcHere ? (
                     <button type="button" ref={npcRef}
-                        className={`gv-npc${npcHere.active?.ready ? " is-ready" : ""}${npcHere.active ? "" : " is-done"}`}
+                        className={`gv-npc${npcHere.active?.ready ? " is-ready" : ""}`
+                            + `${npcHere.active && !npcHere.active.started ? " is-new" : ""}`
+                            + `${npcHere.active ? "" : " is-done"}`}
                         onPointerDown={(e) => { e.stopPropagation(); onTalk?.(); }}
                         aria-label={npcHere.active
-                            ? `${npcHere.name} — ${npcHere.active.ready ? "ready to hand in" : npcHere.active.title}`
+                            ? `${npcHere.name} — ${npcHere.active.ready ? "ready to hand in"
+                                : !npcHere.active.started ? "has something to ask"
+                                    : `${npcHere.active.title}, ${npcHere.active.progress} of ${npcHere.active.need}`}`
                             : `${npcHere.name} — nothing more to ask`}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={`/images/grove/npc-${npcHere.npc}.webp`} alt="" draggable={false} />
+                        {/* ── ⚠️ NO FRACTION ON A STEP NOBODY HAS AGREED TO ──────────────────────────
+                            Luke: "0 of 5 doesnt make sense." It did not: an UNTAKEN step rendered
+                            `0/5` over the giver's head, which reads as five things you have somehow
+                            already failed to do — for a job you have not been offered yet. The card
+                            inside has had this rule since it was written ("⚠️ NO BAR ON AN UNTAKEN
+                            STEP"); the pip out in the world never got it.
+
+                            Three states, three marks, which is also the convention every player
+                            already knows: "!" he wants something, the count while you are doing it,
+                            "✓" when it is done and he is waiting for you. */}
                         {npcHere.active ? (
                             <span className="gv-npc-pip">
-                                {npcHere.active.ready ? "!" : `${npcHere.active.progress}/${npcHere.active.need}`}
+                                {npcHere.active.ready ? "✓"
+                                    : !npcHere.active.started ? "!"
+                                        : `${npcHere.active.progress}/${npcHere.active.need}`}
                             </span>
                         ) : null}
                     </button>

@@ -421,6 +421,37 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // Whether the giver standing in this zone is being talked to.
     const [giverOpen, setGiverOpen] = useState(false);
 
+    // ── ⚠️ THE BOARD GOES STALE THE MOMENT YOU AGREE TO ANYTHING ────────────────────────────────────
+    // Luke: "When I tall to the npc after already having their quest I can re accept it which is wrong."
+    // And: "0 of 5 doesnt make sense."
+    //
+    // Both are the same defect. `session` is written ONCE, by enter(), and refresh() above only ever
+    // calls setSt — so `session.npcHere` is frozen for the whole visit to a zone. Everything the giver
+    // and his pip are drawn from therefore describes the moment you walked in:
+    //
+    //   · accept a step and `started` stays false, so re-opening him offers it again and the accept
+    //     button is still there — a second QUEST RECEIVED plate over a step you already have
+    //   · the dialogue keeps replaying the `problem` beats, because the state never leaves "offered"
+    //   · kill the five things and the pip still reads 0/5, because `progress` never moves
+    //
+    // So the board is re-read and folded back into the session after anything that can change it. One
+    // small GET of a table the session already reads — see the note on questBoard riding the session —
+    // and NOT the big /api/marketplace/grove state, which is 60+ round trips for a counter.
+    //
+    // ⚠️ npcHere IS RECOMPUTED THE SAME WAY THE SERVER DID IT: the giver whose zone matches this one.
+    // Picking it off the fresh board rather than patching the old object means a step that ADVANCED to
+    // the next link in the chain arrives correctly instead of being merged on top of the previous one.
+    const refreshBoard = useCallback(async () => {
+        const j = await fetch("/api/marketplace/grove/quests", { cache: "no-store" })
+            .then((r) => r.json()).catch(() => null);
+        if (!j?.ok || !Array.isArray(j.quests)) return null;
+        setSession((prev) => (prev
+            ? { ...prev, quests: j.quests, npcHere: j.quests.find((q) => q.zone === prev.zone?.n) || null }
+            : prev));
+        setSt((prev) => (prev ? { ...prev, quests: j.quests } : prev));
+        return j.quests;
+    }, []);
+
     // ⚠️ RETURNS THE SERVER'S ANSWER so the dialogue can say what changed hands — including the token,
     // which is the only part of a payout that unlocks something to go and do.
     const claimStep = useCallback(async (stepId) => {
@@ -429,19 +460,25 @@ export default function GroveClient({ initial, initialView = null, initialTown =
             body: JSON.stringify({ stepId }),
         }).then((r) => r.json()).catch(() => null);
         refresh();
+        await refreshBoard();
         return j || { ok: false };
-    }, [refresh]);
+    }, [refresh, refreshBoard]);
 
     // ⚠️ RETURNS A BOOLEAN, so the dialogue only raises QUEST RECEIVED when the server actually took
     // it. A plate over a failed write is a lie the player then goes and acts on for an hour.
+    //
+    // ⚠️ AND `already` IS NOT A SUCCESS. acceptStep answers { ok: true, already: true } when the row
+    // exists, which is right for the server — the write is idempotent — but raising QUEST RECEIVED over
+    // it tells the player they just took something they have been carrying for an hour.
     const acceptStep = useCallback(async (stepId) => {
         const j = await fetch("/api/marketplace/grove/quests", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ action: "accept", stepId }),
         }).then((r) => r.json()).catch(() => null);
         refresh();
-        return Boolean(j?.ok);
-    }, [refresh]);
+        await refreshBoard();
+        return Boolean(j?.ok) && !j?.already;
+    }, [refresh, refreshBoard]);
 
     // Whether the marshal's card is open. Not a zonePanel: those replace the scene, and this is a thing
     // standing IN the scene that you are talking to without leaving it.
@@ -558,6 +595,11 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         const finished = ticks.find((t) => t.done);
         if (finished) setQuestTick({ ...finished, key: `${finished.step}-done` });
         else if (ticks.length) setQuestTick({ ...ticks[0], key: `${ticks[0].step}-${ticks[0].progress}` });
+        // ⚠️ AND THE PIP OVER HIS HEAD HAS TO MOVE WITH IT. The toast is a moment; the number standing on
+        // the giver is the thing you look at to decide whether to go back yet, and it is drawn from
+        // session.npcHere — which nothing else updates. Only when a step actually moved, so an ordinary
+        // settle is still one request.
+        if (ticks.length) refreshBoard();
 
         if (lost.length) {
             setNote(`Bag full — left ${lost.map(partName).join(", ")} behind. Bank something.`);
@@ -568,7 +610,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         } else if (d.newlySeen?.length) {
             setNote(`Found ${d.newlySeen.map(partName).join(", ")}`);
         }
-    }, [session, refresh, st]);
+    }, [session, refresh, refreshBoard, st]);
 
     // ── THE BOSS ────────────────────────────────────────────────────────────────────────────────────
     // ⚠️ ITS OWN REQUEST, NOT A LINE IN THE SETTLE BATCH. The server checks the zone was cleared and that
@@ -1056,9 +1098,29 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         <GroveQuests
                             quests={session?.quests || st?.quests || []}
                             coliseum={session?.coliseum || null}
-                            onChanged={refresh}
+                            onChanged={() => { refresh(); refreshBoard(); }}
                             busy={col.busy || Boolean(col.run)}
                             onEnter={(map) => { col.start(map); setZonePanel(null); }}
+                            // ⚠️ THE SHORTCUT, AND IT GOES THROUGH THE SAME claimStep THE GIVER USES —
+                            // the server re-reads the requirement and the payout from the catalogue
+                            // either way, so a hand-in from a menu cannot pay differently from a
+                            // hand-in in the world. See the note at the top of GroveQuests for why it
+                            // is back at all.
+                            onHandIn={claimStep}
+                            // ⚠️ "Go to" WALKS YOU THERE, which is the half that makes "where" useful —
+                            // a log that names a room you then have to go and find on the map has only
+                            // moved the search. travel() takes the GLOBAL zone number, which is what the
+                            // board already speaks, and enter() flips the view to the zone itself.
+                            //
+                            // Checked against st.zones first, because entering a locked room answers
+                            // "That one is still closed." as a note over a panel that just closed —
+                            // saying so here keeps the refusal next to the button that caused it.
+                            onGo={(n) => {
+                                const z = (st?.zones || []).find((x) => Number(x.n) === Number(n));
+                                if (z && !z.unlocked) { setNote(`${z.name} is still closed.`); return; }
+                                setZonePanel(null);
+                                travel(Number(n));
+                            }}
                         />
                     )
                     : null}

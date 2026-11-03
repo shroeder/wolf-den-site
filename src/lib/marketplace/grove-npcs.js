@@ -146,6 +146,35 @@ export const foeName = (id) => GROVE_ENEMIES[id]?.name || String(id || "").repla
 
 export const partName = (id) => GROVE_PARTS[id]?.name || String(id || "").replace(/_/g, " ");
 
+/** The zone a global zone number belongs to, for naming a destination. */
+export const zoneByN = (n) => GROVE_ZONES.find((z) => Number(z.n) === Number(n)) || null;
+
+/**
+ * WHERE a step is actually done, as zones you can walk to.
+ *
+ * ⚠️ THE STEP ONLY NAMES A TARGET, NOT A PLACE. A cull step says "12 Mothlight" and nothing about which
+ * of the twelve rooms has Mothlights in them, so the tracker could only ever say "zone 4" for the two
+ * kinds that carry one. Searching the map's own zone list for the creature is the difference between a
+ * quest log and a list of nouns.
+ */
+export function whereFor(step, map) {
+    if (!step) return [];
+    const zones = zonesOfMap(map);
+    const named = (z) => ({ n: z.n, name: z.name });
+    if (step.zone) {
+        const z = zones.find((x) => Number(x.n) === Number(step.zone));
+        return z ? [named(z)] : [];
+    }
+    if (step.foe) {
+        return zones
+            .filter((z) => (z.enemies || []).some((e) => (typeof e === "object" ? e.id : e) === step.foe))
+            .map(named);
+    }
+    // A part comes off whatever drops it, which is spread across the map rather than sitting in one room.
+    if (step.part) return [];
+    return [];
+}
+
 // ── THE CHAINS ───────────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "anywhere from 2 to 5 chains... I don't want it to be the same for every NPC."
 //
