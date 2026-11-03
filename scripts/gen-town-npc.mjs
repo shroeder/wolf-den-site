@@ -21,6 +21,12 @@ import { put } from "@vercel/blob";
 import sharp from "sharp";
 
 import { priceRun, quality } from "./lib/gen-guard.mjs";
+
+// ⚠️ THE MODEL NAME IS IMPORTED, NEVER TYPED. This script asked for "gpt-image-1" by hand, which was
+// retired — the API answers "does not exist", which reads as a key problem and sends you looking in the
+// wrong place entirely. And HOUSE_CHARACTER_TAIL is appended here rather than written into the prompt
+// table, so every town character is drawn to the same written-down style as every Grove NPC.
+const { IMAGE_MODEL, HOUSE_CHARACTER_TAIL } = await import("@/lib/marketplace/image-model.js");
 import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 
 function prop(text, key) {
@@ -89,7 +95,8 @@ for (let i = 1; i <= N; i++) {
     const res = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: q, n: 1 }),
+        body: JSON.stringify({ model: IMAGE_MODEL, prompt: prompt + HOUSE_CHARACTER_TAIL, size: "1024x1024",
+            background: "transparent", quality: q, n: 1 }),
     });
     const j = await res.json();
     if (!res.ok) throw new Error(`OpenAI ${res.status}: ${JSON.stringify(j).slice(0, 300)}`);
