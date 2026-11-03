@@ -44,16 +44,49 @@ export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim
     );
     const state = focus?.state || (board?.done ? "finished" : null);
 
+    // ── ⚠️ EACH BEAT IS SAID ONCE, NOT EVERY TIME YOU WALK PAST ────────────────────────────────────
+    // Luke: "You s[houldn't] have to go through an npc dialogue every time. Its annoying."
+    //
+    // He is right, and the first version got this exactly backwards. Dialogue is worth tapping through
+    // the first time a person tells you something, and it is an obstacle every time after that — and the
+    // most common visit to a quest giver is not the first, it is walking back mid-job to check a number
+    // or hand a thing in. Metering a line you have already read is just a door you have to open twice.
+    //
+    // So a beat is keyed by WHICH STEP and WHICH STATE, and heard once it is never played again: come
+    // back to an active job and the card is simply there. The conversation still happens in full every
+    // time it has something NEW to say — a new rung, or a job that has just turned ready — which is the
+    // half of it that was always the point.
+    const stepKey = focus ? `wd-quest-heard:${board?.townId || board?.giver || "town"}:${focus.key}:${state}` : null;
+    const [heard, setHeard] = useState(false);
+    useEffect(() => {
+        if (!stepKey) { setHeard(false); return; }
+        let was = false;
+        try { was = window.localStorage.getItem(stepKey) === "1"; } catch { was = false; }
+        setHeard(was);
+        // Reset the walk-through whenever the beat changes, or a remembered step would open mid-line.
+        setI(0);
+        setTyped(was);
+    }, [stepKey]);
+
     // The lines for this visit, in order: the hail, then whatever the state has to say.
     const lines = useMemo(() => {
-        if (!board) return [];
+        if (!board || heard) return [];
         const say = focus?.say || {};
         const out = [board.hail].filter(Boolean);
         if (state === "offered") out.push(...(say.problem || []));
         if (state === "active") out.push(say.nudge);
         if (state === "ready") out.push(...(say.done || []));
         return out.filter(Boolean);
-    }, [board, focus, state]);
+    }, [board, focus, state, heard]);
+
+    // Remembered the moment the last line is on screen, so a player who closes the sheet early is not made
+    // to sit through it again — they already read it.
+    useEffect(() => {
+        if (!stepKey || heard) return;
+        if (i >= lines.length - 1 && typed) {
+            try { window.localStorage.setItem(stepKey, "1"); } catch { /* private mode: it just repeats */ }
+        }
+    }, [stepKey, heard, i, lines.length, typed]);
 
     const last = i >= lines.length - 1;
     const advance = useCallback(() => {
@@ -163,19 +196,18 @@ export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim
                     </div>
                 ) : null}
 
-                {/* The rest of the ladder, read-ahead. acts.js is explicit that later rungs stay VISIBLE —
-                    a posted ladder is the whole point — so they are here, small, under the conversation. */}
-                {!sendoff && last && typed ? (
-                    <ol className="qd-ladder">
-                        {ladder.map((r) => (
-                            <li key={r.key} className={`qd-rung is-${r.state}${r.key === board.focusKey ? " is-focus" : ""}`}>
-                                <span className="qd-pip" aria-hidden="true" />
-                                <span className="qd-rt">{r.state === "locked" ? "— — —" : r.title}</span>
-                            </li>
-                        ))}
-                    </ol>
-                ) : null}
+                {/* ── ⚠️ NO SECOND QUEST BOARD UNDER THE CONVERSATION ──────────────────────────
+                    Luke: "its odd that they have another quest board under an[y]thing else going on. I
+                    dont think they should have another flat quest board. Just a chain of quests."
 
+                    What stood here was the rest of the ladder as a list — every later rung, with the
+                    locked ones drawn as "— — —". The whole point of replacing the bounty board was that
+                    a list cannot want anything; posting the same list underneath the person asking put
+                    the board straight back, just smaller and in worse company.
+
+                    A chain does not need to show its links. How far along you are is already on the
+                    header as {claimed}/{total}, and the next rung arrives the way the first one did:
+                    somebody asks you for it. */}
                 {/* ── ⚠️ THE DAILIES ARE STILL HERE, AND THEY ARE NOT THE POINT ANY MORE ──────────
                     Luke on the old sheet: "this one big modal with a bunch of irrelevant rewards,
                     it's all gold." It is demoted rather than deleted, for two reasons. The Grove
@@ -256,15 +288,8 @@ const QD_CSS = `
     border: 1px dashed rgba(255,255,255,0.18); background: transparent; color: #a99f88;
     font-size: 0.8rem; font-style: italic; }
 .qd-odd:hover { color: #cfc3ad; border-color: rgba(255,255,255,0.3); }
-.qd-ladder { list-style: none; margin: 12px 0 0; padding: 10px 0 0; display: flex; flex-direction: column; gap: 6px;
-    border-top: 1px solid rgba(255,255,255,0.08); }
-.qd-rung { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: #7d7465; }
-.qd-pip { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 8px; background: rgba(255,255,255,0.18); }
-.qd-rung.is-claimed { color: #8fe39a; }
-.qd-rung.is-claimed .qd-pip { background: #8fe39a; }
-.qd-rung.is-focus { color: #ffd75e; font-weight: 800; }
-.qd-rung.is-focus .qd-pip { background: #ffd75e; box-shadow: 0 0 8px rgba(255,215,94,0.8); }
-.qd-rung.is-locked .qd-rt { letter-spacing: 2px; }
+/* The ladder's rules went with its markup — a rule left behind for a deleted element is what
+   restyles the next thing to take the class name. [[stale-css-rule-on-reshape]] */
 
 .qd-plate { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; pointer-events: none; }
 .qd-plate-in { text-align: center; padding: 18px 30px; border-radius: 14px;
