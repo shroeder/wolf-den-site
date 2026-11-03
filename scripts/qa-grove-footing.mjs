@@ -30,7 +30,12 @@ const waitFor = async (x, n = 240) => { for (let k = 0; k < n; k++) { if (await 
 
 await send("Page.enable"); await send("Runtime.enable"); await send("Network.enable");
 // Landscape, like the phone in the photograph.
-await send("Emulation.setDeviceMetricsOverride", { width: 900, height: 420, deviceScaleFactor: 1, mobile: true });
+// ⚠️ THE SIZE IN THE PHOTOGRAPH. Luke plays in landscape on a phone whose screenshots are ~2000px wide;
+// every measurement before this ran at 900x420 and found nothing, which is the whole reason the float was
+// never reproduced. [[landscape-is-wider-than-your-phone-breakpoint]] is the same scar from the other side.
+const VW = Number(process.env.VW || 2000), VH = Number(process.env.VH || 900);
+await send("Emulation.setDeviceMetricsOverride", { width: VW, height: VH, deviceScaleFactor: 1, mobile: true });
+console.log(`viewport ${VW}x${VH}`);
 await send("Network.setCookie", { name: "wolfden-mkt-buyer-session", value: COOKIE, domain: "localhost", path: "/" });
 await send("Page.navigate", { url: `http://localhost:${PORT}/marketplace/grove` });
 await waitFor(`document.body.classList.contains("gv-full-lock")`, 240);

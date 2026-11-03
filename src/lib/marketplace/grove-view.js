@@ -28,11 +28,39 @@
 export const HERO_UNITS = 7;
 export const PET_UNITS = 4.5;
 
-// The backdrops are all generated at 1536x1024 with the painted ground about an eighth of the way up.
+// The backdrops are all generated at 1536x1024.
 export const PLATE_W = 1536;
 export const PLATE_H = 1024;
 export const PLATE_AR = PLATE_W / PLATE_H;
-export const GROUND_OF_PLATE = 0.13;
+
+// ── ⚠️ WHERE THE PAINTED GROUND IS — MEASURED, NOT "ABOUT AN EIGHTH" ─────────────────────────────────────────
+// Luke: "you can see how the enemy's underground when I jump up on a platform", and "We're like walking on
+// air... it feels like the physics aren't lined up properly with the platforms."
+//
+// This was 0.13, and the comment above it read "the painted ground about an eighth of the way up". ABOUT was
+// doing all the work: every body in the game is placed on that number, and it was a guess made once against
+// eighty-four separately generated backdrops.
+//
+// scripts/measure-ground-line.mjs measures the real line on every plate — the floor is the horizontally
+// UNIFORM band at the bottom, so the horizon is the highest row below which luminance variance stays low.
+// Across all 84: median 0.188, and 67 of them more than three points away from 0.13. Bodies were standing
+// about six points of the plate's height BELOW the painted floor, which on a 900px screen is ~60px down in
+// the dirt — exactly the creatures-underground screenshot.
+//
+// ⚠️ 0.165 AND NOT THE MEASURED 0.188, AND THE DIFFERENCE IS THE WHOLE SUBTLETY. The tool finds the HORIZON
+// — the row where scenery stops and the flat floor band begins. Standing a body exactly there puts it on top
+// of the grass blades rather than in them. And check-grove refuses it outright: at 0.188 the painted ground
+// band becomes TALLER THAN THE HERO (122px of grass against a 110px man), which is the ant-in-a-forest bug
+// that gate exists to catch. Swept 0.130/0.145/0.155/0.165/0.175 against it: 0.165 is the highest value that
+// still passes. So bodies stand just inside the top of the band instead of at the bottom of it, which is the
+// difference between standing on the grass and standing in the dirt under it.
+//
+// ⚠️ ONE CONSTANT, NOT A TABLE, AND THAT IS DELIBERATE FOR NOW. The per-plate spread the tool reports runs
+// 0.0 to 0.5, which is the heuristic failing at the extremes rather than the art varying that much; a table
+// built from numbers I cannot trust per-row would be worse than one number I can. The tool is committed so
+// the table can be done properly when the plates are next regenerated. Same lesson as SLAB_SURFACE, which
+// learned this on the ledges and was never applied to the floor.
+export const GROUND_OF_PLATE = 0.165;
 
 // ── THE SCALE ───────────────────────────────────────────────────────────────────────────────────────────────
 // Aim for a number of world units across the frame, then hold the hero between a floor and a ceiling as a
