@@ -1310,6 +1310,24 @@ export default function TownClient({ initial, frozen = false, halloween = false,
 
     const townHasStocks = !town || town.n === 1;
 
+    // ── ⚠️ A REAL TOWN TAKES THE WHOLE SCREEN, LIKE A GROVE ZONE ────────────────────────────────
+    // Luke: "I want it to be, like, full screen, just like in the Grove, where I can go full screen,
+    // turn the sound on and off, and leave. It's, like, still kind of its separate feature, and I can
+    // totally tell."
+    //
+    // The header and the chat are already gone for a town; what remained was the SITE around it — the
+    // page scrolling behind the street and the floating social buttons sitting in the bottom corner,
+    // which in a full-bleed scene is inside the play area. The Grove solved both with a body class and
+    // this is the same class of fix, in TOWN_CSS because grove-css only ships with the Grove.
+    //
+    // ⚠️ REMOVED ON UNMOUNT, or leaving the town leaves the whole site unable to scroll. The Grove's
+    // own note learned that one.
+    useEffect(() => {
+        if (typeof document === "undefined" || !town) return undefined;
+        document.body.classList.add("tw-full-lock");
+        return () => document.body.classList.remove("tw-full-lock");
+    }, [town]);
+
 
     // ── THE ACT BOARD ───────────────────────────────────────────────────────────────────────────────
     // Luke: "in each town, there'd be a building you can click to see what your quests are for that act
@@ -2523,6 +2541,22 @@ export default function TownClient({ initial, frozen = false, halloween = false,
 
     return (
         <div className="stack reveal">
+            {/* ── ⚠️ A TOWN IS A PLACE, NOT A PAGE WITH A STREET ON IT ────────────────────────────
+                Luke: "when I get in town, I don't want to see the, like, stuff on top. It tells me
+                about other players, and I don't want to see the chat underneath. I want it to be,
+                like, full screen, just like in the Grove... It's, like, still kind of its separate
+                feature, and I can totally tell."
+
+                He is right that you can tell: the roster chips, the Town Hall button and the chat
+                log are website furniture wrapped around a painted street, and the Grove next door
+                has none of it. A biome town is the same kind of room as a Grove zone and gets the
+                same treatment — the scene, and nothing else.
+
+                ⚠️ ONLY FOR A REAL TOWN. The single ungated street is still the social plaza for
+                every member who has not reached the Grove: the roster, the Town Hall and the chat
+                are the whole point of it there, and taking them away would be removing a feature
+                from almost everybody to tidy a screen almost nobody can see yet. */}
+            {town ? null : (
             <section className="tw-hdr">
                 <div className="tw-hdr-top">
                     {/* ⚠️ THE TOWN SAYS WHICH TOWN IT IS. This was hardcoded, which was correct while there
@@ -2553,6 +2587,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                 </div>
                 <p className="tw-hdr-sub">Tap the street to walk · tap a building to enter. <b>In town</b> = here now; <b>around</b> = online elsewhere.</p>
             </section>
+            )}
 
             <div ref={sceneRef} className={`tw-scene${spooky ? " is-spooky" : ""}${litForNight.map((k) => ` night-${k}`).join("")}`} style={anyTownModal ? { pointerEvents: "none" } : undefined} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current.down = false; setDragging(false); }} role="presentation">
                 {/* ⚠️ THE TUNE FOLLOWS THE COSTUME, NOT THE EVENT FLAG. Music is atmosphere, and `spooky`
@@ -3440,6 +3475,8 @@ export default function TownClient({ initial, frozen = false, halloween = false,
 
             </div>
 
+            {/* The plaza's chat belongs to the plaza — see the note on the header above. */}
+            {town ? null : (
             <section className="card tw-chatbar">
                 {chatRows.length ? (
                     <div className="tw-chatlog" aria-label="Plaza chat log">
@@ -3489,6 +3526,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     </div>
                 ) : null}
             </section>
+            )}
 
             {/* Roster overlay — see who's doing what without walking */}
             {roster ? (
@@ -4891,6 +4929,17 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-typing-bubble span:nth-child(2) { animation-delay: .2s; }
 .tw-typing-bubble span:nth-child(3) { animation-delay: .4s; }
 @keyframes twType { 0%,60%,100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+/* ── A TOWN IS FULL SCREEN ────────────────────────────────────────────────────────────────────
+   Mirrors .gv-full-lock from grove-css, which cannot be reused because that stylesheet only ships
+   inside the Grove. Stops the page scrolling behind the street, and gets the site's floating
+   buttons out of the scene — they are fixed to the bottom-right corner, which in a full-bleed town
+   is inside the play area, so a thumb reaching for a building opens a chat panel instead. */
+.tw-full-lock { overflow: hidden; }
+.tw-full-lock .social-bubble,
+.tw-full-lock .social-fab,
+.tw-full-lock .dm-bubble-wrap { display: none; }
+/* The street itself fills what is left under the nav rather than sitting in a card-sized box. */
+.tw-full-lock .tw-scene { min-height: 68vh; }
 .tw-chatbar { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
 /* Persistent plaza chat LOG under the scene — column-reverse so the newest sits at the bottom and it stays
    pinned there as messages arrive (fed newest-first). Each row shows the sender's HERO sprite + name + time. */
