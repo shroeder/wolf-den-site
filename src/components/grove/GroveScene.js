@@ -1544,6 +1544,44 @@ export default function GroveScene({
         // the edge of is a number appearing on things you did not hit; the ring is drawn at exactly the
         // world radius the damage used, so the area IS the picture. Everything else that reads as a hit —
         // the flash, the pop, the shake — is reused here rather than reinvented.
+        // ── ⚠️ WHICH SHAPE A SKILL WEARS ────────────────────────────────────────────────────────
+        // Luke: "everything is the same. A ring on the ground... Friend or foe ring all the same. I
+        // was picturing like legit skill effects. Like in maple story a literal lightning bolt strikes
+        // down for lightning skills."
+        //
+        // Twenty-nine skills all drew the same ground ellipse in one of four colours, and colour is
+        // the weakest signal there is in a scene this busy. Keyed by what the skill IS, not by which
+        // of the six mechanical primitives implements it — Bloodletting and Frostbite are both
+        // `corpse`, and they must not look alike.
+        //
+        // ⚠️ PREFIX FIRST, THEN THE EXCEPTIONS. rv_ is blood, wd_ is the guard, rc_ is elemental and
+        // splits by element. A skill with no entry falls through to the ring, which is why the ring
+        // is kept: a new skill looks plain rather than invisible.
+        const SFX_BY_ID = {
+            rc_kindle: "column", rc_ember: "column", rc_immolate: "column", rc_soulfire: "column",
+            rc_frost: "shards", rc_chill: "shards", rc_rime: "shards",
+            rc_might: "bolt", rc_reservoir: "bolt",
+        };
+        const sfxFor = (sk) => {
+            if (SFX_BY_ID[sk.id]) return SFX_BY_ID[sk.id];
+            if (sk.id.startsWith("wd_")) return "dome";          // the guard: yours, and it grows out of you
+            if (sk.id.startsWith("rv_")) return sk.at === "kill" ? "spray" : "slash";
+            return null;
+        };
+        /** Draw one skill shape at a world point. One element, one animation, no per-frame work. */
+        const skillFx = (shape, x, y) => {
+            const layer = fxRef.current;
+            if (!layer || !shape) return;
+            const el = document.createElement("i");
+            el.className = `gv-sfx is-${shape}`;
+            layer.appendChild(el);
+            // Rides the spark pool so it is positioned, aged and removed by the same loop as everything
+            // else — a second lifetime mechanism is a second place to leak nodes.
+            w.sparks.push({ x, y, vx: 0, vy: 0, g: 0,
+                born: w.sceneNow ? w.sceneNow() : performance.now(),
+                life: shape === "slash" ? 320 : shape === "bolt" ? 420 : 520, node: el, ring: true, flat: true });
+        };
+
         const novaRing = (x, y, r, kind) => {
             const layer = fxRef.current;
             if (!layer) return;
@@ -1658,6 +1696,7 @@ export default function GroveScene({
                     skillNova(now, foe.x, foe.y + foe.h * 0.45, sk.radius * n,
                         Math.max(1, foe.maxHp * sk.share * n),
                         { kind: sk.onlyFrozen ? "frost" : "corpse", not: foe });
+                    skillFx(sfxFor(sk), foe.x, foe.y + foe.h * 0.1);
                     sayOnce(sk.name.toUpperCase(), "nova", null, 1.25, foe, now);
                 } else if (sk.kind === "nova") {
                     const src = sk.atHero ? w.hero : (foe || w.hero);
@@ -1673,6 +1712,10 @@ export default function GroveScene({
                             { kind: sk.id.startsWith("rc_") ? "frost" : "nova",
                                 stunMs: (sk.stunMs || 0) * n, knock: (sk.knock || 0) * n });
                     }
+                    // ⚠️ AT THE HERO WHEN IT IS THE HERO'S. The whole friend-or-foe complaint is that a
+                    // defensive proc looked like an attack; the dome has to grow out of HIM.
+                    skillFx(sfxFor(sk), sk.atHero || !foe ? w.hero.x : foe.x,
+                        sk.atHero || !foe ? w.hero.y + w.hero.h * 0.1 : foe.y + foe.h * 0.1);
                     sayOnce(sk.name.toUpperCase(), "nova", null, 1.3, sk.atHero ? null : foe, now);
                 } else if (sk.kind === "cleave") {
                     const base = ctx.dealt || stats?.damage || 0;
@@ -1687,6 +1730,7 @@ export default function GroveScene({
                             if (novaDepth < NOVA_MAX_DEPTH) { novaDepth += 1; killFoe(w, t, now, tick); novaDepth -= 1; }
                         }
                     }
+                    if (from.length) skillFx(sfxFor(sk), from[0].x, from[0].y + from[0].h * 0.1);
                     if (from.length) sayOnce(sk.name.toUpperCase(), "nova", null, 1.2, from[0], now);
                 } else if (sk.kind === "spread") {
                     if (!foe) continue;
@@ -1706,6 +1750,7 @@ export default function GroveScene({
                             nextAt: now + (sk.dot === "burn" ? BURN_TICK_MS : BLEED_TICK_MS) };
                         burst(t.x, t.y + t.h * 0.4, { kind: sk.dot === "burn" ? "burn" : "spark", scale: 0.8 });
                     }
+                    skillFx(sfxFor(sk), foe.x, foe.y + foe.h * 0.1);
                     sayOnce(sk.name.toUpperCase(), sk.dot === "burn" ? "ignite" : "bleed", null, 1.2, foe, now);
                 } else if (sk.kind === "self") {
                     if (sk.tempo) w.hasteUntil = Math.max(w.hasteUntil || 0, now + (sk.ms || 2000));
@@ -3522,6 +3567,14 @@ export default function GroveScene({
                     s.y += s.vy * dt;
                     s.node.style.transform =
                         `translate3d(${(s.x - cam) * unit}px, ${-(s.y - camY) * unit}px, 0) scale(${1 - k})`;
+                } else if (s.flat) {
+                    // ⚠️ POSITION ONLY. A shape's whole identity is its own keyframes — a bolt snapping
+                    // down, fire growing up — and writing a scale() here every frame would overwrite the
+                    // transform those keyframes are animating, flattening all six back into one blob.
+                    // Opacity is left alone for the same reason.
+                    s.node.style.left = `${(s.x - cam) * unit}px`;
+                    s.node.style.bottom = `${(s.y - camY) * unit + (w.groundPx || 0)}px`;
+                    continue;
                 } else {
                     s.node.style.transform =
                         `translate3d(${(s.x - cam) * unit}px, ${-(s.y - camY) * unit}px, 0) scale(${0.3 + k * 2.4})`;

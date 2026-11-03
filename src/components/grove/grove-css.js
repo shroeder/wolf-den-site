@@ -1857,6 +1857,9 @@ export const GROVE_CSS = `
    It expands from nothing to full over 520ms and fades — a ring that appears at full size reads as a
    decal, a ring that GROWS reads as a shockwave leaving the body. Flat ellipse rather than a circle
    because the stage is side-on: a true circle reads as a sphere hanging in the air. */
+/* The ground ring is the FALLBACK now, not the effect. See .gv-sfx below: a skill gets a shape that
+   says what it is, and this is what draws when one has not been given one yet. Luke: "everything is
+   the same. A ring on the ground... Its all just noise. And a bunch of rings." */
 .gv-nova { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
     width: calc(var(--r, 4) * 2 * var(--gv-unit, 1%));
     height: calc(var(--r, 4) * 0.8 * var(--gv-unit, 1%));
@@ -1872,6 +1875,129 @@ export const GROVE_CSS = `
     box-shadow: 0 0 30px 8px rgba(90,190,255,0.5), inset 0 0 40px 12px rgba(120,200,255,0.3); }
 .gv-nova.is-burn { border-color: rgba(255,190,80,0.95);
     box-shadow: 0 0 30px 8px rgba(255,150,40,0.5), inset 0 0 40px 12px rgba(255,170,60,0.32); }
+/* ── ⚠️ A SKILL IS A SHAPE, NOT A RECOLOURED RING ─────────────────────────────────────────────
+   Luke: "The issue is everything is the same. A ring on the ground. An honestly its to the point
+   where me and everyone testing honestly has no clue what is going on. Its all just noise. And a
+   bunch of rings. Friend or foe ring all the same. I was picturing like legit skill effects. Like
+   in maple story a literal lightning bolt strikes down for lightning skills."
+
+   Twenty-nine skills across three classes all drew .gv-nova — the same ground ellipse in one of
+   four colours. Colour is the weakest signal there is in a scene this busy, so every skill in the
+   game read as the same event. Making that ring BRIGHTER, which is what I tried first, makes the
+   noise louder; the fix is that the effects must have different SILHOUETTES.
+
+   Six shapes, chosen so each is identifiable from its outline alone at a glance:
+
+     bolt     a column of light SNAPS DOWN from above onto the target.    arcane / runic
+     column   fire erupts UPWARD out of the ground under the target.      fire
+     shards   ice spikes stab up around the target in a spread.           frost
+     slash    a diagonal arc cuts ACROSS the target.                      blood, on hit
+     spray    a radial burst out of a body.                               blood, on kill
+     dome     a shell swells OUT OF THE HERO.                             warden / self
+
+   ⚠️ AND THE LAST ONE IS THE FRIEND-OR-FOE ANSWER. "Friend or foe ring all the same" — the dome is
+   the only shape centred on YOU and the only one that grows outward from its centre rather than
+   striking into it, so a defensive proc never again looks like something landing on an enemy.
+
+   ⚠️ ALL SIX ARE ONE ELEMENT AND PURE CSS. A skill fires at the busiest moment on screen; anything
+   that allocates a dozen nodes per cast would land straight in the stutter Luke already reported.
+   Each is a single <i> with gradients, clip-path and one transform animation. */
+.gv-sfx { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
+    pointer-events: none; will-change: transform, opacity; transform-origin: 50% 100%; }
+
+/* BOLT — the MapleStory ask. A tall shaft drops from off the top of the frame onto the target and
+   flares where it lands. The snap is the whole effect, so the descent is fast and the flash is slow. */
+.gv-sfx.is-bolt { width: calc(3.6 * var(--gv-unit, 1%)); height: calc(22 * var(--gv-unit, 1%));
+    margin-left: calc(-1.8 * var(--gv-unit, 1%));
+    background: linear-gradient(to bottom, transparent 0%, rgba(190,225,255,0.0) 8%,
+        rgba(190,230,255,0.95) 42%, #ffffff 86%, rgba(190,230,255,0.9) 100%);
+    filter: drop-shadow(0 0 14px rgba(140,200,255,0.95)) drop-shadow(0 0 40px rgba(90,150,255,0.6));
+    clip-path: polygon(38% 0, 62% 0, 54% 46%, 72% 46%, 46% 100%, 50% 58%, 30% 58%);
+    animation: gv-sfx-bolt 420ms cubic-bezier(.2,.9,.1,1) both; }
+@keyframes gv-sfx-bolt {
+    0%   { transform: translateY(-46%) scaleY(0.55); opacity: 0; }
+    12%  { opacity: 1; }
+    34%  { transform: translateY(0) scaleY(1); opacity: 1; }
+    100% { transform: translateY(0) scaleY(1); opacity: 0; }
+}
+
+/* COLUMN — fire comes OUT OF THE GROUND, so it grows upward and the base stays lit longest. */
+.gv-sfx.is-column { width: calc(5.5 * var(--gv-unit, 1%)); height: calc(12 * var(--gv-unit, 1%));
+    margin-left: calc(-2.75 * var(--gv-unit, 1%));
+    background: radial-gradient(ellipse at 50% 100%, #fff3c4 0%, #ffb340 26%, rgba(255,90,20,0.85) 54%, rgba(190,40,10,0) 78%);
+    filter: drop-shadow(0 0 20px rgba(255,150,40,0.8));
+    clip-path: polygon(50% 0, 72% 34%, 64% 62%, 80% 100%, 20% 100%, 36% 62%, 28% 34%);
+    animation: gv-sfx-column 520ms cubic-bezier(.1,.8,.3,1) both; }
+@keyframes gv-sfx-column {
+    0%   { transform: scaleY(0.12) scaleX(0.7); opacity: 0; }
+    18%  { opacity: 1; }
+    60%  { transform: scaleY(1.05) scaleX(1); opacity: 0.95; }
+    100% { transform: scaleY(0.9) scaleX(1.1); opacity: 0; }
+}
+
+/* SHARDS — ice stabs UP out of the floor in a fan. Sharp, brief, and it holds its edges. */
+.gv-sfx.is-shards { width: calc(9 * var(--gv-unit, 1%)); height: calc(7 * var(--gv-unit, 1%));
+    margin-left: calc(-4.5 * var(--gv-unit, 1%));
+    background: linear-gradient(to top, rgba(120,200,255,0.25) 0%, rgba(190,240,255,0.95) 60%, #ffffff 100%);
+    filter: drop-shadow(0 0 14px rgba(120,200,255,0.9));
+    clip-path: polygon(0 100%, 9% 42%, 18% 100%, 30% 18%, 42% 100%, 50% 0, 58% 100%, 70% 18%, 82% 100%, 91% 42%, 100% 100%);
+    animation: gv-sfx-shards 460ms cubic-bezier(.1,1,.3,1) both; }
+@keyframes gv-sfx-shards {
+    0%   { transform: scaleY(0.05); opacity: 0; }
+    22%  { transform: scaleY(1.08); opacity: 1; }
+    40%  { transform: scaleY(1); }
+    100% { transform: scaleY(1); opacity: 0; }
+}
+
+/* SLASH — a blade arc ACROSS the target. Diagonal so it cannot be confused with anything vertical. */
+.gv-sfx.is-slash { width: calc(9 * var(--gv-unit, 1%)); height: calc(9 * var(--gv-unit, 1%));
+    margin-left: calc(-4.5 * var(--gv-unit, 1%)); margin-bottom: calc(-2 * var(--gv-unit, 1%));
+    background: linear-gradient(118deg, transparent 40%, rgba(255,210,210,0.9) 46%, #ffffff 50%,
+        #ff2b2b 54%, rgba(190,0,0,0.7) 58%, transparent 66%);
+    filter: drop-shadow(0 0 12px rgba(255,60,60,0.9));
+    animation: gv-sfx-slash 320ms cubic-bezier(.15,.9,.2,1) both; }
+@keyframes gv-sfx-slash {
+    0%   { transform: rotate(-26deg) scale(0.4); opacity: 0; }
+    25%  { opacity: 1; }
+    100% { transform: rotate(10deg) scale(1.25); opacity: 0; }
+}
+
+/* SPRAY — a kill. Radial, wet, and it falls: the only shape with gravity in its motion. */
+.gv-sfx.is-spray { width: calc(7 * var(--gv-unit, 1%)); height: calc(7 * var(--gv-unit, 1%));
+    margin-left: calc(-3.5 * var(--gv-unit, 1%)); margin-bottom: calc(-1.4 * var(--gv-unit, 1%));
+    background: radial-gradient(circle at 50% 50%, #ff5a5a 0%, rgba(200,20,20,0.85) 38%, rgba(120,0,0,0) 70%);
+    filter: drop-shadow(0 0 16px rgba(220,30,30,0.8));
+    /* ⚠️ NOT A STAR. The first clip-path here was a neat five-pointer and photographed as exactly
+       that — a red cartoon star sitting in the forest. A splatter has no symmetry: uneven arms,
+       different lengths, and more mass below the middle than above it. */
+    clip-path: polygon(48% 2%, 57% 26%, 78% 12%, 68% 38%, 96% 34%, 73% 52%, 92% 74%, 66% 64%,
+        70% 96%, 50% 72%, 33% 98%, 34% 63%, 8% 78%, 25% 53%, 2% 42%, 29% 37%, 18% 14%, 39% 27%);
+    animation: gv-sfx-spray 480ms cubic-bezier(.2,.7,.3,1) both; }
+@keyframes gv-sfx-spray {
+    0%   { transform: scale(0.2) translateY(0); opacity: 0; }
+    20%  { transform: scale(1.1) translateY(-8%); opacity: 1; }
+    100% { transform: scale(1.25) translateY(14%); opacity: 0; }
+}
+
+/* DOME — the only shape that belongs to YOU. Swells out of the hero and settles, so a defensive
+   proc never reads as something landing on an enemy. */
+/* ⚠️ 9 UNITS, NOT 14. A body in this world is 7, so fourteen drew a bubble twice the hero's height
+   that read as weather rather than as his shield. It has to look like it is ON him. */
+.gv-sfx.is-dome { width: calc(9 * var(--gv-unit, 1%)); height: calc(9 * var(--gv-unit, 1%));
+    margin-left: calc(-4.5 * var(--gv-unit, 1%)); margin-bottom: calc(-1.5 * var(--gv-unit, 1%));
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 55%, rgba(255,225,140,0.05) 48%, rgba(255,215,110,0.45) 72%, rgba(255,200,80,0) 82%);
+    box-shadow: inset 0 0 30px rgba(255,220,130,0.5), 0 0 26px rgba(255,200,90,0.5);
+    border: 2px solid rgba(255,225,150,0.85);
+    animation: gv-sfx-dome 560ms cubic-bezier(.15,.85,.25,1) both; }
+@keyframes gv-sfx-dome {
+    0%   { transform: scale(0.25); opacity: 0; }
+    30%  { transform: scale(1.06); opacity: 1; }
+    100% { transform: scale(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) { .gv-sfx { animation-duration: 120ms; } }
+
 @keyframes gv-nova-grow {
     0%   { transform: scale(0.12); opacity: 0; }
     18%  { opacity: 1; }
