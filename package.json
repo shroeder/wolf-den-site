@@ -57,7 +57,8 @@
         "check:acts": "node --import ./scripts/lib/register-loader.mjs scripts/check-acts.mjs",
         "check:street": "node --import ./scripts/lib/register-loader.mjs scripts/check-street.mjs",
         "check:overlays": "node scripts/check-overlays.mjs",
-        "check:slabs": "node --import ./scripts/lib/register-loader.mjs scripts/check-slab-surface.mjs"
+        "check:slabs": "node --import ./scripts/lib/register-loader.mjs scripts/check-slab-surface.mjs",
+        "check:sfx": "node --import ./scripts/lib/register-loader.mjs scripts/check-sfx.mjs"
     },
     "keywords": [],
     "author": "",

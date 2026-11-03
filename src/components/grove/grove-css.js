@@ -1996,6 +1996,152 @@ export const GROVE_CSS = `
     100% { transform: scale(1); opacity: 0; }
 }
 
+/* CLAW — three parallel tears, dragged across. Rend and the bleeds; reads as something raking
+   rather than something cutting once, which is what separates it from the slash. */
+.gv-sfx.is-claw { width: calc(8 * var(--gv-unit, 1%)); height: calc(8 * var(--gv-unit, 1%));
+    margin-left: calc(-4 * var(--gv-unit, 1%)); margin-bottom: calc(-2 * var(--gv-unit, 1%));
+    background: repeating-linear-gradient(104deg,
+        transparent 0 10%, rgba(255,120,120,0.0) 10% 12%, #ffdede 12% 13.5%, #ff2f2f 13.5% 16%,
+        rgba(150,0,0,0.5) 16% 18%, transparent 18% 28%);
+    filter: drop-shadow(0 0 10px rgba(255,50,50,0.85));
+    animation: gv-sfx-claw 360ms cubic-bezier(.15,.9,.2,1) both; }
+@keyframes gv-sfx-claw {
+    0%   { transform: translateX(-14%) scale(0.7) skewX(-8deg); opacity: 0; }
+    22%  { opacity: 1; }
+    100% { transform: translateX(10%) scale(1.15) skewX(4deg); opacity: 0; }
+}
+
+/* FLURRY — many strokes at once, crossing. Quickblade and the swing-counters: the point is COUNT,
+   so it is the only shape built from repeated marks in two directions. */
+.gv-sfx.is-flurry { width: calc(9 * var(--gv-unit, 1%)); height: calc(9 * var(--gv-unit, 1%));
+    margin-left: calc(-4.5 * var(--gv-unit, 1%)); margin-bottom: calc(-2 * var(--gv-unit, 1%));
+    background:
+        repeating-linear-gradient(62deg, transparent 0 14%, rgba(255,245,230,0.95) 14% 15.5%, transparent 15.5% 30%),
+        repeating-linear-gradient(-58deg, transparent 0 16%, rgba(255,210,150,0.8) 16% 17.5%, transparent 17.5% 34%);
+    filter: drop-shadow(0 0 9px rgba(255,220,160,0.9));
+    animation: gv-sfx-flurry 300ms steps(3, end) both; }
+@keyframes gv-sfx-flurry {
+    0%   { transform: scale(0.75) rotate(-6deg); opacity: 0; }
+    30%  { transform: scale(1.05) rotate(2deg); opacity: 1; }
+    100% { transform: scale(1.2) rotate(8deg); opacity: 0; }
+}
+
+/* AURA — the always-on passives. It BREATHES rather than strikes: slow, centred on the hero, and
+   the only shape with no leading edge, so a permanent buff never reads as an impact. */
+.gv-sfx.is-aura { width: calc(8 * var(--gv-unit, 1%)); height: calc(3 * var(--gv-unit, 1%));
+    margin-left: calc(-4 * var(--gv-unit, 1%)); margin-bottom: calc(-0.6 * var(--gv-unit, 1%));
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 50%, rgba(190,255,200,0.55) 0%, rgba(120,230,150,0.25) 46%, rgba(80,200,120,0) 72%);
+    filter: drop-shadow(0 0 12px rgba(140,240,170,0.6));
+    animation: gv-sfx-aura 700ms ease-in-out both; }
+@keyframes gv-sfx-aura {
+    0%   { transform: scale(0.6); opacity: 0; }
+    40%  { transform: scale(1.08); opacity: 0.9; }
+    100% { transform: scale(1.18); opacity: 0; }
+}
+
+/* ── ⚠️ PAINTED ART, NOT PRIMARY SHAPES ───────────────────────────────────────────────────────
+   Luke: "from the pics you are sending it looks like you are using primary shapes and css? Aren't
+   you able to make like real effects? Like a sprite sheets animation or a particle systems or
+   something? Ideally something not too processing heavy given its a browser game."
+
+   He is right that the nine silhouettes above are gradients and clip-paths. The answer is NOT a
+   sprite sheet, and that is settled in this repo rather than a guess: SpriteFx.js in the arena
+   went three generations and a normalisation pass into sheets and abandoned them, because an
+   image model does not hold an anchor, a scale or a silhouette across cells — played back the
+   effect drifts sideways and pulses, which reads as a texture sliding behind a window. What the
+   model is excellent at is ONE striking frame, so the arena ships a painted peak frame per effect
+   and does the MOTION in CSS. Coherent by construction, and free on a phone: transform and
+   opacity are the two things a compositor animates without touching layout or paint.
+
+   So the Grove borrows the arena's technique AND its art. Ten peak frames are already drawn, paid
+   for and in the house style, and six of the nine shapes here already have one.
+
+   WHY SCREEN BLEND: the art is painted on pure black, composited with mix-blend-mode screen, so
+   black is invisible and bright pixels glow. No cutout edge exists, so no halo or sticker rim can
+   be baked in — the alpha-fringe problem the house rule about outlines exists to avoid simply
+   does not arise. It is also how games have done fire and sparks forever.
+
+   The art REPLACES the gradient on these, so a shape never draws both. */
+/* ⚠️ THE ART ARRIVES AS A CUSTOM PROPERTY, NOT AS AN INLINE background-image.
+   The obvious way round — clear the silhouette with "background: none !important" and set the image inline
+   from JS — is silently broken, and the contact sheet is the only reason I know it: a stylesheet !important
+   OUTRANKS a non-important inline declaration, so the shorthand wiped the very image it was making room for
+   and all six painted effects drew an empty box. Nothing errors in that state. It just goes black.
+   Here the reset and the image are two declarations in ONE rule, so the later one wins by cascade order and
+   no priority contest exists at all. JS sets --art and nothing else. */
+.gv-sfx.has-art { background: none; border: 0; filter: none;
+    background-image: var(--art);
+    background-repeat: no-repeat; background-position: center; background-size: contain;
+    mix-blend-mode: screen; border-radius: 0;
+    width: calc(var(--art-w, 10) * var(--gv-unit, 1%));
+    height: calc(var(--art-w, 10) * var(--gv-unit, 1%));
+    margin-left: calc(var(--art-w, 10) * -0.5 * var(--gv-unit, 1%));
+    /* ⚠️ CENTRED ON THE BODY, NOT PERCHED ON THE GROUND LINE. A fixed fraction of the art's own height put
+       every effect at the feet, so a claw swipe landed below the thing it was clawing — and the bigger the
+       art, the lower it sat, which is backwards. The body is about 7 units, so half of it is 3.5: lift by
+       that and drop by half the art, and the art's centre lands on the body's middle at ANY size. */
+    margin-bottom: calc((3.5 - var(--art-w, 10) * 0.5) * var(--gv-unit, 1%));
+    clip-path: none; }
+/* ⚠️ TWO OF THESE ARE DIM BY THEMSELVES. Under screen blend a dark frame all but disappears against
+   foliage — riposte is one thin teal line and drain is a muddy sphere, and on the contact sheet both read
+   as "no effect fired" rather than as a quiet one. Brightened at the composite rather than by repainting
+   the art, which is the thing the house rule says not to do. */
+.gv-sfx.has-art.is-slash { filter: brightness(1.75) saturate(1.25); }
+.gv-sfx.has-art.is-spray { filter: brightness(1.5) saturate(1.45); }
+/* Each one keeps its OWN gesture, because with one frame the movement is where the identity
+   lives: a claw climbs, a flurry stutters across, blood is pulled out, a guard rises into place.
+   Same conclusion the arena reached — "the name is the gesture, not the art". */
+.gv-sfx.has-art.is-claw   { animation: gv-art-rise 420ms cubic-bezier(.2,.8,.3,1) both; }
+.gv-sfx.has-art.is-flurry { animation: gv-art-stutter 380ms steps(4) both; }
+.gv-sfx.has-art.is-slash  { animation: gv-art-punch 300ms cubic-bezier(.1,.9,.2,1) both; }
+.gv-sfx.has-art.is-spray  { animation: gv-art-siphon 460ms ease-out both; }
+.gv-sfx.has-art.is-shards { animation: gv-art-snap 440ms cubic-bezier(.1,1,.3,1) both; }
+.gv-sfx.has-art.is-dome   { animation: gv-art-raise 520ms cubic-bezier(.2,.9,.3,1) both; }
+.gv-sfx.has-art.is-bolt   { animation: gv-art-strike 360ms cubic-bezier(.05,.9,.2,1) both; }
+.gv-sfx.has-art.is-column { animation: gv-art-rise 480ms cubic-bezier(.2,.8,.3,1) both; }
+@keyframes gv-art-rise {
+    0%   { transform: translateY(14%) scale(0.72); opacity: 0; }
+    30%  { transform: translateY(0) scale(1.04); opacity: 1; }
+    100% { transform: translateY(-22%) scale(1.14); opacity: 0; }
+}
+@keyframes gv-art-stutter {
+    0%   { transform: translateX(-16%) scale(0.9); opacity: 0; }
+    25%  { transform: translateX(-4%) scale(1.02); opacity: 1; }
+    75%  { transform: translateX(10%) scale(1.02); opacity: 1; }
+    100% { transform: translateX(18%) scale(0.98); opacity: 0; }
+}
+@keyframes gv-art-punch {
+    0%   { transform: scale(0.5) rotate(-8deg); opacity: 0; }
+    22%  { transform: scale(1.12) rotate(0deg); opacity: 1; }
+    100% { transform: scale(1.3) rotate(4deg); opacity: 0; }
+}
+@keyframes gv-art-siphon {
+    0%   { transform: scale(1.25); opacity: 0; }
+    30%  { transform: scale(1) ; opacity: 1; }
+    100% { transform: scale(0.6); opacity: 0; }
+}
+@keyframes gv-art-snap {
+    0%   { transform: scale(0.42); opacity: 0; }
+    18%  { transform: scale(1.1); opacity: 1; }
+    70%  { transform: scale(1.02); opacity: 0.95; }
+    100% { transform: scale(1.06); opacity: 0; }
+}
+@keyframes gv-art-raise {
+    0%   { transform: translateY(26%) scale(0.74); opacity: 0; }
+    35%  { transform: translateY(0) scale(1.02); opacity: 1; }
+    80%  { transform: translateY(0) scale(1); opacity: 0.9; }
+    100% { transform: translateY(-6%) scale(1.04); opacity: 0; }
+}
+/* A bolt STRIKES DOWN, which is the one Luke named by hand. It arrives from above the body and
+   lands, rather than blooming where the body already is. */
+@keyframes gv-art-strike {
+    0%   { transform: translateY(-80%) scaleY(0.5) scaleX(0.8); opacity: 0; }
+    30%  { transform: translateY(0) scaleY(1.06) scaleX(1); opacity: 1; }
+    62%  { transform: translateY(0) scaleY(1) scaleX(1.02); opacity: 1; }
+    100% { transform: translateY(0) scaleY(1) scaleX(1.1); opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) { .gv-sfx { animation-duration: 120ms; } }
 
 @keyframes gv-nova-grow {

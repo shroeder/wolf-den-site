@@ -1557,23 +1557,99 @@ export default function GroveScene({
         // ⚠️ PREFIX FIRST, THEN THE EXCEPTIONS. rv_ is blood, wd_ is the guard, rc_ is elemental and
         // splits by element. A skill with no entry falls through to the ring, which is why the ring
         // is kept: a new skill looks plain rather than invisible.
+        // ⚠️ ALL THIRTY-SIX ARE NAMED. The first pass mapped by prefix with a handful of exceptions and
+        // left seven skills — Quickblade, Red Harvest, Bastion, Unbreakable, Aether Ward, Runic Overflow,
+        // Cataclysm — falling through to the ring, which is the thing being replaced. Luke counted the
+        // tree before I did: "Should be at least 9 effects right? Since isnt there 9 primary skills?"
+        // Four tiers of nine, 36 nodes, and the nine TIER-0 primaries are the ones a player meets first:
+        //
+        //   Rend · Quickblade · Killing Edge        the blade
+        //   Bulwark · Ironhide · Constitution       the guard
+        //   Kindle · Emberheart · Immolate          the fire
+        //
+        // Every one of those nine now has a silhouette of its own, and the remaining 27 are mapped to the
+        // nine rather than left on the fallback.
         const SFX_BY_ID = {
-            rc_kindle: "column", rc_ember: "column", rc_immolate: "column", rc_soulfire: "column",
-            rc_frost: "shards", rc_chill: "shards", rc_rime: "shards",
-            rc_might: "bolt", rc_reservoir: "bolt",
+            // ── the blade ────────────────────────────────────────────────────────────────────────
+            rv_rend: "claw", rv_scent: "claw", rc_chill: "shards",
+            rv_quick: "flurry", rv_harvest: "flurry",
+            rv_edge: "slash", rv_riposte: "slash", rv_concuss: "slash",
+            rv_letting: "spray", rv_savage: "spray", rv_exsang: "spray",
+            rv_deep: "aura", rv_frenzy: "aura",
+            // ── the guard ────────────────────────────────────────────────────────────────────────
+            wd_bulwark: "dome", wd_deflect: "dome", wd_bastion: "dome", wd_unbreak: "dome",
+            wd_ironhide: "shards", wd_thorns: "shards",
+            wd_const: "aura", wd_mend: "aura", wd_blood: "aura",
+            wd_retrib: "slash", wd_grudge: "slash", wd_concuss: "slash",
+            // ── the fire and the runes ───────────────────────────────────────────────────────────
+            rc_kindle: "column", rc_ember: "column", rc_immolate: "aura", rc_soulfire: "column",
+            rc_frost: "shards", rc_rime: "shards",
+            rc_might: "bolt", rc_reservoir: "bolt", rc_overflow: "bolt",
+            rc_cata: "bolt", rc_ward: "dome",
         };
         const sfxFor = (sk) => {
             if (SFX_BY_ID[sk.id]) return SFX_BY_ID[sk.id];
-            if (sk.id.startsWith("wd_")) return "dome";          // the guard: yours, and it grows out of you
+            // Still a fallback by class, so a skill added tomorrow looks like its family rather than
+            // like nothing — and check:sfx below fails if anybody adds one without naming it.
+            if (sk.id.startsWith("wd_")) return "dome";
             if (sk.id.startsWith("rv_")) return sk.at === "kill" ? "spray" : "slash";
             return null;
         };
+        // ── ⚠️ PAINTED ART WHERE IT EXISTS, SHAPE WHERE IT DOES NOT ─────────────────────────────
+        // Luke: "Aren't you able to make like real effects? ... Ideally something not too
+        // processing heavy given its a browser game."
+        //
+        // These ten frames were drawn, paid for and shipped for the arena months ago, and six of
+        // them ARE these shapes — rend IS the claw, freeze IS the shards, ward IS the dome. Drawing
+        // new art for them would be regenerating art that already shipped, which is against the
+        // house rule, and it would also be worse: this art has been looked at and kept.
+        //
+        // The art is painted on black and composited with screen blend — see grove-css.js. A shape
+        // with no entry here keeps its CSS silhouette, so the fallback is a real effect, not a gap.
+        //
+        // ⚠️ A PATH NAMED HERE MUST EXIST ON DISK. A missing file does not error, does not warn,
+        // and draws nothing at all — the node is there with no background. check:sfx stats every
+        // one of these, because I nearly shipped a guard mapped at a file that was never drawn.
+        // ⚠️ MAPPED BY LOOKING AT THE PICTURES, NOT BY READING THE FILENAMES. The first version of this map
+        // paired them by name and was wrong three times out of six: rend-peak is not a rend, it is a FIRE
+        // EXPLOSION, and flurry-peak is not a flurry, it is three CLAW STREAKS. Those two names come from
+        // arena moves, not from what the generator drew. scripts/fx-sheet.mjs renders every frame on disk
+        // next to the skill using it, which is the only reason I caught it.
+        const ART_BY_SHAPE = {
+            claw: "/images/arena/vfx/flurry-peak.webp",   // three curved streaks — Rend, exactly
+            flurry: "/images/arena/vfx/sunder-peak.webp", // a burst of blades, reads as many fast hits
+            column: "/images/arena/vfx/rend-peak.webp",   // a pillar of fire — Kindle, Emberheart, Soulfire
+            slash: "/images/arena/vfx/riposte-peak.webp", // a single teal crescent
+            spray: "/images/arena/vfx/drain-peak.webp",   // a red sphere pulled inward
+            shards: "/images/arena/vfx/freeze-peak.webp", // blue crystal starburst
+            dome: "/images/arena/vfx/ward-peak.webp",     // a blue shield sphere
+            // bolt stays a CSS silhouette and is NOT a gap: the drawn lightning bolt already reads as
+            // the thing Luke named by hand ("a literal lightning bolt strikes down"), and the nearest
+            // painted candidate, spell-peak, is a few faint purple wisps that vanish against foliage.
+            //
+            // aura stays CSS ON PURPOSE and is not a gap to be filled later: the generator was
+            // asked twice for exactly this (arena surge and gamble) and returned a soft glow wash
+            // both times, which blocks under compression and reads as a smear over the body. Shapes
+            // draw a breathing glow better than the model does, with no artifacts.
+        };
+        // How wide the art draws, in world units, per shape. The bodies are about 7 units, so a
+        // guard dome that reads as protective is wider than a blade flick that reads as fast.
+        // Widths in world units, set against a ~7-unit body on the contact sheet rather than guessed. The
+        // fire column is the tall one because it is a pillar; the crescent is small because it is a flick.
+        const ART_W = { claw: 13, flurry: 13, column: 14, slash: 13, spray: 12, shards: 13, dome: 13 };
         /** Draw one skill shape at a world point. One element, one animation, no per-frame work. */
         const skillFx = (shape, x, y) => {
             const layer = fxRef.current;
             if (!layer || !shape) return;
             const el = document.createElement("i");
             el.className = `gv-sfx is-${shape}`;
+            const art = ART_BY_SHAPE[shape];
+            if (art) {
+                el.classList.add("has-art");
+                // --art, not background-image: see the note on .gv-sfx.has-art in grove-css.js.
+                el.style.setProperty("--art", `url(${art})`);
+                el.style.setProperty("--art-w", String(ART_W[shape] || 10));
+            }
             layer.appendChild(el);
             // Rides the spark pool so it is positioned, aged and removed by the same loop as everything
             // else — a second lifetime mechanism is a second place to leak nodes.

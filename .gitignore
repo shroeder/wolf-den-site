@@ -26,6 +26,7 @@ scripts/_tmp-*.mjs
 scripts/_*.mjs
 # and the throwaway HTML fixtures the shot rig points at for owner-gated screens
 scripts/_*.html
+scripts/_*.png
 .vault-art/
 .harvest-art/
 .bingo-art/
