@@ -204,6 +204,39 @@ if (process.env.PROFILE) {
         const key = `${f.functionName || "(anonymous)"}  ${String(f.url || "").split("/").pop()}:${f.lineNumber + 1}`;
         self.set(key, (self.get(key) || 0) + (dt[i] || 0) / 1000);
     }
+    // ── LINE-LEVEL ATTRIBUTION ──────────────────────────────────────────────────────────────────────
+    // "step is hot" is not actionable: step IS the frame loop, so of course it is hot. positionTicks give
+    // the sampler's hits per LINE inside each function, which is the difference between "the scene loop
+    // costs something" and "these four lines cost it". The bundle is fetched and the lines printed, because
+    // a line number in a built file that nobody reads is just another number.
+    if (process.env.HOTLINES) {
+        const lineHits = new Map();
+        for (const n of profile.nodes) {
+            const f = n.callFrame || {};
+            if (!/GroveScene|grove/i.test(f.url || "")) continue;
+            for (const t of n.positionTicks || []) {
+                lineHits.set(f.url + "|" + t.line, (lineHits.get(f.url + "|" + t.line) || 0) + t.ticks);
+            }
+        }
+        const top = [...lineHits.entries()].sort((a, b) => b[1] - a[1]).slice(0, 18);
+        if (!top.length) console.log("  (no positionTicks came back from Chrome)");
+        else {
+            const srcs = new Map();
+            for (const u of new Set(top.map((t) => t[0].split("|")[0]))) {
+                try { srcs.set(u, (await (await fetch(u)).text()).split(String.fromCharCode(10))); }
+                catch { srcs.set(u, null); }
+            }
+            console.log("");
+            console.log("  hottest LINES inside the Grove scene:");
+            for (const [key, ticks] of top) {
+                const u = key.split("|")[0], ln = key.split("|")[1];
+                const src = srcs.get(u);
+                const text = src ? (src[Number(ln) - 1] || "").trim().slice(0, 110) : "(source not fetched)";
+                console.log("    " + String(ticks).padStart(5) + "  " + u.split("/").pop() + ":" + ln);
+                console.log("           " + text);
+            }
+        }
+    }
     console.log("\n  hottest functions by SELF time (ms over the whole fight):");
     for (const [k, ms] of [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14)) {
         console.log(`    ${String(Math.round(ms)).padStart(6)}ms  ${k}`);

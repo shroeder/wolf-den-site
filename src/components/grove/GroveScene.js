@@ -2179,7 +2179,25 @@ export default function GroveScene({
             // Three of the intents ABOVE it are shares of what is visible now (fetch range, boss notice,
             // pet rescue -- see grove-view.js), and an intent that reads the scale after deciding with it
             // is reading last frame's. One read, at the top, used by everything including the camera.
-            const frameView = viewFor(host.clientWidth, host.clientHeight, w.topY);
+            // ⚠️ THE HOST'S SIZE IS CACHED, NOT READ. clientWidth/clientHeight are LAYOUT READS: asking for
+            // either one forces the browser to flush pending style changes and recompute layout before it
+            // can answer. This loop writes a transform for every body, every shadow, every particle and
+            // every floater, so a read placed after those writes makes the engine lay the whole scene out
+            // again mid-frame -- and the cost of that scales with how many nodes are in the scene.
+            //
+            // Which is exactly the shape of Luke's complaint: "when I kill like more than one thing, the
+            // game freaking like lags out and freaking like stutters big time." A multi-kill floods the
+            // scene with corpses, sparks, loot labels and damage numbers, every one of them making the
+            // forced re-layout more expensive, four times a frame. Measured at 6x CPU throttle on a
+            // production build, line-level: this one line took 7695 of the profiler's samples, five times
+            // the next worst, and the four reads together dwarfed everything else in the frame.
+            //
+            // It also explains a fix that did NOT work: capping how many particle nodes are created in one
+            // frame cut creation from 180 to 70 and moved the frame times not at all, because the expense
+            // was never the insertion -- it was laying out whatever already exists, over and over.
+            //
+            // A scene host only changes size when the window does, so it is observed instead of polled.
+            const frameView = viewFor(w.hostW || host.clientWidth, w.hostH || host.clientHeight, w.topY);
             w.view = frameView;
 
             // ⚠️ REAL MILLISECONDS AND SIMULATION dt ARE DIFFERENT CLOCKS, AND MIXING THEM DEADLOCKS.
@@ -3373,8 +3391,11 @@ export default function GroveScene({
             // Luke: "The camera would trolley and lookahead slightly, common sense. Not jostle the person."
             // So it EASES toward a point ahead of the hero rather than tracking them exactly — a camera
             // locked to the player is what makes a scrolling game feel like it is shaking.
-            const vw = host.clientWidth;
-            const vh = host.clientHeight;
+            // Cached for the same reason as the read at the top of the frame -- and these two sit AFTER
+            // every body in the scene has had its transform written, which is the worst possible place to
+            // ask the browser to lay out.
+            const vw = w.hostW || host.clientWidth;
+            const vh = w.hostH || host.clientHeight;
             const view = frameView;
             const { unit, skyBoxH, groundPx, tileW } = view;
 
@@ -3775,8 +3796,31 @@ export default function GroveScene({
         };
         window.addEventListener("pagehide", flush);
 
+        // ── ⚠️ THE ONLY PLACE THE HOST'S SIZE IS MEASURED ───────────────────────────────────────────
+        // The frame loop used to read host.clientWidth and clientHeight four times a frame, and every one
+        // of those reads forces the browser to lay the whole scene out before it can answer -- after the
+        // loop has just written a transform onto every body, shadow, particle and floater. The more there
+        // is on screen the more that costs, which is why it bit hardest on a multi-kill.
+        //
+        // A scene host changes size when the window does and at no other time, so it is measured here, on
+        // the event that actually means it changed. The loop reads two numbers instead.
+        const measureHost = () => {
+            const h = hostRef.current;
+            if (!h) return;
+            w.hostW = h.clientWidth;
+            w.hostH = h.clientHeight;
+        };
+        measureHost();
+        // ResizeObserver rather than a window resize listener: it also catches the host changing size when
+        // the window does not -- a phone's address bar collapsing, or the keyboard opening over the scene.
+        const ro = typeof ResizeObserver === "function" ? new ResizeObserver(measureHost) : null;
+        ro?.observe(host);
+        window.addEventListener("orientationchange", measureHost);
+
         return () => {
             cancelAnimationFrame(raf);
+            ro?.disconnect();
+            window.removeEventListener("orientationchange", measureHost);
             document.removeEventListener("visibilitychange", onVis);
             window.removeEventListener("pagehide", flush);
             // ⚠️ SETTLE ON THE WAY OUT. Walking away must not throw the session's kills away — the same
