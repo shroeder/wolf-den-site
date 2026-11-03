@@ -76,7 +76,36 @@ export const PLATE_AR = PLATE_W / PLATE_H;
 // hair of margin. I set this to 0.165 earlier chasing the footing alone, which put the hero at 1.03x the
 // grass and turned him back into the ant — the gate caught it and I had misread the gate as passing,
 // because I read the exit code of a PIPELINE rather than of the gate.
-export const GROUND_OF_PLATE = 0.145;
+export const GROUND_OF_PLATE = 0.185;
+
+// ⚠️ AND THE BAND IS A WORLD QUANTITY, WHICH IS WHAT FINALLY UNPINNED THE NUMBER ABOVE.
+// Luke: "Audit each level and gear the grounding level right. Its either high or low on many."
+//
+// Everything above this line was reasoning about ONE number doing TWO jobs, and they pull opposite ways:
+//
+//   · GROUND_OF_PLATE says where the horizon is PAINTED on the plate. That is a property of the art,
+//     measured at 0.188 across all 84, and it does not care what screen you are on.
+//   · groundPx says how tall the grass reads IN THE WORLD. That is a property of the game, and the ant
+//     test is about this one -- the hero must be taller than it.
+//
+// They were the same number times the plate height, so raising the first to stand bodies on the painted
+// floor also made the grass taller than the hero, and the whole 0.145-is-a-solved-number argument above is
+// the record of being squeezed between them. 0.165 "was the highest that still passes"; 0.145 took the
+// ceiling "with a hair of margin"; bodies stood four points below the paint on every plate in the game.
+//
+// Split them and both are free. The band is a fixed number of world units; the plate is sized so its
+// painted horizon lands exactly there, and OFFSET BELOW THE FRAME when it has to be taller than that for
+// coverage. 5.99 is not a new taste -- it is 0.145 x 41.3, exactly what the old pair already produced --
+// so the hero reads against the grass precisely as he did before, while his feet move up to the paint.
+//
+// ⚠️ AND IT NOW HOLDS ON EVERY SCREEN, WHICH IT DID NOT BEFORE. groundPx was a share of the CLAMPED
+// plate height, and the clamps differ by device -- so the ratio the ant test is about drifted from 1.17
+// on a portrait phone to 1.59 in landscape and on an ultrawide, where the plate is capped by
+// SKY_HEADROOM instead of by the world. check-grove now prints 1.17x on all nine viewports because the
+// band is a world quantity and nothing about the screen can move it. That drift is also why raising
+// GROUND_OF_PLATE alone could never have worked: at 0.185 the same clamp puts a portrait phone at 0.98
+// -- under 1.0, the ant bug -- so the split is not a tidier way to get here, it is the only way.
+export const GROUND_BAND_UNITS = 5.99;
 
 // ── THE SCALE ───────────────────────────────────────────────────────────────────────────────────────────────
 // Aim for a number of world units across the frame, then hold the hero between a floor and a ceiling as a
@@ -114,7 +143,10 @@ export const HERO_MAX_VH = 0.26;
 // Which is why heroOverGround still comes out at 1.30, the value every backdrop was drawn against and the
 // value check-grove.mjs asserts. Raising this zooms the PAINTING out without touching the world; lowering
 // it is the grass-taller-than-the-knight bug.
-export const PLATE_UNITS = 41.3;
+// ⚠️ DERIVED, NOT AUTHORED. The plate is exactly as tall as it has to be for its painted horizon to
+// land on the world's ground line: GROUND_BAND_UNITS / GROUND_OF_PLATE. Authoring it separately is how
+// the two drifted apart in the first place.
+export const PLATE_UNITS = GROUND_BAND_UNITS / GROUND_OF_PLATE;
 // ⚠️ AND A FLOOR, OR A WIDE SHORT SCREEN PAINTS A LETTERBOX. On a landscape phone the span term wins and
 // unit falls far enough that a world-sized plate would occupy under half the height, leaving more haze than
 // painting. Below this the plate goes back to covering, and the hero simply reads a little taller against
@@ -250,8 +282,15 @@ export function viewFor(vw, vh, topY = 0) {
     // hero reads a little MORE proud of the grass there, which is the safe direction to fail in.
     const skyBoxH = Math.min(vh * SKY_HEADROOM, Math.max(vh * MIN_PLATE_OF_VH, PLATE_UNITS * unit));
 
-    const groundPx = GROUND_OF_PLATE * skyBoxH;
+    // ⚠️ THE GROUND IS THE WORLD'S, NOT THE PLATE'S. See GROUND_BAND_UNITS. This is why the band no
+    // longer grows when skyBoxH is clamped for coverage, and why heroOverGround is now the same number on
+    // a phone and on an ultrawide instead of sagging into the ant bug on the narrow one.
+    const groundPx = GROUND_BAND_UNITS * unit;
+    // And the plate is pushed DOWN by whatever it is taller than it wanted to be, so its painted horizon
+    // still meets that line. Zero in the common case; negative only when a clamp made the plate bigger.
+    const skyBottom = Math.min(0, groundPx - GROUND_OF_PLATE * skyBoxH);
     return {
+        skyBottom,
         unit,
         span,
         visibleUnits: vw / unit,

@@ -463,7 +463,7 @@ export const GROVE_CSS = `
    so where the plate overtops the viewport its faded top sits ABOVE the screen and is never seen. A mask
    does not create a containing block either -- unlike a filter, which on this element would break the
    camera transform. See [[filter-creates-containing-block]]. */
-.gv-sky { position: absolute; left: 0; bottom: 0; height: var(--gv-sky-h, 100%);
+.gv-sky { position: absolute; left: 0; bottom: var(--gv-sky-b, 0px); height: var(--gv-sky-h, 100%);
     display: flex; align-items: stretch; pointer-events: none; will-change: transform;
     -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 11%);
     mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 11%); }

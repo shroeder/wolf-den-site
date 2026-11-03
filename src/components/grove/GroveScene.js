@@ -3473,7 +3473,7 @@ export default function GroveScene({
             const vw = w.hostW || host.clientWidth;
             const vh = w.hostH || host.clientHeight;
             const view = frameView;
-            const { unit, skyBoxH, groundPx, tileW } = view;
+            const { unit, skyBoxH, groundPx, tileW, skyBottom } = view;
 
             // ⚠️ THE SPRITES SCALE WITH IT. Every body is sized in world units off this variable; a body
             // sized in percent of the scene keeps its pixel size when the scale zooms and only the gaps
@@ -3484,6 +3484,13 @@ export default function GroveScene({
                 w.skyBoxH = skyBoxH;
                 host.style.setProperty("--gv-sky-h", `${skyBoxH}px`);
                 host.style.setProperty("--gv-sky-w", `${tileW}px`);
+            }
+            // ⚠️ AND WHERE ITS BOTTOM SITS. A plate that had to grow for coverage is pushed below the
+            // frame by the excess, so the painted horizon still lands on the world's ground line rather
+            // than riding up with the clamp. See GROUND_BAND_UNITS.
+            if (skyBottom !== w.skyBottom) {
+                w.skyBottom = skyBottom;
+                host.style.setProperty("--gv-sky-b", `${skyBottom}px`);
             }
 
             // The vertical camera. The top tier of a late zone is 78 units up and the frame holds about 25,
