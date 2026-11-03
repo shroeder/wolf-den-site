@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GroveAtlas from "@/components/grove/GroveAtlas";
+import { zonesOfMap } from "@/lib/marketplace/grove-npcs.js";
 import { TOWNS } from "@/lib/marketplace/towns.js";
 import { groveSpot, stampGroveReturn } from "@/lib/marketplace/grove-return.js";
 import { createPortal } from "react-dom";
@@ -911,7 +912,20 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                 first paint would be Deepdelve and the next tick, six seconds later, would quietly put
                 Rootwood back. */}
             {townState?.data
-                ? <TownClient initial={townState.data} previewTown={townState.n} />
+                ? (
+                    <TownClient
+                        initial={townState.data}
+                        previewTown={townState.n}
+                        /* ⚠️ THE FIRST ZONE OF THIS TOWN'S MAP, NOT ZONE 1 OF THE GROVE. Each town sits at
+                           the head of its own map, so "the first area" means a different zone in each one —
+                           sending every town to zone 1 would walk a player in Deepdelve back to Rootwood.
+                           Resolved from the catalogue with zonesOfMap, the same source the map panel uses. */
+                        onGrovePortal={() => {
+                            const first = zonesOfMap(townState.n)[0];
+                            if (first) travel(first.n);
+                        }}
+                    />
+                )
                 : <p className="gv-town-wait">Walking to town…</p>}
         </div>
     ) : null;

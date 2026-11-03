@@ -942,6 +942,14 @@ const SCENE_CLEAR = 2.6;
 const GHOST_CLEAR = 2.6;
 const clearOf = (x, occupied, by) => occupied.every((o) => Math.abs(x - o) > by);
 
+// ⚠️ PAST THE LAST BUILDING, CLAMPED ONTO THE ROAD. A town with few buildings would otherwise put the gate
+// in the middle of the street, and a town with many would push it off the end of the world.
+export function portalXFor(buildings) {
+    const xs = (buildings || []).map((b) => Number(b.x) || 0);
+    const last = xs.length ? Math.max(...xs) : 50;
+    return Math.round(Math.min(97, Math.max(last + 7, 60)) * 100) / 100;
+}
+
 function buildHalloweenDressing(buildings, occupied = []) {
     const rand = hwRng(0x4A5F17);
     // Where the names are. Separate from `occupied` on purpose — the porches are SUPPOSED to land on doors,
@@ -1271,7 +1279,7 @@ const TOWN_VIBE = {
 // component inside its own view, at /marketplace/grove, where there is no query string to read. The poll
 // therefore refetched with no town and overwrote the right street with the default one a few seconds after
 // arriving, which is the long way round to landing in town 1. The prop wins; the URL is the fallback.
-export default function TownClient({ initial, frozen = false, halloween = false, gourd = null, previewTown = null }) {
+export default function TownClient({ initial, frozen = false, halloween = false, gourd = null, previewTown = null, onGrovePortal = null}) {
     const [state, setState] = useState(initial || null);
     // ⚠️ THROUGH A REF, so `load` keeps its empty dep list. Fifteen effects name `load` in their deps and
     // several of them fetch on mount; giving it a changing identity would fire all of them again on the
@@ -1287,6 +1295,7 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     const town = state?.town || null;
     // Where each NPC stands on THIS street, from the single layout pass in town.js. See NPC_FALLBACK.
     const npcAt = useCallback((id) => state?.npcX?.[id] ?? NPC_FALLBACK[id] ?? 50, [state?.npcX]);
+    const portalX = portalXFor(buildings);
     // The stockade belongs to the Den, not to each street: the default town (no gating) or town 1.
     // ── ⚠️ AN NPC STANDS WHERE HIS TRADE DOES ─────────────────────────────────────────────────────
     // Luke, looking at all seven streets side by side: "I don't like the fact that that same vendor is in
@@ -3176,6 +3185,33 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                             ) : null}
                         </button>
                     ) : null}
+                    {/* ── ⚠️ THE WAY INTO THE GROVE IS A PLACE, NOT A MENU ITEM ───────────────────
+                        Luke: "every town needs a portal to be able to go to the first area."
+
+                        A town is where you stand between runs, and until now the only way back out to the
+                        zones was the map panel — which is a menu, and a menu is not somewhere you can walk
+                        to. [[game-content-must-exist-in-the-world]] is the rule; the doors at either end of
+                        a zone are the same idea already working.
+
+                        ⚠️ ITS X IS DERIVED FROM THE STREET, NOT PICKED. The buildings are laid out by
+                        layOutStreet() and their spacing changes with how many a town has, so a hardcoded
+                        "96%" would sit on top of a shopfront in some towns and in empty road in others.
+                        It stands past the last building — the edge of town, which is where a gate goes.
+
+                        ⚠️ AND IT ONLY EXISTS WHEN SOMETHING CAN ANSWER IT. Rendered only when a handler is
+                        passed, so the standalone /marketplace/town page does not grow a door to a feature
+                        the visitor may not have. [[a-screen-with-no-door-is-not-shipped]] cuts both ways:
+                        a door that leads nowhere is the same bug wearing the other hat. */}
+                    {onGrovePortal ? (
+                        <button type="button" className="tw-portal"
+                            style={{ left: `${portalX}%`, top: `${GROUND + 2}%` }}
+                            onClick={(e) => { e.stopPropagation(); onGrovePortal(); }}
+                            aria-label="The Grove — walk out to the first area">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/images/grove/portal-open.webp" alt="" draggable={false} />
+                            <span className="tw-portal-sign">The Grove</span>
+                        </button>
+                    ) : null}
                     {/* ⚠️ THE CRIER IS THE CAPITAL'S, NOT EVERY TOWN'S. He shouts the Den's live news and
                         opens the Town Hall — one civic voice for the whole game, so seven of him reads as
                         seven copies of one man rather than seven places. Same call Luke already made for the
@@ -4302,6 +4338,16 @@ export const TOWN_CSS = `
 .tw-scene { position: relative; width: 100%; height: min(66vh, 540px); border-radius: 18px; overflow: hidden; cursor: grab; touch-action: pan-y;
     box-shadow: inset 0 -30px 60px rgba(0,0,0,0.28), 0 10px 30px rgba(0,0,0,0.35); user-select: none; -webkit-user-select: none; background: #1a1330; }
 .tw-scene:active { cursor: grabbing; }
+/* The gate at the edge of town. Sized against the buildings rather than the viewport so it reads as a
+   structure on the street, and lifted a little so its base sits on the cobbles like a door does. */
+.tw-portal { position: absolute; transform: translate(-50%, -100%); height: 30%; width: auto; z-index: 240;
+    background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column;
+    align-items: center; filter: drop-shadow(0 10px 16px rgba(0,0,0,0.5)); }
+.tw-portal img { height: 100%; width: auto; display: block; }
+.tw-portal-sign { margin-top: 4px; font-weight: 800; font-size: 12px; letter-spacing: .04em;
+    color: #F2EBDA; background: rgba(12, 10, 24, 0.82); border: 1px solid rgba(120, 220, 170, 0.55);
+    border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.tw-portal:active { transform: translate(-50%, -100%) scale(0.97); }
 .tw-world { position: absolute; top: 0; left: 0; height: 100%; will-change: transform; }
 .tw-bg { position: absolute; inset: 0; display: flex; height: 100%; }
 .tw-bg img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; }
