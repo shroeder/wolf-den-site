@@ -55,10 +55,30 @@ export default async function ShopPage() {
     // worth more than any amount of tuning inside the grid.
     const view = parseShopView((await cookies()).get(SHOP_VIEW_COOKIE)?.value);
     if (view === SHOP_VIEW.swipe) {
+        // ── ⚠️ THE PRE-ORDER DOOR BELONGS ON THIS PATH TOO ──────────────────────────────────────
+        // Luke, on the deck, on his phone: "I need quick preorder access from here."
+        //
+        // The door below was built on the browse branch only, and then the deck became the DEFAULT
+        // view — so the shelf lost its only entrance for almost everybody, silently, without the
+        // link ever being deleted. Nothing errors; the page simply cannot be reached without
+        // typing its URL, which is the lesson already written twice further down this file.
+        //
+        // ⚠️ THE ONE EXTRA QUERY IS THE POINT OF THE EARLY RETURN, so it is the NARROW accessor and
+        // nothing else. This branch exists to skip listShopInventoryShared — 1,798 items the deck
+        // never uses — and listPreorderShopItems asks only for the pre-order shelf.
+        const openPreorders = await listPreorderShopItems().catch(() => []);
         return (
             <div className="stack reveal">
                 <ViewPing event="view_shop" />
                 <ShopViewToggle view={view} />
+                {openPreorders.length > 0 ? (
+                    <Link href="/shop/preorders" className="shop-preorder-door">
+                        <strong>
+                            {openPreorders.length === 1 ? "1 pre-order open" : `${openPreorders.length} pre-orders open`}
+                        </strong>
+                        <span>Reserve an upcoming release &mdash; pay now, we tell you the day it lands</span>
+                    </Link>
+                ) : null}
                 <DiscoverClient />
             </div>
         );
