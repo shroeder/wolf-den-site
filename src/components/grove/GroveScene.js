@@ -2185,6 +2185,30 @@ export default function GroveScene({
             // goes out, the screen takes a boss-weight knock -- because a drop this rare arriving with the
             // same four pixels as a root is a rarity the player cannot feel. See [[no-pity-progress-bars]]
             // for the opposite failure; this is the one place loudness is earned.
+            // ── ⚠️ GEAR, WHICH THE PLAYER COULD NOT PREVIOUSLY TELL HAD HAPPENED ────────────
+            // Luke: "Playing the grove should drop gear. We designed this but never implemented it."
+            //
+            // It was rolling (grove-roll.js), granting (grantItem, via "grove") and landing in the bag
+            // the whole time. What never existed is THIS: the drop made no sound, printed no label, and
+            // did not appear on the settle receipt, so a one-in-forty event was indistinguishable from
+            // killing a rat for nothing. A reward the player cannot perceive is not a reward.
+            // [[reward-with-no-screen-is-not-shipped]].
+            //
+            // ⚠️ ONLY THE GOOD SLOTS SHOUT. Gear is one kill in forty on the on-ramp, and a name across
+            // the screen with a shake and a sound every forty kills is not a moment, it is weather — and
+            // the thing that would make the Grove feel slow. The normal and rare slots keep the spill
+            // they already had, which is correctly sized for them; `sup` and the set piece get the
+            // emblem's treatment, which puts them around one kill in four hundred and up.
+            //
+            // Pitched BELOW the hyper: no world-stop, a crit-weight knock rather than a boss one. The
+            // hyper keeps the stop to itself because it is forty times rarer again.
+            if (got.gear && (got.gearTier === "sup" || got.gearTier === "set")) {
+                const art = gearArtRef.current?.[got.gear] || null;
+                wd.shake.add(TRAUMA.crit);
+                shockwave(foe.x, foe.y + foe.h * 0.4, "crit");
+                playEmblemDrop();
+                procCall(String(art?.name || "A PIECE OF GEAR").toUpperCase(), "gear", art?.url || null);
+            }
             if (got.hyper) {
                 wd.clock.stop(now, EMBLEM_STOP_MS);
                 wd.shake.add(TRAUMA.boss);

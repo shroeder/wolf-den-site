@@ -601,7 +601,16 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         // settle is still one request.
         if (ticks.length) refreshBoard();
 
-        if (lost.length) {
+        // ── ⚠️ GEAR ON THE RECEIPT, NOT JUST IN THE BAG ───────────────────────────
+        // settle grants it and now returns it; the scene already shouted the piece's name on the kill.
+        // This is the half that survives the shout: the note names what you walked away with, and it
+        // outranks a craft-ready nudge because a piece of gear is the rarer thing by two orders.
+        const gearGot = Array.isArray(d.gear) ? d.gear : [];
+        if (gearGot.length) {
+            setNote(gearGot.length === 1
+                ? `${gearGot[0].name} dropped — it is in your bag`
+                : `${gearGot[0].name} and ${gearGot.length - 1} more dropped`);
+        } else if (lost.length) {
             setNote(`Bag full — left ${lost.map(partName).join(", ")} behind. Bank something.`);
         } else if (made.length) {
             setNote(made.length === 1

@@ -877,7 +877,20 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     for (const g of got.gears || []) {
         if (!g?.id) continue;
         const ok = await grantItem(buyerId, g.id, "grove").catch(() => null);
-        if (ok !== null) gearGot.push(g);
+        // ⚠️ THE NAME AND THE RARITY COME FROM THE CATALOGUE, NOT THE ROLL. The roll carries an id and a
+        // tier band ("sup"/"rare"/"normal"), which is what the TABLE called the slot — not what the item
+        // is. A card reading "grove_sup" is a card nobody can read.
+        if (ok !== null) {
+            const it = itemById(g.id);
+            gearGot.push({
+                id: g.id,
+                name: it?.name || g.id,
+                rarity: it?.rarity || null,
+                slot: it?.slot || null,
+                icon: it?.icon || null,
+                tier: g.tier || null,
+            });
+        }
     }
     // ── ⚠️ THE HYPER-RARES, THROUGH THE BOSS'S OWN grantHyper ───────────────────────────────────────
     // Ordinary kills can now pay the hyper table at about one in two thousand. This grants them with the
@@ -960,6 +973,16 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         // kill; a reward announced in the world but missing from the receipt is half a reward.
         // See [[reward-with-no-screen-is-not-shipped]].
         hypers,
+        // ── ⚠️ THE GEAR, SAID OUT LOUD — IT WAS GRANTED AND NEVER MENTIONED ──────────
+        // Luke: "Playing the grove should drop gear. We designed this but never implemented it."
+        //
+        // It WAS implemented, everywhere except the one place a player could tell. The roll made it
+        // (grove-roll.js), the grant banked it through grantItem exactly like every other source,
+        // and then gearGot was pushed into a local array that nothing ever read. So a drop at
+        // one-in-forty arrived in the bag silently: no label in the world, no line on the receipt,
+        // no card. From the player's side the feature did not exist, which is what was reported.
+        // [[declared-but-never-read]] and [[reward-with-no-screen-is-not-shipped]].
+        gear: gearGot,
         xp: got.xp,
         newlySeen,
         // What moved on the quest board because of this settle, so the scene can SAY SO. Progress that

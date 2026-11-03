@@ -1566,6 +1566,11 @@ export const GROVE_CSS = `
     color: #9fe8ff;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(80,200,255,0.95), 0 0 36px rgba(40,140,255,0.6); }
 .gv-proc.is-haste { color: #9fe8ff; }
+/* ⚠️ GEAR GETS ITS OWN TONE, between a part and a hyper. Gold rather than the hyper's magenta, so
+   the rarest thing in the feature keeps its colour to itself, and bright enough to be unmistakably a
+   DROP rather than a damage number. */
+.gv-proc.is-gear { color: #ffe3a8; letter-spacing: 0.14em;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,200,90,0.85); }
 /* ── ⚠️ THE HEAL IS GREEN, AND IT IS THE ONLY PROC THAT CARRIES AN OBJECT ─────────────────────
    Luke: "when it gets used it should be clear. And sexy, showing it happens and the effect."
 
