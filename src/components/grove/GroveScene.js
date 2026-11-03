@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COLISEUM_H, coliseumArt } from "@/lib/marketplace/grove-arena.js";
 import { createPortal } from "react-dom";
 import { GiSoundOff, GiSoundOn } from "react-icons/gi";
@@ -365,6 +365,88 @@ const DOOR_ART = {
 // How far above or below a creature the hero will still swing at it. A body one tier up is not in reach.
 const SWING_V_REACH = 6;
 // A pet that falls this far behind has lost the plot — see the rescue in the loop.
+
+const bodyArt = (art, { swipe = false, claw = false } = {}) => (
+    <>
+        {/* The only thing on screen that says how high off the floor a body is, which makes it the thing
+            that sells "grounded". A sprite with no shadow is pasted on. */}
+        <span className="gv-shadow" aria-hidden="true" />
+        <span className="gv-art">
+            {/* ⚠️ NO <img> AT ALL WHEN THERE IS NO URL, rather than an img that 404s. An SSR-rendered
+                broken src fires onError before React has hydrated, so a fallback wired to onError never
+                runs and the player gets the browser's broken-image glyph — which is how every card in the
+                game ended up wearing one. See img-onerror-fires-before-hydration. */}
+            {art ? <img src={art} alt="" draggable={false} /> : null}
+            {/* The hit flash: the sprite's own silhouette in white, masked by the art itself, with its
+                opacity driven by the loop. A flash has to be the SHAPE of the thing that was hit — a
+                white box over the sprite reads as a glitch, and a brightness filter on a dark sprite
+                barely reads at all. */}
+            {art ? <span className="gv-flash" style={{ "--gv-art-url": `url(${art})` }} aria-hidden="true" /> : null}
+            {swipe ? <span className="gv-swipe" aria-hidden="true" /> : null}
+            {/* The pet's equivalent, and deliberately a different MARK rather than a smaller version
+                of the hero's crescent: three short claw lines across the direction of travel. Two
+                copies of one shape at two sizes is what reads as one shape stuttering. */}
+            {claw ? <span className="gv-claw" aria-hidden="true"><i /><i /><i /></span> : null}
+        </span>
+    </>
+);
+
+
+// ── ⚠️ A CREATURE IS RENDERED ONCE AND THEN LEFT ALONE ──────────────────────────────────────────────────────
+// Luke: "when I kill like more than one thing, the game freaking like lags out and freaking like stutters big
+// time."
+//
+// A kill changes w.foes.length, which calls rerender(), which re-rendered this list — and every surviving
+// creature's whole subtree with it: shell, shadow, sprite, hit flash, status layer, health bar and wish
+// icons, thirty times over, several times during a multi-kill. Profiled at 6x CPU throttle that is what is
+// left at the top of the frame once the forced layout reads are gone: ReactElement, world.foes.map,
+// batchedUpdates, getNearestMountedFiber.
+//
+// Nothing about a creature's MARKUP changes while it lives. Its position, facing, flash, status and health
+// are all written straight onto its nodes by the frame loop, which is why this file keeps bodies in refs
+// rather than state in the first place. The only thing a kill genuinely changes is which creatures exist.
+//
+// So the subtree is memoised and every prop is stable for the creature's lifetime: the ref and the tap
+// handler are cached per uid by the parent rather than allocated fresh each render, because a new closure
+// in either one is a changed prop, and a changed prop defeats memo entirely. A re-render now walks the list
+// and bails out on everyone still alive.
+//
+// ⚠️ THAT MEANS REACT WILL NOT REPAINT A LIVING CREATURE. Anything that must change about a body while it
+// lives belongs on the loop's side -- a class or a style the loop writes -- exactly as .gv-status and
+// .gv-ehp already are. Adding a prop here that changes during a life would silently stop updating.
+const FoeBody = memo(function FoeBody({ art, h, rare, isBoss, big, name, wish, onDown, refCb }) {
+    return (
+        <button type="button"
+            className={`gv-foe${rare ? " is-rare" : ""}${isBoss ? " is-boss" : ""}`}
+            // ⚠️ THE SPRITE URL RIDES ON THE SHELL so the status layer can mask to the creature's own
+            // silhouette, the way .gv-flash already does. A condition painted as a rectangle over the body
+            // is far worse than no condition at all.
+            style={{ "--gv-h": h, "--gv-art-url": art ? `url(${art})` : undefined }}
+            ref={refCb}
+            onPointerDown={onDown} aria-label={name}>
+            {bodyArt(art)}
+            {/* Rendered once and never touched by React again: the loop owns its className outright. */}
+            <i className="gv-status" aria-hidden="true" />
+            {/* One hidden strip per body, revealed by the loop the instant a hit lands. Building it at that
+                moment would mean a re-render of the whole zone per hit. */}
+            {isBoss || big || rare ? null : (
+                <span className="gv-ehp" aria-hidden="true">
+                    <u /><i /><s />
+                </span>
+            )}
+            {/* Which of these is carrying what you came for. Computed by the parent from the creature's id
+                and the wish list, both of which change on a tap and never on a frame. */}
+            {wish?.length ? (
+                <span className="gv-foe-wish" aria-hidden="true">
+                    {wish.slice(0, 3).map((pt) => (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img key={pt} src={groveArt(pt)} alt="" width={16} height={16} />
+                    ))}
+                </span>
+            ) : null}
+        </button>
+    );
+});
 
 export default function GroveScene({
     npcHere = null,
@@ -3984,31 +4066,35 @@ export default function GroveScene({
         body.barFill = body.barNode?.querySelector("i") || null;
     }, []);
 
+    // ── ⚠️ ONE REF AND ONE TAP HANDLER PER CREATURE, REUSED FOR ITS WHOLE LIFE ─────────────────────
+    // wire(f) and onTapFoe(f.uid) both BUILD A NEW FUNCTION every time they are called. Passed straight
+    // into the render that is the end of memoisation: a new closure is a changed prop, so every creature
+    // would re-render on every kill no matter how carefully FoeBody is wrapped. It is also a second,
+    // quieter bug -- a changed ref callback makes React detach and re-attach the ref, which runs wire()
+    // again and re-queries four nodes per body.
+    //
+    // Cached by uid, and rebuilt only if the creature object itself is replaced or the tap handler's own
+    // identity changes (it depends on `dead`).
+    const foeCbs = useRef(new Map());
+    const foeCbFor = useCallback((f) => {
+        const m = foeCbs.current;
+        let e = m.get(f.uid);
+        if (!e || e.foe !== f || e.tap !== onTapFoe || e.wireFn !== wire) {
+            e = { foe: f, tap: onTapFoe, wireFn: wire, ref: wire(f), down: onTapFoe(f.uid) };
+            m.set(f.uid, e);
+        }
+        return e;
+    }, [onTapFoe, wire]);
+    // Creatures are spawned and killed all session, so the cache has to be swept or it grows for ever.
+    // Done after render against the world's own list rather than during it.
+    useEffect(() => {
+        const m = foeCbs.current;
+        if (m.size < 120) return;
+        const alive = new Set((worldRef.current?.foes || []).map((f) => f.uid));
+        for (const uid of m.keys()) if (!alive.has(uid)) m.delete(uid);
+    });
+
     // A body: shell (position) > shadow + art (facing, squash) > sprite + flash.
-    const bodyArt = (art, { swipe = false, claw = false } = {}) => (
-        <>
-            {/* The only thing on screen that says how high off the floor a body is, which makes it the thing
-                that sells "grounded". A sprite with no shadow is pasted on. */}
-            <span className="gv-shadow" aria-hidden="true" />
-            <span className="gv-art">
-                {/* ⚠️ NO <img> AT ALL WHEN THERE IS NO URL, rather than an img that 404s. An SSR-rendered
-                    broken src fires onError before React has hydrated, so a fallback wired to onError never
-                    runs and the player gets the browser's broken-image glyph — which is how every card in the
-                    game ended up wearing one. See img-onerror-fires-before-hydration. */}
-                {art ? <img src={art} alt="" draggable={false} /> : null}
-                {/* The hit flash: the sprite's own silhouette in white, masked by the art itself, with its
-                    opacity driven by the loop. A flash has to be the SHAPE of the thing that was hit — a
-                    white box over the sprite reads as a glitch, and a brightness filter on a dark sprite
-                    barely reads at all. */}
-                {art ? <span className="gv-flash" style={{ "--gv-art-url": `url(${art})` }} aria-hidden="true" /> : null}
-                {swipe ? <span className="gv-swipe" aria-hidden="true" /> : null}
-                {/* The pet's equivalent, and deliberately a different MARK rather than a smaller version
-                    of the hero's crescent: three short claw lines across the direction of travel. Two
-                    copies of one shape at two sizes is what reads as one shape stuttering. */}
-                {claw ? <span className="gv-claw" aria-hidden="true"><i /><i /><i /></span> : null}
-            </span>
-        </>
-    );
 
     const scene = (
         // ⚠️ THE SLAB IS A VARIABLE ON THE SCENE, NOT A src ON EACH LEDGE. A zone has up to a dozen ledges
@@ -4292,66 +4378,14 @@ export default function GroveScene({
                     </button>
                 ) : null}
 
-                {world.foes.map((f) => (
-                    <button key={f.uid} type="button"
-                        className={`gv-foe${f.rare ? " is-rare" : ""}${f.isBoss ? " is-boss" : ""}`}
-                        // ⚠️ THE SPRITE URL RIDES ON THE SHELL so the status layer can mask to the
-                        // creature's own silhouette, the way .gv-flash already does. A condition painted
-                        // as a rectangle over the body is far worse than no condition at all -- that is
-                        // the lesson .gv-flash's own @supports fallback is written around.
-                        style={{ "--gv-h": f.h, "--gv-art-url": f.art ? `url(${f.art})` : undefined }}
-                        ref={wire(f)}
-                        onPointerDown={onTapFoe(f.uid)} aria-label={f.name}>
-                        {bodyArt(f.art)}
-                        {/* ── ⚠️ WHAT IS HAPPENING TO THIS CREATURE, FOR AS LONG AS IT IS HAPPENING ──
-                            A freeze lasts two seconds, a chill eight and a burn three ticks, and until
-                            now NONE of them put a mark on the body. The word flashed once and vanished,
-                            and for the rest of the duration a burning, frozen, chilled creature looked
-                            exactly like one that was fine. You could not look at a fight and see what
-                            was happening to whom -- which is most of what makes a fight readable.
-
-                            Rendered once and never touched by React again: the loop owns its className
-                            outright. Putting the state on the BUTTON's own class would work until the
-                            next rerender() dropped it, because that class belongs to React. */}
-                        <i className="gv-status" aria-hidden="true" />
-                        {/* ⚠️ THE BAR IS RENDERED FOR EVERY CREATURE AND SHOWN FOR ALMOST NONE OF THEM.
-                            It is one hidden strip per body, which costs nothing, and it means the loop can
-                            reveal one the instant a hit lands — building the element at that moment would
-                            mean a re-render of the whole zone per hit. Visibility is a class the loop
-                            toggles; see the bar block in the loop for when.
-
-                            Not on anything that drives the banner at the top of the screen: a boss and the
-                            rare spawn already have a named bar up there, and two bars for one creature is
-                            the player reading the same number twice. */}
-                        {f.isBoss || f.big || f.rare ? null : (
-                            <span className="gv-ehp" aria-hidden="true">
-                                <u /><i /><s />
-                            </span>
-                        )}
-                        {/* ── ⚠️ WHICH OF THESE IS CARRYING WHAT YOU CAME FOR ──────────────────────
-                            Luke: "above enemies which items they have that you wish for".
-
-                            A zone holds fifteen to thirty creatures of three or four kinds and they are
-                            told apart by silhouette, which works right up until the question is "which
-                            one drops Thornhusk". This answers it in the one place the player is already
-                            aiming. The PART's own sprite, not a generic marker: the generic marker says
-                            "something you want" and a player with four things on their list still has to
-                            go and check.
-
-                            ⚠️ COMPUTED HERE AND NOT IN THE LOOP. It depends only on the creature's id and
-                            the list, both of which change on a tap and never on a frame — putting it in
-                            the rAF would be per-body work sixty times a second to answer a question whose
-                            answer cannot have changed. */}
-                        {wishHere[f.id]?.length ? (
-                            <span className="gv-foe-wish" aria-hidden="true">
-                                {wishHere[f.id].slice(0, 3).map((pt) => (
-                                    /* eslint-disable-next-line @next/next/no-img-element */
-                                    <img key={pt} src={groveArt(pt)} alt="" width={16} height={16} />
-                                ))}
-                            </span>
-                        ) : null}
-                    </button>
-                ))}
+                {world.foes.map((f) => {
+                    const cb = foeCbFor(f);
+                    return (
+                        <FoeBody key={f.uid} art={f.art} h={f.h} rare={f.rare} isBoss={f.isBoss}
+                            big={f.big} name={f.name} wish={wishHere[f.id]}
+                            onDown={cb.down} refCb={cb.ref} />
+                    );
+                })}
 
                 {/* ⚠️ THE PET IS RENDERED BEFORE THE HERO, SO IT PAINTS BEHIND HIM. These are absolutely
                     positioned siblings with no z-index, so document order is the entire stacking rule — and

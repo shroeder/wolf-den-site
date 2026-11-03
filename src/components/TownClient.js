@@ -3461,6 +3461,30 @@ export default function TownClient({ initial, frozen = false, halloween = false,
 
                 See QuestDialogue for the beats. The ladder is still in there, underneath the
                 conversation, because acts.js is explicit that later rungs stay visible. */}
+
+            </div>
+
+            {/* ── ⚠️ MOUNTED OUTSIDE .tw-scene, LIKE EVERY OTHER MODAL ──────────────────────────────
+                Luke: "when you tap the conversation, you're just locked in the modal with the NPC. You
+                can't tap to see the next line. You can't even close the modal."
+
+                This was rendered INSIDE the scene, and the scene carries
+
+                    style={anyTownModal ? { pointerEvents: "none" } : undefined}
+
+                which exists so a tap on a dialogue cannot also walk the hero underneath it. Opening this
+                dialogue set that flag — and because the dialogue was a CHILD of the scene, it switched
+                off the dialogue too. Every tap fell straight through to whatever sat behind it: measured,
+                the centre of the panel hit .tw-levelup-btn and the close button hit .tw-buffcele-sub.
+                Nothing errors, and the modal looks completely normal while being entirely inert.
+
+                ⚠️ AND IT WAS NEVER FULL-SCREEN EITHER. .tw-scene has a transform, which makes it the
+                containing block for position:fixed descendants — so .qd-wrap's `fixed` resolved against
+                the scene, not the viewport: 355x622 inside a 412x915 phone. [[filter-creates-containing-block]]
+                is the same scar from the other side.
+
+                Both faults are the same mistake — a modal living inside the thing it covers — and both
+                go away by mounting it where boardOpen and smithOpen already are. */}
             {actOpen ? (
                 <QuestDialogue
                     board={actBoard}
@@ -3472,8 +3496,6 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                     onClose={() => setActOpen(false)}
                 />
             ) : null}
-
-            </div>
 
             {/* The plaza's chat belongs to the plaza — see the note on the header above. */}
             {town ? null : (
