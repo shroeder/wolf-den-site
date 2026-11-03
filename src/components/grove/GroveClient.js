@@ -140,7 +140,7 @@ const GROVE_STAT_READOUT = {
 // annotates itself is a menu that does not trust its own labels, and nine of them on one screen is the
 // list telling you to read rather than to pick. GroveMenu still renders `note` when a row carries one;
 // nothing does any more.
-const familiesFor = ({ benchFresh = 0, statuesHeld = 0 } = {}) => [
+const familiesFor = ({ benchFresh = 0, statuesHeld = 0, questsReady = 0, questsActive = 0 } = {}) => [
     {
         title: "Go", rows: [
             { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
@@ -158,7 +158,16 @@ const familiesFor = ({ benchFresh = 0, statuesHeld = 0 } = {}) => [
             // I grabbed an asset because it was lying around and its name sounded right, which is
             // [[grep-the-class-name-before-taking-it]] wearing a different hat. ui-quests.webp is a
             // notice board drawn for this row.
-            { k: "quests", label: "Quests", art: "/images/grove/ui-quests.webp" },
+            // ⚠️ THE SAME BADGE RULE AS THE ZONE'S, because it is the same door and a player should
+            // not have to learn that the number means something different depending on where they are
+            // standing. Ready-to-hand-in badges; in-progress is only a note. See ZONE_FAMILIES.
+            {
+                k: "quests", label: "Quests", art: "/images/grove/ui-quests.webp",
+                badge: questsReady > 0 ? String(questsReady) : null,
+                note: questsReady > 0
+                    ? `${questsReady} ready to hand in`
+                    : questsActive > 0 ? `${questsActive} on the go` : null,
+            },
             // ⚠️ TOWN IS A PLACE IN THE GROVE, NOT A WAY OUT OF IT. Luke: "if you go to town, you
             // completely get booted out of the Grove. Like, the whole experience is lost... when you're
             // in the town, it should be like you're in any other zone of the Grove with the menu on the
@@ -1572,6 +1581,10 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     // Whoever is standing in THIS zone, if anyone. Most zones have nobody — three givers
                     // across twelve rooms — so the scene draws a figure only when this is non-null.
                     npcHere={col.run ? null : (session.npcHere || null)}
+                    // ⚠️ FROM THE SESSION'S OWN BOARD, which refreshBoard keeps current -- so the badge
+                    // moves the moment a step finishes rather than at the next zone entry.
+                    questsReady={(session.quests || []).filter((q) => q.active?.ready).length}
+                    questsActive={(session.quests || []).filter((q) => q.active?.started && !q.active.ready).length}
                     // ── ⚠️ THE COLISEUM IS IN A ZONE, SO IT IS DRAWN IN THAT ZONE ───────────────
                     // coliseumState is keyed on MAP, which is why its card showed up identically in
                     // all twelve rooms and "Coliseum · zone 7" was a sentence about a place that did
@@ -1863,7 +1876,14 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                 open={menuOpen}
                 onOpen={() => setMenuOpen(true)}
                 onClose={() => setMenuOpen(false)}
-                families={familiesFor({ benchFresh: st ? readyCount(st) : 0, statuesHeld: statueCount })}
+                families={familiesFor({
+                    benchFresh: st ? readyCount(st) : 0,
+                    statuesHeld: statueCount,
+                    // The hub has no session, so the board comes off st -- the same list, read from the
+                    // other of its two homes. See the note where GroveQuests is mounted.
+                    questsReady: (st?.quests || []).filter((q) => q.active?.ready).length,
+                    questsActive: (st?.quests || []).filter((q) => q.active?.started && !q.active.ready).length,
+                })}
                 current={view}
                 onPick={(k) => setView(k)}
             />

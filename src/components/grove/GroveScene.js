@@ -140,6 +140,26 @@ const SETTLE_EVERY_MS = 45_000;
 // ⚠️ SAME KEYS AS BEFORE. openPanel is unchanged and still flushes the kill batch before anything opens --
 // see the note at the markup. The arrangement moved; the wiring did not.
 const ZONE_FAMILIES = [
+    // ── ⚠️ QUESTS IS A ZONE DOOR NOW, AND IT IS THE FIRST ONE ──────────────────────────────────
+    // Luke: "I wamt a question meni item and area first class please design it properly."
+    //
+    // It was deliberately left out, and the note in GroveClient said why: "minus Quests, which has no
+    // meaning while you are standing inside a zone." That was TRUE of what the panel used to be -- a
+    // tracker whose whole job was naming the zone a giver stands in, which is a thing you read before
+    // you set off, not while you are fighting.
+    //
+    // It is not true of what the panel is now. The log carries live progress, the creature and the rooms
+    // it lives in, and a hand-in -- and every one of those is most useful IN a zone, mid-kill, when the
+    // question is "does any of this count for anything". Leaving it out meant the only way to look at a
+    // quest while doing it was to leave the zone, and leaving is not a free action.
+    //
+    // ⚠️ AND IT GOES ABOVE THE MAP. The menu's first row is what the game thinks you should do next;
+    // the map is where you go when you have decided. [[a-screen-with-no-door-is-not-shipped]].
+    {
+        title: "Do", rows: [
+            { k: "quests", label: "Quests", art: "/images/grove/ui-quests.webp" },
+        ],
+    },
     {
         title: "Go", rows: [
             { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
@@ -493,6 +513,7 @@ export default function GroveScene({
     // GroveClient off the shared recipe rule; see the note there.
     benchReady = 0,
     onSettle, onBoss, onLeave, onDeath, onTravel, onPanel, paused = false, unlockedN = 1,
+    questsReady = 0, questsActive = 0,
 }) {
     const hostRef = useRef(null);
     const worldLayerRef = useRef(null);
@@ -4585,7 +4606,19 @@ export default function GroveScene({
                     families={ZONE_FAMILIES.map((f) => ({
                         ...f,
                         rows: f.rows.map((r) => (
-                            r.k === "bench" && benchReady > 0
+                            // ⚠️ READY TO HAND IN IS THE BADGE; IN PROGRESS IS ONLY A NOTE. A number on
+                            // the closed menu means "there is something to collect in here", which is true
+                            // of a finished step and a lie about one you are halfway through -- and a badge
+                            // that is always lit is a badge nobody looks at.
+                            r.k === "quests"
+                                ? {
+                                    ...r,
+                                    badge: questsReady > 0 ? String(questsReady) : null,
+                                    note: questsReady > 0
+                                        ? `${questsReady} ready to hand in`
+                                        : questsActive > 0 ? `${questsActive} on the go` : null,
+                                }
+                                : r.k === "bench" && benchReady > 0
                                 ? { ...r, badge: benchReady > 99 ? "99+" : String(benchReady), note: `${benchReady} ready` }
                                 // ⚠️ NOTHING TO WARN ABOUT. This said FULL, and then "n slots left",
                                 // because the bag had a ceiling and loot past it was never granted. The
