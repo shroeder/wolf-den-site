@@ -1583,7 +1583,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     the bottom of this file never renders here. [[groveclient-has-two-returns]]. It is also
                     not a zonePanel: a panel REPLACES the scene, and this is a person you are talking to
                     while standing in front of them. */}
-                {questTick ? (
+                {questTick && mounted ? createPortal((
                     <div key={questTick.key}
                         className={`gv-qtick${questTick.done ? " is-done" : ""}`}
                         role="status">
@@ -1597,11 +1597,35 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         </span>
                         <span className="gv-qtick-num">{questTick.progress}/{questTick.need}</span>
                     </div>
-                ) : null}
+                ), fsHost || document.body) : null}
 
-                {/* The person who asked for it, where they are standing. Same branch as the marshal and
-                    for the same reason — [[groveclient-has-two-returns]]. */}
-                {giverOpen && session.npcHere ? (
+                {/* ── ⚠️ PORTALLED, LIKE EVERY OTHER THING THAT COVERS THE ZONE ──────────────────────
+                    Luke: "Clicking npc freezes."
+
+                    These two were the last overlays in this branch still rendered into the PAGE TREE.
+                    GroveScene portals its full-screen layer to the body (or to its own host in native
+                    full screen), so anything left behind in the page tree is laid out inside a `.gv`
+                    that has no content left in it — the scene having portalled itself away — and the
+                    zone is painted over the top of it. Measured on a 412x915 phone: .qd-scrim, whose
+                    rule is `position: fixed; inset: 0; z-index: 4200`, came out a 377x34 box at
+                    (17,135); elementFromPoint over the middle of the conversation returned
+                    `div.gv-world`, so every tap went to the forest instead. A real tap did not advance
+                    the line, the walk-away button did not close it, and the dismiss did not either —
+                    and `paused` is true the whole time the giver is open, so the scene behind it is
+                    stopped as well. A dialogue that cannot be advanced or closed over a scene that is
+                    not running IS the freeze that was reported.
+
+                    The note on the sheet below already wrote down the cost of learning this once:
+                    "the panel was there, the zone was paused, and the close button could not be
+                    pressed, so the only way out was a reload." Same sentence, two components over.
+
+                    ⚠️ AND THE TICK GOES WITH THEM. It is a status card over the zone and it had the
+                    same fault — it just does not take taps, so it only ever looked misplaced.
+
+                    ⚠️ fsHost || document.body, NOT document.body. A browser in native full screen
+                    paints only the full-screen element's subtree, so a dialogue portalled to the body
+                    is a SIBLING of the scene: in the DOM, correct in the stylesheet, and never drawn. */}
+                {giverOpen && session.npcHere && mounted ? createPortal((
                     <GroveGiver
                         npcHere={session.npcHere}
                         busy={col.busy || Boolean(col.run)}
@@ -1609,9 +1633,9 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         onAccept={acceptStep}
                         onClose={() => setGiverOpen(false)}
                     />
-                ) : null}
+                ), fsHost || document.body) : null}
 
-                {marshalOpen && session.coliseum ? (
+                {marshalOpen && session.coliseum && mounted ? createPortal((
                     <GroveMarshal
                         coliseum={session.coliseum}
                         busy={col.busy || Boolean(col.run)}
@@ -1619,8 +1643,12 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         onEnter={() => { setMarshalOpen(false); col.start(session.coliseum.map); }}
                         onClose={() => setMarshalOpen(false)}
                     />
-                ) : null}
-                {bossWon ? (
+                ), fsHost || document.body) : null}
+                {/* ⚠️ PORTALLED TOO, and for the same reason as the giver above — this is a click-to-dismiss
+                    card over the zone, and the zone is somewhere else in the DOM. It does not pause the
+                    scene, so it was never a freeze; it was a boss-kill card and its loot laid out inside a
+                    `.gv` box with nothing left in it, underneath the forest. */}
+                {bossWon && mounted ? createPortal((
                     <div className="gv-unlock gv-won" onClick={() => setBossWon(null)}>
                         <div>
                             <span>{bossWon.first ? "First kill" : `Kill ${bossWon.kills}`}</span>
@@ -1674,7 +1702,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                             <button type="button" onClick={() => setBossWon(null)}>Good</button>
                         </div>
                     </div>
-                ) : null}
+                ), fsHost || document.body) : null}
                 {/* ── ⚠️ THE PANEL IS A SHEET OVER THE ZONE, NOT A SCREEN INSTEAD OF IT ────────────
                     Luke: "The buttons to access crafting and backpack and map should be available when in
                     a node on the Grove." The scene stays mounted underneath — see the hoist note for why
@@ -1715,7 +1743,10 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         <style>{GROVE_CSS}</style>
                     </div>
                 ), fsHost || document.body) : null}
-                {popNode}
+                {/* ⚠️ AND THE UNLOCK POP, same reason again. It is shared with the return below, where the
+                    wrapper IS the full-screen layer and it needs no portal — so it is portalled HERE only,
+                    in the branch where the zone has moved out from under it. */}
+                {popNode && mounted ? createPortal(popNode, fsHost || document.body) : null}
                 <style>{GROVE_CSS}</style>
             </div>
         );
