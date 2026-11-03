@@ -48,7 +48,7 @@ import {
     popScale, popWeight, barHit, barColor, FOE_BAR_LINGER_MS,
     HITSTOP_MS, TRAUMA, SWING, SWING_TOTAL_MS, KNOCK, RECOIL, FLASH_MS, SPAWN_FADE_MS,
     deathKit, DEATH_SINK, DEATH_OPAQUE_UNTIL, DEATH_IMPACT, HERO_DEATH, DEATH_VEIL_DELAY_MS,
-    SPARK, DUST, VIGNETTE, COMBO_WINDOW_MS, COMBO_PITCH_STEPS, LOOT_BOUNCE, LOOT_REST_MS,
+    SPARK, DUST, VIGNETTE, COMBO_WINDOW_MS, COMBO_PITCH_STEPS, LOOT_BOUNCE, LOOT_REST_MS, LOOT_AUTO_MS,
     LOOT_LABEL_MS, LOOT_DRAW_ACCEL, LOOT_DRAW_MAX, LOOT_EAT_DIST,
     pouncePose, POUNCE, PET_TRAUMA_SHARE, PET_KNOCK_SHARE, PET_SPARKS,
 } from "@/lib/marketplace/grove-juice.js";
@@ -837,7 +837,6 @@ export default function GroveScene({
             petAt: null,
             petDone: true,
             // The one drop it has committed to collecting, so it does not dither between two piles.
-            petFetch: null,
             // Replaced by the real figure at the end of the first camera pass; this is only what the pet
             // follow reads on frame one, before anything has been measured.
             visibleUnits: UNITS_PER_SCREEN,
@@ -2798,18 +2797,24 @@ export default function GroveScene({
             // bezel and then off it entirely. See grove-view.js.
             const pf = petFollow(w.visibleUnits || UNITS_PER_SCREEN);
 
-            // ── ⚠️ THREE JOBS, IN A FIXED ORDER, AND THE ORDER IS THE DESIGN ────────────────────
-            // Luke: "the pet should only attack if you attack, and it should attack your target", and
-            // separately "the pet should be able to set it to pick up items for you. Actually, it should
-            // do that automatically."
+            // ── ⚠️ TWO JOBS NOW: FIGHT, THEN FOLLOW ────────────────────────────────────────────
+            // Luke: "the pet should only attack if you attack, and it should attack your target."
             //
-            // FIGHT beats FETCH beats FOLLOW, and fighting winning is what makes the pickup safe to make
-            // automatic. The alternative — nearest job wins — means a drop landing mid-boss walks your
-            // damage out of the fight to go shopping, which is the kind of "help" a player would want a
-            // toggle to switch off. Loot never expires (a drop rests in w.drops until something collects
-            // it), so deferring the sweep until the fight is over costs nothing at all: the pet tidies the
-            // floor on the walk to the next thing. That is why there is no setting. The priority IS the
-            // setting, and it is the one a player would have picked.
+            // It used to FETCH as well, and that is gone. Luke: "The pet like glitches out in the grove and
+            // like tries to go pick stuff up, but then just keeps getting rubber banded back to me. I wonder
+            // if maybe let's just have the pet focus on attacking."
+            //
+            // ⚠️ THE RUBBER BAND WAS TWO CORRECT RULES FIGHTING EACH OTHER. The fetch errand ranged as far
+            // as fetchRangeFor() — a share of the visible frame — while the leash below rescues the pet the
+            // moment it is further from the hero than petLostFor(). Those are two different fractions of the
+            // same frame, so on any screen where the fetch range is the larger one the pet walks out, trips
+            // the leash, is teleported back, re-picks the same drop and walks out again, for ever. Neither
+            // rule is wrong on its own and neither logs anything, which is why it reads as the pet glitching
+            // rather than as a conflict.
+            //
+            // The loot problem it was solving is solved properly instead: a drop now comes to the hero on
+            // its own after LOOT_AUTO_MS, from anywhere. Nothing has to walk to it, so nothing can be
+            // yanked back mid-errand, and the floor still empties itself.
             const petTgt = w.petFoe && w.petFoe.hp > 0 && !w.petFoe.dying ? w.petFoe : null;
             const petting = now < (w.petEngagedUntil || 0) && petTgt;
             if (petting) {
@@ -2855,50 +2860,13 @@ export default function GroveScene({
                     w.petBiting = petTgt;
                     w.petDone = false;
                 }
-            } else if (w.petFetch && (w.petFetch.state !== "rest" || !w.drops.includes(w.petFetch))) {
-                // The drop it was going for was collected by the hero on his way past, or the zone was
-                // rebuilt under it. Drop the errand rather than walking to where it used to be.
-                w.petFetch = null;
             } else {
-                // ── FETCH ──────────────────────────────────────────────────────────────────────
-                // Nothing to fight: the pet goes and gets the floor. It commits to ONE drop at a time and
-                // keeps it until it is collected — re-picking the nearest every frame makes it dither
-                // between two equidistant piles for ever, which films as a pet having a seizure.
-                if (!w.petFetch) {
-                    let best = null;
-                    let bestD = fetchRangeFor(frameView.visibleUnits);
-                    for (const d of w.drops) {
-                        if (d.state !== "rest") continue;
-                        // Not the ones the hero is about to walk over himself. Letting the pet race him
-                        // for a drop two units from his feet steals the one bit of collecting that is
-                        // supposed to feel like the player did it.
-                        if (Math.hypot(d.x - w.hero.x, d.y - w.hero.y) < LOOT_DRAW_RANGE) continue;
-                        const dist = Math.hypot(d.x - w.pet.x, (d.y - w.pet.y) * 0.8);
-                        if (dist < bestD) { bestD = dist; best = d; }
-                    }
-                    w.petFetch = best;
-                }
-                if (w.petFetch) {
-                    const d = w.petFetch;
-                    const nav = navigate(plats, w.pet, d.x, d.y);
+                // ── FOLLOW ─────────────────────────────────────────────────────────────────
+                const petWant = w.hero.x - w.hero.face * pf.trail;
+                if (Math.abs(petWant - w.pet.x) > pf.slack || Math.abs(w.hero.y - w.pet.y) > 4) {
+                    const nav = navigate(plats, w.pet, petWant, w.hero.y);
                     drive(w.pet, nav.dir);
                     if (nav.hop) hop(w.pet, HOP);
-                    // Close enough: the drop commits to the PET and is drawn in by the same magnet that
-                    // serves the hero. See the loot block for why that matters.
-                    if (Math.hypot(d.x - w.pet.x, (d.y - w.pet.y) * 0.8) < PET_FETCH_REACH) {
-                        d.state = "draw";
-                        d.dv = 0;
-                        d.to = "pet";
-                        w.petFetch = null;
-                    }
-                } else {
-                    // ── FOLLOW ─────────────────────────────────────────────────────────────────
-                    const petWant = w.hero.x - w.hero.face * pf.trail;
-                    if (Math.abs(petWant - w.pet.x) > pf.slack || Math.abs(w.hero.y - w.pet.y) > 4) {
-                        const nav = navigate(plats, w.pet, petWant, w.hero.y);
-                        drive(w.pet, nav.dir);
-                        if (nav.hop) hop(w.pet, HOP);
-                    }
                 }
             }
 
@@ -3376,12 +3344,15 @@ export default function GroveScene({
                 } else if (d.state === "rest") {
                     integrate(d, plats, dt, { clampX: bounds });
                     const dist = Math.hypot(d.x - w.hero.x, (d.y - w.hero.y) * 0.8);
-                    if (now - d.restAt > LOOT_REST_MS && dist < LOOT_DRAW_RANGE) {
+                    // ⚠️ TWO WAYS IN, AND KEEPING BOTH IS THE POINT. Walking over a drop still collects it
+                    // on the spot, because that is the half of collecting that feels like the player did
+                    // something. The timer is the safety net underneath it: once a drop has sat for
+                    // LOOT_AUTO_MS it comes to you from anywhere, so nothing is ever stranded on a ledge
+                    // you cannot be bothered to climb and nothing has to walk out to get it.
+                    const near = now - d.restAt > LOOT_REST_MS && dist < LOOT_DRAW_RANGE;
+                    const waited = now - d.restAt > LOOT_AUTO_MS;
+                    if (near || waited) {
                         d.state = "draw"; d.dv = 0; d.to = "hero";
-                        // The hero walking over a drop outranks the errand: if the pet was on its way,
-                        // the errand is simply over. Without this the pet keeps walking to a pile that
-                        // is already flying to the hero and then stands on the empty spot.
-                        if (d === w.petFetch) w.petFetch = null;
                     }
                 } else {
                     // ⚠️ EASING IN, NOT A CONSTANT GLIDE. A magnet that commits is the whole feeling; a
@@ -3403,7 +3374,6 @@ export default function GroveScene({
                         // Hidden rather than removed, for the same reason as a dying foe above.
                         if (d.node) d.node.style.display = "none";
                         w.drops.splice(i, 1);
-                        if (d === w.petFetch) w.petFetch = null;
                         // ⚠️ THE THING YOU PICKED UP, NOT THE NAME OF IT. Luke: "You should actually see
                         // the sprite and the name of it." The drop spends its whole life as a sprite on
                         // the floor and then became a line of text at the moment of collection, which is

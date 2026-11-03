@@ -486,6 +486,11 @@ export function stepPop(pop, dt) {
 export const LOOT_SPILL = { up: 0.62, upVar: 0.34, out: 0.42, spin: 0 };
 export const LOOT_BOUNCE = 0.42;
 export const LOOT_REST_MS = 900;      // how long before it is even willing to be drawn in
+// ⚠️ AND HOW LONG BEFORE IT COMES TO YOU ANYWAY, wherever you are standing.
+// Luke: "let's just have the loot automatically get picked up after a few seconds instead of having to
+// go near it." Long enough that walking over a drop still feels like YOU collected it — the near-range
+// rule above fires at 900ms — and short enough that nothing is ever left behind on the floor.
+export const LOOT_AUTO_MS = 3600;     // collected from anywhere once it has sat this long
 export const LOOT_LABEL_MS = 2800;    // how long the name stays up — 4.2s put four names on screen at once
 export const LOOT_DRAW_ACCEL = 0.055;
 export const LOOT_DRAW_MAX = 1.5;
