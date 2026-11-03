@@ -3,10 +3,24 @@
 // Lets maybe make it a little more appealing and simple, just, we have 6, they are 450, order online, free
 // shipping"
 //
-// Four facts, in the order a buyer needs them: there are six, they are $450, you order online, shipping is
-// free. The previous version carried a struck-through $582, a TCGplayer market comparison, a release date, a
-// pickup option and a town — all true, and together they read as a spec sheet rather than an offer. Luke's
-// word was "simple", so everything that is not one of the four facts is gone.
+// Four facts, in the order a buyer needs them: it is a PRE-ORDER landing on a named day, there are six,
+// they are $450, you order online. The previous version carried a struck-through $582, a TCGplayer market
+// comparison, a pickup option and a town — all true, and together they read as a spec sheet rather than an
+// offer. Luke's word was "simple", so everything that is not one of those facts is gone.
+//
+// ⚠️ "PRE-ORDER" AND THE DATE ARE NOT DECORATION, they are the terms of the sale. An ad that takes $450
+// today without saying the product does not exist yet is the single most complainable thing a card shop can
+// post, so the word leads the block and the arrival date sits with the price rather than in small print.
+//
+// ⚠️ THE DATE IS THE STREET DATE, 13 November 2026 — a Friday, and the same date the Square listing and the
+// pre-order script carry. Luke: "They should get in by Friday." Both Nov 6 and Nov 13 are Fridays, and
+// stock may well land in the shop on the earlier one, but a sealed Magic product cannot be sold or shipped
+// before its street date — so the day the BUYER gets it is the 13th either way. Advertising the 6th would
+// promise something the shop is not allowed to do.
+//
+// ⚠️ NO SHIPPING CLAIM. An earlier draft said "free shipping" and checkout charges live EasyPost rates, so
+// the ad and the cart contradicted each other. Luke: "Remove free shipping." Nothing about shipping is
+// promised here now, which is the only safe state until the checkout rule says otherwise.
 //
 // ⚠️ NOTHING IS DRAWN BY A MODEL. The box is the publisher's own product photo and the mark is the shop's own
 // logo. Generating art for an ad about a specific physical product is the one job where a generated picture
@@ -39,6 +53,8 @@ const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
 const COUNT = 6;
 const PRICE = "$450";
 const SITE = "wolfdengamingmn.com";
+// The street date, carried as one value so the poster cannot drift from the listing.
+const ARRIVES = "Friday, Nov 13";
 
 const b64 = (p) => fs.readFileSync(p).toString("base64");
 // ⚠️ THE CUT-OUT, NOT THE RAW JPEG. The publisher photo is on pure white, and dropped straight onto a dark
@@ -96,8 +112,13 @@ const html = `<!doctype html><meta charset="utf-8">
   .price { font-family: "Space Grotesk", Manrope, sans-serif; font-weight: 700;
     font-size: ${WIDE ? 100 : 112}px; line-height: 1; color: #ffffff; margin: ${WIDE ? "2px 0 10px" : "0 0 12px"};
     text-shadow: 0 0 46px rgba(201,162,77,0.28); }
-  .ship { display: inline-block; font-weight: 800; font-size: ${WIDE ? 23 : 26}px; letter-spacing: .03em;
-    color: #0c1512; background: #4ec4a0; padding: ${WIDE ? "9px 20px" : "11px 24px"}; border-radius: 999px; }
+  /* The arrival date sits where the eye already is — directly under the price — rather than in small print
+     at the foot of the poster, because it is a condition of the price. */
+  .lands { display: inline-block; font-family: "Space Grotesk", Manrope, sans-serif; font-weight: 700;
+    font-size: ${WIDE ? 24 : 27}px; letter-spacing: .02em; color: #f4efe6;
+    border: 1px solid rgba(201,162,77,0.55); background: rgba(201,162,77,0.10);
+    padding: ${WIDE ? "9px 22px" : "11px 26px"}; border-radius: 999px; }
+  .lands b { color: #c9a24d; font-weight: 700; }
   .cta { font-family: "Space Grotesk", Manrope, sans-serif; font-weight: 700;
     font-size: ${WIDE ? 27 : 29}px; color: #ffffff; margin-top: ${WIDE ? 16 : 18}px; }
   .cta b { color: #c9a24d; font-weight: 700; }
@@ -107,20 +128,20 @@ ${WIDE ? `
   <div class="glow"><img class="shot" src="${BOX}" alt="" /></div>
   <div class="stack">
     <img class="mark" src="${LOGO}" alt="" />
-    <div class="count">${COUNT} in stock</div>
+    <div class="count">Pre-order &middot; ${COUNT} available</div>
     <h1 class="name"><small>Magic &times; Star Trek</small>Collector Booster Display</h1>
     <div class="price">${PRICE}</div>
-    <span class="ship">Free shipping</span>
+    <span class="lands">Arrives <b>${ARRIVES}</b></span>
     <div class="cta">Order online &middot; <b>${SITE}</b></div>
   </div>
 ` : `
   <img class="mark" src="${LOGO}" alt="" />
   <div class="stack">
     <div class="glow"><img class="shot" src="${BOX}" alt="" /></div>
-    <div class="count">Only ${COUNT} left</div>
+    <div class="count">Pre-order &middot; only ${COUNT}</div>
     <h1 class="name"><small>Magic &times; Star Trek</small>Collector Booster Display</h1>
     <div class="price">${PRICE}</div>
-    <span class="ship">Free shipping</span>
+    <span class="lands">Arrives <b>${ARRIVES}</b></span>
     <div class="cta">Order online &middot; <b>${SITE}</b></div>
   </div>
 `}
