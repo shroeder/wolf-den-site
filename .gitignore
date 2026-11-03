@@ -65,3 +65,7 @@ scripts/.trial/
 # Scratch extracts from the quest-chain ledger build.
 _quests*.json
 _quests*.html
+
+# Promo working files (product photos fetched from the publisher CDN, cut-outs)
+.promo/
+startrek-promo*.png
