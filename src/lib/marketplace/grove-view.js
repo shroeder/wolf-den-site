@@ -60,7 +60,23 @@ export const PLATE_AR = PLATE_W / PLATE_H;
 // built from numbers I cannot trust per-row would be worse than one number I can. The tool is committed so
 // the table can be done properly when the plates are next regenerated. Same lesson as SLAB_SURFACE, which
 // learned this on the ledges and was never applied to the floor.
-export const GROUND_OF_PLATE = 0.165;
+// ⚠️ 0.145 IS A SOLVED NUMBER, NOT A TASTE. Two rules pin it from opposite sides and they very nearly
+// meet, which is why guessing at it kept breaking the other one:
+//
+//   · bodies must stand ON the painted floor. measure-ground-line.mjs puts the median painted horizon at
+//     0.188 of the plate, and standing far below it is what Luke photographed as creatures underground.
+//   · the hero must stand TALLER than the painted foreground band — the ant test in check-grove.mjs,
+//     from "What am I an ant in a forest of grass". That ratio is fixed by geometry:
+//
+//         heroOverGround = HERO_UNITS / (GROUND_OF_PLATE * PLATE_UNITS) = 7 / (g * 41.3)
+//
+//     and >= 1.15 means g <= 0.147. Nothing about sprite size can rescue it; it is this one number.
+//
+// So the ceiling is 0.147 and the floor is "as near 0.188 as that allows". 0.145 takes the ceiling with a
+// hair of margin. I set this to 0.165 earlier chasing the footing alone, which put the hero at 1.03x the
+// grass and turned him back into the ant — the gate caught it and I had misread the gate as passing,
+// because I read the exit code of a PIPELINE rather than of the gate.
+export const GROUND_OF_PLATE = 0.145;
 
 // ── THE SCALE ───────────────────────────────────────────────────────────────────────────────────────────────
 // Aim for a number of world units across the frame, then hold the hero between a floor and a ceiling as a

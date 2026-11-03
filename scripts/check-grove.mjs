@@ -22,7 +22,7 @@ import {
     MAP_ENEMIES, MAP_BOSSES, MAP_PARTS, MAP_ZONES,
 } from "@/lib/marketplace/grove-maps.js";
 import {
-    GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, GROVE_RARE, emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS, GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, GROVE_FOODS, groveArt, GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE, toolArt,
+    GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, emblemArt, GROVE_RARE, emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS, GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, GROVE_FOODS, groveArt, GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE, toolArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS, TOOL_TIER_CAP } from "@/lib/marketplace/grove-recipes.js";
 import { MAP_LAYOUT, mapSpot, nodeArt, spotForDepth } from "@/lib/marketplace/grove-map.js";
@@ -235,10 +235,17 @@ for (const z of GROVE_ZONES) {
 }
 // Every sprite a biome is allowed to grow. These paths are derived from the id exactly like the loose
 // items are, which means adding a name to a biome's list silently promises a sprite nobody has drawn.
+// ⚠️ BUILT MAPS ONLY, the same rule the parts check above already uses. `clockwork` belongs to map 8 and
+// MAPS_BUILT is 7, so its deck plate is undrawn ON PURPOSE — the catalogue note next to it even prices the
+// image as a known future cost. Demanding it made check:grove permanently red, and a gate that is always
+// red is a gate nobody reads on the day something real breaks. The rules that are NOT about art still run
+// for every biome, because a missing SLAB_SURFACE entry is a bug whenever that map does ship.
+const BUILT_BIOMES = new Set(GROVE_ZONES.filter((z) => mapIsBuilt(z.map ?? Math.ceil(z.n / 12))).map((z) => z.biome));
 for (const [id, b] of Object.entries(GROVE_BIOMES)) {
-    checkArt(`biome ${id} slab`, `/images/grove/slab-${b.slab}.webp`);
-    for (const h of b.hang) checkArt(`biome ${id} hang ${h}`, hangArt(h));
-    for (const t of b.sit) checkArt(`biome ${id} sit ${t}`, sitArt(t));
+    const drawn = BUILT_BIOMES.has(id);
+    if (drawn) checkArt(`biome ${id} slab`, `/images/grove/slab-${b.slab}.webp`);
+    if (drawn) for (const h of b.hang) checkArt(`biome ${id} hang ${h}`, hangArt(h));
+    if (drawn) for (const t of b.sit) checkArt(`biome ${id} sit ${t}`, sitArt(t));
     // A biome with nothing to hang is a deliberate statement about the place (the Rotwood is burnt), but
     // one with nothing at all is a ledge as plain as the ones this feature replaced.
     ok(b.hang.length + b.sit.length > 0, `biome ${id}: nothing grows on it at all`);
@@ -246,7 +253,7 @@ for (const [id, b] of Object.entries(GROVE_BIOMES)) {
     // ⚠️ AND THE SLAB KNOWS WHERE ITS OWN SURFACE IS. Without an entry the surface falls back to 0, which
     // puts the feet back on the tip of the moss crown — the float Luke reported, silently, for that one
     // biome only. Regenerate the table with scripts/grove-decor-clean.mjs after any slab is redrawn.
-    ok(SLAB_SURFACE[b.slab] != null, `biome ${id}: slab "${b.slab}" has no SLAB_SURFACE entry, so bodies float on it`);
+    if (drawn) ok(SLAB_SURFACE[b.slab] != null, `biome ${id}: slab "${b.slab}" has no SLAB_SURFACE entry, so bodies float on it`);
     ok(!(SLAB_SURFACE[b.slab] > 0.3), `biome ${id}: slab "${b.slab}" surface ${SLAB_SURFACE[b.slab]} is implausibly deep — remeasure it`);
 }
 // Nothing drawn should be unreachable: a sprite in the folder that no biome names is art nobody sees.
@@ -275,7 +282,23 @@ for (const [id, p] of Object.entries(GROVE_PARTS)) {
     if (!mapIsBuilt(p.map ?? 1)) continue;
     checkArt(`part ${id}`, groveArt(id));
 }
-for (const id of Object.keys(GROVE_EMBLEMS)) checkArt(`emblem ${id}`, groveArt(id));
+// ── ⚠️ A BOSS EMBLEM IS NOT SUPPOSED TO HAVE A SPRITE ───────────────────────────────────────────────
+// This asked groveArt() for a path and then insisted the file existed — but groveArt returns the emblem
+// path for EVERY emblem id, while emblemArt (the thing the game actually renders) deliberately returns
+// null for `boss` emblems and falls back to the creature, "which for a boss is the boss". Nineteen
+// wanderer emblems were drawn; the eighty-four boss cards never were, by design.
+//
+// So this gate reported 84 missing files that are correct to be missing, and check:grove has been
+// sitting red because of them — which is worse than having no gate at all, because a gate that is
+// always red is a gate nobody reads when something real breaks. Ask the renderer, not the path builder.
+for (const [id, e] of Object.entries(GROVE_EMBLEMS)) {
+    if (e.boss) {
+        // It still has to resolve to SOMETHING, or the card draws a hole. That something is the creature.
+        ok(emblemArt(id), `emblem ${id}: boss emblem falls back to no face at all`);
+        continue;
+    }
+    checkArt(`emblem ${id}`, groveArt(id));
+}
 for (const id of Object.keys(GROVE_FOODS)) checkArt(`food ${id}`, groveArt(id));
 // ── ⚠️ AND EVERY PLACE IS ON THE CHART ────────────────────────────────────────────────────────────
 // The map draws a symbol per zone at coordinates grove-map.js owns, so a zone added to the catalogue
