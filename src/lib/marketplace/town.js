@@ -5,7 +5,7 @@ import { TOWNS, NEVER_GATED } from "@/lib/marketplace/towns.js";
 import { gateStateFor } from "@/lib/marketplace/town-gate.js";
 
 import { db } from "@/lib/db";
-import { isOwner, isPrimaryOwner } from "@/lib/marketplace/owner.js";
+import { groveOpen, isOwner, isPrimaryOwner } from "@/lib/marketplace/owner.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -546,8 +546,36 @@ export async function getTownState(buyerId, { previewTown = null } = {}) {
     // the seven towns are unreachable — including for the person who has to decide whether they look right.
     // `?town=3` lets the owner stand in any of them. Checked against isOwner here rather than trusted from
     // the query string, because a town override that anyone could type is a way to walk past the gate.
-    const preview = previewTown && isOwner(buyerId) ? Math.max(1, Math.min(TOWNS.length, Number(previewTown))) : null;
-    const town = preview || (gate.exempt ? null : gate.town);
+    // ⚠️ AND YOU MAY STAND IN ANY TOWN YOU HAVE REACHED. This was isOwner-only, which meant a Grove member
+    // could tap any town card in the atlas and always arrive in whichever town their depth said — the cards
+    // were decoration for everyone but Luke. towns.js already describes fast travel as moving "between the
+    // ones you have reached", so that is the rule: clamped to gate.town for a member, unclamped for an owner
+    // who has to be able to look at all seven before they are reachable.
+    //
+    // ⚠️ CLAMPED SERVER-SIDE, NEVER TRUSTED FROM THE QUERY STRING — a town override anyone could type is a
+    // way to walk past the gate.
+    const canPreview = isOwner(buyerId) || groveOpen(buyerId);
+    const previewCap = isOwner(buyerId) ? TOWNS.length : Math.max(1, Number(gate.town) || 1);
+    const preview = previewTown && canPreview
+        ? Math.max(1, Math.min(previewCap, Number(previewTown)))
+        : null;
+    // ── ⚠️ IF YOU CAN OPEN THE GROVE, YOU GET THE REAL TOWNS ────────────────────────────────────────
+    // Luke: "My son has the Grove, but when he goes to the first town, it's not the town that I'm looking
+    // for. It's the old town."
+    //
+    // This read `gate.exempt ? null : gate.town`, and GATING_LIVE is false, so EVERY account is exempt and
+    // the seven towns resolved to null for everybody except the owner, who got in through the ?town=
+    // preview. Littlewolf has the Grove, walks to town one, and lands on the legacy street — the feature
+    // he is testing is invisible to him.
+    //
+    // The towns and the Grove are one feature: a town is where a map's rewards unlock, and the only thing
+    // that opens a town is Grove progress. So the door is the same door — groveOpen. The three preview
+    // guests and the owner see their real town, derived from how deep they are; everyone else keeps the
+    // single ungated street exactly as before, which is the whole point of GATING_LIVE still being false.
+    //
+    // ⚠️ THE GATE ITSELF IS UNTOUCHED. This decides which STREET is drawn, not what is unlocked —
+    // featureUnlocked still answers from gated_at, so nothing is taken away from anyone by this line.
+    const town = preview || (gate.exempt ? (groveOpen(buyerId) ? gate.town : null) : gate.town);
 
     // ── ⚠️ A TOWN MUST NEVER RENDER AS A VOID ───────────────────────────────────────────────────────
     // Biome towns switch off the midground and the six depth bands, because a cavern has no city skyline.
