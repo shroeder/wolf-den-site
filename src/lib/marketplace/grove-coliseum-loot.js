@@ -6,7 +6,7 @@ import "server-only";
 // rarity of the chest... I'll let you decide what's fair."
 //
 // ⚠️ SAME SPRITE, SAME TIER NAMES, DIFFERENT TABLE. The tier here is a LOOK and a weight; it does not reach
-// into GROVE_CHESTS' own contents. Pointing a new payout at an existing reward row is how a shared table
+// into the Grove chests' own contents, back when those existed. Pointing a new payout at an existing row
 // quietly decays for everything else that reads it.
 //
 // ⚠️ AND PARTS COME FROM THE MAP THE RUN WAS ON. A heartwrought chest from the Ashen Reach paying Rootwood
@@ -15,7 +15,6 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { GROVE_PARTS } from "@/lib/marketplace/grove-catalog.js";
-import { GROVE_CHEST_ORDER } from "@/lib/marketplace/grove-forge.js";
 import { storeParts } from "@/lib/marketplace/grove.js";
 
 /**
@@ -59,7 +58,17 @@ export async function openColiseumChest(buyerId, chestId) {
     ).catch(() => null);
     if (!row) return { ok: false, error: "already_open" };
 
-    const tier = TIER[row.tier] || TIER[GROVE_CHEST_ORDER[0]];
+// ⚠️ THE COLISEUM'S OWN TIER LADDER, NOT THE GROVE'S. These four names used to come from
+// COLISEUM_TIERS in grove-forge.js, which went when the Grove's chests were removed. The Coliseum's
+// chests are a DIFFERENT system -- their own table (mkt_grove_coliseum_chest), their own roll, their own
+// opening screen -- and they are the whole of what an arena run pays, so removing them would leave the
+// Coliseum rewarding nothing. Luke asked for the Grove's chests and merits to go; this was not that.
+//
+// Borrowing the names was always the loose part: a shared constant implied a shared system and there was
+// none. Declared here, where the only thing that reads it lives.
+const COLISEUM_TIERS = ["mossbound", "barrowed", "warrenspun", "heartwrought"];
+
+    const tier = TIER[row.tier] || TIER[COLISEUM_TIERS[0]];
     const pool = partsOfMap(row.map_n);
     if (!pool.length) return { ok: true, tier: row.tier, parts: {}, gear: null };
 

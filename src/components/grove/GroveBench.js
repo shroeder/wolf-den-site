@@ -17,7 +17,7 @@ import {
 import Area from "@/components/grove/GroveArea.js";
 import GroveCraftAct from "@/components/grove/GroveCraftAct.js";
 import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes, reworkCost } from "@/lib/marketplace/grove-recipes.js";
-import { QUALITY_BANDS, qualityBand, toolBonusFor, GROVE_CHESTS, GROVE_CHEST_ORDER, craftBonusLabel, charmValue, CHARM_STAT_LABEL, bandTint } from "@/lib/marketplace/grove-forge.js";
+import { QUALITY_BANDS, qualityBand, toolBonusFor, craftBonusLabel, charmValue, CHARM_STAT_LABEL, bandTint } from "@/lib/marketplace/grove-forge.js";
 
 // ── THE WORKBENCH ───────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "Crafting is very ghetto, needs full pass of grove crafting dopamine thoughtfulness and
@@ -177,33 +177,11 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     const [qty, setQty] = useState({});
     // ⚠️ ITS OWN CARD, NOT THE CRAFT RESULT. An open and a craft pay different things and the open can
     // CHAIN -- "open another" has to leave the card standing while the thing underneath it changes.
-    const [opened, setOpened] = useState(null);
 
     // ── ⚠️ THE DROP WAS BEING BANKED IN SILENCE ─────────────────────────────────────────────────────
-    // The boss has been paying chests and merits into the database since they were built, and no screen
-    // in the game mentioned either one. The server even returns both from the kill with a comment saying
-    // the card should show them. Luke, playing it: "I'm not seeing any of the new stuff we added around
-    // crafting or any of the new loot. I don't see any of the dopamine."
-    //
-    // So a reward that exists only as a row is not a reward. The shelf sits at the TOP of the bench --
-    // above the ladder, above every recipe -- because an unopened chest is the single most urgent thing
-    // on this screen, and because what spills out of it is exactly what the rest of the screen spends.
-    const chests = useMemo(() => GROVE_CHEST_ORDER
-        .map((id) => ({ ...GROVE_CHESTS[id], have: Number(st.chests?.[id]) || 0 }))
-        .filter((c) => c.have > 0), [st.chests]);
-
-    const openChest = async (tier) => {
-        setBusy(`chest:${tier}`);
-        const d = await post({ action: "openChest", tier });
-        setBusy(null);
-        if (!d?.ok) {
-            setNote(d?.error === "none_held" ? "You don't have one of those."
-                : "That chest wouldn't open.");
-            return;
-        }
-        setOpened(d);
-        await refresh();
-    };
+    // ⚠️ THE UNOPENED-CHEST SHELF STOOD HERE, above the ladder and above every recipe, because an
+    // unopened chest was the most urgent thing on the screen. Chests are removed from the Grove, so the
+    // bench opens straight onto what you can make -- which is what it is for.
 
     // ── ⚠️ THE RESULT CARD IS PORTALLED, AND A z-index WAS NOT ENOUGH ───────────────────────────
     // Exactly the scar the zone sheet already carries. The card lives inside the panel, and an ancestor
@@ -288,7 +266,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     const topBandName = `${QUALITY_BANDS[2].name} or better`;
     const topOdds = goodShare(odds);
     const recent = lvl.recent || [];
-    const merits = Number(st.merits) || 0;
 
     // ── ⚠️ PRESSING CRAFT OPENS THE ACT; THE ACT DOES THE CRAFTING ──────────────────────────────────
     // Luke: "Let's make it fun." The button no longer spends anything — it starts three beats, and the
@@ -357,7 +334,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
         const short = d.stopped === "not_enough_parts" && d.count < d.asked
             ? ` — parts ran out after ${d.count}` : "";
         setNote(`Made ${what}${short}.${d.levelled ? " Crafting levelled up." : ""}`);
-        if (d.firstCraft) setNote(`Made ${what}. A Mossbound Cache went to your chests.`);
         await refresh();
         return { ...d, batched: times };
     };
@@ -423,32 +399,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                                 history behind it is a number you are asked to take on faith.
                   AWARENESS     every tool on the bench wears its own band, so the thing the level BUYS
                                 is visible on the thing it was spent on. */}
-            {/* The heading wears the DEEPEST chest on the shelf rather than a generic one, so the panel
-                itself says whether what is waiting is a Cache or a Reliquary. */}
-            {chests.length ? (
-                <Area id="chests" icon={`chest-${chests[chests.length - 1].id}`} title="Unopened"
-                    count={`${chests.reduce((n, c) => n + c.have, 0)}`}>
-                    <ul className="gv-shelf">
-                        {chests.map((c) => (
-                            <li key={c.id} className={`gv-chest is-${c.id}`}>
-                                <button type="button" disabled={busy === `chest:${c.id}`}
-                                    onClick={() => openChest(c.id)}>
-                                    <span className="gv-chest-art">
-                                        <img src={`/images/grove/chest-${c.id}.webp`} alt=""
-                                            width={40} height={40} />
-                                        {c.have > 1 ? <em>×{c.have}</em> : null}
-                                    </span>
-                                    <b>{c.name}</b>
-                                    <span className="gv-chest-go">
-                                        {busy === `chest:${c.id}` ? "Opening…" : "Open"}
-                                    </span>
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </Area>
-            ) : null}
-
             <Area id="bench" icon="ui-bench" title="Workbench"
                 count={readyCount > 0 ? `${readyCount} ready` : null}>
             {/* ── ⚠️ THE BENCH OPENS ON THINGS YOU CAN MAKE ──────────────────────────────────────
@@ -470,12 +420,8 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                 <span className="gv-level-bar">
                     <i style={{ width: `${Math.round((lvl.progress || 0) * 100)}%` }} />
                 </span>
-                {merits > 0 ? (
-                    <span className="gv-merits" title="Won from bosses — spent on boss armour, under Emblems">
-                        <GiLaurelCrown aria-hidden="true" focusable="false" />
-                        <b>{merits}</b>
-                    </span>
-                ) : null}
+                {/* ⚠️ THE MERIT BALANCE SAT HERE, beside the crafting level. Merits and the boss armour
+                    they bought are removed from the Grove. */}
                 {odds.length || recent.length ? (
                     <details className="gv-level-more">
                         <summary aria-label="Crafting odds and recent crafts">Details</summary>
@@ -832,61 +778,9 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
                 should be three openings, not one opening and two silent decrements. The key is what makes
                 React tear the contents down and replay every animation; without it the second open paints
                 new numbers into an already-finished card and nothing moves. */}
-            {opened && host ? createPortal((
-                <div className="gv-made gv-spill" role="dialog" aria-label={`Opened ${opened.name}`}
-                    onClick={() => setOpened(null)}>
-                    <div className="gv-made-card gv-spill-card" key={`${opened.tier}-${opened.left}`}
-                        onClick={(e) => e.stopPropagation()}>
-                        <i className="gv-made-kick">Opened</i>
-                        <b className="gv-made-name">{opened.name}</b>
-
-                        <div className="gv-spill-face">
-                            <img src={`/images/grove/chest-${opened.tier}.webp`} alt=""
-                                width={104} height={104} />
-                            <span className="gv-spill-burst" aria-hidden="true" />
-                        </div>
-
-                        <ul className="gv-spill-loot">
-                            {Object.entries(opened.parts || {}).map(([id, n], i) => (
-                                <li key={id} style={{ animationDelay: `${140 + i * 110}ms` }}>
-                                    <PartIcon id={id} size={30} />
-                                    <b>{n}</b>
-                                    <span>{partName(id)}</span>
-                                    {opened.newlySeen?.includes(id)
-                                        ? <em className="gv-tag is-new">New</em> : null}
-                                </li>
-                            ))}
-                        </ul>
-
-                        {opened.merits > 0 ? (
-                            <div className="gv-spill-merits"
-                                style={{ animationDelay: `${180 + Object.keys(opened.parts || {}).length * 110}ms` }}>
-                                <GiLaurelCrown aria-hidden="true" focusable="false" />
-                                <b>+{opened.merits}</b>
-                                <span>merits</span>
-                            </div>
-                        ) : null}
-
-                        {/* The bag can be full, and a reward that vanished into a full bag without saying
-                            so is the worst possible version of a reward. storeParts already knows. */}
-                        {Object.keys(opened.overflow || {}).length ? (
-                            <p className="gv-spill-over">
-                                No room for {Object.entries(opened.overflow).map(([k, n]) => `${n} ${partName(k)}`).join(" · ")}
-                                {" "}— left in the grove.
-                            </p>
-                        ) : null}
-
-                        {opened.left > 0 ? (
-                            <button type="button" className="gv-spill-again"
-                                disabled={busy === `chest:${opened.tier}`}
-                                onClick={() => openChest(opened.tier)}>
-                                Open another ({opened.left})
-                            </button>
-                        ) : null}
-                        <button type="button" onClick={() => setOpened(null)}>Good</button>
-                    </div>
-                </div>
-            ), host) : null}
+            {/* ⚠️ THE CHEST-OPENING CARD STOOD HERE: the spill of parts, the merit line and "Open
+                another". It was the payoff moment for a system that no longer exists. Removed whole
+                rather than left behind an unreachable branch. */}
 
             {/* ── ⚠️ THE ACT, PORTALLED LIKE EVERY OTHER FULL-SCREEN LAYER HERE ──────────────────────
                 Into the SAME host the result card uses. The Grove runs in native full screen, where

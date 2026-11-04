@@ -170,17 +170,16 @@ export function spanTailed([lo, hi], r) {
 const XP_PER_FOE_HP = 96;    // 770hp -> 8 xp,  1460hp -> 15 xp
 const XP_PER_BOSS_HP = 200;  // 59k   -> 295,   180k   -> 900
 
-import { bossChestChance, bossMerits, chestForZone } from "@/lib/marketplace/grove-forge.js";
 import { GROVE_ZONES, wandererHyperChance, safeCredit } from "@/lib/marketplace/grove-catalog.js";
 import { STATUE_CHANCE, STATUE_STAT_IDS, rarityWeights } from "@/lib/marketplace/grove-statues.js";
-import { GROVE_GEAR, GEAR_CHEST, SET_PIECE, SLOT_SPLIT, gearChanceFor } from "@/lib/marketplace/grove-loot.js";
+import { GROVE_GEAR, SET_PIECE, SLOT_SPLIT, gearChanceFor } from "@/lib/marketplace/grove-loot.js";
 
 export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = null) {
     // ⚠️ zoneN AND hyperTable DEFAULT TO OFF, and that is a safety property rather than tidiness. Both
     // sides of the wire have to pass the same arguments or the replay disagrees; defaulting to "no hyper
     // roll" means a caller that has not been updated is merely missing a feature instead of quietly
     // rolling a different stream and handing the player a drop the server then declines.
-    const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0, band: null, rare: null, hyper: null, gear: null, gearTier: null, setPiece: null, statue: null };
+    const out = { parts: {}, emblem: null, gold: 0, xp: 0, band: null, rare: null, hyper: null, gear: null, gearTier: null, setPiece: null, statue: null };
     if (!foe) return out;
     const r = killRng(seed, index);
 
@@ -277,8 +276,11 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
     if (Array.isArray(foe.gold)) {
         out.gold = Math.round(span(foe.gold, r()) * (1 + (Number(bonus.goldFind) || 0) / 100));
     }
-    const chestChance = (Number(foe.chestChance) || 0) * (1 + (Number(bonus.chestFind) || 0) / 100);
-    if (chestChance && r() < chestChance) out.chest = foe.chestTier || "wooden";
+    // ⚠️ THE CHEST ROLL IS GONE AND ITS r() CALL WENT WITH IT. Every draw shifts the stream for
+    // everything after it, so removing one re-rolls the whole tail of this function -- parts and the rare
+    // row are drawn ABOVE and are untouched, but gear below now lands on what the chest used to. That is
+    // acceptable exactly once, at the deploy; both sides replay the same function so they cannot disagree
+    // with each other. See the note on appending at the end.
 
     // ── 1.3 THE WOW ─────────────────────────────────────────────────────────────────────────────────
     // The hyper table -- enchant scroll, power scroll, ship upgrade, Mythic Morsel, enshrinement stone --
@@ -335,18 +337,11 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
             else if (slot < SLOT_SPLIT.sup + SLOT_SPLIT.rare) { out.gear = table.rare; out.gearTier = "rare"; }
             else { out.gear = table.normal; out.gearTier = "normal"; }
 
-            // ── THE TAIL ────────────────────────────────────────────────────────────────────────────
-            // Luke, on celestial and primordial: "no, it's rare, but possible." They cannot drop as items
-            // — every tier above mythic is elite-sourced — so the drop becomes a top-tier CHEST instead,
-            // granted through addChests at the call site like the rare spawn's. One place still decides
-            // how often elite gear enters the game, and the chest open is already a moment the game
-            // celebrates. Deep maps only: this is a frontier reward.
-            if (map >= GEAR_CHEST.fromMap) {
-                const t = r();
-                if (t < GEAR_CHEST.primordial) { out.chest = "primordial"; out.gear = null; out.gearTier = null; }
-                else if (t < GEAR_CHEST.primordial + GEAR_CHEST.celestial) { out.chest = "celestial"; out.gear = null; out.gearTier = null; }
-            }
-
+            // ⚠️ THE TAIL IS GONE. Celestial and primordial could not drop as items -- every tier
+            // above mythic is elite-sourced -- so the super-rare slot used to hand over a top-tier CHEST
+            // instead, which was the only way either tier entered the game. Luke's call on removing
+            // chests was to drop the top tiers rather than pay them another way, so the Grove's ladder
+            // now ends at mythic and the super-rare slot simply pays its own item.
             // ── A COLLECTION PIECE ──────────────────────────────────────────────────────────────────
             // Luke: "make it extremely hard to get in the Grove as well." Two a month Den-wide, one per
             // ~39 hours of farming — 2.5% of the flow the game already produces, which makes this the
@@ -388,7 +383,7 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
  * @param {object} bonus  emblem-derived { rarityFind, emblemFind }
  */
 export function rollBoss(boss, zoneN, seed, index, bonus = {}, hyperChance = 0, hyperTable = null) {
-    const out = { parts: {}, emblem: null, hyper: null, xp: 0, chest: null, merits: 0 };
+    const out = { parts: {}, emblem: null, hyper: null, xp: 0 };
     if (!boss) return out;
     const r = killRng(seed, index);
 
@@ -413,64 +408,12 @@ export function rollBoss(boss, zoneN, seed, index, bonus = {}, hyperChance = 0, 
 
     out.xp = Math.max(4, Math.round((boss.hp || 100) / XP_PER_BOSS_HP));
 
-    // ── ⚠️ THE CHEST AND THE MERITS, AND WHY THEY ARE HERE AND NOT IN THE CHEST CHAIN ────────────────
-    // Luke: "the boss table has a loot table its got good shot like random chests and stuff, the chests
-    // are a parallel chest that have rare crafting goods for the grove."
-    //
-    // Rolled from the SAME seeded stream as everything else above, so the server re-rolling a claimed
-    // boss arrives at the identical answer the client already showed -- which is the whole contract of
-    // this file. A chest decided anywhere else would be a second source of truth about one kill.
-    //
-    // It is a Grove chest, never one of chests.js's eight tiers. Granting through addChests would push
-    // Grove parts into the chain that pays Arena gear, where the first match wins and raising one tier
-    // steals from the ones beneath it. See [[chest-rolls-are-a-chain]].
-    //
-    // ⚠️ MERITS ARE FLAT AND NOT ROLLED. The chest is the variance; a standing currency that swung as
-    // well would make the thing it buys unpriceable, and merits exist to have exactly one sink.
-    const depth = Math.max(1, Number(zoneN) || 1);
-    if (r() < bossChestChance(depth)) out.chest = chestForZone(depth).id;
-    out.merits = bossMerits(depth);
+    // ⚠️ A BOSS PAID A CHEST AND A FLAT MERIT STIPEND HERE. Both removed with the systems they fed;
+    // the boss still pays parts, an emblem, the hyper table and xp, which was always the reason to fight it.
     return out;
 }
 
-/**
- * What a Grove chest pays when it is opened.
- *
- * ⚠️ EVERY ROW IS ROLLED INDEPENDENTLY, NOT AS A WEIGHTED CHAIN. A chest should feel like opening a chest --
- * several things at once -- and an independent roll per row cannot be stolen from by raising a sibling,
- * which is the exact failure the main chest line has and the reason this one is separate at all.
- *
- * Seeded by the chest's own opening, not by a kill: these are opened from the bag at a time of the player's
- * choosing, long after whatever dropped them.
- */
-export function rollGroveChest(chest, seed, index, bonus = {}, hyperTable = null) {
-    const out = { parts: {}, merits: 0, hyper: null };
-    if (!chest) return out;
-    const r = killRng(seed, index);
-    const rarity = Number(bonus.rarityFind) || 0;
-    for (const row of chest.parts || []) {
-        if (row.chance != null && r() >= row.chance) continue;
-        let n = span(row.n, r());
-        if (rarity > 0 && r() < Math.min(0.75, rarity / 100)) n += 1;
-        out.parts[row.part] = (out.parts[row.part] || 0) + n;
-    }
-    out.merits = span(chest.merits, r());
-
-    // ── ⚠️ AND ONE THING THE ZONE CANNOT GIVE YOU ───────────────────────────────────────────────────
-    // Luke, reading his own chest contents against his own bag: a Barrowed Casket paid 4-8 Bristle Hide to
-    // a player holding 71 of it. Opening it could not feel like anything, and five of them sat unopened in
-    // the workbench -- which is the system reporting its own verdict.
-    //
-    // A chest is not a bigger pile. It is the one place you reliably meet something you cannot farm: the
-    // merits above (which buy the boss armour and have exactly one other faucet) and, at a real rate, a
-    // roll on the hyper table. hyperFloor is the chest's own depth, so a Mossbound Cache cannot pay an
-    // enshrinement stone -- see pickHyper, whose floor fails upward.
-    if (hyperTable && chest.hyperChance && r() < chest.hyperChance * (1 + rarity / 100)) {
-        out.hyper = pickHyper(chest.hyperFloor || 1, r(), hyperTable);
-    }
-
-    return out;
-}
+// ⚠️ rollGroveChest LIVED HERE — what a Grove chest paid when opened. Removed with the chests.
 
 /**
  * Which hyper-rare, given the depth it dropped at.

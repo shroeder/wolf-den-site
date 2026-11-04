@@ -111,7 +111,8 @@ const out = `// ── THE GROVE'S GEAR TABLES ───────────
 //   · isOwnerOnlyItem · isSeasonItem · isHalloweenItem · isGourdfatherItem
 //
 // So the Grove's item ladder runs common → mythic and stops. "Rare but possible" above that is handled by the
-// super-rare slot occasionally paying a top-tier CHEST instead (see GEAR_CHEST below), which keeps one place
+// super-rare slot simply paying its own item -- the chest that used to sit above it, and the celestial and
+// primordial tiers it was the only route to, were removed with the Grove's chests.
 // deciding how often elite gear enters the game.
 //
 // Collection set pieces are NOT in these tables either — they have their own roll, SET_PIECE below.
@@ -147,7 +148,6 @@ export const SLOT_SPLIT = { rare: 0.20, sup: 0.04 };   // the remainder is the n
 // ⚠️ NOT SET-AND-FORGET. These scale with how much the Den farms — twenty people farming five hours a week
 // would put out 28 celestials a month against the ladder's five. Re-measure by daily total once the Grove has
 // real traffic; scripts/grove-tail.mjs re-solves them for any target.
-export const GEAR_CHEST = { celestial: 0.0034, primordial: 0.00067, fromMap: 6 };
 
 // ── COLLECTION PIECES ────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "if you're using [set pieces], make it extremely hard to get in the Grove as well."

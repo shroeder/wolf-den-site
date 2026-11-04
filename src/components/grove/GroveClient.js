@@ -44,13 +44,12 @@ const TownClient = dynamic(() => import("@/components/TownClient"), { ssr: false
 import SkillTree from "@/components/arena/SkillTree";
 import SkillPanel from "@/components/arena/SkillPanel";
 import { qualityBand } from "@/lib/marketplace/grove-forge.js";
-import GroveArmoury from "@/components/grove/GroveArmoury.js";
 import GroveGear from "@/components/grove/GroveGear.js";
 import GroveQuests from "@/components/grove/GroveQuests";
 import { useColiseum } from "@/components/grove/useColiseum";
 import GroveMarshal from "@/components/grove/GroveMarshal";
 import GroveGiver from "@/components/grove/GroveGiver";
-import { GROVE_CHESTS, CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
+import { CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
 import {
     GROVE_RECIPES, recipeById, canCraft, newlyReady, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
 } from "@/lib/marketplace/grove-recipes.js";
@@ -351,9 +350,6 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // a dive the player had forgotten they armed it for.
     const [charmPick, setCharmPick] = useState(null);
     const [menuOpen, setMenuOpen] = useState(false);
-    // Which half of the emblems panel is showing: the shelf of monster cards, or the merit till.
-    // See the note where the tabs are rendered for why these stopped sharing one scroll.
-    const [embTab, setEmbTab] = useState("cards");
     // Which panel is open OVER the zone, or null for none. Separate from `view`, which stays "zone" the
     // whole time you are in one — see the hoist note above the panels.
     const [zonePanel, setZonePanel] = useState(null);
@@ -731,8 +727,9 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // this game teaches everything else. See [[teach-by-showing-not-telling]].
     const benchReady = useMemo(() => {
         if (!st) return 0;
-        const chests = Object.values(st.chests || {}).reduce((a, n) => a + (Number(n) || 0), 0);
-        return readyCount(st) + chests;
+        // ⚠️ THIS USED TO ADD UNOPENED CHESTS to the craftable count, because from the player's side
+        // "is there anything to do at the bench" was one question. Chests are gone; it is just the count.
+        return readyCount(st);
     }, [st]);
 
     const stats = useMemo(() => {
@@ -1458,22 +1455,10 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                             Tabs rather than a sixth dock button: the dock is five controls wide already
                             and a 375px phone has no room for another, and these two genuinely are two
                             views of one subject rather than two destinations. */}
-                        <div className="gv-etabs" role="tablist" aria-label="Emblems and armour">
-                            <button type="button" role="tab" aria-selected={embTab === "cards"}
-                                className={embTab === "cards" ? "is-on" : ""}
-                                onClick={() => setEmbTab("cards")}>
-                                Monster Cards<i>{(st.emblems || []).filter((e) => e.count > 0).length}/{CARD_TOTAL}</i>
-                            </button>
-                            <button type="button" role="tab" aria-selected={embTab === "armour"}
-                                className={embTab === "armour" ? "is-on" : ""}
-                                onClick={() => setEmbTab("armour")}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src="/images/grove/ui-merit.webp" alt="" width={16} height={16}
-                                    style={{ objectFit: "contain", verticalAlign: "-0.2em" }} />
-                                Boss Armour<i>{Number(st.merits) || 0}</i>
-                            </button>
-                        </div>
-                        {embTab === "cards" ? (
+                        {/* ⚠️ THE TAB ROW IS GONE WITH THE SECOND TAB. It existed to split the shelf of
+                            monster cards from the merit till; the till went with the merits, and one tab is
+                            not a tablist. [[stale-css-rule-on-reshape]] applies to .gv-etabs if nothing else
+                            claims it. */}
                         <Area id="emblems" icon="ui-cards" title="Monster Cards"
                             count={`${(st.emblems || []).filter((e) => e.count > 0).length}/${CARD_TOTAL} found`}>
                         {/* ⚠️ NO CAPTION HERE. It read "Three may be worn. Three more are sealed." —
@@ -1518,12 +1503,6 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                             anywhere, they just stopped being a single column of them. */}
                         <GroveCards emblems={st.emblems || []} />
                         </Area>
-                        ) : null}
-                        {/* The till. Behind its own tab now — see the note at the top of this panel. */}
-                        {embTab === "armour" ? (
-                            <GroveArmoury st={st} partName={partName} PartIcon={PartIcon}
-                                post={post} refresh={refresh} setNote={setNote} />
-                        ) : null}
                     </div>
                 ) : null}
 
@@ -1746,30 +1725,9 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                                 forty-five at the deepest zone, so when it lands it must not be a word in a
                                 list of roots. */}
                             {bossWon.hyper ? <strong className="gv-hyper">{bossWon.hyper.name}</strong> : null}
-                            {/* ── ⚠️ THE CHEST AND THE MERITS, ANNOUNCED WHERE THEY ARE WON ──────────
-                                Both have been returned by the kill since they were built -- the server's
-                                own comment says "so the kill card can show them rather than the player
-                                discovering a chest in their bag later and not knowing what dropped it" --
-                                and the card showed neither. Luke, playing it: "I'm not seeing any of the
-                                new loot. I don't see any of the dopamine."
-
-                                The chest gets the louder line of the two: it is roughly one kill in two
-                                and it is the only route to the deep crafting parts, so it is the reason
-                                to come back. Merits are a running total, so they read as a score. */}
-                            {bossWon.chest ? (
-                                <strong className="gv-won-chest">
-                                    <img src={`/images/grove/chest-${bossWon.chest}.webp`} alt=""
-                                        width={34} height={34} />
-                                    {GROVE_CHESTS[bossWon.chest]?.name || "A chest"}
-                                    <em>open it at the workbench</em>
-                                </strong>
-                            ) : null}
-                            {bossWon.merits > 0 ? (
-                                <span className="gv-won-merits">
-                                    <GiLaurelCrown aria-hidden="true" focusable="false" />
-                                    +{bossWon.merits} merits
-                                </span>
-                            ) : null}
+                            {/* ⚠️ THE CHEST AND THE MERIT TOTAL WERE ANNOUNCED HERE. Both removed with
+                                the systems behind them; the card still shows the parts, the emblem, the
+                                hyper-rare and the recipe, which is where the dopamine actually was. */}
                             {/* ── ⚠️ THE RECIPE IT TAUGHT, AND IT GETS THE LOUDEST LINE ON THE CARD ──
                                 This happens once per map, ever, and it is the only way a recipe reaches
                                 the bench that is not simply being alive. A row quietly appearing in a

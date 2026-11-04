@@ -15,7 +15,7 @@
 //   node --import ./scripts/lib/register-loader.mjs scripts/check-grove-roll.mjs
 import { GROVE_ENEMIES, GROVE_RARE, GROVE_ZONES } from "@/lib/marketplace/grove-catalog.js";
 import { rollKill, settleKills, rollRareSpawn, killRng } from "@/lib/marketplace/grove-roll.js";
-import { GROVE_GEAR, GEAR_CHEST, SET_PIECE } from "@/lib/marketplace/grove-loot.js";
+import { GROVE_GEAR, SET_PIECE } from "@/lib/marketplace/grove-loot.js";
 import { itemById, isForgedItem, isRealMoneyItem, isOwnerOnlyItem, isSeasonItem, isHalloweenItem } from "@/lib/marketplace/items.js";
 
 const fail = [];
@@ -178,7 +178,7 @@ ok(onramp > deep * 2,
 console.log("── THE GEAR ─────────────────────────────────────────────────────────────────");
 console.log(`  tables          ${Object.keys(GROVE_GEAR).length} rows, ${gearItems.size} distinct items, 0 exclusives`);
 console.log(`  on-ramp rate    ${(onramp * 100).toFixed(2)}%  vs frontier ${(deep * 100).toFixed(2)}%`);
-console.log(`  depth floors    chest from map ${GEAR_CHEST.fromMap}, set piece from map ${SET_PIECE.fromMap} — nothing early`);
+console.log(`  depth floors    set piece from map ${SET_PIECE.fromMap} — nothing early`);
 
 if (fail.length) {
     console.log(`\n── ${fail.length} PROBLEM(S) ──────────────────────────────────────────────────`);

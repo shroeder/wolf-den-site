@@ -265,7 +265,6 @@ export function toolBonusFor(tier, quality) {
 // ⚠️ ROUGH IS EXACTLY WHAT THE RECIPE ALREADY SAID. Every number below is an ADDITION to the authored value,
 // so no craft in the game got worse the day this shipped and no recipe's printed payoff became a lie.
 const EXTRA_SLOTS = [0, 0, 1, 2, 3];      // by band step: rough, sound, fine, pristine, masterwork
-const MERITS_PER_STEP = 12;
 const FOOD_EXTRA_SHARE = 0.18;            // of the authored batch, per band step
 
 /**
@@ -278,15 +277,16 @@ const FOOD_EXTRA_SHARE = 0.18;            // of the authored batch, per band ste
  */
 export function craftBonusFor(recipe, quality) {
     const step = qualityStep(quality);
-    const out = { step, band: qualityBand(quality).id, extra: 0, slots: 0, merits: 0 };
+    const out = { step, band: qualityBand(quality).id, extra: 0, slots: 0 };
     if (!recipe || !step) return out;
     if (recipe.kind === "food") {
         out.extra = Math.round((Number(recipe.makes) || 1) * FOOD_EXTRA_SHARE * step);
     } else if (recipe.kind === "pack" || recipe.kind === "bank") {
         out.slots = EXTRA_SLOTS[Math.min(step, EXTRA_SLOTS.length - 1)];
-    } else if (recipe.kind === "plot" || recipe.kind === "deco") {
-        out.merits = step * MERITS_PER_STEP;
     }
+    // ⚠️ A GOOD ROLL ON A PLOT OR A DECORATION USED TO PAY MERITS, because those two kinds have no
+    // "more" to give -- a plot is capped at two and a decoration is one object. Merits are gone and
+    // nothing replaced it, so quality currently does nothing on those two kinds.
     return out;
 }
 
@@ -325,226 +325,18 @@ export function craftBonusLabel(recipe, quality) {
     }
     if (b.extra) return `+${b.extra} extra`;
     if (b.slots) return `+${b.slots} bonus ${recipe.kind === "bank" ? "vault" : "pack"} slot${b.slots > 1 ? "s" : ""}`;
-    if (b.merits) return `+${b.merits} merits`;
     return null;
 }
 
-// ── THE GROVE'S CHESTS ──────────────────────────────────────────────────────────────────────────────────────
-// Luke: "the chests are a parallel chest that have rare crafting goods for the grove."
+
+// ── CHESTS, MERITS AND THE BOSS SETS LIVED HERE ─────────────────────────────────
+// Luke: "Lets remove merits chests and boss sets now."
 //
-// ⚠️ FOUR TIERS AGAINST TWELVE ZONES, NOT TWELVE. A tier per boss would mean twelve tables nobody can hold
-// in their head and eleven of them dead the moment the twelfth is reachable. Four bands, each covering three
-// zones, keeps every tier meaningful for a stretch of the map and keeps the whole economy readable on one
-// screen.
+// Removed 2026-11-03, with the knock-ons he chose: the five boss sets go WITH the merits rather than
+// being repriced (merits had exactly one sink and it goes with them), and the celestial/primordial tail
+// is DROPPED rather than paid out another way -- the Grove's item ladder now ends at mythic, full stop.
 //
-// `parts` rows are rolled INDEPENDENTLY, not as a weighted chain. A chest should feel like opening a chest --
-// several things at once -- and an independent roll per row cannot be "stolen from" by raising a sibling,
-// which is the exact failure mode the main chest line has.
-// ── ⚠️ hyperChance IS THE REASON TO OPEN ONE ────────────────────────────────────────────────────────────────
-// The parts below are bulk, and bulk is what the player already has too much of; measured live, a chest's
-// whole payload was 4-8 of a part somebody was holding 71 of. What makes a chest worth the tap is that it is
-// the one reliable place to meet the hyper table -- a scroll, a ship upgrade, pet food, a stone -- which
-// otherwise only a boss can pay, and nobody had ever fought a boss.
-//
-// Climbing by tier, and hyperFloor keeps a shallow chest paying shallow rewards: pickHyper's floor fails
-// upward, so a Mossbound Cache from zone two can never hand over an enshrinement stone.
-//
-// ⚠️ THIS IS NOT THE EIGHT-TIER CHEST CHAIN IN chests.js, where the first match wins and raising one tier
-// silently steals from the ones beneath. A Grove chest rolls every row independently, so adding this took
-// nothing away from anything. See [[chest-rolls-are-a-chain]].
-export const GROVE_CHESTS = {
-    mossbound: {
-        id: "mossbound", hyperChance: 0.10, hyperFloor: 1, name: "Mossbound Cache", zones: [1, 3], merits: [2, 4],
-        parts: [
-            { part: "damp_moss", n: [4, 8], chance: 1 },
-            { part: "gnawed_root", n: [4, 8], chance: 1 },
-            { part: "grub_fat", n: [2, 5], chance: 0.7 },
-        ],
-    },
-    barrowed: {
-        id: "barrowed", hyperChance: 0.16, hyperFloor: 4, name: "Barrowed Casket", zones: [4, 6], merits: [4, 8],
-        parts: [
-            { part: "bristle_hide", n: [4, 8], chance: 1 },
-            { part: "thorn_barb", n: [4, 8], chance: 1 },
-            { part: "gourd_rind", n: [3, 6], chance: 0.7 },
-            { part: "split_antler", n: [2, 5], chance: 0.5 },
-        ],
-    },
-    warrenspun: {
-        id: "warrenspun", hyperChance: 0.24, hyperFloor: 7, name: "Warrenspun Coffer", zones: [7, 9], merits: [8, 14],
-        parts: [
-            { part: "barrow_tooth", n: [4, 9], chance: 1 },
-            { part: "warren_silk", n: [4, 9], chance: 1 },
-            { part: "bound_straw", n: [3, 7], chance: 0.7 },
-            { part: "mothlight_dust", n: [2, 5], chance: 0.5 },
-        ],
-    },
-    heartwrought: {
-        id: "heartwrought", hyperChance: 0.34, hyperFloor: 10, name: "Heartwrought Reliquary", zones: [10, 12], merits: [14, 24],
-        parts: [
-            { part: "ash_ember", n: [5, 10], chance: 1 },
-            { part: "rotwood_knot", n: [4, 9], chance: 1 },
-            { part: "goblin_rivet", n: [4, 8], chance: 0.8 },
-            { part: "elder_heartwood", n: [2, 5], chance: 0.6 },
-            { part: "crystal_shard", n: [1, 2], chance: 0.25 },
-        ],
-    },
-};
-
-export const GROVE_CHEST_ORDER = ["mossbound", "barrowed", "warrenspun", "heartwrought"];
-
-/**
- * Which chest a zone's boss carries.
- *
- * ⚠️ IT FAILS UPWARD. A zone past the last band gets the DEEPEST chest, never undefined and never the
- * shallowest. This repo has paid for a downward-falling rarity lookup twice -- celestial gear forged at a
- * 625th of its price, and a Master dish feeding a pet ten xp -- and both were a table that stopped one rung
- * short of the content. See [[rarity-tables-stop-at-eternal]] and [[ladder-lookups-must-fail-upward]].
- */
-export function chestForZone(n) {
-    const z = Math.max(1, Number(n) || 1);
-    for (const id of GROVE_CHEST_ORDER) {
-        const c = GROVE_CHESTS[id];
-        if (z >= c.zones[0] && z <= c.zones[1]) return c;
-    }
-    return GROVE_CHESTS[GROVE_CHEST_ORDER[GROVE_CHEST_ORDER.length - 1]];
-}
-
-// How often a boss drops one at all. Climbs with depth so the deep bosses are worth the walk, but never to
-// certainty -- a guaranteed chest is a wage, not a reward.
-export const BOSS_CHEST_CHANCE = { base: 0.45, perZone: 0.025, max: 0.8 };
-export const bossChestChance = (n) =>
-    Math.min(BOSS_CHEST_CHANCE.max, BOSS_CHEST_CHANCE.base + (Math.max(1, n) - 1) * BOSS_CHEST_CHANCE.perZone);
-
-// ── MERITS ──────────────────────────────────────────────────────────────────────────────────────────────────
-// The Grove's own standing, paid by bosses and spent on the boss sets. ⚠️ ONE FAUCET AND ONE SINK, WHICH IS
-// THE WHOLE POINT. A currency with several faucets and no sink is the thing every economy note in this repo
-// is about; merits come from bosses only, and the only thing they buy is the armour those bosses imply.
-export const BOSS_MERITS = { base: 6, perZone: 2.5 };
-export const bossMerits = (n) => Math.max(1, Math.round(BOSS_MERITS.base + (Math.max(1, n) - 1) * BOSS_MERITS.perZone));
-
-// ── THE BOSS SETS ───────────────────────────────────────────────────────────────────────────────────────────
-// Luke: "you can make boss armor that is a set in game. Depending on the boss difficulty determines the
-// rarity of the set."
-//
-// ⚠️ RARITY IS READ FROM THE ZONE, NOT AUTHORED PER SET. Authoring it twice is how a set ends up claiming to
-// be legendary in one table and epic in another, and the depth IS the difficulty -- that is what Luke's rule
-// says. One lookup, failing upward like every other ladder here.
-export const SET_RARITY = [
-    { upTo: 3, id: "common", name: "Common" },
-    { upTo: 6, id: "uncommon", name: "Uncommon" },
-    { upTo: 9, id: "rare", name: "Rare" },
-    { upTo: 11, id: "epic", name: "Epic" },
-    { upTo: Infinity, id: "legendary", name: "Legendary" },
-];
-export const setRarityForZone = (n) => SET_RARITY.find((r) => (Number(n) || 1) <= r.upTo) || SET_RARITY[SET_RARITY.length - 1];
-
-/**
- * The five sets, one per rarity band.
- *
- * ⚠️ THIS IS THE ONLY SINK MERITS HAVE. They have had one faucet since the day they were built -- every boss
- * pays them -- and nothing at all to spend them on, which is the shape every economy note in this repo warns
- * about. prove-grove-forge.mjs has been printing "THE SETS ARE THE ONLY SINK AND THEY MUST BE PRICED AGAINST
- * THIS" at the bottom of its run since before they existed. So the prices below are set against LIFETIME
- * merit income on a repeatable boss, not against one clear.
- *
- * ⚠️ THREE DISTINCT SLOTS, NOT THREE COPIES OF ONE. A set whose pieces share a slot can never be completed,
- * so its set bonus is unreachable and nothing says so on screen. See [[worn-sets-need-distinct-slots]] --
- * that gate is gone and this is the hand-check it asked for.
- *
- * The stats are STAT POINTS in the same vocabulary the emblems use, because grove-kit folds both into the
- * Arena's own pool. A point of Might here is worth exactly what a point of Might on a sword is worth, through
- * the same curve, which is the whole reason that file calls combatStats instead of adding numbers up.
- */
-export const ARMOUR_SLOTS = [
-    { slot: "head", noun: "Crown" },
-    { slot: "body", noun: "Mantle" },
-    { slot: "feet", noun: "Treads" },
-];
-
-// What each slot is FOR, before rarity scales it. Three different answers so a half-finished set still
-// pulls in a direction, rather than three pieces of the same bonus in different sizes.
-// ⚠️ SIZED AGAINST THE OTHER FOUR STAT SOURCES, NOT AGAINST NOTHING. The first pass of these numbers gave
-// a FULL LEGENDARY SET 17 Might -- against about 202 for a best-in-slot wardrobe and about 356 for a full
-// badge set. The deepest grind in the Grove would have been worth less than one badge, which is the kind of
-// reward that teaches a player the content is not worth doing. See [[combat-stat-sources-four]].
-const SLOT_PROFILE = {
-    head: { crit_rate: 1.05, rarity_find: 2.4 },
-    body: { armour: 6, vitality: 7.2 },
-    // ⚠️ feet NO LONGER ROLL move_speed. It was the only stat on the slot that did not touch a fight, and
-    // a boot whose good roll is "you walk between kills faster" is a boot nobody is pleased to find.
-    feet: { attack_speed: 1.2, tenacity: 2.4 },
-};
-
-// ⚠️ ONE CURVE, NOT A HAND-WRITTEN NUMBER PER PIECE. Fifteen pieces authored by hand is fifteen chances to
-// make the epic Treads quietly better than the legendary ones. Rarity scales the profile; nothing else does.
-const RARITY_SCALE = { common: 1, uncommon: 1.9, rare: 3.2, epic: 5, legendary: 7.2 };
-
-// ⚠️ PRICED AGAINST THE REPEAT. Clearing every boss once pays 240 merits and the cooldown is 30 minutes PER
-// ZONE, so a determined player can earn several hundred an hour -- the first pass of these prices put the
-// ENTIRE wardrobe at 1.2x a single full clear, which is about thirty-five minutes for everything the system
-// has. These put the Heartwrought set at roughly ten days of steady play and the whole wardrobe at 8x a
-// full clear. See [[economy-nerf-measure-daily-total]].
-export const GROVE_SETS = {
-    common: { id: "common", name: "Rootbound", zones: [1, 3], merits: 60 },
-    uncommon: { id: "uncommon", name: "Barrowplate", zones: [4, 6], merits: 141 },
-    rare: { id: "rare", name: "Warrenweave", zones: [7, 9], merits: 300 },
-    epic: { id: "epic", name: "Rotwood", zones: [10, 11], merits: 519 },
-    legendary: { id: "legendary", name: "Heartwrought", zones: [12, 12], merits: 900 },
-};
-export const GROVE_SET_ORDER = ["common", "uncommon", "rare", "epic", "legendary"];
-
-/** Every forgeable piece, built from the three tables above rather than listed. */
-export const ARMOUR_PIECES = GROVE_SET_ORDER.flatMap((rid) => {
-    const set = GROVE_SETS[rid];
-    const scale = RARITY_SCALE[rid];
-    return ARMOUR_SLOTS.map((s) => ({
-        id: `${rid}_${s.slot}`,
-        setId: rid,
-        slot: s.slot,
-        // ⚠️ DERIVED, LIKE EVERY OTHER PATH IN THIS FEATURE. gen-grove-art.mjs names the file by family
-        // and id — armour-common_head.webp — so the id IS the path, and fifteen literals would be fifteen
-        // chances to disagree with the file on disk. Same rule and reason as groveArt and toolArt.
-        // Drawn 2026-10-23: five sets of three, one material per set, so the ladder reads at a glance.
-        art: `/images/grove/armour-${rid}_${s.slot}.webp`,
-        name: `${set.name} ${s.noun}`,
-        rarity: rid,
-        rarityName: SET_RARITY.find((r) => r.id === rid)?.name || rid,
-        // Rounded to two places: these are added to a pool that is itself rounded at the swing, and a
-        // fourteen-decimal stat point in a tooltip reads as a bug.
-        stats: Object.fromEntries(
-            Object.entries(SLOT_PROFILE[s.slot]).map(([k, v]) => [k, Math.round(v * scale * 100) / 100]),
-        ),
-        // The toll. Merits are the gate; the parts are the grind, and they come from the chest the boss of
-        // that band actually drops, so the set is paid for with the band it belongs to.
-        merits: Math.round(set.merits / 3),
-        parts: chestForZone(set.zones[1]).parts.slice(0, 2).map((r) => ({
-            part: r.part,
-            n: Math.round(r.n[1] * (1 + GROVE_SET_ORDER.indexOf(rid) * 0.45)),
-        })),
-    }));
-});
-
-export const pieceById = (id) => ARMOUR_PIECES.find((p) => p.id === id) || null;
-
-/**
- * What wearing the whole set is worth on top of its pieces.
- *
- * ⚠️ A SET BONUS THAT IS JUST MORE OF THE SAME STATS IS NOT A SET BONUS. It has to be a reason to finish the
- * set rather than to wear the best three pieces you happen to own, so it pays stats NONE of the three slots
- * pay on their own -- finishing a set is the only way to get these at all.
- */
-export const setBonusFor = (rarityId) => {
-    const scale = RARITY_SCALE[rarityId] || 1;
-    return {
-        might: Math.round(9.6 * scale * 100) / 100,
-        crit_damage: Math.round(3.6 * scale * 100) / 100,
-        life_steal: Math.round(1.4 * scale * 100) / 100,
-    };
-};
-
-/** Which set a zone's boss wears, so the kill card and the armoury agree on one answer. */
-export const setForZone = (n) => GROVE_SETS[setRarityForZone(n).id] || GROVE_SETS.common;
-
-/** The zone a boss stands at, so a set can price itself off the thing that drops its parts. */
-export const zoneOfBoss = (bossId) => GROVE_ZONES.find((z) => z.boss === bossId)?.n || 1;
+// ⚠️ THE TABLES ARE NOT DROPPED. mkt_grove_chest, mkt_grove_armour and mkt_grove_player.merits still
+// exist and still hold what four players had (3,704 merits, 16 unopened chests, 10 forged pieces). A
+// migration is spent the moment it runs, and deleting the rows buys nothing: nothing reads them now.
+// See [[verify-build-and-migrations]].

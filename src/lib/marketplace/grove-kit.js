@@ -7,7 +7,6 @@ import { groveSkills } from "@/lib/marketplace/grove-skills.js";
 import { upgradeEffects } from "@/lib/marketplace/arena-upgrades.js";
 import { GROVE_EMBLEMS, emblemStars } from "@/lib/marketplace/grove-catalog.js";
 import { statueBonus } from "@/lib/marketplace/grove-statues.js";
-import { pieceById, setBonusFor, ARMOUR_SLOTS } from "@/lib/marketplace/grove-forge.js";
 import { procFrom, COUNTER_PER_POINT } from "@/lib/marketplace/arena-kit.js";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -236,31 +235,11 @@ export async function groveFighter(buyerId) {
                 (t) => { emblemTempo += t / 100; }, (mv) => { moveSpeed += mv; });
         }
 
-        // ── ⚠️ THE BOSS SETS JOIN THE SAME POOL, THROUGH THE SAME MAPPING ───────────────────────────
-        // Luke: "you can make boss armor that is a set in game."
-        //
-        // Deliberately the SECOND loop over the same `add` and the same stat names rather than a parallel
-        // path: armour and emblems are two ways to wear a thing, and the moment they are two ways to
-        // CALCULATE a thing they start disagreeing about what a point of Might is. The names are mapped
-        // once, in the block above, and this reuses that mapping verbatim.
-        //
-        // ⚠️ THE SET BONUS IS WHY THIS READS THE WHOLE WARDROBE AND NOT JUST THE SLOTS. Three pieces of
-        // one set pays stats that NO individual piece pays -- so the bonus cannot be computed per row, it
-        // needs the count of worn pieces per set first.
-        const armRows = await db.query(
-            `SELECT piece_id FROM mkt_grove_armour WHERE buyer_id = $1 AND worn`, [buyerId]
-        ).catch(() => []);
-        const wornBySet = {};
-        for (const row of armRows || []) {
-            const piece = pieceById(row.piece_id);
-            if (!piece) continue;
-            wornBySet[piece.setId] = (wornBySet[piece.setId] || 0) + 1;
-            addGroveStat(stats, piece.stats, (v) => { emblemTempo += v / 100; }, (v) => { moveSpeed += v; });
-        }
-        for (const [setId, worn] of Object.entries(wornBySet)) {
-            if (worn < ARMOUR_SLOTS.length) continue;
-            addGroveStat(stats, setBonusFor(setId), (v) => { emblemTempo += v / 100; }, (v) => { moveSpeed += v; });
-        }
+        // ⚠️ THE BOSS-SET BONUS WAS COMPUTED HERE, reading the whole wardrobe because a set bonus
+        // needs the count of worn pieces per set rather than a per-row figure. The sets were removed with
+        // the merits that bought them, so the fighter no longer carries anything from mkt_grove_armour --
+        // and a player who had forged pieces loses those stats. Four players held merits and ten pieces
+        // existed in total; Luke's call was to remove the sets rather than reprice them.
 
         const prog = await db.queryOne(
             `SELECT arena_class, skill_tree, upgrades FROM mkt_arena WHERE buyer_id = $1`, [buyerId]

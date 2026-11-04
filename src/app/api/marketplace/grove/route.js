@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
-    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveCraftMany, groveRework, groveBelt, groveBoss, groveOpenChest,
-    groveForgeArmour, groveWearArmour } from "@/lib/marketplace/grove.js";
+    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveCraftMany, groveRework, groveBelt,
+    groveBoss } from "@/lib/marketplace/grove.js";
 import { turnInStatue } from "@/lib/marketplace/grove-statue-store.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -83,9 +83,6 @@ export async function POST(request) {
                 }));
                 case "rework": return noStore(await groveRework(buyer.id, String(b.slot || "")));
                 // The Grove's own chest line, never chests.js. See the note on the boss grant.
-                case "openChest": return noStore(await groveOpenChest(buyer.id, String(b.tier || "")));
-                case "forgeArmour": return noStore(await groveForgeArmour(buyer.id, String(b.piece || "")));
-                case "wearArmour": return noStore(await groveWearArmour(buyer.id, String(b.piece || "")));
                 // ⚠️ ONE STATUE PER CALL, matching the gesture. Luke: "you can turn them in by clicking the
                 // associated statue. It fills a bar." A bulk endpoint would spend the first-crystal and
                 // first-prismatic moments -- the actual reward of the whole system -- inside a loop nobody

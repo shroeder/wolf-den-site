@@ -21,7 +21,6 @@
 
 import { GROVE_ZONES, GROVE_BOSSES, scaledFoe, scaledRare } from "@/lib/marketplace/grove-catalog.js";
 import { bossHpAt, bossDmgAt } from "@/lib/marketplace/grove-maps.js";
-import { GROVE_CHEST_ORDER } from "@/lib/marketplace/grove-forge.js";
 import { COLISEUM_ZONE } from "@/lib/marketplace/grove-npcs.js";
 import { arenaFor, arenaArt, ARENA_W } from "@/lib/marketplace/grove-arena.js";
 
@@ -127,6 +126,16 @@ export function runPlan(mapN) {
 // clear is a run nobody attempts twice.
 export function chestsFor({ map, wavesCleared, totalWaves, cleared }) {
     const frac = totalWaves > 0 ? wavesCleared / totalWaves : 0;
+// ⚠️ THE COLISEUM'S OWN TIER LADDER, NOT THE GROVE'S. These four names used to come from
+// COLISEUM_TIERS in grove-forge.js, which went when the Grove's chests were removed. The Coliseum's
+// chests are a DIFFERENT system -- their own table (mkt_grove_coliseum_chest), their own roll, their own
+// opening screen -- and they are the whole of what an arena run pays, so removing them would leave the
+// Coliseum rewarding nothing. Luke asked for the Grove's chests and merits to go; this was not that.
+//
+// Borrowing the names was always the loose part: a shared constant implied a shared system and there was
+// none. Declared here, where the only thing that reads it lives.
+const COLISEUM_TIERS = ["mossbound", "barrowed", "warrenspun", "heartwrought"];
+
     // Deeper maps hand out better boxes for the same fraction — the bodies were harder for the same effort.
     // ⚠️ THE LADDER NEEDS HEADROOM OR LATE MAPS STOP REWARDING EFFORT. Dividing by 2 put map 7 at the top
     // tier before any performance was counted, so a quarter-clear and a full clear both paid heartwrought
@@ -135,14 +144,14 @@ export function chestsFor({ map, wavesCleared, totalWaves, cleared }) {
     // 4 through 7 shared a base and paid identically, which erases the reason to run a deeper Coliseum.
     // Letting the top map reach base 2 differentiates the maps and compresses only the last rung, where
     // there is simply no fifth chest to give.
-    const base = Math.min(GROVE_CHEST_ORDER.length - 2, Math.floor((Number(map) - 1) / 3));
+    const base = Math.min(COLISEUM_TIERS.length - 2, Math.floor((Number(map) - 1) / 3));
 
     const out = [];
-    if (frac >= 0.25) out.push(GROVE_CHEST_ORDER[base]);
-    if (frac >= 0.5) out.push(GROVE_CHEST_ORDER[base]);
-    if (frac >= 0.75) out.push(GROVE_CHEST_ORDER[Math.min(GROVE_CHEST_ORDER.length - 1, base + 1)]);
+    if (frac >= 0.25) out.push(COLISEUM_TIERS[base]);
+    if (frac >= 0.5) out.push(COLISEUM_TIERS[base]);
+    if (frac >= 0.75) out.push(COLISEUM_TIERS[Math.min(COLISEUM_TIERS.length - 1, base + 1)]);
     // Clearing the whole thing inside the clock is the only way to the top box on that map.
-    if (cleared) out.push(GROVE_CHEST_ORDER[Math.min(GROVE_CHEST_ORDER.length - 1, base + 2)]);
+    if (cleared) out.push(COLISEUM_TIERS[Math.min(COLISEUM_TIERS.length - 1, base + 2)]);
     return out;
 }
 

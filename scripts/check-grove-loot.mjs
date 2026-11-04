@@ -16,7 +16,6 @@ import {
 import {
     GROVE_ENEMIES, GROVE_HYPER, GROVE_PARTS, wandererHyperChance, bossHyperChance,
 } from "../src/lib/marketplace/grove-catalog.js";
-import { GROVE_CHESTS } from "../src/lib/marketplace/grove-forge.js";
 import { reachableRecipes, GROVE_RECIPES } from "../src/lib/marketplace/grove-recipes.js";
 
 let fails = 0;
@@ -121,16 +120,8 @@ ok("a boss is still far likelier to pay a hyper than a wanderer",
     `boss ${bossHyperChance(4)} vs wanderer ${wandererHyperChance(4)}`);
 ok("both climb with depth", wandererHyperChance(12) > wandererHyperChance(1));
 
-console.log("\nA CHEST CONTAINS SOMETHING YOU CANNOT FARM");
-// A chest whose whole payload is bulk parts is a bigger pile of what the player already has too much of --
-// measured live: 4-8 Bristle Hide to somebody holding 71, and five chests left unopened because of it.
-for (const [id, c] of Object.entries(GROVE_CHESTS)) {
-    ok(`${c.name} can pay a hyper-rare`, Number(c.hyperChance) > 0, `got ${c.hyperChance}`);
-    ok(`${c.name} pays merits, which only a boss and a chest ever do`, Array.isArray(c.merits));
-}
-const floors = Object.values(GROVE_CHESTS).map((c) => c.hyperFloor);
-ok("a shallow chest cannot pay a deep reward", floors.every((f, i) => i === 0 || f > floors[i - 1]),
-    `floors ${floors.join(",")}`);
+// ⚠️ "A CHEST CONTAINS SOMETHING YOU CANNOT FARM" STOOD HERE — four assertions about chest contents and
+// the hyperFloor ladder. Removed with the Grove's chests; nothing it guarded exists any more.
 
 console.log("\nTHE WORKBENCH DOES NOT SHOW A WALL");
 const reach = reachableRecipes().length;
@@ -138,5 +129,5 @@ ok(`only reachable recipes are counted (${reach} of ${GROVE_RECIPES.length})`, r
 ok("every reachable recipe needs only parts that exist",
     reachableRecipes().every((x) => Object.keys(x.parts).every((pt) => GROVE_PARTS[pt])));
 
-console.log(fails ? `\ncheck:grove-loot — ${fails} FAILED\n` : "\nOK — every creature pays its own rare, a kill is a roll, a chest holds something you cannot farm.\n");
+console.log(fails ? `\ncheck:grove-loot — ${fails} FAILED\n` : "\nOK — every creature pays its own rare, a kill is a roll, and nothing early is farmable that should not be.\n");
 process.exit(fails ? 1 : 0);

@@ -9,9 +9,8 @@ import { db } from "@/lib/db";
 import { vendorTier } from "@/lib/marketplace/grove-statues.js";
 import { grantStatues, statueState } from "@/lib/marketplace/grove-statue-store.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
-import { craftLevel, craftXpFor, rollQuality, qualityBand, qualityOdds, QUALITY_BANDS, toolBonusFor, GROVE_CHESTS,
-    ARMOUR_PIECES, pieceById, setBonusFor, GROVE_SETS, craftBonusFor, charmValue, charmValueOf } from "@/lib/marketplace/grove-forge.js";
-import { addChests } from "@/lib/marketplace/chests.js";
+import { craftLevel, craftXpFor, rollQuality, qualityBand, qualityOdds, QUALITY_BANDS, toolBonusFor,
+    craftBonusFor, charmValue, charmValueOf } from "@/lib/marketplace/grove-forge.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -29,7 +28,7 @@ import { reworkCost, toolRecipeFor, repeatable, CRAFT_ALL_CAP
 } from "@/lib/marketplace/grove-recipes.js";
 import { rackFor, scatterFor, landingFor, bandAt, oddsForAim, rattle, qualityInBand,
     clampAct, actScore } from "@/lib/marketplace/grove-craft-act.js";
-import { settleKills, rollBoss, rollGroveChest } from "@/lib/marketplace/grove-roll.js";
+import { settleKills, rollBoss } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { groveFighter } from "@/lib/marketplace/grove-kit.js";
 import { grantStone } from "@/lib/marketplace/pet-ascension.js";
@@ -139,7 +138,7 @@ function bonusesFrom(emblemRows, player = null) {
     // silently does nothing, which is the one failure a collectible cannot survive.
     const out = {
         rarityFind: 0, emblemFind: 0, rareSpawn: 0,
-        hyperFind: 0, chestFind: 0, partYield: 0, goldFind: 0, xpFind: 0, overkill: 0,
+        hyperFind: 0, partYield: 0, goldFind: 0, xpFind: 0, overkill: 0,
         // Map 8's Geared Mark. Read by the rare row in grove-roll.js and nowhere else -- the row that
         // already pays a part from one map deeper, so this buys more of it rather than adding a mechanism.
         salvage: 0,
@@ -176,7 +175,6 @@ function bonusesFrom(emblemRows, player = null) {
         else if (meta.stat === "emblem_find") out.emblemFind += v;
         else if (meta.stat === "rare_spawn") out.rareSpawn += v;
         else if (meta.stat === "hyper_find") out.hyperFind += v;
-        else if (meta.stat === "chest_find") out.chestFind += v;
         else if (meta.stat === "part_yield") out.partYield += v;
         else if (meta.stat === "gold_find") out.goldFind += v;
         else if (meta.stat === "xp_find") out.xpFind += v;
@@ -283,7 +281,7 @@ async function heroLook(buyerId) {
 export async function groveState(buyerId) {
     if (!buyerId || !groveOpen(buyerId)) return { ok: false, error: "closed" };
 
-    const [p, zones, items, seen, emblems, tools, chests, craftLog, everMade, armour, charms, look, hero] = await Promise.all([
+    const [p, zones, items, seen, emblems, tools, craftLog, everMade, charms, look, hero] = await Promise.all([
         playerRow(buyerId),
         // ⚠️ THE COOLDOWN IS COMPUTED IN SQL, ON THE QUERY THIS ALREADY RAN. Two reasons. It costs nothing
         // — no extra round trip, and round trips are the meter that bills. And the comparison happens where
@@ -299,7 +297,6 @@ export async function groveState(buyerId) {
         db.query(`SELECT part_id FROM mkt_grove_seen WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT slot, tier, quality, reworks FROM mkt_grove_tool WHERE buyer_id = $1`, [buyerId]).catch(() => []),
-        db.query(`SELECT tier, qty FROM mkt_grove_chest WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         // ⚠️ RECALL. Luke: the crafting level needs "visibility transparency recall and awareness". A level
         // with no history behind it is a number the player is asked to take on faith -- and this one is a
         // ladder they are being asked to climb, so "what have I actually made, and how did it come out"
@@ -324,7 +321,6 @@ export async function groveState(buyerId) {
         // asks the question it is actually being asked. Distinct ids only — in the same Promise.all,
         // which is where this file already puts an extra read rather than paying a round trip for it.
         db.query(`SELECT DISTINCT recipe_id FROM mkt_grove_craft_log WHERE buyer_id = $1`, [buyerId]).catch(() => []),
-        db.query(`SELECT piece_id, worn FROM mkt_grove_armour WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         // ⚠️ IN THE SAME Promise.all, NOT A FOURTEENTH ROUND TRIP. Round trips are the meter that
         // bills — see CLAUDE.md — and this is one more row set on a query set that is already in flight.
         db.query(`SELECT charm_id, band, qty FROM mkt_grove_charm WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
@@ -415,17 +411,7 @@ export async function groveState(buyerId) {
         // How many times each tool has been reworked. Beside the quality because it is the same fact seen
         // from the other side: what it came out at, and how many tries that took.
         toolReworks: Object.fromEntries((tools || []).map((t) => [t.slot, Number(t.reworks) || 0])),
-        // ⚠️ THE GROVE'S OWN CHESTS, NOT mkt_chest. See the note on the boss grant.
-        chests: Object.fromEntries((chests || []).map((c) => [c.tier, Number(c.qty) || 0])),
-        // ⚠️ OWNED AND WORN AS TWO SHAPES, NOT ONE LIST WITH A FLAG. The armoury asks "do I have this
-        // piece" fifteen times while it renders, and "what is in this slot" three times; a flat list
-        // makes both of those a scan. The catalogue stays the only thing that knows what a piece IS.
-        armour: {
-            owned: (armour || []).map((r) => r.piece_id),
-            worn: Object.fromEntries((armour || []).filter((r) => r.worn)
-                .map((r) => [pieceById(r.piece_id)?.slot, r.piece_id]).filter(([k]) => k)),
-        },
-        merits: Number(p?.merits) || 0,
+
         craft: {
             ...craftLevel(Number(p?.craft_xp) || 0),
             // ⚠️ THE ODDS ARE SENT, NOT DESCRIBED. "Higher levels improve your rolls" is a claim; the
@@ -861,9 +847,8 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         const after = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, paid]).catch(() => null);
         await logCoin(buyerId, paid, "grove_rare", { balanceAfter: after?.gold, meta: { zone: zoneId } }).catch(() => {});
     }
-    for (const tier of got.chests) {
-        await addChests(buyerId, { [tier]: 1 }, { source: "grove_rare" }).catch(() => {});
-    }
+    // ⚠️ THE RARE SPAWN PAID A CHEST HERE. Chests are removed from the Grove; the rare spawn still
+    // pays its own loot row, which is the part players could actually see.
 
     // ── GEAR ────────────────────────────────────────────────────────────────────────────────────────
     // Luke: "gear drops on enemies throughout the entirety of the grove. That way there's something to
@@ -968,7 +953,6 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         belt: beltNow,
         emblems: got.emblems,
         gold: got.gold,
-        chests: got.chests,
         // Named in the response so the screen can say what arrived. The scene already celebrated it on the
         // kill; a reward announced in the world but missing from the receipt is half a reward.
         // See [[reward-with-no-screen-is-not-shipped]].
@@ -1101,23 +1085,11 @@ export async function groveBoss(buyerId, zoneId) {
     // and coins -- and in a chain the first match wins, so adding anything to it silently steals from
     // every tier beneath. A Grove chest pays Grove parts out of its own roll and must stay out of that
     // table entirely. See [[chest-rolls-are-a-chain]].
-    if (got.chest) {
-        await db.query(
-            `INSERT INTO mkt_grove_chest (buyer_id, tier, qty) VALUES ($1, $2, 1)
-             ON CONFLICT (buyer_id, tier) DO UPDATE
-                SET qty = mkt_grove_chest.qty + 1, updated_at = NOW()`,
-            [buyerId, got.chest],
-        ).catch(() => {});
-    }
+    // ⚠️ A BOSS BANKED A GROVE CHEST HERE, and a flat merit stipend below it. Both gone with the
+    // systems they fed.
     // ⚠️ MERITS ARE NOT GOLD AND MUST NEVER TOUCH awardXp. awardXp pays gold 1:1 with points unless told
     // otherwise, which is the landmine two lines above this one; merits are their own column with one
     // faucet (this) and one sink (the boss sets). See [[awardxp-gold-tracks-xp-landmine]].
-    if (got.merits > 0) {
-        await db.query(
-            `UPDATE mkt_grove_player SET merits = merits + $2, updated_at = NOW() WHERE buyer_id = $1`,
-            [buyerId, got.merits],
-        ).catch(() => {});
-    }
 
     const after = await db.queryOne(
         `UPDATE mkt_grove_zone
@@ -1174,8 +1146,6 @@ export async function groveBoss(buyerId, zoneId) {
         hyper,
         // Both reported back so the kill card can show them rather than the player discovering a chest in
         // their bag later and not knowing what dropped it.
-        chest: got.chest || null,
-        merits: got.merits || 0,
         kills: Number(after?.boss_kills) || 1,
         first: Boolean(after?.was_first),
         // The zone this kill just opened, or null if it was already open (a repeat kill, or zone twelve).
@@ -1187,107 +1157,7 @@ export async function groveBoss(buyerId, zoneId) {
     };
 }
 
-/**
- * Forge one piece of boss armour.
- *
- * ⚠️ MERITS ARE TAKEN BY A CONDITIONAL UPDATE, NOT BY READ-THEN-WRITE. "Check you can afford it, then
- * charge" is two statements with a gap, and two taps on a slow connection both walk through that gap and
- * forge two pieces for one price. The UPDATE carries its own `merits >= $2` and RETURNING says whether it
- * actually took anything -- the same shape as the chest open and every other claim in this file.
- *
- * ⚠️ AND THE PARTS ARE TAKEN FIRST. There is no transaction available here (neon() is the HTTP driver, so
- * every query is its own request -- see [[postgres-landmines]]), which means the order of the two debits is
- * the whole of the safety. Parts first: if the merit debit then fails the player is out some parts, which
- * the next kill replaces. Merits first and a failed part debit would hand out a free piece, which nothing
- * replaces. Fail toward the recoverable side.
- */
-export async function groveForgeArmour(buyerId, pieceId) {
-    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
-    const piece = pieceById(String(pieceId || ""));
-    if (!piece) return { ok: false, error: "no_piece" };
 
-    const already = await db.queryOne(
-        `SELECT 1 FROM mkt_grove_armour WHERE buyer_id = $1 AND piece_id = $2`, [buyerId, piece.id],
-    ).catch(() => null);
-    if (already) return { ok: false, error: "already_made" };
-
-    // The parts, each conditionally, and each put back if a later one is short.
-    const taken = [];
-    for (const need of piece.parts) {
-        const got = await db.queryOne(
-            `UPDATE mkt_grove_item SET qty = qty - $4
-              WHERE buyer_id = $1 AND place = $2 AND part_id = $3 AND qty >= $4 RETURNING qty`,
-            [buyerId, "pack", need.part, need.n],
-        ).catch(() => null);
-        if (!got) {
-            for (const back of taken) {
-                await db.query(
-                    `UPDATE mkt_grove_item SET qty = qty + $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2`,
-                    [buyerId, back.part, back.n],
-                ).catch(() => {});
-            }
-            return { ok: false, error: "not_enough_parts" };
-        }
-        taken.push(need);
-    }
-
-    const paid = await db.queryOne(
-        `UPDATE mkt_grove_player SET merits = merits - $2, updated_at = NOW()
-          WHERE buyer_id = $1 AND merits >= $2 RETURNING merits`,
-        [buyerId, piece.merits],
-    ).catch(() => null);
-    if (!paid) {
-        for (const back of taken) {
-            await db.query(
-                `UPDATE mkt_grove_item SET qty = qty + $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2`,
-                [buyerId, back.part, back.n],
-            ).catch(() => {});
-        }
-        return { ok: false, error: "not_enough_merits" };
-    }
-
-    await db.query(
-        `INSERT INTO mkt_grove_armour (buyer_id, piece_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-        [buyerId, piece.id],
-    ).catch(() => {});
-    await trackActivity(buyerId, "grove_armour", { piece: piece.id }).catch(() => {});
-
-    return { ok: true, piece: { id: piece.id, name: piece.name, slot: piece.slot, rarity: piece.rarity,
-        stats: piece.stats }, meritsLeft: Number(paid.merits) || 0, spent: piece.parts };
-}
-
-/**
- * Wear a piece, or take off whatever is in its slot.
- *
- * ⚠️ TAKE OFF THE SLOT FIRST, ALWAYS, EVEN WHEN PUTTING SOMETHING ON. The unique index refuses a second
- * worn piece in a slot (see migration 480), so "wear this" without clearing the slot is a query that throws
- * on exactly the common case -- swapping a crown for a better crown.
- */
-export async function groveWearArmour(buyerId, pieceId) {
-    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
-    const piece = pieceById(String(pieceId || ""));
-    if (!piece) return { ok: false, error: "no_piece" };
-
-    const owned = await db.queryOne(
-        `SELECT worn FROM mkt_grove_armour WHERE buyer_id = $1 AND piece_id = $2`, [buyerId, piece.id],
-    ).catch(() => null);
-    if (!owned) return { ok: false, error: "not_owned" };
-
-    // Tapping the piece you are already wearing takes it off, which is how the emblems already behave.
-    const takingOff = Boolean(owned.worn);
-    await db.query(
-        `UPDATE mkt_grove_armour SET worn = false
-          WHERE buyer_id = $1 AND worn AND split_part(piece_id, '_', 2) = $2`,
-        [buyerId, piece.slot],
-    ).catch(() => {});
-    if (!takingOff) {
-        await db.query(
-            `UPDATE mkt_grove_armour SET worn = true WHERE buyer_id = $1 AND piece_id = $2`,
-            [buyerId, piece.id],
-        ).catch(() => {});
-    }
-    return { ok: true, worn: !takingOff, slot: piece.slot };
-}
 
 export async function groveMove(buyerId, { partId, from, to, qty = 1 } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
@@ -1498,37 +1368,21 @@ export async function groveCraft(buyerId, recipeId, { act = null, aim = 0.5 } = 
         ).catch(() => {});
     }
 
-    // ── ⚠️ THE FIRST CRAFT EVER PAYS A CHEST ────────────────────────────────────────────────────────
-    // Luke: "little wolf not crafting, we should find a way to guide and condition him."
+    // ── ⚠️ THE FIRST CRAFT EVER ─────────────────────────────────────────────────────────────────────
+    // This used to hand over a Mossbound Cache: the one teaching beat that explained the loop by giving
+    // the player a thing to open. The chest went with the rest of them, and nothing replaced it -- so if
+    // the on-ramp needs that beat back it has to be built out of something that still exists. The quest
+    // chains are the obvious home.
     //
-    // He has 93 Bound Straw, can make 25 recipes and has made none. The reason is not difficulty: it is
-    // that a first craft costs three piles of parts and returns a tool whose entire payoff happens in
-    // ANOTHER SYSTEM, days later, as a percentage. There is nothing at the end of the first one to tell
-    // a player the machine pays out at all.
-    //
-    // So the first craft, once per account ever, hands back a Mossbound Cache: a real object, visible
-    // where it is kept, openable on the spot, that pays merits and a hyper roll. It teaches the loop by
-    // completing it rather than by explaining it -- see [[teach-by-showing-not-telling]].
-    //
-    // ⚠️ ONE CHEST, AND NOTHING ELSE ALONGSIDE IT. A chest handed over next to some other reward makes
-    // both of them smaller and neither of them the point. See [[rewards-must-be-scoped]].
+    // ⚠️ THE FLAG ITSELF STAYS, because it is not about chests. The craft card announces it and
+    // trackActivity records it, and "was this their first ever craft" is still worth both.
     //
     // ⚠️ AND IT IS GATED ON THE CRAFT LOG, NOT ON A FLAG SOMEBODY HAS TO REMEMBER TO SET. The log already
-    // records every craft; "has this account ever crafted" is a question it can answer, and a question
-    // answered from the real record cannot drift out of step with it.
-    let firstCraft = false;
+    // records every craft; a question answered from the real record cannot drift out of step with it.
     const everCrafted = await db.queryOne(
         `SELECT 1 AS x FROM mkt_grove_craft_log WHERE buyer_id = $1 LIMIT 1`, [buyerId],
-    ).catch(() => ({ x: 1 }));   // on a DB error, assume they have: a wrongly-paid chest is worse than a missed one
-    if (!everCrafted) {
-        firstCraft = true;
-        await db.query(
-            `INSERT INTO mkt_grove_chest (buyer_id, tier, qty) VALUES ($1, 'mossbound', 1)
-             ON CONFLICT (buyer_id, tier) DO UPDATE
-                SET qty = mkt_grove_chest.qty + 1, updated_at = NOW()`,
-            [buyerId],
-        ).catch(() => {});
-    }
+    ).catch(() => ({ x: 1 }));
+    const firstCraft = !everCrafted;
 
     await trackActivity(buyerId, "grove_craft", {
         recipe: recipe.id, kind: recipe.kind, first: firstCraft, quality, band: bonus.band,
@@ -1538,10 +1392,8 @@ export async function groveCraft(buyerId, recipeId, { act = null, aim = 0.5 } = 
     // A plot is capped at two and a decoration is one object, so a good roll cannot hand over a bigger
     // one. Merits are the Grove's own currency with its own sink (the five boss sets), which keeps the
     // payout inside this system rather than inventing a third plot or minting gold on a kill loop.
-    if (bonus.merits > 0) {
-        await db.query(`UPDATE mkt_grove_player SET merits = merits + $2, updated_at = NOW() WHERE buyer_id = $1`,
-            [buyerId, bonus.merits]).catch(() => {});
-    }
+    // ⚠️ THE QUALITY BAND PAID MERITS on the two recipe kinds with no "more" to give. Removed with
+    // merits; those kinds now pay the band's other rewards only.
 
     // The xp is priced off the recipe's own PART COST, never flat per craft -- a flat award makes the
     // cheapest recipe the fastest ladder, which turns crafting into poultice spam. Food is additionally
@@ -1914,50 +1766,3 @@ export async function groveRework(buyerId, slot) {
     };
 }
 
-export async function groveOpenChest(buyerId, tier) {
-    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
-    const chest = GROVE_CHESTS[String(tier || "")];
-    if (!chest) return { ok: false, error: "no_chest" };
-
-    const took = await db.queryOne(
-        `UPDATE mkt_grove_chest SET qty = qty - 1, updated_at = NOW()
-          WHERE buyer_id = $1 AND tier = $2 AND qty > 0
-          RETURNING qty`,
-        [buyerId, chest.id],
-    ).catch(() => null);
-    if (!took) return { ok: false, error: "none_held" };
-
-    const p = await playerRow(buyerId);
-    const emblemRows = await db.query(
-        `SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId],
-    ).catch(() => []);
-
-    // ⚠️ SEEDED ON THE OPENING, NOT ON A KILL. These are opened from the bag whenever the player likes,
-    // long after whatever dropped them -- there is no kill index to share. The index is how many of this
-    // tier they have left, which moves every open and cannot be steered by retrying.
-    const got = rollGroveChest(chest, Number(p?.seed) || 1, Number(took.qty) + chest.id.length,
-        bonusesFrom(emblemRows, p), GROVE_HYPER);
-
-    const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts, Number(p?.pack_slots) || 16);
-    if (got.merits > 0) {
-        await db.query(
-            `UPDATE mkt_grove_player SET merits = merits + $2, updated_at = NOW() WHERE buyer_id = $1`,
-            [buyerId, got.merits],
-        ).catch(() => {});
-    }
-    // The thing that makes a chest worth opening rather than a bigger pile of what you have. Same grant
-    // path as the boss and the wanderer roll.
-    const hyper = got.hyper ? await grantHyper(buyerId, got.hyper, { chest: chest.id }).catch(() => null) : null;
-
-    return {
-        ok: true,
-        tier: chest.id,
-        name: chest.name,
-        left: Number(took.qty) || 0,
-        parts: stored,
-        overflow,
-        newlySeen,
-        merits: got.merits || 0,
-        hyper,
-    };
-}

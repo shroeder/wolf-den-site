@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 
 import { chestsFor } from "@/lib/marketplace/grove-coliseum-plan.js";
-import { GROVE_CHESTS } from "@/lib/marketplace/grove-forge.js";
 
 // ── THE MARSHAL'S OFFER ─────────────────────────────────────────────────────────────────────────────────────
 // Luke on the first version: "Just not good enough it doesnt feel like an mmo quest. Its too web forms."
@@ -33,7 +32,7 @@ export default function GroveMarshal({ coliseum, busy = false, onTakeKey, onEnte
         const full = chestsFor({ map, wavesCleared: 4, totalWaves: 4, cleared: true });
         const by = new Map();
         for (const id of full) by.set(id, (by.get(id) || 0) + 1);
-        return [...by].map(([id, n]) => ({ id, n, name: GROVE_CHESTS[id]?.name || id }));
+        return [...by].map(([id, n]) => ({ id, n, name: id }));
     }, [map]);
 
     if (!marshal) return null;

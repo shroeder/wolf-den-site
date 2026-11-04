@@ -268,17 +268,8 @@ export async function claimStep(buyerId, stepId) {
         }).catch(() => {});
     }
 
-    // ⚠️ THE GROVE'S OWN CHEST TABLE, NEVER addChests. mkt_chest rolls a CHAIN across eight tiers and the
-    // first match wins, so a Grove tier dropped in there silently steals from every tier beneath it. Same
-    // reason the boss grant keeps out of it. See [[chest-rolls-are-a-chain]].
-    if (paid.chest) {
-        await db.query(
-            `INSERT INTO mkt_grove_chest (buyer_id, tier, qty) VALUES ($1, $2, 1)
-             ON CONFLICT (buyer_id, tier) DO UPDATE
-                SET qty = mkt_grove_chest.qty + 1, updated_at = NOW()`,
-            [buyerId, paid.chest],
-        ).catch(() => {});
-    }
+    // ⚠️ THE CLAIM BANKED A CHEST HERE for the last step of a chain. Chests are removed; the step
+    // pays gold, xp, parts and the Coliseum token.
 
     // ── THE PARTS ───────────────────────────────────────────────────────────────────────────────────
     // ⚠️ THROUGH storeParts, NOT A RAW INSERT. That function owns the bag cap and the overflow report;
