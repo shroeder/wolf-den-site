@@ -192,13 +192,33 @@ export async function bumpQuests(buyerId, events = {}) {
             if (!cur.started) continue;
             const next = Math.min(s.need, (cur.progress || 0) + add);
             if (next === cur.progress) continue;
-            await db.query(
+            // ── ⚠️ THIS UPDATE THREW ON EVERY CALL IT HAS EVER MADE ────────────────────────────
+            // Luke: "The question pop up says 6 of 6 complete, the npc says 0 of 6." The NPC was right.
+            // cart_1 was progress 0 in the database while the toast announced 6 of 6.
+            //
+            // The statement referenced $1, $2 and $5 and was handed FIVE parameters, so npc.id and map
+            // arrived as $3 and $4 with nothing to infer a type from. Postgres answers "could not
+            // determine data type of parameter $3" and refuses the whole statement -- and the .catch()
+            // on the end threw that away. NO QUEST PROGRESS HAS EVER BEEN WRITTEN. Every bar in the
+            // feature has been sitting at zero since the day it was built.
+            //
+            // ⚠️ AND THE TOAST REPORTED THE INTENDED NUMBER, WHICH IS WHY IT LOOKED FINE. touched was
+            // pushed unconditionally, so the screen announced what the code MEANT to store. Two paths for
+            // one number always drift; this one drifted on the very first call.
+            // See [[atomic-split-into-steps-drops-lines]].
+            //
+            // So: only the parameters the statement actually uses, and the row it wrote is the row the
+            // screen is told about. RETURNING is the proof -- no row back, no toast.
+            const wrote = await db.queryOne(
                 `UPDATE mkt_grove_quest
-                    SET progress = LEAST($5, GREATEST(progress, $5)), updated_at = NOW()
-                  WHERE buyer_id = $1 AND step_id = $2 AND claimed_at IS NULL`,
-                [buyerId, s.id, npc.id, map, next],
-            ).catch(() => {});
-            touched.push({ step: s.id, progress: next, need: s.need, done: next >= s.need, title: titleOf(s) });
+                    SET progress = LEAST($3, GREATEST(progress, $3)), updated_at = NOW()
+                  WHERE buyer_id = $1 AND step_id = $2 AND claimed_at IS NULL
+                  RETURNING progress`,
+                [buyerId, s.id, next],
+            ).catch(() => null);
+            if (!wrote) continue;
+            const stored = Number(wrote.progress);
+            touched.push({ step: s.id, progress: stored, need: s.need, done: stored >= s.need, title: titleOf(s) });
         }
     }
     return touched;
