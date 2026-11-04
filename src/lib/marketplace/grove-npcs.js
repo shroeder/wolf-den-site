@@ -195,7 +195,7 @@ const CHAINS = {
 
     // map 2 — the dark one. more fetching, because looking is the theme
     mub:     [["harvest", 1, "The Glow Is Failing"], ["cull", 1, "Whatever's Eating It"], ["forge", 1, "A Lamp That Holds"]],
-    cart:    [["delve", 1, "Make Noise at the {Ord_zone}"], ["cull", 1, "Count Them for Me"], ["delve", 2, "And the {Ord_zone}"], ["ticket", 1, "The Loud Room"]],
+    cart:    [["delve", 1, "Make Noise in {zone_name}"], ["cull", 1, "Count Them for Me"], ["delve", 2, "And {zone_name}"], ["ticket", 1, "The Loud Room"]],
     odd:     [["delve", 2, "One Chamber Further"], ["hunt", 1, "The Thing I Saw"]],
 
     // map 3 — the fen. slow, patient asks
@@ -211,7 +211,7 @@ const CHAINS = {
     // map 5 — the ruins. architecture, reading, diving
     mason:   [["harvest", 1, "Stone That Still Rings"], ["forge", 1, "Set a Keystone"], ["cull", 1, "Clear the Scaffold"], ["ticket", 1, "Prove It Holds"]],
     quell:   [["delve", 2, "Down and Back"], ["hunt", 1, "What's at the Bottom"], ["harvest", 2, "Go Again"]],
-    vane:    [["harvest", 1, "The Writing Survived"], ["cull", 1, "Why That Order"], ["delve", 2, "The {Ord_zone} Room"], ["forge", 1, "Copy It Properly"], ["survive", 1, "Read It Through"]],
+    vane:    [["harvest", 1, "The Writing Survived"], ["cull", 1, "Why That Order"], ["delve", 2, "{zone_name}"], ["forge", 1, "Copy It Properly"], ["survive", 1, "Read It Through"]],
 
     // map 6 — the waste. assaying, digging, losing
     dune:    [["harvest", 1, "Bring Me Gold"], ["harvest", 2, "Bring Me Actual Gold"], ["forge", 1, "Assay It"]],

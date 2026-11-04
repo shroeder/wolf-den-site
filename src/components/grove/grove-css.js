@@ -1299,6 +1299,10 @@ export const GROVE_CSS = `
 
 .qd-count { display: block; margin-top: 7px; font-size: 0.94rem; font-weight: 700; color: #CFC4E4;
     font-variant-numeric: tabular-nums; }
+/* The same thing on the card you get standing in front of them — see .gql-place. */
+.qd-place { display: block; margin-top: 9px; font-size: 0.92rem; font-weight: 700; color: #CFC4E4;
+    letter-spacing: 0.01em; }
+.qd-block.is-ready .qd-place { color: #9fe36a; }
 .qd-block.is-ready .qd-count { color: #FFD75E; font-size: 1.08rem;
     text-shadow: 0 0 14px rgba(255, 215, 94, 0.5); }
 .qd-block.is-ready .qd-label { color: #FFD75E;
@@ -4537,6 +4541,15 @@ export const GROVE_CSS = `
 
 .gql-prog { display: flex; align-items: center; gap: 8px; }
 .gql-num { flex: 0 0 auto; font-size: 0.7rem; color: #a79e88; font-variant-numeric: tabular-nums; }
+/* ⚠️ WHAT A "GO THERE" STEP SHOWS INSTEAD OF A BAR. a delve stores the zone index where a quantity would go, so a gauge
+   under it drew the same number twice and neither was a quantity. These two say the only thing there is
+   to say about such a step: whether you have been. See the counts flag in grove-quests.js.
+
+   ⚠️ AND THEY HAVE RULES. A class name with no rule styles nothing and fails silently -- which is the
+   defect that put two 512px slabs across the base town this morning.
+   [[grep-the-class-name-before-taking-it]]. */
+.gql-place { font-size: 0.72rem; color: #bcd97a; font-style: italic; }
+.gql-row.is-ready .gql-place { color: #9fe36a; font-style: normal; font-weight: 700; }
 .gql-pay { font-size: 0.68rem; color: #8d866f; }
 
 /* ⚠️ THE SAME GAUGE AS THE DIALOGUE'S, and it has to be: these are the same fact in two places, and

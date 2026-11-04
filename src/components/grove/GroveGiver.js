@@ -162,7 +162,17 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
                         {/* ⚠️ NO BAR ON AN UNTAKEN STEP. A 0/37 under a job nobody has agreed to reads as
                             progress already lost, and it was the thing that made the old card feel like
                             a form: the counter existed before the conversation did. */}
-                        {state !== "offered" ? (
+                        {/* ⚠️ A BAR IS ONLY HONEST WHEN `need` IS A QUANTITY. On a delve it is the
+                            ZONE INDEX, so this drew "0/6" directly under "go to the 6th chamber" -- the
+                            same number twice, and neither of them a thing you can collect. Luke: "I don't
+                            understand what go to the sixth chamber means." Those steps say where to go and
+                            whether you have been, which is all there is to say about them. */}
+                        {state !== "offered" && !a.counts ? (
+                            <span className="qd-place">
+                                {a.ready ? "You've been. Tell them." : `Go to ${a.zoneName || "the place they named"}`}
+                            </span>
+                        ) : null}
+                        {state !== "offered" && a.counts ? (
                             <>
                                 <span className="qd-bar" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
                                 <span className="qd-count">{a.progress}/{a.need}</span>
@@ -220,8 +230,7 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
                         {plate === "complete" && a?.reward ? (
                             <em>
                                 {a.reward.gold ? `${a.reward.gold} gold` : null}
-                                {a.reward.xp ? ` · ${a.reward.xp} xp` : null}
-                                {a.reward.chest ? " · a chest" : null}
+                                {a.reward.xp ? ` · ${a.reward.xp} xp` : null}
                                 {a.reward.token ? " · a Coliseum token" : null}
                             </em>
                         ) : null}

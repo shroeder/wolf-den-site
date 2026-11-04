@@ -119,8 +119,8 @@ export const STEPS = {
     },
     alder_3: {
         problem: ["I've told you what's out there. You've taken my word for it twice.", "That's twice too many. A warden who only knows the edge isn't a warden."],
-        ask: "Walk it yourself. Get as far as the {nth_zone} room and look at it.",
-        nudge: "You've not got there yet. It doesn't bite until the {ord_zone}.",
+        ask: "Walk it yourself. Get as far as {zone_name} and look at it.",
+        nudge: "You've not got there yet. It doesn't bite until {zone_name}.",
         done: ["You went. Good. Now you've seen why I stand where I stand.", "That's everything I had. Go deeper than I ever did."],
     },
 
@@ -159,7 +159,7 @@ export const STEPS = {
     },
     snare_4: {
         problem: ["Here's what I've never done, in eleven years of setting lines.", "Stayed out with them overnight. Not once. I'd like to know what it's like."],
-        ask: "Sit the night out in the {nth_zone} room and clear it without leaving.",
+        ask: "Sit the night out in {zone_name} and clear it without leaving.",
         nudge: "You've come back. That's not sitting it out, is it.",
         done: ["You stayed. You actually stayed.", "I'm not going to do that. But I'm very glad somebody has. That's my lot — go on."],
     },
@@ -188,8 +188,8 @@ export const STEPS = {
     // The Blind Cartographer — maps by sound. Precise, commanding, impatient with description.
     cart_1: {
         problem: ["I don't want to know what it looks like. Everyone tells me what it looks like.", "I want to know how big it is, and for that I need a sound made in it."],
-        ask: "Go to the {nth_zone} chamber and make noise. Properly. I'll be listening.",
-        nudge: "I've heard nothing from the {ord_zone}. You're not there.",
+        ask: "Go to {zone_name} and make noise. Properly. I'll be listening.",
+        nudge: "I've heard nothing from {zone_name}. You're not there.",
         done: ["Twelve-second return. It's a long room, and it narrows.", "Now the part where my ears aren't enough."],
     },
     cart_2: {
@@ -199,9 +199,9 @@ export const STEPS = {
         done: ["{n}. That matches my worst estimate, which is reassuring and horrible.", "Deeper, now. There's a chamber I've never got a return from."],
     },
     cart_3: {
-        problem: ["The {ord_zone} is a hole in my map. Every sound I send in dies in it.", "Either it is enormous or it is full of something soft."],
-        ask: "Reach the {nth_zone} chamber and make the same noise there.",
-        nudge: "Nothing back from the {ord_zone} yet.",
+        problem: ["{zone_name} is a hole in my map. Every sound I send in dies in it.", "Either it is enormous or it is full of something soft."],
+        ask: "Reach {zone_name} and make the same noise there.",
+        nudge: "Nothing back from {zone_name} yet.",
         done: ["No return at all. Nothing. I don't like that and I'm glad to know it.", "One more. And this one is not for the map."],
     },
     cart_4: {
@@ -214,7 +214,7 @@ export const STEPS = {
     // Spelunker Odd — goes further than is sensible. Reckless, cheerful, no sense of danger.
     odd_1: {
         problem: ["Everyone stops one short of it. There's a draught and they decide it means something.", "It means there's more cave. That's ALL a draught has ever meant."],
-        ask: "Go one chamber further than sensible — the {nth_zone}.",
+        ask: "Go one chamber further than sensible — {zone_name}.",
         nudge: "You've not passed it yet. Go on!",
         done: ["HA. And nothing happened, did it. Nothing ever does.", "Well. Something did happen to me once, down there."],
     },
@@ -247,7 +247,7 @@ export const STEPS = {
     },
     sil_4: {
         problem: ["You cut the fen standing in it. Not from a boat, not from a bank — in it.", "Most people manage an hour and go home shaking."],
-        ask: "Stand in the wet in the {nth_zone} stretch and clear it without stepping out.",
+        ask: "Stand in the wet in {zone_name} and clear it without stepping out.",
         nudge: "You came out. It doesn't count if you come out.",
         done: ["You stood it. Twenty years and I've seen four people stand it.", "That's my lot. You cut reed now, whatever else you do."],
     },
@@ -275,7 +275,7 @@ export const STEPS = {
     // Stiltwalker Nim — never touches the ground. Proud, fussy, quietly superior.
     nim_1: {
         problem: ["Eleven years. Not one wet foot. People think it's a trick — it's route-finding.", "There's a dry line through this marsh and almost nobody walks it."],
-        ask: "Find the dry way as far as the {nth_zone} stretch. On foot. I'll allow it.",
+        ask: "Find the dry way as far as {zone_name}. On foot. I'll allow it.",
         nudge: "You're going round. There's a way through, you know.",
         done: ["You found it. Mostly. I watched you take two wrong turnings but you found it.", "From up here you'd have seen it straight away, which is my next point."],
     },
@@ -322,7 +322,7 @@ export const STEPS = {
     // The Line-Keeper — decides where the coast ends. Bureaucratic, territorial, deadpan.
     keeper_1: {
         problem: ["There is a line. On this side, my responsibility. On the far side, not yet.", "It has moved inland twice this year and nobody has written that down but me."],
-        ask: "Walk out to the line — the {nth_zone} stretch — and confirm where it actually is.",
+        ask: "Walk out to the line — {zone_name} — and confirm where it actually is.",
         nudge: "You've not reached it. I'd have the report by now.",
         done: ["Confirmed, and further in than the last survey. Noted and dated.", "A line only means something if it is held."],
     },
@@ -347,8 +347,8 @@ export const STEPS = {
         done: ["Look at that mesh. Nothing on this coast is getting through that.", "Only one way to know, though, and it isn't looking at it."],
     },
     oss_3: {
-        problem: ["A net is a promise you make before you need it kept.", "Take it out to the {nth_zone} stretch where the worst of them are and haul it in full."],
-        ask: "Hold the {nth_zone} stretch and clear it without leaving. Bring the net back whole.",
+        problem: ["A net is a promise you make before you need it kept.", "Take it out to {zone_name} where the worst of them are and haul it in full."],
+        ask: "Hold {zone_name} and clear it without leaving. Bring the net back whole.",
         nudge: "You've come in. The net can't prove anything on the beach.",
         done: ["Not a tear in it. Not one.", "I've nothing left to mend and nothing left to ask. Strange day. Go well."],
     },
@@ -383,7 +383,7 @@ export const STEPS = {
     // Diver Quell — goes down and comes back less. Fatalistic, very short sentences.
     quell_1: {
         problem: ["Everything valuable is at the bottom.", "So is everything that wants you there. Those are the same sentence."],
-        ask: "Get down to the {nth_zone} level. And come back up. The second half is the job.",
+        ask: "Get down to {zone_name}. And come back up. The second half is the job.",
         nudge: "You're still dry.",
         done: ["Down and back. That's one more than most manage.", "Now you know the way, I'll tell you what's at the end of it."],
     },
@@ -414,8 +414,8 @@ export const STEPS = {
         done: ["{n}. Nothing has moved on my table since this morning. Bliss.", "There's a room I've never reached and the sequence points at it."],
     },
     vane_3: {
-        problem: ["Everything I have read points at the {ord_zone} room and then stops pointing.", "Either that is where they went or that is where they stopped writing."],
-        ask: "Reach the {nth_zone} room and tell me which it is.",
+        problem: ["Everything I have read points at {zone_name} and then stops pointing.", "Either that is where they went or that is where they stopped writing."],
+        ask: "Reach {zone_name} and tell me which it is.",
         nudge: "You've not reached it. The sequence waits.",
         done: ["They stopped writing. They did not stop. That is an enormous difference.", "Which makes copying what survives rather more urgent."],
     },
@@ -427,7 +427,7 @@ export const STEPS = {
     },
     vane_5: {
         problem: ["You have carried, cleared and copied it. You have not read it.", "Read it through, in the room it was written in, without coming out. That is how it was meant to be taken."],
-        ask: "Hold the {nth_zone} room and clear it without leaving. Read it through.",
+        ask: "Hold {zone_name} and clear it without leaving. Read it through.",
         nudge: "You came out. It does not land if you come out.",
         done: ["You read it. All of it. Say nothing about it for a day; it settles.", "The record is complete and somebody living has read it. That was my whole work. Thank you."],
     },
@@ -456,13 +456,13 @@ export const STEPS = {
     // The Gilt-Hunter — still convinced. Manic, optimistic, wrong, delightful.
     gilt_1: {
         problem: ["Dune told you it's not out here. Dune has never dug a hole in his life.", "I have dug four hundred. The maths is entirely on my side."],
-        ask: "Go to the {nth_zone} dig with me — well, go to it. I'll catch up.",
+        ask: "Go to {zone_name} with me — well, go to it. I'll catch up.",
         nudge: "You've not got there. It's the RIGHT hole, I can feel it.",
         done: ["Nothing! Which narrows it! That's progress and Dune can't take it from me.", "Right — and if that one's empty, I know which one isn't."],
     },
     gilt_2: {
         problem: ["The next right hole. I want to be clear that this is a different hole.", "Deeper. Further. Statistically this is the one."],
-        ask: "Get down to the {nth_zone} dig. That's the one.",
+        ask: "Get down to {zone_name}. That's the one.",
         nudge: "Not there yet! Nearly! Go on!",
         done: ["Also nothing. BUT.", "But on the way out — you saw it too, didn't you. The big one."],
     },
@@ -488,7 +488,7 @@ export const STEPS = {
     },
     kel_3: {
         problem: ["I've never seen one of my markers survive a night. I've only ever seen the aftermath.", "I would like one person to stand there and watch it not fall over."],
-        ask: "Hold the {nth_zone} stretch and clear it without leaving. Watch it stand.",
+        ask: "Hold {zone_name} and clear it without leaving. Watch it stand.",
         nudge: "You left. So did my certainty.",
         done: ["It stood. You watched it stand.", "Nobody has ever been able to tell me that before. One more thing, and it's a strange ask."],
     },
@@ -509,13 +509,13 @@ export const STEPS = {
     },
     rook_2: {
         problem: ["I hold this edge. I have never walked the far one.", "A warden who only knows his own side is holding a line he cannot see the back of."],
-        ask: "Walk out to the {nth_zone} reach and look at the far edge.",
+        ask: "Walk out to {zone_name} and look at the far edge.",
         nudge: "You've not reached it.",
         done: ["Hotter on that side and spreading inward. Thought so. Hate being right.", "You'll want to understand what holding actually costs."],
     },
     rook_3: {
         problem: ["Holding isn't fighting. Fighting is the easy hour.", "Holding is the eleven hours where nothing happens and you do not leave."],
-        ask: "Hold the {nth_zone} reach and clear it without stepping out. It's patient. Be patient.",
+        ask: "Hold {zone_name} and clear it without stepping out. It's patient. Be patient.",
         nudge: "You stepped out. So did the line.",
         done: ["You held. That's the job — the whole job, and almost nobody can do it.", "Right. Now the thing that's been feeding it."],
     },
@@ -611,12 +611,24 @@ const nth = (n) => {
     return `${v}${["th", "st", "nd", "rd"][v % 10] || "th"}`;
 };
 
+// ⚠️ AND THE PLACE HAS A NAME. Luke: "I don't understand what go to the sixth chamber means."
+//
+// He is right, and the ordinal disagreeing with itself was never the thing to fix. NOTHING in the game
+// calls a zone "the sixth chamber": the atlas, the zone strip and the quest log's own travel buttons all
+// say The Spore Hall, Shalestep, Rotwood. The number was an index into a list the player has never been
+// shown, so "go to the 6th chamber" is an instruction nobody can act on -- which is worse than two
+// ordinals contradicting each other, and I fixed the contradiction first and called it done.
+//
+// {zone_name} is the zone the step actually points at, by the name the rest of the game uses. It arrives
+// through `names` for the same reason foe and part do: this file is pure data with no imports, and the
+// caller already has the catalogue in hand.
 export function fill(text, step, names = {}) {
     if (!text) return text;
     const localZone = step.kind === "delve"
         ? step.need
         : step.zone ? ((step.zone - 1) % 12) + 1 : null;
     return String(text)
+        .replaceAll("{zone_name}", names.zone || "there")
         .replaceAll("{n}", String(step.need ?? ""))
         .replaceAll("{foe}", names.foe || "it")
         .replaceAll("{part}", names.part || "the stuff")

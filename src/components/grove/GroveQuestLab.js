@@ -30,7 +30,7 @@ const BEATS = {
     3: { done: 0, progress: 1, label: "Beat 3 — ready to hand in",
          blurb: "Bar full, CLAIM appears, and the giver's pip in the world turns to a !" },
     4: { done: 1, progress: 0, label: "Beat 4 — handed in, paid",
-         blurb: "Gold, xp and — on the last step of a chain — a chest and a Coliseum token." },
+         blurb: "Gold, xp and — on the last step of a chain — a Coliseum token." },
     5: { done: 3, progress: 0.6, label: "Beat 5 — deep in the chain",
          blurb: "The next step took over on its own. Three of four done; the last one pays the token." },
     6: { done: 4, progress: 0, label: "Beat 6 — nothing more to ask",

@@ -50,9 +50,17 @@ export function activeStep(chain, rows) {
  * ⚠️ ONLY THE BEATS FOR THE STATE. Sending all four would put the payoff line in the browser before the
  * work was done, which is a spoiler sitting in devtools.
  */
+// ⚠️ A DELVE STORES ITS DESTINATION IN `need`, NOT IN `zone`. questsFor sets zone = base + need for a
+// delve, so both work -- but survive and ticket steps only have one of the two, and a helper that guesses
+// is how the wrong room gets named. One place decides, and both the prose and the log read it.
+function zoneNameFor(step) {
+    const n = step?.zone || (step?.kind === "delve" ? step?.need : null);
+    return n ? (zoneByN(n)?.name || null) : null;
+}
+
 function sayFor(cur, npc) {
     const l = stepLines(cur.step.id, npc.id, npc.line);
-    const names = { foe: foeName(cur.step.foe), part: partName(cur.step.part) };
+    const names = { foe: foeName(cur.step.foe), part: partName(cur.step.part), zone: zoneNameFor(cur.step) };
     const f = (x) => fill(x, cur.step, names);
     if (!cur.started) return { problem: (l.problem || []).map(f), ask: f(l.ask) };
     if (cur.progress >= cur.step.need) return { done: (l.done || []).map(f), ask: f(l.ask) };
@@ -99,9 +107,17 @@ export async function questBoard(buyerId) {
                         // same place the ask does.
                         title: fill(cur.step.title, cur.step, {
                             foe: foeName(cur.step.foe), part: partName(cur.step.part),
+                            zone: zoneNameFor(cur.step),
                         }),
                         kind: cur.step.kind,
                         need: cur.step.need, progress: Math.min(cur.progress, cur.step.need),
+                        // ⚠️ WHETHER `need` IS A QUANTITY AT ALL. For a cull it is "twelve Mothlight" and
+                        // a bar is the right picture. For a delve it is the ZONE INDEX -- so the card drew
+                        // "0/6" directly under "go to the 6th chamber": the same number twice, and neither
+                        // of them a thing you can collect. Progress on these is binary, so the screens show
+                        // the destination instead of a fraction.
+                        counts: !["delve", "survive", "ticket"].includes(cur.step.kind),
+                        zoneName: zoneNameFor(cur.step),
                         ready: cur.progress >= cur.step.need,
                         // `started` is the acceptance — see acceptStep. Untaken means the giver is
                         // offering it, which is a different conversation from nudging you about it.

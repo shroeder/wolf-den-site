@@ -39,8 +39,8 @@ const KIND_WORD = {
 function askLine(a) {
     const verb = KIND_WORD[a.kind] || "Do";
     const what = a.foeLabel || a.partLabel || null;
-    if (a.kind === "delve") return `Reach zone ${a.zone}`;
-    if (a.kind === "survive") return `Clear zone ${a.zone} without leaving`;
+    if (a.kind === "delve") return `Reach ${a.zoneName || "the far room"}`;
+    if (a.kind === "survive") return `Clear ${a.zoneName || "it"} without leaving`;
     if (a.kind === "ticket") return `Reach wave ${a.wave} in the Coliseum`;
     const n = a.need > 1 ? ` ${a.need}` : "";
     return what ? `${verb}${n} ${what}` : `${verb}${n}`;
@@ -111,21 +111,28 @@ function Row({ q, onHandIn, onGo, busy }) {
 
                     {/* ⚠️ NO BAR ON AN UNTAKEN STEP. Same rule as the card in the world and the pip over
                         his head: a 0/12 under a job nobody has agreed to reads as progress already lost. */}
-                    {a.started ? (
+                    {/* ⚠️ SAME RULE AS THE CARD: a bar needs a quantity, and a delve's `need` is a
+                        zone index. See the note on `counts` in grove-quests.js. */}
+                    {a.started && !a.counts ? (
+                        <span className="gql-place">
+                            {a.ready ? "You've been — go and tell them" : `Not been yet`}
+                        </span>
+                    ) : null}
+                    {a.started && a.counts ? (
                         <span className="gql-prog">
                             <Bar have={a.progress} need={a.need} done={a.ready} />
                             <span className="gql-num">{a.progress}/{a.need}</span>
                         </span>
-                    ) : (
+                    ) : null}
+                    {!a.started ? (
                         <span className="gql-untaken">Walk to them to take it on.</span>
-                    )}
+                    ) : null}
 
                     {a.reward ? (
                         <span className="gql-pay">
                             Pays
                             {a.reward.gold ? ` ${a.reward.gold} gold` : ""}
                             {a.reward.xp ? `${a.reward.gold ? " ·" : ""} ${a.reward.xp} xp` : ""}
-                            {a.reward.chest ? " · a chest" : ""}
                             {a.reward.token ? " · a Coliseum token" : ""}
                         </span>
                     ) : null}
