@@ -4680,11 +4680,21 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    So: DARKENED rather than faded. It keeps its colour relationships and its edges, sits in shadow like
    a place with the lights off, and stands a little smaller and further back. The eye reads "closed",
    not "half-deleted". */
+/* ⚠️ THE FILTER IS ON THE ART, NOT ON THE BUILDING. It used to sit on .is-shuttered itself, with
+   "filter: none" on the label underneath to keep the text bright — and that cannot work: a CSS filter on
+   an ancestor applies to every descendant, and a child cannot cancel it. filter:none on the label only
+   clears the label OWN filter. So the gold "Opens at Ashfall Bastion" was being rendered at 42% brightness
+   along with the building, which is the exact text the locked building exists to show.
+   Measured live against a gated account: computed colour rgb(255,215,94), painted grey.
+
+   Dimming the ART and leaving the text alone is what the old comment always meant. */
 .tw-building.is-shuttered { cursor: default; pointer-events: none; text-align: center;
-    opacity: 0.9; filter: grayscale(0.55) brightness(0.42) contrast(1.05);
     transform: scale(0.88); transform-origin: 50% 100%; }
-/* The label is the only part that stays bright — it is the advertisement, and a dark building with a
-   legible "Opens at Fenhollow" under it is the whole point of showing it at all. */
+.tw-building.is-shuttered .tw-building-art,
+.tw-building.is-shuttered .tw-b-emoji {
+    opacity: 0.9; filter: grayscale(0.55) brightness(0.42) contrast(1.05); }
+/* The label and the line under it are the advertisement — a dark building with a legible
+   "Opens at Fenhollow" beneath it is the whole point of showing it at all. */
 .tw-building.is-shuttered .tw-b-label { filter: none; opacity: 1; }
 .tw-building.is-shuttered .tw-b-soon { display: block; font-size: 10px; letter-spacing: 0.04em;
     color: #ffd75e; opacity: 1; margin-top: 2px; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
