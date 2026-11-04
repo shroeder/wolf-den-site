@@ -58,6 +58,17 @@ function zoneNameFor(step) {
     return n ? (zoneByN(n)?.name || null) : null;
 }
 
+// ⚠️ A TITLE IS A TEMPLATE, AND THERE ARE THREE WAYS OUT OF THIS FILE. Luke: "I see make noise in
+// brackets zone name bracket." questBoard filled its copy and the other two did not -- the in-play toast
+// (bumpQuests) and the hand-in result (claimStep) both shipped "{zone_name}" straight to the screen.
+//
+// One function now, used by all three. A raw `step.title` must not appear in a return anywhere.
+function titleOf(step) {
+    return fill(step.title, step, {
+        foe: foeName(step.foe), part: partName(step.part), zone: zoneNameFor(step),
+    });
+}
+
 function sayFor(cur, npc) {
     const l = stepLines(cur.step.id, npc.id, npc.line);
     const names = { foe: foeName(cur.step.foe), part: partName(cur.step.part), zone: zoneNameFor(cur.step) };
@@ -105,10 +116,7 @@ export async function questBoard(buyerId) {
                         // never templated, which is exactly why the ordinal in it could rot while the ask
                         // beside it stayed right. Anything a title says about a number now comes from the
                         // same place the ask does.
-                        title: fill(cur.step.title, cur.step, {
-                            foe: foeName(cur.step.foe), part: partName(cur.step.part),
-                            zone: zoneNameFor(cur.step),
-                        }),
+                        title: titleOf(cur.step),
                         kind: cur.step.kind,
                         need: cur.step.need, progress: Math.min(cur.progress, cur.step.need),
                         // ⚠️ WHETHER `need` IS A QUANTITY AT ALL. For a cull it is "twelve Mothlight" and
@@ -190,7 +198,7 @@ export async function bumpQuests(buyerId, events = {}) {
                   WHERE buyer_id = $1 AND step_id = $2 AND claimed_at IS NULL`,
                 [buyerId, s.id, npc.id, map, next],
             ).catch(() => {});
-            touched.push({ step: s.id, progress: next, need: s.need, done: next >= s.need, title: s.title });
+            touched.push({ step: s.id, progress: next, need: s.need, done: next >= s.need, title: titleOf(s) });
         }
     }
     return touched;
@@ -317,7 +325,7 @@ export async function claimStep(buyerId, stepId) {
 
     return {
         ok: true,
-        step: { id: step.id, title: step.title },
+        step: { id: step.id, title: titleOf(step) },
         reward: step.reward,
         partsPaid,
         token,

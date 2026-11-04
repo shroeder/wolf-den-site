@@ -112,7 +112,16 @@ for (let map = 1; map <= 7; map += 1) {
             if (/\{n\}\s*(th|st|nd|rd)?\s*(chamber|room|zone|level|deep|hollow)/i.test(raw)) {
                 problems.push(`template: {n} used where {n_zone} is meant`);
             }
-            // 4. "1" asked for in the plural.
+            // ⚠️ 4. DID ANYTHING SHIP A RAW TEMPLATE? Luke: "I see make noise in brackets zone name
+            // bracket." The title is a template and there were THREE ways out of grove-quests.js —
+            // questBoard filled its copy, and the in-play toast and the hand-in result did not. A token
+            // that reaches a screen is the most visible possible bug and the cheapest possible check.
+            for (const [where, v] of Object.entries(text)) {
+                const left = String(v).match(/\{[a-zA-Z_]+\}/g);
+                if (left) problems.push(`${where}: shipped an unfilled template — ${left.join(", ")}`);
+            }
+
+            // 5. "1" asked for in the plural.
             if (step.need === 1 && /\b(them all|each of|every)\b/i.test(text.ask)) {
                 problems.push(`ask: plural wording for a need of 1`);
             }
