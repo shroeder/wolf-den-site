@@ -352,15 +352,62 @@ const PLOT_SLOTS = [
     { x: 10, y: 89, s: 1 }, { x: 34, y: 89, s: 1 }, { x: 58, y: 89, s: 1 }, { x: 82, y: 89, s: 1 }, // front row
     { x: 22, y: 69, s: 0.8 }, { x: 46, y: 69, s: 0.8 }, { x: 70, y: 69, s: 0.8 }, { x: 92, y: 69, s: 0.8 }, // back row, inset + smaller
 ];
-function defaultPlotPos(i) {
-    return PLOT_SLOTS[i] || PLOT_SLOTS[PLOT_SLOTS.length - 1];
+// ── ⚠️ AND THE TABLE RAN OUT, WHICH PILED EVERY EXTRA PLOT ON ONE SPOT ───────────────────────────────────────
+// Eric: "whenever new plots are added to the farm, when someone already has like the max amount but they're
+// able to get like new plots after that, these new plots are like squished on top of each other, and you're
+// unable to move them to be able to access each one."
+//
+// `defaultPlotPos` was `PLOT_SLOTS[i] || PLOT_SLOTS[PLOT_SLOTS.length - 1]` — so every plot past the eighth
+// got the EIGHTH ONE'S COORDINATES. Not nearby: identical. Four beds could end up stacked on the back-right
+// corner, and since plots stopped being draggable on purpose (see the note above PLOT_SLOTS) there was no way
+// to pull them apart. The fallback was written to stop an undefined position crashing the scene and it does
+// that perfectly; it just reads as "spare plots are invisible" to the person who bought one.
+//
+// ⚠️ THE TABLE WAS RIGHT WHEN IT WAS WRITTEN. Eight slots covered BASE_PLOTS + the plots track's max of 5.
+// Two sources arrived afterwards and neither of them is a purchasable level, so neither showed up as a
+// bigger `max` to notice: Second Sowing (+2, an ascension power) and grove_plots (+2, capped by
+// GROVE_PLOT_CAP). plotCount tops out at TWELVE now against a table of eight.
+//
+// So the row is computed for however many plots there are, which is the same answer the town street arrived
+// at for the same reason — a hand-picked table cannot know what a later feature added.
+//
+// ⚠️ AND IT RETURNS PLOT_SLOTS UNCHANGED AT EIGHT OR FEWER, so nobody's farm rearranges itself over a bug
+// they never had. Only the counts that were broken get a new layout.
+const PLOT_ROWS = [{ y: 89, s: 1, inset: 0 }, { y: 69, s: 0.8, inset: 12 }];
+const PLOT_X0 = 10;       // the left fence
+const PLOT_X_MAX = 92;    // the right one. 92 rather than 94 is the hand-tuned value the back row already sat at
+const PLOT_STEP = 24;     // the spacing the field was designed around; a row only tightens below it if it must
+
+/**
+ * One position per plot, front row first.
+ *
+ * Spacing is the constant and the row tightens only when the fence demands it: with twelve plots the front
+ * row steps 16.4 and the back row 14, against a bed that is 10.8 points wide (ScenePlot sizes it at 0.108 of
+ * the field, and x here is a percentage of that same field). So the tightest row the cap can produce still
+ * leaves 3.2 points between neighbours — crowded at twelve, which is what twelve plots should look like, and
+ * never overlapping.
+ */
+function plotSlots(n) {
+    if (n <= PLOT_SLOTS.length) return PLOT_SLOTS;
+    const perRow = Math.ceil(n / PLOT_ROWS.length);
+    const out = [];
+    for (const row of PLOT_ROWS) {
+        const k = Math.min(perRow, n - out.length);
+        if (k <= 0) break;
+        const start = PLOT_X0 + row.inset;
+        const step = k > 1 ? Math.min(PLOT_STEP, (PLOT_X_MAX - start) / (k - 1)) : PLOT_STEP;
+        for (let i = 0; i < k; i += 1) {
+            out.push({ x: Math.round((start + step * i) * 10) / 10, y: row.y, s: row.s });
+        }
+    }
+    return out;
 }
 
 // Full garden state for the client: every plot (empty or growing/ready), the seed bag, upgrades + costs,
 // fertilizer stock, and how many crops are ready right now (for the alert badge).
 export async function getGarden(buyerId) {
     if (!buyerId) return null;
-    const [buyer, plots, seeds, packRows, plotUp, bedRows, cropRows] = await Promise.all([
+    const [buyer, plots, seeds, packRows, plotUp, bedRows, cropRows, powers] = await Promise.all([
         loadFarmBuyer(buyerId),
         db.query(`SELECT slot, seed_id, planted_at, ready_at, fertilized FROM mkt_farm_plot WHERE buyer_id = $1 ORDER BY slot`, [buyerId]).catch(() => []),
         db.query(`SELECT seed_id, count FROM mkt_farm_seed WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
@@ -368,6 +415,17 @@ export async function getGarden(buyerId) {
         getPlotUpgrades(buyerId).catch(() => ({})),
         db.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key = 'farm_bed' OR art_key LIKE 'farm_bed_t%'`).catch(() => []),
         db.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key LIKE 'crop_%'`).catch(() => []),
+        // ── ⚠️ THE GARDEN DREW FEWER PLOTS THAN THE GARDEN WOULD LET YOU PLANT IN ────────────────────
+        // plantSeed validates against `plotCount(up, await equippedPowers(buyerId))` and this read used
+        // `plotCount(up)` with no powers at all — so Second Sowing's two plots were accepted by the server
+        // and never drawn for the member who owns the power. Two plots they paid an ascension for, which
+        // only exist if you POST at the endpoint directly.
+        //
+        // In the batch rather than awaited separately: the same reason the hud route folds its gate in —
+        // this is a read the farm screen makes constantly and a call of its own would be another round trip
+        // on every visit. The two counts now come from the same expression, which is the only way they
+        // cannot drift again.
+        equippedPowers(buyerId).catch(() => null),
     ]);
     const cropSprites = {};
     for (const r of (cropRows || [])) if (r.url) cropSprites[r.art_key] = r.url; // { crop_sprout, crop_<id>_grow, crop_<id>_ripe }
@@ -375,14 +433,16 @@ export async function getGarden(buyerId) {
     const bedTiers = {};
     for (const r of (bedRows || [])) if (r.url) { const t = r.art_key === "farm_bed" ? 0 : Number(r.art_key.replace("farm_bed_t", "")); if (Number.isFinite(t)) bedTiers[t] = r.url; }
     const up = buyer?.farm_upgrades || {};
-    const n = plotCount(up);
+    const n = plotCount(up, powers);
     const byslot = new Map((plots || []).map((p) => [p.slot, p]));
     const now = Date.now();
     const gardenPlots = [];
     let readyCount = 0;
     // Server-set only — saved drag positions are deliberately ignored (see PLOT_SLOTS). Anyone who had
     // dragged plots into a pile gets the tidy layout back on their next load.
-    const posFor = (i) => defaultPlotPos(i);
+    // Laid out for THIS member's plot count, so a ninth plot gets a ninth spot rather than the eighth one's.
+    const slots = plotSlots(n);
+    const posFor = (i) => slots[i] || slots[slots.length - 1];
     for (let i = 0; i < n; i += 1) {
         const pos = posFor(i);
         const tracks = plotTracksFor(plotUp[i] || {}); // this plot's specialization tracks (levels + costs)
