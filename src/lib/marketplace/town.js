@@ -5,7 +5,7 @@ import { TOWNS, NEVER_GATED } from "@/lib/marketplace/towns.js";
 import { gateStateFor } from "@/lib/marketplace/town-gate.js";
 
 import { db } from "@/lib/db";
-import { groveOpen, isOwner, isPrimaryOwner } from "@/lib/marketplace/owner.js";
+import { groveOpen, isOwner, isPrimaryOwner, realStreet } from "@/lib/marketplace/owner.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -575,7 +575,10 @@ export async function getTownState(buyerId, { previewTown = null } = {}) {
     //
     // ⚠️ THE GATE ITSELF IS UNTOUCHED. This decides which STREET is drawn, not what is unlocked —
     // featureUnlocked still answers from gated_at, so nothing is taken away from anyone by this line.
-    const town = preview || (gate.exempt ? (groveOpen(buyerId) ? gate.town : null) : gate.town);
+    // ⚠️ realStreet, NOT groveOpen. Same people today -- see REAL_STREET_IDS -- but the question
+    // "which street do I land on" now has its own list, so testing the ungated street no longer means
+    // taking an account out of OWNER_BUYER_IDS and losing admin in 44 other files.
+    const town = preview || (gate.exempt ? (realStreet(buyerId) ? gate.town : null) : gate.town);
 
     // ── ⚠️ A TOWN MUST NEVER RENDER AS A VOID ───────────────────────────────────────────────────────
     // Biome towns switch off the midground and the six depth bands, because a cavern has no city skyline.

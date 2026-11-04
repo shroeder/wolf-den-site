@@ -78,6 +78,32 @@ export function canPreview(feature, buyerId) {
  */
 export const groveOpen = (buyerId) => canPreview("grove", buyerId);
 
+// ── ⚠️ WHICH STREET YOU LAND ON, AS ITS OWN LIST ───────────────────────────────────────────────────────────
+// Luke: "Dont test this specific scenario locally. Just use an account online there. If the owner gated is an
+// issue use a white list and remove us from it temporarily."
+//
+// It was `groveOpen(buyerId) ? gate.town : null`, and groveOpen is `isOwner || guests`. So the only way for
+// an owner to see the street that every ordinary member sees was to take himself out of OWNER_BUYER_IDS —
+// which isOwner is checked for in 44 files, and which would switch off the casino controls, the admin
+// screens, credit checkout and the raid trigger to look at a quest giver.
+//
+// The street you land on is not the same question as what you are allowed to administer, so it gets its own
+// list. Seeded with exactly who had it before, so nobody's street moves on the day this ships.
+//
+// ⚠️ REMOVING YOURSELF HERE DOES NOT COST YOU THE TOWNS. ?town=N still works — canPreview("grove") gates
+// the preview and is untouched — so an owner off this list gets the DEFAULT street by default and any Grove
+// town on request, which is the combination that makes the ungated street testable at all.
+const REAL_STREET_IDS = new Set([
+    "6857d67e-3dd0-46b6-aad7-b91699155ff6", // The Wolf Den (Luke)
+    "27da67c2-8548-453f-bda4-4349c0e4ef06", // Littlewolf
+    "9db11753-f826-4a4f-8ad9-41e19bc45fe4", // Adam Malz
+    "d68dacf6-10e1-40fe-93c8-9ca6ebdbb87e", // Eric D
+    "cd8f4cd8-330a-4ead-ab34-b664fdd6dacf", // aannw
+]);
+
+/** Whether this account lands on its own Grove town, or on the single ungated street everyone else sees. */
+export const realStreet = (buyerId) => Boolean(buyerId) && REAL_STREET_IDS.has(String(buyerId));
+
 // ── THE COSTUME'S DOOR, AND THE ONLY ONE ─────────────────────────────────────────────────────────────────────
 // ⚠️ A GATE THAT DOES NOT HEAR THE LAUNCH SWITCH IS A GATE THAT NEVER OPENS. The Halloween event turns on with
 // one line — HALLOWEEN_PUBLIC in halloween.js — and that line was wired to the chests, the items, the pets and
