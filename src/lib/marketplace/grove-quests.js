@@ -92,7 +92,15 @@ export async function questBoard(buyerId) {
                 sendoff: SENDOFF[npc.id] || "",
                 active: cur
                     ? {
-                        id: cur.step.id, title: cur.step.title, kind: cur.step.kind,
+                        id: cur.step.id,
+                        // ⚠️ THE TITLE GOES THROUGH fill() TOO. It is the one line of a step that was
+                        // never templated, which is exactly why the ordinal in it could rot while the ask
+                        // beside it stayed right. Anything a title says about a number now comes from the
+                        // same place the ask does.
+                        title: fill(cur.step.title, cur.step, {
+                            foe: foeName(cur.step.foe), part: partName(cur.step.part),
+                        }),
+                        kind: cur.step.kind,
                         need: cur.step.need, progress: Math.min(cur.progress, cur.step.need),
                         ready: cur.progress >= cur.step.need,
                         // `started` is the acceptance — see acceptStep. Untaken means the giver is
