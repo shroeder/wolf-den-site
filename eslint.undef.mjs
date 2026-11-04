@@ -22,7 +22,10 @@ const silenced = nextVitals.map((c) => ({ ...c, rules: {} }));
 export default [
     // Generated output is not source. Without this the gate spends its time on turbopack chunks and reports
     // `importScripts is not defined` in a service worker bundle.
-    { ignores: [".next/**", "node_modules/**", "out/**", "public/sw.js", "public/firebase-messaging-sw.js"] },
+    // public/draco/** is the Draco decoder shipped with three.js, copied in verbatim so the Model Lab can
+    // decode its compressed glTF without reaching a CDN. It is a UMD bundle, so it references `define` and
+    // reports four no-undef findings — vendor output, same as the service workers above.
+    { ignores: [".next/**", "node_modules/**", "out/**", "public/sw.js", "public/firebase-messaging-sw.js", "public/draco/**"] },
     ...silenced,
     {
         languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: GLOBALS },
