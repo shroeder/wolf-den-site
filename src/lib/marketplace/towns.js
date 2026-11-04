@@ -7,7 +7,10 @@
 // A town sits BEFORE the map it is named for. Town 1 is where a new account starts and opens onto the Grove's
 // first forest; town 7 opens onto the Ashen Reach. Clearing a map opens the next town.
 //
-// Full design, with the measurements behind the ordering: docs/grove-towns-design.md
+// ⚠️ THE DESIGN DOC THIS ONCE POINTED AT IS DELETED (2026-11-04, Luke: "serves to really just be a risk
+// to regress" -- and it had already drifted, proposing a curve segment the game does not have). The
+// measurements behind the ordering are not lost: the ordering IS this table, and what must not be changed
+// about it is in docs/grove-release-guide.md 3.2 and the plaza-is-the-city memory.
 //
 // ⚠️ THIS FILE IS PURE. No db import, no server-only — the hud route reads it, the route guards read it, and
 // the menu reads the answer it produces. One table, three readers, no second copy of the rule.

@@ -13,14 +13,20 @@ we have a place to keep notes and make sure that we capture any gotchas."*
 
 ---
 
-## 1. The two switches, and why they are one switch
+## 1. The switches
 
-There are exactly two constants that open the Grove, and **they must flip in the same deploy.**
+Two constants open the Grove. **A third thing moves with them and is not a constant at all**, which is
+exactly why it is easy to miss — see §3.11.
 
 | switch | file | today | what it does |
 |---|---|---|---|
 | `canPreview("grove")` | `owner.js` | owners + 4 guests | who may enter the Grove at all |
 | `GATING_LIVE` | `towns.js` | `false` | whether new signups are stamped `gated_at` |
+| the onboarding guide | `guide-chapters.js`, `/marketplace/guide` | live | a chapter-by-chapter ramp through a game that gating locks |
+
+⚠️ **Nothing greps for the third row.** The first two are named constants a launch-day reader will find by
+searching; the guide is a whole feature with a gold payout attached, and the only reason it is written down
+here is that the doc which held it was deleted on 2026-11-04. Read §3.11 before step 4.
 
 ### ⚠️ The order is not a preference — one order mints unplayable accounts
 
@@ -51,7 +57,9 @@ keep everything"* — is already implemented by doing nothing. Do not write a mi
 3. **Deploy and watch, with gating still off.** Everyone can play; nobody is gated. This is the window where
    load, the economy and the curve get their first real numbers.
 4. **Then flip `GATING_LIVE = true`**, in its own deploy, once step 3 looks right.
-5. **Announce.** See [[announce-every-fix-or-it-is-half-a-fix]] — and the standing carve-out that casino
+5. **Retire the onboarding guide in that same deploy** — see §3.11. It is a third switch, and it is the one
+   nobody would think to look for.
+6. **Announce.** See [[announce-every-fix-or-it-is-half-a-fix]] — and the standing carve-out that casino
    rates are never announced.
 
 ---
@@ -64,7 +72,8 @@ Each of these was discovered during build and would otherwise be rediscovered at
 Decided 2026-11-04, reversing the original plan. `/marketplace/town` is always the plaza;
 `town.js` has `const town = preview || null`. If anyone ever re-introduces a lookup there, the Den gets
 sorted into seven streets **by Grove depth** and global chat, raids and the tavern fragment along with it.
-Full reasoning: `docs/grove-towns-design.md` §1b.
+Full reasoning: the `plaza-is-the-city` memory. The design doc that carried it was deleted 2026-11-04 —
+see §6.
 
 ### 3.2 `TOWNS[n].features` is an unlock set, not a street inventory
 Two consumers: `featureUnlocked` (what a gated account may use, anywhere) and `townStreet(n)` (what stands
@@ -124,6 +133,27 @@ Removing chests removed the only route celestial and primordial had into the gam
 call (*"drop the top tiers entirely"*), not an oversight — but it means **the Grove cannot pay elite gear at
 all**. If that is wrong, it is a content decision to make before launch, not after.
 
+### 3.11 ⚠️ The onboarding guide has to retire in the SAME deploy as `GATING_LIVE`
+Rescued 2026-11-04 from `grove-progression-requirements.md` before deleting it. This is the third thing
+that moves on launch day and the only one with no constant to grep for.
+
+Luke: *"we need to retire the onboarding guide, but only once the gate for the Grove opens."* And:
+*"instead of having the onboarding guide — which is now kind of not gonna work all that great because it was
+meant to be a ramp, but now you don't have access to everything — I'd probably maybe do away with that
+entirely."*
+
+`guide-chapters.js` walks a new member through the whole game, chapter by chapter. Under gating most of that
+game is locked on day one, so the guide becomes **a list of doors that do not open** — the most discouraging
+thing a new account could be handed.
+
+- **Not before.** Until `GATING_LIVE` flips nobody is gated, every door the guide names is open, and it is
+  doing its job. Pulling it early deletes a working ramp and puts nothing in its place.
+- **⚠️ IT IS A DELETION WITH A PAYOUT ATTACHED.** `src/lib/marketplace/guide.js`, `guide-chapters.js`,
+  `/marketplace/guide`, and **`guide_step` / `guide_chapter` mint reasons already wired into the coin
+  ledger**. Remove the guide without the reasons and two faucets exist that nothing can reach; remove the
+  reasons without checking and members who were mid-guide have a dead balance. **Check both before deleting
+  either.**
+
 ---
 
 ## 4. Checks to run on the day
@@ -142,7 +172,31 @@ above rendered perfectly while being broken.
 
 ---
 
-## 5. Still open
+## 5. ⚠️ The design docs are gone — deleted 2026-11-04
+
+Luke: *"I think at this point, the design doc is largely unneeded since we've implemented most of what I
+needed it for. And at this point, serves to really just be a risk to regress."*
+
+He is right, and one of them proves it: `grove-towns-design.md` §3c proposed an on-ramp segment for depths
+1–24 against a "shipped climb" of `hpPerZone 5.04%`. The live curve is **`hpPerZone 0.065`, `dmgPerZone
+0.0519`, with no segment** — the whole blocker section described numbers that no longer exist and a proposal
+that was superseded by retuning the curve instead. A doc like that does not sit there inertly; it gets read
+and believed.
+
+| deleted | why it was safe |
+|---|---|
+| `grove-towns-design.md` | built. The one live item in it — the City reversal — is §3.1 here and the `plaza-is-the-city` memory. Its only open question (the Tavern door) is §6 below. |
+| `grove-npcs-and-coliseum.md` | built, and both its decisions are now stated in the code that implements them: `grove-coliseum.js` settles kills "by the ordinary Grove path — same zone gate", and `chestsFor` spawns chests for waves cleared on a failed run. |
+| `grove-progression-requirements.md` | a roadmap written before the City decision, so its "replace the town" assumptions were already false. Its one live gotcha is §3.11 above. |
+
+**Kept, deliberately:** this file; `grove-maps-remaining.md` (maps 8–12 are undrawn — a work list, not a
+plan); `node-map-design.md` (unbuilt, and §11 is where the open **stat ceilings** question lives, cited from
+five places in `grove-catalog.js`, `grove-maps.js` and `grove-recipes.js`); `grove-feedback-backlog.md`
+(Luke's own words, with what is done and what is not).
+
+---
+
+## 6. Still open
 
 - **3.4** — credit preview players' lost quest progress, or accept it?
 - **3.9** — is `sigil_road`'s carved sign a defect?
