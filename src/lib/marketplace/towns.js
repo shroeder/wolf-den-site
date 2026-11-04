@@ -35,6 +35,21 @@ export const GATING_LIVE = false;
  * the game and the late ones hold what a thirty-hour player is finally ready for. Spreading features evenly
  * would lock a new member out of the farm for a week.
  */
+// ── ⚠️ `features` IS AN UNLOCK SET, NOT A STREET INVENTORY ────────────────────────────────────────────
+// It does two jobs and they are easy to confuse:
+//
+//   FEATURE_TOWN / featureUnlocked   the town at which a gated account UNLOCKS that feature, anywhere
+//   townStreet(n)                    which buildings stand on that town's own street
+//
+// So town 1 listing "tavern" means THE TAVERN UNLOCKS AT TOWN 1 — and the tavern it unlocks is the one in
+// the City, which is where the tavern is. It does not mean Rootwood has a pub.
+//
+// ⚠️ WHICH IS WHY TOWN 1 IS NOT TRIMMED. It reads like a copy of the plaza's starter kit because that is
+// precisely what it is: the onboarding unlock set. Stripping it to "grove only" to make Rootwood feel like
+// a trailhead would gate pets, the bag and the profile behind deeper Grove progress — the opposite of the
+// settled decision that pets open IN FULL at town 1.
+//
+// Rootwood is a trailhead because of what STANDS on it, not because of what it unlocks.
 export const TOWNS = [
     {
         n: 1, id: "rootwood", name: "Rootwood Waystation", biome: "forest", opens: "The Grove",

@@ -5,7 +5,7 @@ import { TOWNS, NEVER_GATED } from "@/lib/marketplace/towns.js";
 import { gateStateFor } from "@/lib/marketplace/town-gate.js";
 
 import { db } from "@/lib/db";
-import { groveOpen, isOwner, isPrimaryOwner, realStreet } from "@/lib/marketplace/owner.js";
+import { groveOpen, isOwner, isPrimaryOwner } from "@/lib/marketplace/owner.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -132,9 +132,10 @@ export const GATED_BUILDINGS = [
 // Luke: "the existing town will end up changing and encompass only the first few features that you have
 // unlocked. Every additional town will have those new features."
 //
-// So a town is not the whole street with some doors dark — each town is its own short street carrying only
-// ITS features, and fast travel moves between the ones you have reached. Town 1 is a waystation with two
-// buildings on it, and that is correct: it is a trailhead, not a city.
+// ⚠️ THAT PLAN CHANGED ON 2026-11-04 AND THIS NOTE IS KEPT TO SAY SO. The existing town does NOT change
+// and does NOT split — it is the City and it keeps everything. What is still true is the second half: each
+// Grove town is its own short street carrying only ITS features, with fast travel between the ones you have
+// reached. Town 1 is a trailhead, not a city, because the City is somewhere else entirely.
 //
 // ⚠️ AND IT SHOWS THE NEXT TOWN'S BUILDINGS, SHUTTERED. A street with two lit doors and nothing else reads as
 // an empty game. The next town's buildings stand on it dark, named, saying which map opens them — which is
@@ -575,10 +576,30 @@ export async function getTownState(buyerId, { previewTown = null } = {}) {
     //
     // ⚠️ THE GATE ITSELF IS UNTOUCHED. This decides which STREET is drawn, not what is unlocked —
     // featureUnlocked still answers from gated_at, so nothing is taken away from anyone by this line.
-    // ⚠️ realStreet, NOT groveOpen. Same people today -- see REAL_STREET_IDS -- but the question
-    // "which street do I land on" now has its own list, so testing the ungated street no longer means
-    // taking an account out of OWNER_BUYER_IDS and losing admin in 44 other files.
-    const town = preview || (gate.exempt ? (realStreet(buyerId) ? gate.town : null) : gate.town);
+    // ── ⚠️ THE PLAZA IS THE CITY, AND IT IS PERMANENT ─────────────────────────────────────────
+    // Luke, 2026-11-04: "I think I was naive when I was building the Grove Towns... I would have thought
+    // that I could replace the existing town. Now I'm thinking we need to leave that. Even after we
+    // release the Grove, we can't get rid of it."
+    //
+    // The plan this replaces was that a Grove town SWAPPED your plaza: reach map 3 and /marketplace/town
+    // became Fenhollow. That cannot work, and the reason is social rather than technical. Everything the
+    // Den does together lives on the plaza — global chat, the tavern room with other patrons visibly in
+    // it, the stockade, live town raids, the voting booth, town projects. A raid needs everybody in one
+    // place; chat is worthless if the population is scattered across seven streets BY GROVE DEPTH, which
+    // is exactly what the swap sorted them by. It would have split the Den by how far somebody had got.
+    //
+    // So: the plaza is the CITY — one room, everyone, forever. The seven Grove towns are forward
+    // operating bases, entered from inside the Grove (GroveClient loads TownClient when you walk to one)
+    // and never through this route. A respite between maps, and the place that shows what the next map
+    // unlocks.
+    //
+    // ⚠️ THIS IS `null`, NOT A LOOKUP, AND THAT IS THE WHOLE CHANGE. Everything else about the towns
+    // survives: gating, the unlock sets, fast travel, the shuttered next-town buildings. Only the
+    // question "which street is /marketplace/town" has a new answer, and the answer is always the City.
+    //
+    // ⚠️ `preview` STAYS. ?town=N is how the seven are looked at without walking the Grove, and it is
+    // what makes the ungated street testable from an owner account — see qa-town-npcs.mjs.
+    const town = preview || null;
 
     // ── ⚠️ A TOWN MUST NEVER RENDER AS A VOID ───────────────────────────────────────────────────────
     // Biome towns switch off the midground and the six depth bands, because a cavern has no city skyline.

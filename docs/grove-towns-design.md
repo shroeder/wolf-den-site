@@ -18,8 +18,8 @@ From Luke, 2026-10-28 — these are settled, not open:
   regardless of where they are in the Grove. The gating applies to accounts created after launch.
 - **A locked feature is VISIBLE and clearly locked**, not hidden. (Luke said both in one breath and then
   corrected to visible; visible is the rule.)
-- **The existing town splits.** Today's town has a house per feature. Those houses distribute across the
-  seven towns — town 1 keeps only the first few, and each new town brings its own.
+- ~~**The existing town splits.**~~ **REVERSED 2026-11-04 — see §1b.** The existing town does not split and
+  does not change. It is the City.
 
 ### Decided 2026-10-28, answering the open questions
 
@@ -31,6 +31,70 @@ From Luke, 2026-10-28 — these are settled, not open:
   stage."* **Already true in the shipped code** — see §3b.
 - **The curve gets rethought, not patched.** Luke: *"make the boss way easier, along with many in the forest
   and second maps, and the enemies too."* The measured case is §3a; the proposal is §3c.
+
+---
+
+## 1b. The City and the forward bases — reversed 2026-11-04
+
+Luke: *"I think I was naive when I was building the Grove Towns. I would have thought that I could replace
+the existing town. Now I'm thinking we need to leave that. Even after we release the Grove, we can't get rid
+of it."*
+
+**The plaza is the City. It is permanent, it is shared, and nothing replaces it.** The seven Grove towns are
+**forward operating bases**: a respite between maps, and the place that shows a player which systems the next
+map opens.
+
+### Why the swap could never have worked
+
+The reason is social, not technical. Everything the Den does *together* lives on the plaza — global chat, the
+tavern room with other patrons visibly in it, the stockade, live town raids, the voting booth, town projects.
+A raid needs everybody in one place. Chat is worthless if the population is sorted into seven streets **by
+Grove depth**, which is exactly what the swap sorted them by: it would have split the Den by how far each
+member had got.
+
+### What this changes in code
+
+Almost nothing, which is the good news — the towns were already entered from inside the Grove
+(`GroveClient` loads `TownClient` when you walk to one). One line in `town.js`:
+
+```js
+const town = preview || null;   // was: realStreet(buyerId) ? gate.town : null
+```
+
+`/marketplace/town` is now always the City. `?town=N` still previews a Grove town. `REAL_STREET_IDS`
+— the allow-list deciding whose plaza got swapped — is deleted, because nobody's does.
+
+### What does NOT change
+
+- **Gating.** New accounts still unlock features town by town. `featureUnlocked` is untouched.
+- **The unlock sets.** See the trap below.
+- **Fast travel**, and **shuttered next-town buildings** — that second one is now load-bearing: it is the
+  whole "see what you are unlocking" job, and it was already built for it.
+
+### ⚠️ The trap: `features` is an unlock set, NOT a street inventory
+
+`TOWNS[n].features` does two jobs:
+
+| consumer | meaning |
+|---|---|
+| `FEATURE_TOWN` / `featureUnlocked` | the town at which a gated account **unlocks** that feature, anywhere in the game |
+| `townStreet(n)` | which buildings stand on **that town's street** |
+
+Town 1 lists `tavern`, which means *the tavern unlocks at town 1* — and the tavern it unlocks is the one in
+the **City**. It does not mean Rootwood has a pub.
+
+So **town 1's list must not be trimmed** to make Rootwood "feel like a trailhead". It reads like a copy of
+the plaza's starter kit because it *is* the onboarding unlock set; stripping it would gate pets, the bag and
+the profile behind deeper Grove progress — the opposite of the settled decision that **pets open in full at
+town 1**. Rootwood is a trailhead because of what *stands* on it, not because of what it unlocks.
+
+*(This was nearly got wrong on the day the decision was made: the first proposal was to strip town 1.)*
+
+### Open, from this change
+
+- The Grove-town **Tavern building** has `href: "/marketplace/friends"` — not the tavern room, which is
+  entered from the plaza via `setInTavern(true)`. Under the City model the tavern is a City building and
+  this door on a Grove street is probably wrong. Not yet decided.
 
 ---
 
