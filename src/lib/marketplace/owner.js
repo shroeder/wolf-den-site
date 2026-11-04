@@ -94,10 +94,7 @@ export const groveOpen = (buyerId) => canPreview("grove", buyerId);
 // the preview and is untouched — so an owner off this list gets the DEFAULT street by default and any Grove
 // town on request, which is the combination that makes the ungated street testable at all.
 const REAL_STREET_IDS = new Set([
-    // ⚠️ TEMPORARILY OUT — Luke, 2026-11-04: "remove us from it temporarily", so the ungated street can be
-    // tested on the LIVE site from his own account. PUT THIS LINE BACK when the test is done. While it is
-    // commented out he lands on the default street; ?town=N still gives him any Grove town on request.
-    // "6857d67e-3dd0-46b6-aad7-b91699155ff6", // The Wolf Den (Luke)
+    "6857d67e-3dd0-46b6-aad7-b91699155ff6", // The Wolf Den (Luke)
     "27da67c2-8548-453f-bda4-4349c0e4ef06", // Littlewolf
     "9db11753-f826-4a4f-8ad9-41e19bc45fe4", // Adam Malz
     "d68dacf6-10e1-40fe-93c8-9ca6ebdbb87e", // Eric D
