@@ -195,7 +195,8 @@ sc = bpy.context.scene
 sc.frame_start, sc.frame_end = 1, FRAMES
 sc.render.fps = 24
 
-ARM_SWING = 17.0          # degrees, peak
+ARM_SWING = 19.0          # degrees, peak
+ARM_TUCK = 27.0           # degrees, bringing the A-pose arms down to the sides
 
 # ── SIGNS ARE CALIBRATED, NEVER TYPED ─────────────────────────────────────────
 # Every failure in this animation has been a mirrored axis: the right knee bent
@@ -221,13 +222,46 @@ def _probe(bone, watch_bone, use_tail, axis_deg, want):
     bpy.context.view_layer.update()
     return 1.0 if want(before, after) else -1.0
 
-FOOT_SIGN, ARM_SIGN = {}, {}
+FOOT_SIGN, ARM_SIGN, TUCK_SIGN = {}, {}, {}
 for _s in ("l", "r"):
+    # ⚠️ MPFB RESTS IN AN A-POSE -- arms ~42 degrees out from the body. Keying
+    # only fore-aft swing on top leaves them splayed all cycle, which reads as
+    # a scarecrow. They must come DOWN to the sides first.
+    #
+    # ⚠️ AND THE AXIS IS SEARCHED, NOT PICKED. My first attempt assumed Z and
+    # measured success as "the hand moved toward the midline" -- but Z swings
+    # the arm FORWARD on this rig, which also moves the hand inward, so the
+    # probe passed while the arms went out to horizontal. The test that
+    # actually means "tucked" is the upperarm's ANGLE FROM STRAIGHT DOWN.
+    def _elev(side):
+        pb = arm.pose.bones["upperarm_%s" % side]
+        bpy.context.view_layer.update()
+        d = (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % side].head) - (arm.matrix_world @ pb.head)
+        return math.degrees(math.atan2(math.hypot(d.x, d.y), -d.z))
+    def _tuck_probe(side):
+        pb = arm.pose.bones["upperarm_%s" % side]
+        pb.rotation_euler = Euler((0, 0, 0), "XYZ")
+        base = _elev(side)
+        best, bestv = None, base
+        for ax in (1, 2):
+            for sg in (1, -1):
+                e = [0.0, 0.0, 0.0]
+                e[ax] = math.radians(20 * sg)
+                pb.rotation_euler = Euler(e, "XYZ")
+                v = _elev(side)
+                if v < bestv:
+                    best, bestv = (ax, sg), v
+        pb.rotation_euler = Euler((0, 0, 0), "XYZ")
+        bpy.context.view_layer.update()
+        return best or (2, 1), base, bestv
+    TUCK_SIGN[_s] = _tuck_probe(_s)
     # +pitch must drop the TOE (plantarflexion, the push-off).
     FOOT_SIGN[_s] = _probe("foot_%s" % _s, "ball_%s" % _s, True, 20, lambda b, a: a.z < b.z)
     # +swing must carry the HAND forward, and forward is -Y.
     ARM_SIGN[_s] = _probe("upperarm_%s" % _s, "lowerarm_%s" % _s, True, 20, lambda b, a: a.y < b.y)
-print("CALIBRATED foot %s  arm %s" % (FOOT_SIGN, ARM_SIGN))
+print("CALIBRATED tuck l axis%d sign%+d elev %.0f->%.0f | r axis%d sign%+d elev %.0f->%.0f" % (
+    TUCK_SIGN["l"][0][0], TUCK_SIGN["l"][0][1], TUCK_SIGN["l"][1], TUCK_SIGN["l"][2],
+    TUCK_SIGN["r"][0][0], TUCK_SIGN["r"][0][1], TUCK_SIGN["r"][1], TUCK_SIGN["r"][2]))
 
 def arm_pose(side, phase):
     """Arms swing opposite the leg on the same side."""
@@ -273,7 +307,10 @@ for f in range(1, FRAMES + 2):
         tgt.keyframe_insert("rotation_quaternion", frame=f)
 
         ab = arm.pose.bones["upperarm_%s" % s]
-        ab.rotation_euler = Euler((math.radians(arm_pose(s, ph) * ARM_SIGN[s]), 0, 0), "XYZ")
+        (_ax, _sg), _base, _best = TUCK_SIGN[s]
+        _e = [math.radians(arm_pose(s, ph) * ARM_SIGN[s]), 0.0, 0.0]
+        _e[_ax] += math.radians(ARM_TUCK * _sg)
+        ab.rotation_euler = Euler(_e, "XYZ")
         ab.keyframe_insert("rotation_euler", frame=f)
         lb = arm.pose.bones["lowerarm_%s" % s]
         lb.rotation_euler = Euler((math.radians((-14 - 7 * math.cos(2 * math.pi * ph)) * ARM_SIGN[s]), 0, 0), "XYZ")

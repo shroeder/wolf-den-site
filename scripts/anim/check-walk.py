@@ -38,6 +38,9 @@ for f in range(1, FRAMES + 1):
         r["%s_ank_z" % s] = ank.z
         r["%s_toe_z" % s] = toe.z
         r["%s_sole" % s] = min(ank.z - ANKLE_H, toe.z)
+    for s in ("l", "r"):
+        d = (W @ arm.pose.bones["lowerarm_%s" % s].head) - (W @ arm.pose.bones["upperarm_%s" % s].head)
+        r["%s_arm_elev" % s] = math.degrees(math.atan2(math.hypot(d.x, d.y), -d.z))
     r["hip_z"] = (W @ arm.pose.bones["pelvis"].head).z
     # ── GROUND TRUTH: THE DEFORMED MESH ITSELF ────────────────────────────
     # Deriving the sole from bone positions means approximating where the foot
@@ -115,6 +118,11 @@ check("hip bob present", 0.025 <= bob <= 0.11, "travel %.3f" % bob)
 
 sym = max(abs(rows[i]["l_knee_deg"] - rows[(i + FRAMES // 2) % FRAMES]["r_knee_deg"]) for i in range(FRAMES))
 check("left/right symmetry", sym < 6.0, "worst half-cycle mismatch %.1f deg" % sym)
+
+maxarm = max(max(r["l_arm_elev"], r["r_arm_elev"]) for r in rows)
+minarm = min(min(r["l_arm_elev"], r["r_arm_elev"]) for r in rows)
+check("arms hang at the sides", maxarm <= 30.0,
+      "upper arm %.0f..%.0f deg from vertical (hanging ~10-20, A-pose 42, T-pose 90)" % (minarm, maxarm))
 
 maxthigh = max(max(r["l_thigh_deg"], r["r_thigh_deg"]) for r in rows)
 check("no marching", maxthigh <= 34.0, "peak thigh lift %.0f deg from vertical (walk ~25, march 60+)" % maxthigh)
