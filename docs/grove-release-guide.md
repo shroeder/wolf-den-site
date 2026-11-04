@@ -91,6 +91,18 @@ They survived the removal and are the whole of what an arena run pays. They borr
 old chest tiers any more — `COLISEUM_TIERS` is declared locally in `grove-coliseum-plan.js` and
 `grove-coliseum-loot.js`.
 
+### 3.6b The City shutters what you have not unlocked — and this path has never run live
+`GATING_LIVE` is `false`, so **no account has ever been gated**: every member alive today is exempt and
+sees the whole street. The shuttering added 2026-11-04 is therefore **dormant code that switches on for the
+first time on launch day**, for brand-new accounts only.
+
+A gated account at town 1 sees 3 doors open (Tavern, General Store, Vault) and **11 shuttered**, each named
+with the town and the map that opens it. At town 3 it is 7 and 7; at town 7 everything is open.
+
+**Test it before launch** by creating a real account with `gated_at` set, or by temporarily returning a
+fake `gate` — do not assume. It reuses the Grove towns' `is-shuttered` markup, which had a real bug in it
+as recently as 2026-11-03 (buildings rendering at their natural 1024px size).
+
 ### 3.7 A new quest giver must join five registries
 `CHAINS`, the title table, `npcsOnMap`, the board's `coliseum` flag, and the scene's `npcHere` filter. The
 scene is the one that fails **silently** — a marshal matched by zone paints a second figure on the same spot.

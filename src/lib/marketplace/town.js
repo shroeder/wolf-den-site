@@ -3,6 +3,7 @@ import path from "node:path";
 import fsSync from "node:fs";
 import { TOWNS, NEVER_GATED } from "@/lib/marketplace/towns.js";
 import { gateStateFor } from "@/lib/marketplace/town-gate.js";
+import { TOWNS as GATE_TOWNS, FEATURE_TOWN, NEVER_GATED as GATE_NEVER } from "@/lib/marketplace/towns.js";
 
 import { db } from "@/lib/db";
 import { groveOpen, isOwner, isPrimaryOwner } from "@/lib/marketplace/owner.js";
@@ -793,9 +794,41 @@ export async function getTownState(buyerId, { previewTown = null } = {}) {
             //
             // The branch is on the MEMBER, not on a deploy flag, because the two kinds of account coexist
             // forever: a member from before gating keeps the whole street for good.
+            // ── ⚠️ THE CITY SHOWS EVERY DOOR, SO IT HAS TO SAY WHICH ONES ARE SHUT ────────────────
+            // Luke, 2026-11-04: "the main hub town, let's call it the city, has features like the Forge
+            // that players may not yet have access to... we have to figure out how to communicate that to
+            // players who don't have the Forge unlocked, but will see it."
+            //
+            // This branch handed back every building, lit, for everybody. That was correct while the
+            // street was only ever walked by ungated accounts — and it stopped being correct the moment
+            // the plaza became the permanent City, because now a gated newcomer walks the SAME street.
+            //
+            // What they got: a Forge standing open, a tap, and a silent redirect to the hub by gatePage.
+            // A locked door with no sign on it, which is the worst of the three options — worse than
+            // hiding it, because it looks like a bug.
+            //
+            // ⚠️ IT IS THE TREATMENT THE GROVE TOWNS ALREADY HAVE. townStreet() marks the NEXT town's
+            // buildings `locked` with the town that opens them, and the client already draws that:
+            // .is-shuttered, dimmed, with "Opens at ..." under the name. Same flag, same markup, same
+            // copy — the City just never set it. Nothing new is drawn and nothing new is styled.
+            //
+            // ⚠️ AND IT IS THE *MEMBER* THAT DECIDES, NOT A DEPLOY FLAG. gate.exempt is true for every
+            // account that predates gating, so their street is exactly as lit as it was yesterday. The
+            // two kinds of account coexist forever.
+            const lockInfo = (b) => {
+                if (gate.exempt) return null;                       // grandfathered: everything open
+                if (!b.feature || GATE_NEVER.has(b.feature)) return null;
+                const need = FEATURE_TOWN[b.feature];
+                if (!need || need <= (gate.town || 1)) return null;  // already reached
+                const t = GATE_TOWNS.find((x) => x.n === need) || null;
+                // opensAt is the TOWN, opensPast is the MAP that opens it — the client prints the first
+                // and the design says a locked feature must name the second, so both travel.
+                return { locked: true, opensAt: t?.name || `Town ${need}`, opensPast: t?.opens || null };
+            };
             const visible = town
                 ? townStreet(town).filter((b) => b.gate !== "owner" || isOwner(buyerId))
-                : [...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))];
+                : [...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))]
+                    .map((b) => ({ ...b, ...(lockInfo(b) || { locked: false }) }));
             // ⚠️ ONE PASS FOR EVERYTHING THAT STANDS OUT THERE — see layOutStreet. The NPCs used to carry
             // their own hand-picked percentages in the client, which is how the act board ended up 0.4%
             // from the Mine. They take a slot in this row now, so a collision cannot be expressed.
