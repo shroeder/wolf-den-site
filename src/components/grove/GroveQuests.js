@@ -182,7 +182,9 @@ export default function GroveQuests({
         try {
             const r = await onHandIn?.(stepId);
             if (r?.ok) {
-                setNote(r.token ? "Handed in — and a Coliseum token with the rest." : "Handed in.");
+                setNote("Handed in."
+                    + (r.chest ? ` A ${r.chest} chest went to your bag.` : "")
+                    + (r.token ? " And a Coliseum token." : ""));
             } else {
                 setNote(r?.error === "not_finished" ? "That one is not finished yet." : "They cannot take that right now.");
             }

@@ -103,7 +103,11 @@ export default function GroveGiver({ npcHere, busy = false, onAccept, onClaim, o
             setNote(r?.error === "not_finished" ? "Not yet." : "They cannot take that right now.");
             return;
         }
-        setNote(r.token ? "They press a Coliseum token in with the rest." : null);
+        // ⚠️ NAME WHAT ARRIVED. A chest granted silently is a chest nobody knows they have.
+        setNote([
+            r.chest ? `A ${r.chest} chest goes in your bag.` : null,
+            r.token ? "They press a Coliseum token in with the rest." : null,
+        ].filter(Boolean).join(" ") || null);
         setPlate("complete");
     };
 

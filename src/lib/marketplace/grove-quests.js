@@ -385,6 +385,46 @@ export async function claimStep(buyerId, stepId) {
         }
     }
 
+    // ── ⚠️ A CHEST, FROM THE GAME'S OWN EIGHT-TIER LADDER ─────────────────────────────────────────
+    // Luke: "I dont want grove chests. I want the grove quests to rewards typical loot chest, you know
+    // iron wooden etc."
+    //
+    // So this is addChests and mkt_chest -- the wheel's chests, the boss's chests, the mine's -- NOT the
+    // four Grove tiers that were removed this afternoon. Nothing new to open, nothing new to draw: a
+    // quest now pays the chest every other part of the game already pays.
+    //
+    // ⚠️ DEPTH PICKS THE TIER, AND IT STOPS AT MYTHIC. Everything above it -- ascendant, eternal,
+    // celestial, primordial -- is elite-sourced and is how real-money gear enters the game; a repeatable
+    // route to one through questing would be a hole in that. Map 7 paying mythic is already the best
+    // chest in the game that is not elite.
+    //
+    // ⚠️ AND THIS IS A BOUNDED GRANT, NOT A FAUCET. A step can be claimed once, ever, and there are 71
+    // in the whole game. Whatever the rate, the lifetime supply per account is fixed -- which is why a
+    // coin-flip here is safe where the same odds on a kill loop would not be. See [[chest-rolls-are-a-chain]]
+    // for why the TIER matters more than the rate: the roll inside a chest is first-match-wins, so handing
+    // out a higher tier steals from every tier beneath it.
+    const CHEST_BY_MAP = ["wooden", "wooden", "iron", "iron", "gold", "gold", "mythic"];
+    const UP = { wooden: "iron", iron: "gold", gold: "mythic", mythic: "mythic" };
+    let chest = null;
+    {
+        const base = CHEST_BY_MAP[Math.min(CHEST_BY_MAP.length - 1, Math.max(0, npc.map - 1))];
+        const lastOfChain = chain.length > 0 && chain[chain.length - 1].id === step.id;
+        // The last step of a chain is the beat that already pays the Coliseum token, so it gets the
+        // better chest rather than a second kind of reward nobody was expecting.
+        const rnd = rollFor(`${buyerId}|${stepId}|chest`);
+        if (lastOfChain) chest = UP[base] || base;
+        else if (rnd() < 0.5) chest = base;
+        if (chest) {
+            const { addChests } = await import("@/lib/marketplace/chests.js");
+            const ok = await addChests(buyerId, { [chest]: 1 }, {
+                source: "grove_quest", meta: { stepId, npc: npcId, map: npc.map },
+            }).then(() => true).catch(() => false);
+            // ⚠️ ONLY REPORT WHAT WAS GRANTED. The quest toast spent the whole life of this feature
+            // announcing a number the database had refused; not again.
+            if (!ok) chest = null;
+        }
+    }
+
     // The Coliseum token. Clamped at the cap rather than refused, so finishing a chain while full still
     // completes the chain — you simply do not get a fourth token you could not have held anyway.
     let token = 0;
@@ -404,6 +444,7 @@ export async function claimStep(buyerId, stepId) {
         step: { id: step.id, title: titleOf(step) },
         reward: step.reward,
         partsPaid,
+        chest,
         token,
         npc: npc.name,
     };
