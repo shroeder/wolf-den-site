@@ -100,8 +100,15 @@ export default function DailyCheckin() {
                     </>
                 ) : (
                     <>
-                        <h2 className="checkin-title">Welcome back!</h2>
-                        <p className="checkin-sub">Today&apos;s streak reward: <strong><Glyph value={reward.emoji} /> {reward.label}</strong></p>
+                        {/* ⚠️ "WELCOME BACK" TO SOMEBODY WHO HAS NEVER BEEN HERE. A brand-new
+                            account meets this modal before it meets the game — it is the first screen
+                            after signup — and it greeted them as a returning member. See firstEver in
+                            daily-checkin.js for why streak === 1 could not tell the two apart. */}
+                        <h2 className="checkin-title">{state.firstEver ? "Welcome to the Den!" : "Welcome back!"}</h2>
+                        <p className="checkin-sub">
+                            {state.firstEver ? "Your first day's reward: " : "Today's streak reward: "}
+                            <strong><Glyph value={reward.emoji} /> {reward.label}</strong>
+                        </p>
                         <div className="checkin-summary">
                             {s.pet ? <div className="checkin-row">🐾 <strong>{s.pet.name}</strong> is Lv {s.pet.level}{s.pet.maxed ? " (MAX)" : ""}</div> : null}
                             {s.bossName && s.packDamage24h > 0 ? <div className="checkin-row">⚔️ The pack hit <strong>{s.bossName}</strong> for {s.packDamage24h.toLocaleString()} in the last day</div> : null}

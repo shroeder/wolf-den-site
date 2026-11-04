@@ -126,6 +126,13 @@ export async function getDailyCheckin(buyerId) {
         show: !claimedToday, // pop the modal once per day, until claimed
         claimedToday,
         currentStreak: row?.streak || 0,
+        // ⚠️ NEVER CLAIMED IS NOT THE SAME AS STREAK 1. Both read nextStreak === 1, and the modal
+        // greeted both with "Welcome back!" — which is simply false for somebody who has never been here,
+        // and it is the FIRST thing a new account sees, over a town they have not met yet.
+        //
+        // streak_claimed_day is NULL only for an account that has never claimed a day, so it separates the
+        // two cleanly: a returning member whose streak broke has a date in it and is genuinely coming back.
+        firstEver: !row?.streak_claimed_day,
         nextStreak,
         reward: { label: reward.label, emoji: reward.emoji },
         summary: claimedToday ? null : await awaySummary(buyerId),
