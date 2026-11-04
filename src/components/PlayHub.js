@@ -86,8 +86,9 @@ const READY = [
         n: (h) => (h.mine?.unlocked ? h.mine.trips : 0), want: (n) => `${n} mine trip${n === 1 ? "" : "s"}` },
     { key: "casts", href: "/marketplace/fishing", tone: "sets", art: "fishing",
         n: (h) => (h.sailing?.fishing ? h.sailing.casts : 0), want: (n) => `${n} cast${n === 1 ? "" : "s"} left` },
-    { key: "chips", href: "/marketplace/casino", tone: "track", art: "casino",
-        n: (h) => (h.casinoChips ? 1 : 0), want: () => "Free chips waiting" },
+    // ⚠️ NO CASINO ROW. "Free chips waiting" pointed at the free thousand a day, which the chips-to-gold
+    // rework removed — so it sat in every member's hub forever offering a claim with nothing behind it.
+    // See the tombstone in the hud route.
     { key: "delves", href: "/marketplace/dungeons", tone: "bounty", art: "dungeons",
         n: (h) => (h.delves?.unlocked ? h.delves.runs : 0), want: (n) => `${n} dungeon run${n === 1 ? "" : "s"}` },
 ];

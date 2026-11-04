@@ -61,7 +61,10 @@ export async function GET(request) {
             });
         }
 
-        const [arena, mining, delves, chests, spin, quests, strikes, attention, casts, featureClaims, townTodo, farm, freeChips, gate] =
+        // ⚠️ FOURTEEN NAMES AGAINST THIRTEEN PROMISES IS HOW BOTH BUGS BELOW HAPPENED. Keep this list and
+        // the array underneath it the same length; a destructure is positional and silently binds the wrong
+        // thing rather than failing.
+        const [arena, mining, delves, chests, spin, quests, strikes, attention, casts, featureClaims, townTodo, farm, gate] =
             await Promise.all([
                 safe(arenaNav(id), { unlocked: false, fightsLeft: 0 }),
                 MINING_UNLOCKED(id) ? safe(miningNav(id), null) : null,
@@ -85,11 +88,27 @@ export async function GET(request) {
                 // Returns an empty `locked` for any account that predates gating, which is almost all of
                 // them — so an existing member's menu is byte-identical to what it renders today.
                 safe(gateForMenu(id), { town: 1, exempt: true, locked: {}, towns: [] }),
-                // ── THE FREE CHIPS, AS ONE BOOLEAN ───────────────────────────────────────────────────
-                // Luke: "casino should show a badge if you havent claimed your free chips."
-                // dailyChipsReady is a single indexed read of one column on mkt_buyer — deliberately NOT
-                // getCasinoState, which builds the whole floor. A nav badge that costs a feature build is
-                // the exact thing check:chrome exists to catch, and this component is in the layout.
+                // ── TOMBSTONE: THE FREE CHIPS BADGE ──────────────────────────────────────────────────
+                // Luke's original ask — "casino should show a badge if you havent claimed your free
+                // chips" — outlived the thing it pointed at. casino.js carries its own tombstone for the
+                // feature ("dailyChips / dailyChipsN / chipRate. The free thousand a day went with the
+                // rework") and migration 463 nulled chips_day for every member when the floor moved to
+                // gold. There is no claim left to make and no code anywhere that makes it.
+                //
+                // Eric: "There's a notification on the casino for everybody right now that's saying
+                // something about like free chips waiting for them." Everybody, permanently, and for two
+                // independent reasons:
+                //
+                //   · the badge read `freeChips`, which was bound to the gateForMenu object ABOVE — this
+                //     array had thirteen entries and the destructure named fourteen, so every name from
+                //     `freeChips` on was off by one. Boolean({...}) is true forever.
+                //   · and the underlying test would have been stuck on anyway. `chips_day IS DISTINCT
+                //     FROM today` against a column migration 463 set to NULL is true for everyone, every
+                //     day, because NULL is distinct from every date.
+                //
+                // The second one is why this is deleted rather than repaired: a correct reading of a dead
+                // column is still a badge for a reward that cannot be collected. `gate` binds properly
+                // again now, which also un-breaks the thing the comment below was worried about.
             ]);
 
         const chestList = Array.isArray(chests) ? chests : (chests?.chests || []);
@@ -103,8 +122,8 @@ export async function GET(request) {
             // rule in the menu would keep the entry hidden for everyone after the feature had opened.
             vault: vaultOpenFor(id),
             casino: true,
-            // Unclaimed free chips today — drives the nav badge on /marketplace/casino.
-            casinoChips: Boolean(freeChips),
+            // ⚠️ NO `casinoChips`. It drove a badge for the free thousand a day, which no longer exists —
+            // see the tombstone in the batch above. GameNav and PlayHub both read it and both now do not.
             kitchen: COOK_UNLOCKED(id),
             // The cards prototype, owner-only. The gate is IMPORTED rather than re-written as isOwner(id) here:
             // on launch day CARDS_UNLOCKED becomes Boolean(buyerId) in one place, and a second copy of the rule

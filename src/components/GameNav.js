@@ -297,8 +297,9 @@ export default function GameNav() {
         if (href === "/marketplace/spin" && spins > 0) return { badge: spins, title: `${plural(spins, "spin")} ready` };
         if (href === "/marketplace/quests" && questsReady > 0) return { badge: questsReady, title: `${plural(questsReady, "quest")} to claim` };
         // Feature pills also badge their claimable daily-quests (farm crops + quests together).
-        // The casino's free thousand a day. One dot, no count — there is only ever one to claim.
-        if (href === "/marketplace/casino" && hud?.casinoChips) return { badge: 1, title: "1,000 free chips waiting" };
+        // ⚠️ THE CASINO HAS NO BADGE. It carried "1,000 free chips waiting" for the free thousand a day,
+        // which went when the floor moved from chips to gold — so the dot was on every member's menu,
+        // permanently, pointing at a claim that does not exist. See the tombstone in the hud route.
         if (href === "/marketplace/farm") { const n = cropsReady + petNudge + (featureClaims.farm || 0); if (n > 0) return { badge: n, title: [cropsReady ? `${plural(cropsReady, "crop")} ready` : null, petNudge ? `${plural(petNudge, "pet")} to pet` : null, featureClaims.farm ? `${plural(featureClaims.farm, "quest")} to claim` : null].filter(Boolean).join(" · ") }; }
         // Sailing badges everything waiting on you out there, summed like the farm pill: unthrown casts
         // (fishing happens during a voyage nobody watches, so the free casts quietly expire), claimable

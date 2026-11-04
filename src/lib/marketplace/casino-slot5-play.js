@@ -323,8 +323,26 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // ⚠️ BOTH ROWS GO OUT WITHOUT THE BONUS — see `next` below for why. `recent` matters as much
             // as `next` does: on an ORDINARY spin it is the row as it now stands, i.e. the one carrying this
             // spin's fresh entry, so leaving the bonus in here would leak it just as loudly.
+            // ── ⚠️ ABSOLUTE ENGINE UNITS, SO DIVIDE BY THE STAKE — THE SAME TRAP TWICE ─────────
+            // Eric: "the vault machine in the casino is giving out false numbers on the top for what
+            // people can win back. It's saying like astronomical numbers are the potential win back, but
+            // people are getting the normal rates still."
+            //
+            // Display only, and the arithmetic is the whole of it. `payoutFor(bet, multiple)` wants a
+            // MULTIPLE; the row holds `spinWin`, which is absolute engine units exactly like `total` and
+            // `meterBonus` beside it. Passing an absolute into the multiple slot multiplies by the stake a
+            // SECOND time, so at a 500 bet a spin that won 500 drew 250,000 instead of 500 — inflated by
+            // precisely the stake, which is why it looked astronomical at the high stakes and nearly right
+            // at a bet of 1.
+            //
+            // `fired.total` four lines down always had the `/ stake` and so did `won`, which is why the
+            // payouts were correct the whole time and only the row lied. Nothing rate-side moves here.
+            //
+            // The note above describes this bug being fixed ONCE already, when the row was multiples and
+            // the screen drew engine units. The units later became absolute, every other conversion in
+            // this file picked up `/ stake`, and these two rows did not.
             recent: (r.winAgain ? r.winAgain.row : hideBonus(r.meter || []))
-                .map((v) => (v > 0 ? payoutFor(stake, v) : 0)),
+                .map((v) => (v > 0 ? payoutFor(stake, v / stake) : 0)),
             // ── AND WHAT THE ROW LOOKS LIKE ONCE THE DUST SETTLES ───────────────────────────────
             // `recent` on a firing spin is the row that was PAID, because the animation lights those
             // slots before it empties them — so the row the fire leaves behind was never sent, and the
@@ -342,7 +360,8 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // adds it to the first slot when the Gem Vault closes, which is also the better moment for it:
             // the bonus you just played visibly lands in the meter instead of having been there all along.
             // The row SAVED above is the full one, so a reload mid-bonus settles on the right number.
-            next: hideBonus(r.meter || []).map((v) => (v > 0 ? payoutFor(stake, v) : 0)),
+            // `/ stake` for the same reason as `recent` above — same units, same second multiplication.
+            next: hideBonus(r.meter || []).map((v) => (v > 0 ? payoutFor(stake, v / stake) : 0)),
             // meterBonus and winAgain.paid are now ABSOLUTE engine units, like `total`, rather
             // than multiples of the bet — so both divide by the stake here exactly as
             // `payoutFor(stake, r.total / stake)` does a few lines up.
