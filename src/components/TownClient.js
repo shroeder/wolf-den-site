@@ -2916,9 +2916,19 @@ export default function TownClient({ initial, frozen = false, halloween = false,
                                 <div key={b.id} className={`tw-building is-shuttered${shutArt.url ? " has-art" : ""}`}
                                     style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }}
                                     title={`${b.label} — opens at ${b.opensAt}`}>
+                                    {/* ⚠️ tw-building-art, NOT tw-b-art. `.tw-b-art` had no rule anywhere in
+                                        this file, so a shuttered building fell back to its image's NATURAL
+                                        size: the mine rendered 901x901 inside a 355x622 scene — two and a
+                                        half times the width of the whole town — and the forge 451x455, while
+                                        every open building sat correctly at 176px. Two black slabs covering
+                                        the street is what "the town is all messed up" looked like.
+
+                                        The class that sizes a building is the one the open branch below
+                                        already uses. A name that is nearly right styles nothing and says
+                                        nothing. [[grep-the-class-name-before-taking-it]] */}
                                     {shutArt.url ? (
                                         // eslint-disable-next-line @next/next/no-img-element
-                                        <img className="tw-b-art" src={shutArt.url} alt="" draggable={false} />
+                                        <img className="tw-building-art" src={shutArt.url} alt="" draggable={false} />
                                     ) : <span className="tw-b-emoji" aria-hidden="true">{b.emoji}</span>}
                                     <span className="tw-b-label">{b.label}</span>
                                     <span className="tw-b-soon">Opens at {b.opensAt}</span>
