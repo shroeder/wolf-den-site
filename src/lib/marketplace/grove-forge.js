@@ -179,11 +179,13 @@ export const QUALITY_BIAS = 0.062;   // how hard a level bends the curve
 // by playing the three minigames, it costs no parts, and it is the whole reason the act exists. The
 // resemblance is only that both bend this one exponent.
 
-// ⚠️ `extra` IS A THIRD TERM, NOT A FOURTH CURVE. The craft act (grove-craft-act.js) needs to bend the same
-// exponent that the level and the temper bend, and the first attempt expressed it as extra LEVELS -- which
-// silently did nothing at level 25, because the level is clamped to the cap. A capped crafter would have
-// played the beats perfectly and watched the board not move, which is the dead-ladder bug this curve was
-// rewritten once already to remove. A term outside the clamp cannot have that problem.
+// ⚠️ `extra` HAS NO CALLER TODAY, AND IT IS KEPT ON PURPOSE. It was the craft act's bias term: a way to
+// bend this exponent from outside without pretending to be extra LEVELS, which was the first attempt and
+// silently did nothing at level 25 because the level is clamped to the cap. A capped crafter would have
+// played the beats perfectly and watched the board not move -- the dead-ladder bug this curve was already
+// rewritten once to remove. The act was removed on 2026-11-04 and its replacement is undecided; whatever
+// it turns out to be will want exactly this hook, and a term outside the clamp is the shape that works.
+// ⚠️ IT DEFAULTS TO 0, SO NOTHING READS DIFFERENTLY WHILE NOBODY PASSES IT.
 export function rollQuality(level, rand, extra = 0) {
     const lv = Math.max(1, Math.min(CRAFT_LEVEL_CAP, Number(level) || 1));
     const p = 1 / (1 + lv * QUALITY_BIAS + Math.max(0, Number(extra) || 0));

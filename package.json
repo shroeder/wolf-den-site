@@ -52,7 +52,6 @@
         "harness:vault": "node scripts/vault-harness.mjs",
         "harness:grove-chain": "node scripts/harness-grove-chain.mjs",
         "prove:vault": "node --import ./scripts/lib/register-loader.mjs scripts/prove-vault.mjs",
-        "check:craft-act": "node --import ./scripts/lib/register-loader.mjs scripts/check-craft-act.mjs",
         "check:gates": "node --import ./scripts/lib/register-loader.mjs scripts/check-gates.mjs",
         "check:acts": "node --import ./scripts/lib/register-loader.mjs scripts/check-acts.mjs",
         "check:street": "node --import ./scripts/lib/register-loader.mjs scripts/check-street.mjs",

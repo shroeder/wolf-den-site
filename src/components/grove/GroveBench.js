@@ -15,7 +15,6 @@ import {
 } from "react-icons/gi";
 
 import Area from "@/components/grove/GroveArea.js";
-import GroveCraftAct from "@/components/grove/GroveCraftAct.js";
 import { GROVE_RECIPES, TOOL_SLOTS, toolBonusPct, recipeRows, reachableRecipes, reworkCost } from "@/lib/marketplace/grove-recipes.js";
 import { QUALITY_BANDS, qualityBand, toolBonusFor, craftBonusLabel, charmValue, CHARM_STAT_LABEL, bandTint } from "@/lib/marketplace/grove-forge.js";
 
@@ -167,7 +166,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     const [busy, setBusy] = useState(null);
     // The craft being played out, or null. Holds the recipe, because
     // both are needed when the act finally posts and the row underneath may have re-sorted by then.
-    const [acting, setActing] = useState(null);
     // ── ⚠️ HOW MANY THIS ROW WILL MAKE, AND ABSENT MEANS "ALL OF THEM" ──────────────────────────────
     // Luke: "they should be able to craft a selected amount up to the max quantity of ingredients that
     // they have." Keyed by recipe id and deliberately NOT seeded to the max for every row on mount: the
@@ -267,26 +265,23 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     const topOdds = goodShare(odds);
     const recent = lvl.recent || [];
 
-    // ── ⚠️ PRESSING CRAFT OPENS THE ACT; THE ACT DOES THE CRAFTING ──────────────────────────────────
-    // Luke: "Let's make it fun." The button no longer spends anything — it starts three beats, and the
-    // third of them posts. Nothing has left the bag until the hammer work is done, so backing out of the
-    // overlay costs nothing and a player who opens it by accident is not charged for curiosity.
-    const craft = (r) => { setActing({ recipe: r, times: 1 }); };
-
-    /** Called by the act once the skill beats are played. This is the only place a craft is posted. */
-    const commitCraft = async (act, aim) => {
-        const r = acting?.recipe;
-        if (!r) return { ok: false };
-        // ⚠️ ONE ACT, EITHER ONE ITEM OR THE WHOLE BATCH. The act does not know or care which; it plays
-        // the beats and hands back a performance, and this decides what that performance buys. Keeping
-        // the branch here rather than inside the act means there is still exactly ONE place a craft is
-        // posted from, which is what the note on this function has always promised.
-        const times = Math.max(1, Number(acting.times) || 1);
-        if (times > 1) return await postBatch(r, times, act, aim);
+    // ── ⚠️ PRESSING CRAFT CRAFTS. THE THREE BEATS ARE GONE ─────────────────────────────────────────
+    // Luke, 2026-11-04: "I would love to just remove all the crafting minigames from the Groves crafting."
+    //
+    // It used to open GroveCraftAct — coals, anvil, then a plinko drop whose landing WAS the quality —
+    // and the third beat was the only place a craft was ever posted. The quality is rolled on the server
+    // now, so there is nothing to perform and nothing to hand back; the button posts directly.
+    //
+    // ⚠️ WHICH MEANS PRESSING CRAFT SPENDS PARTS WITH NO CONFIRMATION, and that is a real change in
+    // feel worth saying out loud rather than discovering. The act was also an unintended are-you-sure:
+    // nothing left the bag until the hammer work was done, so a mis-tap cost nothing. A player who taps
+    // the wrong row now pays for it. Flagged for whatever replaces the act; not papered over with a
+    // confirm dialog, because a modal asking "craft this?" on every single craft is worse than both.
+    const craft = async (r) => {
         setBusy(r.id);
-        const d = await post({ action: "craft", recipe: r.id, act, aim });
+        const d = await post({ action: "craft", recipe: r.id });
         setBusy(null);
-        return d;
+        await finishCraft(d, r);
     };
 
     // ── ⚠️ CRAFT ALL POSTS DIRECTLY AND OPENS NOTHING ───────────────────────────────────────────────
@@ -296,31 +291,25 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
     // one note saying what came out. It deliberately does NOT reuse the result card -- that card shows a
     // board, a landing and one band, and a batch has ten of each. Printing the last roll's card over ten
     // crafts would be the same class of lie as a card announcing `recipe.makes` after a Masterwork.
-    // ⚠️ IT OPENS THE ACT NOW INSTEAD OF POSTING. Luke: "when people do craft 10, it just skips the entire
-    // minigame... it should always do the minigame." One performance, then the whole batch is forged
-    // against it -- see commitCraft, which is still the only place a craft is posted from.
-    const craftAll = (r, times) => {
+    // ⚠️ IT POSTS AGAIN, as it did before the act existed. One request, one note saying what came out.
+    const craftAll = async (r, times) => {
         if (!times) return;
-        setActing({ recipe: r, times });
+        await postBatch(r, times);
     };
 
-    // ⚠️ THIS MUST RETURN SOMETHING WITH `ok` ON IT, AND NOT RETURNING ONE WAS A SHIPPED BUG.
-    // Luke: "Plinko mini game is broken, when you choose to drop it, the screen just closes."
+    // ── A BATCH REPORTS ITSELF, AND DELIBERATELY DOES NOT DEAL A RESULT CARD ────────────────────────
+    // That card names ONE band and one score. A batch of ten has ten of each, so showing the last roll's
+    // card over the whole batch would be the same class of lie as a card printing `recipe.makes` after a
+    // Masterwork roll. The summary note below is the batch's answer.
     //
-    // It was. GroveCraftAct's release() does `const d = await onCommit(...)` and then
-    // `if (!d?.ok) { onClose(d); return; }`. This function was lifted out of the old void-returning
-    // craftAll handler and kept returning undefined, so after a perfectly good batch the act read "no ok"
-    // and shut itself — and finishCraft, seeing the same undefined, then wrote "That did not work."
-    // The craft had already succeeded on the server. The player got the parts spent, the items made, the
-    // screen closed and an error, which is about the worst possible combination of true and false.
-    //
-    // ⚠️ IT RETURNS `batched` SO THE ACT KNOWS NOT TO DEAL A CARD. The result card shows a board, a
-    // landing and one band; a batch has ten of each, and printing the last roll's card over ten crafts
-    // would be the same class of lie the original comment on craft-all warned about. The summary note
-    // below is the batch's answer; the act just needs to close cleanly rather than look crashed.
-    const postBatch = async (r, times, act, aim) => {
+    // ⚠️ IT STILL RETURNS `d`, EVEN THOUGH NOTHING AWAITS THE VALUE TODAY. It did once, and not
+    // returning it was a shipped bug: the act's release() read "no ok" off an undefined return, closed
+    // itself and wrote "That did not work." over a batch that had succeeded on the server — parts spent,
+    // items made, and an error on screen. The act is gone; the habit of returning the result is cheap and
+    // the next caller should not have to rediscover why.
+    const postBatch = async (r, times) => {
         setBusy(`all-${r.id}`);
-        const d = await post({ action: "craftAll", recipe: r.id, times, act, aim });
+        const d = await post({ action: "craftAll", recipe: r.id, times });
         setBusy(null);
         if (!d?.ok) {
             setNote(d?.error === "not_enough_parts" ? "Not enough parts for that."
@@ -338,10 +327,8 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
         return { ...d, batched: times };
     };
 
-    /** Called when the act closes — with the finished craft, or with an error it could not complete. */
-    const finishCraft = async (d) => {
-        const r = acting?.recipe;
-        setActing(null);
+    /** The result of a single craft: the card, or the reason there isn't one. */
+    const finishCraft = async (d, r) => {
         if (!d?.ok) {
             setNote(d?.error === "not_enough_parts" ? "Not enough parts for that."
                 : d?.error === "already_built" ? "You already have that one."
@@ -781,19 +768,6 @@ export default function GroveBench({ st, known, partName, PartIcon, post, refres
             {/* ⚠️ THE CHEST-OPENING CARD STOOD HERE: the spill of parts, the merit line and "Open
                 another". It was the payoff moment for a system that no longer exists. Removed whole
                 rather than left behind an unreachable branch. */}
-
-            {/* ── ⚠️ THE ACT, PORTALLED LIKE EVERY OTHER FULL-SCREEN LAYER HERE ──────────────────────
-                Into the SAME host the result card uses. The Grove runs in native full screen, where
-                document.body is the wrong parent and a layer rendered into the page tree paints under
-                the scene no matter what its z-index says. */}
-            {acting && host ? createPortal((
-                <GroveCraftAct
-                    recipe={acting.recipe}
-                    level={lvl.level}
-                    onCommit={commitCraft}
-                    onClose={finishCraft}
-                />
-            ), host) : null}
 
             {/* ⚠️ MOUNTED IN THE SAME COMMIT AS THE TAP THAT OPENS IT. A handler with no screen is the
                 defect this codebase has shipped three times now. */}

@@ -26,8 +26,6 @@ import { petBiteShare } from "@/lib/marketplace/grove-world.js";
 import { pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { reworkCost, toolRecipeFor, repeatable, CRAFT_ALL_CAP
 } from "@/lib/marketplace/grove-recipes.js";
-import { rackFor, scatterFor, landingFor, bandAt, oddsForAim, rattle, qualityInBand,
-    clampAct, actScore } from "@/lib/marketplace/grove-craft-act.js";
 import { settleKills, rollBoss } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { groveFighter } from "@/lib/marketplace/grove-kit.js";
@@ -1199,7 +1197,7 @@ export async function groveMove(buyerId, { partId, from, to, qty = 1 } = {}) {
 }
 
 /** Craft a discovered recipe. Parts come out of the BAG. */
-export async function groveCraft(buyerId, recipeId, { act = null, aim = 0.5 } = {}) {
+export async function groveCraft(buyerId, recipeId) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const recipe = recipeById(recipeId);
     if (!recipe) return { ok: false, error: "no_recipe" };
@@ -1274,39 +1272,42 @@ export async function groveCraft(buyerId, recipeId, { act = null, aim = 0.5 } = 
     const beforeXp = Number(p.craft_xp) || 0;
     const beforeLevel = craftLevel(beforeXp).level;
     const gained = craftXpFor(recipe);
-    // Seeded off the player's own running total rather than the session seed: a craft is not a kill and has
-    // no kill index, and a client that could re-roll a bad quality by retrying is a client that never gets
-    // ── ⚠️ THE BOARD IS THE ROLL ────────────────────────────────────────────────────────────────────
-    // Luke: "Let's make it fun ... 3 interactive steps ... one is just rng, la plinko ball hitting pegs on
-    // itd way down. With varying buckets."
+    // ── ⚠️ THE ROLL IS THE GAME'S AGAIN, NOT A PERFORMANCE ────────────────────────────────────────
+    // Luke, 2026-11-04: "I want to remove the crafting minigame ... I know that that plays into the
+    // variance ... for now I'm going to tell you to just have it randomly select variance while I figure
+    // out what to replace it with."
     //
-    // The quality no longer comes from rollQuality here. It comes from where the ball lands on a board whose
-    // five buckets are the five bands, each exactly as wide as its chance at this level,
-    // after this act. That is not decoration over a number decided elsewhere: the landing IS the number, so
-    // the thing the player watched is the thing they were given. See grove-craft-act.js for the two versions
-    // of this that were not honest and why.
+    // So this is deliberately a PLACEHOLDER with a known shape, not a design. What stood here was the
+    // plinko board: five buckets cut as wide as the player's odds, and where the ball landed WAS the
+    // quality. The honesty of that is worth keeping in mind for whatever replaces it — the band was not
+    // decided elsewhere and then animated.
     //
-    // rollQuality is still the game's quality roll — groveRework uses it, and qualityOdds is what the board
-    // is cut from — so there is still one curve. What changed is where the dice are thrown.
+    // ⚠️ THE CURVE DID NOT CHANGE, ONLY WHO THROWS. rollQuality is the same function groveRework has
+    // always used and the same one qualityOdds publishes, so the odds the bench prints are still the odds
+    // a craft rolls against. Removing the act removes its bias term (ACT_MAX_BIAS, up to +0.52) and
+    // nothing else: the crafting LEVEL still bends the exponent exactly as before, which means a
+    // level-25 crafter is no worse off than yesterday and a level-1 crafter is no better.
     //
-    // ⚠️ SEEDED ON THE PLAYER'S RUNNING XP, like the roll it replaces. A craft has no kill index, and a
-    // client that could retry for a better landing is a client that never gets a bad one. It cannot retry
-    // anyway — the parts are already spent by the time this runs — but the seed should not invite it.
-    const tidy = clampAct(act);
-    // ⚠️ THE AIM IS CLAMPED AND NOTHING ELSE IS DONE WITH IT. It is a number from the client like the skill
-    // scores, and like them it cannot buy anything the rack does not already offer: it chooses WHERE on the
-    // rack the piece is thrown, and the rack decides the rest. The middle is worth the most and is the
-    // hardest to hold, which is the whole of the decision.
-    const where = Math.max(0, Math.min(1, Number(aim)));
-    const seed = ((beforeXp + 1) * 2654435761) ^ Math.round(actScore(tidy) * 1e6)
-        ^ Math.round(where * 1e5);
-    const spans = rackFor(beforeLevel);
-    const scatter = scatterFor(tidy);
-    const landing = landingFor(where, scatter, seed);
-    const band = bandAt(spans, landing);
+    // ⚠️ AND THE BENCH'S PRINTED ODDS ARE NOW EXACTLY RIGHT RATHER THAN A FLOOR. qualityOdds(level) is
+    // what the screen shows and, with no act to widen it, what the craft actually uses. Before, a player
+    // who played the beats well rolled against better odds than the ones on screen.
+    //
+
+    // ⚠️ SEEDED ON THE RUNNING XP *AND* THE RECIPE, and the second half matters. Seeded on xp alone, two
+    // different recipes crafted at the same xp total roll the identical band — and a batch is ten crafts
+    // off one starting xp, so the id is what keeps "one craft, one draw" true for the second item in a
+    // batch of a cheap recipe. Same reasoning as the rework's seed, which rides its own counter.
+    const rand = (() => {
+        let x = ((beforeXp + 1) * 2654435761) >>> 0;
+        for (const ch of String(recipe.id)) x = (x ^ ch.charCodeAt(0)) * 16777619 >>> 0;
+        return () => {
+            x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
+            return x / 4294967296;
+        };
+    })();
     // ⚠️ EVERY KIND ROLLS. This was `recipe.kind === "tool" ? ... : null`, which is the single line that
     // made three crafts in four a vending machine — see craftBonusFor for what each kind does with it.
-    const quality = qualityInBand(band, seed);
+    const quality = rollQuality(beforeLevel, rand);
     const bonus = craftBonusFor(recipe, quality);
 
     // ── WHAT IT MAKES ───────────────────────────────────────────────────────────────────────────────
@@ -1461,22 +1462,9 @@ export async function groveCraft(buyerId, recipeId, { act = null, aim = 0.5 } = 
         slot: recipe.slot || null,
         // What the band bought on top of the recipe, so the card can show the roll paying for itself.
         bonus,
-        // ── ⚠️ THE FALL, SENT BACK SO THE SCREEN CAN PLAY IT ────────────────────────────────────────
-        // The client is handed the board it was already looking at, the landing the server chose, and a
-        // rattle that provably ends on it. It animates the drop it is given rather than running its own
-        // physics and reporting where the ball stopped — the same rule as a kill, where the scene plays
-        // the fight and the server decides the loot.
-        set: {
-            spans,
-            landing,
-            band,
-            aim: where,
-            scatter,
-            path: rattle(landing, seed),
-            odds: oddsForAim(spans, where, scatter),
-            act: tidy,
-            score: actScore(tidy),
-        },
+        // ⚠️ NO BOARD RIDES BACK ANY MORE. `set` carried the rack, the landing and the rattle for the
+        // act to animate; with no act there is nothing to animate and a result card that reads it would be
+        // drawing a board nobody threw. The band and the score it fell in still travel below.
         // A charm's whole payoff is its rolled potency; the card has nothing else to show for it.
         charm: recipe.kind === "charm" ? { stat: recipe.stat, value: charmValueOf(recipe.id, quality) } : null,
         // The ladder, reported back so the result card can show the bar moving and say when it levelled.
@@ -1616,20 +1604,11 @@ export { GROVE_RECIPES };
 // ⚠️ IT STOPS, IT DOES NOT FAIL. A batch that runs out of parts on the seventh has made six real things and
 // must report six -- returning an error would be a lie about a bag that has already changed. Only a refusal
 // on the FIRST pass is an error, because then nothing happened.
-// ── ⚠️ THE BATCH PLAYS THE ACT TOO, AS OF 2026-10-30 ────────────────────────────────────────────────────────
-// Luke: "when people do craft 10, it just skips the entire minigame... it should always do the minigame."
-//
-// This used to call groveCraft with NO act and NO aim, so every item in a batch was forged by a null
-// performance on a neutral rack. The old comment on the button called that "a real trade" and it was an
-// honest design -- the ceremony for one, the relief from it for ten -- but it meant the fastest way to make
-// anything was to never play the game, which is the wrong incentive to put on a skill minigame.
-//
-// ⚠️ ONE PERFORMANCE, TEN LANDINGS -- NOT ONE LANDING COPIED TEN TIMES. The act is played once and handed
-// to every craft in the batch, but each groveCraft re-seeds off the player's CURRENT xp (which moves with
-// every craft), so the ten items still roll ten bands. The performance shifts where that spread sits; it
-// does not flatten it. That keeps the comment below honest -- a batch really does roll ten bands -- while
-// making the minigame matter to all ten instead of none.
-export async function groveCraftMany(buyerId, recipeId, { times = 1, act = null, aim = 0.5 } = {}) {
+// ── ⚠️ TEN CRAFTS STILL ROLL TEN BANDS ─────────────────────────────────────────────────────────────────────
+// The act used to be played once and handed to all ten. With it gone this is simply ten rolls, and the thing
+// that keeps them ten DIFFERENT rolls is unchanged: each groveCraft re-seeds off the player's current xp,
+// which moves with every craft. See the seed note in groveCraft for why the recipe id is in there too.
+export async function groveCraftMany(buyerId, recipeId, { times = 1 } = {}) {
     if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
     const recipe = recipeById(recipeId);
     if (!recipe) return { ok: false, error: "no_recipe" };
@@ -1640,7 +1619,7 @@ export async function groveCraftMany(buyerId, recipeId, { times = 1, act = null,
     const made = [];
     let stopped = null;
     for (let i = 0; i < want; i += 1) {
-        const one = await groveCraft(buyerId, recipeId, { act, aim });
+        const one = await groveCraft(buyerId, recipeId);
         if (!one?.ok) {
             // The first refusal is the whole answer; a later one just ends the batch.
             if (!made.length) return one;

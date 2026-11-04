@@ -100,10 +100,17 @@ charged. Verified by driving the real room, not by a green build.
 > they all have to be super clear. So it'll pull from a pool of 10 mini games randomly, and it'll pull three
 > of them, and there's clearly three phases."*
 
-**DONE** (`20`, `21`). Ten games with ten distinct verbs, drawn three at a time without replacement, wired
-into the real `GroveCraftAct` — the hardcoded bellows and anvil are two of the ten now. Each game reports one
-number 0..1 and the act weights three; the economy's range is provably unchanged. Bench at
-`/marketplace/grove/minilab`, owner-only.
+**BUILT, THEN REMOVED — 2026-11-04.** Luke: *"I want to remove the crafting minigame ... I would love to
+just remove all the crafting minigames from the Groves crafting ... for now I'm going to tell you to just
+have it randomly select variance while I figure out what to replace it with."*
+
+So this item is **open again, not done**, and the ten games, the three-beat act and the plinko rack are
+deleted rather than parked behind a flag. Quality is rolled server-side from the crafting level alone.
+
+> ⚠️ **Do not rebuild this from the quote above.** It is the brief that produced the thing Luke removed.
+> What a replacement has to beat is on the record: the act's own honesty (the ball's landing *was* the
+> quality, not an animation over a number decided elsewhere), and its two real costs — a performance the
+> server could never verify, and ten crafts needing ten performances. The deleted code is at `04f9be33`.
 
 ### D. A full usability pass on the inventory
 > *"when you're looking at your inventory, you can't collapse things… when you craft something, we need a
