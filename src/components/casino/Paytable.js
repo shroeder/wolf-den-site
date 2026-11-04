@@ -231,10 +231,39 @@ export default function Paytable({ machineId, kind, table, art, bet, onClose }) 
                             This said "three of them open the free spins" on all five. The Vault has NO free
                             round — its three moons open the Gem Vault directly — so the one machine where
                             the scatter does something different was the one being described wrongly. */}
+                        {/* ── ⚠️ PAYING FROM ANYWHERE AND TRIGGERING FROM ANYWHERE ARE DIFFERENT CLAIMS ──
+                            ValkyrieSylve, in #bugs: "I was in the casino on the machine 'the deep' and hit 3
+                            shooting starfish on 2 separate occasions and the free spins did not trigger the
+                            way it says in the layout section."
+
+                            She read this screen correctly and this screen was wrong. The sentence said
+                            "anywhere" in bold and then "Three of them open the free spins" in the same
+                            breath — but The Deep and The Harvest both carry `lineTrigger`, so three
+                            scattered starfish pay the scatter (1x the bet, which is why it felt like
+                            nothing happened) and open NOTHING. The round wants three on one of the twenty
+                            declared lines, walking from reel one.
+
+                            Both halves are true at once and that is exactly why they have to be said apart:
+                            the scatter PAYS from anywhere, and on these two cabinets it TRIGGERS on a line.
+                            evaluate() has always known the difference (`m.lineTrigger ? lineTrig >= 3 :
+                            scatters >= 3`) and so does the tease, which walks the lines rather than counting
+                            symbols precisely so it cannot promise what the machine will not pay. This screen
+                            was the last place still describing every cabinet as scatter-anywhere.
+
+                            The note below says a paytable is the one screen a player is entitled to trust
+                            literally. She did, twice, and it cost her the round both times. */}
                         <li>
                             <b style={{ color: lookFor(machineId, m.scatter)?.tone }}>{pretty(m.scatter, machineId)}</b> pays from
-                            <b> anywhere</b>, on your whole bet rather than on a line. Three of them open{" "}
-                            {m.free ? "the free spins" : <b>{m.second?.label || "the bonus"}</b>}.
+                            <b> anywhere</b>, on your whole bet rather than on a line.{" "}
+                            {m.lineTrigger ? (
+                                <>
+                                    Three of them <b>on a payline</b>, from reel one, open{" "}
+                                    {m.free ? "the free spins" : <b>{m.second?.label || "the bonus"}</b>} —
+                                    three scattered across the glass pay, but do not open it.
+                                </>
+                            ) : (
+                                <>Three of them open {m.free ? "the free spins" : <b>{m.second?.label || "the bonus"}</b>}.</>
+                            )}
                         </li>
                         {/* ── AND THE SECOND ROUND, ONLY WHERE THERE IS ONE ───────────────────────────
                             This line rendered on every cabinet and read "Five ▮s anywhere open the second

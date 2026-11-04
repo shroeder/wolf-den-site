@@ -36,8 +36,15 @@ import Glyph from "@/components/Glyph";
 // street nobody complained about, which is the check that the arithmetic is right.
 const WORLD_MIN = 2900;
 const PER_SLOT = 284;      // px between neighbours — the nine-building spacing, kept as buildings are added
-const SPREAD = 88;         // spaceOut lays out across 4..92%, so a slot is SPREAD/(n-1) percent of the world
-const worldWidthFor = (slots) => Math.max(WORLD_MIN, Math.round((PER_SLOT * 100 * Math.max(1, slots - 1)) / SPREAD));
+// ⚠️ A MIRROR OF worldWidthFor IN town.js, AND IT IS A FALLBACK ONLY. The street's width now travels in the
+// payload as `worldW`, because this copy is what squashed the town: it still held the OLD "spread the objects
+// across 4..92%" rule (`SPREAD = 88`) long after town.js replaced it with constant spacing plus a real margin
+// at each end. The two formulas disagreed by a third.
+//
+// It cannot be imported — town.js is "server-only" — so if PER_SLOT or the margin ever moves, it moves in BOTH
+// files or this one silently compresses the street again the first time a payload arrives without worldW.
+const EDGE_MARGIN = Math.round(PER_SLOT * 1.5);
+const worldWidthFor = (slots) => Math.max(WORLD_MIN, PER_SLOT * Math.max(0, slots - 1) + EDGE_MARGIN * 2);
 const GROUND = 72;      // % from top where building BASES sit (avatars walk in front, lower/foreground)
 const spriteTransform = (flip, facing) => ((Boolean(flip) !== (facing === -1)) ? "scaleX(-1)" : "none");
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -1421,7 +1428,17 @@ export default function TownClient({ initial, frozen = false, halloween = false,
     // Every door in the plaza, with the spot it stands on. Buildings sit on the ground line (their art is
     // anchored at GROUND - 4 and is 176px tall, so the pail goes at their foot); the NPCs stand a little
     // nearer the camera at GROUND + 6 and their pails go in front of them, hence the higher z.
-    const WORLD_W = worldWidthFor(buildings.length + 1);
+    // ── ⚠️ THE SERVER'S WIDTH, NOT OUR OWN GUESS AT IT ───────────────────────────────────────────────
+    // Every building x in `state` is a PERCENTAGE of the world spaceOut sized, so this number has to be
+    // that same world or the whole street renders compressed. It used to be worldWidthFor(buildings.length
+    // + 1) — the local copy below — and it was wrong twice: the old 4..92% spread rule, against a count
+    // that saw the buildings and the well but not the NPCs, the Quest Giver, the Crier or the Stockade.
+    // 15 slots where the server had 21, 4,518px where the server had 6,532, so the designed 284px gap drew
+    // at 196px and the 244px sprites overlapped. That is what Eric and ValkyrieSylve were looking at.
+    //
+    // worldWidthFor stays below as the FALLBACK ONLY, for a payload that predates this field — a stale poll
+    // mid-deploy, exactly like NPC_FALLBACK above and not a path anybody lives in.
+    const WORLD_W = Number(state?.worldW) || worldWidthFor(buildings.length + 1);
     // Parallax rows are mirror-tiled to span the world; the counts below were sized for a 2900px street, so
     // they scale with it or a longer street simply runs out of scenery at the far end.
     const tiles = useCallback((base) => TILES(Math.ceil(base * (WORLD_W / WORLD_MIN))), [WORLD_W]);

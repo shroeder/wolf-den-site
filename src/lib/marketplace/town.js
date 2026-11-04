@@ -843,6 +843,29 @@ export async function getTownState(buyerId, { previewTown = null } = {}) {
                 wellX: objects.find((o) => o.kind === "well")?.x ?? 50,
                 // Where each NPC stands on THIS street. The client reads this instead of a fixed table.
                 npcX,
+                // ── ⚠️ HOW WIDE THE STREET IS, SENT RATHER THAN RE-DERIVED ───────────────────────────
+                // Eric: "the ending of the Halloween event caused the town to condense, all the buildings
+                // are kinda squished together." ValkyrieSylve: "buildings and NPCs are not in the correct
+                // places it would appear." It was not the event. TownClient kept its OWN copy of this
+                // arithmetic and the two drifted apart, which is the third time this street has been bitten
+                // by exactly that — see the two notes above layOutStreet about the act board.
+                //
+                // Every x above is a PERCENTAGE of the world spaceOut sized, so the client rendering those
+                // percentages against a different width compresses the whole street uniformly. The client's
+                // copy was wrong twice over:
+                //
+                //   · it still used the OLD "spread across 4..92%" rule (its own `SPREAD = 88`), which the
+                //     note over EDGE_MARGIN replaced with constant spacing plus a real margin, and
+                //   · it counted `buildings.length + 1` — the buildings and the well — while the row below
+                //     also carries the NPCs, the Quest Giver, the Crier and the Stockade. 15 against 21.
+                //
+                // Measured on the ungated street: the server sizes 6,532px and the client drew 4,518px, so
+                // the designed 284px gap rendered at 196px while a building sprite is up to 244px wide.
+                // They were not "squished together" in anyone's imagination; they were overlapping.
+                //
+                // So the number travels with the positions it belongs to. There is no second formula left
+                // to drift, which is the same fix npcX above already is.
+                worldW: worldWidthFor(objects.length),
                 // Which town this is, and which ones the member can travel to. Null for an ungated account,
                 // and TownClient draws its usual single street when it is null.
                 town: town ? {
