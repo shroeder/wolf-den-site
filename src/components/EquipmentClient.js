@@ -337,8 +337,13 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const [shelf, setShelf] = useState(heroShelf);
     const [shelfBusy, setShelfBusy] = useState(false);
     const [shelfNote, setShelfNote] = useState(null);
+    // ⚠️ DELETE ASKS TWICE, AND IT IS THE ONLY THING ON THIS SCREEN THAT DOES. Wearing and starring are both
+    // undone by doing them again; a delete is the one tap here that destroys something. Holding the id of the
+    // sprite being confirmed (rather than a boolean) keeps the question attached to the picture it is about --
+    // a shelf-wide "are you sure?" over a strip of near-identical heroes is not a question anybody can answer.
+    const [shelfConfirm, setShelfConfirm] = useState(null);
     const heroAct = useCallback(async (body, note) => {
-        setShelfBusy(true); setShelfNote(null);
+        setShelfBusy(true); setShelfNote(null); setShelfConfirm(null);
         const d = await fetch("/api/marketplace/avatar", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -349,7 +354,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
         if (d.ok === false) {
             setShelfNote(d.error === "too_soon" ? "You have already had a new hero today. Try again tomorrow."
                 : d.error === "draw_failed" ? "The drawing did not come back. Nothing was changed."
-                    : "That did not go through.");
+                    // Says WHY, and says what to do instead. "You cannot do that" on the last hero reads as a
+                    // bug, because from the member's side deleting one picture out of one is a reasonable ask.
+                    : d.error === "last_one" ? "That is your only hero, so there would be nothing to show. Draw a new one first, then delete this one."
+                        : "That did not go through.");
             return;
         }
         if (note) setShelfNote(note);
@@ -692,6 +700,44 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 >
                                     {sp.favourite ? "★" : "☆"}
                                 </button>
+                                {/* ── DELETE ─────────────────────────────────────────────────────────
+                                    Eric: "the ability to delete avatars that have been drawn in case
+                                    someone doesn't want it or doesn't like it or it doesn't work with
+                                    their gear."
+
+                                    ⚠️ ONLY SHOWN WHEN THERE IS SOMEWHERE TO LAND. One hero on the shelf
+                                    means the server will refuse (you always keep one), so offering the
+                                    button there is offering a tap that cannot work. The strip is the
+                                    right place to learn that, not an error line after the fact. */}
+                                {shelf.sprites.length > 1 ? (
+                                    shelfConfirm === sp.id ? (
+                                        <span className="herobar-confirm">
+                                            <button
+                                                type="button" className="herobar-yes" disabled={shelfBusy}
+                                                onClick={() => heroAct({ action: "delete", sprite: sp.id },
+                                                    sp.worn ? "Deleted, and you are wearing the one you had before."
+                                                        : "Deleted. The rest of your shelf is untouched.")}
+                                            >
+                                                Delete
+                                            </button>
+                                            <button
+                                                type="button" className="herobar-no" disabled={shelfBusy}
+                                                onClick={() => setShelfConfirm(null)}
+                                            >
+                                                Keep
+                                            </button>
+                                        </span>
+                                    ) : (
+                                        <button
+                                            type="button" className="herobar-trash" disabled={shelfBusy}
+                                            aria-label="Delete this hero"
+                                            title="Delete this hero"
+                                            onClick={() => { setShelfNote(null); setShelfConfirm(sp.id); }}
+                                        >
+                                            ✕
+                                        </button>
+                                    )
+                                ) : null}
                             </div>
                         ))}
 
@@ -709,7 +755,12 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     </div>
 
                     <p className="herobar-foot">
-                        {shelfNote || "Switching between the ones you have is free, and never loses one."}
+                        {shelfNote || (shelf.sprites.length > 1
+                            // ⚠️ THE ONLY PLACE DELETE IS ADVERTISED IN WORDS. The ✕ is a glyph in a corner;
+                            // this is the line that says what it costs you, and it only claims there is one
+                            // when the button is actually on the strip.
+                            ? "Switching between the ones you have is free, and never loses one. ✕ deletes one for good."
+                            : "Switching between the ones you have is free, and never loses one.")}
                     </p>
                 </section>
             ) : null}

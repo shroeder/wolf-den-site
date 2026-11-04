@@ -2,8 +2,8 @@ import { after, NextResponse } from "next/server";
 
 import { AVATAR_FIELDS, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { generateAvatarSvg, renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
-import { favouriteSprite, generateBuyerSprite, heroRedrawQuote, requestSpriteDraw, setSpriteLock,
-    spriteShelf, wearSprite } from "@/lib/marketplace/avatar-sprite.js";
+import { deleteSprite, favouriteSprite, generateBuyerSprite, heroRedrawQuote, requestSpriteDraw,
+    setSpriteLock, spriteShelf, wearSprite } from "@/lib/marketplace/avatar-sprite.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { setAvatarConfig } from "@/lib/marketplace/profile.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -65,7 +65,7 @@ export async function POST(request) {
             if (body?.action === "lock") return noStore(await setSpriteLock(buyer.id, Boolean(body?.locked)));
 
             // ── THE SHELF ────────────────────────────────────────────────────────────────────────────
-            // Read it, wear one, star one, ask for a new one. Four verbs against one lib, because every
+            // Read it, wear one, star one, throw one away, ask for a new one. Five verbs against one lib, because every
             // rule about what a member owns and when a draw is allowed lives in avatar-sprite.js -- a
             // route that re-decided any of it would be a second answer. Same shape as the pose shelf.
             if (body?.action === "shelf") return noStore(await spriteShelf(buyer.id));
@@ -75,6 +75,12 @@ export async function POST(request) {
             }
             if (body?.action === "favourite") {
                 const r = await favouriteSprite(buyer.id, body?.sprite, Boolean(body?.on));
+                return noStore({ ...r, ...(await spriteShelf(buyer.id)) }, { status: r.ok ? 200 : 400 });
+            }
+            // Throw one away. The lib owns both rules -- you always keep one, and deleting the worn hero
+            // moves you onto another first -- so this is the same thin pass-through as wear and favourite.
+            if (body?.action === "delete") {
+                const r = await deleteSprite(buyer.id, body?.sprite);
                 return noStore({ ...r, ...(await spriteShelf(buyer.id)) }, { status: r.ok ? 200 : 400 });
             }
             // ⚠️ THE ONLY THING ON THIS ROUTE THAT SPENDS MONEY, AND IT IS AWAITED. A draw is ~4c of

@@ -748,6 +748,32 @@ export async function bonusFlip(buyerId, index) {
     return { ok: true, index: i, tile: gearCard(revealedId), done: Boolean(winner), winner, board: fullBoard };
 }
 
+// ── THE "YOU OWN THEM ALL" CONSOLATION, PAID LIKE EVERY OTHER COIN THE WHEEL PAYS ────────────────────────────
+// Sunflower Jinxx, in #bugs: "I have every recipe, I just got that sliver on the wheel and it just said I got a
+// new one" and then "the farm decor is also doing that. Just says i got one but I have all of them. I've wasted
+// a few wheel spins now :("
+//
+// She was right, and she owns all 118 recipes and all 18 spin-source decorations, so both consolation branches
+// were the ones firing. They DID add the gold -- with a bare `UPDATE mkt_buyer SET gold = gold + 300` and no
+// logCoin beside it. So the gold landed in the balance and NOWHERE ELSE: no mkt_coin_event row, nothing in the
+// member's gold history, and nothing in the coin-economy report. From the player's side a few hundred gold
+// appearing silently in a five-figure balance, with a card naming the wedge, is indistinguishable from being
+// paid nothing at all. The complaint is a reporting bug, not a payment bug, which is why it took two reports.
+//
+// The jackpot and gold wedges thirty lines below both do UPDATE + logCoin together; the note at the bonus-round
+// payout already says why ("so the gold rides mint() like every other coin the wheel pays. A bare UPDATE
+// here..."). These two branches are the ones that were missed.
+//
+// ⚠️ NOT RUN THROUGH mint(), AND THAT IS DELIBERATE -- DO NOT "FIX" IT. `spin_prize` is a HEAVY_FAUCET, so its
+// effective rate is GOLD_MINT_RATE x 0.5 = 0.2 today. These two figures are already in POST-mint units, the same
+// units the wheel's gold wedges are displayed in (600/1,200/2,400 on the face are minted from 3,000/6,000/
+// 12,000). Wrapping 300 in mint() would pay 60 and read in the diff as tidying up an inconsistency, while
+// quietly cutting a consolation prize by five times for the members who have finished a collection.
+async function payConsolation(buyerId, amount, wedge) {
+    await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amount]).catch(() => {});
+    await logCoin(buyerId, amount, "spin_prize", { meta: { prize: wedge, consolation: true } }).catch(() => {});
+}
+
 // Weighted pick of a prize INDEX, straight off the wheel's own weights — no pity, no floor, no thumb.
 function pickIndex(wheel, rand = Math.random) {
     const pool = wheel.prizes.map((p, i) => ({ i, w: p.weight }));
@@ -851,7 +877,7 @@ async function grantPrize(buyerId, prize, opts = {}) {
         const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
         const rec = await grantRecipeReward(buyerId, "spin").catch(() => null);
         // Knows every recipe the wheel can teach? Pay gold rather than landing on a blank wedge.
-        if (!rec) { await db.query(`UPDATE mkt_buyer SET gold = gold + 300 WHERE id = $1`, [buyerId]).catch(() => {}); return { sprite, text: "300 gold — you already know them all" }; }
+        if (!rec) { await payConsolation(buyerId, 300, "New Recipe"); return { sprite, text: "300 gold — you already know them all" }; }
         // Same fault, same fix: the recipe wedge showed its own icon for every page in the book. A
         // recipe's art is the dish it makes (mkt_cooking_sprite, keyed by the recipe's `out`).
         // Keyed by the RECIPE id (k_flour), not the thing it outputs — every one of the 78 has art.
@@ -898,7 +924,7 @@ async function grantPrize(buyerId, prize, opts = {}) {
         const fresh = pool.filter((d) => !owned.has(d.id));
         // Own every one of them? Pay gold rather than landing on a blank wedge — same as the recipe wedge above.
         if (!fresh.length) {
-            await db.query(`UPDATE mkt_buyer SET gold = gold + 400 WHERE id = $1`, [buyerId]).catch(() => {});
+            await payConsolation(buyerId, 400, "Farm Decoration");
             return { sprite, text: "400 gold — your farm has them all" };
         }
         const pick = fresh[Math.floor(Math.random() * fresh.length)];

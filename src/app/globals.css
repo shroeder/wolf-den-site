@@ -10675,6 +10675,30 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .herobar-star:hover:not(:disabled) { color: #ffd166; }
 .herobar-star.is-on { color: #ffd166; border-color: rgba(255,209,102,.6); }
 
+/* ── DELETE ────────────────────────────────────────────────────────────────────────────────────────────
+   Opposite corner from the star, and deliberately so: they are the two opposed verbs on a tile ("keep
+   this" / "lose this") and stacking them under one thumb is how a member stars a hero they meant to bin.
+   Grey until hovered, never red at rest -- a strip of heroes each wearing a red button reads as a strip
+   of problems. */
+.herobar-trash { position: absolute; top: 5px; left: 5px; width: 26px; height: 26px; border-radius: 999px;
+    display: grid; place-items: center; cursor: pointer; font-size: 13px; line-height: 1; padding: 0;
+    color: #9aa2ab; background: rgba(10,8,14,.78); border: 1px solid rgba(255,255,255,.16); }
+.herobar-trash:hover:not(:disabled) { color: #ff8585; border-color: rgba(255,133,133,.6);
+    background: rgba(255,80,80,.1); }
+.herobar-trash:disabled { cursor: default; color: #5c626c; }
+
+/* The confirm replaces the tag line rather than floating over the picture, so the member can still SEE the
+   hero they are deciding about. Delete is the destructive half and says so in colour; Keep is the plain
+   one, and it is also what tapping anywhere else effectively does. */
+.herobar-confirm { position: absolute; inset: auto 0 0; display: flex; gap: 4px; justify-content: center;
+    padding: 4px; background: linear-gradient(to top, rgba(10,8,14,.95), rgba(10,8,14,.72)); }
+.herobar-confirm button { cursor: pointer; font-size: .62rem; font-weight: 800; letter-spacing: .04em;
+    text-transform: uppercase; padding: 4px 7px; border-radius: 6px; line-height: 1; }
+.herobar-yes { color: #ffd4d4; background: rgba(190,45,45,.85); border: 1px solid rgba(255,133,133,.5); }
+.herobar-yes:hover:not(:disabled) { background: rgba(220,55,55,.95); }
+.herobar-no { color: #cfd4da; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); }
+.herobar-no:hover:not(:disabled) { background: rgba(255,255,255,.14); color: #fff; }
+
 .herobar-foot { margin: 8px 0 0; font-size: .73rem; color: #8b93a0; }
 
 .equip-hero { grid-area: hero; position: relative; display: grid; place-items: center; padding: 4px; }

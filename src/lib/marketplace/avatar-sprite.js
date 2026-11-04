@@ -586,6 +586,73 @@ export async function wearSprite(buyerId, spriteId) {
     return { ok: true, url: row.url };
 }
 
+/**
+ * Throw one away, because the member does not want it.
+ *
+ * Eric: "we add the ability to delete avatars that have been drawn in case someone doesn't want it or
+ * doesn't like it or it doesn't work with their gear. They have the ability to either delete or keep the
+ * avatar that was drawn."
+ *
+ * ── ⚠️ THE ONE THEY WANT TO DELETE IS THE ONE THEY ARE WEARING ───────────────────────────────────────────
+ * requestSpriteDraw puts the new hero ON you ("Drawn, and you are wearing it"), so the moment a member
+ * decides they dislike it, the thing they dislike is the thing they are wearing. Refusing to delete the worn
+ * sprite and telling them to go and wear another one first would miss the entire reason this exists. So a
+ * delete of the worn hero MOVES them to another one first -- newest favourite if they starred anything,
+ * newest otherwise, which is "put back what I had" in both cases -- and then removes the row.
+ *
+ * ── ⚠️ YOU MAY NOT DELETE YOUR LAST ONE, AND THIS IS A COST RULE, NOT A TIDINESS RULE ────────────────────
+ * pendingSpriteIds selects on `avatar_sprite_url IS NULL` and draws a FREE first hero for anybody who
+ * matches -- deliberately, because a member with no hero does not know there is a button. Deleting the last
+ * sprite would null that column and hand the member an automatic, paid, cron-side redraw that never consults
+ * canDraw. That turns delete into: draw, dislike, delete, get redrawn free, forever, at Luke's expense and
+ * past REGEN_COOLDOWN_HOURS. One has to stay. "Draw a new one, then delete this one" is the same number of
+ * taps and spends nothing extra.
+ *
+ * ── ⚠️ THE ROW GOES; THE BLOB STAYS ─────────────────────────────────────────────────────────────────────
+ * Blob URLs are immutable and we never delete the image itself (see migration 505). This drops the only
+ * POINTER to it, which is precisely the loss 505 was written to stop happening by accident -- the difference
+ * being that here a member asked for it, about one specific picture, having been told what it does.
+ *
+ * ── ⚠️ IT DOES NOT TOUCH avatar_sprite_at ───────────────────────────────────────────────────────────────
+ * Same reason wearSprite does not: that column is the clock on the draw BUTTON. Clearing or bumping it here
+ * would make deleting a hero either refund or burn a draw, and neither is what the member asked for.
+ */
+export async function deleteSprite(buyerId, spriteId) {
+    if (!buyerId) return { ok: false, error: "unauthorized" };
+    const id = Number(spriteId) || 0;
+
+    // Read the whole shelf rather than just the target: the two rules below are both about what ELSE is on it.
+    const [target, rest] = await Promise.all([
+        db.queryOne(
+            `SELECT s.id, s.url, s.favourite, (s.url = b.avatar_sprite_url) AS worn
+               FROM mkt_buyer_sprite s JOIN mkt_buyer b ON b.id = s.buyer_id
+              WHERE s.id = $1 AND s.buyer_id = $2`,
+            [id, buyerId],
+        ).catch(() => null),
+        db.query(
+            `SELECT id, url, prompt, favourite FROM mkt_buyer_sprite
+              WHERE buyer_id = $1 AND id <> $2 ORDER BY favourite DESC, created_at DESC`,
+            [buyerId, id],
+        ).catch(() => []),
+    ]);
+    if (!target) return { ok: false, error: "not_yours" };
+    if (!rest.length) return { ok: false, error: "last_one" };
+
+    // Worn → step onto the fallback BEFORE the row goes, so there is never an instant where mkt_buyer points
+    // at a sprite with no shelf row behind it. The prompt moves with the picture for the same reason
+    // wearSprite moves it: avatar_sprite_prompt is what every staleness test compares against.
+    if (target.worn === true) {
+        const next = rest[0];
+        await db.query(
+            `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_prompt = $3 WHERE id = $1`,
+            [buyerId, next.url, next.prompt],
+        );
+    }
+
+    await db.query(`DELETE FROM mkt_buyer_sprite WHERE id = $1 AND buyer_id = $2`, [id, buyerId]);
+    return { ok: true, deleted: id, wore: target.worn === true ? rest[0].url : null };
+}
+
 /** Star one, or unstar it. A star is a promise we keep it; nothing else about it changes. */
 export async function favouriteSprite(buyerId, spriteId, on) {
     if (!buyerId) return { ok: false, error: "unauthorized" };
