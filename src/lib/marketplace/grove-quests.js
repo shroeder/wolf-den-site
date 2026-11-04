@@ -11,7 +11,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { GROVE_NPCS, COLISEUM_NPCS, COLISEUM_ZONE, questsFor, npcsOnMap, mapTargets, foeName, partName, mapName, zoneByN, whereFor } from "@/lib/marketplace/grove-npcs.js";
-import { GREET, SENDOFF, SPENT, fill, stepLines } from "@/lib/marketplace/grove-npc-dialogue.js";
+import { fill } from "@/lib/marketplace/grove-quest-text.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
 /** The shop's own day, for the Coliseum daily. See the note in migration 500 about why this is a date. */
@@ -44,38 +44,28 @@ export function activeStep(chain, rows) {
     return null;
 }
 
-/**
- * The beats this step's state calls for, with the real creature and part names put in.
- *
- * ⚠️ ONLY THE BEATS FOR THE STATE. Sending all four would put the payoff line in the browser before the
- * work was done, which is a spoiler sitting in devtools.
- */
+// ⚠️ sayFor() STOOD HERE and resolved the four beats a step's state called for — the greeting, the
+// problem, the nudge and the payoff. Removed with the dialogue: there is nothing to say any more, only
+// something to show.
+
 // ⚠️ A DELVE STORES ITS DESTINATION IN `need`, NOT IN `zone`. questsFor sets zone = base + need for a
-// delve, so both work -- but survive and ticket steps only have one of the two, and a helper that guesses
-// is how the wrong room gets named. One place decides, and both the prose and the log read it.
+// delve, so both work there — but survive and ticket steps only have one of the two, and a helper that
+// guesses is how the wrong room gets named. One place decides it.
 function zoneNameFor(step) {
     const n = step?.zone || (step?.kind === "delve" ? step?.need : null);
     return n ? (zoneByN(n)?.name || null) : null;
 }
 
-// ⚠️ A TITLE IS A TEMPLATE, AND THERE ARE THREE WAYS OUT OF THIS FILE. Luke: "I see make noise in
-// brackets zone name bracket." questBoard filled its copy and the other two did not -- the in-play toast
-// (bumpQuests) and the hand-in result (claimStep) both shipped "{zone_name}" straight to the screen.
+// ⚠️ A TITLE IS A TEMPLATE AND THERE ARE THREE WAYS OUT OF THIS FILE. Luke: "I see make noise in brackets
+// zone name bracket." questBoard filled its copy and the in-play toast and the hand-in result did not.
+// One function now, used by all three; a raw `step.title` must not appear in a return anywhere.
 //
-// One function now, used by all three. A raw `step.title` must not appear in a return anywhere.
+// It is also the ONLY authored string left in a quest. Everything else a screen shows — the ask, the
+// progress, where to go — is built from the step's own fields.
 function titleOf(step) {
     return fill(step.title, step, {
         foe: foeName(step.foe), part: partName(step.part), zone: zoneNameFor(step),
     });
-}
-
-function sayFor(cur, npc) {
-    const l = stepLines(cur.step.id, npc.id, npc.line);
-    const names = { foe: foeName(cur.step.foe), part: partName(cur.step.part), zone: zoneNameFor(cur.step) };
-    const f = (x) => fill(x, cur.step, names);
-    if (!cur.started) return { problem: (l.problem || []).map(f), ask: f(l.ask) };
-    if (cur.progress >= cur.step.need) return { done: (l.done || []).map(f), ask: f(l.ask) };
-    return { nudge: f(l.nudge), ask: f(l.ask) };
 }
 
 /** Everything the tracker needs: who, where, what, how far, what it pays. */
@@ -94,6 +84,10 @@ export async function questBoard(buyerId) {
                 // ⚠️ THE REGION'S NAME, NOT ITS NUMBER. The log groups by region and "Map 3" is not a
                 // place anybody has been to — the zone strip, the atlas and the giver all say Bogwater.
                 mapName: mapName(map),
+                // ⚠️ CARRIED THROUGH, NOT INFERRED. grove.js uses this to keep the marshal out of
+                // npcHere so the scene does not paint him twice; a board row that dropped the flag
+                // would put a second figure outside the Coliseum and nothing would error.
+                coliseum: Boolean(npc.coliseum),
                 zone: npc.zone,
                 zoneName: zoneByN(npc.zone)?.name || null,
                 steps: npc.chain.length,
@@ -101,14 +95,8 @@ export async function questBoard(buyerId) {
                 // Which link of the chain is in hand, so the log can say "step 2 of 5" rather than
                 // leaving the player to subtract.
                 step: done + 1,
-                // `null` here means finished, and the screen says so rather than hiding the row — a chain you
-                // completed is a thing you want to see you completed.
-                // What they actually say, for the state this step is in. ⚠️ FILLED HERE, where the
-                // resolved step is in hand — the client has the step id and nothing to turn
-                // "{n} {foe}" into "37 Urchin Roller" with, and shipping raw placeholders to a
-                // browser is how a player ends up reading the template.
-                greet: cur ? (GREET[npc.id] || npc.line) : (SPENT[npc.id] || npc.line),
-                sendoff: SENDOFF[npc.id] || "",
+                // ⚠️ NO greet, sendoff OR say. A card that is a display has nothing to narrate; what
+                // it shows is the step, and what the step is comes from the fields below.
                 active: cur
                     ? {
                         id: cur.step.id,
@@ -144,7 +132,6 @@ export async function questBoard(buyerId) {
                         // rooms has them in it. This is the map's own zone list searched for the target.
                         where: whereFor(cur.step, map),
                         reward: cur.step.reward,
-                        say: sayFor(cur, npc),
                     }
                     : null,
             });

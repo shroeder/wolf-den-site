@@ -188,6 +188,26 @@ export function whereFor(step, map) {
 // `n` is a MULTIPLIER on the step's natural size, not a raw count — the counts themselves scale with map
 // depth in stepSize(), because forty kills is a lot on map one and nothing on map seven.
 const CHAINS = {
+    // ── ⚠️ THE COLISEUM MARSHALS, ONE CHAIN EACH ──────────────────────────────────────────────
+    // Luke: "The npc in front of the coliseum in each map should have a coliseum quest chain for that
+    // map."
+    //
+    // They were the fourth NPC on every map and the only one with nothing to ask -- a person you walk up
+    // to, take a key from, and never speak to again. Every chain here ENDS on a ticket step, because the
+    // arena is the thing they are standing in front of; the steps before it are the price of admission in
+    // that marshal's own terms. Mixed kinds, per the rule over CHAINS: a chain is not one verb with
+    // different nouns.
+    //
+    // ⚠️ NO NEW ART. All seven portraits already shipped with the Coliseum (npc-thorn.webp and the
+    // rest) -- this is dialogue and a chain table, nothing drawn.
+    thorn:   [["cull", 1, "Something for the Stands"], ["ticket", 1, "A Short One, First"], ["ticket", 2, "Now the Real One"]],
+    caller:  [["hunt", 1, "Whatever Answers"], ["cull", 1, "Quiet the Approach"], ["ticket", 2, "Shout Back"]],
+    dredge:  [["survive", 1, "Prove You Can Hold"], ["cull", 1, "We Drained It for This"], ["ticket", 2, "Don't Waste It"]],
+    brin:    [["ticket", 1, "Two Minutes"], ["harvest", 1, "Pack the Tide Out"], ["cull", 1, "Clear the Shallows"], ["ticket", 2, "The Long Tide"]],
+    herald:  [["cull", 1, "They Are Watching"], ["hunt", 1, "One for the Front Row"], ["ticket", 2, "Fill the Stands"]],
+    vex:     [["harvest", 1, "The Purse Is Real"], ["cull", 1, "Honest Work"], ["ticket", 1, "Earn the Entry"], ["ticket", 2, "The Whole Purse"]],
+    kade:    [["hunt", 1, "The Warm Sand"], ["survive", 1, "Stand in It"], ["ticket", 2, "It's Always Warm"]],
+
     // map 1 — gentle, and it teaches the verbs one at a time
     alder:   [["cull", 1, "Thin the Treeline"], ["harvest", 1, "What Grows on the Dead"], ["delve", 1, "Walk It Yourself"]],
     pell:    [["harvest", 1, "A Basket's Worth"], ["cull", 1, "The Ones That Bite Back"]],
@@ -279,7 +299,11 @@ const pick = (list, seed) => (list.length ? list[Math.abs(seed) % list.length] :
 
 /** The full, resolved chain for one NPC: every step with its real target, size and reward. */
 export function questsFor(npcId) {
-    const npc = GROVE_NPCS.find((n) => n.id === npcId);
+    // ⚠️ A MARSHAL IS A GIVER TOO NOW. They live in their own list because they are placed by the
+    // Coliseum rather than by NPC_ZONES, but to everything downstream -- the board, accept, claim, the
+    // log -- they are an NPC on a map with a chain. One lookup across both, or questsFor returns [] for
+    // seven people with chains and nothing errors.
+    const npc = GROVE_NPCS.find((n) => n.id === npcId) || COLISEUM_NPCS.find((n) => n.id === npcId);
     if (!npc) return [];
     const shape = CHAINS[npcId] || [];
     const t = mapTargets(npc.map);
@@ -318,8 +342,20 @@ export function questsFor(npcId) {
 
 /** Every NPC on a map, with the zone they stand in and their resolved chain. */
 export function npcsOnMap(map) {
-    const zones = NPC_ZONES[Number(map)] || [];
-    return GROVE_NPCS.filter((n) => n.map === Number(map)).map((n, i) => ({
-        ...n, zone: (Number(map) - 1) * 12 + zones[i], chain: questsFor(n.id),
+    const m = Number(map);
+    const zones = NPC_ZONES[m] || [];
+    const givers = GROVE_NPCS.filter((n) => n.map === m).map((n, i) => ({
+        ...n, zone: (m - 1) * 12 + zones[i], chain: questsFor(n.id),
     }));
+    // ⚠️ THE MARSHAL STANDS AT THE COLISEUM, NOT AT AN NPC_ZONES SLOT, and is flagged so the SCENE can
+    // tell them apart. The zone already draws him as .gv-colnpc outside his building; without the flag
+    // npcHere would match him by zone and paint a second figure on the same spot.
+    const marshal = COLISEUM_NPCS.find((n) => n.map === m);
+    if (!marshal) return givers;
+    return [...givers, {
+        ...marshal,
+        zone: (m - 1) * 12 + (COLISEUM_ZONE[m] || 1),
+        chain: questsFor(marshal.id),
+        coliseum: true,
+    }];
 }

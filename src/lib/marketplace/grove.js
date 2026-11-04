@@ -624,7 +624,12 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
     // Three givers are hidden across twelve zones per map, so most zones have nobody and the scene must
     // not draw a figure in them. Matching on the global zone number rather than a per-map index keeps
     // this honest across map boundaries, where an off-by-twelve would put map 2's cartographer in map 1.
-    const npcHere = quests.find((q) => q.zone === zone.n) || null;
+    // ⚠️ NOT THE MARSHAL. He has a chain now and so he is on the board, but the scene already paints
+    // him outside his own building as .gv-colnpc -- matching him here would stand a SECOND figure on the
+    // same spot and give one person two cards. He is reached by tapping the Coliseum, which is where he
+    // is standing. Flagged on the board by npcsOnMap rather than inferred from the zone, because the
+    // Coliseum zone is a perfectly ordinary zone that a quest giver could also stand in.
+    const npcHere = quests.find((q) => q.zone === zone.n && !q.coliseum) || null;
     const coliseum = await coliseumState(buyerId, zone.map || 1).catch(() => null);
 
     return {

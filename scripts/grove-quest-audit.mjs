@@ -21,7 +21,7 @@
 //
 //   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/grove-quest-audit.mjs
 import { GROVE_NPCS, questsFor, npcsOnMap, foeName, partName, zoneByN } from "@/lib/marketplace/grove-npcs.js";
-import { stepLines, fill } from "@/lib/marketplace/grove-npc-dialogue.js";
+import { fill } from "@/lib/marketplace/grove-quest-text.js";
 
 const ORD = {
     first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6,
@@ -55,7 +55,6 @@ const rows = [];
 for (let map = 1; map <= 7; map += 1) {
     for (const npc of npcsOnMap(map)) {
         for (const step of questsFor(npc.id)) {
-            const l = stepLines(step.id, npc.id, npc.line);
             const zoneN = step.zone || (step.kind === "delve" ? step.need : null);
             const names = { foe: foeName(step.foe), part: partName(step.part),
                 zone: zoneN ? (zoneByN(zoneN)?.name || null) : null };
@@ -65,13 +64,10 @@ for (let map = 1; map <= 7; map += 1) {
                 ? step.need
                 : step.zone ? ((step.zone - 1) % 12) + 1 : null;
 
-            const text = {
-                title: f(step.title || ""),
-                problem: (l.problem || []).map(f).join(" "),
-                ask: f(l.ask),
-                nudge: f(l.nudge),
-                done: (l.done || []).map(f).join(" "),
-            };
+            // ⚠️ ONLY THE TITLE IS LEFT TO CHECK. The dialogue is gone, so the step's own name is the
+            // whole of its authored text -- and it is still a template, so it can still ship a brace or
+            // name a room by number.
+            const text = { title: f(step.title || "") };
 
             const problems = [];
             // 1. An ordinal that is not this step's zone, anywhere in the step's own words.
@@ -95,9 +91,13 @@ for (let map = 1; map <= 7; map += 1) {
             // So a step that sends you somewhere must NAME the somewhere. An ordinal or a bare index in
             // the prose of a delve/survive step is the defect, whether or not it agrees with itself.
             if (["delve", "survive"].includes(step.kind)) {
-                const all = Object.values(text).join(" ");
-                if (names.zone && !all.includes(names.zone)) {
-                    problems.push(`never names its destination (${names.zone})`);
+                // ⚠️ THE ASK IS BUILT NOW, NOT AUTHORED. This used to require the step's own PROSE to
+                // contain the zone's name, which was right when a writer typed the ask by hand. With the
+                // dialogue gone the screens compose it from fields — so what has to be true is that the
+                // step RESOLVES to a real place for them to name. A delve whose zone does not resolve
+                // renders "Reach the far room", which is the old defect wearing a fallback.
+                if (!names.zone) {
+                    problems.push(`has no resolvable destination — the card can only say "the far room"`);
                 }
                 for (const [where, v] of Object.entries(text)) {
                     const hits = ordinalsIn(v);
@@ -107,12 +107,7 @@ for (let map = 1; map <= 7; map += 1) {
                 }
             }
 
-            // 3. The raw template using {n} where a place is meant.
-            const raw = [l.ask, l.nudge, ...(l.problem || []), ...(l.done || [])].filter(Boolean).join(" ");
-            if (/\{n\}\s*(th|st|nd|rd)?\s*(chamber|room|zone|level|deep|hollow)/i.test(raw)) {
-                problems.push(`template: {n} used where {n_zone} is meant`);
-            }
-            // ⚠️ 4. DID ANYTHING SHIP A RAW TEMPLATE? Luke: "I see make noise in brackets zone name
+            // ⚠️ 3. DID ANYTHING SHIP A RAW TEMPLATE? Luke: "I see make noise in brackets zone name
             // bracket." The title is a template and there were THREE ways out of grove-quests.js —
             // questBoard filled its copy, and the in-play toast and the hand-in result did not. A token
             // that reaches a screen is the most visible possible bug and the cheapest possible check.
@@ -121,10 +116,9 @@ for (let map = 1; map <= 7; map += 1) {
                 if (left) problems.push(`${where}: shipped an unfilled template — ${left.join(", ")}`);
             }
 
-            // 5. "1" asked for in the plural.
-            if (step.need === 1 && /\b(them all|each of|every)\b/i.test(text.ask)) {
-                problems.push(`ask: plural wording for a need of 1`);
-            }
+            // ⚠️ THE PLURAL CHECK WENT WITH THE ASK. It read the authored "ask" line, which no longer
+            // exists — the screens build that sentence from kind + need + the creature's name now, so
+            // there is no hand-written plural left to get wrong.
 
             rows.push({ map, npc: npc.id, id: step.id, kind: step.kind, need: step.need,
                 zone: step.zone ?? null, localZone, text, problems });
@@ -133,7 +127,9 @@ for (let map = 1; map <= 7; map += 1) {
 }
 
 const bad = rows.filter((r) => r.problems.length);
-console.log(`${rows.length} steps across ${GROVE_NPCS.length} givers.`);
+// Givers now include the seven Coliseum marshals, which GROVE_NPCS does not list.
+const givers = new Set(rows.map((r) => r.npc));
+console.log(`${rows.length} steps across ${givers.size} givers.`);
 console.log(`${bad.length} say something a player cannot act on.\n`);
 
 const byKind = {};

@@ -1202,6 +1202,12 @@ export const GROVE_CSS = `
     animation: qdNudge 1.4s ease-in-out infinite; }
 @keyframes qdNudge { 50% { transform: translateX(3px); opacity: 0.5; } }
 .qd-steps { margin-left: auto; font-size: 0.72rem; font-weight: 800; color: #9A8FB8; }
+/* What the step pays, on the card as well as in the log. The dialogue used to say this out loud on the
+   way past; with the dialogue gone the card has to show it.
+   ⚠️ AND IT HAS A RULE. An unstyled class name is what put two 512px slabs across the base town this
+   morning -- it does not fail, it just silently styles nothing.
+   [[grep-the-class-name-before-taking-it]] */
+.qd-pay { display: block; margin-top: 8px; font-size: 0.78rem; color: #9A8FB8; }
 
 /* ── THE MOMENT ───────────────────────────────────────────────────────────────────────────────
    Centre screen, over everything, and it is the thing Luke asked for by name. pointer-events none
