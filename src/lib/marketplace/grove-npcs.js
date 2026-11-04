@@ -259,16 +259,14 @@ function stepReward(kind, map, idx, last) {
     const scale = Math.pow(1.6, m - 1);
     const gold = Math.round((40 + idx * 25) * scale);
     const xp = Math.round((30 + idx * 20) * scale);
-    const chestByMap = ["mossbound", "mossbound", "barrowed", "barrowed", "warrenspun", "warrenspun", "heartwrought"];
     return {
         gold,
         xp,
         parts: kind === "forge" ? 0 : Math.max(1, Math.round(2 * Math.pow(1.2, m - 1))),
-        chest: last ? chestByMap[Math.min(chestByMap.length - 1, m - 1)] : null,
         // ⚠️ A COLISEUM TOKEN, ON THE LAST STEP ONLY. Luke, asked where tokens should come from besides
         // the daily one: "Pretty much just this question chain, and then daily once."
         //
-        // The last step of a chain is already the one that pays the chest — [[the big one]] by the rule
+        // The last step of a chain is already the biggest beat — [[the big one]] by the rule
         // written over CHAINS — so the token rides the beat that already exists rather than inventing a
         // fourth kind of payout. Three givers to a map means three tokens a map from chains, which is
         // exactly the bank cap: you can finish a map's chains and spend all three, and no more.

@@ -202,7 +202,9 @@ export default function GroveQuests({
                 body: JSON.stringify({ daily: true, map }),
             }).then((x) => x.json()).catch(() => null);
             setNote(q?.ok ? "The marshal hands you a key." : "You already took today's key.");
-            if (q?.ok) onChanged?.();
+            // ⚠️ THE MAP GOES BACK WITH IT, so the caller can re-read THIS map's coliseum. Without
+            // it the refresh cannot know which one to ask for and the key count never moves.
+            if (q?.ok) onChanged?.(map);
         } finally { setBusy(false); }
     }
 

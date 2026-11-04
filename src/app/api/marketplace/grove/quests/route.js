@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session";
 import { groveOpen } from "@/lib/marketplace/grove.js";
-import { questBoard, acceptStep, claimStep, claimDailyKey } from "@/lib/marketplace/grove-quests.js";
+import { questBoard, acceptStep, claimStep, claimDailyKey, coliseumState } from "@/lib/marketplace/grove-quests.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -23,7 +23,19 @@ export async function GET(request) {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer || !groveOpen(buyer.id)) return noStore({ error: "Not found." }, { status: 404 });
-            return noStore({ ok: true, quests: await questBoard(buyer.id) });
+            // ⚠️ THE COLISEUM RIDES THIS TOO, OR THE KEY COUNT NEVER MOVES. Luke: "I can take a key in
+            // the quest panel once. Second time still baits me into clicking it. And when i get a key it
+            // still says 0 keys." session.coliseum is written once by enter() and nothing updated it, so
+            // dailyReady stayed true and keys stayed 0 for the rest of the visit -- the identical defect
+            // the quest board had, in the field beside it that I did not carry over.
+            //
+            // Keyed on the map the caller is standing in, because coliseumState is per map.
+            const map = Number(new URL(request.url).searchParams.get("map")) || 0;
+            return noStore({
+                ok: true,
+                quests: await questBoard(buyer.id),
+                coliseum: map ? await coliseumState(buyer.id, map).catch(() => null) : null,
+            });
         } catch (error) {
             return internalError(error, { event: "grove.quests.get.failure" });
         }

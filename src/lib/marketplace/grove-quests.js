@@ -10,7 +10,7 @@ import "server-only";
 // opposite of "you have to come back to them".
 
 import { db } from "@/lib/db";
-import { GROVE_NPCS, COLISEUM_NPCS, COLISEUM_ZONE, questsFor, npcsOnMap, foeName, partName, mapName, zoneByN, whereFor } from "@/lib/marketplace/grove-npcs.js";
+import { GROVE_NPCS, COLISEUM_NPCS, COLISEUM_ZONE, questsFor, npcsOnMap, mapTargets, foeName, partName, mapName, zoneByN, whereFor } from "@/lib/marketplace/grove-npcs.js";
 import { GREET, SENDOFF, SPENT, fill, stepLines } from "@/lib/marketplace/grove-npc-dialogue.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 
@@ -322,11 +322,67 @@ export async function claimStep(buyerId, stepId) {
     //
     // ⚠️ DYNAMIC IMPORT because grove.js imports THIS file — a static import back is a cycle. Same shape
     // chests.js and arena-progress.js already use for addParts.
+    // ── ⚠️ A HAUL, ROLLED FROM THIS MAP'S OWN TABLES ──────────────────────────────────────────────
+    // Luke: "Quests can give gold and exp but they should offer random loot as well... depending on the
+    // zone."
+    //
+    // It paid ONE part, chosen deterministically, in a fixed amount -- so every hand-in on a map gave the
+    // same thing and a chain's fifth step felt like its first. Now it rolls two or three DIFFERENT parts
+    // out of mapTargets(map).parts, which is the pool that map's own creatures drop, in amounts that climb
+    // with depth. Same tables the zone already uses, so this adds no content and cannot name a part that
+    // does not exist there.
+    //
+    // ⚠️ STILL NOT THE PART THEY JUST ASKED FOR. Being handed more of the thing you were sent to collect
+    // is a refund, not a reward -- the rule the old single-part pick already had, kept.
+    //
+    // ⚠️ AND IT IS SEEDED ON THE STEP, NOT ON THE CLOCK. A claim that rerolled per attempt would let a
+    // failed write be retried for better loot. Same step, same haul, every time.
+    const rollFor = (seedStr) => {
+        let h = 2166136261;
+        for (const ch of String(seedStr)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+        return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
+    };
+
     let partsPaid = null;
-    if (paid.parts > 0 && paid.partId) {
+    const pool = (mapTargets(npc.map).parts || []).filter((x) => x !== step.part);
+    if (paid.parts > 0 && pool.length) {
+        const rnd = rollFor(`${buyerId}|${stepId}`);
+        const kinds = Math.min(pool.length, 2 + (rnd() < 0.45 ? 1 : 0));
+        const picked = [];
+        const left = [...pool];
+        for (let i = 0; i < kinds && left.length; i += 1) {
+            picked.push(left.splice(Math.floor(rnd() * left.length), 1)[0]);
+        }
+    // ⚠️ THE MIX IS WHAT VARIES, NOT THE TOTAL. The first cut made the budget `parts x kinds`, so a
+        // step that rolled three kinds paid three times one that rolled two -- a 3x swing in part income
+        // decided by a coin flip, which is an economy change wearing a variety costume. The haul is a
+        // FIXED multiple of the authored figure and the roll only decides how it is split.
+        //
+        // ⚠️ 2x IS A DELIBERATE BUMP AND IT IS THE ONLY ONE HERE. Luke asked for quests to pay loot, and
+        // one part per hand-in was thin enough that nobody noticed it arriving. Stated here so the next
+        // person tuning part income can find the number instead of inferring it.
+        // See [[economy-nerf-measure-daily-total]].
+        const budget = Math.max(picked.length, Number(paid.parts) * 2);
+        const give = {};
+        let spent = 0;
+        for (let i = 0; i < picked.length; i += 1) {
+            const share = i === picked.length - 1
+                ? budget - spent
+                : Math.max(1, Math.round((budget / picked.length) * (0.6 + rnd() * 0.8)));
+            const n = Math.max(1, Math.min(share, budget - spent - (picked.length - 1 - i)));
+            give[picked[i]] = n;
+            spent += n;
+        }
         const { storeParts } = await import("@/lib/marketplace/grove.js");
-        const r = await storeParts(buyerId, { [paid.partId]: Number(paid.parts) }).catch(() => null);
-        if (r) partsPaid = { part: paid.partId, n: Number(paid.parts), overflow: r.overflow || {} };
+        const r = await storeParts(buyerId, give).catch(() => null);
+        if (r) {
+            partsPaid = {
+                parts: give,
+                // The first row keeps the old shape, so a screen that only knew how to show one still does.
+                part: picked[0], n: give[picked[0]],
+                overflow: r.overflow || {},
+            };
+        }
     }
 
     // The Coliseum token. Clamped at the cap rather than refused, so finishing a chain while full still

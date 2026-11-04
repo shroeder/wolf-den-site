@@ -446,12 +446,21 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // ⚠️ npcHere IS RECOMPUTED THE SAME WAY THE SERVER DID IT: the giver whose zone matches this one.
     // Picking it off the fresh board rather than patching the old object means a step that ADVANCED to
     // the next link in the chain arrives correctly instead of being merged on top of the previous one.
-    const refreshBoard = useCallback(async () => {
-        const j = await fetch("/api/marketplace/grove/quests", { cache: "no-store" })
+    const refreshBoard = useCallback(async (mapN = null) => {
+        const q = mapN ? `?map=${mapN}` : "";
+        const j = await fetch(`/api/marketplace/grove/quests${q}`, { cache: "no-store" })
             .then((r) => r.json()).catch(() => null);
         if (!j?.ok || !Array.isArray(j.quests)) return null;
         setSession((prev) => (prev
-            ? { ...prev, quests: j.quests, npcHere: j.quests.find((q) => q.zone === prev.zone?.n) || null }
+            ? {
+                ...prev,
+                quests: j.quests,
+                npcHere: j.quests.find((qq) => qq.zone === prev.zone?.n) || null,
+                // ⚠️ AND THE COLISEUM, which is the other thing enter() wrote once and nothing refreshed.
+                // Only when the server actually answered with one -- a call that did not ask for a map
+                // must not blank the card that is on screen.
+                coliseum: j.coliseum ? { ...prev.coliseum, ...j.coliseum } : prev.coliseum,
+            }
             : prev));
         setSt((prev) => (prev ? { ...prev, quests: j.quests } : prev));
         return j.quests;
@@ -497,8 +506,11 @@ export default function GroveClient({ initial, initialView = null, initialTown =
             body: JSON.stringify({ daily: true, map }),
         }).then((r) => r.json()).catch(() => null);
         refresh();
+        // ⚠️ ASK FOR THIS MAP'S COLISEUM BACK. Without it dailyReady stays true and keys stays 0 for the
+        // rest of the visit: the button re-offers a key you already took, and the card still says none.
+        await refreshBoard(map);
         return Boolean(j?.ok);
-    }, [refresh]);
+    }, [refresh, refreshBoard]);
 
     // ── ENTER A ZONE ────────────────────────────────────────────────────────────────────────────────
     const enter = useCallback(async (zone) => {
@@ -1113,7 +1125,8 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         <GroveQuests
                             quests={session?.quests || st?.quests || []}
                             coliseum={session?.coliseum || null}
-                            onChanged={() => { refresh(); refreshBoard(); }}
+                            // ⚠️ THE PANEL TAKES KEYS TOO, so it hands back the map it acted on.
+                            onChanged={(mapN) => { refresh(); refreshBoard(mapN || session?.zone?.map || null); }}
                             busy={col.busy || Boolean(col.run)}
                             onEnter={(map) => { col.start(map); setZonePanel(null); }}
                             // ⚠️ THE SHORTCUT, AND IT GOES THROUGH THE SAME claimStep THE GIVER USES —
