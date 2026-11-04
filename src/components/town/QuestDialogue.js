@@ -2,41 +2,37 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import QuestSpeech from "@/components/QuestSpeech";
 
 import { PERK_SYSTEM } from "@/lib/marketplace/acts.js";
 
-// ── A PERSON ASKING YOU FOR SOMETHING ────────────────────────────────────────────────────────────────────────
-// Luke: "why did you elect to use a bounty board? I thought we were going to use NPCs for all of this... I was
-// hoping for like dialogue where they tell you about the problem they're having and then the solution, and
-// then you get the quest and there's like a big thing in the middle saying like quest received."
+// ── THE QUEST CARD IN A GROVE TOWN ───────────────────────────────────────────────────────────────────────────
+// Luke: "I don't want no dialogie in grove town npcs."
 //
-// What this replaces was an ordered list with Claim buttons down the side. Everything about the ladder was
-// already right — one rung open at a time, one-time, paying passive perks rather than gold — and none of it
-// READ as a quest, because a list cannot want anything.
+// This was a five-beat conversation: a hail, the problem in the giver's own register, the ask, a QUEST
+// RECEIVED plate centre-screen, and a send-off that closed the sheet itself — typed out a line at a time and
+// remembered per step in localStorage so no beat ever played twice. All of it is gone, with the typewriter,
+// both timers and the tap-to-advance.
 //
-// The beats, in order, and each one is a tap:
+// What is left is the card: who is asking, how far through the act you are, the rung's own title and ask,
+// a bar, and one button.
 //
-//   1. the hail            they notice you
-//   2. the problem         1-2 lines. Why they are asking, in their own register.
-//   3. the ask             the job, as a card: title, what it needs, what it pays.
-//   4. QUEST RECEIVED      the plate, centre screen, over everything.
-//   5. their send-off      one line, and the sheet closes itself.
+// ⚠️ GROVE TOWNS ONLY — THE DEFAULT STREET DOES NOT COME THROUGH HERE. Luke: "There is a difference
+// between grove towns and the default town, which we shouldn't touch." The quest giver in TownClient
+// branches on `town`:
 //
-// Come back mid-job and you get the nudge and a progress bar. Come back finished and you get the payoff
-// lines, then QUEST COMPLETE and the perk.
+//     onClick={() => { if (town) { openActBoard(); } else { setQuestOpen(true); } }}
 //
-// ⚠️ ONE LINE AT A TIME, AND TAPPING IS THE WHOLE INTERACTION. The first draft put all of a rung's dialogue
-// on screen together, which is a paragraph — and a paragraph is a thing you skim and dismiss. Metering it
-// makes the player set the pace, and it is the only reason the ask lands as a sentence somebody said rather
-// than as a row in a table.
+// A Grove town takes the first branch and lands in this component; the ungated street takes the second and
+// opens the older quest panel, which is untouched. That branch is the whole of the separation, so anything
+// added here must stay behind it.
+//
+// ⚠️ SAME .qd-* CLASSES AS THE GROVE'S OWN CARD, still. Two people you walk up to should not be two
+// kinds of object, and that was true when both had dialogue and is true now that neither does.
 
 export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim, onClose }) {
-    // Which beat we are on. `i` walks the current state's line list; `card` is the ask; `plate` is the moment.
-    const [i, setI] = useState(0);
-    const [typed, setTyped] = useState(false);
-    const [plate, setPlate] = useState(null);     // null | "received" | "complete"
-    const [sendoff, setSendoff] = useState(false);
+    // ⚠️ WHAT THE CARD SAYS AFTER YOU PRESS SOMETHING. The plate and the send-off said it with a
+    // full-screen moment and two timers; this is one line in the card.
+    const [note, setNote] = useState(null);
 
     const focus = useMemo(
         () => (board?.rungs || []).find((r) => r.key === board?.focusKey) || null,
@@ -44,78 +40,21 @@ export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim
     );
     const state = focus?.state || (board?.done ? "finished" : null);
 
-    // ── ⚠️ EACH BEAT IS SAID ONCE, NOT EVERY TIME YOU WALK PAST ────────────────────────────────────
-    // Luke: "You s[houldn't] have to go through an npc dialogue every time. Its annoying."
-    //
-    // He is right, and the first version got this exactly backwards. Dialogue is worth tapping through
-    // the first time a person tells you something, and it is an obstacle every time after that — and the
-    // most common visit to a quest giver is not the first, it is walking back mid-job to check a number
-    // or hand a thing in. Metering a line you have already read is just a door you have to open twice.
-    //
-    // So a beat is keyed by WHICH STEP and WHICH STATE, and heard once it is never played again: come
-    // back to an active job and the card is simply there. The conversation still happens in full every
-    // time it has something NEW to say — a new rung, or a job that has just turned ready — which is the
-    // half of it that was always the point.
-    const stepKey = focus ? `wd-quest-heard:${board?.townId || board?.giver || "town"}:${focus.key}:${state}` : null;
-    const [heard, setHeard] = useState(false);
-    useEffect(() => {
-        if (!stepKey) { setHeard(false); return; }
-        let was = false;
-        try { was = window.localStorage.getItem(stepKey) === "1"; } catch { was = false; }
-        setHeard(was);
-        // Reset the walk-through whenever the beat changes, or a remembered step would open mid-line.
-        setI(0);
-        setTyped(was);
-    }, [stepKey]);
+    // ⚠️ "EACH BEAT IS SAID ONCE" LIVED HERE, with a localStorage key per step so a line you had
+    // already read never played again. Luke: "You s[houldn't] have to go through an npc dialogue every
+    // time. Its annoying." That fix is now moot in the only way that fully solves it — there is no beat
+    // left to remember, so there is nothing to skip and no key to keep.
 
-    // The lines for this visit, in order: the hail, then whatever the state has to say.
-    const lines = useMemo(() => {
-        if (!board || heard) return [];
-        const say = focus?.say || {};
-        const out = [board.hail].filter(Boolean);
-        if (state === "offered") out.push(...(say.problem || []));
-        if (state === "active") out.push(say.nudge);
-        if (state === "ready") out.push(...(say.done || []));
-        return out.filter(Boolean);
-    }, [board, focus, state, heard]);
-
-    // Remembered the moment the last line is on screen, so a player who closes the sheet early is not made
-    // to sit through it again — they already read it.
-    useEffect(() => {
-        if (!stepKey || heard) return;
-        if (i >= lines.length - 1 && typed) {
-            try { window.localStorage.setItem(stepKey, "1"); } catch { /* private mode: it just repeats */ }
-        }
-    }, [stepKey, heard, i, lines.length, typed]);
-
-    const last = i >= lines.length - 1;
-    const advance = useCallback(() => {
-        if (!typed) { setTyped(true); return; }          // first tap finishes the line
-        if (!last) { setI((n) => n + 1); setTyped(false); }
-    }, [typed, last]);
-
-    // ⚠️ THE PLATE IS THE POINT, so it gets its own beat rather than being a toast beside the button. It
-    // covers the sheet, it cannot be missed, and it is the thing Luke asked for by name.
     const take = async () => {
         const ok = await onAccept?.(focus.key);
         if (ok === false) return;
-        setPlate("received");
+        setNote("Taken.");
     };
     const turnIn = async () => {
         const ok = await onClaim?.(focus.key);
         if (ok === false) return;
-        setPlate("complete");
+        setNote("Handed in.");
     };
-    useEffect(() => {
-        if (!plate) return undefined;
-        const t = setTimeout(() => { setPlate(null); setSendoff(true); }, 1900);
-        return () => clearTimeout(t);
-    }, [plate]);
-    useEffect(() => {
-        if (!sendoff) return undefined;
-        const t = setTimeout(() => onClose?.(), 2600);
-        return () => clearTimeout(t);
-    }, [sendoff, onClose]);
 
     if (!board) {
         return (
@@ -131,7 +70,7 @@ export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim
 
     return (
         <div className="qd-wrap" role="dialog" aria-label={`${board.giver || "Quest"}`} onClick={onClose}>
-            <div className="qd-panel" onClick={(e) => { e.stopPropagation(); if (!plate && !sendoff) advance(); }}>
+            <div className="qd-panel" onClick={(e) => e.stopPropagation()}>
                 <button type="button" className="qd-x" onClick={(e) => { e.stopPropagation(); onClose?.(); }} aria-label="Close">✕</button>
 
                 <div className="qd-who">
@@ -147,33 +86,21 @@ export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim
                     <span className="qd-prog" aria-label={`${claimedN} of ${ladder.length} done`}>{claimedN}/{ladder.length}</span>
                 </div>
 
-                {/* ⚠️ KEYED ON THE LINE ONLY. This keyed on `typed` as well, so the moment a line
-                    finished the whole typewriter remounted and retyped it — on top of the callback-in-
-                    deps loop described in QuestSpeech. (The text prop was also `typed ? lines[i] :
-                    lines[i]`, which is the same thing twice and did nothing.) */}
-                {sendoff ? (
-                    <QuestSpeech key="sendoff" text={board.accepted} className="qd-line" />
-                ) : (
-                    <QuestSpeech
-                        key={`${state}-${i}`}
-                        text={lines[i]}
-                        complete={typed}
-                        onComplete={() => setTyped(true)}
-                        className="qd-line"
-                    />
-                )}
+                {note ? <p className="qd-line">{note}</p> : null}
 
-                {/* ── THE ASK, AS A CARD ───────────────────────────────────────────────────────────────
-                    It appears only once the talking is finished, so the job is the LAST thing on screen
-                    when the player decides. A card that is up from the first line is a form with a story
-                    above it. */}
-                {!sendoff && last && typed && focus ? (
+                {/* ── THE JOB ─────────────────────────────────────────────────────────────────────────
+                    This used to wait for the talking to finish, so the job was the last thing on screen
+                    when the player decided. There is no talking now, so it is simply the card. */}
+                {focus ? (
                     <div className={`qd-card is-${state}`}>
                         <div className="qd-card-top">
                             <b>{focus.title}</b>
                             {focus.perk ? <i>+{focus.perk.pct}% {PERK_SYSTEM[focus.perk.slot] || focus.perk.slot}</i> : null}
                         </div>
-                        <p className="qd-ask">&ldquo;{focus.say?.ask}&rdquo;</p>
+                        {/* ⚠️ THE ASK IS STILL THE STEP'S OWN SENTENCE, because the act board authors
+                            one per rung and it is the job, not narration. What went is everything AROUND
+                            it. */}
+                        <p className="qd-ask">{focus.say?.ask}</p>
                         {state !== "offered" ? (
                             <>
                                 <div className="qd-bar"><span style={{ width: `${Math.round((focus.have / focus.need) * 100)}%` }} /></div>
@@ -226,21 +153,11 @@ export default function QuestDialogue({ board, portrait, busy, onAccept, onClaim
                     door this removes was the fourth, not the only.
 
                     A quest giver offers a chain. That is all he offers. */}
-                {!sendoff && !(last && typed) ? <span className="qd-more" aria-hidden="true">tap</span> : null}
             </div>
 
-            {/* ── THE MOMENT ───────────────────────────────────────────────────────────────────────────── */}
-            {plate ? (
-                <div className="qd-plate" role="status">
-                    <div className="qd-plate-in">
-                        <b>{plate === "received" ? "QUEST RECEIVED" : "QUEST COMPLETE"}</b>
-                        <span>{focus?.title}</span>
-                        {plate === "complete" && focus?.perk ? (
-                            <em>+{focus.perk.pct}% {PERK_SYSTEM[focus.perk.slot] || focus.perk.slot}</em>
-                        ) : null}
-                    </div>
-                </div>
-            ) : null}
+            {/* ⚠️ THE QUEST RECEIVED PLATE STOOD HERE, centre screen, over everything. It was the beat
+                Luke asked for by name in August, and it goes with the rest of the conversation. The card
+                says "Taken." now, which is the same fact without the ceremony. */}
             <style>{QD_CSS}</style>
         </div>
     );
@@ -264,6 +181,9 @@ const QD_CSS = `
 .qd-name b { color: #ffd75e; font-size: 1rem; }
 .qd-name i { color: #a99f88; font-size: 0.74rem; font-style: normal; }
 .qd-prog { margin-left: auto; font-size: 0.72rem; font-weight: 800; color: #a99f88; }
+/* ⚠️ THE PLATE'S RULES WENT WITH THE PLATE. A rule for a shape that no longer exists is how a later
+   element with a reused class name inherits a look nobody meant it to have.
+   [[stale-css-rule-on-reshape]] */
 .qd-line { margin: 0 0 10px; color: #f2ead9; font-size: 0.96rem; line-height: 1.5; min-height: 2.9em; }
 .qd-caret { display: inline-block; width: 7px; height: 1em; margin-left: 2px; vertical-align: -2px;
     background: rgba(255,215,110,0.7); animation: qdBlink 1s steps(1) infinite; }
@@ -293,15 +213,8 @@ const QD_CSS = `
 /* .qd-odd's rules went with its markup. [[stale-css-rule-on-reshape]] */
 /* The ladder's rules went with its markup — a rule left behind for a deleted element is what
    restyles the next thing to take the class name. [[stale-css-rule-on-reshape]] */
-
-.qd-plate { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; pointer-events: none; }
-.qd-plate-in { text-align: center; padding: 18px 30px; border-radius: 14px;
-    background: linear-gradient(180deg, rgba(32,24,12,0.97), rgba(18,13,8,0.97));
-    border: 1px solid rgba(255,215,110,0.55); box-shadow: 0 0 60px rgba(255,200,80,0.35), 0 20px 60px rgba(0,0,0,0.7);
-    animation: qdPlate .5s cubic-bezier(.2,1.4,.4,1) both; }
-.qd-plate-in b { display: block; font-size: 1.25rem; letter-spacing: 3px; color: #ffd75e; }
-.qd-plate-in span { display: block; margin-top: 4px; font-size: 0.92rem; color: #f2ead9; }
-.qd-plate-in em { display: block; margin-top: 8px; font-size: 0.86rem; font-style: normal; font-weight: 800; color: #8fe39a; }
-@keyframes qdPlate { from { opacity: 0; transform: scale(.82); } }
-@media (prefers-reduced-motion: reduce) { .qd-plate-in, .qd-card { animation: none; } }
+/* ⚠️ THE PLATE'S RULES WENT WITH THE PLATE — .qd-plate, .qd-plate-in and the qdPlate keyframe. A rule for
+   a shape that no longer exists is how a later element with a reused class name inherits a look nobody
+   meant it to have. [[stale-css-rule-on-reshape]] */
+@media (prefers-reduced-motion: reduce) { .qd-card { animation: none; } }
 `;
