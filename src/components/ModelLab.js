@@ -50,9 +50,12 @@ export default function ModelLab() {
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             host.appendChild(renderer.domElement);
 
-            // Three lights, same shape as the Blender setup, so what renders here matches what renders there.
-            const key = new THREE.DirectionalLight(0xfff2e6, 2.6);
-            key.position.set(2.6, 3.4, 2.4);
+            // ⚠️ KEEP THE KEY LOW AND FRONTAL. A light high overhead carves a hard
+            // shadow under the pectoral, and on a pale untextured body that crease
+            // reads as the underside of a breast -- the model is a flat-chested male
+            // in Blender and looked otherwise here purely because of this angle.
+            const key = new THREE.DirectionalLight(0xfff2e6, 2.3);
+            key.position.set(2.2, 1.5, 3.4);
             key.castShadow = true;
             key.shadow.mapSize.set(1024, 1024);
             key.shadow.camera.near = 0.5;
@@ -60,13 +63,15 @@ export default function ModelLab() {
             key.shadow.camera.left = key.shadow.camera.bottom = -3;
             key.shadow.camera.right = key.shadow.camera.top = 3;
             scene.add(key);
-            const fill = new THREE.DirectionalLight(0xbfd6e6, 0.75);
-            fill.position.set(-3.2, 1.8, 1.6);
+            const fill = new THREE.DirectionalLight(0xbfd6e6, 0.85);
+            fill.position.set(-3.2, 1.2, 2.4);
             scene.add(fill);
-            const rim = new THREE.DirectionalLight(0xffd9a8, 1.5);
-            rim.position.set(-1.2, 2.4, -3.2);
+            const rim = new THREE.DirectionalLight(0xffd9a8, 1.1);
+            rim.position.set(-1.0, 1.8, -3.2);
             scene.add(rim);
-            scene.add(new THREE.HemisphereLight(0x5e7a8a, 0x241c18, 0.5));
+            // A low hemisphere: too much ground bounce fills the shadow UNDER a form
+            // and turns flat muscle into something rounded.
+            scene.add(new THREE.HemisphereLight(0x5e7a8a, 0x241c18, 0.28));
 
             const grid = new THREE.GridHelper(8, 16, 0x2f4248, 0x1b282d);
             grid.position.y = 0.001;
@@ -115,9 +120,12 @@ export default function ModelLab() {
                     root.position.y -= box.min.y;
                     scene.add(root);
 
+                    // ⚠️ LEAVE REAL MARGIN. At h*1.45 the frustum showed only ~1.2x the
+                    // model height, so on a narrow phone viewport the figure arrived
+                    // cropped at the shoulders and thighs.
                     const h = size.y || 1.8;
-                    controls.target.set(0, h * 0.52, 0);
-                    camera.position.set(h * 0.95, h * 0.72, h * 1.45);
+                    controls.target.set(0, h * 0.50, 0);
+                    camera.position.set(h * 1.05, h * 0.78, h * 2.15);
                     controls.update();
 
                     const clip = gltf.animations?.[0] || null;
