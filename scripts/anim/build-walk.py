@@ -18,61 +18,23 @@ from mathutils import Vector, Euler, Matrix, Quaternion
 # glTF has no IK, so the result is baked down to plain bone keys before export.
 # ═══════════════════════════════════════════════════════════════════════════════
 OUT = os.environ.get("OUT_DIR", ".")
-bpy.ops.preferences.addon_enable(module="bl_ext.blender_org.mpfb")
-from bl_ext.blender_org.mpfb.services.humanservice import HumanService
-from bl_ext.blender_org.mpfb.services.targetservice import TargetService
+BASE = os.environ.get("HERO_BASE", os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "hero-base.blend"))
 
-bpy.ops.wm.read_homefile(use_empty=True)
-
-macro = TargetService.get_default_macro_info_dict()
-for k, v in (("gender", 1.0), ("age", 0.55), ("muscle", 0.95), ("weight", 0.56),
-             ("height", 0.80), ("proportions", 1.0), ("cupsize", 0.0), ("firmness", 0.9)):
-    macro[k] = v
-human = HumanService.create_human(macro_detail_dict=macro, scale=0.1,
-                                  feet_on_ground=True, detailed_helpers=False)
-arm = HumanService.add_builtin_rig(human, "game_engine")
-
-# ── BAKE THE MACRO, THEN FIT THE SKELETON TO THE BODY ────────────────────────
-# ⚠️ MPFB BUILDS THE RIG AGAINST base.obj, the pristine MakeHuman mesh. A
-# character with macro details therefore gets a skeleton sized for somebody
-# else -- 1.654 of rig inside 2.127 of body -- and every joint ends up a
-# hip-height below the limb it drives. refit() does not resize it. The whole
-# previous walk was authored on that: the skeleton posed correctly and the
-# flesh pivoted about points a metre away, which is why the renders looked
-# deformed while every skeleton measurement passed.
+# ── LOAD THE FROZEN HERO ─────────────────────────────────────────────────────
+# ⚠️ THIS SCRIPT NO LONGER GENERATES ANYTHING. It used to call MPFB on every
+# build, which meant re-triggering its whole quirk list -- rig fitted to the
+# wrong mesh, macro shape keys breaking the bind, helper geometry hidden
+# rather than deleted -- every single export. The model changed underneath the
+# animation constantly, and each fix had to survive being re-applied.
 #
-# Editing the REST bones after binding is safe: at rest, pose equals rest, so
-# pose * rest-inverse is identity and the mesh does not move. Only the pivots
-# move -- onto the anatomy.
-if human.data.shape_keys:
-    bpy.context.view_layer.objects.active = human
-    human.select_set(True)
-    bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
-    human.select_set(False)
-
-_dg = bpy.context.evaluated_depsgraph_get(); _ev = human.evaluated_get(_dg)
-_mz = [(_ev.matrix_world @ v.co).z for v in _ev.data.vertices]
-_mlo, _mhi = min(_mz), max(_mz)
-_bz = [(arm.matrix_world @ b.head_local).z for b in arm.data.bones] +       [(arm.matrix_world @ b.tail_local).z for b in arm.data.bones]
-_blo, _bhi = min(_bz), max(_bz)
-_k = (_mhi - _mlo) / (_bhi - _blo)
-bpy.context.view_layer.objects.active = arm
-arm.select_set(True)
-bpy.ops.object.mode_set(mode="EDIT")
-for _eb in arm.data.edit_bones:
-    for _a in ("head", "tail"):
-        _p = getattr(_eb, _a).copy()
-        _p.x *= _k; _p.y *= _k
-        _p.z = _mlo + (_p.z - _blo) * _k
-        setattr(_eb, _a, _p)
-bpy.ops.object.mode_set(mode="OBJECT")
-arm.select_set(False)
-bpy.context.view_layer.update()
-print("RIGFIT scale %.4f -> rig now spans the body" % _k)
-
-for ob in list(bpy.data.objects):
-    if ob.type == "MESH" and ob is not human:
-        bpy.data.objects.remove(ob, do_unlink=True)
+# Generation now happens once, in scripts/anim/freeze-hero.py, and is
+# committed as an asset. This loads it. Change the animation and the model
+# cannot move.
+bpy.ops.wm.open_mainfile(filepath=BASE)
+human = bpy.data.objects["Hero"]
+arm = bpy.data.objects["HeroRig"]
+print("LOADED %s  %d verts, %d bones" % (os.path.basename(BASE),
+                                         len(human.data.vertices), len(arm.data.bones)))
 
 for pb in arm.pose.bones:
     pb.rotation_mode = "XYZ"

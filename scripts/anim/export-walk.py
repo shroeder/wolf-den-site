@@ -11,7 +11,7 @@ sc = bpy.context.scene
 # assigned in the PREVIEW section, which runs after export_scene.gltf, so the
 # browser got bare geometry and three.js substituted its default grey. That is
 # the whole reason the lab looked nothing like the render.
-skin = bpy.data.materials.new("HeroSkin")
+skin = human.data.materials[0] if human.data.materials else bpy.data.materials.new("HeroSkin")
 skin.use_nodes = True
 p = skin.node_tree.nodes["Principled BSDF"]
 p.inputs["Base Color"].default_value = (0.78, 0.55, 0.45, 1)
