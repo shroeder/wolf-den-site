@@ -68,6 +68,53 @@ if human.data.shape_keys and len(human.data.shape_keys.key_blocks) > 1:
     bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
     print("BAKED %d shape keys" % n)
 
+# ── DELETE THE HELPER GEOMETRY FOR REAL ──────────────────────────────────────
+# ⚠️ THE MASK MODIFIER ONLY HIDES IT. MakeHuman's base mesh carries proxy
+# volumes for fitting clothes and hair, plus anatomical detail, and MPFB hides
+# them behind a MASK modifier rather than deleting them. Blender renders look
+# clean; the GLB does not, because export_apply must stay FALSE (applying
+# modifiers would flatten the Armature and destroy the skinning). So the
+# browser got a figure wearing a robe, with hair and genitals, while every
+# render here showed a bare base mesh.
+#
+# Applying the MASK alone removes those vertices permanently and leaves the
+# Armature modifier intact.
+before = len(human.data.vertices)
+bpy.ops.object.select_all(action="DESELECT")
+human.select_set(True)
+bpy.context.view_layer.objects.active = human
+for m in list(human.modifiers):
+    if m.type == "MASK":
+        try:
+            bpy.ops.object.modifier_apply(modifier=m.name)
+            print("MASK APPLIED %s" % m.name)
+        except Exception as e:
+            print("MASK APPLY FAILED: %s" % e)
+print("VERTS %d -> %d (removed %d helper verts)" % (before, len(human.data.vertices), before - len(human.data.vertices)))
+
+# ⚠️ AND BONE CUSTOM SHAPES COME ALONG TOO. MPFB gives pose bones a display
+# object -- an icosphere -- and the exporter ships it as real geometry even
+# though it is never an object in the scene and never renders. That is a
+# 42-vertex untextured ball riding inside every export.
+_cleared = 0
+for _pb in arm.pose.bones:
+    if _pb.custom_shape:
+        _pb.custom_shape = None
+        _cleared += 1
+print("CLEARED %d bone custom shapes" % _cleared)
+for _d in list(bpy.data.objects):
+    if _d.type == "MESH" and _d is not human and _d.users == 0:
+        bpy.data.objects.remove(_d, do_unlink=True)
+
+# ⚠️ THE EXPORTER FOLLOWS CHILDREN OF WHAT YOU SELECT. MPFB parents bone-shape
+# helper objects to the armature, so selecting only the body and the rig still
+# shipped a stray 42-vertex Icosphere with no material. Delete anything that is
+# not the body outright.
+for ob in list(bpy.data.objects):
+    if ob.type == "MESH" and ob is not human:
+        print("DROPPED stray mesh %s" % ob.name)
+        bpy.data.objects.remove(ob, do_unlink=True)
+
 for ob in bpy.data.objects:
     ob.select_set(ob in (arm, human))
 bpy.context.view_layer.objects.active = arm
