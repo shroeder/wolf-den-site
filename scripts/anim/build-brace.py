@@ -105,8 +105,9 @@ for f in range(1, BF + 2):
     # ── THE SHIELD ── up at the chin, across the centreline, answering the
     # breath a beat LATE so it reads as weight being carried, not glued on.
     lag = math.sin(2 * math.pi * ((f - 1) / BF) - 0.9)
+    # The fist rides BEHIND the shield face; the shield centre is at 0.40.
     _hand_goal.location = (SHIELD_SIDE * 0.02 * LEG + 0.010 * LEG * lag,
-                           FWD * (0.44 * LEG + 0.012 * LEG * lag),
+                           FWD * (0.32 * LEG + 0.012 * LEG * lag),
                            FLOOR + LEG * 1.16 + 0.011 * LEG * lag)
     _hand_goal.keyframe_insert("location", frame=f)
     _elbow_pole.location = (SHIELD_SIDE * (0.30 * LEG), 0.40 * LEG, FLOOR + LEG * 0.76)

@@ -163,7 +163,7 @@ SHIELD = build_shield(LEG)
 SHIELD_REST_SOLVED_AT = 1
 _hand_rest = (arm.matrix_world @ arm.pose.bones["hand_l"].bone.matrix_local)
 _chest_z = FLOOR + LEG * 1.26
-_wanted = Matrix.Translation(Vector((0.30 * LEG, -0.26 * LEG, _chest_z))) @           Matrix.Rotation(math.radians(-19), 4, "Y") @           Matrix.Rotation(math.radians(9), 4, "X")
+_wanted = Matrix.Translation(Vector((0.30 * LEG, -0.29 * LEG, _chest_z))) @           Matrix.Rotation(math.radians(-19), 4, "Y") @           Matrix.Rotation(math.radians(9), 4, "X")
 SHIELD_PLACEMENT = (_hand_rest, _wanted)
 bpy.context.view_layer.update()
 
@@ -316,7 +316,10 @@ SHIELD_ARM = "l"
 # horizontal so the shield rides on it.
 _sa = SHIELD_ARM
 _sho = arm.matrix_world @ arm.pose.bones["upperarm_%s" % _sa].head
-_hand_goal = empty("guard_%s" % _sa, (0.10 * LEG, FWD * 0.30 * LEG, FLOOR + LEG * 1.09))
+# ⚠️ THE HAND SITS BEHIND THE SHIELD, NOT THROUGH IT. A shield is gripped by
+# a handle behind the boss -- the fist is hidden by the face. The goal used to
+# be FORWARD of the shield centre, which pushed the hand out through the front.
+_hand_goal = empty("guard_%s" % _sa, (0.10 * LEG, FWD * 0.20 * LEG, FLOOR + LEG * 1.09))
 _elbow_pole = empty("guardpole_%s" % _sa, (_sho.x + 0.26 * LEG, 0.34 * LEG, FLOOR + LEG * 0.82))
 _gc = arm.pose.bones["lowerarm_%s" % _sa].constraints.new("IK")
 _gc.target = _hand_goal
@@ -325,6 +328,43 @@ _gc.chain_count = 2
 _gc.pole_angle = math.radians(-90)
 _gc.use_tail = True
 print("GUARD arm %s solved by IK" % _sa)
+
+# ── A GRIPPING FIST ──────────────────────────────────────────────────────────
+# An open hand behind a shield reads as someone balancing a tray. The fingers
+# curl around a handle: proximal hardest, then mid, then the tip, with the
+# thumb coming over the top rather than curling the same way.
+#
+# ⚠️ CURL DIRECTION IS CALIBRATED, NOT TYPED. Finger bones mirror per side
+# like every other bone on this rig, and a wrong sign splays the hand
+# backwards into a claw.
+def _curl_sign(side):
+    base = arm.pose.bones["index_01_%s" % side]
+    tipb = arm.pose.bones["index_03_%s" % side]
+    wrist = arm.matrix_world @ arm.pose.bones["hand_%s" % side].head
+    base.rotation_euler = Euler((0, 0, 0), "XYZ")
+    bpy.context.view_layer.update()
+    d0 = ((arm.matrix_world @ tipb.tail) - wrist).length
+    base.rotation_euler = Euler((math.radians(30), 0, 0), "XYZ")
+    bpy.context.view_layer.update()
+    d1 = ((arm.matrix_world @ tipb.tail) - wrist).length
+    base.rotation_euler = Euler((0, 0, 0), "XYZ")
+    bpy.context.view_layer.update()
+    return 1.0 if d1 < d0 else -1.0
+
+def close_fist(side, amount=1.0):
+    cs = _curl_sign(side)
+    for fng in ("index", "middle", "ring", "pinky"):
+        for seg, deg in (("01", 58), ("02", 76), ("03", 48)):
+            b = arm.pose.bones.get("%s_%s_%s" % (fng, seg, side))
+            if b:
+                b.rotation_euler = Euler((math.radians(deg * amount * cs), 0, 0), "XYZ")
+    for seg, deg in (("01", 26), ("02", 34), ("03", 30)):
+        b = arm.pose.bones.get("thumb_%s_%s" % (seg, side))
+        if b:
+            b.rotation_euler = Euler((math.radians(deg * amount * cs), 0, 0), "XYZ")
+    print("FIST %s closed (curl sign %+.0f)" % (side, cs))
+
+close_fist(SHIELD_ARM)
 
 # ── KEY IT ────────────────────────────────────────────────────────────────────
 sc = bpy.context.scene
