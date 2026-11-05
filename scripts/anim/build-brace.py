@@ -99,7 +99,7 @@ for f in range(1, BF + 2):
         tgt.keyframe_insert("location", frame=f)
         tgt.rotation_quaternion = FOOT_REST[side]
         tgt.keyframe_insert("rotation_quaternion", frame=f)
-        pole.location = (fx * 1.1, fy + FWD * 0.40 * LEG, FLOOR + LEG * 0.50)
+        pole.location = (fx * 1.15, fy + FWD * 0.40 * LEG, FLOOR + LEG * 0.50)
         pole.keyframe_insert("location", frame=f)
 
     # ── THE SHIELD ── up at the chin, across the centreline, answering the

@@ -84,7 +84,8 @@ def key_idle(frames=48):
             tgt.keyframe_insert("location", frame=f)
             tgt.rotation_quaternion = Quaternion((0, 0, 1), math.radians(8.0 * sx)) @ FOOT_REST[s]
             tgt.keyframe_insert("rotation_quaternion", frame=f)
-            pole.location = (sx * 0.18 * LEG, FWD * 0.40 * LEG, FLOOR + LEG * 0.52)
+            # 0.30 of a leg is where the knee tracks straight; see KNEE_POLE.
+            pole.location = (sx * 0.305 * LEG, FWD * 0.40 * LEG, FLOOR + LEG * 0.52)
             pole.keyframe_insert("location", frame=f)
 
         # Shield hangs low and relaxed at the side.
@@ -175,7 +176,7 @@ def key_impact(frames=26):
             tgt.keyframe_insert("location", frame=f)
             tgt.rotation_quaternion = FOOT_REST[s]
             tgt.keyframe_insert("rotation_quaternion", frame=f)
-            pole.location = (fx * 1.1, fy + FWD * 0.40 * LEG, FLOOR + LEG * 0.50)
+            pole.location = (fx * 1.15, fy + FWD * 0.40 * LEG, FLOOR + LEG * 0.50)
             pole.keyframe_insert("location", frame=f)
 
         hand_goal.location = (side * 0.02 * LEG,

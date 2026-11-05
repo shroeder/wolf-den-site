@@ -191,6 +191,13 @@ LIFT = 0.085 * LEG     # how high the swinging foot clears the floor
 # toilet. A real stance is a little wider WITH the toes turned out.
 TRACK = 0.155          # ankle offset from centre, as a fraction of leg
 TOE_OUT = 7.0          # degrees, outward
+# ⚠️ KNEE TRACKING IS SET BY THE POLE'S X, AND ONLY BY THAT. Swept it: at
+# 0.18 of a leg the knee sits 0.06 INBOARD of the hip-ankle line -- visibly
+# knock-kneed -- at 0.30 it is dead straight (-0.001), past 0.45 it bows out.
+# pole_angle turned out to be nearly irrelevant across -120..-60, so the knock
+# -knee was never an angle problem; the poles were simply too close to centre.
+KNEE_POLE = 0.315      # fraction of leg, outboard. A hair past straight,
+                       # because a dead-parallel male walk reads stiff.
 
 def ease(t):
     return t * t * (3 - 2 * t)
@@ -492,7 +499,7 @@ for f in range(1, FRAMES + 2):
         tgt.keyframe_insert("location", frame=f)
 
         pole = ik_targets[s][1]
-        pole.location = (sign * TRACK * LEG * 1.1, fy * 0.45 + FWD * 0.42, FLOOR + LEG * 0.55)
+        pole.location = (sign * KNEE_POLE * LEG, fy * 0.45 + FWD * 0.42, FLOOR + LEG * 0.55)
         pole.keyframe_insert("location", frame=f)
 
         # +pitch about world X drops the toe, because the foot points -Y.
