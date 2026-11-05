@@ -282,12 +282,27 @@ def key_run(frames=16):
     side = 1 if SA == "l" else -1
     G_ = G
 
-    DUTY = 0.34               # fraction of the cycle a foot is down. < 0.5 IS the run
-    STRIDE = 1.00 * LEG       # contact-to-contact split, nearly double the walk's
-    LIFT = 0.185 * LEG        # the swinging foot comes up hard
-    BASE = 0.885 * LEG        # average hip height: lower than a walk, knees loaded
-    BOB = 0.055 * LEG
-    LEAN = 11.0               # degrees of forward pitch through the spine
+    # ⚠️ A LONG CONTACT SPLIT IS NOT WHERE A RUN'S SPEED COMES FROM, AND
+    # REACHING FOR ONE PUTS THE CHARACTER IN A PERMANENT SQUAT. At a split of
+    # 1.00 x leg the planted leg has to span sqrt(hip^2 + 0.5^2), which is
+    # longer than the leg -- so the reach clamp below drags the hips down and
+    # HOLDS them there. Measured: 83.8% of leg length against the walk's 103%.
+    # Real running form lands the foot close under the body; the ground comes
+    # from the flight phase and from cadence, not from reaching forward. A
+    # shorter split and a shorter stance buy the same speed standing up.
+    DUTY = 0.26               # fraction of the cycle a foot is down. < 0.5 IS the run
+    STRIDE = 0.76 * LEG       # contact split -- see above
+    LIFT = 0.190 * LEG        # the swinging foot comes up hard
+    # ⚠️ HIP HEIGHT IS AN ABSOLUTE Z AND LEG IS A LENGTH. `BASE = 0.945 * LEG`
+    # reads like "94.5% of leg extension" and is not: the value is compared
+    # against world Z, where a straight leg puts the hip at
+    # FLOOR + ANKLE_H + LEG. Leaving those two terms out dropped every hip
+    # sample by 0.089 units -- 8.4% of a leg -- which is the entire squat.
+    # The reach clamp below was never even binding; it was being handed a
+    # number already lower than anything it would have enforced.
+    BASE = FLOOR + ANKLE_H + 0.945 * LEG
+    BOB = 0.030 * LEG
+    LEAN = 13.0               # degrees of forward pitch through the spine
     TRACK = G_["TRACK"]
     REACH = G_["REACH"]
     free_side = "r" if SA == "l" else "l"
@@ -317,7 +332,13 @@ def key_run(frames=16):
         # cos(4*pi*p) is +1 at p=0 and p=0.5, which are the two CONTACTS, and
         # -1 at the two mid-flights; mid-stance sits at DUTY/2 past each
         # contact, so the phase is shifted to put the trough there.
-        hip = BASE - BOB * math.cos(4 * math.pi * (pl - DUTY / 2) + math.pi)
+        # ⚠️ AND THE PHASE HAD AN EXTRA PI IN IT, SO IT DID THE WALK'S BOB.
+        # cos(0) = 1 at mid-stance, so `BASE - BOB*cos(...)` puts the trough
+        # exactly there, which is what the comment above says and what a run
+        # does. The `+ pi` flipped it: hips PEAKED under the load and dipped
+        # in the air, which is a walk, and is precisely the mistake the
+        # docstring warns about. Written and then not done.
+        hip = BASE - BOB * math.cos(4 * math.pi * (pl - DUTY / 2))
         for (fy, fz, dn) in ((fy_l, fz_l, down_l), (fy_r, fz_r, down_r)):
             if dn:
                 span = (LEG * REACH) ** 2 - fy ** 2
@@ -362,7 +383,7 @@ def key_run(frames=16):
         # ── SHIELD ARM ── carried high and tight across the chest, pumping
         # with the stride. Keyed every frame because the goal is a world-space
         # empty; left alone it stays nailed to the room while the body runs on.
-        bob = hip - (FLOOR + BASE)
+        bob = hip - BASE
         sw = math.sin(2 * math.pi * pl)
         hand_goal.location = (side * 0.13 * LEG,
                               FWD * (0.26 + 0.07 * sw) * LEG,

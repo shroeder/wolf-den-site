@@ -25,17 +25,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const MODEL_URL = "/models/hero.glb";
 
 // Measured, not chosen -- `_stride.py` prints these. See SKATING above.
-// The run is not a fast walk: 25% of its cycle has both feet off the ground,
+// The run is not a fast walk: 38% of its cycle has both feet off the ground,
 // which is what a duty factor below 0.5 means and what makes it a run.
-const GAIT = { Walk: 1.2784, Run: 3.1799 };
-const UP_AT = 2.30;               // actual speed at which Walk becomes Run
-const DOWN_AT = 1.85;             // and back. The gap is hysteresis: one
+const GAIT = { Walk: 1.2784, Run: 4.6710 };
+const UP_AT = 3.00;               // actual speed at which Walk becomes Run
+const DOWN_AT = 2.30;             // and back. The gap is hysteresis: one
                                   // threshold would flutter between the two
                                   // clips for as long as he held that speed.
 const TURN_RATE = 6.0;            // rad/s
 const ARRIVE = 0.12;              // close enough
 const EASE_IN = 0.30;             // seconds from standstill to full speed
-const APPROACH = 2.2;             // target speed is distance x this, so he
+const APPROACH = 2.6;             // target speed is distance x this, so he
                                   // sheds run -> walk -> stop on his own
 // ⚠️ ANY LIMIT MEASURED FROM THE WORLD ORIGIN SHRINKS AS HE WALKS AWAY FROM
 // IT. The first version clamped taps to 7 units from (0,0), so the further he
@@ -499,7 +499,7 @@ export default function IsoLab() {
                 The hero moves in a straight line — there is no obstacle avoidance and nothing to avoid, so
                 &ldquo;pathing&rdquo; here is steering, not a search. The number that matters is{" "}
                 <strong>Speed</strong> against <strong>Clip speed</strong>: the walk was authored at 1.2784
-                u/s and the run at 3.1799, both measured in Blender rather than chosen, and each clip&apos;s
+                u/s and the run at 4.6710, both measured in Blender rather than chosen, and each clip&apos;s
                 playback rate is driven from the distance actually covered each frame — so the feet stay
                 planted through the acceleration ramp, the turn, and the hand-over between gaits. He picks
                 the gait from the speed he is actually making, and his target speed is simply proportional

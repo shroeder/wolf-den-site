@@ -32,7 +32,7 @@ const MODELS = [
         clips: [
             { id: "Idle", label: "Idle", kind: "loop", hint: "Relaxed stand" },
             { id: "Walk", label: "Walk", kind: "loop", hint: "Locomotion, 1.28 u/s" },
-            { id: "Run", label: "Run", kind: "loop", hint: "3.18 u/s, 25% of the cycle airborne" },
+            { id: "Run", label: "Run", kind: "loop", hint: "4.67 u/s, 38% of the cycle airborne" },
             { id: "Brace", label: "Brace", kind: "loop", hint: "Shield guard" },
             { id: "Impact", label: "Impact", kind: "oneShot", hint: "Takes a hit, returns to guard" },
         ],
