@@ -417,152 +417,146 @@ def key_run(frames=16):
 
 # ───────────────────────────────────────────────────────────────────────────
 def key_mine(frames=40):
-    """A TWO-HANDED pickaxe strike into the ground. One-shot, 40 frames.
+    """A two-handed pickaxe strike into the ground. One-shot, 40 frames.
 
-    The tool is rigidly bound to the driving hand -- skinned rather than
-    bone-parented only because the glTF exporter silently drops bone
-    parenting -- so that hand can never lose it. The OFF hand is IK'd onto a
-    point on the haft that is computed from the tool's own pose, every
-    frame, so it cannot drift off either.
+    ⚠️ THIS CLIP ANIMATES ONE OBJECT. Both wrist IK targets and both
+    hand-rotation targets are children of the tool control (see
+    build-pick.py), so moving the control moves the pickaxe and both fists
+    together and they cannot come apart. The previous version keyed the
+    hands and recomputed the tool from them, which is a hand chasing a
+    moving target -- and it lost, every frame, for six attempts.
 
-    ⚠️ THE FIRST VERSION HAD THE OFF HAND RELEASE AT THE APEX, AND THAT WAS
-    ME TREATING A TOOL PROBLEM AS PHYSICS. I measured that it could not
-    reach, concluded no pair of arms could do it, and animated around it.
-    What could not reach was a 1.05 haft gripped 0.40 of the way up. The
-    length of haft above the fist sets how far OFF THE SHAFT the point sits
-    -- 43 degrees at those numbers -- so the only way to put the tip on the
-    floor was to stand the shaft bolt upright against the stomach and crouch
-    under it, which also threw the haft out of the off hand's reach. A 1.38
-    haft gripped at 0.42 puts the point 27 degrees off the shaft, the haft
-    18 degrees forward of vertical at impact, and both fists comfortably
-    inside their own reach for the entire swing. The pose, the posture and
-    the grip were one problem.
+    What is authored is therefore what an animator would actually say: where
+    the POINT is, and which way the haft leans. The hands are a consequence.
 
-    The beats, and why each exists:
-
-      1-6    SETTLE. A dip DOWN before going up. Anticipation for the
-             anticipation; an arm that starts straight up from rest has no
-             weight in it.
-      6-18   WIND-UP, over the driving shoulder rather than straight
-             overhead, elbows staying bent. Hips and torso rotate away, the
-             spine extends back. Slow out -- the only slow part, and what
-             makes the strike read as fast.
-      16-18  FLOAT. Two frames of near-stillness at the apex: a heavy tool
-             goes weightless at the top of its arc before gravity takes it.
-      18-23  THE STRIKE. Five frames, LINEAR into contact. An impact that
-             eases in has no impact.
-      23-24  HIT-STOP. Contact held for two frames. One frame of nothing
-             happening at the right moment is the strongest impact cue
-             there is.
-      24-28  RECOIL. The head bounces out of the ground and the body
-             unloads. Fast, because a rebound is elastic.
-      28-40  RECOVER, with a small overshoot, ending exactly on frame 1.
-
-    The haft angle is its own curve, lagging the hands, so the head drags on
-    the way up and whips through the bottom.
+    Beats:
+      1-6    settle, a dip down before going up
+      6-18   wind-up over the driving shoulder, slow out
+      16-18  float: two frames of near-stillness at the apex, because a
+             heavy tool goes weightless at the top of its arc
+      18-23  the strike -- five frames, LINEAR into contact
+      23-24  hit-stop, held two frames
+      24-30  recoil, fast, because a rebound is elastic
+      30-40  recover and settle, ending exactly on frame 1
     """
     arm, iks, hand_goal, elbow_pole, LEG, FLOOR, ANKLE_H, HIP0, FWD, FOOT_REST, \
         TUCK, ARMS, TUCKAMT, SA, GRIP, HQ = _ctx()
     g = G
     _fresh_action("Mine")
 
-    # Both arms are on IK for this clip and stay there. See build-pick.py for
-    # why the right one is parked at influence 0 the rest of the time.
     g["_pick_ik"].influence = 1.0
     g["_pgc"].influence = 1.0
     g["_gc"].influence = 1.0
     g["_grc"].influence = 1.0
 
-    PH = g["PICK_HAND"]
-    R_REST = g["R_REST"]
-    PQ = g["PICK_HAND_REST_Q"]
-    pick_goal, pick_pole = g["_pick_goal"], g["_pick_pole"]
-    pgrip = g["_pgrip"]
-    sho = arm.matrix_world @ arm.pose.bones["upperarm_%s" % PH].head
-    SH_OFF = sho.z - (FLOOR + LEG * 0.985)
-    HI = g["PICK_LOCAL"]["hi"]
+    TOOL = g["TOOL"]
     TIP = g["PICK_TIP"]
+    # Haft straight down, points forward. phi is degrees of forward tilt off
+    # that, which is what the table below means by it.
+    DOWN = Quaternion((0, 1, 0), math.pi)
+    # ⚠️ READ THE SHOULDERS INSIDE THE LOOP. Captured once up here they are
+    # the REST shoulders, and the reach report then compares a posed hand
+    # against a shoulder that has not moved -- which is the third time this
+    # exact mistake has produced a confident number that disagreed with the
+    # render. `sho0` is only for placing the static elbow poles.
+    sho0 = {s_: (arm.matrix_world @ arm.pose.bones["upperarm_%s" % s_].head).copy()
+            for s_ in ("l", "r")}
     MAXR = {s_: g["ARM_FULL"][s_] * 0.97 for s_ in ("l", "r")}
 
-    def tool_q(phi):
-        return Quaternion((1, 0, 0), math.radians(phi)) @ R_REST
+    # ⚠️ AUTHOR THE GRIP, NOT THE POINT. Driving the control by where the TIP
+    # goes is the nicer idea and it is unusable: the tip is a metre from the
+    # hands, so a tip path that looks right puts the grip somewhere the arms
+    # cannot reach -- measured, 1.18 of reach needed against 0.62 available
+    # in the ready pose alone. Author where the HANDS are, which is bounded
+    # by the body, and let the point fall where the tool points.
+    # ⚠️ THE HANDS STAY IN FRONT OF THE SPINE. The wind-up used to carry the
+    # grip to y = +0.27 -- a quarter of a leg BEHIND body centre at hip
+    # height -- and the reach check passed it, because distance from the
+    # shoulder was fine. Distance says nothing about whether a shoulder can
+    # rotate there: the arms came out wrenched behind his back. The tool
+    # head goes back by TILTING THE HAFT, which is what phi is for; the
+    # hands only have to go up. And it has to tilt FAR -- at 118 degrees
+    # the head only reaches shoulder height and the pose reads as a man
+    # holding a rifle across his chest. 148 puts it overhead, which is
+    # what a wind-up looks like.
+    #      f   grip y  grip z   phi   hip dz  hip dy  twist spine head
+    B = [(1,  -0.36,  0.810, -30.0, -0.100,  0.000,  10,   26,  14),
+         (6,  -0.30,  0.740, -24.0, -0.140,  0.010,  13,   30,  15),
+         (10, -0.24,  1.010,  34.0, -0.060,  0.030,   0,   12,  17),
+         (13, -0.14,  1.300,  96.0,  0.010,  0.045, -16,   -2,  20),
+         (16, -0.06,  1.440, 142.0,  0.045,  0.050, -24,  -10,  22),
+         (18, -0.05,  1.450, 148.0,  0.050,  0.052, -25,  -11,  22),
+         (20, -0.12,  1.410, 112.0,  0.000,  0.030, -10,    6,  18),
+         (21, -0.24,  1.250,  56.0, -0.090,  0.000,   2,   22,  14),
+         (22, -0.40,  0.780,   2.0, -0.205, -0.045,   6,   38,  12),
+         (23, -0.50,  0.560,  None, -0.280, -0.075,   8,   46,  10),
+         (24, -0.50,  0.554,  None, -0.285, -0.077,   8,   47,  10),
+         (27, -0.44,  0.800, -34.0, -0.185, -0.030,   7,   34,  13),
+         (30, -0.40,  0.880, -40.0, -0.140, -0.015,   8,   30,  14),
+         (34, -0.37,  0.820, -36.0, -0.110,  0.000,   9,   27,  14),
+         (40, -0.36,  0.810, -30.0, -0.100,  0.000,  10,   26,  14)]
 
-    def tool_pt(local, hand, phi):
-        return hand + (tool_q(phi) @ (local - HI))
+    GRIP_W = Vector((0, 0, g["GRIP_HI"] * LEG))
 
-    def solve_contact(hand):
-        """⚠️ THE CONTACT POSE IS SOLVED, NOT EYEBALLED. The point has to be
-        ON the floor on the frame of the hit; short reads as mime, through
-        reads as a bug, and at this speed neither is visible by eye. Scan
-        the haft angle for the one that lands it, over the forward-leaning
-        branch only -- the backward solution also touches the floor and
-        does it with the pick pointing at the miner."""
-        best, bphi = 1e9, -20.0
-        for i in range(1921):
-            phi = -80.0 + i * 0.0625
-            err = abs(tool_pt(TIP, hand, phi).z - FLOOR)
+    def place(gy, gz, phi):
+        rot = Quaternion((1, 0, 0), math.radians(phi)) @ DOWN
+        return rot, Vector((0.0, gy * LEG, FLOOR + gz * LEG)) - (rot @ GRIP_W)
+
+    def solve_contact(gy, gz):
+        """⚠️ THE CONTACT ANGLE IS SOLVED. The point has to be ON the floor on
+        the frame of the hit; short reads as mime, through reads as a bug,
+        and at this speed neither is visible by eye."""
+        best, bphi = 1e9, -26.0
+        for i in range(1601):
+            phi = -90.0 + i * 0.0625
+            rot, loc = place(gy, gz, phi)
+            err = abs((loc + (rot @ TIP)).z - FLOOR)
             if err < best:
                 best, bphi = err, phi
-        return bphi, best
+        return bphi
 
-    # ⚠️ THE OFF HAND'S SLIDE IS A FRACTION OF THE HAFT AND HAS TO STAY
-    # BELOW THE DRIVING GRIP. When the haft was shortened, GRIP_HI came
-    # down from 0.42 to 0.26 and these were left where they were -- so at
-    # the apex both fists were asked for the SAME point on the shaft and
-    # the off arm folded across the chest trying to occupy the other
-    # hand. It passed every reach check, because the target was perfectly
-    # reachable; it was just the wrong one.
-    #     f   hand x    y      z    phi    hip dz  hip dy  twist spine head grip
-    B = [(1,  -0.06, -0.34, 0.800, -30.0, -0.100,  0.000,  10,   26,  14, 0.05),
-         (6,  -0.06, -0.30, 0.740, -24.0, -0.150,  0.010,  14,   30,  16, 0.05),
-         (10, -0.10, -0.08, 1.020,  18.0, -0.060,  0.030,  -4,   10,  18, 0.07),
-         (13, -0.16,  0.16, 1.260,  78.0,  0.020,  0.045, -18,   -4,  20, 0.11),
-         (16, -0.20,  0.26, 1.380, 118.0,  0.045,  0.050, -24,  -10,  22, 0.15),
-         (18, -0.21,  0.27, 1.390, 124.0,  0.050,  0.052, -25,  -11,  22, 0.16),
-         (20, -0.14,  0.08, 1.340,  84.0,  0.000,  0.030, -10,    6,  18, 0.12),
-         (21, -0.08, -0.12, 1.160,  38.0, -0.090,  0.000,   2,   22,  14, 0.09),
-         (22, -0.06, -0.26, 0.760,   2.0, -0.245, -0.035,   6,   42,  12, 0.06),
-         (23, -0.05, -0.32, 0.535,  None, -0.330, -0.055,   8,   52,  10, 0.05),
-         (24, -0.05, -0.32, 0.530,  None, -0.335, -0.057,   8,   53,  10, 0.05),
-         (26, -0.06, -0.31, 0.760, -34.0, -0.225, -0.020,   7,   38,  13, 0.05),
-         (28, -0.06, -0.34, 0.920, -42.0, -0.130, -0.010,   8,   30,  14, 0.05),
-         (32, -0.06, -0.35, 0.840, -33.0, -0.110,  0.000,   9,   27,  14, 0.05),
-         (36, -0.06, -0.345, 0.810, -31.0, -0.105, 0.000,  10,   26,  14, 0.05),
-         (40, -0.06, -0.34, 0.800, -30.0, -0.100,  0.000,  10,   26,  14, 0.12)]
-
-    def hand_world(hx, hy, hz):
-        return Vector((hx * LEG, hy * LEG, FLOOR + hz * LEG))
-
-    # Solve the two contact frames, then evaluate the table per frame.
-    contact_err, contact_phi = None, None
-    solved = {}
-    for row in B:
-        if row[4] is None:
-            phi, contact_err = solve_contact(hand_world(row[1], row[2], row[3]))
-            solved[row[0]] = phi
-            contact_phi = phi
-    TAB = [(r[0], r[1], r[2], r[3], solved.get(r[0], r[4])) + tuple(r[5:]) for r in B]
+    B = [(r[0], r[1], r[2], solve_contact(r[1], r[2]) if r[3] is None else r[3]) + r[4:]
+         for r in B]
 
     def sample(f):
-        for i in range(len(TAB) - 1):
-            f0, f1 = TAB[i][0], TAB[i + 1][0]
+        for i in range(len(B) - 1):
+            f0, f1 = B[i][0], B[i + 1][0]
             if f0 <= f <= f1:
                 u = (f - f0) / float(f1 - f0) if f1 > f0 else 0.0
                 # Linear through the strike and the hold; eased elsewhere.
-                # This is the one place where the shape of the curve IS the
-                # animation, so it is explicit rather than left to handles.
+                # An impact that eases in has no impact.
                 if not (18 <= f0 < 24):
                     u = u * u * (3 - 2 * u)
-                return [p0 + (p1 - p0) * u for p0, p1 in zip(TAB[i][1:], TAB[i + 1][1:])]
-        return list(TAB[-1][1:])
+                return [p0 + (p1 - p0) * u for p0, p1 in zip(B[i][1:], B[i + 1][1:])]
+        return list(B[-1][1:])
 
     LEAD_Y, REAR_Y = FWD * 0.26 * LEG, 0.26 * LEG
     SPLIT = 0.185 * LEG
     worst = {"l": (0.0, 0), "r": (0.0, 0)}
+    behind = {"l": (-180.0, 0), "r": (-180.0, 0)}
+    tip_lo = 1e9
 
     for f in range(1, frames + 1):
-        hx, hy, hz, phi, dz, dy, twist, spine, head, grip = sample(f)
-        H = hand_world(hx, hy, hz)
+        gy, gz, phi, dz, dy, twist, spine, head = sample(f)
+
+        # ── THE TOOL ── put the driving grip here, lean the haft like this.
+        # Everything both hands do follows from this and nothing else.
+        rot, loc = place(gy, gz, phi)
+        TOOL.rotation_quaternion = rot
+        TOOL.location = loc
+        TOOL.keyframe_insert("location", frame=f)
+        TOOL.keyframe_insert("rotation_quaternion", frame=f)
+        # The children ride the control, but their offsets must be RE-STATED
+        # before keying: other clips key these same empties in world space,
+        # so whatever Impact left on them is still there, and keying without
+        # setting would record that stale world value as a local one.
+        for ob in g["TOOL_CHILDREN"]:
+            loc, q = g["TOOL_LOCALS"][ob.name]
+            ob.location = loc
+            ob.keyframe_insert("location", frame=f)
+            if q is not None:
+                ob.rotation_quaternion = q
+                ob.keyframe_insert("rotation_quaternion", frame=f)
 
         arm.location = (0.0, dy * LEG, (FLOOR + LEG * 0.985 + dz * LEG) - HIP0)
         arm.keyframe_insert("location", frame=f)
@@ -578,10 +572,9 @@ def key_mine(frames=40):
                 b.rotation_euler = Euler((math.radians(spine * ks), 0,
                                           math.radians(twist * kt)), "XYZ")
                 b.keyframe_insert("rotation_euler", frame=f)
-        # ── EYES ON THE ROCK ── the head counter-rotates against both the
-        # twist and the spine, so the gaze stays on the spot being hit while
-        # the body turns away from it. A head that rides the torso reads as
-        # someone swinging with their eyes shut.
+        # Eyes stay on the rock: the head counter-rotates against both the
+        # twist and the fold, so the gaze holds the spot while the body turns
+        # away from it.
         for bn, k in (("neck_01", 0.45), ("head", 0.55)):
             b = arm.pose.bones.get(bn)
             if b:
@@ -597,82 +590,51 @@ def key_mine(frames=40):
             tgt.keyframe_insert("rotation_quaternion", frame=f)
             pole.location = (fx * 1.5, fy + FWD * 0.45 * LEG, FLOOR + LEG * 0.52)
             pole.keyframe_insert("location", frame=f)
+        g["_elbow_pole"].location = (abs(sho0["r"].x) * 2.0, 0.45 * LEG,
+                                     FLOOR + LEG * 1.05)
+        g["_elbow_pole"].keyframe_insert("location", frame=f)
+        g["_pick_pole"].location = (sho0["r"].x * 2.1, 0.55 * LEG, FLOOR + LEG * 1.25)
+        g["_pick_pole"].keyframe_insert("location", frame=f)
 
-        # ⚠️ EVALUATE BEFORE READING A BONE. pose.bones[].head is whatever the
-        # depsgraph last computed, so reading the shoulders here without this
-        # returns the PREVIOUS frame's pose -- which is how the reach report
-        # came back claiming the driving arm was 0.206 over on a frame where
-        # it is comfortably inside. The body is posed above; the hands below
-        # are placed against where the shoulders have actually ended up.
+        # ── READINGS ── where the wrists have to be is now a consequence, so
+        # the only thing that can go wrong is that an arm cannot get there.
+        # An IK chain asked for more reach than it has stops short in silence.
         bpy.context.view_layer.update()
-        sl = arm.matrix_world @ arm.pose.bones["upperarm_l"].head
-        sr = arm.matrix_world @ arm.pose.bones["upperarm_r"].head
+        tip_lo = min(tip_lo, (TOOL.matrix_world @ TIP).z - FLOOR)
+        for s_, ob in (("r", g["_pick_goal"]), ("l", hand_goal)):
+            now = arm.matrix_world @ arm.pose.bones["upperarm_%s" % s_].head
+            d = (ob.matrix_world.translation - now).length - MAXR[s_]
+            if d > worst[s_][0]:
+                worst[s_] = (d, f)
+            # ⚠️ AND HOW FAR BEHIND HIM IT IS. A shoulder extends about 60
+            # degrees before the arm is behind the back; past that the pose
+            # is anatomically wrong however reachable it was. Measured in
+            # the TORSO's frame, so leaning does not count as reaching back.
+            hip = arm.matrix_world @ arm.pose.bones["pelvis"].head
+            up = (now - hip).normalized()
+            back = Vector((0.0, -FWD, 0.0))
+            back = (back - up * back.dot(up)).normalized()
+            v = (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % s_].head) - now
+            ext = math.degrees(math.atan2(v.dot(back), -v.dot(up)))
+            if ext > behind[s_][0]:
+                behind[s_] = (ext, f)
 
-        # ── THE DRIVING HAND ── owns the tool outright.
-        pick_goal.location = H
-        pick_goal.keyframe_insert("location", frame=f)
-        pick_pole.location = (sho.x * 2.1, 0.55 * LEG, FLOOR + LEG * 1.25)
-        pick_pole.keyframe_insert("location", frame=f)
-        pgrip.rotation_quaternion = Quaternion((1, 0, 0), math.radians(phi)) @ PQ
-        pgrip.keyframe_insert("rotation_quaternion", frame=f)
-
-        # ── THE OFF HAND RIDES THE HAFT ── computed from the tool's own pose
-        # rather than keyed, so it is on the wood by construction. The goal
-        # is pulled back toward the shoulder by half a hand, because the IK
-        # target is the WRIST and putting a wrist on the axis pushes the
-        # whole fist out the far side with the fingers closing on air.
-        haft = tool_q(phi) @ Vector((0, 0, 1))      # butt -> head, in world
-        hpt = tool_pt(Vector((0, 0, grip * LEG)), H, phi)
-        # ⚠️ OFFSET PERPENDICULAR TO THE HAFT, NOT TOWARD THE SHOULDER. Pulling
-        # the wrist straight at the shoulder has a large sideways component
-        # whenever the shaft is in front of the body, which parks the fist
-        # BESIDE the haft with its fingers closing on air next to it. What a
-        # grip needs is to be off the axis by the thickness of a hand, square
-        # to the shaft.
-        d = sl - hpt
-        d = d - haft * d.dot(haft)
-        if d.length > 1e-6:
-            hpt = hpt + d.normalized() * (0.055 * LEG)
-        hand_goal.location = hpt
-        hand_goal.keyframe_insert("location", frame=f)
-        elbow_pole.location = (abs(sho.x) * 2.0, 0.45 * LEG, FLOOR + LEG * 1.05)
-        elbow_pole.keyframe_insert("location", frame=f)
-        # ⚠️ AND THE OFF HAND IS NOT ORIENTED LIKE THE DRIVING ONE. Two hands
-        # on one shaft are mirror images: their palms both face the wood,
-        # which means their world rotations differ by half a turn ABOUT THE
-        # SHAFT. Handing the left hand the right hand's delta pointed its
-        # palm at the camera and curled the fingers in a plane the haft does
-        # not pass through.
-        GRIP.rotation_quaternion = (Quaternion(haft, math.pi)
-                                    @ Quaternion((1, 0, 0), math.radians(phi)) @ HQ)
-        GRIP.keyframe_insert("rotation_quaternion", frame=f)
-
-        # A reading, not a gate: an IK chain asked for more reach than it has
-        # just stops short and says nothing, and a hand 0.2 off the haft is
-        # the single most obvious flaw this clip can ship with.
-        for _k, _v in (("l", (hpt - sl).length - MAXR["l"]),
-                       ("r", (H - sr).length - MAXR["r"])):
-            if _v > worst[_k][0]:
-                worst[_k] = (_v, f)
-
-    # Both fists grip the haft. Nothing keys fingers, so this persists -- and
-    # Mine is baked last, which is the only reason it is safe to do here.
-    g["close_fist"]("l", 0.85)
+    g["close_fist"]("l", 0.86)
     g["close_fist"]("r", 0.90)
 
     _smooth([arm] + list(G["helpers"]))
-    # ⚠️ NO EASE INTO THE HIT, AND NONE OUT OF THE HOLD. Bezier handles across
-    # 18-24 would round off exactly the two frames the whole clip exists to
-    # deliver: the strike would decelerate into contact and the hit-stop
-    # would drift instead of stopping dead.
+    # No ease into the hit and none out of the hold: Bezier handles across
+    # 18-24 would round off exactly the two frames the clip exists to deliver.
     for ob in [arm] + list(G["helpers"]):
         if ob.animation_data and ob.animation_data.action:
             for fc in ob.animation_data.action.fcurves:
                 for kp in fc.keyframe_points:
                     if 18 <= kp.co[0] <= 24:
                         kp.interpolation = "LINEAR"
-    print("MINE  contact tip %.4f off the floor, haft %.1f deg forward of vertical"
-          % (contact_err or -1, -(contact_phi or 0)))
-    print("MINE  reach headroom: off hand %+.4f (f%d), driving hand %+.4f (f%d)"
-          % (worst["l"][0], worst["l"][1], worst["r"][0], worst["r"][1]))
+    print("MINE  point reaches %.4f above the floor at its lowest" % tip_lo)
+    print("MINE  reach over: driving %+.4f (f%d), off %+.4f (f%d)   (negative fits)"
+          % (worst["r"][0], worst["r"][1], worst["l"][0], worst["l"][1]))
+    print("MINE  shoulder extension: driving %.0f deg (f%d), off %.0f deg (f%d)"
+          "   (over ~60 is behind the back)"
+          % (behind["r"][0], behind["r"][1], behind["l"][0], behind["l"][1]))
     return frames
