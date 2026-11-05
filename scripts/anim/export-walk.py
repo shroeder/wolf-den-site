@@ -11,19 +11,16 @@ sc = bpy.context.scene
 # assigned in the PREVIEW section, which runs after export_scene.gltf, so the
 # browser got bare geometry and three.js substituted its default grey. That is
 # the whole reason the lab looked nothing like the render.
-skin = human.data.materials[0] if human.data.materials else bpy.data.materials.new("HeroSkin")
-skin.use_nodes = True
-p = skin.node_tree.nodes["Principled BSDF"]
-p.inputs["Base Color"].default_value = (0.78, 0.55, 0.45, 1)
-p.inputs["Roughness"].default_value = 0.58
-try:
-    p.inputs["Metallic"].default_value = 0.0
-except Exception:
-    pass
-human.data.materials.clear()
-human.data.materials.append(skin)
-for poly in human.data.polygons:
-    poly.material_index = 0
+# ⚠️ THE MATERIAL COMES FROM THE FROZEN ASSET AND IS NOT TOUCHED HERE. This
+# block used to re-assign a hardcoded pale base colour, which silently undid a
+# re-freeze: the hero was made dark-skinned in freeze-hero.py and exported
+# light every time.
+if not human.data.materials:
+    _m = bpy.data.materials.new("HeroSkin")
+    _m.use_nodes = True
+    _m.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.19, 0.08, 0.05, 1)
+    human.data.materials.append(_m)
+
 
 # ── BAKE IK DOWN TO BONE KEYS ────────────────────────────────────────────────
 # glTF has no constraints. Everything the IK and the Copy Rotation solved has
@@ -110,15 +107,34 @@ for _d in list(bpy.data.objects):
 # helper objects to the armature, so selecting only the body and the rig still
 # shipped a stray 42-vertex Icosphere with no material. Delete anything that is
 # not the body outright.
+# ⚠️ EQUIPMENT IS NOT A STRAY. This loop exists because the exporter follows
+# children of the armature and was shipping MPFB bone-shape helpers -- but it
+# deletes anything that is not the body, which silently ate the shield the
+# first time it was built. Keep whatever is bone-parented on purpose.
+KEEP = {human}
+KEEP |= {o for o in bpy.data.objects
+         if o.type == "MESH" and any(m.type == "ARMATURE" and m.object is arm for m in o.modifiers)}
 for ob in list(bpy.data.objects):
-    if ob.type == "MESH" and ob is not human:
+    if ob.type == "MESH" and ob not in KEEP:
         print("DROPPED stray mesh %s" % ob.name)
         bpy.data.objects.remove(ob, do_unlink=True)
+print("EQUIPPED %s" % sorted(o.name for o in KEEP if o is not human))
+for _k in KEEP:
+    if _k is human: continue
+    print("  %s: parent=%s type=%s bone=%s faces=%d mats=%s" % (
+        _k.name, _k.parent.name if _k.parent else None, _k.parent_type,
+        _k.parent_bone, len(_k.data.polygons), [m.name for m in _k.data.materials]))
 
 for ob in bpy.data.objects:
-    ob.select_set(ob in (arm, human))
+    ob.select_set(ob in KEEP or ob is arm)
 bpy.context.view_layer.objects.active = arm
-path = os.path.join(OUT, "hero-walk.glb")
+# ⚠️ WRITE TO public/models BY DEFAULT, NEVER THE CWD. OUT used to default to
+# "." so running this from the repo root quietly dropped hero-walk.glb beside
+# package.json while every inspection read the real, stale one in
+# public/models -- and I spent four rounds "debugging" a shield that had been
+# exporting correctly the whole time.
+_repo = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+path = os.environ.get("GLB_OUT", os.path.join(_repo, "public", "models", "hero-walk.glb"))
 bpy.ops.export_scene.gltf(
     filepath=path, export_format="GLB", use_selection=True,
     export_animations=True, export_animation_mode="ACTIONS",

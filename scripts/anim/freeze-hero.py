@@ -27,11 +27,19 @@ bpy.ops.wm.read_homefile(use_empty=True)
 for o in list(bpy.data.objects):
     bpy.data.objects.remove(o, do_unlink=True)
 
+# ⚠️ ETHNICITY IS A MORPH, NOT A TINT. MPFB carries african/asian/caucasian
+# targets that reshape the skull, nose, lips and jaw. Darkening the material
+# alone gives you a recoloured white model, which is the wrong thing and looks
+# it. Set the morph and the skin tone together.
 MACRO = {"gender": 1.0, "age": 0.55, "muscle": 0.95, "weight": 0.56,
          "height": 0.80, "proportions": 1.0, "cupsize": 0.0, "firmness": 0.9}
+RACE = {"african": 1.0, "asian": 0.0, "caucasian": 0.0}
+SKIN = (0.185, 0.082, 0.046)     # linear; a warm deep brown
 
 macro = TargetService.get_default_macro_info_dict()
 macro.update({k: v for k, v in MACRO.items() if k in macro})
+if "race" in macro:
+    macro["race"] = dict(RACE)
 human = HumanService.create_human(macro_detail_dict=macro, scale=0.1,
                                   feet_on_ground=True, detailed_helpers=False)
 print("1. generated   %d verts" % len(human.data.vertices))
@@ -93,7 +101,7 @@ for ob in list(bpy.data.objects):
 skin = bpy.data.materials.new("HeroSkin")
 skin.use_nodes = True
 p = skin.node_tree.nodes["Principled BSDF"]
-p.inputs["Base Color"].default_value = (0.78, 0.55, 0.45, 1)
+p.inputs["Base Color"].default_value = (SKIN[0], SKIN[1], SKIN[2], 1)
 p.inputs["Roughness"].default_value = 0.58
 human.data.materials.clear()
 human.data.materials.append(skin)

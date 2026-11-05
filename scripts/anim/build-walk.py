@@ -61,6 +61,121 @@ TOE_LEN = abs(tail("ball_l").y - head("foot_l").y)
 HEEL_LEN = TOE_LEN * 0.38
 print("RIG leg=%.3f ankle_h=%.3f toe=%.3f heel=%.3f floor=%.3f" % (LEG, ANKLE_H, TOE_LEN, HEEL_LEN, FLOOR))
 
+# ── EQUIPMENT: A HEATER SHIELD ───────────────────────────────────────────────
+# Procedural geometry is the thing that actually worked when I tried to build
+# a character by hand -- it is wrong for anatomy and right for props. A shield
+# is a lofted outline with a bowed face, a rim and a boss, and it is the same
+# every run.
+#
+# It is BONE-PARENTED to hand_l, so it inherits the animation for free and
+# exports as a node under that joint. No skinning, no weights, no second rig.
+import bmesh
+
+def build_shield(scale):
+    W, H, D = 0.46 * scale, 0.62 * scale, 0.075 * scale
+    ROWS, COLS = 14, 11
+    bm = bmesh.new()
+    grid = []
+    for r in range(ROWS + 1):
+        t = r / ROWS
+        hw = (W / 2) * max(1e-4, (1 - t ** 2.3)) ** 0.5     # heater taper to a point
+        row = []
+        for c in range(COLS + 1):
+            u = -1 + 2 * c / COLS
+            x = u * hw
+            bow = D * (1 - u * u) * (1 - 0.35 * t)           # face bows outward
+            row.append(bm.verts.new((x, -bow, H * (0.5 - t))))
+        grid.append(row)
+    bm.verts.ensure_lookup_table()
+    for r in range(ROWS):
+        for c in range(COLS):
+            bm.faces.new((grid[r][c], grid[r][c + 1], grid[r + 1][c + 1], grid[r + 1][c]))
+    me = bpy.data.meshes.new("ShieldFace")
+    bm.to_mesh(me); bm.free()
+    sh = bpy.data.objects.new("Shield", me)
+    bpy.context.collection.objects.link(sh)
+    me.polygons.foreach_set("use_smooth", [True] * len(me.polygons))
+    sol = sh.modifiers.new("Thickness", "SOLIDIFY")
+    sol.thickness = 0.022 * scale
+    sol.offset = 1.0
+    bev = sh.modifiers.new("Edge", "BEVEL")
+    bev.width = 0.006 * scale
+    bev.segments = 2
+
+    wood = bpy.data.materials.new("ShieldFace")
+    wood.use_nodes = True
+    wp = wood.node_tree.nodes["Principled BSDF"]
+    wp.inputs["Base Color"].default_value = (0.055, 0.145, 0.150, 1)   # deep teal
+    wp.inputs["Roughness"].default_value = 0.62
+    me.materials.append(wood)
+
+    # A boss, because a flat plate does not read as a shield.
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=20, ring_count=10, radius=0.085 * scale)
+    boss = bpy.context.active_object
+    boss.name = "ShieldBoss"
+    boss.scale = (1.0, 0.55, 1.0)
+    boss.location = (0, -(D + 0.02 * scale), H * 0.06)
+    bpy.ops.object.transform_apply(scale=True)
+    boss.data.polygons.foreach_set("use_smooth", [True] * len(boss.data.polygons))
+    gold = bpy.data.materials.new("ShieldBoss")
+    gold.use_nodes = True
+    gp = gold.node_tree.nodes["Principled BSDF"]
+    gp.inputs["Base Color"].default_value = (0.62, 0.42, 0.09, 1)
+    gp.inputs["Roughness"].default_value = 0.34
+    try: gp.inputs["Metallic"].default_value = 0.85
+    except Exception: pass
+    boss.data.materials.append(gold)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    boss.select_set(True); sh.select_set(True)
+    bpy.context.view_layer.objects.active = sh
+    bpy.ops.object.join()
+    sh = bpy.context.active_object
+    sh.select_set(False)
+    return sh
+
+SHIELD = build_shield(LEG)
+
+# ── ⚠️ SKIN THE SHIELD, DO NOT BONE-PARENT IT ────────────────────────────────
+# Bone parenting is the obvious way to attach a prop and it rides the
+# animation correctly in Blender -- but the glTF exporter silently DROPS it.
+# The object was present, selected, in the view layer, correctly parented to
+# hand_l with 354 faces and two materials, and simply did not appear in the
+# file. No error, no warning.
+#
+# Skinning it instead -- one vertex group named for the bone, weight 1, an
+# Armature modifier -- makes it an ordinary skinned mesh and it exports the
+# same way the body does.
+# ⚠️ A SKINNED PROP IS PLACED AT REST AND THEN CARRIED BY THE POSE. Setting
+# the shield's world transform directly puts it where I want it in the REST
+# pose -- and the animation then rotates it by however much the hand has moved
+# by frame 1, which tipped it on its side at the hip.
+#
+# So solve for it. Decide the world transform the shield should HAVE once
+# posed, evaluate the hand's pose delta at that frame, and invert it:
+#
+#     world_f = (hand_pose_f @ hand_rest-inverse) @ shield_rest
+#     shield_rest = (hand_pose_f @ hand_rest-inverse)-inverse @ world_wanted
+#
+# SHIELD_REST_SOLVED_AT is the frame it is aimed for; it drifts slightly
+# across the cycle as the arm breathes, which is correct -- a held shield
+# moves with its owner.
+SHIELD_REST_SOLVED_AT = 1
+_hand_rest = (arm.matrix_world @ arm.pose.bones["hand_l"].bone.matrix_local)
+_chest_z = FLOOR + LEG * 1.26
+_wanted = Matrix.Translation(Vector((0.30 * LEG, -0.26 * LEG, _chest_z))) @           Matrix.Rotation(math.radians(-19), 4, "Y") @           Matrix.Rotation(math.radians(9), 4, "X")
+SHIELD_PLACEMENT = (_hand_rest, _wanted)
+bpy.context.view_layer.update()
+
+_vg = SHIELD.vertex_groups.new(name="hand_l")
+_vg.add(list(range(len(SHIELD.data.vertices))), 1.0, "REPLACE")
+_am = SHIELD.modifiers.new("Armature", "ARMATURE")
+_am.object = arm
+SHIELD.parent = arm
+SHIELD.matrix_parent_inverse = arm.matrix_world.inverted()
+
+print("SHIELD built, %d faces, skinned to hand_l" % len(SHIELD.data.polygons))
+
 # ── THE CYCLE ─────────────────────────────────────────────────────────────────
 FRAMES = 24
 REACH = 0.995
@@ -194,6 +309,7 @@ sc.frame_start, sc.frame_end = 1, FRAMES
 sc.render.fps = 24
 
 ARM_SWING = 19.0          # degrees, peak
+SHIELD_ARM = "l"
 ARM_TUCK = 27.0           # degrees, bringing the A-pose arms down to the sides
 
 # ── SIGNS ARE CALIBRATED, NEVER TYPED ─────────────────────────────────────────
@@ -304,6 +420,21 @@ for f in range(1, FRAMES + 2):
         tgt.rotation_quaternion = q
         tgt.keyframe_insert("rotation_quaternion", frame=f)
 
+        if s == SHIELD_ARM:
+            # ⚠️ THE SHIELD ARM DOES NOT SWING. A guard is a held pose: upper arm
+            # down and slightly forward, elbow folded so the shield covers the
+            # chest. Letting it swing makes the shield flap like a handbag.
+            ab = arm.pose.bones["upperarm_%s" % s]
+            (_ax2, _sg2), _b2, _c2 = TUCK_SIGN[s]
+            _eg = [math.radians(34 * ARM_SIGN[s]), 0.0, 0.0]
+            _eg[_ax2] += math.radians((ARM_TUCK + 6) * _sg2)
+            ab.rotation_euler = Euler(_eg, "XYZ")
+            ab.keyframe_insert("rotation_euler", frame=f)
+            lb = arm.pose.bones["lowerarm_%s" % s]
+            lb.rotation_euler = Euler((math.radians(-84 * ARM_SIGN[s]), 0, 0), "XYZ")
+            lb.keyframe_insert("rotation_euler", frame=f)
+            continue
+
         ab = arm.pose.bones["upperarm_%s" % s]
         (_ax, _sg), _base, _best = TUCK_SIGN[s]
         _e = [math.radians(arm_pose(s, ph) * ARM_SIGN[s]), 0.0, 0.0]
@@ -320,6 +451,16 @@ print("KEYED hip %.3f..%.3f (bob %.3f)" % (min(hip_curve), max(hip_curve), max(h
 
 
 
+
+# ── NOW SOLVE THE SHIELD'S REST TRANSFORM ────────────────────────────────────
+sc.frame_set(SHIELD_REST_SOLVED_AT)
+bpy.context.view_layer.update()
+_hand_rest, _wanted = SHIELD_PLACEMENT
+_hand_posed = arm.matrix_world @ arm.pose.bones["hand_l"].matrix
+_delta = _hand_posed @ _hand_rest.inverted()
+SHIELD.matrix_world = _delta.inverted() @ _wanted
+bpy.context.view_layer.update()
+print("SHIELD solved against frame %d" % SHIELD_REST_SOLVED_AT)
 
 for ob in (arm, *helpers):
     if ob.animation_data and ob.animation_data.action:
