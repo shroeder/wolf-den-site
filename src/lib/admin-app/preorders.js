@@ -159,3 +159,27 @@ export async function applySquarePrefix(variationId) {
         ok: false, error: e?.message || "square_failed",
     }));
 }
+
+/**
+ * Take "[Pre-Order] " back OFF without marking anything arrived — for a drop that got CANCELLED.
+ *
+ * ⚠️ CANCELLING IS NOT ARRIVING, AND IT MUST NOT BORROW arrivePreorder TO DO THE RENAME. Arriving claims
+ * the holders and emails every one of them "your pre-order is in the shop". A cancelled allocation is the
+ * opposite news, and sending that email would be worse than leaving the name wrong.
+ *
+ * ⚠️ AND WITHOUT THIS, CLEARING A DATE LEFT THE PREFIX ON. The route only renamed when a date was being
+ * SET, so an ended pre-order kept "[Pre-Order]" in the name on the storefront and the POS with nothing
+ * anywhere saying it was still coming — the item reads as a pre-order and behaves as ordinary stock.
+ */
+export async function clearSquarePrefix(variationId, baseName) {
+    // Prefer the name we recorded when the pre-order was set, exactly as arrival does — string surgery on
+    // whatever the item is called by now is the fallback, not the plan. The caller is a phone that has no
+    // reason to know the base name, so it is read here rather than trusted from the request.
+    const stored = baseName || (await db
+        .queryOne(`SELECT preorder_base_name FROM shop_item_rules WHERE variation_id = $1`, [String(variationId)])
+        .then((r) => r?.preorder_base_name || null)
+        .catch(() => null));
+    return renameSquareItem(variationId, (current) => stored || plainName(current)).catch((e) => ({
+        ok: false, error: e?.message || "square_failed",
+    }));
+}

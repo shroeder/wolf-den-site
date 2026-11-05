@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyAdminApiKey } from "@/lib/admin/admin-auth";
-import { applySquarePrefix, arrivePreorder, preorderBoard } from "@/lib/admin-app/preorders.js";
+import { applySquarePrefix, arrivePreorder, clearSquarePrefix, preorderBoard } from "@/lib/admin-app/preorders.js";
 import { setPreorder } from "@/lib/shop-item-rules.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -66,7 +66,16 @@ export async function POST(request) {
                 // it CREATES in Square and cannot prefix one that already existed — see applySquarePrefix.
                 // Applying it here covers both branches with one implementation, and it is idempotent, so
                 // the created-item case simply finds nothing to change.
-                const square = r.ok && body?.arrivesOn ? await applySquarePrefix(variationId) : null;
+                //
+                // ⚠️ AND CLEARING HAS TO RENAME TOO, which it did not. A null arrivesOn ends the pre-order
+                // in our table and used to leave "[Pre-Order]" sitting in the Square name — so a cancelled
+                // drop stayed labelled as a pre-order on the storefront and the POS while behaving as
+                // ordinary stock. Both directions of the same switch now move the same name.
+                const square = !r.ok
+                    ? null
+                    : body?.arrivesOn
+                        ? await applySquarePrefix(variationId)
+                        : await clearSquarePrefix(variationId, body?.baseName || null);
                 return noStore({ ...r, square, ...(await preorderBoard()) }, { status: r.ok ? 200 : 400 });
             }
 
