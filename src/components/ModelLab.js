@@ -3,39 +3,44 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // ── THE MODEL LAB ────────────────────────────────────────────────────────────────────────────────────────────
-// A real-time 3D viewport for the rigged hero, so an animation can be JUDGED instead of described. A walk
-// cycle is the thing a still picture is worst at: contact, down, pass and up all look fine frozen and only
-// read as wrong once they are moving at 24fps.
+// A real-time 3D viewport with a clip mixer. A walk cycle is the thing a still picture is worst at; a BLEND is
+// the thing a VIDEO is worst at, because what you need to feel is whether a transition holds at a given
+// duration — which means a slider and your own hand on it.
 //
-// ⚠️ three.js IS IMPORTED DYNAMICALLY, INSIDE THE EFFECT. It is ~600KB and it must never land in the shared
-// bundle for a page nobody else visits — this lab is owner-gated and the import has to be too. A top-level
-// `import * as THREE` would be pulled into the route chunk whether or not the viewport ever mounts.
+// ⚠️ EVERY CLIP RIDES IN ONE GLB. Two files cannot cross-fade: an AnimationMixer blends actions that share a
+// skeleton, so all four clips are exported into hero.glb against the same 53-bone rig.
 //
-// ⚠️ AND THE MODEL IS DRACO-COMPRESSED. MPFB builds a body out of morph targets, so the raw export carried 32
-// shape keys and weighed 10MB; baking them down took it to 258KB. The decoder lives in /public/draco because
-// a CDN path would be blocked and would be a third-party dependency on a page that has none.
+// ⚠️ three.js IS IMPORTED DYNAMICALLY, INSIDE THE EFFECT. It is ~600KB and must never land in the shared
+// bundle for a page nobody else can open.
 
+const MODEL_URL = "/models/hero.glb";
+
+// loop: a state that holds until something replaces it. oneShot: a reaction that plays once and hands control
+// back to whatever was running.
 const CLIPS = [
-    { id: "walk", label: "Walk", url: "/models/hero-walk.glb" },
-    { id: "brace", label: "Brace", url: "/models/hero-brace.glb" },
+    { id: "Idle", label: "Idle", kind: "loop", hint: "Relaxed stand" },
+    { id: "Walk", label: "Walk", kind: "loop", hint: "Locomotion" },
+    { id: "Brace", label: "Brace", kind: "loop", hint: "Shield guard" },
+    { id: "Impact", label: "Impact", kind: "oneShot", hint: "Takes a hit, returns to guard" },
 ];
-const SPEEDS = [0.25, 0.5, 1, 1.5];
+const BLENDS = [0, 0.08, 0.2, 0.45];
 
 export default function ModelLab() {
     const hostRef = useRef(null);
-    const clipRef = useRef("walk");
     const apiRef = useRef(null);
+    const blendRef = useRef(0.2);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState(null);
     const [playing, setPlaying] = useState(true);
     const [speed, setSpeed] = useState(1);
-    const [wireframe, setWireframe] = useState(false);
+    const [blend, setBlend] = useState(0.2);
+    const [current, setCurrent] = useState("Idle");
+    const [log, setLog] = useState([]);
     const [info, setInfo] = useState(null);
-    const [clip, setClip] = useState("walk");
 
-    // Reloading on clip change tears the viewport down and rebuilds it. That is
-    // fine here: two models, a few hundred KB each, and a lab nobody is
-    // speed-running.
+    useEffect(() => { blendRef.current = blend; }, [blend]);
+    const note = useCallback((t) => setLog((p) => [t, ...p].slice(0, 5)), []);
+
     useEffect(() => {
         let cancelled = false;
         let cleanup = () => {};
@@ -52,16 +57,14 @@ export default function ModelLab() {
             scene.background = new THREE.Color(0x11181c);
 
             const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             host.appendChild(renderer.domElement);
 
-            // ⚠️ KEEP THE KEY LOW AND FRONTAL. A light high overhead carves a hard
-            // shadow under the pectoral, and on a pale untextured body that crease
-            // reads as the underside of a breast -- the model is a flat-chested male
-            // in Blender and looked otherwise here purely because of this angle.
+            // ⚠️ KEEP THE KEY LOW AND FRONTAL. A light high overhead carves a shadow under the pectoral, and
+            // on a pale untextured body that crease reads as the underside of a breast.
             const key = new THREE.DirectionalLight(0xfff2e6, 2.3);
             key.position.set(2.2, 1.5, 3.4);
             key.castShadow = true;
@@ -77,8 +80,6 @@ export default function ModelLab() {
             const rim = new THREE.DirectionalLight(0xffd9a8, 1.1);
             rim.position.set(-1.0, 1.8, -3.2);
             scene.add(rim);
-            // A low hemisphere: too much ground bounce fills the shadow UNDER a form
-            // and turns flat muscle into something rounded.
             scene.add(new THREE.HemisphereLight(0x5e7a8a, 0x241c18, 0.28));
 
             const grid = new THREE.GridHelper(8, 16, 0x2f4248, 0x1b282d);
@@ -102,17 +103,14 @@ export default function ModelLab() {
             draco.setDecoderPath("/draco/");
             const loader = new GLTFLoader();
             loader.setDRACOLoader(draco);
-
-            let mixer = null;
-            let meshes = [];
             const clock = new THREE.Clock();
 
-            const url = (CLIPS.find((c) => c.id === clipRef.current) || CLIPS[0]).url;
             loader.load(
-                url,
+                MODEL_URL,
                 (gltf) => {
                     if (cancelled) return;
                     const root = gltf.scene;
+                    const meshes = [];
                     root.traverse((o) => {
                         if (o.isMesh) {
                             o.castShadow = true;
@@ -121,42 +119,95 @@ export default function ModelLab() {
                         }
                     });
 
-                    // Frame the model from its own bounds rather than hardcoding a camera distance, so a
-                    // re-export at a different scale still arrives centred.
                     const box = new THREE.Box3().setFromObject(root);
                     const size = box.getSize(new THREE.Vector3());
-                    const centre = box.getCenter(new THREE.Vector3());
                     root.position.y -= box.min.y;
                     scene.add(root);
 
-                    // ⚠️ LEAVE REAL MARGIN. At h*1.45 the frustum showed only ~1.2x the
-                    // model height, so on a narrow phone viewport the figure arrived
-                    // cropped at the shoulders and thighs.
+                    // ⚠️ LEAVE REAL MARGIN. At h*1.45 the frustum showed only ~1.2x the model height, so on a
+                    // narrow phone viewport the figure arrived cropped at the shoulders and thighs.
                     const h = size.y || 1.8;
                     controls.target.set(0, h * 0.50, 0);
                     camera.position.set(h * 1.05, h * 0.78, h * 2.15);
                     controls.update();
 
-                    const clip = gltf.animations?.[0] || null;
-                    if (clip) {
-                        mixer = new THREE.AnimationMixer(root);
-                        const action = mixer.clipAction(clip);
-                        action.setLoop(THREE.LoopRepeat, Infinity);
-                        action.play();
-                    }
+                    const mixer = new THREE.AnimationMixer(root);
+                    const actions = {};
+                    gltf.animations.forEach((c) => {
+                        const spec = CLIPS.find((x) => x.id === c.name);
+                        const a = mixer.clipAction(c);
+                        if (spec && spec.kind === "oneShot") {
+                            a.setLoop(THREE.LoopOnce, 1);
+                            a.clampWhenFinished = true;
+                        } else {
+                            a.setLoop(THREE.LoopRepeat, Infinity);
+                        }
+                        actions[c.name] = a;
+                    });
+
+                    const first = actions.Idle || Object.values(actions)[0];
+                    first.play();
+
+                    const api = {
+                        mixer, actions, meshes,
+                        activeId: first.getClip().name,
+                        fallbackId: first.getClip().name,   // where a one-shot hands back to
+                    };
+
+                    // ── THE BLEND ───────────────────────────────────────────────────────────────────
+                    // crossFadeFrom with warping maps time between two clips of different length, which
+                    // is what makes a transition read as one continuous body rather than a cut.
+                    //
+                    // A CANCEL is the same call with a shorter duration. There is no separate stop path,
+                    // and that is exactly why interrupting feels continuous instead of snapping — the
+                    // outgoing clip keeps playing while its weight falls away.
+                    api.play = (id, seconds) => {
+                        const next = actions[id];
+                        if (!next) return;
+                        const prev = actions[api.activeId];
+                        const spec = CLIPS.find((x) => x.id === id);
+                        if (spec && spec.kind === "oneShot") {
+                            if (api.activeId !== id) api.fallbackId = api.activeId;
+                        } else {
+                            api.fallbackId = id;
+                        }
+                        next.reset();
+                        next.enabled = true;
+                        next.setEffectiveTimeScale(1);
+                        next.setEffectiveWeight(1);
+                        next.play();
+                        if (prev && prev !== next && seconds > 0) {
+                            next.crossFadeFrom(prev, seconds, true);
+                        } else if (prev && prev !== next) {
+                            prev.stop();
+                        }
+                        api.activeId = id;
+                    };
+
+                    mixer.addEventListener("finished", (e) => {
+                        const doneId = e.action.getClip().name;
+                        if (doneId !== api.activeId) return;   // already cancelled into something else
+                        const back = api.fallbackId || "Idle";
+                        api.play(back, Math.min(0.25, blendRef.current || 0.12));
+                        setCurrent(back);
+                        note(`Impact finished → ${back}`);
+                    });
+
+                    apiRef.current = Object.assign({}, apiRef.current || {}, api);
 
                     let tris = 0;
-                    meshes.forEach((m) => { tris += (m.geometry.index?.count || m.geometry.attributes.position.count) / 3; });
+                    meshes.forEach((m) => {
+                        tris += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3;
+                    });
                     setInfo({
                         tris: Math.round(tris),
                         bones: root.getObjectsByProperty("isBone", true).length,
-                        clip: clip ? clip.name : "none",
-                        seconds: clip ? clip.duration.toFixed(2) : "0",
+                        clips: gltf.animations.length,
                     });
                     setReady(true);
                 },
                 undefined,
-                (e) => { if (!cancelled) setError(String(e?.message || e || "failed to load")); },
+                (e) => { if (!cancelled) setError(String((e && e.message) || e || "failed to load")); },
             );
 
             const resize = () => {
@@ -175,7 +226,9 @@ export default function ModelLab() {
                 raf = requestAnimationFrame(tick);
                 const dt = clock.getDelta();
                 const api = apiRef.current;
-                if (mixer && api?.playing) mixer.update(dt * api.speed);
+                if (api && api.mixer && api.playing !== false) {
+                    api.mixer.update(dt * (api.speed === undefined ? 1 : api.speed));
+                }
                 controls.update();
                 renderer.render(scene, camera);
             };
@@ -189,35 +242,33 @@ export default function ModelLab() {
                 renderer.dispose();
                 scene.traverse((o) => {
                     if (o.isMesh) {
-                        o.geometry?.dispose?.();
+                        if (o.geometry) o.geometry.dispose();
                         const m = o.material;
-                        (Array.isArray(m) ? m : [m]).forEach((x) => x?.dispose?.());
+                        (Array.isArray(m) ? m : [m]).forEach((x) => { if (x) x.dispose(); });
                     }
                 });
                 if (renderer.domElement.parentNode === host) host.removeChild(renderer.domElement);
             };
-            apiRef.current = { ...(apiRef.current || {}), meshes };
-        })().catch((e) => { if (!cancelled) setError(String(e?.message || e)); });
+        })().catch((e) => { if (!cancelled) setError(String((e && e.message) || e)); });
 
         return () => { cancelled = true; cleanup(); };
-    }, [clip]);
+    }, [note]);
 
-    // The render loop reads playback state from a ref so changing speed never re-runs the whole setup effect.
+    // Playback state lives on a ref so changing speed never re-runs the setup effect.
     useEffect(() => {
-        apiRef.current = { ...(apiRef.current || {}), playing, speed };
+        apiRef.current = Object.assign({}, apiRef.current || {}, { playing, speed });
     }, [playing, speed]);
 
-    useEffect(() => { clipRef.current = clip; }, [clip]);
-
-    useEffect(() => {
-        const meshes = apiRef.current?.meshes || [];
-        meshes.forEach((m) => {
-            const mats = Array.isArray(m.material) ? m.material : [m.material];
-            mats.forEach((mat) => { if (mat) mat.wireframe = wireframe; });
-        });
-    }, [wireframe, ready]);
-
-    const reset = useCallback(() => { setPlaying(true); setSpeed(1); setWireframe(false); }, []);
+    const trigger = useCallback((id) => {
+        const api = apiRef.current;
+        if (!api || !api.play) return;
+        const from = api.activeId;
+        const d = blendRef.current;
+        api.play(id, d);
+        setCurrent(id);
+        const cancelled = from === "Impact" && id !== "Impact";
+        note(`${from} → ${id} over ${d.toFixed(2)}s${cancelled ? "   (cancelled Impact)" : ""}`);
+    }, [note]);
 
     return (
         <div className="lab">
@@ -226,54 +277,68 @@ export default function ModelLab() {
                 {error ? <p className="hint err">Could not load the model: {error}</p> : null}
             </div>
 
-            <div className="bar">
-                <div className="speeds" role="group" aria-label="Clip">
-                    {CLIPS.map((c) => (
-                        <button key={c.id} type="button" className={c.id === clip ? "on" : ""}
-                            onClick={() => { setReady(false); setInfo(null); setClip(c.id); }}
-                            aria-pressed={c.id === clip}>
-                            {c.label}
-                        </button>
-                    ))}
-                </div>
+            <div className="row">
+                <span className="lbl">Clip</span>
+                {CLIPS.map((c) => (
+                    <button key={c.id} type="button" title={c.hint}
+                        className={c.id === current ? "on" : (c.kind === "oneShot" ? "shot" : "")}
+                        onClick={() => trigger(c.id)} aria-pressed={c.id === current}>
+                        {c.label}
+                    </button>
+                ))}
+            </div>
+
+            <div className="row">
+                <span className="lbl">Blend</span>
+                {BLENDS.map((b) => (
+                    <button key={b} type="button" className={b === blend ? "on" : ""}
+                        onClick={() => setBlend(b)} aria-pressed={b === blend}>
+                        {b === 0 ? "Snap" : `${b}s`}
+                    </button>
+                ))}
+            </div>
+
+            <div className="row">
+                <span className="lbl">Play</span>
                 <button type="button" onClick={() => setPlaying((p) => !p)} aria-pressed={playing}>
                     {playing ? "Pause" : "Play"}
                 </button>
-                <div className="speeds" role="group" aria-label="Playback speed">
-                    {SPEEDS.map((s) => (
-                        <button key={s} type="button" className={s === speed ? "on" : ""}
-                            onClick={() => setSpeed(s)} aria-pressed={s === speed}>
-                            {s}x
-                        </button>
-                    ))}
-                </div>
-                <button type="button" onClick={() => setWireframe((w) => !w)} aria-pressed={wireframe}>
-                    {wireframe ? "Solid" : "Wireframe"}
-                </button>
-                <button type="button" onClick={reset}>Reset</button>
+                {[0.25, 0.5, 1].map((s) => (
+                    <button key={s} type="button" className={s === speed ? "on" : ""}
+                        onClick={() => setSpeed(s)} aria-pressed={s === speed}>
+                        {s}x
+                    </button>
+                ))}
             </div>
+
+            {log.length ? (
+                <ol className="log">
+                    {log.map((l, i) => <li key={`${l}-${i}`} className={i === 0 ? "fresh" : ""}>{l}</li>)}
+                </ol>
+            ) : null}
 
             {info ? (
                 <dl className="facts">
                     <div><dt>Triangles</dt><dd>{info.tris.toLocaleString()}</dd></div>
                     <div><dt>Bones</dt><dd>{info.bones}</dd></div>
-                    <div><dt>Clip</dt><dd>{info.clip}</dd></div>
-                    <div><dt>Length</dt><dd>{info.seconds}s</dd></div>
+                    <div><dt>Clips</dt><dd>{info.clips}</dd></div>
                 </dl>
             ) : null}
 
             <p className="muted note">
-                Drag to orbit, scroll to zoom, right-drag to pan. The walk is a 24-frame cycle keyed on four
-                stations — contact, down, pass and up — mirrored for the second stride.
+                Drag to orbit, scroll to zoom. Set <strong>Snap</strong> and switch clips to see what a cut
+                looks like, then raise the blend and switch again. Trigger <strong>Impact</strong> mid-walk — it
+                plays once and hands back to whatever was running. Press another clip while it is mid-hit and
+                you cancel it.
             </p>
 
             <style jsx>{`
-                .lab { display: flex; flex-direction: column; gap: 12px; }
+                .lab { display: flex; flex-direction: column; gap: 10px; }
                 .stage {
                     position: relative;
                     width: 100%;
                     aspect-ratio: 4 / 3;
-                    max-height: 72vh;
+                    max-height: 70vh;
                     border-radius: 10px;
                     overflow: hidden;
                     background: #11181c;
@@ -287,38 +352,42 @@ export default function ModelLab() {
                     color: #8fa6ae; font-size: 14px; text-align: center; padding: 0 16px;
                 }
                 .hint.err { color: #e2a0a0; }
-                .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-                .speeds { display: flex; gap: 4px; }
+                .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+                .lbl {
+                    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+                    color: #8fa6ae; min-width: 44px;
+                }
                 button {
-                    font: inherit;
-                    font-size: 14px;
-                    padding: 7px 13px;
-                    border-radius: 7px;
+                    font: inherit; font-size: 14px;
+                    padding: 7px 13px; border-radius: 7px;
                     border: 1px solid rgba(255, 255, 255, 0.14);
                     background: rgba(255, 255, 255, 0.05);
-                    color: #dce8ea;
-                    cursor: pointer;
-                    min-height: 38px;
+                    color: #dce8ea; cursor: pointer; min-height: 38px;
                 }
                 button:hover { background: rgba(255, 255, 255, 0.1); }
+                button.shot { border-color: rgba(255, 170, 90, 0.4); color: #ffcc99; }
                 button.on {
-                    background: #2e8f86;
-                    border-color: #39b3a7;
-                    color: #04120f;
-                    font-weight: 600;
+                    background: #2e8f86; border-color: #39b3a7;
+                    color: #04120f; font-weight: 600;
                 }
                 button:focus-visible { outline: 2px solid #45d6c6; outline-offset: 2px; }
+                .log {
+                    list-style: none; margin: 0; padding: 8px 11px;
+                    background: rgba(255, 255, 255, 0.035);
+                    border: 1px solid rgba(255, 255, 255, 0.07);
+                    border-radius: 8px;
+                    font-size: 12.5px; line-height: 1.7; color: #8fa6ae;
+                    font-variant-numeric: tabular-nums;
+                }
+                .log .fresh { color: #cfe6e4; }
                 .facts {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-                    gap: 8px;
-                    margin: 0;
+                    display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                    gap: 8px; margin: 0;
                 }
                 .facts > div {
                     background: rgba(255, 255, 255, 0.04);
                     border: 1px solid rgba(255, 255, 255, 0.07);
-                    border-radius: 8px;
-                    padding: 8px 11px;
+                    border-radius: 8px; padding: 8px 11px;
                 }
                 dt { font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #8fa6ae; }
                 dd { margin: 2px 0 0; font-size: 17px; font-variant-numeric: tabular-nums; }
