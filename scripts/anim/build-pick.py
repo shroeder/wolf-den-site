@@ -110,54 +110,98 @@ def _build_pick(scale):
 PICK = _build_pick(LEG)
 PICK_TIP = Vector((0, -TIP_Y * LEG, TIP_Z * LEG))
 
-close_fist(PICK_HAND, 0.90)
-close_fist(OFF_HAND, 0.86)
+# Thumbs stay on a fixed curl; only the fingers are solved.
+_CURL_SIGN = {s_: _curl_sign(s_) for s_ in ('l', 'r')}
+for _s in ('l', 'r'):
+    for _seg, _deg in (('01', 26), ('02', 34), ('03', 30)):
+        _b = arm.pose.bones.get('thumb_%s_%s' % (_seg, _s))
+        if _b:
+            _b.rotation_euler = Euler(
+                (math.radians(_deg * 0.9 * _CURL_SIGN[_s]), 0, 0), 'XYZ')
 bpy.context.view_layer.update()
 
 
 SHAFT_R = 0.0285 * LEG
-FINGER_R = 0.011 * LEG
+SKIN = 0.009 * LEG          # fingertip flesh outside the bone
+
+
+def _curl(side, finger, amt):
+    for seg, deg in (("01", 58), ("02", 76), ("03", 48)):
+        b = arm.pose.bones.get("%s_%s_%s" % (finger, seg, side))
+        if b:
+            b.rotation_euler = Euler((math.radians(deg * amt * _CURL_SIGN[side]),
+                                      0, 0), "XYZ")
 
 
 def grip_frame(side):
-    """Where a closed fist can hold a shaft of THIS thickness, and which way
-    it runs. +Z runs up out of the thumb side.
+    """Where a fist holds a shaft of THIS thickness, which way it runs, and
+    how far each finger has to close to reach it.
 
-    ⚠️ THE CENTRE IS SOLVED, NOT AVERAGED. Averaging the knuckle positions
-    puts the axis on the line the FINGER BONES lie on -- so the shaft is
-    threaded through them. Measured, the finger joints came out 0.013 to
-    0.027 from the axis against a shaft radius of 0.030: his fingers were
-    inside the wood, and I read those numbers and called it a perfect grip.
-    A held shaft sits in the HOLE, clear of every bone by its own radius
-    plus a finger. Search the plane square to the axis for the point that
-    actually achieves that."""
+    ⚠️ THE CENTRE IS NOT THE AVERAGE OF THE KNUCKLES. That puts the axis on
+    the line the finger BONES lie on, threading the shaft through them --
+    measured, finger joints 0.013 to 0.027 from the axis against a 0.030
+    shaft. Nor is it "the biggest gap near the hand": searching for that
+    walked 0.095 away and found the open air beside his fist. A held shaft
+    lies against the PALM, one radius in from the knuckles, and the fingers
+    close until they meet it."""
     def bone(n, tail=False):
         pb = arm.pose.bones["%s_%s" % (n, side)]
         return arm.matrix_world @ (pb.tail if tail else pb.head)
-    i1, p1 = bone("index_01"), bone("pinky_01")
-    z = (i1 - p1).normalized()
+
+    for fng in ("index", "middle", "ring", "pinky"):
+        _curl(side, fng, 0.45)
+    bpy.context.view_layer.update()
+    knuck = [bone("%s_01" % f) for f in ("index", "middle", "ring", "pinky")]
+    tips = [bone("%s_03" % f, True) for f in ("index", "middle", "ring", "pinky")]
+    kmid = sum(knuck, Vector()) / 4.0
+    z = (bone("index_01") - bone("pinky_01")).normalized()
+
+    # ⚠️ PUT THE SHAFT WHERE THE CLOSING FINGERS ACTUALLY GO. Deriving the
+    # centre from the KNUCKLES and stepping one radius toward the palm put
+    # it somewhere the fingertips could not reach even at full curl --
+    # measured 0.055 to 0.079 away from a 0.030 shaft, which is a hand
+    # cupping it, exactly as it looked. Curl to a natural grip first, see
+    # where the tips come to, and seat the shaft against them.
+    for fng in ("index", "middle", "ring", "pinky"):
+        _curl(side, fng, 0.80)
+    bpy.context.view_layer.update()
+    tmid = sum((bone("%s_03" % f, True)
+                for f in ("index", "middle", "ring", "pinky")), Vector()) / 4.0
+    back = (kmid - tmid)
+    back = (back - z * back.dot(z))
+    back = back.normalized() if back.length > 1e-5 else Vector((0, 0, 1))
+    centre = tmid + back * (SHAFT_R + SKIN)
     fwd = Vector((0.0, FWD, 0.0))
     y = fwd - z * fwd.dot(z)
-    y = y.normalized() if y.length > 1e-5 else Vector((0, 0, 1)).cross(z).normalized()
+    y = y.normalized() if y.length > 1e-5 else palm
     x = y.cross(z)
 
-    ring = [bone(n, t) for n in ("index_01", "index_02", "index_03",
-                                 "middle_01", "middle_02", "middle_03",
-                                 "pinky_01", "pinky_02", "pinky_03",
-                                 "thumb_02", "thumb_03") for t in (False, True)]
-    seed = sum(ring, Vector()) / len(ring)
-    want = SHAFT_R + FINGER_R
-    best, centre = -1e9, seed
-    for ix in range(-14, 15):
-        for iy in range(-14, 15):
-            c = seed + x * (ix * 0.004 * LEG) + y * (iy * 0.004 * LEG)
-            gap = min((p - c - z * (p - c).dot(z)).length for p in ring)
-            score = -abs(gap - want)
-            if score > best:
-                best, centre = score, c
-    clear = min((p - centre - z * (p - centre).dot(z)).length for p in ring)
-    print("        grip %s: nearest bone %.4f from the axis "
-          "(shaft %.4f, want >= %.4f)" % (side, clear, SHAFT_R, want))
+    # ── CLOSE EACH FINGER ONTO THE SHAFT ──────────────────────────────────
+    # One global curl cannot fit four fingers of different length around a
+    # cylinder: they cup it instead of closing on it, which is exactly how
+    # it looked. Solve each one.
+    want = SHAFT_R + SKIN
+    for fng in ("index", "middle", "ring", "pinky"):
+        # ⚠️ SCAN, DO NOT BISECT. Closing a finger does not reduce its
+        # distance to the shaft monotonically -- past a point the tip curls
+        # PAST the shaft and the distance grows again, so bisection walks
+        # off and leaves three fingers of the left hand short.
+        best, bamt = 1e9, 0.8
+        for k in range(29):
+            amt = 0.20 + k * 0.05
+            _curl(side, fng, amt)
+            bpy.context.view_layer.update()
+            t = bone("%s_03" % fng, True)
+            d = abs((t - centre - z * (t - centre).dot(z)).length - want)
+            if d < best:
+                best, bamt = d, amt
+        _curl(side, fng, bamt)
+    bpy.context.view_layer.update()
+    gaps = [((bone("%s_03" % f, True) - centre)
+             - z * (bone("%s_03" % f, True) - centre).dot(z)).length
+            for f in ("index", "middle", "ring", "pinky")]
+    print("        grip %s: fingertips %s from the axis (shaft %.4f)"
+          % (side, " ".join("%.3f" % g for g in gaps), SHAFT_R))
     return centre, Matrix((x, y, z)).transposed().to_3x3()
 
 

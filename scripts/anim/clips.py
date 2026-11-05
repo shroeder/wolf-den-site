@@ -507,10 +507,19 @@ def key_mine(frames=40):
         f = (f - up * f.dot(up)).normalized()
         return mid, up, f, up.cross(f).normalized()
 
-    def solve(reach, elev, lead):
+    def solve(reach, elev, lead, yaw=0.0):
         """Hand position and the tool's full transform, from the three
         body-relative numbers. Returns (wrist, tool_rotation)."""
         mid, up, f, right = frame_axes()
+        # ⚠️ THE SWING IS NOT IN THE MIDLINE. Keeping it in the sagittal
+        # plane is what stops the tool windmilling into his torso, but it
+        # also walks the shaft straight across his FACE at the apex. A real
+        # over-the-shoulder lift goes up one SIDE of the head. Yawing the
+        # whole plane out toward the driving shoulder keeps the first
+        # property and fixes the second.
+        yq = Quaternion(up, math.radians(yaw))
+        f = yq @ f
+        right = yq @ right
         e = math.radians(elev)
         armdir = (-up * math.cos(e)) + (f * math.sin(e))
         H = mid + armdir * (min(reach, REACH_MAX) * ARM)
@@ -530,41 +539,41 @@ def key_mine(frames=40):
         rot = rot @ Quaternion((0, 0, 1), math.radians(globals().get('_ROLL', 0.0)))
         return H, rot
 
-    #     f  reach  elev  lead   hip dz  hip dy twist spine head
-    B = [(1,  0.86,  38, -14,  -0.100,  0.000,  10,   26,  14),
-         (6,  0.84,  30, -10,  -0.140,  0.010,  13,   30,  15),
-         (10, 0.72,  62,  10,  -0.070,  0.025,   2,   16,  17),
-         (13, 0.62,  96,  34,   0.000,  0.040, -12,    2,  20),
-         (16, 0.58, 126,  52,   0.040,  0.048, -22,  -10,  22),
-         (18, 0.57, 132,  56,   0.045,  0.050, -24,  -11,  22),
-         (20, 0.66, 108,  40,   0.000,  0.030, -10,    6,  18),
-         (21, 0.74,  80,  22,  -0.080,  0.000,   2,   20,  14),
-         (22, 0.86,  48,  -4,  -0.180, -0.030,   6,   34,  12),
-         (23, 0.93,  28, -16,   None,  -0.055,   8,   46,  10),
-         (24, 0.93,  27, -16,   None,  -0.057,   8,   47,  10),
-         (27, 0.88,  40, -18,  -0.185, -0.025,   7,   34,  13),
-         (30, 0.86,  46, -20,  -0.145, -0.012,   8,   30,  14),
-         (34, 0.86,  40, -16,  -0.112,  0.000,   9,   27,  14),
-         (40, 0.86,  38, -14,  -0.100,  0.000,  10,   26,  14)]
+    #     f  reach  elev  lead  yaw  hip dz  hip dy twist spine head
+    B = [(1,  0.86,  38, -14,  10,  -0.100,  0.000,  10,   26,  14),
+         (6,  0.84,  30, -10,  12,  -0.140,  0.010,  13,   30,  15),
+         (10, 0.72,  62,  10,  20,  -0.070,  0.025,   2,   16,  17),
+         (13, 0.70, 104,  40,  28,   0.000,  0.040, -12,    2,  20),
+         (16, 0.72, 142,  64,  34,   0.040,  0.048, -22,  -10,  22),
+         (18, 0.73, 147,  68,  35,   0.045,  0.050, -24,  -11,  22),
+         (20, 0.72, 118,  50,  30,   0.000,  0.030, -10,    6,  18),
+         (21, 0.80,  86,  28,  24,  -0.080,  0.000,   2,   20,  14),
+         (22, 0.86,  48,  -4,  16,  -0.180, -0.030,   6,   34,  12),
+         (23, 0.93,  28, -16,  10,   None,  -0.055,   8,   46,  10),
+         (24, 0.93,  27, -16,  10,   None,  -0.057,   8,   47,  10),
+         (27, 0.88,  40, -18,  12,  -0.185, -0.025,   7,   34,  13),
+         (30, 0.86,  46, -20,  12,  -0.145, -0.012,   8,   30,  14),
+         (34, 0.86,  40, -16,  11,  -0.112,  0.000,   9,   27,  14),
+         (40, 0.86,  38, -14,  10,  -0.100,  0.000,  10,   26,  14)]
 
-    def tip_z(reach, elev, lead, dz, dy, twist, spine, head):
+    def tip_z(reach, elev, lead, yaw, dz, dy, twist, spine, head):
         body(dz, dy, twist, spine, head)
-        H, rot = solve(reach, elev, lead)
+        H, rot = solve(reach, elev, lead, yaw)
         return ((H - (rot @ WRIST)) + (rot @ TIP)).z - FLOOR
 
     # ── THE ONE SOLVE ── how deep does he have to get for the point to
     # touch? Bisection on hip height; everything else is already safe.
     rows = []
     for r in B:
-        if r[4] is None:
+        if r[5] is None:
             lo, hi = -0.55, 0.0
             for _ in range(28):
                 mid_ = (lo + hi) * 0.5
-                if tip_z(r[1], r[2], r[3], mid_, r[5], r[6], r[7], r[8]) > 0:
+                if tip_z(r[1], r[2], r[3], r[4], mid_, r[6], r[7], r[8], r[9]) > 0:
                     hi = mid_
                 else:
                     lo = mid_
-            r = r[:4] + ((lo + hi) * 0.5,) + r[5:]
+            r = r[:5] + ((lo + hi) * 0.5,) + r[6:]
         rows.append(r)
     B = rows
 
@@ -582,11 +591,12 @@ def key_mine(frames=40):
     SPLIT = 0.185 * LEG
     worst_reach, worst_elev, tip_lo = 0.0, 999.0, 1e9
     worst_wrist = {"l": 0.0, "r": 0.0}
+    head_clear = 1e9
 
     for f in range(1, frames + 1):
-        reach, elev, lead, dz, dy, twist, spine, head = sample(f)
+        reach, elev, lead, yaw, dz, dy, twist, spine, head = sample(f)
         body(dz, dy, twist, spine, head)
-        H, rot = solve(reach, elev, lead)
+        H, rot = solve(reach, elev, lead, yaw)
 
         TOOL.rotation_quaternion = rot
         TOOL.location = H - (rot @ WRIST)
@@ -657,12 +667,20 @@ def key_mine(frames=40):
             worst_wrist[s_] = max(worst_wrist[s_], best)
         bpy.context.view_layer.update()
 
+        hd = arm.matrix_world @ arm.pose.bones["head"].head
+        ht = arm.matrix_world @ arm.pose.bones["head"].tail
+        ha = TOOL.matrix_world @ Vector((0, 0, 0))
+        hb = TOOL.matrix_world @ Vector((0, 0, g["HAFT_LEN"] * LEG))
+        d_ = hb - ha
+        t_ = max(0.0, min(1.0, ((hd + ht) * 0.5 - ha).dot(d_) / max(d_.dot(d_), 1e-9)))
+        head_clear = min(head_clear, (((hd + ht) * 0.5) - (ha + d_ * t_)).length)
         worst_reach = max(worst_reach, reach)
         worst_elev = min(worst_elev, elev)
         tip_lo = min(tip_lo, ((H - (rot @ WRIST)) + (rot @ TIP)).z - FLOOR)
 
-    g["close_fist"]("l", 0.86)
-    g["close_fist"]("r", 0.90)
+    # ⚠️ DO NOT RE-CLOSE THE FISTS HERE. build-pick solves each finger
+    # against the shaft radius; a global close_fist stamps over that
+    # and puts them back to cupping it.
     _smooth([arm] + list(G["helpers"]))
     for ob in [arm] + list(G["helpers"]):
         if ob.animation_data and ob.animation_data.action:
@@ -675,4 +693,6 @@ def key_mine(frames=40):
           "(negative is behind him)" % (worst_reach, REACH_MAX, worst_elev))
     print("MINE  worst wrist bend  L %.0f  R %.0f deg   (a wrist does about 70)"
           % (worst_wrist["l"], worst_wrist["r"]))
+    print("MINE  closest the shaft comes to his head: %.3f  (his head is ~0.09 wide)"
+          % head_clear)
     return frames
