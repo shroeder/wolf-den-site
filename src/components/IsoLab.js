@@ -30,8 +30,19 @@ const TURN_RATE = 6.0;            // rad/s
 const ARRIVE = 0.12;              // close enough
 const EASE_IN = 0.30;             // seconds from standstill to full speed
 const SLOW_FROM = 0.55;           // start easing down this far out
-const BOUNDS = 7.0;               // keep him on the grid
+// ⚠️ ANY LIMIT MEASURED FROM THE WORLD ORIGIN SHRINKS AS HE WALKS AWAY FROM
+// IT. The first version clamped taps to 7 units from (0,0), so the further he
+// got the less of the visible floor would accept a tap -- it read as the
+// controls going stiff rather than as a boundary, because the boundary was
+// off-screen. The floor is endless now (it follows him) and the only clamp
+// left is relative to the HERO, far outside anything on screen, and exists
+// solely so a grazing ray cannot return a destination a mile away.
+const REACH = 60.0;
 
+// three.js lights are physical since r155, so a point light's intensity is in
+// candela and does not compare to the directional key's number at all. Rather
+// than pick one and hope, the lamp has a dial.
+const LAMP = [{ k: "Dim", v: 14 }, { k: "Warm", v: 34 }, { k: "Blaze", v: 78 }];
 const AZIMUTHS = [45, 135, 225, 315];
 const ZOOMS = [4.2, 6.0, 8.5];
 
@@ -43,12 +54,26 @@ export default function IsoLab() {
     const [azimuth, setAzimuth] = useState(0);
     const [zoom, setZoom] = useState(1);
     const [follow, setFollow] = useState(true);
+    const [sun, setSun] = useState(true);
+    const [lampOn, setLampOn] = useState(true);
+    const [lampLvl, setLampLvl] = useState(1);
+    const [placing, setPlacing] = useState(false);
     const [hud, setHud] = useState({ state: "Idle", speed: 0, dist: 0 });
 
     useEffect(() => {
         const api = apiRef.current;
-        if (api) { api.azimuth = AZIMUTHS[azimuth]; api.view = ZOOMS[zoom]; api.follow = follow; }
-    }, [azimuth, zoom, follow]);
+        if (!api) return;
+        api.azimuth = AZIMUTHS[azimuth];
+        api.view = ZOOMS[zoom];
+        api.follow = follow;
+        api.placing = placing;
+        api.lampOn = lampOn;
+        api.lampWatts = LAMP[lampLvl].v;
+        api.sun = sun;
+        if (api.key) api.key.intensity = sun ? 2.1 : 0.12;
+        if (api.flame) api.flame.visible = lampOn;
+        if (api.bulb) api.bulb.visible = lampOn;
+    }, [azimuth, zoom, follow, sun, lampOn, lampLvl, placing, ready]);
 
     useEffect(() => {
         let cancelled = false;
@@ -63,7 +88,12 @@ export default function IsoLab() {
             const host = hostRef.current;
             const scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0e1418);
-            scene.fog = new THREE.Fog(0x0e1418, 16, 30);
+            // ⚠️ FOG IS MEASURED FROM THE CAMERA, AND AN ISO CAMERA IS FAR AWAY. At
+            // near 16 / far 30 with the camera parked 24 units back, the hero himself sat at 57% fog --
+            // every surface in the scene was being mixed more than half way to the background colour,
+            // which reads as "the lighting is bad" and is not. The band now starts past him and only
+            // catches the far edge of the grid.
+            scene.fog = new THREE.Fog(0x0e1418, 27, 52);
 
             const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 120);
             const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -88,12 +118,12 @@ export default function IsoLab() {
             scene.add(new THREE.HemisphereLight(0x5d7d91, 0x1a1512, 0.45));
 
             const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(40, 40).rotateX(-Math.PI / 2),
+                new THREE.PlaneGeometry(220, 220).rotateX(-Math.PI / 2),
                 new THREE.MeshStandardMaterial({ color: 0x27333a, roughness: 0.95 }),
             );
             ground.receiveShadow = true;
             scene.add(ground);
-            const grid = new THREE.GridHelper(32, 32, 0x44606c, 0x2b3a42);
+            const grid = new THREE.GridHelper(72, 72, 0x44606c, 0x2b3a42);
             grid.position.y = 0.002;
             scene.add(grid);
 
@@ -106,6 +136,30 @@ export default function IsoLab() {
             ring.position.y = 0.01;
             ring.visible = false;
             scene.add(ring);
+
+            // ── THE LAMP ── a real point light with a body you can see, so its shadows have an
+            // obvious source. Shadow-casting point lights render six faces, which is why there is
+            // exactly one of them.
+            const lamp = new THREE.Group();
+            const post = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.045, 0.075, 1.5, 10),
+                new THREE.MeshStandardMaterial({ color: 0x1d2328, roughness: 0.6, metalness: 0.7 }),
+            );
+            post.position.y = 0.75;
+            post.castShadow = true;
+            const bulb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.15, 20, 14),
+                new THREE.MeshBasicMaterial({ color: 0xffd9a0 }),
+            );
+            bulb.position.y = 1.62;
+            const flame = new THREE.PointLight(0xffb46a, 34, 18, 2);
+            flame.position.y = 1.62;
+            flame.castShadow = true;
+            flame.shadow.mapSize.set(512, 512);   // x6 faces; this one opens on a phone
+            flame.shadow.bias = -0.004;
+            lamp.add(post, bulb, flame);
+            lamp.position.set(2.5, 0, -2.5);
+            scene.add(lamp);
 
             const draco = new DRACOLoader();
             draco.setDecoderPath("/draco/");
@@ -145,6 +199,7 @@ export default function IsoLab() {
 
                 apiRef.current = Object.assign({}, apiRef.current || {}, {
                     rig, mixer, walk, idle, camera, ring, key, plane, ray, ndc, hit,
+                    lamp, flame, bulb, placing: false, sun: true, lampOn: true, lampWatts: LAMP[1].v,
                     target: null, moving: false, speed: 0,
                     azimuth: AZIMUTHS[azimuth], view: ZOOMS[zoom], follow: true,
                     look: new THREE.Vector3(0, 0.9, 0),
@@ -164,10 +219,18 @@ export default function IsoLab() {
                     -((ev.clientY - r.top) / r.height) * 2 + 1);
                 ray.setFromCamera(ndc, camera);
                 if (!ray.ray.intersectPlane(plane, hit)) return;
-                const d = Math.hypot(hit.x, hit.z);
-                if (d > BOUNDS) { hit.x *= BOUNDS / d; hit.z *= BOUNDS / d; }
-                api.target = { x: hit.x, z: hit.z };
-                api.ring.position.set(hit.x, 0.01, hit.z);
+                if (api.placing) {
+                    api.lamp.position.set(hit.x, 0, hit.z);
+                    return;
+                }
+                const dx = hit.x - api.rig.position.x;
+                const dz = hit.z - api.rig.position.z;
+                const d = Math.hypot(dx, dz);
+                const k = d > REACH ? REACH / d : 1;
+                const tx = api.rig.position.x + dx * k;
+                const tz = api.rig.position.z + dz * k;
+                api.target = { x: tx, z: tz };
+                api.ring.position.set(tx, 0.01, tz);
                 api.ring.visible = true;
             };
             let dragging = false;
@@ -280,7 +343,21 @@ export default function IsoLab() {
                 key.position.set(api.look.x + 5, 9, api.look.z + 4);
                 key.target.position.copy(api.look);
                 key.target.updateMatrixWorld();
+                // ── THE FLOOR FOLLOWS ── an unlit flat plane can be moved under the camera without
+                // anyone seeing it move, and the grid is snapped to whole cells so its lines stay put.
+                // Together that is an endless floor, which is what makes removing the clamp safe.
+                ground.position.set(api.look.x, 0, api.look.z);
+                grid.position.set(Math.round(api.look.x), 0.002, Math.round(api.look.z));
                 if (api.view !== lastView) { lastView = api.view; resize(); }
+
+                // A steady point light reads as a bulb; a flickering one reads as a flame. Cheap,
+                // and it is the difference between "there is a light here" and "there is a fire here".
+                if (api.lampOn) {
+                    const fl = 0.86 + 0.14 * Math.sin(clock.elapsedTime * 11.3)
+                        * Math.sin(clock.elapsedTime * 4.1);
+                    api.flame.intensity = (api.lampWatts || 34) * fl;
+                    api.bulb.material.color.setRGB(1, 0.84 * fl + 0.1, 0.62 * fl);
+                }
 
                 if (api.ring.visible) {
                     const p = 1 + 0.08 * Math.sin(clock.elapsedTime * 7);
@@ -333,7 +410,11 @@ export default function IsoLab() {
             <div className="stage" ref={hostRef}>
                 {!ready && !error ? <p className="hint">Loading…</p> : null}
                 {error ? <p className="hint err">Could not load the model: {error}</p> : null}
-                {ready ? <p className="tip">Tap the ground. Hold and drag to steer.</p> : null}
+                {ready ? (
+                    <p className="tip">
+                        {placing ? "Tap to drop the lamp." : "Tap the ground. Hold and drag to steer."}
+                    </p>
+                ) : null}
             </div>
 
             <div className="row">
@@ -354,6 +435,23 @@ export default function IsoLab() {
                 <button type="button" onClick={recentre}>Recentre</button>
             </div>
 
+            <div className="row">
+                <span className="lbl">Light</span>
+                <button type="button" className={sun ? "on" : ""}
+                    onClick={() => setSun((v) => !v)} aria-pressed={sun}>Sun</button>
+                <button type="button" className={lampOn ? "on" : ""}
+                    onClick={() => setLampOn((v) => !v)} aria-pressed={lampOn}>Lamp</button>
+                {LAMP.map((l, i) => (
+                    <button key={l.k} type="button" className={i === lampLvl ? "on" : ""}
+                        onClick={() => { setLampLvl(i); setLampOn(true); }}
+                        aria-pressed={i === lampLvl}>{l.k}</button>
+                ))}
+                <button type="button" className={placing ? "on" : ""}
+                    onClick={() => setPlacing((v) => !v)} aria-pressed={placing}>
+                    {placing ? "Tap to place lamp" : "Move lamp"}
+                </button>
+            </div>
+
             <dl className="facts">
                 <div><dt>State</dt><dd>{hud.state}</dd></div>
                 <div><dt>Speed</dt><dd>{hud.speed.toFixed(2)} u/s</dd></div>
@@ -362,6 +460,9 @@ export default function IsoLab() {
             </dl>
 
             <p className="muted note">
+                Turn the <strong>Sun</strong> off to see the lamp on its own — it is a shadow-casting point
+                light, so walking him past it swings his shadow round. The floor is endless: it follows the
+                camera and the grid snaps to whole cells, so there is nowhere he cannot be sent.
                 The hero moves in a straight line — there is no obstacle avoidance and nothing to avoid, so
                 &ldquo;pathing&rdquo; here is steering, not a search. The number that matters is{" "}
                 <strong>Speed</strong> against <strong>Clip speed</strong>: the walk cycle was authored at
