@@ -17,7 +17,11 @@ model switcher, clip buttons and a blend-duration control.
 | `build-brace.py` | The shield guard, on the same rig. |
 | `clips.py` | Idle and Impact, keyed against a rig that already exists. |
 | `export-all.py` | Bakes IK to bone keys, writes `public/models/hero.glb`. |
+| `build-armour.py` | Cuirass, pauldrons and greaves, cut from the hero's own surface and thickened. |
 | `debug-rig.py` | **Not a gate.** A debugger, for when the body does not match the skeleton. |
+| `_hfilm.py` | Photograph the hero. `SOLO=` one piece, `STRIP=` some off, `CLIP=`, `AZIM=`. |
+| `_stride.py` | Prints the walk's foot travel per step. **`/marketplace/iso-lab` depends on this number.** |
+| `_rootmove.py` | Prints whether a clip travels or runs in place. |
 
 ## The dragon — a body generated from its own skeleton
 
@@ -65,6 +69,32 @@ converges, and it says `failed to find solution for one or more bones` when it
 does not — which it will on a membrane that is a separate 0.03-thick shell.
 Distance to the bone **segment**, inverse-cubed over the nearest four, has no
 failure mode, and with a graph this sparse it is accurate.
+
+## Equipment
+
+Plates are **cut out of the hero's own surface and thickened outward**, which
+solves fit and skinning at once: the plate IS the body's surface so it cannot
+clip or float, and duplicating a vertex duplicates its vertex groups, so it
+arrives weighted to exactly the bones driving the flesh under it.
+
+Equipping is showing a node and removing it is hiding one — one skeleton,
+several meshes, `/marketplace/model-lab` has the toggles. Four traps:
+
+1. **Measure the figure before choosing a thickness.** He is 2.212 units
+   tall, so 0.0075 of that is 1.4cm of steel at human scale.
+2. **`shrink_fatten`'s sign is backwards from how it reads.** Use a Displace
+   modifier along NORMAL, which has one meaning, and print which way the
+   shell actually moved.
+3. **A weight sum is not a region.** It passes and fails in patches and the
+   plate comes out in islands. Select by exclusion — not arm, not leg, not
+   neck — and remember "arm" includes every finger bone.
+4. **A shell cut from a body is a cast of that body.** Relax it with
+   LAPLACIANSMOOTH and `use_volume_preserve`; the plain Smooth modifier
+   contracts and sinks the plate under the skin.
+
+And a hard threshold on a smooth field always cuts a ragged edge, because a
+face survives only when ALL of its vertices do. Blur the membership field,
+then erode the faces that hang off the boundary by one side.
 
 ## There are no gates here, on purpose
 
