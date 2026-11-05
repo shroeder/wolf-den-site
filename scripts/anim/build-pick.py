@@ -210,6 +210,7 @@ TOOL_CHILDREN = _children
 # where the driving hand's own rest pose would put it:
 #     tool_rest = hand_rest @ (hand-in-tool)^-1
 # Then hand_now = CONTROL @ hand-in-tool gives tool_now = CONTROL, exactly.
+WRIST_IN_TOOL = Vector(_w)   # the driving wrist, in tool space
 _Th = Matrix.Translation(_w) @ _q.to_matrix().to_4x4()
 PICK.matrix_world = (arm.matrix_world
                      @ arm.pose.bones["hand_%s" % PICK_HAND].bone.matrix_local) @ _Th.inverted()

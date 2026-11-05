@@ -419,117 +419,142 @@ def key_run(frames=16):
 def key_mine(frames=40):
     """A two-handed pickaxe strike into the ground. One-shot, 40 frames.
 
-    ⚠️ THIS CLIP ANIMATES ONE OBJECT. Both wrist IK targets and both
-    hand-rotation targets are children of the tool control (see
-    build-pick.py), so moving the control moves the pickaxe and both fists
-    together and they cannot come apart. The previous version keyed the
-    hands and recomputed the tool from them, which is a hand chasing a
-    moving target -- and it lost, every frame, for six attempts.
+    ⚠️ AUTHORED IN THE SHOULDERS' FRAME, NOT THE WORLD'S. This is the whole
+    reason the earlier versions could not be fixed by adjusting them.
 
-    What is authored is therefore what an animator would actually say: where
-    the POINT is, and which way the haft leans. The hands are a consequence.
+    A character swinging a tool at the ground is FOUR constraints that fight
+    each other: the point must reach the floor, the haft must not pass
+    through the body, both fists must stay on one shaft, and the arms have
+    a hard reach and a shoulder that only rotates so far. Authoring world
+    positions means hand-solving that system one number at a time -- and
+    every single fix satisfied the constraint being looked at while
+    breaking one that was not. Put the tip on the floor and the haft stands
+    upright through his stomach; angle the haft and the tip leaves the
+    floor; reach the haft with both hands and the arms go behind the back;
+    lift it overhead and it swings backward through horizontal on the way.
+    All four happened, in that order.
 
-    Beats:
-      1-6    settle, a dip down before going up
-      6-18   wind-up over the driving shoulder, slow out
-      16-18  float: two frames of near-stillness at the apex, because a
-             heavy tool goes weightless at the top of its arc
-      18-23  the strike -- five frames, LINEAR into contact
-      23-24  hit-stop, held two frames
-      24-30  recoil, fast, because a rebound is elastic
-      30-40  recover and settle, ending exactly on frame 1
+    In the shoulders' frame three of the four cannot be expressed:
+
+      REACH is a fraction of arm length, so an unreachable pose is not
+            writable. Capped at 0.95.
+      ELEV  is the angle of the hands around the shoulder in the body's own
+            sagittal plane, so "behind his back" is a bounded number rather
+            than an emergent surprise. Capped at -20.
+      LEAD  is the haft's angle relative to the ARM, so the tool cannot
+            windmill independently into his torso; it always continues the
+            line of the arm, give or take.
+
+    That leaves exactly one thing to solve against the world -- the point
+    touching the floor on the frame of the hit -- and one unknown to solve
+    it with: how far he bends. One equation, one unknown, instead of four
+    coupled ones.
     """
     arm, iks, hand_goal, elbow_pole, LEG, FLOOR, ANKLE_H, HIP0, FWD, FOOT_REST, \
         TUCK, ARMS, TUCKAMT, SA, GRIP, HQ = _ctx()
     g = G
     _fresh_action("Mine")
+    for c in ("_pick_ik", "_pgc", "_gc", "_grc"):
+        g[c].influence = 1.0
 
-    g["_pick_ik"].influence = 1.0
-    g["_pgc"].influence = 1.0
-    g["_gc"].influence = 1.0
-    g["_grc"].influence = 1.0
+    TOOL, TIP = g["TOOL"], g["PICK_TIP"]
+    WRIST = g["WRIST_IN_TOOL"]
+    REACH_MAX = 0.95
+    ARM = 0.5 * (g["ARM_FULL"]["l"] + g["ARM_FULL"]["r"])
 
-    TOOL = g["TOOL"]
-    TIP = g["PICK_TIP"]
-    # Haft straight down, points forward. phi is degrees of forward tilt off
-    # that, which is what the table below means by it.
-    DOWN = Quaternion((0, 1, 0), math.pi)
-    # ⚠️ READ THE SHOULDERS INSIDE THE LOOP. Captured once up here they are
-    # the REST shoulders, and the reach report then compares a posed hand
-    # against a shoulder that has not moved -- which is the third time this
-    # exact mistake has produced a confident number that disagreed with the
-    # render. `sho0` is only for placing the static elbow poles.
-    sho0 = {s_: (arm.matrix_world @ arm.pose.bones["upperarm_%s" % s_].head).copy()
-            for s_ in ("l", "r")}
-    MAXR = {s_: g["ARM_FULL"][s_] * 0.97 for s_ in ("l", "r")}
+    def body(dz, dy, twist, spine, head):
+        arm.location = (0.0, dy * LEG, (FLOOR + LEG * 0.985 + dz * LEG) - HIP0)
+        pb = arm.pose.bones["pelvis"]
+        pb.rotation_euler = Euler((math.radians(spine * 0.20), 0,
+                                   math.radians(twist * 0.42)), "XYZ")
+        for bn, ks, kt in (("spine_01", 0.26, 0.22), ("spine_02", 0.36, 0.30),
+                           ("spine_03", 0.30, 0.26)):
+            b = arm.pose.bones.get(bn)
+            if b:
+                b.rotation_euler = Euler((math.radians(spine * ks), 0,
+                                          math.radians(twist * kt)), "XYZ")
+        for bn, k in (("neck_01", 0.45), ("head", 0.55)):
+            b = arm.pose.bones.get(bn)
+            if b:
+                b.rotation_euler = Euler((math.radians(head * k), 0,
+                                          math.radians(-twist * 0.5 * k)), "XYZ")
+        bpy.context.view_layer.update()
 
-    # ⚠️ AUTHOR THE GRIP, NOT THE POINT. Driving the control by where the TIP
-    # goes is the nicer idea and it is unusable: the tip is a metre from the
-    # hands, so a tip path that looks right puts the grip somewhere the arms
-    # cannot reach -- measured, 1.18 of reach needed against 0.62 available
-    # in the ready pose alone. Author where the HANDS are, which is bounded
-    # by the body, and let the point fall where the tool points.
-    # ⚠️ THE HANDS STAY IN FRONT OF THE SPINE. The wind-up used to carry the
-    # grip to y = +0.27 -- a quarter of a leg BEHIND body centre at hip
-    # height -- and the reach check passed it, because distance from the
-    # shoulder was fine. Distance says nothing about whether a shoulder can
-    # rotate there: the arms came out wrenched behind his back. The tool
-    # head goes back by TILTING THE HAFT, which is what phi is for; the
-    # hands only have to go up.
-    #
-    # ⚠️ AND IT TILTS THE OTHER WAY ROUND. Taking the haft from "head down
-    # in front" to "head up behind" by INCREASING the angle swings it
-    # backward through horizontal at waist height -- which is a man
-    # holding a pickaxe behind his back, and it is what the whole
-    # wind-up looked like. A real overhead lift carries the head up the
-    # FRONT and then tips it over the shoulder, so phi runs NEGATIVE,
-    # through -125 (head up in front) to -196 (head up and back).
-    #      f   grip y  grip z   phi   hip dz  hip dy  twist spine head
-    B = [(1,  -0.36,  0.810, -30.0, -0.100,  0.000,  10,   26,  14),
-         (6,  -0.30,  0.740, -24.0, -0.140,  0.010,  13,   30,  15),
-         (10, -0.30,  0.950, -70.0, -0.060,  0.030,   0,   12,  17),
-         (13, -0.26,  1.180, -125.0,  0.010,  0.045, -16,   -2,  20),
-         (16, -0.20,  1.360, -185.0,  0.045,  0.050, -24,  -10,  22),
-         (18, -0.19,  1.375, -196.0,  0.050,  0.052, -25,  -11,  22),
-         (20, -0.24,  1.330, -150.0,  0.000,  0.030, -10,    6,  18),
-         (21, -0.30,  1.190, -100.0, -0.090,  0.000,   2,   22,  14),
-         (22, -0.42,  0.820, -45.0, -0.205, -0.045,   6,   38,  12),
-         (23, -0.50,  0.560,  None, -0.280, -0.075,   8,   46,  10),
-         (24, -0.50,  0.554,  None, -0.285, -0.077,   8,   47,  10),
-         (27, -0.44,  0.800, -34.0, -0.185, -0.030,   7,   34,  13),
-         (30, -0.40,  0.880, -40.0, -0.140, -0.015,   8,   30,  14),
-         (34, -0.37,  0.820, -36.0, -0.110,  0.000,   9,   27,  14),
-         (40, -0.36,  0.810, -30.0, -0.100,  0.000,  10,   26,  14)]
+    def frame_axes():
+        """The body's own up / forward / right, and the point the arms swing
+        about -- read from the POSED skeleton, so leaning is already in it."""
+        pel = arm.matrix_world @ arm.pose.bones["pelvis"].head
+        sl = arm.matrix_world @ arm.pose.bones["upperarm_l"].head
+        sr = arm.matrix_world @ arm.pose.bones["upperarm_r"].head
+        mid = (sl + sr) * 0.5
+        up = (mid - pel).normalized()
+        f = Vector((0.0, FWD, 0.0))
+        f = (f - up * f.dot(up)).normalized()
+        return mid, up, f, up.cross(f).normalized()
 
-    GRIP_W = Vector((0, 0, g["GRIP_HI"] * LEG))
+    def solve(reach, elev, lead):
+        """Hand position and the tool's full transform, from the three
+        body-relative numbers. Returns (wrist, tool_rotation)."""
+        mid, up, f, right = frame_axes()
+        e = math.radians(elev)
+        armdir = (-up * math.cos(e)) + (f * math.sin(e))
+        H = mid + armdir * (min(reach, REACH_MAX) * ARM)
+        # The haft continues the line of the arm, rotated by `lead` in the
+        # body's own sagittal plane -- never out of it, so it cannot swing
+        # sideways through him.
+        l = math.radians(lead)
+        # Rodrigues about the body's right axis: the haft stays in the
+        # sagittal plane by construction, so it cannot swing sideways
+        # through him however `lead` is keyed.
+        haft = (armdir * math.cos(l)) + (right.cross(armdir) * math.sin(l))
+        haft.normalize()
+        y = haft.cross(right)
+        rot = Matrix((right, y, haft)).transposed().to_3x3().to_quaternion()
+        return H, rot
 
-    def place(gy, gz, phi):
-        rot = Quaternion((1, 0, 0), math.radians(phi)) @ DOWN
-        return rot, Vector((0.0, gy * LEG, FLOOR + gz * LEG)) - (rot @ GRIP_W)
+    #     f  reach  elev  lead   hip dz  hip dy twist spine head
+    B = [(1,  0.86,  38, -14,  -0.100,  0.000,  10,   26,  14),
+         (6,  0.84,  30, -10,  -0.140,  0.010,  13,   30,  15),
+         (10, 0.72,  62,  10,  -0.070,  0.025,   2,   16,  17),
+         (13, 0.62,  96,  34,   0.000,  0.040, -12,    2,  20),
+         (16, 0.58, 126,  52,   0.040,  0.048, -22,  -10,  22),
+         (18, 0.57, 132,  56,   0.045,  0.050, -24,  -11,  22),
+         (20, 0.66, 108,  40,   0.000,  0.030, -10,    6,  18),
+         (21, 0.74,  80,  22,  -0.080,  0.000,   2,   20,  14),
+         (22, 0.86,  48,  -4,  -0.180, -0.030,   6,   34,  12),
+         (23, 0.93,  28, -16,   None,  -0.055,   8,   46,  10),
+         (24, 0.93,  27, -16,   None,  -0.057,   8,   47,  10),
+         (27, 0.88,  40, -18,  -0.185, -0.025,   7,   34,  13),
+         (30, 0.86,  46, -20,  -0.145, -0.012,   8,   30,  14),
+         (34, 0.86,  40, -16,  -0.112,  0.000,   9,   27,  14),
+         (40, 0.86,  38, -14,  -0.100,  0.000,  10,   26,  14)]
 
-    def solve_contact(gy, gz):
-        """⚠️ THE CONTACT ANGLE IS SOLVED. The point has to be ON the floor on
-        the frame of the hit; short reads as mime, through reads as a bug,
-        and at this speed neither is visible by eye."""
-        best, bphi = 1e9, -26.0
-        for i in range(1601):
-            phi = -90.0 + i * 0.0625
-            rot, loc = place(gy, gz, phi)
-            err = abs((loc + (rot @ TIP)).z - FLOOR)
-            if err < best:
-                best, bphi = err, phi
-        return bphi
+    def tip_z(reach, elev, lead, dz, dy, twist, spine, head):
+        body(dz, dy, twist, spine, head)
+        H, rot = solve(reach, elev, lead)
+        return ((H - (rot @ WRIST)) + (rot @ TIP)).z - FLOOR
 
-    B = [(r[0], r[1], r[2], solve_contact(r[1], r[2]) if r[3] is None else r[3]) + r[4:]
-         for r in B]
+    # ── THE ONE SOLVE ── how deep does he have to get for the point to
+    # touch? Bisection on hip height; everything else is already safe.
+    rows = []
+    for r in B:
+        if r[4] is None:
+            lo, hi = -0.55, 0.0
+            for _ in range(28):
+                mid_ = (lo + hi) * 0.5
+                if tip_z(r[1], r[2], r[3], mid_, r[5], r[6], r[7], r[8]) > 0:
+                    hi = mid_
+                else:
+                    lo = mid_
+            r = r[:4] + ((lo + hi) * 0.5,) + r[5:]
+        rows.append(r)
+    B = rows
 
     def sample(f):
         for i in range(len(B) - 1):
             f0, f1 = B[i][0], B[i + 1][0]
             if f0 <= f <= f1:
                 u = (f - f0) / float(f1 - f0) if f1 > f0 else 0.0
-                # Linear through the strike and the hold; eased elsewhere.
-                # An impact that eases in has no impact.
                 if not (18 <= f0 < 24):
                     u = u * u * (3 - 2 * u)
                 return [p0 + (p1 - p0) * u for p0, p1 in zip(B[i][1:], B[i + 1][1:])]
@@ -537,24 +562,17 @@ def key_mine(frames=40):
 
     LEAD_Y, REAR_Y = FWD * 0.26 * LEG, 0.26 * LEG
     SPLIT = 0.185 * LEG
-    worst = {"l": (0.0, 0), "r": (0.0, 0)}
-    behind = {"l": (-180.0, 0), "r": (-180.0, 0)}
-    tip_lo = 1e9
+    worst_reach, worst_elev, tip_lo = 0.0, 999.0, 1e9
 
     for f in range(1, frames + 1):
-        gy, gz, phi, dz, dy, twist, spine, head = sample(f)
+        reach, elev, lead, dz, dy, twist, spine, head = sample(f)
+        body(dz, dy, twist, spine, head)
+        H, rot = solve(reach, elev, lead)
 
-        # ── THE TOOL ── put the driving grip here, lean the haft like this.
-        # Everything both hands do follows from this and nothing else.
-        rot, loc = place(gy, gz, phi)
         TOOL.rotation_quaternion = rot
-        TOOL.location = loc
+        TOOL.location = H - (rot @ WRIST)
         TOOL.keyframe_insert("location", frame=f)
         TOOL.keyframe_insert("rotation_quaternion", frame=f)
-        # The children ride the control, but their offsets must be RE-STATED
-        # before keying: other clips key these same empties in world space,
-        # so whatever Impact left on them is still there, and keying without
-        # setting would record that stale world value as a local one.
         for ob in g["TOOL_CHILDREN"]:
             loc, q = g["TOOL_LOCALS"][ob.name]
             ob.location = loc
@@ -563,29 +581,10 @@ def key_mine(frames=40):
                 ob.rotation_quaternion = q
                 ob.keyframe_insert("rotation_quaternion", frame=f)
 
-        arm.location = (0.0, dy * LEG, (FLOOR + LEG * 0.985 + dz * LEG) - HIP0)
         arm.keyframe_insert("location", frame=f)
-
-        pb = arm.pose.bones["pelvis"]
-        pb.rotation_euler = Euler((math.radians(spine * 0.20), 0,
-                                   math.radians(twist * 0.42)), "XYZ")
-        pb.keyframe_insert("rotation_euler", frame=f)
-        for bn, ks, kt in (("spine_01", 0.26, 0.22), ("spine_02", 0.36, 0.30),
-                           ("spine_03", 0.30, 0.26)):
-            b = arm.pose.bones.get(bn)
-            if b:
-                b.rotation_euler = Euler((math.radians(spine * ks), 0,
-                                          math.radians(twist * kt)), "XYZ")
-                b.keyframe_insert("rotation_euler", frame=f)
-        # Eyes stay on the rock: the head counter-rotates against both the
-        # twist and the fold, so the gaze holds the spot while the body turns
-        # away from it.
-        for bn, k in (("neck_01", 0.45), ("head", 0.55)):
-            b = arm.pose.bones.get(bn)
-            if b:
-                b.rotation_euler = Euler((math.radians(head * k), 0,
-                                          math.radians(-twist * 0.5 * k)), "XYZ")
-                b.keyframe_insert("rotation_euler", frame=f)
+        for bn in ("pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head"):
+            if arm.pose.bones.get(bn):
+                arm.pose.bones[bn].keyframe_insert("rotation_euler", frame=f)
 
         for s_, (fx, fy) in (("l", (SPLIT, LEAD_Y)), ("r", (-SPLIT, REAR_Y))):
             tgt, pole = iks[s_]
@@ -595,51 +594,26 @@ def key_mine(frames=40):
             tgt.keyframe_insert("rotation_quaternion", frame=f)
             pole.location = (fx * 1.5, fy + FWD * 0.45 * LEG, FLOOR + LEG * 0.52)
             pole.keyframe_insert("location", frame=f)
-        g["_elbow_pole"].location = (abs(sho0["r"].x) * 2.0, 0.45 * LEG,
-                                     FLOOR + LEG * 1.05)
+        mid, up, fv, right = frame_axes()
+        g["_elbow_pole"].location = mid + right * (0.9 * ARM) + fv * (0.25 * ARM)
         g["_elbow_pole"].keyframe_insert("location", frame=f)
-        g["_pick_pole"].location = (sho0["r"].x * 2.1, 0.55 * LEG, FLOOR + LEG * 1.25)
+        g["_pick_pole"].location = mid - right * (0.9 * ARM) + fv * (0.25 * ARM)
         g["_pick_pole"].keyframe_insert("location", frame=f)
 
-        # ── READINGS ── where the wrists have to be is now a consequence, so
-        # the only thing that can go wrong is that an arm cannot get there.
-        # An IK chain asked for more reach than it has stops short in silence.
-        bpy.context.view_layer.update()
-        tip_lo = min(tip_lo, (TOOL.matrix_world @ TIP).z - FLOOR)
-        for s_, ob in (("r", g["_pick_goal"]), ("l", hand_goal)):
-            now = arm.matrix_world @ arm.pose.bones["upperarm_%s" % s_].head
-            d = (ob.matrix_world.translation - now).length - MAXR[s_]
-            if d > worst[s_][0]:
-                worst[s_] = (d, f)
-            # ⚠️ AND HOW FAR BEHIND HIM IT IS. A shoulder extends about 60
-            # degrees before the arm is behind the back; past that the pose
-            # is anatomically wrong however reachable it was. Measured in
-            # the TORSO's frame, so leaning does not count as reaching back.
-            hip = arm.matrix_world @ arm.pose.bones["pelvis"].head
-            up = (now - hip).normalized()
-            back = Vector((0.0, -FWD, 0.0))
-            back = (back - up * back.dot(up)).normalized()
-            v = (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % s_].head) - now
-            ext = math.degrees(math.atan2(v.dot(back), -v.dot(up)))
-            if ext > behind[s_][0]:
-                behind[s_] = (ext, f)
+        worst_reach = max(worst_reach, reach)
+        worst_elev = min(worst_elev, elev)
+        tip_lo = min(tip_lo, ((H - (rot @ WRIST)) + (rot @ TIP)).z - FLOOR)
 
     g["close_fist"]("l", 0.86)
     g["close_fist"]("r", 0.90)
-
     _smooth([arm] + list(G["helpers"]))
-    # No ease into the hit and none out of the hold: Bezier handles across
-    # 18-24 would round off exactly the two frames the clip exists to deliver.
     for ob in [arm] + list(G["helpers"]):
         if ob.animation_data and ob.animation_data.action:
             for fc in ob.animation_data.action.fcurves:
                 for kp in fc.keyframe_points:
                     if 18 <= kp.co[0] <= 24:
                         kp.interpolation = "LINEAR"
-    print("MINE  point reaches %.4f above the floor at its lowest" % tip_lo)
-    print("MINE  reach over: driving %+.4f (f%d), off %+.4f (f%d)   (negative fits)"
-          % (worst["r"][0], worst["r"][1], worst["l"][0], worst["l"][1]))
-    print("MINE  shoulder extension: driving %.0f deg (f%d), off %.0f deg (f%d)"
-          "   (over ~60 is behind the back)"
-          % (behind["r"][0], behind["r"][1], behind["l"][0], behind["l"][1]))
+    print("MINE  point lowest %.4f above the floor" % tip_lo)
+    print("MINE  max reach %.2f of arm (cap %.2f) | min elevation %.0f deg "
+          "(negative is behind him)" % (worst_reach, REACH_MAX, worst_elev))
     return frames
