@@ -2,7 +2,8 @@ import bpy, math, os
 from mathutils import Vector
 
 OUT = os.environ.get("OUT_DIR", ".")
-exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build-walk.py")).read())
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       os.environ.get("BUILD", "build-walk.py"))).read())
 
 sc = bpy.context.scene
 
@@ -31,7 +32,8 @@ arm.select_set(True)
 bpy.context.view_layer.objects.active = arm
 bpy.ops.object.mode_set(mode="POSE")
 bpy.ops.pose.select_all(action="SELECT")
-bpy.ops.nla.bake(frame_start=1, frame_end=FRAMES, step=1,
+_END = globals().get("BF", FRAMES)
+bpy.ops.nla.bake(frame_start=1, frame_end=_END, step=1,
                  only_selected=True, visual_keying=True, clear_constraints=True,
                  clear_parents=False, use_current_action=True, bake_types={"POSE", "OBJECT"})
 bpy.ops.object.mode_set(mode="OBJECT")
@@ -41,10 +43,10 @@ for e in helpers:
     bpy.data.objects.remove(e, do_unlink=True)
 
 act = arm.animation_data.action
-act.name = "Walk"
+act.name = os.environ.get("CLIP", "Walk")
 try:
     act.use_frame_range = True
-    act.frame_start, act.frame_end = 1, FRAMES + 1
+    act.frame_start, act.frame_end = 1, _END + 1
 except Exception:
     pass
 # Loop cleanly: frame FRAMES+1 must equal frame 1.
@@ -52,7 +54,7 @@ for fc in act.fcurves:
     v1 = next((k.co[1] for k in fc.keyframe_points if abs(k.co[0] - 1) < 0.01), None)
     if v1 is None:
         continue
-    fc.keyframe_points.insert(FRAMES + 1, v1, options={"FAST"})
+    fc.keyframe_points.insert(_END + 1, v1, options={"FAST"})
     for k in fc.keyframe_points:
         k.interpolation = "BEZIER"
 act.fcurves.update()
@@ -134,7 +136,7 @@ bpy.context.view_layer.objects.active = arm
 # public/models -- and I spent four rounds "debugging" a shield that had been
 # exporting correctly the whole time.
 _repo = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-path = os.environ.get("GLB_OUT", os.path.join(_repo, "public", "models", "hero-walk.glb"))
+path = os.environ.get("GLB_OUT", os.path.join(_repo, "public", "models", os.environ.get("GLB_NAME", "hero-walk.glb")))
 bpy.ops.export_scene.gltf(
     filepath=path, export_format="GLB", use_selection=True,
     export_animations=True, export_animation_mode="ACTIONS",
@@ -171,7 +173,7 @@ for tag, azim in (("side", 90), ("tq", 40)):
     a = math.radians(azim); mid = (lo + hi) / 2
     cam.location = (9 * math.sin(a), -9 * math.cos(a), mid + 0.25)
     cam.rotation_euler = (Vector((0, 0, mid)) - Vector(cam.location)).to_track_quat("-Z", "Y").to_euler()
-    for f in range(1, FRAMES + 1):
+    for f in range(1, _END + 1):
         sc.frame_set(f)
         sc.render.filepath = os.path.join(OUT, "fin_%s" % tag, "%02d.png" % f)
         bpy.ops.render.render(write_still=True)

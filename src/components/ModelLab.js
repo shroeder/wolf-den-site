@@ -15,11 +15,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // shape keys and weighed 10MB; baking them down took it to 258KB. The decoder lives in /public/draco because
 // a CDN path would be blocked and would be a third-party dependency on a page that has none.
 
-const MODEL_URL = "/models/hero-walk.glb";
+const CLIPS = [
+    { id: "walk", label: "Walk", url: "/models/hero-walk.glb" },
+    { id: "brace", label: "Brace", url: "/models/hero-brace.glb" },
+];
 const SPEEDS = [0.25, 0.5, 1, 1.5];
 
 export default function ModelLab() {
     const hostRef = useRef(null);
+    const clipRef = useRef("walk");
     const apiRef = useRef(null);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState(null);
@@ -27,7 +31,11 @@ export default function ModelLab() {
     const [speed, setSpeed] = useState(1);
     const [wireframe, setWireframe] = useState(false);
     const [info, setInfo] = useState(null);
+    const [clip, setClip] = useState("walk");
 
+    // Reloading on clip change tears the viewport down and rebuilds it. That is
+    // fine here: two models, a few hundred KB each, and a lab nobody is
+    // speed-running.
     useEffect(() => {
         let cancelled = false;
         let cleanup = () => {};
@@ -99,8 +107,9 @@ export default function ModelLab() {
             let meshes = [];
             const clock = new THREE.Clock();
 
+            const url = (CLIPS.find((c) => c.id === clipRef.current) || CLIPS[0]).url;
             loader.load(
-                MODEL_URL,
+                url,
                 (gltf) => {
                     if (cancelled) return;
                     const root = gltf.scene;
@@ -191,12 +200,14 @@ export default function ModelLab() {
         })().catch((e) => { if (!cancelled) setError(String(e?.message || e)); });
 
         return () => { cancelled = true; cleanup(); };
-    }, []);
+    }, [clip]);
 
     // The render loop reads playback state from a ref so changing speed never re-runs the whole setup effect.
     useEffect(() => {
         apiRef.current = { ...(apiRef.current || {}), playing, speed };
     }, [playing, speed]);
+
+    useEffect(() => { clipRef.current = clip; }, [clip]);
 
     useEffect(() => {
         const meshes = apiRef.current?.meshes || [];
@@ -211,11 +222,20 @@ export default function ModelLab() {
     return (
         <div className="lab">
             <div className="stage" ref={hostRef}>
-                {!ready && !error ? <p className="hint">Loading the hero…</p> : null}
+                {!ready && !error ? <p className="hint">Loading…</p> : null}
                 {error ? <p className="hint err">Could not load the model: {error}</p> : null}
             </div>
 
             <div className="bar">
+                <div className="speeds" role="group" aria-label="Clip">
+                    {CLIPS.map((c) => (
+                        <button key={c.id} type="button" className={c.id === clip ? "on" : ""}
+                            onClick={() => { setReady(false); setInfo(null); setClip(c.id); }}
+                            aria-pressed={c.id === clip}>
+                            {c.label}
+                        </button>
+                    ))}
+                </div>
                 <button type="button" onClick={() => setPlaying((p) => !p)} aria-pressed={playing}>
                     {playing ? "Pause" : "Play"}
                 </button>
