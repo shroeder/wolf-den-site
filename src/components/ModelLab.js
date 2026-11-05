@@ -13,15 +13,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // ⚠️ three.js IS IMPORTED DYNAMICALLY, INSIDE THE EFFECT. It is ~600KB and must never land in the shared
 // bundle for a page nobody else can open.
 
-const MODEL_URL = "/models/hero.glb";
-
 // loop: a state that holds until something replaces it. oneShot: a reaction that plays once and hands control
 // back to whatever was running.
-const CLIPS = [
-    { id: "Idle", label: "Idle", kind: "loop", hint: "Relaxed stand" },
-    { id: "Walk", label: "Walk", kind: "loop", hint: "Locomotion" },
-    { id: "Brace", label: "Brace", kind: "loop", hint: "Shield guard" },
-    { id: "Impact", label: "Impact", kind: "oneShot", hint: "Takes a hit, returns to guard" },
+const MODELS = [
+    {
+        id: "hero", label: "Hero", url: "/models/hero.glb",
+        note: "MPFB body, 53-bone rig, IK-authored clips baked to bone keys.",
+        clips: [
+            { id: "Idle", label: "Idle", kind: "loop", hint: "Relaxed stand" },
+            { id: "Walk", label: "Walk", kind: "loop", hint: "Locomotion" },
+            { id: "Brace", label: "Brace", kind: "loop", hint: "Shield guard" },
+            { id: "Impact", label: "Impact", kind: "oneShot", hint: "Takes a hit, returns to guard" },
+        ],
+    },
+    {
+        id: "dragon", label: "Dragon", url: "/models/dragon.glb",
+        note: "Built from a joint graph: the mesh is inflated from it and the 109-bone rig is generated from "
+            + "the same graph, so a bone cannot sit outside the limb it drives.",
+        clips: [
+            { id: "Idle", label: "Idle", kind: "loop", hint: "Grounded. Breath, head drift, slow tail wander" },
+            { id: "Fly", label: "Fly", kind: "loop", hint: "Airborne. Asymmetric stroke, forearm and hand lag" },
+            { id: "Roar", label: "Roar", kind: "oneShot", hint: "Anticipate, attack, sustain, settle" },
+        ],
+    },
 ];
 const BLENDS = [0, 0.08, 0.2, 0.45];
 
@@ -37,11 +51,21 @@ export default function ModelLab() {
     const [current, setCurrent] = useState("Idle");
     const [log, setLog] = useState([]);
     const [info, setInfo] = useState(null);
+    const [modelId, setModelId] = useState("hero");
+    const model = MODELS.find((m) => m.id === modelId) || MODELS[0];
+    const CLIPS = model.clips;
 
     useEffect(() => { blendRef.current = blend; }, [blend]);
     const note = useCallback((t) => setLog((p) => [t, ...p].slice(0, 5)), []);
 
     useEffect(() => {
+        // Switching models tears the whole viewport down and rebuilds it. The alternative -- swapping the
+        // root inside a live scene -- means hand-disposing one skeleton's geometry while a mixer still holds
+        // actions against it, and that is where leaks live.
+        setReady(false);
+        setError(null);
+        setInfo(null);
+        setCurrent("Idle");
         let cancelled = false;
         let cleanup = () => {};
 
@@ -106,7 +130,7 @@ export default function ModelLab() {
             const clock = new THREE.Clock();
 
             loader.load(
-                MODEL_URL,
+                model.url,
                 (gltf) => {
                     if (cancelled) return;
                     const root = gltf.scene;
@@ -126,9 +150,12 @@ export default function ModelLab() {
 
                     // ⚠️ LEAVE REAL MARGIN. At h*1.45 the frustum showed only ~1.2x the model height, so on a
                     // narrow phone viewport the figure arrived cropped at the shoulders and thighs.
-                    const h = size.y || 1.8;
-                    controls.target.set(0, h * 0.50, 0);
-                    camera.position.set(h * 1.05, h * 0.78, h * 2.15);
+                    // ⚠️ FRAME ON THE LARGEST DIMENSION, NOT ON HEIGHT. The hero is tall and narrow so
+                    // height is his size; the dragon is three times wider than it is tall, and framing that
+                    // on size.y puts both wingtips outside the frustum.
+                    const h = Math.max(size.x, size.y, size.z) || 1.8;
+                    controls.target.set(0, (size.y || h) * 0.50, 0);
+                    camera.position.set(h * 0.70, h * 0.52, h * 1.45);
                     controls.update();
 
                     const mixer = new THREE.AnimationMixer(root);
@@ -190,7 +217,7 @@ export default function ModelLab() {
                         const back = api.fallbackId || "Idle";
                         api.play(back, Math.min(0.25, blendRef.current || 0.12));
                         setCurrent(back);
-                        note(`Impact finished → ${back}`);
+                        note(`${doneId} finished → ${back}`);
                     });
 
                     apiRef.current = Object.assign({}, apiRef.current || {}, api);
@@ -252,7 +279,7 @@ export default function ModelLab() {
         })().catch((e) => { if (!cancelled) setError(String((e && e.message) || e)); });
 
         return () => { cancelled = true; cleanup(); };
-    }, [note]);
+    }, [note, model]);
 
     // Playback state lives on a ref so changing speed never re-runs the setup effect.
     useEffect(() => {
@@ -266,15 +293,26 @@ export default function ModelLab() {
         const d = blendRef.current;
         api.play(id, d);
         setCurrent(id);
-        const cancelled = from === "Impact" && id !== "Impact";
-        note(`${from} → ${id} over ${d.toFixed(2)}s${cancelled ? "   (cancelled Impact)" : ""}`);
-    }, [note]);
+        const prevSpec = CLIPS.find((x) => x.id === from);
+        const cancelled = prevSpec && prevSpec.kind === "oneShot" && id !== from;
+        note(`${from} → ${id} over ${d.toFixed(2)}s${cancelled ? `   (cancelled ${from})` : ""}`);
+    }, [note, CLIPS]);
 
     return (
         <div className="lab">
             <div className="stage" ref={hostRef}>
                 {!ready && !error ? <p className="hint">Loading…</p> : null}
                 {error ? <p className="hint err">Could not load the model: {error}</p> : null}
+            </div>
+
+            <div className="row">
+                <span className="lbl">Model</span>
+                {MODELS.map((m) => (
+                    <button key={m.id} type="button" className={m.id === modelId ? "on" : ""}
+                        onClick={() => setModelId(m.id)} aria-pressed={m.id === modelId}>
+                        {m.label}
+                    </button>
+                ))}
             </div>
 
             <div className="row">
@@ -327,10 +365,10 @@ export default function ModelLab() {
 
             <p className="muted note">
                 Drag to orbit, scroll to zoom. Set <strong>Snap</strong> and switch clips to see what a cut
-                looks like, then raise the blend and switch again. Trigger <strong>Impact</strong> mid-walk — it
-                plays once and hands back to whatever was running. Press another clip while it is mid-hit and
-                you cancel it.
+                looks like, then raise the blend and switch again. The amber clip is a one-shot: it plays once
+                and hands back to whatever was running, and pressing another clip mid-way cancels it.
             </p>
+            <p className="muted note">{model.note}</p>
 
             <style jsx>{`
                 .lab { display: flex; flex-direction: column; gap: 10px; }
