@@ -303,6 +303,29 @@ FOOT_REST["r"] = Quaternion((_ql.w, _ql.x, -_ql.y, -_ql.z))
 print("FOOT_REST l %s  r %s" % (tuple(round(v, 3) for v in FOOT_REST["l"]),
                                 tuple(round(v, 3) for v in FOOT_REST["r"])))
 
+SHIELD_ARM = "l"
+
+# ── THE SHIELD ARM IS SOLVED, NOT POSED ─────────────────────────────────────
+# Every joint angle I have typed today has been wrong at least once, usually
+# because the sign convention differs per side. So the guard arm gets the same
+# treatment the legs did: say where the HAND must be in world space and let IK
+# work out the elbow. A hand position is unambiguous and has no handedness.
+#
+# Bracing a shield: hand across the belly on the far side of centre, elbow
+# tucked DOWN and BACK against the ribs (the pole target), forearm roughly
+# horizontal so the shield rides on it.
+_sa = SHIELD_ARM
+_sho = arm.matrix_world @ arm.pose.bones["upperarm_%s" % _sa].head
+_hand_goal = empty("guard_%s" % _sa, (0.10 * LEG, FWD * 0.30 * LEG, FLOOR + LEG * 1.09))
+_elbow_pole = empty("guardpole_%s" % _sa, (_sho.x + 0.26 * LEG, 0.34 * LEG, FLOOR + LEG * 0.82))
+_gc = arm.pose.bones["lowerarm_%s" % _sa].constraints.new("IK")
+_gc.target = _hand_goal
+_gc.pole_target = _elbow_pole
+_gc.chain_count = 2
+_gc.pole_angle = math.radians(-90)
+_gc.use_tail = True
+print("GUARD arm %s solved by IK" % _sa)
+
 # ── KEY IT ────────────────────────────────────────────────────────────────────
 sc = bpy.context.scene
 sc.frame_start, sc.frame_end = 1, FRAMES
@@ -421,19 +444,7 @@ for f in range(1, FRAMES + 2):
         tgt.keyframe_insert("rotation_quaternion", frame=f)
 
         if s == SHIELD_ARM:
-            # ⚠️ THE SHIELD ARM DOES NOT SWING. A guard is a held pose: upper arm
-            # down and slightly forward, elbow folded so the shield covers the
-            # chest. Letting it swing makes the shield flap like a handbag.
-            ab = arm.pose.bones["upperarm_%s" % s]
-            (_ax2, _sg2), _b2, _c2 = TUCK_SIGN[s]
-            _eg = [math.radians(34 * ARM_SIGN[s]), 0.0, 0.0]
-            _eg[_ax2] += math.radians((ARM_TUCK + 6) * _sg2)
-            ab.rotation_euler = Euler(_eg, "XYZ")
-            ab.keyframe_insert("rotation_euler", frame=f)
-            lb = arm.pose.bones["lowerarm_%s" % s]
-            lb.rotation_euler = Euler((math.radians(-84 * ARM_SIGN[s]), 0, 0), "XYZ")
-            lb.keyframe_insert("rotation_euler", frame=f)
-            continue
+            continue          # solved by IK below, not by guessing angles
 
         ab = arm.pose.bones["upperarm_%s" % s]
         (_ax, _sg), _base, _best = TUCK_SIGN[s]
