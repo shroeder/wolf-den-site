@@ -14,11 +14,59 @@ AZIM = float(os.environ.get("AZIM", "48"))
 arm.animation_data_create()
 arm.animation_data.action = bpy.data.actions[CLIP]
 
-m = bpy.data.materials.new("scale"); m.use_nodes = True
-p = m.node_tree.nodes["Principled BSDF"]
-p.inputs["Base Color"].default_value = (0.085, 0.165, 0.135, 1)
-p.inputs["Roughness"].default_value = 0.58
-drg.data.materials.append(m)
+if os.environ.get("TEXTURE"):
+    exec(open(os.path.join(_here, "texture-dragon.py")).read())
+else:
+    m = bpy.data.materials.new("clay"); m.use_nodes = True
+    p = m.node_tree.nodes["Principled BSDF"]
+    p.inputs["Base Color"].default_value = (0.085, 0.165, 0.135, 1)
+    p.inputs["Roughness"].default_value = 0.58
+    drg.data.materials.append(m)
+
+if os.environ.get("PROCVIS"):
+    # The PROCEDURAL colour, before baking, emitted flat. Against BASEVIS
+    # this splits the only two possibilities left: if they match, the shader
+    # is wrong; if they differ, the UVs or the bake are.
+    _e = nt.nodes.new("ShaderNodeEmission")
+    _o2 = nt.nodes.new("ShaderNodeOutputMaterial")
+    nt.links.new(surf.outputs["Color"], _e.inputs["Color"])
+    nt.links.new(_e.outputs["Emission"], _o2.inputs["Surface"])
+    for _n in nt.nodes:
+        if _n.type == "OUTPUT_MATERIAL":
+            _n.is_active_output = (_n == _o2)
+    drg.data.materials.clear()
+    drg.data.materials.append(mat)
+
+if os.environ.get("BASEVIS"):
+    # The baked base colour, emitted flat. Takes lighting out of the picture
+    # entirely, which is the only way to tell pigment from a blown highlight.
+    bv = bpy.data.materials.new("basevis"); bv.use_nodes = True
+    _t = bv.node_tree
+    for _n in list(_t.nodes):
+        _t.nodes.remove(_n)
+    _i = _t.nodes.new("ShaderNodeTexImage"); _i.image = baked["color"]
+    _e = _t.nodes.new("ShaderNodeEmission")
+    _o = _t.nodes.new("ShaderNodeOutputMaterial")
+    _t.links.new(_i.outputs["Color"], _e.inputs["Color"])
+    _t.links.new(_e.outputs["Emission"], _o.inputs["Surface"])
+    drg.data.materials.clear()
+    drg.data.materials.append(bv)
+
+if os.environ.get("MASKVIS"):
+    # Paint the region attribute straight onto the body: red membrane, green
+    # keratin, blue belly. Looking at the mask beats reasoning about it --
+    # two rounds went on guessing which mask was bleaching the dragon.
+    mv = bpy.data.materials.new("maskvis"); mv.use_nodes = True
+    _t = mv.node_tree
+    for _n in list(_t.nodes):
+        _t.nodes.remove(_n)
+    _a = _t.nodes.new("ShaderNodeAttribute"); _a.attribute_name = "region"
+    _e = _t.nodes.new("ShaderNodeEmission")
+    _o = _t.nodes.new("ShaderNodeOutputMaterial")
+    _t.links.new(_a.outputs["Color"], _e.inputs["Color"])
+    _t.links.new(_e.outputs["Emission"], _o.inputs["Surface"])
+    drg.data.materials.clear()
+    drg.data.materials.append(mv)
 
 sc.render.engine = "BLENDER_EEVEE_NEXT"
 sc.view_settings.view_transform = "Standard"; sc.view_settings.look = "None"

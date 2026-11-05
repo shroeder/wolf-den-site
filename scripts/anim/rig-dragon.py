@@ -39,6 +39,16 @@ def _apply(ob):
 
 drg = _apply(drg)
 MEMBRANES = [_apply(m) for m in MEMBRANES]
+# ── TAG THE MEMBRANE BEFORE IT STOPS BEING ITS OWN OBJECT ───────────────────
+# Surfacing needs to know which vertices are sail and which are hide, and
+# after the join nothing distinguishes them: the membrane is weighted to the
+# same wing bones as the arm's flesh, so no bone group can answer it. A join
+# merges vertex groups by name and gives absent verts zero, so a group set
+# here survives as a clean mask -- and Decimate interpolates it, so it
+# survives that too.
+for _m in MEMBRANES:
+    _g = _m.vertex_groups.new(name="MEMBRANE")
+    _g.add(range(len(_m.data.vertices)), 1.0, "REPLACE")
 bpy.ops.object.select_all(action="DESELECT")
 for o in [drg] + MEMBRANES:
     o.select_set(True)
