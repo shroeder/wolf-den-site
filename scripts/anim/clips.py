@@ -475,20 +475,25 @@ def key_mine(frames=40):
     # shoulder was fine. Distance says nothing about whether a shoulder can
     # rotate there: the arms came out wrenched behind his back. The tool
     # head goes back by TILTING THE HAFT, which is what phi is for; the
-    # hands only have to go up. And it has to tilt FAR -- at 118 degrees
-    # the head only reaches shoulder height and the pose reads as a man
-    # holding a rifle across his chest. 148 puts it overhead, which is
-    # what a wind-up looks like.
+    # hands only have to go up.
+    #
+    # ⚠️ AND IT TILTS THE OTHER WAY ROUND. Taking the haft from "head down
+    # in front" to "head up behind" by INCREASING the angle swings it
+    # backward through horizontal at waist height -- which is a man
+    # holding a pickaxe behind his back, and it is what the whole
+    # wind-up looked like. A real overhead lift carries the head up the
+    # FRONT and then tips it over the shoulder, so phi runs NEGATIVE,
+    # through -125 (head up in front) to -196 (head up and back).
     #      f   grip y  grip z   phi   hip dz  hip dy  twist spine head
     B = [(1,  -0.36,  0.810, -30.0, -0.100,  0.000,  10,   26,  14),
          (6,  -0.30,  0.740, -24.0, -0.140,  0.010,  13,   30,  15),
-         (10, -0.24,  1.010,  34.0, -0.060,  0.030,   0,   12,  17),
-         (13, -0.14,  1.300,  96.0,  0.010,  0.045, -16,   -2,  20),
-         (16, -0.06,  1.440, 142.0,  0.045,  0.050, -24,  -10,  22),
-         (18, -0.05,  1.450, 148.0,  0.050,  0.052, -25,  -11,  22),
-         (20, -0.12,  1.410, 112.0,  0.000,  0.030, -10,    6,  18),
-         (21, -0.24,  1.250,  56.0, -0.090,  0.000,   2,   22,  14),
-         (22, -0.40,  0.780,   2.0, -0.205, -0.045,   6,   38,  12),
+         (10, -0.30,  0.950, -70.0, -0.060,  0.030,   0,   12,  17),
+         (13, -0.26,  1.180, -125.0,  0.010,  0.045, -16,   -2,  20),
+         (16, -0.20,  1.360, -185.0,  0.045,  0.050, -24,  -10,  22),
+         (18, -0.19,  1.375, -196.0,  0.050,  0.052, -25,  -11,  22),
+         (20, -0.24,  1.330, -150.0,  0.000,  0.030, -10,    6,  18),
+         (21, -0.30,  1.190, -100.0, -0.090,  0.000,   2,   22,  14),
+         (22, -0.42,  0.820, -45.0, -0.205, -0.045,   6,   38,  12),
          (23, -0.50,  0.560,  None, -0.280, -0.075,   8,   46,  10),
          (24, -0.50,  0.554,  None, -0.285, -0.077,   8,   47,  10),
          (27, -0.44,  0.800, -34.0, -0.185, -0.030,   7,   34,  13),
