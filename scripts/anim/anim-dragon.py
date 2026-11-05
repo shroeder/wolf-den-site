@@ -78,6 +78,41 @@ for sd in ("l", "r"):
         "curl": axis_for("spar1_%s_01" % sd, "spar1_%s_02" % sd,
                          (lambda d, s=sd: -d.x if s == "l" else d.x)),
     }
+
+def axis_toward(bone, watch, target, use_tail=True, deg=22.0):
+    """Which axis and sign moves `watch` TOWARD a fixed point?
+
+    ⚠️ FOLDING IS NOT A DIRECTION, SO axis_for CANNOT EXPRESS IT. A folded
+    wing is a Z: the forearm comes back over the upper arm and the hand back
+    over the forearm. "Up" was the best any fixed direction could do for that,
+    and it produced an idle with both wings fanned straight into the air like
+    antlers. Score the delta by how much of it points at the joint the limb
+    has to close onto instead."""
+    base = _world(watch, use_tail)
+    want = (Vector(target) - base)
+    if want.length < 1e-6:
+        return (0, 1.0)
+    want.normalize()
+    return axis_for(bone, watch, lambda d: d.dot(want), use_tail, deg)
+
+
+# Where each wing segment closes onto when the wing folds against the back.
+for sd in ("l", "r"):
+    _root = _world("wing_%s_01" % sd, False)
+    _elbow = _world("wing_%s_02" % sd, False)
+    WING[sd]["fold_fore"] = axis_toward("wing_%s_02" % sd, "wing_%s_03" % sd, _root)
+    WING[sd]["fold_hand"] = axis_toward("wing_%s_03" % sd, "spar1_%s_02" % sd, _elbow)
+    WING[sd]["fold_spar"] = axis_toward("spar1_%s_01" % sd, "spar1_%s_02" % sd, _elbow)
+
+# The folded resting wing, and how far each joint opens from it. Everything
+# grounded blends against these, so Idle and Roar cannot disagree about where
+# a closed wing is.
+# ⚠️ DO NOT FOLD IT ALL THE WAY. Linear blend skinning has no cloth in it:
+# past about 110 degrees at the wrist the membrane stops folding and starts
+# crumpling, and the resting dragon grew a vertical blob over its shoulder.
+# Games that show a tightly furled wing model that state separately. This is
+# a half-furled rest -- held up, partly closed, drooping.
+FOLD = {"arm": 10.0, "fore": 74.0, "hand": 62.0, "spar": 34.0}
 JAW = axis_for("jaw_01", "jaw_02", DOWN)
 HEAD_UP = axis_for("head_01", "head_03", UP)
 NECK_UP = [axis_for("neck_%02d" % n, "neck_04", UP) for n in (1, 2, 3)]
@@ -173,14 +208,14 @@ for F in range(1, FLY + 1):
         # 56 degrees, so oscillating around zero only ever flaps the top half
         # of the stroke.
         rot("wing_%s_01" % sd, W["arm"], math.radians(ARM_BASE + ARM_AMP * (0.5 - s0) * 2))
-        rot("wing_%s_02" % sd, W["fore"], math.radians(-8 + 10 * (0.5 - s1) * 2))
-        rot("wing_%s_03" % sd, W["hand"], math.radians(-3 + 8 * (0.5 - s2) * 2))
+        rot("wing_%s_02" % sd, W["fold_fore"], math.radians(12 - 10 * (0.5 - s1) * 2))
+        rot("wing_%s_03" % sd, W["fold_hand"], math.radians(10 - 8 * (0.5 - s2) * 2))
         for b in ("wing_%s_01" % sd, "wing_%s_02" % sd, "wing_%s_03" % sd):
             key(b)
         # Fingers spread on the power stroke, curl in on the recovery.
         curl = math.radians(13) * max(0.0, math.cos(2 * math.pi * (u + 0.25)))
         for k in range(1, 5):
-            rot("spar%d_%s_01" % (k, sd), W["curl"], curl * (0.4 + 0.2 * k))
+            rot("spar%d_%s_01" % (k, sd), W["fold_spar"], curl * (0.4 + 0.2 * k))
             key("spar%d_%s_01" % (k, sd))
 
     # Lift arrives after the wing has already pushed: the body rises LATE.
@@ -226,7 +261,7 @@ for F in range(1, IDLE + 1):
     br = math.sin(2 * math.pi * u)                 # breath
     dr = math.sin(2 * math.pi * u * 0.5 + 1.1)     # a slower wander
 
-    arm.location.z = 0.018 * br
+    arm.location.z = 0.09 + 0.018 * br
     arm.keyframe_insert("location", frame=F)
     rot("spine_03", SPINE_UP, math.radians(1.5) * br)
     key("spine_03")
@@ -242,13 +277,13 @@ for F in range(1, IDLE + 1):
 
     for sd in ("l", "r"):
         W = WING[sd]
-        rot("wing_%s_01" % sd, W["arm"], math.radians(-26 + 2.0 * br))
-        rot("wing_%s_02" % sd, W["fore"], math.radians(34 + 1.4 * br))
-        rot("wing_%s_03" % sd, W["hand"], math.radians(30 + 1.0 * br))
+        rot("wing_%s_01" % sd, W["arm"], math.radians(FOLD["arm"] + 1.6 * br))
+        rot("wing_%s_02" % sd, W["fold_fore"], math.radians(FOLD["fore"] - 1.4 * br))
+        rot("wing_%s_03" % sd, W["fold_hand"], math.radians(FOLD["hand"] - 1.0 * br))
         for b in ("wing_%s_01" % sd, "wing_%s_02" % sd, "wing_%s_03" % sd):
             key(b)
         for k in range(1, 5):
-            rot("spar%d_%s_01" % (k, sd), W["curl"], math.radians(22 + 1.2 * br))
+            rot("spar%d_%s_01" % (k, sd), W["fold_spar"], math.radians(FOLD["spar"] - 1.2 * br))
             key("spar%d_%s_01" % (k, sd))
 
     wave(TAIL_SIDE, "tail", (7, 6, 5, 4, 3, 2), math.radians(6.0),
@@ -290,16 +325,22 @@ for F in range(1, ROAR + 1):
     k = beat(F)
     trem = math.sin(F * 1.9) * max(0.0, min(1.0, (F - 12) / 4.0)) * max(0.0, 1 - (F - 12) / 20.0)
 
-    arm.location.z = 0.10 * max(0.0, k)
+    arm.location.z = 0.09 + 0.10 * max(0.0, k)
     arm.location.y = -0.14 * k
     arm.keyframe_insert("location", frame=F)
     rot("spine_03", SPINE_UP, math.radians(7) * k)
     key("spine_03")
 
-    for i, n in enumerate((1, 2, 3)):
-        rot("neck_%02d" % n, NECK_UP[i], math.radians(17 + 2.0 * trem) * k)
+    # ⚠️ THE SAME ANGLE ON EVERY LINK OF A CHAIN IS A CURL, NOT A LIFT. The
+    # first pass gave all three neck bones 17 degrees and the head 21. That
+    # is 72 degrees of cumulative bend: the neck rolled over past vertical
+    # and delivered the head pointing at the FLOOR on the frame of the roar.
+    # Pitch from the BASE and taper to nothing, and the head arrives up and
+    # still in line with the neck.
+    for i, (n, amt) in enumerate(zip((1, 2, 3), (17.0, 8.0, 2.0))):
+        rot("neck_%02d" % n, NECK_UP[i], math.radians(amt + 0.8 * trem) * k)
         key("neck_%02d" % n)
-    rot("head_01", HEAD_UP, math.radians(21 + 3.0 * trem) * k)
+    rot("head_01", HEAD_UP, math.radians(11 + 3.0 * trem) * k)
     key("head_01")
     rot("jaw_01", JAW, math.radians(34) * max(0.0, k) + math.radians(2.5) * trem)
     key("jaw_01")
@@ -308,13 +349,23 @@ for F in range(1, ROAR + 1):
 
     for sd in ("l", "r"):
         W = WING[sd]
-        rot("wing_%s_01" % sd, W["arm"], math.radians(-26 + 54 * k))
-        rot("wing_%s_02" % sd, W["fore"], math.radians(34 - 40 * k))
-        rot("wing_%s_03" % sd, W["hand"], math.radians(30 - 34 * k))
+        # Starts from the Idle fold and SPREADS. The first pass added 54
+        # degrees to the arm at the peak, which folds it further up the back:
+        # the threat display ended with the wings tighter shut than it began.
+        # Spreading is what the display IS.
+        # A grounded display MANTLES: the shoulder stays high and the elbow
+        # and wrist STRAIGHTEN out of the fold. Spreading by dropping the
+        # shoulder instead just drapes both wings on the floor -- the
+        # shoulder is only 1.6 up and the wing is three units long.
+        op = max(0.0, k)                      # anticipation closes, it does
+        sh = min(0.0, k)                      # not open
+        rot("wing_%s_01" % sd, W["arm"], math.radians(FOLD["arm"] + 34 * op + 10 * sh))
+        rot("wing_%s_02" % sd, W["fold_fore"], math.radians(FOLD["fore"] * (1 - 0.86 * op) - 9 * sh))
+        rot("wing_%s_03" % sd, W["fold_hand"], math.radians(FOLD["hand"] * (1 - 0.88 * op) - 8 * sh))
         for b in ("wing_%s_01" % sd, "wing_%s_02" % sd, "wing_%s_03" % sd):
             key(b)
         for n in range(1, 5):
-            rot("spar%d_%s_01" % (n, sd), W["curl"], math.radians(22 - 24 * k))
+            rot("spar%d_%s_01" % (n, sd), W["fold_spar"], math.radians(FOLD["spar"] * (1 - 0.92 * op)))
             key("spar%d_%s_01" % (n, sd))
 
     wave(TAIL_SIDE, "tail", (7, 6, 5, 4, 3, 2), math.radians(13) * abs(k),
