@@ -2,9 +2,11 @@ import bpy, math, os, sys
 from mathutils import Vector, Euler
 
 # ═══════════════════════════════════════════════════════════════════════════
-# RIG DIAGNOSTIC
+# RIG DEBUGGER -- NOT A GATE
 #
-# The thing that should have run before a single keyframe was authored.
+# Reach for this when the body does not match the skeleton. Do not run it by
+# reflex and do not treat it passing as evidence of anything beyond what it
+# measures: whether the bones sit inside the flesh they drive.
 #
 # A rig that MOVES the mesh is not the same as a rig that moves it CORRECTLY.
 # I confirmed the first and assumed the second, then spent a whole session

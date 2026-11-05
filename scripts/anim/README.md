@@ -1,6 +1,6 @@
 # Hero animation pipeline
 
-Four scripts and one asset. Run with Blender headless:
+Run with Blender headless:
 
     "C:\Program Files\Blender Foundation\Blender 4.4\blender.exe" -b -P <script>
 
@@ -8,22 +8,28 @@ Four scripts and one asset. Run with Blender headless:
 |---|---|
 | `assets/hero-base.blend` | **The hero.** Rigged, fitted, stripped, materialled. The only character asset. |
 | `freeze-hero.py` | Regenerates that asset from MPFB. **The only script allowed to touch MPFB.** |
-| `rig-diagnostic.py` | Is the skeleton actually inside the body? Run after any freeze. |
 | `build-walk.py` | Loads the asset, builds the walk on IK. Generates nothing. |
-| `check-walk.py` | Ten assertions on the motion. |
 | `export-walk.py` | Bakes IK to bone keys, writes `public/models/hero-walk.glb`. |
-| `check-export.py` | Imports the **exported file** and verifies it. |
+| `debug-rig.py` | **Not a gate.** A debugger, for when the body does not match the skeleton. |
 
-## Why it is split this way
+## There are no gates here, on purpose
 
-Every defect this pipeline shipped came from the generation step, and the
-build used to re-run it on every export — so the model changed underneath the
-animation and each fix had to survive being re-applied.
+There were three. They were cut the day they were written.
 
-Generation now happens once. Change an animation and the model cannot move.
+`check-walk.py` ran ten numeric assertions on the motion and went GREEN on a
+visibly broken walk for hours — because every assertion measured the
+skeleton, and the skeleton was fine. It did not merely fail to help; it
+manufactured confidence and argued against what was on screen.
+`check-export.py` caught nothing and produced a false positive that was
+nearly "fixed" twice.
 
-A new character is a deliberate act: edit `MACRO` in `freeze-hero.py`, run it,
-run `rig-diagnostic.py`, commit the new `.blend`.
+Every real defect in this pipeline — helper geometry in the export, a rig
+that missed its own body, a chest lit to look female — was found by **opening
+the lab and looking at it**.
+
+So: fix the bug, do not also build a detector for it. If something is wrong,
+reach for `debug-rig.py` and render the deliverable LARGE. Judging a character
+from thumbnails in a contact sheet is how most of a day got lost.
 
 ## The three things that bite
 
@@ -32,5 +38,5 @@ run `rig-diagnostic.py`, commit the new `.blend`.
 2. **The MASK modifier only hides helper geometry.** `export_apply` must stay
    false (it would flatten the Armature), so the mask has to be applied
    explicitly or the export ships a robe, hair and genitals.
-3. **Verify the exported file, never the scene.** Both of the above were
-   invisible from the scene that produced them.
+3. **Correct in Blender is not correct in the browser.** The body was right
+   and read as female purely from a key light sitting too high.
