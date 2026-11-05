@@ -19,12 +19,26 @@ from mathutils import Vector, Matrix, Quaternion, Euler
 # ═══════════════════════════════════════════════════════════════════════════
 
 PICK_HAND = "r"
+# ⚠️ HAFT LENGTH AND GRIP POSITION DECIDE THE WHOLE STRIKE POSE, AND A SHORT
+# ONE CANNOT BE ANIMATED OUT. The pick arm sticks out sideways from the head,
+# so the tip sits at an angle OFF the haft axis -- and that angle is set by
+# the length of haft above the fist. At 1.05 long gripped 0.40 up, the tip is
+# 43 degrees off the shaft, which means the only way to put the point on the
+# floor is to stand the haft bolt upright against the stomach and crouch
+# under it. That is not a pose anyone can fix with keyframes.
+#
+# Measured: 1.38 long gripped at 0.42 drops the tip to 27 degrees off the
+# shaft, the haft lands 18 degrees forward of vertical with the hands at a
+# normal 0.72, and the off hand is inside its own reach the whole way round.
+# One number fixes the shape of the pose, the posture, AND the grip.
+# ⚠️ SIZE IT AGAINST THE MAN, AND MEASURE IT. I lengthened the haft to
+# buy a better strike pose and never checked the result against him: it
+# came out 1.50 long with a 0.94 head on a hero 2.21 tall -- 68% of his
+# height with a 76cm head. A pickaxe is about half a man tall with a
+# 50cm head. _pickshot.py prints both ratios now.
 HAFT_LEN = 1.05                   # butt at local z=0, head at z=HAFT_LEN
-_HZ = HAFT_LEN / 0.90             # the head profile was authored against 0.90
-GRIP_HI = 0.40                    # where the driving hand holds
-GRIP_LO = 0.08                    # where the off hand holds -- both moved
-                                  # down the haft so the head sits further from
-                                  # the fist and can actually reach the floor
+GRIP_HI = 0.26                    # the driving hand, upper
+GRIP_LO = 0.05                    # the off hand, down at the butt for leverage
 
 _iron = bpy.data.materials.new("PickIron")
 _iron.use_nodes = True
@@ -58,9 +72,9 @@ def _build_pick(scale):
 
     # ── HAFT ── slightly thicker at the head end, with a swell at the butt so
     # the hand has something to stop against.
-    for z0, z1, r0, r1 in ((0.00, 0.045, 0.0300, 0.0255),
-                           (0.045, 0.62, 0.0255, 0.0235),
-                           (0.62, HAFT_LEN, 0.0235, 0.0290)):
+    for z0, z1, r0, r1 in ((0.00, 0.050, 0.0300, 0.0250),
+                           (0.050, 0.90, 0.0250, 0.0230),
+                           (0.90, HAFT_LEN, 0.0230, 0.0285)):
         bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=12,
                               radius1=r0 * scale, radius2=r1 * scale,
                               depth=(z1 - z0) * scale,
@@ -75,22 +89,35 @@ def _build_pick(scale):
                               (0, 0, (GRIP_LO - 0.07 + GRIP_HI + 0.07) * 0.5 * scale)))
     grip_faces = set(bm.faces) - haft_faces
 
-    # ── HEAD ── (y, z, half_x, half_z) along the bar.
-    # ⚠️ A SPIKE IS SLENDER AND IT DROOPS. The first profile kept too much
-    # depth too far out, so from the side -- which is the only angle the
-    # swing is ever seen from -- it read as a flat adze blade rather than a
-    # pick. Thinner through the arm, and the tip curves DOWN toward the
-    # work, which is both what a pick does and what makes it read as one.
-    PROF = [(y, z * _HZ, hx, hz) for (y, z, hx, hz) in
-            [(-0.430, 0.735, 0.006, 0.007),
-             (-0.330, 0.795, 0.011, 0.016),
-             (-0.205, 0.838, 0.019, 0.030),
-             (-0.080, 0.861, 0.029, 0.049),
-             (0.000, 0.868, 0.036, 0.062),
-             (0.070, 0.864, 0.031, 0.054),
-             (0.140, 0.861, 0.026, 0.062),
-             (0.200, 0.859, 0.015, 0.076),
-             (0.238, 0.857, 0.003, 0.083)]]
+    # ── HEAD ── (y, z, half_x, half_z).
+    #
+    # ⚠️ DOUBLE-ENDED. The first head had a spike one side and a flaring adze
+    # the other, which is a mattock -- from the side, the only angle a swing
+    # is ever seen from, it read as a hammer with a hook. A mining pick is
+    # SYMMETRIC: two tapered points, both drooping a little toward the work.
+    # The symmetry is also why it reads at speed, because whichever way round
+    # the head is in a given frame the silhouette is the same.
+    # ⚠️ THE DROOP IS WHAT MAKES IT READ AS A PICK. At 6.7 degrees the two
+    # points and the eye fall on almost one line, and from the side -- the
+    # only angle a swing is seen from -- the head reads as a single slender
+    # crescent blade rather than two spikes. 18 degrees separates them. It
+    # trades a little against the strike pose: more droop puts the point
+    # further off the haft axis, which stands the haft more upright at
+    # impact, so this is as much curve as the pose can pay for.
+    TIP_Y, TIP_Z, EYE_Z = 0.272, 0.934, 1.022
+    PROF = []
+    for sgn in (-1, 1):
+        for fy, fz, hx, hz in ((1.000, 0.000, 0.0055, 0.0075),
+                               (0.740, 0.555, 0.0130, 0.0200),
+                               (0.440, 0.830, 0.0230, 0.0300),
+                               (0.170, 0.955, 0.0320, 0.0430)):
+            PROF.append((sgn * fy * TIP_Y,
+                         TIP_Z + (EYE_Z - TIP_Z) * fz, hx, hz))
+        if sgn < 0:
+            PROF.append((0.0, EYE_Z, 0.0400, 0.0520))
+    PROF[4:] = sorted(PROF[4:], key=lambda r: r[0])
+    PROF = sorted(PROF, key=lambda r: r[0])
+
     rings = []
     for y, z, hx, hz in PROF:
         ring = [bm.verts.new((sx * hx * scale, y * scale, (z + sz * hz) * scale))
@@ -154,7 +181,7 @@ PICK_LOCAL = {"hi": Vector((0, 0, GRIP_HI * LEG)), "lo": Vector((0, 0, GRIP_LO *
 # contact pose by putting this exact point on the floor; a second copy of
 # the coordinate is how the solve silently starts aiming at thin air the
 # first time the head profile is touched.
-PICK_TIP = Vector((0, -0.430 * LEG, 0.735 * _HZ * LEG))
+PICK_TIP = Vector((0, -0.272 * LEG, 0.934 * LEG))
 PICK_REST_M = PICK.matrix_world.copy()
 PICK_HAND_REST_M = (arm.matrix_world @ arm.pose.bones[HAND_P].matrix).copy()
 
