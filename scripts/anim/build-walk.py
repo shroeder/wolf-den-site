@@ -389,6 +389,11 @@ def close_fist(side, amount=1.0):
     print("FIST %s closed (curl sign %+.0f)" % (side, cs))
 
 close_fist(SHIELD_ARM)
+# ⚠️ AND A RELAXED CURL ON THE OTHER ONE. Nothing keys the fingers, so whatever
+# they are left in is what every clip bakes -- and MPFB rests them splayed
+# flat. At a walk that passes; at a run the free hand reaches out in front with
+# its fingers spread like a mime. A hand at rest is never flat.
+close_fist("r" if SHIELD_ARM == "l" else "l", 0.34)
 
 # ── KEY IT ────────────────────────────────────────────────────────────────────
 sc = bpy.context.scene

@@ -70,6 +70,7 @@ _brace_src = _brace_src.split('exec(open(os.path.join(_here, "build-walk.py")).r
 exec(_brace_src)
 bake_and_stash("Brace", BF)
 
+bake_and_stash("Run", clips.key_run())
 bake_and_stash("Idle", clips.key_idle())
 bake_and_stash("Impact", clips.key_impact())
 

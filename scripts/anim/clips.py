@@ -38,6 +38,43 @@ def _fresh_action(name):
     return name
 
 
+def _elbow_axis(side):
+    """Which local axis and sign FOLDS this elbow?
+
+    ⚠️ DO NOT REUSE ARM_SIGN FOR THIS. ARM_SIGN was probed on the UPPERARM,
+    for the question "which way swings the hand forward" -- a different bone
+    and a different question. Driving the forearm's local X with it bends
+    nothing on this rig; at the walk's -14 degrees that is invisible, and at
+    a run's -90 it produced a straight arm with a splayed hand reaching out
+    in front, which reads as a man hailing a cab.
+    
+    The test that means "elbow" is whether the HAND comes closer to the
+    SHOULDER. That has one answer and no handedness."""
+    a = G["arm"]
+    pb = a.pose.bones["lowerarm_%s" % side]
+    sh = a.pose.bones["upperarm_%s" % side]
+    rest = pb.rotation_euler.copy()
+
+    def reach():
+        bpy.context.view_layer.update()
+        return ((a.matrix_world @ a.pose.bones["hand_%s" % side].tail)
+                - (a.matrix_world @ sh.head)).length
+
+    pb.rotation_euler = Euler((0, 0, 0), "XYZ")
+    best, pick = reach(), (0, 1.0)
+    for ax in range(3):
+        for sg in (1.0, -1.0):
+            e = [0.0, 0.0, 0.0]
+            e[ax] = math.radians(45) * sg
+            pb.rotation_euler = Euler(e, "XYZ")
+            d = reach()
+            if d < best:
+                best, pick = d, (ax, sg)
+    pb.rotation_euler = rest
+    bpy.context.view_layer.update()
+    return pick
+
+
 def _smooth(ob_list):
     for ob in ob_list:
         if ob.animation_data and ob.animation_data.action:
@@ -211,4 +248,147 @@ def key_impact(frames=26):
                 for kp in fc.keyframe_points:
                     if kp.co[0] <= 3:
                         kp.interpolation = "LINEAR"
+    return frames
+
+
+# ───────────────────────────────────────────────────────────────────────────
+def key_run(frames=16):
+    """A RUN. Not a fast walk -- the difference is structural.
+
+    A walk always has a foot down: the two stances overlap, which is why the
+    hips are HIGHEST at mid-stance (the planted leg is at its straightest)
+    and why build-walk.py can solve hip height from whichever foot is
+    planted. A run has a DUTY FACTOR BELOW 0.5, so each stance ends before
+    the other begins and the body is airborne twice per cycle. Everything
+    follows from that:
+
+      BALLISTIC   there is no planted foot during flight, so nothing
+                  constrains hip height and it has to be authored. The bob
+                  INVERTS relative to a walk -- lowest at mid-stance, where
+                  the leg compresses under the load, highest at the apex of
+                  the flight. Getting that upside down is the single thing
+                  that makes a run read as a bouncy walk.
+      REACH       during stance the authored height is still clamped by what
+                  the planted leg can reach, so the knee never snaps
+                  straight through.
+      LEAN        you fall forwards and catch yourself. A vertical run reads
+                  as jogging on the spot.
+      ARMS        bent near ninety degrees and driven hard. A runner with
+                  straight swinging arms reads as a man chasing a bus.
+    """
+    arm, iks, hand_goal, elbow_pole, LEG, FLOOR, ANKLE_H, HIP0, FWD, FOOT_REST, \
+        TUCK, ARMS, TUCKAMT, SA, GRIP, HQ = _ctx()
+    _fresh_action("Run")
+    side = 1 if SA == "l" else -1
+    G_ = G
+
+    DUTY = 0.34               # fraction of the cycle a foot is down. < 0.5 IS the run
+    STRIDE = 1.00 * LEG       # contact-to-contact split, nearly double the walk's
+    LIFT = 0.185 * LEG        # the swinging foot comes up hard
+    BASE = 0.885 * LEG        # average hip height: lower than a walk, knees loaded
+    BOB = 0.055 * LEG
+    LEAN = 11.0               # degrees of forward pitch through the spine
+    TRACK = G_["TRACK"]
+    REACH = G_["REACH"]
+    free_side = "r" if SA == "l" else "l"
+    ELBOW = _elbow_axis(free_side)
+    print("RUN elbow axis %d sign %+.0f" % ELBOW)
+
+    def foot(p):
+        """Ankle Y and Z at `p` through this foot's own cycle."""
+        p %= 1.0
+        if p < DUTY:                                   # STANCE: planted, no slide
+            t = p / DUTY
+            return FWD * (STRIDE / 2) * (1 - 2 * t), ANKLE_H
+        t = (p - DUTY) / (1 - DUTY)                    # FLIGHT: recover and reach
+        y = FWD * (STRIDE / 2) * (-1 + 2 * G_["ease"](t))
+        return y, ANKLE_H + LIFT * math.sin(math.pi * t) ** 0.75
+
+    for f in range(1, frames + 2):
+        i = (f - 1) % frames
+        pl = i / frames
+        pr = pl + 0.5
+        fy_l, fz_l = foot(pl)
+        fy_r, fz_r = foot(pr)
+        down_l = (pl % 1.0) < DUTY
+        down_r = (pr % 1.0) < DUTY
+
+        # ── HEIGHT ── authored bob at twice cycle rate, lowest at mid-stance.
+        # cos(4*pi*p) is +1 at p=0 and p=0.5, which are the two CONTACTS, and
+        # -1 at the two mid-flights; mid-stance sits at DUTY/2 past each
+        # contact, so the phase is shifted to put the trough there.
+        hip = BASE - BOB * math.cos(4 * math.pi * (pl - DUTY / 2) + math.pi)
+        for (fy, fz, dn) in ((fy_l, fz_l, down_l), (fy_r, fz_r, down_r)):
+            if dn:
+                span = (LEG * REACH) ** 2 - fy ** 2
+                hip = min(hip, FLOOR + fz + math.sqrt(max(span, 0.01)))
+        arm.location.z = hip - HIP0
+        arm.location.x = 0.010 * LEG * math.sin(2 * math.pi * pl)
+        arm.keyframe_insert("location", frame=f)
+
+        # ── LEAN ── spread down the spine so it is a curve, not a hinge.
+        pb = arm.pose.bones["pelvis"]
+        pb.rotation_euler = Euler((math.radians(LEAN * 0.22), 0, 0), "XYZ")
+        pb.keyframe_insert("rotation_euler", frame=f)
+        for bn, k in (("spine_01", 0.30), ("spine_02", 0.34), ("spine_03", 0.26)):
+            b = arm.pose.bones.get(bn)
+            if b:
+                b.rotation_euler = Euler((math.radians(LEAN * k), 0, 0), "XYZ")
+                b.keyframe_insert("rotation_euler", frame=f)
+        # The head stays level: a runner looks where he is going, so the neck
+        # pays back most of what the spine just took.
+        for bn, k in (("neck_01", -0.42), ("head", -0.34)):
+            b = arm.pose.bones.get(bn)
+            if b:
+                b.rotation_euler = Euler((math.radians(LEAN * k), 0, 0), "XYZ")
+                b.keyframe_insert("rotation_euler", frame=f)
+
+        for s, (fy, fz, ph) in (("l", (fy_l, fz_l, pl)), ("r", (fy_r, fz_r, pr))):
+            tgt, pole = iks[s]
+            sx = 1 if s == "l" else -1
+            tgt.location = (sx * TRACK * LEG, fy, FLOOR + fz)
+            tgt.keyframe_insert("location", frame=f)
+            # Toes down through flight and at contact -- a run lands on the
+            # ball, not the heel, and a flat foot in the air reads as a clog.
+            pitch = 14.0 * math.sin(math.pi * min(1.0, max(0.0, ((ph % 1.0) - DUTY) / (1 - DUTY))))
+            tgt.rotation_quaternion = (
+                Quaternion((0, 0, 1), math.radians(G_["TOE_OUT"] * sx))
+                @ Quaternion((1, 0, 0), math.radians(pitch)) @ FOOT_REST[s])
+            tgt.keyframe_insert("rotation_quaternion", frame=f)
+            pole.location = (sx * G_["KNEE_POLE"] * LEG, fy * 0.45 + FWD * 0.52 * LEG,
+                             FLOOR + LEG * 0.52)
+            pole.keyframe_insert("location", frame=f)
+
+        # ── SHIELD ARM ── carried high and tight across the chest, pumping
+        # with the stride. Keyed every frame because the goal is a world-space
+        # empty; left alone it stays nailed to the room while the body runs on.
+        bob = hip - (FLOOR + BASE)
+        sw = math.sin(2 * math.pi * pl)
+        hand_goal.location = (side * 0.13 * LEG,
+                              FWD * (0.26 + 0.07 * sw) * LEG,
+                              FLOOR + LEG * 0.99 + bob)
+        hand_goal.keyframe_insert("location", frame=f)
+        elbow_pole.location = (side * 0.40 * LEG, 0.40 * LEG, FLOOR + LEG * 0.74 + bob)
+        elbow_pole.keyframe_insert("location", frame=f)
+        GRIP.rotation_quaternion = (Quaternion((0, 1, 0), math.radians(-24 + 6 * sw))
+                                    @ Quaternion((1, 0, 0), math.radians(14))
+                                    @ HQ)
+        GRIP.keyframe_insert("rotation_quaternion", frame=f)
+
+        # ── FREE ARM ── opposite the leg on its own side, elbow locked near
+        # ninety. The amplitude is more than double the walk's.
+        free = "r" if SA == "l" else "l"
+        ab = arm.pose.bones["upperarm_%s" % free]
+        (ax, sg), _b, _c = TUCK[free]
+        e = [math.radians(-42.0 * math.cos(2 * math.pi * pr) * ARMS[free]), 0.0, 0.0]
+        e[ax] += math.radians((TUCKAMT - 4) * sg)
+        ab.rotation_euler = Euler(e, "XYZ")
+        ab.keyframe_insert("rotation_euler", frame=f)
+        lb = arm.pose.bones["lowerarm_%s" % free]
+        _e2 = [0.0, 0.0, 0.0]
+        _e2[ELBOW[0]] = math.radians(84 + 16 * math.cos(2 * math.pi * pr)) * ELBOW[1]
+        lb.rotation_euler = Euler(_e2, "XYZ")
+        lb.keyframe_insert("rotation_euler", frame=f)
+
+    _smooth([arm] + list(G["helpers"]))
     return frames

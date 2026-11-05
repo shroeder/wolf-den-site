@@ -24,12 +24,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const MODEL_URL = "/models/hero.glb";
 
-// Measured, not chosen. See SKATING above.
-const CLIP_SPEED = 1.2784;        // world units per second at timeScale 1
+// Measured, not chosen -- `_stride.py` prints these. See SKATING above.
+// The run is not a fast walk: 25% of its cycle has both feet off the ground,
+// which is what a duty factor below 0.5 means and what makes it a run.
+const GAIT = { Walk: 1.2784, Run: 3.1799 };
+const UP_AT = 2.30;               // actual speed at which Walk becomes Run
+const DOWN_AT = 1.85;             // and back. The gap is hysteresis: one
+                                  // threshold would flutter between the two
+                                  // clips for as long as he held that speed.
 const TURN_RATE = 6.0;            // rad/s
 const ARRIVE = 0.12;              // close enough
 const EASE_IN = 0.30;             // seconds from standstill to full speed
-const SLOW_FROM = 0.55;           // start easing down this far out
+const APPROACH = 2.2;             // target speed is distance x this, so he
+                                  // sheds run -> walk -> stop on his own
 // ⚠️ ANY LIMIT MEASURED FROM THE WORLD ORIGIN SHRINKS AS HE WALKS AWAY FROM
 // IT. The first version clamped taps to 7 units from (0,0), so the further he
 // got the less of the visible floor would accept a tap -- it read as the
@@ -58,6 +65,7 @@ export default function IsoLab() {
     const [lampOn, setLampOn] = useState(true);
     const [lampLvl, setLampLvl] = useState(1);
     const [placing, setPlacing] = useState(false);
+    const [maxGait, setMaxGait] = useState("Run");
     const [hud, setHud] = useState({ state: "Idle", speed: 0, dist: 0 });
 
     useEffect(() => {
@@ -67,13 +75,14 @@ export default function IsoLab() {
         api.view = ZOOMS[zoom];
         api.follow = follow;
         api.placing = placing;
+        api.maxGait = maxGait;
         api.lampOn = lampOn;
         api.lampWatts = LAMP[lampLvl].v;
         api.sun = sun;
         if (api.key) api.key.intensity = sun ? 2.1 : 0.12;
         if (api.flame) api.flame.visible = lampOn;
         if (api.bulb) api.bulb.visible = lampOn;
-    }, [azimuth, zoom, follow, sun, lampOn, lampLvl, placing, ready]);
+    }, [azimuth, zoom, follow, sun, lampOn, lampLvl, placing, maxGait, ready]);
 
     useEffect(() => {
         let cancelled = false;
@@ -192,14 +201,18 @@ export default function IsoLab() {
                     a.setLoop(THREE.LoopRepeat, Infinity);
                     actions[c.name] = a;
                 });
-                const walk = actions.Walk;
                 const idle = actions.Idle;
-                if (!walk || !idle) { setError("hero.glb has no Walk/Idle clip"); return; }
+                if (!idle || !actions.Walk || !actions.Run) {
+                    setError("hero.glb is missing an Idle, Walk or Run clip");
+                    return;
+                }
                 idle.play();
 
                 apiRef.current = Object.assign({}, apiRef.current || {}, {
-                    rig, mixer, walk, idle, camera, ring, key, plane, ray, ndc, hit,
+                    rig, mixer, actions, idle, camera, ring, key, plane, ray, ndc, hit,
+                    gait: "Idle",
                     lamp, flame, bulb, placing: false, sun: true, lampOn: true, lampWatts: LAMP[1].v,
+                    maxGait: "Run",
                     target: null, moving: false, speed: 0,
                     azimuth: AZIMUTHS[azimuth], view: ZOOMS[zoom], follow: true,
                     look: new THREE.Vector3(0, 0.9, 0),
@@ -286,13 +299,16 @@ export default function IsoLab() {
                         const cap = TURN_RATE * dt;
                         rig.rotation.y += Math.max(-cap, Math.min(cap, diff));
 
-                        // ── SPEED ── eased in from rest, eased down on approach, and scaled by how well
-                        // he faces the target so a hard turn becomes a pivot rather than a sideways slide.
-                        // The floor of 0.3 keeps him stepping through the turn; at 0 the walk clip would
-                        // freeze mid-stride, which looks like a bug.
+                        // ── SPEED ── target is proportional to what is left to cover, capped at
+                        // the fastest gait allowed. That single line gives the whole approach for
+                        // free: he cruises at a run, passes down through walking pace as he nears,
+                        // and arrives slowly, without any of it being scripted. Scaled by how well
+                        // he faces the target so a hard turn is a pivot and not a sideways slide --
+                        // floored at 0.3, because at 0 the clip would freeze mid-stride and read as
+                        // a bug rather than a turn.
                         const align = Math.max(0.3, Math.cos(diff));
-                        const near = dist < SLOW_FROM ? 0.45 + 0.55 * (dist / SLOW_FROM) : 1;
-                        const want_s = CLIP_SPEED * align * near;
+                        const top = GAIT[api.maxGait || "Run"];   // `cap` is the turn limiter above
+                        const want_s = Math.min(top, Math.max(0.42 * GAIT.Walk, dist * APPROACH)) * align;
                         api.speed += (want_s - api.speed) * Math.min(1, dt / EASE_IN);
                         step = Math.min(api.speed * dt, dist);
                         rig.position.x += Math.sin(rig.rotation.y) * step;
@@ -306,25 +322,32 @@ export default function IsoLab() {
                     api.speed = 0;
                 }
 
-                const moving = step > 0.0001;
-                if (moving !== api.moving) {
-                    api.moving = moving;
-                    const [to, from, secs] = moving
-                        ? [api.walk, api.idle, 0.14]      // starting should feel immediate
-                        : [api.idle, api.walk, 0.26];     // stopping should settle
-                    to.reset().setEffectiveWeight(1).play();
-                    // ⚠️ NO WARPING. crossFadeFrom's third argument re-times both clips so their
-                    // durations match during the fade, which is right in the model lab and wrong here:
-                    // Walk is 24 frames and Idle is 48, so warping would run the walk at double rate for
-                    // the length of the fade and fight the anti-skate below for control of the same
-                    // property. The timeScale has one owner.
-                    to.crossFadeFrom(from, secs, false);
+                // ── GAIT ── chosen from the speed actually achieved, not from the distance
+                // remaining. Those differ during the acceleration ramp and through every turn, and
+                // picking on distance makes him break into a run while still standing still.
+                const actual = step / dt;
+                let gait = "Idle";
+                if (step > 0.0001) {
+                    const run = api.gait === "Run" ? actual > DOWN_AT : actual > UP_AT;
+                    gait = run && (api.maxGait || "Run") === "Run" ? "Run" : "Walk";
                 }
-                // ⚠️ THE ANTI-SKATE. Drive the clip from the distance actually covered this frame, not from
-                // the speed we asked for -- they differ on the last frame before arrival and during the ramps.
-                if (moving) {
-                    api.walk.setEffectiveTimeScale(
-                        Math.max(0.2, Math.min(1.8, (step / dt) / CLIP_SPEED)));
+                if (gait !== api.gait) {
+                    const from = api.actions[api.gait] || api.idle;
+                    const to = api.actions[gait] || api.idle;
+                    // Leaving a standstill should feel immediate; arriving at one should settle.
+                    const secs = gait === "Idle" ? 0.26 : (api.gait === "Idle" ? 0.14 : 0.20);
+                    to.reset().setEffectiveWeight(1).play();
+                    // ⚠️ NO WARPING -- see the note on the anti-skate below. Warping re-times both
+                    // clips to match durations, and the timeScale has exactly one owner here.
+                    if (to !== from) to.crossFadeFrom(from, secs, false);
+                    api.gait = gait;
+                }
+                // ⚠️ THE ANTI-SKATE. Drive the clip from the distance actually covered this frame,
+                // against THAT GAIT's own authored speed -- they differ on the last frame before
+                // arrival and all through the ramps.
+                if (gait !== "Idle") {
+                    api.actions[gait].setEffectiveTimeScale(
+                        Math.max(0.2, Math.min(1.8, actual / GAIT[gait])));
                 }
                 api.mixer.update(dt);
 
@@ -368,7 +391,7 @@ export default function IsoLab() {
                 hudAt += dt;
                 if (hudAt > 0.12) {
                     hudAt = 0;
-                    setHud({ state: moving ? "Walk" : "Idle", speed: step / dt, dist });
+                    setHud({ state: gait, speed: actual, dist });
                 }
             };
             tick();
@@ -436,6 +459,16 @@ export default function IsoLab() {
             </div>
 
             <div className="row">
+                <span className="lbl">Gait</span>
+                {["Walk", "Run"].map((g) => (
+                    <button key={g} type="button" className={maxGait === g ? "on" : ""}
+                        onClick={() => setMaxGait(g)} aria-pressed={maxGait === g}>
+                        {g === "Walk" ? "Walk only" : "Up to run"}
+                    </button>
+                ))}
+            </div>
+
+            <div className="row">
                 <span className="lbl">Light</span>
                 <button type="button" className={sun ? "on" : ""}
                     onClick={() => setSun((v) => !v)} aria-pressed={sun}>Sun</button>
@@ -456,7 +489,7 @@ export default function IsoLab() {
                 <div><dt>State</dt><dd>{hud.state}</dd></div>
                 <div><dt>Speed</dt><dd>{hud.speed.toFixed(2)} u/s</dd></div>
                 <div><dt>To target</dt><dd>{hud.dist.toFixed(2)} u</dd></div>
-                <div><dt>Clip speed</dt><dd>{CLIP_SPEED} u/s</dd></div>
+                <div><dt>Clip speed</dt><dd>{hud.state === "Idle" ? "—" : `${GAIT[hud.state]} u/s`}</dd></div>
             </dl>
 
             <p className="muted note">
@@ -465,10 +498,13 @@ export default function IsoLab() {
                 camera and the grid snaps to whole cells, so there is nowhere he cannot be sent.
                 The hero moves in a straight line — there is no obstacle avoidance and nothing to avoid, so
                 &ldquo;pathing&rdquo; here is steering, not a search. The number that matters is{" "}
-                <strong>Speed</strong> against <strong>Clip speed</strong>: the walk cycle was authored at
-                1.2784 u/s (measured in Blender — 0.6392 units of foot travel per step, two steps per 1s loop),
-                and the clip&apos;s playback rate is driven from the distance actually covered each frame, so
-                the feet stay planted through the acceleration ramp and the turn.
+                <strong>Speed</strong> against <strong>Clip speed</strong>: the walk was authored at 1.2784
+                u/s and the run at 3.1799, both measured in Blender rather than chosen, and each clip&apos;s
+                playback rate is driven from the distance actually covered each frame — so the feet stay
+                planted through the acceleration ramp, the turn, and the hand-over between gaits. He picks
+                the gait from the speed he is actually making, and his target speed is simply proportional
+                to the distance left, which is what sheds run → walk → stop on the approach without any of
+                it being scripted.
             </p>
 
             <style jsx>{`
