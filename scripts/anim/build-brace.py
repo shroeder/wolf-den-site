@@ -112,6 +112,13 @@ for f in range(1, BF + 2):
     _hand_goal.keyframe_insert("location", frame=f)
     _elbow_pole.location = (SHIELD_SIDE * (0.30 * LEG), 0.40 * LEG, FLOOR + LEG * 0.76)
     _elbow_pole.keyframe_insert("location", frame=f)
+    # Shield squared to the threat, breathing with the body.
+    _grip.rotation_quaternion = (
+        Quaternion((0, 1, 0), math.radians(-20 * SHIELD_SIDE))
+        @ Quaternion((1, 0, 0), math.radians(10 + 1.5 * lag))
+        @ Quaternion((0, 0, 1), math.radians(-12 * SHIELD_SIDE))
+        @ HAND_REST_Q)
+    _grip.keyframe_insert("rotation_quaternion", frame=f)
 
     # ── COUNTERWEIGHT ── free arm back and down, elbow out.
     free = "r" if SHIELD_ARM == "l" else "l"
@@ -132,16 +139,4 @@ for ob in (arm, *helpers):
             for kp in fc.keyframe_points:
                 kp.interpolation = "BEZIER"
 
-# Re-solve the shield's rest transform against THIS pose -- it was solved
-# against a walk frame and the hand is somewhere else entirely now.
-sc.frame_set(1)
-bpy.context.view_layer.update()
-_hand_posed = arm.matrix_world @ arm.pose.bones["hand_%s" % SHIELD_ARM].matrix
-_hr = arm.matrix_world @ arm.pose.bones["hand_%s" % SHIELD_ARM].bone.matrix_local
-_want = Matrix.Translation(Vector((SHIELD_SIDE * 0.10 * LEG, FWD * 0.40 * LEG, FLOOR + LEG * 1.16))) @ \
-        Matrix.Rotation(math.radians(-16 * SHIELD_SIDE), 4, "Y") @ \
-        Matrix.Rotation(math.radians(11), 4, "X") @ \
-        Matrix.Rotation(math.radians(-10 * SHIELD_SIDE), 4, "Z")
-SHIELD.matrix_world = (_hand_posed @ _hr.inverted()).inverted() @ _want
-bpy.context.view_layer.update()
-print("BRACE built, %d frames, shield re-solved" % BF)
+print("BRACE built, %d frames" % BF)

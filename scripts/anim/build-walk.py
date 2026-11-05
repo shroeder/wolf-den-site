@@ -134,6 +134,9 @@ def build_shield(scale):
     sh.select_set(False)
     return sh
 
+SHIELD_ARM = "l"       # which hand carries the shield
+FWD = -1.0             # the character faces -Y
+
 SHIELD = build_shield(LEG)
 
 # ── ⚠️ SKIN THE SHIELD, DO NOT BONE-PARENT IT ────────────────────────────────
@@ -146,25 +149,22 @@ SHIELD = build_shield(LEG)
 # Skinning it instead -- one vertex group named for the bone, weight 1, an
 # Armature modifier -- makes it an ordinary skinned mesh and it exports the
 # same way the body does.
-# ⚠️ A SKINNED PROP IS PLACED AT REST AND THEN CARRIED BY THE POSE. Setting
-# the shield's world transform directly puts it where I want it in the REST
-# pose -- and the animation then rotates it by however much the hand has moved
-# by frame 1, which tipped it on its side at the hip.
+# ⚠️ A PROP HAS ONE REST TRANSFORM, NOT ONE PER CLIP. Re-solving it against
+# each animation meant whichever clip solved LAST won -- the brace solve was
+# being applied to the walk and the idle, which laid the shield flat across
+# the hips like a surfboard.
 #
-# So solve for it. Decide the world transform the shield should HAVE once
-# posed, evaluate the hand's pose delta at that frame, and invert it:
-#
-#     world_f = (hand_pose_f @ hand_rest-inverse) @ shield_rest
-#     shield_rest = (hand_pose_f @ hand_rest-inverse)-inverse @ world_wanted
-#
-# SHIELD_REST_SOLVED_AT is the frame it is aimed for; it drifts slightly
-# across the cycle as the arm breathes, which is correct -- a held shield
-# moves with its owner.
-SHIELD_REST_SOLVED_AT = 1
-_hand_rest = (arm.matrix_world @ arm.pose.bones["hand_l"].bone.matrix_local)
-_chest_z = FLOOR + LEG * 1.26
-_wanted = Matrix.Translation(Vector((0.30 * LEG, -0.29 * LEG, _chest_z))) @           Matrix.Rotation(math.radians(-19), 4, "Y") @           Matrix.Rotation(math.radians(9), 4, "X")
-SHIELD_PLACEMENT = (_hand_rest, _wanted)
+# So it is fixed ONCE here, upright and facing forward, sitting beside the
+# hand in the REST pose. Which way it points in a given clip is then decided
+# by the HAND's world rotation, which is itself controlled explicitly (see
+# the grip target below) instead of being whatever the IK solver happened to
+# produce.
+HAND_B = "hand_%s" % SHIELD_ARM
+_hand_rest_m = arm.matrix_world @ arm.pose.bones[HAND_B].bone.matrix_local
+HAND_REST_Q = _hand_rest_m.to_quaternion()
+_sgn = 1 if SHIELD_ARM == "l" else -1
+SHIELD.matrix_world = Matrix.Translation(
+    _hand_rest_m.translation + Vector((_sgn * 0.05 * LEG, FWD * 0.09 * LEG, 0.17 * LEG)))
 bpy.context.view_layer.update()
 
 _vg = SHIELD.vertex_groups.new(name="hand_l")
@@ -185,7 +185,12 @@ REACH = 0.995
 # clearing the ground. In body units it survives any character the macro makes.
 STRIDE = 0.60 * LEG    # heel-to-heel split at contact
 LIFT = 0.085 * LEG     # how high the swinging foot clears the floor
-FWD = -1.0             # the character faces -Y
+# ⚠️ FEET DIRECTLY UNDER THE HIP JOINTS LOOK PINCHED. Hip joints sit at
+# 0.127 of a leg either side; putting the ankles there presses the thighs
+# together and, with perfectly parallel feet, reads as someone who needs the
+# toilet. A real stance is a little wider WITH the toes turned out.
+TRACK = 0.155          # ankle offset from centre, as a fraction of leg
+TOE_OUT = 7.0          # degrees, outward
 
 def ease(t):
     return t * t * (3 - 2 * t)
@@ -327,7 +332,19 @@ _gc.pole_target = _elbow_pole
 _gc.chain_count = 2
 _gc.pole_angle = math.radians(-90)
 _gc.use_tail = True
-print("GUARD arm %s solved by IK" % _sa)
+
+# ⚠️ IK CONTROLS POSITION, NOT ORIENTATION. The hand's rotation falls out of
+# the solver and is effectively arbitrary -- and the shield is welded to it,
+# so the shield's angle was arbitrary too. A Copy Rotation off a keyable
+# empty makes it explicit. GRIP keys are "point the shield this way".
+_grip = empty("grip_%s" % _sa, (0, 0, 0))
+_grip.rotation_mode = "QUATERNION"
+_grip.rotation_quaternion = HAND_REST_Q
+_grc = arm.pose.bones[HAND_B].constraints.new("COPY_ROTATION")
+_grc.target = _grip
+_grc.target_space = "WORLD"
+_grc.owner_space = "WORLD"
+print("GUARD arm %s solved by IK, grip orientation explicit" % _sa)
 
 # ── A GRIPPING FIST ──────────────────────────────────────────────────────────
 # An open hand behind a shield reads as someone balancing a tray. The fingers
@@ -471,20 +488,39 @@ for f in range(1, FRAMES + 2):
     for s, (fy, fz, ph) in (("l", (fy_l, fz_l, ph_l)), ("r", (fy_r, fz_r, ph_r))):
         tgt, _pole = ik_targets[s]
         sign = 1 if s == "l" else -1
-        tgt.location = (sign * HALF_W, fy, FLOOR + fz)
+        tgt.location = (sign * TRACK * LEG, fy, FLOOR + fz)
         tgt.keyframe_insert("location", frame=f)
 
         pole = ik_targets[s][1]
-        pole.location = (sign * HALF_W, fy * 0.45 + FWD * 0.42, FLOOR + LEG * 0.55)
+        pole.location = (sign * TRACK * LEG * 1.1, fy * 0.45 + FWD * 0.42, FLOOR + LEG * 0.55)
         pole.keyframe_insert("location", frame=f)
 
         # +pitch about world X drops the toe, because the foot points -Y.
-        q = Quaternion((1, 0, 0), math.radians(foot_pitch(ph))) @ FOOT_REST[s]
+        q = (Quaternion((0, 0, 1), math.radians(TOE_OUT * sign))
+             @ Quaternion((1, 0, 0), math.radians(foot_pitch(ph))) @ FOOT_REST[s])
         tgt.rotation_quaternion = q
         tgt.keyframe_insert("rotation_quaternion", frame=f)
 
         if s == SHIELD_ARM:
-            continue          # solved by IK below, not by guessing angles
+            # ⚠️ THE GUARD TARGET IS A WORLD-SPACE EMPTY. Left unkeyed it is
+            # nailed to a point in the room: the body bobs past it and the arm
+            # hangs in front, dead, while everything else walks. It has to be
+            # re-keyed every frame so it rides the hips.
+            _bob = hip_z - (FLOOR + LEG * 0.985)
+            _sway = math.sin(2 * math.pi * ph) * 0.016 * LEG
+            _hand_goal.location = (0.17 * LEG,
+                                   FWD * 0.17 * LEG + _sway * 0.5,
+                                   FLOOR + LEG * 0.96 + _bob + abs(_sway) * 0.3)
+            _hand_goal.keyframe_insert("location", frame=f)
+            _elbow_pole.location = (0.34 * LEG, 0.36 * LEG, FLOOR + LEG * 0.72 + _bob)
+            _elbow_pole.keyframe_insert("location", frame=f)
+            # Upright carry, rocking a few degrees with the stride.
+            _grip.rotation_quaternion = (
+                Quaternion((0, 1, 0), math.radians(-14 + 4 * math.sin(2 * math.pi * ph)))
+                @ Quaternion((1, 0, 0), math.radians(6))
+                @ HAND_REST_Q)
+            _grip.keyframe_insert("rotation_quaternion", frame=f)
+            continue
 
         ab = arm.pose.bones["upperarm_%s" % s]
         (_ax, _sg), _base, _best = TUCK_SIGN[s]
@@ -497,21 +533,6 @@ for f in range(1, FRAMES + 2):
         lb.keyframe_insert("rotation_euler", frame=f)
 
 print("KEYED hip %.3f..%.3f (bob %.3f)" % (min(hip_curve), max(hip_curve), max(hip_curve) - min(hip_curve)))
-
-
-
-
-
-
-# ── NOW SOLVE THE SHIELD'S REST TRANSFORM ────────────────────────────────────
-sc.frame_set(SHIELD_REST_SOLVED_AT)
-bpy.context.view_layer.update()
-_hand_rest, _wanted = SHIELD_PLACEMENT
-_hand_posed = arm.matrix_world @ arm.pose.bones["hand_l"].matrix
-_delta = _hand_posed @ _hand_rest.inverted()
-SHIELD.matrix_world = _delta.inverted() @ _wanted
-bpy.context.view_layer.update()
-print("SHIELD solved against frame %d" % SHIELD_REST_SOLVED_AT)
 
 for ob in (arm, *helpers):
     if ob.animation_data and ob.animation_data.action:

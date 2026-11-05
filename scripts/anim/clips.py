@@ -11,7 +11,7 @@
 # handedness.
 # ═══════════════════════════════════════════════════════════════════════════
 import bpy, math
-from mathutils import Vector, Euler, Matrix
+from mathutils import Vector, Euler, Matrix, Quaternion
 
 G = {}
 
@@ -26,7 +26,7 @@ def _ctx():
     return (g["arm"], g["ik_targets"], g["_hand_goal"], g["_elbow_pole"],
             g["LEG"], g["FLOOR"], g["ANKLE_H"], g["HIP0"], g["FWD"],
             g["FOOT_REST"], g["TUCK_SIGN"], g["ARM_SIGN"], g["ARM_TUCK"],
-            g["SHIELD_ARM"])
+            g["SHIELD_ARM"], g["_grip"], g["HAND_REST_Q"])
 
 
 def _fresh_action(name):
@@ -52,7 +52,7 @@ def key_idle(frames=48):
     shield resting low at the side. The baseline every other clip blends
     out of, so it deliberately has NO attitude."""
     arm, iks, hand_goal, elbow_pole, LEG, FLOOR, ANKLE_H, HIP0, FWD, FOOT_REST, \
-        TUCK, ARMS, TUCKAMT, SA = _ctx()
+        TUCK, ARMS, TUCKAMT, SA, GRIP, HQ = _ctx()
     _fresh_action("Idle")
     side = 1 if SA == "l" else -1
     for f in range(1, frames + 2):
@@ -79,11 +79,12 @@ def key_idle(frames=48):
 
         for s, sx in ((SA, side), ("r" if SA == "l" else "l", -side)):
             tgt, pole = iks[s]
-            tgt.location = (sx * 0.13 * LEG, 0.0, FLOOR + ANKLE_H)
+            # Wider than the hip joints, or the thighs press together.
+            tgt.location = (sx * 0.165 * LEG, 0.0, FLOOR + ANKLE_H)
             tgt.keyframe_insert("location", frame=f)
-            tgt.rotation_quaternion = FOOT_REST[s]
+            tgt.rotation_quaternion = Quaternion((0, 0, 1), math.radians(8.0 * sx)) @ FOOT_REST[s]
             tgt.keyframe_insert("rotation_quaternion", frame=f)
-            pole.location = (sx * 0.14 * LEG, FWD * 0.40 * LEG, FLOOR + LEG * 0.52)
+            pole.location = (sx * 0.18 * LEG, FWD * 0.40 * LEG, FLOOR + LEG * 0.52)
             pole.keyframe_insert("location", frame=f)
 
         # Shield hangs low and relaxed at the side.
@@ -92,6 +93,11 @@ def key_idle(frames=48):
         hand_goal.keyframe_insert("location", frame=f)
         elbow_pole.location = (side * 0.46 * LEG, 0.30 * LEG, FLOOR + LEG * 0.62)
         elbow_pole.keyframe_insert("location", frame=f)
+        # Hanging at the side, face outward, drifting a couple of degrees.
+        GRIP.rotation_quaternion = (Quaternion((0, 1, 0), math.radians(-8 + 2.5 * rock))
+                                    @ Quaternion((1, 0, 0), math.radians(3))
+                                    @ HQ)
+        GRIP.keyframe_insert("rotation_quaternion", frame=f)
 
         free = "r" if SA == "l" else "l"
         ab = arm.pose.bones["upperarm_%s" % free]
@@ -118,7 +124,7 @@ def key_impact(frames=26):
     absorbs, then a push back to guard with a small overshoot. It does not
     loop -- it ends on the brace pose so it can hand back cleanly."""
     arm, iks, hand_goal, elbow_pole, LEG, FLOOR, ANKLE_H, HIP0, FWD, FOOT_REST, \
-        TUCK, ARMS, TUCKAMT, SA = _ctx()
+        TUCK, ARMS, TUCKAMT, SA, GRIP, HQ = _ctx()
     _fresh_action("Impact")
     side = 1 if SA == "l" else -1
     TURN = math.radians(-24 * side)
@@ -178,6 +184,11 @@ def key_impact(frames=26):
         hand_goal.keyframe_insert("location", frame=f)
         elbow_pole.location = (side * 0.30 * LEG, 0.40 * LEG, FLOOR + LEG * 0.76)
         elbow_pole.keyframe_insert("location", frame=f)
+        GRIP.rotation_quaternion = (Quaternion((0, 1, 0), math.radians(-20 * side))
+                                    @ Quaternion((1, 0, 0), math.radians(10 + 6 * k))
+                                    @ Quaternion((0, 0, 1), math.radians(-12 * side))
+                                    @ HQ)
+        GRIP.keyframe_insert("rotation_quaternion", frame=f)
 
         free = "r" if SA == "l" else "l"
         ab = arm.pose.bones["upperarm_%s" % free]
