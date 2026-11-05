@@ -31,6 +31,45 @@ for k, v in (("gender", 1.0), ("age", 0.55), ("muscle", 0.95), ("weight", 0.56),
 human = HumanService.create_human(macro_detail_dict=macro, scale=0.1,
                                   feet_on_ground=True, detailed_helpers=False)
 arm = HumanService.add_builtin_rig(human, "game_engine")
+
+# ── BAKE THE MACRO, THEN FIT THE SKELETON TO THE BODY ────────────────────────
+# ⚠️ MPFB BUILDS THE RIG AGAINST base.obj, the pristine MakeHuman mesh. A
+# character with macro details therefore gets a skeleton sized for somebody
+# else -- 1.654 of rig inside 2.127 of body -- and every joint ends up a
+# hip-height below the limb it drives. refit() does not resize it. The whole
+# previous walk was authored on that: the skeleton posed correctly and the
+# flesh pivoted about points a metre away, which is why the renders looked
+# deformed while every skeleton measurement passed.
+#
+# Editing the REST bones after binding is safe: at rest, pose equals rest, so
+# pose * rest-inverse is identity and the mesh does not move. Only the pivots
+# move -- onto the anatomy.
+if human.data.shape_keys:
+    bpy.context.view_layer.objects.active = human
+    human.select_set(True)
+    bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
+    human.select_set(False)
+
+_dg = bpy.context.evaluated_depsgraph_get(); _ev = human.evaluated_get(_dg)
+_mz = [(_ev.matrix_world @ v.co).z for v in _ev.data.vertices]
+_mlo, _mhi = min(_mz), max(_mz)
+_bz = [(arm.matrix_world @ b.head_local).z for b in arm.data.bones] +       [(arm.matrix_world @ b.tail_local).z for b in arm.data.bones]
+_blo, _bhi = min(_bz), max(_bz)
+_k = (_mhi - _mlo) / (_bhi - _blo)
+bpy.context.view_layer.objects.active = arm
+arm.select_set(True)
+bpy.ops.object.mode_set(mode="EDIT")
+for _eb in arm.data.edit_bones:
+    for _a in ("head", "tail"):
+        _p = getattr(_eb, _a).copy()
+        _p.x *= _k; _p.y *= _k
+        _p.z = _mlo + (_p.z - _blo) * _k
+        setattr(_eb, _a, _p)
+bpy.ops.object.mode_set(mode="OBJECT")
+arm.select_set(False)
+bpy.context.view_layer.update()
+print("RIGFIT scale %.4f -> rig now spans the body" % _k)
+
 for ob in list(bpy.data.objects):
     if ob.type == "MESH" and ob is not human:
         bpy.data.objects.remove(ob, do_unlink=True)
@@ -62,16 +101,13 @@ print("RIG leg=%.3f ankle_h=%.3f toe=%.3f heel=%.3f floor=%.3f" % (LEG, ANKLE_H,
 
 # ── THE CYCLE ─────────────────────────────────────────────────────────────────
 FRAMES = 24
-STRIDE = 0.50          # heel-to-heel split; 0.62 was 78% of leg length and
-                       # the skinning stretched the heel through the floor at
-                       # full extension. 0.50 is a normal walking stride here.
-LIFT = 0.055           # how high the swinging foot clears the floor
-# ⚠️ REACH IS NOT KNEE ANGLE, AND THE DIFFERENCE IS ENORMOUS. Thigh and shin
-# are each about half the leg, so span = 0.965 of straight puts the knee at
-# 149 degrees -- which LOOKS like a deep crouch even though the leg is at 96%
-# extension. 0.99 gives 164 degrees, which reads as standing. This single
-# number is why every version so far looked like it was squatting.
 REACH = 0.995
+# ⚠️ THE CYCLE IS EXPRESSED IN LEG LENGTHS, NOT METRES. These were absolute,
+# tuned against a 0.797 leg -- and when the rig fit corrected the skeleton to
+# 1.025 the stride silently became a shuffle and the swing foot stopped
+# clearing the ground. In body units it survives any character the macro makes.
+STRIDE = 0.60 * LEG    # heel-to-heel split at contact
+LIFT = 0.085 * LEG     # how high the swinging foot clears the floor
 FWD = -1.0             # the character faces -Y
 
 def ease(t):

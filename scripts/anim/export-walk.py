@@ -62,7 +62,7 @@ act.fcurves.update()
 print("LOOPED keys=%d" % len(act.fcurves))
 
 # ── SHAPE KEYS OUT, OR THE FILE IS 10MB ──────────────────────────────────────
-if human.data.shape_keys:
+if human.data.shape_keys and len(human.data.shape_keys.key_blocks) > 1:
     n = len(human.data.shape_keys.key_blocks)
     bpy.context.view_layer.objects.active = human
     bpy.ops.object.shape_key_remove(all=True, apply_mix=True)

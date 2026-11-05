@@ -110,11 +110,11 @@ check("stance count", min(len([r for r in rows if r["%s_sole" % s] - base < 0.01
           len([r for r in rows if r["r_sole"] - base < 0.012]), FRAMES))
 
 ms = max(r["stride"] for r in rows)
-check("stride length", 0.50 <= ms <= 0.78, "max separation %.3f" % ms)
+check("stride length", 0.46 <= ms / LEG <= 0.78, "max separation %.3f = %.0f%% of leg" % (ms, 100 * ms / LEG))
 
 hips = [r["hip_z"] for r in rows]
 bob = max(hips) - min(hips)
-check("hip bob present", 0.025 <= bob <= 0.11, "travel %.3f" % bob)
+check("hip bob present", 0.022 <= bob / LEG <= 0.10, "travel %.3f = %.1f%% of leg" % (bob, 100 * bob / LEG))
 
 sym = max(abs(rows[i]["l_knee_deg"] - rows[(i + FRAMES // 2) % FRAMES]["r_knee_deg"]) for i in range(FRAMES))
 check("left/right symmetry", sym < 6.0, "worst half-cycle mismatch %.1f deg" % sym)

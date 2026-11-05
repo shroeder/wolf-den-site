@@ -75,6 +75,47 @@ if os.environ.get("ALIGN", "0") == "1":
     bpy.context.view_layer.update()
     print("  ALIGNED mesh by %+.4f onto the skeleton" % dz)
 
+if os.environ.get("REFIT", "0") == "1":
+    # MPFB fits the rig to base.obj -- the pristine MakeHuman mesh -- so a
+    # character with macro details gets a skeleton sized for somebody else.
+    # refit() is the step that pulls rig (and clothes) onto the real shape.
+    try:
+        HumanService.refit(human)
+        print("  REFIT called")
+    except Exception as e:
+        print("  REFIT FAILED: %s" % e)
+    bpy.context.view_layer.update()
+
+if os.environ.get("FITRIG", "0") == "1":
+    # ── FIT THE REST SKELETON TO THE ACTUAL BODY ─────────────────────────
+    # MPFB builds the rig against base.obj -- the pristine MakeHuman mesh --
+    # so a character with macro details gets a skeleton sized for somebody
+    # else: 1.654 of rig inside 2.127 of body. refit() does not resize it.
+    #
+    # Editing the REST bones after binding is safe: at rest, pose equals rest,
+    # so pose * rest-inverse is identity and the mesh does not move. What
+    # changes is where the pivots are -- which is the whole problem.
+    dg0 = bpy.context.evaluated_depsgraph_get(); ev0 = human.evaluated_get(dg0)
+    mz = [(ev0.matrix_world @ v.co).z for v in ev0.data.vertices]
+    mlo0, mhi0 = min(mz), max(mz)
+    bz = [(arm.matrix_world @ b.head_local).z for b in arm.data.bones] +          [(arm.matrix_world @ b.tail_local).z for b in arm.data.bones]
+    blo0, bhi0 = min(bz), max(bz)
+    k = (mhi0 - mlo0) / (bhi0 - blo0)
+    print("  FITRIG scale %.4f  (rig %.4f -> body %.4f), anchor %.4f" % (k, bhi0 - blo0, mhi0 - mlo0, mlo0))
+    bpy.context.view_layer.objects.active = arm
+    arm.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    for eb in arm.data.edit_bones:
+        for attr in ("head", "tail"):
+            p = getattr(eb, attr).copy()
+            p.x *= k; p.y *= k
+            p.z = mlo0 + (p.z - blo0) * k
+            setattr(eb, attr, p)
+        eb.length = max(eb.length, 1e-4)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    arm.select_set(False)
+    bpy.context.view_layer.update()
+
 print("")
 print("  ════ A. OBJECT GRAPH ═══════════════════════════════════════════")
 print("  human            : %s   parent=%s" % (human.name, human.parent.name if human.parent else None))
@@ -111,6 +152,8 @@ def ev_coords():
 
 print("")
 print("  ════ C. DO BONES SIT INSIDE THE BODY AT REST? ══════════════════")
+_bz = [(arm.matrix_world @ b.head_local).z for b in arm.data.bones] +       [(arm.matrix_world @ b.tail_local).z for b in arm.data.bones]
+print("  RIG spans %.4f   (bones z %+.4f .. %+.4f)" % (max(_bz) - min(_bz), min(_bz), max(_bz)))
 bpy.context.view_layer.update()
 rest = ev_coords()
 mlo, mhi = min(p.z for p in rest), max(p.z for p in rest)
@@ -205,10 +248,12 @@ for n in ("pelvis", "spine_03", "neck_01", "head", "thigh_l", "calf_l",
     L = seg.length or 1e-6
     u = max(0.0, min(1.0, (cen - h).dot(seg) / (L * L)))
     dist = (cen - (h + seg * u)).length
-    worst = max(worst, dist / L)
-    flag = "" if dist < L * 0.9 else "   *** JOINT IS OUTSIDE ITS LIMB ***"
-    print("  %-11s centroid %6.3f from the bone (bone is %.3f long) -> %.0f%% of its length%s" % (
-        n, dist, L, 100 * dist / L, flag))
+    worst = max(worst, dist / max(1e-6, (mhi - mlo)))
+    err = cen - (h + seg * u)
+    flag = "" if dist < (mhi - mlo) * 0.045 else "  *** OUTSIDE ITS LIMB ***"
+    print("  %-11s bone %-22s centroid %-22s err %-22s |%.3f|%s" % (
+        n, "(%.2f,%.2f,%.2f)" % (h.x, h.y, h.z), "(%.2f,%.2f,%.2f)" % (cen.x, cen.y, cen.z),
+        "(%+.2f,%+.2f,%+.2f)" % (err.x, err.y, err.z), dist, flag))
 print("")
-print("  WORST: centroid sits %.0f%% of a bone length away from its own bone" % (100 * worst))
-print("  (under ~50%% means the skeleton is inside the body; over 100%% means it is not)")
+print("  WORST: %.2f%% of body height  (under 4.5%% = skeleton is inside the body)" % (100 * worst))
+print("  VERDICT: %s" % ("RIG OK" if worst < 0.045 else "RIG BROKEN"))
