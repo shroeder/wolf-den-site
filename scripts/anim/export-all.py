@@ -24,6 +24,10 @@ exec(open(os.path.join(HERE, "build-walk.py")).read())
 # skinned to the rig the bakes are about to drive.
 exec(open(os.path.join(HERE, "build-armour.py")).read())
 
+# ── THE PICKAXE ── and the right-arm IK that swings it, parked at
+# influence 0 so no clip authored before Mine is disturbed by it.
+exec(open(os.path.join(HERE, "build-pick.py")).read())
+
 import clips
 clips.init(globals())
 
@@ -50,9 +54,9 @@ def bake_and_stash(name, end):
         act.frame_start, act.frame_end = 1, end + 1
     except Exception:
         pass
-    # Loop seam: frame end+1 repeats frame 1. Impact is a one-shot and is
-    # deliberately left alone -- looping a hit reaction makes it stutter.
-    if name != "Impact":
+    # Loop seam: frame end+1 repeats frame 1. The one-shots are left alone --
+    # looping a hit reaction or a swing makes it stutter.
+    if name not in ("Impact", "Mine"):
         for fc in act.fcurves:
             v1 = next((k.co[1] for k in fc.keyframe_points if abs(k.co[0] - 1) < 0.01), None)
             if v1 is not None:
@@ -73,6 +77,7 @@ bake_and_stash("Brace", BF)
 bake_and_stash("Run", clips.key_run())
 bake_and_stash("Idle", clips.key_idle())
 bake_and_stash("Impact", clips.key_impact())
+bake_and_stash("Mine", clips.key_mine())
 
 # Constraints and helpers go now that every clip is baked.
 bpy.context.view_layer.objects.active = arm

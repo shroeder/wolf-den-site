@@ -190,6 +190,10 @@ export default function IsoLab() {
                 // group below is what moves, so the offset cannot drift.
                 const box = new THREE.Box3().setFromObject(model);
                 model.position.y -= box.min.y;
+                // No equip UI here, and a pickaxe swinging from the hand of a
+                // walk cycle it was not authored for clips the ground.
+                const px = model.getObjectByName("Pickaxe");
+                if (px) px.visible = false;
                 const rig = new THREE.Group();
                 rig.add(model);
                 scene.add(rig);

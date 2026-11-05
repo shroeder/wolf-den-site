@@ -413,3 +413,331 @@ def key_run(frames=16):
 
     _smooth([arm] + list(G["helpers"]))
     return frames
+
+
+# ───────────────────────────────────────────────────────────────────────────
+def key_mine(frames=40):
+    """A two-handed overhead pickaxe strike into the ground. ONE-SHOT.
+
+    Keyed ON BEATS, not per frame. Everything else in this file writes a
+    value for all 24 or 48 frames, because a cycle driven by a sine has a
+    value at every frame by construction. A performance does not. Keys go on
+    the poses that matter and the curves between them are the animation --
+    which is also the only way a single frame's interpolation can be changed
+    without fighting a sampled curve.
+
+    The beats, and why each one exists:
+
+      1-6    SETTLE. A small dip DOWN before going up. Anticipation for the
+             anticipation: an arm that starts straight up from rest has no
+             weight in it.
+      6-16   WIND-UP. Up and behind the driving shoulder, hips and torso
+             rotating away, spine extending back. Slow out -- this is the
+             only slow part of the clip and it is what makes the strike
+             read as fast.
+      16-18  FLOAT. Two frames of near-stillness at the apex. A heavy tool
+             goes weightless at the top of its arc before gravity takes it,
+             and skipping that is the difference between a swing and a wave.
+      18-23  THE STRIKE. Five frames for about 170 degrees of arc, LINEAR
+             into contact. An impact that eases in has no impact -- easing
+             is the animator telling the viewer the hit was expected, and
+             nothing about a pick meeting rock is expected.
+      23-24  HIT-STOP. Contact held for two frames. One frame of nothing
+             happening, at the right moment, is the cheapest and strongest
+             impact cue there is; it is what every fighting game does on a
+             connect.
+      24-27  RECOIL. The head bounces off the rock and the body unloads
+             upward. Fast, because a rebound is elastic.
+      27-40  RECOVER. Back to the ready pose with a small overshoot, easing
+             out, ending exactly where frame 1 began so it can hand back.
+
+    Throughout, THE TOOL LAGS THE HANDS: the haft angle is its own curve,
+    offset from the hand arc by a beat. Drag is most of what makes a
+    weighted object feel carried by a body rather than welded to a bone.
+    """
+    arm, iks, hand_goal, elbow_pole, LEG, FLOOR, ANKLE_H, HIP0, FWD, FOOT_REST, \
+        TUCK, ARMS, TUCKAMT, SA, GRIP, HQ = _ctx()
+    g = G
+    _fresh_action("Mine")
+
+    # The right arm comes off FK only for this clip; see build-pick.py.
+    g["_pick_ik"].influence = 1.0
+    g["_pgc"].influence = 1.0
+
+    PH = g["PICK_HAND"]
+    R_REST = g["R_REST"]
+    PQ = g["PICK_HAND_REST_Q"]
+    pick_goal, pick_pole = g["_pick_goal"], g["_pick_pole"]
+    pgrip = g["_pgrip"]
+    sho = arm.matrix_world @ arm.pose.bones["upperarm_%s" % PH].head
+    # ⚠️ THE SWING PIVOTS ON THE SHOULDERS, AND THE SHOULDERS MOVE. First
+    # pass fixed the pivot at the REST shoulder height and swung the hands on
+    # a circle around it -- so no matter how far round the arc went, the tip
+    # could not get within 0.67 of the floor. The arm is 0.61 long; reaching
+    # the ground is not something arms do, it is something a BENT BACK does.
+    # The pivot is now carried by the hips and the spine fold, which is both
+    # correct and the reason the contact pose has to be deep.
+    SH_OFF = sho.z - (FLOOR + LEG * 0.985)
+    RAD = 0.88 * g["ARM_R"]
+    HI = g["PICK_LOCAL"]["hi"]
+    LO = g["PICK_LOCAL"]["lo"]
+    TIP = g["PICK_TIP"]          # from build-pick; never retyped here
+
+    def pivot_at(dz, dy, spine):
+        """Where the shoulders actually are once the hips have dropped and
+        the back has folded."""
+        th = math.radians(spine)
+        return Vector((sho.x * 0.35,
+                       dy * LEG + FWD * SH_OFF * math.sin(th),
+                       FLOOR + LEG * 0.985 + dz * LEG + SH_OFF * math.cos(th)))
+
+    def hand_at(a_deg, P):
+        """Hand position on the swing arc. `a` is degrees from straight up,
+        rotating toward the front."""
+        a = math.radians(a_deg)
+        return Vector((P.x, P.y + FWD * RAD * math.sin(a), P.z + RAD * math.cos(a)))
+
+    def tool_q(phi_deg):
+        return Quaternion((1, 0, 0), math.radians(phi_deg)) @ R_REST
+
+    def tool_pt(local, hand, phi_deg):
+        return hand + (tool_q(phi_deg) @ (local - HI))
+
+    def solve_contact(hand):
+        """⚠️ THE CONTACT POSE IS SOLVED, NOT EYEBALLED. The tip has to be ON
+        the floor on the frame of the hit: a pick that stops short reads as
+        mime, one that goes through reads as a bug, and both are invisible
+        at the speed this plays. Given where the hands are, scan the haft
+        angle for the one that puts the tip at ground level."""
+        best, bphi = 1e9, -55.0
+        for i in range(2401):
+            phi = -150.0 + i * 0.0625
+            err = abs(tool_pt(TIP, hand, phi).z - FLOOR)
+            if err < best:
+                best, bphi = err, phi
+        return bphi, best
+
+    # ⚠️ THE OFF HAND SLIDES ON THE HAFT, AND IT HAS TO. Measured with the
+    # grip fixed at the butt: on the wind-up and again mid-strike the left
+    # arm needed 0.643 of reach against the 0.612 it has, so the IK gave up
+    # short and the hand tore off the haft for a third of the clip. Pinning
+    # both fists to fixed points on a long tool swung overhead is simply not
+    # something a pair of arms can do.
+    #
+    # It is also what a real swing looks like. The hands come TOGETHER near
+    # the head to carry the weight up, then the lower one runs down to the
+    # butt through the descent, which is where the leverage at impact comes
+    # from. The thing that fixes the reach is the thing that sells the
+    # swing.
+    #     frame   a     phi    hip dz   hip dy  twist  spine  head  grip
+    B = [(1,     150, -40.0, -0.100,  0.000,   10,    28,    14,  0.08),
+         (6,     158, -28.0, -0.130,  0.010,   14,    32,    16,  0.11),
+         (16,    -10, 140.0,  0.055,  0.050,  -19,   -10,    22,  0.30),
+         (18,    -13, 145.0,  0.060,  0.055,  -21,   -11,    23,  0.31),
+         (23,    160, None,  -0.302, -0.060,    8,    56,    10,  0.08),
+         (24,    160, None,  -0.307, -0.062,    8,    57,    11,  0.08),
+         (27,    141, -18.0, -0.165, -0.020,    7,    38,    14,  0.09),
+         (31,    152, -45.0, -0.115,  0.000,    9,    30,    14,  0.08),
+         (36,    151, -41.0, -0.105,  0.000,   10,    29,    14,  0.08),
+         (40,    150, -40.0, -0.100,  0.000,   10,    28,    14,  0.08)]
+
+    # ── THE OFF HAND LETS GO AT THE TOP ────────────────────────────────────
+    # ⚠️ AND IT HAS TO, THIS IS NOT A STYLE CHOICE. Measured across the whole
+    # clip with the grip solved to the nearest reachable point on the haft:
+    # nine frames still left the wrist short of the wood, by up to 0.23. The
+    # arm spans 0.643 and the tool is 1.05 long -- carrying BOTH fists
+    # through an overhead wind-up with the torso twisted away from the tool
+    # is not a thing a pair of arms can do, and no amount of sliding the
+    # grip fixes a reach that is simply absent.
+    #
+    # Which is also why nobody does it. The off hand comes off at the top,
+    # swings back as a counterweight, and slams back onto the haft on the
+    # way down -- and a hand that visibly RE-GRIPS before the hit is worth
+    # more to the impact than one that was glued on throughout.
+    #
+    # The handoff is a constraint-influence ramp rather than a cut, so the
+    # IK result and the free FK pose cross-fade into each other.
+    HOLD = [(1, 1.0), (11, 1.0), (14, 0.0), (19, 0.0), (22, 1.0), (40, 1.0)]
+
+    def hold_at(f):
+        for i in range(len(HOLD) - 1):
+            (f0, v0), (f1, v1) = HOLD[i], HOLD[i + 1]
+            if f0 <= f <= f1:
+                u = (f - f0) / float(f1 - f0) if f1 > f0 else 0.0
+                return v0 + (v1 - v0) * (u * u * (3 - 2 * u))
+        return HOLD[-1][1]
+
+    ELBOW_L = _elbow_axis("l")
+    guard_ik, guard_rot = g["_gc"], g["_grc"]
+
+    # Feet stay planted all clip: lead foot forward, rear foot braced behind.
+    # The knees are never keyed -- the hips drop 0.14 of a leg into the hit
+    # and the leg IK bends them, which is less work and more correct than
+    # authoring a crouch.
+    LEAD_Y, REAR_Y = FWD * 0.24 * LEG, 0.28 * LEG
+    SPLIT = 0.185 * LEG
+
+    # ⚠️ KEY THE PARAMETERS ON BEATS, BUT SAMPLE THE POSE EVERY FRAME.
+    # The first version keyed the IK goals only on the beats and let Blender
+    # interpolate between them. For a hand travelling on an ARC that is
+    # wrong twice over. The straight line between "up behind the shoulder"
+    # and "down in front of the shins" is a chord straight through the
+    # ribcage -- so mid-swing the arm passed through the chest instead of
+    # going round. And the two hands were keyed as independent world
+    # positions, so across 190 degrees of rotation the off hand came away
+    # from the haft entirely and floated beside it.
+    #
+    # Both are the same mistake: interpolating POSITIONS that are derived
+    # from a parameter, instead of interpolating the parameter. The beat
+    # table is still the performance; it is just evaluated per frame and the
+    # arc recomputed, which keeps the path curved and keeps both fists on
+    # one rigid object by construction.
+    contact_err = None
+    solved = {}
+    for (f, a, phi, dz, dy, twist, spine, head, grip) in B:
+        if phi is None:
+            phi, contact_err = solve_contact(hand_at(a, pivot_at(dz, dy, spine)))
+            solved[f] = phi
+    TAB = [(f, a, solved.get(f, phi), dz, dy, twist, spine, head, grip)
+           for (f, a, phi, dz, dy, twist, spine, head, grip) in B]
+
+    def sample(f):
+        for i in range(len(TAB) - 1):
+            f0, f1 = TAB[i][0], TAB[i + 1][0]
+            if f0 <= f <= f1:
+                u = (f - f0) / float(f1 - f0) if f1 > f0 else 0.0
+                # Linear through the strike and the hold; eased everywhere
+                # else. This is the one place the shape of the curve IS the
+                # animation, so it is explicit rather than left to handles.
+                if not (18 <= f0 < 24):
+                    u = u * u * (3 - 2 * u)
+                return [p0 + (p1 - p0) * u for p0, p1 in zip(TAB[i][1:], TAB[i + 1][1:])]
+        return list(TAB[-1][1:])
+
+    for f in range(1, frames + 1):
+        a, phi, dz, dy, twist, spine, head, grip = sample(f)
+        P = pivot_at(dz, dy, spine)
+        H = hand_at(a, P)
+
+        arm.location = (0.0, dy * LEG, (FLOOR + LEG * 0.985 + dz * LEG) - HIP0)
+        arm.keyframe_insert("location", frame=f)
+
+        pb = arm.pose.bones["pelvis"]
+        pb.rotation_euler = Euler((math.radians(spine * 0.20), 0,
+                                   math.radians(twist * 0.42)), "XYZ")
+        pb.keyframe_insert("rotation_euler", frame=f)
+        for bn, ks, kt in (("spine_01", 0.26, 0.22), ("spine_02", 0.36, 0.30),
+                           ("spine_03", 0.30, 0.26)):
+            b = arm.pose.bones.get(bn)
+            if b:
+                b.rotation_euler = Euler((math.radians(spine * ks), 0,
+                                          math.radians(twist * kt)), "XYZ")
+                b.keyframe_insert("rotation_euler", frame=f)
+        # ── EYES ON THE ROCK ── the head counter-rotates against both the
+        # twist and the spine, so the gaze stays on the spot being hit while
+        # the body turns away from it. A head that rides the torso reads as
+        # someone swinging with their eyes shut.
+        for bn, k in (("neck_01", 0.45), ("head", 0.55)):
+            b = arm.pose.bones.get(bn)
+            if b:
+                b.rotation_euler = Euler((math.radians(head * k), 0,
+                                          math.radians(-twist * 0.5 * k)), "XYZ")
+                b.keyframe_insert("rotation_euler", frame=f)
+
+        for s_, (fx, fy) in (("l", (SPLIT, LEAD_Y)), ("r", (-SPLIT, REAR_Y))):
+            tgt, pole = iks[s_]
+            tgt.location = (fx, fy, FLOOR + ANKLE_H)
+            tgt.keyframe_insert("location", frame=f)
+            tgt.rotation_quaternion = FOOT_REST[s_]
+            tgt.keyframe_insert("rotation_quaternion", frame=f)
+            pole.location = (fx * 1.5, fy + FWD * 0.45 * LEG, FLOOR + LEG * 0.52)
+            pole.keyframe_insert("location", frame=f)
+
+        # ── THE DRIVING HAND ──
+        pick_goal.location = H
+        pick_goal.keyframe_insert("location", frame=f)
+        pick_pole.location = (sho.x * 2.0, 0.55 * LEG, FLOOR + LEG * 1.30)
+        pick_pole.keyframe_insert("location", frame=f)
+        pgrip.rotation_quaternion = Quaternion((1, 0, 0), math.radians(phi)) @ PQ
+        pgrip.keyframe_insert("rotation_quaternion", frame=f)
+
+        # ── THE OFF HAND RIDES THE HAFT ── computed, not posed. The tool is
+        # rigidly skinned to the driving hand and that hand's world position
+        # IS the IK goal, so every point on the haft has a closed form and
+        # the second grip can be put on it exactly, on every frame.
+        # ⚠️ THE GOAL IS THE WRIST, AND A FIST IS NOT ITS WRIST. Putting the
+        # wrist exactly on the haft axis -- which is what "the hand is on the
+        # haft" naively means -- pushes the whole fist past the shaft and the
+        # fingers close on air behind it. Measured 0.046 of daylight. The
+        # goal is pulled back toward the shoulder by half a hand so the palm
+        # lands on the wood.
+        # ⚠️ AND THE SLIDE IS SOLVED, NOT AUTHORED. Hand-picking where the
+        # off hand sits per beat was guesswork in a frame that rotates 190
+        # degrees: sliding it up helped at one beat and made the next worse,
+        # because "up the haft" points toward the body early in the swing
+        # and away from it at the top. The authored value is a PREFERENCE
+        # now; if it puts the fist out of reach, the grip runs along the
+        # haft to the nearest spot the arm can actually hold, which is also
+        # exactly what a hand does on a tool it is not willing to drop.
+        _sl = arm.matrix_world @ arm.pose.bones["upperarm_l"].head
+        _maxr = g["ARM_FULL"]["l"] * 0.96
+        _best, hpt = None, None
+        for _i in range(61):
+            _t = (_i / 60.0) * g["GRIP_HI"]
+            _p = tool_pt(Vector((0, 0, _t * LEG)), H, phi)
+            _v = _sl - _p
+            if _v.length > 1e-6:
+                _p = _p + _v.normalized() * (0.075 * LEG)
+            _cost = abs(_t - grip) + max(0.0, (_sl - _p).length - _maxr) * 12.0
+            if _best is None or _cost < _best:
+                _best, hpt = _cost, _p
+        hand_goal.location = hpt
+        hand_goal.keyframe_insert("location", frame=f)
+        elbow_pole.location = (abs(sho.x) * 1.9, 0.50 * LEG, FLOOR + LEG * 1.10)
+        elbow_pole.keyframe_insert("location", frame=f)
+        GRIP.rotation_quaternion = Quaternion((1, 0, 0), math.radians(phi)) @ HQ
+        GRIP.keyframe_insert("rotation_quaternion", frame=f)
+
+        # ── RELEASE ── influence down, and an FK counterweight underneath it
+        # for the ramp to blend into: the free arm sweeps back and out, which
+        # is both what balances an overhead wind-up and what keeps the
+        # silhouette from going symmetrical at the most important pose in the
+        # clip.
+        hold = hold_at(f)
+        guard_ik.influence = hold
+        guard_ik.keyframe_insert("influence", frame=f)
+        guard_rot.influence = hold
+        guard_rot.keyframe_insert("influence", frame=f)
+
+        rel = 1.0 - hold
+        ab = arm.pose.bones["upperarm_l"]
+        (ax, sg), _b, _c = TUCK["l"]
+        e = [math.radians(-34.0 * rel * ARMS["l"]), 0.0, 0.0]
+        e[ax] += math.radians((TUCKAMT + 16 * rel) * sg)
+        ab.rotation_euler = Euler(e, "XYZ")
+        ab.keyframe_insert("rotation_euler", frame=f)
+        lb = arm.pose.bones["lowerarm_l"]
+        e2 = [0.0, 0.0, 0.0]
+        e2[ELBOW_L[0]] = math.radians(46.0 * rel) * ELBOW_L[1]
+        lb.rotation_euler = Euler(e2, "XYZ")
+        lb.keyframe_insert("rotation_euler", frame=f)
+
+    # Both fists grip the haft. Nothing keys fingers, so this persists -- and
+    # Mine is baked last, which is the only reason it is safe to do here.
+    g["close_fist"]("l", 0.80)
+    g["close_fist"]("r", 0.90)
+
+    _smooth([arm] + list(G["helpers"]))
+    # ⚠️ NO EASE INTO THE HIT, AND NONE OUT OF THE HOLD. Bezier handles across
+    # 18-24 would round off exactly the two frames the whole clip exists to
+    # deliver: the strike would decelerate into contact and the hit-stop
+    # would drift instead of stopping dead.
+    for ob in [arm] + list(G["helpers"]):
+        if ob.animation_data and ob.animation_data.action:
+            for fc in ob.animation_data.action.fcurves:
+                for kp in fc.keyframe_points:
+                    if 18 <= kp.co[0] <= 24:
+                        kp.interpolation = "LINEAR"
+    print("MINE keyed on %d beats; contact tip lands %.4f from the floor"
+          % (len(B), contact_err if contact_err is not None else -1))
+    return frames

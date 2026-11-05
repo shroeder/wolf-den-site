@@ -28,13 +28,18 @@ const MODELS = [
             { id: "pauldrons", label: "Pauldrons", nodes: ["Pauldron_L", "Pauldron_R"] },
             { id: "greaves", label: "Greaves", nodes: ["Greave_L", "Greave_R"] },
             { id: "shield", label: "Shield", nodes: ["Shield"] },
+            { id: "pickaxe", label: "Pickaxe", nodes: ["Pickaxe"] },
         ],
         clips: [
             { id: "Idle", label: "Idle", kind: "loop", hint: "Relaxed stand" },
             { id: "Walk", label: "Walk", kind: "loop", hint: "Locomotion, 1.28 u/s" },
             { id: "Run", label: "Run", kind: "loop", hint: "4.67 u/s, 38% of the cycle airborne" },
-            { id: "Brace", label: "Brace", kind: "loop", hint: "Shield guard" },
-            { id: "Impact", label: "Impact", kind: "oneShot", hint: "Takes a hit, returns to guard" },
+            { id: "Brace", label: "Brace", kind: "loop", hint: "Shield guard",
+                kit: { on: ["shield"], off: ["pickaxe"] } },
+            { id: "Impact", label: "Impact", kind: "oneShot", hint: "Takes a hit, returns to guard",
+                kit: { on: ["shield"], off: ["pickaxe"] } },
+            { id: "Mine", label: "Mine", kind: "oneShot", hint: "Two-handed pickaxe strike into the ground",
+                kit: { on: ["pickaxe"], off: ["shield"] } },
         ],
     },
     {
@@ -326,6 +331,19 @@ export default function ModelLab() {
         const d = blendRef.current;
         api.play(id, d);
         setCurrent(id);
+        // ⚠️ THE SHIELD AND THE PICKAXE SHARE A BODY. Both are skinned to
+        // hands, so leaving both on means the mining swing is performed with
+        // a shield flailing off the off arm. Choosing a clip chooses the
+        // loadout it was animated against; the Equip row still overrides.
+        const spec = CLIPS.find((x) => x.id === id);
+        if (spec && spec.kit) {
+            setEquipped((p) => {
+                const next = new Set(p);
+                (spec.kit.on || []).forEach((k) => next.add(k));
+                (spec.kit.off || []).forEach((k) => next.delete(k));
+                return [...next];
+            });
+        }
         const prevSpec = CLIPS.find((x) => x.id === from);
         const cancelled = prevSpec && prevSpec.kind === "oneShot" && id !== from;
         note(`${from} → ${id} over ${d.toFixed(2)}s${cancelled ? `   (cancelled ${from})` : ""}`);
