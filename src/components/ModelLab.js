@@ -18,7 +18,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const MODELS = [
     {
         id: "hero", label: "Hero", url: "/models/hero.glb",
-        note: "MPFB body, 53-bone rig, IK-authored clips baked to bone keys.",
+        note: "MPFB body, 53-bone rig, IK-authored clips baked to bone keys. Each plate is cut from the "
+            + "hero's own surface and thickened, so it fits exactly and inherits the bone weights of the "
+            + "flesh underneath it.",
+        // Equipment is one skeleton and several meshes. Equipping is showing
+        // a node; removing is hiding it. Nothing is re-skinned at runtime.
+        equip: [
+            { id: "cuirass", label: "Cuirass", nodes: ["Cuirass"] },
+            { id: "pauldrons", label: "Pauldrons", nodes: ["Pauldron_L", "Pauldron_R"] },
+            { id: "greaves", label: "Greaves", nodes: ["Greave_L", "Greave_R"] },
+            { id: "shield", label: "Shield", nodes: ["Shield"] },
+        ],
         clips: [
             { id: "Idle", label: "Idle", kind: "loop", hint: "Relaxed stand" },
             { id: "Walk", label: "Walk", kind: "loop", hint: "Locomotion" },
@@ -52,6 +62,7 @@ export default function ModelLab() {
     const [log, setLog] = useState([]);
     const [info, setInfo] = useState(null);
     const [modelId, setModelId] = useState("hero");
+    const [equipped, setEquipped] = useState(() => ["cuirass", "pauldrons", "greaves", "shield"]);
     const model = MODELS.find((m) => m.id === modelId) || MODELS[0];
     const CLIPS = model.clips;
 
@@ -66,6 +77,8 @@ export default function ModelLab() {
         setError(null);
         setInfo(null);
         setCurrent("Idle");
+        setEquipped((MODELS.find((m) => m.id === modelId) || MODELS[0]).equip
+            ? (MODELS.find((m) => m.id === modelId) || MODELS[0]).equip.map((e) => e.id) : []);
         let cancelled = false;
         let cleanup = () => {};
 
@@ -176,7 +189,7 @@ export default function ModelLab() {
                     first.play();
 
                     const api = {
-                        mixer, actions, meshes,
+                        mixer, actions, meshes, root,
                         activeId: first.getClip().name,
                         fallbackId: first.getClip().name,   // where a one-shot hands back to
                     };
@@ -281,6 +294,25 @@ export default function ModelLab() {
         return () => { cancelled = true; cleanup(); };
     }, [note, model]);
 
+    // ⚠️ SEPARATE EFFECT, AND IT MUST DEPEND ON `ready`. The pieces do not
+    // exist until the GLB has loaded, so applying the equipped set from the
+    // click handler alone would leave the initial state unapplied.
+    useEffect(() => {
+        const api = apiRef.current;
+        if (!api || !api.root || !model.equip) return;
+        model.equip.forEach((e) => {
+            const on = equipped.includes(e.id);
+            e.nodes.forEach((n) => {
+                const o = api.root.getObjectByName(n);
+                if (o) o.visible = on;
+            });
+        });
+    }, [equipped, model, ready]);
+
+    const toggleEquip = useCallback((id) => {
+        setEquipped((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+    }, []);
+
     // Playback state lives on a ref so changing speed never re-runs the setup effect.
     useEffect(() => {
         apiRef.current = Object.assign({}, apiRef.current || {}, { playing, speed });
@@ -326,6 +358,24 @@ export default function ModelLab() {
                 ))}
             </div>
 
+            {model.equip ? (
+                <div className="row">
+                    <span className="lbl">Equip</span>
+                    {model.equip.map((e) => (
+                        <button key={e.id} type="button"
+                            className={equipped.includes(e.id) ? "on" : ""}
+                            onClick={() => toggleEquip(e.id)}
+                            aria-pressed={equipped.includes(e.id)}>
+                            {e.label}
+                        </button>
+                    ))}
+                    <button type="button" className="shot"
+                        onClick={() => setEquipped((p) => (p.length ? [] : model.equip.map((x) => x.id)))}>
+                        {equipped.length ? "Strip" : "Full kit"}
+                    </button>
+                </div>
+            ) : null}
+
             <div className="row">
                 <span className="lbl">Blend</span>
                 {BLENDS.map((b) => (
@@ -367,6 +417,8 @@ export default function ModelLab() {
                 Drag to orbit, scroll to zoom. Set <strong>Snap</strong> and switch clips to see what a cut
                 looks like, then raise the blend and switch again. The amber clip is a one-shot: it plays once
                 and hands back to whatever was running, and pressing another clip mid-way cancels it.
+                Equip and remove pieces while a clip is playing — they are skinned to the same skeleton, so
+                they keep deforming with the body rather than riding along as props.
             </p>
             <p className="muted note">{model.note}</p>
 

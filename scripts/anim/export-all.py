@@ -20,6 +20,10 @@ sys.path.insert(0, HERE)
 # closed fist -- and a keyed Walk.
 exec(open(os.path.join(HERE, "build-walk.py")).read())
 
+# ── EQUIPMENT ── built before any clip is keyed, so every plate is already
+# skinned to the rig the bakes are about to drive.
+exec(open(os.path.join(HERE, "build-armour.py")).read())
+
 import clips
 clips.init(globals())
 
