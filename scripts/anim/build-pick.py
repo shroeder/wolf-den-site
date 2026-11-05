@@ -115,19 +115,50 @@ close_fist(OFF_HAND, 0.86)
 bpy.context.view_layer.update()
 
 
+SHAFT_R = 0.0285 * LEG
+FINGER_R = 0.011 * LEG
+
+
 def grip_frame(side):
-    """Where a closed fist holds a shaft, and which way it runs. +Z runs up
-    out of the thumb side; +Y is as near the character's forward as it can
-    be while square to the shaft."""
-    def bone(n):
-        return arm.matrix_world @ arm.pose.bones["%s_%s" % (n, side)].head
+    """Where a closed fist can hold a shaft of THIS thickness, and which way
+    it runs. +Z runs up out of the thumb side.
+
+    ⚠️ THE CENTRE IS SOLVED, NOT AVERAGED. Averaging the knuckle positions
+    puts the axis on the line the FINGER BONES lie on -- so the shaft is
+    threaded through them. Measured, the finger joints came out 0.013 to
+    0.027 from the axis against a shaft radius of 0.030: his fingers were
+    inside the wood, and I read those numbers and called it a perfect grip.
+    A held shaft sits in the HOLE, clear of every bone by its own radius
+    plus a finger. Search the plane square to the axis for the point that
+    actually achieves that."""
+    def bone(n, tail=False):
+        pb = arm.pose.bones["%s_%s" % (n, side)]
+        return arm.matrix_world @ (pb.tail if tail else pb.head)
     i1, p1 = bone("index_01"), bone("pinky_01")
-    i2, p2 = bone("index_02"), bone("pinky_02")
     z = (i1 - p1).normalized()
     fwd = Vector((0.0, FWD, 0.0))
     y = fwd - z * fwd.dot(z)
     y = y.normalized() if y.length > 1e-5 else Vector((0, 0, 1)).cross(z).normalized()
-    return (i1 + p1 + i2 + p2) / 4.0, Matrix((y.cross(z), y, z)).transposed().to_3x3()
+    x = y.cross(z)
+
+    ring = [bone(n, t) for n in ("index_01", "index_02", "index_03",
+                                 "middle_01", "middle_02", "middle_03",
+                                 "pinky_01", "pinky_02", "pinky_03",
+                                 "thumb_02", "thumb_03") for t in (False, True)]
+    seed = sum(ring, Vector()) / len(ring)
+    want = SHAFT_R + FINGER_R
+    best, centre = -1e9, seed
+    for ix in range(-14, 15):
+        for iy in range(-14, 15):
+            c = seed + x * (ix * 0.004 * LEG) + y * (iy * 0.004 * LEG)
+            gap = min((p - c - z * (p - c).dot(z)).length for p in ring)
+            score = -abs(gap - want)
+            if score > best:
+                best, centre = score, c
+    clear = min((p - centre - z * (p - centre).dot(z)).length for p in ring)
+    print("        grip %s: nearest bone %.4f from the axis "
+          "(shaft %.4f, want >= %.4f)" % (side, clear, SHAFT_R, want))
+    return centre, Matrix((x, y, z)).transposed().to_3x3()
 
 
 # ── THE CONTROL ─────────────────────────────────────────────────────────────

@@ -457,6 +457,21 @@ def key_mine(frames=40):
     for c in ("_pick_ik", "_pgc", "_gc", "_grc"):
         g[c].influence = 1.0
 
+    # ⚠️ THE ROLL OF THE SHAFT ABOUT ITS OWN AXIS IS NOT FREE -- IT IS THE
+    # BIGGEST SINGLE INFLUENCE ON THE WRISTS. A shaft rolled about itself
+    # looks identical; the HANDS holding it do not, because the grip is
+    # welded to the tool and every degree of roll is a degree of forearm
+    # twist the wrist has to find. Luke spotted it by eye -- "it looks like
+    # you've overspun the pickaxe and it's causing his hands to twist" --
+    # and _roll.py confirms it, sweeping the roll and measuring:
+    #
+    #     roll     0 deg  ->  wrists  47 / 83     (what shipped)
+    #     roll   240 deg  ->  wrists 101 / 46
+    #     roll   310 deg  ->  wrists  52 / 62     both inside human range
+    #
+    # 83 and 101 degrees are not poses, they are breaks. It was overspun by
+    # about 50 degrees and I had been treating the roll as cosmetic.
+    globals()['_ROLL'] = float(globals().get('ROLL_TEST', 310.0))
     TOOL, TIP = g["TOOL"], g["PICK_TIP"]
     WRIST = g["WRIST_IN_TOOL"]
     REACH_MAX = 0.95
@@ -510,6 +525,9 @@ def key_mine(frames=40):
         haft.normalize()
         y = haft.cross(right)
         rot = Matrix((right, y, haft)).transposed().to_3x3().to_quaternion()
+        # A shaft rolled about its own axis looks the same; the HANDS do
+        # not. _roll.py sweeps this and measures the wrists.
+        rot = rot @ Quaternion((0, 0, 1), math.radians(globals().get('_ROLL', 0.0)))
         return H, rot
 
     #     f  reach  elev  lead   hip dz  hip dy twist spine head
@@ -563,6 +581,7 @@ def key_mine(frames=40):
     LEAD_Y, REAR_Y = FWD * 0.26 * LEG, 0.26 * LEG
     SPLIT = 0.185 * LEG
     worst_reach, worst_elev, tip_lo = 0.0, 999.0, 1e9
+    worst_wrist = {"l": 0.0, "r": 0.0}
 
     for f in range(1, frames + 1):
         reach, elev, lead, dz, dy, twist, spine, head = sample(f)
@@ -594,11 +613,49 @@ def key_mine(frames=40):
             tgt.keyframe_insert("rotation_quaternion", frame=f)
             pole.location = (fx * 1.5, fy + FWD * 0.45 * LEG, FLOOR + LEG * 0.52)
             pole.keyframe_insert("location", frame=f)
-        mid, up, fv, right = frame_axes()
-        g["_elbow_pole"].location = mid + right * (0.9 * ARM) + fv * (0.25 * ARM)
-        g["_elbow_pole"].keyframe_insert("location", frame=f)
-        g["_pick_pole"].location = mid - right * (0.9 * ARM) + fv * (0.25 * ARM)
-        g["_pick_pole"].keyframe_insert("location", frame=f)
+        # ── THE ELBOW POLES ARE SOLVED, PER FRAME, PER ARM ──────────────
+        # ⚠️ A FORCED HAND ORIENTATION HAS TO GO SOMEWHERE. IK sets where
+        # the wrist IS and a Copy Rotation sets which way the hand POINTS;
+        # the wrist joint silently absorbs the entire difference, and
+        # nothing in the rig says no. Measured on the first version: 123
+        # degrees of wrist bend where a human manages about 70. That is the
+        # "every joint torqued the wrong way" -- not a posing taste
+        # question, a broken arm.
+        #
+        # A real forearm ROLLS to meet the grip, and on an IK chain the
+        # thing that rolls it is the pole. So the pole angle is no longer a
+        # placed guess: it is swept around the shoulder-to-wrist axis and
+        # the position that leaves the LEAST wrist bend wins. The arm
+        # arrives already oriented, so the wrist has almost nothing to
+        # absorb.
+        for s_, pole in (("l", elbow_pole), ("r", g["_pick_pole"])):
+            sh = arm.matrix_world @ arm.pose.bones["upperarm_%s" % s_].head
+            wr = arm.matrix_world @ arm.pose.bones["hand_%s" % s_].head
+            ax = (wr - sh)
+            if ax.length < 1e-5:
+                continue
+            ax.normalize()
+            u = ax.cross(Vector((0, 0, 1)))
+            u = u.normalized() if u.length > 1e-4 else ax.cross(Vector((0, 1, 0))).normalized()
+            v = ax.cross(u)
+            best, bpos = 1e9, pole.location.copy()
+            for k in range(24):
+                th = k * (math.pi / 12.0)
+                cand = ((sh + wr) * 0.5
+                        + (u * math.cos(th) + v * math.sin(th)) * (0.9 * ARM))
+                pole.location = cand
+                bpy.context.view_layer.update()
+                fa = (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % s_].tail) -                      (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % s_].head)
+                hd = (arm.matrix_world @ arm.pose.bones["hand_%s" % s_].tail) -                      (arm.matrix_world @ arm.pose.bones["hand_%s" % s_].head)
+                if fa.length < 1e-6 or hd.length < 1e-6:
+                    continue
+                bend = math.degrees(fa.angle(hd))
+                if bend < best:
+                    best, bpos = bend, cand
+            pole.location = bpos
+            pole.keyframe_insert("location", frame=f)
+            worst_wrist[s_] = max(worst_wrist[s_], best)
+        bpy.context.view_layer.update()
 
         worst_reach = max(worst_reach, reach)
         worst_elev = min(worst_elev, elev)
@@ -616,4 +673,6 @@ def key_mine(frames=40):
     print("MINE  point lowest %.4f above the floor" % tip_lo)
     print("MINE  max reach %.2f of arm (cap %.2f) | min elevation %.0f deg "
           "(negative is behind him)" % (worst_reach, REACH_MAX, worst_elev))
+    print("MINE  worst wrist bend  L %.0f  R %.0f deg   (a wrist does about 70)"
+          % (worst_wrist["l"], worst_wrist["r"]))
     return frames
