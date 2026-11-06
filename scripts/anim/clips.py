@@ -417,39 +417,61 @@ def key_run(frames=16):
 
 # ───────────────────────────────────────────────────────────────────────────
 def _twist_from_rest(pb):
-    """Signed roll of a bone about its own length, minus the same at rest.
+    """Roll of a bone about its own length vs rest. Same logic as qa.py.
 
-    ⚠️ THE POLE SWEEP BELOW USED TO SCORE WRIST BEND ALONE, and an optimiser
-    graded on one joint will happily destroy another to win. It rolled the
-    humerus 165 degrees at the apex of Mine -- the arm ends up across his face
-    -- because that bought a degree or two at the wrist. qa.py caught it as
-    upperarm-TWIST; Luke caught it as "arms completely twisted and mangled".
+    ⚠️ THE OPTIMISER WAS BLIND TO THE FLIP IT WAS CAUSING. This read one axis
+    only, which goes degenerate at exactly the elevations where the pick arm
+    passes overhead -- so the sweep scored a 180-degree shoulder flip as free
+    and took it. The per-frame profile of Mine made it undeniable:
 
-    Rest roll is subtracted so the large constant offset between a bone and
-    its parent cancels, leaving only what the animation did. Same derivation
-    as qa.py's twist_deg; two earlier versions of that calculation were wrong
-    in ways that passed review, so keep the two in step.
+        upperarm_r  f8: 0   f9: 141   f10: 146   f11: 156   f12: 180   f13: 3
+
+    Four frames on the wrong branch, invisible to the ruler that chose them
+    and plain in the render -- arms wrapped across his chest.
+
+    ⚠️ KEEP IN STEP WITH qa.py's twist_deg. An optimiser graded with a
+    different ruler from the judge optimises for the wrong thing, and that is
+    not hypothetical here: it is this exact bug.
+
+    The one deliberate difference is what "unmeasurable" means. qa.py EXCLUDES
+    such a frame -- do not report a number you cannot stand behind. Here it
+    scores 180, the worst possible, because for an optimiser "I cannot verify
+    this candidate" must read as risky rather than as free.
     """
     if pb.parent is None:
         return 0.0
+
     def roll(axis, up, ref):
+        if axis.length < 1e-6:
+            return None
         axis = axis.normalized()
         u = up - axis * up.dot(axis)
         r = ref - axis * ref.dot(axis)
-        if u.length < 1e-6 or r.length < 1e-6:
-            return 0.0
-        u.normalize(); r.normalize()
+        if u.length < 0.45 or r.length < 0.45:
+            return None
+        u.normalize()
+        r.normalize()
         return math.degrees(math.atan2(u.cross(r).dot(axis), u.dot(r)))
-    ax = pb.tail - pb.head
-    if ax.length < 1e-6:
-        return 0.0
-    now = roll(ax, pb.matrix.to_3x3() @ Vector((0, 0, 1)),
-               pb.parent.matrix.to_3x3() @ Vector((0, 0, 1)))
-    rb, rp = pb.bone, pb.parent.bone
-    rest = roll(rb.tail_local - rb.head_local,
-                rb.matrix_local.to_3x3() @ Vector((0, 0, 1)),
-                rp.matrix_local.to_3x3() @ Vector((0, 0, 1)))
-    return abs((now - rest + 180.0) % 360.0 - 180.0)
+
+    def one(k):
+        now = roll(pb.tail - pb.head, pb.matrix.to_3x3() @ k,
+                   pb.parent.matrix.to_3x3() @ k)
+        rb, rp = pb.bone, pb.parent.bone
+        rest = roll(rb.tail_local - rb.head_local,
+                    rb.matrix_local.to_3x3() @ k, rp.matrix_local.to_3x3() @ k)
+        if now is None or rest is None:
+            return None
+        return abs((now - rest + 180.0) % 360.0 - 180.0)
+
+    a = one(Vector((0.0, 0.0, 1.0)))
+    b = one(Vector((1.0, 0.0, 0.0)))
+    if a is None and b is None:
+        return 180.0        # unverifiable is risky, not free
+    if a is None or b is None:
+        return a if b is None else b
+    if abs(a - b) > 30.0:
+        return min(a, b)    # the artifact inflates; trust the smaller
+    return max(a, b)
 
 
 def key_mine(frames=40):
