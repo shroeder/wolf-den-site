@@ -110,6 +110,22 @@ SUSPECT = {"lowerarm", "calf"}
 # How far a hand may come to the spine axis before it is inside the chest. Not
 # guessed: measured per frame from the torso's own vertices (see torso_radius).
 PENETRATION_MARGIN = 0.02
+# ⚠️ POKE IS MEASURED BUT NOT GATED -- IT FAILED ITS OWN VALIDATION.
+# Counts by clip: Idle 164, Walk 186, Brace 375, Mine 632, Impact 658, Run 970.
+# Rendered and checked: Idle's cuirass is CLEAN at full zoom, so its 164 are
+# false positives, and Run scores WORST of all six while looking fine. The
+# ordering does not track the renders, so the number cannot be acted on.
+#
+# Known weaknesses of the outward-ray test: where a plate is thin or strongly
+# curved the body normal runs ALONG the steel rather than through it and the
+# ray escapes; and the 0.04 "is this spot covered" radius catches flesh the
+# plate does not really cover. Probably wants a depth comparison between an
+# armour-only and a body-only render instead of a geometric ray.
+#
+# It still prints, because the defect is real -- flesh does punch through the
+# cuirass on Mine f18 -- and a number nobody trusts is still better than
+# forgetting the defect exists, which is what happened the first time I saw it.
+POKE_VERTS = None
 
 
 def ang(a, b, c, d):
@@ -210,6 +226,64 @@ TORSO_G = {g.index for g in human.vertex_groups
 HAND_G = {s: {g.index for g in human.vertex_groups if g.name == "hand_%s" % s}
           for s in ("l", "r")}
 
+PLATES = ("Cuirass", "Pauldron_L", "Pauldron_R", "Greave_L", "Greave_R")
+
+
+def plate_poke(ev):
+    """How many body vertices are sticking OUT through a piece of armour.
+
+    ⚠️ A WHOLE CLASS OF DEFECT LIVES ONLY IN THE MESH. Every angle in this file
+    reads the skeleton, so flesh punching through steel scores a clean pass. It
+    is in the QA sheet for Mine f18, and I had seen the same thing hours before
+    with no way to record it, so it was lost.
+
+    ⚠️ SECOND ATTEMPT. The first compared each body vertex to the nearest point
+    on the plate and used the sign of the plate's normal. A solidified plate has
+    an INNER and an OUTER surface whose normals oppose, so flesh correctly
+    tucked under the inner surface read as "outside" -- every clip failed, all
+    at exactly 0.030, which was my own search radius saturating. A metric that
+    returns the same number for good and bad work is measuring the search, not
+    the mesh.
+
+    This asks the question with no sign ambiguity: stand on the body vertex,
+    look outward along its own normal, and see whether the armour is there. If
+    the plate covers this spot but is not in front of the flesh, the flesh is
+    outside it. Rim vertices are skipped -- flesh is meant to be outside the
+    armour at its edges.
+    """
+    bad, where = 0, None
+    for nm in PLATES:
+        ob = bpy.data.objects.get(nm)
+        if ob is None or ob.hide_render:
+            continue
+        pm = ob.evaluated_get(dg).to_mesh()
+        verts = [ob.matrix_world @ v.co for v in pm.vertices]
+        polys = [list(pl.vertices) for pl in pm.polygons]
+        count = {}
+        for pl in pm.polygons:
+            vs = list(pl.vertices)
+            for k in range(len(vs)):
+                e = tuple(sorted((vs[k], vs[(k + 1) % len(vs)])))
+                count[e] = count.get(e, 0) + 1
+        rim = [verts[i] for e, c in count.items() if c == 1 for i in e]
+        tree = BVHTree.FromPolygons(verts, polys, all_triangles=False)
+        n_bad = 0
+        for v in ev.vertices:
+            p = human.matrix_world @ v.co
+            near = tree.find_nearest(p, 0.04)
+            if near is None or near[0] is None:
+                continue                      # plate does not cover this spot
+            if any((near[0] - r).length < 0.04 for r in rim):
+                continue                      # at the edge of the plate
+            nrm = (human.matrix_world.to_3x3() @ v.normal).normalized()
+            if tree.ray_cast(p + nrm * 1e-4, nrm, 0.08)[0] is None:
+                n_bad += 1                    # nothing between flesh and air
+        ob.evaluated_get(dg).to_mesh_clear()
+        if n_bad > bad:
+            bad, where = n_bad, nm
+    return bad, where
+
+
 def cam_for(azim):
     """Place an ortho camera at `azim` degrees around the figure, matching the
     look the hero is normally reviewed in (low frontal key, Standard view
@@ -251,7 +325,8 @@ print("=" * 78)
 for name, end, _c in STASHED:
     arm.animation_data_create()
     arm.animation_data.action = bpy.data.actions[name]
-    worst = {"wrist": (0, 0), "elbow": (0, 0), "knee": (0, 0), "pen": (1e9, 0)}
+    worst = {"wrist": (0, 0), "elbow": (0, 0), "knee": (0, 0), "pen": (1e9, 0),
+             "poke": (0.0, 0, None)}
     twist = {k: (0, 0) for k in TWIST_LIMITS}
     for f in range(1, end + 1):
         sc.frame_set(f)
@@ -298,6 +373,9 @@ for name, end, _c in STASHED:
                     gap = (p - loc).dot(nor)
                     if gap < worst["pen"][0]:
                         worst["pen"] = (gap, f)
+        pk, pw = plate_poke(ev)
+        if pk > worst["poke"][0]:
+            worst["poke"] = (pk, f, pw)
         human.evaluated_get(dg).to_mesh_clear()
 
     for key in ("wrist", "elbow", "knee"):
@@ -314,6 +392,9 @@ for name, end, _c in STASHED:
             fails.append((name, "%s-TWIST" % part, val, f))
         print("%-7s %-6s %6.1f deg  (f%-3d) limit %.0f  %s"
               % (name, part[:5] + "~", val, f, lim, "FAIL" if bad else "ok"))
+    pk, f, pw = worst["poke"]
+    print("%-7s %-6s %6d vts  (f%-3d) %s"
+          % (name, "poke", pk, f, "SUSPECT - not gated, see POKE_VERTS"))
     gap, f = worst["pen"]
     bad = gap < PENETRATION_MARGIN
     if bad:
