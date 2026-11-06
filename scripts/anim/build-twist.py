@@ -32,7 +32,7 @@ from mathutils import Vector
 # twist group has to exist before they are made or the armour will not follow
 # the forearm it is strapped to.
 
-TWIST_FRACTION = 0.5    # how much of the hand's roll the forearm absorbs
+TWIST_FRACTION = 0.5    # 0.8 was tried and made no visible difference at all
 
 _ebones = None
 bpy.context.view_layer.objects.active = arm
