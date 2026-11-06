@@ -416,6 +416,42 @@ def key_run(frames=16):
 
 
 # ───────────────────────────────────────────────────────────────────────────
+def _twist_from_rest(pb):
+    """Signed roll of a bone about its own length, minus the same at rest.
+
+    ⚠️ THE POLE SWEEP BELOW USED TO SCORE WRIST BEND ALONE, and an optimiser
+    graded on one joint will happily destroy another to win. It rolled the
+    humerus 165 degrees at the apex of Mine -- the arm ends up across his face
+    -- because that bought a degree or two at the wrist. qa.py caught it as
+    upperarm-TWIST; Luke caught it as "arms completely twisted and mangled".
+
+    Rest roll is subtracted so the large constant offset between a bone and
+    its parent cancels, leaving only what the animation did. Same derivation
+    as qa.py's twist_deg; two earlier versions of that calculation were wrong
+    in ways that passed review, so keep the two in step.
+    """
+    if pb.parent is None:
+        return 0.0
+    def roll(axis, up, ref):
+        axis = axis.normalized()
+        u = up - axis * up.dot(axis)
+        r = ref - axis * ref.dot(axis)
+        if u.length < 1e-6 or r.length < 1e-6:
+            return 0.0
+        u.normalize(); r.normalize()
+        return math.degrees(math.atan2(u.cross(r).dot(axis), u.dot(r)))
+    ax = pb.tail - pb.head
+    if ax.length < 1e-6:
+        return 0.0
+    now = roll(ax, pb.matrix.to_3x3() @ Vector((0, 0, 1)),
+               pb.parent.matrix.to_3x3() @ Vector((0, 0, 1)))
+    rb, rp = pb.bone, pb.parent.bone
+    rest = roll(rb.tail_local - rb.head_local,
+                rb.matrix_local.to_3x3() @ Vector((0, 0, 1)),
+                rp.matrix_local.to_3x3() @ Vector((0, 0, 1)))
+    return abs((now - rest + 180.0) % 360.0 - 180.0)
+
+
 def key_mine(frames=40):
     """A two-handed pickaxe strike into the ground. One-shot, 40 frames.
 
@@ -648,7 +684,7 @@ def key_mine(frames=40):
             u = ax.cross(Vector((0, 0, 1)))
             u = u.normalized() if u.length > 1e-4 else ax.cross(Vector((0, 1, 0))).normalized()
             v = ax.cross(u)
-            best, bpos = 1e9, pole.location.copy()
+            best, bpos, bbend = 1e9, pole.location.copy(), 0.0
             for k in range(24):
                 th = k * (math.pi / 12.0)
                 cand = ((sh + wr) * 0.5
@@ -660,11 +696,17 @@ def key_mine(frames=40):
                 if fa.length < 1e-6 or hd.length < 1e-6:
                     continue
                 bend = math.degrees(fa.angle(hd))
-                if bend < best:
-                    best, bpos = bend, cand
+                # ⚠️ SCORE BOTH JOINTS, OR THE SWEEP TRADES ONE FOR THE OTHER.
+                # Shoulder roll is weighted above wrist bend because a wrist a
+                # few degrees past comfortable reads as a stiff grip, while a
+                # humerus rolled past 90 reads as a broken man.
+                tw = _twist_from_rest(arm.pose.bones["upperarm_%s" % s_])
+                cost = bend + 1.5 * tw
+                if cost < best:
+                    best, bpos, bbend = cost, cand, bend
             pole.location = bpos
             pole.keyframe_insert("location", frame=f)
-            worst_wrist[s_] = max(worst_wrist[s_], best)
+            worst_wrist[s_] = max(worst_wrist[s_], bbend)
         bpy.context.view_layer.update()
 
         hd = arm.matrix_world @ arm.pose.bones["head"].head
