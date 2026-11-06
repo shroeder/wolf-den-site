@@ -436,8 +436,12 @@ def _twist_from_rest(pb):
         axis = axis.normalized()
         u = up - axis * up.dot(axis)
         r = ref - axis * ref.dot(axis)
-        if u.length < 1e-6 or r.length < 1e-6:
-            return 0.0
+        # ⚠️ SAME DEGENERACY GUARD AS qa.py. When a joint is strongly bent the
+        # parent's up-vector lies along the child's axis, the projection
+        # collapses, and the angle between two near-null vectors lands on 180
+        # as often as not. Feeding that into an optimiser makes it chase noise.
+        if u.length < 0.45 or r.length < 0.45:
+            return None
         u.normalize(); r.normalize()
         return math.degrees(math.atan2(u.cross(r).dot(axis), u.dot(r)))
     ax = pb.tail - pb.head
@@ -449,6 +453,8 @@ def _twist_from_rest(pb):
     rest = roll(rb.tail_local - rb.head_local,
                 rb.matrix_local.to_3x3() @ Vector((0, 0, 1)),
                 rp.matrix_local.to_3x3() @ Vector((0, 0, 1)))
+    if now is None or rest is None:
+        return 0.0      # unmeasurable here; do not let noise steer the sweep
     return abs((now - rest + 180.0) % 360.0 - 180.0)
 
 

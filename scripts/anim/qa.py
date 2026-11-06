@@ -145,56 +145,77 @@ def ang(a, b, c, d):
 
 
 def _roll_about(axis, up, ref):
-    """Signed angle from ref to up, measured around axis. Unsigned angles
-    cannot be differenced, which broke attempt two."""
+    """Signed angle from ref to up around axis, or None if ill-conditioned.
+
+    ⚠️ THE MISSING GUARD IS WHY lowerarm AND calf WERE NONSENSE. Roll is read
+    by projecting two up-vectors onto the plane perpendicular to the bone. When
+    a joint is strongly bent, the PARENT's up-vector lies almost along the
+    child's axis, its projection collapses to near-zero, and the angle between
+    two nearly-null vectors is noise -- which lands on +/-180 as often as not.
+    That is exactly the signature we saw: 177-180 on Brace, Run, Impact and
+    Mine, 0.1 on Walk and Idle. Not a forearm doing a half turn. A degenerate
+    projection.
+
+    Returning None rather than a number is the point. A measurement that
+    cannot be made must say so; the alternative is four clips carrying a
+    fabricated failure, which is what they carried all day.
+    """
     axis = axis.normalized()
     u = (up - axis * up.dot(axis))
     r = (ref - axis * ref.dot(axis))
-    if u.length < 1e-6 or r.length < 1e-6:
-        return 0.0
+    # Below this the projection is mostly rounding error. 0.25 of a unit
+    # vector is about 15 degrees off the bone axis.
+    if u.length < 0.45 or r.length < 0.45:
+        return None
     u.normalize(); r.normalize()
     return math.degrees(math.atan2(u.cross(r).dot(axis), u.dot(r)))
 
 
+def _roll_pair(pb, use_x):
+    """Roll of a bone about its own length vs rest, read against X or Z."""
+    ax = pb.tail - pb.head
+    if ax.length < 1e-6:
+        return None
+    k = Vector((1.0, 0.0, 0.0)) if use_x else Vector((0.0, 0.0, 1.0))
+    now = _roll_about(ax, pb.matrix.to_3x3() @ k, pb.parent.matrix.to_3x3() @ k)
+    rb, rp = pb.bone, pb.parent.bone
+    rest = _roll_about(rb.tail_local - rb.head_local,
+                       rb.matrix_local.to_3x3() @ k, rp.matrix_local.to_3x3() @ k)
+    if now is None or rest is None:
+        return None
+    return abs((now - rest + 180.0) % 360.0 - 180.0)
+
+
 def twist_deg(bone):
-    """How far this bone has been rolled about its own length AWAY FROM REST.
+    """Roll of this bone about its own length, away from rest.
 
-    ⚠️ THIRD ATTEMPT. The first two both failed the only test that matters --
-    they disagreed with the renders -- and each failed differently:
-
-      1. Swing-twist on matrix_basis. SINGULAR as swing approaches 180, and
-         raising an arm overhead from arms-down rest is nearly a 180 swing. It
-         reported 179 on Mine, the one clip that goes overhead, and I almost
-         rebuilt the IK rig chasing it.
-      2. Bone up-axis vs PARENT up-axis. That measures the REST OFFSET between
-         the two bones, which is a large constant -- a thigh points opposite
-         the pelvis -- so it failed Idle, which renders clean, at 166 degrees.
-
-    The quantity anatomy cares about is the CHANGE from rest, so the rest roll
-    is measured the same way and subtracted. Constant offsets cancel; what is
-    left is what the animation did to the joint.
-
-    ⚠️ VALIDATE BY DISCRIMINATION BEFORE TUNING ANYTHING AGAINST THIS. It must
-    pass the clips that render clean and fail the ones that look wrung. A
-    metric that fails everything is as useless as one that passes everything,
-    and I have now written one of each.
+    ⚠️ READ AGAINST TWO AXES AND CROSS-CHECKED, because one axis lies. The
+    previous version used the bone's Z alone and reported lowerarm_l as either
+    UNMEASURABLE or EXACTLY 179 -- never a value in between, across all 40
+    frames of Mine, while lowerarm_r sat at 0-3 the whole time. A quantity with
+    only two states is a branch artifact, not a physical measurement: the left
+    arm's rest orientation puts its Z near the flip point of atan2, so the
+    measured and rest rolls land on opposite branches and differ by a half
+    turn that is not there.
+    
+    Measuring against X as well and taking the better-conditioned projection
+    removes the dependence on any one axis being well placed. If the two
+    readings disagree by about 180 we are on a flipped branch and the smaller
+    is the true one -- a bone cannot be simultaneously barely rolled and
+    half-turned.
     """
     pb = arm.pose.bones[bone]
     if pb.parent is None:
         return 0.0
-    ax = pb.tail - pb.head
-    if ax.length < 1e-6:
-        return 0.0
-    now = _roll_about(ax,
-                      pb.matrix.to_3x3() @ Vector((0.0, 0.0, 1.0)),
-                      pb.parent.matrix.to_3x3() @ Vector((0.0, 0.0, 1.0)))
-    rb, rp = pb.bone, pb.parent.bone
-    rax = rb.tail_local - rb.head_local
-    rest = _roll_about(rax,
-                       rb.matrix_local.to_3x3() @ Vector((0.0, 0.0, 1.0)),
-                       rp.matrix_local.to_3x3() @ Vector((0.0, 0.0, 1.0)))
-    d = (now - rest + 180.0) % 360.0 - 180.0
-    return abs(d)
+    a = _roll_pair(pb, False)
+    b = _roll_pair(pb, True)
+    if a is None and b is None:
+        return None
+    if a is None or b is None:
+        return a if b is None else b
+    if abs(abs(a - b) - 180.0) < 20.0:
+        return min(a, b)
+    return max(a, b)
 
 
 def wp(bone, tail=False):
@@ -345,6 +366,7 @@ for name, end, _c in STASHED:
              "poke": (0.0, 0, None)}
     pen_at = [None]
     twist = {k: (0, 0) for k in TWIST_LIMITS}
+    nodata = set()
     for f in range(1, end + 1):
         sc.frame_set(f)
         dg.update()
@@ -368,8 +390,10 @@ for name, end, _c in STASHED:
                 bn = "%s_%s" % (part, s)
                 if arm.pose.bones.get(bn):
                     tw = twist_deg(bn)
-                    if tw > twist[part][0]:
+                    if tw is not None and tw > twist[part][0]:
                         twist[part] = (tw, f)
+                    if tw is None:
+                        nodata.add(part)
 
         # ── HAND INSIDE THE CHEST ──────────────────────────────────────────
         # The check whose absence cost the whole afternoon: "is a hand buried
@@ -411,11 +435,12 @@ for name, end, _c in STASHED:
               % (name, key, val, f, LIMITS[key], "FAIL" if bad else "ok"))
     for part, lim in TWIST_LIMITS.items():
         val, f = twist[part]
+        tag = "  (some frames unmeasurable)" if part in nodata else ""
         bad = val > lim
         if bad:
             fails.append((name, "%s-TWIST" % part, val, f))
-        print("%-7s %-6s %6.1f deg  (f%-3d) limit %.0f  %s"
-              % (name, part[:5] + "~", val, f, lim, "FAIL" if bad else "ok"))
+        print("%-7s %-6s %6.1f deg  (f%-3d) limit %.0f  %s%s"
+              % (name, part[:5] + "~", val, f, lim, "FAIL" if bad else "ok", tag))
     pk, f, pw = worst["poke"]
     print("%-7s %-6s %6d vts  (f%-3d) %s"
           % (name, "poke", pk, f, "SUSPECT - not gated, see POKE_VERTS"))
