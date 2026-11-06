@@ -216,8 +216,14 @@ def key_impact(frames=26):
             pole.location = (fx * 1.15, fy + FWD * 0.40 * LEG, FLOOR + LEG * 0.50)
             pole.keyframe_insert("location", frame=f)
 
+        # ⚠️ THE ABSORB USED TO PULL THE HAND INTO HIS CHEST. At full drive-back
+        # the forward offset collapsed to 0.19 LEG while the body was also
+        # travelling backward, and qa.py measures the guard hand 0.03 INSIDE
+        # the torso surface at f3 -- the frame of the hit, the one frame
+        # anybody looks at. 0.03 keeps a visible absorb and clears the ribs with
+        # margin; 0.07 cleared them by only 0.01 against a 0.02 limit.
         hand_goal.location = (side * 0.02 * LEG,
-                              FWD * (0.32 - 0.13 * k) * LEG,
+                              FWD * (0.32 - 0.03 * k) * LEG,
                               FLOOR + LEG * (1.16 - 0.03 * k))
         hand_goal.keyframe_insert("location", frame=f)
         elbow_pole.location = (side * 0.30 * LEG, 0.40 * LEG, FLOOR + LEG * 0.76)
