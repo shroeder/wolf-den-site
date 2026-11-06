@@ -1,5 +1,12 @@
 # Working on the Wolf Den site
 
+## 🛑 If you are touching `scripts/anim/` — READ `scripts/anim/CLAUDE.md` FIRST
+
+That pipeline hands Luke **art**, not problems, and the definition of done is a command
+(`npm run anim:done`), not a judgement. The rule is there because it was written as prose,
+read, and then violated the same morning.
+
+
 ## Before you cut anything for cost
 
 This repo has been through the same loop more than once: the CPU bill goes up, cuts get made, the cuts break
