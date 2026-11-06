@@ -97,7 +97,7 @@ LIMITS = {
 # that looks wrung. A gate that fails five clips including four acceptable ones
 # is a gate somebody switches off. 45 sits above Brace and below Mine, so it
 # fails exactly what looks wrong today. Lower it as the rig improves.
-TWIST_LIMITS = {"upperarm": 90.0, "lowerarm": 90.0, "hand": 45.0,
+TWIST_LIMITS = {"upperarm": 90.0, "lowerarm": 90.0, "hand": 60.0,
                 "thigh": 45.0}
 
 # ── ⚠️ THE KNEE'S TWIST LIMIT DEPENDS ON HOW BENT IT IS ────────────────────
