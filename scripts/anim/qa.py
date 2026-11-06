@@ -302,6 +302,33 @@ HAND_G = {s: {g.index for g in human.vertex_groups if g.name == "hand_%s" % s}
 
 PLATES = ("Cuirass", "Pauldron_L", "Pauldron_R", "Greave_L", "Greave_R")
 
+# ── ⚠️ A SHEET MUST SHOW THE LOADOUT THE CLIP WAS ANIMATED FOR ─────────────
+# _hfilm and the first version of these sheets rendered every prop in the
+# scene regardless of clip, so Impact came out wearing its shield AND the
+# pickaxe -- and the pickaxe is skinned to a hand that, in Impact, is doing
+# something else entirely. The result is a tool flying across his shoulders
+# and a shield hanging in mid air, in a frame I was about to judge the
+# animation by. ModelLab already encodes this as each clip's "kit"; the
+# harness has to agree with it or every sheet is evidence about the wrong
+# thing. Props not listed for a clip are hidden before it is photographed.
+CLIP_PROPS = {
+    "Idle":   ("Pickaxe",),
+    "Walk":   ("Pickaxe",),
+    "Run":    ("Pickaxe",),
+    "Brace":  ("Shield", "ShieldBoss", "ShieldFace"),
+    "Impact": ("Shield", "ShieldBoss", "ShieldFace"),
+    "Mine":   ("Pickaxe",),
+}
+ALL_PROPS = ("Shield", "ShieldBoss", "ShieldFace", "Pickaxe")
+
+
+def set_kit(clip):
+    keep = set(CLIP_PROPS.get(clip, ()))
+    for n in ALL_PROPS:
+        ob = bpy.data.objects.get(n)
+        if ob:
+            ob.hide_render = n not in keep
+
 
 def plate_poke(ev):
     """How many body vertices are sticking OUT through a piece of armour.
@@ -529,6 +556,7 @@ if fails and SHEETS:
     sc.render.image_settings.file_format = "PNG"
     for clip, frame in want:
         arm.animation_data.action = bpy.data.actions[clip]
+        set_kit(clip)
         sc.frame_set(frame)
         for az in (34, -55, 125, 215):
             cam_for(az)
