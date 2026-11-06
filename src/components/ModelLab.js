@@ -38,8 +38,16 @@ const MODELS = [
                 kit: { on: ["shield"], off: ["pickaxe"] } },
             { id: "Impact", label: "Impact", kind: "oneShot", hint: "Takes a hit, returns to guard",
                 kit: { on: ["shield"], off: ["pickaxe"] } },
-            { id: "Mine", label: "Mine", kind: "oneShot", hint: "Two-handed pickaxe strike into the ground",
-                kit: { on: ["pickaxe"], off: ["shield"] } },
+            // ⚠️ MINE IS PULLED. 2026-11-05: at the grip, the left hand melts into the forearm and a
+            // SECOND hand-shaped mass grows out of his abdomen — Luke spotted it from across the room,
+            // which is the distance that matters. Idle renders clean with the same rig, the same
+            // skinning and the same per-finger grip solve, so this is not the hands in general, it is
+            // what key_mine's arm positions do to them.
+            //
+            // The clip is still in hero.glb and still measures well on BODY motion (wrists 69/71 deg,
+            // reach 0.93, tip exactly on the floor, a real anticipation/apex/impact rhythm). None of
+            // that is worth anything with a hand growing out of his stomach. It stays out of the lab
+            // until key_mine is re-authored, so nobody judges the rig by it.
         ],
     },
     {
