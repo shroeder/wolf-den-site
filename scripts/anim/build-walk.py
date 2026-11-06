@@ -391,19 +391,67 @@ print("GUARD arm %s solved by IK, grip orientation explicit, wrist capped 50 deg
 # ⚠️ CURL DIRECTION IS CALIBRATED, NOT TYPED. Finger bones mirror per side
 # like every other bone on this rig, and a wrong sign splays the hand
 # backwards into a claw.
+#
+# ⚠️ AND THE FIRST CALIBRATION GOT THE LEFT HAND WRONG FOR ITS WHOLE LIFE.
+# It nudged ONE finger by 30 degrees and kept the sign that moved the tip
+# nearer the WRIST JOINT. Two things are wrong with that and both were
+# invisible until the hand was rendered at hand size:
+#
+#   The signal is tiny. 30 degrees moved the index tip 0.012 against a
+#   0.20 baseline -- 6 per cent -- and the two sides' finger bones do not
+#   share a local axis, so the same +30 swings the right tip FORWARD and the
+#   left tip straight DOWN. At that scale the measurement is noise.
+#
+#   "Nearer the wrist" is not "curling". A finger EXTENDING backwards also
+#   swings its tip around past the knuckle, and on the left that landed
+#   nearer the wrist joint than curling did. So the probe confidently chose
+#   the direction that bends the fingers backwards through the palm.
+#
+# The result shipped in hero.glb in all six clips: a shredded left fist, with
+# qa.py reporting PASSED on every one of them, because every check it owns
+# measures bone ANGLES and a fist curled the wrong way has identical angles.
+# It was found by rendering the hand at hand size, which is the only thing
+# that ever finds this class of defect.
+#
+# So: pose the WHOLE hand at FULL curl both ways and keep the sign that tucks
+# the fingertips in against the knuckles, which is what a closed fist is. The
+# margin is 2x rather than 6 per cent, and it is right on both hands.
+_CURL_SEGS = (("01", 58), ("02", 76), ("03", 48))
+_CURL_FNG = ("index", "middle", "ring", "pinky")
+
+
 def _curl_sign(side):
-    base = arm.pose.bones["index_01_%s" % side]
-    tipb = arm.pose.bones["index_03_%s" % side]
-    wrist = arm.matrix_world @ arm.pose.bones["hand_%s" % side].head
-    base.rotation_euler = Euler((0, 0, 0), "XYZ")
-    bpy.context.view_layer.update()
-    d0 = ((arm.matrix_world @ tipb.tail) - wrist).length
-    base.rotation_euler = Euler((math.radians(30), 0, 0), "XYZ")
-    bpy.context.view_layer.update()
-    d1 = ((arm.matrix_world @ tipb.tail) - wrist).length
-    base.rotation_euler = Euler((0, 0, 0), "XYZ")
-    bpy.context.view_layer.update()
-    return 1.0 if d1 < d0 else -1.0
+    def put(sign, amount=1.0):
+        for fng in _CURL_FNG:
+            for seg, deg in _CURL_SEGS:
+                b = arm.pose.bones.get("%s_%s_%s" % (fng, seg, side))
+                if b:
+                    b.rotation_euler = Euler(
+                        (math.radians(deg * amount * sign), 0, 0), "XYZ")
+        bpy.context.view_layer.update()
+
+    def tucked(sign):
+        """Mean fingertip distance to the knuckle line at full curl. A fist
+        brings them in; bending backwards carries them away."""
+        put(sign)
+        knuck = arm.matrix_world @ arm.pose.bones["hand_%s" % side].tail
+        tips = [arm.matrix_world @ arm.pose.bones["%s_03_%s" % (f, side)].tail
+                for f in _CURL_FNG
+                if arm.pose.bones.get("%s_03_%s" % (f, side))]
+        return sum((t - knuck).length for t in tips) / float(len(tips))
+
+    pos, neg = tucked(1.0), tucked(-1.0)
+    put(1.0, 0.0)
+    sign = 1.0 if pos < neg else -1.0
+    # ⚠️ PRINT THE MARGIN, NOT JUST THE VERDICT. The old probe was wrong by
+    # 6 per cent and said nothing; a reading that cannot be doubted is how it
+    # survived. Anything under about 1.3x means the hand is not closing
+    # either way and the finger bones' axis is the real problem.
+    ratio = max(pos, neg) / max(min(pos, neg), 1e-6)
+    print("CURL %s sign %+.0f  tucked +1 %.4f / -1 %.4f  (%.2fx margin)%s"
+          % (side, sign, pos, neg, ratio,
+             "  ⚠️ WEAK — check the render" if ratio < 1.3 else ""))
+    return sign
 
 def close_fist(side, amount=1.0):
     cs = _curl_sign(side)

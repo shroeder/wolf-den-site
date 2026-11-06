@@ -550,11 +550,19 @@ def key_mine(frames=40):
     #
     # 83 and 101 degrees are not poses, they are breaks. It was overspun by
     # about 50 degrees and I had been treating the roll as cosmetic.
-    # ⚠️ RE-SWEEPABLE, BECAUSE THE COST FUNCTION IT WAS TUNED AGAINST CHANGED.
-    # 310 was chosen by _roll.py when the pole sweep scored WRIST BEND ALONE.
-    # The sweep now also scores shoulder twist, so the optimum moved and the
-    # old constant is stale. ROLL_TEST=<deg> re-sweeps without editing code.
-    globals()['_ROLL'] = float(os.environ.get("ROLL_TEST") or globals().get('ROLL_TEST', 310.0))
+    # ⚠️ RE-SWEEP IT WHENEVER ANYTHING UPSTREAM OF THE GRIP CHANGES. It has
+    # gone stale twice now, both times silently:
+    #   310 was chosen when the pole sweep scored WRIST BEND ALONE, and went
+    #       stale when the sweep started scoring shoulder twist too.
+    #   310 went stale AGAIN on 2026-11-06 when the curl-sign fix changed
+    #       what the left hand's grip demands. Worst wrist went to 82 and
+    #       tripped qa -- the gate caught a constant, not a pose.
+    #   345 is the current answer: worst wrist 70.7 against a limit of 80,
+    #       swept full-circle on the rig that actually ships (build-walk +
+    #       twist + armour + pick), which is a thing _roll.py did not do
+    #       until that run either.
+    # ROLL_TEST=<deg> overrides without editing code; _roll.py re-solves it.
+    globals()['_ROLL'] = float(os.environ.get("ROLL_TEST") or globals().get('ROLL_TEST', 345.0))
     TOOL, TIP = g["TOOL"], g["PICK_TIP"]
     WRIST = g["WRIST_IN_TOOL"]
     REACH_MAX = 0.95

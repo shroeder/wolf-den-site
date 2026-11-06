@@ -181,14 +181,24 @@ def grip_frame(side):
     # cylinder: they cup it instead of closing on it, which is exactly how
     # it looked. Solve each one.
     want = SHAFT_R + SKIN
+    chose = {}
     for fng in ("index", "middle", "ring", "pinky"):
         # ⚠️ SCAN, DO NOT BISECT. Closing a finger does not reduce its
         # distance to the shaft monotonically -- past a point the tip curls
         # PAST the shaft and the distance grows again, so bisection walks
         # off and leaves three fingers of the left hand short.
+        # ⚠️ THE RANGE RAN TO 1.60, WHICH IS 293 DEGREES IN ONE FINGER.
+        # The scan takes a global minimum, and a finger that curls PAST the
+        # shaft comes back around and approaches the axis again from the far
+        # side -- so "closest to the shaft" was happily satisfied by a finger
+        # looped into a full circle. The ring finger chose 1.45 on both hands
+        # and renders as a tentacle. The comment two lines up already knew
+        # the distance is not monotonic; the range was the part that let it
+        # matter. Capped at 1.0, which this file's own print defines as a
+        # closed fist, so an impossible curl is no longer expressible.
         best, bamt = 1e9, 0.8
-        for k in range(29):
-            amt = 0.20 + k * 0.05
+        for k in range(33):
+            amt = 0.20 + k * 0.025
             _curl(side, fng, amt)
             bpy.context.view_layer.update()
             t = bone("%s_03" % fng, True)
@@ -196,12 +206,16 @@ def grip_frame(side):
             if d < best:
                 best, bamt = d, amt
         _curl(side, fng, bamt)
+        chose[fng] = bamt
     bpy.context.view_layer.update()
     gaps = [((bone("%s_03" % f, True) - centre)
              - z * (bone("%s_03" % f, True) - centre).dot(z)).length
             for f in ("index", "middle", "ring", "pinky")]
     print("        grip %s: fingertips %s from the axis (shaft %.4f)"
           % (side, " ".join("%.3f" % g for g in gaps), SHAFT_R))
+    print("        grip %s: curl %s  (1.0 = a closed fist)"
+          % (side, " ".join("%s %.2f" % (f[:3], chose[f])
+                            for f in ("index", "middle", "ring", "pinky"))))
     return centre, Matrix((x, y, z)).transposed().to_3x3()
 
 
