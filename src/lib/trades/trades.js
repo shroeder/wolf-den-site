@@ -180,8 +180,63 @@ export async function listTrades({ limit = 200, offset = 0 } = {}) {
     }
 
     const ids = trades.map((t) => t.id);
+    // ── WHY square_variation_id IS RESOLVED HERE AND NOT JUST READ ────────────────────────────────
+    // Only 223 of 2,003 IN lines ever recorded carry a square_variation_id. The app sends one when it
+    // creates a trade, but at that moment the card has usually not been pushed to Square yet — the
+    // intake writes the Square item AFTERWARDS — so the column is null for ~89% of history. Anything
+    // built on that column alone (reprinting a shelf tag, say) works for one trade in nine and looks
+    // broken for the rest. That is exactly how it was reported: "I dont see any print buttons".
+    //
+    // The id is not lost, it is elsewhere: trade intake writes wolfden_item_cost with the variation
+    // id, the item name and the capture time. Resolving on READ rather than in the client means every
+    // reader gets it and no app release is needed.
+    //
+    // ⚠️ A WRONG MATCH PRINTS A WRONG PRICE ON A SHELF TAG, so this refuses rather than guesses: the
+    // cost row's name must START WITH the line's item name (intake appends rarity and condition), the
+    // capture must be within a day of the trade (the same card is traded in again months later under
+    // a different variation), and the answer must be UNAMBIGUOUS.
+    //
+    // ⚠️ CONDITION IS A TIE-BREAKER, NOT A GATE, AND THAT IS ON EVIDENCE. Requiring it looked
+    // obviously right and silently dropped real matches: trade #d7f1b37e records an Eevee 114/103 as
+    // LP while the Square item intake created for it is named "... Illustration Rare NM". The
+    // condition written into Square item names is not reliable, so insisting on it throws away the
+    // only candidate there is. Preferring it when several exist still keeps NM and LP copies of the
+    // same card apart, which is the case that would actually mis-price a tag.
     const lines = await db.query(
-        `SELECT * FROM trade_line WHERE trade_id = ANY($1) ORDER BY sort_order ASC`,
+        `SELECT l.*,
+                COALESCE(l.square_variation_id, (
+                    SELECT c.variation_id
+                    FROM wolfden_item_cost c
+                    WHERE c.item_name ILIKE l.item_name || '%'
+                      AND c.captured_at BETWEEN t.traded_at - INTERVAL '1 day'
+                                            AND t.traded_at + INTERVAL '1 day'
+                      AND (
+                        (SELECT COUNT(*) FROM wolfden_item_cost a
+                          WHERE a.item_name ILIKE l.item_name || '%'
+                            AND a.captured_at BETWEEN t.traded_at - INTERVAL '1 day'
+                                                  AND t.traded_at + INTERVAL '1 day') = 1
+                        OR
+                        (SELECT COUNT(*) FROM wolfden_item_cost b
+                          WHERE b.item_name ILIKE l.item_name || '%'
+                            AND b.item_name ILIKE '%' || cond.abbr
+                            AND b.captured_at BETWEEN t.traded_at - INTERVAL '1 day'
+                                                  AND t.traded_at + INTERVAL '1 day') = 1
+                      )
+                    ORDER BY (c.item_name ILIKE '%' || cond.abbr) DESC,
+                             ABS(EXTRACT(EPOCH FROM (c.captured_at - t.traded_at))) ASC
+                    LIMIT 1
+                )) AS square_variation_id
+         FROM trade_line l
+         JOIN trade t ON t.id = l.trade_id
+         -- ⚠️ trade_line stores the condition ENUM ("NEAR_MINT"); intake writes the ABBREVIATION
+         -- into the item name ("... Illustration Rare NM"). Comparing them directly matches nothing,
+         -- which is why the first attempt at this resolved zero rows.
+         LEFT JOIN LATERAL (SELECT CASE l.condition
+                 WHEN 'NEAR_MINT' THEN 'NM' WHEN 'LIGHTLY_PLAYED' THEN 'LP'
+                 WHEN 'MODERATELY_PLAYED' THEN 'MP' WHEN 'HEAVILY_PLAYED' THEN 'HP'
+                 WHEN 'DAMAGED' THEN 'DMG' ELSE l.condition END AS abbr) cond ON TRUE
+         WHERE l.trade_id = ANY($1)
+         ORDER BY l.sort_order ASC`,
         [ids]
     );
 
