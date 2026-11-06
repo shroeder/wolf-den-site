@@ -490,8 +490,23 @@ def key_mine(frames=40):
         TUCK, ARMS, TUCKAMT, SA, GRIP, HQ = _ctx()
     g = G
     _fresh_action("Mine")
-    for c in ("_pick_ik", "_pgc", "_gc", "_grc"):
-        g[c].influence = 1.0
+    # ⚠️ THE GRIP IS COMPLIANT, NOT WELDED, AND THAT IS THE WHOLE TRADE.
+    # At influence 1.0 the hand must match the tool's grip frame EXACTLY, so
+    # every degree the arm chain cannot supply lands in the wrist -- 73 of
+    # twist in a joint that anatomically has no twist axis. The pole sweep now
+    # scores wrist twist and gets that to about 60, but 60 is a floor: the
+    # pole rolls the ARM, and the remainder is the gap between what the arm
+    # can deliver and what the grip demands.
+    #
+    # Backing the rotation copies off lets the hand sit a few degrees out of
+    # perfect alignment with the haft. A slightly imperfect grip is a thing
+    # you have to look for; an impossible wrist is what Luke saw from across
+    # a room. The IK stays at 1.0 -- the hand still goes exactly where the
+    # tool is, it just does not have to point exactly how the tool points.
+    g["_pick_ik"].influence = 1.0
+    g["_gc"].influence = 1.0
+    g["_pgc"].influence = 0.75
+    g["_grc"].influence = 0.75
 
     # ⚠️ THE ROLL OF THE SHAFT ABOUT ITS OWN AXIS IS NOT FREE -- IT IS THE
     # BIGGEST SINGLE INFLUENCE ON THE WRISTS. A shaft rolled about itself
@@ -696,8 +711,10 @@ def key_mine(frames=40):
             u = u.normalized() if u.length > 1e-4 else ax.cross(Vector((0, 1, 0))).normalized()
             v = ax.cross(u)
             best, bpos, bbend = 1e9, pole.location.copy(), 0.0
-            for k in range(24):
-                th = k * (math.pi / 12.0)
+            # 48 steps, not 24: the cost surface has three terms competing
+            # now and a 15-degree sweep walks past the minimum between samples.
+            for k in range(48):
+                th = k * (math.pi / 24.0)
                 cand = ((sh + wr) * 0.5
                         + (u * math.cos(th) + v * math.sin(th)) * (0.9 * ARM))
                 pole.location = cand
@@ -711,8 +728,18 @@ def key_mine(frames=40):
                 # Shoulder roll is weighted above wrist bend because a wrist a
                 # few degrees past comfortable reads as a stiff grip, while a
                 # humerus rolled past 90 reads as a broken man.
+                # ⚠️ SCORE THE WRIST'S TWIST TOO, NOT JUST ITS BEND. This
+                # sweep exists because "a real forearm ROLLS to meet the grip,
+                # and on an IK chain the thing that rolls it is the pole" --
+                # but it only ever measured BEND, so it rolled the arm to
+                # straighten the wrist while leaving 73 degrees of twist in a
+                # joint that anatomically has no twist axis at all. Palm
+                # rotation belongs to the forearm; putting hand twist in the
+                # cost is what actually sends it there, kinematically, rather
+                # than hiding it in deformation.
                 tw = _twist_from_rest(arm.pose.bones["upperarm_%s" % s_])
-                cost = bend + 1.5 * tw
+                hw = _twist_from_rest(arm.pose.bones["hand_%s" % s_])
+                cost = bend + 1.5 * tw + 1.5 * hw
                 if cost < best:
                     best, bpos, bbend = cost, cand, bend
             pole.location = bpos
