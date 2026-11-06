@@ -90,7 +90,23 @@ LIMITS = {
 # is a gate somebody switches off. 45 sits above Brace and below Mine, so it
 # fails exactly what looks wrong today. Lower it as the rig improves.
 TWIST_LIMITS = {"upperarm": 90.0, "lowerarm": 90.0, "hand": 45.0,
-                "thigh": 45.0, "calf": 10.0}
+                "thigh": 45.0, "calf": 15.0}
+
+# ⚠️ TWO OF THESE READINGS ARE NOT YET TRUSTWORTHY. Said out loud rather than
+# silenced, because a gate nobody believes is worse than no gate:
+#   lowerarm  reads 177-180 on Brace, Run, Impact and Mine, and 0.1 on Walk
+#             and Idle. A near-binary jump to exactly 180 is an axis flip in
+#             _roll_about when the two up-vectors go antiparallel, not a real
+#             forearm doing a half turn. DO NOT fix an animation against this
+#             number until the degenerate case is handled.
+#   calf      clean clips sit at 10.2 (Walk) and 10.5 (Idle), so the old 10
+#             limit failed known-good work. 15 clears them; whether Run at 62
+#             and Impact at 48 are real knee twist or the same flip is still
+#             open.
+# upperarm and hand DO discriminate -- hand runs Walk 9 / Idle 16 / Run 23 /
+# Impact 45 / Brace 47 / Mine 69, matching the renders, and upperarm fails on
+# Mine alone. Those two are safe to work against.
+SUSPECT = {"lowerarm", "calf"}
 # How far a hand may come to the spine axis before it is inside the chest. Not
 # guessed: measured per frame from the torso's own vertices (see torso_radius).
 PENETRATION_MARGIN = 0.02
@@ -104,24 +120,57 @@ def ang(a, b, c, d):
     return math.degrees(u.angle(v))
 
 
-def twist_deg(bone):
-    """How far this bone is rotated ABOUT ITS OWN LENGTH, away from rest.
-
-    Swing-twist decomposition: project the local rotation's vector part onto
-    the bone axis (Blender bones run +Y), and what survives is the twist.
-    matrix_basis is the animated deviation from the rest pose, which is
-    exactly the quantity anatomy has an opinion about.
-    """
-    q = arm.pose.bones[bone].matrix_basis.to_quaternion()
-    axis = Vector((0.0, 1.0, 0.0))
-    v = Vector((q.x, q.y, q.z))
-    p = v.project(axis)
-    t = Quaternion((q.w, p.x, p.y, p.z))
-    if t.magnitude < 1e-9:
+def _roll_about(axis, up, ref):
+    """Signed angle from ref to up, measured around axis. Unsigned angles
+    cannot be differenced, which broke attempt two."""
+    axis = axis.normalized()
+    u = (up - axis * up.dot(axis))
+    r = (ref - axis * ref.dot(axis))
+    if u.length < 1e-6 or r.length < 1e-6:
         return 0.0
-    t.normalize()
-    a = math.degrees(2.0 * math.acos(max(-1.0, min(1.0, abs(t.w)))))
-    return a if a <= 180.0 else 360.0 - a
+    u.normalize(); r.normalize()
+    return math.degrees(math.atan2(u.cross(r).dot(axis), u.dot(r)))
+
+
+def twist_deg(bone):
+    """How far this bone has been rolled about its own length AWAY FROM REST.
+
+    ⚠️ THIRD ATTEMPT. The first two both failed the only test that matters --
+    they disagreed with the renders -- and each failed differently:
+
+      1. Swing-twist on matrix_basis. SINGULAR as swing approaches 180, and
+         raising an arm overhead from arms-down rest is nearly a 180 swing. It
+         reported 179 on Mine, the one clip that goes overhead, and I almost
+         rebuilt the IK rig chasing it.
+      2. Bone up-axis vs PARENT up-axis. That measures the REST OFFSET between
+         the two bones, which is a large constant -- a thigh points opposite
+         the pelvis -- so it failed Idle, which renders clean, at 166 degrees.
+
+    The quantity anatomy cares about is the CHANGE from rest, so the rest roll
+    is measured the same way and subtracted. Constant offsets cancel; what is
+    left is what the animation did to the joint.
+
+    ⚠️ VALIDATE BY DISCRIMINATION BEFORE TUNING ANYTHING AGAINST THIS. It must
+    pass the clips that render clean and fail the ones that look wrung. A
+    metric that fails everything is as useless as one that passes everything,
+    and I have now written one of each.
+    """
+    pb = arm.pose.bones[bone]
+    if pb.parent is None:
+        return 0.0
+    ax = pb.tail - pb.head
+    if ax.length < 1e-6:
+        return 0.0
+    now = _roll_about(ax,
+                      pb.matrix.to_3x3() @ Vector((0.0, 0.0, 1.0)),
+                      pb.parent.matrix.to_3x3() @ Vector((0.0, 0.0, 1.0)))
+    rb, rp = pb.bone, pb.parent.bone
+    rax = rb.tail_local - rb.head_local
+    rest = _roll_about(rax,
+                       rb.matrix_local.to_3x3() @ Vector((0.0, 0.0, 1.0)),
+                       rp.matrix_local.to_3x3() @ Vector((0.0, 0.0, 1.0)))
+    d = (now - rest + 180.0) % 360.0 - 180.0
+    return abs(d)
 
 
 def wp(bone, tail=False):
