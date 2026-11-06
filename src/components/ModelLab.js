@@ -38,16 +38,22 @@ const MODELS = [
                 kit: { on: ["shield"], off: ["pickaxe"] } },
             { id: "Impact", label: "Impact", kind: "oneShot", hint: "Takes a hit, returns to guard",
                 kit: { on: ["shield"], off: ["pickaxe"] } },
-            // ⚠️ MINE IS PULLED. 2026-11-05: at the grip, the left hand melts into the forearm and a
-            // SECOND hand-shaped mass grows out of his abdomen — Luke spotted it from across the room,
-            // which is the distance that matters. Idle renders clean with the same rig, the same
-            // skinning and the same per-finger grip solve, so this is not the hands in general, it is
-            // what key_mine's arm positions do to them.
+            // ⚠️ MINE IS BACK, BUT ON PROBATION. Pulled 2026-11-05 when Luke saw a hand apparently
+            // growing out of the hero's abdomen from across the room. The wrist clamp in build-walk
+            // has since taken this clip's left wrist from 69 degrees to 49 (and Brace from 75 to 45),
+            // which is a real fix for a real defect -- but it did NOT change what that render looks
+            // like, so it is probably not the thing Luke saw.
             //
-            // The clip is still in hero.glb and still measures well on BODY motion (wrists 69/71 deg,
-            // reach 0.93, tip exactly on the floor, a real anticipation/apex/impact rhythm). None of
-            // that is worth anything with a hand growing out of his stomach. It stays out of the lab
-            // until key_mine is re-authored, so nobody judges the rig by it.
+            // Four hypotheses were measured and all four were wrong: bone placement (both hands track
+            // the shaft a constant 0.252 apart for all 40 frames), stray vertex weights (farthest vert
+            // on hand_l is 0.192 from the bone, normal falloff), wrist angle (clamped, no visual
+            // change), and torso penetration (hand_l never closer than 0.185 to the spine axis).
+            //
+            // ⚠️ SO IT GOES BACK IN THE LAB TO BE JUDGED IN 3D, NOT IN STILLS. Two separate calls were
+            // blown today reading single-azimuth renders -- an arm declared missing that was merely
+            // behind the torso, and a grip declared fine that was not. The lab orbits; a PNG does not.
+            { id: "Mine", label: "Mine", kind: "oneShot", hint: "Two-handed pickaxe strike into the ground",
+                kit: { on: ["pickaxe"], off: ["shield"] } },
         ],
     },
     {

@@ -351,7 +351,37 @@ _grc = arm.pose.bones[HAND_B].constraints.new("COPY_ROTATION")
 _grc.target = _grip
 _grc.target_space = "WORLD"
 _grc.owner_space = "WORLD"
-print("GUARD arm %s solved by IK, grip orientation explicit" % _sa)
+
+# ── ⚠️ AND THE WRIST HAS TO BE ALLOWED TO SAY NO ────────────────────────────
+# The two constraints above fight: the IK decides where the wrist IS, the Copy
+# Rotation decides which way the hand POINTS, and the joint between them
+# absorbs the whole difference. _wrist.py has been printing the damage since it
+# was written -- 55 on Walk, 60 on Idle, 63 on Run, 75 on Brace, 91 on Impact,
+# 69 on Mine -- and nothing ever acted on it.
+#
+# 2026-11-05: Luke, on a wide shot of Mine, "A hand is growing out his belly.
+# Its noticeable from far away." It was not a stray bone -- both hands track
+# the shaft correctly all 40 frames, a constant 0.252 apart. It is this joint.
+# Linear blend skinning shears long before a wrist reaches its anatomical
+# limit, so a pose the measurement calls legal still tears the mesh open, and
+# the torn geometry reads as a second hand.
+#
+# 50 degrees, because Idle sits at 60 and renders CLEAN while Mine at 69 does
+# not -- so the mesh gives out somewhere in between, and the cap belongs below
+# the lowest known-bad number rather than at the anatomical one.
+#
+# ⚠️ LEFT HAND ONLY, AND NOT BY OVERSIGHT. The pickaxe is SKINNED to hand_r at
+# weight 1.0, so clamping that wrist rotates the tool itself and un-solves the
+# tip-on-the-floor contact key_mine spends its whole solver budget on. The off
+# hand only rides the shaft, so bounding it costs a little grip accuracy and
+# nothing else.
+_wlim = arm.pose.bones[HAND_B].constraints.new("LIMIT_ROTATION")
+_wlim.owner_space = "LOCAL"
+for _ax in ("x", "y", "z"):
+    setattr(_wlim, "use_limit_%s" % _ax, True)
+    setattr(_wlim, "min_%s" % _ax, math.radians(-50))
+    setattr(_wlim, "max_%s" % _ax, math.radians(50))
+print("GUARD arm %s solved by IK, grip orientation explicit, wrist capped 50 deg" % _sa)
 
 # ── A GRIPPING FIST ──────────────────────────────────────────────────────────
 # An open hand behind a shield reads as someone balancing a tray. The fingers
