@@ -1,5 +1,5 @@
 import bpy, os, sys, math
-from mathutils import Vector
+from mathutils import Vector, Quaternion
 from mathutils.bvhtree import BVHTree
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -60,6 +60,37 @@ LIMITS = {
     "elbow": 155.0,    # upperarm vs lowerarm, straightened
     "knee": 155.0,
 }
+
+# ── ⚠️ TWIST IS THE ONE THAT MANGLES AN ARM, AND BEND CANNOT SEE IT ────────
+# Luke, 2026-11-05: "their arms are, like, getting completely twisted and
+# mangled when they're trying to swing the axe... the most important test is
+# whether or not the animation has flaws in the human anatomy."
+#
+# He is right and the first version of this file was blind to it. Every check
+# above measures the ANGLE BETWEEN TWO BONE VECTORS. A forearm rotated 180
+# degrees about its own length has an identical vector -- elbow to wrist is
+# unchanged -- so it scores a perfect zero while the limb is wrung like a
+# towel. Bend is one of three rotational freedoms and it is the one that
+# happens to be easy to measure.
+#
+# These are anatomy, not taste, and two of them are HARD:
+#   lowerarm  pronation/supination at the radioulnar joint, ~75 one way and
+#             ~85 the other. 90 is already generous.
+#   hand      A WRIST HAS NO TWIST AXIS. Forearm rotation is what turns the
+#             palm over. Any twist here is the rig wringing a joint that
+#             physically cannot do it -- 15 is tolerance for float noise and
+#             skinning slop, not a real allowance.
+#   calf      A KNEE IS A HINGE. Same argument.
+#   upperarm  shoulder internal/external rotation, genuinely large.
+# ⚠️ hand IS 45, NOT THE ANATOMICAL 15, AND THAT IS A DELIBERATE CLIMBDOWN.
+# A wrist really has no twist axis, so 15 is what anatomy says. But measured:
+# Idle 9, Walk 28, Run 36, Impact 39, Brace 41, Mine 64 -- and Luke calls
+# everything up to Brace "within the realm of plausible" while Mine is the one
+# that looks wrung. A gate that fails five clips including four acceptable ones
+# is a gate somebody switches off. 45 sits above Brace and below Mine, so it
+# fails exactly what looks wrong today. Lower it as the rig improves.
+TWIST_LIMITS = {"upperarm": 90.0, "lowerarm": 90.0, "hand": 45.0,
+                "thigh": 45.0, "calf": 10.0}
 # How far a hand may come to the spine axis before it is inside the chest. Not
 # guessed: measured per frame from the torso's own vertices (see torso_radius).
 PENETRATION_MARGIN = 0.02
@@ -71,6 +102,26 @@ def ang(a, b, c, d):
     if u.length < 1e-6 or v.length < 1e-6:
         return 0.0
     return math.degrees(u.angle(v))
+
+
+def twist_deg(bone):
+    """How far this bone is rotated ABOUT ITS OWN LENGTH, away from rest.
+
+    Swing-twist decomposition: project the local rotation's vector part onto
+    the bone axis (Blender bones run +Y), and what survives is the twist.
+    matrix_basis is the animated deviation from the rest pose, which is
+    exactly the quantity anatomy has an opinion about.
+    """
+    q = arm.pose.bones[bone].matrix_basis.to_quaternion()
+    axis = Vector((0.0, 1.0, 0.0))
+    v = Vector((q.x, q.y, q.z))
+    p = v.project(axis)
+    t = Quaternion((q.w, p.x, p.y, p.z))
+    if t.magnitude < 1e-9:
+        return 0.0
+    t.normalize()
+    a = math.degrees(2.0 * math.acos(max(-1.0, min(1.0, abs(t.w)))))
+    return a if a <= 180.0 else 360.0 - a
 
 
 def wp(bone, tail=False):
@@ -119,6 +170,7 @@ for name, end, _c in STASHED:
     arm.animation_data_create()
     arm.animation_data.action = bpy.data.actions[name]
     worst = {"wrist": (0, 0), "elbow": (0, 0), "knee": (0, 0), "pen": (1e9, 0)}
+    twist = {k: (0, 0) for k in TWIST_LIMITS}
     for f in range(1, end + 1):
         sc.frame_set(f)
         dg.update()
@@ -138,6 +190,12 @@ for name, end, _c in STASHED:
                 if arm.pose.bones.get("thigh_%s" % s) else 0.0
             if k > worst["knee"][0]:
                 worst["knee"] = (k, f)
+            for part in TWIST_LIMITS:
+                bn = "%s_%s" % (part, s)
+                if arm.pose.bones.get(bn):
+                    tw = twist_deg(bn)
+                    if tw > twist[part][0]:
+                        twist[part] = (tw, f)
 
         # ── HAND INSIDE THE CHEST ──────────────────────────────────────────
         # The check whose absence cost the whole afternoon: "is a hand buried
@@ -167,6 +225,13 @@ for name, end, _c in STASHED:
             fails.append((name, key, val, f))
         print("%-7s %-6s %6.1f deg  (f%-3d) limit %.0f  %s"
               % (name, key, val, f, LIMITS[key], "FAIL" if bad else "ok"))
+    for part, lim in TWIST_LIMITS.items():
+        val, f = twist[part]
+        bad = val > lim
+        if bad:
+            fails.append((name, "%s-TWIST" % part, val, f))
+        print("%-7s %-6s %6.1f deg  (f%-3d) limit %.0f  %s"
+              % (name, part[:5] + "~", val, f, lim, "FAIL" if bad else "ok"))
     gap, f = worst["pen"]
     bad = gap < PENETRATION_MARGIN
     if bad:
