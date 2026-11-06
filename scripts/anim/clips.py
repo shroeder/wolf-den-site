@@ -10,7 +10,7 @@
 # once, because the sign convention mirrors per side; a position has no
 # handedness.
 # ═══════════════════════════════════════════════════════════════════════════
-import bpy, math
+import bpy, os, math
 from mathutils import Vector, Euler, Matrix, Quaternion
 
 G = {}
@@ -507,7 +507,11 @@ def key_mine(frames=40):
     #
     # 83 and 101 degrees are not poses, they are breaks. It was overspun by
     # about 50 degrees and I had been treating the roll as cosmetic.
-    globals()['_ROLL'] = float(globals().get('ROLL_TEST', 310.0))
+    # ⚠️ RE-SWEEPABLE, BECAUSE THE COST FUNCTION IT WAS TUNED AGAINST CHANGED.
+    # 310 was chosen by _roll.py when the pole sweep scored WRIST BEND ALONE.
+    # The sweep now also scores shoulder twist, so the optimum moved and the
+    # old constant is stale. ROLL_TEST=<deg> re-sweeps without editing code.
+    globals()['_ROLL'] = float(os.environ.get("ROLL_TEST") or globals().get('ROLL_TEST', 310.0))
     TOOL, TIP = g["TOOL"], g["PICK_TIP"]
     WRIST = g["WRIST_IN_TOOL"]
     REACH_MAX = 0.95

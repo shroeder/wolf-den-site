@@ -20,6 +20,12 @@ sys.path.insert(0, HERE)
 # closed fist -- and a keyed Walk.
 exec(open(os.path.join(HERE, "build-walk.py")).read())
 
+# ── THE FOREARM TWIST JOINT ── before the armour, because the plates inherit
+# the bone weights of the flesh underneath them and must follow the forearm
+# they are strapped to. See build-twist.py: the rig had no way to pronate, so
+# every degree of palm orientation was landing in the shoulder and the wrist.
+exec(open(os.path.join(HERE, "build-twist.py")).read())
+
 # ── EQUIPMENT ── built before any clip is keyed, so every plate is already
 # skinned to the rig the bakes are about to drive.
 exec(open(os.path.join(HERE, "build-armour.py")).read())

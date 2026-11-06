@@ -18,7 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const MODELS = [
     {
         id: "hero", label: "Hero", url: "/models/hero.glb",
-        note: "MPFB body, 53-bone rig, IK-authored clips baked to bone keys. Each plate is cut from the "
+        note: "MPFB body, 55-bone rig (incl. forearm twist), IK-authored clips baked to bone keys. Each plate is cut from the "
             + "hero's own surface and thickened, so it fits exactly and inherits the bone weights of the "
             + "flesh underneath it.",
         // Equipment is one skeleton and several meshes. Equipping is showing
