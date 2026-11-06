@@ -55,8 +55,16 @@ dg = bpy.context.evaluated_depsgraph_get()
 # therefore sits at 62 — above every clip known to look right, below the lowest
 # known to look wrong. If a clip that renders clean ever trips it, RAISE it and
 # say so here; do not silence the check.
+# ⚠️ wrist RAISED 62 -> 80 ON EVIDENCE, 2026-11-06, NOT TO MAKE A GATE PASS.
+# 62 was set when Idle ran 57 clean and Mine ran 69 and tore -- but that was
+# BEFORE build-twist.py gave the forearm a twist joint. The rig changed under
+# the threshold. Re-checked by rendering Mine f18 (the worst frame, 77.6) bare
+# at magnification: both hands read as hands, fingers and thumbs intact,
+# forearms smooth, no shear at either wrist. A human wrist does about 80 of
+# flexion, so 80 is the anatomical figure and the mesh now survives it.
+# If you lower the twist fraction in build-twist.py, lower this with it.
 LIMITS = {
-    "wrist": 62.0,     # hand vs forearm
+    "wrist": 80.0,     # hand vs forearm
     "elbow": 155.0,    # upperarm vs lowerarm, straightened
     "knee": 155.0,
 }
