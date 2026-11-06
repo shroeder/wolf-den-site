@@ -125,6 +125,51 @@ physically he was naming a parameter. *"It looks like you've overspun the
 pickaxe and it's causing his hands to twist"* → sweep the roll → it was
 overspun by 50°, wrists 83 → 52, settled in ninety seconds.
 
+## 3b. Two things that cost most of 2026-11-06
+
+### Remove the ambiguity, do not argue with it
+
+The grip looked wrapped at az34 and draped at az-55 and I argued both sides
+for an hour, inventing metrics. What settled it in one frame was **hiding the
+tool**: a hand that grips leaves a closed hole, a hand that drapes leaves an
+arch. No occlusion, no metric, no opinion. `_ring.py`.
+
+When two views disagree, do not look for a third view or a cleverer number.
+Find the render in which the question cannot be ambiguous.
+
+### A control must be verified IN THE POSE YOU ARE TESTING
+
+`_wrap.py` measured encirclement, reported that **neither** hand wrapped, and
+I discarded it for "failing its control" — the control being the driving
+hand, which "obviously grips". The probe was right and the control was a
+guess: I had promoted that hand on the strength of a different frame at a
+different azimuth.
+
+"It looks right from over here" is not a control. A control has to be checked
+in the exact pose under test, by a method that cannot be fooled by the thing
+being measured.
+
+### ⚠️ Sweep coupled parameters TOGETHER
+
+The shaft roll was re-solved **three times in one session** and each answer
+was correct until something upstream moved:
+
+| | |
+|---|---|
+| 310 | chosen when the pole sweep scored wrist bend alone |
+| 345 | after the curl-sign fix changed what the left hand demands |
+| 321.5 | after the grip solve was reworked to wrap the fingers |
+
+`GRIP_LO`, the roll and `_grc` are one system. Sweeping `GRIP_LO` against a
+roll tuned for the *old* `GRIP_LO` scores every candidate on a handicap — two
+positions read as OVER THE LIMIT that may simply have needed their own roll.
+`_gripsolve.py` sweeps the pair and judges each hand position at **its own**
+best roll, which is the only honest comparison.
+
+The general rule: if re-running a sweep keeps changing a constant you already
+"solved", the parameters are coupled and the one-at-a-time loop will not
+converge.
+
 ## 4. `qa.py` — numbers, and only ones with a control
 
 ⚠️ **A metric you have not validated is not evidence. It is a confident way
