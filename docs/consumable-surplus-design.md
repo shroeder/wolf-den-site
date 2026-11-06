@@ -1,6 +1,15 @@
 # Selling surplus consumables — what is safe and what the numbers have to be
 
-Captured 2026-11-05 from Eric, **to build after review**. Nothing started.
+## ⛔ PARKED — 2026-11-05. Do not build this.
+
+Eric, the same day it was written up: *"Let's put a pin in this for right now. We're not going to release
+anything for this just yet. It was just an idea I was throwing out."* **Nothing ships from this document
+until Eric raises it again.** It is kept because the measurements in §3.1 and §3.6 were paid for with a read
+of the live ledger and are worth more than the proposal they were gathered for — the finding that
+`consumable` is already 32.1% of all XP in the Den applies to any future XP reward, not just this one.
+
+**And §9 is the thing to pick up first when it does come back**, because it is what Eric asked for on the
+way out and because the obvious way to build it is wrong.
 
 Rate and cap set from a read of the live ledger on 2026-11-05 — see §3.1 and §3.6, and
 `scripts/audit-xp-per-day.mjs`, which is read-only and reproduces every figure in this document.
@@ -514,3 +523,69 @@ in one function or neither lands.
    past `MAX_POTION_STRIKES` at a steep conversion. Deliberately not proposed — eight is called
    "deliberately generous" in its own comment, and the cap exists to stop stockpiles substituting for the
    things members build.
+
+---
+
+## 9. ⏭️ NEXT TIME: a per-ITEM daily limit, not a per-action one
+
+Eric, parking the idea: *"Something to look into next time I bring this up is to maybe put a daily limit on
+how many of each item people will get to sell each day."*
+
+That is a different cap from the one in §3.6 and it is worth being precise about the difference, because the
+two look identical in a sentence and only one of them is free:
+
+| | what it bounds | §3.6's answer |
+|---|---|---|
+| **per-action** | *total* melts a day, whatever the item | `dailyCap: 5` — already built |
+| **per-item** | melts *of each item* a day | **not possible with `dailyCap`** |
+
+### 9.1 ⚠️ `awardXp`'s `dailyCap` cannot do this, and the reason is in the SQL
+
+The guard is one statement (`xp.js:184`), and its count is keyed on the **action alone**:
+
+```sql
+INSERT INTO mkt_xp_event (buyer_id, action, points, dedupe_key, meta)
+SELECT $1, $2, $3, $4, $5
+ WHERE (SELECT COUNT(*) FROM mkt_xp_event
+          WHERE buyer_id = $1 AND action = $2
+            AND created_at::date = (NOW() AT TIME ZONE 'utc')::date) < $6
+RETURNING id
+```
+
+The item id lives in `meta`, which the `WHERE` never looks at. So `dailyCap: 3` on `consumable_melt` means
+three melts of *anything*, not three of each.
+
+**⚠️ And do not solve it with a read-then-write.** "Count today's melts of this id, then award if under the
+limit" is two statements, and `neon()`'s HTTP driver has no `BEGIN`/`ROLLBACK` — so two taps race it and
+both pass. That single-statement `INSERT … SELECT … WHERE` shape *is* the concurrency control, which is the
+same lesson `market.js` spells out at length for listings. Any per-item cap has to stay inside one
+statement.
+
+### 9.2 Two ways that keep the atomicity, and the trade between them
+
+**A — one action per item** (`consumable_melt:pot_adrenaline`). Gets the existing guard for free with no
+change to `awardXp` at all. Costs: the action namespace stops being a closed set, and `xp-economy.js` grows
+from one row to eight on the XP screen — which is noise on a screen whose whole job is showing where XP
+comes from, and §3.1 is the argument for keeping that screen readable.
+
+**B — extend the guard to count on `meta`**, e.g. an optional `dailyCapKey` that adds
+`AND meta->>'id' = $7` to the subquery. Keeps one action, one row on the XP screen, and the same atomic
+shape. Costs: a change to `awardXp`, which every feature in the game calls — so it has to be additive and
+default to today's behaviour when the new argument is absent.
+
+**B is the better shape** and it is a small, contained change. Worth building the narrow version rather than
+reaching for A because A is zero-diff.
+
+### 9.3 ⚠️ The landmine either way: `dailyCap` resets on a UTC day, and nothing else in the game does
+
+Look again at the guard above — `(NOW() AT TIME ZONE 'utc')::date`. **51 files under
+`src/lib/marketplace/` compute their day boundary in `America/Chicago`** (the arena's free respec, the
+dungeon run counters, the daily deals, the feature dailies, every `*_today` column). `dailyCap` is the
+outlier.
+
+So a melt limit riding on `dailyCap` would reset at **midnight UTC — 6pm or 7pm Central**, hours before
+every other daily in the game. The symptom is not a crash; it is "my melts came back in the evening but my
+dungeon runs didn't", reported weeks later, exactly like the sailing-notification cadence bug in
+`CLAUDE.md`'s family-B list. Whichever of A or B gets built, **the day expression has to move to
+`America/Chicago` to match the other fifty-one**, and that is a change to shared code used by
+`purchase_flat` today — so it needs checking against that one caller rather than being assumed harmless.
