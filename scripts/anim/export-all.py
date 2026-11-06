@@ -62,7 +62,7 @@ def bake_and_stash(name, end):
         pass
     # Loop seam: frame end+1 repeats frame 1. The one-shots are left alone --
     # looping a hit reaction or a swing makes it stutter.
-    if name not in ("Impact", "Mine"):
+    if name not in ("Impact", "Swing"):
         for fc in act.fcurves:
             v1 = next((k.co[1] for k in fc.keyframe_points if abs(k.co[0] - 1) < 0.01), None)
             if v1 is not None:
@@ -83,7 +83,7 @@ bake_and_stash("Brace", BF)
 bake_and_stash("Run", clips.key_run())
 bake_and_stash("Idle", clips.key_idle())
 bake_and_stash("Impact", clips.key_impact())
-bake_and_stash("Mine", clips.key_mine())
+bake_and_stash("Swing", clips.key_swing())
 
 # Constraints and helpers go now that every clip is baked.
 bpy.context.view_layer.objects.active = arm

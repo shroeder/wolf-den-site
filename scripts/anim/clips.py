@@ -480,127 +480,81 @@ def _twist_from_rest(pb):
     return max(a, b)
 
 
-def key_mine(frames=40):
-    """A two-handed pickaxe strike into the ground. One-shot, 40 frames.
+def key_swing(frames=48):
+    """An overhand swing with NOTHING in his hands, and the weight is the point.
 
-    ⚠️ AUTHORED IN THE SHOULDERS' FRAME, NOT THE WORLD'S. This is the whole
-    reason the earlier versions could not be fixed by adjusting them.
+    Replaces the pickaxe clip. The tool is gone and with it every constraint
+    that made that clip unfixable: no shaft to roll, no grip frame to seat, no
+    hand welded to a mount, no point that has to reach the floor. What is kept
+    is the one thing that worked -- AUTHORING IN THE SHOULDERS' FRAME.
 
-    A character swinging a tool at the ground is FOUR constraints that fight
-    each other: the point must reach the floor, the haft must not pass
-    through the body, both fists must stay on one shaft, and the arms have
-    a hard reach and a shoulder that only rotates so far. Authoring world
-    positions means hand-solving that system one number at a time -- and
-    every single fix satisfied the constraint being looked at while
-    breaking one that was not. Put the tip on the floor and the haft stands
-    upright through his stomach; angle the haft and the tip leaves the
-    floor; reach the haft with both hands and the arms go behind the back;
-    lift it overhead and it swings backward through horizontal on the way.
-    All four happened, in that order.
+      REACH is a fraction of arm length, so an unreachable pose is not writable.
+      ELEV  is the angle of the hands about the shoulders in the body's own
+            sagittal plane: 0 is straight down, 90 forward, 180 overhead. So
+            "behind his back" is a bounded number, not an emergent surprise.
+      LEAD  orients the fists relative to the ARM, so the invisible haft always
+            continues the line of the arm and cannot windmill into his chest.
+      YAW   swings the whole plane out past the side of his head, because a
+            strictly sagittal lift walks the hands across his face at the apex.
 
-    In the shoulders' frame three of the four cannot be expressed:
+    ⚠️ WEIGHT IS TIMING AND SPACING, NOT POSES. A pose sheet of this clip would
+    look identical with the weight taken out, which is exactly why it is judged
+    from the video. Four things carry it, and all four are in the frame numbers
+    rather than in the joint angles:
 
-      REACH is a fraction of arm length, so an unreachable pose is not
-            writable. Capped at 0.95.
-      ELEV  is the angle of the hands around the shoulder in the body's own
-            sagittal plane, so "behind his back" is a bounded number rather
-            than an emergent surprise. Capped at -20.
-      LEAD  is the haft's angle relative to the ARM, so the tool cannot
-            windmill independently into his torso; it always continues the
-            line of the arm, give or take.
+      ANTICIPATION   f4-f14 is the lift and it is SLOW -- ten frames to travel
+                     110 degrees. Then f14-f18 is almost still. That near-stop
+                     at the top is what makes the strike read as heavy; without
+                     it the arms just change direction.
+      ACCELERATION   f20-f26 covers 130 degrees in six frames, and those keys
+                     interpolate LINEAR so nothing eases INTO the hit. A bezier
+                     there decelerates the hands just before impact, which is
+                     the single most common way a swing reads as weightless.
+      THE HIT        one frame. Maximum forward flex, hips at their lowest, head
+                     down. The knees absorbing it -- the hip dropping 0.17 of a
+                     leg length while the feet stay planted -- is the biggest
+                     single weight cue in the clip.
+      RECOVERY       a small rebound at f28, then a long slow settle. Returning
+                     straight to the ready pose makes the whole thing feel like
+                     it weighed nothing.
 
-    That leaves exactly one thing to solve against the world -- the point
-    touching the floor on the frame of the hit -- and one unknown to solve
-    it with: how far he bends. One equation, one unknown, instead of four
-    coupled ones.
+    ⚠️ THE HANDS ARE NOT FORCED ONTO ANYTHING. In the pickaxe clip the hand had
+    to match a tool's grip frame exactly, and every degree the arm chain could
+    not supply landed in the wrist -- 73 degrees of twist in a joint that has no
+    twist axis. Here the orientation is CHOSEN, derived from the arm itself, so
+    there is nothing for the wrist to absorb. The fists stay closed because
+    build-pick already solved the fingers; he reads as gripping a haft that
+    simply is not drawn.
     """
     arm, iks, hand_goal, elbow_pole, LEG, FLOOR, ANKLE_H, HIP0, FWD, FOOT_REST, \
         TUCK, ARMS, TUCKAMT, SA, GRIP, HQ = _ctx()
     g = G
-    _fresh_action("Mine")
-    # ⚠️ THE GRIP IS COMPLIANT, NOT WELDED, AND THAT IS THE WHOLE TRADE.
-    # At influence 1.0 the hand must match the tool's grip frame EXACTLY, so
-    # every degree the arm chain cannot supply lands in the wrist -- 73 of
-    # twist in a joint that anatomically has no twist axis. The pole sweep now
-    # scores wrist twist and gets that to about 60, but 60 is a floor: the
-    # pole rolls the ARM, and the remainder is the gap between what the arm
-    # can deliver and what the grip demands.
-    #
-    # Backing the rotation copies off lets the hand sit a few degrees out of
-    # perfect alignment with the haft. A slightly imperfect grip is a thing
-    # you have to look for; an impossible wrist is what Luke saw from across
-    # a room. The IK stays at 1.0 -- the hand still goes exactly where the
-    # tool is, it just does not have to point exactly how the tool points.
-    # ⚠️ SWEEPABLE, LIKE THE ROLL, BECAUSE IT HAS ALREADY BEEN TUNED BY HAND
-    # TWICE AND IS COUPLED TO BOTH OF THE OTHERS. 0.75 relieves the wrist;
-    # it also decides whether the off hand WRAPS the haft or merely lies
-    # across it, and that second effect was never measured -- the hand is
-    # 0.0000 from its IK goal and still not holding the tool.
-    # GRC_TEST / PGC_TEST override without editing code.
-    g["_pick_ik"].influence = 1.0
-    g["_gc"].influence = 1.0
-    g["_pgc"].influence = float(os.environ.get("PGC_TEST") or 0.75)
-    g["_grc"].influence = float(os.environ.get("GRC_TEST") or 0.75)
+    _fresh_action("Swing")
 
-    # ⚠️ THE ROLL OF THE SHAFT ABOUT ITS OWN AXIS IS NOT FREE -- IT IS THE
-    # BIGGEST SINGLE INFLUENCE ON THE WRISTS. A shaft rolled about itself
-    # looks identical; the HANDS holding it do not, because the grip is
-    # welded to the tool and every degree of roll is a degree of forearm
-    # twist the wrist has to find. Luke spotted it by eye -- "it looks like
-    # you've overspun the pickaxe and it's causing his hands to twist" --
-    # and _roll.py confirms it, sweeping the roll and measuring:
+    OFF, DRV = SA, ("r" if SA == "l" else "l")
+    off_goal, drv_goal = hand_goal, g["_pick_goal"]
+    off_grip, drv_grip = GRIP, g["_pgrip"]
+    g["_gc"].influence = 1.0
+    g["_pick_ik"].influence = 1.0
+    # ⚠️ DO NOT FORCE THE HAND ORIENTATION. HE IS HOLDING NOTHING.
+    # A Copy Rotation says which way the hand POINTS while the IK says where
+    # the wrist IS, and the wrist silently absorbs every degree of difference
+    # the arm chain cannot supply. Welded to an imaginary haft at influence
+    # 1.0 that cost 101 degrees of bend in a joint that manages about 80 --
+    # the exact failure that made the pickaxe clip unfixable, reproduced here
+    # for a tool that is not even in the scene.
     #
-    #     roll     0 deg  ->  wrists  47 / 83     (what shipped)
-    #     roll   240 deg  ->  wrists 101 / 46
-    #     roll   310 deg  ->  wrists  52 / 62     both inside human range
-    #
-    # 83 and 101 degrees are not poses, they are breaks. It was overspun by
-    # about 50 degrees and I had been treating the roll as cosmetic.
-    # ⚠️ RE-SWEEP IT WHENEVER ANYTHING UPSTREAM OF THE GRIP CHANGES. It has
-    # gone stale twice now, both times silently:
-    #   310 was chosen when the pole sweep scored WRIST BEND ALONE, and went
-    #       stale when the sweep started scoring shoulder twist too.
-    #   310 went stale AGAIN on 2026-11-06 when the curl-sign fix changed
-    #       what the left hand's grip demands. Worst wrist went to 82 and
-    #       tripped qa -- the gate caught a constant, not a pose.
-    #   345 went stale within the hour, when the grip solve was reworked to
-    #       seat the shaft against the palm and wrap the fingers round it.
-    #       THAT IS THE PATTERN: this constant is downstream of the grip, so
-    #       any change to how the hands hold the tool invalidates it. Re-run
-    #       _roll.py as a matter of course after touching build-pick.py.
-    #   321.5 went stale when GRIP_LO moved the off hand up the haft.
-    #
-    # ⚠️ AND THE SURFACE IT IS SWEPT ON WAS NOISE UNTIL _POLE_JUMP WENT TO
-    # 150. At 45 the per-frame pole cost had two near-tied minima with very
-    # different wrist BEND, so one degree of roll flipped a few frames
-    # between them: 280 -> 69.1, 281.2 -> 76.2, 285 -> 68.2, with the worst
-    # FRAME hopping between f18, f10 and f8. A minimum with no good
-    # neighbours is not a minimum, it is a sampling artefact, and picking it
-    # is what made this constant go stale three times in a day. At 150 the
-    # same span is a clean monotone basin, every frame reading f18:
-    #       268:77.1  270:74.9  272:73.0  274:72.6  276:69.9  278:68.8
-    #       280:66.8  | 282:79.9 <- cliff, f9 takes over as worst
-    #
-    #   278 was chosen off _roll.py's basin and FAILED qa at 99.2. That is
-    #       the fourth stale answer in a day and the last one taught the
-    #       actual lesson: _roll.py does not measure the shipping clip even
-    #       after being fixed to build all four stages, because export-all
-    #       BAKES five clips before Mine is keyed and Mine is authored on
-    #       what that leaves behind. Use harness/_rollq.py, which runs the
-    #       real exporter and reads the baked action -- its wrist figure
-    #       matches qa's to the decimal.
-    #
-    #   270 is the current answer: worst wrist 72.1 against a limit of 80,
-    #       measured through the exporter and confirmed by a full qa pass.
-    #       _POLE_JUMP stays at 45; 150 smoothed _roll.py's surface but made
-    #       no difference to the number that actually gates (82.7 vs 82.7 at
-    #       roll 300, 82.7 vs 82.4 at 321), so it was buying nothing real.
-    # ROLL_TEST=<deg> overrides without editing code; _roll.py re-solves it.
-    globals()['_ROLL'] = float(os.environ.get("ROLL_TEST") or globals().get('ROLL_TEST', 270.0))
-    TOOL, TIP = g["TOOL"], g["PICK_TIP"]
-    WRIST = g["WRIST_IN_TOOL"]
-    REACH_MAX = 0.95
+    # The fists stay closed because build-pick solved the fingers; letting
+    # them ride the forearm is both free and correct. A grip only needs
+    # forcing when something real has to stay in it.
+    g["_grc"].influence = 0.0
+    g["_pgc"].influence = 0.0
+
     ARM = 0.5 * (g["ARM_FULL"]["l"] + g["ARM_FULL"]["r"])
+    REACH_MAX = 0.92
+    GAP = 0.09 * LEG                 # how far apart the fists sit on the haft
+    _JUMP = float(os.environ.get("POLE_JUMP") or 45.0)
+    _ROLL = float(os.environ.get("SWING_ROLL") or 0.0)
 
     def body(dz, dy, twist, spine, head):
         arm.location = (0.0, dy * LEG, (FLOOR + LEG * 0.985 + dz * LEG) - HIP0)
@@ -621,8 +575,8 @@ def key_mine(frames=40):
         bpy.context.view_layer.update()
 
     def frame_axes():
-        """The body's own up / forward / right, and the point the arms swing
-        about -- read from the POSED skeleton, so leaning is already in it."""
+        """The body's own up / forward / right, read from the POSED skeleton so
+        the lean is already in it."""
         pel = arm.matrix_world @ arm.pose.bones["pelvis"].head
         sl = arm.matrix_world @ arm.pose.bones["upperarm_l"].head
         sr = arm.matrix_world @ arm.pose.bones["upperarm_r"].head
@@ -632,133 +586,120 @@ def key_mine(frames=40):
         f = (f - up * f.dot(up)).normalized()
         return mid, up, f, up.cross(f).normalized()
 
-    def solve(reach, elev, lead, yaw=0.0):
-        """Hand position and the tool's full transform, from the three
-        body-relative numbers. Returns (wrist, tool_rotation)."""
+    def solve(reach, elev, lead, yaw):
+        """Both fists, and the orientation they share, from the body-relative
+        numbers. Returns (lead hand, off hand, quaternion)."""
         mid, up, f, right = frame_axes()
-        # ⚠️ THE SWING IS NOT IN THE MIDLINE. Keeping it in the sagittal
-        # plane is what stops the tool windmilling into his torso, but it
-        # also walks the shaft straight across his FACE at the apex. A real
-        # over-the-shoulder lift goes up one SIDE of the head. Yawing the
-        # whole plane out toward the driving shoulder keeps the first
-        # property and fixes the second.
         yq = Quaternion(up, math.radians(yaw))
-        f = yq @ f
-        right = yq @ right
+        f, right = yq @ f, yq @ right
+        # ⚠️ ELEVATION IS MEASURED FROM WORLD DOWN, NOT FROM THE TORSO.
+        # It used to be an angle about the body's own `up`, which sounds
+        # right and is a trap: frame_axes() reads `up` off the POSED
+        # skeleton, so a forward flex rotates the frame the arms are
+        # measured in. At the hit the spine leans the frame ~50 degrees, so
+        # `elev 30` put his fists 20 degrees BEHIND vertical -- he finished
+        # the strike hunched with his hands tucked under his chest.
+        #
+        # I then "fixed" it by adding a 1.12 * spine correction term, which
+        # is a fudge factor standing in for a measurement, and it was still
+        # wrong. The real fix is to stop coupling them: swing the arm from
+        # world DOWN, in the body's own facing direction flattened to the
+        # horizontal. Torso flex can no longer move the hands, which is what
+        # lets the spine carry the weight without dragging the arms with it.
+        #
+        #   elev 0 = hanging straight down, 90 = straight out front,
+        #   180 = straight overhead. Negative would be behind him, and the
+        #   table never writes one.
+        fh = Vector((f.x, f.y, 0.0))
+        fh = fh.normalized() if fh.length > 1e-6 else Vector((0.0, FWD, 0.0))
         e = math.radians(elev)
-        armdir = (-up * math.cos(e)) + (f * math.sin(e))
+        armdir = (Vector((0.0, 0.0, -1.0)) * math.cos(e)) + (fh * math.sin(e))
+        armdir.normalize()
         H = mid + armdir * (min(reach, REACH_MAX) * ARM)
-        # The haft continues the line of the arm, rotated by `lead` in the
-        # body's own sagittal plane -- never out of it, so it cannot swing
-        # sideways through him.
+        # The invisible haft continues the line of the arm, rotated by `lead`
+        # in the sagittal plane only -- so it cannot swing sideways through him
+        # however lead is keyed.
         l = math.radians(lead)
-        # Rodrigues about the body's right axis: the haft stays in the
-        # sagittal plane by construction, so it cannot swing sideways
-        # through him however `lead` is keyed.
         haft = (armdir * math.cos(l)) + (right.cross(armdir) * math.sin(l))
         haft.normalize()
         y = haft.cross(right)
         rot = Matrix((right, y, haft)).transposed().to_3x3().to_quaternion()
-        # A shaft rolled about its own axis looks the same; the HANDS do
-        # not. _roll.py sweeps this and measures the wrists.
-        rot = rot @ Quaternion((0, 0, 1), math.radians(globals().get('_ROLL', 0.0)))
-        return H, rot
+        rot = rot @ Quaternion((0, 0, 1), math.radians(_ROLL))
+        return H, H - haft * GAP, rot
 
-    # ⚠️ THE APEX REACH WAS CHANGED AND CHANGED BACK. I pushed frames 13-20
-    # from 0.70-0.73 out to 0.82-0.87 to clear a hand-in-torso failure, and it
-    # cost 4 degrees of wrist. The failure was not real: qa.py was reading the
-    # normal of an OPEN BOUNDARY on its torso proxy, and the hand it called
-    # 0.085 deep in his chest was 0.46 away, overhead and to the side. Reverted
-    # once the harness was fixed. Do not re-tune these against a number without
-    # checking what the number is actually touching.
-    #     f  reach  elev  lead  yaw  hip dz  hip dy twist spine head
-    B = [(1,  0.86,  38, -14,  10,  -0.100,  0.000,  10,   26,  14),
-         (6,  0.84,  30, -10,  12,  -0.140,  0.010,  13,   30,  15),
-         (10, 0.72,  62,  10,  20,  -0.070,  0.025,   2,   16,  17),
-         (13, 0.70, 104,  40,  28,   0.000,  0.040, -12,    2,  20),
-         (16, 0.72, 142,  64,  34,   0.040,  0.048, -22,  -10,  22),
-         (18, 0.73, 147,  68,  35,   0.045,  0.050, -24,  -11,  22),
-         (20, 0.72, 118,  50,  30,   0.000,  0.030, -10,    6,  18),
-         (21, 0.80,  86,  28,  24,  -0.080,  0.000,   2,   20,  14),
-         (22, 0.86,  48,  -4,  16,  -0.180, -0.030,   6,   34,  12),
-         (23, 0.93,  28, -16,  10,   None,  -0.055,   8,   46,  10),
-         (24, 0.93,  27, -16,  10,   None,  -0.057,   8,   47,  10),
-         (27, 0.88,  40, -18,  12,  -0.185, -0.025,   7,   34,  13),
-         (30, 0.86,  46, -20,  12,  -0.145, -0.012,   8,   30,  14),
-         (34, 0.86,  40, -16,  11,  -0.112,  0.000,   9,   27,  14),
-         (40, 0.86,  38, -14,  10,  -0.100,  0.000,  10,   26,  14)]
+    # ⚠️ ELEV IS MEASURED AGAINST THE POSED TORSO, NOT THE WORLD, AND THE
+    # FIRST VERSION OF THIS TABLE IGNORED THAT. frame_axes() reads `up` from
+    # pelvis -> shoulder midpoint on the SKELETON AS POSED, so a forward flex
+    # tilts the whole frame the arms are measured in. The spine keys below
+    # distribute to pelvis 0.20 + spine_01 0.26 + spine_02 0.36 + spine_03
+    # 0.30 = 1.12x, so `spine 47` leans the arm frame 53 degrees forward --
+    # and `elev 30` in that frame is 23 degrees BEHIND vertical in the world.
+    # He finished the strike with his fists tucked under his chest, hunched
+    # like a man winded, which is exactly what it rendered as.
+    #
+    # So every elevation here is derived, not typed:
+    #
+    #     elev = (angle wanted in the world) + 1.12 * spine
+    #
+    # with the world angle measured from straight down: 0 hanging, 90 straight
+    # out in front, 180 overhead.
+    #
+    # elev is now the WORLD angle from straight down (see solve), so these
+    # read as the picture: 35 is hands low in front, 170 is overhead.
+    #    f  reach elev lead yaw   dz     dy   twist spine head
+    B = [(1,  0.60,  38,  -6, 10, -0.060, 0.010,   4,  14,   6),   # ready
+         (4,  0.64,  46,  -4, 10, -0.052, 0.006,   4,  11,   8),
+         # ── the lift: slow, ten frames. Weight back, spine extends ──────
+         (10, 0.80, 112,  16, 14, -0.026,-0.018,  -5,  -6,  13),
+         (14, 0.88, 152,  30, 17, -0.014,-0.032, -10, -16,  15),
+         # ── the hold: four frames that barely move. This IS the weight. ──
+         (18, 0.90, 170,  36, 18, -0.010,-0.038, -12, -20,  14),   # apex
+         (20, 0.90, 164,  34, 18, -0.022,-0.028,  -9, -12,  13),
+         # ── the strike: 130 degrees in six frames, LINEAR, no ease-in ───
+         (23, 0.92,  92,  10, 15, -0.082, 0.012,   2,  12,  16),
+         (26, 0.90,  30, -14,  9, -0.170, 0.050,  10,  30,  20),   # THE HIT
+         # ── recoil, then a long settle ──────────────────────────────────
+         (28, 0.86,  42, -11,  9, -0.142, 0.041,   9,  27,  18),
+         (31, 0.74,  52,  -8, 10, -0.104, 0.024,   7,  26,  15),
+         (36, 0.65,  44,  -7, 10, -0.072, 0.014,   5,  18,   9),
+         (48, 0.60,  38,  -6, 10, -0.060, 0.010,   4,  14,   6)]
 
-    def tip_z(reach, elev, lead, yaw, dz, dy, twist, spine, head):
-        body(dz, dy, twist, spine, head)
-        H, rot = solve(reach, elev, lead, yaw)
-        return ((H - (rot @ WRIST)) + (rot @ TIP)).z - FLOOR
+    STRIKE = (20, 26)
 
-    # ── THE ONE SOLVE ── how deep does he have to get for the point to
-    # touch? Bisection on hip height; everything else is already safe.
-    rows = []
-    for r in B:
-        if r[5] is None:
-            lo, hi = -0.55, 0.0
-            for _ in range(28):
-                mid_ = (lo + hi) * 0.5
-                if tip_z(r[1], r[2], r[3], r[4], mid_, r[6], r[7], r[8], r[9]) > 0:
-                    hi = mid_
-                else:
-                    lo = mid_
-            r = r[:5] + ((lo + hi) * 0.5,) + r[6:]
-        rows.append(r)
-    B = rows
-
-    def sample(f):
+    def sample(fr):
         for i in range(len(B) - 1):
             f0, f1 = B[i][0], B[i + 1][0]
-            if f0 <= f <= f1:
-                u = (f - f0) / float(f1 - f0) if f1 > f0 else 0.0
-                if not (18 <= f0 < 24):
+            if f0 <= fr <= f1:
+                u = (fr - f0) / float(f1 - f0) if f1 > f0 else 0.0
+                if STRIKE[0] <= f0 < STRIKE[1]:
+                    u = u ** 1.55        # accelerate INTO the hit, never ease
+                else:
                     u = u * u * (3 - 2 * u)
                 return [p0 + (p1 - p0) * u for p0, p1 in zip(B[i][1:], B[i + 1][1:])]
         return list(B[-1][1:])
 
-    LEAD_Y, REAR_Y = FWD * 0.26 * LEG, 0.26 * LEG
-    SPLIT = 0.185 * LEG
-    worst_reach, worst_elev, tip_lo = 0.0, 999.0, 1e9
+    SPLIT, LEAD_Y, REAR_Y = 0.17 * LEG, FWD * 0.22 * LEG, 0.24 * LEG
     worst_wrist = {"l": 0.0, "r": 0.0}
-    head_clear = 1e9
-
-    # ⚠️ THE SWEEP NEEDS A MEMORY, OR THE ARM FLIPS MID-SWING. Each frame used
-    # to pick its minimum-cost pole with no reference to the frame before it,
-    # so two adjacent frames could land on opposite sides of the arm and the
-    # shoulder would snap through a half turn between them. That is exactly
-    # what Mine f12 was: arms wrapped across the chest, hands crossing the
-    # face, 179 degrees of upperarm twist -- in the middle of a lift whose
-    # neighbours are clean. The old metric could not see f12 at all, so
-    # "shoulder fixed, 165 -> 24" was measured by an instrument blind to the
-    # worst frame in the clip.
+    worst_miss = [0.0, 0, ""]
     last_pole = {}
-    _POLE_JUMP = float(os.environ.get("POLE_JUMP") or 45.0)
+    hand_speed, speed_at = 0.0, 0
+    prev_hand = None
+
     for f in range(1, frames + 1):
         reach, elev, lead, yaw, dz, dy, twist, spine, head = sample(f)
         body(dz, dy, twist, spine, head)
-        H, rot = solve(reach, elev, lead, yaw)
+        Hd, Ho, rot = solve(reach, elev, lead, yaw)
 
-        TOOL.rotation_quaternion = rot
-        TOOL.location = H - (rot @ WRIST)
-        TOOL.keyframe_insert("location", frame=f)
-        TOOL.keyframe_insert("rotation_quaternion", frame=f)
-        for ob in g["TOOL_CHILDREN"]:
-            loc, q = g["TOOL_LOCALS"][ob.name]
-            ob.location = loc
-            ob.keyframe_insert("location", frame=f)
-            if q is not None:
-                ob.rotation_quaternion = q
-                ob.keyframe_insert("rotation_quaternion", frame=f)
+        for goal, pos in ((drv_goal, Hd), (off_goal, Ho)):
+            goal.location = pos
+            goal.keyframe_insert("location", frame=f)
 
         arm.keyframe_insert("location", frame=f)
         for bn in ("pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head"):
             if arm.pose.bones.get(bn):
                 arm.pose.bones[bn].keyframe_insert("rotation_euler", frame=f)
 
-        for s_, (fx, fy) in (("l", (SPLIT, LEAD_Y)), ("r", (-SPLIT, REAR_Y))):
+        for s_, (fx, fy) in ((OFF, (SPLIT, LEAD_Y)), (DRV, (-SPLIT, REAR_Y))):
             tgt, pole = iks[s_]
             tgt.location = (fx, fy, FLOOR + ANKLE_H)
             tgt.keyframe_insert("location", frame=f)
@@ -766,22 +707,12 @@ def key_mine(frames=40):
             tgt.keyframe_insert("rotation_quaternion", frame=f)
             pole.location = (fx * 1.5, fy + FWD * 0.45 * LEG, FLOOR + LEG * 0.52)
             pole.keyframe_insert("location", frame=f)
-        # ── THE ELBOW POLES ARE SOLVED, PER FRAME, PER ARM ──────────────
-        # ⚠️ A FORCED HAND ORIENTATION HAS TO GO SOMEWHERE. IK sets where
-        # the wrist IS and a Copy Rotation sets which way the hand POINTS;
-        # the wrist joint silently absorbs the entire difference, and
-        # nothing in the rig says no. Measured on the first version: 123
-        # degrees of wrist bend where a human manages about 70. That is the
-        # "every joint torqued the wrong way" -- not a posing taste
-        # question, a broken arm.
-        #
-        # A real forearm ROLLS to meet the grip, and on an IK chain the
-        # thing that rolls it is the pole. So the pole angle is no longer a
-        # placed guess: it is swept around the shoulder-to-wrist axis and
-        # the position that leaves the LEAST wrist bend wins. The arm
-        # arrives already oriented, so the wrist has almost nothing to
-        # absorb.
-        for s_, pole in (("l", elbow_pole), ("r", g["_pick_pole"])):
+
+        # ── the elbow poles are solved per frame, per arm ────────────────
+        # ⚠️ WITH A MEMORY. A per-frame optimum is not a trajectory: without
+        # the continuity term two adjacent frames land on opposite sides of
+        # the arm and the shoulder snaps through a half turn between them.
+        for s_, pole in ((OFF, elbow_pole), (DRV, g["_pick_pole"])):
             sh = arm.matrix_world @ arm.pose.bones["upperarm_%s" % s_].head
             wr = arm.matrix_world @ arm.pose.bones["hand_%s" % s_].head
             ax = (wr - sh)
@@ -792,48 +723,24 @@ def key_mine(frames=40):
             u = u.normalized() if u.length > 1e-4 else ax.cross(Vector((0, 1, 0))).normalized()
             v = ax.cross(u)
             best, bpos, bbend = 1e9, pole.location.copy(), 0.0
-            # 48 steps, not 24: the cost surface has three terms competing
-            # now and a 15-degree sweep walks past the minimum between samples.
             for k in range(48):
                 th = k * (math.pi / 24.0)
                 cand = ((sh + wr) * 0.5
                         + (u * math.cos(th) + v * math.sin(th)) * (0.9 * ARM))
                 pole.location = cand
                 bpy.context.view_layer.update()
-                fa = (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % s_].tail) -                      (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % s_].head)
-                hd = (arm.matrix_world @ arm.pose.bones["hand_%s" % s_].tail) -                      (arm.matrix_world @ arm.pose.bones["hand_%s" % s_].head)
+                fa = (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % s_].tail) - \
+                     (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % s_].head)
+                hd = (arm.matrix_world @ arm.pose.bones["hand_%s" % s_].tail) - \
+                     (arm.matrix_world @ arm.pose.bones["hand_%s" % s_].head)
                 if fa.length < 1e-6 or hd.length < 1e-6:
                     continue
                 bend = math.degrees(fa.angle(hd))
-                # ⚠️ SCORE BOTH JOINTS, OR THE SWEEP TRADES ONE FOR THE OTHER.
-                # Shoulder roll is weighted above wrist bend because a wrist a
-                # few degrees past comfortable reads as a stiff grip, while a
-                # humerus rolled past 90 reads as a broken man.
-                # ⚠️ SCORE THE WRIST'S TWIST TOO, NOT JUST ITS BEND. This
-                # sweep exists because "a real forearm ROLLS to meet the grip,
-                # and on an IK chain the thing that rolls it is the pole" --
-                # but it only ever measured BEND, so it rolled the arm to
-                # straighten the wrist while leaving 73 degrees of twist in a
-                # joint that anatomically has no twist axis at all. Palm
-                # rotation belongs to the forearm; putting hand twist in the
-                # cost is what actually sends it there, kinematically, rather
-                # than hiding it in deformation.
                 tw = _twist_from_rest(arm.pose.bones["upperarm_%s" % s_])
                 hw = _twist_from_rest(arm.pose.bones["hand_%s" % s_])
-                # Continuity: drifting the elbow a little between frames is
-                # free, teleporting it to the other side of the arm is not.
                 prev = last_pole.get(s_)
                 jump = 0.0 if prev is None else (cand - prev).length / ARM
-                # ⚠️ THE JUMP WEIGHT DECIDES WHETHER THIS CLIP'S WRIST
-                # FIGURE IS A NUMBER OR A COIN FLIP. At 45 the combined cost
-                # has two near-tied minima per frame with very different
-                # BEND, so a one-degree change in the shaft roll flips a few
-                # frames between them and the clip's worst wrist jumps 7
-                # degrees. Measured: roll 280 -> 69.1, 281.2 -> 76.2,
-                # 282.5 -> 75.9, 285 -> 68.2, and the worst FRAME moves
-                # between f18, f10 and f8 as it goes. Tuning the roll against
-                # that is tuning against noise. POLE_JUMP re-tests it.
-                cost = bend + 1.5 * tw + 1.5 * hw + _POLE_JUMP * jump
+                cost = bend + 1.5 * tw + 1.5 * hw + _JUMP * jump
                 if cost < best:
                     best, bpos, bbend = cost, cand, bend
             pole.location = bpos
@@ -842,32 +749,42 @@ def key_mine(frames=40):
             worst_wrist[s_] = max(worst_wrist[s_], bbend)
         bpy.context.view_layer.update()
 
-        hd = arm.matrix_world @ arm.pose.bones["head"].head
-        ht = arm.matrix_world @ arm.pose.bones["head"].tail
-        ha = TOOL.matrix_world @ Vector((0, 0, 0))
-        hb = TOOL.matrix_world @ Vector((0, 0, g["HAFT_LEN"] * LEG))
-        d_ = hb - ha
-        t_ = max(0.0, min(1.0, ((hd + ht) * 0.5 - ha).dot(d_) / max(d_.dot(d_), 1e-9)))
-        head_clear = min(head_clear, (((hd + ht) * 0.5) - (ha + d_ * t_)).length)
-        worst_reach = max(worst_reach, reach)
-        worst_elev = min(worst_elev, elev)
-        tip_lo = min(tip_lo, ((H - (rot @ WRIST)) + (rot @ TIP)).z - FLOOR)
+        # ⚠️ DID THE HANDS ACTUALLY GO WHERE THEY WERE SENT? The goal is an
+        # empty parented to the tool control; solve() computes a WORLD point
+        # and writes it to a LOCAL location, which is only the same thing
+        # while that control sits at the origin. And an IK chain that cannot
+        # reach simply stops short, silently. Both failures look identical in
+        # a render -- the arms just end up somewhere else -- so this prints
+        # the gap rather than leaving me to infer it from a picture.
+        for s_, want in ((DRV, Hd), (OFF, Ho)):
+            got = arm.matrix_world @ arm.pose.bones["hand_%s" % s_].head
+            miss = (got - want).length / ARM
+            if miss > worst_miss[0]:
+                worst_miss[0], worst_miss[1], worst_miss[2] = miss, f, s_
 
-    # ⚠️ DO NOT RE-CLOSE THE FISTS HERE. build-pick solves each finger
-    # against the shaft radius; a global close_fist stamps over that
-    # and puts them back to cupping it.
+        # How fast the hands are actually travelling, per frame. The swing is
+        # only convincing if this has a sharp peak -- a flat profile is the
+        # numeric signature of a weightless swing.
+        if prev_hand is not None:
+            sp = (Hd - prev_hand).length / LEG
+            if sp > hand_speed:
+                hand_speed, speed_at = sp, f
+        prev_hand = Hd.copy()
+
     _smooth([arm] + list(G["helpers"]))
+    # ⚠️ NOTHING EASES INTO THE HIT. _smooth puts every key back on bezier,
+    # which decelerates the hands just before impact and is the single most
+    # common way a heavy swing reads as weightless. Put the strike back to
+    # linear AFTER the smoothing pass, not before.
     for ob in [arm] + list(G["helpers"]):
         if ob.animation_data and ob.animation_data.action:
             for fc in ob.animation_data.action.fcurves:
                 for kp in fc.keyframe_points:
-                    if 18 <= kp.co[0] <= 24:
+                    if STRIKE[0] <= kp.co[0] <= STRIKE[1]:
                         kp.interpolation = "LINEAR"
-    print("MINE  point lowest %.4f above the floor" % tip_lo)
-    print("MINE  max reach %.2f of arm (cap %.2f) | min elevation %.0f deg "
-          "(negative is behind him)" % (worst_reach, REACH_MAX, worst_elev))
-    print("MINE  worst wrist bend  L %.0f  R %.0f deg   (a wrist does about 70)"
-          % (worst_wrist["l"], worst_wrist["r"]))
-    print("MINE  closest the shaft comes to his head: %.3f  (his head is ~0.09 wide)"
-          % head_clear)
+    print("SWING hand MISSED its goal by %.3f of an arm (f%d, %s) %s"
+          % (worst_miss[0], worst_miss[1], worst_miss[2],
+             "" if worst_miss[0] < 0.05 else "  <-- the arms are not following"))
+    print("SWING peak hand speed %.3f leg-lengths/frame at f%d" % (hand_speed, speed_at))
+    print("SWING worst wrist bend  L %.0f  R %.0f deg" % (worst_wrist["l"], worst_wrist["r"]))
     return frames

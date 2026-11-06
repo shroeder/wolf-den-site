@@ -89,7 +89,7 @@ _rg = os.environ.get("FILM_REGIONS",
                      "grip,hand_l,hand_r,head,shoulders,feet")
 REGIONS = [] if _rg in ("none", "") else [r.strip() for r in _rg.split(",")]
 
-_shot.stage(human)
+_shot.stage(human, floor_z=FLOOR)
 print("")
 print("=" * 78)
 print("FILM — the deliverable first")

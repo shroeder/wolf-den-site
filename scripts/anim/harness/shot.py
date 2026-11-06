@@ -40,8 +40,18 @@ def measure(human):
     return min(zs), max(zs), max(zs) - min(zs)
 
 
-def stage(human, ground=True, bg=(0.40, 0.44, 0.49, 1.0)):
-    """Lights, world and floor. Idempotent -- safe to call per shot."""
+def stage(human, ground=True, bg=(0.40, 0.44, 0.49, 1.0), floor_z=None):
+    """Lights, world and floor. Idempotent -- safe to call per shot.
+
+    ⚠️ PASS floor_z. Without it the ground is laid at the mesh's lowest
+    vertex AT CALL TIME, and film.py calls this once before any clip or
+    frame is set -- so the floor is placed from whatever pose export-all
+    happened to leave behind. On 2026-11-06 that put the ground 0.2 units
+    low and every frame of a clip rendered with the hero hanging in mid
+    air with his toes pointed. It reads exactly like an animation bug, and
+    I was one step from re-posing the clip to fix it; the feet measured
+    -0.0000, flat on the floor, identical to every shipping clip. The rig
+    knows where its floor is (build-walk's FLOOR) -- use that."""
     if _STAGED[0]:
         return
     sc = bpy.context.scene
@@ -58,7 +68,8 @@ def stage(human, ground=True, bg=(0.40, 0.44, 0.49, 1.0)):
     lo, hi, _h = measure(human)
     mid = Vector((0, 0, (lo + hi) * 0.52))
     if ground:
-        bpy.ops.mesh.primitive_plane_add(size=14, location=(0, 0, lo))
+        bpy.ops.mesh.primitive_plane_add(
+            size=14, location=(0, 0, lo if floor_z is None else floor_z))
         gob = bpy.context.active_object
         gob.name = "ShotGround"
         gm = bpy.data.materials.new("ShotGroundMat")

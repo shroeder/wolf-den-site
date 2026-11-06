@@ -21,14 +21,33 @@ CLIP_PROPS = {
     "Run":    ("Pickaxe",),
     "Brace":  ("Shield", "ShieldBoss", "ShieldFace"),
     "Impact": ("Shield", "ShieldBoss", "ShieldFace"),
-    "Mine":   ("Pickaxe",),
+    # ⚠️ Swing carries NOTHING. He is swinging an imaginary haft --
+    # the fists are closed because build-pick solved the fingers, not
+    # because a tool is in them. Listing a prop here would put the
+    # pickaxe back in a clip that was made precisely to go without it.
+    "Swing":  (),
 }
 ALL_PROPS = ("Shield", "ShieldBoss", "ShieldFace", "Pickaxe")
+
+# ── THE BARE MODEL ──────────────────────────────────────
+# Armour is not a prop. The plates are cut from the hero's own surface and
+# skinned to the same bones, so they are always in the scene and hiding
+# them is a separate switch. A clip listed in BARE renders on the base
+# body: no steel, nothing in his hands.
+# Luke, on the swing: "take all the armor off and get rid of the pickaxe.
+# We just want the base model."
+PLATES = ("Cuirass", "Pauldron_L", "Pauldron_R", "Greave_L", "Greave_R")
+BARE = {"Swing"}
 
 
 def set_kit(clip):
     """Hide every prop this clip is not holding. Returns what stayed."""
     keep = set(CLIP_PROPS.get(clip, ()))
+    bare = clip in BARE
+    for n in PLATES:
+        ob = bpy.data.objects.get(n)
+        if ob:
+            ob.hide_render = bare
     shown = []
     for n in ALL_PROPS:
         ob = bpy.data.objects.get(n)
