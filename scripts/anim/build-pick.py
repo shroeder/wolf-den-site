@@ -1,4 +1,4 @@
-import bpy, bmesh, math
+import bpy, bmesh, math, os
 from mathutils import Vector, Matrix, Quaternion, Euler
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -28,8 +28,12 @@ from mathutils import Vector, Matrix, Quaternion, Euler
 PICK_HAND = "r"
 OFF_HAND = "l" if PICK_HAND == "r" else "r"
 HAFT_LEN = 1.05
-GRIP_HI = 0.26                    # driving hand, up the haft
-GRIP_LO = 0.05                    # off hand, at the butt
+# ⚠️ THESE ARE WHERE THE HANDS GO AND THEY WERE NEVER SWEPT. GRIP_LO at 0.05
+# put the off hand HALF A FIST OFF THE END of the wood -- the butt's end face
+# is visible in the apex render with the hand curled over the air past it.
+# Sweepable now; _offgrip.py renders each candidate.
+GRIP_HI = float(os.environ.get("GRIP_HI_TEST") or 0.26)   # driving hand, up the haft
+GRIP_LO = float(os.environ.get("GRIP_LO_TEST") or 0.05)   # off hand, near the butt
 
 _iron = bpy.data.materials.new("PickIron")
 _iron.use_nodes = True
@@ -156,21 +160,28 @@ def grip_frame(side):
     kmid = sum(knuck, Vector()) / 4.0
     z = (bone("index_01") - bone("pinky_01")).normalized()
 
-    # ⚠️ PUT THE SHAFT WHERE THE CLOSING FINGERS ACTUALLY GO. Deriving the
-    # centre from the KNUCKLES and stepping one radius toward the palm put
-    # it somewhere the fingertips could not reach even at full curl --
-    # measured 0.055 to 0.079 away from a 0.030 shaft, which is a hand
-    # cupping it, exactly as it looked. Curl to a natural grip first, see
-    # where the tips come to, and seat the shaft against them.
+    # ⚠️ SEATING THE SHAFT AGAINST THE FINGERTIPS MAKES A CRADLE, NOT A GRIP.
+    # The previous version curled to 0.80, read where the tips had come to,
+    # and put the shaft there, one radius back. That CANNOT fail -- and it
+    # cannot succeed either, because the shaft is placed to fit whatever
+    # shape the fingers are already in, so they are never required to come
+    # AROUND it. Rendered bare, with the tool hidden, both hands were an open
+    # C with a gap you could put a wrist through. From one azimuth that reads
+    # as a grip, which is why it survived.
+    #
+    # The shaft goes where a held shaft goes: against the PALM, just inside
+    # the knuckles. The palm direction is read from the hand itself -- curl
+    # hard and see which way the fingertips travel, because that is the palm
+    # by definition.
     for fng in ("index", "middle", "ring", "pinky"):
-        _curl(side, fng, 0.80)
+        _curl(side, fng, 1.40)
     bpy.context.view_layer.update()
-    tmid = sum((bone("%s_03" % f, True)
+    deep = sum((bone("%s_03" % f, True)
                 for f in ("index", "middle", "ring", "pinky")), Vector()) / 4.0
-    back = (kmid - tmid)
-    back = (back - z * back.dot(z))
-    back = back.normalized() if back.length > 1e-5 else Vector((0, 0, 1))
-    centre = tmid + back * (SHAFT_R + SKIN)
+    palm_d = (deep - kmid)
+    palm_d = (palm_d - z * palm_d.dot(z))
+    palm_d = palm_d.normalized() if palm_d.length > 1e-5 else Vector((0, 0, -1))
+    centre = kmid + palm_d * (SHAFT_R + SKIN)
     fwd = Vector((0.0, FWD, 0.0))
     y = fwd - z * fwd.dot(z)
     y = y.normalized() if y.length > 1e-5 else palm
@@ -187,22 +198,38 @@ def grip_frame(side):
         # distance to the shaft monotonically -- past a point the tip curls
         # PAST the shaft and the distance grows again, so bisection walks
         # off and leaves three fingers of the left hand short.
-        # ⚠️ THE RANGE RAN TO 1.60, WHICH IS 293 DEGREES IN ONE FINGER.
-        # The scan takes a global minimum, and a finger that curls PAST the
-        # shaft comes back around and approaches the axis again from the far
-        # side -- so "closest to the shaft" was happily satisfied by a finger
-        # looped into a full circle. The ring finger chose 1.45 on both hands
-        # and renders as a tentacle. The comment two lines up already knew
-        # the distance is not monotonic; the range was the part that let it
-        # matter. Capped at 1.0, which this file's own print defines as a
-        # closed fist, so an impossible curl is no longer expressible.
+        #
+        # ⚠️ AND THE DISTANCE ALONE HAS TWO SOLUTIONS, WHICH IS THE WHOLE
+        # BUG. "Tip is one radius from the axis" is satisfied by a finger
+        # that has wrapped round to the palm side AND by a barely-curled
+        # finger still sitting on the knuckle side -- and the second one is
+        # nearer, so it always won. That is the open C.
+        #
+        # So the cost is SIGNED: a finger has only gripped once its tip is
+        # past the axis, on the palm side. Unwrapped candidates are pushed
+        # out of contention rather than being quietly preferred.
+        #
+        # ⚠️ THE RANGE HAS TO REACH 1.7, AND 1.0 IS NOT A CLOSED FIST.
+        # 58/76/48 degrees at amount 1.0 is a loose cup -- the curl sweep
+        # shows the hand only closing near 1.5. An earlier fix capped this
+        # at 1.0 "because the print calls 1.0 a closed fist"; the print was
+        # wrong and the cap made the fingers LESS closed. What the cap was
+        # really for -- a ring finger looping a full circle at 1.45 -- is
+        # handled properly by the signed term, which stops rewarding a tip
+        # that has gone all the way round and come back.
         best, bamt = 1e9, 0.8
-        for k in range(33):
+        for k in range(61):
             amt = 0.20 + k * 0.025
             _curl(side, fng, amt)
             bpy.context.view_layer.update()
             t = bone("%s_03" % fng, True)
-            d = abs((t - centre - z * (t - centre).dot(z)).length - want)
+            r = (t - centre) - z * (t - centre).dot(z)
+            d = abs(r.length - want)
+            # How far past the axis, toward the palm, the tip has come.
+            # Negative means it never got round the shaft at all.
+            wrap = r.dot(palm_d)
+            if wrap <= 0.0:
+                d += 1.0 + (-wrap)
             if d < best:
                 best, bamt = d, amt
         _curl(side, fng, bamt)
@@ -213,7 +240,9 @@ def grip_frame(side):
             for f in ("index", "middle", "ring", "pinky")]
     print("        grip %s: fingertips %s from the axis (shaft %.4f)"
           % (side, " ".join("%.3f" % g for g in gaps), SHAFT_R))
-    print("        grip %s: curl %s  (1.0 = a closed fist)"
+    # ⚠️ 1.0 IS A LOOSE CUP, NOT A CLOSED FIST. 58/76/48 degrees only closes
+    # the hand near 1.5, which is why the solver legitimately wants >1.
+    print("        grip %s: curl %s  (1.5 is about a closed fist)"
           % (side, " ".join("%s %.2f" % (f[:3], chose[f])
                             for f in ("index", "middle", "ring", "pinky"))))
     return centre, Matrix((x, y, z)).transposed().to_3x3()

@@ -531,10 +531,16 @@ def key_mine(frames=40):
     # you have to look for; an impossible wrist is what Luke saw from across
     # a room. The IK stays at 1.0 -- the hand still goes exactly where the
     # tool is, it just does not have to point exactly how the tool points.
+    # ⚠️ SWEEPABLE, LIKE THE ROLL, BECAUSE IT HAS ALREADY BEEN TUNED BY HAND
+    # TWICE AND IS COUPLED TO BOTH OF THE OTHERS. 0.75 relieves the wrist;
+    # it also decides whether the off hand WRAPS the haft or merely lies
+    # across it, and that second effect was never measured -- the hand is
+    # 0.0000 from its IK goal and still not holding the tool.
+    # GRC_TEST / PGC_TEST override without editing code.
     g["_pick_ik"].influence = 1.0
     g["_gc"].influence = 1.0
-    g["_pgc"].influence = 0.75
-    g["_grc"].influence = 0.75
+    g["_pgc"].influence = float(os.environ.get("PGC_TEST") or 0.75)
+    g["_grc"].influence = float(os.environ.get("GRC_TEST") or 0.75)
 
     # ⚠️ THE ROLL OF THE SHAFT ABOUT ITS OWN AXIS IS NOT FREE -- IT IS THE
     # BIGGEST SINGLE INFLUENCE ON THE WRISTS. A shaft rolled about itself
@@ -557,12 +563,17 @@ def key_mine(frames=40):
     #   310 went stale AGAIN on 2026-11-06 when the curl-sign fix changed
     #       what the left hand's grip demands. Worst wrist went to 82 and
     #       tripped qa -- the gate caught a constant, not a pose.
-    #   345 is the current answer: worst wrist 70.7 against a limit of 80,
+    #   345 went stale within the hour, when the grip solve was reworked to
+    #       seat the shaft against the palm and wrap the fingers round it.
+    #       THAT IS THE PATTERN: this constant is downstream of the grip, so
+    #       any change to how the hands hold the tool invalidates it. Re-run
+    #       _roll.py as a matter of course after touching build-pick.py.
+    #   321.5 is the current answer: worst wrist 68.3 against a limit of 80,
     #       swept full-circle on the rig that actually ships (build-walk +
     #       twist + armour + pick), which is a thing _roll.py did not do
     #       until that run either.
     # ROLL_TEST=<deg> overrides without editing code; _roll.py re-solves it.
-    globals()['_ROLL'] = float(os.environ.get("ROLL_TEST") or globals().get('ROLL_TEST', 345.0))
+    globals()['_ROLL'] = float(os.environ.get("ROLL_TEST") or globals().get('ROLL_TEST', 321.5))
     TOOL, TIP = g["TOOL"], g["PICK_TIP"]
     WRIST = g["WRIST_IN_TOOL"]
     REACH_MAX = 0.95
