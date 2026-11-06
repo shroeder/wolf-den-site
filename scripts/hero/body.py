@@ -94,18 +94,39 @@ TORSO = [
 SHOULDER_BAND = 6
 
 
+# ⚠️ THE BIND POSE IS AN A-POSE, AND THAT IS NOT A STYLE CHOICE.
+# Built with the arms hanging straight down, the hands sit right beside the
+# hips -- and an outer-hip vertex then measures 0.082 m to the HAND bone
+# against 0.096 m to its own thigh. Distance-based weights hand the hip to
+# the arm, so raising the arm dragged a blade of flank up with it, from hip
+# to ear. Measured, not guessed: thigh flesh rose 0.51 m when an ARM moved.
+#
+# Every base mesh in the world is modelled in an A- or T-pose for exactly
+# this reason: no limb may lie next to another part at bind time, or the
+# skin solver cannot tell them apart. 40 degrees clears the hands of the
+# hips while keeping the armpit far less stretched than a full T-pose,
+# which is what tears a deltoid at rest.
+ARM_DROP = math.radians(40.0)
+
+
 def arm_path(side):
     s = 1.0 if side == "l" else -1.0
-    return [((s * 0.205, -0.004, 1.470), 0.058),
-            ((s * 0.240, -0.004, 1.395), 0.057),   # deltoid, the widest point
-            ((s * 0.252, -0.002, 1.255), 0.047),
-            ((s * 0.256, 0.000, 1.150), 0.042),    # elbow
-            ((s * 0.258, 0.000, 1.045), 0.041),
-            ((s * 0.260, 0.000, 0.935), 0.033),
-            ((s * 0.262, 0.000, 0.880), (0.030, 0.024)),   # wrist
-            ((s * 0.264, -0.010, 0.820), (0.042, 0.022)),  # palm
-            ((s * 0.264, -0.016, 0.760), (0.040, 0.021)),  # knuckles
-            ((s * 0.262, -0.018, 0.715), (0.028, 0.016))]  # fingertips
+    ox, oz = s * 0.165, 1.445                      # the shoulder joint
+    dx, dz = math.sin(ARM_DROP) * s, -math.cos(ARM_DROP)
+
+    def at(t, y=0.0):
+        return (ox + dx * t, y, oz + dz * t)
+
+    return [(at(0.045), 0.058),
+            (at(0.105), 0.057),                    # deltoid, widest point
+            (at(0.235), 0.047),
+            (at(0.335), 0.042),                    # elbow
+            (at(0.445), 0.041),
+            (at(0.560), 0.033),
+            (at(0.620), (0.030, 0.024)),           # wrist
+            (at(0.680, -0.008), (0.042, 0.022)),   # palm
+            (at(0.725, -0.013), (0.040, 0.021)),   # knuckles
+            (at(0.780, -0.015), (0.028, 0.016))]   # fingertips
 
 
 def leg_path(side):
