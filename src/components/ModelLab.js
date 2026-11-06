@@ -270,7 +270,17 @@ export default function ModelLab() {
             let raf = 0;
             const tick = () => {
                 raf = requestAnimationFrame(tick);
-                const dt = clock.getDelta();
+                // ⚠️ CLAMPED, OR A STALL EATS A WHOLE ONE-SHOT. getDelta() returns the entire stalled
+                // interval, so one frame after a backgrounded tab, an alt-tab, a GC pause or a devtools
+                // breakpoint arrives with a multi-second dt — and a single mixer.update that big steps
+                // clean past the end of a 1.7s clip. The swing never draws a frame: "Mine finished"
+                // fires immediately and the body is back in Idle before anybody saw it move.
+                //
+                // Found 2026-11-05 trying to film the Mine clip at 0.25x, where it should take seven
+                // seconds and instead completed between two screenshots, every time. IsoLab — the
+                // sibling lab, written in the same batch — has had this clamp and this comment since it
+                // shipped; this file just never got it.
+                const dt = Math.min(clock.getDelta(), 0.05);   // a backgrounded tab returns a huge delta
                 const api = apiRef.current;
                 if (api && api.mixer && api.playing !== false) {
                     api.mixer.update(dt * (api.speed === undefined ? 1 : api.speed));
