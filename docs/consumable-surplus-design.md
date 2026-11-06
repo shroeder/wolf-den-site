@@ -135,7 +135,14 @@ lose a sink either — which rules out more than it sounds like, as §5 and §6 
 
 ```js
 // Melt one surplus consumable. XP only, flat, no gold — see the three reasons below.
-await awardXp(buyerId, "apothecary_melt", { points: meltXp(id), gold: 0, flat: true });
+// Its own action, not the existing `consumable` one, so the XP screen can separate melts from uses.
+await awardXp(buyerId, "consumable_melt", {
+    points: meltXp(id),          // round(list / 150) * 25 — §3.2
+    gold: 0,                     // no mint, so §2 never applies
+    flat: true,                  // no Happy Hour, no Town prosperity
+    dailyCap: MELT_DAILY_CAP,    // 10 — launch-cliff control, §3.5
+    meta: { id, n },
+});
 ```
 
 Three properties, each already load-bearing somewhere else in the codebase:
@@ -152,54 +159,161 @@ Three properties, each already load-bearing somewhere else in the codebase:
    And it is what a member at the strike cap actually wants: the cap is reached by late-game players, and
    XP is the one reward that still moves for them.
 
-### 3.1 The rate: XP = list ÷ 10
+### 3.1 What a level actually costs, which is the thing "reasonable" has to be measured against
 
-25% of the item's list value, priced at the Ancient Codex's own gold-per-XP (5,000 gold ÷ 2,000 XP = 2.5):
+Computed from `xp-curve.js`'s own table rather than the old closed form:
 
-```
-meltXp(id) = round(0.25 × list(id) / 2.5) = list(id) / 10
-```
-
-| id | list | **XP on melt** |
+| level | cumulative XP to reach | **cost of that one level** |
 |---|---|---|
-| `pot_adrenaline` | 1,200 | **120** |
-| `stone_storm` | 2,000 | **200** |
-| `pot_secondwind` | 3,200 | **320** |
-| `stone_ember` | 3,500 | **350** |
-| `pot_berserker` | 4,000 | **400** |
-| `pot_fury` | 6,500 | **650** |
-| `candy_caramel_apple` | *inherits `stone_storm`* | **200** |
-| `candy_sour_worm` | *inherits `stone_ember`* | **350** |
+| 5 | 1,000 | 500 |
+| 10 | 4,500 | 1,000 |
+| 15 | 10,500 | 1,500 |
+| 20 | 19,000 | 2,000 |
+| 21 | 21,000 | 2,520 |
+| 25 | 34,600 | 5,000 |
+| 30 | 67,200 | 9,000 |
+| 40 | 203,400 | 20,000 |
+| 50 | 467,600 | 35,000 |
 
-**Drop-only items inherit the list price of the buyable item with the identical effect.** That is what
-removes the one genuinely unsolvable problem with any sell system: a drop-only item has no honest price, and
-inventing one turns a relic into currency. A Caramel Apple is `strikes: 3` and so is a Storm Crystal, so it
-is worth what a Storm Crystal is worth — nothing invented, nothing argued about. **An item with no priced
-twin is simply not meltable.**
+⚠️ **And `xp-curve.js` says where the Den actually is:** `CURVE_KNEE` was set to 20 because "the whole Den
+sits at or below it apart from two members at 21 and the owner." So for essentially every member a level
+costs **1,000–2,520 XP**, not tens of thousands. Any melt rate has to be judged against that, and it is why
+the first draft's `list ÷ 10` needed checking rather than shipping.
 
-### 3.2 The no-arbitrage proof
+For scale, the rest of the XP table (`xp.js:54`):
 
-The only attack is: buy at the floor, melt, keep the XP. So compare gold-per-XP against the cheapest
-*direct* gold→XP route in the game.
+| action | XP | how often |
+|---|---|---|
+| `daily_active` | 3 | once a day |
+| `boss_attack` | **30** | every swing, bounded by the strike cap |
+| `profile_complete` | 25 | once, ever |
+| `discord_link` | 50 | once, ever |
+| `first_purchase` | 100 | once, ever |
+| `boss_won` | 150 | once per boss, raffle winner |
+| Tome of Wisdom (1,500 gold) | **500** | unlimited |
+| Ancient Codex (5,000 gold) | **2,000** | unlimited |
+
+### 3.2 The rate: `round(list / 150) × 25`
+
+That is `list ÷ 6`, snapped to the nearest 25 so every number on a card is a round one — one expression, no
+per-item table to maintain:
+
+| id | list | **XP on melt** | share of a level at L20 |
+|---|---|---|---|
+| `pot_adrenaline` | 1,200 | **200** | 10% |
+| `stone_storm` | 2,000 | **325** | 16% |
+| `pot_secondwind` | 3,200 | **525** | 26% |
+| `stone_ember` | 3,500 | **575** | 29% |
+| `pot_berserker` | 4,000 | **675** | 34% |
+| `pot_fury` | 6,500 | **1,075** | 54% |
+| `candy_caramel_apple` | *inherits `stone_storm`* | **325** | 16% |
+| `candy_sour_worm` | *inherits `stone_ember`* | **575** | 29% |
+
+**Drop-only items inherit the list price of the buyable item with the identical effect.** That removes the
+one genuinely unsolvable problem with any sell system: a drop-only item has no honest price, and inventing
+one turns a relic into currency. A Caramel Apple is `strikes: 3` and so is a Storm Crystal, so it is worth
+what a Storm Crystal is worth — nothing invented, nothing argued about. **An item with no priced twin is
+simply not meltable.**
+
+### 3.3 Why `÷ 6` and not `÷ 10` or `÷ 3`
+
+There are two hard walls, and both scale with list price, so the constraint is a single divisor rather than a
+per-item check.
+
+**Wall 1 — the repeatable one, and the binding one.** Buy at the haggle floor, melt, keep the XP. That has
+to be worse per XP than simply buying a haggled Tome of Wisdom (900 gold ÷ 500 XP = 1.80 gold/XP):
+
+```
+0.60 × list / meltXp  >  1.80     →     meltXp  <  list / 3.0
+```
+
+**Wall 2 — the day-capped one.** The same attack through a featured daily deal with the eye power
+(0.25 × list), against that same deal's Ancient Codex at 0.63 gold/XP:
+
+```
+0.25 × list / meltXp  >  0.63     →     meltXp  <  list / 2.52
+```
+
+So `list ÷ 3` is the wall. The ladder:
+
+| divisor | vial | Second Wind | Bottled Fury | margin vs the wall | Second Wind as a share of an L20 level |
+|---|---|---|---|---|---|
+| ÷ 10 *(first draft)* | 120 | 320 | 650 | 3.3× | 16% |
+| **÷ 6** *(recommended)* | **200** | **525** | **1,075** | **2.0×** | **26%** |
+| ÷ 5 | 240 | 640 | 1,300 | 1.67× | 32% |
+| ÷ 4 | 300 | 800 | 1,625 | 1.33× | 40% |
+| ÷ 3 | 400 | 1,067 | 2,167 | 1.0× — **at the wall** | 53% |
+
+`÷ 6` roughly doubles the first draft, keeps a clean **2× safety margin** so a future discount change cannot
+quietly cross the wall, and lands a melted Second Wind at about a quarter of a level — which reads as worth
+doing without reading as a shortcut.
+
+**The one-line invariant for the test:** for every meltable id, `meltXp(id) < list(id) / 3`. Assert it
+across the whole set and no future price edit can open the loop silently.
+
+### 3.4 ⚠️ The melt pays more XP than using the item does, and that is not a bug
+
+Worth stating plainly because it looks wrong on the card. An Adrenaline Vial grants +2 strikes, and a swing
+is `boss_attack: 30` — so **using** it earns 60 XP, while melting it pays 200.
+
+| item | XP if used (strikes × 30) | XP if melted | ratio |
+|---|---|---|---|
+| `pot_adrenaline` | 60 | 200 | 3.3× |
+| `stone_storm` | 90 | 325 | 3.6× |
+| `pot_secondwind` | 150 | 525 | 3.5× |
+
+That inversion is real in *pure XP* terms and harmless in practice, because a swing is not worth only its
+XP. Per the strike handler in `boss.js` (~line 1549), one strike also pays a raffle ticket — "the heaviest
+ticket in the table" — plus a `surpriseChest` roll, candy during an event, a Prospector gold proc, and the
+damage itself toward the kill (`boss_participated` 30, `boss_won` 150, and the boss rewards). Anybody who
+can still use a strike gains more by swinging.
+
+The deeper reason is a true fact about these items rather than a fudge: **strike potions are poor XP and
+good damage.** The shop sells XP at ~3 gold/XP (a Tome) and sells strikes at 600 gold each (a vial), so a
+vial was never an XP purchase. The melt is denominated in the item's **gold** value, not its XP output,
+because what you give up by melting is a tradeable asset, not an XP stream.
+
+**If that still reads wrong, there is a clean fix:** gate the melt on the cap.
+`memberBonusStrikes(buyerId)` already returns today's total, clamped to `MAX_POTION_STRIKES`, so the button
+can be offered only for the portion genuinely over the ceiling. Then "XP if used" is literally zero, the
+inversion cannot exist at any rate, and the rate could go right up to the wall. Cost: one extra read and
+one condition. Left out of the recommendation only because surplus is something a member notices in their
+stash, not at the moment they cap out — a button that appears and disappears by time of day is harder to
+explain than a flat rate.
+
+### 3.5 The daily cap is for the launch cliff, not the steady state
+
+`awardXp` already takes `dailyCap` — "at most this many awards of this action per user per day"
+(`xp.js:125`), a count of awards rather than a point budget. Used once today, by `purchase_flat` with
+`dailyCap: 1`.
+
+**Steady state does not need a cap.** §3.3 proves XP can never be bought more cheaply by melting, so the
+only potions a melt can convert are ones the game gave away — drops, the wheel, chests — which is a faucet
+that is already tuned. Melting does not create a new faucet, it drains an existing one.
+
+**Day one does need a cap.** Members have been accumulating spares for months with nowhere to put them. The
+first tap of this feature on a stash of forty potions is several levels at once, and that is a one-time
+cliff, not an ongoing rate.
+
+So: **`dailyCap: 10`**, justified as cliff control and reviewable once the backlog has drained. At `÷ 6`
+that is roughly 2,000–5,000 XP a day for someone actively working through a hoard — one to two levels at
+L20, falling away fast as they climb — and after the first week nobody reaches it.
+
+### 3.6 The no-arbitrage proof, at the recommended rate
 
 | route | gold | XP | gold/XP |
 |---|---|---|---|
-| Ancient Codex, featured deal + eye (the cheapest XP in the game) | 1,250 | 2,000 | **0.63** |
+| Ancient Codex, featured deal + eye — the cheapest XP in the game | 1,250 | 2,000 | **0.63** |
+| Tome of Wisdom, haggled 40% — the cheapest *repeatable* XP | 900 | 500 | **1.80** |
 | Ancient Codex at list | 5,000 | 2,000 | 2.50 |
-| Tome of Wisdom, haggled 40% | 900 | 500 | 1.80 |
 | Tome of Wisdom at list | 1,500 | 500 | 3.00 |
-| **melt a vial bought at the daily-deal floor** | 300 | 120 | **2.50** |
-| **melt a vial bought haggled 40%** | 720 | 120 | **6.00** |
+| **melt a vial bought at the daily-deal floor** | 300 | 200 | **1.50** |
+| **melt a vial bought haggled 40%** | 720 | 200 | **3.60** |
 
-The repeatable route is **3.3× worse** than simply buying a haggled Tome, and the once-a-day route is **4×
-worse** than the deal it would have to beat. There is no rate of play that makes melting a cheaper way to
-buy XP than buying XP.
-
-**The one-line invariant for the test:** for every meltable id,
-`floor_price(id) / meltXp(id) > 0.63` — i.e. melting is never cheaper per XP than the cheapest shelf. Assert
-it across the whole meltable set and a future price change cannot quietly open the loop.
-
-### 3.3 What it costs to build
+The repeatable route is **2.0× worse** than the cheapest repeatable shelf, and the once-a-day route is
+**2.4× worse** than the deal it would have to beat. There is no rate of play that makes melting a cheaper
+way to buy XP than buying XP.
+### 3.7 What it costs to build
 
 | piece | where |
 |---|---|
@@ -208,7 +322,9 @@ it across the whole meltable set and a future price change cannot quietly open t
 | a `POST { action: "melt" }` branch | `src/app/api/marketplace/consumables/route.js` |
 | a "Melt — N XP" button on meltable stacks only | `src/components/ConsumablesClient.js` |
 | bulk melt | `BULK_USE_CAP = 25` already exists; reuse the cap and the confirm |
-| the test from §3.2 | new |
+| `MELT_DAILY_CAP = 10` passed as `dailyCap` | `consumables.js` (§3.5) |
+| an `XP_ACTION` label for the new action | `xp-economy.js`, so the melt is separable on the XP screen |
+| the §3.3 invariant as a test | new |
 
 Decrement **before** the award, guarded, and read the count off the `RETURNING` row — the same ordering
 `market.js` documents at length, since `neon()`'s HTTP driver has no `BEGIN`/`ROLLBACK` and a read-then-write
@@ -315,10 +431,19 @@ in one function or neither lands.
 1. **Bulk melt, or one at a time?** `BULK_USE_CAP = 25` and `canBulkUse()` already exist for the strike and
    damage families, so "melt all but 4" is nearly free. Forty confirms is the actual cost of the Forge
    (`crafting.js`'s own note on bulk salvage), and this would repeat it.
-2. **Is `list ÷ 10` the right generosity?** §3.2 shows the ceiling is far higher than this — up to ~480 XP
-   for a vial is still non-arbitrageable, because the cheap routes are day-capped. 120 is the conservative
-   pick. The whole balance of the feature is that one divisor.
-3. **Should the bench raise the cap instead?** An alternative nobody asked for: let surplus potions push
+2. **Is `÷ 6` the right generosity?** §3.3 lays out the ladder and the wall at `÷ 3`. `÷ 6` is the pick
+   because it holds a 2× margin against a future discount change; `÷ 5` and `÷ 4` are both still safe and
+   pay 20% and 50% more. The whole balance of the feature is that one divisor — it is a one-line change in
+   one place, so it can move after launch on what the XP screen shows.
+3. **Gate the melt on the strike cap, or keep a flat rate?** §3.4 — gating dissolves the
+   melt-pays-more-than-using inversion completely and would let the rate go to the wall, at the cost of a
+   button that comes and goes with the day's cap. Flat is recommended; this is the call most worth
+   disagreeing with.
+4. **Worth a read of `mkt_xp_event` before committing to a number?** The one figure not in this document is
+   what a median member earns in XP on an ordinary day, which is what would settle `÷ 6` versus `÷ 4`. It is
+   a read-only `SELECT` on the analytics table — but it is the live shared database, so say the word rather
+   than assume it.
+5. **Should the bench raise the cap instead?** An alternative nobody asked for: let surplus potions push
    past `MAX_POTION_STRIKES` at a steep conversion. Deliberately not proposed — eight is called
    "deliberately generous" in its own comment, and the cap exists to stop stockpiles substituting for the
    things members build.
