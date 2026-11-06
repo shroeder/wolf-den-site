@@ -40,9 +40,14 @@ def stage(floor_z=0.0, bg=(0.40, 0.44, 0.49, 1.0)):
 
     # Key low and frontal: a light high overhead carves a shadow under the
     # pectoral that reads as a breast.
-    for nm, en, loc, size in (("key", 420, (2.4, -3.2, 2.2), 3.0),
-                              ("fill", 120, (-3.0, -2.2, 1.6), 4.0),
-                              ("rim", 240, (-1.0, 3.2, 2.6), 2.5)):
+    # ⚠️ AN OVERLIT FIGURE HAS NO FORM. At 420 W the clay clipped to near
+    # white and every muscle I had just authored was invisible -- I spent a
+    # render cycle deciding the anatomy was not reading when it was simply
+    # blown out. Key around 190 W, a dim fill so the shadow side still has
+    # information, and a rim to separate him from the ground.
+    for nm, en, loc, size in (("key", 190, (2.4, -3.2, 2.2), 2.4),
+                              ("fill", 42, (-3.0, -2.2, 1.6), 4.0),
+                              ("rim", 95, (-1.0, 3.2, 2.6), 2.0)):
         d = bpy.data.lights.new(nm, type="AREA")
         d.energy, d.size = en, size
         o = bpy.data.objects.new(nm, d)
@@ -52,7 +57,7 @@ def stage(floor_z=0.0, bg=(0.40, 0.44, 0.49, 1.0)):
     _READY[0] = True
 
 
-def clay(ob, rgb=(0.74, 0.52, 0.42)):
+def clay(ob, rgb=(0.62, 0.44, 0.36)):
     m = bpy.data.materials.new("Clay")
     m.use_nodes = True
     p = m.node_tree.nodes["Principled BSDF"]

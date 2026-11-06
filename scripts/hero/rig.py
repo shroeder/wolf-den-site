@@ -42,16 +42,16 @@ def joints(body):
     for s in ("l", "r"):
         a, l = body.arm_path(s), body.leg_path(s)
         m = MIRROR[s]
-        J["clav_%s" % s] = Vector((m * 0.035, -0.010, 1.455))
-        J["shoulder_%s" % s] = Vector((m * 0.165, -0.004, 1.445))
-        J["elbow_%s" % s] = _p(a, 3)
-        J["wrist_%s" % s] = _p(a, 6)
-        J["hand_end_%s" % s] = _p(a, 9)
+        J["clav_%s" % s] = Vector((m * 0.040, -0.010, 1.462))
+        J["shoulder_%s" % s] = Vector((m * body.SHOULDER_X, -0.004, 1.452))
+        J["elbow_%s" % s] = _p(a, body.ARM_AT["elbow"])
+        J["wrist_%s" % s] = _p(a, body.ARM_AT["wrist"])
+        J["hand_end_%s" % s] = _p(a, body.ARM_AT["end"])
         J["hip_%s" % s] = Vector((m * 0.082, 0.0, 0.915))
-        J["knee_%s" % s] = _p(l, 3)
-        J["ankle_%s" % s] = _p(l, 6)
-        J["ball_%s" % s] = _p(l, 8)
-        J["toe_%s" % s] = _p(l, 9)
+        J["knee_%s" % s] = _p(l, body.LEG_AT["knee"])
+        J["ankle_%s" % s] = _p(l, body.LEG_AT["ankle"])
+        J["ball_%s" % s] = _p(l, body.LEG_AT["ball"])
+        J["toe_%s" % s] = _p(l, body.LEG_AT["toe"])
     return J
 
 
