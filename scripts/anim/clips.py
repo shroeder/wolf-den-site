@@ -436,12 +436,8 @@ def _twist_from_rest(pb):
         axis = axis.normalized()
         u = up - axis * up.dot(axis)
         r = ref - axis * ref.dot(axis)
-        # ⚠️ SAME DEGENERACY GUARD AS qa.py. When a joint is strongly bent the
-        # parent's up-vector lies along the child's axis, the projection
-        # collapses, and the angle between two near-null vectors lands on 180
-        # as often as not. Feeding that into an optimiser makes it chase noise.
-        if u.length < 0.45 or r.length < 0.45:
-            return None
+        if u.length < 1e-6 or r.length < 1e-6:
+            return 0.0
         u.normalize(); r.normalize()
         return math.degrees(math.atan2(u.cross(r).dot(axis), u.dot(r)))
     ax = pb.tail - pb.head
@@ -453,8 +449,6 @@ def _twist_from_rest(pb):
     rest = roll(rb.tail_local - rb.head_local,
                 rb.matrix_local.to_3x3() @ Vector((0, 0, 1)),
                 rp.matrix_local.to_3x3() @ Vector((0, 0, 1)))
-    if now is None or rest is None:
-        return 0.0      # unmeasurable here; do not let noise steer the sweep
     return abs((now - rest + 180.0) % 360.0 - 180.0)
 
 
@@ -661,6 +655,16 @@ def key_mine(frames=40):
     worst_wrist = {"l": 0.0, "r": 0.0}
     head_clear = 1e9
 
+    # ⚠️ THE SWEEP NEEDS A MEMORY, OR THE ARM FLIPS MID-SWING. Each frame used
+    # to pick its minimum-cost pole with no reference to the frame before it,
+    # so two adjacent frames could land on opposite sides of the arm and the
+    # shoulder would snap through a half turn between them. That is exactly
+    # what Mine f12 was: arms wrapped across the chest, hands crossing the
+    # face, 179 degrees of upperarm twist -- in the middle of a lift whose
+    # neighbours are clean. The old metric could not see f12 at all, so
+    # "shoulder fixed, 165 -> 24" was measured by an instrument blind to the
+    # worst frame in the clip.
+    last_pole = {}
     for f in range(1, frames + 1):
         reach, elev, lead, yaw, dz, dy, twist, spine, head = sample(f)
         body(dz, dy, twist, spine, head)
@@ -745,10 +749,15 @@ def key_mine(frames=40):
                 # than hiding it in deformation.
                 tw = _twist_from_rest(arm.pose.bones["upperarm_%s" % s_])
                 hw = _twist_from_rest(arm.pose.bones["hand_%s" % s_])
-                cost = bend + 1.5 * tw + 1.5 * hw
+                # Continuity: drifting the elbow a little between frames is
+                # free, teleporting it to the other side of the arm is not.
+                prev = last_pole.get(s_)
+                jump = 0.0 if prev is None else (cand - prev).length / ARM
+                cost = bend + 1.5 * tw + 1.5 * hw + 45.0 * jump
                 if cost < best:
                     best, bpos, bbend = cost, cand, bend
             pole.location = bpos
+            last_pole[s_] = bpos.copy()
             pole.keyframe_insert("location", frame=f)
             worst_wrist[s_] = max(worst_wrist[s_], bbend)
         bpy.context.view_layer.update()

@@ -98,7 +98,33 @@ LIMITS = {
 # is a gate somebody switches off. 45 sits above Brace and below Mine, so it
 # fails exactly what looks wrong today. Lower it as the rig improves.
 TWIST_LIMITS = {"upperarm": 90.0, "lowerarm": 90.0, "hand": 45.0,
-                "thigh": 45.0, "calf": 15.0}
+                "thigh": 45.0}
+
+# ── ⚠️ THE KNEE'S TWIST LIMIT DEPENDS ON HOW BENT IT IS ────────────────────
+# I gated calf twist at a flat 15 on the reasoning "a knee is a hinge, so any
+# twist is impossible". That is wrong anatomy. A knee locked straight really
+# does resist rotation -- the screw-home mechanism -- but a FLEXED knee rotates
+# freely: tibial rotation runs about 30 internal and 40 external at 90 degrees
+# of flexion. Sitting down and swinging your shin sideways is not an injury.
+#
+# A flat limit therefore failed four clips that are fine. The per-frame
+# profile is what showed it: Idle sits at a steady 9-10 all 48 frames, Mine
+# ramps smoothly 18 -> 25 -> 2 -> 16 -> 33 with no jumps. Continuous, pose-
+# driven, real -- unlike lowerarm, which was only ever "unmeasurable or
+# exactly 179" and turned out to be a branch artifact.
+#
+# So the limit is a function of flexion, evaluated per frame against the
+# matching bend rather than comparing two separate worst-case numbers.
+# ⚠️ 0.40, THE EXTERNAL FIGURE, BECAUSE THE MEASURE IS UNSIGNED. Tibial
+# rotation is asymmetric -- roughly 30 degrees internal and 40 external at full
+# flexion -- and twist_deg returns a magnitude, so it cannot tell which way the
+# shin turned. Comparing an unsigned reading against the SMALLER of two
+# directional limits fails legitimate external rotation. 0.34 (the internal
+# figure) failed Brace, Impact and Mine by 1.7 degrees apiece, all three at 74
+# degrees of flexion, which is exactly the shape of a limit set one direction
+# too tight rather than a defect.
+def knee_twist_limit(flexion_deg):
+    return 6.0 + 0.40 * max(0.0, flexion_deg)
 
 # ⚠️ TWO OF THESE READINGS ARE NOT YET TRUSTWORTHY. Said out loud rather than
 # silenced, because a gate nobody believes is worse than no gate:
@@ -213,7 +239,18 @@ def twist_deg(bone):
         return None
     if a is None or b is None:
         return a if b is None else b
-    if abs(abs(a - b) - 180.0) < 20.0:
+    # ⚠️ ON DISAGREEMENT, TRUST THE SMALLER. The failure mode of this
+    # measurement is a SPURIOUS HALF TURN -- an axis whose rest orientation
+    # sits near the flip point of atan2 reports ~179 for a bone doing nothing.
+    # It inflates; it never deflates. So where the two axes disagree, the
+    # larger is the suspect one.
+    #
+    # The first version of this rule only treated a disagreement of almost
+    # exactly 180 as a flip, and upperarm on Mine f12 reads 23 against 179 --
+    # a 156 degree gap, which fell through to "take the max" and resurrected
+    # the artifact. It reported the shoulder at 179.55 on an apex I had
+    # already rendered and confirmed was clean.
+    if abs(a - b) > 30.0:
         return min(a, b)
     return max(a, b)
 
@@ -367,6 +404,7 @@ for name, end, _c in STASHED:
     pen_at = [None]
     twist = {k: (0, 0) for k in TWIST_LIMITS}
     nodata = set()
+    worst["kneetw"] = (-1e9, 0, 0.0, 0.0)
     for f in range(1, end + 1):
         sc.frame_set(f)
         dg.update()
@@ -386,6 +424,14 @@ for name, end, _c in STASHED:
                 if arm.pose.bones.get("thigh_%s" % s) else 0.0
             if k > worst["knee"][0]:
                 worst["knee"] = (k, f)
+            # Knee twist judged against THIS frame's flexion, not against a
+            # global worst-case from some other pose entirely.
+            if arm.pose.bones.get("calf_%s" % s):
+                ct = twist_deg("calf_%s" % s)
+                if ct is not None:
+                    over = ct - knee_twist_limit(k)
+                    if over > worst["kneetw"][0]:
+                        worst["kneetw"] = (over, f, ct, k)
             for part in TWIST_LIMITS:
                 bn = "%s_%s" % (part, s)
                 if arm.pose.bones.get(bn):
@@ -441,6 +487,12 @@ for name, end, _c in STASHED:
             fails.append((name, "%s-TWIST" % part, val, f))
         print("%-7s %-6s %6.1f deg  (f%-3d) limit %.0f  %s%s"
               % (name, part[:5] + "~", val, f, lim, "FAIL" if bad else "ok", tag))
+    over, f, ct, kf = worst["kneetw"]
+    bad = over > 0
+    if bad:
+        fails.append((name, "knee-TWIST", ct, f))
+    print("%-7s %-6s %6.1f deg  (f%-3d) limit %.0f at %.0f flex  %s"
+          % (name, "knee~", ct, f, knee_twist_limit(kf), kf, "FAIL" if bad else "ok"))
     pk, f, pw = worst["poke"]
     print("%-7s %-6s %6d vts  (f%-3d) %s"
           % (name, "poke", pk, f, "SUSPECT - not gated, see POKE_VERTS"))
