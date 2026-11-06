@@ -788,3 +788,146 @@ def key_swing(frames=48):
     print("SWING peak hand speed %.3f leg-lengths/frame at f%d" % (hand_speed, speed_at))
     print("SWING worst wrist bend  L %.0f  R %.0f deg" % (worst_wrist["l"], worst_wrist["r"]))
     return frames
+
+
+def key_raise(frames=96):
+    """A DIAGNOSTIC. Right hand straight up, down. Then the left. Nothing else.
+
+    Luke: "have him raise his right hand straight up like he has a question in
+    school, then put it down, then do it with his left."
+
+    ⚠️ THIS CLIP EXISTS TO ANSWER ONE QUESTION AND IT MUST NOT PREJUDGE IT.
+    The suspicion is that the arms are inverted, so every quantity here is
+    taken from the BONE NAMES and nothing is corrected on the way:
+    `hand_r` is driven by `_pick_goal`, `hand_l` by `_hand_goal`, and the
+    outward direction for each arm is measured as (right shoulder - left
+    shoulder) off the skeleton itself.
+
+    If the bone names agree with the mesh, his right hand goes up first --
+    and because he faces the camera, that is the hand on the LEFT of frame.
+    If the wrong hand rises, the naming is mirrored relative to the body and
+    every left/right decision downstream of it has been inverted. Either way
+    the clip answers it, which a correction applied first could not.
+
+    Deliberately plain: no armour, no props, no spine work, no weight shift.
+    A test that is also a performance cannot be read.
+    """
+    arm, iks, hand_goal, elbow_pole, LEG, FLOOR, ANKLE_H, HIP0, FWD, FOOT_REST, \
+        TUCK, ARMS, TUCKAMT, SA, GRIP, HQ = _ctx()
+    g = G
+    _fresh_action("Raise")
+
+    # Position only. Forcing hand ORIENTATION is what wrung the wrist to 101
+    # degrees in the swing, and a raised hand needs no orientation at all.
+    g["_gc"].influence = 1.0
+    g["_pick_ik"].influence = 1.0
+    g["_grc"].influence = 0.0
+    g["_pgc"].influence = 0.0
+
+    GOAL = {"r": g["_pick_goal"], "l": hand_goal}
+    POLE = {"r": g["_pick_pole"], "l": elbow_pole}
+    ARMLEN = g["ARM_FULL"]
+    _JUMP = float(os.environ.get("POLE_JUMP") or 45.0)
+
+    def stand():
+        """Neutral. He is just standing there."""
+        arm.location = (0.0, 0.0, (FLOOR + LEG * 0.985) - HIP0)
+        for bn in ("pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head"):
+            b = arm.pose.bones.get(bn)
+            if b:
+                b.rotation_euler = Euler((0.0, 0.0, 0.0), "XYZ")
+        bpy.context.view_layer.update()
+
+    def ramp(f, t0, t1):
+        if f <= t0:
+            return 0.0
+        if f >= t1:
+            return 1.0
+        u = (f - t0) / float(t1 - t0)
+        return u * u * (3 - 2 * u)
+
+    # right up, hold, down ... then the same for the left. Nothing overlaps,
+    # so a frame can only ever be about one arm.
+    SCHED = {"r": lambda f: ramp(f, 12, 22) - ramp(f, 32, 42),
+             "l": lambda f: ramp(f, 54, 64) - ramp(f, 74, 84)}
+
+    stand()
+    # Measured, not typed: this vector points at the RIGHT shoulder because
+    # of what the bones are called, which is the thing under test.
+    sl = arm.matrix_world @ arm.pose.bones["upperarm_l"].head
+    sr = arm.matrix_world @ arm.pose.bones["upperarm_r"].head
+    to_right = (sr - sl).normalized()
+    print("RAISE  his right is world %+.2f %+.2f %+.2f  (from the bone names)"
+          % tuple(to_right))
+
+    peak = {}
+    for f in range(1, frames + 1):
+        stand()
+        for s_ in ("l", "r"):
+            sh = arm.matrix_world @ arm.pose.bones["upperarm_%s" % s_].head
+            L = ARMLEN[s_]
+            out = to_right * (1.0 if s_ == "r" else -1.0)
+            down = sh + Vector((0, 0, -1)) * (0.93 * L) + out * (0.13 * L)
+            up = sh + Vector((0, 0, 1)) * (0.97 * L)
+            a = max(0.0, min(1.0, SCHED[s_](f)))
+            H = down.lerp(up, a)
+            GOAL[s_].location = H
+            GOAL[s_].keyframe_insert("location", frame=f)
+            if a > peak.get(s_, (0.0, 0))[0]:
+                peak[s_] = (a, f)
+
+        arm.keyframe_insert("location", frame=f)
+        for bn in ("pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head"):
+            if arm.pose.bones.get(bn):
+                arm.pose.bones[bn].keyframe_insert("rotation_euler", frame=f)
+
+        for s_, sx in (("l", 1.0), ("r", -1.0)):
+            tgt, pole = iks[s_]
+            # Feet apart, each on its own side -- measured the same way.
+            foot = to_right * (0.085 * LEG) * (1.0 if s_ == "r" else -1.0)
+            tgt.location = (foot.x, foot.y, FLOOR + ANKLE_H)
+            tgt.keyframe_insert("location", frame=f)
+            tgt.rotation_quaternion = FOOT_REST[s_]
+            tgt.keyframe_insert("rotation_quaternion", frame=f)
+            pole.location = (foot.x * 1.6, FWD * 0.45 * LEG, FLOOR + LEG * 0.52)
+            pole.keyframe_insert("location", frame=f)
+
+        bpy.context.view_layer.update()
+        for s_ in ("l", "r"):
+            pole = POLE[s_]
+            sh = arm.matrix_world @ arm.pose.bones["upperarm_%s" % s_].head
+            wr = arm.matrix_world @ arm.pose.bones["hand_%s" % s_].head
+            ax = (wr - sh)
+            if ax.length < 1e-5:
+                continue
+            ax.normalize()
+            u = ax.cross(Vector((0, 0, 1)))
+            u = u.normalized() if u.length > 1e-4 else ax.cross(Vector((0, 1, 0))).normalized()
+            v = ax.cross(u)
+            best, bpos = 1e9, pole.location.copy()
+            for k in range(36):
+                th = k * (math.pi / 18.0)
+                cand = ((sh + wr) * 0.5
+                        + (u * math.cos(th) + v * math.sin(th)) * (0.9 * ARMLEN[s_]))
+                pole.location = cand
+                bpy.context.view_layer.update()
+                fa = (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % s_].tail) - \
+                     (arm.matrix_world @ arm.pose.bones["lowerarm_%s" % s_].head)
+                hd = (arm.matrix_world @ arm.pose.bones["hand_%s" % s_].tail) - \
+                     (arm.matrix_world @ arm.pose.bones["hand_%s" % s_].head)
+                if fa.length < 1e-6 or hd.length < 1e-6:
+                    continue
+                bend = math.degrees(fa.angle(hd))
+                tw = _twist_from_rest(arm.pose.bones["upperarm_%s" % s_])
+                hw = _twist_from_rest(arm.pose.bones["hand_%s" % s_])
+                cost = bend + 1.5 * tw + 1.5 * hw
+                if cost < best:
+                    best, bpos = cost, cand
+            pole.location = bpos
+            pole.keyframe_insert("location", frame=f)
+
+    _smooth([arm] + list(G["helpers"]))
+    for s_ in ("r", "l"):
+        print("RAISE  hand_%s fully up at f%d" % (s_, peak.get(s_, (0, 0))[1]))
+    print("RAISE  right hand f12-f42, left hand f54-f84")
+    return frames

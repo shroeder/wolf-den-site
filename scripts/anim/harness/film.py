@@ -1,4 +1,5 @@
 import bpy, os, sys, math
+from mathutils import Vector
 
 # ═══════════════════════════════════════════════════════════════════════════
 # FILM — THE FIRST ARTEFACT, AND IT IS THE DELIVERABLE
@@ -119,7 +120,26 @@ for name, end in CLIPS:
                          for i in range(k)}) if k > 1 else [1]
 
     # ── THE VIDEO ──────────────────────────────────────────────────────────
+    # ⚠️ FRAME THE WHOLE CLIP, NOT THE FIRST POSE. full_body() measures the
+    # figure as it stands right now, and the width was taken once from
+    # whatever pose frame 1 happened to be -- so the moment he raised a hand
+    # it went off the top of the picture, and the one thing the clip existed
+    # to show was the thing not in shot. Sweep the clip's own vertical extent
+    # off the skeleton first (cheap -- bones, not an evaluated mesh) and frame
+    # to that, with the height fixed for the whole clip so the camera does not
+    # breathe.
     ctr, w = _shot.full_body(human)
+    _zlo, _zhi = 1e9, -1e9
+    for f in range(1, end + 1):
+        sc.frame_set(f)
+        for pb in arm.pose.bones:
+            for pt in (arm.matrix_world @ pb.head, arm.matrix_world @ pb.tail):
+                _zlo, _zhi = min(_zlo, pt.z), max(_zhi, pt.z)
+    _zlo = min(_zlo, FLOOR)
+    _span = (_zhi - _zlo) * 1.16
+    w = max(w, _span * VID_RES[0] / float(VID_RES[1]))
+    _zmid = (_zlo + _zhi) * 0.5
+    print("   frame  %.2f units tall over %d frames" % (_span, end))
     for az in (VID_AZ if WANT_VIDEO else []):
         fdir = os.path.join(OUT, name, "body_az%d" % int(az))
         frames = []
@@ -128,9 +148,8 @@ for name, end in CLIPS:
             # Re-frame per frame: a clip that TRAVELS walks out of a fixed
             # ortho frame, and _rootmove.py exists because I could not tell
             # which clips travel. Track the pelvis horizontally, hold Z.
-            c, _w2 = _shot.full_body(human)
             pel = arm.matrix_world @ arm.pose.bones["pelvis"].head
-            c.x, c.y = pel.x, pel.y
+            c = Vector((pel.x, pel.y, _zmid))
             _shot.frame_on(c, w, az)
             frames.append(_shot.shoot(
                 os.path.join(fdir, "f%04d.png" % f), res=VID_RES))

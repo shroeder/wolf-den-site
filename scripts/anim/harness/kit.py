@@ -26,6 +26,7 @@ CLIP_PROPS = {
     # because a tool is in them. Listing a prop here would put the
     # pickaxe back in a clip that was made precisely to go without it.
     "Swing":  (),
+    "Raise":  (),
 }
 ALL_PROPS = ("Shield", "ShieldBoss", "ShieldFace", "Pickaxe")
 
@@ -37,7 +38,7 @@ ALL_PROPS = ("Shield", "ShieldBoss", "ShieldFace", "Pickaxe")
 # Luke, on the swing: "take all the armor off and get rid of the pickaxe.
 # We just want the base model."
 PLATES = ("Cuirass", "Pauldron_L", "Pauldron_R", "Greave_L", "Greave_R")
-BARE = {"Swing"}
+BARE = {"Swing", "Raise"}
 
 
 def set_kit(clip):
