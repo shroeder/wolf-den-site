@@ -161,6 +161,39 @@ TORSO_G = {g.index for g in human.vertex_groups
 HAND_G = {s: {g.index for g in human.vertex_groups if g.name == "hand_%s" % s}
           for s in ("l", "r")}
 
+def cam_for(azim):
+    """Place an ortho camera at `azim` degrees around the figure, matching the
+    look the hero is normally reviewed in (low frontal key, Standard view
+    transform) so a QA sheet is comparable to a _hfilm shot."""
+    zs = [(human.matrix_world @ v.co).z for v in human.data.vertices]
+    lo, hi = min(zs), max(zs)
+    mid = Vector((0, 0, (lo + hi) * 0.52))
+    cam = bpy.data.objects.get("QACam")
+    if cam is None:
+        cd = bpy.data.cameras.new("QACam")
+        cd.type = "ORTHO"
+        cd.ortho_scale = (hi - lo) * 1.15
+        cam = bpy.data.objects.new("QACam", cd)
+        bpy.context.collection.objects.link(cam)
+        for n_, en, l, sz in (("qk", 320, (2.4, -3.2, 2.2), 3.0),
+                              ("qf", 90, (-3.0, -2.2, 1.6), 4.0),
+                              ("qr", 190, (-1.0, 3.2, 2.6), 2.5)):
+            d = bpy.data.lights.new(n_, type="AREA")
+            d.energy = en
+            d.size = sz
+            o = bpy.data.objects.new(n_, d)
+            bpy.context.collection.objects.link(o)
+            o.location = l
+            o.rotation_euler = (mid - Vector(l)).to_track_quat("-Z", "Y").to_euler()
+        sc.render.engine = "BLENDER_EEVEE_NEXT"
+        sc.view_settings.view_transform = "Standard"
+    sc.camera = cam
+    a, e, D = math.radians(azim), math.radians(7), 9
+    cam.location = (D * math.sin(a) * math.cos(e), -D * math.cos(a) * math.cos(e),
+                    mid.z + D * math.sin(e))
+    cam.rotation_euler = (mid - Vector(cam.location)).to_track_quat("-Z", "Y").to_euler()
+
+
 fails = []
 print("\n" + "=" * 78)
 print("RIG QA — numbers, not opinions")
@@ -238,6 +271,30 @@ for name, end, _c in STASHED:
         fails.append((name, "hand-in-torso", gap, f))
     print("%-7s %-6s %6.3f gap  (f%-3d) limit %.2f  %s"
           % (name, "pen", gap, f, PENETRATION_MARGIN, "FAIL" if bad else "ok"))
+
+# ── ⚠️ A FAILURE HAS TO PHOTOGRAPH ITSELF ─────────────────────────────────
+# The two lessons that cost the most are here as CODE, not as advice:
+#   FOUR ANGLES. One azimuth cannot separate absent geometry from occluded
+#   geometry. I called an arm missing that was behind the torso, and a grip
+#   fine that was mangled -- same mistake, opposite directions, same day.
+#   AND A ZOOM. A 640px full body puts the hands at twenty pixels. Every time
+#   I looked at one I was wrong; every time I magnified I was right in seconds.
+# So the harness never asks anyone to go and find the frame. It renders it.
+if fails and SHEETS:
+    os.makedirs(OUT, exist_ok=True)
+    want = sorted({(n, int(f)) for n, _k, _v, f in fails})
+    print("")
+    print("SHEETS -> %s" % OUT)
+    sc.render.resolution_x, sc.render.resolution_y = 520, 660
+    sc.render.image_settings.file_format = "PNG"
+    for clip, frame in want:
+        arm.animation_data.action = bpy.data.actions[clip]
+        sc.frame_set(frame)
+        for az in (34, -55, 125, 215):
+            cam_for(az)
+            sc.render.filepath = os.path.join(OUT, "%s_f%02d_az%d.png" % (clip, frame, az))
+            bpy.ops.render.render(write_still=True)
+        print("   %s f%d  4 angles" % (clip, frame))
 
 print("=" * 78)
 if fails:

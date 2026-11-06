@@ -69,3 +69,6 @@ _quests*.html
 # Promo working files (product photos fetched from the publisher CDN, cut-outs)
 .promo/
 startrek-promo*.png
+
+# QA renders are build output, not source.
+scripts/anim/_qa/
