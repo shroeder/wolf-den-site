@@ -310,24 +310,15 @@ PLATES = ("Cuirass", "Pauldron_L", "Pauldron_R", "Greave_L", "Greave_R")
 # and a shield hanging in mid air, in a frame I was about to judge the
 # animation by. ModelLab already encodes this as each clip's "kit"; the
 # harness has to agree with it or every sheet is evidence about the wrong
-# thing. Props not listed for a clip are hidden before it is photographed.
-CLIP_PROPS = {
-    "Idle":   ("Pickaxe",),
-    "Walk":   ("Pickaxe",),
-    "Run":    ("Pickaxe",),
-    "Brace":  ("Shield", "ShieldBoss", "ShieldFace"),
-    "Impact": ("Shield", "ShieldBoss", "ShieldFace"),
-    "Mine":   ("Pickaxe",),
-}
-ALL_PROPS = ("Shield", "ShieldBoss", "ShieldFace", "Pickaxe")
-
-
-def set_kit(clip):
-    keep = set(CLIP_PROPS.get(clip, ()))
-    for n in ALL_PROPS:
-        ob = bpy.data.objects.get(n)
-        if ob:
-            ob.hide_render = n not in keep
+# thing.
+#
+# ⚠️ THE TABLE LIVES IN harness/kit.py AND IS IMPORTED, NEVER COPIED. It used
+# to live here, which meant anything else that photographed a clip got it
+# wrong by default -- and a rule that has moved while one of its readers has
+# not is a defect nothing errors on.
+sys.path.insert(0, os.path.join(HERE, "harness"))
+import kit as _kit
+CLIP_PROPS, ALL_PROPS, set_kit = _kit.CLIP_PROPS, _kit.ALL_PROPS, _kit.set_kit
 
 
 def plate_poke(ev):
@@ -385,39 +376,9 @@ def plate_poke(ev):
     return bad, where
 
 
-def cam_for(azim):
-    """Place an ortho camera at `azim` degrees around the figure, matching the
-    look the hero is normally reviewed in (low frontal key, Standard view
-    transform) so a QA sheet is comparable to a _hfilm shot."""
-    zs = [(human.matrix_world @ v.co).z for v in human.data.vertices]
-    lo, hi = min(zs), max(zs)
-    mid = Vector((0, 0, (lo + hi) * 0.52))
-    cam = bpy.data.objects.get("QACam")
-    if cam is None:
-        cd = bpy.data.cameras.new("QACam")
-        cd.type = "ORTHO"
-        cd.ortho_scale = (hi - lo) * 1.15
-        cam = bpy.data.objects.new("QACam", cd)
-        bpy.context.collection.objects.link(cam)
-        for n_, en, l, sz in (("qk", 320, (2.4, -3.2, 2.2), 3.0),
-                              ("qf", 90, (-3.0, -2.2, 1.6), 4.0),
-                              ("qr", 190, (-1.0, 3.2, 2.6), 2.5)):
-            d = bpy.data.lights.new(n_, type="AREA")
-            d.energy = en
-            d.size = sz
-            o = bpy.data.objects.new(n_, d)
-            bpy.context.collection.objects.link(o)
-            o.location = l
-            o.rotation_euler = (mid - Vector(l)).to_track_quat("-Z", "Y").to_euler()
-        sc.render.engine = "BLENDER_EEVEE_NEXT"
-        sc.view_settings.view_transform = "Standard"
-    sc.camera = cam
-    a, e, D = math.radians(azim), math.radians(7), 9
-    cam.location = (D * math.sin(a) * math.cos(e), -D * math.cos(a) * math.cos(e),
-                    mid.z + D * math.sin(e))
-    cam.rotation_euler = (mid - Vector(cam.location)).to_track_quat("-Z", "Y").to_euler()
-
-
+# cam_for() lived here and framed the whole figure. It is gone: framing is
+# harness/shot.py now, so the camera, the lights and the four angles are the
+# same ones the filmer uses and a QA sheet is comparable to a film still.
 fails = []
 print("\n" + "=" * 78)
 print("RIG QA — numbers, not opinions")
@@ -547,22 +508,43 @@ for name, end, _c in STASHED:
 #   AND A ZOOM. A 640px full body puts the hands at twenty pixels. Every time
 #   I looked at one I was wrong; every time I magnified I was right in seconds.
 # So the harness never asks anyone to go and find the frame. It renders it.
+# ⚠️ AND THE ZOOM WAS PROSE, NOT CODE, FOR A DAY. Everything above this line
+# was written on 2026-11-05 and the block underneath it rendered a 520x660
+# FULL FIGURE -- the exact composition scale the comment says is useless. The
+# lesson was in the file and absent from the program, which is the same as
+# absent: a shredded fist shipped in hero.glb through every clip while this
+# said PASS. Framing now comes from harness/shot.py, which takes a WIDTH IN
+# WORLD UNITS, so a hand is a hand-sized picture.
+_region_for = {
+    "wrist": "grip", "hand-TWIST": "grip", "lowerarm-TWIST": "grip",
+    "hand-in-torso": "grip",
+    "elbow": "shoulders", "upperarm-TWIST": "shoulders",
+    "knee": "feet", "knee-TWIST": "feet", "calf-TWIST": "feet",
+}
 if fails and SHEETS:
     os.makedirs(OUT, exist_ok=True)
-    want = sorted({(n, int(f)) for n, _k, _v, f in fails})
+    import shot as _shot
+    _shot.stage(human)
+    want = {}
+    for n, k, _v, f in fails:
+        want.setdefault((n, int(f)), set()).add(_region_for.get(k, "body"))
     print("")
     print("SHEETS -> %s" % OUT)
-    sc.render.resolution_x, sc.render.resolution_y = 520, 660
-    sc.render.image_settings.file_format = "PNG"
-    for clip, frame in want:
+    for (clip, frame), regions in sorted(want.items()):
         arm.animation_data.action = bpy.data.actions[clip]
         set_kit(clip)
         sc.frame_set(frame)
-        for az in (34, -55, 125, 215):
-            cam_for(az)
-            sc.render.filepath = os.path.join(OUT, "%s_f%02d_az%d.png" % (clip, frame, az))
-            bpy.ops.render.render(write_still=True)
-        print("   %s f%d  4 angles" % (clip, frame))
+        # The whole figure for context, then the anatomy the check named, at
+        # the size the defect actually is.
+        for rname in ["body"] + sorted(regions - {"body"}):
+            ctr, w = _shot.region(arm, human, rname)
+            for az in _shot.ANGLES:
+                _shot.frame_on(ctr, w, az)
+                _shot.shoot(os.path.join(OUT, "%s_f%02d_%s_az%d.png"
+                                         % (clip, frame, rname, int(az))),
+                            res=(900, 900))
+            print("   %s f%-3d %-9s x4 angles  (%.0f mm wide)"
+                  % (clip, frame, rname, w * 1000))
 
 print("=" * 78)
 if fails:

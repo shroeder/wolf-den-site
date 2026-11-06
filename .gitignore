@@ -72,3 +72,5 @@ startrek-promo*.png
 
 # QA renders are build output, not source.
 scripts/anim/_qa/
+scripts/anim/_film/
+__pycache__/
