@@ -195,30 +195,38 @@ def wp(bone, tail=False):
 
 
 def torso_tree(ev):
-    """A BVH of the TORSO SURFACE ONLY, for a real signed-distance test.
+    """BVH of the torso surface, plus its open boundary, for a signed test.
 
-    ⚠️ THE FIRST VERSION OF THIS WAS A CYLINDER AND IT LIED. It compared each
-    hand vertex to the spine axis against ONE global torso radius -- the widest
-    point, the shoulders -- so a hand at belly height, comfortably clear of the
-    actual surface, measured 0.2 "inside" a cylinder that does not exist at
-    that height. I then spent two rounds tuning Luke's animation against that
-    number, moved the penetration from frame 6 to frame 24, and made the wrist
-    worse. A metric you have not validated is not evidence; it is a confident
-    way to be wrong.
-
-    This tests against the mesh the renderer actually draws: nearest point on
-    the torso surface, and the sign of the surface normal decides in or out.
+    ⚠️ THIRD VERSION. The failures are instructive and all the same shape --
+    the proxy was never the surface I thought it was:
+      1. A CYLINDER of one global radius (the shoulders). A hand at belly
+         height read 0.2 "inside" a shape that does not exist there. I tuned
+         two rounds of animation against it before checking.
+      2. The real surface, but IGNORING ITS EDGES. Filtering faces by vertex
+         group cuts the mesh open at the shoulders, neck and hips, and a
+         nearest-point landing on one of those open rims has a meaningless
+         normal. It reported hand_r 0.085 INSIDE his chest on Mine f18 when
+         the hand was 0.46 away, overhead and out to the side -- found only
+         because the harness started printing WHERE, not just how deep.
+    Hits near a boundary edge are now discarded: the test is only meaningful
+    where the surface actually has a well-defined inside.
     """
     tvi = {i for i, v in enumerate(ev.vertices)
            if any(g.group in TORSO_G and g.weight > 0.5 for g in v.groups)}
     if not tvi:
-        return None
+        return None, []
     verts = [human.matrix_world @ v.co for v in ev.vertices]
     polys = [list(pl.vertices) for pl in ev.polygons
              if all(i in tvi for i in pl.vertices)]
     if not polys:
-        return None
-    return BVHTree.FromPolygons(verts, polys, all_triangles=False)
+        return None, []
+    edge = {}
+    for pl in polys:
+        for k in range(len(pl)):
+            e = tuple(sorted((pl[k], pl[(k + 1) % len(pl)])))
+            edge[e] = edge.get(e, 0) + 1
+    rim = [verts[i] for e, c in edge.items() if c == 1 for i in e]
+    return BVHTree.FromPolygons(verts, polys, all_triangles=False), rim
 
 
 TORSO_G = {g.index for g in human.vertex_groups
@@ -327,6 +335,7 @@ for name, end, _c in STASHED:
     arm.animation_data.action = bpy.data.actions[name]
     worst = {"wrist": (0, 0), "elbow": (0, 0), "knee": (0, 0), "pen": (1e9, 0),
              "poke": (0.0, 0, None)}
+    pen_at = [None]
     twist = {k: (0, 0) for k in TWIST_LIMITS}
     for f in range(1, end + 1):
         sc.frame_set(f)
@@ -358,7 +367,7 @@ for name, end, _c in STASHED:
         # The check whose absence cost the whole afternoon: "is a hand buried
         # in the torso" is answerable in one line and I guessed at it four
         # times instead.
-        tree = torso_tree(ev)
+        tree, rim = torso_tree(ev)
         if tree is not None:
             for s_ in ("l", "r"):
                 for v in ev.vertices:
@@ -369,10 +378,17 @@ for name, end, _c in STASHED:
                     if hit is None or hit[0] is None:
                         continue
                     loc, nor = hit[0], hit[1]
+                    if any((loc - r).length < 0.05 for r in rim):
+                        continue        # open edge: the normal means nothing
                     # Signed: negative means the point sits behind the surface.
                     gap = (p - loc).dot(nor)
                     if gap < worst["pen"][0]:
                         worst["pen"] = (gap, f)
+                        # ⚠️ A FAILURE THAT CANNOT SAY WHERE IT IS gets fixed
+                        # by guesswork. I moved this one from f6 to f24 to f18
+                        # to f16 patching frames blind before adding this.
+                        pen_at[0] = (s_, tuple(round(c, 3) for c in p),
+                                     tuple(round(c, 3) for c in loc))
         pk, pw = plate_poke(ev)
         if pk > worst["poke"][0]:
             worst["poke"] = (pk, f, pw)
@@ -396,11 +412,20 @@ for name, end, _c in STASHED:
     print("%-7s %-6s %6d vts  (f%-3d) %s"
           % (name, "poke", pk, f, "SUSPECT - not gated, see POKE_VERTS"))
     gap, f = worst["pen"]
+    # ⚠️ 1e9 MEANS EVERY CANDIDATE WAS DISCARDED, NOT THAT THE CLIP IS CLEAN.
+    # The rim exclusion can leave a clip with nothing tested at all, and a
+    # silent "ok" there is a check pretending to work.
+    if gap > 1e8:
+        print("%-7s %-6s %s" % (name, "pen", "NO DATA - every hit fell on an open edge"))
+        continue
     bad = gap < PENETRATION_MARGIN
     if bad:
         fails.append((name, "hand-in-torso", gap, f))
     print("%-7s %-6s %6.3f gap  (f%-3d) limit %.2f  %s"
           % (name, "pen", gap, f, PENETRATION_MARGIN, "FAIL" if bad else "ok"))
+    if bad and pen_at[0]:
+        print("         hand_%s at %s   nearest torso point %s"
+              % (pen_at[0][0], pen_at[0][1], pen_at[0][2]))
 
 # ── ⚠️ A FAILURE HAS TO PHOTOGRAPH ITSELF ─────────────────────────────────
 # The two lessons that cost the most are here as CODE, not as advice:

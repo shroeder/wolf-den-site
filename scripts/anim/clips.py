@@ -579,6 +579,13 @@ def key_mine(frames=40):
         rot = rot @ Quaternion((0, 0, 1), math.radians(globals().get('_ROLL', 0.0)))
         return H, rot
 
+    # ⚠️ THE APEX REACH WAS CHANGED AND CHANGED BACK. I pushed frames 13-20
+    # from 0.70-0.73 out to 0.82-0.87 to clear a hand-in-torso failure, and it
+    # cost 4 degrees of wrist. The failure was not real: qa.py was reading the
+    # normal of an OPEN BOUNDARY on its torso proxy, and the hand it called
+    # 0.085 deep in his chest was 0.46 away, overhead and to the side. Reverted
+    # once the harness was fixed. Do not re-tune these against a number without
+    # checking what the number is actually touching.
     #     f  reach  elev  lead  yaw  hip dz  hip dy twist spine head
     B = [(1,  0.86,  38, -14,  10,  -0.100,  0.000,  10,   26,  14),
          (6,  0.84,  30, -10,  12,  -0.140,  0.010,  13,   30,  15),
