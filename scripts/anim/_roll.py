@@ -1,6 +1,22 @@
 import bpy, os, sys, math
 
 # ── SWEEP THE SHAFT ROLL ───────────────────────────────────────────────────
+#
+# 🛑 THIS FILE IS A ROUGH GUIDE. IT DOES NOT AGREE WITH qa.py. Confirm every
+# answer it gives with harness/_rollq.py, which measures through the real
+# exporter. At roll 278 this reports a worst wrist of 68.8 and qa reports
+# 99.2 -- reproducibly, on a freshly built rig.
+#
+# The reason is the same one this file was already fixed for once today, one
+# level further out: export-all.py keys and BAKES Walk, Brace, Run, Idle and
+# Impact before Mine is keyed, and Mine is authored on top of whatever that
+# leaves in the rig. Building only the four geometry stages is not the
+# shipping scene, however many stages you add.
+#
+# Keep it for its speed -- it is the only way to see the SHAPE of the cost
+# surface cheaply, and that shape is what exposed the pole-flip cliff. Do not
+# take a constant from it without _rollq.py confirming the number.
+
 # Luke's hypothesis, 2026-11-05: "it looks like you've overspun the pickaxe
 # and it's causing his hands to twist". He was right, by 50 degrees. Rolling
 # a shaft about its own axis is nearly free visually -- the tool looks

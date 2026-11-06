@@ -33,7 +33,13 @@ HAFT_LEN = 1.05
 # is visible in the apex render with the hand curled over the air past it.
 # Sweepable now; _offgrip.py renders each candidate.
 GRIP_HI = float(os.environ.get("GRIP_HI_TEST") or 0.26)   # driving hand, up the haft
-GRIP_LO = float(os.environ.get("GRIP_LO_TEST") or 0.05)   # off hand, near the butt
+# ⚠️ 0.05 PUT THE OFF HAND OFF THE END OF THE WOOD. From az125 the haft
+# visibly stops short of it and the fist closes on air. 0.14 leaves about one
+# fist of butt protruding past the upper hand, which is how a pick is held.
+# Chosen by _gripsolve.py, which sweeps this JOINTLY with the shaft roll --
+# judged one-at-a-time against a roll tuned for 0.05, both 0.10 and 0.14 read
+# as over the wrist limit, and that was the stale roll's fault, not theirs.
+GRIP_LO = float(os.environ.get("GRIP_LO_TEST") or 0.14)   # off hand, up from the butt
 
 _iron = bpy.data.materials.new("PickIron")
 _iron.use_nodes = True

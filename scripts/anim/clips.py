@@ -568,12 +568,35 @@ def key_mine(frames=40):
     #       THAT IS THE PATTERN: this constant is downstream of the grip, so
     #       any change to how the hands hold the tool invalidates it. Re-run
     #       _roll.py as a matter of course after touching build-pick.py.
-    #   321.5 is the current answer: worst wrist 68.3 against a limit of 80,
-    #       swept full-circle on the rig that actually ships (build-walk +
-    #       twist + armour + pick), which is a thing _roll.py did not do
-    #       until that run either.
+    #   321.5 went stale when GRIP_LO moved the off hand up the haft.
+    #
+    # ⚠️ AND THE SURFACE IT IS SWEPT ON WAS NOISE UNTIL _POLE_JUMP WENT TO
+    # 150. At 45 the per-frame pole cost had two near-tied minima with very
+    # different wrist BEND, so one degree of roll flipped a few frames
+    # between them: 280 -> 69.1, 281.2 -> 76.2, 285 -> 68.2, with the worst
+    # FRAME hopping between f18, f10 and f8. A minimum with no good
+    # neighbours is not a minimum, it is a sampling artefact, and picking it
+    # is what made this constant go stale three times in a day. At 150 the
+    # same span is a clean monotone basin, every frame reading f18:
+    #       268:77.1  270:74.9  272:73.0  274:72.6  276:69.9  278:68.8
+    #       280:66.8  | 282:79.9 <- cliff, f9 takes over as worst
+    #
+    #   278 was chosen off _roll.py's basin and FAILED qa at 99.2. That is
+    #       the fourth stale answer in a day and the last one taught the
+    #       actual lesson: _roll.py does not measure the shipping clip even
+    #       after being fixed to build all four stages, because export-all
+    #       BAKES five clips before Mine is keyed and Mine is authored on
+    #       what that leaves behind. Use harness/_rollq.py, which runs the
+    #       real exporter and reads the baked action -- its wrist figure
+    #       matches qa's to the decimal.
+    #
+    #   270 is the current answer: worst wrist 72.1 against a limit of 80,
+    #       measured through the exporter and confirmed by a full qa pass.
+    #       _POLE_JUMP stays at 45; 150 smoothed _roll.py's surface but made
+    #       no difference to the number that actually gates (82.7 vs 82.7 at
+    #       roll 300, 82.7 vs 82.4 at 321), so it was buying nothing real.
     # ROLL_TEST=<deg> overrides without editing code; _roll.py re-solves it.
-    globals()['_ROLL'] = float(os.environ.get("ROLL_TEST") or globals().get('ROLL_TEST', 321.5))
+    globals()['_ROLL'] = float(os.environ.get("ROLL_TEST") or globals().get('ROLL_TEST', 270.0))
     TOOL, TIP = g["TOOL"], g["PICK_TIP"]
     WRIST = g["WRIST_IN_TOOL"]
     REACH_MAX = 0.95
@@ -712,6 +735,7 @@ def key_mine(frames=40):
     # "shoulder fixed, 165 -> 24" was measured by an instrument blind to the
     # worst frame in the clip.
     last_pole = {}
+    _POLE_JUMP = float(os.environ.get("POLE_JUMP") or 45.0)
     for f in range(1, frames + 1):
         reach, elev, lead, yaw, dz, dy, twist, spine, head = sample(f)
         body(dz, dy, twist, spine, head)
@@ -800,7 +824,16 @@ def key_mine(frames=40):
                 # free, teleporting it to the other side of the arm is not.
                 prev = last_pole.get(s_)
                 jump = 0.0 if prev is None else (cand - prev).length / ARM
-                cost = bend + 1.5 * tw + 1.5 * hw + 45.0 * jump
+                # ⚠️ THE JUMP WEIGHT DECIDES WHETHER THIS CLIP'S WRIST
+                # FIGURE IS A NUMBER OR A COIN FLIP. At 45 the combined cost
+                # has two near-tied minima per frame with very different
+                # BEND, so a one-degree change in the shaft roll flips a few
+                # frames between them and the clip's worst wrist jumps 7
+                # degrees. Measured: roll 280 -> 69.1, 281.2 -> 76.2,
+                # 282.5 -> 75.9, 285 -> 68.2, and the worst FRAME moves
+                # between f18, f10 and f8 as it goes. Tuning the roll against
+                # that is tuning against noise. POLE_JUMP re-tests it.
+                cost = bend + 1.5 * tw + 1.5 * hw + _POLE_JUMP * jump
                 if cost < best:
                     best, bpos, bbend = cost, cand, bend
             pole.location = bpos
