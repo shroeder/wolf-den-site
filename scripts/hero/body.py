@@ -1,6 +1,9 @@
 import bpy, bmesh, math, os, sys
 from mathutils import Vector
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hand as hand_mod
+
 # ═══════════════════════════════════════════════════════════════════════════
 # THE BODY — a quad cage we own, with loops where the joints are, and muscle
 # authored as CROSS-SECTIONS.
@@ -219,6 +222,24 @@ TORSO = [
 ]
 SHOULDER_BAND = [t[0] for t in TORSO].index("clavicle")
 
+# THE HAND'S SIZE, as one set of numbers. A hand is about the height of a
+# face: for a 1.80 m figure that is ~190 mm wrist to fingertip, of which the
+# palm is a little under half.
+# ⚠️ THE PALM IS THE LONGER HALF. Giving the fingers the bigger share makes
+# every one of them read long however wide it is: on a real hand the palm is
+# about 55% of wrist-to-fingertip. And a palm is not a sheet -- at 14 mm of
+# half-thickness the whole hand photographs as a plank.
+PALM_LEN = 0.102        # wrist to knuckle line
+PALM_HALF_W = 0.047     # half the knuckle-line width
+PALM_HALF_T = 0.0165    # half the palm's thickness
+
+
+def hand_centre(side="l"):
+    """Where to point a camera to photograph the hand."""
+    p = arm_path(side)
+    a, b = Vector(p[ARM_AT["wrist"]][0]), Vector(p[ARM_AT["end"]][0])
+    return tuple((a + b) * 0.5)
+
 
 # ⚠️ THE BIND POSE IS AN A-POSE, AND THAT IS NOT A STYLE CHOICE.
 # Built with the arms hanging straight down, the hands sit right beside the
@@ -278,10 +299,19 @@ def arm_path(side):
         (at(0.470), 0.041, [(L_ANT, 0.24, 0.12)]),
         (at(0.540), 0.034, None),
         (at(0.592), (0.030, 0.024), None),                       # wrist (9)
+        # ⚠️ PAST HERE IS REFERENCE, NOT GEOMETRY. The arm tube is meshed up
+        # to the wrist only; hand.py builds the palm and bridges into this
+        # ring. These three entries stay because rig.py reads ARM_AT["end"]
+        # for the hand bone and the hand is placed from them -- deleting them
+        # would move a joint silently.
         (at(0.648, -0.008), (0.045, 0.024), None),               # palm
         (at(0.694, -0.013), (0.043, 0.023), None),               # knuckles
-        (at(0.748, -0.015), (0.030, 0.017), None),               # end (12)
+        (at(0.782, -0.018), (0.030, 0.017), None),               # end (12)
     ]
+
+
+# The arm is meshed to this ring and no further.
+ARM_MESH_TO = 9
 
 
 def leg_path(side):
@@ -379,17 +409,36 @@ def build():
         t.ensure_lookup_table()
 
     log = []
+    hands = {}
     for side, cols in (("l", ARM_COLS["l"]), ("r", ARM_COLS["r"])):
         bm.edges.ensure_lookup_table()
         hole = cut_arm_hole(bm, rings, SHOULDER_BAND, cols)
-        a = limb(bm, arm_path(side), NA)
+        path = arm_path(side)
+        a = limb(bm, path[:ARM_MESH_TO + 1], NA)
         tube(bm, a)
-        bm.faces.new(a[-1])
         bm.edges.ensure_lookup_table()
         cuff = [e for e in bm.edges if len(e.link_faces) == 1 and set(e.verts) <= set(a[0])]
         r = bmesh.ops.bridge_loops(bm, edges=hole + cuff)
         log.append("arm_%s  hole %2d  cuff %2d  -> %2d faces"
                    % (side, len(hole), len(cuff), len(r.get("faces", []))))
+
+        # THE HAND. The forearm's last ring is 12 verts and the palm's is 18
+        # -- see hand.py for why the palm cannot be narrower. bridge_loops
+        # spans the difference; the triangles land on the inside of the wrist.
+        wrist = path[ARM_AT["wrist"]][0]
+        tip = path[ARM_AT["end"]][0]
+        h = hand_mod.build(bm, side, wrist, tip,
+                           palm_len=PALM_LEN, half_w=PALM_HALF_W,
+                           half_t=PALM_HALF_T)
+        hands[side] = h
+        bm.edges.ensure_lookup_table()
+        wcuff = [e for e in bm.edges
+                 if len(e.link_faces) == 1 and set(e.verts) <= set(a[-1])]
+        hcuff = [e for e in bm.edges
+                 if len(e.link_faces) == 1 and set(e.verts) <= set(h.ring_verts)]
+        r = bmesh.ops.bridge_loops(bm, edges=wcuff + hcuff)
+        log.append("hand_%s wrist %2d  palm %2d  -> %2d faces"
+                   % (side, len(wcuff), len(hcuff), len(r.get("faces", []))))
 
     sockets = hip_sockets(bm, rings[0])
     for side in ("l", "r"):
@@ -417,6 +466,7 @@ def build():
     # ⚠️ A HOLE AND A PINCH BOTH RENDER AS "FINE" FROM MOST ANGLES.
     print("HERO cage %d verts %d faces | boundary edges %d | non-manifold %d"
           % (len(me.vertices), len(me.polygons), len(loose), len(bad)))
+    ob["hand_joints"] = {s: h.joints for s, h in hands.items()}
     return ob
 
 
@@ -430,8 +480,11 @@ if __name__ == "__main__":
     look.clay(ob)
     look.stage(floor_z=0.0)
     out = os.path.join(HERE, "_look")
+    HAND_CENTRE = hand_centre("l")
     look.sheet(out, "body", (0, 0, 0.92), 2.05)
     look.sheet(out, "torso", (0, 0, 1.24), 0.85, res=(900, 900))
     look.sheet(out, "arm", (0.30, 0, 1.25), 0.60, res=(900, 900))
+    # A hand is a hand-sized picture or it is four pink pixels.
+    look.sheet(out, "hand", HAND_CENTRE, 0.30, res=(900, 900))
     look.sheet(out, "calf", (0.10, 0, 0.33), 0.45, res=(900, 900))
     print("LOOK_OK %s" % out)
