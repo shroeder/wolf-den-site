@@ -37,8 +37,10 @@ def joints(body):
          "spine_02": Vector((0, 0.004, 1.19)),
          "chest": Vector((0, -0.002, 1.33)),
          "neck": Vector((0, -0.004, 1.50)),
-         "head": Vector((0, 0.0, 1.62)),
-         "head_top": Vector((0, 0.004, 1.79))}
+         # The atlas, where a head actually pivots -- just under the skull
+         # base and BEHIND the jaw, not in the middle of the face.
+         "head": Vector((0, 0.012, 1.585)),
+         "head_top": Vector((0, 0.004, 1.800))}
     for s in ("l", "r"):
         a, l = body.arm_path(s), body.leg_path(s)
         m = MIRROR[s]
