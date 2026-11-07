@@ -5,6 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cage
 import hand as hand_mod
 import face as face_mod
+import foot as foot_mod
 import head as head_mod
 
 from cage import ring, shape, tube
@@ -195,6 +196,13 @@ SHOULDER_BAND = [t[0] for t in TORSO].index("clavicle")
 PALM_LEN = 0.102        # wrist to knuckle line
 PALM_HALF_W = 0.047     # half the knuckle-line width
 PALM_HALF_T = 0.0165    # half the palm's thickness
+
+
+def foot_plan(side):
+    """The foot's own landmarks, with no mesh built -- same contract as
+    hand_plan(): one function, two readers, so a joint cannot end up outside
+    the flesh it drives."""
+    return foot_mod.plan(side, leg_path(side)[LEG_AT["ankle"]][0])
 
 
 def hand_plan(side):
@@ -389,6 +397,7 @@ def build():
 
     log = []
     hands = {}
+    feet = {}
     for side, cols in (("l", ARM_COLS["l"]), ("r", ARM_COLS["r"])):
         bm.edges.ensure_lookup_table()
         hole = cut_arm_hole(bm, rings, SHOULDER_BAND, cols)
@@ -450,14 +459,26 @@ def build():
 
     sockets = hip_sockets(bm, rings[0])
     for side in ("l", "r"):
-        lg = limb(bm, leg_path(side), NL)
+        path = leg_path(side)
+        lg = limb(bm, path[:LEG_AT["ankle"] + 1], NL)
         tube(bm, lg)
-        bm.faces.new(lg[-1])
         bm.edges.ensure_lookup_table()
         cuff = [e for e in bm.edges if len(e.link_faces) == 1 and set(e.verts) <= set(lg[0])]
         r = bmesh.ops.bridge_loops(bm, edges=sockets[side] + cuff)
         log.append("leg_%s  socket %2d  cuff %2d  -> %2d faces"
                    % (side, len(sockets[side]), len(cuff), len(r.get("faces", []))))
+
+        # THE FOOT. The leg is meshed to the ankle and no further -- a tube
+        # cannot have a heel, because a heel is mass BEHIND the path that
+        # generated it. See foot.py.
+        ft = foot_mod.build(bm, side, path[LEG_AT["ankle"]][0])
+        feet[side] = ft
+        bm.edges.ensure_lookup_table()
+        acuff = [e for e in bm.edges
+                 if len(e.link_faces) == 1 and set(e.verts) <= set(lg[-1])]
+        r = bmesh.ops.bridge_loops(bm, edges=acuff + ft.instep)
+        log.append("foot_%s ankle %2d  instep %2d  -> %2d faces"
+                   % (side, len(acuff), len(ft.instep), len(r.get("faces", []))))
 
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     loose = [e for e in bm.edges if len(e.link_faces) == 1]
@@ -503,4 +524,6 @@ if __name__ == "__main__":
     look.sheet(out, "head", (0, 0, 1.70), 0.30, angles=(0, 35, 90, 180),
                res=(900, 900))
     look.sheet(out, "calf", (0.10, 0, 0.33), 0.45, res=(900, 900))
+    look.sheet(out, "foot", (0.10, -0.06, 0.06), 0.32, angles=(0, 35, 90, 180),
+               res=(900, 900))
     print("LOOK_OK %s" % out)

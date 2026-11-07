@@ -58,8 +58,14 @@ def joints(body):
         J["hip_%s" % s] = Vector((m * 0.082, 0.0, 0.915))
         J["knee_%s" % s] = _p(l, body.LEG_AT["knee"])
         J["ankle_%s" % s] = _p(l, body.LEG_AT["ankle"])
-        J["ball_%s" % s] = _p(l, body.LEG_AT["ball"])
-        J["toe_%s" % s] = _p(l, body.LEG_AT["toe"])
+        # ⚠️ THE FOOT MOVED AND THESE HAVE TO MOVE WITH IT. leg_path's last
+        # entries describe the flipper the foot used to be; the real ball
+        # and toe are foot.py's now. A bone left on the old numbers sits in
+        # the middle of the arch and bends the foot in the wrong place --
+        # the same bind mismatch this whole file exists to make impossible.
+        fp = body.foot_plan(s)
+        J["ball_%s" % s] = fp["ball"]
+        J["toe_%s" % s] = fp["toe"]
     return J
 
 
