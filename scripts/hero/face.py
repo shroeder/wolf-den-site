@@ -127,7 +127,7 @@ def nose(bm, rings, ri0, cols, n, width=0.016, out=0.026, down=0.040):
     return _bridge(bm, rim, _tube(bm, path, NN, Vector((0, 0, 1))), NN)
 
 
-def eyeball(bm, at, cy, r=0.0136, sink=-0.0042, segs=12, rings_=8):
+def eyeball(bm, at, cy, r=0.0118, sink=-0.0030, segs=14, rings_=10):
     """A sphere set into the socket, as its own closed shell.
 
     ⚠️ THE SOCKET CANNOT BE THE EYE. A hollow in the skull is a hollow; it

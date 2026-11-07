@@ -2,8 +2,12 @@ import bpy, bmesh, math, os, sys
 from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cage
 import hand as hand_mod
 import face as face_mod
+import head as head_mod
+
+from cage import ring, shape, tube
 
 # ═══════════════════════════════════════════════════════════════════════════
 # THE BODY — a quad cage we own, with loops where the joints are, and muscle
@@ -49,58 +53,8 @@ HIP_ORDER = {"l": [24, 25, 26, 27, 28, 29, 30, 31, 0, 1, 2, 3, 4, 5, 6, 7, 8],
 
 # Where things sit around a TORSO ring, as a fraction of the way round.
 T_LEFT, T_BACK, T_RIGHT, T_FRONT = 0.00, 0.25, 0.50, 0.75
-# Face landmarks, as fractions of the way round a head ring. They pair about
-# the midline at 0.75: his left is the larger number. Named because a brow
-# ridge written as 0.818 is a number nobody can check.
-# ⚠️ EYES SET TOO CLOSE READ AS A DOLL. The pair at 0.818/0.682 put the
-# centres 24 mm either side of the midline when a real one is about 32, and
-# nothing else about the face could compensate: a narrow-set pair is the one
-# proportion an audience spots instantly.
-F_EYE_L, F_EYE_R = 0.840, 0.660
-F_CHEEK_L, F_CHEEK_R = 0.855, 0.645
-F_TEMPLE_L, F_TEMPLE_R = 0.888, 0.612
-F_JAW_L, F_JAW_R = 0.898, 0.602
-F_NOSE_L, F_NOSE_R = 0.786, 0.714
 # ...and around a LIMB ring. 0 is anterior by construction in limb().
 L_ANT, L_LAT, L_POST, L_MED = 0.00, 0.25, 0.50, 0.75
-
-
-def shape(n, bumps):
-    """Radial multipliers around a ring. Each bump is (where, width, amount),
-    all as fractions of the way round, with a cosine falloff and wraparound."""
-    out = []
-    for i in range(n):
-        f = i / float(n)
-        m = 1.0
-        for c, w, a in bumps or ():
-            d = abs(((f - c + 0.5) % 1.0) - 0.5)
-            if d < w:
-                m += a * (0.5 + 0.5 * math.cos(math.pi * d / w))
-        out.append(m)
-    return out
-
-
-def ring(bm, cz, rx, ry, cy=0.0, n=N, bumps=None, dz=None):
-    """One elliptical cross-section, optionally shaped by muscle bumps.
-    `dz` lifts individual verts (the trapezius rises, it does not just
-    widen)."""
-    mult = shape(n, bumps)
-    lift = shape(n, dz) if dz else [1.0] * n
-    vs = []
-    for i in range(n):
-        a = 2.0 * math.pi * i / n
-        vs.append(bm.verts.new((rx * mult[i] * math.cos(a),
-                                cy + ry * mult[i] * math.sin(a),
-                                cz + (lift[i] - 1.0))))
-    return vs
-
-
-def tube(bm, rings):
-    for a, b in zip(rings, rings[1:]):
-        n = len(a)
-        for i in range(n):
-            j = (i + 1) % n
-            bm.faces.new((a[i], a[j], b[j], b[i]))
 
 
 def limb(bm, path, n):
@@ -228,101 +182,6 @@ TORSO = [
       (T_BACK, 0.050, -0.05)]),
     ("neck", 1.562, 0.062, 0.066, -0.004,
      [(0.700, 0.070, 0.07), (0.800, 0.070, 0.07)]),              # sternomastoid
-    # ── THE HEAD ──────────────────────────────────────────────────────────
-    # ⚠️ MEASURE THE PROFILE, DO NOT JUDGE IT. The first head read as having
-    # a huge hooked nose, and the nose was a perfectly ordinary 26 mm. What
-    # was wrong was everything ELSE: at the midline the jaw stood at -0.110
-    # and the lips at -0.104 while the brow was at -0.092 and the forehead
-    # at -0.088, so the upper face was set 15 mm BEHIND the lower one. That
-    # is an ape's profile, and the eye blames whichever feature is sticking
-    # out rather than the two that are sunk. Printing the front-most y at
-    # each landmark found it in one pass after three rounds of adjusting a
-    # nose that was never the problem.
-    #
-    # Each ring's cy is its forward offset; they now step forward from the
-    # crown down to the brow and back again toward the jaw, which is what a
-    # profile is.
-    # ⚠️ IT WAS A BALL ON ITS SIDE. Four rings carried the whole head and it
-    # came out 160 mm tall against 184 mm wide -- a head is the other way
-    # round, and at that height the figure stood ELEVEN heads tall when
-    # heroic is eight and a half. No amount of face would have fixed it:
-    # every feature would have been laid on a skull that was the wrong shape.
-    # Chin to crown is 222 mm now, across thirteen rings instead of four.
-    #
-    # ⚠️ AND A FACE IS PAIRS WITH NEGATIVES BETWEEN THEM, exactly as the
-    # chest was. A single bump at the midline for the brow is a forehead
-    # boss; what makes a brow read is the pair and the GLABELLA dip between
-    # them. Same for the eye sockets either side of the nose bridge, the
-    # cheekbones either side of the muzzle, and the lips either side of the
-    # lip line. The negatives are the whole trick here too.
-    #
-    # Landmarks around a head ring, as fractions: 0.75 is the face's
-    # midline, and everything pairs about it.
-    # ⚠️ THE CHIN HAS TO COME FORWARD OR THE PROFILE IS A BEAK. With the
-    # chin 13 mm behind the base of the nose the whole lower face fell away,
-    # and the nose -- which is a perfectly ordinary 26 mm -- read as an
-    # enormous hooked one. Nothing was wrong with the nose. A profile is the
-    # RELATIONSHIP between brow, nose base and chin, and the eye reads the
-    # one that is out of line as the one that is wrong.
-    ("chin", 1.578, 0.048, 0.066, -0.034,
-     [(F_EYE_L, 0.070, -0.12), (F_EYE_R, 0.070, -0.12),
-      (T_FRONT, 0.055, 0.20)]),                                  # the chin point
-    ("jaw", 1.602, 0.064, 0.080, -0.016,
-     [(F_JAW_L, 0.055, 0.12), (F_JAW_R, 0.055, 0.12),            # gonial angles
-      (T_FRONT, 0.060, 0.08)]),
-    # ⚠️ LIPS ARE THREE RINGS, NOT A BUMP. A mouth is a horizontal feature
-    # and rings vary with ANGLE, so anything one ring can say runs vertically.
-    # What says mouth is the LINE between the lips, which means a ring that
-    # pulls in with one pushing out above it and one below.
-    #
-    # ⚠️ AND THEY HAVE TO BE CLOSE TOGETHER OR SUBDIVISION EATS THE LINE.
-    # Spread 12 mm apart, Catmull-Clark rounded the three rings into one
-    # soft swelling and the mouth did not read at all. The sharpness of a
-    # crease on a subdivided cage is set by how close the loops either side
-    # of it are, not by how deep it is -- pulling it deeper just makes a
-    # wider dent. 8 mm apart, it is a mouth.
-    ("mouth_low", 1.626, 0.071, 0.089, -0.011,
-     [(T_FRONT, 0.048, 0.16)]),                                  # lower lip
-    ("mouth", 1.634, 0.072, 0.090, -0.010,
-     [(T_FRONT, 0.058, -0.17)]),                                 # the lip line
-    ("mouth_up", 1.642, 0.073, 0.091, -0.010,
-     [(T_FRONT, 0.042, 0.13)]),                                  # upper lip
-    # ⚠️ THE NOSE IS RINGS, AND THE RING UNDER IT IS WHAT MAKES IT A NOSE.
-    # Built as a bridged tube it came out a beak, then a straw -- see
-    # face.py. What a ring stack cannot do on its own is STOP: push the
-    # midline forward over three rings and the ridge runs on down into the
-    # lip and the chin, and a ridge that does not stop is a muzzle.
-    #
-    # So the ring 10 mm under the nose base takes no bump at all. That gap
-    # is the same trick the lips use -- on a subdivided cage the sharpness
-    # of a feature is set by how close the loops either side of it are --
-    # and the step it cuts is the UNDERCUT, which is the whole difference
-    # between a nose and a swelling.
-    ("subnasal", 1.654, 0.074, 0.088, -0.009,
-     [(T_FRONT, 0.030, -0.04)]),                                 # philtrum
-    ("nose_base", 1.664, 0.075, 0.090, -0.010,
-     [(T_FRONT, 0.034, 0.36),                                    # the nostril base
-      (F_NOSE_L, 0.022, 0.11), (F_NOSE_R, 0.022, 0.11)]),        # the wings
-    ("cheek", 1.686, 0.077, 0.091, -0.009,
-     [(T_FRONT, 0.030, 0.24),                                    # the dorsum
-      (F_CHEEK_L, 0.072, 0.13), (F_CHEEK_R, 0.072, 0.13),        # CHEEKBONES
-      (F_TEMPLE_L, 0.060, -0.05), (F_TEMPLE_R, 0.060, -0.05)]),
-    ("eye", 1.708, 0.077, 0.091, -0.009,
-     [(F_EYE_L, 0.052, -0.14), (F_EYE_R, 0.052, -0.14),          # the SOCKETS
-      (T_FRONT, 0.030, 0.090)]),                                 # the root
-    ("brow", 1.728, 0.076, 0.089, -0.011,
-     [(F_EYE_L, 0.058, 0.15), (F_EYE_R, 0.058, 0.15),            # BROW RIDGE
-      (T_FRONT, 0.026, -0.05),                                   # glabella
-      (F_TEMPLE_L, 0.065, -0.07), (F_TEMPLE_R, 0.065, -0.07)]),  # temples
-    ("forehead", 1.750, 0.074, 0.086, -0.009,
-     [(F_TEMPLE_L, 0.070, -0.05), (F_TEMPLE_R, 0.070, -0.05)]),
-    ("skull", 1.770, 0.068, 0.080, -0.006,
-     [(T_BACK, 0.090, 0.07)]),                                   # occiput
-    ("skull_up", 1.788, 0.050, 0.059, -0.004, None),
-    # ⚠️ A WIDE CAP FACETS. The crown used to close with a 32-gon 120 mm
-    # across and the flat of it caught the light as a ring of ridges on top
-    # of his head. Taper to something small and the cap stops being visible.
-    ("crown", 1.800, 0.024, 0.030, -0.002, None),
 ]
 SHOULDER_BAND = [t[0] for t in TORSO].index("clavicle")
 
@@ -520,9 +379,11 @@ def build():
     bpy.context.collection.objects.link(ob)
     bm = bmesh.new()
 
-    rings = [ring(bm, z, rx, ry, cy, bumps=b) for _n, z, rx, ry, cy, b in TORSO]
+    rings = [ring(bm, z, rx, ry, cy, n=N, bumps=b) for _n, z, rx, ry, cy, b in TORSO]
     tube(bm, rings)
-    bm.faces.new(rings[-1])
+    # The head is a cage of its own at twice this resolution; it steps up off
+    # the torso's last ring rather than continuing it. See head.py for why.
+    hrings = head_mod.build(bm, rings[-1])
     for t in (bm.verts, bm.edges, bm.faces):
         t.ensure_lookup_table()
 
@@ -559,34 +420,31 @@ def build():
                    % (side, len(wcuff), len(hcuff), len(r.get("faces", []))))
 
     # ── THE FACE'S SEPARATE PIECES ────────────────────────────────────────
-    # Vertex 24 is the face's midline, so the two columns straddling it are
-    # 23 and 24 -- about 35 mm of face, which is a nose. The ears sit at the
-    # sides, a little behind the midline of the skull.
-    NAMES = [t[0] for t in TORSO]
-    bm.edges.ensure_lookup_table()
     # ⚠️ MIRRORING A RING INDEX IS 0.5 - f, NOT f + 0.5. A ring runs left ->
     # back -> right -> front, so the reflection of a vertex across the body's
     # midline is the one with the SAME y and the opposite x -- which is
     # (N/2 - i), not (i + N/2). Getting it the obvious way round put his
     # right ear on his cheek, pointing forwards, and it rendered as a slab
     # stuck to the middle of his face.
-    # ⚠️ AN EAR BELONGS OVER THE JAW HINGE, WHICH IS BARELY PAST THE MIDDLE
-    # OF THE SKULL. Put on the columns a quarter of the way round, it sat
-    # 47 mm behind centre -- most of the way to the back of his head -- and
-    # in profile it read as a growth on the occiput rather than an ear.
-    for side, cols in (("l", (0, 1)), ("r", (N // 2 - 2, N // 2 - 1))):
+    #
+    # ⚠️ AN EAR BELONGS OVER THE JAW HINGE, which is barely past the middle
+    # of the skull. A quarter of the way round put it 47 mm behind centre --
+    # most of the way to the back of his head.
+    NH = head_mod.NH
+    bm.edges.ensure_lookup_table()
+    for side, c0 in (("l", 1), ("r", NH // 2 - 3)):
         bm.edges.ensure_lookup_table()
         log.append("ear_%s  rim %2d  cuff %2d  -> %2d faces"
-                   % ((side,) + face_mod.ear(bm, rings, NAMES.index("nose_base"),
-                                             cols, N, side)))
+                   % ((side,) + face_mod.ear(bm, hrings, head_mod.at("nose_base"),
+                                             (c0, c0 + 1, c0 + 2), NH, side)))
 
     # The eyes go in the sockets the "eye" ring already hollowed out -- taken
     # from the ring's own vertices, so a socket cannot move without the eye
     # in it moving too.
-    eye_ri = NAMES.index("eye")
-    for f in (F_EYE_L, F_EYE_R):
-        v = rings[eye_ri][int(round(f * N)) % N]
-        face_mod.eyeball(bm, v.co.copy(), TORSO[eye_ri][4])
+    eye_ri = head_mod.at("eye")
+    for f in (head_mod.F_EYE_L, head_mod.F_EYE_R):
+        v = hrings[eye_ri][int(round(f * NH)) % NH]
+        face_mod.eyeball(bm, v.co.copy(), head_mod.HEAD[eye_ri][4])
     bm.verts.ensure_lookup_table()
     bm.edges.ensure_lookup_table()
 
