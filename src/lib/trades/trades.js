@@ -45,7 +45,7 @@ function mapTrade(trade, lines) {
             buyRatePercent: toNumber(l.buy_rate_percent),
             notes: l.notes || null,
             squareItemId: l.square_item_id || null,
-            squareVariationId: l.square_variation_id || null,
+            squareVariationId: l.resolved_variation_id || l.square_variation_id || null,
             setName: l.set_name || null,
             cardNumber: l.card_number || null,
             condition: l.condition || null,
@@ -167,6 +167,108 @@ async function loadTrade(client, id) {
     return mapTrade(tradeRes.rows[0], linesRes.rows);
 }
 
+// ── WHERE A LINE'S SQUARE VARIATION ID COMES FROM ─────────────────────────────────────────────────
+// Only 223 of 2,003 IN lines ever recorded carry a square_variation_id of their own. The app sends
+// one when it creates a trade, but at that moment the card has usually not been pushed to Square yet
+// -- the intake writes the Square item AFTERWARDS -- so the column is null for ~89% of history.
+// Anything built on that column alone (reprinting a shelf tag, say) works for one trade in nine and
+// looks broken for the rest. That is exactly how it was reported: "I dont see any print buttons".
+//
+// The id is not lost, it is elsewhere: trade intake writes wolfden_item_cost with the variation id,
+// the item name and the capture time. Resolving on READ rather than in the client means every reader
+// gets it and no app release is needed.
+//
+// ⚠️ A WRONG MATCH PRINTS A WRONG PRICE ON A SHELF TAG, so the match is pinned on the COLLECTOR
+// NUMBER, not the name. Names collide across completely different cards: a line named "Pikachu"
+// (27/111) prefix-matched the cost row for "Pikachu 94/123", and one "Pikachu" line was a RC7/RC25
+// worth $33 tagged from a $4 common. Eleven lines in history were matched to the wrong card that
+// way. The number is in both -- trade_line.card_number and the intake-written item name -- so when
+// any candidate carries the line's number, only those candidates are eligible.
+//
+// ⚠️ DUPLICATES ARE THE NORMAL CASE AND MUST NOT BE REFUSED. Intake creates a SEPARATE Square item
+// per copy, so four Lapras 131/128 in one trade are four cost rows with four variation ids. The
+// first version of this demanded exactly ONE candidate and therefore matched none of them: trade
+// #18fea911 printed 42 of 65 tags and reported the other 23 as "no Square item yet" when every one
+// of them was in Square. Copies are instead PAIRED one-to-one -- the nth line of a name takes the
+// nth candidate -- which also stops three copies all printing the same variation's barcode.
+//
+// ⚠️ CONDITION IS A TIE-BREAKER, NOT A GATE, AND THAT IS ON EVIDENCE. Requiring it looked obviously
+// right and silently dropped real matches: trade #d7f1b37e records an Eevee 114/103 as LP while the
+// Square item intake created for it is named "... Illustration Rare NM". The condition written into
+// Square item names is not reliable, so insisting on it throws away the only candidate there is.
+// Preferring it when several exist still keeps NM and LP copies of the same card apart.
+//
+// Lines with no collector number anywhere (sheet-imported history) keep the old strict rule: the
+// candidate set must match the copy count exactly, so a singleton still needs a unique candidate.
+async function resolveTradeLines(tradeIds) {
+    return db.query(
+        `WITH tl AS (
+             SELECT l.*, t.traded_at,
+                    CASE l.condition
+                        WHEN 'NEAR_MINT' THEN 'NM' WHEN 'LIGHTLY_PLAYED' THEN 'LP'
+                        WHEN 'MODERATELY_PLAYED' THEN 'MP' WHEN 'HEAVILY_PLAYED' THEN 'HP'
+                        WHEN 'DAMAGED' THEN 'DMG' ELSE l.condition END AS cond_abbr,
+                    lower(l.item_name) AS name_key,
+                    COALESCE(l.condition, '') AS cond_key,
+                    COALESCE(NULLIF(trim(l.card_number), ''), '') AS num_key
+             FROM trade_line l
+             JOIN trade t ON t.id = l.trade_id
+             WHERE l.trade_id = ANY($1)
+         ),
+         copies AS (
+             SELECT tl.*,
+                    ROW_NUMBER() OVER (PARTITION BY trade_id, name_key, cond_key, num_key
+                                       ORDER BY sort_order, id) AS copy_no,
+                    COUNT(*) OVER (PARTITION BY trade_id, name_key, cond_key, num_key) AS copy_count
+             FROM tl
+             WHERE tl.direction = 'IN' AND tl.square_variation_id IS NULL
+         ),
+         grp AS (
+             SELECT DISTINCT trade_id, traded_at, item_name, cond_abbr,
+                    name_key, cond_key, num_key, copy_count
+             FROM copies
+         ),
+         cand AS (
+             SELECT g.trade_id, g.name_key, g.cond_key, g.num_key,
+                    c.variation_id, d.gap,
+                    (c.item_name ILIKE '%' || g.cond_abbr) AS cond_hit,
+                    (g.num_key <> '' AND c.item_name ILIKE '%' || g.num_key || '%') AS num_hit
+             FROM grp g
+             JOIN wolfden_item_cost c
+               ON c.item_name ILIKE g.item_name || '%'
+              AND c.captured_at BETWEEN g.traded_at - INTERVAL '1 day'
+                                    AND g.traded_at + INTERVAL '1 day'
+             CROSS JOIN LATERAL (
+                 SELECT ABS(EXTRACT(EPOCH FROM (c.captured_at - g.traded_at))) AS gap
+             ) d
+         ),
+         tiered AS (
+             SELECT cand.*,
+                    BOOL_OR(num_hit) OVER (PARTITION BY trade_id, name_key, cond_key, num_key)
+                        AS has_num_tier
+             FROM cand
+         ),
+         picked AS (
+             SELECT trade_id, name_key, cond_key, num_key, variation_id, has_num_tier,
+                    COUNT(*) OVER (PARTITION BY trade_id, name_key, cond_key, num_key) AS cand_count,
+                    ROW_NUMBER() OVER (PARTITION BY trade_id, name_key, cond_key, num_key
+                                       ORDER BY cond_hit DESC, gap ASC, variation_id ASC) AS pick_no
+             FROM tiered
+             WHERE (NOT has_num_tier) OR num_hit
+         )
+         SELECT l.*, COALESCE(l.square_variation_id, p.variation_id) AS resolved_variation_id
+         FROM tl l
+         LEFT JOIN copies c ON c.id = l.id
+         LEFT JOIN picked p
+           ON p.trade_id = c.trade_id AND p.name_key = c.name_key
+          AND p.cond_key = c.cond_key AND p.num_key = c.num_key
+          AND p.pick_no = c.copy_no
+          AND (p.has_num_tier OR p.cand_count = c.copy_count)
+         ORDER BY l.sort_order ASC`,
+        [tradeIds]
+    );
+}
+
 // Trade history, newest first, each with its lines. One round trip + an in-memory group by trade id.
 export async function listTrades({ limit = 200, offset = 0 } = {}) {
     const cappedLimit = Math.min(Number(limit) || 200, 1000);
@@ -180,65 +282,7 @@ export async function listTrades({ limit = 200, offset = 0 } = {}) {
     }
 
     const ids = trades.map((t) => t.id);
-    // ── WHY square_variation_id IS RESOLVED HERE AND NOT JUST READ ────────────────────────────────
-    // Only 223 of 2,003 IN lines ever recorded carry a square_variation_id. The app sends one when it
-    // creates a trade, but at that moment the card has usually not been pushed to Square yet — the
-    // intake writes the Square item AFTERWARDS — so the column is null for ~89% of history. Anything
-    // built on that column alone (reprinting a shelf tag, say) works for one trade in nine and looks
-    // broken for the rest. That is exactly how it was reported: "I dont see any print buttons".
-    //
-    // The id is not lost, it is elsewhere: trade intake writes wolfden_item_cost with the variation
-    // id, the item name and the capture time. Resolving on READ rather than in the client means every
-    // reader gets it and no app release is needed.
-    //
-    // ⚠️ A WRONG MATCH PRINTS A WRONG PRICE ON A SHELF TAG, so this refuses rather than guesses: the
-    // cost row's name must START WITH the line's item name (intake appends rarity and condition), the
-    // capture must be within a day of the trade (the same card is traded in again months later under
-    // a different variation), and the answer must be UNAMBIGUOUS.
-    //
-    // ⚠️ CONDITION IS A TIE-BREAKER, NOT A GATE, AND THAT IS ON EVIDENCE. Requiring it looked
-    // obviously right and silently dropped real matches: trade #d7f1b37e records an Eevee 114/103 as
-    // LP while the Square item intake created for it is named "... Illustration Rare NM". The
-    // condition written into Square item names is not reliable, so insisting on it throws away the
-    // only candidate there is. Preferring it when several exist still keeps NM and LP copies of the
-    // same card apart, which is the case that would actually mis-price a tag.
-    const lines = await db.query(
-        `SELECT l.*,
-                COALESCE(l.square_variation_id, (
-                    SELECT c.variation_id
-                    FROM wolfden_item_cost c
-                    WHERE c.item_name ILIKE l.item_name || '%'
-                      AND c.captured_at BETWEEN t.traded_at - INTERVAL '1 day'
-                                            AND t.traded_at + INTERVAL '1 day'
-                      AND (
-                        (SELECT COUNT(*) FROM wolfden_item_cost a
-                          WHERE a.item_name ILIKE l.item_name || '%'
-                            AND a.captured_at BETWEEN t.traded_at - INTERVAL '1 day'
-                                                  AND t.traded_at + INTERVAL '1 day') = 1
-                        OR
-                        (SELECT COUNT(*) FROM wolfden_item_cost b
-                          WHERE b.item_name ILIKE l.item_name || '%'
-                            AND b.item_name ILIKE '%' || cond.abbr
-                            AND b.captured_at BETWEEN t.traded_at - INTERVAL '1 day'
-                                                  AND t.traded_at + INTERVAL '1 day') = 1
-                      )
-                    ORDER BY (c.item_name ILIKE '%' || cond.abbr) DESC,
-                             ABS(EXTRACT(EPOCH FROM (c.captured_at - t.traded_at))) ASC
-                    LIMIT 1
-                )) AS square_variation_id
-         FROM trade_line l
-         JOIN trade t ON t.id = l.trade_id
-         -- ⚠️ trade_line stores the condition ENUM ("NEAR_MINT"); intake writes the ABBREVIATION
-         -- into the item name ("... Illustration Rare NM"). Comparing them directly matches nothing,
-         -- which is why the first attempt at this resolved zero rows.
-         LEFT JOIN LATERAL (SELECT CASE l.condition
-                 WHEN 'NEAR_MINT' THEN 'NM' WHEN 'LIGHTLY_PLAYED' THEN 'LP'
-                 WHEN 'MODERATELY_PLAYED' THEN 'MP' WHEN 'HEAVILY_PLAYED' THEN 'HP'
-                 WHEN 'DAMAGED' THEN 'DMG' ELSE l.condition END AS abbr) cond ON TRUE
-         WHERE l.trade_id = ANY($1)
-         ORDER BY l.sort_order ASC`,
-        [ids]
-    );
+    const lines = await resolveTradeLines(ids);
 
     const linesByTrade = new Map();
     for (const line of lines) {
