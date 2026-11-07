@@ -234,6 +234,20 @@ PALM_HALF_W = 0.047     # half the knuckle-line width
 PALM_HALF_T = 0.0165    # half the palm's thickness
 
 
+def hand_plan(side):
+    """The hand's own joint centres, with no mesh built.
+
+    ⚠️ THE RIG MUST NOT RE-DERIVE THESE. rig.py reads arm_path() for the
+    elbow for exactly this reason -- a joint computed twice is a joint that
+    can disagree with itself, and a skeleton sitting outside its flesh is
+    the defect that cost this pipeline its worst day. One function, two
+    readers.
+    """
+    p = arm_path(side)
+    return hand_mod.plan(side, p[ARM_AT["wrist"]][0], p[ARM_AT["end"]][0],
+                         PALM_LEN, PALM_HALF_W, PALM_HALF_T)
+
+
 def hand_centre(side="l"):
     """Where to point a camera to photograph the hand."""
     p = arm_path(side)

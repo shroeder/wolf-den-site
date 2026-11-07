@@ -47,6 +47,12 @@ def joints(body):
         J["elbow_%s" % s] = _p(a, body.ARM_AT["elbow"])
         J["wrist_%s" % s] = _p(a, body.ARM_AT["wrist"])
         J["hand_end_%s" % s] = _p(a, body.ARM_AT["end"])
+        # ⚠️ THE HAND BONE STOPS AT THE KNUCKLES NOW. It used to run to the
+        # fingertips, which was right when the fingertips were a mitt -- and
+        # is wrong the moment the fingers have bones of their own, because a
+        # bone that lies along the whole of every finger competes with all
+        # fifteen of them for every vertex on them. A hand is the palm.
+        J["knuckle_%s" % s] = body.hand_plan(s)["knuckle"]
         J["hip_%s" % s] = Vector((m * 0.082, 0.0, 0.915))
         J["knee_%s" % s] = _p(l, body.LEG_AT["knee"])
         J["ankle_%s" % s] = _p(l, body.LEG_AT["ankle"])
@@ -78,12 +84,62 @@ def chain(J):
                J["shoulder_%s" % s].lerp(J["elbow_%s" % s], 0.42), "clav_%s" % s, True),
               ("upperarm_%s" % s, J["shoulder_%s" % s], J["elbow_%s" % s], "clav_%s" % s, True),
               ("lowerarm_%s" % s, J["elbow_%s" % s], J["wrist_%s" % s], "upperarm_%s" % s, True),
-              ("hand_%s" % s, J["wrist_%s" % s], J["hand_end_%s" % s], "lowerarm_%s" % s, True),
+              ("hand_%s" % s, J["wrist_%s" % s], J["knuckle_%s" % s], "lowerarm_%s" % s, True),
               ("thigh_%s" % s, J["hip_%s" % s], J["knee_%s" % s], "pelvis", True),
               ("calf_%s" % s, J["knee_%s" % s], J["ankle_%s" % s], "thigh_%s" % s, True),
               ("foot_%s" % s, J["ankle_%s" % s], J["ball_%s" % s], "calf_%s" % s, True),
               ("toe_%s" % s, J["ball_%s" % s], J["toe_%s" % s], "foot_%s" % s, True)]
     return B
+
+
+# ── THE DIGITS ────────────────────────────────────────────────────────────
+# Three bones each, from the four points hand.plan() laid the tube on, so a
+# knuckle joint is inside its own knuckle by construction.
+#
+# ⚠️ THE BIND POSE ALREADY HAS A CURL IN IT and that is what makes these
+# bones usable. A finger modelled dead straight gives three co-linear bones,
+# and a co-linear chain has no plane to bend in: whichever axis is asked to
+# curl it, the answer is arbitrary and the first pose folds a finger
+# sideways. The 0.34 radians of relaxed curl in the mesh is also the hinge.
+def digit_bones(body, J):
+    B = []
+    for s in ("l", "r"):
+        for name, segs in body.hand_plan(s)["digits"].items():
+            parent = "hand_%s" % s
+            for k in range(len(segs) - 1):
+                bn = "%s_%02d_%s" % (name, k + 1, s)
+                B.append((bn, segs[k][0], segs[k + 1][0], parent, True))
+                parent = bn
+    return B
+
+
+def digit_roll(body):
+    """Every digit bone rolled so ONE local axis is the flexion hinge.
+
+    ⚠️ A BONE WHOSE ROLL IS WHATEVER BLENDER CHOSE HAS NO CLEAN AXIS TO BEND
+    ABOUT, AND THE SHORTFALL IS SILENT. Left to the default, a finger's local
+    X and Z sat about 45 degrees off the plane the finger actually folds in,
+    so asking the middle joint for 78 degrees of flex produced 32 -- the rest
+    went into twisting the finger sideways. Nothing errors; the fist simply
+    does not close, and the obvious diagnosis (ask for more degrees) makes
+    the twist worse.
+    #
+    Aligning roll to the direction the digit FLEXES puts local Z on that
+    direction, which leaves local X as the hinge exactly, for every digit on
+    both hands. A solver downstream rotates one axis and gets pure flexion.
+
+    ⚠️ AND THE THUMB'S DIRECTION IS NOT THE FINGERS'. Rolling all five to the
+    palm's normal left the thumb at 0.72 of square -- a quarter of every
+    degree asked of it going into twist -- because a thumb flexes ACROSS the
+    palm, not toward it. hand.plan() owns that distinction; this reads it.
+    """
+    roll = {}
+    for s in ("l", "r"):
+        pl = body.hand_plan(s)
+        for name, segs in pl["digits"].items():
+            for k in range(len(segs) - 1):
+                roll["%s_%02d_%s" % (name, k + 1, s)] = pl["folds"][name]
+    return roll
 
 
 def build(ob, body):
@@ -94,10 +150,13 @@ def build(ob, body):
     bpy.context.view_layer.objects.active = rig
     bpy.ops.object.mode_set(mode="EDIT")
     made = {}
-    for name, head, tail, parent, deform in chain(J):
+    roll = digit_roll(body)
+    for name, head, tail, parent, deform in chain(J) + digit_bones(body, J):
         eb = ad.edit_bones.new(name)
         eb.head, eb.tail = head, tail
         eb.use_deform = deform
+        if name in roll:
+            eb.align_roll(roll[name])
         if parent:
             eb.parent = made[parent]
         eb.use_connect = False
@@ -149,7 +208,8 @@ def _seg_dist(p, a, b, over=3.0):
 
 def skin(ob, rig, body, power=4.0, keep=4, smooth_rounds=3):
     J = joints(body)
-    segs = [(n, h, t) for n, h, t, _p, deform in chain(J) if deform]
+    segs = [(n, h, t) for n, h, t, _p, deform in chain(J) + digit_bones(body, J)
+            if deform]
     names = [n for n, _h, _t in segs]
     for n in names:
         if n not in ob.vertex_groups:

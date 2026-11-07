@@ -59,6 +59,10 @@ FINGERS = [
 SEGMENTS = [(0.00, 1.00), (0.40, 0.98), (0.72, 0.93), (1.00, 0.82)]
 CURL = 0.34     # radians the fingertip falls toward the palm
 
+# The thumb is shorter, thicker and its base segment is the fattest thing on
+# the hand -- it is a whole metacarpal buried in the thenar.
+T_SEG = [(0.00, 1.55), (0.44, 1.02), (0.78, 0.95), (1.00, 0.82)]
+
 
 def _frame(wrist, tip, side):
     """Hand axes from the arm's own path: d along the fingers, u across the
@@ -96,16 +100,75 @@ class Hand:
         self.ring_verts = []    # the proximal 18, for the wrist bridge
 
 
-def build(bm, side, wrist, tip, palm_len, half_w, half_t):
-    """Palm, four fingers and a thumb. Returns (Hand, cuff edge list)."""
+# ── THE PLAN ──────────────────────────────────────────────────────────────
+# ⚠️ THE RIG READS THIS, NOT THE MESH, AND NOT A COPY OF THESE NUMBERS.
+# The worst day of the last pipeline was a bind mismatch: a skeleton fitted
+# to a mesh it did not come from, every joint a little way outside the flesh
+# it drove, and every numeric check green. rig.py cannot make that mistake
+# about an elbow because body.py hands it arm_path(); it must not be able to
+# make it about a knuckle either. So every joint centre a finger has is
+# computed HERE, once, by a function with no bmesh in it, and build() below
+# lays geometry on the same points the bones are built from.
+def plan(side, wrist, tip, palm_len, half_w, half_t):
     d, u, v = _frame(wrist, tip, side)
     origin = Vector(wrist)
     finger_len = (Vector(tip) - origin).length - palm_len
-    cols = _columns()
-    out = Hand()
 
     def P(along, across, through):
         return origin + d * along + u * across + v * through
+
+    pl = {"d": d, "u": u, "v": v, "P": P, "origin": origin,
+          "finger_len": finger_len, "palm_len": palm_len,
+          "knuckle": P(palm_len, 0.0, 0.0), "digits": {}}
+
+    for name, c, w, lf, back in FINGERS:
+        base = P(palm_len - finger_len * back, half_w * c, 0.0)
+        length = finger_len * lf
+        segs = []
+        for t, rm in SEGMENTS:
+            # The curl is a rotation of the finger's own axis about the
+            # across-the-palm vector, growing with distance from the knuckle.
+            ang = CURL * t * t
+            dir_ = (d * math.cos(ang) + v * -math.sin(ang)).normalized()
+            segs.append((base + dir_ * (length * t),
+                         (half_w * w * 0.90 * rm, half_w * w * 0.76 * rm)))
+        pl["digits"][name] = segs
+
+    t_dir = (u * 0.38 + v * -0.52 + d * 0.76).normalized()
+    t_base = P(palm_len * 0.34, half_w * 0.76, -half_t * 0.30)
+    t_len = finger_len * 0.98
+    segs = []
+    for t, rm in T_SEG:
+        ang = 0.34 * t * t
+        dd = (t_dir * math.cos(ang) + v * -math.sin(ang)).normalized()
+        ru = half_w * 0.250 * rm
+        segs.append((t_base + dd * (t_len * t), (ru, ru * 0.86)))
+    pl["digits"]["thumb"] = segs
+
+    # ⚠️ WHICH WAY A DIGIT FLEXES IS ANATOMY, SO IT LIVES HERE WITH THE REST
+    # OF THE ANATOMY. The rig rolls each bone so this direction is one of its
+    # own local axes, and the poser turns about that axis; if the two ever
+    # disagree the flex leaks into twist and the hand quietly fails to close.
+    # One definition, both readers.
+    #
+    # A finger flexes toward the palm's FACE. A thumb flexes ACROSS the palm
+    # toward the little finger -- that is the whole of what opposable means.
+    # Handing the thumb the fingers' plane curls it backwards over the hand.
+    pl["folds"] = {n: -v for n in pl["digits"]}
+    pl["folds"]["thumb"] = (-u * 0.80 - v * 0.60).normalized()
+    return pl
+
+
+DIGITS = [f[0] for f in FINGERS] + ["thumb"]
+
+
+def build(bm, side, wrist, tip, palm_len, half_w, half_t):
+    """Palm, four fingers and a thumb, laid on plan()'s points."""
+    pl = plan(side, wrist, tip, palm_len, half_w, half_t)
+    d, u, v, P = pl["d"], pl["u"], pl["v"], pl["P"]
+    finger_len = pl["finger_len"]
+    cols = _columns()
+    out = Hand()
 
     # ── THE PALM ──────────────────────────────────────────────────────────
     # Four stations wrist -> knuckles. The thumb needs its socket on the
@@ -219,16 +282,7 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
 
     # ── THE FINGERS ───────────────────────────────────────────────────────
     for fi, (name, c, w, lf, back) in enumerate(FINGERS):
-        base = P(palm_len - finger_len * back, half_w * c, 0.0)
-        length = finger_len * lf
-        segs = []
-        for t, rm in SEGMENTS:
-            # The curl is a rotation of the finger's own axis about the
-            # across-the-palm vector, growing with distance from the knuckle.
-            ang = CURL * t * t
-            dir_ = (d * math.cos(ang) + v * -math.sin(ang)).normalized()
-            segs.append((base + dir_ * (length * t),
-                         (half_w * w * 0.90 * rm, half_w * w * 0.76 * rm)))
+        segs = pl["digits"][name]
         tube_rings = []
         for k, (ctr, (ru, rv)) in enumerate(segs):
             nxt = segs[min(k + 1, len(segs) - 1)][0]
@@ -251,8 +305,7 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
                 if len(e.link_faces) == 1 and set(e.verts) <= set(tube_rings[0])]
         bmesh.ops.bridge_loops(bm, edges=holes[fi] + cuff)
         bm.edges.ensure_lookup_table()
-        out.joints["%s_%d" % (name, 0)] = segs[0][0]
-        for k in range(1, len(segs)):
+        for k in range(len(segs)):
             out.joints["%s_%d" % (name, k)] = segs[k][0]
 
     # ── THE THUMB ─────────────────────────────────────────────────────────
@@ -280,36 +333,18 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
 
     # Out along the palm's edge, forward across it, and a little toward the
     # fingers: an opposable thumb points at the fingertips, not away.
-    # ⚠️ A THUMB THAT POINTS SIDEWAYS IS A SPUR. The first one took 0.62 of
-    # its direction laterally and read as a cockerel's toe sticking off the
-    # wrist. What makes a thumb a thumb is that it points at the FINGERTIPS
-    # and lies across the palm -- the lateral part is the smallest of the
-    # three, and it is the only digit that can touch the others.
-    t_dir = (u * 0.38 + v * -0.52 + d * 0.76).normalized()
-    # ⚠️ SEAT THE CUFF INSIDE THE SURFACE, exactly as the arm is seated
-    # inside the torso. A base ring sitting PROUD of the palm leaves the
-    # bridge to span the gap, and a short span across a step is a cliff --
-    # the same triangular flap that cost two passes at the shoulder.
-    t_base = P(palm_len * 0.34, half_w * 0.76, -half_t * 0.30)
-    t_len = finger_len * 0.98
-    T_SEG = [(0.00, 1.55), (0.44, 1.02), (0.78, 0.95), (1.00, 0.82)]
+    t_pts = [c for c, _r in pl["digits"]["thumb"]]
     t_rings = []
-    t_pts = []
-    for t, rm in T_SEG:
-        ang = 0.34 * t * t
-        dd = (t_dir * math.cos(ang) + v * -math.sin(ang)).normalized()
-        t_pts.append(t_base + dd * (t_len * t))
     for k, ctr in enumerate(t_pts):
-        rm = T_SEG[k][1]
+        ru, rv = pl["digits"]["thumb"][k][1]
         nxt, prv = t_pts[min(k + 1, len(t_pts) - 1)], t_pts[max(k - 1, 0)]
         ax = (nxt - prv)
-        ax = ax.normalized() if ax.length > 1e-6 else t_dir
+        ax = ax.normalized() if ax.length > 1e-6 else d
         uu = (d - ax * d.dot(ax)).normalized()
         vv = ax.cross(uu).normalized()
-        ru = half_w * 0.250 * rm
         t_rings.append([bm.verts.new(
             ctr + uu * (ru * math.cos(2 * math.pi * i / NF))
-            + vv * (ru * 0.86 * math.sin(2 * math.pi * i / NF)))
+            + vv * (rv * math.sin(2 * math.pi * i / NF)))
             for i in range(NF)])
     for a, b in zip(t_rings, t_rings[1:]):
         for i in range(NF):
