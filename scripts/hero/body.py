@@ -216,6 +216,55 @@ TORSO = [
     ("neck", 1.562, 0.062, 0.066, -0.004,
      [(0.700, 0.070, 0.07), (0.800, 0.070, 0.07)]),              # sternomastoid
 ]
+# ── THE BACK ──────────────────────────────────────────────────────────────
+# ⚠️ THE BACK HAD ALMOST NOTHING ON IT AND I HAD NEVER RENDERED IT STRAIGHT
+# ON. The spinal furrow and the erectors existed on four rings out of
+# seventeen -- the ribs and the chest -- so everything below the ribcage was
+# a smooth slab from the armpits to the waist. Three-quarter views had been
+# hiding it the same way they hid the shoulders being half a head too wide.
+#
+# The furrow was also 45-50 thousandths wide, which on a 32-vert ring is
+# three vertices of gentle cosine and reads as nothing. It is 28 now, which
+# is the same arithmetic as the lips and the ab bands: a crease is sharp
+# because the thing either side of it is CLOSE, not because it is deep.
+#
+# (ring -> erector height, furrow depth). Strongest through the thoracic
+# spine and easing off at the lumbar and the neck, which is where a back
+# actually carries its mass.
+F_ERECTOR_L, F_ERECTOR_R = 0.293, 0.207
+
+# ⚠️ NOT CALLED "BACK". That name is already the index of the ring vertex
+# at the rear (FRONT, BACK = 24, 8) and hip_sockets() indexes a vertex list
+# with it -- shadowing it swapped an integer for a dict and the figure
+# failed to build at the crotch, which is nowhere near where the edit was.
+BACK_FORMS = {
+    "hips": (0.06, -0.05), "ab_low": (0.07, -0.06),
+    "ab1_top": (0.07, -0.06), "ab_gap1": (0.07, -0.06),
+    "ab2_bot": (0.08, -0.07), "waist": (0.09, -0.08),
+    "ab2_top": (0.09, -0.08), "ab_gap2": (0.09, -0.08),
+    "ab3_bot": (0.09, -0.08), "ribs": (0.10, -0.08),
+    "pec_under": (0.10, -0.08), "pec_rim": (0.10, -0.08),
+    "chest": (0.11, -0.08), "chest_up": (0.11, -0.07),
+    "clavicle": (0.09, -0.06), "shoulder": (0.07, -0.05),
+    "trapezius": (0.18, -0.07),
+}
+
+
+def _apply_back():
+    """Replace whatever erector and furrow bumps a ring already had."""
+    names = [t[0] for t in TORSO]
+    for name, (ere, fur) in BACK_FORMS.items():
+        i = names.index(name)
+        n, z, rx, ry, cy, b = TORSO[i]
+        keep = [t for t in (b or ()) if not (0.185 <= t[0] <= 0.315)]
+        TORSO[i] = (n, z, rx, ry, cy,
+                    keep + [(F_ERECTOR_L, 0.052, ere),
+                            (F_ERECTOR_R, 0.052, ere),
+                            (T_BACK, 0.028, fur)])
+
+
+_apply_back()
+
 SHOULDER_BAND = [t[0] for t in TORSO].index("clavicle")
 
 # THE HAND'S SIZE, as one set of numbers. A hand is about the height of a

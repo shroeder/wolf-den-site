@@ -143,6 +143,26 @@ def measure(ob):
                                        ("ab_gap2", "ab2_top", "ab3_bot"))]
     depths = [d for d in depths if d is not None]
     m["ab_groove"] = min(depths) if depths else None
+    # ⚠️ HOW DEEP THE SPINAL FURROW RUNS, measured the same way the ab bands
+    # are: on the evaluated surface, at the column where the erector
+    # actually is rather than anywhere convenient. The midline is the
+    # groove and the erector either side of it is the datum -- the same
+    # relationship as a tendinous band, read from the back.
+    def back_near(z, xw, tol=0.005):
+        ys = [v.y for v in V
+              if abs(v.z - z) < tol and abs(abs(v.x) - xw) < 0.007]
+        return max(ys) if ys else None
+
+    def furrow_at(name):
+        ti = [t[0] for t in body_mod.TORSO].index(name)
+        _n, z, rx, _ry, _cy, _b = body_mod.TORSO[ti]
+        xw = abs(rx * math.cos(2 * math.pi * body_mod.F_ERECTOR_L))
+        mid, ere = back_near(z, 0.0), back_near(z, xw)
+        return None if None in (mid, ere) else ere - mid
+
+    f = [furrow_at(n) for n in ("ribs", "waist", "chest")]
+    f = [x for x in f if x is not None]
+    m["furrow"] = min(f) if f else None
     m["shoulder_w"] = ring_width("shoulder")
     m["waist_w"] = ring_width("waist")
     m["hip_w"] = ring_width("hips")
@@ -368,6 +388,8 @@ def checks(m):
         # tolerance answers is not "what counts as fine" but "how small a
         # change must I still be able to see". A visible band on a lean
         # figure is 4 to 8 mm, so the window is 4.4 to 7.6.
+        Check("spinal furrow", (m["furrow"] or 0) * 1000, 5.0, 2.0, "mm",
+              "the midline against the erector beside it"),
         Check("ab definition", (m["ab_groove"] or 0) * 1000, 6.0, 1.6, "mm",
               "how far a tendinous band sits behind the muscle beside it"),
         Check("shoulder : waist", m["shoulder_w"] / m["waist_w"], 1.55, 0.20, ""),
@@ -509,7 +531,21 @@ BREAKS = [
      lambda: _spread_nose()),
     ("abdomen smoothed to a belly", "ab definition",
      lambda: _smooth_abs()),
+    ("back smoothed to a slab", "spinal furrow",
+     lambda: _smooth_back()),
 ]
+
+
+def _smooth_back():
+    """Flatten the erectors -- the furrow is read against THEM, so taking
+    the groove out on its own would barely move it, which is the mistake
+    the abdomen's break made first."""
+    names = [t[0] for t in body_mod.TORSO]
+    for i, (n, z, rx, ry, cy, b) in enumerate(body_mod.TORSO):
+        if not b:
+            continue
+        keep = [(c, w, a) for c, w, a in b if not (0.185 <= c <= 0.315)]
+        body_mod.TORSO[i] = (n, z, rx, ry, cy, keep or None)
 
 
 def _smooth_abs():
