@@ -200,6 +200,36 @@ def eye_socket(bm, rings, ri0, cols, n, w=0.0166, h=0.0082, depth=0.0135):
     return centre, outward
 
 
+def nostril(bm, rings, ri0, col, n, depth=0.0115, back=0.55):
+    """One nostril, as a small pocket cut into the UNDERSIDE of the nose.
+
+    ⚠️ A NOSTRIL IS NOT ON A RING, IT IS ON THE STEP BETWEEN TWO. The nose
+    is made by the subnasal ring sitting back and the nose-base ring pushing
+    forward; the faces spanning that 2.5 mm gap are the nose's underside,
+    facing down. A ring can only vary a radius, so it can put a dimple on
+    the FRONT of the nose -- which is a scar, not a nostril. The opening has
+    to be cut from the step itself.
+
+    ⚠️ AND IT IS ONE VERTEX WIDE AT THIS RESOLUTION. A nostril is about 8 mm
+    across and a head ring at 64 verts gives 7.8 mm a vertex, so there is
+    exactly one quad to work with per side. That is enough for a hole with a
+    pocket behind it and not enough for the wing shape around it -- which is
+    why the wings stay as ring bumps and only the opening is cut.
+    """
+    rim, centre = patch(bm, rings, ri0, 1, (col,), n)
+    # Up and back, into the head: the nasal passage does not point forward.
+    into = Vector((0.0, back, 1.0)).normalized()
+    ring_ = []
+    base = centre + into * depth
+    for i in range(4):
+        t = 2.0 * math.pi * i / 4
+        ring_.append(bm.verts.new(base
+                                  + Vector((1.0, 0.0, 0.0)) * (0.0022 * math.cos(t))
+                                  + Vector((0.0, -1.0, 0.0)).cross(into).normalized()
+                                  * 0.0 + Vector((0.0, 0.2, 0.0)) * (0.0022 * math.sin(t))))
+    return _bridge(bm, rim, [ring_], 4)
+
+
 def mouth(bm, rings, ri0, cols, n, w=0.0250, h=0.0136, stand=0.0062, slit=0.0014):
     """The lips -- a vermillion border standing proud, closing on a slit.
 

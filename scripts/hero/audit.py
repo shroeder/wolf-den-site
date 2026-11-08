@@ -191,6 +191,31 @@ def measure(ob):
         return min(ys) if ys else None
     _c, _u = front_at(hz["chin"]), front_at(hz["chin"] - 0.012)
     m["chin_undercut"] = (_u - _c) if (_c is not None and _u is not None) else None
+    # ⚠️ NOSE WIDTH, MEASURED ON THE FRONT-MOST SLICE AT THE NOSTRIL LINE.
+    # The wings of a nose line up with the inner corners of the eyes -- it
+    # is about one eye wide, a fifth of head breadth. Taking the whole z
+    # band would measure the cheeks, so only the verts within 8 mm of the
+    # front-most point at that height count, which is the nose and nothing
+    # else.
+    # ⚠️ AND IT IS NOT "NEAR THE FRONT-MOST POINT". That measured 19 mm
+    # against a real 39, because the front-most point is the nose's TIP and
+    # its wings sit 20 mm further back -- the filter excluded the very thing
+    # being measured. What defines the width is where the nose stops
+    # standing proud of the CHEEK beside it, so the cheek is the datum.
+    # ⚠️ AND "PROUD BY 3 mm" IS A THRESHOLD I WOULD BE PICKING TO GET AN
+    # ANSWER. It counted the gentle tail of the bump and read 68 mm; a
+    # larger threshold would have read whatever I chose. Full width at half
+    # maximum is the honest version -- how wide the nose is where it stands
+    # out HALF as far as it does at its most -- and it has no free knob.
+    nb = [v for v in V if abs(v.z - hz["nose_base"]) < 0.004]
+    side = [v.y for v in nb if abs(v.x) > 0.040]
+    if nb and side:
+        datum = min(side)
+        peak = datum - min(v.y for v in nb)
+        m["nose_w"] = 2.0 * max(abs(v.x) for v in nb
+                                if (datum - v.y) >= 0.5 * peak)
+    else:
+        m["nose_w"] = None
     m["mouth_w"] = 2.0 * face_mod.mouth.__defaults__[0]
     m["eye_w"] = 2.0 * face_mod.eye_socket.__defaults__[0]
     ri = head_mod.at("eye")
@@ -288,6 +313,8 @@ def checks(m):
         Check("ear projection", (m["ear_proj"] or 0) * 1000, 17.0, 5.0, "mm"),
         # The corners of a mouth sit under the pupils -- about a third of
         # the head's breadth. The first lattice came out 58 mm, a letterbox.
+        Check("nose width", (m["nose_w"] or 0) / hw, 0.235, 0.040, "head-widths",
+              "the wings line up with the inner eye corners"),
         Check("mouth width", m["mouth_w"] / hw, 0.335, 0.045, "head-widths"),
         Check("chin undercut", (m["chin_undercut"] or 0) * 1000, 30.0, 10.0, "mm",
               "how far the face falls back 12 mm under the chin"),
@@ -368,7 +395,22 @@ BREAKS = [
      lambda: _wide_mouth()),
     ("chin merged back into the neck", "chin undercut",
      lambda: _jowl()),
+    ("nose wings spread wide", "nose width",
+     lambda: _spread_nose()),
 ]
+
+
+def _spread_nose():
+    """⚠️ THE FIRST VERSION OF THIS BREAK WIDENED THE WINGS AND THE CHECK
+    DID NOT MOVE -- correctly. Full width at half maximum is set by the
+    bump that makes the PEAK, and the wings never reach half of it, so
+    spreading them changes a number the metric does not read. A break has
+    to attack what the check actually measures or it proves nothing."""
+    i = head_mod.at("nose_base")
+    n, z, rx, ry, cy, b = head_mod.HEAD[i]
+    head_mod.HEAD[i] = (n, z, rx, ry, cy,
+                        [(c, w * 1.85, a) if abs(c - head_mod.T_FRONT) < 1e-6
+                         else (c, w, a) for c, w, a in b])
 
 
 def _jowl():

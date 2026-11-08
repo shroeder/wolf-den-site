@@ -498,6 +498,16 @@ def build():
                    % ((side,) + face_mod.ear(bm, hrings, head_mod.at("nose_base"),
                                              (c0, c0 + 1, c0 + 2), NH, side)))
 
+    # ── THE NOSTRILS ──────────────────────────────────────────────────────
+    # One quad each on the nose's underside, either side of the midline
+    # column. The mirror of a ring index is (N/2 - i), so 46 and 49 are a
+    # pair about the face's midline at 48.
+    bm.edges.ensure_lookup_table()
+    for col in (int(round(0.75 * NH)) - 2, int(round(0.75 * NH)) + 1):
+        bm.edges.ensure_lookup_table()
+        face_mod.nostril(bm, hrings, head_mod.at("subnasal"), col, NH)
+    log.append("nostrils on the subnasal step")
+
     # ── THE MOUTH ─────────────────────────────────────────────────────────
     # Eight columns centred on the face's midline, four ring gaps tall: a
     # 24-edge rim for a 24-vert lattice.
