@@ -166,6 +166,14 @@ def measure(ob):
 
     m["patella"] = proud(L, "knee", body_mod.LEG_AT, 0.0)
     m["olecranon"] = proud(A, "elbow", body_mod.ARM_AT, 0.5)
+    # The ankle bone, measured the same way: a local widening between the
+    # shin above it and the foot below.
+    # ⚠️ MEASURED ON ITS OWN RING, NOT THE ONE THAT BRIDGES. Pointed at
+    # "ankle" this compared the joint against leg_path's HEEL entry -- which
+    # has not been meshed since the foot became its own cage; the leg stops
+    # at the ankle and everything past it is reference for the rig. It
+    # reported -0.8 mm against a bone that was there.
+    m["malleolus"] = proud(L, "malleolus", body_mod.LEG_AT, 0.25)
     # ⚠️ EAR PROJECTION, MEASURED THE SAME WAY HEAD BREADTH IS. The ear is
     # the only thing sticking out at its own height, so the skull's width
     # on the FRONT half of that z band is an ear-free reference and the
@@ -289,6 +297,8 @@ def checks(m):
         # which is exactly what the first attempt did.
         Check("patella proud", m["patella"] * 1000, 9.0, 3.5, "mm"),
         Check("olecranon proud", m["olecranon"] * 1000, 9.0, 3.5, "mm"),
+        Check("malleolus proud", m["malleolus"] * 1000, 5.0, 2.5, "mm",
+              "the ankle bone; without it the leg tapers into a sock"),
         Check("hand length", m["hand_len"] / h, 0.108, 0.013, "of height"),
         Check("foot length", (m["foot_len"] or 0) / h, 0.152, 0.018, "of height"),
         # ⚠️ 0.52 WAS A NUMBER I INVENTED AND IT FAILED THE MODEL FOR BEING
@@ -389,6 +399,8 @@ BREAKS = [
      lambda: _flatten_joint("leg_path", "knee", 0)),
     ("elbow flattened back to a tube", "olecranon proud",
      lambda: _flatten_joint("arm_path", "elbow", 1)),
+    ("ankle flattened back to a tube", "malleolus proud",
+     lambda: _flatten_joint("leg_path", "malleolus", 0)),
     ("ears flattened against the skull", "ear projection",
      lambda: _flat_ears()),
     ("mouth widened to a letterbox", "mouth width",

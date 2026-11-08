@@ -256,8 +256,9 @@ ARM_RINGS = ["cuff", "deltoid", "delt_low", "bicep", "bicep_low",
              "elbow_up", "elbow", "elbow_low", "flexor", "forearm_mid",
              "forearm_low", "wrist", "palm", "knuckles", "end"]
 LEG_RINGS = ["hip", "thigh", "thigh_low", "quad_low", "knee_up", "knee",
-             "knee_low", "calf_up", "calf", "calf_low", "shin", "shin_low",
-             "ankle", "heel", "ball", "toe"]
+             "knee_low", "calf_up", "calf", "calf_low", "shin", "achilles",
+             "shin_low", "ankle_up", "malleolus", "ankle",
+             "heel", "ball", "toe"]
 ARM_AT = {n: i for i, n in enumerate(ARM_RINGS)}
 LEG_AT = {n: i for i, n in enumerate(LEG_RINGS)}
 
@@ -368,9 +369,47 @@ def leg_path(side):
         (at(0.410), 0.062, [(L_POST, 0.26, 0.26)]),
         (at(0.350), 0.066, [(L_POST, 0.28, 0.34), (L_LAT, 0.16, 0.06)]),
         (at(0.290), 0.058, [(L_POST, 0.26, 0.24)]),
-        (at(0.220), 0.048, [(L_POST, 0.24, 0.12)]),
-        (at(0.150), 0.040, None),
-        (at(0.090), (0.038, 0.044), None),                        # ankle (10)
+        # ── THE ACHILLES AND THE ANKLE ────────────────────────────────────
+        # The tendon is the one thing on this figure a ring is perfectly
+        # suited to: a narrow ridge running straight down the back of the
+        # leg. It is made by the bump getting NARROWER as it descends while
+        # the leg itself thins -- a wide posterior bump is a calf, the same
+        # bump at half the width is a tendon.
+        #
+        # The malleoli are the opposite shape: a short pair either side at
+        # one height, which makes the ankle a local WIDENING between the
+        # thin shin and the foot. Without them the leg tapers smoothly into
+        # the instep and the join reads as a sock.
+        # ⚠️ AND THE WHOLE LOWER LEG WAS TOO THICK FOR AN ANKLE. At 77 mm
+        # just above the joint it was already wider than a real bimalleolar
+        # 70, so there was no room for the bones to stand proud of anything
+        # -- and widening them to make them read is what pushed the ring
+        # past the instep in the first place.
+        (at(0.220), 0.048, [(L_POST, 0.20, 0.10)]),
+        (at(0.185), 0.0425, [(L_POST, 0.13, 0.13)]),              # Achilles
+        (at(0.150), 0.0360, [(L_POST, 0.11, 0.15)]),
+        (at(0.125), 0.0325, [(L_POST, 0.10, 0.16)]),
+        # The malleoli get a ring of their OWN, above the one that bridges
+        # into the instep -- so the ankle bone can be the widest thing on
+        # the leg without the join having to swallow it.
+        (at(0.104), 0.0315, [(L_POST, 0.10, 0.10),
+                             (L_LAT, 0.115, 0.16), (L_MED, 0.115, 0.13)]),
+        # ⚠️ AND THIS RING MUST FIT INSIDE THE INSTEP IT BRIDGES INTO. At
+        # 76 mm against a 66 mm instep the leg overhung the foot and the
+        # bridge gathered it in like a cuff -- a band of fine vertical
+        # pleats right at the join, which has been there since the foot was
+        # built and which the malleoli made worse before anything caught
+        # it. Exactly the cuff-bigger-than-its-socket mistake the nose and
+        # the ear each made, a third time.
+        # ⚠️ SEAT THE CUFF INSIDE THE SURFACE -- the lesson the shoulder, the
+        # thumb and the nose each taught, and the one I did not apply here.
+        # At z 0.090 against an instep at 0.076 the bridge had 14 mm of
+        # height to span a 50 mm-long rim with a 65 mm ring, so every quad
+        # in it was long and skewed and the band pleated. Width and shape
+        # both mattered and neither was the main thing: a bridge shears in
+        # proportion to how far it has to travel. Dropped INSIDE the foot,
+        # there is almost no span left to shear across.
+        (at(0.072), (0.0310, 0.040), [(L_POST, 0.10, 0.10)]),
         (at(0.042, 0.098, -0.040), (0.040, 0.044), None),
         (at(0.028, 0.098, -0.120), (0.042, 0.028), None),         # ball (12)
         (at(0.020, 0.098, -0.175), (0.032, 0.020), None),         # toe (13)

@@ -57,8 +57,8 @@ CURL = 0.22     # radians the tip drops toward the floor
 # silhouette from the side is a wedge.
 STATIONS = [
     (0.068, 0.026, 0.014, 0.052),       # back of the heel
-    (0.040, 0.033, 0.000, 0.076),       # the heel, on the floor
-    (-0.010, 0.037, 0.013, 0.073),      # the arch, lifted
+    (0.040, 0.0350, 0.000, 0.076),      # the heel, on the floor
+    (-0.010, 0.0390, 0.013, 0.073),     # the arch, lifted
     (-0.090, 0.047, 0.000, 0.047),      # the ball, on the floor
     (-0.150, 0.047, 0.000, 0.029),      # the toe box
 ]
@@ -120,10 +120,21 @@ def build(bm, side, ankle):
     # is as close to a seamless join as a mismatched pair can be.
     ANKLE_COLS = (0, COLS - 1)
 
+    # ⚠️ THE INSTEP IS DOMED, AND A FLAT ONE PLEATS THE ANKLE. The top row
+    # used to sit at one height across every column -- a flat plate -- and
+    # the leg's last ring is an ellipse. Bridging a circle onto a straight
+    # line fans the quads, and the fan rendered as a band of fine vertical
+    # creases right at the join, like a gathered cuff. Narrowing the leg
+    # helped and did not fix it, because width was only half of it: the
+    # SHAPES have to agree as well. An instep is domed anyway.
     def grid(k):
         y, hw, z0, z1 = STATIONS[k]
-        return [[P(y, hw * c, z0 + (z1 - z0) * (r / float(ROWS - 1)))
-                 for r in range(ROWS)] for c in cols]
+
+        def height(c, r):
+            dome = 1.0 - 0.34 * (c / 0.95) ** 2
+            return z0 + (z1 - z0) * (r / float(ROWS - 1)) * (dome if r else 1.0)
+
+        return [[P(y, hw * c, height(c, r)) for r in range(ROWS)] for c in cols]
 
     cyc = [(c, 0) for c in range(COLS)]
     cyc += [(COLS - 1, r) for r in (1, 2)]
